@@ -1,0 +1,320 @@
+{
+  "context": "1. Give TableScrollHint a scroller target (ref or id) so it can measure. 2. Replace the breakpoint gate with measured overflow (scrollWidth > clientWidth) via ResizeObserver plus a post-hydration check. 3. Fold PlatformIndex's span and QueryHeatmap's chip into the component. 4. Add ResizeObserver and scrollWidth/clientWidth geometry shims to src/test/setup.ts, or existing component tests regress for a mechanical reason. 5. Add ONE rule to the existing scan_explorer_tokens.py family: no page-local scroll-hint markup. That is a ban on a known literal pattern, which is all a source scan can honestly enforce.",
+  "description": ".bb-scroll-affordance is display:none above 48rem (index.css), so every TableScrollHint consumer only shows a cue on mobile. At 1440px the cross-benchmark matrix cuts mid-value and the Query results table ends at 'POW...' with nothing indicating more columns exist.\n\nTwo pages worked around this independently rather than fixing the component: PlatformIndex.tsx:686 hard-codes a plain <span>, and QueryHeatmap.tsx:586-597 ships its own `hidden md:block` chip labelled 'Query columns ->' which reads as a control rather than a scroll cue.\n\nBlocking constraint: TableScrollHint is currently a SIBLING of the overflow-x-auto div (MetaLeaderboard.tsx:259-265), so it has no scroller to measure. The component needs a ref/target API before overflow-driven behaviour is possible.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add the ResizeObserver change without the JSDOM shim",
+        "instead": "land the shim in src/test/setup.ts in the same PR",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "why": "JSDOM reports 0 for layout metrics, so every consumer test would evaluate to false"
+      },
+      {
+        "dont": "claim a general anti-fork architectural guard",
+        "instead": "add one literal-pattern rule to the existing scanner",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "why": "a source scan cannot recognise semantic reimplementation; all three reviewers rejected the broader claim"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "flip the breakpoint or add a second breakpoint",
+        "instead": "measure actual overflow on the scroll container",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "why": "column counts vary per benchmark; no breakpoint predicts overflow"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T20:15:38Z",
+      "completed_pr": 1826,
+      "created_at": "2026-08-22T14:48:43Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "QueryHeatmap's cloned sticky header (QueryHeatmap.tsx:598) keeps working",
+        "item_id": "rx-ux-02-scroll-affordance-defork"
+      },
+      {
+        "behavior": "Sticky first columns already exist: MetaLeaderboard.tsx:273-280 (Platform) and QueryHeatmap.tsx:669-732 (four frozen columns). Do not re-add them.",
+        "item_id": "rx-ux-02-scroll-affordance-defork"
+      },
+      {
+        "behavior": "The 48rem mobile behaviour must remain correct; this widens when the cue appears, it does not remove mobile support",
+        "item_id": "rx-ux-02-scroll-affordance-defork"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/chartMath.ts"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/scan_explorer_tokens.py"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/DataTable.tsx"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryDiffTable.tsx"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TableScrollHint.tsx"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/TableScrollHint.test.tsx"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/test/setup.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "last_result": "pass",
+        "last_run": "2026-08-23T14:44:45Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium",
+        "description": "Chromium browser suite passes against a fresh build",
+        "expected": "fixtures verified, build succeeds, chromium suite green",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "last_result": "pass",
+        "last_run": "2026-08-23T14:50:47Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'scroll affordance'",
+        "description": "Desktop cue appears exactly when a container overflows",
+        "expected": "cue visible for matrix and query table at 1440px; absent for a narrow non-overflowing table",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "last_result": "pass",
+        "last_run": "2026-08-23T14:50:59Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/scan_explorer_tokens.py --help >/dev/null && make lint-explorer-tokens",
+        "description": "No page-local scroll-hint markup remains",
+        "expected": "scan passes with the new rule enabled",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "last_result": "pass",
+        "last_run": "2026-08-23T14:51:01Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "needs_wid": "w3",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "TableScrollHint requires scrollerRef; npm run typecheck passed 2026-08-22",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "notes": null,
+        "started_at": "2026-08-22T19:44:41Z",
+        "started_branch": "fix/rx-ux-02-scroll-affordance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-02-scroll-affordance",
+        "status": "done",
+        "summary": "Add scroller-target API to TableScrollHint",
+        "wid": "w1"
+      },
+      {
+        "evidence": "src/test/setup.ts supplies ResizeObserver and layout geometry; focused TableScrollHint suite 6 passed",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "notes": null,
+        "started_at": "2026-08-22T19:44:43Z",
+        "started_branch": "fix/rx-ux-02-scroll-affordance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-02-scroll-affordance",
+        "status": "done",
+        "summary": "Add ResizeObserver + geometry shims to src/test/setup.ts",
+        "wid": "w2"
+      },
+      {
+        "evidence": "useLayoutEffect measures scrollWidth > clientWidth and observes container/table; 873 Explorer tests passed",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "notes": null,
+        "started_at": "2026-08-22T19:46:24Z",
+        "started_branch": "fix/rx-ux-02-scroll-affordance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-02-scroll-affordance",
+        "status": "done",
+        "summary": "Replace breakpoint gate with measured overflow",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PlatformIndex local span replaced by TableScrollHint bound to results scroller; full Explorer suite passed",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "notes": null,
+        "started_at": "2026-08-22T19:49:24Z",
+        "started_branch": "fix/rx-ux-02-scroll-affordance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-02-scroll-affordance",
+        "status": "done",
+        "summary": "Fold PlatformIndex span into the component",
+        "wid": "w4"
+      },
+      {
+        "evidence": "QueryHeatmap local chip replaced by TableScrollHint while sticky header remains; full Explorer suite passed",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "notes": null,
+        "started_at": "2026-08-22T19:49:26Z",
+        "started_branch": "fix/rx-ux-02-scroll-affordance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-02-scroll-affordance",
+        "status": "done",
+        "summary": "Fold QueryHeatmap chip into the component",
+        "wid": "w5"
+      },
+      {
+        "evidence": "make lint-explorer-tokens passed with page-local scroll-hint literal rule",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "notes": null,
+        "started_at": "2026-08-22T19:49:48Z",
+        "started_branch": "fix/rx-ux-02-scroll-affordance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-02-scroll-affordance",
+        "status": "done",
+        "summary": "Add no-page-local-scroll-hint rule to scan_explorer_tokens family",
+        "wid": "w6"
+      },
+      {
+        "evidence": "Fresh fixture/build plus npx playwright test --project=chromium --grep 'scroll affordance': 1 passed",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "notes": null,
+        "started_at": "2026-08-22T19:49:51Z",
+        "started_branch": "fix/rx-ux-02-scroll-affordance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-02-scroll-affordance",
+        "status": "done",
+        "summary": "e2e: overflowing table shows a cue at 1440px; non-overflowing does not",
+        "wid": "w7"
+      },
+      {
+        "evidence": "QueryDiffTable, Home, and ResultDetail consumers now pass explicit scroller refs; typecheck and 873 tests passed",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "notes": null,
+        "started_at": "2026-08-22T19:46:27Z",
+        "started_branch": "fix/rx-ux-02-scroll-affordance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-02-scroll-affordance",
+        "status": "done",
+        "summary": "Wire remaining TableScrollHint consumers to the scroller-target API",
+        "wid": "w8"
+      },
+      {
+        "evidence": "TableScrollHint tests cover overflowing and equal-width targets; 7 focused tests and 873 full tests passed",
+        "item_id": "rx-ux-02-scroll-affordance-defork",
+        "notes": null,
+        "started_at": "2026-08-22T19:49:29Z",
+        "started_branch": "fix/rx-ux-02-scroll-affordance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-02-scroll-affordance",
+        "status": "done",
+        "summary": "Update TableScrollHint component coverage for measured overflow",
+        "wid": "w9"
+      }
+    ]
+  }
+}

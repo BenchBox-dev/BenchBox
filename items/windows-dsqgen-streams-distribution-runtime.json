@@ -1,0 +1,63 @@
+{
+  "context": "Reproduce the exact staged command and compare Windows distribution/template staging with a green platform; fix packaging/staging if corrupt, otherwise encode an evidence-backed platform capability without hiding real deterministic regressions.",
+  "description": "Run 30434746317 reaches the bundled Windows dsqgen.exe but two fixed-seed STREAMS tests fail with 'Distribution over-run/under-run ... active_cities ... index=-1, length=1000'. The same corpus passes on macOS/Linux, so presence-only binary gating is insufficient.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-29T13:05:18Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "green platforms still validate official ordering and fixed-seed determinism against the real bundled binary",
+        "item_id": "windows-dsqgen-streams-distribution-runtime"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-dsqgen-streams-distribution-runtime",
+        "kind": "only_modify",
+        "path_glob": "benchbox/_binaries/**"
+      },
+      {
+        "item_id": "windows-dsqgen-streams-distribution-runtime",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/**"
+      },
+      {
+        "item_id": "windows-dsqgen-streams-distribution-runtime",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/streams.py"
+      },
+      {
+        "item_id": "windows-dsqgen-streams-distribution-runtime",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/tpcds/test_dsqgen_streams.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/tpcds/test_dsqgen_streams.py -q",
+        "description": "Real-binary dsqgen stream tests pass or skip only on a proven unsupported binary",
+        "expected": "exit 0",
+        "item_id": "windows-dsqgen-streams-distribution-runtime",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-dsqgen-streams-distribution-runtime",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Root-cause the Windows dsqgen distribution overrun and add a durable platform-specific guard",
+        "wid": "w1"
+      }
+    ]
+  }
+}

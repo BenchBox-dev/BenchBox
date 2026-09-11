@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #87 of implement-dataframe-benchmarks.\nDeferred: TPC-DI DataFrame implementation (38 operations)\nReason deferred: ETL pipeline with mutation-heavy operations (SCD Type 2, incremental loads). Requires fundamentally different DataFrame patterns (stateful transforms, write operations) beyond read-only query model. Needs separate TODO with dedicated architecture.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:33:33Z",
+      "worktree": "dataframe-benchmarks"
+    }
+  }
+}

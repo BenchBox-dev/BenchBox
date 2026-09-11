@@ -1,0 +1,125 @@
+{
+  "description": "The empty-string-vs-null contract is centralized at the Parquet conversion layer\n(data_loader.py, strings_can_be_null = null_marker is not None), and\nprefer_parquet=True is the default - so the DEFAULT path is consistent. But on the\nprefer_parquet=False CSV-direct path the contract is NOT uniform:\n  - pandas_df.py:378 and polars_df.py:283 restore '' for empty fields when\n    null_marker is None (dask/modin/cudf do likewise).\n  - pyspark_df.py:461 returns directly after CSV load (Spark emits null for empty\n    fields by default).\n  - datafusion_df.py:511 documents null_marker as \"Unused\".\nSo for a null-marker-less benchmark (e.g. ClickBench), a prefer_parquet=False run\non PySpark or DataFusion emits NULL where the SQL reference (and the other\nadapters) emit \"\" - the exact Q6/Q17/Q18 divergence class the polars adapter's own\ncomment warns about. It is non-default, hence latent, but it is a real\ncross-surface fidelity gap and will silently mis-compare if that path is exercised.\n\nPrefer a SINGLE shared post-coercion (so future adapters inherit it) over\nper-adapter patches.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hardcode empty->'' regardless of null_marker",
+        "instead": "(not specified)",
+        "item_id": "dataframe-csv-empty-string-null-uniform",
+        "why": "that would break null_marker='' benchmarks."
+      },
+      {
+        "dont": "patch only PySpark and DataFusion in isolation",
+        "instead": "(not specified)",
+        "item_id": "dataframe-csv-empty-string-null-uniform",
+        "why": "centralize so future adapters inherit the contract."
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-06-28T00:00:00Z",
+      "created_at": "2026-06-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "JoinOrder and other null_marker='' benchmarks still map empty -> NULL; the fix is null_marker-driven, not a blanket empty->'' for all.",
+        "item_id": "dataframe-csv-empty-string-null-uniform"
+      },
+      {
+        "behavior": "The production DataFrame run path is reused, not forked; the change is additive.",
+        "item_id": "dataframe-csv-empty-string-null-uniform"
+      },
+      {
+        "behavior": "prefer_parquet=True (default) load behavior is byte-unchanged for every adapter.",
+        "item_id": "dataframe-csv-empty-string-null-uniform"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': '_project/analysis/joinorder-synthetic-cross-surface-divergences.md and clickbench-cross-surface-divergences.md', 'note': 'Documents the null_marker root cause (resolve_csv_dialect) and the Q17/Q24/Q6/Q17/Q18 empty-string class.'}",
+        "decision": "reuse",
+        "item_id": "dataframe-csv-empty-string-null-uniform",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/core/dataframe/data_loader.py:423', 'note': 'The Parquet-layer contract (strings_can_be_null = null_marker is not None) - the canonical semantics the CSV-direct path must match.'}",
+        "decision": "reuse",
+        "item_id": "dataframe-csv-empty-string-null-uniform",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/platforms/dataframe/benchmark_mixin.py / shared_loading.py', 'note': 'Where a shared post-load coercion should live so PySpark/DataFusion inherit it without per-adapter code.'}",
+        "decision": "reuse",
+        "item_id": "dataframe-csv-empty-string-null-uniform",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/platforms/dataframe/pandas_df.py:378, polars_df.py:283', 'note': \"The correct empty-string restoration (fillna('')/missing_utf8_is_empty_string) to generalize into one shared step.\"}",
+        "decision": "reuse",
+        "item_id": "dataframe-csv-empty-string-null-uniform",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dataframe-csv-empty-string-null-uniform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/"
+      },
+      {
+        "item_id": "dataframe-csv-empty-string-null-uniform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/"
+      },
+      {
+        "item_id": "dataframe-csv-empty-string-null-uniform",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_dataframe_csv_empty_string_null_semantics.py -q",
+        "description": "CSV-direct empty-string parity on the two lagging adapters",
+        "expected": "0 empty-string-vs-null divergences; JoinOrder still nulls empties",
+        "item_id": "dataframe-csv-empty-string-null-uniform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dataframe-csv-empty-string-null-uniform",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dataframe-csv-empty-string-null-uniform",
+        "notes": "Add one shared post-load step (in benchmark_mixin/shared_loading) that, when\nnull_marker is None, restores '' for empty string-typed fields - applied\nuniformly across adapters, including PySpark (emptyValue/post-read restore) and\nDataFusion. Resolve null_marker via resolve_csv_dialect (the benchmark\ninstance's marker), not a file-extension heuristic. Keep prefer_parquet=True\nbehavior byte-unchanged.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a shared null_marker-aware empty-string post-coercion on the CSV-direct path",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dataframe-csv-empty-string-null-uniform",
+        "notes": "Extend coverage to run a null-marker-less benchmark (ClickBench) cross-surface\non PySpark and DataFusion with prefer_parquet=False and assert zero\nempty-string-vs-null divergences. Add a focused regression naming the Q6/Q17/\nQ18 pattern. Confirm JoinOrder (null_marker=\"\") still nulls empties (must not\nregress the opposite direction).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Gate the fix: ClickBench cross-surface on PySpark/DataFusion with prefer_parquet=False",
+        "wid": "w2"
+      }
+    ]
+  }
+}

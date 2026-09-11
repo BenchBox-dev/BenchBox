@@ -1,0 +1,98 @@
+{
+  "context": "Pin the corpus EOL in .gitattributes rather than normalising inside the test. Normalising in the test restores green while leaving a Windows contributor able to publish CRLF bundles under different result IDs, which is the actual defect.",
+  "description": "results-data/**/*.json has no text/eol gitattribute - git check-attr text eol reports 'unspecified' for both - so a Windows checkout with core.autocrlf=true rewrites every multi-line bundle to CRLF. Nightly Validation on 2026-08-05 fails tests/unit/scripts/test_corpus_privacy_invariant.py::test_rederived_corpus_publishes_byte_identically_to_what_is_stored on windows-latest 3.10 and 3.12 with '207 bundle(s) are not stored at the publication fixed point', while the same test is green on ubuntu. The test is behaving correctly. Bundle bytes are identity-bearing because result_id embeds a sha8 computed over them, so publishing from a Windows checkout would derive different result IDs than publishing from Linux for byte-identical logical content. That is a content-addressing hazard, not merely a test artifact. PR CI never sees it because PR CI runs ubuntu only; Windows appears solely in the nightly matrix, which is why this landed green and went red the next morning.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-05T14:57:53Z",
+      "completed_pr": 1568,
+      "created_at": "2026-08-05T14:48:32Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The byte-identity assertion stays a raw byte comparison - it must not be relaxed to a newline-insensitive compare",
+        "item_id": "corpus-bundles-have-no-eol-attribute-20260805"
+      },
+      {
+        "behavior": "result_id derivation is unchanged",
+        "item_id": "corpus-bundles-have-no-eol-attribute-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "corpus-bundles-have-no-eol-attribute-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "corpus-bundles-have-no-eol-attribute-20260805",
+        "kind": "only_modify",
+        "path_glob": ".gitattributes"
+      },
+      {
+        "item_id": "corpus-bundles-have-no-eol-attribute-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "corpus-bundles-have-no-eol-attribute-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git check-attr eol -- results-data/bundles/amplab_sf001_datafusion_df_20260502_223331_f228f907.json | grep -q 'eol: lf'",
+        "description": "Corpus files are explicitly LF on every platform",
+        "expected": "Fails on the unfixed tree where the attribute reports 'unspecified'",
+        "item_id": "corpus-bundles-have-no-eol-attribute-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-05T14:56:37Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_corpus_privacy_invariant.py -q",
+        "description": "Byte-identity gate still passes here",
+        "expected": "No regression on Linux or macOS",
+        "item_id": "corpus-bundles-have-no-eol-attribute-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-05T14:56:45Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "corpus-bundles-have-no-eol-attribute-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Reproduced, and it downgrades this item's own premise.\n\nARITHMETIC MATCH: 207 primary bundles under results-data/bundles (excluding companion suffixes and the migration manifest), and all 207 are multi-line. Windows nightly reported exactly 207 failures. Every scanned bundle fails there, so the cause is systematic, not per-bundle content.\n\nDIVERGENCE REPRODUCED: for a bundle whose stored LF bytes re-derive byte-identically, converting the bytes to CRLF (what core.autocrlf=true produces on checkout) makes canonical_json_bytes(anonymize(json.loads(...))) differ from the on-disk bytes: 7522 re-derived vs 7777 stored, a 255-byte gap equal to the file's 255 lines. json.loads parses both forms to the SAME dict, so this is purely an encoding-level divergence with identical logical content.\n\nCORRECTION - the result_id hazard I asserted when filing this item is WRONG. I claimed publishing from a Windows checkout would derive different result IDs for identical content. It would not. pipeline.py:655 sets public_raw = canonical_json_bytes(public_bundle) and passes that to result_id_from_bundle as raw, so the sha8 in the result_id is computed over the canonical re-encoding, which emits LF regardless of how the source file was checked out. Line 722 then writes those same canonical bytes. Publication output and result IDs are therefore EOL-stable, and I did not check that before asserting it.\n\nWHAT THE DEFECT ACTUALLY IS, at correspondingly lower severity: results-data/** has no text/eol attribute, so working-tree bytes are platform-dependent. That (a) makes the byte-identity test pass on Linux and macOS and fail on Windows, which is why it landed green and went red in the next nightly, and (b) lets a contributor on a translating checkout commit CRLF bundles that then permanently disagree with what publication emits - breaking the in-tree invariant and producing spurious whole-file diffs. It is a repo-hygiene and test-portability defect, not a content-addressing one.\n\nSCOPE CHECK for the fix: results-data holds 400 .json, 4 .md, 1 .py, plus .gitkeep/.gitignore - all text, no binary - so pinning the whole tree to LF is safe.",
+        "item_id": "corpus-bundles-have-no-eol-attribute-20260805",
+        "notes": null,
+        "started_at": "2026-08-05T14:51:58Z",
+        "started_branch": "fix/corpus-eol-attribute-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Reproduce the CRLF divergence under a simulated autocrlf checkout and confirm it accounts for all 207 bundles",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Fixed in 1302c1accc.\n\nCHANGE: .gitattributes gains '/results-data/** text eol=lf'. Chose the attribute over a newline-insensitive comparison in the test, because the weaker test goes green while still allowing a contributor on a translating checkout to commit CRLF bundles that permanently disagree with what publication emits.\n\nNO CORPUS PERTURBATION: 'git add --renormalize results-data' stages 0 files, so every tracked corpus blob is already LF in the index. The attribute is purely forward-looking - no bundle bytes change, so no digest and no result_id moves. This was the main risk of the fix and it is disproved rather than assumed.\n\nTEST: tests/unit/scripts/test_corpus_privacy_invariant.py::test_corpus_checks_out_with_lf_on_every_platform asserts every git-tracked path under results-data resolves eol=lf, via 'git ls-files -z' piped into 'git check-attr -z --stdin eol'. It sits next to the byte-identity gate it protects.\n\nFALSIFIED: with .gitattributes reverted to develop's version and the test unchanged, the test FAILS - 'git check-attr eol' reports 'unspecified' and the assertion lists all tracked corpus files. Restoring the attribute makes it pass. So the test observes the fix, not merely the presence of new code.\n\nSUITES: tests/unit/scripts/test_corpus_privacy_invariant.py 9 passed; tests/unit/scripts 1493 passed. check-scope: OK, 2 changed files, both inside only_modify.\n\nRESIDUAL: this pins the attribute, which is the mechanism git actually uses. It does not prove the outcome on a real Windows checkout - I have no Windows host - so the nightly matrix remains the confirming observation. Expect tomorrow's Nightly Validation to drop test_rederived_corpus_publishes_byte_identically_to_what_is_stored from its windows-latest failures while the 7 pre-existing MCP durable-jobs failures persist.",
+        "item_id": "corpus-bundles-have-no-eol-attribute-20260805",
+        "notes": null,
+        "started_at": "2026-08-05T14:53:31Z",
+        "started_branch": "fix/corpus-eol-attribute-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Pin corpus EOL in .gitattributes and cover it with a test",
+        "wid": "w1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "context": "Extend the existing Windows antipattern scanner or add a focused AST check, cover aliases and keyword/positional calls, wire it into CI lint, and preserve legitimate binary open calls.",
+  "description": "PR #1352 fixed the two known bare product read_text calls, and current benchbox has none. The original follow-up also required a durable ratchet so locale-default reads cannot return. Add an AST-based check over benchbox for Path.read_text/open text reads without explicit encoding, with an allowlist only for intentionally binary or locale-sensitive boundaries.",
+  "legacy": {
+    "item_meta": {
+      "category": "Cross-platform correctness",
+      "completed_at": "2026-08-01T17:55:51Z",
+      "completed_pr": 1427,
+      "created_at": "2026-08-01T14:22:33Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Binary file opens and explicit non-UTF8 encodings remain allowed.",
+        "item_id": "product-text-read-encoding-ratchet-v3"
+      },
+      {
+        "behavior": "The explicit UTF-8 product fixes from PR #1352 remain unchanged.",
+        "item_id": "product-text-read-encoding-ratchet-v3"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "product-text-read-encoding-ratchet-v3",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "product-text-read-encoding-ratchet-v3",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "product-text-read-encoding-ratchet-v3",
+        "kind": "only_modify",
+        "path_glob": "scripts/check_windows_antipatterns.py"
+      },
+      {
+        "item_id": "product-text-read-encoding-ratchet-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_check_windows_antipatterns.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_check_windows_antipatterns.py -q",
+        "description": "Windows antipattern tests",
+        "expected": "fails to reject a bare product read_text call on the unfixed tree; exit 0 after ratchet",
+        "item_id": "product-text-read-encoding-ratchet-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n 'read_text\\(\\)' benchbox/",
+        "description": "No bare product read_text remains",
+        "expected": "exit 0",
+        "item_id": "product-text-read-encoding-ratchet-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "product-text-read-encoding-ratchet-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "product-text-read-encoding-ratchet-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventoried 30 benchbox read_text calls: all explicitly encode today; call forms include keyword/positional encodings, explicit errors policy, and unrelated binary reads. Existing scanner covered only executable bits and Unix signals.",
+        "item_id": "product-text-read-encoding-ratchet-v3",
+        "notes": null,
+        "started_at": "2026-08-01T17:50:24Z",
+        "started_branch": "fix/product-text-encoding-ratchet",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Inventory product text-read call forms and existing scanner coverage",
+        "wid": "w0"
+      },
+      {
+        "evidence": "WA003 AST rule rejects missing/None/ambiguous encoding and preserves positional, keyword, computed, non-UTF8, and binary reads; 30 focused tests pass.",
+        "item_id": "product-text-read-encoding-ratchet-v3",
+        "notes": null,
+        "started_at": "2026-08-01T17:50:30Z",
+        "started_branch": "fix/product-text-encoding-ratchet",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Add AST detection and positive/negative fixtures",
+        "wid": "w1"
+      },
+      {
+        "evidence": "windows-antipatterns-check runs from make lint, report-all ci-lint, and required code-lint guard; 17 parity/marker tests pass and product scan covers 977 files cleanly.",
+        "item_id": "product-text-read-encoding-ratchet-v3",
+        "notes": null,
+        "started_at": "2026-08-01T17:50:36Z",
+        "started_branch": "fix/product-text-encoding-ratchet",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Wire the ratchet into local and required CI lint",
+        "wid": "w2"
+      }
+    ]
+  }
+}

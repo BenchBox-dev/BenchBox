@@ -1,0 +1,112 @@
+{
+  "context": "Documentation, not code. The mechanism is correct; only its discoverability is missing.\n\nWrite the maintainer procedure into docs/operations/results-phase-2-runbook.md and cross-reference it from results-data/README.md:\n\n- Withdrawing from the public archive: open a deletion-only PR against published-results. Cite #1882 and #1940 as the worked examples.\n- Adding to the public archive: land on develop, then run `gh workflow run sync-results-data-to-published.yml` and merge the auto/results-mirror-* PR. Never add by hand.\n- Why: name the union overlay and the four-signal waiver explicitly, so the next reader does not have to reverse-engineer them from the workflow.\n- Ordering when a change both adds and deletes: mirror last, so the corpus floor is never violated on the public branch.\n\nDo not relax the four-signal waiver to make hand-opened additions work. It is confined to an unforgeable bot identity on purpose; widening it would let a fork PR launder a community bundle into a ranking-eligible maintainer-run stamp.",
+  "description": "GAP found 2026-08-28 by hitting it: PR #1940's first revision failed CI, and the reason was only discoverable by reading validate-submission.yml line by line.\n\nTwo constraints exist, both deliberate, neither written down anywhere a maintainer would look:\n\n1. DELETIONS never propagate. sync-results-data-to-published.yml applies a union overlay to results-data/bundles, precisely so an automated mirror can never delete public community content. A develop-side withdrawal therefore needs a separate hand-opened PR against published-results. PR #1882 (2026-08-24, 154 files) and PR #1940 both did this, but neither the runbook nor results-data/README.md says it is the procedure.\n\n2. ADDITIONS by hand are impossible. The manifest waiver in validate-submission.yml requires four signals: base published-results, head.repo.fork == false, PR author github-actions[bot], and head_ref matching auto/results-mirror-*. A maintainer PR fails three of them, is treated as a community submission, and every added bundle is rejected for a missing sidecar. So a bundle can only reach published-results through the sync mirror.\n\nThe combined rule -- hand-opened PRs against published-results must be DELETION-ONLY, additions go through the mirror -- is nowhere stated. It cost a failed CI run and a full workflow read to recover, and the next person will pay the same cost.\n\nRelated but distinct from validate-submission-empty-bundle-arg-scans-live-corpus, which is the actual bug that made the failure confusing. Even with that bug fixed, constraint 2 stands.",
+  "legacy": {
+    "item_meta": {
+      "category": "results",
+      "created_at": "2026-08-29T12:11:57Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The four-signal manifest waiver, including head.repo.fork == false as the unforgeable signal",
+        "item_id": "published-results-deletion-path-undocumented"
+      },
+      {
+        "behavior": "The union overlay in sync-results-data-to-published.yml: an automated mirror must never delete public content",
+        "item_id": "published-results-deletion-path-undocumented"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "published-results-deletion-path-undocumented",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/sync-results-data-to-published.yml"
+      },
+      {
+        "item_id": "published-results-deletion-path-undocumented",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "item_id": "published-results-deletion-path-undocumented",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-phase-2-runbook.md"
+      },
+      {
+        "item_id": "published-results-deletion-path-undocumented",
+        "kind": "only_modify",
+        "path_glob": "results-data/README.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -i 'deletion-only' docs/operations/results-phase-2-runbook.md",
+        "description": "Runbook states the deletion-only rule for hand-opened published-results PRs",
+        "expected": "present",
+        "item_id": "published-results-deletion-path-undocumented",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -i 'auto/results-mirror' docs/operations/results-phase-2-runbook.md",
+        "description": "Runbook states additions must go through the mirror",
+        "expected": "present",
+        "item_id": "published-results-deletion-path-undocumented",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "published-results-deletion-path-undocumented",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "published-results-deletion-path-undocumented",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "published-results-deletion-path-undocumented",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Write the deletion-only rule and the mirror-for-additions rule into the results phase 2 runbook",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "published-results-deletion-path-undocumented",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Name the union overlay and the four-signal waiver explicitly, citing #1882 and #1940",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "published-results-deletion-path-undocumented",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Cross-reference from results-data/README.md",
+        "wid": "w2"
+      }
+    ]
+  }
+}

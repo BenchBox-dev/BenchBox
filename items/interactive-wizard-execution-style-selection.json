@@ -1,0 +1,11 @@
+{
+  "description": "Add a new selection step to the interactive CLI wizard that appears BEFORE the\n\"Available Database Platforms\" table. This step should allow users to choose:\n\n1. Execution Mode: SQL vs DataFrame\n2. Platform Location: Local vs Remote/Cloud\n\nThis will filter the subsequent platform list to only show relevant platforms,\nimproving the user experience by reducing the number of choices.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2025-12-26T00:00:00Z",
+      "created_at": "2025-12-26T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

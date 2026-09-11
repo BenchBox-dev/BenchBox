@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: Medium\"\n- \"**Status**: Completed (commit 2a3c78b)\"\n- \"**Description**: Change the default TPC-DS SQL dialect from `ansi` (uses `SELECT TOP n`) to `netezza` (uses `LIMIT n`) for better modern SQL compatibility. This change affects all TPC-DS query generation and should be applied consistently across the codebase while maintaining support for all existing dialects.\"\n- \"**Context**:\"\n- \"**Requirements**:\"\n- \"**Detailed Implementation Tasks**:\"\n- \"**Technical Requirements**:\"\n- \"**Files Affected**:\"\n- \"**Success Criteria**:\"\n- \"**Impact**: Improves default SQL compatibility with modern databases, reduces SQL translation complexity for most platforms, maintains full backward compatibility for users who need specific dialects, aligns with industry standards for LIMIT clause usage\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "context": "For validate_session_cache_control:\n- Extract to a shared mixin or utility function accepting cache_control_query,\n  setting_key, disabled_value, and platform_name parameters\n- Both Redshift and Snowflake inherit/call the shared implementation\n\nFor _prompt_default_output_location:\n- Extract to benchbox/platforms/credentials/shared.py with parameters for\n  path_scheme, storage_label, permission_note, platform_name\n- BigQuery and Redshift credential modules call the shared function\n",
+  "description": "Two groups from the duplicate-check report identify shared logic across\ncloud platform adapters:\n\n- Group 21 (86 lines): `validate_session_cache_control` is duplicated between\n  redshift.py:1417 and snowflake.py:914. Identical algorithm (result dict,\n  try/except/finally, ConfigurationError, strict_validation branching) with\n  only SQL query string, setting key, and platform name differing.\n\n- Group 29 (69 lines): `_prompt_default_output_location` is duplicated between\n  credentials/bigquery.py:204 and credentials/redshift.py:247. Identical\n  interactive prompt flow with only cloud-specific strings differing (gs:// vs\n  s3://, storage_bucket vs s3_bucket, permission names).",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-22T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "_prompt_default_output_location interactive flow unchanged from user perspective",
+        "item_id": "dedup-cloud-platform-shared-utilities"
+      },
+      {
+        "behavior": "validate_session_cache_control returns identical result dict structure",
+        "item_id": "dedup-cloud-platform-shared-utilities"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v -k 'redshift or snowflake or bigquery'",
+        "description": "Platform adapter tests pass",
+        "expected": "all tests pass",
+        "item_id": "dedup-cloud-platform-shared-utilities",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dedup-cloud-platform-shared-utilities",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dedup-cloud-platform-shared-utilities",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dedup-cloud-platform-shared-utilities",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dedup-cloud-platform-shared-utilities",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dedup-cloud-platform-shared-utilities",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract validate_session_cache_control to shared cloud platform mixin",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-cloud-platform-shared-utilities",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor Redshift and Snowflake to use shared cache validation",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-cloud-platform-shared-utilities",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _prompt_default_output_location to credentials/shared.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-cloud-platform-shared-utilities",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor BigQuery and Redshift credentials to use shared prompt",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-cloud-platform-shared-utilities",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run platform tests to verify no regressions",
+        "wid": "w5"
+      }
+    ]
+  }
+}

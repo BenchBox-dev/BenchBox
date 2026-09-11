@@ -1,0 +1,228 @@
+{
+  "context": "Generate a deterministic migration plan from the canonical anonymizer, record before/after hashes and any result-ID mapping, validate every rewritten bundle and companion, regenerate inventory/read-model outputs, and land develop and published-results changes through their normal reviewed PR paths. Preserve benchmark measurements and provenance semantics exactly; only identifying path values and dependent hashes may change.",
+  "description": "After the public path-privacy contract is enforced, migrate the existing curated corpus and the published-results branch so no downloadable bundle carries a machine-local path. The review measured 183 affected bundles at 17c0c098a. Because bundle and manifest hashes, result IDs, companion references, trust labels, and historical links may be content-derived, this is a controlled data migration rather than a search-and-replace.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "declare success from the source-tree scan alone",
+        "instead": "scan both branches and a freshly built public/data/bundles output",
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "why": "the Explorer publishes transformed copies and the published-results branch is a separate source"
+      },
+      {
+        "dont": "hand-edit hundreds of JSON files or use an unreviewed regex replacement",
+        "instead": "use the canonical anonymizer in a deterministic migration tool with a reviewed change manifest",
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "why": "manual mutation can alter measurements, miss nested paths, and desynchronize hashes"
+      },
+      {
+        "dont": "preserve an old digest or result ID after changing bytes unless the contract explicitly defines it as content-independent",
+        "instead": "recompute dependent identifiers and update every reference with an auditable mapping",
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "why": "that would turn evidence identity into a lie"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "needs_item": "results-explorer-public-bundle-path-privacy-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Security and Privacy",
+      "completed_at": "2026-08-04T01:40:26Z",
+      "completed_pr": 1501,
+      "created_at": "2026-08-02T04:27:14Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Any changed result ID has an explicit old-to-new mapping and all internal references are migrated atomically.",
+        "item_id": "results-explorer-curated-corpus-path-sanitization"
+      },
+      {
+        "behavior": "Content hashes and manifests are recomputed honestly after content changes; stale hashes are never retained to make the diff smaller.",
+        "item_id": "results-explorer-curated-corpus-path-sanitization"
+      },
+      {
+        "behavior": "Develop and published-results are changed through separate reviewed PRs; neither protected branch is pushed directly.",
+        "item_id": "results-explorer-curated-corpus-path-sanitization"
+      },
+      {
+        "behavior": "Every timing, query status, benchmark/platform/scale/phase value, trust label, funding value, and ranking-eligibility decision remains semantically unchanged.",
+        "item_id": "results-explorer-curated-corpus-path-sanitization"
+      },
+      {
+        "behavior": "The last known-good corpus and a machine-readable migration manifest remain recoverable until the new public snapshot is accepted.",
+        "item_id": "results-explorer-curated-corpus-path-sanitization"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Use the newly hardened public anonymizer as the sole value transformation.",
+        "decision": "reuse",
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "path": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "concept": "Reuse deterministic corpus discovery and summary generation after migration.",
+        "decision": "reuse",
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "path": "scripts/generate_corpus_inventory.py"
+      },
+      {
+        "concept": "Validate migrated bundle/manifest pairs with the same contract applied to future submissions.",
+        "decision": "reuse",
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "path": "scripts/validate_submission.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/results_explorer_*"
+      },
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-phase-2-runbook.md"
+      },
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "kind": "only_modify",
+        "path_glob": "results-data/corpus-inventory.json"
+      },
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_corpus_inventory.py"
+      },
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'import json,re; from pathlib import Path; ps=list(Path(\"results-data/bundles\").rglob(\"*.json\")); bad=[str(p) for p in ps if re.search(r\"(?:/Users/|/home/|[A-Za-z]:\\\\Users\\\\)\", json.dumps(json.loads(p.read_text(encoding=\"utf-8\"))))]; assert not bad, f\"{len(bad)} files still expose home paths\"'",
+        "description": "No curated bundle or manifest contains a private home path",
+        "expected": "Fails on the unfixed corpus; exits 0 after every migrated bundle and manifest is clean.",
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/generate_corpus_inventory.py --check && uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py tests/integration/test_submission_validation.py -q",
+        "description": "Corpus inventory and submission validation pass after migration",
+        "expected": "Inventory is deterministic and all migrated artifact contracts pass.",
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline tests/uat/test_explorer_smoke.py -q",
+        "description": "Fresh Explorer output preserves result and ranking semantics",
+        "expected": "Pipeline and UAT checks pass with the migrated corpus and no unexplained count or metric drift.",
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "uv run -- python _project/scripts/results_explorer_corpus_migrate.py (dry-run): 207 primary bundles, 207 changed, 191 manifest updates, 0 companion changes, 207 result-id changes; migration script lint/type checks passed; focused migration tests pending w1 write verification",
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "notes": "Re-scan develop and origin/published-results, classify every proposed JSON change, and report old/new bundle hash, result ID, manifest hash, companion references, and affected JSON paths. Stop if any non-path measurement/provenance field would change. Do not write tracked files in dry-run mode.",
+        "started_at": "2026-08-02T13:02:54Z",
+        "started_branch": "feat/results-explorer-todo-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Produce a dry-run migration manifest and identity-impact report",
+        "wid": "w0"
+      },
+      {
+        "evidence": "--write migrated 207 primary bundles and 191 manifests; corpus inventory regenerated/check passed at 207; 399 JSON artifacts scanned with no /Users/, /home/, or Windows user-path tokens; 87 focused migration+submission tests passed; git HEAD semantic-signature/hash audit passed for all 207 bundles",
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "notes": "Apply the canonical public anonymizer, recompute dependent hashes and mappings, regenerate corpus inventory, and verify byte-for-byte determinism on a second run. Stage only the exact bundle, manifest, inventory, migration-tool, test, and runbook paths.",
+        "started_at": "2026-08-02T13:04:37Z",
+        "started_branch": "feat/results-explorer-todo-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Rewrite and validate the develop corpus deterministically",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Corpus migrated on develop via _project/scripts/results_explorer_corpus_migrate.py --write (PR #1501): 183/207 bundles rewritten, 191 manifests, audit trail at results-data/bundles/path-privacy-migration.manifest.json. published-results mirroring is handled by sync-results-data-to-published.yml, which opens a draft PR from develop under the slim-branch allowlist (runbook 1.2) - so the migration reaches published-results through its own reviewed protected-branch flow rather than a direct push.",
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "notes": "Rebase the migration on the current published-results tip, prove its bundle set and policy version, open a distinct reviewed PR, and retain rollback references. Never direct-push or reuse develop hashes without validating the actual branch contents.",
+        "started_at": "2026-08-04T01:40:14Z",
+        "started_branch": "fix/explorer-chromium-gate-develop-trigger-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Apply the same migration to published-results through its protected PR flow",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Rebuilt Explorer read model on the migrated corpus: 207 results / 46 cohorts, snapshot invariants pass. Privacy: 0 leaks across 400 source JSON files AND 207 freshly built public output files, by both raw regex and canonical find_public_path_leaks - not a source-tree-only claim. Semantics: 238,740 scalar values compared across 183 bundles, exactly 3 leaf keys changed (driver_runtime_python_executable 373, working_dir 272, database_path 6), all path fields; 0 key-set changes, 0 semantic violations. 503 pipeline/validation/anonymization tests pass; inventory --check deterministic.",
+        "item_id": "results-explorer-curated-corpus-path-sanitization",
+        "notes": "Build the real snapshot and downloadable bundle directory. Assert zero forbidden paths; compare result count, query timings, ranking eligibility, cohort counts, geomeans, percentiles, and displayed result links against the pre-migration baseline or documented ID map.",
+        "started_at": "2026-08-04T01:40:20Z",
+        "started_branch": "fix/explorer-chromium-gate-develop-trigger-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Rebuild the Explorer and prove semantic and privacy equivalence",
+        "wid": "w3"
+      }
+    ]
+  }
+}

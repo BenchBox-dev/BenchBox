@@ -1,0 +1,150 @@
+{
+  "context": "Treat this as a mechanical re-serialization guarded by an equality test.\nw3 (the round-trip equality test) is the safety net -- write it first if\nconvenient so w2 is provably non-semantic. Reuse the existing loader; only\nthe on-disk YAML representation changes.\n",
+  "description": "PR #604 moved SQL out of Python triple-quoted strings into YAML catalogs --\na legitimate, on-pattern reduction (-1840 Python lines). But the SQL was\nmachine-dumped as escaped-newline DOUBLE-QUOTED scalars, e.g.:\n\n  sql: \"\\n            SELECT\\n                f.reporting_airline,\\n ...\"\n\nrather than literal block scalars (`sql: |`). A grep across PR 604 found\nZERO block-scalar SQL keys. The consequence: the SQL is un-greppable with\nany tool expecting normal whitespace, un-lintable, and effectively\nunreadable in the file. This is the navigability defect the goal's Objective\nFunction explicitly forbids (_project/goal-shrink-core-code.md:37, \"never use\nescaped newline scalars\"; moving SQL out of Python counts only when\nreviewability and searchability are preserved).\n\nThe fix is a pure serialization change -- re-dump the same SQL text as\nliteral block scalars -- with no semantic change to the queries.\n\nAffected catalogs (PR 604):\n  - benchbox/core/flightdata/query_catalog.yaml\n  - benchbox/core/nyctaxi/query_catalog.yaml\n  - benchbox/core/tsbs_devops/query_catalog.yaml\n  - (loader: benchbox/core/static_query_catalog.py)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hand-edit the SQL while reformatting",
+        "instead": "re-dump programmatically and diff the loaded strings",
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "why": "a single stray character changes query semantics"
+      },
+      {
+        "dont": "move the SQL back into Python",
+        "instead": "the catalog pattern is right; only the scalar style is wrong",
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "why": "that re-inflates the Python surface #604 correctly reduced"
+      }
+    ],
+    "item_meta": {
+      "category": "Technical Debt",
+      "completed_at": "2026-05-24T00:00:00Z",
+      "created_at": "2026-05-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Exact SQL semantics and any {placeholder} tokens inside the SQL strings",
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars"
+      },
+      {
+        "behavior": "The Python-line reduction from #604 is not undone (SQL stays in YAML)",
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars"
+      },
+      {
+        "behavior": "load_static_query_catalog() API and the QUERIES dict shape are unchanged",
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/read_primitives/catalog/queries.yaml — existing catalog; check whether it already uses block scalars and match that convention",
+        "decision": "reuse",
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "path": "benchbox/core/read_primitives/catalog/queries.yaml"
+      },
+      {
+        "concept": "benchbox/core/static_query_catalog.py:load_static_query_catalog — reuse the loader unchanged; only the dumper/representation changes",
+        "decision": "reuse",
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "path": "benchbox/core/static_query_catalog.py:load_static_query_catalog"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/query_catalog.yaml"
+      },
+      {
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/query_catalog.yaml"
+      },
+      {
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/static_query_catalog.py"
+      },
+      {
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tsbs_devops/query_catalog.yaml"
+      },
+      {
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -cE '^\\s*sql: \\|' benchbox/core/flightdata/query_catalog.yaml",
+        "description": "SQL is now stored as block scalars",
+        "expected": "non-zero (one block scalar per query)",
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -k 'static_query_catalog or query_catalog' -q",
+        "description": "Round-trip SQL equality test passes",
+        "expected": "all pass",
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "notes": "Verify the escaped-scalar form and list all catalogs/keys holding SQL.\nConfirm whether any placeholders (e.g. {start_date}, {end_date}) live\ninside the SQL -- they must survive byte-identical.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm current serialization and enumerate every affected SQL key",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "notes": "Use a yaml dumper configured to emit block style for the `sql` field\n(e.g. a str subclass with a registered representer, or post-process).\nDo NOT hand-edit SQL text -- generate the new YAML so the SQL string\ncontent is provably unchanged.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-dump each catalog's SQL as YAML literal block scalars (|), programmatically",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-sql-catalog-yaml-block-scalars",
+        "notes": "Assert load_static_query_catalog(...)[\"QUERIES\"][id][\"sql\"] is\nbyte-identical before and after reformatting (or parses to the same\nDuckDB AST). This guards against whitespace-sensitive breakage and\nplaceholder loss.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a round-trip test: loaded SQL string == pre-migration SQL string",
+        "wid": "w3"
+      }
+    ]
+  }
+}

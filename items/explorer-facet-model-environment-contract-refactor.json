@@ -1,0 +1,276 @@
+{
+  "context": "Sequence as: audit → model migration → query migration → label reconciliation\n→ coverage re-validation → test update → cross-corpus check. Treat the\nmigration table from w1 as the contract for w2-w4; do not let label\ndecisions leak into the model layer. Use the normalized field names from\n`results-complete-execution-environment-capture` w1 as the authoritative\nvocabulary; the explorer is a consumer, not a co-designer of the contract.\n",
+  "description": "`explorer-selection-facets-coverage-at-scale` ships the explorer facet model\n(`results-explorer/src/lib/facetModel.ts`) against current adapter fields\nbecause the normalized execution-environment contract from\n`results-complete-execution-environment-capture` is not yet available. That\nis the right sequencing call for shipping speed, but it leaves behind a\nknown refactor: facet keys like `deployment_class`, `cloud_provider`,\n`cloud_region`, `instance_or_warehouse`, `storage_format`, and `cost_status`\nmust currently be sourced from adapter-specific raw config fields with\nper-adapter fallbacks. Once `results-complete-execution-environment-capture`\nlands, those fields will be emitted as a stable normalized contract on\nevery result artifact.\n\nThis item is the loop-back: migrate the facet model and its consumers off\nthe per-adapter fallbacks and onto the normalized execution-environment\ncontract. The product surface should not change — same facet rail, same\nURL contract, same coverage signals — but the data path becomes uniform\nacross adapters and the fallback scraping code goes away.\n\nScope is intentionally narrow: facet model + DuckDB queries + immediate\nconsumers (FacetRail labels, CoverageBadge grouping). Anything outside\nthe scope_limit is a separate item.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "block this item on cosmetic facet improvements",
+        "instead": "file follow-up items instead.",
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "why": "scope creep is how refactors stall"
+      },
+      {
+        "dont": "change visible facet behavior or labels",
+        "instead": "keep product surface identical.",
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "why": "this is a refactor, not a redesign"
+      },
+      {
+        "dont": "keep adapter-name-conditional fallbacks 'just in case'",
+        "instead": "delete dead branches.",
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "why": "the whole point of the normalized contract is to remove them"
+      },
+      {
+        "dont": "reshape the normalized contract from the explorer side",
+        "instead": "raise issues against that item if a field is missing or wrong.",
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "why": "the contract is owned by results-complete-execution-environment-capture"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "needs_item": "explorer-selection-facets-coverage-at-scale"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "needs_item": "results-complete-execution-environment-capture"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-02T00:00:00Z",
+      "created_at": "2026-05-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Coverage badges and missing-cell rendering continue to match the pre-refactor explorer for identical inputs.",
+        "item_id": "explorer-facet-model-environment-contract-refactor"
+      },
+      {
+        "behavior": "Existing explorer URLs (shipped pre-refactor) round-trip identically through useUrlState.",
+        "item_id": "explorer-facet-model-environment-contract-refactor"
+      },
+      {
+        "behavior": "FacetRail chip labels stay user-stable (no surprise renames mid-session).",
+        "item_id": "explorer-facet-model-environment-contract-refactor"
+      },
+      {
+        "behavior": "Missing coverage continues to not penalize a platform's average rank.",
+        "item_id": "explorer-facet-model-environment-contract-refactor"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/docs/facet-environment-migration.md"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CoverageBadge.tsx"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/FacetRail.tsx"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/facetModel.test.ts"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/queryFilters.test.ts"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/facetModel.ts"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/queryFilters.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Frontend typecheck and tests pass.",
+        "expected": "All facet/coverage tests pass; pre-refactor URL round-trip regression test passes.",
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build",
+        "description": "Browser build succeeds against the post-environment-capture corpus fixtures.",
+        "expected": "Fixture generation, fixture verification, and Vite build complete without errors.",
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'COALESCE|adapter ===|platform ===' results-explorer/src/lib/facetModel.ts results-explorer/src/lib/queryFilters.ts results-explorer/src/lib/duckdbQueries.ts || true",
+        "description": "No fallback-scraping code remains in the facet path.",
+        "expected": "No matches in facet-path files (matches in unrelated files are acceptable).",
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline/test_visible_metrics_registry.py -q",
+        "description": "Visible metrics parity remains canonical with Python.",
+        "expected": "Registry parity test passes.",
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "notes": "Walk every `FacetKey` in `results-explorer/src/lib/facetModel.ts` and\nits serializer/parser pairs. For each key sourced from adapter-specific\nraw config (deployment_class, cloud_provider, cloud_region,\ninstance_or_warehouse, storage_format, cost_status), record:\n  - current source field(s) and per-adapter quirks;\n  - target field on the normalized execution-environment contract\n    (cross-reference `results-complete-execution-environment-capture`\n    w1 schema);\n  - any value-domain shifts (e.g. cloud_provider casing, region\n    aliases).\nOutput: a short migration table committed to\n`results-explorer/docs/facet-environment-migration.md`. No code edits\nin this unit; downstream units consume the table.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit fallback paths in facetModel.ts and document field-by-field migration",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "notes": "Rewrite serializer/parser pairs and the `facetsToWhereClause` helper\nto read from normalized contract columns. Delete per-adapter fallback\nbranches. Preserve URL round-trip for every existing facet key — URLs\nshipped against the pre-refactor model must still parse.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate facetModel.ts onto normalized contract fields",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "notes": "Update `results-explorer/src/lib/queryFilters.ts` and\n`results-explorer/src/lib/duckdbQueries.ts` so leaderboard, benchmark,\nand platform queries reference normalized columns. Remove `COALESCE`\nand adapter-name-conditional expressions added as fallbacks during\nthe original facet rollout.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update DuckDB queries to read normalized contract columns",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "notes": "Normalized contract may use canonical labels (e.g. AWS/GCP/Azure for\ncloud_provider) where the adapter-specific path used adapter-native\nstrings. Update FacetRail chip rendering and CoverageBadge grouping\nso labels remain stable for users (no chip text churn) while consuming\nthe canonical values. Add a small label-mapping module if needed; do\nnot embed mappings inline in components.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reconcile FacetRail and CoverageBadge labels with normalized vocabulary",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "notes": "Coverage badges, missing-cell rendering, and \"average rank over\ncovered cohorts\" must continue to behave correctly when cohort\nmembership is computed from normalized fields. Confirm: missing\ncoverage still does not penalize average rank; coverage badges\nstill render accurately for the public corpus fixtures.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate coverage signals against the normalized contract",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "notes": "Update `lib/__tests__/facetModel.test.ts` and\n`lib/__tests__/queryFilters.test.ts` to assert canonical field names\nand value domains. Add a regression test that pre-refactor URLs still\nround-trip cleanly. Remove tests that exercised adapter-fallback\nbranches.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update tests to assert against normalized contract",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-facet-model-environment-contract-refactor",
+        "notes": "Run the explorer fixtures end-to-end against the public-corpus shape\nthat `results-complete-execution-environment-capture` w14 establishes.\nConfirm: no facet key falls through to a fallback path; no console\nwarnings about missing normalized fields; coverage and rank surfaces\nmatch the pre-refactor explorer for identical inputs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cross-corpus verification: every result bundle facets through the normalized path",
+        "wid": "w7"
+      }
+    ]
+  }
+}

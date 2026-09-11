@@ -1,0 +1,136 @@
+{
+  "description": "From the 2026-07 remediation batch (#1176 e2e): once tuning constraints\nactually reach the engine, loading TPC-H with the shipped tpch_tuned.yaml\n(foreign_keys.enabled: true) fails because tables load in an order that\nviolates FK references (e.g. lineitem before orders). Invisible for months\nbecause tuning never reached the engine. Reproduce (duckdb SF 0.01, shipped\ntemplate), then fix by dependency-ordering the load sequence from schema FK\nmetadata or deferring FK creation to post-load (choose per-engine semantics;\npost-load ALTER is the portable default).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "silently disable FK enforcement to make the run pass",
+        "instead": "(not specified)",
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Applied-ledger records the constraint statements actually executed",
+        "item_id": "tuning-fk-load-ordering-fix-20260716"
+      },
+      {
+        "behavior": "Untuned/notuning load behavior and timings-attribution (constraint work must not silently inflate load phase without being visible in phase metadata)",
+        "item_id": "tuning-fk-load-ordering-fix-20260716"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/**"
+      },
+      {
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "kind": "only_modify",
+        "path_glob": "examples/tunings/**"
+      },
+      {
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --non-interactive --output /tmp/fk-check",
+        "description": "E2E tuned run with shipped template passes (original command; does not exercise FK enforcement on develop until PR #1176 merges -- see substitution below)",
+        "expected": "Run completes; bundle status applied_unverified; FK constraints present",
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest tests/integration/tuning/test_duckdb_fk_load_ordering.py -v -m slow",
+        "description": "SUBSTITUTED verification (develop lacks PR #1176's tuning-delivery fix): adapter-level FK-enforced tuned load + constraint-enforcement + ordering tests",
+        "expected": "3 passed",
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "notes": "E2E command from this TODO's verification section does NOT reproduce\non develop: -vv logs show foreign_keys=False reaching the adapter\neven with foreign_keys.enabled: true in tpch_tuned.yaml (PR #1176's\ntuning-delivery fix isn't merged yet). Reproduced instead by setting\nadapter.unified_tuning_configuration directly (bypassing the\ndelivery gap, exercising the real constraint-application path) and\nloading real SF 0.01 TPC-H data via DuckDBAdapter.load_data in the\nthen-current alphabetical fallback order: every table except\npart/region (no FK deps) failed with \"Violates foreign key\nconstraint\" (e.g. lineitem before orders, customer before nation).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce with the shipped template on duckdb SF 0.01; capture the exact failure",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "notes": "Chose FK-aware load ordering, not post-load ALTER: verified DuckDB\n1.3.2 rejects ALTER TABLE ... ADD FOREIGN KEY (\"No support for that\nALTER TABLE option yet!\"), so the \"portable default\" doesn't work on\nthis engine. Added benchbox.core.schema_primitives.\nget_fk_ordered_table_names (stable topo-sort over\nBaseSchemaTable.get_foreign_keys()), benchbox.core.tpch.schema.\nget_table_loading_order(), and TPCHBenchmark.get_table_loading_order\n-- the same hasattr(benchmark, \"get_table_loading_order\") extension\npoint benchbox/platforms/base/data_loading.py already uses for\nTPC-DS. Constraint application itself (apply_constraint_configuration,\ninline CREATE TABLE FK clauses) is untouched.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement fix (FK-aware load order or post-load constraint application) with rationale",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "notes": "tests/integration/tuning/test_duckdb_fk_load_ordering.py (real\nDuckDB + real generated SF 0.01 data, FK enforcement forced on via\nthe same bypass as w0): tuned load completes with nonzero rows in\nevery table; a violating INSERT into orders is still rejected\npost-load; TPCHBenchmark.get_table_loading_order returns a\ndependency-safe order for the real loader's table set. Unit\ncoverage added in tests/unit/core/test_tpch_schema_helpers.py\n(topo-sort correctness, stability, cycle-safety) and\ntests/unit/core/test_tpch_benchmark_fakes.py (benchmark-level\nordering against a shuffled available_tables list).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tests: tuned run with FK enforcement completes; constraint actually enforced post-load (violation insert rejected)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-fk-load-ordering-fix-20260716",
+        "notes": "Opus review flagged that SSB (lineorder -> customer/part/supplier/\ndate) and CoffeeShop (order_lines -> dim_locations/dim_products)\nhave the same latent defect: no get_table_loading_order, so the\nalphabetical fallback would violate SSB's FKs the moment tuning\ndelivery is fixed (ssb_tuned.yaml already ships foreign_keys\nenabled). Added schema_primitives._DottedForeignKeyTable +\nget_fk_ordered_table_names_from_column_specs() to adapt SSB/\nCoffeeShop's dict-based schema_specs.yaml (dotted \"table.column\"\nforeign_key strings) onto the existing get_fk_ordered_table_names\ntopo-sort unchanged; wired get_table_loading_order into both\nschema.py modules and both benchmark classes. Also corrected the\nget_fk_ordered_table_names docstring's self-reference claim.\nTPC-DS/Data Vault already have ordering and were left alone.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Post-review: extend FK-aware load ordering to SSB and CoffeeShop; fix a docstring imprecision",
+        "wid": "w3"
+      }
+    ]
+  }
+}

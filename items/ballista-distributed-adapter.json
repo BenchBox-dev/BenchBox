@@ -1,0 +1,331 @@
+{
+  "description": "Add support for Apache DataFusion Ballista, a distributed SQL query engine built on\nApache DataFusion and Apache Arrow. Ballista extends DataFusion's single-node execution\nto a distributed cluster architecture with a scheduler and multiple executor nodes.\n\nBallista is notable for:\n- Distributed SQL execution across a cluster (scheduler + executors)\n- Built on DataFusion - same SQL dialect, same query planning, same Arrow-native execution\n- Python bindings built from source (BallistaBuilder and BallistaSessionContext APIs)\n- Supports Parquet, CSV, and other Arrow-compatible formats on shared storage\n- Kubernetes-native deployment with Helm charts\n- Standalone mode for single-machine testing\n- Columnar execution via Apache Arrow with query vectorization\n- Claims 2.9x speedup over Spark on TPC-H at 100GB scale factor\n\nSince Ballista uses DataFusion internally, the existing DataFusion adapter provides\na strong foundation. The key differences are: (1) connection via BallistaBuilder to a\nremote scheduler instead of a local SessionContext, (2) data must reside on shared\nstorage accessible to all executors (S3, GCS, HDFS, or shared filesystem), and\n(3) distributed execution semantics (partitioning, shuffles, task scheduling).\n\nIMPORTANT: The `ballista` name on PyPI is occupied by an UNRELATED package (a PyTorch\nhelper). The Apache Ballista Python bindings are NOT published to PyPI as prebuilt\nwheels. Users must build from source using maturin from the main Ballista repo\n(apache/datafusion-ballista/python/). This significantly affects installation UX\nand CI integration.\n\nReference: https://github.com/apache/datafusion-ballista\nPython bindings: https://github.com/apache/datafusion-ballista/tree/main/python\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assume local filesystem access for data in distributed mode",
+        "instead": "support object storage URIs (s3://, gs://)",
+        "item_id": "ballista-distributed-adapter",
+        "why": "executors read from shared storage"
+      },
+      {
+        "dont": "fork or modify DataFusionQueryTransformer",
+        "instead": "import and reuse it directly",
+        "item_id": "ballista-distributed-adapter",
+        "why": "Ballista uses the same DataFusion SQL dialect"
+      },
+      {
+        "dont": "hardcode scheduler addresses",
+        "instead": "make host:port configurable with sensible defaults",
+        "item_id": "ballista-distributed-adapter",
+        "why": "deployment varies"
+      },
+      {
+        "dont": "modify the existing DataFusion adapter",
+        "instead": "create a new ballista.py file",
+        "item_id": "ballista-distributed-adapter",
+        "why": "Ballista is a separate platform"
+      },
+      {
+        "dont": "skip standalone mode support",
+        "instead": "support both standalone and remote deployment modes",
+        "item_id": "ballista-distributed-adapter",
+        "why": "it enables CI testing without a cluster"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-03-24T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing DataFusion adapter tests pass: uv run -- python -m pytest tests/unit/platforms/test_datafusion_adapter.py -v",
+        "item_id": "ballista-distributed-adapter"
+      },
+      {
+        "behavior": "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "ballista-distributed-adapter"
+      },
+      {
+        "behavior": "DataFusion query transformer behavior unchanged (reused, not forked)",
+        "item_id": "ballista-distributed-adapter"
+      },
+      {
+        "behavior": "DataFusion write transformer behavior unchanged (reused, not forked)",
+        "item_id": "ballista-distributed-adapter"
+      },
+      {
+        "behavior": "Platform registry autodiscovery continues working for all existing platforms",
+        "item_id": "ballista-distributed-adapter"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ballista-distributed-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/datafusion.py"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/datafusion_query_transformer.py"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/datafusion_write_transformer.py"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/ballista.py"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/ballista.md"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_ballista_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.ballista import BallistaAdapter; print('import OK')\"",
+        "description": "Ballista adapter imports correctly",
+        "expected": "import OK",
+        "item_id": "ballista-distributed-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_ballista_adapter.py -v --tb=short",
+        "description": "Unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "ballista-distributed-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "Existing platform tests unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "ballista-distributed-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.platform_registry import PlatformRegistry; r = PlatformRegistry(); print('ballista' in r.get_all_platforms())\"",
+        "description": "Platform registry lists ballista",
+        "expected": "True",
+        "item_id": "ballista-distributed-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from ballista import BallistaBuilder; ctx = BallistaBuilder().standalone().build(); df = ctx.sql('SELECT 1 AS x'); print(df.collect())\"",
+        "description": "Standalone mode smoke test (if ballista installed)",
+        "expected": "Arrow batch with value 1",
+        "item_id": "ballista-distributed-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ballista-distributed-adapter",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "needs_wid": "w7",
+        "wid": "w9"
+      },
+      {
+        "item_id": "ballista-distributed-adapter",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ballista-distributed-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Build Ballista Python bindings from source and document setup",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ballista-distributed-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Create BallistaAdapter class with standalone and remote connection modes",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ballista-distributed-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement data loading for standalone mode (local filesystem)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "ballista-distributed-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement data loading for distributed mode (shared storage)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "ballista-distributed-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wire up query transformer and plan parser reuse",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "ballista-distributed-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Register Ballista in platform registry and lazy loading",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "ballista-distributed-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add comprehensive unit tests",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "ballista-distributed-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run TPC-H validation in standalone mode at SF 0.01",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "ballista-distributed-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Create platform documentation",
+        "wid": "w9"
+      }
+    ]
+  }
+}

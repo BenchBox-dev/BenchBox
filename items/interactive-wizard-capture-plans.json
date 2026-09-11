@@ -1,0 +1,10 @@
+{
+  "description": "The CLI supports `--capture-plans` for capturing query execution plans during\nbenchmark runs (3-8% overhead). This is useful for:\n1. Query performance analysis\n2. Optimizer behavior debugging\n3. Understanding execution patterns\n4. Identifying optimization opportunities\n\nSupported platforms: DuckDB, PostgreSQL, DataFusion",
+  "legacy": {
+    "item_meta": {
+      "category": "User Experience",
+      "created_at": "2025-12-21T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

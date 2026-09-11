@@ -1,0 +1,177 @@
+{
+  "description": "Blind-spot `2026-05-02-155524` documented that the DuckDB community\ndatasketches extension (commit 2e38607, downloaded on-demand by\n`INSTALL datasketches FROM community`) silently dropped the `theta`\nand `frequent_items` families between PR #114 morning and the audit\nlater that day. Four sketch ops referencing `datasketch_theta` /\n`datasketch_frequent_items` are still in\n`benchbox/core/write_primitives/catalog/operations.yaml` and fail\nend-to-end. CI does not currently exercise these aggregates beyond\nloader unit tests.\n\nTwo work threads close the gap:\n\n1. Fast smoke that fails the build if any planned-on family (`theta`,\n   `frequent_items`, `cpc`, `req`, `kll`, `hll`) disappears from a\n   freshly-installed extension.\n2. Decision artifact (ADR) on vendoring vs HLL substitution. Current\n   state of evidence: PR #182 already added CPC + REQ family ops, so\n   HLL substitution is not the only path. Vendoring in\n   `_binaries/datasketches/` gives version control but adds artifact\n   tree weight.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "inline the smoke into `tests/`",
+        "instead": "(not specified)",
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "why": "it is a CI-time check, not a unit test, and pulls a network resource (the community extension) on every run."
+      },
+      {
+        "dont": "pin the community-extension commit by editing `pyproject.toml`",
+        "instead": "(not specified)",
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "why": "the extension is loaded by DuckDB itself via `INSTALL ... FROM community`, not by uv. The ADR may choose vendoring as a separate mechanism."
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-05-06T00:00:00Z",
+      "created_at": "2026-05-05T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing op definitions in `operations.yaml` are not removed -- the ADR may keep them and let the smoke gate the build instead.",
+        "item_id": "duckdb-datasketches-family-ci-smoke"
+      },
+      {
+        "behavior": "PR #182 CPC + REQ family ops continue to load and run on DuckDB.",
+        "item_id": "duckdb-datasketches-family-ci-smoke"
+      },
+      {
+        "behavior": "The smoke does not block the build for transient network failures fetching the extension -- network errors are reported but not fatal.",
+        "item_id": "duckdb-datasketches-family-ci-smoke"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "kind": "only_modify",
+        "path_glob": "_binaries/datasketches/"
+      },
+      {
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/write-primitives-sketch-functions.md"
+      },
+      {
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/"
+      },
+      {
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "kind": "only_modify",
+        "path_glob": "scripts/duckdb_datasketches_smoke.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f scripts/duckdb_datasketches_smoke.py",
+        "description": "Smoke script exists",
+        "expected": "exit 0",
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/duckdb_datasketches_smoke.py 2>&1 | grep -cE '^(theta|frequent_items|cpc|req|kll|hll):'",
+        "description": "Smoke runs locally and reports per-family status",
+        "expected": ">= 6",
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rE 'duckdb_datasketches_smoke|datasketches.*smoke' .github/workflows/",
+        "description": "CI job present",
+        "expected": "matches >= 1",
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "notes": "Connect to a fresh DuckDB, `INSTALL datasketches FROM community`,\nthen for each required family (`theta`, `frequent_items`, `cpc`,\n`req`, `kll`, `hll`) call a representative function (e.g.\n`SELECT datasketch_theta(1)`). Exit non-zero if any family raises\na Catalog Error. Print the resolved extension version (commit\nhash) on every run so failures are diagnosable from CI logs alone.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write `scripts/duckdb_datasketches_smoke.py` enumerating required families",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "notes": "Add a job to `.github/workflows/pr.yml` (or a new\n`extension-smoke.yml`) that runs the script. Cache: do not cache\nthe extension download -- the whole point is to detect upstream\nrebuilds. Job timeout: <2 min wall.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire the smoke into a fast CI lane",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "notes": "Capture trade-offs: vendoring gives version pinning but adds\n~5 MB to the artifact tree per platform; HLL fallback narrows\ncross-engine sketch coverage but matches the Redshift ceiling\nalready documented. Decision criterion: how often does the\nupstream community-extensions build actually drop a family? If\nsmoke catches drift in <1 month, fallback path is enough; if\ndrift is monthly, vendoring earns its weight.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Author ADR: vendor `_binaries/datasketches/` vs accept HLL fallback",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "notes": "One-shot. Link the BenchBox smoke output and ask why the theta +\nfrequent-items families were dropped from the v1.3.2 build\nartifact. No ongoing engagement; tracking the response can stay\nin the ADR.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "File an upstream issue against duckdb-community-extensions if smoke confirms drift",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-datasketches-family-ci-smoke",
+        "notes": "Until the ADR's chosen path lands, mark the four affected ops\n(`sketch_insert_theta_per_partition`, `sketch_insert_topk_per_shard`,\n`sketch_query_theta_union_merge`, `sketch_query_topk_combine`) as\n\"blocked on upstream extension stability\" with a link to the ADR.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document affected ops in `docs/benchmarks/write-primitives-sketch-functions.md`",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "description": "A load/re-export cycle corrupts bundles (all reproduced):\n1. Plans destroyed: loaded results carry counts but no plan payloads, so\n   re-export writes no .plans.json (partially fixed by qpc-01; this item\n   asserts the property end-to-end).\n2. Warmup rows become measurement rows: exporter writes iter: 0, loader\n   keeps iteration only `if q.get(\"iter\"):` (loader.py:448) — 0 is falsy —\n   so re-export defaults iteration=1/run_type=measurement and warmup times\n   pollute summary stats.\n3. FAILED queries duplicate as phantom successes: loader hardcodes\n   \"status\": \"SUCCESS\" for every queries[] entry (loader.py:446) and also\n   appends a FAILED row from errors[].\nLoader also drops run_type, stream 0, plan_fingerprint, plan_capture_time_ms.\n\nFindings: F1.4 (and the `if capture_time:` 0.0-drop from F1.5).\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "'fix' by making the exporter omit warmup rows",
+        "instead": "(not specified)",
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "why": "warmup data is part of the record."
+      },
+      {
+        "dont": "drop errors[] from the export format",
+        "instead": "(not specified)",
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "why": "it is the legacy-load fallback; dedup on load instead."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "needs_item": "qpc-01-plan-rehydration-and-phases-view"
+      }
+    ],
+    "item_meta": {
+      "category": "Bug Fix / Data Pipeline",
+      "completed_at": "2026-07-07T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "Legacy bundles (queries[] without status/run_type keys) still load without error",
+        "item_id": "qpc-02-loader-roundtrip-fidelity"
+      },
+      {
+        "behavior": "compute_plan_capture_stats measurement-only semantics",
+        "item_id": "qpc-02-loader-roundtrip-fidelity"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/results/canonical_json.py — byte-stable form enables byte-equality round-trip test",
+        "decision": "reuse",
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "path": "benchbox/core/results/canonical_json.py"
+      },
+      {
+        "concept": "benchbox/core/results/loader.py:426-466 _reconstruct_query_results",
+        "decision": "reuse",
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "path": "benchbox/core/results/loader.py:426-466"
+      },
+      {
+        "concept": "benchbox/core/results/schema.py:376-423 _build_queries (writes iter/stream/run_type/status unconditionally)",
+        "decision": "reuse",
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "path": "benchbox/core/results/schema.py:376-423"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/loader.py"
+      },
+      {
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_loader.py -q -k roundtrip",
+        "description": "Byte-equality round trip",
+        "expected": "all pass",
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_loader.py -q",
+        "description": "No phantom SUCCESS rows for failed queries",
+        "expected": "all pass",
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "notes": "Rewrote loader with is-not-None checks for iter/stream/run_type; status now read per-entry (default SUCCESS for legacy); errors[] merges detail onto non-success rows and only synthesizes a standalone row when the query_id is absent from queries[] (legacy shape). Fixed schema.py capture_time falsy-check to `is not None`.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: fix _reconstruct_query_results to honor status/run_type, keep iter/stream 0, dedupe errors[], and carry plan fields through.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "notes": "Added byte-equality roundtrip test (warmup iter0/stream0, FAILED dup, stream1+plan w/ capture_time_ms=0.0) plus two targeted loader tests (no phantom-dup for current-format failures; iter0/stream0 preserved).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: round-trip property test — export, load, re-export must be byte-identical for both main file and plans companion.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Review: adversarial code review (legacy-bundle branch, errors[] dedup rules, summary-stat recomputation).",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix: address review findings; re-run verification.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-02-loader-roundtrip-fidelity",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Submit PR referencing qpc-02.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

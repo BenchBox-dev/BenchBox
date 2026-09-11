@@ -1,0 +1,92 @@
+{
+  "context": "Prefer a second tsconfig (e.g. results-explorer/tsconfig.e2e.json) covering e2e/ with the Playwright types, and a typecheck script that runs both, over widening the main include (which would pull Playwright types into the app build). Wire it into whatever the browser CI job already runs so it fails before Playwright starts.",
+  "description": "results-explorer/tsconfig.json line 29 sets include to [\"src\", \"vite.config.ts\"], so nothing under results-explorer/e2e/ is ever typechecked: npm run typecheck (tsc --noEmit) does not see it, and vitest does not compile it either. Playwright specs and the shared e2e/support/fixtures.ts therefore compile by inspection only. This is not theoretical — during the cold-snapshot work (#1368) a fixture edit passed npm run typecheck while being wrong, and only a runtime Playwright failure caught it; a separate fake-connection edit had a genuine type error (TS2559) that surfaced only because that file happened to live under src/. The e2e harness is the blocking Chromium gate's own code, so a type error there costs a full ~3-minute CI round-trip to discover.",
+  "legacy": {
+    "item_meta": {
+      "category": "test-infra",
+      "completed_at": "2026-08-10T00:10:27Z",
+      "completed_pr": 1666,
+      "created_at": "2026-07-31T01:28:04Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No e2e assertion is changed; this is a compile-time gate only",
+        "item_id": "explorer-e2e-typecheck-gap-20260730"
+      },
+      {
+        "behavior": "The app build and npm run typecheck keep their current scope and speed",
+        "item_id": "explorer-e2e-typecheck-gap-20260730"
+      }
+    ],
+    "verifications": [
+      {
+        "command": null,
+        "description": "A deliberate type error in e2e/support/fixtures.ts fails the new typecheck",
+        "expected": null,
+        "item_id": "explorer-e2e-typecheck-gap-20260730",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Explorer typecheck passes on a clean tree",
+        "expected": "pass",
+        "item_id": "explorer-e2e-typecheck-gap-20260730",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:07:15Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-e2e-typecheck-gap-20260730",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-e2e-typecheck-gap-20260730",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Confirmed results-explorer/tsconfig.json includes only src and vite.config.ts. Chose a child tsconfig.e2e.json plus typecheck:e2e so app npm run typecheck remains unchanged while the Playwright harness gets an isolated compile gate.",
+        "item_id": "explorer-e2e-typecheck-gap-20260730",
+        "notes": null,
+        "started_at": "2026-08-10T00:02:59Z",
+        "started_branch": "fix/explorer-e2e-typecheck-gap-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Confirm the gap and pick the config shape (second tsconfig vs widened include)",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added results-explorer/tsconfig.e2e.json and typecheck:e2e; clean harness check passes, and the deliberate fixtures.ts string-vs-number probe failed with TS2322/TS6133 before removal.",
+        "item_id": "explorer-e2e-typecheck-gap-20260730",
+        "notes": null,
+        "started_at": "2026-08-10T00:04:56Z",
+        "started_branch": "fix/explorer-e2e-typecheck-gap-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Add the e2e typecheck and fix whatever it surfaces",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added npm run typecheck:e2e to the blocking chromium job immediately after npm ci and before Playwright installation; workflow contract tests pass (13 passed).",
+        "item_id": "explorer-e2e-typecheck-gap-20260730",
+        "notes": null,
+        "started_at": "2026-08-10T00:06:24Z",
+        "started_branch": "fix/explorer-e2e-typecheck-gap-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Wire it into the results-explorer browser CI job so it runs before Playwright",
+        "wid": "w2"
+      }
+    ]
+  }
+}

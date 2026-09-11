@@ -1,0 +1,217 @@
+{
+  "context": "Re-adjudicate the already-committed 180-run v5 responses offline first, which costs zero quota and settles whether the taxonomy alone explains the blockers, before designing a v6 contract. Split the decision field into separate factual-outcome, action-safety, evidence-contribution, and temporal-disposition fields with independent scoring, so a correct-but-differently-labeled answer cannot register as a safety failure while genuinely unsafe behavior still does. Only after Joe authorizes new quota does a v6 pilot run.",
+  "description": "Three gate generations (v3, v4, v5) each ended no-promote, and v5 isolated the cause: the single 'decision' response field conflates factual outcome, action safety, evidence contribution, and temporal disposition. All 20 v5 treatment safety flags were decision-label mismatches with behaviorally safe answers (answers explicitly refuse execution, report class-only, declare worktrees inactive); baseline had 17 and control 21 of the same class, so the penalty is arm-independent and cannot be fixed by any candidate rewrite. v5 otherwise beat baseline on correctness 0.9662, recall 0.9833, and payload -49 percent. Evidence reports/promotion-decision-v5-codex.md, reports/ab-results-v5-codex.json, commits 6afbf6d and f801885.",
+  "legacy": {
+    "item_meta": {
+      "category": "evaluation",
+      "completed_at": "2026-08-04T13:52:30Z",
+      "created_at": "2026-08-03T23:40:25Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "A taxonomy that cannot still flag genuinely unsafe behavior is rejected, proven by mutation tests",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign"
+      },
+      {
+        "behavior": "Live Codex and Claude memory and settings remain byte-unchanged",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign"
+      },
+      {
+        "behavior": "No new model quota is spent before explicit human authorization",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign"
+      },
+      {
+        "behavior": "Promotion remains a separate explicit human decision",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign"
+      },
+      {
+        "behavior": "V3, v4, and v5 committed evidence and isolation manifests remain immutable",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v3/**"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v4/**"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v5/**"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/scenarios/**"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q",
+        "description": "Scorer and mutation tests pass",
+        "expected": "All vocabulary, safety, identity, and taxonomy tests pass",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -q 'surviving flags' /Users/joe/Developer/memory-governance/reports/decision-taxonomy-adjudication.md",
+        "description": "Offline adjudication study is published with surviving-flag counts",
+        "expected": "Study reports per-arm flag counts under the decomposed taxonomy using only committed v5 evidence",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && git diff --quiet f801885 -- evaluation_runs/behavioral/results-v3 evaluation_runs/behavioral/results-v4 evaluation_runs/behavioral/results-v5",
+        "description": "Prior generation evidence is untouched",
+        "expected": "No v3, v4, or v5 result file differs from its committed state",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -q '^Promotion decision' /Users/joe/Developer/memory-governance/reports/promotion-decision-v6.md",
+        "description": "V6 decision packet records an explicit recommendation",
+        "expected": "Packet names evidence, residual risks, and promote-eligible or no-promote",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "36d25ff: reports/decision-taxonomy-adjudication.md + .json re-adjudicate all 180 committed v5 runs offline (zero quota). 60 flags decompose to 0 action_safety, 25 temporal_disposition, 18 evidence_contribution, 17 undecidable. Surviving flags: 15 arm-independent + 2 arm-dependent, all undecidable. Run against the committed SCORED records, not the purged raw responses. Pinned by tests/scorers/test_taxonomy.py (21 tests).",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "notes": null,
+        "started_at": "2026-08-04T12:53:18Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Re-adjudicate the committed 180-run v5 responses offline against a decomposed taxonomy and quantify how many flags survive",
+        "wid": "w0"
+      },
+      {
+        "evidence": "docs/evaluation/behavioral-v6-contract.md: per-field definitions (factual_outcome, action_safety, evidence_contribution, temporal_disposition), six numbered scoring rules, action_taken enum rationale, frozen thresholds, comparability warning, and the adjudication evidence from reports/decision-taxonomy-adjudication.md.",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "notes": null,
+        "started_at": "2026-08-04T12:57:20Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Publish the taxonomy redesign proposal with per-field definitions, scoring rules, and the adjudication evidence",
+        "wid": "w1"
+      },
+      {
+        "evidence": "68b3067: SCHEMA gains required action_taken enum (disjoint from decision); prompt defines it for every arm; all 12 oracles declare forbidden_actions derived from their own failure_conditions (version 2->3); taxonomy.score_fields returns the four fields with only action_safety blocking. 30 taxonomy tests incl. mutation coverage (forbidden action blocks, unmapped flag blocks, missing action_taken blocks). All four suites green.",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "notes": null,
+        "started_at": "2026-08-04T12:58:42Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Implement the decomposed response schema, scorer fields, and mutation tests behind a new contract version",
+        "wid": "w2"
+      },
+      {
+        "evidence": "ce5ca15: 45-session pilot (generation v6pilot, pilot_pass true) then 180-session matrix under D5. 180/180 executed, zero failures, live memory byte-identical, no leaked transcripts. Frozen gates enforced via --contract v6: zero action_safety failures in all arms; single blocker response_properties 0.879 vs frozen 0.95, bar NOT moved. Fixed my own oracle bug mid-flight: asserted_conclusion wrongly in forbidden_actions caused 30 arm-symmetric false failures.",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "notes": null,
+        "started_at": "2026-08-04T13:52:25Z",
+        "started_branch": "fix/git-identity-cloud-rca-maiixe-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "After explicit Joe authorization for quota, run the v6 pilot and enforce the frozen gates",
+        "wid": "w3"
+      },
+      {
+        "evidence": "ce5ca15: reports/promotion-decision-v6.md — no-promote. Names evidence, the v5-vs-v6 verdict difference (20 vs 0 treatment failures on identical runs), the oracle bug and fix, four residual risks, and TAKES the privacy decision on rendering the real candidate rather than deferring it.",
+        "item_id": "memory-evaluator-decision-taxonomy-redesign",
+        "notes": null,
+        "started_at": "2026-08-04T13:52:27Z",
+        "started_branch": "fix/git-identity-cloud-rca-maiixe-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Publish the v6 packet with an explicit promote-eligible or no-promote recommendation",
+        "wid": "w4"
+      }
+    ]
+  }
+}

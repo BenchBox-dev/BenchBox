@@ -1,0 +1,300 @@
+{
+  "context": "Order the work units to minimize risk: hooks first (w1) is the\nload-bearing change; fanout (w2) depends on hooks being opt-in;\nlock (w3) is independent but read tests/README.md:257 first to\nunderstand the existing rationale; docs (w4) reflect the new\nreality; blind-spots (w5) are the protocol-debt cleanup; PR (w6)\nships everything as one cohesive unit.\n\nFor w1, prefer wrapping hook commands in `bash -c` with the env-var\nguard — it's smaller than rewriting hook definitions and easier to\nrevert if something breaks.\n\nFor w2, the `xargs -P` approach is simpler than GNU parallel\n(parallel may not be installed). Keep the per-worktree output\nprefixed with the worktree name so logs remain readable.\n",
+  "description": "First implementation step of the dev-loop simplification plan. Removes\nlocal-loop friction so agents can push and run `pr-fanout` without\nhook serialization, while preserving the global test lock that protects\nthe workstation from concurrent xdist storms.\n\nThis step also captures the consolidated L2 blind-spot findings from\nthe four-round merge-loop audit to `_project/blind-spots/`, satisfying\nthe protocol-debt accumulated during the planning rounds.\n\nSingle PR via `make pr-open`. Independently shippable; no dependency\non Steps 2-4 landing first.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "localize the test lock to per-worktree by default",
+        "instead": "keep global default and offer override only",
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "why": "10 concurrent xdist runs (auto-workers) would exhaust CPU and produce timing-flake"
+      },
+      {
+        "dont": "remove pr-refresh target in this PR",
+        "instead": "that target stays useful until then",
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "why": "branch protection still requires up-to-date until Step 3 lands"
+      },
+      {
+        "dont": "skip the blind-spot capture (w5)",
+        "instead": "they are 6 small files",
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "why": "the protocol explicitly requires file-first capture and this is the natural home"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "needs_item": "dev-loop-step-0-verify-assumptions"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-30T00:00:00Z",
+      "created_at": "2026-04-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing pr-fanout output structure (one section per worktree) — only parallelism changes, not the report shape",
+        "item_id": "dev-loop-step-1-local-loop-cleanup"
+      },
+      {
+        "behavior": "Existing test runtime when BENCHBOX_PREPUSH is set — no functional change to the hook itself",
+        "item_id": "dev-loop-step-1-local-loop-cleanup"
+      },
+      {
+        "behavior": "Global test lock as the DEFAULT — agents that don't set the env var continue to be CPU-protected",
+        "item_id": "dev-loop-step-1-local-loop-cleanup"
+      },
+      {
+        "behavior": "make pr-preflight as a working manual command (it is the human-facing escape hatch)",
+        "item_id": "dev-loop-step-1-local-loop-cleanup"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml (Step 4 owns this)"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/test.yml (Step 3 owns this)"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub branch protection / rulesets (Step 3 manual deployment)"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile pr-refresh target (Step 3 deprecates this; here it stays)"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile worktree-add, worktree-prune, worktree-pool-* targets (Step 2 owns these)"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "kind": "only_modify",
+        "path_glob": ".pre-commit-config.yaml"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md (manual-coordination and pre-push hook paragraphs)"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md (manual-coordination and pre-push hook paragraphs)"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "kind": "only_modify",
+        "path_glob": "Makefile (pr-fanout target only)"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-04-30-*.md (6 new files)"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "kind": "only_modify",
+        "path_glob": "tests/README.md (around line 257)"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "kind": "only_modify",
+        "path_glob": "tests/conftest.py (lock-path logic only)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "BENCHBOX_PREPUSH= uv run -- pre-commit run --hook-stage pre-push --all-files 2>&1 | grep -cE '(Skipped|Passed)'",
+        "description": "All pre-push hooks no-op when BENCHBOX_PREPUSH is unset",
+        "expected": "matches the count of pre-push hooks in .pre-commit-config.yaml",
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_PREPUSH=1 uv run -- pre-commit run pr-preflight-fast-tests --hook-stage pre-push --all-files 2>&1 | tail -3",
+        "description": "Pre-push hooks execute when BENCHBOX_PREPUSH=1",
+        "expected": "hook runs (success or expected failure on uncommitted state); does not skip",
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -E '^PR_FANOUT_JOBS \\?= ' Makefile",
+        "description": "pr-fanout default parallelism is 4",
+        "expected": "PR_FANOUT_JOBS ?= 4",
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_TEST_LOCK_DIR=/tmp/bb-lock-test uv run -- python -m pytest -m fast -q tests/unit/ -x 2>&1 | tail -5 && ls /tmp/bb-lock-test/test.lock",
+        "description": "Test lock honors BENCHBOX_TEST_LOCK_DIR override",
+        "expected": "lock file present at /tmp/bb-lock-test/test.lock; tests run normally",
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from pathlib import Path; from tests.conftest import _get_test_lock_path; print(_get_test_lock_path() == Path.home() / '.benchbox' / 'test.lock')\"",
+        "description": "Default test lock still uses ~/.benchbox/",
+        "expected": "True",
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE '(Drain one at a time|One PR per file area|Sequential by design|pre-push hook.*runs the fast lane|re-runs the fast lane automatically)' CLAUDE.md AGENTS.md",
+        "description": "Stale guidance removed from agent-facing docs",
+        "expected": "0",
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'BENCHBOX_PREPUSH=1|pre-push hooks.*opt-in|make pr-preflight.*explicit|explicit.*make pr-preflight' CLAUDE.md AGENTS.md",
+        "description": "Agent docs say pre-push fast lane is opt-in and pr-preflight is explicit",
+        "expected": ">= 2",
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "ls _project/blind-spots/2026-04-30-*.md | wc -l",
+        "description": "Six blind-spot findings recorded",
+        "expected": "6",
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "notes": "Audit `.pre-commit-config.yaml` for every hook with `stages:\n[pre-push]`. Currently includes at minimum:\n  - `pr-preflight-fast-tests`\n  - `timing-policy-fast-lane`\nWrap each entry's command in a guard:\n  `if [ \"$BENCHBOX_PREPUSH\" = \"1\" ]; then <existing-cmd>; else exit 0; fi`\nOr use the `args` / `entry` pattern that pre-commit supports.\nDefault behavior: hooks no-op unless env var is set. `make\npr-preflight` remains the explicit human-facing invocation\n(does not depend on the env var).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Gate all expensive pre-push hooks behind BENCHBOX_PREPUSH=1",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "notes": "Change `pr-fanout` target in `Makefile` from sequential to parallel.\nAdd `PR_FANOUT_JOBS ?= 4` near the top. Use `xargs -P \"$(PR_FANOUT_JOBS)\"`\nor GNU `parallel -j \"$(PR_FANOUT_JOBS)\"` to fan out\n`make pr-open` calls across worktrees. Drop the\n\"Sequential by design\" comment block. Document the env var in\nthe help target.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make pr-fanout bounded-parallel with PR_FANOUT_JOBS=4 default",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "notes": "Read `tests/conftest.py` and locate the lock acquisition logic\n(currently `~/.benchbox/test.lock`). Do NOT change the default —\na global lock is what prevents 10 concurrent xdist runs from\nsaturating the workstation. Add an env-var-aware helper, e.g.\n`_get_test_lock_path()`, that returns:\n  `Path(os.environ.get(\"BENCHBOX_TEST_LOCK_DIR\",\n                       Path.home() / \".benchbox\")) / \"test.lock\"`\nUpdate `Makefile` `test-unlock` target to honor the same env var.\nUpdate `tests/README.md:257` area to document the override and\nexplain WHY the default stays global.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Keep global test lock; add BENCHBOX_TEST_LOCK_DIR override",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "notes": "Remove from both files:\n  - \"Drain one at a time, oldest first\" (and surrounding pr-refresh prose)\n  - \"One PR per file area at a time\"\n  - \"Sequential by design\" notes around pr-fanout\n  - Any claim that the pre-push hook reruns the fast lane\n    automatically on every push\nReplace with a one-paragraph summary of the new model: pool\nworktrees + auto-merge + post-merge auto-revert as safety net.\nUpdate the pre-push-hook guidance to say expensive pre-push hooks\nare opt-in via `BENCHBOX_PREPUSH=1`; `make pr-preflight` is the\nexplicit local gate for humans/agents that want the fast lane before\npushing.\nNote that this paragraph will be expanded by Steps 2 and 4 once\nthose land; here, just remove the now-incorrect guidance.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Strip manual-coordination guidance from CLAUDE.md and AGENTS.md",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "notes": "Six findings from the four-round merge-loop audit (2026-04-30 session):\n  1. Original plan bundled \"stop babysitting PRs\" with \"promote\n     develop to release-grade gating\" — separable decisions\n  2. PR CI on develop is already heavy today; reducing it is the\n     highest-leverage standalone move\n  3. Test-lock localization is not a pure win at scale; the global\n     lock has a real CPU-protection job (10 worktrees × xdist auto)\n  4. A queue creates a single point of failure with no analog in\n     current setup\n  5. Dwell time silently changes the agent contract (5 min today\n     vs hours under a queue)\n  6. develop-post-merge.yml is the actual safety net; queue plan\n     kept it as belt-and-suspenders without resolving the tension\nOne file per finding under `_project/blind-spots/2026-04-30-HHMMSS-<slug>.md`\nusing the frontmatter schema from `_project/blind-spots/README.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture consolidated L2 blind-spot findings to _project/blind-spots/",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-1-local-loop-cleanup",
+        "notes": "Run `make lint format typecheck`, then\n`BENCHBOX_PREPUSH=1 make pr-preflight` to confirm the opt-in path\nstill works. Then `make pr-open`. Do NOT enable the new env var\nglobally; the point is that absence-of-var is the new default.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run validation locally and open the PR",
+        "wid": "w6"
+      }
+    ]
+  }
+}

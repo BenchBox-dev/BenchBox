@@ -1,0 +1,146 @@
+{
+  "description": "ADR-003 changed what \"tuned\" and \"notuning\" physically mean on ClickHouse\n(session pack moved to the tuned path; tuned DDL now actually renders).\nBundles record benchbox_version but nothing semantically marks which\ntuning-policy generation produced a run, so third-party bundles spanning\nthe seam can be compared without any warning. Add a compact\ntuning_policy_generation marker to the bundle tuning block (e.g. \"adr3-v1\";\nemitted by result capture, constant defined beside the ledger vocabulary),\ningest it in the explorer, and have ComparabilityReceipt warn when compared\nruns carry different generations (absent = pre-seam, treated as its own\ngeneration). The seed corpus is already clean (pre-seam tuned bundles were\ndropped in #1185); this protects third-party submissions.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "overload benchbox_version parsing as the seam signal",
+        "instead": "(not specified)",
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "why": "explicit marker only"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "needs_item": "tuning-renderer-consolidation-and-baseline-policy-20260712"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-22T22:13:43Z",
+      "completed_pr": 1270,
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Facet MATCHING unchanged (warning-only, like the mechanisms warning) unless a future ADR says otherwise",
+        "item_id": "tuning-policy-generation-seam-20260716"
+      },
+      {
+        "behavior": "Legacy bundles load unchanged",
+        "item_id": "tuning-policy-generation-seam-20260716"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/tuning/modes.py: vocabulary constants home - extend",
+        "decision": "extend",
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "path": "benchbox/core/tuning/modes.py"
+      },
+      {
+        "concept": "results-explorer/src/components/ComparabilityReceipt.tsx mechanisms warning (#1182): warning-only comparability signal pattern - reuse",
+        "decision": "reuse",
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "path": "results-explorer/src/components/ComparabilityReceipt.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/**"
+      },
+      {
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/**"
+      },
+      {
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/**"
+      },
+      {
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results tests/unit/scripts/explorer_pipeline -q -k 'generation or seam or policy'",
+        "description": "New bundle carries the marker; receipt warns on cross-generation tuned pairs",
+        "expected": "All passing",
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "last_result": "pass",
+        "last_run": "2026-07-22T22:13:06Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "New benchbox/core/tuning/policy_generation.py TUNING_POLICY_GENERATION='adr-003' (EXPLICIT marker per ADR-3, NOT benchbox_version). schema.py emits tuning_policy_generation in _build_tuning_summary + build_tuning_payload (only when tuning present, next to hashes). docs/reference/result-formats.md documents it.",
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T22:12:47Z",
+        "started_branch": "feat/tuning-policy-generation-seam",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Emit tuning_policy_generation in the bundle tuning block + companion; document in result-formats.md",
+        "wid": "w1"
+      },
+      {
+        "evidence": "explorer_pipeline transformer._tuning_policy_generation (verbatim, legacy->None) into manifest+detail; models display-only field; duckdb_builder column+view+INSERT. TS ComparabilityReceipt buildTuningPolicyGenerationField: WARNS (never blocks) when >=2 tuned runs span different generations; absent='pre-seam' (two legacy=no warning). Mirrors cross-mechanism warning. types.ts/duckdbQueries.ts wiring.",
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T22:12:56Z",
+        "started_branch": "feat/tuning-policy-generation-seam",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Explorer ingest + receipt warning across differing generations (absent = pre-seam generation)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "test_tuning_provenance_export (marker in summary+companion; omitted no-tuning); test_transformer (verbatim ingest manifest+detail; None legacy); test_duckdb_browser_contract (column); ComparabilityReceipt.test.tsx (warns cross-gen; no warn same-gen/both-pre-seam). 59 passed (-k generation/seam/policy); 1041 passed broad; ruff/ty clean. FACET MATCHING UNCHANGED (0 refs in ranking/facetMatching/facetModel). Legacy loads unchanged. npm verifies in CI (node_modules absent).",
+        "item_id": "tuning-policy-generation-seam-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T22:12:58Z",
+        "started_branch": "feat/tuning-policy-generation-seam",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Tests both sides; legacy bundles unaffected except the receipt note",
+        "wid": "w3"
+      }
+    ]
+  }
+}

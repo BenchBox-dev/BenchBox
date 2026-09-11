@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #583 of pg-duckdb-platform-adapter.\nDeferred: Data lake query support (S3 Parquet/Iceberg reads via pg_duckdb)\nReason deferred: Requires cloud storage credentials and Parquet file management - separate feature",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:37:03Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

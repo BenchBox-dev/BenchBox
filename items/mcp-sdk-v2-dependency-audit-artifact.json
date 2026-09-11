@@ -1,0 +1,125 @@
+{
+  "context": "Run the canonical dependency audit generator after the MCP SDK 2 manifest and lock changes, review the generated diff to confirm it contains only the two intended MCP constraint updates, and verify the check mode passes. This artifact must travel in the same PR as its source manifest because either half alone is mechanically invalid.",
+  "description": "The MCP SDK 2 migration changes both declared mcp constraints from mcp>=1.28.1,<2 to mcp>=2,<3. The repository's dependency-audit-raw.md is a generated manifest inventory and its drift gate fails until that artifact is regenerated atomically with the dependency change.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hand-edit the generated dependency audit",
+        "instead": "run _project/scripts/dependency_audit/parse_deps.py",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact",
+        "why": "manual edits can diverge from the canonical renderer"
+      },
+      {
+        "dont": "land the artifact separately from its source manifest",
+        "instead": "include it atomically in the MCP SDK 2 migration PR",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact",
+        "why": "one side of either PR would fail the drift guard"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact",
+        "needs_item": "mcp-sdk-v2-server-migration-v2"
+      }
+    ],
+    "item_meta": {
+      "category": "compatibility",
+      "created_at": "2026-08-01T20:19:00Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "No dependency declaration or lock resolution is changed by this follow-up",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact"
+      },
+      {
+        "behavior": "The artifact changes only the two MCP declarations migrated by its prerequisite",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact"
+      },
+      {
+        "behavior": "The generated audit remains a faithful rendering of pyproject.toml",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact",
+        "kind": "do_not_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact",
+        "kind": "only_modify",
+        "path_glob": "docs/development/dependency-audit-raw.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/dependency_audit/parse_deps.py --check",
+        "description": "The committed dependency audit matches pyproject.toml",
+        "expected": "the drift check exits successfully",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff -- docs/development/dependency-audit-raw.md | rg -q 'mcp>=2,<3'",
+        "description": "The generated diff is limited to the intended MCP constraints",
+        "expected": "the audit diff records the MCP 2 range and no unrelated dependency changes",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Regenerate dependency-audit-raw.md with the canonical parser",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Review the generated diff and prove check mode is clean",
+        "wid": "w2"
+      }
+    ]
+  }
+}

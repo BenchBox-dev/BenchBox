@@ -1,0 +1,404 @@
+{
+  "context": "Treat this as an architecture/design gate. Read canonical JOB behavior, TPC-DS\ncompliance labeling, result-bundle metadata, runner phase handling, and\nplatform stats/analyze support before recommending implementation. The output\nshould be a decision record plus an updated TODO for the chosen prototype.\nWrite the main decision to\n`_project/decisions/joinorder-scale-stress-decision-<date>.md`; do not use\nthe licensing filename prefix for the main architecture decision.\n\nCross-TODO write coordination: w7 may update the prototype TODO file\n(`joinorder-replicated-imdb-scale-prototype.yaml`) to copy the chosen\nscope and success criteria. Before doing so, verify the prototype is\nquiescent: status: \"Not Started\" and no work units in_progress. If the\nprototype is in flight, w7 instead writes the recommendation to the\ndecision note ONLY and lets the implementing agent on the prototype\nside update their own TODO at the next checkpoint.\n",
+  "description": "Define whether and how BenchBox should add a scaled JOB-derived benchmark for\nevaluating the interplay of optimizer statistics maintenance, predicate\nselectivity, cardinality estimation, planning limits, and physical execution\nthresholds at large data scales.\n\nThis item is deliberately a decision framework, not an implementation. It\nshould conclude with a recommendation on which scale-up path, if any, is worth\nprototyping after canonical JOB has a reliable dataset contract and oracle.\nThe primary decision record is\n`_project/decisions/joinorder-scale-stress-decision-<date>.md`; licensing is\ncaptured separately in\n`_project/decisions/joinorder-scale-stress-licensing-<date>.md`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "build graph expansion before defining validation gates",
+        "instead": "define measurement gates first.",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "why": "synthetic correlations can look plausible while destroying the JOB signal"
+      },
+      {
+        "dont": "call a scaled derived workload 'JOB' without a qualifier",
+        "instead": "use explicit labels such as replicated_imdb or job_scale_stress.",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "why": "users may assume literature comparability"
+      },
+      {
+        "dont": "choose offset replication only because it is easiest",
+        "instead": "evaluate whether it answers the benchmark question.",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "why": "it may hide the statistics/predicate-selectivity problem"
+      },
+      {
+        "dont": "fold stats-build timing into load or query execution",
+        "instead": "require separate stats/analyze phase accounting.",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "why": "the core research question includes statistics maintenance"
+      },
+      {
+        "dont": "proceed on intuition that optimizers fail at scale",
+        "instead": "collect documented examples or local evidence first.",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "why": "this benchmark must justify a distinct workload identity"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-scale-stress-decision-framework",
+        "id": 424,
+        "reason": "This item is the decision framework. Implementation belongs in a follow-up TODO after w7 chooses a path.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: 'Implement any scaled JOB generator' is exactly the follow-up now tracked as track2-joinorder-scaling-strategy (select+implement JOB scaling strategy).",
+        "summary": "Implement any scaled JOB generator"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-scale-stress-decision-framework",
+        "id": 425,
+        "reason": "This decision item must decide whether that is required and create a dedicated TODO if so.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Follow-up TODOs track2-joinorder-stats-phase.yaml and track2-joinorder-stats-phase-controls.yaml are both already in _project/DONE; statistics/analyze accounting was implemented.",
+        "summary": "Implement first-class statistics/analyze phase accounting"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-scale-stress-decision-framework",
+        "id": 426,
+        "reason": "Explorer work depends on final result-bundle fields and benchmark labels.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Scale-stress dashboard/explorer UI blocked on final result-bundle fields/labels stabilizing; no evidence that dependency has landed.",
+        "summary": "Build dashboard/explorer UI for scale-stress metrics"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "needs_item": "joinorder-canonical-foundation"
+      }
+    ],
+    "item_meta": {
+      "category": "Benchmark Development",
+      "created_at": "2026-05-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A scaled JOB-derived prototype must not start until stats/analyze phase requirements are either satisfied or explicitly scoped out in the decision note.",
+        "item_id": "joinorder-scale-stress-decision-framework"
+      },
+      {
+        "behavior": "Canonical joinorder remains fixed to canonical_imdb SF=1 and is never silently replaced by derived scale modes.",
+        "item_id": "joinorder-scale-stress-decision-framework"
+      },
+      {
+        "behavior": "Derived workloads must report their data-generation strategy, dataset version, generator version, seed, and stats protocol.",
+        "item_id": "joinorder-scale-stress-decision-framework"
+      },
+      {
+        "behavior": "If w7 mutates the prototype TODO file, the prototype TODO must be quiescent (no in-progress work units) at the time of mutation; otherwise concurrent edits create lost-write risk.",
+        "item_id": "joinorder-scale-stress-decision-framework"
+      },
+      {
+        "behavior": "Query validation must use the canonical oracle contract from joinorder-canonical-foundation when applicable.",
+        "item_id": "joinorder-scale-stress-decision-framework"
+      },
+      {
+        "behavior": "The scale-stress decision record and licensing record use distinct filename prefixes so verification commands cannot read the wrong document.",
+        "item_id": "joinorder-scale-stress-decision-framework"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/joinorder-scale-stress-decision-framework.yaml"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/track2-joinorder-stats-phase.yaml (canonical stats-phase follow-up slug; seeded by track2-groundwork w2 — referenced from this TODO's `Stats phase gate: dependency:` line, not created here)"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/joinorder-scale-stress-decision-*.md"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/joinorder-scale-stress-licensing-*.md"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/join-order.md"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "kind": "only_modify",
+        "path_glob": "docs/development/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -hEc '^## (Benchmark question|Scale semantics|Statistics phase|Scale-up options|Validation gates|Fixed vs parameterized|Recommendation|CI cost|Licensing posture)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'",
+        "description": "Decision note covers all required sections (programmatic header check)",
+        "expected": ">= 9",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -hEc '^\\| (DuckDB|PostgreSQL|ClickHouse|StarRocks|Spark) ' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'",
+        "description": "Per-engine stats compatibility matrix lists 4+ engines",
+        "expected": ">= 4",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -hEc 'canonical_imdb|replicated_imdb|expanded_imdb|parameterized_imdb|synthetic_schema' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'",
+        "description": "Workload labels (canonical_imdb, replicated_imdb, etc.) are defined with comparability rules",
+        "expected": ">= 5",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -hEc '^Stats phase gate: (completed|smoke-only|dependency:track2-joinorder-stats-phase)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'",
+        "description": "Stats/analyze prototype gate is concrete and machine-checkable",
+        "expected": "1",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -hEc '^Recommendation: (no scaled JOB|replicated_imdb baseline|expanded_imdb research|parameterized_imdb|staged combination)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'",
+        "description": "Recommendation is explicit and unambiguous (one of 5 named choices, not 'maybe')",
+        "expected": "1",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -hEc 'non-empty (checks|results) (are )?insufficient|q-error|cardinalit' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'",
+        "description": "Validation gates section explicitly rejects non-empty-only checks",
+        "expected": ">= 2",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -hEc '^## (Posture|Hosting model|Attribution|Takedown contact)' _project/decisions/joinorder-scale-stress-licensing-*.md | awk '{ s += $1 } END { print s }'",
+        "description": "Licensing posture for derived workloads is recorded with required fields",
+        "expected": ">= 4",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph remains valid",
+        "expected": "Graph validation passed",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/DONE/main/planning/joinorder-scale-stress-decision-framework.yaml",
+        "description": "This item validates individually",
+        "expected": "is valid",
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "notes": "Before choosing a scaled JOB-derived path, collect evidence that the target\nproblem is real and distinct from canonical JOB. Include at least three of:\n  - documented optimizer/cardinality/statistics failures that appear only\n    or primarily at larger data scales;\n  - BenchBox-local observations from prior large-scale runs;\n  - engine documentation describing sampled, stale, partition, or\n    incremental statistics limits;\n  - academic or vendor papers on optimizer search, planning-time, or\n    statistics-maintenance breakdowns at scale.\nThe decision note must separate this evidence from the original JOB paper's\nfixed-dataset cardinality-estimation problem.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Collect evidence for optimizer and statistics failures at scale",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "notes": "Produce a short decision note that separates:\n  - canonical JOB comparability,\n  - physical scale stress,\n  - statistics maintenance stress,\n  - predicate selectivity drift,\n  - optimizer search/planning-time limits,\n  - distributed skew and spill behavior.\nExplicitly state that scaled JOB-derived results are not canonical JOB\nresults.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write the benchmark question and non-goals",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "notes": "Decide whether scale factor means total rows, title count, all major\nentity classes, bytes, or expected query cardinality. Define labels and\nresult-bundle fields for at least:\n  - canonical_imdb\n  - replicated_imdb\n  - expanded_imdb\n  - parameterized_imdb\n  - synthetic_schema\nDocument how each label affects comparability and publication.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define scale semantics and workload labels",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "notes": "Decide whether BenchBox needs a first-class stats/analyze phase before\nscale-stress work can be meaningful. The decision must cover:\n  - no/default stats,\n  - fresh sampled stats,\n  - fresh full or high-quality stats where supported,\n  - stale stats after loading additional scale,\n  - incremental or partition stats where supported.\nMeasurements should keep load, stats-build, planning, and execution time\nseparate. Capture engine-specific stats metadata where available.\n\nPer-engine compatibility matrix (REQUIRED — addresses the\n\"engines without ANALYZE\" gap):\n  | Engine | Has explicit ANALYZE? | Auto-stats on load? | Sampled mode? |\n  | DuckDB | yes (ANALYZE)         | yes (background)    | n/a           |\n  | PostgreSQL | yes (ANALYZE)     | no                  | yes           |\n  | ClickHouse | partial (per-table) | yes (on insert)   | n/a           |\n  | StarRocks | yes (ANALYZE TABLE)| no                  | yes           |\n  | Spark | yes (ANALYZE TABLE)    | no                  | yes           |\nConcrete numbers TBD during implementation; bind them in the\ndecision note. For engines without an explicit ANALYZE, the\nstats-phase wall-clock is reported as zero with `stats_mode:\nauto-on-load` recorded in result bundle metadata so the\nattribution is unambiguous.\n\nMeasurement methodology (REQUIRED):\n  - Cold cache vs warm cache: each phase begins with documented\n    cache state (e.g., drop_caches before stats-build, no drop\n    between stats-build and planning).\n  - Per-engine knobs: explicit configuration per engine\n    documented in the decision note (e.g., default_statistics_target\n    for PostgreSQL, sample size for StarRocks).\n  - Idempotence: re-running ANALYZE on already-analyzed data\n    must produce the same plan (sanity check).\nIf a first-class stats/analyze phase is required, the canonical\nslug for that follow-up TODO is\n`_project/TODO/main/planning/track2-joinorder-stats-phase.yaml`\n(seeded by joinorder-track2-groundwork w2; reuse rather than\ncreating a separate `joinorder-statistics-phase-measurement.yaml`\nto avoid duplicate stewardship). Make any implementation prototype\ndepend on that TODO before coding. The decision must identify\nrequired changes to runner phases, result bundles, platform\nadapter hooks, CLI phase parsing, and validation/reporting.\nThe decision note must include exactly one machine-checkable line:\n`Stats phase gate: completed`, `Stats phase gate: smoke-only`, or\n`Stats phase gate: dependency:track2-joinorder-stats-phase`.\nUse `smoke-only` only when the prototype is explicitly narrowed so it\ncannot claim publication-quality stats-maintenance conclusions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Specify statistics-maintenance phases and measurements",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "notes": "Compare at least these options:\n  - offset replication of canonical IMDB,\n  - predicate-preserving augmentation,\n  - profiled graph expansion,\n  - parameterized JOB-like query generation,\n  - newer real IMDb snapshot if legally and technically viable.\nFor each option, evaluate correlation fidelity, implementation cost,\nvalidation oracle availability, statistics-stress usefulness, and risk of\nmisleading users.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Compare scale-up implementation options",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "notes": "The validation gate must include:\n  - FK integrity,\n  - per-table row counts,\n  - predicate-domain frequencies,\n  - per-column null counts,\n  - fixed-query result cardinalities,\n  - pre-aggregate match counts,\n  - important join-subgraph cardinalities,\n  - q-error profile where a reference estimator or engine output exists,\n  - plan shape and planning-time summaries.\nNon-empty checks are explicitly insufficient.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define validation gates for any scaled JOB-derived workload",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "notes": "Decide whether the first scaled workload should:\n  - keep the fixed 113 JOB queries and study what happens as the database\n    grows around those fixed literals, or\n  - generate parameterized JOB-like queries whose predicates are sampled\n    from the scaled graph.\nIf both are useful, define separate result labels and do not mix them in\none leaderboard/cohort.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide fixed 113 queries versus parameterized JOB-like queries",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "notes": "End with a written recommendation:\n  - no scaled JOB for now,\n  - replicated_imdb baseline only,\n  - expanded_imdb research prototype,\n  - parameterized_imdb benchmark family,\n  - or staged combination.\nThe recommendation must name the smallest next prototype and its\nverification criteria.\n\nCI cost & infrastructure section (REQUIRED):\n  - Estimated dataset size for each scale tier evaluated\n    (e.g., replicated SF=2 ~ 3 GB Parquet, SF=10 ~ 15 GB)\n  - Cache strategy: CI runner cache vs fresh download per run\n    (size × runner-count × frequency = monthly bandwidth)\n  - Download-failure handling: retry policy, fallback if\n    hosted Release is unreachable, abort threshold\n  - Cost ceiling per matrix run (rough $/run for cloud\n    engine matrix if deferred from prototype)\n\nLicensing posture for derived workloads (REQUIRED):\n  - State whether the chosen scale-up path requires fresh\n    licensing review (e.g., redistributing a synthesized\n    dataset created from canonical IMDb data may need its\n    own DATA-LICENSE.md provenance trail).\n  - For replicated_imdb specifically: derived archive carries\n    source canonical dataset_version; redistribution posture\n    inherits canonical's license review (foundation TODO's\n    context_sections.Research Findings) unless transformation\n    is material.\n  - For parameterized_imdb: queries-only (no derived data\n    archive) — no new license review needed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Produce a go/no-go recommendation and prototype scope",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-scale-stress-decision-framework",
+        "notes": "Output: `_project/decisions/joinorder-scale-stress-licensing-<date>.md`\n\nThe recommended path from w7 may require its own licensing\nreview (separate from the canonical foundation's). Pin it\nexplicitly so future archive publishers don't have to\nre-derive the analysis:\n  - Posture (low / ambiguous / high) for the derived form\n  - Required attribution and disclaimers\n  - Hosting model (GitHub Release / user-supplied path / both)\n  - Takedown contact (inherits from canonical unless changed)\n\nIf w7 chooses \"no scaled JOB for now\", still use the four headings above;\neach section may state that no derived archive is planned and licensing\nreview re-opens when scale-stress work resumes. If the recommendation is\nreplicated_imdb, the licensing note must also state whether the\nstatistics/analyze phase blocker is satisfied, deferred with a narrower\nprototype scope, or represented by a new TODO that the prototype must\ndepend on.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pin the licensing decision for the recommended scale-up path",
+        "wid": "w8"
+      }
+    ]
+  }
+}

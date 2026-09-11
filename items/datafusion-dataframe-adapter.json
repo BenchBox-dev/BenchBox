@@ -1,0 +1,10 @@
+{
+  "description": "Implement a DataFusion DataFrame adapter for BenchBox, enabling TPC-H benchmark\nexecution using DataFusion's Python bindings. DataFusion belongs to the Expression\nfamily (like Polars), offering lazy evaluation, Arrow-native execution, and\ncompetitive single-node performance.\n\nCurrent State:\n- BenchBox has no DataFusion integration (neither SQL nor DataFrame)\n- Expression family base class exists (ExpressionFamilyAdapter)\n- Polars adapter serves as reference implementation for Expression family\n- TPC-H queries have dual implementations (pandas_impl, expression_impl)\n\nValue Proposition:\n- Fastest single-node Parquet engine (ClickBench 2024)\n- Apache Arrow native - zero-copy data interchange\n- SQL and DataFrame API in same engine\n- Rust core with Python bindings - memory safe, performant\n- Growing adoption (InfluxDB 3, GlareDB, OpenObserve)",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Enhancement",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

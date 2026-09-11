@@ -1,0 +1,11 @@
+{
+  "description": "Extract file format detection and compression extension handling to a centralized utility.\n\nCurrently, compression extension sets and format detection logic are duplicated across 5+ files\nwith inconsistent coverage (some include .snappy, others don't; some handle .lz4, others don't).\n\nThis violates DRY and creates maintenance burden - adding a new compression format requires\nupdating multiple scattered locations.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-25T00:00:00Z",
+      "created_at": "2026-01-25T00:00:00Z",
+      "worktree": "core-functionality"
+    }
+  }
+}

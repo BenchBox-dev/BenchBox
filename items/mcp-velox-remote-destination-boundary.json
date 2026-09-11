@@ -1,0 +1,80 @@
+{
+  "context": "Decide between the two shapes the ClickHouse item already validated, and prefer the cheaper one unless remote Velox is a real MCP use case. (a) Drop `deployment` from MCP_PLATFORM_OPTION_ALLOWLIST['velox'] entirely: local is the only deployment MCP can fully describe, since `endpoint`, `gluten_jar_path` and the rest are not admissible anyway, so a caller asking for `remote` is asking for a run that cannot be configured through this boundary. (b) If remote Velox must stay reachable, mirror BENCHBOX_MCP_CLICKHOUSE_PROFILES: add a server-owned velox endpoint profile registry, accept only a profile name, resolve it in _prepare_adapter_platform_options at execution time so durable replays re-resolve, and reject `deployment='remote'` without a profile. Do NOT simply suppress the endpoint from the error text -- the connection attempt itself is the boundary crossing, not just its error message. Whichever is chosen, update tests/unit/mcp/test_schemas.py:272 and the 'Server-owned ClickHouse connection profiles' section of docs/operations/mcp-remote-security.md so the documented rule covers every connection-class option, not just ClickHouse.",
+  "description": "The ClickHouse remediation (#1510) established that a connection-class platform option must name a server-owned destination, never describe one. `velox.deployment` is classified `security_class=\"connection\"` in MCP_PLATFORM_OPTION_CONTRACT but was never brought under that rule, so an authenticated MCP caller can still steer the server at a listener the operator never approved.\n\nReproduced on develop 4836e3988d:\n  validate_platform_options('velox', {'deployment': 'remote'}) -> {'deployment': 'remote'}   (accepted)\n  _prepare_adapter_platform_options -> {'deployment': 'remote'}                              (unchanged)\n  VeloxAdapter.from_config(...).endpoint -> 'sc://localhost:50051'\n\nbenchbox/platforms/velox.py:153 defaults the Spark-Connect endpoint to sc://localhost:50051 when the caller supplies none, and MCP does not allow `endpoint`, so `remote` always resolves to that fixed host-local target. benchbox/platforms/velox.py:370 then calls SparkSession.builder.remote(endpoint), and :389-393 probes reachability and raises an error whose text contains the endpoint. A caller who cannot set a port still learns whether a Spark-Connect server is listening on localhost:50051, and can cause a connection attempt to it.\n\nThis is narrower than the ClickHouse finding (one fixed port, not caller-chosen), and on a remote deployment the operator's `allowed_platforms` policy must already include velox for it to be reachable at all -- hence high rather than critical. But it is the same defect class the batch was convened to close, left open in the platform whose item (#1520) touched this exact option: #1520 closed only the enumeration half (deployment='docker' now fails closed) and left `remote` admissible.\n\nNote that tests/unit/mcp/test_schemas.py:272 asserts `validate_platform_options('velox', {'deployment': 'remote'}) == {'deployment': 'remote'}`, so the current test suite pins the behaviour rather than questioning it. That assertion has to change with the fix.\n\nIdentified 2026-08-04 during the adversarial review of the mcp-v2-platform-options batch.",
+  "legacy": {
+    "item_meta": {
+      "category": "security",
+      "created_at": "2026-08-04T23:25:07Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI and direct-constructor use of VeloxAdapter(deployment='remote', endpoint=...) keeps working unchanged; this is an MCP admission boundary, not an adapter capability change",
+        "item_id": "mcp-velox-remote-destination-boundary"
+      },
+      {
+        "behavior": "deployment='docker' keeps failing closed with the existing explanatory hint",
+        "item_id": "mcp-velox-remote-destination-boundary"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-velox-remote-destination-boundary",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-boundary",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-boundary",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/velox.py"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-boundary",
+        "kind": "only_modify",
+        "path_glob": "docs/development/mcp-platform-option-contract.md"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-boundary",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-boundary",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-boundary",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_velox_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.mcp.schemas import validate_platform_options as v, MCPValidationError; import sys; \\ntry:\\n  v('velox', {'deployment': 'remote'}); sys.exit(1)\\nexcept MCPValidationError: sys.exit(0)\"",
+        "description": "MCP cannot produce a Velox adapter aimed at an unapproved endpoint",
+        "expected": "exits 1 today because bare remote is admitted; exits 0 once remote requires a server-owned destination (or is removed from the allow-list)",
+        "item_id": "mcp-velox-remote-destination-boundary",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/platforms/test_velox_adapter.py tests/unit/mcp/test_schemas.py -q -n 0",
+        "description": "The velox adapter and MCP suites still pass after the boundary change",
+        "expected": "exits 0",
+        "item_id": "mcp-velox-remote-destination-boundary",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

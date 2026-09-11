@@ -1,0 +1,204 @@
+{
+  "description": "Run benchmarks referenced in the tutorial blog posts to verify that\nall example commands work correctly and placeholder data can be replaced\nwith real results.\n\nTutorial posts affected:\n- read-primitives-introduction.md (Read Primitives benchmark)\n- tpchavoc-introduction.md (TPC-Havoc benchmark)\n- write-primitives-introduction.md (Write Primitives benchmark)\n\nReference drafts: _blog/tutorials/drafts/\n\nVerification results:\n- Read Primitives on DuckDB: 135/152 queries pass (88.8%), 31 categories\n- Read Primitives on SQLite: 74/152 queries pass (48.7%)\n- TPC-Havoc on DuckDB: 211/220 variants pass (95.9%)\n- Write Primitives on DuckDB: 73/109 operations pass (67.0%)\n\nPost-review corrections applied:\n- Fixed category count from 26 to 31 with accurate per-category counts\n- Fixed SF 0.1 row count from ~7.4M to ~866K\n- Added single-run timing caveat to TPC-Havoc results\n- Moved bulk-load caveat adjacent to results table in Write Primitives\n- Added CLI data-loading bug note to all three tutorials\n\nNote: CLI `benchbox run` has a data loading bug with sharded manifest\nfiles (files exist but loader reports \"file not found\"). Python API\nworks correctly. Benchmark commands documented with correct benchmark\nnames (read_primitives, write_primitives, tpchavoc).",
+  "legacy": {
+    "item_meta": {
+      "category": "Blog Revision",
+      "completed_at": "2026-02-20T00:00:00Z",
+      "created_at": "2025-12-15T00:00:00Z",
+      "worktree": "blog-content"
+    },
+    "work_needs": [
+      {
+        "item_id": "tutorial-benchmark-verification",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "tutorial-benchmark-verification",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tutorial-benchmark-verification",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tutorial-benchmark-verification",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "tutorial-benchmark-verification",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "tutorial-benchmark-verification",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "tutorial-benchmark-verification",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run Read Primitives on DuckDB",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document variant result mismatches (window-in-window, ambiguous refs, DUAL table)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Check if write-primitives benchmark is implemented (yes, 109 operations)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run Write Primitives (73/109 pass, 36 bulk load failures due to missing CSV test data)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update platform patterns table in read-primitives-introduction.md",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update variant timing examples in tpchavoc-introduction.md",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "benchbox run --platform duckdb --benchmark read_primitives --scale 0.1",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify all 152 queries execute (135 pass, 17 fail on unsupported features)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run Read Primitives on SQLite (comparison)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "benchbox run --platform sqlite --benchmark read_primitives --scale 0.1",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Note any skipped queries (78 fail due to limited SQL feature support)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run TPC-Havoc on DuckDB",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "benchbox run --platform duckdb --benchmark tpchavoc --scale 0.1",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "tutorial-benchmark-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify all 220 query variants execute (211 pass, 9 fail)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

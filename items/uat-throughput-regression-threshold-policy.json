@@ -1,0 +1,120 @@
+{
+  "context": "Data-first: no threshold is written until w0 shows a stable baseline. The\nfloor is a relative model derived from observed spread, implemented as an\nadditive check in the existing nightly assert step, not a rewrite of it.\n",
+  "description": "Promoted from the deferred item in\n[[nightly-throughput-gate-restoration]] (surfaced by the UAT-effort\nassessment, 2026-07-16). Restoring the nightly throughput gate detects\nbreakage (a cell fails / stream count wrong) but NOT gradual slowdown: there\nis no Throughput@Size floor per platform/scale that a green run must clear.\nWithout it, a platform can regress in performance run-over-run without the\ngate noticing.\n\nThis item defines that floor policy. It is deliberately gated on the gate\nitself being restored AND on baseline data existing, because the parent's\ndeferral reason is explicit: \"Needs baseline data from several green nightly\nruns before a floor is defensible; premature thresholds create flake.\" A\nthreshold set before there is a stable baseline manufactures false failures.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "gate on throughput before the gate that produces the baseline (nightly-throughput-gate-restoration) has run green repeatedly.",
+        "instead": "(not specified)",
+        "item_id": "uat-throughput-regression-threshold-policy",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hardcode an absolute Throughput@Size number from a single run",
+        "instead": "(not specified)",
+        "item_id": "uat-throughput-regression-threshold-policy",
+        "why": "it will flake on the next runner."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-throughput-regression-threshold-policy",
+        "id": 47,
+        "reason": "Coverage widening is tracked separately (nightly-throughput-gate-restoration defers platform widening on runtime-budget grounds); the floor policy should prove out on the one covered cell first.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Deferral's own reason states coverage widening is tracked in nightly-throughput-gate-restoration, which is open.",
+        "summary": "Extend the floor beyond DuckDB TPC-H SF1"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-throughput-regression-threshold-policy",
+        "needs_item": "nightly-throughput-gate-restoration"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "The existing stream-count hard gate stays independent — a throughput-floor failure must not mask or replace a stream-count failure.",
+        "item_id": "uat-throughput-regression-threshold-policy"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-throughput-regression-threshold-policy",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "uat-throughput-regression-threshold-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -rni 'throughput.*floor\\|Throughput@Size' .github/workflows/nightly.yml docs/operations/uat-framework.md",
+        "description": "Floor check present and documented with a data-derived value",
+        "expected": "floor check in the nightly assert + documented model/value",
+        "item_id": "uat-throughput-regression-threshold-policy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-throughput-regression-threshold-policy",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-throughput-regression-threshold-policy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-throughput-regression-threshold-policy",
+        "notes": "Confirm nightly-throughput-gate-restoration has landed and that at least\nseveral consecutive green nightly runs exist for DuckDB TPC-H SF1 (the\ncurrent single covered cell). Record the observed Throughput@Size spread.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-validate the gap and confirm baseline availability",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-throughput-regression-threshold-policy",
+        "notes": "Decision unit. Prefer a relative floor (e.g. fail if Throughput@Size drops\nmore than X% below a rolling median of the last N green runs) over a\nhardcoded absolute number, so the floor tracks hardware/runner drift.\nX and N are set from the w0 spread, not guessed. Needs sign-off — a\ntoo-tight floor flakes the gate; a too-loose floor is decorative.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Choose the threshold model (relative % floor vs absolute floor vs rolling baseline)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-throughput-regression-threshold-policy",
+        "notes": "Add the floor evaluation to the nightly throughput assert (alongside the\nexisting stream-count hard gate) and document the chosen model + values in\ndocs/operations/uat-framework.md so the number is not a magic constant.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement the floor check in the nightly assert step and document the policy",
+        "wid": "w2"
+      }
+    ]
+  }
+}

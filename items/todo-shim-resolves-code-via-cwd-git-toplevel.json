@@ -1,0 +1,93 @@
+{
+  "context": "Derive ROOT from the shim script location (not cwd git toplevel); keep git_main_root for local-fallback DB placement if that must stay shared.",
+  "description": "Defect/surprise found during 2026-08-05 tracker-simplification batch close-out.\n\n`_project/scripts/todo` does ROOT=\\$(git rev-parse --show-toplevel) then runs \\$ROOT/_project/scripts/todo_db.py. Invoking an absolute path to a worktree's shim while cwd is the primary clone (or any other tree) therefore executes that cwd tree's todo_db.py, not the shim's tree. Close-out verification wrongly concluded update was missing on develop until cwd was fixed.\n\nThis is easy to hit for agents: worktree path hard-coded, cwd left on lagging primary. After #1580/#1581 landed, primary was still at a pre-auth SHA and absolute-path calls silently ran the old CLI.\n\nDesired: either (a) resolve ROOT from the shim's own realpath (BASH_SOURCE/dir of the script) so absolute invocations hit the intended tree, or (b) document as intentional and fail loudly when the shim path and git toplevel disagree. Prefer (a) with tests.",
+  "legacy": {
+    "item_meta": {
+      "category": "tracker-simplification",
+      "completed_at": "2026-08-09T23:54:19Z",
+      "completed_pr": 1603,
+      "created_at": "2026-08-05T23:19:16Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Local fallback DB placement policy is intentional and documented if still using git_main_root",
+        "item_id": "todo-shim-resolves-code-via-cwd-git-toplevel"
+      },
+      {
+        "behavior": "uv run --project isolation and schema-version pin stay",
+        "item_id": "todo-shim-resolves-code-via-cwd-git-toplevel"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-shim-resolves-code-via-cwd-git-toplevel",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo"
+      },
+      {
+        "item_id": "todo-shim-resolves-code-via-cwd-git-toplevel",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/todo-db-tracker.md"
+      },
+      {
+        "item_id": "todo-shim-resolves-code-via-cwd-git-toplevel",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_wrapper.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": " uv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py -q -n 0 ",
+        "description": "Wrapper suite ",
+        "expected": " exit 0",
+        "item_id": "todo-shim-resolves-code-via-cwd-git-toplevel",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": " uv run -- python -c \"from pathlib import Path; import subprocess,sys; root=Path(\\\".\\\").resolve(); r=subprocess.run([str(root/\\\"_project/scripts/todo\\\"),\\\"update\\\",\\\"--help\\\"],cwd=\\\"/tmp\\\",capture_output=True,text=True); sys.exit(0 if r.returncode==0 and \\\"update\\\" in r.stdout+r.stderr else 1)\" ",
+        "description": "Absolute shim path from foreign cwd uses that tree code ",
+        "expected": " exit 0 on a develop-or-later tree",
+        "item_id": "todo-shim-resolves-code-via-cwd-git-toplevel",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-shim-resolves-code-via-cwd-git-toplevel",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "BASH_SOURCE ROOT in _project/scripts/todo PR #1603",
+        "item_id": "todo-shim-resolves-code-via-cwd-git-toplevel",
+        "notes": null,
+        "started_at": "2026-08-05T23:28:54Z",
+        "started_branch": "fix/todo-shim-cwd-root",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/batch2-shim",
+        "status": "done",
+        "summary": "Resolve ROOT from shim realpath",
+        "wid": "w1"
+      },
+      {
+        "evidence": "test_shim_resolves_code_from_own_location_not_cwd_git_root; 15 wrapper tests PR #1603",
+        "item_id": "todo-shim-resolves-code-via-cwd-git-toplevel",
+        "notes": null,
+        "started_at": "2026-08-05T23:40:39Z",
+        "started_branch": "fix/todo-shim-cwd-root",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/batch2-shim",
+        "status": "done",
+        "summary": "Wrapper tests covering absolute invocation from foreign cwd",
+        "wid": "w2"
+      }
+    ]
+  }
+}

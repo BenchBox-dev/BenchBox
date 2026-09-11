@@ -1,0 +1,60 @@
+{
+  "context": "Decide whether to pin a minimum uv version for contributors (and enforce it in the same place other tool floors live), add a pre-commit or CI guard that rejects a uv.lock revision decrease, or both. A guard is the higher-value half: it catches the case regardless of who or what ran the lock.",
+  "description": "uv.lock is committed with 'revision = 3'. Running any lock-updating command under uv 0.7.3 (current local install) rewrites it to 'revision = 2' alongside the intended change - observed 2026-07-30 while adding the ducklake extra, where the real diff was 3 added lines and the revision downgrade rode along invisibly. It was caught by reading the diff and reverted by hand. Nothing warns about it, and the downgrade is easy to commit without noticing because the substantive part of the diff looks correct.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "created_at": "2026-07-30T18:15:40Z",
+      "worktree": "ci-infrastructure"
+    },
+    "preserves": [
+      {
+        "behavior": "Legitimate uv.lock updates are still possible without special ceremony",
+        "item_id": "uv-lock-revision-downgraded-by-older-uv"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "<new guard invocation>",
+        "description": "A uv.lock revision decrease is rejected",
+        "expected": "guard fails on a revision 3 -> 2 diff and passes on an unchanged revision",
+        "item_id": "uv-lock-revision-downgraded-by-older-uv",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uv-lock-revision-downgraded-by-older-uv",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uv-lock-revision-downgraded-by-older-uv",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a guard that rejects a uv.lock revision decrease",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uv-lock-revision-downgraded-by-older-uv",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document or enforce the minimum uv version for contributors",
+        "wid": "w2"
+      }
+    ]
+  }
+}

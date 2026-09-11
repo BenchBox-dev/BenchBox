@@ -1,0 +1,136 @@
+{
+  "context": "Thread the official flag from the run configuration through to validate_tpcds_scale and classify_tpcds_run. Then add an integration-level test that runs the CLI with --official at an official scale point and asserts the emitted bundle carries compliance_class=official and passes submit - the existing unit tests cannot catch this class of defect because they bypass the caller. Check whether TPC-H and other TPC benchmarks have an equivalent gate before assuming this is TPC-DS-only. Re-run the TPC-DS cohort once fixed.",
+  "description": "REVALIDATED 2026-08-20 (corrected after adversarial review). The wiring defect is fixed on origin/develop: PR #1770 (baaf965b8) threads official through validate_tpcds_scale / classify_tpcds_run. Merged 2026-08-19T13:14:08Z, not 2026-08-18 as previously recorded here.\n\nRemaining work is w2 only: an end-to-end test asserting an --official run emits compliance_class=official and passes submit. w3 and w4 are done. Publish path is add-third-benchmark-cohort-to-corpus.\n\nDO NOT close this item on the strength of the published bundle. tpcds_sf1_duckdb_sql_20260818_093123_8c8b40ef.json (now on published-results via PR #1786, merged 2026-08-20T19:07:20Z) does carry benchmark.compliance_class=official at scale_factor 1.0, but its run.timestamp is 2026-08-18T09:31:23 -- roughly 28 hours BEFORE #1770 merged. It was produced by the pre-merge working tree. It demonstrates the change works; it is not evidence that the code now on develop produces official bundles. Only w2 closes that gap.\n\nNote also that compliance_class is asserted in tests/unit/** and tests/uat/**, but in zero tests under tests/integration/. The missing assertion is specifically the integration/end-to-end one.\n\nUnrelated: PR #1771 (platform support status in the CLI) is a separate fix and is not evidence for this item.",
+  "legacy": {
+    "item_meta": {
+      "category": "core",
+      "completed_at": "2026-08-24T08:17:53Z",
+      "completed_pr": 1864,
+      "created_at": "2026-08-18T13:24:55Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/run_service.py"
+      },
+      {
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpcds/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox run --official --seed 42 --platform duckdb --benchmark tpcds --scale 1",
+        "description": "An official run is classified official",
+        "expected": "bundle carries compliance_class=official",
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox submit <bundle>",
+        "description": "The resulting bundle submits",
+        "expected": "not refused",
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "2026-08-20 revalidation: origin/develop contains baaf965b8 (#1770); local tpcds_sf1_duckdb_sql_20260818_093123_8c8b40ef.json has benchmark.compliance_class=official",
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "notes": null,
+        "started_at": "2026-08-20T14:51:58Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Revalidate",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1770 merged 2026-08-18 as baaf965b8: official flag now reaches classify_tpcds_run on origin/develop",
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "notes": null,
+        "started_at": "2026-08-20T14:52:01Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Thread official through validate_tpcds_scale to classify_tpcds_run",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1846: tests/integration/test_tpcds_official_end_to_end.py -- 5 tests through the production path get_benchmark_instance -> build_enhanced_benchmark_result -> build_result_payload -> load_result_file -> publish_admission. Official SF1 emits compliance_class=official and admission allows it; official=False at SF1 and --official at 0.5/2.0 are refused with code unofficial_compliance. Negative control: reverting compliance_mode_kwargs to return {} fails the two official assertions and leaves the three refusals passing. pr-preflight 28011 passed, 0 failed.",
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "notes": null,
+        "started_at": "2026-08-23T18:59:15Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add an end-to-end test asserting an --official run emits compliance_class=official and passes submit",
+        "wid": "w2"
+      },
+      {
+        "evidence": "COMPLIANCE_GATED_BENCHMARKS is only {tpcds}; benchbox/core/tpch and tpcdi have no compliance_class classifier. Submit refuses unofficial TPC-DS only. TPC-H SF10/SF100 submitted without that gate in PR #1786.",
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "notes": null,
+        "started_at": "2026-08-20T16:53:19Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Check whether TPC-H and TPC-DI have the same unwired-flag defect",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Handoff complete: official TPC-DS is in PR #1786. No new wiring PR.",
+        "item_id": "tpcds-can-never-be-published-official-flag-not-wired",
+        "notes": null,
+        "started_at": "2026-08-20T16:54:28Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Handoff: submit official TPC-DS bundles via add-third-benchmark-cohort-to-corpus; do not treat this item as an Explorer launch gate",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "context": "Extract a `_insert_returns_generic(self, connection, sales_table, returns_table,\nsales_columns, returns_columns, row_generator_fn, estimated_rows)` method.\nEach channel-specific method becomes a 5-line call site passing its specific\ntable names, column lists, and row generator callback.\n",
+  "description": "Group 17 from the duplicate-check report identifies 3 copies of nearly\nidentical logic in benchbox/core/tpcds/maintenance_operations.py:\n- _insert_store_returns (line 470, ~44 lines)\n- _insert_catalog_returns (line 515, ~44 lines)\n- _insert_web_returns (line 564, ~44 lines)\n\nAll three follow the same algorithm:\n1. Log the insert count\n2. Get parameter placeholder\n3. Build SELECT ... FROM {sales_table} ORDER BY RANDOM() LIMIT {n}\n4. Execute query, fetch records\n5. Handle empty result / error cases identically\n6. Loop over records calling self._generate_{type}_returns_from_sale(sale)\n7. Call self._execute_batched_insert(connection, table, columns, rows, N)\n\nOnly the table/column names and the row generator callback differ.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-21T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Batched insert behavior identical (same batch size, same error handling)",
+        "item_id": "dedup-tpcds-maintenance-returns"
+      },
+      {
+        "behavior": "_insert_store_returns, _insert_catalog_returns, _insert_web_returns public API unchanged",
+        "item_id": "dedup-tpcds-maintenance-returns"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dedup-tpcds-maintenance-returns",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/maintenance_operations.py"
+      },
+      {
+        "item_id": "dedup-tpcds-maintenance-returns",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k tpcds",
+        "description": "TPC-DS tests pass",
+        "expected": "all tests pass",
+        "item_id": "dedup-tpcds-maintenance-returns",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dedup-tpcds-maintenance-returns",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dedup-tpcds-maintenance-returns",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dedup-tpcds-maintenance-returns",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create _insert_returns_generic parameterized helper method",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-tpcds-maintenance-returns",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _insert_{store,catalog,web}_returns to use generic helper",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-tpcds-maintenance-returns",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run TPC-DS tests to verify no regressions",
+        "wid": "w3"
+      }
+    ]
+  }
+}

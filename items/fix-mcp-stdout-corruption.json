@@ -1,0 +1,11 @@
+{
+  "description": "The MCP server emits non-protocol output to stdout during result export,\nwhich breaks stdio MCP clients like the codex CLI. For stdio MCP servers,\nstdout must contain exclusively JSON-RPC messages. When ResultExporter\nprints status lines to stdout, it corrupts the JSON-RPC stream, causing\nstrict clients to close the transport with \"Transport closed\" errors.\n\nRoot cause: ResultExporter in benchbox/core/results/exporter.py uses\nself.console.print() at multiple points (lines 167, 171, 175, 247, 255)\nto output status messages. When MCP tools create ResultExporter without\na quiet console, these messages leak to stdout.\n\nThe fix uses the existing quiet-mode infrastructure in benchbox/utils/printing.py\nwhich already provides get_quiet_console() and set_quiet() utilities.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-27T00:00:00Z",
+      "created_at": "2026-01-27T00:00:00Z",
+      "worktree": "mcp-integration"
+    }
+  }
+}

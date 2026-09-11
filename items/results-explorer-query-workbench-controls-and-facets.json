@@ -1,0 +1,277 @@
+{
+  "context": "Repair the existing visible-column test TODO before layout churn. Use\nshared label formatting so Query, receipts, and filters do not diverge.\nCollapse controls by default only when the active state remains\ndiscoverable.\n",
+  "description": "Make Query Workbench controls earn their space, keep long facets navigable,\nand replace raw internal labels with user-facing labels. Defects this item\naddresses were flagged in the 2026-05-08 Results Explorer follow-up review\n(chat-only artifact, not committed to _project/audits/). w0 rebinds the\nreview evidence against develop tip and captures it to\n_project/verification-logs/results-explorer-query-workbench-controls-and-facets/w0.log\nbefore any other work unit runs; that log replaces the previous \"review row\n#25/#26/#27/#28/#29/#30\" citations as the durable reference.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "expose raw database enum strings as primary user-facing copy.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hide selected filters inside a closed panel with no visible summary.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "remove visible-column customization to reclaim space.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "needs_item": "query-test-configure-visible-columns-failures"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend UX",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "CSV/JSON exports must continue to honor the currently visible columns.",
+        "item_id": "results-explorer-query-workbench-controls-and-facets"
+      },
+      {
+        "behavior": "Facet counts and active filter chips must remain accurate.",
+        "item_id": "results-explorer-query-workbench-controls-and-facets"
+      },
+      {
+        "behavior": "Shareable query state must keep working after controls move.",
+        "item_id": "results-explorer-query-workbench-controls-and-facets"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "kind": "do_not_modify",
+        "path_glob": "DuckDB snapshot generation unless duplicate benchmark labels cannot be resolved in presentation data."
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayLabels.ts"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/Query.test.tsx src/pages/__tests__/Home.test.tsx src/lib/__tests__/displayLabels.test.ts",
+        "description": "Query controls and label tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: browser-check /results/query and /results/ for column disclosure, facet collapse, and duplicate SSB labels'",
+        "description": "Manual Query Workbench browser check is complete",
+        "expected": "manual evidence captured in PR notes or audit artifact",
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "needs_wid": "w0",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "needs_wid": "w0",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "notes": "Walk /results/query (desktop and mobile), /results/ Browse-by-Benchmark,\nand Query CSV/JSON export against the current develop tip. Capture the\nVisible Columns control's vertical footprint, facet collapse state for\nlong Benchmark groups, duplicate SSB labels, and raw enum strings\nvisible in rows/filters/exports/receipts to\n_project/verification-logs/results-explorer-query-workbench-controls-and-facets/w0.log.\nOutput is the rebind reference for w1-w7 acceptance.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rebind Query Workbench review evidence against develop tip",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "notes": "Confirm `query-test-configure-visible-columns-failures` is closed and\nre-run `cd results-explorer && npm test -- --run src/pages/__tests__/Query.test.tsx`\nagainst develop tip to verify visible-column tests are green. Capture\nthe PASS line to\n_project/verification-logs/results-explorer-query-workbench-controls-and-facets/w1.log.\nSubsequent work units must not weaken assertions around column\nvisibility, sorting, or export behavior.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm Query Workbench visible-column contract before layout changes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "notes": "Move Visible Columns out of the dominant top content block and into a\ncompact \"Configure columns\" disclosure near the results toolbar. The\ntable and result count should be visible sooner on desktop without\nlosing column customization.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Visible Columns into a compact Configure columns disclosure",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "notes": "Add Reset to default, Select all, and Clear optional columns actions.\nPrevent users from hiding every useful data column by keeping required\nrow actions and at least one identifying/result column visible.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add reset and bulk actions to visible-column controls",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "notes": "FacetGroupSection grew a per-group expand/collapse toggle (chevron\nbutton with aria-expanded/aria-controls) and an optional\n`defaultCollapsed` flag. Selected option chips render inline when a\ngroup is collapsed so active facets stay visible without expanding.\nQuery.tsx now opts the long groups (Benchmark, Platform, Cloud region,\nInstance/warehouse) into the existing `searchable` affordance and\ndefault-collapses every secondary group beyond Benchmark/Platform/\nScale so Platform and Scale stay above the fold. FacetDrawer (mobile)\ninherits the same behavior via FacetRail. Tests added in\nsrc/components/__tests__/FacetRail.test.tsx cover default-collapsed\nrendering, toggle behavior, and search-after-expand. The Query\nintegration test was updated to expand secondary groups before\nclicking nested checkboxes (no assertion weakened). Verification log:\n_project/verification-logs/results-explorer-query-workbench-controls-and-facets/w4.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make left-rail facet groups collapsible and searchable",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "notes": "Fix duplicate SSB labels in Query Workbench facets and Home Browse by\nBenchmark. Use canonical display names or add a short qualifier so the\ntwo choices are distinguishable before navigation or filtering.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Disambiguate duplicate SSB benchmark labels",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "notes": "Add a shared display formatter for internal enum values shown to users:\ncommunity-submission, public-curated, not_applicable, validation\nstatus, visibility, cost status, and similar raw fields. Apply it to\nQuery rows, filters, exports where appropriate, result receipts, and\ntooltips.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Centralize public formatting for raw enum labels",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-query-workbench-controls-and-facets",
+        "notes": "Add tests for column disclosure open/close, bulk actions, export\nvisible column behavior, facet collapse/show all, duplicate benchmark\nlabels, and formatted enum labels. Include one browser check on\n`/results/query` with a long benchmark facet list.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover Query controls, facets, and label formatting",
+        "wid": "w7"
+      }
+    ]
+  }
+}

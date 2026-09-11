@@ -1,0 +1,225 @@
+{
+  "context": "Define path ownership and metadata promotion for draft-to-published posts. Rewrite draft-relative image and companion links at promotion. Build API docs once per release with release commit and artifact digest. Prose builds link or mount those versioned artifacts without importing the package under development.",
+  "description": "Create an independently promotable prose/site lane for docs, blog posts, images, and redirects, while consuming immutable versioned API docs built from validated package releases. Remove release-date coupling only after the lane passes shadow, production, rollback, link, route, and visual checks.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Build prose docs by importing arbitrary develop package code",
+        "instead": "mount immutable API docs from a validated release",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "why": "that re-couples site publication to an unvalidated tool state"
+      },
+      {
+        "dont": "Copy drafts to docs without path transformation",
+        "instead": "apply and test an explicit publication transform",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "why": "relative images and companion links change shape"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "needs_item": "independent-publication-a5-noop-deploy-and-automatic-rollback"
+      }
+    ],
+    "item_meta": {
+      "category": "Publication Architecture",
+      "completed_at": "2026-09-04T17:20:18Z",
+      "completed_pr": 2022,
+      "created_at": "2026-08-31T20:37:39Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing blog and docs URLs, images, RSS metadata, and cross-links remain valid.",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane"
+      },
+      {
+        "behavior": "Versioned API docs remain tied to the exact validated package release that produced them.",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Preserve the atomic Pages deploy while decoupling content build cadence",
+        "decision": "extend",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "path": ".github/workflows/docs.yml"
+      },
+      {
+        "concept": "Replace obsolete split-repository publication instructions",
+        "decision": "supersede",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "path": "_blog/PUBLISHING.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/*publication*"
+      },
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "kind": "only_modify",
+        "path_glob": "_blog/**"
+      },
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "kind": "only_modify",
+        "path_glob": "publication/**"
+      },
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "kind": "only_modify",
+        "path_glob": "scripts/blog_*"
+      },
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run sphinx-build -W -b html docs docs/_build/html && uv run sphinx-build -W -b linkcheck docs docs/_build/linkcheck",
+        "description": "Sphinx HTML and linkcheck pass against mounted release API docs",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/blog_content_validation.py _blog/building-benchbox/drafts _blog/building-benchbox/outlines",
+        "description": "Blog publication transform resolves images, companion links, dates, status, and feeds",
+        "expected": "validation passes",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/verify_lane_isolation.py --lane site",
+        "description": "A prose-only production canary changes site content without changing package, Explorer, or corpus receipts",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "docs.yml builds versioned API docs from validated releases (green every merge); live site serving",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build and attest versioned API documentation from a validated release",
+        "wid": "w1"
+      },
+      {
+        "evidence": "prose/blog lane builds independently; verify_lane_isolation --lane site PASS re-ran in-session",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build prose and blog artifact independently with publication metadata transforms",
+        "wid": "w2"
+      },
+      {
+        "evidence": "shadow integration via rehearsal workflows + gen1 preview deploy run 33814942530 (199-result DB served)",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate API docs, images, redirects, and companion links in shadow",
+        "wid": "w3"
+      },
+      {
+        "evidence": "live docs 200s throughout G2 soak; 12h all-PASS in live receipt live-gen1-2026-09-04T13:11:04Z",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Promote a prose-only canary and verify live site with unchanged tool release",
+        "wid": "w4"
+      },
+      {
+        "evidence": "rollback runbook exercised in G3 drill PR 2037; restore receipt docs/operations/publication-rollback-receipt-2026-09-04.json",
+        "item_id": "independent-publication-a6-site-and-api-docs-lane",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document rollback and editorial runbook",
+        "wid": "w5"
+      }
+    ]
+  }
+}

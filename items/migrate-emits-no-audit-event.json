@@ -1,0 +1,36 @@
+{
+  "description": "The hosted tracker moved v4 to v5 on 2026-08-04 and the events table has no record of it: migrate_backend/migrate_db update meta.schema_version inside _write_txn but never call log_event, unlike freeze, unfreeze and config which all do. Discovered empirically - the DB was already v5 before this session ran migrate, and querying events for a migrate action returned nothing, so who migrated and when cannot be recovered. This matters because migrate is step 0 of the destructive todo-db 0.3 cutover runbook: the one structural write whose provenance the runbook depends on is the one write that leaves no trace, and the audit chain still verifies without it.",
+  "legacy": {
+    "item_meta": {
+      "category": "Data integrity",
+      "completed_at": "2026-08-10T00:11:06Z",
+      "completed_pr": 1651,
+      "created_at": "2026-08-04T15:03:56Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "migrate-emits-no-audit-event",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "migrate-emits-no-audit-event",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q -k migrate_audit",
+        "description": "migrate writes an audit event",
+        "expected": "exits 1 on an unfixed tree - no such test exists and migrate emits no event today",
+        "item_id": "migrate-emits-no-audit-event",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:11:00Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

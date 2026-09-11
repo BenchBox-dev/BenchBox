@@ -1,0 +1,205 @@
+{
+  "description": "benchbox plan-history is dead end-to-end:\n- PlanHistoryStorage.add_run reads results.run_id / results.start_time /\n  results.phases — none exist on BenchmarkResults (fields are execution_id\n  / timestamp; phases arrives with qpc-01) — so it warns and no-ops\n  (history.py:78-97). Same silent-empty pattern in\n  core/manifest/plan_metadata_utils.py:38.\n- add_run has zero production callers; the CLI reads a store nothing\n  populates.\n- query_plan_history sorts ISO timestamp strings lexicographically\n  (history.py:155) — mixed-offset timestamps misorder flap detection.\n- detect_plan_flapping ignores platform: a history dir with two platforms\n  for one query id reports 100% flapping.\n\nFindings: F1.2, F7.2, plus the platform-partitioning slice of F3.4.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "compare fingerprints across fingerprint_version or across platforms in flap detection.",
+        "instead": "(not specified)",
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "keep defensive getattr(..., default) for required attributes",
+        "instead": "(not specified)",
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "why": "it converted a wiring bug into permanently-empty output."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "needs_item": "qpc-01-plan-rehydration-and-phases-view"
+      }
+    ],
+    "item_meta": {
+      "category": "Feature Completion",
+      "completed_at": "2026-07-07T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing history-file JSON shape stays readable",
+        "item_id": "qpc-08-history-and-plan-metadata-wiring"
+      },
+      {
+        "behavior": "plan-history CLI flags and output format",
+        "item_id": "qpc-08-history-and-plan-metadata-wiring"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/commands/plan_history.py",
+        "decision": "reuse",
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "path": "benchbox/cli/commands/plan_history.py"
+      },
+      {
+        "concept": "benchbox/core/manifest/plan_metadata_utils.py:25-46",
+        "decision": "reuse",
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "path": "benchbox/core/manifest/plan_metadata_utils.py:25-46"
+      },
+      {
+        "concept": "benchbox/core/query_plans/history.py:71-156",
+        "decision": "reuse",
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "path": "benchbox/core/query_plans/history.py:71-156"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/plan_history.py"
+      },
+      {
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/manifest/plan_metadata_utils.py"
+      },
+      {
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/history.py"
+      },
+      {
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/query_plans/test_plan_history.py -q",
+        "description": "add_run stores fingerprints from a real BenchmarkResults",
+        "expected": "all pass, including real-object add_run test",
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands/test_plan_history_coverage.py -q",
+        "description": "plan-history CLI end-to-end",
+        "expected": "all pass",
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "notes": "Fixed add_run to read execution_id/timestamp (not run_id/start_time) and iterate plans via iter_query_results. plan_metadata_utils was already correct (fixed by #967); no change needed there.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: fix dead attribute reads in history and plan_metadata_utils; make shape drift fail loudly instead of getattr defaults.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "notes": "Wired add_run via ResultExporter._record_plan_history (single call site, opt-in plan_history_dir arg + BENCHBOX_PLAN_HISTORY_DIR env, no-op by default, non-fatal on error). Timestamps parsed with datetime.fromisoformat for sorting; flap detection partitioned by platform.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: wire add_run into the export/post-run path; timestamp-parse sorting; partition flap detection by platform.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: end-to-end test — run add_run on a real BenchmarkResults with plans, then plan-history CLI via CliRunner shows the entry; flapping test with mixed platforms asserts partitioning.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "notes": "Opus review: flagged that add_run still used getattr(..., None) for the now-required execution_id/timestamp (spec-forbidden anti-pattern) and that the mixed-offset sort test did not actually distinguish lexicographic from chronological order. Out-of-scope forward-ref noted: flap detection compares raw fingerprints — revisit when qpc-03's fingerprint_version lands.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Review: adversarial code review (history dir lifecycle, cache staleness, fingerprint_version interaction with qpc-03).",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "notes": "Changed add_run to direct results.execution_id/results.timestamp access; rewrote the mixed-offset timestamp sort test to genuinely fail under a lexicographic sort. 88 passed, ruff/ty clean.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix: address review findings; re-run verification.",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-08-history-and-plan-metadata-wiring",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Submit PR referencing qpc-08.",
+        "wid": "w6"
+      }
+    ]
+  }
+}

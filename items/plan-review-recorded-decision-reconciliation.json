@@ -1,0 +1,76 @@
+{
+  "description": "Add a prior-decision reconciliation step to review-shaped actions on plans. Before judging steps, enumerate the recorded decision surfaces the plan's scope touches: future-state index and priority tiers, migration gates in design docs, readiness/evidence documents, and open tracker items at the relevant priority. The plan must cite each one or explicitly supersede it. Treat an unexplained demotion of recorded priority, or a dropped open gate, as a plan defect. Do not replace claim-against-code checking; add this as a parallel axis.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-17T14:45:49Z",
+      "completed_pr": 1762,
+      "created_at": "2026-08-17T13:16:21Z",
+      "worktree": "quality-governance"
+    },
+    "scope_rules": [
+      {
+        "item_id": "plan-review-recorded-decision-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "plan-review-recorded-decision-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "docs/design/future-state/**"
+      },
+      {
+        "item_id": "plan-review-recorded-decision-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.skill-sync/skills/SHARED/review-protocol/**"
+      },
+      {
+        "item_id": "plan-review-recorded-decision-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/review-protocol.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'recorded decision|prior-decision' docs/agent/review-protocol.md",
+        "description": "Protocol requires citing or superseding recorded decisions",
+        "expected": "match",
+        "item_id": "plan-review-recorded-decision-reconciliation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "plan-review-recorded-decision-reconciliation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Enumerated decision surfaces: future-state index/priority tiers, migration gates, readiness/evidence docs, open tracker items.",
+        "item_id": "plan-review-recorded-decision-reconciliation",
+        "notes": null,
+        "started_at": "2026-08-17T14:34:16Z",
+        "started_branch": "docs/review-protocol-axes-20260817",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-review-protocol-axes-20260817",
+        "status": "done",
+        "summary": "Enumerate the recorded decision surfaces plan reviews must reconcile",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added prior-decision reconciliation to docs/agent/review-protocol.md and ~/.skill-sync/skills/SHARED/review-protocol/SKILL.md. Repo mirrors stay pin-driven; lock timestamp churn reverted.",
+        "item_id": "plan-review-recorded-decision-reconciliation",
+        "notes": null,
+        "started_at": "2026-08-17T14:35:27Z",
+        "started_branch": "docs/review-protocol-axes-20260817",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-review-protocol-axes-20260817",
+        "status": "done",
+        "summary": "Add the prior-decision reconciliation step to plan-review guidance",
+        "wid": "w1"
+      }
+    ]
+  }
+}

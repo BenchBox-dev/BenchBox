@@ -1,0 +1,254 @@
+{
+  "context": "Treat this as a provisioning/lifecycle recovery, not a SQL compatibility\nfix. The first gate is service reachability on localhost:9000. Only after a\nhealthy server-backed tpch SF=0.01 cell passes or fails later in the run\nshould any ClickHouse adapter/query changes be considered.\n",
+  "description": "RC-1 is the clickhouse-server UAT wipeout: the 2026-05-31 retry artifacts\nshow 57/57 clickhouse-server cells failed with `terminal_state=no_json_nonzero`\nand empty `failure_tail`, so the original run did not expose the actionable\nerror.\n\nRe-run on 2026-06-01 after the stderr-visible diagnostic fix confirmed the\nreal failure for the smallest cell:\n\n  BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs \\\n    LOG_DIR=~/Developer/benchmark_runs/logs/clickhouse-server-rc1-repro-20260601 \\\n    TIMEOUT_S=90 make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpch SCALE=0.01\n\nResult: failed in 33.96s, log\n`~/Developer/benchmark_runs/logs/clickhouse-server-rc1-repro-20260601/clickhouse-server_tpch_0.01_20260601_103610.log`\ncaptured `Code: 210. Connection refused (localhost:9000)`. `nc -vz\nlocalhost 9000` and `localhost 8123` also returned connection refused.\n\nThe missing-extra hypothesis was checked and is not the observed failure in\nthis worktree: `clickhouse-driver` is installed and the diagnostic reached\nthe driver connection path. The UAT argv is still hardened separately so\nclickhouse-server uses its canonical uv extra instead of relying on whatever\nthe current environment has installed.\n\nFollow-up live repro on 2026-06-01 found three additional server-specific\nblockers after Docker was healthy: the local compose stack required an\nexplicit host-accessible password, the adapter selected `database=default`\nbefore creating it, and ClickHouse server mode attempted to load Docker-host\npaths through server-side `file()`, which is limited to\n`/var/lib/clickhouse/user_files`. After those fixes plus removal of\nsession-resetting unsupported `SET` statements, the smallest live cell passed:\n\n  CLICKHOUSE_HOST_PORT=19000 CLICKHOUSE_HTTP_HOST_PORT=18123 \\\n    BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs \\\n    LOG_DIR=~/Developer/benchmark_runs/logs/clickhouse-server-rc1-repro-20260601 \\\n    TIMEOUT_S=600 make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpch SCALE=0.01\n\nResult: passed in 10.24s with `submit_terminal_state=submittable`, log\n`~/Developer/benchmark_runs/logs/clickhouse-server-rc1-repro-20260601/clickhouse-server_tpch_0.01_20260601_114205.log`,\nand result\n`~/Developer/benchmark_runs/results/tpch_sf001_clickhouse_server_sql_20260601_114215_e1a77de5.json`.\n\nPost-fix corpus verification on 2026-06-01 ran the original 57-cell\nclickhouse-server non-OLTP surface under UAT-managed Docker lifecycle:\n\n  CLICKHOUSE_HOST_PORT=19000 CLICKHOUSE_HTTP_HOST_PORT=18123 \\\n    BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs \\\n    make uat-sweep CONFIG=/tmp/uat-clickhouse-server-rc1-corpus-20260601.yaml\n\nArtifacts:\n  `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/matrix_summary.tsv`\n  `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/cells.jsonl`\n  `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/uat_lifecycle.log`\n  `/tmp/uat-clickhouse-server-rc1-corpus-20260601.outer.log`\n\nThe corpus executed all 57 candidate cells with no compatibility or\nearly-stop pruning. Summary footer: `passed=15 failed=40 timed_out=2`,\n`run_status=COMPLETED`, `source_dirty=false`. Docker lifecycle recorded\nproject-scoped clickhouse-server up/down success. The original RC-1 total\nwipeout is therefore fixed; remaining failures are benchmark-specific\nloader, DDL, query, data-availability, and timeout issues routed to\nfollow-up TODOs.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hide the connection-refused failure as generic no_json_nonzero again; keep the diagnostic tail in the evidence.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "mark RC-1 fixed from a clickhouse-local result; this TODO is specifically for clickhouse-server.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "restart or prune the Docker daemon while other UAT agents are active without coordination.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-06-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not duplicate or undo uat-docker-stack-recovery's broader Docker lifecycle work.",
+        "item_id": "uat-clickhouse-server-rc1-recovery"
+      },
+      {
+        "behavior": "Do not run unqualified Docker cleanup; use UAT-owned project-scoped cleanup only.",
+        "item_id": "uat-clickhouse-server-rc1-recovery"
+      },
+      {
+        "behavior": "Keep ClickHouse server mode on native TCP port 9000 unless the compose mapping changes and the registry derives a new host port.",
+        "item_id": "uat-clickhouse-server-rc1-recovery"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/planning/uat-docker-stack-recovery.yaml: broader Docker-stack recovery owns LakeSail/OLTP ordering and must not be duplicated",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "path": "_project/TODO/main/planning/uat-docker-stack-recovery.yaml"
+      },
+      {
+        "concept": "docs/operations/uat-framework.md: managed Docker sweeps start project-scoped compose stacks and tear them down with docker_manage_platforms=true",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "path": "docs/operations/uat-framework.md"
+      },
+      {
+        "concept": "docs/operations/uat-local-provisioning.md: clickhouse-server is an automated Docker-backed platform at localhost:9000; use make uat-bring-up PLATFORM=clickhouse-server",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "path": "docs/operations/uat-local-provisioning.md"
+      },
+      {
+        "concept": "tests/uat/docker_assets.py: clickhouse-server compose metadata and service port 9000 are already registered",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "path": "tests/uat/docker_assets.py"
+      },
+      {
+        "concept": "tests/uat/matrix.py: platform uv extras are centralized in PLATFORM_UV_EXTRA",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "path": "tests/uat/matrix.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/metadata.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/setup.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/tuning.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "docker/clickhouse/docker-compose.yml"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "docker/clickhouse/init-default-database.sql"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/local-platform-provisioning.tsv"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-local-provisioning.md"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/docker_assets.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/matrix.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_connection_registry_drift.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_docker_assets.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_matrix.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_clickhouse_adapter.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_clickhouse_platform_split.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_matrix.py::test_uv_run_argv_clickhouse_server_uses_canonical_extra -q",
+        "description": "UAT argv uses the canonical clickhouse-server extra",
+        "expected": "test passes",
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-bring-up PLATFORM=clickhouse-server && nc -vz localhost 9000",
+        "description": "ClickHouse server stack is reachable before rerunning the corpus",
+        "expected": "make succeeds and nc reports an open localhost:9000 endpoint",
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpch SCALE=0.01",
+        "description": "Smallest server-backed cell no longer fails at connection setup",
+        "expected": "cell passes or fails later than connection setup with a captured ClickHouse-specific tail",
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "notes": "Evidence points to an unavailable ClickHouse service on localhost:9000,\nnot a query/DDL/data-load bug and not a missing driver in the current\nworktree. The diagnostic re-run also proved the stderr capture fix is\neffective for this failure class.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Preserve the diagnostic evidence and classify the observed failure",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "notes": "Update PLATFORM_UV_EXTRA so clickhouse-server cells run through\n`uv run --extra clickhouse-server --`, matching the platform's public\ninstallation contract and avoiding environment-dependent driver presence.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make clickhouse-server UAT invocations self-contained on the canonical uv extra",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "notes": "Docker recovered after launching Docker Desktop. A UAT-owned compose\nproject was run on alternate host ports (`19000/18123`) to avoid the\nexisting debug container on `9000/8123`. The smallest server-backed cell\nnow passes with a submittable manifest:\n\n  ~/Developer/benchmark_runs/logs/clickhouse-server-rc1-repro-20260601/clickhouse-server_tpch_0.01_20260601_114205.log\n  ~/Developer/benchmark_runs/results/tpch_sf001_clickhouse_server_sql_20260601_114215_e1a77de5.json\n\nRoot causes fixed in the live path: local compose auth/port propagation,\nmissing database bootstrap, host-local data loading for Docker-backed\nserver mode, type conversion for clickhouse-driver INSERT batches, and\nlegacy unsupported ClickHouse `SET` statements resetting session cache\ncontrols before validation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "After Docker CLI is healthy, bring up the ClickHouse stack and rerun the smallest cell",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-server-rc1-recovery",
+        "notes": "Completed on 2026-06-01 with a temporary corpus config at\n`/tmp/uat-clickhouse-server-rc1-corpus-20260601.yaml`. The config used\nUAT-managed Docker lifecycle, alternate host ports (`19000/18123`), the\n`clickhouse-server` platform include, all non-OLTP benchmarks, scales\n`0.01/0.1/1.0`, and `load,power` execution phases.\n\nEvidence:\n\n  ~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/matrix_summary.tsv\n  ~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/cells.jsonl\n  ~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/uat_lifecycle.log\n  /tmp/uat-clickhouse-server-rc1-corpus-20260601.outer.log\n\nMatrix footer: 57 candidates, 57 executed, 15 passed, 40 failed,\n2 timed out, 0 compatibility pruned, 0 early-stop pruned,\n`run_status=COMPLETED`, `source_dirty=false`. Lifecycle logs show\nclickhouse-server Docker up/down succeeded and no UAT compose project\nremained after teardown. This satisfies the RC-1 metric: the platform no\nlonger has a 57/57 total wipeout. Follow-up failures are tracked in\n`uat-clickhouse-server-loader-type-coverage`,\n`uat-clickhouse-server-ddl-compatibility`,\n`uat-clickhouse-server-query-compatibility`, and\n`uat-clickhouse-server-data-and-timeout-tail`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "If the smallest cell passes, rerun the clickhouse-server fast Docker corpus into a fresh run root",
+        "wid": "w3"
+      }
+    ]
+  }
+}

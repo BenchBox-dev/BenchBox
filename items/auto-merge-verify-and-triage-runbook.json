@@ -1,0 +1,140 @@
+{
+  "description": "WS8 of _project/planning/ci-failure-reduction-plan.md. Two triage-loop hardening items:\n\n(1) A 2026-07-23 API snapshot showed auto_merge: null on open PRs whose auto-merge-on-open `enable` job had succeeded. May be timing, may be silent failure (e.g. token permissions after ruleset changes) - prior art: harden-auto-merge-on-open-stranding (done) diagnosed exactly this class when 3 remediation fixes were orphaned. Rather than modifying the owner-gated auto-merge-on-open.yml, add a nightly sweep: open non-draft PR + green required lane + auto-merge off + not soundness-gated = alert. This catches stranding regardless of cause.\n\n(2) The triage judgment rules currently live only in a hand-carried prompt (stale-SHA verification before acting on webhook events; the GitHub-outage signature - whole run failing at setup steps with Unicorn HTML; worktree-based cross-branch comparison, never `git checkout <ref> --`; conflict-resolution rules for TODO modify/delete). Codify them in docs/operations/pr-triage.md so any session/agent inherits them without prompt archaeology.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Have the sweep enable auto-merge itself on hits",
+        "instead": "Alert only; a human or the triage loop re-runs the sanctioned enable path",
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "why": "That re-implements the owner-gated enable path outside its soundness predicate"
+      },
+      {
+        "dont": "Paste the triage prompt verbatim into docs",
+        "instead": "Extract only the durable judgment rules; keep live state in the tracker",
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "why": "It mixes session-specific state (PR numbers, dates) with durable rules"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "created_at": "2026-07-23T12:29:53Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Soundness-gated PRs are excluded from the sweep's alert (their auto-merge-off state is correct by design)",
+        "item_id": "auto-merge-verify-and-triage-runbook"
+      },
+      {
+        "behavior": "auto-merge-on-open.yml is owner-gated and untouched - the sweep is external observation",
+        "item_id": "auto-merge-verify-and-triage-runbook"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/auto_merge_soundness_paths.py"
+      },
+      {
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/green_unmerged_sweep.py --dry-run",
+        "description": "Sweep dry-run classifies current open PRs correctly",
+        "expected": "soundness PRs excluded; stranded PRs (if any) listed",
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f docs/operations/pr-triage.md && grep -c pr-triage AGENTS.md",
+        "description": "Runbook exists and is linked",
+        "expected": ">= 1",
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Nightly green-but-unmerged sweep for non-soundness PRs with auto-merge off; alert on hits",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Investigate the auto_merge:null observation; document root cause (timing vs real stranding) in the item evidence",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "auto-merge-verify-and-triage-runbook",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Write docs/operations/pr-triage.md codifying the judgment rules from the triage prompt; link from AGENTS.md Further Reading",
+        "wid": "w3"
+      }
+    ]
+  }
+}

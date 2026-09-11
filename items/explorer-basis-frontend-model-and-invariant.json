@@ -1,0 +1,274 @@
+{
+  "context": "Add a `results-explorer/src/lib/measurementBasis.ts` module owning the basis types, the per-query value computation over `query_executions` rows, the same-query-set geomean, the URL serde, and the cross-run invariant as a constructor that cannot represent an illegal comparison.\n\nMake the invariant structural rather than advisory: model a comparison as a discriminated union -- a cross-run comparison holds N runs and exactly ONE basis; a within-run comparison holds one run and N bases. There is then no way for a component to pass heterogeneous bases across runs, because the type does not admit it. A validator that components must remember to call would be a rule; this is a guardrail.\n\nBuild it against the widened `query_executions` from the ingest item so per-pass values are real, and keep `display_ms` as the authority for the default basis so the default view keeps matching published figures exactly.",
+  "description": "Today the explorer has exactly one reduction and no way to name it. `_query_display_ms` picks the median of measurement passes per logical query, the frontend consumes the precomputed `display_timings[].display_ms`, and no UI anywhere says that is what the number means. `Compare.tsx` carries a single control -- a Baseline selector -- and no metric picker, no pass selector and no query filter.\n\nThe approved design replaces that with an explicit measurement basis. Every figure on every comparison surface becomes a function of `(run, passes, statistic)`:\n  - passes: all warm passes, the warmup pass, or one named warm pass;\n  - statistic: median or min, collapsing to the single recorded value when the pass selection yields one execution.\n\nThe design also carries one non-negotiable invariant, and it is the reason this is a model rather than a set of component props. WHEN A COMPARISON SPANS MORE THAN ONE RUN, ALL SERIES SHARE ONE BASIS. Reading one run's min against another run's median measures the statistic, not the engine. Only when every series is the same run may the basis vary per series -- there the engine and hardware are fixed by construction, so the variation is the subject rather than a confound.\n\nA second invariant follows from real corpus data: geomeans compared against each other must be computed over the same query set. A query missing a pass on one side must be excluded from every side's geomean, not just its own.\n\nThis item builds that model as pure, tested functions with no UI. Every surface item depends on it.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Compute each series' geomean over whatever queries that series happens to have.",
+        "instead": "Intersect first, then compute every geomean over the shared query set and state its size.",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "why": "Geomeans over different query sets are not comparable. This exact bug was found and fixed in the design prototype, where a query missing one pass made a same-run comparison read 18% instead of 7%."
+      },
+      {
+        "dont": "Expose per-run basis props on components and validate them at render time.",
+        "instead": "Model a cross-run comparison as N runs plus exactly one basis, so heterogeneous bases are unrepresentable.",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "why": "A validator only fires where someone remembered to call it. A type that cannot express the illegal state removes the class of bug from every current and future call site."
+      },
+      {
+        "dont": "Fall back to the nearest available basis when a run cannot answer the requested one.",
+        "instead": "Report the basis as unavailable, name the reason, and let the surface disable it.",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "why": "A silent substitution would label a warm-pass-1 figure as a warmup figure, which is a fabricated comparison presented as a real one."
+      },
+      {
+        "dont": "Put basis logic in Compare.tsx because that is the only page that needs it today.",
+        "instead": "Keep it in lib with unit tests; four surfaces consume it.",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "why": "Compare.tsx is already 1181 lines and the same model is needed by Result Detail, the within-run route, the multi-run layout and Browse."
+      },
+      {
+        "dont": "Recompute the default basis client-side from raw query_executions rows because it is 'the same formula'.",
+        "instead": "Read display_ms for the default basis and compute from raw rows only for non-default bases.",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "why": "Any float-ordering or rounding difference between the Python pipeline and the browser would make the headline figure disagree with the published leaderboard for no visible reason."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "needs_item": "explorer-basis-ingest-warmup-pass-provenance"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-30T00:40:02Z",
+      "completed_pr": 1950,
+      "created_at": "2026-08-29T19:12:26Z",
+      "worktree": "explorer-measurement-basis"
+    },
+    "preserves": [
+      {
+        "behavior": "A basis a run cannot answer must be reported as unavailable with a reason, never silently substituted with another basis.",
+        "item_id": "explorer-basis-frontend-model-and-invariant"
+      },
+      {
+        "behavior": "A comparison spanning more than one run must be unable to hold more than one basis. This is a type-level guarantee, not a runtime warning.",
+        "item_id": "explorer-basis-frontend-model-and-invariant"
+      },
+      {
+        "behavior": "Basis state must round-trip through the URL so a shared link reproduces exactly the figures the sender saw.",
+        "item_id": "explorer-basis-frontend-model-and-invariant"
+      },
+      {
+        "behavior": "Geomeans that are compared against each other must be computed over the identical query set; a query missing a pass on any series is excluded from every series.",
+        "item_id": "explorer-basis-frontend-model-and-invariant"
+      },
+      {
+        "behavior": "Median must remain a true median for any sample count, including even counts, not the middle element of a three-element list.",
+        "item_id": "explorer-basis-frontend-model-and-invariant"
+      },
+      {
+        "behavior": "Selecting a single pass must collapse the statistic to that one value and must not present median and min as a live choice.",
+        "item_id": "explorer-basis-frontend-model-and-invariant"
+      },
+      {
+        "behavior": "The default basis -- median over all warm passes, per unique query -- must produce values identical to today's display_ms for every existing bundle, so the default view keeps matching published figures.",
+        "item_id": "explorer-basis-frontend-model-and-invariant"
+      },
+      {
+        "behavior": "display_ms remains the authority for the default basis. The client must not recompute the default from raw executions and quietly diverge from the snapshot.",
+        "item_id": "explorer-basis-frontend-model-and-invariant"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Owns vsSlowestRatio and the shared log2 speedup scale constants. Reuse its scale so bar geometry stays consistent across charts.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "path": "results-explorer/src/lib/chartMath.ts"
+      },
+      {
+        "concept": "Already owns cohort compatibility, the lock signature and mismatch partitioning for a comparison. The basis invariant belongs next to it as a second comparison-level rule, not in a component.",
+        "decision": "extend",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "path": "results-explorer/src/lib/compareCohort.ts"
+      },
+      {
+        "concept": "Owns timingValueForQuery and isValidTimingValue, the current single-value-per-query accessor. The basis model generalises it; keep it as the default-basis path so published figures stay authoritative.",
+        "decision": "extend",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "path": "results-explorer/src/lib/displayEligibility.ts"
+      },
+      {
+        "concept": "formatSpeedup, formatDurationSeconds and friends already define speedup and duration wording. Reuse rather than introducing a second formatting vocabulary.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "path": "results-explorer/src/lib/metricFormatters.ts"
+      },
+      {
+        "concept": "Established URL state serde pattern with aliases. Reuse it for basis parameters rather than hand-rolling query-string parsing.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "path": "results-explorer/src/lib/useUrlState.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/components/"
+      },
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/"
+      },
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/explorer-basis-frontend-model-and-invariant/**"
+      },
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/**"
+      },
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/compareCohort.ts"
+      },
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayEligibility.ts"
+      },
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/measurementBasis.ts"
+      },
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/types.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test",
+        "description": "Explorer unit tests pass, including the default-basis fixture, even-count median, uneven pass counts and URL round-trip",
+        "expected": null,
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "last_result": "pass",
+        "last_run": "2026-08-30T01:11:22Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Explorer typechecks with the new basis model",
+        "expected": null,
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "last_result": "pass",
+        "last_run": "2026-08-30T01:11:28Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cat _project/verification-logs/explorer-basis-frontend-model-and-invariant/w0.log",
+        "description": "The default basis reproduces the pinned published values exactly",
+        "expected": null,
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "last_result": "pass",
+        "last_run": "2026-08-30T00:39:55Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cat _project/verification-logs/explorer-basis-frontend-model-and-invariant/w1.log",
+        "description": "A cross-run comparison holding two different bases is unrepresentable in the type system",
+        "expected": null,
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "last_result": "pass",
+        "last_run": "2026-08-30T00:39:55Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "_project/verification-logs/explorer-basis-frontend-model-and-invariant/w0.log - 3 results pinned from read_model_version 7 snapshot; uneven-pass decision gate resolved from real corpus data (tpcds-spark-sf10 query 95, failed pass 2)",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "notes": "Before writing the model, capture per-query display_ms and the derived geomean for a representative set of committed-corpus results, straight from the snapshot. Store the values in `_project/verification-logs/explorer-basis-frontend-model-and-invariant/w0.log` and turn them into a fixture.\n\nThis fixture is the contract for the whole item: the model's default basis must reproduce these numbers exactly. Capture at least one result with an even measurement-pass count if the corpus has one, and at least one query whose pass count differs from its siblings.\n\nDECISION GATE: if no corpus result has a query with a differing pass count, construct one as a test fixture rather than assuming the uneven case cannot occur. The uneven case is what breaks the geomean, so it must be covered whether or not the current corpus exhibits it.",
+        "started_at": "2026-08-29T23:31:24Z",
+        "started_branch": "feat/explorer-basis-frontend-model-and-invariant",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-frontend-model-and-invariant",
+        "status": "done",
+        "summary": "Pin the current default-basis values as a regression baseline",
+        "wid": "w0"
+      },
+      {
+        "evidence": "measurementBasis.ts types + comparison union + URL serde; 6 illegal states proven uncompilable (w1.log), enforced permanently via @ts-expect-error under npm run typecheck; 20 tests pass",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "notes": "Add `results-explorer/src/lib/measurementBasis.ts` with the pass selection and statistic types, and a comparison model as a discriminated union:\n  - a cross-run comparison: two to four runs and exactly one basis;\n  - a within-run comparison: one run and two to four bases.\n\nThe union is the guardrail. Verify by attempting to construct a cross-run comparison with two different bases and confirming it does not typecheck; record that attempt as a type-level test if the toolchain supports one, or as a documented compile failure in the log otherwise.\n\nAdd the URL serde alongside, using the existing useUrlState pattern, and pin the parameter grammar: one `basis` parameter for cross-run comparisons, a `bases` list only on the within-run route.",
+        "started_at": "2026-08-30T00:18:12Z",
+        "started_branch": "feat/explorer-basis-frontend-model-and-invariant",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-frontend-model-and-invariant",
+        "status": "done",
+        "summary": "Define the basis types and the unrepresentable-illegal-state comparison model",
+        "wid": "w1"
+      },
+      {
+        "evidence": "resolveQueryValue/basisAvailability/sharedQueryGeomeans + read-model bridge; 34 tests incl. decision gate (default basis reproduces w0 exactly for all 3 pinned results)",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "notes": "Implement per-query value resolution for each basis from query_executions rows, the default-basis path reading display_ms, basis availability per run, and the geomean over the intersected query set.\n\nCover in unit tests, as executable assertions:\n  - default basis reproduces the w0 fixture exactly;\n  - median is correct for even sample counts, not the middle of three;\n  - a single-pass basis collapses the statistic and reports it as collapsed;\n  - a query missing a pass on one series is excluded from every series' geomean, and the reported query-set size shrinks accordingly;\n  - a basis a run cannot answer reports unavailable with a reason and never substitutes;\n  - basis state round-trips through the URL, including the within-run bases list.\n\nDECISION GATE: if the default basis does not reproduce w0 exactly, stop. Do not adjust the fixture to match the code; find the divergence first, because it means the client and the pipeline disagree about a published figure.",
+        "started_at": "2026-08-30T00:22:14Z",
+        "started_branch": "feat/explorer-basis-frontend-model-and-invariant",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-frontend-model-and-invariant",
+        "status": "done",
+        "summary": "Implement value resolution, availability and the same-query-set geomean",
+        "wid": "w2"
+      },
+      {
+        "evidence": "compareCohort.ts: basis in the cohort signature + 'measurement basis' mismatch field + lockCrossRunBasis runtime guard; 15 tests; full explorer suite 997 passed / 8 skipped",
+        "item_id": "explorer-basis-frontend-model-and-invariant",
+        "notes": "Extend `compareCohort.ts` so basis compatibility sits alongside benchmark, scale and phase compatibility as a comparison-level rule, and so a cohort lock records the basis in force.\n\nAdd the rule that a cross-run comparison carries exactly one basis to the same place that already reports cohort mismatches, so a future surface that tries to violate it fails in the model rather than rendering a misleading page.",
+        "started_at": "2026-08-30T00:24:09Z",
+        "started_branch": "feat/explorer-basis-frontend-model-and-invariant",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-frontend-model-and-invariant",
+        "status": "done",
+        "summary": "Extend the cohort rules with the basis invariant",
+        "wid": "w3"
+      }
+    ]
+  }
+}

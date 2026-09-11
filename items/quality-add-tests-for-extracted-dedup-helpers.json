@@ -1,0 +1,127 @@
+{
+  "context": "Each helper gets its own test module. Use the existing\n`test_credentials_helper.py` / `test_gcs_path.py` patterns as templates.\n\nMark all tests `pytest.mark.unit + pytest.mark.fast`. None of these\nhelpers require external services or fixtures larger than dict/string\ninputs.\n",
+  "description": "Code review of `quality-consolidate-duplicate-code-clusters` flagged\ntest-coverage gaps for 5 of the 11 helpers extracted by that work.\nThe dedup TODO shipped tests for 2 helpers\n(`test_credentials_helper.py`, `test_gcs_path.py`) but not the others.\n\nThe 5 untested helpers are exercised indirectly via adapter / family\ntests, so there's no immediate behavioral risk - but isolated unit\ntests catch regressions earlier and document the helper contract.\n\nHelpers needing dedicated tests:\n  - `benchbox/platforms/azure/_livy_mixin.py::LivyStatementMixin`\n  - `benchbox/platforms/_spark_helpers.py::get_spark_query_plan`\n  - `benchbox/platforms/dataframe/_result_helpers.py`\n    (`build_success_result_dict` / `build_failure_result_dict`)\n  - `benchbox/platforms/presto_trino_utils.py`\n    (escape_insert_value / is_date_value / normalize_existing_files /\n    load_file_batches / resolve_data_files)\n  - `benchbox/core/schema_primitives.py::BaseSchemaTable`",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle tests for multiple helpers into one module",
+        "instead": "one test module per helper",
+        "item_id": "quality-add-tests-for-extracted-dedup-helpers",
+        "why": "review needs to be bounded"
+      },
+      {
+        "dont": "modify the helper modules to make them easier to test",
+        "instead": "test the existing API as-is",
+        "item_id": "quality-add-tests-for-extracted-dedup-helpers",
+        "why": "that's scope creep"
+      },
+      {
+        "dont": "use mocks for things that can be tested with real values",
+        "instead": "only mock external boundaries (HTTP, SDK calls)",
+        "item_id": "quality-add-tests-for-extracted-dedup-helpers",
+        "why": "mocks hide bugs"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "quality-add-tests-for-extracted-dedup-helpers",
+        "needs_item": "quality-consolidate-duplicate-code-clusters"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-14T00:00:00Z",
+      "created_at": "2026-04-13T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing tests for the 2 already-tested helpers (test_credentials_helper.py, test_gcs_path.py) - don't refactor them as part of this work",
+        "item_id": "quality-add-tests-for-extracted-dedup-helpers"
+      },
+      {
+        "behavior": "Helper module signatures unchanged - tests only, no production-code edits",
+        "item_id": "quality-add-tests-for-extracted-dedup-helpers"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/azure/test_livy_mixin.py tests/unit/platforms/test_spark_helpers.py tests/unit/platforms/dataframe/test_result_helpers.py tests/unit/platforms/test_presto_trino_utils.py tests/unit/core/test_schema_primitives_base.py -q",
+        "description": "All new test files pass",
+        "expected": "all tests pass",
+        "item_id": "quality-add-tests-for-extracted-dedup-helpers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest --cov=benchbox/platforms/azure/_livy_mixin --cov=benchbox/platforms/_spark_helpers --cov=benchbox/platforms/dataframe/_result_helpers --cov=benchbox/platforms/presto_trino_utils --cov=benchbox/core/schema_primitives --cov-fail-under=80 tests/unit/ -q",
+        "description": "Coverage of the 5 helper modules reaches ≥80%",
+        "expected": "passed (no 'FAIL Required test coverage of 80%' line in output)",
+        "item_id": "quality-add-tests-for-extracted-dedup-helpers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-add-tests-for-extracted-dedup-helpers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for LivyStatementMixin: cover _execute_statement timing accumulation, _wait_for_statement passthrough, and the _get_headers/_ensure_session interface contract.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-add-tests-for-extracted-dedup-helpers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for get_spark_query_plan: cover normal plan capture, missing/closed connection, plan-string truncation.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-add-tests-for-extracted-dedup-helpers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for _result_helpers.build_success_result_dict / build_failure_result_dict: required-field presence, error-string handling, optional-metric defaults.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-add-tests-for-extracted-dedup-helpers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for presto_trino_utils helpers: escape_insert_value (quote/escape edges), is_date_value (date detection), normalize_existing_files, load_file_batches, resolve_data_files.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-add-tests-for-extracted-dedup-helpers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for BaseSchemaTable: schema parsing, primary-key + partitioning passthrough, CREATE TABLE statement formatting per backend hook.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

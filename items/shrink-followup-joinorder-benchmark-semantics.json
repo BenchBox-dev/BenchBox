@@ -1,0 +1,135 @@
+{
+  "context": "This is primarily an analysis + documentation/test task, not a translator\nrewrite. Lead with w1 -- the empirical question of whether join order is\nfixed -- because it determines whether there is a real regression or just a\nmissing semantic label. Do NOT reintroduce hand-translations as a reflex.\n",
+  "description": "Highest-severity finding from the shrink-campaign review. PRs #587 (113-query\nJOB) and #588 (13-query synthetic) removed the hand-written DataFrame\ntranslations and set `_HAND_TRANSLATED_DATAFRAME_QUERY_IDS = set()`\n(benchbox/core/joinorder/dataframe_queries.py:39), promoting the generated\ntranslation factory (lines 427-447) to sole authority.\n\nThe standing oracle tests\n(tests/unit/core/joinorder/test_dataframe_query_capabilities.py:93-157)\nassert *result-equivalence*: each generated pandas and expression impl\nreturns the same rows as a DuckDB oracle executing the canonical SQL, and\n`get_untranslated_dataframe_query_ids() == []`. That is genuine and\nsufficient to refute the \"untested\" charge from the original review.\n\nBut result-equivalence is NOT benchmark-equivalence. The Join Order\nBenchmark exists to stress the optimizer's ability to reorder joins across\n113 query shapes. A generator that emits a deterministic, topology-fixed\njoin sequence passes every row-equality test while measuring a different\nthing: multi-join *execution* with a fixed plan, not optimizer join-ordering\nquality. This is \"right results, wrong thing measured\" -- unfalsifiable by\nany row assertion -- and it touches the goal's \"preserve benchmark\nsemantics\" non-negotiable. Neither the campaign nor the original review\ncaught it.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "reintroduce the 13/113 hand-translations to 'fix' this without measuring",
+        "instead": "decide via w1/w2 first",
+        "item_id": "shrink-followup-joinorder-benchmark-semantics",
+        "why": "the generator may be perfectly correct once the benchmark intent is reclassified"
+      },
+      {
+        "dont": "treat the row-equality oracle tests as evidence of benchmark equivalence",
+        "instead": "assert plan shape or document the reclassification instead",
+        "item_id": "shrink-followup-joinorder-benchmark-semantics",
+        "why": "they prove same rows, not same measured operation"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-24T00:00:00Z",
+      "created_at": "2026-05-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Generated impls keep their explicit __name__/__doc__",
+        "item_id": "shrink-followup-joinorder-benchmark-semantics"
+      },
+      {
+        "behavior": "The oracle tests at tests/unit/core/joinorder/test_dataframe_query_capabilities.py:93-157 keep passing",
+        "item_id": "shrink-followup-joinorder-benchmark-semantics"
+      },
+      {
+        "behavior": "get_untranslated_dataframe_query_ids() == [] (113/113 JOB coverage) remains true",
+        "item_id": "shrink-followup-joinorder-benchmark-semantics"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/joinorder/dataframe_queries.py:427-447 — the generator factory under scrutiny; reclassification doc attaches here",
+        "decision": "reuse",
+        "item_id": "shrink-followup-joinorder-benchmark-semantics",
+        "path": "benchbox/core/joinorder/dataframe_queries.py:427-447"
+      },
+      {
+        "concept": "tests/unit/core/joinorder/test_dataframe_query_capabilities.py:93-157 — extend the oracle suite with a plan-shape assertion (path b) rather than a new test harness",
+        "decision": "extend",
+        "item_id": "shrink-followup-joinorder-benchmark-semantics",
+        "path": "tests/unit/core/joinorder/test_dataframe_query_capabilities.py:93-157"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "shrink-followup-joinorder-benchmark-semantics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/"
+      },
+      {
+        "item_id": "shrink-followup-joinorder-benchmark-semantics",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/joinorder/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/joinorder/ -q",
+        "description": "JoinOrder DataFrame test module passes",
+        "expected": "all pass",
+        "item_id": "shrink-followup-joinorder-benchmark-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rnE 'multi-join execution|optimizer ordering|plan.shape|not deterministically' benchbox/core/joinorder/ tests/unit/core/joinorder/",
+        "description": "Chosen mitigation present (semantic note or structural test)",
+        "expected": "matching reclassification doc or structural assertion found",
+        "item_id": "shrink-followup-joinorder-benchmark-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "shrink-followup-joinorder-benchmark-semantics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "shrink-followup-joinorder-benchmark-semantics",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-joinorder-benchmark-semantics",
+        "notes": "Read the generated factories (`_make_generated_expression_impl`,\n`_make_generated_pandas_impl`, joinorder/dataframe_queries.py:427-447)\nand `_execute_joinorder_expression_query` / `_execute_joinorder_pandas_query`.\nDetermine whether join order is fixed by the query topology in the\ngenerator, or deferred to the engine (polars/pandas) -- and whether the\nengine even exposes optimizer join-reordering the way the SQL backend\ndoes. Record the finding; it decides w2.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Characterize what JoinOrder DataFrame mode actually measures today",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-joinorder-benchmark-semantics",
+        "notes": "GATING. Two mitigations:\n(a) If DataFrame JoinOrder is inherently execution-focused (likely --\n    DataFrame engines plan differently than a SQL optimizer), document\n    the reclassification: \"JoinOrder DataFrame mode measures multi-join\n    execution, not optimizer ordering.\" Restore that distinction to the\n    module docstring (this is the PR #588 note the review flagged).\n(b) If it is meant to preserve optimizer-stress, add a structural test\n    asserting the generated plan is NOT deterministically sequenced\n    (e.g. logical-plan cardinality/shape snapshot per query).\nPick based on w1; (a) is cheaper and likely correct.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide: document semantic reclassification, or add a structural plan-shape test",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-joinorder-benchmark-semantics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the chosen mitigation",
+        "wid": "w3"
+      }
+    ]
+  }
+}

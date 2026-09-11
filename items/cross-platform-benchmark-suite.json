@@ -1,0 +1,16 @@
+{
+  "description": "Create comprehensive benchmark suite comparing DataFrame platform performance.\nThis was deferred from the dataframe-performance Phase 9.3 work pending\ncompletion of Modin, cuDF, and Dask adapters.\n\nCurrent state:\n- Basic profiling exists (execute_query_profiled, MemoryTracker)\n- Cross-platform example exists: examples/dataframe/cross_platform_comparison.py\n- Missing: Systematic benchmark suite with standardized comparisons\n\nGoal: Generate reproducible performance comparisons across all DataFrame\nplatforms for blog posts and documentation.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "cross-platform-benchmark-suite",
+        "needs_item": "modin-cudf-dask-production-ready"
+      }
+    ],
+    "item_meta": {
+      "category": "Performance and Efficiency",
+      "created_at": "2025-12-13T00:00:00Z",
+      "worktree": "dataframe-performance"
+    }
+  }
+}

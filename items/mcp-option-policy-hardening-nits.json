@@ -1,0 +1,67 @@
+{
+  "context": "Address (1) first - it is the only one with an availability dimension. Cache the parsed registry keyed on the raw env string so a repeated malformed value logs once, and keep resolution per-request so a withdrawn profile still fails closed on durable replay (that behaviour is covered by an existing test and must not regress). Convert (2) to explicit raises returning MCPValidationError. For (3), either alias the constants with a comment or document why they are intentionally independent.",
+  "description": "Three findings from the adversarial review of the MCP v2 platform_options batch. None is exploitable today; all are latent. (1) Log-amplification: _load_clickhouse_connection_profiles() re-reads and re-parses BENCHBOX_MCP_CLICKHOUSE_PROFILES on every request that names a profile, and emits logger.error per malformed entry. If an operator's registry is malformed, an authenticated caller can drive unbounded error-log volume by looping requests. Rate-limit, cache with invalidation, or log the parse outcome once per distinct env value. (2) _validate_dask_options() uses bare assert for type narrowing (workers/threads ints, per_worker_bytes not None). Python -O strips asserts; the values are guaranteed by MCPPlatformOptionSpec.parse upstream so behaviour is unchanged today, but a future direct caller under -O would get a TypeError instead of a structured MCPValidationError. (3) CLICKHOUSE_PROFILE_NAME_PATTERN is a byte-identical duplicate of PLATFORM_OPTION_NAME_PATTERN. Keeping them separate is defensible - they are different domains that may diverge - but it should be a stated decision, not an accident. Also noted: tests/unit/mcp/test_benchmark_tools.py::test_platform_options_are_forwarded_only_after_validation still asserts get_adapter.call_args.kwargs against a mocked factory. That assertion is no longer load-bearing now that PR #1514 added real effective-state coverage, but it is the exact false-green shape the DuckDB item warned about and should carry a comment saying what it does and does not prove.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "mcp-option-policy-hardening-nits",
+        "needs_item": "mcp-v2-clickhouse-option-security-boundary-v3"
+      }
+    ],
+    "item_meta": {
+      "category": "mcp",
+      "completed_at": "2026-08-08T18:13:12Z",
+      "created_at": "2026-08-04T12:37:01Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "A withdrawn ClickHouse profile still fails closed on durable replay - caching must not pin a stale profile",
+        "item_id": "mcp-option-policy-hardening-nits"
+      },
+      {
+        "behavior": "Validation errors never echo the requested profile name or enumerate configured profiles",
+        "item_id": "mcp-option-policy-hardening-nits"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-option-policy-hardening-nits",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-option-policy-hardening-nits",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_benchmark_tools.py"
+      },
+      {
+        "item_id": "mcp-option-policy-hardening-nits",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_schemas.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_schemas.py -q -k ClickHouseConnectionBoundary",
+        "description": "A malformed registry logs once per distinct value, not once per request",
+        "expected": "exits 0 with the existing fail-closed and no-probe-oracle coverage intact plus a new log-amplification case",
+        "item_id": "mcp-option-policy-hardening-nits",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -O -m pytest tests/unit/mcp/test_schemas.py -q -k DaskResourceEnvelope",
+        "description": "Dask envelope rejection survives assertions being stripped",
+        "expected": "exits 1 while bare asserts carry the type narrowing under -O; exits 0 once explicit raises replace them",
+        "item_id": "mcp-option-policy-hardening-nits",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

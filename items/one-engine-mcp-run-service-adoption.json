@@ -1,0 +1,222 @@
+{
+  "context": "MCP calls the same RunRequest/RunPlan boundary the CLI uses; the security layer remains a pre-filter in front of it (allowlist -> validated options -> service). ClickHouse profile resolution stays MCP-side (server-config-owned secret material) but its OUTPUT feeds the service's standard option path rather than a private adapter-kwargs rewrite. Add a cross-surface equivalence test: for identical logical inputs, CLI and MCP produce the same resolved RunPlan (modulo surface metadata). Verify the statistics_benchmark_name subtlety survives via a characterization test before removing the special case.",
+  "description": "PR #1692 routed ordinary MCP run_benchmark execution and durable benchmark jobs through benchbox/core/run_service.py, removed the former MCP-local mode, phase-type, and adapter-option translators, preserved surface-owned admission, tenancy, response envelopes, and durable publication, and verified execution-type parity across all 127 phase subsets. The original work order also required deleting _generate_data_impl where core covers data_only. A 2026-08-13 adversarial review confirmed that requirement remains incomplete: synchronous and durable mode=data_only still use the MCP-local generator. Successor mcp-adversarial-review-runtime-remediation-20260813 owns that remaining implementation plus real surface-level parity oracles. This done item now records the completed PR #1692 slice rather than asserting full data-only adoption.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "keep _prepare_adapter_platform_options as a 'thin' MCP shim after adoption",
+        "instead": "delete it; option translation belongs below both surfaces",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "why": "any MCP-side rewrite layer regrows the two-halves bug class this item exists to kill"
+      },
+      {
+        "dont": "let the service grow MCP-specific branches (if mcp: ...)",
+        "instead": "express differences as RunRequest inputs or surface-layer post-processing",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "why": "surface conditionals in core recreate coupling in the opposite direction"
+      },
+      {
+        "dont": "move the MCP security allowlist down into the core service",
+        "instead": "keep security admission at the MCP layer as a pre-filter; the service trusts validated inputs",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "why": "CLI legitimately allows what MCP must forbid; policy is surface-scoped, engine is shared"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "needs_item": "one-engine-core-run-service"
+      },
+      {
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "needs_item": "one-engine-unify-constants"
+      }
+    ],
+    "item_meta": {
+      "category": "MCP",
+      "completed_at": "2026-08-09T12:02:27Z",
+      "created_at": "2026-08-04T17:14:57Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "Durable jobs: lease/fencing, idempotency, staging->os.replace publication are untouched except for the worker's inner run call.",
+        "item_id": "one-engine-mcp-run-service-adoption"
+      },
+      {
+        "behavior": "MCP response schemas: run_benchmark/start_benchmark payload fields unchanged (mcp_metadata envelope, summary fields, summary_charts).",
+        "item_id": "one-engine-mcp-run-service-adoption"
+      },
+      {
+        "behavior": "Security invariants: allowlist, contract matrix, admission, tenant containment, scale clamp, sync-execution block in remote mode all keep their tests green.",
+        "item_id": "one-engine-mcp-run-service-adoption"
+      },
+      {
+        "behavior": "benchbox.mcp still never imports benchbox.cli (AST boundary test).",
+        "item_id": "one-engine-mcp-run-service-adoption"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "The shared service created by one-engine-core-run-service",
+        "decision": "reuse",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "path": "benchbox/core/run_service.py"
+      },
+      {
+        "concept": "validate_platform_options + allowlist stays as the MCP admission pre-filter",
+        "decision": "reuse",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "path": "benchbox/mcp/schemas.py"
+      },
+      {
+        "concept": "Existing MCP-prompt/CLI feature-parity assertions to keep green",
+        "decision": "reuse",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "path": "tests/unit/landing/test_landing_quickstarts.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/run_service.py"
+      },
+      {
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -n '_map_phases_to_test_execution_type\\|_prepare_adapter_platform_options\\|_validate_and_resolve_mode' benchbox/mcp/tools/benchmark.py",
+        "description": "MCP no longer carries private mode/phase/option translation",
+        "expected": "The three private translators are gone from the MCP layer.",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'runplan and (equivalence or parity)' -q",
+        "description": "Cross-surface RunPlan equivalence",
+        "expected": "Same logical inputs resolve identically via CLI and MCP.",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -m fast -q",
+        "description": "MCP security and jobs suites green",
+        "expected": "Allowlist, admission, tenancy, and durable-jobs tests all pass unchanged.",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -k 'run_benchmark and (smoke or impl)' -q",
+        "description": "Smoke run through MCP path still works",
+        "expected": "End-to-end tool tests pass on the service-backed path.",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "w0: re-verified at HEAD pool-08: benchmark.py still carries 3 private translators (_prepare_adapter_platform_options:98, _validate_and_resolve_mode:131, _map_phases_to_test_execution_type:167) with call sites 478,497,527,695; statistics-phase opt-in still handled via phases_list contains statistics → gather_statistics+statistics_benchmark_name, distinct from core run_service resolve_lifecycle_phases/gather_statistics. Option translation still MCP-side, not yet via core RunRequest.",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "notes": null,
+        "started_at": "2026-08-09T02:23:30Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-verify MCP impl shape at HEAD; characterize statistics-phase and option-translation behavior",
+        "wid": "w0"
+      },
+      {
+        "evidence": "GREP PASS, 676 MCP fast tests passed, benchmark.py private translators removed and inlined via core helpers",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "notes": null,
+        "started_at": "2026-08-09T02:43:58Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Rewire sync run_benchmark path onto the service; delete mode/phase/option reimplementations",
+        "wid": "w1"
+      },
+      {
+        "evidence": "DurableJobWorker._execute_benchmark now delegates via core/run_service.execute_run with SilentVerbosity and AdapterFactory, preserving lease/fencing/idempotency and anonymize=True export; 676 MCP fast tests still pass",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "notes": null,
+        "started_at": "2026-08-09T12:02:13Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Rewire jobs.py worker path; keep durable-queue semantics intact",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added tests/unit/test_runplan_equivalence.py 10 tests (runplan equivalence/parity) verifying CLI and MCP share core helpers resolve_lifecycle_phases/_map_phases_to_execution_type/resolve_run_config; _generate_data_impl retained for MCP data_generation shape until service response contract updated",
+        "item_id": "one-engine-mcp-run-service-adoption",
+        "notes": null,
+        "started_at": "2026-08-09T12:02:16Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Cross-surface RunPlan equivalence test + delete _generate_data_impl if service covers data_only",
+        "wid": "w3"
+      }
+    ]
+  }
+}

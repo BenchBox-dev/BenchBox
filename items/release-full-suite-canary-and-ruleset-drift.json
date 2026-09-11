@@ -1,0 +1,329 @@
+{
+  "context": "Treat canary and ruleset drift as evidence freshness problems. First define\nwhich evidence is required and how fresh it must be; then produce compact\nartifacts; then make release PRs consume those artifacts. Keep live cloud\nsuites advisory unless credential and cost policy are explicitly resolved.\n",
+  "description": "The first release-required gate should stay focused enough to be reliable on\nevery release PR. That still leaves long-tail risk: slow/resource-heavy/stress\ntests, live integration tests, scheduled cross-platform validation, and\nGitHub ruleset drift can invalidate release confidence without blocking a\nsingle release PR.\n\nThis TODO adds defense-in-depth:\n  - a periodic canary that runs the broader non-fast suite families on a\n    clear schedule,\n  - a compact release-readiness check that fails release PRs when the latest\n    required canary is stale or red,\n  - a repository-visible ruleset drift check so comments about\n    `main-release-only` and `develop-squash-only` do not silently diverge from\n    live GitHub settings.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "commit raw CI logs or screenshots as evidence",
+        "instead": "(not specified)",
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "why": "release readiness needs compact durable summaries."
+      },
+      {
+        "dont": "make API failure pass silently",
+        "instead": "fail or require an explicit override.",
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "why": "ruleset drift is external-state risk"
+      },
+      {
+        "dont": "use stale nightly success from a SHA that does not contain the release branch changes unless the release-readiness policy explicitly permits ancestor-based evidence.",
+        "instead": "(not specified)",
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "wire a long full-suite run directly into every develop PR",
+        "instead": "use scheduled canary plus release-readiness.",
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "why": "this defeats the current path-aware dev loop"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "release-full-suite-canary-and-ruleset-drift",
+        "id": 465,
+        "reason": "Requires credential availability, cloud spend policy, and flake history; start with credential-free canary plus explicit live-test advisory status.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Describes the rejected alternative (block release on all live cloud) versus the actual DONE solution (credential-free canary + advisory status).",
+        "summary": "Block every release on all live cloud integrations"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "release-full-suite-canary-and-ruleset-drift",
+        "id": 466,
+        "reason": "Package indexes are immutable for version uploads; recovery should be patch release or incident process, not automated destructive action.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly argues against the action: package indexes are immutable and automated destructive rollback is rejected in favor of manual incident process.",
+        "summary": "Automatically revert published releases on canary failure"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "needs_item": "release-required-main-pr-test-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "created_at": "2026-05-25T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Raw pytest, Docker, and live-test logs remain CI artifacts or `/tmp` files, not tracked source.",
+        "item_id": "release-full-suite-canary-and-ruleset-drift"
+      },
+      {
+        "behavior": "Release-readiness checks fail closed on stale evidence unless an explicit documented override path is used.",
+        "item_id": "release-full-suite-canary-and-ruleset-drift"
+      },
+      {
+        "behavior": "Routine develop PR latency remains governed by the lightweight PR gate; canary work runs scheduled/manual or release-readiness only.",
+        "item_id": "release-full-suite-canary-and-ruleset-drift"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/cross-platform-validation.yml:TPC-H SF=0.01 validation — reuse structured diff artifact pattern for canary evidence",
+        "decision": "reuse",
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "path": ".github/workflows/cross-platform-validation.yml:TPC-H"
+      },
+      {
+        "concept": ".github/workflows/develop-post-merge.yml:auto-revert metrics — reuse compact workflow-summary style, not raw logs in git",
+        "decision": "reuse",
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "path": ".github/workflows/develop-post-merge.yml:auto-revert"
+      },
+      {
+        "concept": ".github/workflows/nightly.yml:scheduled validation — extend existing scheduled validation surface",
+        "decision": "extend",
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "path": ".github/workflows/nightly.yml:scheduled"
+      },
+      {
+        "concept": "docs/operations/repo-admin-settings.md:ruleset runbook — use as local expected-state source",
+        "decision": "reuse",
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "path": "docs/operations/repo-admin-settings.md:ruleset"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "only_modify",
+        "path_glob": ".github/RELEASE_PR_TEMPLATE.md"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/cross-platform-validation.yml"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/release-canary.yml"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/validate-main-pr.yml"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/release-full-suite-canary-and-ruleset-drift.yaml"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/release-guide.md"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "only_modify",
+        "path_glob": "scripts/release_readiness_check.py"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "only_modify",
+        "path_glob": "scripts/ruleset_drift_check.py"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_readiness.py"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_ruleset_drift.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python - <<'PY'\nfrom pathlib import Path\nimport yaml\nfor path in Path('.github/workflows').glob('*.yml'):\n    yaml.safe_load(path.read_text())\nprint('workflow yaml ok')\nPY\n",
+        "description": "Canary workflow YAML parses",
+        "expected": "workflow yaml ok",
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'ruleset or release_readiness or canary' -q",
+        "description": "Ruleset drift script or workflow test passes with mocked expected data",
+        "expected": "all matching tests pass",
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "for path in docs/operations/release-guide.md docs/operations/repo-admin-settings.md .github/RELEASE_PR_TEMPLATE.md; do grep -q \"canary\" \"$path\" || exit 1; grep -q \"ruleset drift\" \"$path\" || exit 1; done\n",
+        "description": "Release docs mention canary freshness and ruleset drift",
+        "expected": "canary and ruleset drift are present in every release documentation surface",
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/DONE/main/planning/release-full-suite-canary-and-ruleset-drift.yaml\n",
+        "description": "TODO graph remains valid",
+        "expected": "exit 0",
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "notes": "Capture raw output under `/tmp/release-canary-ruleset-w0/` and commit only\na compact summary in PR body or TODO notes.\n\nRequired commands:\n  - `rg -n \"schedule:|cron:|workflow_dispatch:|integration:|test-all|test-slow|resource_heavy|stress\" .github/workflows Makefile pytest.ini`\n  - `BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest --collect-only -q -n 0 -m \"slow or resource_heavy or stress\"`\n  - `BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest --collect-only -q -n 0 -m \"live_integration\"`\n  - `sed -n '47,130p' docs/operations/repo-admin-settings.md`\n\nOptional live ruleset verification, only with user authorization:\n  - `gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | {id, name, target}'`\n\nDecision gate:\n  - If slow/resource/stress collection is too large or unstable for one\n    job, split the canary by suite family and make the readiness check\n    require the configured subset, not an impossible monolith.\n\nImplementation evidence:\n  - Captured raw w0 output under `/tmp/release-canary-ruleset-w0/`.\n  - `slow or resource_heavy or stress` collected 684/24780 tests.\n  - `live_integration` collected 233/24780 tests.\n  - Blocking credential-free canary expression\n    `(slow or resource_heavy) and not (stress or live_integration)`\n    collected 388/24780 tests.\n  - Decision: make the first blocking canary daily, credential-free,\n    serial, and freshness-gated at 48h. Keep stress and live suites\n    advisory until runtime, credential, cost, and flake policy are stable.\n  - Live GitHub ruleset API verification was not performed locally; drift\n    detection is implemented as a scheduled/manual canary job and mocked\n    unit tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate current scheduled workflows, suite sizes, and ruleset runbook state",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "notes": "Document:\n  - Which scheduled workflow(s) count as release canaries.\n  - Maximum allowed age, initially 48h unless CI quota/runtime evidence\n    says otherwise.\n  - Which failures block release PRs.\n  - Who can approve an emergency override and where that override is\n    recorded.\n\nDecision gate:\n  - Do not add a release-readiness check until the stale/red behavior and\n    emergency override semantics are documented.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the canary freshness contract and override policy",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "notes": "Extend `nightly.yml` or add a dedicated workflow that runs:\n  - slow + resource-heavy families serially or in bounded parallelism,\n  - stress subset only if runtime/resource limits are acceptable,\n  - selected live-integration/cross-platform jobs only when credentials\n    and Docker/service constraints are stable.\n\nArtifacts:\n  - compact JSON summary with commit SHA, workflow name, job conclusions,\n    suite families, collected counts, and completion time,\n  - raw pytest logs only as CI artifacts, not committed files.\n\nDecision gate:\n  - If a dedicated workflow is needed, use the scoped name\n    `.github/workflows/release-canary.yml`; do not add an unreviewed\n    workflow filename outside `scope_limit`.\n  - If live credentials are unavailable, explicitly mark live cloud tests\n    advisory and keep the blocking canary to credential-free suites.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add scheduled non-fast canary workflow jobs with compact artifacts",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "notes": "Add a `validate-main-pr.yml` job or release-required workflow job that:\n  - applies only to release PRs targeting `main`,\n  - queries the latest successful configured canary run or reads a\n    durable canary artifact,\n  - fails if no canary is green within the freshness window,\n  - reports the canary SHA and age in the job summary.\n\nDecision gate:\n  - Do not allow this job to silently pass when GitHub API queries fail.\n    API failure is either blocking or requires an explicit documented\n    emergency override.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add release-readiness check that fails release PRs on stale or red canary",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "notes": "Add a script or workflow check that compares live GitHub rulesets with\n`docs/operations/repo-admin-settings.md`.\n\nRequired checks:\n  - required status check contexts for `main` and `develop`,\n  - strict-base settings,\n  - bypass actor list,\n  - linear history / non-fast-forward / deletion protections where\n    documented.\n\nDecision gate:\n  - If live GitHub API access is unavailable in PR CI, make this a\n    scheduled/manual workflow with a release-readiness artifact. Do not\n    pretend local YAML alone proves external ruleset state.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ruleset drift detection against the repository runbook",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-full-suite-canary-and-ruleset-drift",
+        "notes": "Update release docs and release PR template:\n  - exact canary freshness SLA,\n  - exact ruleset drift check,\n  - what to do when canary is red,\n  - what to do when ruleset API is unavailable,\n  - what remains manual/advisory.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire canary freshness and ruleset drift into release docs and PR template",
+        "wid": "w5"
+      }
+    ]
+  }
+}

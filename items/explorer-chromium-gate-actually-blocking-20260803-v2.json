@@ -1,0 +1,145 @@
+{
+  "context": "Add a push trigger for develop so merged state is verified, then make the Chromium result gate merges, either by adding its context to the develop ruleset or by folding it into the ci-required-result aggregate. Sequence this only after the suite is green, or develop becomes unmergeable.",
+  "description": "The job named 'Chromium (full suite, blocking)' is blocking in name only. Verified 2026-08-03: develop has no legacy branch protection, and ruleset develop-squash-only (id 15611785) requires exactly one status context, ci-required-result, which is produced by pr.yml and does not aggregate the browser workflow. PR #1482 merged at 12:49Z with its Chromium job red. Separately, results-explorer-browser.yml triggers only on push to release and pull_request to release or develop, so gh run list --workflow=results-explorer-browser.yml --branch develop returns an empty list: the merged state of develop has never been browser-tested at all.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "needs_item": "explorer-home-abovefold-desktop-wide-20260803-v2"
+      },
+      {
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "needs_item": "explorer-home-smoke-loaded-assertions-20260803-v2"
+      },
+      {
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "needs_item": "explorer-webkit-tpch-databind-rootcause-20260803-v2"
+      }
+    ],
+    "item_meta": {
+      "category": "CI enforcement",
+      "created_at": "2026-08-03T23:43:11Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Chromium is only made required once the suite is green, so develop is never left unmergeable",
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2"
+      },
+      {
+        "behavior": "Firefox and WebKit remain independently assessed and are not silently promoted by this change",
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2"
+      },
+      {
+        "behavior": "The job name stops claiming blocking unless the gate genuinely blocks",
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh api repos/joeharris76/BenchBox/rulesets/15611785 | grep -q Chromium",
+        "description": "Chromium appears as a required context on the develop ruleset",
+        "expected": "Exits 1 today - the live develop ruleset requires only ci-required-result - and exits 0 once the Chromium gate is genuinely required. Verified failing 2026-08-03.",
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows/test_results_explorer_browser_gate.py -q",
+        "description": "Browser workflow gate contract test passes",
+        "expected": "Exits 1 until the develop push trigger and gate wiring are asserted by a test; exits 0 once both hold.",
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --workers=1 --retries=0 --grep-invert @performance",
+        "description": "Full Chromium suite is green before the gate is enforced",
+        "expected": "Zero failures and zero did-not-run entries",
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a push trigger for develop to the browser workflow",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a workflow contract test for the trigger and gate wiring",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-chromium-gate-actually-blocking-20260803-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make Chromium a required context once the suite is green",
+        "wid": "w2"
+      }
+    ]
+  }
+}

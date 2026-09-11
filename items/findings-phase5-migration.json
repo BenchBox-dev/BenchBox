@@ -1,0 +1,239 @@
+{
+  "context": "Importer lives beside the phase-3 module; dry-run into a scratch DB first, produce a machine-checkable parity report (67/67, per-record field diff, dangling-link count), review it, then production import. Bulk path only: libsql write delegation is ~0.15s/statement (~10 items/min row-by-row per hosted-ops memory) — batch via the importer's Hrana-pipeline bulk path, never loop per-row against the primary. One artifact-restore proof: export a findings-inclusive snapshot to the CI artifact channel and restore it into a clean DB, verifying finding_events round-trip.",
+  "description": "Import the 67 Markdown records (66 tracked + 1 untracked capture) into the findings tables with a FALSIFIABLE parity definition — the adversarial review (M4) found 'lossless parity for triage history' unfalsifiable as written because triage history is free-text '## Triage log' prose. Parity here means: verbatim body sections (Finding / Why this matters / Suggested next steps) and every frontmatter field preserved; each triage-log line imported as one finding_events row with action='imported_triage_log' and prose intact; status map open->open, actionable->actionable, actioned->actioned, dismissed->dismissed, merged-to-todo->promoted. Dangling todo_id policy (drop semantics reserve ids forever; YAML-era ids may not exist): resolve each todo_id against the live DB; danglers import as finding_links(kind=promoted-to, target_item=NULL) plus a note, and the parity report counts them explicitly. After production import the Markdown tree is FROZEN (capture already redirected in phase 1) for one full planning cycle before phase 6 deletes it.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Delete or edit record files in this phase",
+        "instead": "Phase 6 deletes, after its gates",
+        "item_id": "findings-phase5-migration",
+        "why": "The freeze cycle is the requirement-2 proof window and the rollback path"
+      },
+      {
+        "dont": "Parse triage-log prose into structured disposition events",
+        "instead": "One imported_triage_log event per line, prose verbatim",
+        "item_id": "findings-phase5-migration",
+        "why": "Unfalsifiable parity: either trivial (blob) or unachievable (prose parsing); structured guesses corrupt the audit trail"
+      },
+      {
+        "dont": "Row-by-row writes against the hosted primary for the import",
+        "instead": "Hrana-pipeline bulk path, matching import-yaml",
+        "item_id": "findings-phase5-migration",
+        "why": "~0.15s RTT per statement; measured ~10 items/min — an hours-long accidental import (hosted-ops memory)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "findings-phase5-migration",
+        "needs_item": "findings-phase1-capture-redirect"
+      },
+      {
+        "item_id": "findings-phase5-migration",
+        "needs_item": "findings-phase3-schema-cli"
+      }
+    ],
+    "item_meta": {
+      "category": "migration",
+      "completed_at": "2026-07-30T19:09:28Z",
+      "completed_pr": 1359,
+      "created_at": "2026-07-22T12:51:21Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "Every record's body sections verbatim (hash-verified) and all frontmatter fields",
+        "item_id": "findings-phase5-migration"
+      },
+      {
+        "behavior": "Production items domain untouched by the import (findings tables only)",
+        "item_id": "findings-phase5-migration"
+      },
+      {
+        "behavior": "The 67 Markdown files themselves untouched until phase 6 (frozen, not deleted)",
+        "item_id": "findings-phase5-migration"
+      },
+      {
+        "behavior": "Triage-log prose intact as imported_triage_log events — no parsing-lossy structuring",
+        "item_id": "findings-phase5-migration"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Triage lifecycle the status map must honor — status->disposition mapping defined above",
+        "decision": "extend",
+        "item_id": "findings-phase5-migration",
+        "path": "_project/blind-spots/README.md:99-143"
+      },
+      {
+        "concept": "Bulk importer with collision handling and Hrana pipeline — same bulk mechanics, findings target",
+        "decision": "extend",
+        "item_id": "findings-phase5-migration",
+        "path": "_project/scripts/todo_db.py (import-yaml path)"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-phase5-migration",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "findings-phase5-migration",
+        "kind": "do_not_modify",
+        "path_glob": ".gitignore"
+      },
+      {
+        "item_id": "findings-phase5-migration",
+        "kind": "do_not_modify",
+        "path_glob": "_project/blind-spots/2026-*.md"
+      },
+      {
+        "item_id": "findings-phase5-migration",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/README.md"
+      },
+      {
+        "item_id": "findings-phase5-migration",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-phase5-migration",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_findings.py"
+      },
+      {
+        "item_id": "findings-phase5-migration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts -k 'finding_import or parity' -q",
+        "description": "Importer + parity tests green on fixture corpus",
+        "expected": "all passed",
+        "item_id": "findings-phase5-migration",
+        "last_result": "pass",
+        "last_run": "2026-07-30T01:11:33Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python -m todo_findings import --dry-run --report",
+        "description": "Dry-run parity report: 67/67, zero unexplained diffs",
+        "expected": "67/67, danglers dispositioned, exit 0",
+        "item_id": "findings-phase5-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Artifact restore proof",
+        "expected": "clean-DB restore contains all findings + finding_events; evidence recorded on w5",
+        "item_id": "findings-phase5-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-phase5-migration",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "findings-phase5-migration",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "findings-phase5-migration",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "findings-phase5-migration",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "findings-phase5-migration",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "import_corpus() in _project/scripts/todo_findings.py: Markdown -> findings/finding_evidence/finding_links/finding_sections/finding_events per the v4 mapping; deterministic (sorted glob, document-order sections); idempotent by filename-stem id; records imported_from; READ-ONLY over the corpus (separate from sync_drafts precisely because that renames to *.synced). Triage log -> one imported_triage_log event per line, prose verbatim.",
+        "item_id": "findings-phase5-migration",
+        "notes": null,
+        "started_at": "2026-07-30T01:11:10Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Importer: Markdown -> findings tables per parity mapping; deterministic; idempotent by record id",
+        "wid": "w1"
+      },
+      {
+        "evidence": "parity_report(): coverage (corpus_records vs stored_records), sha256 hash diff on title/finding_text/why_matters/next_steps, diff over all 10 frontmatter-derived columns, extra-section comparison by (position, heading, text), triage-log line count vs imported_triage_log event count, and a dangling-todo_id table. ok is true only when every diff list is empty; the CLI exits 1 otherwise. Fails closed on a lost section and a lost triage line (tests).",
+        "item_id": "findings-phase5-migration",
+        "notes": null,
+        "started_at": "2026-07-30T01:11:13Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Parity report: 67/67 coverage, verbatim-body hash diff, frontmatter diff, triage-log line counts, dangling-todo_id table",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Dry-run + full import into a scratch DB seeded with all 1674 production items (an empty DB would report all legacy todo_ids as false danglers). Result: 64/64 tracked records imported, 0 failed parses, 260 imported_triage_log events, 0 danglers. Parity report ok=true with ZERO diffs across body hashes, frontmatter columns, extra sections and triage-log counts. Corpus verified untouched (git status clean, no .synced files). NOTE the live count is 64 tracked here + the 1 already-synced untracked record already in production = 65, not the 67 in the item title; production currently holds findings=1 so a production import is 64 new + 1 skipped.",
+        "item_id": "findings-phase5-migration",
+        "notes": null,
+        "started_at": "2026-07-30T01:11:28Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Dry-run into scratch DB; parity report reviewed, zero unexplained diffs; danglers dispositioned",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PRODUCTION IMPORT COMPLETE via the Hrana bulk path: 'todo finding import --bulk --confirm-target benchbox-todo' moved 432 rows in 4 batches, 64 records, pk offset {finding_events: 1}. Post-import production state verified: findings=65 (64 imported + 1 pre-existing), finding_evidence=3 (pre-existing rows untouched), finding_links=36 (32 promoted-to + 4 resolved-by), finding_sections=8, finding_events=325 (64 import + 260 imported_triage_log + 1 prior sync). Items domain untouched. Parity re-run on a fresh connection: OK 64/64, zero diffs. NOTE the run printed a FALSE 'PARITY FAILED' because parity was computed against the pre-transfer embedded replica; data was correct throughout and the read-after-write bug is fixed in PR #1359.",
+        "item_id": "findings-phase5-migration",
+        "notes": null,
+        "started_at": "2026-07-30T19:07:15Z",
+        "started_branch": "fix/findings-import-parity-replica-sync",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Production import via Hrana bulk path into benchbox-todo; post-import parity re-run",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Findings-inclusive snapshot written to the artifact-channel shape (one jsonl per findings table, NOT _project/todo-db-export/ which stays items-domain only): findings=65, finding_evidence=3, finding_links=36, finding_sections=8, finding_events=325. Restored into a clean v4 database and verified: all 5 table counts match, and finding_events round-trips BYTE-IDENTICALLY -- sha256 over (seq, at, actor, finding_id, action, detail) ORDER BY seq is b374a79f0c918f0e on both source and restore, with all 260 imported_triage_log rows present. Committed export confirmed untouched (git clean) and still carries 0 findings-domain data rows.",
+        "item_id": "findings-phase5-migration",
+        "notes": null,
+        "started_at": "2026-07-30T19:08:11Z",
+        "started_branch": "fix/findings-import-parity-replica-sync",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Findings-inclusive snapshot to CI artifact + clean-DB restore proof (finding_events round-trip)",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Freeze announced at the top of _project/blind-spots/README.md (PR #1359): directory marked read-only as of 2026-07-30, all 65 records stated as living in the tracker at SCHEMA_VERSION 4, capture routed to 'todo finding create' (drafts dir, zero-credential) and landing to 'todo finding sync', triage to list/show/candidates/triage/promote. States explicitly that the freeze runs one planning cycle and IS the rollback window, so the files remain until phase 6. Corpus itself untouched: validate_blind_spot --all still reports all 64 tracked files valid.",
+        "item_id": "findings-phase5-migration",
+        "notes": null,
+        "started_at": "2026-07-30T19:09:22Z",
+        "started_branch": "fix/findings-import-parity-replica-sync",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Announce freeze: tree read-only one planning cycle; README note points at todo finding",
+        "wid": "w6"
+      }
+    ]
+  }
+}

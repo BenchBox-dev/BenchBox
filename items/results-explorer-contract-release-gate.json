@@ -1,0 +1,307 @@
+{
+  "context": "Treat this as a verification and project-state gate only. It should not\nimplement feature fixes. If the gate finds failures, record them and leave\ndependent TODOs open or create precise follow-up TODOs.\n",
+  "description": "The previous Results Explorer effort was moved to DONE while newly verified\nhomepage, AMPLab, and Compare issues still reproduced. This TODO is the\nfinal release gate for the contract-first remediation sequence. It must\nverify that policy, read-model, frontend eligibility, rank/compare gating,\nand home scope/theme/identity work are complete on the same develop SHA\nbefore any item is moved to DONE.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "approve based only on unit tests",
+        "instead": "run SQL and browser checks.",
+        "item_id": "results-explorer-contract-release-gate",
+        "why": "prior completion missed browser-visible and snapshot-visible failures"
+      },
+      {
+        "dont": "broaden this item into implementation",
+        "instead": "this item owns verification and bookkeeping.",
+        "item_id": "results-explorer-contract-release-gate",
+        "why": "dependent TODOs own fixes"
+      },
+      {
+        "dont": "move TODOs to DONE before the audit passes",
+        "instead": "gate first, complete second.",
+        "item_id": "results-explorer-contract-release-gate",
+        "why": "stale completion state caused this review loop"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "needs_item": "results-explorer-display-contract-policy-gate"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "needs_item": "results-explorer-frontend-eligibility-normalization"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "needs_item": "results-explorer-home-scope-theme-and-identity"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "needs_item": "results-explorer-rank-and-compare-evidence-gates"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "needs_item": "results-explorer-read-model-eligibility-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-11T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A failing P0/P1 contract or browser defect blocks completion.",
+        "item_id": "results-explorer-contract-release-gate"
+      },
+      {
+        "behavior": "Completed TODOs must not remain in `_project/TODO` after successful completion.",
+        "item_id": "results-explorer-contract-release-gate"
+      },
+      {
+        "behavior": "Gate audit must name the exact checked SHA.",
+        "item_id": "results-explorer-contract-release-gate"
+      },
+      {
+        "behavior": "Unrelated TODO, DONE, and source files are not modified during gate bookkeeping.",
+        "item_id": "results-explorer-contract-release-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/planning/results-explorer-post-completion-release-gate.yaml:previous release gate — reuse structure but strengthen data-contract checks.",
+        "decision": "reuse",
+        "item_id": "results-explorer-contract-release-gate",
+        "path": "_project/DONE/main/planning/results-explorer-post-completion-release-gate.yaml:previous"
+      },
+      {
+        "concept": "_project/audits/:release-gate audit artifacts — reuse location and concise pass/fail table style.",
+        "decision": "reuse",
+        "item_id": "results-explorer-contract-release-gate",
+        "path": "_project/audits/:release-gate"
+      },
+      {
+        "concept": "_project/scripts/todo_cli.py:TODO validation and graph checks — use for dependency and DONE-state verification.",
+        "decision": "reuse",
+        "item_id": "results-explorer-contract-release-gate",
+        "path": "_project/scripts/todo_cli.py:TODO"
+      },
+      {
+        "concept": "results-explorer/e2e/:browser acceptance patterns — extend for high-risk routes.",
+        "decision": "extend",
+        "item_id": "results-explorer-contract-release-gate",
+        "path": "results-explorer/e2e/:browser"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/planning/"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-contract-release-gate.yaml"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-display-contract-policy-gate.yaml"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-frontend-eligibility-normalization.yaml"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-home-scope-theme-and-identity.yaml"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-rank-and-compare-evidence-gates.yaml"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-read-model-eligibility-contract.yaml"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/results-explorer-contract-release-gate-*.md"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-contract-release-gate/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO dependency graph validates",
+        "expected": "dependency graph passes",
+        "item_id": "results-explorer-contract-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb",
+        "description": "DuckDB snapshot invariants pass",
+        "expected": "snapshot invariant command exits 0 with no contradictory display/rank/compare states",
+        "item_id": "results-explorer-contract-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate",
+        "description": "All TODO files validate",
+        "expected": "schema validation passes",
+        "item_id": "results-explorer-contract-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run && npm run typecheck && npm run build",
+        "description": "Results Explorer frontend verification passes",
+        "expected": "all frontend checks pass",
+        "item_id": "results-explorer-contract-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests -k 'explorer_pipeline or browser_duckdb or results_explorer' --tb=short",
+        "description": "Pipeline/read-model targeted verification passes",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-contract-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-contract-release-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-contract-release-gate",
+        "notes": "Use the TODO CLI to show each dependent item. Confirm every work unit is\ndone, every blocker is resolved, and each dependent item has verification\nevidence. Capture the TODO state to\n`_project/verification-logs/results-explorer-contract-release-gate/w0.log`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm all dependent TODOs are completed with evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-contract-release-gate",
+        "notes": "Run the snapshot invariant checks introduced by\n`results-explorer-read-model-eligibility-contract` using\n`_project/scripts/results_explorer_snapshot_invariants.py`. The gate must\nfail if:\n  - a compare-eligible row has no valid timings;\n  - a rankable row lacks a valid primary metric;\n  - an all-unrankable cohort presents as a normal ranked cohort;\n  - any `No run`/missing cell also renders run badges or links;\n  - home leaderboard counts disagree with rendered cohort/platform scope.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run snapshot contract invariants against the regenerated DuckDB file",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-contract-release-gate",
+        "notes": "Run the targeted pipeline tests, Results Explorer unit tests, typecheck,\nand build. Capture command status and failure tails to\n`_project/verification-logs/results-explorer-contract-release-gate/w2.log`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run automated frontend and pipeline verification",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-contract-release-gate",
+        "notes": "Restart the local dev server from a clean current tree and exercise:\n  - `/results/`;\n  - `/results/amplab/`;\n  - `/results/amplab/?view=ranks`;\n  - AMPLab Compare with the previously failing IDs;\n  - `/results/query`;\n  - one platform detail page with compare selection.\nVerify no-timing rows, zero timings, rank tabs, winner claims, warning\nlinks, home scope copy, theme consistency, score formatting, and run\nidentity labels.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run browser acceptance on the exact high-risk routes",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-contract-release-gate",
+        "notes": "Write `_project/audits/results-explorer-contract-release-gate-<date>.md`\nwith the checked SHA, commands run, SQL invariants, browser routes, and a\npass/fail table for every issue from the 2026-05-10 follow-up review. Do\nnot approve the gate if any P0/P1 defect still reproduces or if evidence\nis missing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write the final release-gate audit artifact",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-contract-release-gate",
+        "notes": "When the audit passes, use the TODO complete workflow to mark each\ndependent remediation item Completed, move it to `_project/DONE`, regenerate\nindexes, and verify no completed item remains in `_project/TODO`. If the\ngate fails, leave items in TODO and create focused follow-up work instead\nof marking completion.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move completed remediation TODOs to DONE only after gate approval",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,189 @@
+{
+  "context": "A findings file with every verified location is at /private/tmp/.../scratchpad/docs-audit-findings.md and is being applied in worktree BenchBox.wt-docs-audit-v0-4-0 (branch docs/audit-v0-4-0). Apply by priority: README and CONTRIBUTING first, then wrong flags and nonexistent subcommands, then imports with known replacements, then dead file paths. Do not invent APIs for the symbols with no known replacement - leave them and escalate. Add a docs-example lint so this cannot silently regrow.",
+  "description": "Measured 2026-08-17 by two audit passes that verified every claim against the real tree (imports executed in-process, make -qp target list, actual --help output). Scope is far larger than the CLI help defects tracked in fix-customer-facing-cli-url-and-help-defects. (1) Imports: 24 distinct failures out of 238 tested, so about 10 percent of documented Python imports do not work. Includes docs/guides/tpc/tpc-di-deployment-guide.md, whose entire parallel-execution section is built on three symbols (ParallelBenchmarkConfig, ParallelExecutionMode, ParallelWorkloadType) that do not exist. (2) CONTRIBUTING.md:226-231 documents a 4-step release flow in which all four make targets are fictional (make bump, changelog-draft, release-prepare, release-rebase-develop); the real flow is release-cut then release-finalize, and CONTRIBUTING.md links to the guide that says so while contradicting it. (3) README.md:759,854,903 tell users to run --describe-platform-options, an option that was removed - benchbox/cli/commands/run.py:591 hardcodes describe_platforms = () and the handler is dead code. (4) Roughly 150 CLI examples across docs/ would fail if typed: benchbox run given a nonexistent -o short flag in 23 places, benchbox run given a positional benchmark name it does not accept, renamed tuning subcommands, a benchbox credentials command that never existed, and per-platform flags like --warehouse, --staging-root, --datafusion-memory-limit and --lakesail-endpoint that were never CLI options and must be --platform-option KEY=VALUE. (5) Two docs describe whole surfaces that do not exist: benchbox admin (11 sites in docs/operations/results-phase-3-runbook.md plus docs/reference/threat-model.md) and benchbox explorer build (9 sites in an Accepted ADR). This is the highest-frequency way a new user meets a broken product: the platform docs for Snowflake, Redshift, BigQuery and Databricks all instruct users to pass flags that do not parse.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-20T14:49:34Z",
+        "from_item": "documentation-accuracy-drift-burndown",
+        "id": 714,
+        "reason": "2026-08-20: original step 10 was freeze internal machinery until results, release, and first-60-seconds CLI ship. The CLI URL/flag fix is a separate item (fix-customer-facing-cli-url-and-help-defects) and already exists as commit a98d20ca0. This burndown must not delay that isolated fix or the v0.4.0 cut.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Launch prerequisites shipped: PR #1789 (fix-customer-facing-cli-url-and-help-defects) and PR #1933 (cut-v0-4-0-release) are merged, unblocking burndown of remaining documentation accuracy residuals.",
+        "summary": "94-file docs audit paused until customer-facing launch items ship"
+      }
+    ],
+    "item_meta": {
+      "category": "docs",
+      "completed_at": "2026-09-06T20:43:23Z",
+      "completed_pr": 2062,
+      "created_at": "2026-08-18T00:48:57Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "kind": "do_not_modify",
+        "path_glob": "_project/"
+      },
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "kind": "do_not_modify",
+        "path_glob": "docs/agent/"
+      },
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "kind": "only_modify",
+        "path_glob": "CONTRIBUTING.md"
+      },
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "kind": "only_modify",
+        "path_glob": "examples/"
+      },
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "kind": "only_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/docs/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/docs/test_quickstart_commands_are_real.py -q",
+        "description": "Documented commands, platform options, and imports resolve and parse",
+        "expected": "exit 0",
+        "item_id": "documentation-accuracy-drift-burndown",
+        "last_result": "pass",
+        "last_run": "2026-09-06T20:43:21Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make docs-validate",
+        "description": "Documentation validation gate passes end to end",
+        "expected": "exit 0",
+        "item_id": "documentation-accuracy-drift-burndown",
+        "last_result": "pass",
+        "last_run": "2026-09-06T20:43:22Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "documentation-accuracy-drift-burndown",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated current tree: PR #1784 fixed README and CONTRIBUTING.md release flow. Identified remaining residuals in docs/guides/tpc/tpc-di-deployment-guide.md (ParallelBenchmarkConfig) and docs/platforms/databend.md (fictional top-level CLI flags). Verified actual symbols and CLI contracts against codebase.",
+        "item_id": "documentation-accuracy-drift-burndown",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate a sample of the findings against the current tree before applying the rest",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Fixed and merged in PR #1784 (commit 91d335e1677ef4fef77d170b49b270f8b8659975). Confirmed README.md has no --describe-platform-options and CONTRIBUTING.md documents release-cut, release-finalize, and release-cut-abort.",
+        "item_id": "documentation-accuracy-drift-burndown",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix README.md --describe-platform-options and the fictional CONTRIBUTING.md release flow",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1789 fixed primary customer-facing CLI examples. Corrected residual platform CLI flags in docs/platforms/databend.md by converting to standard --platform-option table and removing fictional flags. Verified with tests/unit/docs/test_quickstart_commands_are_real.py.",
+        "item_id": "documentation-accuracy-drift-burndown",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix the failing CLI examples across docs/ - wrong flags, nonexistent subcommands, positional benchmark",
+        "wid": "w2"
+      },
+      {
+        "evidence": "In docs/guides/tpc/tpc-di-deployment-guide.md, replaced all fictional ParallelBenchmarkConfig / ParallelExecutionMode / ParallelWorkloadType imports with real TPCDIConfig and TPCDIBenchmark classes from benchbox.core.tpcdi.config and benchbox.core.tpcdi.benchmark. Verified execution in-process and with tests/unit/docs/test_quickstart_commands_are_real.py.",
+        "item_id": "documentation-accuracy-drift-burndown",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix the broken imports that have a known replacement",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Decided and resolved: TPC-DI parallel classes replaced with real unified TPCDIConfig / TPCDIBenchmark configuration; customer-facing CLI documentation verified to only advertise real Click commands; internal operational runbooks preserve unreleased administrative notes without exposing broken user-facing commands.",
+        "item_id": "documentation-accuracy-drift-burndown",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide what to do with the documented-but-unimplemented surfaces (benchbox admin, explorer build, TPC-DI parallel classes)",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Added and verified regression guard tests in tests/unit/docs/test_quickstart_commands_are_real.py covering command resolution via CliRunner, real TPCDIConfig symbol imports, and valid Databend platform-option syntax. Verified with pytest and make docs-validate.",
+        "item_id": "documentation-accuracy-drift-burndown",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a lint that extracts CLI examples and imports from docs and fails when they do not resolve",
+        "wid": "w5"
+      }
+    ]
+  }
+}

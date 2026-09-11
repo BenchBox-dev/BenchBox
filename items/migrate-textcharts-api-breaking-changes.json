@@ -1,0 +1,120 @@
+{
+  "context": "Mechanical find-and-replace per the rename map. Each file: update import\nlines first, then update all usages in function bodies. The\nbenchbox/core/visualization/ascii/*.py shim modules use wildcard imports\nfrom textcharts and need no changes - they auto-adapt.\n\nProcess each source file independently. Run lint after each file to catch\nimport errors immediately. Commit per work unit.\n",
+  "description": "The textcharts library has removed all backward-compatibility stubs:\n- 17 ASCII*-prefixed class names removed (e.g. ASCIIBarChart -> BarChart)\n- 13 deprecated factory functions removed (not used in BenchBox - no action)\n- 2 deprecated re-export aliases removed from __init__.py\n\nBenchBox imports textcharts via wildcard shims in\nbenchbox/core/visualization/ascii/*.py, which auto-adapt. But 10 files\nreference the old ASCII*-prefixed names directly in imports, type\nannotations, instantiations, isinstance checks, and string literals.\nThese will raise ImportError or test failures when textcharts is upgraded.\n\nThis is a mechanical find-and-replace - no behavioral changes, no\nconstructor signature changes, byte-identical rendering output.\n\nScope: 6 source files (~66 references) + 4 test files (~133 references).\nNo factory function changes needed (BenchBox doesn't use any deprecated\nfactory functions).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change constructor signatures or add/remove parameters",
+        "instead": "(not specified)",
+        "item_id": "migrate-textcharts-api-breaking-changes",
+        "why": "the API is identical, only names changed"
+      },
+      {
+        "dont": "modify the ascii/*.py shim modules",
+        "instead": "(not specified)",
+        "item_id": "migrate-textcharts-api-breaking-changes",
+        "why": "wildcard imports auto-adapt to the new names"
+      },
+      {
+        "dont": "rename string literals like 'ASCII charts' or 'ascii_api'",
+        "instead": "because these are descriptive terms, not code symbols",
+        "item_id": "migrate-textcharts-api-breaking-changes",
+        "why": "only rename class name references like ASCIIBarChart"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-03-10T00:00:00Z",
+      "created_at": "2026-03-10T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All 16 chart types render identically before and after migration",
+        "item_id": "migrate-textcharts-api-breaking-changes"
+      },
+      {
+        "behavior": "MCP visualization tool produces identical output",
+        "item_id": "migrate-textcharts-api-breaking-changes"
+      },
+      {
+        "behavior": "ascii_api.py facade continues to re-export all chart classes",
+        "item_id": "migrate-textcharts-api-breaking-changes"
+      },
+      {
+        "behavior": "benchbox.core.visualization.ascii.* import paths continue to work (wildcard shim)",
+        "item_id": "migrate-textcharts-api-breaking-changes"
+      },
+      {
+        "behavior": "render_ascii_chart_from_results() function signature unchanged",
+        "item_id": "migrate-textcharts-api-breaking-changes"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ tests/contracts/visualization/ -v",
+        "description": "All visualization tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "migrate-textcharts-api-breaking-changes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -v",
+        "description": "Golden snapshot tests produce identical output",
+        "expected": "all tests pass, snapshots match",
+        "item_id": "migrate-textcharts-api-breaking-changes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rn 'ASCII[A-Z]' benchbox/ tests/ --include='*.py' | grep -v 'ascii_api\\|ASCII chart\\|ASCII-only\\|ASCII tree\\|ASCII art\\|# ASCII'",
+        "description": "No remaining ASCII*-prefixed class references",
+        "expected": "no output (all references migrated)",
+        "item_id": "migrate-textcharts-api-breaking-changes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Smoke tests pass",
+        "expected": "all tests pass",
+        "item_id": "migrate-textcharts-api-breaking-changes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "migrate-textcharts-api-breaking-changes",
+        "notes": "Class rename map (only the names actually used in BenchBox source):\n  ASCIIChartOptions -> ChartOptions\n  ASCIIBarChart -> BarChart\n  ASCIIBoxPlot -> BoxPlot\n  ASCIIComparisonBar -> ComparisonBar\n  ASCIIDivergingBar -> DivergingBar\n  ASCIIHeatmap -> Heatmap\n  ASCIIQueryHistogram -> Histogram\n  ASCIILineChart -> LineChart\n  ASCIINormalizedSpeedup -> NormalizedSpeedup\n  ASCIIPercentileLadder -> PercentileLadder\n  ASCIIRankTable -> RankTable\n  ASCIIScatterPlot -> ScatterPlot\n  ASCIISparklineTable -> SparklineTable\n  ASCIIStackedBar -> StackedBar\n  ASCIISummaryBox -> SummaryBox\n  ASCIICDFChart -> CDFChart\n\nUpdate imports, instantiations, type annotations, and docstring\nreferences. Preserve all string literals that refer to \"ASCII\" as a\nrendering mode concept (e.g. \"ASCII charts\", \"ascii_api\") - only\nrename class name references.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename ASCII*-prefixed classes in 6 source files - ascii_runtime.py, exporters.py, post_run_summary.py, chart_generator.py, visualize.py, mcp/visualization.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-textcharts-api-breaking-changes",
+        "notes": "Same rename map as w1. These test files import from\nbenchbox.core.visualization.ascii.* submodules. Independent of w1 -\nthe shim modules export whatever textcharts exports (wildcard imports),\nso both work units fix consumer-side references and can run in parallel.\n\ntest_ascii_charts.py has monkey-patching of runtime.ASCIIBarChart -\nupdate to runtime.BarChart.\n\ntest_post_run_summary.py:266 has a mock path string\n\"benchbox.core.visualization.post_run_summary.ASCIISummaryBox.render\"\n- update to SummaryBox. Lines 659/677 have docstring references.\n\nAfter all renames, run the verification commands from the verification\nsection to confirm no remaining old references and golden snapshots\nare byte-identical.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename ASCII*-prefixed classes in 4 test files and run full verification - test_ascii_golden_output.py, test_nocolor_rendering.py, test_ascii_charts.py, test_post_run_summary.py",
+        "wid": "w2"
+      }
+    ]
+  }
+}

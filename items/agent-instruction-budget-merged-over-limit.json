@@ -1,0 +1,118 @@
+{
+  "description": "PR #1541 merged with active_bytes=16088 against a 16000 budget. The guard runs as both a pre-commit hook and a CI lint step, yet develop ended up in a state its own guard rejects - so every subsequent commit in every worktree aborted and every open PR failed, independent of content. Fixed the symptom in PR #1544 by compressing the corpus back to 15993. The unanswered question is how it merged: either the lint job did not run the check on that PR, or it ran against a different file set than the hook does. Until that is known the same class recurs on the next byte-adding merge, and the failure mode is repo-wide. Note the failure is also easy to misread: the pre-commit abort leaves the branch pushable, so a commit that never happened looks like a successful push.",
+  "legacy": {
+    "item_meta": {
+      "category": "CI reliability",
+      "completed_at": "2026-08-13T15:33:27Z",
+      "completed_pr": 1708,
+      "created_at": "2026-08-04T17:23:21Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "kind": "only_modify",
+        "path_glob": "scripts/ruleset_drift_check.py"
+      },
+      {
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/release/test_ruleset_drift_review_coverage.py"
+      },
+      {
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      },
+      {
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_ruleset_drift.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_ruleset_drift.py tests/unit/release/test_ruleset_drift_review_coverage.py -q",
+        "description": "Ruleset drift policy tests",
+        "expected": "passed",
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:33:22Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"strict_required_status_checks_policy: true\" docs/operations/repo-admin-settings.md",
+        "description": "Runbook requires current-base checks",
+        "expected": "strict_required_status_checks_policy: true",
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:33:24Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR 1541 CI tested synthetic merge fea61e4 against base d1f7cbcd at active_bytes=15947. PR 1539 then advanced develop to active_bytes=15990 before PR 1541 merged; its 98-byte delta produced active_bytes=16088. Live ruleset 15611785 has strict_required_status_checks_policy=false, so stale green checks remained merge-eligible.",
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "notes": null,
+        "started_at": "2026-08-13T13:46:34Z",
+        "started_branch": "fix/agent-instruction-budget-gate",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-agent-instruction-budget-gate",
+        "status": "done",
+        "summary": "Reconstruct PR 1541 tested merge, concurrent develop merges, and final budget state",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Runbook now requires strict current-base checks and explains concurrency tradeoff; drift fixtures and parser assertions pin develop strict=true. 41 focused tests pass; live negative control fails only because ruleset 15611785 remains false.",
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "notes": null,
+        "started_at": "2026-08-13T13:47:01Z",
+        "started_branch": "fix/agent-instruction-budget-gate",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-agent-instruction-budget-gate",
+        "status": "done",
+        "summary": "Pin strict current-base required checks in the ruleset runbook and drift tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Updated live develop ruleset 15611785 on 2026-08-13 to strict_required_status_checks_policy=true while preserving all other rules; API verification confirms required contexts ci-required-result and Results Explorer browser gate, zero bypass actors, linear history, non-fast-forward, and deletion protection. PR #1708 worktree live drift check passed with only the pre-existing non-blocking v-tag bypass confirmation advisory.",
+        "item_id": "agent-instruction-budget-merged-over-limit",
+        "notes": null,
+        "started_at": "2026-08-13T14:30:48Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Apply strict current-base policy to the live develop ruleset and confirm drift parity",
+        "wid": "w2"
+      }
+    ]
+  }
+}

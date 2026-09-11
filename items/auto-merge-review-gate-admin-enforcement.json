@@ -1,0 +1,178 @@
+{
+  "description": "Follow-up to auto-merge-review-gate-soundness-paths (PR #912, already DONE). The\nadversarial holistic-review found the gate is only half-real in production. The\ncode side is correct and sound: pr-open (Makefile:1161) and the\nauto-merge-on-open.yml workflow share one predicate\n(_project/scripts/auto_merge_soundness_paths.py, invoked with --no-renames) and\ncorrectly WITHHOLD auto-merge enablement for PRs touching comparator/plan-parser\nsoundness paths. But nothing ENFORCES a review: the develop ruleset\n`develop-squash-only` has required_approving_review_count: 0 and\nrequire_code_owner_review: false (verified via `gh api repos/.../rules/branches/develop`;\nlegacy branch protection returns 404 \"Branch not protected\"). So a soundness-path\nPR can still be squash-merged with zero approvals — manually or by re-enabling\nauto-merge. The DONE item's success_metric (\"PRs touching the comparator or plan\nparsers cannot squash-auto-merge without a review\") is NOT met at the repo level.\n\nTwo parts: (1) a CI meta-check that makes the gap LOUD and self-healing so it\ncannot silently regress once set; (2) the actual ruleset change, which requires\na repo admin and is tracked here as the gating human action.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate the soundness path list; the meta-check must read it from auto_merge_soundness_paths.py.",
+        "instead": "(not specified)",
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "mark this Completed while the ruleset still shows review_count 0 / code-owner review false",
+        "instead": "(not specified)",
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "why": "that repeats the overstated DONE metric."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "auto-merge-review-gate-admin-enforcement",
+        "id": 343,
+        "reason": "Requires a repo admin (gh api PUT on the ruleset); cannot be done by an agent PR. Tracked as the gating human action for w3.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: CLAUDE.md states this exact require_code_owner_review ruleset target was retired 2026-07-18; maintainer-manual-merge path replaces it.",
+        "summary": "Apply the develop ruleset change: require_code_owner_review=true."
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "created_at": "2026-06-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Non-soundness-path PRs keep squash auto-merge on CI-pass; this item only hardens the soundness exception.",
+        "item_id": "auto-merge-review-gate-admin-enforcement"
+      },
+      {
+        "behavior": "The code-side withholding behavior (pr-open + auto-merge-on-open.yml shared predicate, --no-renames) is unchanged.",
+        "item_id": "auto-merge-review-gate-admin-enforcement"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': '.github/workflows/pr.yml:270', 'note': \"Existing 'Oracle coverage map drift check' / drift-check step pattern in the lint job — model the ruleset meta-check on these gh-api-backed drift steps.\"}",
+        "decision": "reuse",
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'CODEOWNERS', 'note': 'Owns the soundness globs (parsers/**, equivalence/**, **/validation.py); require_code_owner_review only triggers if an owner team/user is actually assigned to those paths — verify, do not assume.'}",
+        "decision": "reuse",
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': '_project/scripts/auto_merge_soundness_paths.py', 'note': 'The shared soundness-path predicate; the meta-check should reuse its SOUNDNESS_PREFIXES so the CI assertion and the auto-merge withholding agree on one source of truth.'}",
+        "decision": "reuse",
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/active/auto-merge-review-gate-soundness-paths.yaml"
+      },
+      {
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/release/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/release/ -k ruleset_review_enforcement -q",
+        "description": "Meta-check fails on an unenforced ruleset and passes on an enforced one",
+        "expected": "asserts the check fails when review_count<1 or code-owner review false; passes otherwise",
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "notes": "Capture `gh api repos/joeharris76/BenchBox/rulesets` and the develop ruleset\ndetail; record required_approving_review_count and require_code_owner_review.\nConfirm CODEOWNERS assigns a real owner to parsers/**, equivalence/**,\n**/validation.py. Summarize (values + glob->owner) in the PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-confirm live ruleset state and CODEOWNERS ownership of soundness globs",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "notes": "Add a step in an ALWAYS-required job (e.g. pr.yml lint / code-lint), never\ncontent-guard: content-guard is gated by content-guard-needed and skipped for\ncode-only PRs (ci-required-result ignores it unless content paths changed), so\na check placed there would let a code-only PR pass while review enforcement is\nabsent - defeating this item's stated self-healing guarantee. The step queries\nthe live develop ruleset via gh api and FAILS if require_code_owner_review !=\ntrue. required_approving_review_count is deliberately NOT part of this check:\nit is branch-wide, not CODEOWNERS-scoped, so asserting it here would gate\nevery develop PR rather than just soundness-path ones (see\nruleset_review_enforcement.py's module docstring). Reuse\nauto_merge_soundness_paths.py SOUNDNESS_PREFIXES for the path set it narrates.\nIf a ruleset-read token is unavailable in CI, fall back to a documented manual\nrelease-runbook checklist item and record that decision.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a CI meta-check that fails when the develop ruleset lacks review enforcement",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "notes": "Amend _project/DONE/main/active/auto-merge-review-gate-soundness-paths.yaml\nsuccess_metrics to state the code side is complete and the hard review\nprecondition is enforced by the ruleset change tracked in THIS item (link by\nid). Add the exact ruleset PUT to the release/admin runbook (AGENTS.md or\ndocs) so the human action is discoverable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Correct the DONE success_metric and document the admin runbook step",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "auto-merge-review-gate-admin-enforcement",
+        "notes": "CANCELLED by the 2026-07-18 retirement decision (see resolution_notes):\nthe admin action this waited on was retired without being applied, so\nthere is no enforcement to verify. Closed as retired, not as verified.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify enforcement end-to-end once the admin applies the ruleset change",
+        "wid": "w3"
+      }
+    ]
+  }
+}

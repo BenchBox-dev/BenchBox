@@ -1,0 +1,125 @@
+{
+  "context": "Bind schema revision, migration inventory, and wrapper dependency/version with a static gate; cover CLI-ahead and DB-ahead disposable databases.",
+  "description": "A CLI-ahead-of-hosted-DB skew can brick read-only tracker commands until migrate runs, obscuring authoritative state and encouraging stale fallback. Reproduce revision skew, choose an atomic CI/release guard rather than weakening unknown-schema write refusal, and require each schema bump to include migration plus deployment-order evidence.",
+  "legacy": {
+    "item_meta": {
+      "category": "Tracker integrity",
+      "completed_at": "2026-08-01T17:30:56Z",
+      "completed_pr": 1421,
+      "created_at": "2026-08-01T14:07:24Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Hosted DSN and tokens are never printed.",
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3"
+      },
+      {
+        "behavior": "Writes against unknown revisions fail closed.",
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3",
+        "kind": "only_modify",
+        "path_glob": "_project/**"
+      },
+      {
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts -k 'todo and (schema or migration or revision)' -q",
+        "description": "Tracker schema skew tests",
+        "expected": "fails to detect an unpaired bump on the unfixed tree; exit 0 after guard",
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'schema.*migration|migration.*schema' .github/workflows _project/scripts | grep -q .",
+        "description": "Workflow wiring references migration guard",
+        "expected": "exit 0",
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Disposable SQLite tests reproduce CLI-ahead and database-ahead rejection; direct migrate now rejects unknown newer revisions.",
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3",
+        "notes": null,
+        "started_at": "2026-08-01T17:15:37Z",
+        "started_branch": "fix/todo-schema-migration-atomicity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Reproduce CLI-ahead and DB-ahead behavior with disposable databases",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Decision recorded in _project/decisions/todo-schema-migration-atomicity-2026-08-01.md, including migrate-before-merge ordering and rejected alternatives.",
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3",
+        "notes": null,
+        "started_at": "2026-08-01T17:15:43Z",
+        "started_branch": "fix/todo-schema-migration-atomicity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Record atomic guard and deployment ordering decision",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Static inventory guard, wrapper binding, fail-closed migration change, and atomic rollback/skew regressions implemented; 40 focused tests pass.",
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3",
+        "notes": null,
+        "started_at": "2026-08-01T17:15:49Z",
+        "started_branch": "fix/todo-schema-migration-atomicity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Implement revision migration inventory gate and skew tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Required ci-paths job runs dependency-free todo_schema_migration_check.py on every develop PR; direct guard and workflow grep pass.",
+        "item_id": "todo-cli-schema-bump-migration-atomicity-v3",
+        "notes": null,
+        "started_at": "2026-08-01T17:15:54Z",
+        "started_branch": "fix/todo-schema-migration-atomicity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Wire the guard into required CI in the same PR",
+        "wid": "w3"
+      }
+    ]
+  }
+}

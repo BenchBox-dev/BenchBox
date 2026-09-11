@@ -1,0 +1,107 @@
+{
+  "description": "Add a narrow structural validator for authoritative public-contract Markdown tables: delimiter integrity, header column count, contiguous data rows, and heading boundaries. Keep content-specific MCP contract assertions separate.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-10T14:52:57Z",
+      "completed_pr": 1675,
+      "created_at": "2026-08-10T14:22:31Z",
+      "worktree": "mcp-stateless"
+    },
+    "scope_rules": [
+      {
+        "item_id": "mcp-public-contract-table-topology-gate-v1",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "mcp-public-contract-table-topology-gate-v1",
+        "kind": "do_not_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "mcp-public-contract-table-topology-gate-v1",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_run_surface_contract.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_run_surface_contract.py -q",
+        "description": "Public-contract topology tests pass",
+        "expected": "Authoritative tables pass structural validation and existing semantic contract tests remain green",
+        "item_id": "mcp-public-contract-table-topology-gate-v1",
+        "last_result": "pass",
+        "last_run": "2026-08-10T14:45:37Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_run_surface_contract.py -q -k 'table or topology'",
+        "description": "Topology negative controls pass",
+        "expected": "Malformed table fixtures are rejected",
+        "item_id": "mcp-public-contract-table-topology-gate-v1",
+        "last_result": "pass",
+        "last_run": "2026-08-10T14:45:44Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check tests/unit/mcp/test_run_surface_contract.py",
+        "description": "Scoped test lint passes",
+        "expected": "No lint errors in the changed test",
+        "item_id": "mcp-public-contract-table-topology-gate-v1",
+        "last_result": "pass",
+        "last_run": "2026-08-10T14:45:47Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-public-contract-table-topology-gate-v1",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-public-contract-table-topology-gate-v1",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Implemented _assert_markdown_table_topology in tests/unit/mcp/test_run_surface_contract.py; authoritative public-contract tables pass 28-test file suite and ruff format/check",
+        "item_id": "mcp-public-contract-table-topology-gate-v1",
+        "notes": null,
+        "started_at": "2026-08-10T14:43:36Z",
+        "started_branch": "chore/sync-code-five-axis-c49764b",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Add a structural Markdown-table validator for the authoritative public-contract tables without changing documentation content",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added negative controls for missing leading/trailing delimiters, wrong column count, and prose interruption; topology selection passes 8 tests",
+        "item_id": "mcp-public-contract-table-topology-gate-v1",
+        "notes": null,
+        "started_at": "2026-08-10T14:45:06Z",
+        "started_branch": "chore/sync-code-five-axis-c49764b",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Add negative-control tests for missing delimiters, wrong column counts, and prose inserted inside a table",
+        "wid": "w2"
+      },
+      {
+        "evidence": "scope check passed for the single scoped test file; 28 full tests and 8 topology tests passed; ruff check/format passed; make pr-preflight passed (27,734 passed, 19 skipped); five-axis code review completed; PR #1675 opened",
+        "item_id": "mcp-public-contract-table-topology-gate-v1",
+        "notes": null,
+        "started_at": "2026-08-10T14:45:53Z",
+        "started_branch": "chore/sync-code-five-axis-c49764b",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Run scope and verification gates, perform code review, commit the test-only change, and open one PR",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #726: Only DuckDB and DataFusion have summary.validation=passed locally. ClickHouse Local is incompatible (ACL privilege requirements). Fresh SQLite run 2026-09-04 failed all 51 queries (PARTIAL). Needs a third validation-passed local platform before corpus admission.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-09-04T20:20:56Z",
+      "worktree": "main"
+    }
+  }
+}

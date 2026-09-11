@@ -1,0 +1,10 @@
+{
+  "description": "Add a blog to the BenchBox website at https://benchbox.dev/blog/ using ABlog,\na Sphinx extension for blogging. This integrates seamlessly with the existing\nSphinx/Furo/MyST documentation setup, requiring minimal changes.\n\nABlog was chosen over alternatives (Hugo, Pelican, Jekyll) because:\n- Uses existing Sphinx toolchain (no new build system)\n- Inherits Furo theme for visual consistency with docs\n- Supports Markdown via MyST (already configured)\n- Integrates into existing GitHub Actions deployment\n- Provides full blog features: RSS, archives, tags, categories",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2025-01-22T00:00:00Z",
+      "worktree": "docs-experience"
+    }
+  }
+}

@@ -1,0 +1,279 @@
+{
+  "context": "Start with facts from the current repo, then make product decisions in a\nshort `_project/decisions/` document. Treat this decision item as the\nauthorization boundary for the implementation chain. Downstream TODOs should\nread the decision record first and must not reinterpret unresolved choices.\n",
+  "description": "BenchBox plans to add a `/prompts/` landing route that converts casual\nlanding-page visitors into people who actually try the existing BenchBox\nCLI or MCP surfaces with agents such as Codex and Claude Code.\n\nThe feature is explicitly a marketing/conversion surface, not a new\nruntime BenchBox feature. It must not add a new `benchbox prompts ...`\ncommand, new MCP prompt-rendering tools, or another public API surface.\nThe page should compose copy-paste prompts from known snippets and\nvalidated metadata, while keeping the generated guidance aligned with\nexisting CLI and MCP capabilities.\n\nThis TODO is the mandatory decision gate before implementation. It\nresolves the public label, default state, analytics posture, cloud safety\npolicy, generic-agent semantics, and JSON/API posture so downstream work\ncan stay narrow and testable.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "define an internal `server` environment value",
+        "instead": "use registry literals internally and friendly labels in UI.",
+        "item_id": "landing-prompts-decision-gates",
+        "why": "the registry uses `self-hosted` and docs use deployment modes"
+      },
+      {
+        "dont": "make analytics an afterthought",
+        "instead": "either wire measurement or record an explicit deferral with revisit criteria.",
+        "item_id": "landing-prompts-decision-gates",
+        "why": "this is a conversion feature"
+      },
+      {
+        "dont": "publish a standalone `recipes.json` in MVP",
+        "instead": "inline generated catalog data unless a documented API decision is made.",
+        "item_id": "landing-prompts-decision-gates",
+        "why": "that creates a hidden public API"
+      },
+      {
+        "dont": "start implementing `landing/prompts/` before this decision item is complete",
+        "instead": "write and review the decision record first.",
+        "item_id": "landing-prompts-decision-gates",
+        "why": "unresolved defaults and cloud safety rules will leak into code"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-decision-gates",
+        "id": 322,
+        "reason": "Out of scope because the feature is meant to drive use of existing CLI/MCP surfaces, not add another one.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Explicitly rejected as out of scope: feature is meant to drive existing CLI/MCP surfaces, not add a new 'benchbox prompts' command.",
+        "summary": "Add new public `benchbox prompts` CLI commands"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-decision-gates",
+        "id": 323,
+        "reason": "Out of scope for the same reason; MCP mode should reference existing MCP tools/prompts.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicitly out of scope; MCP mode should reuse existing tools/prompts, not add new prompt-builder tools.",
+        "summary": "Add new MCP prompt-builder tools"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-decision-gates",
+        "id": 324,
+        "reason": "Over-engineered for a lightweight marketing conversion page.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly rejects moving the MVP into the explorer SPA as over-engineered for a lightweight marketing page.",
+        "summary": "Move the MVP into the results-explorer SPA"
+      }
+    ],
+    "item_meta": {
+      "category": "Product and Documentation",
+      "completed_at": "2026-05-13T00:00:00Z",
+      "created_at": "2026-05-13T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cloud platforms remain visible in MVP, but live cloud execution is never the primary copied action.",
+        "item_id": "landing-prompts-decision-gates"
+      },
+      {
+        "behavior": "Existing root landing, docs, blog, and results links continue to work.",
+        "item_id": "landing-prompts-decision-gates"
+      },
+      {
+        "behavior": "The `/prompts/` route remains a landing conversion surface, not a replacement for reference docs.",
+        "item_id": "landing-prompts-decision-gates"
+      },
+      {
+        "behavior": "The plan does not authorize new public CLI commands or new public MCP tools.",
+        "item_id": "landing-prompts-decision-gates"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/docs.yml:landing/* copied to site root — reuse deployment path for `/prompts/`",
+        "decision": "reuse",
+        "item_id": "landing-prompts-decision-gates",
+        "path": ".github/workflows/docs.yml:landing/*"
+      },
+      {
+        "concept": "benchbox/core/platform_registry.py:DeploymentCapability.mode — reuse `local`, `self-hosted`, and `managed` vocabulary",
+        "decision": "reuse",
+        "item_id": "landing-prompts-decision-gates",
+        "path": "benchbox/core/platform_registry.py:DeploymentCapability.mode"
+      },
+      {
+        "concept": "benchbox/mcp/prompts/registry.py:existing MCP prompt names — reuse or reference rather than duplicating MCP semantics",
+        "decision": "reuse",
+        "item_id": "landing-prompts-decision-gates",
+        "path": "benchbox/mcp/prompts/registry.py:existing"
+      },
+      {
+        "concept": "docs/_templates/page.html:site-wide docs nav — extend only after the public label is chosen",
+        "decision": "extend",
+        "item_id": "landing-prompts-decision-gates",
+        "path": "docs/_templates/page.html:site-wide"
+      },
+      {
+        "concept": "landing/index.html:static landing surface and nav — reuse for public route placement and visual tone",
+        "decision": "reuse",
+        "item_id": "landing-prompts-decision-gates",
+        "path": "landing/index.html:static"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "landing-prompts-decision-gates",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "landing-prompts-decision-gates",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "landing-prompts-decision-gates",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "landing-prompts-decision-gates",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/"
+      },
+      {
+        "item_id": "landing-prompts-decision-gates",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/"
+      },
+      {
+        "item_id": "landing-prompts-decision-gates",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/decisions/landing-prompts-route.md && for h in '## Public label' '## Default agent and surface' '## Cloud safety' '## Generic-agent semantics' '## Analytics posture' '## API and JSON posture'; do rg -nF \"$h\" _project/decisions/landing-prompts-route.md >/dev/null || { echo \"missing: $h\"; exit 1; }; done",
+        "description": "Decision record exists and contains the six required section headings",
+        "expected": "exit 0; all six required headings present",
+        "item_id": "landing-prompts-decision-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! git diff --name-only | rg '^(benchbox/cli/commands|benchbox/mcp/tools)'",
+        "description": "No new public CLI/MCP implementation files are modified by this decision-only TODO",
+        "expected": "exit 0; negated rg finds no matches",
+        "item_id": "landing-prompts-decision-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "landing-prompts-decision-gates",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "landing-prompts-decision-gates",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "landing-prompts-decision-gates",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "landing-prompts-decision-gates",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "landing-prompts-decision-gates",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "landing-prompts-decision-gates",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "landing-prompts-decision-gates",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-decision-gates",
+        "notes": "Re-check the current files because the plan depends on live surfaces:\n`landing/index.html`, `.github/workflows/docs.yml`,\n`docs/_templates/page.html`, `benchbox/mcp/prompts/registry.py`,\n`benchbox/mcp/tools/benchmark.py`, `benchbox/cli/commands/run.py`,\n`benchbox/cli/commands/compare.py`, `benchbox/core/platform_registry.py`,\nand `benchbox/core/benchmark_registry.py`.\n\nConfirm that MCP prompt names and compare CLI behavior still match\nthe assumptions in this TODO chain before documenting final decisions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify current CLI, MCP, landing, and docs anchors before deciding",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-decision-gates",
+        "notes": "Create a compact `_project/decisions/landing-prompts-route.md` with the\nsix required H2 section headings (see verification):\n- `## Public label` — public label used in nav and page title\n- `## Default agent and surface` — default agent + default surface + rationale\n- `## Cloud safety` — required behaviors for managed/cloud platforms\n- `## Generic-agent semantics` — label and output contract for the\n  non-Codex/non-Claude-Code option\n- `## Analytics posture` — wired vs explicit deferral, revisit date\n- `## API and JSON posture` — why no standalone recipes.json in MVP\n\nAlso state why `/prompts/` remains on the landing surface instead of\nSphinx, and why no new public CLI/MCP APIs are allowed in MVP.\n\nCurrent recommended defaults are not settled. Candidate default state:\n`Codex + CLI + Test one local SQL platform + DuckDB + TPC-H + scale 0.01`.\nThe decision record may choose Claude Code instead, but must state why.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write a decision record for public label, default state, and page location",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-decision-gates",
+        "notes": "Cloud platforms must remain visible in MVP, but the decision record must\ndefine hard safety behavior under the `## Cloud safety` heading:\n- use registry vocabulary internally: `local`, `self-hosted`, `managed`\n- present managed platforms as \"Managed cloud\" in UI\n- never make a live cloud run the primary copied command\n- require dependency/status checks before dry-run\n- require dry-run before any live run\n- instruct agents not to ask for or accept pasted secrets in chat\n- stop and summarize missing credentials/config before proceeding\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the cloud-visible MVP safety contract",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-decision-gates",
+        "notes": "User requirement keeps Codex, Claude Code, and generic selectable. The\ngeneric option must not imply every chatbot has shell, filesystem, or\nMCP tool access. Decide whether to label it `Generic agent`,\n`Generic / manual`, or another term, and define its output contract\nunder the `## Generic-agent semantics` heading.\n\nSafe default: generic output is a human-readable recipe with commands\nand steps the user can execute manually, plus optional wording for an\nagent that has shell access.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define generic-agent semantics and capability boundaries",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-decision-gates",
+        "notes": "Decide whether to wire a privacy-respecting analytics provider for the\nmarketing surface or explicitly defer analytics. If analytics are\ndeferred, record a revisit date and a qualitative fallback review plan.\n\nThis item owns the policy decision; concrete launch values (final\nkill-criteria thresholds, dashboards, revisit date follow-through) are\nrecorded by `landing-prompts-launch-gates` w6.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose analytics posture (this TODO owns policy; launch-gates records final values)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-decision-gates",
+        "notes": "Review the decision record against the known risk topics:\n- existing MCP prompt overlap with `benchbox/mcp/prompts/registry.py`\n- compare CLI dual-mode (SQL vs DataFrame) in `benchbox/cli/commands/compare.py`\n- deployment vocabulary (`local`, `self-hosted`, `managed` per\n  `benchbox/core/platform_registry.py` `DeploymentCapability.mode`)\n- hidden JSON API risk if a standalone `recipes.json` ships\n- cloud safety (dependency check, dry-run-first, no pasted secrets)\n- generic-agent ambiguity (shell/MCP capability assumptions)\n- conversion measurement (analytics wired vs explicit deferral)\n\nImplementation TODOs should not move to active until this gate is\ncomplete.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decision review gate before implementation TODOs move out of planning",
+        "wid": "w6"
+      }
+    ]
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "context": "Read the remesure snapshot and overlap inventory. Apply a coverage-based gate: unexplained required-lane risk is KEEP_IDLE. OPEN_ONE_FOLLOWUP must name the single follow-up, its skip-or-not contract, and which recorded decision it extends or supersedes.",
+  "description": "Sixth item in the CI-waste sequence. After remesure and overlap inventory exist, choose exactly one outcome: KEEP_IDLE (no skip, no shard, no engine-sample rotation, no PR-vs-queue event split, no post-merge slow lane) or OPEN_ONE_FOLLOWUP (create exactly one new tracker item with its own decision record).\n\nThis item does not implement skips. Engine-sample rotation, PR vs merge_group event split, medium/correctness sharding, Hypothesis expansion, mutation testing as a PR job, and a post-merge slow lane stay idle unless OPEN_ONE_FOLLOWUP names one of them and cites required-ci-coverage-deepest-reproducers if that one is a slow lane.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "implement a skip in this item",
+        "instead": "create a follow-up item if authorized",
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "why": "this is a gate, not a rollout"
+      },
+      {
+        "dont": "open several skip/shard items at once",
+        "instead": "KEEP_IDLE or OPEN_ONE_FOLLOWUP",
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "why": "the activation pattern is exactly one path"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "needs_item": "ci-waste-dev-loop-remeasure"
+      },
+      {
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "needs_item": "ci-waste-fast-lane-overlap-inventory"
+      }
+    ],
+    "item_meta": {
+      "category": "CI",
+      "completed_at": "2026-09-01T00:14:22Z",
+      "completed_pr": 1989,
+      "created_at": "2026-08-27T23:11:53Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "No skip, shard, or rotation is implemented in this item",
+        "item_id": "ci-waste-skip-shard-go-no-go"
+      },
+      {
+        "behavior": "required-ci-coverage-deepest-reproducers remains in force unless OPEN_ONE_FOLLOWUP is a slow-lane item that explicitly supersedes it",
+        "item_id": "ci-waste-skip-shard-go-no-go"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "exactly-one-path activation gate",
+        "decision": "reuse",
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "path": "_project/decisions/strict-base-refresh-activation-2026-08-14.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/ci-waste-skip-shard-keep-idle-2026-08-31.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "decision_file=_project/decisions/ci-waste-skip-shard-keep-idle-2026-08-31.md; test \"$(rg -c '^Outcome:' \"$decision_file\")\" -eq 1; test \"$(rg -c '^Outcome: KEEP_IDLE$' \"$decision_file\")\" -eq 1; ! rg -q '^Outcome: OPEN_ONE_FOLLOWUP$' \"$decision_file\"",
+        "description": "decision file contains exactly one anchored KEEP_IDLE outcome",
+        "expected": "all assertions pass",
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "last_result": "pass",
+        "last_run": "2026-09-01T00:14:19Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -z \"$(git diff --name-only origin/develop -- .github/workflows Makefile tests benchbox)\"; test -z \"$(git ls-files --others --exclude-standard -- .github/workflows Makefile tests benchbox)\"",
+        "description": "no governed implementation or workflow files changed or appeared untracked",
+        "expected": "both assertions pass",
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "last_result": "pass",
+        "last_run": "2026-09-01T00:14:20Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Live tracker reads confirm ci-waste-dev-loop-remeasure done via PR 1981, ci-waste-fast-lane-overlap-inventory done via PR 1988, and required-ci-coverage-deepest-reproducers done; the remeasure, durable overlap inventory, and strict-base SHADOW_ONLY decision were re-read from current origin/develop a6090eb31.",
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "notes": null,
+        "started_at": "2026-09-01T00:04:44Z",
+        "started_branch": "docs/ci-waste-skip-shard-keep-idle",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-skip-shard-keep-idle",
+        "status": "done",
+        "summary": "Re-read remesure snapshot, overlap inventory, and required-ci-coverage-deepest-reproducers status",
+        "wid": "w0"
+      },
+      {
+        "evidence": "KEEP_IDLE selected in the sole decision file after evidence review. Exact outcome and tracked-plus-untracked scope verifiers passed; tracker scope is narrowed to the exact file; independent findings-only review returned no Critical, Required, Nit, or Consider findings; no follow-up TODO was created.",
+        "item_id": "ci-waste-skip-shard-go-no-go",
+        "notes": null,
+        "started_at": "2026-09-01T00:05:07Z",
+        "started_branch": "docs/ci-waste-skip-shard-keep-idle",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-skip-shard-keep-idle",
+        "status": "done",
+        "summary": "DECISION GATE: choose exactly one of KEEP_IDLE or OPEN_ONE_FOLLOWUP; if the latter, create one follow-up item and stop",
+        "wid": "w1"
+      }
+    ]
+  }
+}

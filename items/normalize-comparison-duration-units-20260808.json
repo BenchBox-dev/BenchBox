@@ -1,0 +1,265 @@
+{
+  "context": "Introduce one duration normalizer with an explicit millisecond return contract. Prefer explicit millisecond data, convert explicit seconds by 1000, preserve zero, and never infer units from magnitude. Inventory bare execution_time and per_query_timings producers before choosing deprecation or a documented legacy policy. Route all comparison extraction loops through the same boundary and prove canonical file behavior is unchanged.",
+  "description": "The public in-memory PlatformComparison(results=...) path can treat execution_time_seconds as milliseconds, producing a 1000x error, and truthiness fallbacks discard a legitimate zero-millisecond duration. Canonical v2 file and CLI comparison paths currently reconstruct execution_time_ms and are safe. Fix the public library hazard without changing compact artifact units or regressing file-based comparisons, and settle the dead or ambiguous per_query_timings/execution_time compatibility surface.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Guess units based on whether a value looks large or small.",
+        "instead": "Require a named field or documented legacy contract.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "why": "Duration magnitudes overlap across units."
+      },
+      {
+        "dont": "Preserve dead per_query_timings code without a producer inventory.",
+        "instead": "Deprecate it or define and test a real producer contract.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "why": "Dead compatibility surfaces create untested ambiguity."
+      },
+      {
+        "dont": "Use truthiness chains for duration aliases.",
+        "instead": "Resolve explicit fields with non-None checks and unit-specific conversion.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "why": "They discard zero and obscure unit conversion."
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness and Comparison API",
+      "completed_at": "2026-08-08T22:50:28Z",
+      "created_at": "2026-08-08T19:49:42Z",
+      "worktree": "comparison-correctness"
+    },
+    "preserves": [
+      {
+        "behavior": "Canonical v2 compact artifacts continue storing and loading documented millisecond fields.",
+        "item_id": "normalize-comparison-duration-units-20260808"
+      },
+      {
+        "behavior": "No unit is inferred from numerical magnitude.",
+        "item_id": "normalize-comparison-duration-units-20260808"
+      },
+      {
+        "behavior": "The benchbox compare CLI produces unchanged values for valid canonical artifacts.",
+        "item_id": "normalize-comparison-duration-units-20260808"
+      },
+      {
+        "behavior": "Zero is a valid measured duration and is not treated as missing.",
+        "item_id": "normalize-comparison-duration-units-20260808"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Current file and in-memory extraction paths.",
+        "decision": "supersede",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "path": "benchbox/core/analysis/comparison.py"
+      },
+      {
+        "concept": "Canonical v2 millisecond reconstruction used by file comparisons.",
+        "decision": "reuse",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "path": "benchbox/core/results/loader.py"
+      },
+      {
+        "concept": "Completed duration-seconds propagation work.",
+        "decision": "extend",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "path": "propagate-duration-seconds-in-enhanced-results"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/"
+      },
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/performance/test_comparison_performance.py"
+      },
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/analysis/"
+      },
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_comparison.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/analysis/test_analysis_comparison.py tests/unit/core/test_comparison.py -q",
+        "description": "Focused analysis comparison tests pass",
+        "expected": "Direct and file comparison tests pass with correct units.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T21:59:06Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/core/analysis tests/unit/core/analysis tests/unit/core/test_comparison.py",
+        "description": "Comparison paths satisfy Ruff",
+        "expected": "Ruff exits zero.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T21:59:08Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/analysis/test_analysis_comparison.py -q",
+        "description": "Seconds-to-milliseconds regression is falsifiable on the unfixed tree",
+        "expected": "This command exits nonzero on the unfixed tree for a seconds-only direct comparison and exits zero after normalization.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T21:59:12Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 -m performance tests/performance/test_comparison_performance.py -q",
+        "description": "Comparison performance coverage remains green",
+        "expected": "Performance test executes and passes without material regression.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T21:59:16Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Pinned direct seconds-only 2.0 -> erroneous 2.0 ms reproduction and canonical v2 ms=2000 safe path; regression tests added.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T21:56:03Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Pin the direct-constructor 2-second-to-2-millisecond reproduction and the safe canonical-file behavior in tests.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Inventory: 33 production files use execution_time_ms, 63 use execution_time_seconds; bare execution_time emitted as seconds by builder; per_query_timings has model declaration/consumers but no producer.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T21:56:09Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Inventory all producers and consumers of execution_time_ms, execution_time_seconds, bare execution_time, and per_query_timings.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Decision: ms canonical; named seconds and legacy bare execution_time mean seconds; no magnitude inference; per_query_timings retained as compatibility input; conflicts beyond 1 ms fail closed.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T21:56:14Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Decide the bare execution_time compatibility policy and whether per_query_timings is deprecated or receives a typed producer contract.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added _normalize_execution_time_ms preserving zero, rejecting booleans/nonnumeric/negative/nonfinite/conflicting values, with 1 ms builder truncation tolerance.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T21:56:19Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Implement a single explicit-millisecond normalizer with zero preservation and conflict handling.",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Both query extraction paths and source collections use one normalizer; true arithmetic mean replaces order-biased pairwise averaging; aggregate total_execution_time uses documented seconds.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T21:56:24Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Migrate all comparison query-time extraction paths to the normalizer.",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Tests cover direct constructor, canonical files, legacy seconds, per_query timings, zero, missing, truncation agreement, conflicts, aggregate cost units, sparse cost platforms, and order independence.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T21:56:30Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add direct-constructor, canonical-file, CLI, zero-duration, and conflicting-unit regression tests.",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Negative controls failed for seconds-as-ms (2 vs 2000), positional cost mapping (2 vs 1), and pairwise mean (225 vs 200), then fixes restored. Final broader 208 passed/1 deselected; parent serial 83 passed; Ruff/format/ty/diff passed.",
+        "item_id": "normalize-comparison-duration-units-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T21:56:35Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Restore the seconds-as-milliseconds fallback as a negative control and prove the focused test fails.",
+        "wid": "w6"
+      }
+    ]
+  }
+}

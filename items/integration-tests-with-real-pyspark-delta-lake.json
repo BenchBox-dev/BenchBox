@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #390 of df-support-transaction-primitives.\nDeferred: Integration tests with real PySpark + Delta Lake\nReason deferred: Requires PySpark + Delta Lake runtime. Add to live_integration test suite with @pytest.mark.live_integration.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:03Z",
+      "worktree": "main"
+    }
+  }
+}

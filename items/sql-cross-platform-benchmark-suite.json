@@ -1,0 +1,10 @@
+{
+  "description": "*** SUPERSEDED BY: unified-platform-comparison-cli.yaml ***\n\nThis TODO was superseded by a unified approach that avoids CLI bloat.\nInstead of adding a separate `compare-sql` command, we will:\n- Extend existing `benchbox compare` command with --run mode\n- Support both SQL and DataFrame via --type flag\n- Share visualization and reporting code\n\nNew CLI pattern:\n- benchbox compare results/*.json              # Existing: compare files\n- benchbox compare --run -p duckdb -p sqlite   # NEW: run & compare\n\nSee: _project/TODO/platform-comparison/planning/unified-platform-comparison-cli.yaml\n\nOriginal problem (still valid):\n- MISSING: CLI command to RUN benchmarks across SQL platforms\n- MISSING: Visualization integration for SQL comparison charts\n- MISSING: User-friendly documentation for SQL comparison\n\nThese will be addressed in the unified TODO.",
+  "legacy": {
+    "item_meta": {
+      "category": "Performance and Efficiency",
+      "created_at": "2025-12-14T00:00:00Z",
+      "worktree": "platform-comparison"
+    }
+  }
+}

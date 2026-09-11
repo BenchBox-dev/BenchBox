@@ -1,0 +1,257 @@
+{
+  "context": "Separate the two axes the current Independence column conflates. (w1) Independence\nbecomes reference-independence only, derived from the oracle KIND, so every\ncross-surface gate reads self-referential. (w2) A new Surface-provenance column/field\ncarries the shared-spec/mixed/separate-handwritten gradient from the live\nCrossSurfaceGate metadata, `—` where it does not apply. (w3) The prose explains the\ntwo axes distinctly and states the self-referential-regardless-of-provenance fact.\n(w4) The truth tests assert cross-surface Independence == self-referential and a new\nsurface-provenance truth, both derived (flip the live signal -> the cell flips), and\nthe committed artifacts regenerate deterministically.\n",
+  "description": "Follow-on from the PR #913 review (chatgpt-codex-connector, P2, thread\nhttps://github.com/joeharris76/BenchBox/pull/913#discussion_r3488713690). The\nreference-independence axis shipped in oracle-coverage-map-reference-independence-disclosure,\nbut its cross-surface branch renders the per-gate SURFACE-PROVENANCE gradient\n(shared-spec / mixed-provenance / separate-handwritten) directly in the\n\"Independence\" column instead of the self-referential label that item's own w1\nand its open-question DEFAULT specified (\"cross-surface / variant-equivalence ->\nself-referential\"). The result conflates two orthogonal axes in one column.\n\nReproduced facts (verified by reading\n_project/scripts/generate_oracle_coverage_map.py on develop):\n\n- oracle_reference_independence()/oracle_independence_and_rationale() return\n  gate.surface_independence for ORACLE_CROSS_SURFACE, so the Independence cell\n  for amplab/coffeeshop/h2odb reads `separate-handwritten`, ssb/joinorder_synthetic\n  read `shared-spec`, and clickbench/read_primitives read `mixed-provenance`.\n- But for EVERY cross-surface gate the reference is the benchmark's own SQL\n  surface, authored by the same person from the same spec understanding\n  (benchbox/core/equivalence/cross_surface.py:15-19 states this explicitly:\n  \"the independence is always SQL-text vs DataFrame-code, authored by the same\n  person from the same understanding\"). On the reference-independence axis every\n  cross-surface gate is therefore SELF-REFERENTIAL, regardless of whether the two\n  surfaces were generated from one spec or hand-written separately.\n- Net effect (the reviewer's concern): a reader skimming the Independence column\n  sees `separate-handwritten` and may read it as \"checked against an independent,\n  separately-built implementation\" and over-trust those value-level cells — the\n  same coverage-theater the column was added to remove. The two facts a reader\n  needs are distinct: (a) is the reference external to benchbox? (always \"no\" for\n  cross-surface) and (b) how independent are the two compared surfaces from each\n  other? (the shared-spec -> separate-handwritten gradient). One column cannot\n  carry both without misleading on axis (a).\n\nThis item splits the single overloaded column into two orthogonal, derived\ncolumns: Independence (reference-independence: self-referential vs\nsemi-independent vs independent) and Surface provenance (shared-spec /\nmixed-provenance / separate-handwritten / — for non-cross-surface), updates the\ndisclosure prose and the classifier-truth tests accordingly, and regenerates the\ncommitted map. It keeps everything GENERATED from live sources and ADDITIVE — it\ndoes not change any oracle's actual strength, does not re-do Strength/Scale/Enforced,\nand does not touch UNGUARDED breadth.\n\nNote on parent status: oracle-coverage-map-reference-independence-disclosure is\nstill marked Not Started even though the axis shipped (PR #913); this follow-on\nrealigns the shipped behavior with that item's stated w1 design (cross-surface =\nself-referential, provenance as a SEPARATE axis) per the reviewer, rather than\nre-opening it.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change any oracle's actual Strength or close UNGUARDED breadth",
+        "instead": "(not specified)",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "why": "this item only re-shapes DISCLOSURE."
+      },
+      {
+        "dont": "hand-label either axis per benchmark",
+        "instead": "derive Independence from the oracle KIND and provenance from the live CrossSurfaceGate metadata.",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "why": "it would rot like a hand-maintained doc"
+      },
+      {
+        "dont": "keep surface provenance in the Independence column",
+        "instead": "give provenance its own column.",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "why": "a `separate-handwritten` cell reads as an external reference when the reference is actually benchbox's own SQL"
+      },
+      {
+        "dont": "let the new column or provenance stamp enter the drift-compared body non-deterministically",
+        "instead": "keep generation deterministic.",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "why": "`--check` would churn"
+      },
+      {
+        "dont": "reuse the INDEPENDENCE_* vocabulary for the provenance column",
+        "instead": "keep the two label sets distinct.",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "why": "that is what caused the conflation"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "oracle-coverage-map-independence-provenance-split",
+        "id": 27,
+        "reason": "This item only DISCLOSES the axes honestly; it does not change any oracle's strength. Owned by correctness-gate-value-digest-fidelity-followups (cross-engine agreement is only semi-independent) and remains an explicit roadmap gap.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Building an independent value oracle is subsumed by active benchmark-correctness-oracle-coverage-map, which explicitly owns 'a small curated expected-results subset' oracle per unguarded benchmark. Not a new item.",
+        "summary": "Building an actual independent value oracle for any benchmark (external answer key / spec-derived expected values)."
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "oracle-coverage-map-independence-provenance-split",
+        "id": 28,
+        "reason": "Breadth is owned by benchmark-correctness-oracle-coverage-map; this item improves DISCLOSURE quality of already-guarded cells.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Closing unguarded benchmarks / adding oracles is explicitly owned by the open oracle-coverage-map item; this item only improves disclosure of already-guarded cells. (tracked by benchmark-correctness-oracle-coverage-map)",
+        "summary": "Closing the UNGUARDED benchmarks or adding new oracles."
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "oracle-coverage-map-independence-provenance-split",
+        "id": 29,
+        "reason": "Shipped in oracle-coverage-map-strength-disclosure (#867) and the reference-independence item; this follow-on is additive and must not touch them.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Deferral text is a negative scope boundary ('do not redo shipped columns'), not a task; the parent item is itself already open and covers this work. (tracked by oracle-coverage-map-independence-provenance-split)",
+        "summary": "Re-doing the Strength/Scale/Enforced columns or the provenance-stamp work."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-29T11:54:29Z",
+      "completed_pr": 1328,
+      "created_at": "2026-06-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The drift check (`make oracle-coverage-map-check`) stays green on a clean tree and on the required PR path; the new column/field regenerates deterministically and the provenance stamp stays out of the drift-compared body.",
+        "item_id": "oracle-coverage-map-independence-provenance-split"
+      },
+      {
+        "behavior": "The map stays GENERATED from live sources — no hand-maintained per-benchmark classification — so neither axis can drift from reality.",
+        "item_id": "oracle-coverage-map-independence-provenance-split"
+      },
+      {
+        "behavior": "The split is ADDITIVE: Strength/Scale/Enforced columns, the drift check, and every non-cross-surface Independence label stay exactly as they shipped.",
+        "item_id": "oracle-coverage-map-independence-provenance-split"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/planning/oracle-coverage-map-reference-independence-disclosure.yaml — the parent item; its w1 and open_question DEFAULT specify cross-surface -> self-referential and 'add a separate orthogonal column, do not overload'. This follow-on realizes that design for the cross-surface branch that shipped as surface-provenance instead.",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "path": "_project/TODO/main/planning/oracle-coverage-map-reference-independence-disclosure.yaml"
+      },
+      {
+        "concept": "_project/analysis/oracle-coverage-map.md and .json — the committed artifacts to regenerate with the new column/field; the drift check must stay green.",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "path": "_project/analysis/oracle-coverage-map.md"
+      },
+      {
+        "concept": "_project/scripts/generate_oracle_coverage_map.py:INDEPENDENCE_SHARED_SPEC/INDEPENDENCE_MIXED/INDEPENDENCE_SEPARATE — these provenance constants are currently aliased into the independence vocabulary; move them under a surface-provenance label set distinct from INDEPENDENCE_SELF/SEMI/INDEPENDENT.",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "path": "_project/scripts/generate_oracle_coverage_map.py:INDEPENDENCE_SHARED_SPEC/INDEPENDENCE_MIXED/INDEPENDENCE_SEPARATE"
+      },
+      {
+        "concept": "_project/scripts/generate_oracle_coverage_map.py:build_coverage_map/render_markdown/render_json — add the surface_provenance field to each row and a distinct column to the markdown/JSON; keep both derived from live sources.",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "path": "_project/scripts/generate_oracle_coverage_map.py:build_coverage_map/render_markdown/render_json"
+      },
+      {
+        "concept": "_project/scripts/generate_oracle_coverage_map.py:oracle_reference_independence/oracle_independence_and_rationale/_cross_surface_independence — the functions that today fold surface provenance into the Independence value; split them so Independence returns the reference axis and a new accessor returns provenance.",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "path": "_project/scripts/generate_oracle_coverage_map.py:oracle_reference_independence/oracle_independence_and_rationale/_cross_surface_independence"
+      },
+      {
+        "concept": "benchbox/core/equivalence/cross_surface.py:SURFACE_INDEPENDENCE_SHARED_SPEC/MIXED/SEPARATE and CrossSurfaceGate.surface_independence/surface_independence_rationale — the live source for the provenance column; the reference-independence label derives from the oracle KIND (cross-surface -> self), not from this field.",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "path": "benchbox/core/equivalence/cross_surface.py:SURFACE_INDEPENDENCE_SHARED_SPEC/MIXED/SEPARATE"
+      },
+      {
+        "concept": "tests/unit/test_oracle_coverage_map.py:test_known_oracle_independence_truth/test_independence_is_derived_from_value_digest_signal — the truth tests that currently assert cross-surface Independence == surface provenance; they must be updated to assert Independence == self-referential and a NEW provenance-truth test added.",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "path": "tests/unit/test_oracle_coverage_map.py:test_known_oracle_independence_truth/test_independence_is_derived_from_value_digest_signal"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "kind": "only_modify",
+        "path_glob": "_project/"
+      },
+      {
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      },
+      {
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/generate_oracle_coverage_map.py"
+      },
+      {
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_oracle_coverage_map.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make oracle-coverage-map && make oracle-coverage-map-check",
+        "description": "Map regenerates with distinct Independence and Surface-provenance columns and is internally consistent",
+        "expected": "regenerates with cross-surface Independence = self-referential and a separate Surface-provenance column; --check reports up to date",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "last_result": "pass",
+        "last_run": "2026-07-29T11:49:43Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_oracle_coverage_map.py -q",
+        "description": "Classifier-truth tests pin both axes and catch a mislabel on either",
+        "expected": "tests pass; flipping a cross-surface Independence to non-self, or a surface_provenance label, fails an assertion",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "last_result": "pass",
+        "last_run": "2026-07-29T11:50:06Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "generate_oracle_coverage_map.py: oracle_reference_independence() no longer takes benchmark_id and returns self-referential for all cross-surface gates; INDEPENDENCE_SHARED_SPEC/MIXED/SEPARATE removed from the independence vocabulary. Verified: make oracle-coverage-map regenerates ssb/coffeeshop/clickbench with Independence=self-referential",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "notes": "Change oracle_reference_independence()/oracle_independence_and_rationale() so a\ncross-surface gate returns INDEPENDENCE_SELF (self-referential) with a rationale\nthat names WHY — the reference is the benchmark's own SQL surface, a same-author\nSQL-vs-DataFrame transcription oracle, not an external authority. Keep the\nexpected-results branches unchanged (value digest -> self-referential; row-count\nanswers -> semi-independent). Independence stays DERIVED from the oracle KIND,\nnot from gate.surface_independence.\n",
+        "started_at": "2026-07-29T11:45:24Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Make the Independence column report reference-independence only (cross-surface -> self-referential)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added PROVENANCE_SHARED_SPEC/MIXED/SEPARATE/NONE vocabulary + oracle_surface_provenance(); rows carry surface_provenance and surface_provenance_rationale; markdown gains Surface provenance + Provenance rationale columns. Verified: make oracle-coverage-map && make oracle-coverage-map-check",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "notes": "Add a surface_provenance field to each coverage-map row and a separate column to\noracle-coverage-map.md plus a key in the .json. Populate it from the live\nCrossSurfaceGate.surface_independence for cross-surface rows and render `—` for\nevery non-cross-surface row (the provenance axis only applies when two surfaces\nare compared). Carry the gate's surface_independence_rationale into the per-row\nrationale so the same-author / shared-spec caveat stays visible. Do NOT reuse the\nINDEPENDENCE_* vocabulary for this column — keep the two label sets distinct.\n",
+        "started_at": "2026-07-29T11:47:27Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add a distinct SURFACE-PROVENANCE column/field (shared-spec / mixed-provenance / separate-handwritten / —)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "render_markdown(): split the single Reference-independence paragraph into a Reference-independence paragraph (is the reference outside benchbox?) and a Surface-provenance paragraph (how far apart were the two benchbox surfaces authored, explicitly not independence). Verified in _project/analysis/oracle-coverage-map.md",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "notes": "Update the 'Reference-independence disclosure' prose in render_markdown so it\ndescribes Independence (how independent the reference is from benchbox: external\nauthority vs self-referential snapshot vs same-author cross-surface) and Surface\nprovenance (how independent the two compared surfaces are from each other)\nSEPARATELY, and states plainly that a cross-surface gate is always self-referential\non the reference axis even when its surfaces are separately handwritten — so a\n`separate-handwritten` provenance cell is never read as an external reference.\n",
+        "started_at": "2026-07-29T11:47:29Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Rewrite the disclosure prose so the two axes read as distinct",
+        "wid": "w3"
+      },
+      {
+        "evidence": "tests/unit/test_oracle_coverage_map.py: rewrote test_known_oracle_independence_truth (all cross-surface gates now pinned self-referential + a leak guard that no PROVENANCE_* label appears in the Independence column) and added test_surface_provenance_column_present, test_known_surface_provenance_truth, test_surface_provenance_is_read_live_from_gate_metadata, test_provenance_never_changes_independence, test_markdown_renders_independence_and_provenance_as_distinct_columns. Verified: uv run -- python -m pytest tests/unit/test_oracle_coverage_map.py -q -> 20 passed; mutation-checked both axes (cross-surface independence -> separate-handwritten, and gate provenance -> shared-spec) each fail dedicated truth tests, not only the drift check",
+        "item_id": "oracle-coverage-map-independence-provenance-split",
+        "notes": "Update tests/unit/test_oracle_coverage_map.py: change test_known_oracle_independence_truth\nand test_independence_is_derived_from_value_digest_signal so cross-surface gates\nassert Independence == self-referential (no longer surface provenance), and add a\nNEW truth test asserting each known gate's surface_provenance value (ssb=shared-spec,\ncoffeeshop/amplab/h2odb=separate-handwritten, clickbench/read_primitives=mixed-provenance,\nnon-cross-surface = —) and that it is derived from the live gate metadata (flip a\ngate's surface_independence -> the column flips). Keep the value-digest derive-flip\nassertion for the Independence axis. Regenerate the committed .md/.json artifacts.\n",
+        "started_at": "2026-07-29T11:49:33Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Update and extend the classifier-truth tests for the split axes",
+        "wid": "w4"
+      }
+    ]
+  }
+}

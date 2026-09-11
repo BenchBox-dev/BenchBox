@@ -1,0 +1,459 @@
+{
+  "context": "Treat each work unit as a small targeted fix. Before editing, reopen the\ncurrent `origin/develop` file and the linked GitHub review comment, then\nconfirm whether a newer commit already handled the issue. Prefer regression\ntests around each behavior rather than broad rewrites.\n\nFor Makefile work, keep shell syntax POSIX-compatible unless the target\nexplicitly sets `SHELL` and all callers/tests are updated. For DONE-item\nverification text, follow the policy in `description`: edit in place to\nkeep historical commands portable and runnable.\n",
+  "description": "Audit and fix the Codex web-agent review findings that were left on merged\nPRs during the 2026-04-24 through 2026-05-01 commit window.\n\nSource scan:\n  - Git range: `origin/develop` commits since `2026-04-24 00:00:00 -0400`.\n  - PR-numbered squash merges scanned: 68 merged PRs, #19 through #94 where\n    present in the commit subjects.\n  - Codex author matched: `chatgpt-codex-connector`.\n  - Inline Codex findings found: 26 comments across 17 merged PRs.\n\nNot every unresolved GitHub thread still requires a code change. Several\ncomments were fixed in later PRs but remain unresolved/outdated on GitHub.\nThis TODO keeps the active work units focused on findings that still looked\nunresolved against `origin/develop` at scan time, with enough source context\nto re-check before editing.\n\nPolicy decision (resolves prior `open_questions` ambiguity): historical\nDONE-item verification commands are kept executable. If a Codex finding\nidentifies a portability or correctness defect in a DONE-item verification\nblock, fix it in place. Rationale: those commands serve as runnable\ndocumentation of how the policy was confirmed, so anyone re-verifying the\nhistorical decision (forks, recreated rulesets, future audits) needs them\nto work. This policy applies to w11, w12, and w13 below; future sweeps\ninherit the same rule.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix only the Home.tsx empty-state issue from PR #86 without also restoring strict row-count assertions in `platform-index-cold-load.spec.ts`",
+        "instead": "(not specified)",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "why": "the loosened `count > 0` assertion will not detect partial-row cold-load regressions, which is exactly the failure mode the original test was guarding."
+      },
+      {
+        "dont": "remove the hosted-submit env-token guard globally",
+        "instead": "add a login-specific prompt path instead.",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "why": "CI and non-interactive submit flows depend on env-token precedence"
+      },
+      {
+        "dont": "replace the results explorer retry with a generic empty state",
+        "instead": "keep one retry and handle only persistent mismatch differently.",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "why": "transient DuckDB snapshot ordering can recover on retry"
+      },
+      {
+        "dont": "resolve or dismiss a GitHub review thread solely because it is outdated",
+        "instead": "verify current behavior first.",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "why": "later commits may or may not have fixed it"
+      },
+      {
+        "dont": "switch the whole Makefile to bash to fix one trap",
+        "instead": "use POSIX shell patterns or justify a scoped shell change.",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "why": "these recipes currently run under `/bin/sh` on common Linux hosts"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-01T00:00:00Z",
+      "created_at": "2026-05-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DONE-item verification commands edited under this TODO remain executable on a clean fork (no hard-coded ruleset IDs, no repo-specific account paths).",
+        "item_id": "codex-pr-review-followups-week-2026-05-01"
+      },
+      {
+        "behavior": "Environment tokens remain the normal precedence for submit/auth resolution outside the explicit `auth login` prompt path.",
+        "item_id": "codex-pr-review-followups-week-2026-05-01"
+      },
+      {
+        "behavior": "Results explorer Home keeps the transient empty-results retry, but persistent snapshot mismatch must not render an endless spinner.",
+        "item_id": "codex-pr-review-followups-week-2026-05-01"
+      },
+      {
+        "behavior": "TODO and DONE YAML edited by this work remains schema-valid and graph-valid.",
+        "item_id": "codex-pr-review-followups-week-2026-05-01"
+      },
+      {
+        "behavior": "The path classifier continues to include deleted files via `ACDMRT` and content-only deletion PRs keep the intended cheap guard path.",
+        "item_id": "codex-pr-review-followups-week-2026-05-01"
+      },
+      {
+        "behavior": "`worktree-claim` remains compatible with `/bin/sh` on Ubuntu/dash; do not reintroduce bash-only `ERR` traps.",
+        "item_id": "codex-pr-review-followups-week-2026-05-01"
+      },
+      {
+        "behavior": "`worktree-release` and `worktree-pool-reset` must not discard dirty pool worktrees without an explicit force path.",
+        "item_id": "codex-pr-review-followups-week-2026-05-01"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/DONE/main/active/codex-pr-review-followups-week-2026-05-01.yaml",
+        "description": "This TODO item validates cleanly",
+        "expected": "Validation passes with no schema or DAG errors",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO dependency graph remains valid",
+        "expected": "Graph validation passes",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_blind_spot_tools.py -q",
+        "description": "w1 - blind-spot frontmatter stamping regression test",
+        "expected": "All blind-spot tests pass, including the new block/sequence-shaped status field regression",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "tmp_home=$(mktemp -d); trap 'rm -rf \"$tmp_home\"' EXIT; mkdir -p \"$tmp_home/tmp/benchbox-lock-probe\"; touch \"$tmp_home/tmp/benchbox-lock-probe/test.lock\"; HOME=\"$tmp_home\" PATH='/usr/bin:/bin' BENCHBOX_TEST_LOCK_DIR='~/tmp/benchbox-lock-probe' make test-unlock; test ! -e \"$tmp_home/tmp/benchbox-lock-probe/test.lock\"",
+        "description": "w2 - test-unlock honors BENCHBOX_TEST_LOCK_DIR with ~",
+        "expected": "Resolved lock path expands ~ to $HOME and deletes the stale lock without requiring uv on PATH",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/worktree/test_worktree_release_dirty_guard.py -q || echo 'test must be created by w3 implementation'",
+        "description": "w3 - worktree-release refuses dirty trees without FORCE=1",
+        "expected": "New test exercises a pool worktree with staged changes and confirms release exits nonzero without FORCE=1",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/worktree/test_worktree_claim_benchbox_scratch.py -q || echo 'test must be created by w4 implementation'",
+        "description": "w4 - .benchbox scratch files do not block claim",
+        "expected": "New test seeds a free pool slot with .benchbox/foo and confirms claim succeeds",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/worktree/test_worktree_claim_signal_exit.py -q || echo 'test must be created by w5 implementation'",
+        "description": "w5 - INT/TERM trap exits nonzero",
+        "expected": "New test sends INT mid-claim under /bin/sh and confirms recipe exits nonzero with cleanup performed",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/dev-loop-step-5-measurement-window.yaml",
+        "description": "w6 / w7 - Step 5 TODO remains schema-valid after edits",
+        "expected": "Validation passes; last_updated is full ISO date-time; due_date is max(step_3a_merged_at, step_4_merged_at) + 30 days",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows/test_develop_post_merge_metrics.py -q || echo 'fixture test does not exist yet - w8 must create it'",
+        "description": "w8 - develop-post-merge metrics jq fixture for two failed jobs",
+        "expected": "Two failed jobs at different completed_at produce develop_red_detected_at equal to the earlier timestamp",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test -- src/pages/__tests__/Home.test.tsx",
+        "description": "w9 - Home.tsx persistent-mismatch unit test",
+        "expected": "Home tests pass; new test asserts persistent empty-results renders an actionable error/empty state, not a spinner",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 10,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -E 'toHaveCount\\(' results-explorer/e2e/failures/platform-index-cold-load.spec.ts",
+        "description": "w9 (related) - cold-load e2e restores strict row-count assertions",
+        "expected": "Test contains explicit toHaveCount(N) assertions, not just count > 0",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 11,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands/test_auth.py -q",
+        "description": "w10 - benchbox auth login prompt with env token set",
+        "expected": "All auth tests pass; new test sets BENCHBOX_SUBMIT_TOKEN, runs auth login without --token, and confirms keyring stores prompted value",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 12,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -nE 'rulesets/[0-9]+' _project/DONE/main/active/dev-loop-step-3a-path-based-ci-skip.yaml",
+        "description": "w11 - Step 3a ruleset verification is repo-instance-agnostic",
+        "expected": "No matches (hard-coded numeric ruleset ID has been replaced by dynamic lookup); grep exit 1 inverted to 0",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 13,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -nE 'baseRefName' _project/DONE/main/planning/dev-loop-step-3-ci-rebalance-and-strict-base-off.yaml",
+        "description": "w12 - Step 3 verification asserts develop-targeted PR base",
+        "expected": "baseRefName guard present before gh run list ... --event pull_request",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 14,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -nE 'gh pr list[^|\\\\n]*--state[^|\\\\n]*--base develop' _project/DONE/main/planning/dev-loop-step-0-verify-assumptions.yaml",
+        "description": "w13 - Step 0 secondary probe is scoped",
+        "expected": "Secondary probe includes --state and --base develop filters",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 15,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f _project/audits/codex-thread-rescan-week-2026-05-01.md && [ \"$(grep -cE '^## ' _project/audits/codex-thread-rescan-week-2026-05-01.md)\" -ge 3 ]",
+        "description": "w14 - rescan audit artifact exists with required sections",
+        "expected": "File exists with at least three ## section headers (Resolved / Already-fixed / Still actionable)",
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "last_result": null,
+        "last_run": null,
+        "seq": 16,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "needs_wid": "w1",
+        "wid": "w14"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "needs_wid": "w10",
+        "wid": "w14"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "needs_wid": "w11",
+        "wid": "w14"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "needs_wid": "w12",
+        "wid": "w14"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "needs_wid": "w2",
+        "wid": "w14"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "needs_wid": "w3",
+        "wid": "w14"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "needs_wid": "w4",
+        "wid": "w14"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "needs_wid": "w5",
+        "wid": "w14"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "needs_wid": "w6",
+        "wid": "w14"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "needs_wid": "w7",
+        "wid": "w14"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "needs_wid": "w8",
+        "wid": "w14"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "needs_wid": "w9",
+        "wid": "w14"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Source review comment:\n  - PR #59, P2, `_project/scripts/sweep_blind_spots.py`\n  - https://github.com/joeharris76/BenchBox/pull/59#discussion_r3164438197\n\nFinding: `replace_frontmatter_field()` replaces only the first line that\nstarts with `status:` or `todo_id:`. If a malformed finding has a block\nor sequence-shaped value, triage can leave orphaned continuation lines\nbehind and make the markdown file unparsable.\n\nCurrent evidence on `origin/develop`: lines 223-228 still use a\nregex-line substitution over raw frontmatter. That preserves formatting\nfor normal scalar fields, but it does not replace the whole YAML node.\n\nRecommended fix: parse the frontmatter into a YAML node tree or use a\nsafer text rewrite that can remove the full field block before inserting\nthe normalized scalar. Add a regression test that starts with\n`status:\\n  - open`, stamps `dismissed`, and verifies the result parses\nand contains exactly scalar `status: dismissed`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make blind-spot frontmatter stamping replace complete YAML nodes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Source review comment:\n  - PR #93, P2, `benchbox/cli/commands/auth.py`\n  - https://github.com/joeharris76/BenchBox/pull/93#discussion_r3172049089\n\nFinding: `auth.login()` calls `refresh_submission_token()` when\n`--token` is omitted. That helper intentionally raises if\n`BENCHBOX_SUBMIT_TOKEN` or `BENCHBOX_SERVICE_TOKEN` is active, so a user\ncannot use the login prompt to bootstrap/update keyring credentials from\na shell that also has an environment token.\n\nCurrent evidence on `origin/develop`: `auth.login()` calls\n`refresh_submission_token()` for the prompt path; the helper in\n`submit_auth.py` (`refresh_submission_token` and its env-token check)\nstill rejects active env tokens before prompting.\n\nRecommended fix: keep env-token precedence and refresh safety for\nnon-login flows, but give `auth login` an explicit prompt/store path\nthat bypasses the env-token refresh guard. Add CLI coverage that sets\n`BENCHBOX_SUBMIT_TOKEN`, runs `benchbox auth login` without `--token`,\nand confirms the prompt value is saved.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Allow `benchbox auth login` to prompt even when an env token is set",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Source review comment:\n  - PR #80, P2, `_project/DONE/main/active/dev-loop-step-3a-path-based-ci-skip.yaml`\n  - https://github.com/joeharris76/BenchBox/pull/80#discussion_r3170714532\n\nFinding: a DONE-item verification command calls\n`gh api repos/joeharris76/BenchBox/rulesets/15611785`, which is\nrepository-instance-specific. Forks or recreated rulesets can make this\nhistorical checklist fail even if the policy is configured correctly.\n\nCurrent evidence on `origin/develop`: line 448 still hard-codes\n`rulesets/15611785`.\n\nPer the policy decision in `description` above, edit the DONE file\nin place rather than closing as no-op.\n\nRecommended fix: replace the command with a dynamic ruleset lookup that\nfilters for develop-targeting required status checks before asserting\n`ci-required-result`. Pattern:\n`gh api repos/{owner}/{repo}/rulesets --jq '.[] | select(.target == \"branch\" and (.conditions.ref_name.include // []) | any(. == \"refs/heads/develop\")) | .id'`\nthen pipe the resolved id back into the existing `--jq` extraction.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove hard-coded repository ruleset ID from Step 3a verification",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Source review comment:\n  - PR #67, P2, `_project/TODO/main/planning/dev-loop-step-3-ci-rebalance-and-strict-base-off.yaml`\n  - https://github.com/joeharris76/BenchBox/pull/67#discussion_r3168098551\n\nFinding: the verification command for routine develop PR job count can\ninspect the latest `pull_request` `test.yml` run for the current branch\nwithout proving the run came from a PR targeting `develop`. A\nmain-targeted PR run could produce a false failure.\n\nCurrent evidence on `origin/develop`: the item has moved to\n`_project/DONE/main/planning/dev-loop-step-3-ci-rebalance-and-strict-base-off.yaml`;\nline 239 uses `gh run list --workflow test.yml --branch \"$branch\"\n--event pull_request --limit 1` before `gh run view`.\n\nPer the policy decision in `description` above, edit the DONE file\nin place rather than closing as no-op.\n\nRecommended fix: resolve the current branch's PR and assert\n`baseRefName == develop` before selecting the run. Pattern:\n`pr_base=$(gh pr view \"$branch\" --json baseRefName --jq .baseRefName); [ \"$pr_base\" = \"develop\" ] || { echo \"PR for $branch targets $pr_base, not develop\"; exit 1; }`\nthen proceed with the existing `gh run list ... --event pull_request`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make Step 3 job-count verification select develop-targeted PR runs",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Source review comment (newly tracked — was acknowledged in inventory\nbut not assigned to a work unit in the prior revision):\n  - PR #67, P2, `_project/DONE/main/planning/dev-loop-step-0-verify-assumptions.yaml`\n\nFinding: the Step 0 secondary-signal probe runs\n`gh pr list --json comments` without `--state`, `--base`, or `--limit`.\nThat scans the full PR history (open + closed + merged across all base\nbranches), which is slow on busy repos, returns a different population\nthan the primary probe (which is develop-merged-recent), and can\nrate-limit the gh client mid-audit.\n\nCurrent evidence on `origin/develop`: line 83 of\n`_project/DONE/main/planning/dev-loop-step-0-verify-assumptions.yaml`\nstill has the unscoped form.\n\nPer the policy decision in `description` above, edit the DONE file\nin place rather than closing as no-op.\n\nRecommended fix: scope the secondary probe to match the primary probe's\npopulation. Pattern:\n`gh pr list --state merged --base develop --limit 50 --json number,comments`\nthen grep the comments payload for the `pr-refresh` / `make pr-refresh`\n/ `merged develop into branch` markers as today.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Scope Step 0 secondary-probe `gh pr list --json comments` query",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Re-run the PR thread scan for `chatgpt-codex-connector` on the same\nmerge window and record which comments are now fixed, stale, or still\nactionable. Do not mark a thread resolved only because it is outdated;\nverify the current code or TODO text first.\n\nRequired output artifact (resolves prior ambiguity):\n  - Write findings to a new file under `_project/audits/` named\n    `codex-thread-rescan-week-2026-05-01.md`.\n  - File must contain three sections: (1) Resolved by w1-w13 (one row\n    per thread, link to commit/PR that fixed it), (2) Already-fixed by\n    earlier merges (one row per stale-but-ok thread, link to the merge\n    that fixed it), (3) Still actionable (one row per thread that\n    neither this TODO nor any earlier merge addressed — promote each\n    to a new TODO or blind-spot).\n  - Cross-check: diff `_project/blind-spots/` for entries dated within\n    2026-04-24 .. 2026-05-01 and either fold them into the audit or\n    mark out-of-scope with a one-line rationale. This addresses the\n    framework-gap finding in\n    `_project/blind-spots/2026-05-01-130000-codex-followups-todo-misses-coverage-downgrades.md`.\n\nFindings that looked already fixed or stale during the 2026-05-01 scan:\n  - PR #56 date sorting: current code uses `fmt_date(...)` before\n    sorting/listing blind-spot dates.\n  - PR #64 gitignore semantics: current workflow uses\n    `git check-ignore -z -v --no-index --stdin`, not pathspec matching.\n  - PR #64 PR-base reuse: current `pr-open` reuses PRs only with\n    `gh pr list --base develop --head \"$CURRENT\"`.\n  - PR #66 Step 0 merge-queue signal: current TODO explicitly says not\n    to infer merge-queue availability from `.has_issues`.\n  - PR #66 Step 1 lock-path command: current verification uses valid\n    Python syntax.\n  - PR #66 Step 3 unsupported `gh run list --json jobs`: current\n    verification lists run IDs and uses `gh run view` for jobs.\n  - PR #66 Step 6 machine-specific Makefile path: current TODO no longer\n    references `/Users/joe/Developer/BenchBox/Makefile`.\n  - PR #70 content-guard aggregator exit: current `.github/workflows/pr.yml`\n    exits immediately on content-guard failure before content-only\n    success messages.\n  - PR #75 and PR #76 non-POSIX `ERR` trap: current claim path uses a\n    POSIX `EXIT INT TERM` trap, though w5 tracks the remaining signal\n    exit problem.\n  - PR #75 and PR #76 PR-list cap: current pool status/sweep use\n    `--limit 1000` plus per-branch fallback lookups.\n  - PR #79 deleted-file classifier: current diff filter is `ACDMRT`,\n    including deletions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-audit stale Codex threads after fixes and record which ones are closed",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Source review comment:\n  - PR #71, P2, `Makefile`\n  - https://github.com/joeharris76/BenchBox/pull/71#discussion_r3169224322\n\nFinding: `tests/conftest.py` resolves `BENCHBOX_TEST_LOCK_DIR` with\n`Path(...).expanduser()`, but `make test-unlock` removes\n`$LOCK_DIR/test.lock` directly. If the environment variable contains a\nliteral `~/tmp`, pytest and the Make target disagree on the lock path.\n\nCurrent evidence on `origin/develop`: `test-unlock` lines 58-61 still\nset `LOCK_DIR=\"$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}\"` and run\n`rm -f \"$$LOCK_DIR/test.lock\"` without expanduser-equivalent handling.\n\nRecommended fix: resolve the lock directory through a tiny `uv run --`\nPython one-liner or an existing helper so the Make target matches\n`tests.conftest._get_test_lock_path()`. Add or update coverage for the\n`BENCHBOX_TEST_LOCK_DIR=~/...` case.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Expand BENCHBOX_TEST_LOCK_DIR consistently in `make test-unlock`",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Source review comment:\n  - PR #73, P1, `Makefile`\n  - https://github.com/joeharris76/BenchBox/pull/73#discussion_r3169372557\n\nFinding: `worktree-release-locked` detaches and hard-resets a pool\nworktree after checking the PR is merged, but it does not first refuse\nstaged, unstaged, or non-ignored untracked changes. A user can lose local\nedits when releasing a slot.\n\nCurrent evidence on `origin/develop`: lines 1057-1072 perform\n`git checkout --detach origin/develop` and `git reset --hard\norigin/develop` without the dirty guard that `worktree-pool-reset-locked`\nhas at lines 1177-1183.\n\nRecommended fix: before detach/reset, compute dirty state with the same\n`.benchbox` exclusion used by pool status/reset. Refuse by default and\nallow discard only with `FORCE=1`, preserving the existing PR-merged\nsafety check.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refuse `worktree-release` on dirty pool worktrees unless forced",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Source review comment:\n  - PR #73, P2, `Makefile`\n  - https://github.com/joeharris76/BenchBox/pull/73#discussion_r3169372563\n\nFinding: `worktree-claim-attempt` treats any `git status --porcelain`\noutput as dirty, but pool status/reset already ignore expected\nuntracked `.benchbox/` scratch artifacts. A released slot with harmless\n`.benchbox/*` files can become unclaimable.\n\nCurrent evidence on `origin/develop`: line 1032 uses raw\n`git status --porcelain`; line 1033 requires it to be empty. Other pool\ncommands filter `^\\?\\? \\.benchbox(/|$)`.\n\nRecommended fix: reuse the same filtered dirty check in\n`worktree-claim-attempt`, while still treating\n`.benchbox/claim_in_progress` as an aborted claim marker that must not\nbe ignored.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Ignore expected `.benchbox` scratch files when claiming free pool slots",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Source review comment:\n  - PR #78, P1, `Makefile`\n  - https://github.com/joeharris76/BenchBox/pull/78#discussion_r3170491244\n\nFinding: the claim cleanup handler is registered for `EXIT INT TERM`,\nbut the handler does not exit when invoked by INT/TERM. In `/bin/sh`\nimplementations such as dash, the trap can swallow cancellation and let\nthe recipe continue or return success.\n\nCurrent evidence on `origin/develop`: lines 1014-1022 define\n`cleanup()` and install `trap cleanup EXIT INT TERM`; the function has no\nsignal-aware exit path.\n\nRecommended fix: split cleanup from signal handling, or have the\nINT/TERM trap run cleanup and then exit with a nonzero status. Keep the\nrecipe POSIX-sh compatible; do not reintroduce a bash-only `ERR` trap.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make INT/TERM claim-trap handling exit nonzero after cleanup",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Source review comment:\n  - PR #70, P2, `_project/TODO/main/planning/dev-loop-step-5-measurement-window.yaml`\n  - https://github.com/joeharris76/BenchBox/pull/70#discussion_r3168890227\n\nFinding: Step 5 says the measurement window runs after Steps 1-4 plus\nStep 3a, but w1 still says \"post-Step-4-merge\" and the notes start the\ntimer from Step 4 alone.\n\nCurrent evidence on `origin/develop`: lines 33-42 still describe a\nStep-4-only timer. In the actual merge order Step 3a landed before\nStep 4, so the current `due_date: 2026-05-30` may still be valid;\nverify before changing dates.\n\nRecommended fix: update w1's summary and notes to define the start\ntimestamp as the later of Step 3a and Step 4 merge times. Confirm\nwhether the existing `2026-05-30` due date remains correct (compute\n`max(step_3a_merged_at, step_4_merged_at) + 30 days`); only adjust\n`due_date` if the math diverges.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Correct Step 5 measurement-window start description in TODO",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Source review comment:\n  - PR #83, P2, `_project/TODO/main/planning/dev-loop-step-5-measurement-window.yaml`\n  - https://github.com/joeharris76/BenchBox/pull/83#discussion_r3171491441\n\nFinding: `metadata.last_updated` is `2026-04-30`, but the TODO schema\nexpects a date-time value.\n\nCurrent evidence on `origin/develop`: line 234 has\n`last_updated: \"2026-04-30\"`. The repo convention elsewhere is full\nISO 8601 with `Z` (e.g. this TODO's own `2026-05-01T13:30:00Z`).\n\nRecommended fix: change `last_updated` to a full ISO date-time stamped\nat the time of edit. Independent of w6 — they happen to touch the same\nfile but have unrelated acceptance criteria.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Convert Step 5 `last_updated` to ISO date-time as schema expects",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Source review comment:\n  - PR #81, P2, `.github/workflows/develop-post-merge.yml`\n  - https://github.com/joeharris76/BenchBox/pull/81#discussion_r3170954637\n\nFinding: the metrics job computes `develop_red_detected_at` using\n`max` over failed lint/fast-test completion timestamps. If both fail,\nthis records the last failure and understates time to revert/recover.\n\nCurrent evidence on `origin/develop`: lines 326-330 select failed\n`lint`/`fast-test` jobs and use `.completed_at] | max // null`.\n\nRecommended fix: use the earliest failed completion timestamp, e.g.\n`min`, and add a local jq regression fixture with two failed jobs at\ndifferent completion times.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Record first failed post-merge job completion as red-detection time",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-01",
+        "notes": "Source review comment:\n  - PR #86, P1, `results-explorer/src/pages/Home.tsx`\n  - https://github.com/joeharris76/BenchBox/pull/86#discussion_r3171854306\n\nFinding: when `listResults()` returns `[]` while meta-leaderboard data\nis present, the Home page retries once. If the retry also returns empty,\n`hasInconsistentEmptySnapshot` remains true and the page renders\n`Loading results...` forever instead of surfacing a recoverable error or\nempty-state message.\n\nCurrent evidence on `origin/develop`: lines 60-76 implement a one-shot\nretry, while lines 159-162 still render the loading spinner whenever\n`hasInconsistentEmptySnapshot` is true.\n\nRecommended fix: after the one retry has completed, render an\nactionable error/empty state for persistent mismatch. Preserve the\ntransient retry path. Add a Home unit test in\n`results-explorer/src/pages/__tests__/Home.test.tsx`.\n\nRelated blind-spot (separate regression on the same PR):\n  - `_project/blind-spots/2026-05-01-103002-explorer-cold-load-test-coverage-weakened.md`\n  - PR #86 also weakened `platform-index-cold-load.spec.ts` from strict\n    row counts (`toHaveCount(4)` / `toHaveCount(2)`) to `count > 0`.\n    Whoever picks up w9 should restore strict assertions in the same\n    PR or open a follow-up — the cold-load partial-row regression is a\n    different failure mode than the Home empty-state and the loosened\n    assertion will not catch it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle persistent results-explorer snapshot mismatch without an infinite spinner",
+        "wid": "w9"
+      }
+    ]
+  }
+}

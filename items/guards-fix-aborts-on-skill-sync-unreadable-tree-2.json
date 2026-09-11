@@ -1,0 +1,109 @@
+{
+  "context": "Contain the failure at the guards-fix recipe level (e.g. run the skill-sync step with its exit status captured, print the notice naming the underlying error, and decide deliberately whether guards-fix then exits 0-with-notice or nonzero-after-summary). Do not change what `make skill-sync` itself does for direct callers, and do not touch the skill-sync CLI or its pin.",
+  "description": "Successor of guards-fix-aborts-on-skill-sync-unreadable-tree (dropped 2026-07-31: its only rung, `make guards-fix`, is machine-dependent - wherever the skill-sync CLI is absent the target already exits 0 with a skip notice, so the rung was green on the unfixed tree in every environment except the one machine with the CLI installed; not falsifiable elsewhere). Reported failure (on a machine with skill-sync installed): guards-fix aborts at its final skill-sync step with 'unable to read tree <sha>'; the earlier regens have already landed but the completion summary never prints. Reproduced deterministically 2026-07-31 in a clean clone by pointing SKILL_SYNC at a stub that prints 'unable to read tree deadbeef' and exits 1: `make guards-fix SKILL_SYNC=<stub>` aborts with 'make: *** [Makefile:828: guards-fix] Error 2' before its 'guards-fix done' summary. Fix in the Makefile: when the skill-sync step fails, guards-fix must surface the failure text and still print its regenerated-artifact summary (skip-with-notice, or fail only after reporting) - without silently swallowing genuine skill-sync drift.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-31T23:47:21Z",
+        "from_item": "guards-fix-aborts-on-skill-sync-unreadable-tree-2",
+        "id": 674,
+        "reason": "Environment-bound: this session is an ephemeral clone without the skill-sync CLI at /Users/joe/Developer/skill-sync; only the deterministic stub reproduction was verifiable here",
+        "resolution": "promoted",
+        "resolved_item": "guards-fix-skill-sync-real-cli-manual-confirmation",
+        "resolved_reason": null,
+        "summary": "Confirm on the machine with the real skill-sync CLI that the original unable-to-read-tree case reports cleanly and genuine drift still fails skill-sync-check"
+      }
+    ],
+    "item_meta": {
+      "category": "tooling",
+      "completed_at": "2026-07-31T23:48:34Z",
+      "completed_pr": 1380,
+      "created_at": "2026-07-31T23:34:07Z",
+      "worktree": "ci-infrastructure"
+    },
+    "preserves": [
+      {
+        "behavior": "A genuine skill-sync drift is still surfaced, not silently swallowed",
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree-2"
+      },
+      {
+        "behavior": "Direct `make skill-sync` behavior is unchanged for callers that want a hard failure",
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree-2"
+      },
+      {
+        "behavior": "guards-fix still regenerates every other drift-guard artifact",
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree-2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree-2",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "S=\"$(mktemp -t skill-sync-stub-XXXXXX)\"; printf 'console.error(\"unable to read tree deadbeef\");process.exit(1);\\n' > \"$S\"; make guards-fix SKILL_SYNC=\"$S\" 2>&1 | grep -q 'guards-fix done'",
+        "description": "guards-fix completes its summary even when the skill-sync CLI fails",
+        "expected": "exits 1 on the unfixed tree (verified 2026-07-31: make aborts at the skill-sync step with Error 2 before the summary); exits 0 once guards-fix reports and completes. Run in a disposable/pool worktree: the target regenerates drift artifacts as a side effect - reset uncommitted regen output afterwards. Needs node.",
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "S=\"$(mktemp -t skill-sync-stub-XXXXXX)\"; printf 'console.error(\"unable to read tree deadbeef\");process.exit(1);\\n' > \"$S\"; make guards-fix SKILL_SYNC=\"$S\" 2>&1 | grep -qi 'unable to read tree'",
+        "description": "the skill-sync failure text is surfaced, not swallowed",
+        "expected": "passes before and after (today the text reaches output via the abort; it must keep appearing once the abort is fixed) - preserve guard, not a gate",
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make guards-fix",
+        "description": "normal guards-fix still succeeds",
+        "expected": "exit 0 with either a real sync or a skip notice - regression guard; same side-effect caveat as rung 1",
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree-2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "guards-fix now runs its skill-sync step with '|| echo WARNING...'; stub repro: make_exit flipped 2 -> 0, summary prints, 'unable to read tree' still surfaced; direct make skill-sync unchanged",
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree-2",
+        "notes": null,
+        "started_at": "2026-07-31T23:47:19Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-guards-fix",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Make guards-fix surface a skill-sync failure and still complete its report (skip-with-notice or fail-after-reporting)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Not runnable in this ephemeral clone (no real skill-sync CLI); promoted to its own item guards-fix-skill-sync-real-cli-manual-confirmation via deferral 674 - the stub reproduction covered the abort/containment behavior deterministically",
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree-2",
+        "notes": null,
+        "started_at": "2026-07-31T23:48:06Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-guards-fix",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "On the machine with the real skill-sync CLI: confirm the original 'unable to read tree' case now reports cleanly, and that genuine drift still fails skill-sync-check (manual, environment-bound)",
+        "wid": "w2"
+      }
+    ]
+  }
+}

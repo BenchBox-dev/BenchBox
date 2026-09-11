@@ -1,0 +1,367 @@
+{
+  "context": "After the upstream skill and diagnostic changes land, define a BenchBox authority model and stable policy IDs, reduce AGENTS.md to concise cross-agent project policy, keep agent adapters thin, move operational detail to durable runbooks, repair executable Claude surfaces, and add a deterministic audit plus scenario corpus. Capture baseline and post-change effectiveness, efficiency, and conformance metrics, and wire the guard and required CI in the same PR.",
+  "description": "BenchBox agent policy is large, duplicated, and weakly evaluated. AGENTS.md is roughly 425 lines and 19 KB; CLAUDE.md is a pointer rather than a native import; GEMINI.md and ANTIGRAVITY.md substantially duplicate policy; the Claude /pr command can add an unconditional Claude coauthor and has ambiguous dirty-worktree commit behavior; project hooks duplicate global hooks, invoke bare python3, mutate edits, and swallow failures; and no rule requires agents to identify the authority behind words such as required. The earlier required Claude author incident was task-local, not repository policy, and exposed this provenance gap.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Build a structured-policy generator before the concise documents and checks prove it necessary",
+        "instead": "Use Markdown, stable policy IDs, and small deterministic checks",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "why": "A new abstraction would add maintenance cost before the policy model is validated"
+      },
+      {
+        "dont": "Duplicate AGENTS.md into a Copilot-specific file without loader evidence",
+        "instead": "Use AGENTS.md when the consumer supports it",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "why": "Duplication creates another drift surface"
+      },
+      {
+        "dont": "Edit generated skill mirrors as the source of truth",
+        "instead": "Change canonical skills upstream and regenerate through skill-sync",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "why": "They will drift from canonical skills and be overwritten"
+      },
+      {
+        "dont": "Land the audit without required-CI wiring",
+        "instead": "Land the guard and path-filtered required check together",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "why": "An unwired guard is non-load-bearing"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "needs_item": "align-canonical-agent-skills-with-authority-and-identity-policy"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "needs_item": "repair-skill-sync-cross-agent-readiness-diagnostics"
+      }
+    ],
+    "item_meta": {
+      "category": "Agent infrastructure",
+      "completed_at": "2026-07-27T16:45:12Z",
+      "completed_pr": 1318,
+      "created_at": "2026-07-27T15:48:31Z",
+      "worktree": "agent-instructions"
+    },
+    "preserves": [
+      {
+        "behavior": "BenchBox worktree isolation, uv-only Python execution, explicit staging, and protected-branch safety remain normative",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate"
+      },
+      {
+        "behavior": "No agent identity is imposed unless the current authorized task explicitly requires it",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate"
+      },
+      {
+        "behavior": "Review authorization stays read-only until implementation is explicitly requested",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate"
+      },
+      {
+        "behavior": "Soundness-path auto-merge exceptions and existing release safety remain intact",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate"
+      },
+      {
+        "behavior": "The audit and its required-CI wiring land in the same PR",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Canonical cross-agent BenchBox project policy",
+        "decision": "supersede",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "path": "AGENTS.md"
+      },
+      {
+        "concept": "Full review authorization and defect routing protocol",
+        "decision": "reuse",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "path": "docs/development/agent-review-protocol.md"
+      },
+      {
+        "concept": "Canonical-to-generated skill materialization",
+        "decision": "extend",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "path": "skill-sync.yaml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": ".claude/commands/**"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": ".claude/settings.json"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": ".pre-commit-config.yaml"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": "ANTIGRAVITY.md"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": "GEMINI.md"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/evals/agent-instructions/**"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/development/agent-*.md"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.lock"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.yaml"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_agent_instruction_audit.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make agent-instructions-check",
+        "description": "Deterministic instruction audit and scenario evaluation pass",
+        "expected": "exit 0 with effectiveness, efficiency, and conformance thresholds met",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "last_result": "pass",
+        "last_run": "2026-07-27T16:34:49Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make skill-sync-verify",
+        "description": "Generated skill mirrors and lock are current",
+        "expected": "exit 0",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "last_result": "pass",
+        "last_run": "2026-07-27T16:34:50Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_agent_instruction_audit.py -q",
+        "description": "Focused audit tests pass",
+        "expected": "exit 0",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "last_result": "pass",
+        "last_run": "2026-07-27T16:38:14Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Repository pre-PR gate passes",
+        "expected": "exit 0",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "last_result": "pass",
+        "last_run": "2026-07-27T16:43:34Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated current loaders and source contracts: AGENTS/CLAUDE/GEMINI/ANTIGRAVITY discovery is reported by skill-sync schema v2; canonical source is /Users/joe/.skill-sync/skills; project settings and PR command conflicts were traced; active CI and skill-sync wiring inspected.",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "notes": null,
+        "started_at": "2026-07-27T16:23:27Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Revalidate origin/develop, current agent loader behavior, and the landed upstream skill and diagnostic contracts",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Reduced AGENTS.md from 425 to 146 lines and active instruction bytes from 41,634 baseline to 12,255 candidate while preserving safety, worktree, uv, staging, PR, TODO, and BenchBox domain invariants.",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "notes": null,
+        "started_at": "2026-07-27T16:30:11Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Write the authority model and stable policy IDs for task, repository, mechanical gate, and recommendation sources",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Converted CLAUDE.md, GEMINI.md, and ANTIGRAVITY.md to thin AGENTS.md adapters; removed mutating project hooks; repaired /pr identity and explicit-scope behavior.",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "notes": null,
+        "started_at": "2026-07-27T16:30:16Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Reduce AGENTS.md and replace duplicated agent files with the thinnest loader-compatible adapters",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added active docs/development/agent-review-protocol.md binding with stable authority, identity, review, defect, L2, and capture policy IDs; AGENTS.md explicitly selects it over the legacy document.",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "notes": null,
+        "started_at": "2026-07-27T16:30:21Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Repair the Claude PR command and project hooks to preserve identity, scope commits, use project tooling, and expose failures",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Regenerated all configured mirrors from canonical source using skill-sync after a force dry-run; removed stale docs wrapper from manifest; make skill-sync-verify and make skill-sync-check pass across Claude, Codex, Gemini, Copilot, and Antigravity readiness dimensions.",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "notes": null,
+        "started_at": "2026-07-27T16:30:26Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Implement an agent-instruction audit with deterministic checks for duplication, provenance, identity, loaders, hooks, and generated-mirror drift",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Added five-scenario adversarial corpus covering task, repository, mechanical, and recommendation authority; deterministic audit measures effectiveness coverage, 12,453-byte efficiency budget, stable IDs, adapter budgets, identity, hook, and pointer conformance; negative mutation tests prove failures are detected.",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "notes": null,
+        "started_at": "2026-07-27T16:30:31Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Create a scenario corpus and baseline versus candidate evaluation for correctness, unsupported requirement claims, latency, and instruction volume",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Wired make agent-instructions-check into pre-commit, local ci-lint, required PR lint guard, and fail-closed path filters in the same PR; updated pinned skill-sync verify to merged 1780825; targeted CI parity and path tests pass.",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "notes": null,
+        "started_at": "2026-07-27T16:31:20Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Regenerate tracked mirrors and lock state from the canonical skill source after upstream dependencies land",
+        "wid": "w6"
+      },
+      {
+        "evidence": "All verification ladder steps pass, including make pr-preflight in a clean detached verification worktree: 25,865 passed, 19 skipped and artifact hygiene OK. Commit f30a9e695 preserves configured identity. BenchBox PR #1318 opened with squash auto-merge enabled.",
+        "item_id": "canonicalize-benchbox-agent-instructions-and-add-evaluation-gate",
+        "notes": null,
+        "started_at": "2026-07-27T16:31:25Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Wire the audit into pre-commit and required CI and run targeted, scenario, skill-sync, and PR preflight verification",
+        "wid": "w7"
+      }
+    ]
+  }
+}

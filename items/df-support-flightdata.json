@@ -1,0 +1,184 @@
+{
+  "context": "Follow the read_primitives/dataframe_queries.py pattern: single file with\nexpression_impl and pandas_impl functions for each query, registered in a\nQueryRegistry. Use the get_dataframe_queries() fallback method on the benchmark\nclass (no hard-coded dispatch needed).\n\nReference benchbox/core/flightdata/queries.py for the SQL source - each query's\nSQL maps directly to DataFrame operations. Start with the 5 on-time performance\nqueries (simplest aggregation patterns), then delay analysis, route analytics,\ntemporal patterns, and carrier comparisons.\n\nUse DataFrameQuery categories: JOIN, AGGREGATE, GROUP_BY, FILTER, SORT for\nappropriate classification. Parameterize date ranges via a module-level defaults\ndict with set_parameter_overrides() pattern from tpch/dataframe_queries.py.\n",
+  "description": "Add dual-family DataFrame query implementations (expression + pandas) for all 20\nFlightData OLAP queries, enabling execution on Polars, PySpark, DataFusion, Pandas,\nModin, cuDF, and Dask platforms.\n\nFlightData is a 3-table benchmark (flights fact table + airlines/airports dimensions)\nwith 20 queries across 5 categories: on-time performance (5), delay analysis (4),\nroute analytics (4), temporal patterns (4), and carrier comparisons (3). The queries\nuse standard OLAP patterns - GROUP BY with aggregations, LEFT JOINs to dimension\ntables, CASE expressions, HAVING clauses, date filtering, and ROUND/AVG/SUM/COUNT.\n\nThis is one of the simpler benchmarks to port because the schema is small (3 tables),\njoins are straightforward (single-key LEFT JOINs to dimension tables), and query\npatterns are standard aggregation/filter operations that map cleanly to both\nexpression-family and pandas-family APIs.\n\nMotivation: FlightData uses real-world aviation data and is popular for OLAP\ndemos. DataFrame support enables benchmarking DataFrame platforms on realistic\nanalytics workloads beyond TPC-H/TPC-DS.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hardcode date ranges",
+        "instead": "use the parameter override pattern from tpch/dataframe_queries.py",
+        "item_id": "df-support-flightdata",
+        "why": "FlightData uses parameterized {start_date}/{end_date} based on available data"
+      },
+      {
+        "dont": "implement queries as SQL strings passed to DataFrame engines",
+        "instead": "implement using native DataFrame API (col/lit/join/groupby)",
+        "item_id": "df-support-flightdata",
+        "why": "that defeats the purpose of DataFrame benchmarking"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "df-support-flightdata",
+        "id": 381,
+        "reason": "The get_dataframe_queries() fallback method is sufficient. Hard-coded dispatch only needed for stream_id permutation support (TPC-H/TPC-DS compliance).",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason states the existing fallback method is sufficient and hard-coded dispatch is only needed for out-of-scope stream_id permutation support.",
+        "summary": "Add FlightData dataframe queries to hard-coded dispatch in dataframe_runner.py"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-10T00:00:00Z",
+      "created_at": "2026-04-10T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "FlightDataBenchmark SQL execution path remains unchanged - all existing SQL queries and parameterized date ranges work identically",
+        "item_id": "df-support-flightdata"
+      },
+      {
+        "behavior": "FlightDataDownloader data generation produces files loadable by both SQL and DataFrame paths",
+        "item_id": "df-support-flightdata"
+      },
+      {
+        "behavior": "benchbox run --platform duckdb --benchmark flightdata still works (SQL mode unaffected)",
+        "item_id": "df-support-flightdata"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "df-support-flightdata",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/"
+      },
+      {
+        "item_id": "df-support-flightdata",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "df-support-flightdata",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "df-support-flightdata",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "df-support-flightdata",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/"
+      },
+      {
+        "item_id": "df-support-flightdata",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/flightdata/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.flightdata.dataframe_queries import get_dataframe_queries; r = get_dataframe_queries(); print(f'{len(r)} queries registered'); assert len(r) == 20\"",
+        "description": "All 20 DataFrame queries are registered in the QueryRegistry",
+        "expected": "20 queries registered",
+        "item_id": "df-support-flightdata",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.benchmark_registry import BENCHMARK_REGISTRY; print(BENCHMARK_REGISTRY['flightdata']['supports_dataframe'])\"",
+        "description": "FlightData benchmark reports supports_dataframe=True",
+        "expected": "True",
+        "item_id": "df-support-flightdata",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/flightdata/ -v",
+        "description": "Unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "df-support-flightdata",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "df-support-flightdata",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "df-support-flightdata",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "df-support-flightdata",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "df-support-flightdata",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "df-support-flightdata",
+        "notes": "Create benchbox/core/flightdata/dataframe_queries.py with expression_impl\nfunctions for all 20 queries. Follow the pattern in read_primitives/dataframe_queries.py.\n\nKey translation patterns:\n- LEFT JOIN airlines/airports -> ctx.get_table(\"flights\").join(ctx.get_table(\"airlines\"), ...)\n- CASE WHEN -> col(\"x\").when(...).then(...).otherwise(...)  (Polars) or F.when() (PySpark)\n- ROUND(AVG(...), 2) -> col(\"x\").mean().round(2)\n- date filtering -> col(\"flight_date\") >= lit(start_date)\n- HAVING COUNT(*) >= N -> filter after group_by\n- Integer division for dep_hour -> (col(\"crs_dep_time\") / lit(100)).cast(int)\n\nQueries use parameterized date ranges ({start_date}, {end_date}) - implement\na parameters dict similar to TPCH_DEFAULT_PARAMS in tpch/dataframe_queries.py.\n\nAll 20 queries should be implementable; no SQL-only constructs present.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create expression-family implementations for all 20 FlightData queries",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-flightdata",
+        "notes": "Add pandas_impl functions to each DataFrameQuery in dataframe_queries.py.\n\nKey translation patterns:\n- LEFT JOIN -> pd.merge(flights, airlines, left_on=\"reporting_airline\", right_on=\"code\", how=\"left\")\n- CASE WHEN -> np.where() or df[\"col\"].apply()\n- GROUP BY + agg -> df.groupby([...], as_index=False).agg(...)\n- HAVING -> filter after groupby\n- ROUND -> .round(2)\n- ORDER BY ... LIMIT N -> .sort_values(...).head(N)\n- Integer division -> df[\"crs_dep_time\"] // 100\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create pandas-family implementations for all 20 FlightData queries",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-flightdata",
+        "notes": "Integration steps:\n1. Add get_dataframe_queries() method to FlightDataBenchmark in benchmark.py\n   that imports and returns the QueryRegistry from dataframe_queries.py\n2. Set supports_dataframe: True in benchmark_registry.py for flightdata entry\n3. Ensure FlightData data loader works with DataFrame platforms (CSV/Parquet loading)\n4. Add any skip lists if needed (unlikely - all queries are standard OLAP)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire up FlightData benchmark class and registry for DataFrame dispatch",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-flightdata",
+        "notes": "Create tests/unit/core/flightdata/test_dataframe_queries.py:\n- Test query registration (all 20 queries registered, correct IDs)\n- Test expression_impl functions execute without error on small synthetic data\n- Test pandas_impl functions execute without error on small synthetic data\n- Test result shape/columns match expectations\n- Test parameterized date ranges\n- Mark tests with @pytest.mark.fast where possible\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for FlightData DataFrame queries",
+        "wid": "w4"
+      }
+    ]
+  }
+}

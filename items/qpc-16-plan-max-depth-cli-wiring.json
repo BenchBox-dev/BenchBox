@@ -1,0 +1,177 @@
+{
+  "description": "Follow-up from the qpc-10 (#1018) review. qpc-10 added a configurable\nplan_max_depth adapter-config knob and a truncated_at_depth serialization\nmarker, but two loose ends remain:\n\n1. plan_max_depth is reachable only via direct adapter config= construction /\n   an arbitrary-key config path — it is NOT registered in\n   benchbox/core/results/platform_options.py and has no CLI flag, so\n   `--platform-option plan_max_depth=N` is rejected. (Its sibling\n   plan_capture_timeout_seconds has the same gap.)\n2. The truncated_at_depth marker does not reach the persisted .plans.json:\n   schema.py::_build_plan_entry serializes a QueryPlanDAG via\n   asdict(...)/to_dict() at full depth for the companion, so plan_max_depth\n   today only affects the capture-time size-guard estimate and\n   `show-plan --format json`, not the on-disk bundle. The size-guard hint\n   \"use a smaller plan_max_depth\" therefore overstates its effect.\n\nDecide whether bounding the persisted companion is desired (it would shrink\npathologically deep bundles) or whether full-depth persistence is preferred\n(deep plans are no longer dropped — a strict improvement over pre-qpc-10);\nat minimum, register the option so it is settable and correct the hint.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "leave the size-guard hint claiming plan_max_depth shrinks the bundle if it does not.",
+        "instead": "(not specified)",
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Usability / Config",
+      "created_at": "2026-07-07T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "Deep plans are never dropped (qpc-10 truncation-marker behavior)",
+        "item_id": "qpc-16-plan-max-depth-cli-wiring"
+      },
+      {
+        "behavior": "Default plan_max_depth (50) unchanged when the option is not set",
+        "item_id": "qpc-16-plan-max-depth-cli-wiring"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/results/platform_options.py — the --platform-option allowlist (plan_max_depth + plan_capture_timeout_seconds not registered)",
+        "decision": "reuse",
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "path": "benchbox/core/results/platform_options.py"
+      },
+      {
+        "concept": "benchbox/core/results/query_plan_models.py DEFAULT_PLAN_MAX_DEPTH / to_dict(max_depth) / truncated_at_depth (qpc-10 #1018)",
+        "decision": "reuse",
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "path": "benchbox/core/results/query_plan_models.py"
+      },
+      {
+        "concept": "benchbox/core/results/schema.py::_build_plan_entry — companion serialization (full depth)",
+        "decision": "reuse",
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "path": "benchbox/core/results/schema.py::_build_plan_entry"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/platform_options.py"
+      },
+      {
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_base_adapter_database_management.py tests/unit/core/results/test_query_plan_models.py -q -k depth",
+        "description": "plan_max_depth settable via --platform-option and effective",
+        "expected": "all pass, including new --platform-option test",
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Register plan_max_depth (and plan_capture_timeout_seconds) as PlatformOptionSpecs so --platform-option accepts them; add CLI/help coverage.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide + implement persisted-companion depth policy: either thread plan_max_depth into _build_plan_entry serialization, or correct the size-guard hint to say it does not bound the bundle.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Test: --platform-option plan_max_depth=N is accepted and takes effect; companion depth behavior matches the chosen policy.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Review: adversarial code review (option validation, no schema regression).",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Fix review findings; re-run verification.",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-16-plan-max-depth-cli-wiring",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Submit PR referencing qpc-16.",
+        "wid": "w6"
+      }
+    ]
+  }
+}

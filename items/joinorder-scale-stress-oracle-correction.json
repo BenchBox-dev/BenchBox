@@ -1,0 +1,74 @@
+{
+  "description": "Adversarial review finding (2026-07-02, joinorder Track-2 review), Medium --\ntwo coupled corrections around the `replicated_imdb` scale-stress prototype.\n\n1. Oracle-scaling rule is wrong for all 113 JOB queries. The decision doc\n   states \"Canonical oracle x replica count\"\n   (_project/decisions/joinorder-scale-stress-decision-2026-06-30.md:115) and\n   \"reference cardinalities scale by the replica count...\" (:122-123). But\n   every one of the 113 JOB queries is a scalar `SELECT MIN(...)` with no\n   GROUP BY (re-runnable: load benchbox.core.joinorder.queries and count --\n   0/113 have GROUP BY, 0/113 have COUNT), so each returns exactly ONE row and\n   the MIN value is invariant under value-identical offset replication. The\n   final-result oracle therefore scales x1, not x replica count; only\n   intermediate/join-subgraph cardinalities scale by N. An implementer who\n   multiplies the canonical result oracle by replica count would build a\n   validation gate that fails on all 113 queries. The same doc's line 141-142\n   already distinguishes final-result from join-subgraph cardinalities, so it\n   is partially self-correcting -- reword the headline to match.\n\n2. Latent dependency trap in the prototype seed. The prototype's own w1\n   verification (joinorder-replicated-imdb-scale-prototype.yaml:49-52) requires\n   that IF the decision note uses the\n   `Stats phase gate: dependency:track2-joinorder-stats-phase` gate (it does,\n   per the decision note), then `track2-joinorder-stats-phase` must be added to\n   the prototype's deps.needs before coding. Today the prototype's deps.needs\n   lists only `joinorder-scale-stress-decision-framework` (lines 17-19).\n   Harmless while Not Started, but it will trip whoever starts w1. Add the\n   missing dep now.\n\nMostly doc/metadata; no production code. If\njoinorder-track2-scaling-direction-reconciliation flips the direction away from\nreplicated_imdb, w1 still applies (the stated rule is simply wrong as written);\nw2 would become moot.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "joinorder-scale-stress-oracle-correction",
+        "needs_item": "joinorder-scale-stress-decision-framework"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2026-07-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "joinorder-scale-stress-oracle-correction",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml"
+      },
+      {
+        "item_id": "joinorder-scale-stress-oracle-correction",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/joinorder-scale-stress-decision-2026-06-30.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'replica count' _project/decisions/joinorder-scale-stress-decision-2026-06-30.md",
+        "description": "Decision doc scopes the x-replica-count rule to join-subgraph, not final-result, cardinalities",
+        "expected": "the x-replica-count relationship is qualified to join-subgraph cardinalities, final results stated invariant",
+        "item_id": "joinorder-scale-stress-oracle-correction",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo deps joinorder-scale-stress-oracle-correction",
+        "description": "The prototype dependency is recorded in the current tracker",
+        "expected": "output includes the stats-phase dependency",
+        "item_id": "joinorder-scale-stress-oracle-correction",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-scale-stress-oracle-correction",
+        "notes": "Fix decision-2026-06-30.md:115 and :122-123 so the FINAL-result oracle is\nstated as invariant (x1) for the 113 scalar-MIN queries, and the\nx-replica-count relationship is scoped to intermediate/join-subgraph\ncardinalities (consistent with the same doc's line 141-142 gate list).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reword the decision doc's oracle-scaling rule to match scalar-MIN semantics",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-scale-stress-oracle-correction",
+        "notes": "Edit joinorder-replicated-imdb-scale-prototype.yaml deps.needs to include\ntrack2-joinorder-stats-phase, satisfying that item's own w1 verification\ngate. Re-run check-graph afterward.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add track2-joinorder-stats-phase to the replicated-prototype deps.needs",
+        "wid": "w2"
+      }
+    ]
+  }
+}

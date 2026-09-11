@@ -1,0 +1,175 @@
+{
+  "context": "Pure refactor, no behaviour change. Move the async recovery into src/lib/compareRecovery.ts with an explicit result type distinguishing confirmed absence from transient load failure. Move planCompareIds alongside it for what it actually is - dedupe-and-cap - not as the recovery kernel. Compare keeps consuming both. Unit tests cover retained / missing / duplicate / over-limit / empty and the multi-stays-multi rule.",
+  "description": "Compare implements the only working stale-selection recovery in the product: it resolves short IDs, fetches details, partitions requested IDs into retained / missing / failed, reports 'These results may have been removed from the published dataset', canonicalises the URL to short IDs, and deliberately keeps a multi-selection URL multi after a one-result recovery so it does not collapse into the single-result builder (Compare.tsx:218-300, 331-350).\n\nAn earlier plan proposed extracting planCompareIds as the recovery kernel. That is wrong: planCompareIds (Compare.tsx:94-113) is a SYNCHRONOUS string helper - trim, dedupe, slice - with no database access. It cannot detect a missing run. All three reviewers caught this. The boundary worth extracting is the ASYNC recovery, and it is substantially larger.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change any Compare behaviour in this item",
+        "instead": "keep it a pure refactor with identical outcomes",
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "why": "a behaviour change here would be invisible against the refactor diff"
+      },
+      {
+        "dont": "collapse the missing/failed distinction",
+        "instead": "keep confirmed absence separate from transient failure",
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "why": "they need different recovery messaging and different retry behaviour"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "treat planCompareIds as the recovery kernel",
+        "instead": "extract the async effect at Compare.tsx:218-300",
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "why": "planCompareIds is a synchronous string helper with no DB access"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "needs_item": "rx-ux-00-phase0-contract-decisions"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T18:22:53Z",
+      "completed_pr": 1821,
+      "created_at": "2026-08-22T14:49:22Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "/results/compare?ids=<one> pins that run and opens the builder (Compare.tsx:184+); ?ids=<a,b> renders a comparison. Both are live contracts (ResultDetail.tsx:266, e2e/routes/compare.spec.ts:58, compare-entrypoints.spec.ts:76).",
+        "item_id": "rx-ux-12-extract-compare-recovery"
+      },
+      {
+        "behavior": "Compare's recovery rule that a multi-selection URL stays multi after a one-result recovery, so it does not collapse into the single-result builder (Compare.tsx:331-350).",
+        "item_id": "rx-ux-12-extract-compare-recovery"
+      },
+      {
+        "behavior": "Compare's user-visible behaviour is unchanged by this item; it is a refactor",
+        "item_id": "rx-ux-12-extract-compare-recovery"
+      },
+      {
+        "behavior": "The distinction between a confirmed missing result and a transient load failure",
+        "item_id": "rx-ux-12-extract-compare-recovery"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/**"
+      },
+      {
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/compareRecovery.ts"
+      },
+      {
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "last_result": "pass",
+        "last_run": "2026-08-22T18:22:13Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium e2e/routes/compare.spec.ts e2e/routes/compare-entrypoints.spec.ts e2e/failures/compare-hard-block.spec.ts",
+        "description": "Compare browser behaviour unchanged after refactor",
+        "expected": "all compare specs pass unchanged",
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "last_result": "pass",
+        "last_run": "2026-08-22T18:22:50Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "compareRecovery.ts now owns async alias resolution, load recovery, and explicit recovered/missing/failed result categories; focused tests and typecheck pass.",
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "notes": null,
+        "started_at": "2026-08-22T18:13:56Z",
+        "started_branch": "fix/rx-ux-12-extract-compare-recovery",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-12-extract-compare-recovery",
+        "status": "done",
+        "summary": "Move async recovery into compareRecovery.ts with explicit result type",
+        "wid": "w1"
+      },
+      {
+        "evidence": "planCompareIds moved to compareRecovery.ts as the synchronous trim/dedupe/cap helper and Compare imports it.",
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "notes": null,
+        "started_at": "2026-08-22T18:14:01Z",
+        "started_branch": "fix/rx-ux-12-extract-compare-recovery",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-12-extract-compare-recovery",
+        "status": "done",
+        "summary": "Move planCompareIds alongside as dedupe-and-cap",
+        "wid": "w2"
+      },
+      {
+        "evidence": "New compareRecovery unit suite covers retained, confirmed missing, raw and resolved duplicates, over-limit, empty, resolver failure, and loader failure; 6 tests pass.",
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "notes": null,
+        "started_at": "2026-08-22T18:14:06Z",
+        "started_branch": "fix/rx-ux-12-extract-compare-recovery",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-12-extract-compare-recovery",
+        "status": "done",
+        "summary": "Unit tests: retained/missing/duplicate/over-limit/empty",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Extracted shouldPreserveMultiSelectionUrl and unit-tested two requested IDs plus one recovered result stays multi, while single and duplicate-only URLs do not.",
+        "item_id": "rx-ux-12-extract-compare-recovery",
+        "notes": null,
+        "started_at": "2026-08-22T18:14:11Z",
+        "started_branch": "fix/rx-ux-12-extract-compare-recovery",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-12-extract-compare-recovery",
+        "status": "done",
+        "summary": "Unit test: multi-selection URL stays multi after one-result recovery",
+        "wid": "w4"
+      }
+    ]
+  }
+}

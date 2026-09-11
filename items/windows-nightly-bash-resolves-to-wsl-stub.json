@@ -1,0 +1,36 @@
+{
+  "context": "Test-harness fix, not a product fix: these tests validate workflow YAML shell fragments, so they must run under a real POSIX shell. Resolve Git Bash explicitly (C:\\\\Program Files\\\\Git\\\\bin\\\\bash.exe, which the runner does have - the checkout action uses it) via a shared helper rather than trusting PATH order, and skip with a recorded reason if no Git Bash is present. Do not weaken the assertions. A single shared bash-resolution fixture is preferable to patching each call site.",
+  "description": "~14 Windows nightly failures share one root cause that is NOT an encoding bug. Tests that exercise GitHub Actions shell fragments via subprocess.run(['bash','-c',...]) resolve 'bash' to C:\\\\Windows\\\\System32\\\\bash.exe - the WSL launcher stub - which has no distro installed. It exits 1 and prints its usage text in UTF-16LE, which is why assertions read as 'W\\\\x00i\\\\x00n\\\\x00d\\\\x00o\\\\x00w\\\\x00s\\\\x00 \\\\x00S\\\\x00u\\\\x00b\\\\x00s\\\\x00y\\\\x00s\\\\x00t\\\\x00e\\\\x00m...' (decodes to 'Windows Subsystem for Linux ... <Distro> to install.'). Affected: tests/unit/workflows/test_pr_workflow_path_classifier.py (8), tests/unit/workflows/test_validate_submission_changed_bundles.py (2-4), tests/unit/test_release_infrastructure.py. Evidence: Nightly run 30473819253, both Windows jobs. NOTE: an earlier triage misread this family as a missing encoding='utf-8'; the interpreter is wrong, not the decoding.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci-failure-reduction",
+      "created_at": "2026-07-30T01:08:48Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Assertions on shell-fragment behavior stay exact; Linux/macOS keep using PATH bash",
+        "item_id": "windows-nightly-bash-resolves-to-wsl-stub"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-nightly-bash-resolves-to-wsl-stub",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! rg -n \"subprocess.run\\(\\[.bash.,\" tests/unit/workflows tests/unit/test_release_infrastructure.py",
+        "description": "no test resolves bare 'bash' via PATH for workflow-shell execution",
+        "expected": "exit 0 when all call sites use the resolver",
+        "item_id": "windows-nightly-bash-resolves-to-wsl-stub",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

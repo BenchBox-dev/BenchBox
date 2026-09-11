@@ -1,0 +1,177 @@
+{
+  "context": "Extract-with-generics. The two benchmark classes are not identical; they\nparameterize over different ResultT / OperationT. The extraction must\npreserve that parameterization, not collapse it.\n\nSequence each migration: introduce base, migrate ONE family, run tests,\ncommit; then migrate the second family. Do not bundle. The reason the\nparent dedup TODO refused to touch this was bundle risk.\n",
+  "description": "Quality plan supplement - duplication workstream follow-up. Tracks\nresidual R-08 from\n`quality-consolidate-duplicate-code-clusters` (see\ndocs/development/duplication-residuals.md).\n\n`transaction_primitives` and `write_primitives` ship near-identical\n`Benchmark` and `Operations` base classes - operation registry,\ndispatch, reporting scaffolding - but with type signatures parameterized\nover benchmark-specific result/operation types. Inventory measured the\nduplication at three clusters: 101, 93, and 71 lines (~265 lines total)\nacross two 1300+ line files.\n\nThe dedup TODO deliberately deferred this because:\n  - Multi-day refactor (extraction needs generics over the\n    result/operation type parameter, plus a shared registry contract)\n  - Touches benchmark execution path used by ACID tests - non-trivial\n    test surface\n  - Per-cluster scope of the parent dedup TODO was capped at ≤4 hours\n\nThis TODO does the extraction in reviewable slices and is the explicit\ndestination flagged by R-08.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change benchmark semantics during extraction",
+        "instead": "structural moves only",
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "why": "that's a separate concern"
+      },
+      {
+        "dont": "collapse ResultT / OperationT into a single concrete type",
+        "instead": "keep generics",
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "why": "that loses type safety the existing classes provide"
+      },
+      {
+        "dont": "extract methods that genuinely differ between the two families",
+        "instead": "the survey in w1 must classify each method as shared vs divergent",
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "why": "the diff exists for a reason"
+      },
+      {
+        "dont": "migrate both families in one commit",
+        "instead": "one commit per family",
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "why": "review needs to see each migration in isolation"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "needs_item": "quality-consolidate-duplicate-code-clusters"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "created_at": "2026-04-13T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ACID test results unchanged at every scale factor",
+        "item_id": "quality-extract-transactional-benchmark-base"
+      },
+      {
+        "behavior": "All transaction_primitives + write_primitives tests pass on every backend (DuckDB / Postgres / SQLite at minimum)",
+        "item_id": "quality-extract-transactional-benchmark-base"
+      },
+      {
+        "behavior": "Result-model field names and types unchanged on the public surface (only the implementation moves)",
+        "item_id": "quality-extract-transactional-benchmark-base"
+      },
+      {
+        "behavior": "Runtime behavior of every transaction_primitives + write_primitives benchmark unchanged",
+        "item_id": "quality-extract-transactional-benchmark-base"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --with pylint --with pandas --with polars pylint --disable=all --enable=duplicate-code --min-similarity-lines=15 benchbox/core/transaction_primitives/benchmark.py benchbox/core/transaction_primitives/operations.py benchbox/core/write_primitives/benchmark.py benchbox/core/write_primitives/operations.py 2>&1 | grep -c 'R0801'",
+        "description": "Pylint R0801 count drops to 0 in the four target files (catalog/schema/dataframe_ops files are out-of-scope and retain pre-existing clusters)",
+        "expected": "0",
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/transaction_primitives/ tests/unit/core/write_primitives/ -q",
+        "description": "Transaction primitives tests pass",
+        "expected": "all tests pass",
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox run --platform duckdb --benchmark transaction_primitives --scale 0.01 --dry-run /tmp/preview",
+        "description": "ACID test runs cleanly on DuckDB",
+        "expected": "preview generated, no error",
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Survey both Benchmark + Operations classes side-by-side: produce diff table of (shared method, divergent method, divergent type signature). Identify the minimal generic surface.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Introduce TransactionalBenchmarkBase[ResultT, OperationT] under benchbox/core/transactional/. Migrate transaction_primitives.Benchmark to inherit; one commit.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate write_primitives.Benchmark onto TransactionalBenchmarkBase[ResultT, OperationT]; verify type params bind cleanly. One commit.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Introduce OperationsRegistryBase[OperationT]; migrate transaction_primitives.Operations and write_primitives.Operations one at a time.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-extract-transactional-benchmark-base",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-run pylint duplicate-code at 15-line threshold over both modules; confirm the three R-08 clusters drop out. Update docs/development/duplication-residuals.md.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

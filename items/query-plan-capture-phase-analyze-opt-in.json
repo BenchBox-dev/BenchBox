@@ -1,0 +1,220 @@
+{
+  "context": "Smallest viable change: run_plan_capture_phase already accepts analyze_plans, so\nthe work is (1) pick the opt-in surface (prefer a new plan_capture_analyze flag\nto avoid disturbing the structural-only default), (2) pass it through\n_capture_plans_post_measurement, (3) parse/store it from the CLI. Lean on the\nexisting is_dml_query guard for DML safety rather than adding new write\ndetection.\n",
+  "description": "As of #805, plan capture for phase-eligible engines (DuckDB, MotherDuck,\nSQLite, DataFusion, PostgreSQL, Redshift) runs in an isolated post-measurement\nphase that is STRUCTURAL-ONLY: `_capture_plans_post_measurement` calls\n`run_plan_capture_phase(..., analyze_plans=False)` unconditionally. This is the\nintended default (no re-execution cost, DML runs exactly once), and the\nstructural `plan_fingerprint` is unaffected.\n\nThe trade-off: captured `query_plan` objects for these engines no longer carry\nACTUAL per-operator timing/cardinality (the `EXPLAIN ANALYZE` stats). Before\n#805, `benchbox run --platform duckdb --capture-plans` (with the default\n`analyze_plans=true`) produced ANALYZE plans inline. `--platform-option\nanalyze_plans=true` is now effectively ignored by the phase, so there is no way\nto get actual-stats plans for eligible engines.\n\nThis TODO adds an explicit opt-in that re-enables ANALYZE capture IN THE PHASE,\nwhile preserving the structural-only default and the DML-exactly-once guarantee\n(the shared `is_dml_query` guard already downgrades writes to non-ANALYZE\nEXPLAIN even when ANALYZE is requested, so DML is never re-executed). ANALYZE\nin the phase re-executes SELECTs once post-measurement — off the timed path —\nso it costs roughly 1x query time per captured SELECT, paid only when opted in.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a second DML guard",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "why": "is_dml_query already downgrades writes even under ANALYZE; reuse it."
+      },
+      {
+        "dont": "move ANALYZE re-execution onto the measurement path",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "why": "it belongs strictly in the post-measurement phase."
+      },
+      {
+        "dont": "reuse analyze_plans (default True) as the phase opt-in without care",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "why": "it would silently revert the #805 structural-only default to ~1x-cost capture for every eligible engine."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "needs_item": "query-plan-capture-isolation-phase-design"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-06-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DML/write-DDL runs exactly once even with ANALYZE opted in (is_dml_query downgrade).",
+        "item_id": "query-plan-capture-phase-analyze-opt-in"
+      },
+      {
+        "behavior": "Measurement timings are unaffected — ANALYZE re-execution happens only in the post-measurement phase, never on the timed path.",
+        "item_id": "query-plan-capture-phase-analyze-opt-in"
+      },
+      {
+        "behavior": "Structural-only remains the DEFAULT for the phase (the #805 behavior) — the opt-in must be off unless explicitly requested.",
+        "item_id": "query-plan-capture-phase-analyze-opt-in"
+      },
+      {
+        "behavior": "plan_fingerprint values are unchanged whether or not ANALYZE is used (fingerprint excludes timing/cardinality).",
+        "item_id": "query-plan-capture-phase-analyze-opt-in"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/commands/run.py:2584 — existing --platform-option analyze_plans help text; CLI surface to extend or reuse",
+        "decision": "extend",
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "path": "benchbox/cli/commands/run.py:2584"
+      },
+      {
+        "concept": "benchbox/core/plan_capture_phase.py:run_plan_capture_phase — already accepts analyze_plans=<bool>; no signature change needed",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "path": "benchbox/core/plan_capture_phase.py:run_plan_capture_phase"
+      },
+      {
+        "concept": "benchbox/platforms/base/adapter.py:138 — self.analyze_plans = config.get('analyze_plans', True); existing platform-option already parsed",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "path": "benchbox/platforms/base/adapter.py:138"
+      },
+      {
+        "concept": "benchbox/platforms/base/execution.py:_capture_plans_post_measurement (~line 1457) — calls run_plan_capture_phase(analyze_plans=False); the single place to thread the opt-in",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "path": "benchbox/platforms/base/execution.py:_capture_plans_post_measurement"
+      },
+      {
+        "concept": "benchbox/platforms/base/result_capture.py:is_dml_query — downgrades DML/write-DDL to non-ANALYZE even when analyze=True, preserving DML-once",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "path": "benchbox/platforms/base/result_capture.py:is_dml_query"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/query-plan-capture-phase-analyze-opt-in.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "kind": "only_modify",
+        "path_glob": "docs/features/query-plan-analysis.md"
+      },
+      {
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_plan_capture_phase.py -k analyze -v",
+        "description": "Opt-in captures ANALYZE stats; default stays structural",
+        "expected": "opt-in run shows actual operator timing/cardinality; default run does not; DML row count unchanged",
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_plan_capture_phase.py tests/integration/test_plan_capture_e2e.py -v",
+        "description": "Existing plan-capture suite still passes",
+        "expected": "all pass",
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "notes": "Choose between (a) a new dedicated setting `plan_capture_analyze` (default\nFalse) decoupled from `analyze_plans`, or (b) reusing the existing\n`analyze_plans` platform-option to drive the phase. Recommendation: (a) — a\nnew flag keeps the #805 structural-only DEFAULT intact (analyze_plans\ndefaults to True, so reusing it would silently revert #805 to ~1x-cost\ncapture by default). Document the chosen semantics.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide the opt-in surface (resolve the gating open_question)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "notes": "Pass analyze_plans=<opt-in value> (default False) into run_plan_capture_phase\nfrom _capture_plans_post_measurement. No change to run_plan_capture_phase\nitself (it already supports analyze_plans). Update the helper docstring.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Thread the opt-in through _capture_plans_post_measurement",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "notes": "Register the chosen flag (CLI flag or --platform-option key) in\nbenchbox/cli/commands/run.py and store it on the adapter (alongside the\nexisting plan-capture settings in PlatformAdapter.__init__). Default off.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wire the opt-in from CLI/config onto the adapter",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "notes": "DuckDB file-based (extend tests/integration/test_plan_capture_phase.py):\n  - opt-in ON: captured plan for a SELECT carries actual operator\n    timing/cardinality (ANALYZE fields present in the parsed DAG).\n  - opt-in OFF (default): plan is structural-only (no ANALYZE fields) —\n    guards the #805 default.\n  - DML query with opt-in ON: row count unchanged (is_dml_query still\n    downgrades to non-ANALYZE → executed exactly once).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Tests: opt-in yields ANALYZE plans; default stays structural; DML still once",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-phase-analyze-opt-in",
+        "notes": "Update docs/features/query-plan-analysis.md \"Capture Isolation\n(post-measurement phase)\" to describe the opt-in: structural-only by\ndefault; opt-in re-enables ANALYZE (≈1x query cost per SELECT, paid\npost-measurement); DML always runs once regardless.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Docs: document the ANALYZE opt-in and its cost/DML-safety",
+        "wid": "w5"
+      }
+    ]
+  }
+}

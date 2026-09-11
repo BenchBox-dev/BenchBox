@@ -1,0 +1,208 @@
+{
+  "context": "Retarget validate_blind_spot.py to the drafts directory and teach it the optional fields; rewrite .claude/commands/blind-spot.md to write drafts there while KEEPING the §2 defect gate and class-not-instance step verbatim. Validator must stay green over all 67 legacy records (they are the phase-5 import corpus). Existing _project/blind-spots/ tree is untouched in this phase — capture just stops adding to it.",
+  "description": "Move blind-spot capture out of the Git tree with zero new storage tech. New drafts go to ~/.benchbox/finding-drafts/ (outside every worktree; survives worktree churn; per-machine). The existing Markdown schema IS the offline draft format — this satisfies requirement 4 (no new records in Git) and requirement 5 (zero-credential capture) before any database work exists, and it is exactly the local file write review-protocol §4 authorizes. Frontmatter gains OPTIONAL fields only: observed_sha (provenance, not lookup), evidence (list of {path, pattern, note} — grep-pattern-based per the suggested_sweep precedent; line ranges permitted but discouraged since existing records almost never carry line numbers and they rot), urgency/breadth/confidence (set at triage, never required at capture). Required field set is UNCHANGED (id, date, status, finding_kind, review_context) — the adversarial review found mandatory capture-time judgment fields would raise friction and launder guesses into planning order. Filename stem (YYYY-MM-DD-HHMMSS-slug, collision-suffixed) remains the record id and becomes the sync idempotency key in phase 3.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add a SQLite outbox or any new storage format for drafts",
+        "instead": "Draft files in ~/.benchbox/finding-drafts/, validated by the existing validator",
+        "item_id": "findings-phase1-capture-redirect",
+        "why": "A second schema'd store drifts against server migrations and re-creates the rejected consistency system; the Markdown file + validator already implement offline capture"
+      },
+      {
+        "dont": "Make urgency/effort/confidence required at capture",
+        "instead": "Optional at capture, assigned at triage (phase 3 'todo finding triage')",
+        "item_id": "findings-phase1-capture-redirect",
+        "why": "Reviewing agents would fabricate values mid-review to satisfy the schema; capture friction cuts capture rates"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "findings-phase1-capture-redirect",
+        "needs_item": "findings-phase0-governance"
+      }
+    ],
+    "item_meta": {
+      "category": "capture",
+      "completed_at": "2026-07-22T22:54:40Z",
+      "completed_pr": 1271,
+      "created_at": "2026-07-22T12:50:50Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "All 67 legacy records still validate (phase-5 import depends on this)",
+        "item_id": "findings-phase1-capture-redirect"
+      },
+      {
+        "behavior": "Capture works with no credentials and no network",
+        "item_id": "findings-phase1-capture-redirect"
+      },
+      {
+        "behavior": "Defect gate and class-not-instance judgment steps in the capture command",
+        "item_id": "findings-phase1-capture-redirect"
+      },
+      {
+        "behavior": "Required capture fields exactly: id, date, status, finding_kind, review_context — no judgment fields required at capture",
+        "item_id": "findings-phase1-capture-redirect"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Defect gate + class-not-instance at the capture entrypoint — retained verbatim",
+        "decision": "extend",
+        "item_id": "findings-phase1-capture-redirect",
+        "path": ".claude/commands/blind-spot.md:14-27"
+      },
+      {
+        "concept": "The schema's own missing measured_at_sha provenance field — observed_sha lands as optional frontmatter",
+        "decision": "extend",
+        "item_id": "findings-phase1-capture-redirect",
+        "path": "_project/blind-spots/2026-07-18-190500-evidence-tree-sha-provenance-mismatch.md:37"
+      },
+      {
+        "concept": "Minimal 5-field capture schema + 3-section body — same schema, new location, optional provenance/evidence fields",
+        "decision": "extend",
+        "item_id": "findings-phase1-capture-redirect",
+        "path": "_project/blind-spots/README.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-phase1-capture-redirect",
+        "kind": "do_not_modify",
+        "path_glob": "_project/blind-spots/**"
+      },
+      {
+        "item_id": "findings-phase1-capture-redirect",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/sweep_blind_spots.py"
+      },
+      {
+        "item_id": "findings-phase1-capture-redirect",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-phase1-capture-redirect",
+        "kind": "only_modify",
+        "path_glob": ".claude/commands/blind-spot.md"
+      },
+      {
+        "item_id": "findings-phase1-capture-redirect",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "findings-phase1-capture-redirect",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/validate_blind_spot.py"
+      },
+      {
+        "item_id": "findings-phase1-capture-redirect",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_blind_spot_tools.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_blind_spot_tools.py -q",
+        "description": "Full blind-spot tool test suite green",
+        "expected": "all passed",
+        "item_id": "findings-phase1-capture-redirect",
+        "last_result": "pass",
+        "last_run": "2026-07-22T22:43:10Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/validate_blind_spot.py --all",
+        "description": "Legacy corpus still validates",
+        "expected": "67 records valid, exit 0",
+        "item_id": "findings-phase1-capture-redirect",
+        "last_result": "pass",
+        "last_run": "2026-07-22T22:43:12Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "env -u TODO_DB_URL -u TODO_DB_AUTH_TOKEN uv run --project _project/scripts -- python _project/scripts/validate_blind_spot.py --drafts-dir ~/.benchbox/finding-drafts",
+        "description": "Zero-credential capture round-trip",
+        "expected": "exit 0",
+        "item_id": "findings-phase1-capture-redirect",
+        "last_result": "pass",
+        "last_run": "2026-07-22T22:43:14Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-phase1-capture-redirect",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "findings-phase1-capture-redirect",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "findings-phase1-capture-redirect",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "findings-phase1-capture-redirect",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "validate_blind_spot.py: added --drafts-dir mode (default ~/.benchbox/finding-drafts; absent/empty dir exits 0, zero-credential); OPTIONAL_FIELDS += observed_sha/evidence/urgency/breadth/confidence with shape checks (_check_evidence: list of {path(req),pattern,note,line_start,line_end}, unknown-key rejection; _check_judgment_fields: str|int); unknown-field rejection + required set unchanged.",
+        "item_id": "findings-phase1-capture-redirect",
+        "notes": null,
+        "started_at": "2026-07-22T22:45:08Z",
+        "started_branch": "claude/findings-domain-batch-wvbod8",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "validate_blind_spot.py: --drafts-dir target; optional observed_sha/evidence/urgency/breadth/confidence shape checks; keep unknown-field rejection otherwise",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Rewrote .claude/commands/blind-spot.md: capture to ~/.benchbox/finding-drafts/ (mkdir -p), defect gate + class-not-instance step kept verbatim, optional provenance fields documented, triage fields left unset at capture, Recorded: <path> terminal line kept, explicit 'do not write into tracker DB; todo finding sync is separate' per review-protocol §4.",
+        "item_id": "findings-phase1-capture-redirect",
+        "notes": null,
+        "started_at": "2026-07-22T22:45:10Z",
+        "started_branch": "claude/findings-domain-batch-wvbod8",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Rewrite .claude/commands/blind-spot.md: drafts dir, defect gate + class-not-instance verbatim, 'Recorded: <path>' terminal line unchanged",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Validator green over full legacy corpus: validate_blind_spot.py --all -> 'All 64 file(s) valid' exit 0 (design-time count 67; this checkout has 64 tracked records). New optional fields are additive; existing records unaffected.",
+        "item_id": "findings-phase1-capture-redirect",
+        "notes": null,
+        "started_at": "2026-07-22T22:45:13Z",
+        "started_branch": "claude/findings-domain-batch-wvbod8",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Validator green over all 67 legacy records (phase-5 import corpus regression)",
+        "wid": "w3"
+      },
+      {
+        "evidence": "tests/unit/scripts/test_blind_spot_tools.py (fast): 9 new tests — optional-field acceptance, evidence-shape/unknown-key/non-list/judgment-field rejection, drafts-dir absent-zero-credential/valid-draft/invalid-draft; updated command test (~/.benchbox/finding-drafts present, no-direct-DB-write). Fast lane tripped (25481>25480) -> bumped fast_test_lane_policy.json cap 25480->25500 + composed note. seq1 26 passed; lint-markers pass.",
+        "item_id": "findings-phase1-capture-redirect",
+        "notes": null,
+        "started_at": "2026-07-22T22:45:15Z",
+        "started_branch": "claude/findings-domain-batch-wvbod8",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Unit tests: optional fields + credential-less round-trip; pytestmark per marker policy; bump fast-lane cap if tripped",
+        "wid": "w4"
+      }
+    ]
+  }
+}

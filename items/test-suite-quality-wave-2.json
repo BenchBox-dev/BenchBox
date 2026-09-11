@@ -1,0 +1,196 @@
+{
+  "description": "Follow-up to remediate-coverage-theater (completed 2026-03-05). That work\nremoved the worst offenders (17 hollow files, enforcement scripts) and added\nreal connection tests. This TODO addresses the remaining systemic issues\nfound in the post-remediation audit:\n\nCurrent state (2026-03-06):\n- 13,350 \"fast\" tests take 25+ minutes single-threaded (should be <5 min)\n- 3,350 trivial assertions (isinstance, is not None, len > 0) across suite\n- 1,605 MagicMock instances across 321 files (top 2 replaceable: 124 mocks)\n- Root conftest.py is 746 lines combining unrelated concerns\n- 9 avoidable time.sleep calls in test_tpc_compliance.py\n- 5 thin test files (<200 lines) that should merge into their main adapter files\n- 79 hollow isinstance assertions in 4 files testing guaranteed return types\n\nSeven work units across three phases:\nPhase 1 (independent): fast suite profiling, sleep removal, assertion strengthening\nPhase 2 (depends on w2): isinstance cleanup, MagicMock reduction\nPhase 3 (depends on w1): conftest decomposition, test file consolidation",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add new MagicMock usage",
+        "instead": "use real objects or monkeypatch",
+        "item_id": "test-suite-quality-wave-2",
+        "why": "the suite already has 1,605 instances and mock density is a known problem"
+      },
+      {
+        "dont": "attempt MagicMock reduction in cloud-only platform tests",
+        "instead": "mocking is the correct approach for those",
+        "item_id": "test-suite-quality-wave-2",
+        "why": "Snowflake/BigQuery/Databricks/etc. have no local alternative"
+      },
+      {
+        "dont": "delete test files without merging their tests first",
+        "instead": "move tests to the target file, then delete the source",
+        "item_id": "test-suite-quality-wave-2",
+        "why": "every test file in scope has real value"
+      },
+      {
+        "dont": "move fixtures without verifying scope",
+        "instead": "run affected tests after each fixture move",
+        "item_id": "test-suite-quality-wave-2",
+        "why": "conftest.py fixtures are auto-discovered by pytest scope and moving them changes availability"
+      },
+      {
+        "dont": "replace meaningful isinstance assertions",
+        "instead": "only replace where the return type is guaranteed by the function signature",
+        "item_id": "test-suite-quality-wave-2",
+        "why": "expression wrapper types (UnifiedExpr, pl.Expr) and C binary wrapper types are API contracts"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "test-suite-quality-wave-2",
+        "id": 271,
+        "reason": "Mostly cloud-only platforms where mocking is unavoidable. Address opportunistically when those adapters are modified for other work.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Vague, large-scope 'opportunistic' MagicMock reduction across ~319 cloud-only-platform test files with no concrete plan or owner.",
+        "summary": "Reduce MagicMock in remaining 319 files (~1,460 instances after w6)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "test-suite-quality-wave-2",
+        "id": 272,
+        "reason": "Only ~23 assertions in mixed category. Diminishing returns after w4 handles the 79 clearly hollow ones.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicit diminishing-returns call on ~23 mixed assertions after the 79 clearly hollow ones were fixed in w4; not worth a separate item.",
+        "summary": "Strengthen isinstance in meaningful-but-weak files (test_system_info.py mixed assertions)"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-03-23T00:00:00Z",
+      "created_at": "2026-03-06T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing tests must continue to pass - marker changes only affect which suite they run in",
+        "item_id": "test-suite-quality-wave-2"
+      },
+      {
+        "behavior": "CI fast suite (make test-fast) must still work with updated markers",
+        "item_id": "test-suite-quality-wave-2"
+      },
+      {
+        "behavior": "Cloud platform test files must keep MagicMock - no real connection alternative exists for Snowflake, BigQuery, Databricks, etc.",
+        "item_id": "test-suite-quality-wave-2"
+      },
+      {
+        "behavior": "Consolidated tests must preserve all test methods - merge means zero test loss",
+        "item_id": "test-suite-quality-wave-2"
+      },
+      {
+        "behavior": "Meaningful isinstance assertions must be kept - only replace hollow ones where the type is guaranteed by the function signature",
+        "item_id": "test-suite-quality-wave-2"
+      },
+      {
+        "behavior": "Root conftest parallel locking behavior must be preserved across the split",
+        "item_id": "test-suite-quality-wave-2"
+      },
+      {
+        "behavior": "tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py must be kept (has real Polars execution)",
+        "item_id": "test-suite-quality-wave-2"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "test-suite-quality-wave-2",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "test-suite-quality-wave-2",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "test-suite-quality-wave-2",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "test-suite-quality-wave-2",
+        "needs_wid": "w1",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "test-suite-quality-wave-2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Profile fast suite to identify tests falsely marked fast, and fix markers",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "test-suite-quality-wave-2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Strengthen assertions in the 5 worst is-not-None-heavy test files",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "test-suite-quality-wave-2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove 9 avoidable time.sleep calls from test_tpc_compliance.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "test-suite-quality-wave-2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace hollow isinstance assertions in 4 files with behavioral checks",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "test-suite-quality-wave-2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consolidate 5 thin platform test files into their main adapter test files",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "test-suite-quality-wave-2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace MagicMock with real connections in test_platform_adapters_coverage_wave_remaining.py and test_dataframe_runner.py",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "test-suite-quality-wave-2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Split root conftest.py into domain-specific conftest files",
+        "wid": "w7"
+      }
+    ]
+  }
+}

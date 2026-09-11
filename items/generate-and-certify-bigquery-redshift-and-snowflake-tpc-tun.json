@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #140 of databricks-tpc-liquid-clustering-profile-rendering.\nDeferred: Generate and certify BigQuery, Redshift, and Snowflake TPC tuned templates from the logical profile\nReason deferred: This TODO must keep the Databricks Liquid rendering gap focused while preserving generalized profile semantics.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:05Z",
+      "worktree": "main"
+    }
+  }
+}

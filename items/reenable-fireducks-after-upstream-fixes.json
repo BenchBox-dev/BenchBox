@@ -1,0 +1,167 @@
+{
+  "context": "Follow existing optional-adapter patterns used by other DataFrame platforms,\nbut avoid eager imports that can crash process startup. Prefer lazy loading\nwith robust fallback on import failure.\n",
+  "description": "FireDucks support is intentionally disabled due to runtime instability in local\nexecution environments (native crash behavior during import/use).\n\nRe-enable only after upstream publishes a stable release that resolves known\ncrash conditions and can pass BenchBox validation in supported environments.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "advertise FireDucks in docs/CLI until validation passes",
+        "instead": "gate public exposure on verification completion",
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "why": "users will treat it as production-ready"
+      },
+      {
+        "dont": "re-enable FireDucks via eager module import",
+        "instead": "use deferred import paths and guarded checks",
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "why": "native crashes can terminate process startup"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Current DataFrame platform routing and availability checks remain stable for polars-df, pandas-df, modin-df, cudf-df, dask-df, datafusion-df, bodo-df, and pyspark-df",
+        "item_id": "reenable-fireducks-after-upstream-fixes"
+      },
+      {
+        "behavior": "benchbox CLI startup and platform listing do not crash when optional DataFrame dependencies are unavailable",
+        "item_id": "reenable-fireducks-after-upstream-fixes"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/adapter_factory.py"
+      },
+      {
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/"
+      },
+      {
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "kind": "only_modify",
+        "path_glob": "examples/tunings/dataframe/"
+      },
+      {
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/dataframe/"
+      },
+      {
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_dataframe_factory.py tests/unit/platforms/dataframe/test_pandas_family_adapters.py -q",
+        "description": "Core DataFrame platform listing remains stable without FireDucks crashes",
+        "expected": "All tests pass with 0 failures",
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/test_fireducks_df.py -n 0 -q",
+        "description": "FireDucks-specific tests pass once re-enabled in supported environment",
+        "expected": "Exit code 0 in validated environment",
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Track upstream FireDucks release notes/issues and define re-enable criteria",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reintroduce adapter and platform routing behind a guarded availability path",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Restore FireDucks dependency extras, docs/examples, and platform metadata",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-fireducks-after-upstream-fixes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add/restore unit and integration coverage and verify no regression in non-FireDucks flows",
+        "wid": "w4"
+      }
+    ]
+  }
+}

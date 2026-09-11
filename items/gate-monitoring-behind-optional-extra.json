@@ -1,0 +1,194 @@
+{
+  "context": "Wheel exclusion via [tool.setuptools.packages.find] exclude (NOT MANIFEST.in)\n+ optional-extra marker + conditional imports. No new packages, no\nextraction, no compatibility shims. If wheel exclusion UX is unsatisfactory\n(confirmed in w1a), fall back to conditional imports only (w2, w3).\n",
+  "description": "The `benchbox.monitoring` package (~2,000 lines) ships in the installable\nwheel and is auto-enabled by the runner. It has only one external dependency\n(`benchbox.utils.clock.mono_time`) and integrates with 3 core files\n(runner.py, dataframe_runner.py, progress.py).\n\nThe coupling is light, but monitoring ships to all users even though it is\nnot required for core benchmarking. The proportionate fix is to:\n\n1. Exclude `benchbox.monitoring` from the default wheel by adding it to the\n   `exclude` list in `[tool.setuptools.packages.find]` in pyproject.toml.\n   NOTE: MANIFEST.in controls sdist content only, not wheel content.\n2. Add a `monitoring = []` optional extra in pyproject.toml as an intent\n   marker. This signals the feature exists and reserves the extra name for\n   a future separate distribution. It cannot re-include excluded wheel\n   content - users who want monitoring from a wheel install would need a\n   separate package or a source checkout.\n3. Make the runner's monitoring imports conditional (graceful degradation\n   when monitoring is not importable).\n\nSimpler alternative: skip step 1 (keep monitoring in the wheel) and only\ndo step 3. This achieves graceful degradation without any packaging\ncomplexity. Choose this path if the packaging investigation (w1a) reveals\nthe wheel-exclusion UX is not worth the tradeoff.\n\nA full standalone `runwatch` package is not justified for ~2,000 lines with\none consumer.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add monitoring = [] optional extra expecting it to re-include excluded wheel content",
+        "instead": "(not specified)",
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "why": "pip extras add dependencies, not source files; this extra is a marker only"
+      },
+      {
+        "dont": "change report schemas or timing keys as part of this work",
+        "instead": "(not specified)",
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "create a standalone runwatch package",
+        "instead": "(not specified)",
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "why": "~2,000 lines with one consumer does not justify a separate distribution"
+      },
+      {
+        "dont": "remove monitoring source code from the repo",
+        "instead": "(not specified)",
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "why": "it stays for development, just excluded from the default wheel"
+      },
+      {
+        "dont": "use MANIFEST.in for wheel exclusion",
+        "instead": "(not specified)",
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "why": "MANIFEST.in controls sdist content only; wheel exclusion requires [tool.setuptools.packages.find] exclude in pyproject.toml"
+      }
+    ],
+    "item_meta": {
+      "category": "Packaging",
+      "completed_at": "2026-03-27T00:00:00Z",
+      "created_at": "2026-03-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Core benchmark execution works without monitoring installed",
+        "item_id": "gate-monitoring-behind-optional-extra"
+      },
+      {
+        "behavior": "Existing monitoring test coverage runs from source checkout",
+        "item_id": "gate-monitoring-behind-optional-extra"
+      },
+      {
+        "behavior": "Monitoring behavior unchanged when benchbox[monitoring] is installed",
+        "item_id": "gate-monitoring-behind-optional-extra"
+      },
+      {
+        "behavior": "No added daemon, service, or network requirement for local runs",
+        "item_id": "gate-monitoring-behind-optional-extra"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/progress.py"
+      },
+      {
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/monitoring/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/monitoring/ -q",
+        "description": "Monitoring unit tests still pass from source checkout",
+        "expected": "All tests pass",
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands/test_cli_report.py tests/unit/mcp/test_observability.py -q",
+        "description": "CLI and MCP observability integrations still work",
+        "expected": "All tests pass",
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/runner/ -q",
+        "description": "Core benchmark execution tests pass (monitoring not required)",
+        "expected": "All tests pass",
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv build --wheel && unzip -l dist/*.whl | grep monitoring | wc -l",
+        "description": "Wheel does not contain benchbox/monitoring (if wheel exclusion chosen)",
+        "expected": "0",
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "notes": "Decision: skip wheel exclusion (w2). benchbox.monitoring has no external\ndependencies, so wheel exclusion provides no install-size or dependency\nbenefit worth the confusing `monitoring = []` extra that installs nothing\n(pip extras add dependencies, not source files). Proceeding with\nconditional imports only (w3, w4) - this achieves graceful degradation\nwithout packaging complexity.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research correct wheel-exclusion mechanism and decide on scope",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "notes": "In pyproject.toml [tool.setuptools.packages.find]:\n  Add `\"benchbox.monitoring\"` and `\"benchbox.monitoring.*\"` to the\n  `exclude` list (alongside existing `benchbox.release` entries).\nIn pyproject.toml [project.optional-dependencies]:\n  Add `monitoring = []` as an intent marker. This is a placeholder - it\n  cannot re-include excluded wheel content without a separate distribution.\n  It reserves the extra name and signals the feature exists.\nDo NOT edit MANIFEST.in - it has no effect on wheel content.\nVerify exclusion: `uv build --wheel && unzip -l dist/*.whl | grep -c monitoring`\nshould return 0.\nSkip this unit entirely if w1 decides wheel exclusion is not worth it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply packaging changes: exclude monitoring from wheel, add optional extra marker",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "notes": "In runner.py, dataframe_runner.py, and progress.py: wrap monitoring\nimports in try/except ImportError. Fall back to a no-op stub when\nmonitoring is not importable. This extends the existing monitoring-disabled\nconfig path.\nIf w1 decided to skip wheel exclusion, change this unit's needs to []\n(no dependency on w2) and start here directly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make monitoring imports conditional in runner and progress",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "gate-monitoring-behind-optional-extra",
+        "notes": "Ensure monitoring tests still pass from source checkout. Add a test\nthat verifies core benchmark execution works when monitoring is not\nimportable (mock the ImportError path).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update tests to cover both with-monitoring and without-monitoring paths",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "context": "Two candidate mitigations, pick per maintainer preference. (a) Make the version gate degrade gracefully: allow read-only subcommands (list/show/stats/ready/export) to run against an older-but-forward-compatible schema and fail only on writes, so a pending migration never blinds every session. (b) Add a CI check that fails a PR touching todo_db.py's schema version unless the migration has been applied to the hosted DB, or auto-applies it on merge. (a) is the smaller blast radius and is what actually hurt here - the outage was mostly lost read access. Either way, record the decision so the next bump does not repeat it.",
+  "description": "PR #1347 (74aee99, 'feat/findings schema v4') bumped _project/scripts/todo_db.py to n=4 while the hosted benchbox-todo DB was still schema_version=3. Because the version check runs before every subcommand, EVERY todo command on develop failed - including read-only list/stats/show - with 'database schema_version=3, CLI expects 4; run todo migrate to upgrade it'. The tracker is the project's only TODO record, so the window between merging a CLI bump and someone manually running migrate is a total tracker outage for all sessions. Observed live on 2026-07-30; resolved by running todo migrate, which reported 'schema v4: up to date'. AGENTS.md already states the general principle: 'A drift/pinning guard and its required-CI wiring must land in the same PR.' No existing item covers this (migrate-hosted-tracker-db-to-todo-db-0-3-schema is the separate 0.3 cutover).",
+  "legacy": {
+    "item_meta": {
+      "category": "todo-db",
+      "created_at": "2026-07-30T12:06:18Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Writes must still refuse to run against a schema the CLI does not understand; no silent data corruption",
+        "item_id": "todo-cli-schema-bump-must-ship-with-db-migration"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-cli-schema-bump-must-ship-with-db-migration",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "todo-cli-schema-bump-must-ship-with-db-migration",
+        "kind": "only_modify",
+        "path_glob": "_project/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts -k todo -q",
+        "description": "read-only subcommands survive a CLI-ahead-of-DB skew, or CI blocks the bump",
+        "expected": "exit 0",
+        "item_id": "todo-cli-schema-bump-must-ship-with-db-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

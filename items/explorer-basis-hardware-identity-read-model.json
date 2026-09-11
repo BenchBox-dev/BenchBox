@@ -1,0 +1,385 @@
+{
+  "context": "Capture CPU vendor and model in the bundle environment at run time, normalise a small closed CPU-family vocabulary in the pipeline, and expose architecture, CPU family, CPU model and engine version as separate snapshot columns and separate comparability axes.\n\nTreat absence as a first-class state throughout. The overwhelming majority of the committed corpus predates CPU capture and will never have it; those rows must read \"not recorded\" everywhere and must never be back-filled by inference. Deriving a vendor from `arch` is specifically forbidden -- arm64 is not necessarily Graviton, and x86_64 is not necessarily Intel.\n\nSplit the single Environment field in ComparabilityReceipt into per-axis rows so a comparison can report exactly which axis differs, which is what makes a single-variable read possible.",
+  "description": "The explorer cannot answer \"Intel versus Graviton\" because it does not record what CPU a run used. `Environment` in `results-explorer/src/types.ts` carries only {os, arch, cpu_count, memory_gb, python}, and the snapshot table `result_environment` mirrors that. A grep for graviton or intel across `results-explorer/src/` returns nothing.\n\nVerified coverage over the 213 bundles in `results-explorer/public/data/bundles/` (scanned 2026-08-29): arch is arm64 in 103 bundles, x86_64 in 4, and ABSENT IN 106. Half the published corpus records no architecture at all, and the x86_64 population is four bundles.\n\nThat number governs this item. An architecture facet over the current corpus offers 103 versus 4 with 106 unknown, which is a thin and lopsided filter, and a CPU-family facet would be empty because no bundle records a CPU model today. Coverage grows only from new runs forward, because back-filling historical bundles is forbidden.\n\nThe one place the explorer does compare environments treats the whole thing as an opaque string. `ComparabilityReceipt` renders \"Darwin 25.3.0, arm64, 10 CPU, 16 GB, Python 3.12.11\" as a single field compared by string equality, so any difference reports as one undifferentiated \"differs\" and no individual axis can be isolated.\n\nEngine version is in better shape but is not a filter. `platform_version` and `driver_version` exist on DetailResult and PlatformRow and drive run-identity disambiguation in `results-explorer/src/lib/runIdentity.ts`, but `FACET_KEYS` in `results-explorer/src/lib/facetModel.ts` has no version facet and no hardware facet.\n\nThis item captures CPU identity at the source, promotes architecture, CPU family, CPU model and engine version to structured per-axis fields, and splits the opaque Environment comparison into per-axis rows. Whether any of it ships as a visible filter chip is decided by the coverage gate in w0, not assumed here.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add an open-ended free-text CPU string as a facet value.",
+        "instead": "Facet on a small closed normalised family vocabulary and keep the raw model string as display-only detail.",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "why": "Raw CPU strings vary by kernel, hypervisor and locale; facetting on them yields hundreds of one-row buckets and a useless filter."
+      },
+      {
+        "dont": "Back-fill CPU fields into the committed corpus bundles.",
+        "instead": "Leave historical bundles untouched and let coverage grow from new runs forward.",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "why": "Bundles are signed evidence of what a run recorded. Editing them retroactively destroys that property for every downstream consumer."
+      },
+      {
+        "dont": "Derive CPU vendor or family from environment.arch so the corpus looks populated.",
+        "instead": "Record 'not recorded' for every bundle that predates CPU capture, and let the facet count show how thin the coverage really is.",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "why": "arm64 covers Graviton, Ampere and Apple silicon; x86_64 covers Intel and AMD. A guessed vendor would put a fabricated fact under a comparison a reader will act on."
+      },
+      {
+        "dont": "Keep comparing environment as one concatenated string and add hardware chips on top.",
+        "instead": "Split the receipt into per-axis fields so each axis reports its own verdict.",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "why": "A single opaque verdict is exactly what stops a reader isolating one variable, which is the entire point of an Intel-versus-Graviton comparison."
+      },
+      {
+        "dont": "Ship an architecture facet on the strength of the arm64 bucket alone.",
+        "instead": "Apply the w0 coverage gate and defer the chip until the x86_64 population is large enough to compare.",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "why": "Current coverage is 103 arm64 against 4 x86_64 with 106 unknown; a filter that lands almost every row in one bucket implies a comparison the corpus cannot support."
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-29T20:41:53Z",
+      "completed_pr": 1948,
+      "created_at": "2026-08-29T19:12:20Z",
+      "worktree": "explorer-measurement-basis"
+    },
+    "preserves": [
+      {
+        "behavior": "Absent architecture is the majority case in the current corpus (106 of 213 bundles). Every hardware surface must render absence as 'not recorded' and must not treat it as a distinct comparable value.",
+        "item_id": "explorer-basis-hardware-identity-read-model"
+      },
+      {
+        "behavior": "Anonymisation guarantees on exported bundles must hold: capturing a CPU model must not leak a hostname, serial number or any other host identifier.",
+        "item_id": "explorer-basis-hardware-identity-read-model"
+      },
+      {
+        "behavior": "Architecture must keep coming from the recorded environment.arch and must never be inferred from an instance type or a platform name.",
+        "item_id": "explorer-basis-hardware-identity-read-model"
+      },
+      {
+        "behavior": "CPU vendor and family must never be inferred from arch. arm64 does not imply Graviton and x86_64 does not imply Intel.",
+        "item_id": "explorer-basis-hardware-identity-read-model"
+      },
+      {
+        "behavior": "Comparability verdicts that exist today must not flip. Splitting the Environment field may report more axes, but a comparison that reported 'match' on environment must not now report 'differs' for the same two runs.",
+        "item_id": "explorer-basis-hardware-identity-read-model"
+      },
+      {
+        "behavior": "Existing bundles with no CPU information must ingest, display and compare exactly as they do today, reporting 'not recorded' rather than a guessed value.",
+        "item_id": "explorer-basis-hardware-identity-read-model"
+      },
+      {
+        "behavior": "Existing facet URL parameters and their aliases must keep resolving; adding facet keys must not invalidate a shared filter link.",
+        "item_id": "explorer-basis-hardware-identity-read-model"
+      },
+      {
+        "behavior": "The closed CPU-family vocabulary must be a display-and-filter grouping only, never a join, dedup or ranking key.",
+        "item_id": "explorer-basis-hardware-identity-read-model"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "result_environment table and its join into result_detail_metrics is where new hardware columns belong.",
+        "decision": "extend",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "path": "_project/scripts/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "concept": "Existing planning document for moving deployment facets onto the normalized environment/platform contract. This item lands inside that migration rather than beside it; reconcile with its stated direction before adding keys.",
+        "decision": "extend",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "path": "results-explorer/docs/facet-environment-migration.md"
+      },
+      {
+        "concept": "Currently compares environment as one stringified field. Split into per-axis fields so each axis reports match/differs/not-recorded independently.",
+        "decision": "extend",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "path": "results-explorer/src/components/ComparabilityReceipt.tsx"
+      },
+      {
+        "concept": "FACET_KEYS, DEFAULT_FACETS, FACET_URL_KEYS, FACET_URL_ALIASES and the SQL clause builder are the established facet contract. Add architecture, cpu_family and engine_version as new keys in that contract rather than a parallel filter mechanism.",
+        "decision": "extend",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "path": "results-explorer/src/lib/facetModel.ts"
+      },
+      {
+        "concept": "Already uses driver_version/platform_version as the highest-priority disambiguation qualifier for run labels. Reuse its vocabulary so hardware qualifiers read consistently with version qualifiers.",
+        "decision": "extend",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "path": "results-explorer/src/lib/runIdentity.ts"
+      },
+      {
+        "concept": "Open planning item to rewrite explorer transformer.py to typed models. This item adds hardware fields inside the current structure and does not supersede that rewrite.",
+        "decision": "extend",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "path": "todo:rewrite-explorer-transformer-to-use-typed-models-throughout"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/models.py"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/transformer.py"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/explorer-basis-hardware-identity-read-model/"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/explorer-basis-hardware-identity-read-model/*"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/environment*.py"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/environment.py"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/system.py"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/environment*.py"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ComparabilityReceipt.tsx"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RunReceipt.tsx"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/*"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/*"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/facetDisplay.ts"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/facetMatching.ts"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/facetModel.ts"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/queryFilters.ts"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/types.ts"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/*"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- pytest tests/unit/scripts/explorer_pipeline -q",
+        "description": "Pipeline unit tests pass, including CPU normalisation and the unmatched-family case",
+        "expected": null,
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "last_result": "pass",
+        "last_run": "2026-08-29T20:41:29Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test",
+        "description": "Explorer unit tests pass, including facet URL back-compatibility and the receipt no-flip guarantee",
+        "expected": null,
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "last_result": "pass",
+        "last_run": "2026-08-29T20:41:46Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Explorer typechecks after the Environment type and facet key additions",
+        "expected": null,
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "last_result": "pass",
+        "last_run": "2026-08-29T20:41:50Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make explorer-snapshot-check",
+        "description": "Snapshot invariants pass with the new hardware columns",
+        "expected": null,
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "last_result": "pass",
+        "last_run": "2026-08-29T20:41:51Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cat _project/verification-logs/explorer-basis-hardware-identity-read-model/w0.log",
+        "description": "Corpus coverage and facet-usefulness decision are recorded",
+        "expected": null,
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "last_result": "pass",
+        "last_run": "2026-08-29T20:41:51Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Audited all 213 bundles in corpus: 107 with arch (103 arm64, 4 x86_64), 106 absent, 0 with CPU identity fields, 15 (platform, version) pairs. Reconciled with facet-environment-migration.md. Cleared decision gate: landed read-model columns while deferring single-bucket/zero-bucket visible facet chips per gate rules. Verification log recorded at _project/verification-logs/explorer-basis-hardware-identity-read-model/w0.log.",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "notes": "Re-read `results-explorer/docs/facet-environment-migration.md` in full as it stands today and diff its stated direction against this item's plan. That document is a living plan; do not rely on any summary of it, including this description. Record any conflict and resolve it before adding facet keys.\n\nThen measure the committed corpus: how many bundles record arch, how many distinct arch values, how many record any CPU-identifying field at all, and how many distinct (platform, platform_version) pairs exist. Record the numbers in `_project/verification-logs/explorer-basis-hardware-identity-read-model/w0.log`.\n\nDECISION GATE on facet usefulness: if fewer than two distinct values would exist for a proposed facet across the whole corpus, do not ship that facet as a visible chip in this item. Land the read-model column, and note the facet as blocked on corpus coverage. A filter with one bucket is noise.",
+        "started_at": "2026-08-29T20:09:09Z",
+        "started_branch": "feat/explorer-basis-hardware-identity-read-model",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-hardware-identity-read-model",
+        "status": "done",
+        "summary": "Establish real corpus coverage and reconcile with the facet migration doc",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added zero-dependency CPU model and vendor detection in benchbox/utils/environment.py; wired into ClientHostEnvironment and build_environment_payload; verified anonymization passes with zero host leaks; decision gate cleared with no new dependencies.",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "notes": "Add CPU vendor and model capture to the environment collection that writes `environment` into a bundle, alongside the existing os/arch/cpu_count/memory_gb/python fields. Use platform-appropriate sources and degrade to absent rather than raising.\n\nRun the existing anonymisation and privacy checks over a freshly generated bundle and confirm the new fields carry no host identifier. If any source can return a hostname or serial, do not use that source.\n\nDECISION GATE: if CPU model cannot be captured on a platform without introducing a new runtime dependency, record absence for that platform rather than adding the dependency, and note it in the log.",
+        "started_at": "2026-08-29T20:09:53Z",
+        "started_branch": "feat/explorer-basis-hardware-identity-read-model",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-hardware-identity-read-model",
+        "status": "done",
+        "summary": "Capture CPU vendor and model at run time",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Defined closed CPU family vocabulary and mapping rules in transformer.py; unmatched maps to unknown; persisted cpu_family and cpu_model into result_environment and result_detail_metrics in duckdb_builder.py and browser-duckdb-schema.sql; updated contract tests and snapshot invariants; all 22 CPU identity unit tests, 387 pipeline tests, and 77 frontend test files passed.",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "notes": "Map raw CPU model strings to a small closed family vocabulary in the pipeline, and pass through both the raw model and the normalised family. Anything unmatched maps to an explicit unknown, never to a nearest guess.\n\nDefine the vocabulary in one place with the mapping rules adjacent to it, and unit test the unmatched case explicitly. Persist arch, cpu_family and cpu_model as separate `result_environment` columns and surface them through the snapshot join; update `docs/development/browser-duckdb-schema.sql` in the same commit.",
+        "started_at": "2026-08-29T20:11:54Z",
+        "started_branch": "feat/explorer-basis-hardware-identity-read-model",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-hardware-identity-read-model",
+        "status": "done",
+        "summary": "Normalise a closed CPU-family vocabulary in the pipeline",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Wired platform_version, arch, and cpu_family facets into facetModel.ts, facetMatching.ts, queryFilters.ts, and facetDisplay.ts. Tested URL canonical keys and aliases, missing/empty degradation to all-inclusive, DuckDB WHERE clauses, and in-memory row matching. Vitest 35 tests passed in facetModel.test.ts, and full suite 77 test files (936 tests) passed cleanly with zero typecheck errors.",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "notes": "Add the new keys to FACET_KEYS, DEFAULT_FACETS, FACET_URL_KEYS, the URL serdes and the SQL clause builder in `results-explorer/src/lib/facetModel.ts`, following the shape the existing deployment facets use.\n\nAdd a regression test asserting that every facet URL parameter and alias that resolves today still resolves after the new keys are added, so existing shared links do not break.\n\nRespect the w0 decision gate: only ship chips for facets that have at least two populated values in the committed corpus.",
+        "started_at": "2026-08-29T20:15:57Z",
+        "started_branch": "feat/explorer-basis-hardware-identity-read-model",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-hardware-identity-read-model",
+        "status": "done",
+        "summary": "Promote architecture, CPU family and engine version to facets",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Split monolithic Environment row in ComparabilityReceipt into per-axis hardware rows (Architecture, CPU family, CPU model, CPU count, Memory). Implemented compareHardwareValues with pinned no-flip guarantee: runs without CPU metadata report status 'missing' ('Not recorded') rather than 'diff' ('Differs') and generate no warnings. Added CPU family and CPU model to RunReceipt. Added comprehensive unit tests in ComparabilityReceipt.test.tsx and RunReceipt.test.tsx. All 77 test files (940 tests) pass in vitest, and 387 python tests pass.",
+        "item_id": "explorer-basis-hardware-identity-read-model",
+        "notes": "Replace the single concatenated Environment field in `ComparabilityReceipt` with separate Architecture, CPU family, CPU model, CPU count and Memory rows, each reporting match / differs / not recorded independently. Keep Platform version and Driver version as the existing separate rows.\n\nAdd a test that pins the no-flip guarantee: for two runs whose environments are equal today, no axis may report 'differs' after the split. Add a test that a run with no CPU data reports 'not recorded' and not 'differs'.",
+        "started_at": "2026-08-29T20:21:44Z",
+        "started_branch": "feat/explorer-basis-hardware-identity-read-model",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-hardware-identity-read-model",
+        "status": "done",
+        "summary": "Split the comparability receipt into per-axis hardware rows",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Implement DataFrame versions of AI Primitives benchmark operations. The current\nbenchmark has **16 SQL queries** across 4 categories testing AI/ML functions:\n\n**Categories (16 queries total):**\n- Generative (4): text completion, customer profile summary, Q&A, SQL generation\n- NLP (5): sentiment analysis (single/batch), classification (priority/segment), entity extraction\n- Transform (4): summarization (short/long), translation, grammar correction\n- Embedding (3): single embedding, batch embeddings, large-dimension embeddings\n\n**DataFrame Implementation Approach:**\nThe SQL benchmark uses platform-specific AI functions (Snowflake Cortex, BigQuery ML,\nDatabricks AI). DataFrame implementations would use:\n\n- **PySpark MLlib**: Native ML functions, model inference pipelines\n- **Sentence Transformers**: For embeddings via Hugging Face integration\n- **Polars + NumPy**: Vector operations, embedding similarity\n- **Pandas + scikit-learn**: Classification, NLP pipelines\n\nNot all 16 SQL queries translate directly - generative queries require LLM APIs\nwhile embedding/vector operations map well to DataFrame native operations.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-31T00:00:00Z",
+      "created_at": "2026-01-25T00:00:00Z",
+      "worktree": "dataframe-benchmarks"
+    }
+  }
+}

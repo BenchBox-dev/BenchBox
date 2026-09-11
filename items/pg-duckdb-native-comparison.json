@@ -1,0 +1,101 @@
+{
+  "context": "Create a convenience script or CLI subcommand that:\n1. Runs the same benchmark (e.g., TPC-H SF=1) on both pg_duckdb and duckdb\n2. Feeds both result files to PlatformComparison.from_files() which already\n   handles Welch's t-test, Bonferroni correction, and win/loss matrix\n3. Formats the ComparisonReport with pg_duckdb-specific annotations:\n   overhead percentage per query, geometric mean overhead, queries where\n   pg_duckdb wins (if any)\n\nThe comparison infrastructure already exists and is mature - this is\nprimarily an orchestration and formatting task. PlatformComparison\nvalidates same benchmark name and scale factor, computes per-query\np50/p95/p99, and ranks via PlatformRanker with GEOMETRIC_MEAN strategy.\n\nThe script should also work with pre-existing result files (not just\nlive runs) so users can compare without re-running benchmarks.\n",
+  "description": "pg_duckdb embeds DuckDB inside PostgreSQL. A key user question is: what\noverhead does the PostgreSQL integration layer add? BenchBox can already\nrun the same benchmark on both pg_duckdb and native DuckDB separately, but\nthere's no automated workflow to run both and generate a structured\ncomparison showing per-query timing deltas, overhead percentages, and\nstatistical significance.\n\nThis builds on the existing PlatformComparison infrastructure in\nbenchbox/core/analysis/comparison.py rather than creating new comparison\nlogic.\n\nSplit from pg-extension-advanced-benchmarking (originally deferred from\npg-duckdb-platform-adapter, completed 2026-02-15).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "reimplement comparison logic",
+        "instead": "use from_files() and compare()",
+        "item_id": "pg-duckdb-native-comparison",
+        "why": "PlatformComparison already handles statistical tests, win/loss, and ranking"
+      },
+      {
+        "dont": "require live database connections for comparison",
+        "instead": "accept result file paths as input",
+        "item_id": "pg-duckdb-native-comparison",
+        "why": "users may want to compare pre-existing result files"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-22T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing pg_duckdb and duckdb adapter behavior unmodified",
+        "item_id": "pg-duckdb-native-comparison"
+      },
+      {
+        "behavior": "PlatformComparison and PlatformRanker APIs unchanged - consume, don't modify",
+        "item_id": "pg-duckdb-native-comparison"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pg-duckdb-native-comparison",
+        "kind": "only_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "pg-duckdb-native-comparison",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/compare_pg_duckdb.py --help",
+        "description": "Comparison script runs with pre-existing result files",
+        "expected": "usage information displayed",
+        "item_id": "pg-duckdb-native-comparison",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/ -v -k analysis",
+        "description": "Existing analysis tests pass",
+        "expected": "all tests pass",
+        "item_id": "pg-duckdb-native-comparison",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pg-duckdb-native-comparison",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "pg-duckdb-native-comparison",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create comparison script that orchestrates dual-platform runs and feeds results to PlatformComparison",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-duckdb-native-comparison",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add overhead-specific formatting - per-query overhead %, geometric mean overhead, winner annotations",
+        "wid": "w2"
+      }
+    ]
+  }
+}

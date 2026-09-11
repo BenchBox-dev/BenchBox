@@ -1,0 +1,284 @@
+{
+  "context": "Make the pivot control derive from result availability, not from the whole\nsupported-benchmark catalog. Decide explicitly whether no-result benchmarks\nare hidden or shown as unavailable before implementing, then test both the\nactionable selector path and the direct empty-route path.\n",
+  "description": "The benchmark detail page now has a benchmark switcher, so the original\ntrapped-page navigation defect is largely remediated. The follow-up\nfunctional pass found a remaining usability defect: the switcher exposes the\nfull supported benchmark catalog, including benchmarks with no public result\npage in the current static corpus. Selecting one of those options navigates\nto an empty benchmark page such as `/results/amplab/` and requires recovery\nvia `Back to Results`.\n\nThe root cause is that the control appears to source options from the static\nsupported-benchmark catalog instead of the current public result corpus. The\nblind spot is common in the Results Explorer: fixing \"can pivot to a sibling\"\nby adding a selector is not enough if the selector does not distinguish\nactionable public result pages from no-data placeholders.\n\nThis TODO should make benchmark pivots truthfully actionable. The selector\nshould either list only benchmarks with public results for the current\nexplorer corpus, or it should visibly mark/disable no-result options with an\nexplicit empty-state affordance. Do not remove the empty benchmark route\nitself; it is still useful for direct links and future corpus growth.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "broaden this into a redesign of the benchmark index or Home filter system.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hard-code `TPC-H` and `SSB` as the only public-result options.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "let a selectable option navigate users into a no-result dead end without making that state explicit.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "remove empty routes to make the selector simpler.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-corpus-aware-benchmark-switcher",
+        "id": 480,
+        "reason": "Counts may be useful later, but the immediate defect is that the selector implies non-empty sibling pages.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Speculative UI enhancement ('may be useful later'); no concrete trigger or requirement, not tracked elsewhere.",
+        "summary": "Add public-result counts to every benchmark catalog option"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-corpus-aware-benchmark-switcher",
+        "id": 481,
+        "reason": "Direct empty routes are useful for deep links and future corpus growth; the selector should be fixed instead.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly rejects removal, keeping empty routes for deep links/future growth; selector fix was chosen instead.",
+        "summary": "Remove empty benchmark routes from the static export"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-15T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Compare and Query flows are not changed unless the same actionability defect is reproduced there.",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher"
+      },
+      {
+        "behavior": "Direct no-result routes render a clear empty state and recovery path.",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher"
+      },
+      {
+        "behavior": "The switcher does not show stale hard-coded availability that can drift from the generated corpus.",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher"
+      },
+      {
+        "behavior": "Users can still switch from TPC-H to SSB or any other benchmark with public results without returning to the index.",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/planning/results-explorer-contract-release-gate.yaml — prior release-gate TODO for Results Explorer user flows",
+        "decision": "reuse",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "path": "_project/DONE/main/planning/results-explorer-contract-release-gate.yaml"
+      },
+      {
+        "concept": "results-explorer/e2e/routes/benchmark-index.spec.ts — existing benchmark navigation coverage",
+        "decision": "reuse",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "path": "results-explorer/e2e/routes/benchmark-index.spec.ts"
+      },
+      {
+        "concept": "results-explorer/src/lib/benchmarks.ts — static benchmark label/catalog helpers",
+        "decision": "reuse",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "path": "results-explorer/src/lib/benchmarks.ts"
+      },
+      {
+        "concept": "results-explorer/src/lib/corpus.ts — generated/public corpus helpers used by route pages",
+        "decision": "reuse",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "path": "results-explorer/src/lib/corpus.ts"
+      },
+      {
+        "concept": "results-explorer/src/pages/BenchmarkDetail.tsx — benchmark detail page and switcher behavior",
+        "decision": "reuse",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "path": "results-explorer/src/pages/BenchmarkDetail.tsx"
+      },
+      {
+        "concept": "results-explorer/src/pages/BenchmarkIndex.tsx — benchmark index availability/count display",
+        "decision": "reuse",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "path": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "kind": "do_not_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "kind": "do_not_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      },
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/benchmark-index.spec.ts"
+      },
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/"
+      },
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkDetail.tsx"
+      },
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkDetail.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkDetail.test.tsx",
+        "description": "Benchmark detail tests cover corpus-aware pivot options",
+        "expected": "Benchmark detail tests pass and prove no-result options follow the chosen actionability contract",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --workers=1 e2e/routes/benchmark-index.spec.ts",
+        "description": "Benchmark route e2e covers public and no-result routes",
+        "expected": "Benchmark e2e passes, including public benchmark switching and direct no-result empty-state recovery",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'AMPLab|TPC-H|SSB|BENCHMARK_LABELS|public results|No public results' results-explorer/src/pages/BenchmarkDetail.tsx results-explorer/src/lib results-explorer/src/pages/__tests__ results-explorer/e2e/routes/benchmark-index.spec.ts",
+        "description": "Corpus availability is not hard-coded",
+        "expected": "Implementation derives options from corpus helpers; tests may name fixtures but production code does not hard-code the public option set",
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "notes": "Reproduce from `/results/tpch/`:\n- open the benchmark switcher;\n- record the options shown;\n- select one benchmark with public results such as SSB;\n- select one benchmark with no public results such as AMPLab;\n- record the resulting route and empty-state recovery controls.\n\nIn code, identify whether the switcher options come from a static label\ncatalog, public corpus summary, or generated route manifest.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm the benchmark switcher option source and no-result route behavior",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "notes": "Decision gate: choose one contract:\n- Contract A: benchmark detail switcher lists only benchmarks with public\n  results in the current static corpus.\n- Contract B: switcher lists all supported benchmarks, but no-result\n  options are disabled or grouped under a clear \"No public results yet\"\n  label and do not navigate as though results exist.\n- Contract C: switcher lists all supported benchmarks and navigates to\n  empty pages, but each option includes result availability counts.\n\nContract A is preferred for a dense results explorer because users expect\na detail-page selector to pivot between comparable pages, not catalog\nplaceholders. If another contract is chosen, document why it better serves\nresult discovery.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the actionability contract for benchmark pivot options",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "notes": "Update the benchmark detail page selector so its options reflect the\nchosen actionability contract. If listing only public-result benchmarks,\nderive the option set from the same corpus data that powers benchmark\nindex/list counts, not from a manually maintained allowlist.\n\nPreserve direct routing to no-result benchmark pages and their empty-state\nrecovery. The fix is about the selector's implied actionability, not about\nhiding valid static routes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the corpus-aware benchmark switcher",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "notes": "Add unit and/or e2e coverage that proves:\n- TPC-H and SSB remain reachable from the benchmark selector when they\n  have public results;\n- AMPLab/no-result benchmarks are either absent, disabled, or explicitly\n  labeled according to the chosen contract;\n- direct navigation to `/results/amplab/` still renders a useful empty\n  state with a route back to Results.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for public-result and no-result benchmark pivot behavior",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-corpus-aware-benchmark-switcher",
+        "notes": "Check the platform detail selector, compare builder filters, Query\nWorkbench facets, and Home filters for controls that expose unavailable\noptions as if they are actionable. Do not broaden the implementation\nunless the same defect is reproduced; record any additional issue as a\nseparate TODO if it exceeds this scope.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit platform and compare pivot controls for the same actionability pattern",
+        "wid": "w4"
+      }
+    ]
+  }
+}

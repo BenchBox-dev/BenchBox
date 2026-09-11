@@ -1,0 +1,186 @@
+{
+  "context": "Follow existing patterns from test_release_sync.py: class-based grouping, tmp_path fixture for\nfilesystem operations, direct imports from benchbox.release modules.\n\nAll tests marked @pytest.mark.fast (no real builds, no network, no real git operations). The\nconftest auto-marker in tests/conftest.py automatically applies 'fast' to tests in tests/unit/,\nso explicit markers are optional but recommended for clarity.\n\nMock subprocess.run for git/build operations. Mock datetime.now() for deterministic weekday tests.\nCreate zip files with zipfile.ZipFile for wheel verification tests (no real uv build).\n\nFor script function tests, add scripts/ to sys.path via either:\n- A conftest.py fixture in tests/unit/ that inserts scripts/ path\n- Or direct sys.path manipulation at top of test_release_scripts.py\nThe scripts already do sys.path.insert(0, ...) for their own imports, so this mirrors that pattern.\n\nImport strategy for each test file:\n- test_release_fingerprint.py: from benchbox.release.workflow import compute_source_fingerprint\n- test_release_timestamps.py: from benchbox.release.workflow import calculate_most_recent_saturday_midnight, _normalize_timestamps\n- test_content_validation.py: from benchbox.release.content_validation import validate_file, validate_content, check_content_for_release, ContentViolation, ValidationResult, Severity, _is_example_line, _has_inline_ignore, _get_context, _should_skip_file, _get_file_exceptions, RULE_CATEGORIES\n- test_release_size_check.py: from benchbox.release.workflow import check_release_size, ReleaseSizeViolation, ALLOWED_DATA_PATHS, FORBIDDEN_PATTERNS, DEFAULT_MAX_FILE_SIZE_MB, DEFAULT_MAX_TOTAL_SIZE_MB\n- test_release_scripts.py: import parse_timestamp, run_pre_flight_checks, run_ci_checks from automate_release; calculate_sha256, verify_wheel_timestamps from build_release; verify_wheel_fingerprint from verify_release; git_commit_with_timestamp, git_tag_with_timestamp, verify_git_status, archive_release_artifacts, verify_source_fingerprint from finalize_release\n",
+  "description": "The release automation system is sophisticated (~3,000 lines across benchbox/release/workflow.py,\nbenchbox/release/content_validation.py, and 5 scripts) but significantly under-tested. Existing\ntests (test_release_infrastructure.py, test_release_sync.py) cover repo metadata, YAML validation,\nversion consistency, and sync functions -- but zero coverage exists for source fingerprinting,\ntimestamp normalization, content validation, size safety checks, and release script functions.\n\nThese are critical-path components that prevent source/artifact divergence, ensure reproducible\nbuilds, and gate releases. A fingerprinting bug could ship mismatched artifacts; a timestamp\nnormalization bug could leak build times; a size check gap could allow multi-GB data files into\nreleases.\n\nThis TODO adds ~160 test cases across 5 new test files, organized into 4 phases by dependency\norder (fingerprinting is foundational, scripts depend on understanding the functions they wrap).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create integration tests that require git repos or network",
+        "instead": "mock subprocess.run for all git operations",
+        "item_id": "release-automation-unit-tests",
+        "why": "these are unit tests that must run fast and offline"
+      },
+      {
+        "dont": "import scripts using importlib or exec() hacks",
+        "instead": "mirror that pattern with a simple sys.path.insert in the test file",
+        "item_id": "release-automation-unit-tests",
+        "why": "scripts already use sys.path.insert for their own imports"
+      },
+      {
+        "dont": "modify any production code to make it more testable",
+        "instead": "test the interfaces as they exist",
+        "item_id": "release-automation-unit-tests",
+        "why": "these are public interfaces that should be tested as-is"
+      },
+      {
+        "dont": "run real 'uv build' in unit tests",
+        "instead": "use zipfile.ZipFile to create fake wheel archives instead",
+        "item_id": "release-automation-unit-tests",
+        "why": "builds take 10+ seconds and require full toolchain"
+      },
+      {
+        "dont": "use @pytest.mark.slow",
+        "instead": "use tmp_path and mocks to keep everything fast",
+        "item_id": "release-automation-unit-tests",
+        "why": "all these tests should complete in <30s total"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-02-06T00:00:00Z",
+      "created_at": "2026-02-06T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing tests in tests/ continue passing",
+        "item_id": "release-automation-unit-tests"
+      },
+      {
+        "behavior": "No modifications to production code in benchbox/release/ or scripts/",
+        "item_id": "release-automation-unit-tests"
+      },
+      {
+        "behavior": "test_release_infrastructure.py continues passing unchanged",
+        "item_id": "release-automation-unit-tests"
+      },
+      {
+        "behavior": "test_release_sync.py continues passing unchanged",
+        "item_id": "release-automation-unit-tests"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/release/content_validation.py"
+      },
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/release/workflow.py"
+      },
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/automate_release.py"
+      },
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/build_release.py"
+      },
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/finalize_release.py"
+      },
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/verify_release.py"
+      },
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "do_not_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "do_not_modify",
+        "path_glob": "tests/unit/test_release_sync.py"
+      },
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/conftest.py"
+      },
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_content_validation.py"
+      },
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_fingerprint.py"
+      },
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_scripts.py"
+      },
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_size_check.py"
+      },
+      {
+        "item_id": "release-automation-unit-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_timestamps.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_release_fingerprint.py tests/unit/test_release_timestamps.py tests/unit/test_content_validation.py tests/unit/test_release_size_check.py tests/unit/test_release_scripts.py -v",
+        "description": "All new release tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "release-automation-unit-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_release_fingerprint.py tests/unit/test_release_timestamps.py tests/unit/test_content_validation.py tests/unit/test_release_size_check.py tests/unit/test_release_scripts.py -v -m fast",
+        "description": "All new tests are marked fast",
+        "expected": "same number of tests as without -m fast filter",
+        "item_id": "release-automation-unit-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_release_fingerprint.py tests/unit/test_release_timestamps.py tests/unit/test_content_validation.py tests/unit/test_release_size_check.py tests/unit/test_release_scripts.py -v -p pytest_cov --cov=benchbox.release --cov-report=term-missing",
+        "description": "Coverage improvement on release modules",
+        "expected": "significant coverage increase for benchbox/release/workflow.py and benchbox/release/content_validation.py",
+        "item_id": "release-automation-unit-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_release_infrastructure.py tests/unit/test_release_sync.py -v",
+        "description": "Existing release tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "release-automation-unit-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check tests/unit/test_release_fingerprint.py tests/unit/test_release_timestamps.py tests/unit/test_content_validation.py tests/unit/test_release_size_check.py tests/unit/test_release_scripts.py",
+        "description": "No lint errors",
+        "expected": "All checks passed",
+        "item_id": "release-automation-unit-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

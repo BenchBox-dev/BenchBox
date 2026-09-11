@@ -1,0 +1,166 @@
+{
+  "context": "Re-run the exact pinned conformance and Inspector artifacts, inspect the scenario source and BenchBox capability/tool inventory, and write a revision-bound rationale for each of the four entries. For missing-capability checks, either prove the diagnostic fixture is not part of the BenchBox production contract and keep a narrowly scoped baseline, or implement the protocol-required rejection and remove the exceptions. For list-change warnings, either prove registries are immutable and add an invariant/regression guard, or implement the required notifications if dynamic mutations are supported. Update the verifier and readiness documentation only after the evidence supports the change; any new failure outside the exact baseline must fail the gate.",
+  "description": "The pinned MCP 2026-07-28 conformance run at revision 81eb1c3 passes the selected scenarios only with four explicit server-stateless baseline entries: two required checks for the diagnostic test_missing_capability fixture and two SHOULD warnings for promptsListChanged and toolsListChanged notifications. The run log classifies the first pair as a fixture/tool-surface gap and the second pair as a static-registry behavior, but this compatibility debt is not yet independently tracked. Revalidate the classification against the current upstream suite and BenchBox contract; do not let the baseline hide a real protocol defect or silently broaden it when upstream checks change.",
+  "legacy": {
+    "item_meta": {
+      "category": "compatibility",
+      "created_at": "2026-08-02T01:22:54Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "A baseline entry is never used to suppress an actual BenchBox protocol, security, or tenancy defect",
+        "item_id": "mcp-conformance-baseline-followup-v2"
+      },
+      {
+        "behavior": "BenchBox keeps its current 12-tool production contract unless a separately approved product decision changes it",
+        "item_id": "mcp-conformance-baseline-followup-v2"
+      },
+      {
+        "behavior": "The exact conformance and Inspector revisions remain pinned and every unexpected failure remains gate-blocking",
+        "item_id": "mcp-conformance-baseline-followup-v2"
+      },
+      {
+        "behavior": "The production endpoint remains fail-closed while the classification or evidence is stale",
+        "item_id": "mcp-conformance-baseline-followup-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp*.md"
+      },
+      {
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "kind": "only_modify",
+        "path_glob": "scripts/verify_mcp_conformance.py"
+      },
+      {
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/test_protocol_compatibility.py"
+      },
+      {
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/test_stateless_http.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f docs/operations/mcp-conformance-baseline.md && rg -q \"81eb1c3\" docs/operations/mcp-conformance-baseline.md && rg -q \"test_missing_capability\" docs/operations/mcp-conformance-baseline.md && rg -q \"promptsListChanged|toolsListChanged\" docs/operations/mcp-conformance-baseline.md",
+        "description": "A revision-bound rationale covers the four baseline entries",
+        "expected": "exits 1 until the rationale is present; exits 0 once every entry is explicitly accounted for",
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -q \"EXPECTED_FAILURES\" scripts/verify_mcp_conformance.py && rg -q \"server-stateless:sep-2575-server-rejects-undeclared-capability\" scripts/verify_mcp_conformance.py && rg -q \"server-stateless:sep-2575-missing-capability-http-400\" scripts/verify_mcp_conformance.py && rg -q \"server-stateless:sep-2575-server-sends-prompts-list-changed-on-subscription\" scripts/verify_mcp_conformance.py && rg -q \"server-stateless:sep-2575-server-sends-tools-list-changed-on-subscription\" scripts/verify_mcp_conformance.py",
+        "description": "The verifier retains an exact narrow baseline and no unlisted failure allowance",
+        "expected": "exits 1 if the exact baseline is absent or broadened; exits 0 once it remains explicit and narrow",
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/verify_mcp_conformance.py --protocol-version 2026-07-28",
+        "description": "Pinned conformance rerun passes only with the documented baseline",
+        "expected": "exits 1 on an unaccounted conformance failure; exits 0 when only the documented baseline remains",
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_protocol_compatibility.py tests/integration/mcp/test_stateless_http.py -q",
+        "description": "MCP compatibility tests guard the selected behavior",
+        "expected": "exits 1 if the compatibility or static-registry guard regresses; exits 0 once the selected behavior is covered",
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-run the pinned 2026-07-28 conformance and Inspector checks and revalidate the exact four baseline entries against current upstream scenario source and the BenchBox tool/capability inventory",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Resolve the two missing-capability entries by proving fixture non-applicability or implementing compliant rejection, with a focused regression test and no unapproved production diagnostic tool",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Resolve the two list-change warnings by proving static registries and guarding that invariant, or implement notifications for any supported dynamic mutation path",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-conformance-baseline-followup-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Publish the redacted revision-bound rationale, update the verifier baseline and readiness documentation, and make unexpected new conformance failures fail closed",
+        "wid": "w3"
+      }
+    ]
+  }
+}

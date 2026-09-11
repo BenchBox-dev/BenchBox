@@ -1,0 +1,283 @@
+{
+  "context": "Add scripts/pr_refresh_certification.py as a pure core with injected event, Git, ruleset, PR, Actions-run, and check-run data. Follow scripts/path_filter_decision.py's stdlib bootstrap and structured-output conventions. Return a typed decision such as shadow_eligible or full_required plus stable reason codes; missing, stale, ambiguous, or untrusted input always returns full_required. Do not add a domain map.",
+  "description": "Implement a standard-library, fail-closed classifier that can prove whether a pull_request synchronize event is an exact merge of the current develop base into a previously fully certified same-repository PR head. The classifier is evidence generation only in this TODO: it must never skip a CI job or publish a required success context. It must bind the prior certification to the PR number, feature head, tested base SHA, Actions run and check-run IDs, workflow fingerprint, synthetic merge/tree identity, and selected lanes. Version 1 permits at most one shadow-eligible refresh after a full certification.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Accept a successful check name without its Actions run base and workflow provenance",
+        "instead": "bind check IDs to exact run head, base, and workflow fingerprint",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "why": "the check may certify a different merge tree"
+      },
+      {
+        "dont": "Inspect github.sha or default checkout HEAD as the feature branch",
+        "instead": "use pull_request.head.sha and explicit fetched objects",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "why": "pull_request workflows normally check out a synthetic merge ref"
+      },
+      {
+        "dont": "Treat an earlier fast certification as a full-certification parent",
+        "instead": "force full_required after one fast refresh",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "why": "that permits an unverified attestation chain"
+      },
+      {
+        "dont": "Use a hand-authored path-domain dependency map",
+        "instead": "use conservative global invalidators and keep dynamic safety as a later decision",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "why": "path domains cannot prove Python and runtime coupling"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "needs_item": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-14T13:03:41Z",
+      "completed_pr": 1732,
+      "created_at": "2026-08-14T12:10:39Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Every live required context is discovered from ruleset 15611785 and validated through Check Runs",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier"
+      },
+      {
+        "behavior": "The classifier cannot cause or authorize CI skipping in this TODO",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier"
+      },
+      {
+        "behavior": "Unknown input, API failure, fork PR, force-push, rebase, authored commit, conflict edit, or current-head/base drift returns full_required",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier"
+      },
+      {
+        "behavior": "Version 1 allows only one exact refresh after a full certification",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "pr-refresh merge shape and merge-tree command precedent",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "path": "Makefile"
+      },
+      {
+        "concept": "required-check and exact-head validation patterns",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "path": "_project/scripts/required_lane.py"
+      },
+      {
+        "concept": "stdlib CI bootstrap and structured GitHub outputs",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "path": "scripts/path_filter_decision.py"
+      },
+      {
+        "concept": "ruleset required-context parsing",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "path": "scripts/ruleset_drift_check.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "kind": "do_not_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "kind": "do_not_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "kind": "only_modify",
+        "path_glob": "scripts/pr_refresh_certification.py"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/ci/pr-refresh/**"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_pr_refresh_certification.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_pr_refresh_certification.py -q",
+        "description": "Classifier unit and negative-control suite passes",
+        "expected": "all tests pass",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "last_result": "pass",
+        "last_run": "2026-08-14T13:03:27Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_pr_refresh_certification.py -q -k 'negative or fallback or tamper or chain or race'",
+        "description": "Every negative-control reason defaults to full_required",
+        "expected": "all selected tests pass",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "last_result": "pass",
+        "last_run": "2026-08-14T13:03:32Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo lint strict-base-refresh-01-trusted-certification-classifier",
+        "description": "This TODO passes tracker quality lint",
+        "expected": "0 findings",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "last_result": "pass",
+        "last_run": "2026-08-14T13:03:36Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'import ast,pathlib; t=ast.parse(pathlib.Path(\"scripts/pr_refresh_certification.py\").read_text()); mods=[a.name for n in ast.walk(t) if isinstance(n,ast.Import) for a in n.names]+[n.module for n in ast.walk(t) if isinstance(n,ast.ImportFrom) and n.module]; allowed={\"argparse\",\"dataclasses\",\"datetime\",\"enum\",\"hashlib\",\"json\",\"pathlib\",\"subprocess\",\"sys\",\"typing\",\"urllib\"}; bad=sorted({m.split(\".\")[0] for m in mods if m.split(\".\")[0] not in allowed}); assert not bad,bad'",
+        "description": "Classifier is standard-library only",
+        "expected": "exit 0",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "last_result": "pass",
+        "last_run": "2026-08-14T13:03:38Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Classification, reason codes, certification tuple, and ELIGIBILITY_PREDICATES frozen in scripts/pr_refresh_certification.py",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "notes": "Include full versus fast provenance, required context discovery, workflow fingerprint, exact base/head, and synthetic merge tree identity.",
+        "started_at": "2026-08-14T12:53:46Z",
+        "started_branch": "fix/strict-base-refresh-01-classifier",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-01",
+        "status": "done",
+        "summary": "Freeze the certification tuple, typed decision schema, stable reason codes, and trust boundary from the policy record",
+        "wid": "w0"
+      },
+      {
+        "evidence": "exact two-parent merge-tree proof uses request.head_sha/base_sha, never checkout HEAD",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "notes": "Require synchronize; same repository; exactly two parents; parent1 equals prior head; parent2 equals event base; actual tree equals git merge-tree result; current PR head and base still match.",
+        "started_at": "2026-08-14T12:57:56Z",
+        "started_branch": "fix/strict-base-refresh-01-classifier",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-01",
+        "status": "done",
+        "summary": "Implement exact refresh topology and tree proof using explicit PR head and base objects rather than checkout HEAD",
+        "wid": "w1"
+      },
+      {
+        "evidence": "prior checks bound via CheckRunInfo+ActionsRunInfo; latest-success; full certification_kind; fingerprint",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "notes": "Query Check Runs, never Combined Status. Require every live ruleset context successful on parent1, exact run head/base, a full rather than fast certification, and an unchanged trusted workflow fingerprint.",
+        "started_at": "2026-08-14T12:58:08Z",
+        "started_branch": "fix/strict-base-refresh-01-classifier",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-01",
+        "status": "done",
+        "summary": "Implement prior full-certification validation from Check Runs and Actions run metadata",
+        "wid": "w2"
+      },
+      {
+        "evidence": "global invalidators for self-change, workflows, merge drivers, lockfile, generated data, fixtures, schema/registry, unknown paths",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "notes": "At minimum cover .github/workflows/**, scripts/pr_refresh_certification.py, scripts/path_filter_decision.py, .github/path-filters.yml, .gitattributes and merge-driver paths, uv.lock, pyproject.toml, shared fixtures/configuration, schemas, migrations, dynamic-import registries, and missing paths.",
+        "started_at": "2026-08-14T12:58:20Z",
+        "started_branch": "fix/strict-base-refresh-01-classifier",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-01",
+        "status": "done",
+        "summary": "Implement conservative full-required fallbacks for self-change, merge drivers, dependencies, workflows, generated data, and unknown evidence",
+        "wid": "w3"
+      },
+      {
+        "evidence": "43 unit tests + eligible.json; negatives for chain/race/tamper/fallback; #1539 and cross-module cases documented as non-proofs",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "notes": "Include #1539/#1541-style global invariant history plus a cross-module semantic interaction that the classifier must not claim is proven safe.",
+        "started_at": "2026-08-14T12:58:32Z",
+        "started_branch": "fix/strict-base-refresh-01-classifier",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-01",
+        "status": "done",
+        "summary": "Add exhaustive unit fixtures for eligible refreshes, chained refreshes, races, tampering, synthetic merge confusion, and malformed API data",
+        "wid": "w4"
+      },
+      {
+        "evidence": "test_every_eligibility_predicate_has_a_negative_control pins ELIGIBILITY_PREDICATES 1:1",
+        "item_id": "strict-base-refresh-01-trusted-certification-classifier",
+        "notes": "Mutation-test or parameterize every eligibility predicate so deleting any required predicate makes a test fail.",
+        "started_at": "2026-08-14T12:58:43Z",
+        "started_branch": "fix/strict-base-refresh-01-classifier",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-01",
+        "status": "done",
+        "summary": "Review classifier behavior, reason-code completeness, and default-to-full guarantees",
+        "wid": "w5"
+      }
+    ]
+  }
+}

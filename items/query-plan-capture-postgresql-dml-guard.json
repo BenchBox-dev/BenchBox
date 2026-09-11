@@ -1,0 +1,212 @@
+{
+  "context": "Follow the DuckDB guard pattern in benchbox/platforms/duckdb.py which was added\nby PR #767. Identify DML at the start of the query string (first word match).\nUpdate get_query_plan() to branch on DML vs. SELECT. For DML, omit ANALYZE and\nBUFFERS (both require execution) — keep FORMAT JSON so the parser still works.\nTest by mocking the cursor; no live PostgreSQL needed.\n",
+  "description": "PostgreSQLAdapter.get_query_plan() at benchbox/platforms/postgresql.py:704 always\nissues EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON). PostgreSQL's EXPLAIN ANALYZE\nphysically re-executes the target query to collect actual timing and row counts.\nFor DML statements — INSERT, UPDATE, DELETE, MERGE, COPY — this causes the\nwrite to execute twice: once during the timed benchmark phase and once again\nduring plan capture. There is no DML guard today.\n\nThis violates the hard requirement that plan capture must not cause write\nside-effects on the measured data set. DML double-execution corrupts benchmark\ndata (row counts, aggregations, sequence values) in ways that are difficult to\ndetect and reproduce.\n\nDuckDB already has this guard: PR #767\n(fix/plan-capture): guard DuckDB/MotherDuck DML against double-execution.\nThe fix there detects DML and falls back to EXPLAIN (FORMAT JSON) (no ANALYZE)\nwhich produces an estimated plan without re-executing. PostgreSQL supports the\nsame fallback: EXPLAIN (FORMAT JSON) is valid PostgreSQL syntax and returns a\nJSON plan tree without ANALYZE overhead.\n\nScope: PostgreSQLAdapter only. TimescaleDB, CedarDB, and pg_mooncake inherit\nget_query_plan() from PostgreSQLAdapter and will receive the fix for free.\nRedshiftAdapter.get_query_plan() issues plain EXPLAIN (no ANALYZE) already, so\nit is not affected.\n\nNote: the `query-plan-capture-dml-double-execution` TODO (if it exists) may\nhave been authored with the incorrect assumption that PostgreSQL already uses\nFORMAT JSON without ANALYZE. This item supersedes that assumption — the actual\ncode at postgresql.py:704 uses ANALYZE.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a DML guard to RedshiftAdapter",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "why": "it already uses plain EXPLAIN without ANALYZE."
+      },
+      {
+        "dont": "add the guard to the base class",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "why": "the guard logic is PostgreSQL-specific; other adapters have different EXPLAIN semantics."
+      },
+      {
+        "dont": "parse the full query AST to detect DML",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "why": "first-word detection is sufficient and robust enough for plan capture purposes."
+      },
+      {
+        "dont": "remove ANALYZE from SELECT queries",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "why": "actual timing is required for meaningful plan analysis."
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-06-11T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "EXPLAIN ANALYZE (the current default for SELECT) must remain unchanged — DML-only guard.",
+        "item_id": "query-plan-capture-postgresql-dml-guard"
+      },
+      {
+        "behavior": "Plan capture failures must remain non-fatal when strict_plan_capture is False (the default).",
+        "item_id": "query-plan-capture-postgresql-dml-guard"
+      },
+      {
+        "behavior": "PostgreSQLQueryPlanParser must be able to parse the non-ANALYZE fallback path output.",
+        "item_id": "query-plan-capture-postgresql-dml-guard"
+      },
+      {
+        "behavior": "TimescaleDB, CedarDB, and pg_mooncake adapters must not require code changes.",
+        "item_id": "query-plan-capture-postgresql-dml-guard"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/duckdb.py — DML detection and ANALYZE fallback pattern (PR #767)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "path": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "concept": "benchbox/platforms/postgresql.py:704 — current options = ['ANALYZE', 'BUFFERS', 'FORMAT JSON']",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "path": "benchbox/platforms/postgresql.py:704"
+      },
+      {
+        "concept": "tests/unit/platforms/test_postgresql_plan_capture.py — existing test file to extend",
+        "decision": "extend",
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "path": "tests/unit/platforms/test_postgresql_plan_capture.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/cedardb.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/pg_mooncake.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/redshift.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/timescaledb.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/platform-expansion/planning/query-plan-capture-postgresql-dml-guard.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/postgresql.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_postgresql_plan_capture.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_postgresql_plan_capture.py -k 'dml' -v",
+        "description": "DML query does not trigger EXPLAIN ANALYZE in PostgreSQL adapter",
+        "expected": "All DML guard tests pass",
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_postgresql_plan_capture.py -k 'analyze' -v",
+        "description": "SELECT query still uses EXPLAIN ANALYZE",
+        "expected": "All ANALYZE tests pass",
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_postgresql_plan_capture.py tests/unit/platforms/test_postgresql_adapter.py -v",
+        "description": "Full PostgreSQL plan capture test suite green",
+        "expected": "0 failures, 0 errors",
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "notes": "Check whether a shared DML detection helper exists in\nbenchbox/platforms/base/ or benchbox/utils/. If it does, reuse it.\nIf not, add a module-level function or method to PostgreSQLAdapter\nthat matches DML keywords at the start of the stripped query:\n  INSERT, UPDATE, DELETE, MERGE, COPY, TRUNCATE, DROP TABLE,\n  CREATE TABLE AS SELECT (CTAS writes), ALTER TABLE.\nReplicate the DuckDB pattern exactly: compare stripped uppercase prefix\nof the query string (first word or two).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add _is_dml_query() helper or reuse DuckDB's existing DML detection pattern",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "notes": "In benchbox/platforms/postgresql.py get_query_plan():\n  if self._is_dml_query(query):\n      options = [\"FORMAT JSON\"]  # no ANALYZE: avoids double-execution of DML\n  else:\n      options = [\"ANALYZE\", \"BUFFERS\", \"FORMAT JSON\"]\nThe non-ANALYZE path still returns valid JSON for PostgreSQLQueryPlanParser;\nit will have estimated rows/costs rather than actual rows/timing, which is\nacceptable for DML plan capture.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Guard get_query_plan() to fall back to EXPLAIN (FORMAT JSON) for DML",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "notes": "Extend tests/unit/platforms/test_postgresql_plan_capture.py:\n  - test_get_query_plan_dml_uses_no_analyze: mock cursor; assert\n    cursor.execute() call for INSERT/UPDATE/DELETE does NOT contain\n    \"ANALYZE\" in the EXPLAIN options string.\n  - test_get_query_plan_select_uses_analyze: assert SELECT does\n    contain \"ANALYZE\".\n  - test_get_query_plan_dml_returns_json: assert the non-ANALYZE\n    path still returns parseable JSON (mock a plausible PG response).\nParametrize the DML test over at least INSERT, UPDATE, DELETE.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests covering DML guard behavior",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-postgresql-dml-guard",
+        "notes": "All three subclass PostgreSQLAdapter and do not override get_query_plan().\nAdd a short parametrized test confirming that instantiating each subclass\nand calling get_query_plan() with an INSERT query results in EXPLAIN without\nANALYZE. No new code changes needed in those adapters.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify subclass adapters (TimescaleDB, CedarDB, pg_mooncake) inherit the guard",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,169 @@
+{
+  "description": "PR #277 added the `explorer-tokens` PR-time job in\n`.github/workflows/pr.yml`. It is gated on\n`needs.ci-paths.outputs.needs-code-ci == 'true'`, which is true for any\ncode-CI path (`benchbox/**`, `tests/**`, `scripts/**`, …), so the job\nboots a runner on every Python-only PR before its inner\n`Detect results-explorer/src changes` step short-circuits the scan.\n\nAdd an `explorer-paths-needed` boolean output to\n`scripts/path_filter_decision.py` (mirror the existing\n`content-guard-needed` pattern) and switch the job's `if:` to use it.\nThe inner detection step can then be removed.\n\nThe classifier already has the matching pattern infrastructure;\n`results-explorer/**` is in `.github/path-filters.yml` `code-ci`. Add\na new top-level rule key `explorer-tokens` (sibling of `safe-content`,\n`content-guard`, `code-ci`) matching exactly `results-explorer/src/**`.\nThe classifier emits `explorer-paths-needed` (boolean) when any\nchanged path matches that key; the PR-time job's `if:` switches from\n`needs.ci-paths.outputs.needs-code-ci` to\n`needs.ci-paths.outputs.explorer-paths-needed`. The inner\n`Detect results-explorer/src changes` step is then redundant and is\nremoved in the same change.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "introduce a github-actions-side path filter (e.g. dorny/paths-filter) to gate the job",
+        "instead": "(not specified)",
+        "item_id": "explorer-tokens-path-classifier-output",
+        "why": "diverges from the existing path_filter_decision.py classifier idiom and creates two sources of truth for path classification."
+      },
+      {
+        "dont": "keep the inner `Detect results-explorer/src changes` step alongside the new outer `if:`",
+        "instead": "(not specified)",
+        "item_id": "explorer-tokens-path-classifier-output",
+        "why": "the whole point of moving the gate to the classifier is to remove the duplicate detection."
+      },
+      {
+        "dont": "widen the explorer-tokens scan rule beyond results-explorer/src/**",
+        "instead": "(not specified)",
+        "item_id": "explorer-tokens-path-classifier-output",
+        "why": "the gate's purpose is the retheme contract on the public surface, not the e2e/test fixtures."
+      }
+    ],
+    "item_meta": {
+      "category": "Quality",
+      "completed_at": "2026-08-12T13:20:48Z",
+      "completed_pr": 1697,
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing ci-paths outputs (safe-content-only, needs-code-ci, content-guard-needed) and their semantics.",
+        "item_id": "explorer-tokens-path-classifier-output"
+      },
+      {
+        "behavior": "ci-required-result aggregator behavior — explorer-tokens skipped path still counts as success.",
+        "item_id": "explorer-tokens-path-classifier-output"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-tokens-path-classifier-output",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/scan_explorer_tokens.py"
+      },
+      {
+        "item_id": "explorer-tokens-path-classifier-output",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "explorer-tokens-path-classifier-output",
+        "kind": "only_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "explorer-tokens-path-classifier-output",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "explorer-tokens-path-classifier-output",
+        "kind": "only_modify",
+        "path_glob": "scripts/path_filter_decision.py"
+      },
+      {
+        "item_id": "explorer-tokens-path-classifier-output",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_path_filter_decision.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_path_filter_decision.py -k explorer -v",
+        "description": "Classifier returns explorer-paths-needed=true when results-explorer/src changes",
+        "expected": "all tests pass",
+        "item_id": "explorer-tokens-path-classifier-output",
+        "last_result": "fail",
+        "last_run": "2026-08-12T13:20:36Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -q 'outputs.explorer-paths-needed' .github/workflows/pr.yml",
+        "description": "Workflow gate references the new classifier output",
+        "expected": "exit 0",
+        "item_id": "explorer-tokens-path-classifier-output",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -q 'Detect results-explorer/src changes' .github/workflows/pr.yml",
+        "description": "Inner detection step has been removed",
+        "expected": "exit 0",
+        "item_id": "explorer-tokens-path-classifier-output",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-tokens-path-classifier-output",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-tokens-path-classifier-output",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-tokens-path-classifier-output",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added .github/path-filters.yml explorer-tokens rule matching exactly results-explorer/src/**.",
+        "item_id": "explorer-tokens-path-classifier-output",
+        "notes": null,
+        "started_at": "2026-08-12T13:09:27Z",
+        "started_branch": "fix/explorer-tokens-path-classifier-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.explorer-tokens-path-classifier-20260812",
+        "status": "done",
+        "summary": "Add explorer-tokens rule key to .github/path-filters.yml matching results-explorer/src/**",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Extended path_filter_decision.py with explorer_paths/explorer_paths_needed and explorer-paths-needed GitHub output; generic explorer-tokens group output remains intact.",
+        "item_id": "explorer-tokens-path-classifier-output",
+        "notes": null,
+        "started_at": "2026-08-12T13:11:48Z",
+        "started_branch": "fix/explorer-tokens-path-classifier-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.explorer-tokens-path-classifier-20260812",
+        "status": "done",
+        "summary": "Extend path_filter_decision.py to compute explorer_paths and emit explorer-paths-needed",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added classifier tests covering source-only matching, non-source exclusions, semantic alias, and generic group output.",
+        "item_id": "explorer-tokens-path-classifier-output",
+        "notes": null,
+        "started_at": "2026-08-12T13:11:53Z",
+        "started_branch": "fix/explorer-tokens-path-classifier-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.explorer-tokens-path-classifier-20260812",
+        "status": "done",
+        "summary": "Add unit tests under tests/unit/scripts/test_path_filter_decision.py for the new output",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Changed pr.yml explorer-tokens job gate to explorer-paths-needed, removed duplicate source diff detection, and made the scan step unconditional within the filtered job.",
+        "item_id": "explorer-tokens-path-classifier-output",
+        "notes": null,
+        "started_at": "2026-08-12T13:11:59Z",
+        "started_branch": "fix/explorer-tokens-path-classifier-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.explorer-tokens-path-classifier-20260812",
+        "status": "done",
+        "summary": "Switch pr.yml explorer-tokens job to gate on explorer-paths-needed and drop the inner git diff detection step",
+        "wid": "w4"
+      }
+    ]
+  }
+}

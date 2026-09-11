@@ -1,0 +1,170 @@
+{
+  "description": "The load-only code path (_execute_load_only_mode) has a key mismatch in its\nphases dict: it uses \"duration_seconds\" but the builder reads \"duration_ms\".\nThe total duration only survives in the JSON via a secondary set_loading_time()\ncall that bypasses the broken phases dict - a fragile indirection.\n\nAdditionally, per-table load timings returned by adapter.load_data() are\ncaptured but immediately discarded (_per_table_timings), so the tables block\nin the JSON only contains row counts with no timing information.\n\nA truthiness check on data_loading_time (rather than `is not None`) silently\ndrops zero-duration loads.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a third duration storage path",
+        "instead": "(not specified)",
+        "item_id": "fix-load-phase-duration-metrics",
+        "why": "set_loading_time() feeds summary.data.load_time_ms and set_phase_status() feeds phases.data_loading.duration_ms; both are intentional but they must derive from the same source value (load_time)"
+      },
+      {
+        "dont": "change the adapter.load_data() return type",
+        "instead": "fix the consumer in runner.py and base_benchmark.py instead",
+        "item_id": "fix-load-phase-duration-metrics",
+        "why": "all platform adapters implement it"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-02-25T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Full SQL run path (run_enhanced_benchmark → ExecutionPhases dataclass) continues working - it uses _create_enhanced_data_loading_phase which is correct",
+        "item_id": "fix-load-phase-duration-metrics"
+      },
+      {
+        "behavior": "summary.data.load_time_ms continues to be populated from set_loading_time()",
+        "item_id": "fix-load-phase-duration-metrics"
+      },
+      {
+        "behavior": "tables block continues to include row counts for all tables",
+        "item_id": "fix-load-phase-duration-metrics"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run benchbox run --phases load_only --benchmark tpch --scale 0.01 --platform duckdb 2>/dev/null && python3 -c \"import json, glob; f=sorted(glob.glob('benchmark_runs/results/tpch_sf0.01_duckdb_*.json'))[-1]; d=json.load(open(f)); assert d['phases']['data_loading']['duration_ms'] > 0, f'duration_ms missing or zero: {d[\"phases\"][\"data_loading\"]}'; print('PASS: duration_ms =', d['phases']['data_loading']['duration_ms'])\"",
+        "description": "Load-only run produces duration_ms in phases.data_loading",
+        "expected": "PASS: duration_ms > 0",
+        "item_id": "fix-load-phase-duration-metrics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "python3 -c \"import json, glob; f=sorted(glob.glob('benchmark_runs/results/tpch_sf0.01_duckdb_*.json'))[-1]; d=json.load(open(f)); assert d['phases']['schema_creation'].get('duration_ms') is not None, 'schema_creation missing duration_ms'; print('PASS')\"",
+        "description": "Schema creation phase also has duration_ms",
+        "expected": "PASS",
+        "item_id": "fix-load-phase-duration-metrics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Existing tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "fix-load-phase-duration-metrics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-load-phase-duration-metrics",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fix-load-phase-duration-metrics",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fix-load-phase-duration-metrics",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-load-phase-duration-metrics",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-load-phase-duration-metrics",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-load-phase-duration-metrics",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-load-phase-duration-metrics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix phases dict keys in _execute_load_only_mode: duration_seconds → duration_ms with seconds-to-ms conversion",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-load-phase-duration-metrics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Stop discarding per_table_timings: pass through to create_enhanced_benchmark_result as kwarg",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-load-phase-duration-metrics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update create_enhanced_benchmark_result to pass per-table load_time_ms to builder.add_table_stats",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-load-phase-duration-metrics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix truthiness check: change `if kwargs.get('data_loading_time'):` to `is not None`",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-load-phase-duration-metrics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix builder.py:531 table_statistics export to include load_time_ms when non-zero (currently only exports stats.rows, discarding timing)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-load-phase-duration-metrics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run verification: load-only TPC-H SF0.01 and inspect result JSON for correct duration metrics",
+        "wid": "w6"
+      }
+    ]
+  }
+}

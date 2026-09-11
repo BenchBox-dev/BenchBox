@@ -1,0 +1,85 @@
+{
+  "description": "Canonical JoinOrder SF=1 UAT on Presto fails during schema creation before\ndata load or query execution because the canonical table DDL emits\n`PRIMARY KEY`, which Presto rejects. The remediation for this item is the DDL\nrewrite that lets Presto create the canonical JoinOrder tables; full supported\nmatrix eligibility remains governed by separate canonical UAT evidence.\n\nEvidence:\n  /Users/joe/Developer/benchmark_runs/logs/uat_joinorder_canonical_corpus_20260512/presto_joinorder_1.0_20260512_224026.log\n\nFailure signature:\n  PrestoUserError(type=USER_ERROR, name=SYNTAX_ERROR, message=\"line 1:38:\n  mismatched input 'PRIMARY'. Expecting: ')', ','\")",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Compatibility",
+      "completed_at": "2026-05-15T00:00:00Z",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_presto_adapter.py -q",
+        "description": "Presto DDL rewrite regression coverage passes",
+        "expected": "passes",
+        "item_id": "joinorder-presto-ddl",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/DONE/main/planning/joinorder-presto-ddl.yaml",
+        "description": "TODO graph remains valid after moving this item to DONE",
+        "expected": "passes",
+        "item_id": "joinorder-presto-ddl",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-presto-ddl",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-presto-ddl",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "joinorder-presto-ddl",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-presto-ddl",
+        "notes": "Presto rejects benchmark `CREATE TABLE` statements that contain inline\n`PRIMARY KEY` metadata. The adapter now strips those constraints before the\nexisting memory/Hive catalog rewrites run, preserving the column definitions\nwhile removing metadata that BenchBox does not use for loading immutable\nbenchmark data.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove Presto-incompatible PRIMARY KEY metadata",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-presto-ddl",
+        "notes": "The Presto DDL optimization registry entry now documents the PRIMARY KEY\nstrip alongside the existing memory catalog and Hive format rewrites.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Keep DDL governance aligned with runtime behavior",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-presto-ddl",
+        "notes": "Unit coverage verifies memory and Hive catalog rewrites, confirms inline\nPRIMARY KEY metadata is removed, and checks that all 21 canonical JoinOrder\ntable DDL statements are optimized without PRIMARY KEY or FOREIGN KEY text.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover canonical JoinOrder DDL and Presto catalog variants",
+        "wid": "w3"
+      }
+    ]
+  }
+}

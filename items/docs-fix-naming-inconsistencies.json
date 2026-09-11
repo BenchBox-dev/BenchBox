@@ -1,0 +1,135 @@
+{
+  "description": "Documentation audit (2026-04-01) found systemic naming inconsistencies:\n\nBenchmark naming: Docs use hyphenated filenames (tpc-h.md, tpc-ds.md,\njoin-order.md) while the code registry uses compact/underscored names\n(tpch, tpcds, joinorder). Users reading docs can't directly use the\ndocumented names in CLI commands.\n\nAffected benchmarks: tpc-h->tpch, tpc-ds->tpcds, tpc-di->tpcdi,\ntpc-havoc->tpchavoc, tpch-skew->tpch_skew, tpc-ds-obt->tpcds_obt,\njoin-order->joinorder, metadata-primitives->metadata_primitives,\nread-primitives->read_primitives, write-primitives->write_primitives,\ntransaction-primitives->transaction_primitives, tsbs-devops->tsbs_devops.\n\nPlatform naming: Docs use different conventions than registration names\n(pg_duckdb.md vs registered pg-duckdb, etc.)\n\nResolution approach: Don't rename files (URLs would break). Instead,\nensure each doc prominently shows the CLI-usable name near the top.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-04-01T00:00:00Z",
+      "created_at": "2026-04-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "docs-fix-naming-inconsistencies",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/"
+      },
+      {
+        "item_id": "docs-fix-naming-inconsistencies",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/pg_duckdb.md"
+      },
+      {
+        "item_id": "docs-fix-naming-inconsistencies",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/pg_mooncake.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "total=$(ls docs/benchmarks/*.md | grep -v index.md | wc -l); found=$(grep -l 'CLI name' docs/benchmarks/*.md | grep -v index.md | wc -l); echo \"$found/$total benchmarks have CLI name callout\"; [ \"$found\" -eq \"$total\" ] && echo 'PASS' || echo 'FAIL'",
+        "description": "All benchmark docs (excl. index) contain CLI name callouts",
+        "expected": "20/20 benchmarks have CLI name callout - PASS",
+        "item_id": "docs-fix-naming-inconsistencies",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -q 'CLI Name\\|CLI name\\|cli.name' docs/benchmarks/index.md && echo 'PASS: index has CLI names' || echo 'FAIL: index missing CLI names'",
+        "description": "Index page has CLI name column",
+        "expected": "PASS: index has CLI names",
+        "item_id": "docs-fix-naming-inconsistencies",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "docs-fix-naming-inconsistencies",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "docs-fix-naming-inconsistencies",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "docs-fix-naming-inconsistencies",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "docs-fix-naming-inconsistencies",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add CLI name callout to TPC-family benchmark docs (7 files)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-fix-naming-inconsistencies",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add CLI name callout to non-TPC benchmark docs (8 files)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-fix-naming-inconsistencies",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add CLI name callout to primitives benchmark docs (4 files)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-fix-naming-inconsistencies",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update benchmark index page with CLI names",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-fix-naming-inconsistencies",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add CLI name callout to platform docs with naming mismatches",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-fix-naming-inconsistencies",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Clarify TPC-DS table count (24 vs 25 - DBGEN_VERSION)",
+        "wid": "w6"
+      }
+    ]
+  }
+}

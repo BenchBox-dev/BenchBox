@@ -1,0 +1,67 @@
+{
+  "context": "Do not begin until the authorization and worktree gates pass. Preserve unrelated changes, use temporary outputs for tests, fail closed on uncertainty, and stop on any data-loss or false-success signal.",
+  "description": "Build into temporary output, install with declared dependencies in a clean environment, run installed CLI/version JSON, check metadata, and inspect workflow dependency order.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "fix-gate-4-packaging-release-review",
+        "needs_item": "fix-p1-release-gating"
+      }
+    ],
+    "item_meta": {
+      "category": "architecture-remediation",
+      "completed_at": "2026-08-26T21:28:29Z",
+      "completed_pr": 1925,
+      "created_at": "2026-08-26T17:08:36Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing user files, existing result artifacts, backward compatibility, rollback evidence",
+        "item_id": "fix-gate-4-packaging-release-review"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-gate-4-packaging-release-review",
+        "kind": "do_not_modify",
+        "path_glob": ".bossmode/**"
+      },
+      {
+        "item_id": "fix-gate-4-packaging-release-review",
+        "kind": "do_not_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "fix-gate-4-packaging-release-review",
+        "kind": "do_not_modify",
+        "path_glob": "test-results/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv build --wheel --out-dir /tmp/package && uv pip install",
+        "description": "Clean package acceptance passes",
+        "expected": "build and installed CLI succeed",
+        "item_id": "fix-gate-4-packaging-release-review",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1925 release workflow installs the built wheel on the OS matrix before publication. Release infrastructure tests passed and required preflight passed.",
+        "item_id": "fix-gate-4-packaging-release-review",
+        "notes": null,
+        "started_at": "2026-08-26T21:28:23Z",
+        "started_branch": "fix/architecture-integrity-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-architecture-integrity-batch",
+        "status": "done",
+        "summary": "Run clean package install and release dependency verification without publishing",
+        "wid": "w1"
+      }
+    ]
+  }
+}

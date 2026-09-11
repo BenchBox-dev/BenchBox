@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #644 on guards-fix-regen-target-2. Running make parity-fixtures on a clean develop tree in the cloud sandbox produces a last-significant-digit float difference in tests/parity/fixtures/geomean_ms.json vs the committed fixture, while CI parity-check is green on the same tree - i.e. the regen output is platform-dependent. Consequence: make guards-fix (which includes parity-fixtures) is not a guaranteed no-op on a clean tree on all machines, and a contributor on such a platform could commit spurious fixture churn. Fix direction: make the fixture writer emit round-tripped/explicitly-formatted floats (e.g. repr with fixed precision) or document+enforce a tolerance in parity-check. Acceptance: parity-fixtures regen on a clean tree is byte-identical on linux CI and at least one other platform.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-23T20:04:39Z",
+      "worktree": "ci-failure-reduction"
+    }
+  }
+}

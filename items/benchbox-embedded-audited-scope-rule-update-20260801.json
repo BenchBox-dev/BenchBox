@@ -1,0 +1,124 @@
+{
+  "context": "Port the validated standalone semantics narrowly: an update command with add/drop scope flags, mandatory reason, prevalidation, one transaction, and one audit event. Prove the live item9 scope can then be widened through the CLI.",
+  "description": "The live BenchBox hosted tracker still uses its embedded schema and standalone todo-db intentionally rejects that schema. Add atomic audited only_modify/do_not_modify rule mutation to the embedded CLI so blocked items can be repaired without direct SQL.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-01T20:55:19Z",
+      "completed_pr": 1440,
+      "created_at": "2026-08-01T20:21:20Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "All hosted tracker writes remain CLI-only and project state changes remain atomic.",
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801"
+      },
+      {
+        "behavior": "Scope removals require explicit rationale and invalid/duplicate/conflicting changes roll back completely.",
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/todo-db-tracker.md"
+      },
+      {
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_v2.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -k \"update and scope\" -q",
+        "description": "Focused update tests pass",
+        "expected": "all embedded scope-update tests pass",
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:28:59Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q",
+        "description": "Tracker test module passes",
+        "expected": "module green",
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:29:05Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated: live BenchBox hosted DB is legacy schema v4 without schema_migrations; standalone todo-db correctly rejects it as a foreign tracker schema, while embedded CLI has no update subcommand. Direct SQL is prohibited.",
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801",
+        "notes": null,
+        "started_at": "2026-08-01T20:22:56Z",
+        "started_branch": "fix/embedded-audited-scope-rule-update-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.embedded-scope-20260801",
+        "status": "done",
+        "summary": "Revalidate the standalone-to-embedded schema boundary and current absence of update",
+        "wid": "w0"
+      },
+      {
+        "evidence": "RED proof: focused update/scope selection fails 2 tests because update_scope_rules does not exist; tests cover mandatory reason, exact audit payload, atomic rollback, duplicate/conflict/empty/existing/missing validation.",
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801",
+        "notes": null,
+        "started_at": "2026-08-01T20:23:04Z",
+        "started_branch": "fix/embedded-audited-scope-rule-update-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.embedded-scope-20260801",
+        "status": "done",
+        "summary": "Add failing embedded CLI tests for atomic audited scope mutations",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added embedded todo update with four scope add/drop flags, mandatory --reason, prevalidation, one write transaction, exact update audit payload, CLI routing, spec documentation, and 3 regression tests; focused selection passes.",
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801",
+        "notes": null,
+        "started_at": "2026-08-01T20:24:50Z",
+        "started_branch": "fix/embedded-audited-scope-rule-update-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.embedded-scope-20260801",
+        "status": "done",
+        "summary": "Implement and document the embedded update operation",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Focused tracker update tests 3 passed; full tracker module 86 passed; Ruff check/format clean; scope strict clean; commit bdf45a29b published as PR #1440 with auto-merge and CI green except currently rerunning after develop synchronization.",
+        "item_id": "benchbox-embedded-audited-scope-rule-update-20260801",
+        "notes": null,
+        "started_at": "2026-08-01T20:28:33Z",
+        "started_branch": "fix/embedded-audited-scope-rule-update-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.embedded-scope-20260801",
+        "status": "done",
+        "summary": "Verify, self-review, and publish the repair",
+        "wid": "w3"
+      }
+    ]
+  }
+}

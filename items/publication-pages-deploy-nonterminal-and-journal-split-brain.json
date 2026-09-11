@@ -1,0 +1,202 @@
+{
+  "context": "Keep the normal writer and any observer separate. Start with w1 (diagnosis) before touching code: the ~9-failure streak spans four merged fixes, so confirm the current fault is GitHub Pages env/config or a provider-side change, not another adapter bug. w2 and w3 are independent given w1 and can proceed in parallel. w4 is the production reconciliation and needs maintainer approval plus w2+w3. w5 is the guardrail so this cannot recur silently. Preserve journal CAS, retained artifacts, and the attested-receipt gate throughout; coordinate shared publication paths with the independent-production-deployer-and-retirement claim holder.",
+  "description": "Every github-pages deployment since 2026-09-08 16:13 UTC has failed (~9 in a row across merged fixes #2088-#2091 and multiple SHAs). Each fix moved the failure later: #2089 fixed an empty artifact-id interpolation (JS parse error, pre-send); #2091 fixed a dangling commit-tree OID sent as pages_build_version (provider HTTP 404, post-send, no deployment created). The gen-6 promotion (transaction b706c659, run 34476129946, 2026-09-10) got further still: createDeployment succeeded, GitHub published the artifact, and benchbox.dev now serves the validated gen-6 candidate on all five routes (/, /docs/, /docs/api.html, /results/, /results/data/results.duckdb 434c0b10...; last-modified 12:28:50Z, cache-stable). But the deployment never reported SUCCESS/ACTIVE within the adapter's 12x5s poll, GitHub marked deployment 6371468701 \"failure\" at 12:29:52Z, the Execute job threw, and verify + durable-finalize were skipped.\n\nResult: a split-brain. Provider edge serves gen-6; journal durable head is still gen 3 (legacy-import-34249636570); gen-6 tx b706c659 is recovery-required; next_generation advanced to 7; no signed live receipt was issued. GitHub's own records are also inconsistent (deployment \"failure\", GET /repos/.../pages status: null, gen-3 deployment 6331938635 still marked active). The remaining fault looks like GitHub Pages environment/config, not the adapter: pages.status null, source.branch \"main\" while build_type \"workflow\", custom-domain protected_domain_state null.\n\nThis blocks the independent-production-deployer-and-retirement soak (its w8) and everything downstream (A10, A11). Handoffs: /tmp/publication-handoff.md, /tmp/publication-handoff-2.md. None of #2088-#2091 have tracker items; this one covers the class.",
+  "legacy": {
+    "item_meta": {
+      "category": "Publication Architecture",
+      "created_at": "2026-09-10T21:25:11Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Coordinate overlapping publication paths with the active independent-production-deployer-and-retirement owner before editing; do not shortcut the current soak",
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain"
+      },
+      {
+        "behavior": "Drift and reconciliation checks are observational: they must not deploy, sign, compensate, or finalize a transaction",
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain"
+      },
+      {
+        "behavior": "Journal CAS and retained exact artifacts remain the rollback path; never advance the durable head without an attested Ed25519 live receipt",
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain"
+      },
+      {
+        "behavior": "benchbox.dev serves the site, /results/, and /results/data/results.duckdb without an outage window",
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/**"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run pytest tests/unit/scripts/publication tests/unit/workflows/test_publication_transaction.py tests/unit/workflows/test_publication_recover.py -q",
+        "description": "Publication transaction, recovery, and Pages-adapter tests pass, including the new terminal-state poll regression test",
+        "expected": "all tests pass",
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/check_workflow_permissions.py --workflow .github/workflows/publication-transaction.yml && make docs-validate",
+        "description": "Publication workflow permissions and documentation checks pass",
+        "expected": "exit 0",
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "human verification and evidence review",
+        "description": "A dispatched candidate deployment reaches terminal success and the served bytes match the durable head",
+        "expected": "github-pages deployment reports SUCCESS/ACTIVE; verify_live.py against the live receipt shows zero drift across all five routes; journal durable head equals the deployed transaction; retained evidence",
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "notes": "Determine whether the cause is Pages environment/config (source.branch=main vs build_type=workflow, pages.status=null, protected_domain_state=null), artifact shape/size, a Pages build quota/timeout, or a GitHub-side change. Evidence: deployment IDs and their status transitions, GET /repos/.../pages output, and the last known-good deployment (6331938635 / fdc51332, gen 3).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Root-cause the github-pages deployment failure streak since 2026-09-08 16:13 UTC and write the diagnosis into docs/operations with evidence",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "notes": "The 12x5s (60s) poll is far shorter than a real Pages deployment. The adapter must distinguish still-building from failed, wait long enough for a normal deployment, and not raise a non-terminal state as failure. Regression test under tests/unit/scripts/publication.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Fix terminal-state detection in scripts/publication/pages.cjs and the publication-transaction.yml deploy step; add a regression test",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "notes": "scripts/publication/transaction.py _handle_recovery_required currently permits only mark-terminal. Once an attested route probe confirms the bytes are live (against an issued or reconstructed receipt), the durable head should be able to advance without redeploying. Decide between a new state-machine event and a publication-recover compensation job; write an ADR if the public transaction contract changes. Keep journal CAS and retained-artifact rollback intact.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement a forward reconciliation path for a transaction stuck in recovery-required once the provider effect is confirmed live",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "notes": "gen-6 candidate bytes (tx b706c659, manifest 07a89f79..., archive 12dd4551..., all five live routes verified) are serving on benchbox.dev; journal durable is still gen 3, gen-6 tx recovery-required, next_generation 7, no receipt. Establish provider finality, then either finalize gen-6 through the w3 path or roll to a clean gen-7. Do not force the durable head without an attested receipt.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reconcile the current gen-6/gen-3 split-brain with maintainer approval: finalize gen-6 or roll to a clean gen-7",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "publication-pages-deploy-nonterminal-and-journal-split-brain",
+        "notes": "Catches a future split-brain within one observation cycle. Coordinate with independent-publication-a11 w1 to avoid duplicating the reconciliation observer. This check stays observational: it must not deploy, sign, compensate, or finalize.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a desired-vs-observed drift check that fails when live route content diverges from the durable head manifest",
+        "wid": "w5"
+      }
+    ]
+  }
+}

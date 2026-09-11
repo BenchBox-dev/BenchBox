@@ -1,0 +1,129 @@
+{
+  "context": "Create _project/decisions/native-merge-queue-activation-20260822.md and docs/operations/merge-queue-governance.md. Define the required-context merge_group contract for ci-required-result, Results Explorer browser gate, and ruleset-drift. Specify the soundness-path enqueuing guardrails prohibiting hands-free enqueue on SOUNDNESS_PREFIXES.",
+  "description": "Phase 1 / Gate MQ-1. Author the authoritative decision record and operational governance specification for adopting GitHub Native Merge Queue on BenchBox-dev/BenchBox post-v0.4.0. Formalize queue configuration parameters (squash merge, grouping strategy, timeout, concurrency), soundness-path withholding invariants, CI matrix interaction, and rollback protocol.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add bypass actors to develop-squash-only to allow automatic queue entry",
+        "instead": "Enforce manual maintainer approval for soundness paths",
+        "item_id": "merge-queue-01-decision-and-governance-spec",
+        "why": "Bypass actors violate the soundness review boundary and allow unreviewed writes"
+      },
+      {
+        "dont": "Enable merge queue in repository settings before all required workflows have merge_group triggers",
+        "instead": "Complete all workflow and tooling adaptation first",
+        "item_id": "merge-queue-01-decision-and-governance-spec",
+        "why": "Queued PRs will deadlock indefinitely because required checks will never report"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-22T16:25:45Z",
+      "created_at": "2026-08-22T15:31:07Z",
+      "worktree": "merge-queue"
+    },
+    "preserves": [
+      {
+        "behavior": "Soundness paths continue to require maintainer review before merge",
+        "item_id": "merge-queue-01-decision-and-governance-spec"
+      },
+      {
+        "behavior": "Squash merge method remains the sole integration mode",
+        "item_id": "merge-queue-01-decision-and-governance-spec"
+      },
+      {
+        "behavior": "develop-squash-only bypass_actors remains empty",
+        "item_id": "merge-queue-01-decision-and-governance-spec"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "merge queue assessment and inventory",
+        "decision": "extend",
+        "item_id": "merge-queue-01-decision-and-governance-spec",
+        "path": "_project/decisions/strict-base-refresh-merge-queue-2026-08-14.md"
+      },
+      {
+        "concept": "ruleset governance and review requirements",
+        "decision": "reuse",
+        "item_id": "merge-queue-01-decision-and-governance-spec",
+        "path": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "merge-queue-01-decision-and-governance-spec",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "merge-queue-01-decision-and-governance-spec",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub rulesets or hosted admin settings"
+      },
+      {
+        "item_id": "merge-queue-01-decision-and-governance-spec",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/native-merge-queue-activation-*.md"
+      },
+      {
+        "item_id": "merge-queue-01-decision-and-governance-spec",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/merge-queue-governance.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/decisions/native-merge-queue-activation-*.md",
+        "description": "Decision record exists and specifies squash merge method and concurrency bounds",
+        "expected": "pass",
+        "item_id": "merge-queue-01-decision-and-governance-spec",
+        "last_result": "pass",
+        "last_run": "2026-08-22T16:25:42Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'ci-required-result' docs/operations/merge-queue-governance.md",
+        "description": "Governance doc specifies required merge_group contexts and soundness withholding",
+        "expected": "pass",
+        "item_id": "merge-queue-01-decision-and-governance-spec",
+        "last_result": "pass",
+        "last_run": "2026-08-22T16:25:43Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "merge-queue-01-decision-and-governance-spec",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Authored native merge queue decision record _project/decisions/native-merge-queue-activation-20260822.md",
+        "item_id": "merge-queue-01-decision-and-governance-spec",
+        "notes": null,
+        "started_at": "2026-08-22T16:25:26Z",
+        "started_branch": "docs/merge-queue-01-decision-and-governance-spec",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-01",
+        "status": "done",
+        "summary": "Draft native merge queue decision record with queue parameters and rollback criteria",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Authored merge queue governance doc docs/operations/merge-queue-governance.md with soundness withholding and rollback",
+        "item_id": "merge-queue-01-decision-and-governance-spec",
+        "notes": null,
+        "started_at": "2026-08-22T16:25:33Z",
+        "started_branch": "docs/merge-queue-01-decision-and-governance-spec",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-01",
+        "status": "done",
+        "summary": "Document operational governance and soundness-path withholding specification",
+        "wid": "w1"
+      }
+    ]
+  }
+}

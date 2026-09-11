@@ -1,0 +1,10 @@
+{
+  "description": "- Ensured all TPC-H and TPC-DS queries are generated with a tool-supported base dialect and ALWAYS normalized via SQLGlot to the platform target dialect.\n- \"Added `get_tpc_base_dialect(benchmark_name: str) -> str` to `PlatformAdapter` (default: `ansi`).\"\n- \"Wired adapters to pass both `base_dialect` and `dialect` into benchmark query generation.\"\n- \"Updated TPC-DS and TPC-H benchmarks to:\"\n- Added unit tests covering adapter dialect forwarding and translation pass-through for both TPC-H and TPC-DS.\n- Simplified the query flow and removed ad-hoc translation shortcuts in favor of the standardized SQLGlot path.",
+  "legacy": {
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

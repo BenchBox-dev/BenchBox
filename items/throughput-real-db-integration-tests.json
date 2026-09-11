@@ -1,0 +1,137 @@
+{
+  "description": "The entire production throughput path is exercised only against Mock/Dummy\nconnections. No test runs concurrent streams against a real engine, so real\nconcurrent-execution correctness is unverified:\n\n- tests/unit/core/throughput/test_runner.py — stream_fn is a Mock; docstring\n  states it does NOT test real multi-threaded timing.\n- tests/integration/test_tpch_throughput_test.py, test_tpcds_throughput_test.py\n  — real ThreadPoolExecutor but Mock DB; the TPC-DS file notes \"can't easily\n  test full execution without a real database\".\n- tests/integration/test_throughput_corrections.py — strongest (real threads +\n  timing) but still mock connections.\n\nWhat is therefore unverified today: result integrity under concurrency,\nconnection/session isolation between streams, that all N streams actually run\nall queries against loaded data, TTT/Throughput@Size math on real timings, and\nbehavior under real contention. DuckDB is embedded, fast, and already a test\ndependency -- there is no reason the happy path is not covered end-to-end.\n\nThis item is foundational: the wiring-defect fix, independent-sessions work,\nresult-handling changes, and pre-generation change all need a real-DB oracle\nto prove they did not regress or silently no-op.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "gate the fast test lane on these",
+        "instead": "(not specified)",
+        "item_id": "throughput-real-db-integration-tests",
+        "why": "mark them integration/slow so pr fast-lane stays quick."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-09T00:00:00Z",
+      "created_at": "2026-07-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing mock-based unit tests remain (fast lane) — real-DB tests are additive and marked slow/integration.",
+        "item_id": "throughput-real-db-integration-tests"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/base/execution.py:_execute_tpch_throughput_test — the code path under test.",
+        "decision": "reuse",
+        "item_id": "throughput-real-db-integration-tests",
+        "path": "benchbox/platforms/base/execution.py:_execute_tpch_throughput_test"
+      },
+      {
+        "concept": "tests/integration/test_throughput_corrections.py — closest existing harness (real threads); extend it to a real DuckDB fixture instead of mocks.",
+        "decision": "extend",
+        "item_id": "throughput-real-db-integration-tests",
+        "path": "tests/integration/test_throughput_corrections.py"
+      },
+      {
+        "concept": "tests/integration/test_tpch_power_test.py / test_tpcds_power_test.py — existing real-DuckDB single-stream fixtures to reuse for schema+load setup.",
+        "decision": "reuse",
+        "item_id": "throughput-real-db-integration-tests",
+        "path": "tests/integration/test_tpch_power_test.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "throughput-real-db-integration-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/conftest.py"
+      },
+      {
+        "item_id": "throughput-real-db-integration-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration -k 'throughput and duckdb' -m integration -v",
+        "description": "Real-DB throughput tests pass",
+        "expected": "N-stream runs pass against real DuckDB",
+        "item_id": "throughput-real-db-integration-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "throughput-real-db-integration-tests",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "throughput-real-db-integration-tests",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "throughput-real-db-integration-tests",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "throughput-real-db-integration-tests",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "throughput-real-db-integration-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build a real-DuckDB throughput fixture (SF small) with tables loaded once and reused across streams",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-real-db-integration-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "TPC-H happy-path test: N streams each run 22 queries against real data, all succeed, throughput_at_size > 0",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-real-db-integration-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "TPC-DS happy-path test: N streams run the permuted set against real data",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-real-db-integration-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Concurrency-correctness assertions: no cross-stream result bleed; per-stream query counts correct; streams_successful == N",
+        "wid": "w4"
+      }
+    ]
+  }
+}

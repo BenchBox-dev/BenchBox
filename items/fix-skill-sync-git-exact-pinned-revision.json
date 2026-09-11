@@ -1,0 +1,168 @@
+{
+  "context": "Use the existing no-checkout plus detached exact-ref implementation and its non-default-branch regression test. Keep this PR independent from the todo-db package and BenchBox runtime cutover.",
+  "description": "Land and release the skill-sync Git source fix needed by consumers such as BenchBox that pin a non-default Git revision of skill-sync-skills. The adapter must resolve an exact pinned commit from a clean installation, including a commit not reachable from the default branch. This is a separate source-acquisition prerequisite, not a helper/CLI synchronization change.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Mix the Git adapter release with BenchBox runtime or database migration edits",
+        "instead": "Keep this as a separate package/release item",
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "why": "Source acquisition and tracker cutover have independent rollback and release gates"
+      },
+      {
+        "dont": "Use the local dirty dist build as the only proof of consumer reproducibility",
+        "instead": "Verify the fixed package from a clean installation against an exact non-default revision",
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "why": "A clean CI or cloud runner will use the released package, not the local uncommitted source"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-10T21:39:15Z",
+      "completed_pr": 15,
+      "created_at": "2026-08-10T20:42:12Z",
+      "worktree": "skill-sync-canonical"
+    },
+    "preserves": [
+      {
+        "behavior": "Git sources remain read-only and resolve configured branch, tag, and exact commit refs",
+        "item_id": "fix-skill-sync-git-exact-pinned-revision"
+      },
+      {
+        "behavior": "dirty consumer worktrees and generated skill snapshots remain untouched",
+        "item_id": "fix-skill-sync-git-exact-pinned-revision"
+      },
+      {
+        "behavior": "this change does not install or copy todo-db runtime code into skill directories",
+        "item_id": "fix-skill-sync-git-exact-pinned-revision"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/.claude/skills/**"
+      },
+      {
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/.codex/skills/**"
+      },
+      {
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/.gemini/skills/**"
+      },
+      {
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/skill-sync/src/sources/git.ts"
+      },
+      {
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/skill-sync/tests/unit/sources/git.test.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "npm run test:run -- tests/unit/sources/git.test.ts",
+        "description": "Git exact pinned-revision regression passes",
+        "expected": "exit 0",
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "last_result": "pass",
+        "last_run": "2026-08-10T21:38:20Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "npm run test:run",
+        "description": "Skill-sync full test suite passes",
+        "expected": "exit 0",
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "last_result": "pass",
+        "last_run": "2026-08-10T21:38:26Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "npm run lint && npm run check && npm run build",
+        "description": "Skill-sync lint, type-check, and build pass",
+        "expected": "exit 0",
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "last_result": "pass",
+        "last_run": "2026-08-10T21:38:31Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "In /Users/joe/Developer/skill-sync.pool-git-exact-pinned-revision, confirmed the adapter previously fetched depth-1 FETCH_HEAD and could not guarantee a pinned commit outside the default branch. Added and passed the local non-default-branch exact-SHA regression; npm run test:run -- tests/unit/sources/git.test.ts passed 19 tests.",
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "notes": null,
+        "started_at": "2026-08-10T21:34:35Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Verify the exact pinned-commit failure mode and the existing GitSource regression test",
+        "wid": "w0"
+      },
+      {
+        "evidence": "In /Users/joe/Developer/skill-sync.pool-git-exact-pinned-revision, changed GitSource to clone without checkout and detach the configured branch/tag/exact SHA; added a regression repo with a feature-only commit and asserted both skill resolution and recorded exact revision. Targeted Vitest suite passed 19 tests.",
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "notes": null,
+        "started_at": "2026-08-10T21:35:50Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Complete the Git adapter change and targeted regression coverage",
+        "wid": "w1"
+      },
+      {
+        "evidence": "In /Users/joe/Developer/skill-sync.pool-git-exact-pinned-revision, npm run test:run passed 412 tests across 39 files; npm run lint passed; npm run check passed; npm run build passed.",
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "notes": null,
+        "started_at": "2026-08-10T21:36:16Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run the full skill-sync test, lint, type-check, and build gates",
+        "wid": "w2"
+      },
+      {
+        "evidence": "The fixed package is available to clean consumers at immutable pushed commit d65fc6c: in a fresh /tmp consumer with a fresh npm cache, npx --yes github:joeharris76/skill-sync#d65fc6c --help installed and executed skill-sync v0.1.0. npm registry lookup confirms no published skill-sync package yet; GitHub pinned commit is the documented distribution path.",
+        "item_id": "fix-skill-sync-git-exact-pinned-revision",
+        "notes": null,
+        "started_at": "2026-08-10T21:36:37Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Release or otherwise make the fixed skill-sync package available to clean consumers",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,197 @@
+{
+  "context": "Write a short decision record only. Inventory counts from the live registries. Do not change runtime code, registries, or support_status values in this item.",
+  "description": "DECISION GATE for the architecture-simplification program (origin/develop 29380ce9e).\n\nProblem: 51 platforms (5 stable / 28 beta / 17 experimental / 1 deprecated) and 23 benchmark families have no recorded usage, demand, or support-cost evidence. Later steps (SQL-primitive fold, family-seam pilot, package extraction) guess at breadth.\n\nThis item records a product judgment. It does not delete code.\n\nOptions (pick exactly one and write it to _project/decisions/):\nA) Commit to carry all current registry entries; experimental stays labeled and in-tree.\nB) Commit to stable+beta as the supported product; experimental/deprecated stay in-tree but surface:internal or extra-gated after a later measured item.\nC) Explicit deferral: name the evidence that would settle A vs B (install-size, import time, CI minutes, demand). Until that evidence exists, no family/platform deletion and no companion-package extraction.\n\nStop condition: a decision file exists that names the committed tiers OR an explicit deferral with evidence criteria. docs/design/future-state/index.md must cite that file (handled in arch-future-state-index-reconciliation).\n\nOut of scope: deleting benchmarks/platforms; creating benchbox-experimental or benchbox-maintainer distributions; MCP production publication.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change registry support_status values here",
+        "instead": "cite current counts and leave registries untouched",
+        "item_id": "arch-tier-commitment-decision",
+        "why": "this item is a product judgment, not a metadata sweep"
+      },
+      {
+        "dont": "create a companion package in this item",
+        "instead": "write the decision only",
+        "item_id": "arch-tier-commitment-decision",
+        "why": "extraction is a later measured decision"
+      },
+      {
+        "dont": "treat missing usage data as permission to delete experimental families",
+        "instead": "record A, B, or an evidence-gated deferral",
+        "item_id": "arch-tier-commitment-decision",
+        "why": "Keep remains the residual product verdict until a recorded decision says otherwise"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-14T01:17:51Z",
+        "from_item": "arch-tier-commitment-decision",
+        "id": 711,
+        "reason": "Documented BLOCKED in docs/operations/mcp-production-readiness-evidence.md. Engine execute_run adoption is done. This architecture program must not absorb deployment evidence work.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Resolved as documented out-of-scope deferral: MCP production publication remains BLOCKED in docs/operations/mcp-production-readiness-evidence.md and is explicitly preserved in _project/decisions/architecture-support-tier-commitment.md; no production evidence or implementation belongs to this batch.",
+        "summary": "MCP production publication (TLS, storage, OTLP, multi-host, named approver)"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture",
+      "completed_at": "2026-08-14T01:47:51Z",
+      "completed_pr": 1726,
+      "created_at": "2026-08-14T01:17:45Z",
+      "worktree": "arch-simplification"
+    },
+    "preserves": [
+      {
+        "behavior": "MCP production-readiness gates stay BLOCKED and out of this program",
+        "item_id": "arch-tier-commitment-decision"
+      },
+      {
+        "behavior": "No platform or benchmark is deleted or has support_status changed by this item",
+        "item_id": "arch-tier-commitment-decision"
+      },
+      {
+        "behavior": "Public contracts taxonomy (stable/beta/experimental/deprecated) remains the vocabulary",
+        "item_id": "arch-tier-commitment-decision"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "product-surface deletion is a human decision",
+        "decision": "reuse",
+        "item_id": "arch-tier-commitment-decision",
+        "path": "_project/decisions/shrink-objective.md"
+      },
+      {
+        "concept": "ranked High isolation/extraction proposals",
+        "decision": "extend",
+        "item_id": "arch-tier-commitment-decision",
+        "path": "docs/design/future-state/index.md"
+      },
+      {
+        "concept": "live platform status snapshot",
+        "decision": "reuse",
+        "item_id": "arch-tier-commitment-decision",
+        "path": "docs/platforms/support-status.md"
+      },
+      {
+        "concept": "support_status taxonomy and count policy",
+        "decision": "reuse",
+        "item_id": "arch-tier-commitment-decision",
+        "path": "docs/reference/public-contracts.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "arch-tier-commitment-decision",
+        "kind": "do_not_modify",
+        "path_glob": "MANIFEST.in"
+      },
+      {
+        "item_id": "arch-tier-commitment-decision",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "arch-tier-commitment-decision",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "arch-tier-commitment-decision",
+        "kind": "do_not_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "arch-tier-commitment-decision",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "arch-tier-commitment-decision",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/index.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -n \"$(ls _project/decisions/*tier* 2>/dev/null; ls _project/decisions/*support-tier* 2>/dev/null; true)\"",
+        "description": "Decision file exists and names A, B, or explicit deferral with evidence criteria",
+        "expected": "a new decision file is present",
+        "item_id": "arch-tier-commitment-decision",
+        "last_result": "pass",
+        "last_run": "2026-08-14T01:47:47Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --name-only -- benchbox tests",
+        "description": "No benchbox/ or tests/ files changed",
+        "expected": "empty",
+        "item_id": "arch-tier-commitment-decision",
+        "last_result": "pass",
+        "last_run": "2026-08-14T01:47:49Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "arch-tier-commitment-decision",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "arch-tier-commitment-decision",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "uv live registry probe on origin/develop 40554b9fd: PlatformRegistry summary and benchmark registry summary",
+        "item_id": "arch-tier-commitment-decision",
+        "notes": null,
+        "started_at": "2026-08-14T01:40:54Z",
+        "started_branch": "docs/arch-tier-commitment-decision",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-tier-commitment-decision",
+        "status": "done",
+        "summary": "Re-validate platform and benchmark support_status counts on current origin/develop.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Platform counts 51 total (stable 5, beta 28, experimental 17, deprecated 1); benchmark counts 23 total (stable 5, beta 12, experimental 5, repo_only 1) from benchbox registry APIs",
+        "item_id": "arch-tier-commitment-decision",
+        "notes": null,
+        "started_at": "2026-08-14T01:40:59Z",
+        "started_branch": "docs/arch-tier-commitment-decision",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-tier-commitment-decision",
+        "status": "done",
+        "summary": "Inventory live platform and benchmark support_status counts from the registries and quote them in the draft.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Drafted Options A/B/C with consequences for Steps 3b/5/6; selected evidence-gated Option C because demand/install/import/CI/support-cost evidence is absent",
+        "item_id": "arch-tier-commitment-decision",
+        "notes": null,
+        "started_at": "2026-08-14T01:42:15Z",
+        "started_branch": "docs/arch-tier-commitment-decision",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-tier-commitment-decision",
+        "status": "done",
+        "summary": "Draft options A/B/C with consequences for Steps 3b/5/6; do not pick by line-count.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Created _project/decisions/architecture-support-tier-commitment.md; records Option C, live registry counts, evidence criteria, downstream consequences, and MCP deferral",
+        "item_id": "arch-tier-commitment-decision",
+        "notes": null,
+        "started_at": "2026-08-14T01:43:04Z",
+        "started_branch": "docs/arch-tier-commitment-decision",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-tier-commitment-decision",
+        "status": "done",
+        "summary": "Record the chosen option or explicit deferral under _project/decisions/ and stop.",
+        "wid": "w3"
+      }
+    ]
+  }
+}

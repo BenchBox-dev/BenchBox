@@ -1,0 +1,234 @@
+{
+  "context": "Take the classification rule written by [mcp-option-contract-matrix-enforcement] w1 and apply it. Two shapes, both already validated by the ClickHouse item; prefer (a) unless remote Velox over MCP is a real demand:\n  (a) Remove `deployment` from MCP_PLATFORM_OPTION_ALLOWLIST['velox']. Local is the only Velox deployment MCP can fully describe -- endpoint, gluten_jar_path and the rest are not admissible -- so a caller asking for `remote` is asking for a run this boundary cannot configure. Record the removal in the docs/reference/mcp.md omission ledger with a ratified tier, per the one-engine ADR; an unledgered omission is itself a defect.\n  (b) If remote Velox must stay reachable, mirror BENCHBOX_MCP_CLICKHOUSE_PROFILES: a server-owned velox endpoint registry, accept only a profile name, resolve in the adapter-facing translation at EXECUTION time so durable replays re-resolve, and reject deployment='remote' without a profile.\nEither way, tests/unit/mcp/test_schemas.py:272 currently asserts `remote` is accepted -- that assertion encodes the assumption and must change with the fix.",
+  "description": "The ClickHouse remediation (#1510) established that a connection-class platform option must NAME a server-owned destination, never DESCRIBE one. `velox.deployment` is classified security_class='connection' in MCP_PLATFORM_OPTION_CONTRACT but was never brought under that rule, so an authenticated MCP caller can still steer the server at a listener the operator never approved.\n\nReproduced on develop 4836e3988d:\n  validate_platform_options('velox', {'deployment': 'remote'})  -> {'deployment': 'remote'}  (accepted)\n  _prepare_adapter_platform_options('velox', ...)               -> {'deployment': 'remote'}  (unchanged)\n  VeloxAdapter.from_config(...).endpoint                        -> 'sc://localhost:50051'\n\nbenchbox/platforms/velox.py:153 defaults the Spark-Connect endpoint to sc://localhost:50051 when the caller supplies none, and MCP does not allow `endpoint`, so `remote` always resolves to that fixed host-local target. velox.py:370 then calls SparkSession.builder.remote(endpoint); :389-393 probes reachability and raises an error whose text contains the endpoint. A caller who cannot choose a port still learns whether a Spark-Connect server is listening on localhost:50051, and can cause a connection attempt to it.\n\nNarrower than the ClickHouse finding (one fixed port, not caller-chosen), and on a remote deployment the operator's allowed_platforms policy must already include velox for it to be reachable -- hence high, not critical. But it is the same defect class the batch was convened to close, left open in the platform whose item (#1520) touched this exact option: #1520 closed only the enumeration half (deployment='docker' now fails closed) and left `remote` admissible.\n\nTIMING. benchbox/mcp/tools/benchmark.py is scheduled for rewrite by one-engine-mcp-run-service-adoption, whose rung 1 requires _prepare_adapter_platform_options to be deleted. This item is small and must land BEFORE that rewrite, or the fix has to be re-authored against a moved execution path.\n\nIdentified 2026-08-04 during the adversarial review of the mcp-v2-platform-options batch.\n\nSUPERSEDES `mcp-velox-remote-destination-boundary`, which was dropped minutes after creation on 2026-08-04 to attach anti-patterns, sequenced work units, prior art and dependency edges. `drop` is a soft state change rather than a delete, so the original id could not be reused; the dropped item carries the reason and links back here.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add `endpoint` to the MCP allow-list so that `remote` becomes fully describable",
+        "instead": "if remote must work, callers name a server-owned profile and never describe one",
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "why": "that is exactly the caller-supplied destination the ClickHouse item removed; it converts a one-port probe into arbitrary host and port selection"
+      },
+      {
+        "dont": "fix this by suppressing the endpoint from the _ensure_server_ready error text",
+        "instead": "stop the request at admission, or bind it to a server-owned destination",
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "why": "the connection ATTEMPT is the boundary crossing, not just its error message -- redacting the message leaves the server still dialling a listener the operator never approved, and leaves timing as an oracle"
+      },
+      {
+        "dont": "keep tests/unit/mcp/test_schemas.py:272 asserting that deployment='remote' is accepted",
+        "instead": "replace it with the post-fix contract, and add a case proving MCP cannot produce an adapter aimed at an unapproved endpoint",
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "why": "that assertion is what pinned the assumption in the first place; leaving it forces the fix to route around its own regression test"
+      },
+      {
+        "dont": "land this after one-engine-mcp-run-service-adoption rewrites benchbox/mcp/tools/benchmark.py",
+        "instead": "land this first; it is a small, self-contained admission change",
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "why": "the adoption deletes _prepare_adapter_platform_options, so a fix authored against it would have to be rewritten and re-reviewed against a moved execution path"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "needs_item": "mcp-option-contract-matrix-enforcement"
+      }
+    ],
+    "item_meta": {
+      "category": "MCP",
+      "created_at": "2026-08-04T23:48:40Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI and direct-constructor use of VeloxAdapter(deployment='remote', endpoint=...) keeps working unchanged: this is an MCP admission boundary, not an adapter capability change",
+        "item_id": "mcp-velox-remote-destination-fail-closed"
+      },
+      {
+        "behavior": "The ClickHouse profile boundary is untouched: no change to resolve_clickhouse_connection_profile timing or to what a durable job persists",
+        "item_id": "mcp-velox-remote-destination-fail-closed"
+      },
+      {
+        "behavior": "benchbox.mcp still never imports benchbox.cli",
+        "item_id": "mcp-velox-remote-destination-fail-closed"
+      },
+      {
+        "behavior": "deployment='docker' keeps failing closed with the existing explanatory hint added by #1520",
+        "item_id": "mcp-velox-remote-destination-fail-closed"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "resolve_clickhouse_connection_profile and _validate_clickhouse_options (#1510) are the server-owned destination pattern; extend that pattern if shape (b) is chosen rather than inventing a second registry format",
+        "decision": "extend",
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "path": "benchbox/mcp/schemas.py"
+      },
+      {
+        "concept": "the 'Server-owned ClickHouse connection profiles' section states the rule; generalize its wording to all connection-class options instead of appending a parallel Velox section",
+        "decision": "extend",
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "path": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "concept": "the omission ledger with ratified tiers, mandated by the one-engine ADR; shape (a) must add a tier-tagged row because an unledgered omission is itself a defect",
+        "decision": "extend",
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "path": "docs/reference/mcp.md"
+      },
+      {
+        "concept": "test_clickhouse_profile_withdrawn_by_the_operator_fails_closed is the withdrawal-test shape to copy if shape (b) is chosen",
+        "decision": "reuse",
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "path": "tests/unit/mcp/test_benchmark_tools.py:364"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/**"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/**"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/velox.py"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "kind": "only_modify",
+        "path_glob": "docs/development/mcp-platform-option-contract.md"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_velox_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import sys; from benchbox.mcp.schemas import validate_platform_options as v, MCPValidationError\\ntry:\\n    v('velox', {'deployment': 'remote'}); sys.exit(1)\\nexcept MCPValidationError:\\n    sys.exit(0)\"",
+        "description": "MCP cannot produce a Velox adapter aimed at an unapproved endpoint",
+        "expected": "exits 1 today because bare remote is admitted; exits 0 once remote is removed from the allow-list or requires a server-owned destination",
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/platforms/test_velox_adapter.py tests/unit/mcp/test_schemas.py -q -n 0",
+        "description": "deployment='docker' still fails closed with its hint (no regression of #1520)",
+        "expected": "exits 0",
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/mcp -q -n 0",
+        "description": "Every MCP omission is ledgered (shape a only)",
+        "expected": "exits 0 with the ledger row present and tier-tagged; an unledgered omission is a defect under the one-engine ADR",
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-confirm the repro at HEAD and record whether remote Velox over MCP has any real demand, which decides shape (a) vs (b)",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement the chosen shape in schemas.py (+ benchmark.py translation only if shape b)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace the test_schemas.py:272 assertion and add the cannot-reach-an-unapproved-endpoint case",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-velox-remote-destination-fail-closed",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update mcp-remote-security.md and, for shape (a), add the ratified-tier omission-ledger row in docs/reference/mcp.md",
+        "wid": "w3"
+      }
+    ]
+  }
+}

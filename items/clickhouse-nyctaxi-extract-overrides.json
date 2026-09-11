@@ -1,0 +1,111 @@
+{
+  "context": "Check the existing nyctaxi query structure for override patterns. Create\nclickhouse_sql/ subdirectory with 3 query files using ClickHouse-native\ndate/time functions. The SQL logic stays the same; only the function calls change.\n",
+  "description": "12 query failures across nyctaxi on ClickHouse due to unsupported EXTRACT variants:\n- rush-hour-analysis: EXTRACT(HOUR FROM ts) and EXTRACT(EPOCH FROM interval)\n- weekday-weekend-comparison: EXTRACT(DOW FROM ts)\n- trips-by-day-of-week: EXTRACT(DOW FROM ts)\n\nClickHouse equivalents:\n- EXTRACT(HOUR FROM ts) → toHour(ts)\n- EXTRACT(DOW FROM ts) → toDayOfWeek(ts) % 7\n- EXTRACT(EPOCH FROM (ts2 - ts1)) → dateDiff('second', ts1, ts2)\n\nPart of Pattern B (EXTRACT rewrite) which also affects coffeeshop.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify base query files",
+        "instead": "create clickhouse_sql/ overrides instead",
+        "item_id": "clickhouse-nyctaxi-extract-overrides",
+        "why": "other platforms depend on standard SQL EXTRACT"
+      },
+      {
+        "dont": "use toDayOfWeek() directly as DOW replacement",
+        "instead": "apply % 7 adjustment",
+        "item_id": "clickhouse-nyctaxi-extract-overrides",
+        "why": "ClickHouse returns 1=Monday while SQL standard DOW is 0=Sunday"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-04-08T00:00:00Z",
+      "created_at": "2026-04-08T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Base nyctaxi queries unchanged - other platforms use standard EXTRACT syntax",
+        "item_id": "clickhouse-nyctaxi-extract-overrides"
+      },
+      {
+        "behavior": "Override queries return identical column names, types, and row semantics",
+        "item_id": "clickhouse-nyctaxi-extract-overrides"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'nyctaxi and clickhouse'",
+        "description": "ClickHouse nyctaxi overrides load and use native date functions",
+        "expected": "Tests pass confirming toHour/toDayOfWeek/dateDiff overrides",
+        "item_id": "clickhouse-nyctaxi-extract-overrides",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-nyctaxi-extract-overrides",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "clickhouse-nyctaxi-extract-overrides",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "clickhouse-nyctaxi-extract-overrides",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "clickhouse-nyctaxi-extract-overrides",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create ClickHouse override for rush-hour-analysis query using toHour() and dateDiff('second', ...)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-nyctaxi-extract-overrides",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create ClickHouse override for weekday-weekend-comparison using toDayOfWeek() % 7",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-nyctaxi-extract-overrides",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create ClickHouse override for trips-by-day-of-week using toDayOfWeek() % 7",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-nyctaxi-extract-overrides",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify all 3 overrides are loaded correctly by the query manager",
+        "wid": "w4"
+      }
+    ]
+  }
+}

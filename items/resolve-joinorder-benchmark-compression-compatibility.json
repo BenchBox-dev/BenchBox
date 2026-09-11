@@ -1,0 +1,10 @@
+{
+  "description": "Updated the JoinOrder benchmark stack to recognize compression kwargs, propagate them to the generator, and ensured the loader passes force_regenerate so CLI execution no longer crashes on instantiation.",
+  "legacy": {
+    "item_meta": {
+      "category": "\"Bug Fixes & Reliability\"",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

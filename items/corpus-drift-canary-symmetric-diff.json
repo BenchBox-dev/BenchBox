@@ -1,0 +1,76 @@
+{
+  "context": "Give the comparison directional/subset semantics: flag only paths where develop has content that published-results lacks or differs on, and ignore paths present only on published-results. 'git diff --name-status' plus filtering on status, or comparing develop's tree as a subset, both work. Keep the existing no-op/clean path and the fail-closed missing-tree check. Add a regression test with a published-only bundle so the semantics cannot silently revert.",
+  "description": "Codex P1 on PR #1538 (merged). .github/workflows/corpus-drift-check.yml compares develop and published-results with a SYMMETRIC 'git diff --name-only FETCH_HEAD HEAD'. Per docs/operations/results-phase-2-runbook.md the supported Phase 2 flow has community PRs merging DIRECTLY into published-results, adding bundles plus a regenerated inventory without necessarily landing on develop. Those published-only additions show up as drift, so after the first community merge the canary stays permanently red, cannot distinguish a missed develop mirror from legitimate branch-ahead content, and its remediation text recommends running the mirror - which would DELETE the community contribution. Verified the finding is real by reading the runbook flow; the canary as merged only ever ran against a corpus with no community-only bundles, which is why it looked correct.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "created_at": "2026-08-04T17:15:36Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Still fires when develop is genuinely ahead - that is the leak this canary exists to catch",
+        "item_id": "corpus-drift-canary-symmetric-diff"
+      },
+      {
+        "behavior": "Still reports only; it must not gain write access to a public branch",
+        "item_id": "corpus-drift-canary-symmetric-diff"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "corpus-drift-canary-symmetric-diff",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/corpus-drift-check.yml"
+      },
+      {
+        "item_id": "corpus-drift-canary-symmetric-diff",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit -q -k corpus_drift",
+        "description": "canary tolerates published-only content",
+        "expected": "Write the test in w1 so this rung becomes runnable",
+        "item_id": "corpus-drift-canary-symmetric-diff",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "corpus-drift-canary-symmetric-diff",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "corpus-drift-canary-symmetric-diff",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make the comparison directional so published-only submissions are not drift",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "corpus-drift-canary-symmetric-diff",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Cover it with a test that includes a published-only bundle",
+        "wid": "w1"
+      }
+    ]
+  }
+}

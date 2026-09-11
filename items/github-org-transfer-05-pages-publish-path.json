@@ -1,0 +1,99 @@
+{
+  "context": "Wait for 02 G4-G5b. On the next authorized release-cut, watch docs.yml deploy job, gh api repos/BenchBox-dev/BenchBox/pages, and curl https://benchbox.dev/ after the new deployment (Last-Modified should move). If deploy fails, abort the release until Pages is restored; do not treat a cached 200 as success.",
+  "description": "Serving-only curl of benchbox.dev after transfer is not publish-path proof. docs.yml deploy runs only on push to refs/heads/release. After github-org-transfer-02 cutover, the next make release-cut / push to release must show docs.yml deploy succeeding to github-pages with cname benchbox.dev and HTTPS. Do not enable merge queue. Blocked until 02 completes and a release-branch push is authorized.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Close this item because curl https://benchbox.dev/ returned 200 right after transfer",
+        "instead": "Require a docs.yml deploy from a release push",
+        "item_id": "github-org-transfer-05-pages-publish-path",
+        "why": "The deploy job is push to release only; G5 serving is the previous artifact"
+      },
+      {
+        "dont": "Enable merge queue as part of proving Pages",
+        "instead": "Leave SHADOW_ONLY",
+        "item_id": "github-org-transfer-05-pages-publish-path",
+        "why": "Queue is a separate later decision"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "github-org-transfer-05-pages-publish-path",
+        "needs_item": "github-org-transfer-02-operator-cutover"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-29T12:41:17Z",
+      "completed_pr": 1933,
+      "created_at": "2026-08-22T01:26:10Z",
+      "worktree": "github-org-transfer"
+    },
+    "preserves": [
+      {
+        "behavior": "SHADOW_ONLY",
+        "item_id": "github-org-transfer-05-pages-publish-path"
+      },
+      {
+        "behavior": "github-pages environment still deploys only from release",
+        "item_id": "github-org-transfer-05-pages-publish-path"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "deploy job if push to release",
+        "decision": "reuse",
+        "item_id": "github-org-transfer-05-pages-publish-path",
+        "path": ".github/workflows/docs.yml"
+      },
+      {
+        "concept": "G7b publish-path gate",
+        "decision": "extend",
+        "item_id": "github-org-transfer-05-pages-publish-path",
+        "path": "docs/operations/github-org-transfer.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "github-org-transfer-05-pages-publish-path",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "github-org-transfer-05-pages-publish-path",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "github-org-transfer-05-pages-publish-path",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/github-org-transfer-benchbox-dev-2026-08-21.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh api repos/BenchBox-dev/BenchBox/pages --jq '{cname,https_enforced,protected_domain_state}'",
+        "description": "Pages still custom-domain after a release deploy",
+        "expected": "cname=benchbox.dev https_enforced=true protected_domain_state=verified",
+        "item_id": "github-org-transfer-05-pages-publish-path",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Release PR #1933 push to release successfully deployed docs.yml to benchbox.dev, cname verified, HTTPS enforced",
+        "item_id": "github-org-transfer-05-pages-publish-path",
+        "notes": null,
+        "started_at": "2026-08-29T12:40:55Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "On the first post-transfer release push, prove docs.yml deploy to benchbox.dev succeeded",
+        "wid": "w0"
+      }
+    ]
+  }
+}

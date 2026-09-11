@@ -1,0 +1,140 @@
+{
+  "context": "1) Bump skill-sync.yaml ref to canonical containing todo v1.0.0; drop overrides.todo.source_name; run skill-sync (mirror mode replaces .claude/skills/todo and .agents/skills/todo automatically). 2) Add .mcp.json registering todo-db-mcp (Makefile already whitelists the path). 3) Repoint publication/audit scripts (check_plan_reconciliation.py TODO_SHIM, agent_instruction_audit.py REVIEW-CAPTURE-001) and .github/workflows/todo-db-export.yml + pr.yml. 4) Retire shim + adapter scripts (todo, todo_db_standalone_compat.py, todo_db_standalone_extensions.py, todo_schema_migration_check.py, _project/scripts/pyproject.toml entry); evaluate todo_db_shadow.py separately (export boundary). 5) Remove/rewrite todo_verification_lint.py (shim-vs-raw-entrypoint premise is void under MCP) and delete/rewrite tests: test_todo_wrapper, test_todo_db_standalone_compat(+_real), test_todo_db_standalone_extensions, test_todo_schema_migration_check, test_todo_db_shadow, test_todo_db_export_workflow, test_todo_verification_lint, and shim refs in test_blind_spot_tools + test_release_infrastructure. 6) Drop the wrapper key from .todo-db/config.json. 7) Rewrite shim command examples in docs (todo-db-benchbox-extraction.md, hosted-credentials.md, review-protocol.md, task-management-design.md, dependency-inventory.md, specs/todo-db-tracker.md, specs/findings-domain.md). Warrants a decision record given release-gate and publication-pipeline reach.",
+  "description": "todo-db 0.6.0 makes MCP the sole agent interface; the upstream todo skill v1.0.0 (skill-sync-skills PR #70) drops _project/scripts/todo. BenchBox still runs the pre-MCP model: bash shim -> todo_db_standalone_compat.py against the locked package. This item retires that path and registers todo-db-mcp. BLOCKED on todo-db PR #21 and skill-sync-skills PR #70 merging, plus a canonical skill-sync-skills ref containing todo skill v1.0.0. Full assessment: 40 non-archival files reference the shim; hosted Turso DB and .todo-db project config are unaffected (MCP server reads the same DB). Historical _project/audits, _project/decisions, _project/handoffs, _project/shrink-ledger, _project/planning records must NOT be edited.",
+  "legacy": {
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-09-04T14:17:10Z",
+      "completed_pr": 2032,
+      "created_at": "2026-09-03T18:51:24Z",
+      "worktree": "main"
+    },
+    "work_needs": [
+      {
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "needs_wid": "w4",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Vendored todo-db 0.6.0 wheel @ 664d1982, schema 7 byte-identical migrations; superseded by 0.6.1 @ e692629f in the same branch. Landed in squash merge 848bc08f2 (#2032). PASS",
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "notes": null,
+        "started_at": "2026-09-04T14:17:03Z",
+        "started_branch": "tmp-closeout",
+        "started_worktree": "/private/tmp/todo-closeout",
+        "status": "done",
+        "summary": "Vendor todo-db 0.6.0 wheel (schema-7 compatible)",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Skill-sync ref 20d53d9 adopted todo skill v1.0.0 pure-MCP mirror; skill-integrity CI PASS on #2032.",
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "notes": null,
+        "started_at": "2026-09-04T14:17:04Z",
+        "started_branch": "tmp-closeout",
+        "started_worktree": "/private/tmp/todo-closeout",
+        "status": "done",
+        "summary": "Bump skill-sync ref, drop todo override, run skill-sync, verify mirror",
+        "wid": "w1"
+      },
+      {
+        "evidence": ".mcp.json registers todo-db-mcp; stdio initialize handshake verified against the hosted tracker. Landed in 848bc08f2 (#2032). PASS",
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "notes": null,
+        "started_at": "2026-09-04T14:17:05Z",
+        "started_branch": "tmp-closeout",
+        "started_worktree": "/private/tmp/todo-closeout",
+        "status": "done",
+        "summary": "Add .mcp.json for todo-db-mcp and document actor/repo-root",
+        "wid": "w2"
+      },
+      {
+        "evidence": "check_plan_reconciliation.py repointed to floor-CLI export envelope (via #2034); publication reconciliation CI PASS on #2032.",
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "notes": null,
+        "started_at": "2026-09-04T14:17:05Z",
+        "started_branch": "tmp-closeout",
+        "started_worktree": "/private/tmp/todo-closeout",
+        "status": "done",
+        "summary": "Repoint publication + audit scripts and CI workflows off the shim",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Shim + compat adapter + extensions deleted (-2922 lines); fast suite 29250 passed. Landed in 848bc08f2 (#2032). PASS",
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "notes": null,
+        "started_at": "2026-09-04T14:17:06Z",
+        "started_branch": "tmp-closeout",
+        "started_worktree": "/private/tmp/todo-closeout",
+        "status": "done",
+        "summary": "Retire bash shim + todo_db_standalone_compat.py + _extensions.py adapter only; keep _project/scripts pyproject+vendor+uv.lock (MCP install); eval todo_db_shadow.py separately",
+        "wid": "w4"
+      },
+      {
+        "evidence": "todo_verification_lint.py (dead) + 5 shim-only test files deleted; fast suite 29250 passed with no shim failures. PASS",
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "notes": null,
+        "started_at": "2026-09-04T14:17:07Z",
+        "started_branch": "tmp-closeout",
+        "started_worktree": "/private/tmp/todo-closeout",
+        "status": "done",
+        "summary": "Remove/rewrite todo_verification_lint and delete/rewrite shim-coupled tests",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Inert wrapper key dropped from .todo-db/config.json; todo-db doctor config check PASS.",
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "notes": null,
+        "started_at": "2026-09-04T14:17:08Z",
+        "started_branch": "tmp-closeout",
+        "started_worktree": "/private/tmp/todo-closeout",
+        "status": "done",
+        "summary": "Drop wrapper key from .todo-db/config.json",
+        "wid": "w6"
+      },
+      {
+        "evidence": "Docs moved to MCP/floor-CLI model with parity triple atomic; instruction audit 71 passed, fast suite green. Landed in 848bc08f2 (#2032). PASS",
+        "item_id": "retire-todo-shim-adopt-todo-db-mcp",
+        "notes": null,
+        "started_at": "2026-09-04T14:17:08Z",
+        "started_branch": "tmp-closeout",
+        "started_worktree": "/private/tmp/todo-closeout",
+        "status": "done",
+        "summary": "Rewrite shim command examples across docs and specs",
+        "wid": "w7"
+      }
+    ]
+  }
+}

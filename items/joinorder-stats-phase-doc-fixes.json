@@ -1,0 +1,63 @@
+{
+  "description": "Adversarial review finding (2026-07-02, joinorder Track-2 review). Two factual\nerrors in `_project/design/track2-joinorder-stats-as-phase.md` (PR #926) that\nshould be fixed before the Track-2 stats-phase work is picked up, because they\nmisstate the current-state survey the design reasons from. The central\n\"statistics-as-a-phase gap\" thesis is sound and is NOT being retracted -- only\nthe two overstated data points are corrected.\n\n1. Redshift row is wrong (Medium). The per-engine table\n   (stats-as-phase.md:46) claims Redshift ANALYZE runs \"Only in isolated\n   vacuum/analyze maintenance, not load.\" In fact\n   benchbox/platforms/redshift.py:1531 runs `ANALYZE {qualified_table}` inside\n   `_load_table_via_s3` (the load path, called from load_data at :1825)\n   whenever `self.auto_analyze` is true -- and auto_analyze DEFAULTS TO True\n   (redshift.py:175). So Redshift gathers statistics during load by default.\n   The doc's line-49 \"no centralized call site\" phrasing is fine only for the\n   analyze_table METHOD; the broader \"no engine gathers stats in the lifecycle\"\n   reading is false and should be tightened.\n\n2. \"26+ adapters\" is overstated (Low). stats-as-phase.md:49 says\n   `analyze_table()` \"exists in 26+ adapters\". The actual count of files\n   defining `analyze_table`/`analyze_tables` under benchbox/platforms/ is 16\n   (re-runnable: `grep -rlnE \"def analyze_tables?\\b\" benchbox/platforms/ | wc -l`\n   -> 16). 26+ is only reachable by counting inherited methods across adapter\n   classes; state that basis or correct to 16.\n\nDoc-only; no code change.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2026-07-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "joinorder-stats-phase-doc-fixes",
+        "kind": "only_modify",
+        "path_glob": "_project/design/track2-joinorder-stats-as-phase.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'not load' _project/design/track2-joinorder-stats-as-phase.md || true",
+        "description": "The false 'not load' Redshift claim is gone",
+        "expected": "no line asserting Redshift ANALYZE is 'not load'",
+        "item_id": "joinorder-stats-phase-doc-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n '26+ adapters' _project/design/track2-joinorder-stats-as-phase.md || true",
+        "description": "No unqualified '26+ adapters' claim remains",
+        "expected": "no unqualified '26+ adapters' claim remains",
+        "item_id": "joinorder-stats-phase-doc-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-stats-phase-doc-fixes",
+        "notes": "Fix stats-as-phase.md:46 to state Redshift runs ANALYZE in the S3 load path\nby default (auto_analyze default True, redshift.py:175,1531), and narrow the\nline-49 framing to the precise claim: the analyze_table METHOD has no\ncentralized runner call site (not \"no engine gathers stats\").\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Correct the Redshift row and tighten the lifecycle-gap framing",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-stats-phase-doc-fixes",
+        "notes": "Update stats-as-phase.md:49 to 16 defining files, or explicitly say\n\"26+ adapter classes counting inherited methods; 16 files define it\".\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Correct the adapter count from 26+ to the verified 16 (or state the basis)",
+        "wid": "w2"
+      }
+    ]
+  }
+}

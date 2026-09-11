@@ -1,0 +1,97 @@
+{
+  "description": "Non-required nits and improvements surfaced by the code review of\nexplorer-heatmap-accessibility-and-tests.  Four Required issues\n(broken CSS rule, invisible focus ring, empty columnheader, misleading\naria-sort) were fixed immediately post-review.  This item tracks\nthe remaining nit/consider findings.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change configureAxe to suppress impact levels globally",
+        "instead": "scope the config per-call or per-helper",
+        "item_id": "explorer-heatmap-accessibility-review-followups",
+        "why": "that silences violations in all tests"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "aria-label remains present on all cells in w1 - only the text format changes",
+        "item_id": "explorer-heatmap-accessibility-review-followups"
+      },
+      {
+        "behavior": "axe helper continues to suppress minor violations - only the implementation mechanism changes in w2",
+        "item_id": "explorer-heatmap-accessibility-review-followups"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- QueryHeatmap",
+        "description": "QueryHeatmap axe tests still pass after axe-helper refactor",
+        "expected": "all tests pass including axe assertions",
+        "item_id": "explorer-heatmap-accessibility-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Full test suite green",
+        "expected": "all green",
+        "item_id": "explorer-heatmap-accessibility-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-heatmap-accessibility-review-followups",
+        "notes": "QueryHeatmap.tsx:278 - aria-label uses ms.toFixed(1) (e.g. \"10.0 ms\")\nwhile the visible cell text uses fmtMs() which emits toFixed(0)\n(\"10 ms\").  Screen readers announce a value that differs from what\nis displayed.\n\nFix: use fmtMs(ms) in the aria-label string for consistency.\n\nAlso: for the fastest cell (ratio=1.0), the label reads \"10 ms, 1.0×\nfastest in column\" which is grammatically awkward - the cell IS the\nfastest, not a comparison to it.  Special-case as \"10 ms, fastest in\ncolumn\" when ratio rounds to 1.0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align aria-label text with visible cell text for timing values",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-heatmap-accessibility-review-followups",
+        "notes": "axe-helper.ts:19-41 - The helper manually splits results.violations\ninto serious/critical vs minor arrays, reconstructs { violations:\ncritical }, and passes the partial object to toHaveNoViolations().\nThis works but relies on jest-axe's private object shape.\n\nThe idiomatic approach:\n  import { configureAxe, toHaveNoViolations } from \"jest-axe\";\n  const axe = configureAxe({ impactLevels: [\"serious\", \"critical\"] });\n  expect(await axe(container)).toHaveNoViolations();\n\nThe helper becomes a clean two-liner; jest-axe handles the filtering\ninternally and is not coupled to the violation object shape.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace manual violation-split in axe-helper with configureAxe",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-heatmap-accessibility-review-followups",
+        "notes": "QueryHeatmap.tsx:122-149 - handleCellKey handles ArrowLeft/Right/\nUp/Down but not Home/End.  The WAI-ARIA 1.2 grid pattern recommends\n(not requires) Home to jump to first cell in row and End to last cell\nin row, Ctrl+Home to first cell in grid.\n\nLow priority: not a WCAG requirement for read-only data grids.\nWorth adding if AT user feedback surfaces the gap.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Home/End key support to keyboard grid navigation",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-heatmap-accessibility-review-followups",
+        "notes": "QueryHeatmap.test.tsx currently renders with no onSelectionChange, so\nthe checkbox column header (hasSelection=false) is never in the axe\nDOM.  The Required fix (w3 in the main TODO) added aria-label to the\nempty <th>, but there is no regression test that exercises the\nselection path through axe.\n\nFix: add one axe test case in QueryHeatmap.test.tsx that passes\nselectedIds={new Set()} and onSelectionChange={() => {}} so axe runs\nagainst the full grid including the checkbox column header.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add axe test for QueryHeatmap with selection enabled",
+        "wid": "w4"
+      }
+    ]
+  }
+}

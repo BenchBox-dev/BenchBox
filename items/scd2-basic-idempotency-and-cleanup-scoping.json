@@ -1,0 +1,206 @@
+{
+  "context": "Two small operations.yaml edits (basic INSERT guard, basic+no_change cleanup\nscoping) plus a re-measurement pass. Reuse new_keys_only's existing NOT EXISTS\nshape. The guard must not block the legitimate changed-key new version - key\nit on current-row existence, matching SCD2 semantics (a changed key has no\ncurrent row at insert time because the UPDATE already closed it). Validate the\nclean-run row counts against the integration fixture before committing.\n",
+  "description": "SCD2 adversarial audit finding N4. merge_scd_type2_basic's INSERT fires for\nchange_type='new' OR (changed AND EXISTS <closed row with valid_to =\ns.effective_ts>), with NO NOT EXISTS guard on the current dimension - unlike\nmerge_scd_type2_new_keys_only, which has\nAND NOT EXISTS (SELECT 1 FROM dim d WHERE d.c_custkey = s.c_custkey).\n\nReproduced (scratchpad repro2.py ATTACK 2): run basic's write_sql twice with\nno cleanup between ->\n  after #1: total=1540 cur=1520 closed=20 dup_current_key=0\n  after #2: total=1580 cur=1560 closed=20 dup_current_key=40\nBoth the 'new' and 'changed' branches duplicate. The 'changed' branch\nre-fires because the row closed in run 1 still carries\nvalid_to = DATE '2026-01-01' = s.effective_ts.\n\nReachability is real but narrow: execute_operation runs cleanup after every\nsuccessful write (benchmark.py:1207); _run_operation_cleanup swallows a\ncleanup failure into a warning and the harness continues (benchmark.py:\n1328-1337); the warmup+measurement loop re-runs every op with NO reset()\nbetween iterations (execution.py:213-225). One swallowed cleanup therefore\nproduces the duplicate state on the next iteration - and per finding N1 it\nreports green until the gating TODO lands.\n\nSecond half: the cleanup for basic and no_change is\nDELETE FROM dim WHERE valid_from IN (SELECT effective_ts FROM stage),\nunqualified by change_type. Reproduced (repro2.py ATTACK 3b): running basic's\ncleanup after new_keys_only's write deletes all 20 of new_keys_only's rows.\nThe ops are safe today only because the catalog orders them basic ->\nno_change -> new_keys_only with an immediate cleanup after each.\n\nIMPORTANT downstream: adding the NOT EXISTS guard changes basic's measured\nwrite path, which the blog publishes (2.517 ms SF0.01 / 4.360 ms SF0.1). Per\nthe user decision, re-measure with the same protocol and update the draft +\nresearch note ONLY if the change exceeds run-to-run variance.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "guard on bare c_custkey existence across ALL dim rows",
+        "instead": "guard on current-version existence.",
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "why": "the just-closed old version would block the changed-key new version"
+      },
+      {
+        "dont": "land the SQL change without re-measuring",
+        "instead": "re-run the protocol first.",
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "why": "the blog publishes basic's median and the write path changes"
+      },
+      {
+        "dont": "reorder the catalog ops as a 'fix'",
+        "instead": "make each op self-consistent instead.",
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "why": "relying on order is the bug"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "scd2-basic-idempotency-and-cleanup-scoping",
+        "id": 606,
+        "reason": "N4's cross-op cleanup contamination cannot be fixed in operations.yaml alone: all groups share effective_ts DATE '2026-01-01', so change_type-qualified cleanup subqueries select the same date set and isolate nothing. The real fix changes the population SQL in benchbox/core/write_primitives/benchmark.py, outside this TODO's scope, and would touch the DuckDB + PostgreSQL seed-state assertions. Mitigated meanwhile by the w1 idempotency guard and the merged N1 validation gating (a swallowed cleanup now fails the run observably).",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Exact match: open item scd2-cleanup-isolation-distinct-effective-ts already tracks giving each SCD2 change_type group a distinct effective_ts.",
+        "summary": "Isolate SCD2 cleanup by giving each staging change_type group a distinct effective_ts (population SQL in _get_population_sql), so basic/no_change cleanup cannot delete another op's inserted rows."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "needs_item": "scd2-validation-coverage-hardening"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-11T00:00:00Z",
+      "created_at": "2026-07-10T00:00:00Z",
+      "worktree": "scd2-audit-followup"
+    },
+    "preserves": [
+      {
+        "behavior": "A clean single run of basic still closes 20 changed keys, inserts 20 changed-key new versions + 20 new keys (closed=20, current=70, total=90 at the 50-customer fixture).",
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping"
+      },
+      {
+        "behavior": "Blog SF0.01/SF0.1 basic medians stay accurate: either unchanged within noise, or updated in draft + research note.",
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping"
+      },
+      {
+        "behavior": "basic's own cleanup still restores the pristine seed exactly (0 rows deviating).",
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping"
+      },
+      {
+        "behavior": "no_change and new_keys_only behavior unchanged (cleanup scoping deferred - see deferred[]).",
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md:195-207 published basic median (must re-check if the op changes)",
+        "decision": "reuse",
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "path": "_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md:195-207"
+      },
+      {
+        "concept": "benchbox/core/write_primitives/benchmark.py:1207,1328-1337 cleanup-runs-then-swallows-failure path that makes the double-write reachable",
+        "decision": "reuse",
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "path": "benchbox/core/write_primitives/benchmark.py:1207,1328-1337"
+      },
+      {
+        "concept": "benchbox/core/write_primitives/catalog/operations.yaml merge_scd_type2_basic / _no_change cleanup_sql - the unscoped DELETE to qualify by change_type",
+        "decision": "reuse",
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "path": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "concept": "benchbox/core/write_primitives/catalog/operations.yaml merge_scd_type2_new_keys_only - reuse its NOT EXISTS (dim d WHERE d.c_custkey = s.c_custkey) guard shape",
+        "decision": "reuse",
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "path": "benchbox/core/write_primitives/catalog/operations.yaml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "kind": "only_modify",
+        "path_glob": "_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md"
+      },
+      {
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "kind": "only_modify",
+        "path_glob": "_blog/platform-deep-dives/research/apply-changes-into-vs-merge-verification-2026-06-27.md"
+      },
+      {
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_write_primitives_duckdb.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -k scd2 -n 0 -q",
+        "description": "SCD2 integration green; clean-run row counts unchanged.",
+        "expected": "all pass",
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -n 0 -q -k basic_idempotent",
+        "description": "New idempotency test: basic run twice (no cleanup) yields no duplicate current versions.",
+        "expected": "new test passes",
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "notes": "This makes basic idempotent - the correct SCD2 semantic, not just a guard.\nConfirm the 'changed' branch still inserts the new version on a clean run\n(the closed old row is not 'current', so the guard must key on\nd.c_custkey existence among CURRENT rows only, or the changed-key new\nversion would be blocked). Verify against repro2.py's clean-run expectations\nbefore/after.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add NOT EXISTS (SELECT 1 FROM scd2_ops_dim_customer d WHERE d.c_custkey = s.c_custkey) to merge_scd_type2_basic's INSERT, mirroring new_keys_only.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "notes": "All three staging groups share one effective_ts (DATE '2026-01-01'), verified\nempirically. The proposed cleanup fix (qualify the DELETE/UPDATE subqueries by\nchange_type) therefore selects the same {2026-01-01} set regardless of group,\nso it does NOT isolate one op's cleanup from another op's inserted rows. Real\nisolation requires distinct per-group effective_ts (or per-op new-key custkeys),\nwhich lives in _get_population_sql (benchmark.py) - outside this TODO's\noperations.yaml-only scope. Deferred to a follow-up; the idempotency guard (w1)\nplus the now-merged validation gating (N1) already make a swallowed-cleanup\ncontamination observable rather than silent.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Investigate cleanup change_type-scoping; found ineffective under shared effective_ts, deferred (see deferred[]).",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test: basic's write_sql run twice with no cleanup is a no-op (no duplicate current versions).",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-basic-idempotency-and-cleanup-scoping",
+        "notes": "Audit re-derivation (scratchpad scale.py) for reference:\nSF0.01 basic median 2.09 ms, SF0.1 3.65 ms, SF1.0 13.34 ms (all validations\ngreen). If the guard shifts these beyond noise, update\n_blog/.../drafts/apply-changes-into-vs-standard-sql.md:195-207 AND the\nresearch note's C3 entry, with a dated note that the op changed. Otherwise\nleave the numbers and record 'within noise' in the PR body. While editing\nthe draft table here, also fold in the SF1 basic row deferred from\nscd2-docs-and-count-hygiene-followup (SF1.0 basic median ~13.3 ms) so the\nscale discussion is balanced - this TODO owns all blog-draft edits.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-measure basic (30 runs SF0.01, 15 runs SF0.1) with the audit protocol; update blog draft table + research note C3 only if outside run-to-run variance.",
+        "wid": "w4"
+      }
+    ]
+  }
+}

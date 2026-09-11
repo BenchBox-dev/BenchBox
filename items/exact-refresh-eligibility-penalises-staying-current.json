@@ -1,0 +1,114 @@
+{
+  "context": "Measure first, recommend nothing. Sample develop-refresh-shadow artifacts over a window wide enough to beat artifact retention and count full_required reason codes, keeping prior_check_not_success and prior_check_unbound separate because the latter also covers identity/head-binding failures. Report the share of refreshes that lose eligibility purely to gate timing. Publish the distribution to _project/audits/ and stop there. Do not modify the classifier, workflows, ruleset, or any dropped item; do not treat a non-zero eligible share as an activation argument, because behind-pr-occurrence-02 already forbids that inference.\n\nThe authorized artifact is exactly _project/audits/exact-refresh-eligibility.md. Include a machine-readable JSON accounting block using the schema and validator delivered by the prerequisite baseline item. Reconcile every included/missing refresh observation and reason-code count against _project/analysis/ci-lifecycle-baseline.json; do not resample. Use the shared denominator and preserve separate timing, identity, chained-refresh and missing-evidence categories. A file-existence check cannot satisfy measurement completion.",
+  "description": "Two structural limits bound how much any future exact-refresh skip path could deliver. Recorded as measurement input, not as a shipped defect: the classifier is observational today and skips nothing.\n\n1. EARLY-REFRESH PENALTY (new). pred_prior_full_checks (scripts/pr_refresh_certification.py:405-421) requires every required context on parent1 to be completed AND conclusion=success. A refresh pushed while the prior gate is still running returns prior_check_not_success; a refresh whose check does not bind to parent1 returns prior_check_unbound. Both force full_required. Under develop ruleset 15611785 (strict_required_status_checks_policy: true) absorbing develop early is the merge-preserving move, so the mechanism penalises the behaviour the policy compels. Note prior_check_unbound also covers identity/head-binding failures, not only a still-running gate, so the two codes must be counted separately.\n\n2. CHAINED-REFRESH CAP (already an 07a anti-pattern, restated for measurement only). pred_not_chained (lines 375-384) rejects a refresh whose parent1 is itself a merge. This is NOT a hard one-per-PR cap: a later non-merge commit that earns its own full certification can be refreshed again. Do not weaken it; its rationale (\"pairwise evidence loses cumulative base interactions\") is a soundness constraint.\n\nLIVE YIELD EVIDENCE 2026-08-20 (rehomed here from strict-base-refresh-07a, which is state=dropped). Of the 12 develop-refresh-shadow artifacts ending 18:28:34Z, 3 were shadow_eligible with all 3 required contexts bound: PR 1785 run 32398082881 (17:31:44Z), PR 1787 run 32401308648 (18:06:09Z), PR 1788 run 32403373555 (18:28:34Z). PR 1785 also has a full_required artifact at 17:59:21Z, so sampling one artifact per PR undercounts.\n\nTREAT THAT SNAPSHOT AS WEAK. It is one afternoon, already off the top of the artifact list, and eligible verdicts concentrate on the FIRST exact two-parent synchronize after a full certification. Opened events return missing_event_sha; second refreshes chained_refresh; early refreshes prior_check_not_success/unbound; force-pushes not_exactly_two_parents. Three first-refresh hits do not measure skip safety.\n\nSTATE OF THE WORLD. strict-base-refresh-06 is done (PR 1740) and selected SHADOW_ONLY. 07a and 07b are both state=dropped. behind-pr-occurrence-02-throughput-measurement is done and explicitly forbids unblocking 07a/07b from measurement. The Accepted decision _project/decisions/behind-pr-occurrence-throughput-2026-08-16.md still records yield as 0; this item does not amend it. Nothing here reopens an activation. Any activation needs a NEW decision record and an operator choice.\n\n2026-09-07 reconciliation: native merge queue is now the selected deployed integration authority (native-merge-queue-activation-20260822.md, amended 2026-08-31). Reuse the complete lifecycle manifest from ci-baseline-representative-remeasure-sample; do not separately rediscover or manually sample the same events. This item measures shadow yield only. native-queue-local-landing owns removing unnecessary local ancestry refreshes; no reduced refresh or steward is reopened.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "exact-refresh-eligibility-penalises-staying-current",
+        "needs_item": "ci-baseline-representative-remeasure-sample"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "created_at": "2026-08-20T20:25:19Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Reuse frozen shared metrics; do not introduce another API sampler or revive dropped 07a/07b.",
+        "item_id": "exact-refresh-eligibility-penalises-staying-current"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "exact-refresh-eligibility-penalises-staying-current",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "exact-refresh-eligibility-penalises-staying-current",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "exact-refresh-eligibility-penalises-staying-current",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/pr_refresh_certification.py"
+      },
+      {
+        "item_id": "exact-refresh-eligibility-penalises-staying-current",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/exact-refresh-eligibility.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_pr_refresh_certification.py -q",
+        "description": "Existing shadow controls retain identity, timing and chained-refresh distinctions",
+        "expected": "exit 0; fixtures include negative controls",
+        "item_id": "exact-refresh-eligibility-penalises-staying-current",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-refresh-audit _project/audits/exact-refresh-eligibility.md --baseline _project/analysis/ci-lifecycle-baseline.json",
+        "description": "Refresh distribution reconciles with the shared frozen lifecycle baseline",
+        "expected": "exit 0 only when identities, window, denominator, reason counts, missingness and timing-only share reconcile; dropped/duplicate observations or conflated timing and identity reasons fail",
+        "item_id": "exact-refresh-eligibility-penalises-staying-current",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "exact-refresh-eligibility-penalises-staying-current",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "exact-refresh-eligibility-penalises-staying-current",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "exact-refresh-eligibility-penalises-staying-current",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Sample develop-refresh-shadow artifacts and count full_required reason codes, isolating prior_check_not_success and prior_check_unbound",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "exact-refresh-eligibility-penalises-staying-current",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Measure timing-only ineligibility without proposing or activating reduced refresh",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "exact-refresh-eligibility-penalises-staying-current",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Write the measurement to _project/audits/ and stop; any activation needs a new decision record and an operator choice, not a handoff to dropped 07a",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,267 @@
+{
+  "context": "This is a real release, not a simulation. Every step has external\nside effects (PR opened, branch on origin, tag on main, PyPI\npublish). Procedure:\n\n1. Confirm PR #34 is merged to develop (the new Make targets must\n   exist on develop before invoking them).\n2. Get explicit user go-ahead (PyPI is irreversible).\n3. Run w1 (release-cut), then pause for w2 (manual diff inspection).\n4. After w3 (CI green), run w4 (release-finalize).\n5. Run w5 (post-release verification) immediately after the tag push\n   fires release.yml; wait for the workflow to complete.\n6. Run w6 (CI-optimization verification) opportunistically — w12 is\n   verifiable during the dry-run; w10/w11 verify on the next regular\n   feature-PR cycle.\n\nIf any step fails, do NOT force-push or re-tag. Diagnose, fix on a\nfeature branch off develop, merge back, then bump to rc.2 and repeat.\n",
+  "description": "Split out from simplify-dev-loop-and-release-flow w9 (2026-04-28). The\nparent TODO landed the new 2-command flow (release-cut /\nrelease-finalize) plus the CI churn cuts (w10/w11/w12) and the\ncuration-drift guard (w7). This follow-up exercises the whole flow\nend-to-end on a pre-release tag before any real X.Y.Z version goes\nout.\n\nWhy a dry-run is necessary: the latent rebase-develop bug that the\nparent TODO fixed only surfaces on a real release, so the only\nvalidation gate is to actually cut + finalize a release. Using a\npre-release rc tag (PEP 440 normalized to 0.3.0rc1 on PyPI) means a\nbotched run isn't catastrophic — fix and bump to rc.2.\n\nHard prerequisites (must be true before invoking release-cut):\n  1. PR #34 (chore/todo-simplify-dev-loop) merged to develop, so the\n     new Make targets exist on develop.\n  2. Explicit user authorization — PyPI publishing is irreversible\n     and the tag is public.\n\nOut of scope: the 0.3.0 GA cut. This TODO closes when 0.3.0-rc.1 has\nvalidated the flow; bumping to 0.3.0 is a separate decision made by\nthe user once the rc is verified.\n\nStatus update 2026-05-25: this rc dry-run is no longer executable as\nwritten. The GA `v0.3.0` tag, GitHub release, and PyPI release already\nexist, while no `v0.3.0-rc.*` tag exists. Publishing `0.3.0rc1` after\nGA would not validate the \"before first GA release\" decision gate this\nTODO was created to prove. The actual `v0.3.0` release also exposed\nthe intended class of failure: publish succeeded, but the install\nmatrix failed because importing `benchbox` required `pandas` from a\ndependency path not declared by the wheel. That failure has to be\nhandled by the next monotonic release, not by retroactively running an\nobsolete rc.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bump straight to 0.3.0 GA without the rc dry-run",
+        "instead": "(not specified)",
+        "item_id": "release-flow-dry-run-rc1",
+        "why": "the latent rebase-develop bug only surfaces on a real release, and the parent TODO's whole reason for existing was to fix that bug. The rc is the validation gate."
+      },
+      {
+        "dont": "force-push or re-tag if release.yml fails",
+        "instead": "(not specified)",
+        "item_id": "release-flow-dry-run-rc1",
+        "why": "the tag is already public and PyPI rejects re-uploads of the same version. Bump to rc.2 instead."
+      },
+      {
+        "dont": "modify develop during release-finalize",
+        "instead": "(not specified)",
+        "item_id": "release-flow-dry-run-rc1",
+        "why": "release-finalize was deliberately written to leave develop alone (per the parent TODO and the 2026-04-27 amendment to single-repo-migration.md)."
+      },
+      {
+        "dont": "run release-cut from the main BenchBox/ working clone",
+        "instead": "(not specified)",
+        "item_id": "release-flow-dry-run-rc1",
+        "why": "convention is develop stays on develop. Use a worktree (../BenchBox.release-test-rc1/) or accept that you're temporarily on the v0.3.0-rc.1 branch in the main clone."
+      },
+      {
+        "dont": "skip w2 (manual diff inspection)",
+        "instead": "(not specified)",
+        "item_id": "release-flow-dry-run-rc1",
+        "why": "the curation-drift guard catches missing entries on develop, but a release-cut bug or stale local state could still let an unexpected file land on main. The diff inspection is the last human check before merging."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "needs_item": "simplify-dev-loop-and-release-flow"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-05-25T00:00:00Z",
+      "created_at": "2026-04-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing v0.1.0 / v0.2.0 / v0.2.1 tags on main stay intact.",
+        "item_id": "release-flow-dry-run-rc1"
+      },
+      {
+        "behavior": "The PyPI trusted-publisher configuration on the BenchBox repo — release.yml's `publish` job depends on it; do not rotate or revoke during this dry-run.",
+        "item_id": "release-flow-dry-run-rc1"
+      },
+      {
+        "behavior": "The `v*` tag on main remains immutable — once pushed, never force-push or re-tag (PyPI rejects re-uploads of an existing version anyway).",
+        "item_id": "release-flow-dry-run-rc1"
+      },
+      {
+        "behavior": "develop's tree shape — the whole point of the parent TODO was to keep dev-only paths present on develop post-release.",
+        "item_id": "release-flow-dry-run-rc1"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/lint.yml"
+      },
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/perf-smoke.yml"
+      },
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/check_release_curation.py"
+      },
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/generate_changelog_entry.py"
+      },
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/update_version.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh run list --workflow=release.yml --limit 1 --json conclusion --jq '.[0].conclusion'",
+        "description": "release.yml succeeded after the dry-run",
+        "expected": "success",
+        "item_id": "release-flow-dry-run-rc1",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "pip index versions benchbox 2>&1 | grep -cE '0\\.3\\.0(rc1|-rc\\.1)'",
+        "description": "0.3.0-rc.1 published to PyPI (PyPI normalizes to 0.3.0rc1 per PEP 440)",
+        "expected": "at least 1",
+        "item_id": "release-flow-dry-run-rc1",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff origin/develop develop",
+        "description": "develop unchanged after release-finalize",
+        "expected": "empty diff",
+        "item_id": "release-flow-dry-run-rc1",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -d _project && test -d _blog && test -f AGENTS.md && test -f CLAUDE.md && test -f GEMINI.md && echo OK",
+        "description": "Dev-only paths still present on develop",
+        "expected": "OK",
+        "item_id": "release-flow-dry-run-rc1",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git ls-tree -d --name-only origin/main | grep -E '^(_project|_blog|\\.claude|\\.codex|\\.gemini)$' | wc -l",
+        "description": "Main tree is curated",
+        "expected": "0",
+        "item_id": "release-flow-dry-run-rc1",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh pr view <release-PR#> --json statusCheckRollup --jq '.statusCheckRollup[] | select(.name|test(\"perf-smoke|parity\"))'",
+        "description": "Release v* PR did NOT trigger perf-smoke or parity (validates w12)",
+        "expected": "empty",
+        "item_id": "release-flow-dry-run-rc1",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "release-flow-dry-run-rc1",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "release-flow-dry-run-rc1",
+        "notes": "Prereq: get explicit user authorization first.\n\nProcedure:\n  cd ~/Developer/BenchBox  # must be on develop, clean tree\n  git fetch origin && git checkout develop && git pull --ff-only\n  make worktree-add BRANCH=release-test-rc1  # optional isolation\n  cd ../BenchBox.release-test-rc1            # if using worktree\n  make release-cut VERSION=0.3.0-rc.1\n\nExpected behavior:\n  - Cuts v0.3.0-rc.1 branch off develop.\n  - Bumps the 6 version sources via scripts/update_version.py.\n  - Generates CHANGELOG entry, opens $EDITOR for hand-curation.\n  - git rm's the dev-only paths (curation step).\n  - Commits \"Release v0.3.0-rc.1\" and pushes.\n  - Opens PR vs main with .github/RELEASE_PR_TEMPLATE.md body.\n  - Sweeps prior v* branches (no-op for first run since v0.2.1 was\n    a legacy two-repo release without a v* branch).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run release-cut VERSION=0.3.0-rc.1 from a develop worktree",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-flow-dry-run-rc1",
+        "notes": "Procedure:\n  gh pr diff <PR#> | head -200\n  # Confirm: only curation removals + version bumps + changelog;\n  # no surprise additions.\n\n  git ls-tree -d --name-only origin/v0.3.0-rc.1\n  # Confirm absent: _project, _blog, .claude, .codex, .gemini.\n\nBail out (close PR, delete branch, fix root cause) if anything\nunexpected lands on the release branch.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Inspect PR diff and release branch tree before merging",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-flow-dry-run-rc1",
+        "notes": "Required checks per ruleset main-release-only: lint + test\n(ubuntu-latest, 3.12). perf-smoke and parity should be SKIPPED\n(validates w12 from the parent TODO).\n\nVerification of w12: gh pr view <release-PR#> --json\nstatusCheckRollup --jq '.statusCheckRollup[] | select(.name |\ntest(\"perf-smoke|parity\"))' should return empty (jobs didn't fire).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wait for CI green on the release PR",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-flow-dry-run-rc1",
+        "notes": "Procedure:\n  cd ~/Developer/BenchBox  # main clone on develop\n  make release-finalize VERSION=0.3.0-rc.1\n\nExpected behavior:\n  - Squash-merges the release PR (gh pr merge --squash).\n  - Fast-forwards main locally and tags v0.3.0-rc.1.\n  - Pushes the tag → fires release.yml.\n  - Leaves develop untouched.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run release-finalize VERSION=0.3.0-rc.1",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-flow-dry-run-rc1",
+        "notes": "Verification commands (all must pass):\n\n  # develop unchanged\n  git diff origin/develop develop  # empty\n\n  # dev-only paths preserved on develop\n  test -d _project && test -d _blog && test -f AGENTS.md && \\\n    test -f CLAUDE.md && test -f GEMINI.md && echo OK\n\n  # main is curated\n  git ls-tree -d --name-only origin/main | \\\n    grep -E '^(_project|_blog|\\.claude|\\.codex|\\.gemini)$' | wc -l\n  # → 0\n\n  # release.yml succeeded\n  gh run list --workflow=release.yml --limit 1 --json conclusion \\\n    --jq '.[0].conclusion'\n  # → success\n\n  # PyPI published (PEP 440 normalizes to 0.3.0rc1)\n  pip index versions benchbox 2>&1 | grep -cE '0\\.3\\.0(rc1|-rc\\.1)'\n  # → at least 1\n\n  # GH release created\n  gh release view v0.3.0-rc.1\n\n  # Cross-platform install matrix passed\n  gh run view <release-run-id> --log | grep test-installation\n\n  # No leftover v* branches besides the new one\n  git ls-remote --heads origin 'v*'\n  # → only refs/heads/v0.3.0-rc.1\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify post-release invariants",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-flow-dry-run-rc1",
+        "notes": "Validates w10/w11/w12 in production conditions:\n\nw10 (no push-CI on develop): develop didn't change during this\nrelease, so trivially true here. Validate on the next regular\nfeature-PR squash-merge instead:\n  gh run list --workflow=test.yml --branch develop --event push \\\n    --limit 1\n  # No run after the squash-merge SHA.\n\nw11 (concurrency cancellation): force-push to a feature branch\nduring CI; the older lint/test runs show as \"cancelled\" in the\nActions UI. Can be exercised separately from this dry-run.\n\nw12 (perf-smoke + parity skipped on Release v* PRs): already\nchecked in w3; record the observation here for the closeout.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify CI optimizations from parent TODO held up under real release",
+        "wid": "w6"
+      }
+    ]
+  }
+}

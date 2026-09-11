@@ -1,0 +1,11 @@
+{
+  "description": "Running TPC-DS on PySpark fails with ~60 queries due to missing UnifiedExpr methods\nand Polars-specific code in the DataFrame queries.\n\nThe TPC-DS dataframe queries currently use Polars-specific functions (pl.concat, pl.when)\nand call methods on expressions that don't exist in the UnifiedExpr wrapper class.\nThis prevents TPC-DS from running on PySpark.\n\nRoot causes:\n- 7 missing UnifiedExpr methods: is_between, fill_null, is_null, is_not_null, rank, over, cum_sum\n- 2 missing context functions: concat() and when() - queries use pl.concat/pl.when directly\n- Type unwrapping issues where UnifiedExpr isn't converted to native PySpark Column",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2025-12-27T00:00:00Z",
+      "created_at": "2025-12-27T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

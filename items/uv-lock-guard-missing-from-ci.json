@@ -1,0 +1,137 @@
+{
+  "context": "Add a --base-ref mode to check_uv_lock_revision.py (compare BASE:uv.lock vs checkout), wire a guard-uv-lock-revision step into pr.yml's lint job and the make ci-lint aggregate, and update tests/system/test_ci_lint_parity.py per the CI-local parity contract.",
+  "description": "Confirmed 2026-08-01: pr.yml's lint job has 19 guard-* steps and none runs check_uv_lock_revision (#1382 wired pre-commit + a make target only, as a deliberate scope decision). pre-commit is opt-in locally, so the machine class that most needs the guard - a contributor without hooks pushing a revision-2 uv.lock - is exactly the unprotected one. Note the script's no-arg mode compares HEAD:uv.lock vs the working tree, which is self-identical on a CI checkout, so CI wiring needs a base-ref comparison mode.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "created_at": "2026-08-01T12:42:07Z",
+      "worktree": "ci-infrastructure"
+    },
+    "preserves": [
+      {
+        "behavior": "Legitimate lock updates (revision unchanged or increased) need no ceremony",
+        "item_id": "uv-lock-guard-missing-from-ci"
+      },
+      {
+        "behavior": "Pre-commit and make uv-lock-revision-check behavior unchanged",
+        "item_id": "uv-lock-guard-missing-from-ci"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/check_uv_lock_revision.py"
+      },
+      {
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "kind": "only_modify",
+        "path_glob": "tests/system/test_ci_lint_parity.py"
+      },
+      {
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_check_uv_lock_revision.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -q 'guard-uv-lock' .github/workflows/pr.yml",
+        "description": "pr.yml runs the uv-lock guard",
+        "expected": "exits 1 on the unfixed tree (verified 2026-08-01), 0 once wired",
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/check_uv_lock_revision.py --help | grep -q 'base-ref'",
+        "description": "the script supports a base-ref comparison",
+        "expected": "exits 1 on the unfixed tree (verified 2026-08-01), 0 once the mode exists",
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_check_uv_lock_revision.py -q",
+        "description": "guard script suite still green",
+        "expected": "all pass before and after - regression guard",
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/system/test_ci_lint_parity.py -q",
+        "description": "CI-local lint parity holds",
+        "expected": "all pass before and after - the parity contract is the reason the make aggregate changes with pr.yml",
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-validate pr.yml still has no uv-lock guard and the script has no base-ref mode",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add --base-ref mode with tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uv-lock-guard-missing-from-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wire pr.yml + ci-lint + parity test",
+        "wid": "w2"
+      }
+    ]
+  }
+}

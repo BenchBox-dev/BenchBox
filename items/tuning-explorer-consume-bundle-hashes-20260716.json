@@ -1,0 +1,162 @@
+{
+  "description": "Close-out of review finding C3: after #1176 (requested_config_hash) and the\napplied-ledger PR land, the explorer pipeline should read the bundle's\nhashes rather than computing its own 8-char mode hash\n(_project/scripts/explorer_pipeline/transformer.py _tuning_hash). Legacy\nbundles without the new fields keep the current honest fallback (mode-only\nor none). Receipt display shows which hash kind it is (requested vs applied)\ninstead of an ambiguous \"hash xxxx\" suffix; a mode-only fallback displays as\nmode, not as a pseudo-fingerprint (closes the receipt cosmetic nit from\n#1170's review).\n",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-22T20:24:02Z",
+        "from_item": "tuning-explorer-consume-bundle-hashes-20260716",
+        "id": 636,
+        "reason": "node_modules not installed locally -> npm test/build cannot run in this session; adding blind TS tests risks CI red with no capacity to fix under a session limit. Existing TS receipt tests exercise the new hashRow code path with null values + CI verifies the build. Follow-up: add non-null-path assertions.",
+        "resolution": "promoted",
+        "resolved_item": "tuning-explorer-hash-ts-unit-tests-20260722",
+        "resolved_reason": null,
+        "summary": "TS unit tests for the non-null requested/applied hash path in RunReceipt + ComparabilityReceipt mode-only fallback"
+      },
+      {
+        "created_at": "2026-07-22T20:24:06Z",
+        "from_item": "tuning-explorer-consume-bundle-hashes-20260716",
+        "id": 637,
+        "reason": "w4, deferred from #1182. Needs new plumbing (facet not flowing cleanly); out of the w1-w3 hash-ingest core. Assess+implement as a follow-up.",
+        "resolution": "promoted",
+        "resolved_item": "explorer-physical-rendering-id-facet-20260722",
+        "resolved_reason": null,
+        "summary": "Surface physical_rendering_id secondary facet in the explorer UI (chip/filter)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-22T20:26:06Z",
+      "completed_pr": 1264,
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Legacy bundle ingest (no new fields) keeps current behavior",
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716"
+      },
+      {
+        "behavior": "tuning_hash column remains display-only (never a join/dedup key)",
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q",
+        "description": "Pipeline tests green",
+        "expected": "All passing; new-generation bundle rows carry both hashes",
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "last_result": "pass",
+        "last_run": "2026-07-22T20:24:33Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test && npm run build",
+        "description": "Explorer TS suite + build green (w2/w3/w4 touch results-explorer/src/**)",
+        "expected": "All passing; build succeeds",
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Start gate: #1176 + applied-ledger PR #1261 both merged into develop (24a473935); platform.tuning summary emits requested_config_hash + applied_ledger_hash.",
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T20:23:43Z",
+        "started_branch": "feat/tuning-explorer-consume-bundle-hashes",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Start gate: verify #1176 and the applied-ledger PR are merged; sample a new-generation bundle",
+        "wid": "w0"
+      },
+      {
+        "evidence": "explorer_pipeline: models.py +requested_config_hash/applied_ledger_hash (display-only, legacy-null); transformer.py _tuning_summary/_requested_config_hash/_applied_ledger_hash read verbatim from platform.tuning (never recomputed, never join/dedup key); duckdb_builder.py columns. 287 pipeline tests pass; ruff/ty clean.",
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T20:23:54Z",
+        "started_branch": "feat/tuning-explorer-consume-bundle-hashes",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Transformer/duckdb_builder: ingest requested_config_hash + applied_ledger_hash; legacy fallback unchanged",
+        "wid": "w1"
+      },
+      {
+        "evidence": "TS results-explorer: types.ts optional fields; RunReceipt.tsx hashRow() labeled 'Requested config hash'/'Applied ledger hash' (distinct from self-derived Tuning hash); ComparabilityReceipt.tsx mode-only fallback no longer shown as fingerprint; duckdbQueries.ts/utils.ts wiring. Fields optional -> no build break.",
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T20:23:57Z",
+        "started_branch": "feat/tuning-explorer-consume-bundle-hashes",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Receipt/UI: labeled hash kinds; mode-only fallback stops displaying as a fingerprint",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Python tests: test_transformer.py +3 (both hashes ingested from summary; legacy->None; applied-None-when-only-requested). 287 pipeline tests pass. TS unit tests for non-null path DEFERRED (node_modules absent locally -> can't run npm; CI verifies build+suite).",
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T20:24:00Z",
+        "started_branch": "feat/tuning-explorer-consume-bundle-hashes",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Tests both sides; corpus re-ingest sanity",
+        "wid": "w3"
+      },
+      {
+        "evidence": "physical_rendering_id facet NOT implemented here (out of the w1-w3 hash-ingest core; needs new facet plumbing). Deferred via #637 -> promoted to follow-up item explorer-physical-rendering-id-facet-20260722.",
+        "item_id": "tuning-explorer-consume-bundle-hashes-20260716",
+        "notes": "The predicate and data plumbing exist (facetMatching.physicalRenderingIdsMatch); this adds the user-facing entry point per ADR-002.",
+        "started_at": "2026-07-22T20:26:01Z",
+        "started_branch": "feat/tuning-explorer-consume-bundle-hashes",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Surface the physical_rendering_id secondary facet in the UI (chip/filter), deferred from #1182",
+        "wid": "w4"
+      }
+    ]
+  }
+}

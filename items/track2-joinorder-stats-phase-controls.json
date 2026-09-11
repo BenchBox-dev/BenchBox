@@ -1,0 +1,223 @@
+{
+  "description": "Follow-up captured from the statistics-as-a-phase work (track2-joinorder-stats-phase,\nlanded via PR #980). That work delivered the first-class statistics phase\n(load -> statistics -> query): the StatisticsGatheringPhase dataclass\n(benchbox/core/results/models.py:131), the per-engine ANALYZE knob\n(benchbox/platforms/base/adapter.py:384 gather_statistics / :405\nrun_statistics_phase, with the Redshift auto-on-load override), phases.statistics\nserialization, and the per-benchmark supports_statistics_phase opt-in.\n\nIt resolved exactly ONE of the four \"Open design questions\" in\n_project/design/track2-joinorder-stats-as-phase.md (detect-and-disable vs\ndocument auto-analyze -> \"document\", via stats_mode: auto-on-load). The\nother three were NOT implemented and were not recorded as deferred on the\nnow-DONE seed, so this seed logs them:\n\n  1. (REQUIRED for Track 2) Cold-stats vs warm-stats reset/persist control.\n     The design doc states Track 2 needs BOTH fresh-stats and\n     stale-stats-after-additional-load modes to study statistics maintenance,\n     \"so the phase must support an explicit reset/persist control\". PR #980's\n     phase only runs ANALYZE once after load; there is no way to reset stats,\n     or to load more data and re-measure with deliberately stale stats. Without\n     this, the replicated/sampled scale-stress work cannot exercise the\n     stale-statistics axis at all.\n  2. (OPTIONAL) Per-table stats-build breakdown. PR #980 reports an aggregate\n     phase duration_ms plus a tables_analyzed count; the design doc's lean was\n     \"aggregate phase total with optional per-table breakdown in\n     timing_breakdown\". The optional per-table breakdown was not added.\n  3. (SANITY CHECK) Idempotence. Re-running ANALYZE on already-analyzed data\n     should produce the same plan -- the check that the phase measures stats\n     build, not incidental cache warmth. No such assertion exists.\n\nConsequence being corrected here: track2-joinorder-scaling-strategy's\ndeps.needs and must_preserve treat track2-joinorder-stats-phase (now DONE) as\n\"the statistics-phase requirement satisfied\". That is only true for the phase\nmechanics; the reset/persist control the stale-stats study depends on lives in\nTHIS seed. track2-joinorder-scaling-strategy is updated to also depend on this\nitem so the stats-axis-ready signal is honest.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "block on the joinorder data archive",
+        "instead": "(not specified)",
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "why": "this is runner/adapter mechanics testable on any opted-in benchmark (tpch/tpcds); it is NOT archive-gated."
+      },
+      {
+        "dont": "change the default statistics-phase behavior",
+        "instead": "(not specified)",
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "why": "the reset/persist control is opt-in; a bare `--phases ...,statistics` run must stay identical to PR #980."
+      },
+      {
+        "dont": "force-drop statistics on engines that cannot reset them",
+        "instead": "(not specified)",
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "why": "provide a safe no-op/documented fallback and record it in stats_mode/payload rather than failing the run."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "needs_item": "track2-joinorder-stats-phase"
+      }
+    ],
+    "item_meta": {
+      "category": "Benchmark Development",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-06T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Any new phases.statistics field is additive and omitted-when-empty (the schema-v2 omit-empty rule).",
+        "item_id": "track2-joinorder-stats-phase-controls"
+      },
+      {
+        "behavior": "Default behavior is unchanged from PR #980: without the new reset/persist knob, the statistics phase runs ANALYZE once after load exactly as shipped, and bundles that don't use the control stay byte-identical.",
+        "item_id": "track2-joinorder-stats-phase-controls"
+      },
+      {
+        "behavior": "The per-benchmark supports_statistics_phase opt-in gate still governs whether any statistics phase runs; this seed does not make it run by default.",
+        "item_id": "track2-joinorder-stats-phase-controls"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/design/track2-joinorder-stats-as-phase.md 'Open design questions' -- the source list; item 1 (auto-analyze) is done, items 2-4 are this seed's w1-w3.",
+        "decision": "reuse",
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "path": "_project/design/track2-joinorder-stats-as-phase.md"
+      },
+      {
+        "concept": "benchbox/core/results/models.py:131 StatisticsGatheringPhase (PR #980) -- extend additively for the reset-mode marker (w1) and optional per-table breakdown (w2).",
+        "decision": "extend",
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "path": "benchbox/core/results/models.py:131"
+      },
+      {
+        "concept": "benchbox/core/runner/runner.py + benchbox/core/schemas.py (PR #980, LifecyclePhases.statistics / RunConfig.gather_statistics) -- the flag-threading precedent for the new reset/persist knob.",
+        "decision": "reuse",
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "path": "benchbox/core/runner/runner.py"
+      },
+      {
+        "concept": "benchbox/platforms/base/adapter.py:384 gather_statistics / :405 run_statistics_phase (PR #980) -- extend alongside these; the reset hook is their sibling.",
+        "decision": "extend",
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "path": "benchbox/platforms/base/adapter.py:384"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/benchmark_registry.yaml"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/track2-joinorder-stats-phase-controls.yaml"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/models.py"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema_specs.yaml"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/schemas.py"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_base_adapter.py -k statistics -q",
+        "description": "Default statistics run is unchanged when the reset/persist control is not requested",
+        "expected": "existing statistics-phase tests still pass",
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'statistics and (reset or persist or stale)' -q",
+        "description": "Reset/persist control is exercised and recorded in the payload",
+        "expected": "new reset/persist tests pass",
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo deps track2-joinorder-stats-phase-controls",
+        "description": "Current item dependencies are readable from the tracker",
+        "expected": "exit 0 and dependency list is printed",
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "notes": "Give the statistics phase a mode/knob controlling whether optimizer\nstatistics are reset (dropped/recomputed for a cold-stats measurement) or\npersisted across runs so a subsequent additional load leaves stats stale.\nAdd a per-adapter reset hook (sibling of gather_statistics at\nbenchbox/platforms/base/adapter.py:384) with a safe default for engines\nthat cannot drop stats, surfaced through the same LifecyclePhases/RunConfig\npath that PR #980 used for gather_statistics, and recorded in the\nphases.statistics payload (e.g. a stats_lifecycle / reset field) so a bundle\nsays which mode produced it. Do NOT change default behavior: absent the\nknob, the phase behaves exactly as PR #980 shipped.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add an explicit reset/persist control to the statistics phase (cold vs warm stats)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "notes": "Extend StatisticsGatheringPhase (benchbox/core/results/models.py:131) and\nits serializer with an OPTIONAL per-table timing breakdown (the design\ndoc's timing_breakdown lean), omitted when not collected so existing\nbundles stay byte-identical. Aggregate duration_ms/tables_analyzed remain\nthe primary fields.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Optional per-table stats-build breakdown in the statistics phase payload",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "track2-joinorder-stats-phase-controls",
+        "notes": "Add a test (opt-in / local engine, e.g. DuckDB or PostgreSQL) asserting\nthat running the statistics phase twice on unchanged data produces the same\nplan shape / cardinality estimates, so the phase is measuring stats build\nrather than incidental cache warmth. Mirrors the design doc's idempotence\nsanity check.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Idempotence sanity check: re-ANALYZE yields the same plan",
+        "wid": "w3"
+      }
+    ]
+  }
+}

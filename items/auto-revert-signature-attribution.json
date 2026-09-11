@@ -1,0 +1,253 @@
+{
+  "context": "Keep the workflow as orchestration; put comparison logic in a tested\nstdlib-only script following the path_filter_decision.py precedent. Fail\nopen (current always-revert behavior) whenever the previous run's signature\nis unavailable. Coordination: medium-tier-pre-merge-lane also touches\ndevelop-post-merge.yml and deps.needs on this TODO - land this one first.\n",
+  "description": "The auto-revert-on-failure job in .github/workflows/develop-post-merge.yml\nfires on ANY gate-job failure and reverts `github.sha` unconditionally. On\n2026-07-10 two real breakages (#1093 test-side, #1100 code-side) produced\n15 consecutive red runs and ~14 auto-revert PRs, of which only 2 (#1099,\n#1112) blamed the guilty commit. TODO-only and docs-only merges (#1118,\n#1123) got revert PRs. When the pile of revert PRs was bulk-closed at\n19:22, the one correct revert (#1112) was discarded with the noise.\n\nFix: attribute by failure signature, not by newest SHA.\n\n- Each gate job (lint, fast-test, explorer-tokens, medium-test) exposes a\n  machine-readable failure signature (for pytest lanes: the set of failed\n  test node IDs; for lint/token lanes: the failing job name + step is\n  enough) uploaded as a per-run artifact.\n- auto-revert-on-failure downloads the signature artifact of the PREVIOUS\n  completed develop-post-merge run and diffs:\n    * previous run green, or new failure IDs appeared -> this merge\n      introduced them: open the revert PR (current behavior), listing the\n      new failure IDs in the body.\n    * previous run red with an identical-or-superset signature and no new\n      IDs -> do NOT open a revert PR; upsert a single open\n      \"develop red\" incident issue (label incident:develop-red) appending\n      the run link, so persistent red is one issue, not N PRs.\n- A plain green->red transition guard is NOT sufficient: #1100 added a\n  second failure to an already-red develop and a transition guard would\n  have skipped the one revert PR that was actually correct. Signature\n  diffing handles both cases.\n\nAlso in scope (same file):\n- When all gate jobs succeed, auto-close any open auto-revert/* PRs and\n  open incident:develop-red issues with a comment naming the green run\n  (extension alongside close-orphaned-prs).\n- Fix the stale metrics-job comment (lines ~448-451) claiming\n  MEDIUM_TEST_RESULT is inert under continue-on-error; medium-test was\n  promoted to blocking on 2026-07-06.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add third-party dependencies for the signature script (stdlib only, like the existing token-scan gates)",
+        "instead": "(not specified)",
+        "item_id": "auto-revert-signature-attribution",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "implement a green->red-transition-only guard (misses new failures on an already-red develop)",
+        "instead": "(not specified)",
+        "item_id": "auto-revert-signature-attribution",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "parse human-oriented pytest terminal output; use junit XML",
+        "instead": "(not specified)",
+        "item_id": "auto-revert-signature-attribution",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "silently skip reverting when signature comparison errors out",
+        "instead": "(not specified)",
+        "item_id": "auto-revert-signature-attribution",
+        "why": "fail open to a revert PR, and say so in its body"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "auto-revert-signature-attribution",
+        "id": 50,
+        "reason": "Handled operationally by fix-session-isolation-placeholder-rows w3.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: One-time historical PR relabeling; reason states it's handled operationally elsewhere and source item that would need it is stale/gone.",
+        "summary": "Retroactive relabeling/closing of pre-existing bogus revert PRs"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "auto-revert-signature-attribution",
+        "id": 51,
+        "reason": "This TODO covers the four develop-post-merge gates; new lanes adopt the same helper when added.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Conditional on a future new PR-lane job needing signature capture; no such lane is currently pending. Convention (reuse helper) already established, not a TODO.",
+        "summary": "Signature capture for jobs added later (e.g. a future PR-lane medium job)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-11T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "auto-revert-incident"
+    },
+    "preserves": [
+      {
+        "behavior": "A genuinely new failure on an already-red develop STILL opens a revert PR (the #1100 case)",
+        "item_id": "auto-revert-signature-attribution"
+      },
+      {
+        "behavior": "Existing conflict fallback: git revert conflict still opens the incident:develop-red-revert-conflict issue with SHA-in-body dedup",
+        "item_id": "auto-revert-signature-attribution"
+      },
+      {
+        "behavior": "Idempotency: re-runs for the same SHA must not open duplicate revert PRs or issues",
+        "item_id": "auto-revert-signature-attribution"
+      },
+      {
+        "behavior": "Metrics artifact stays a superset of the current JSON schema (existing keys unchanged)",
+        "item_id": "auto-revert-signature-attribution"
+      },
+      {
+        "behavior": "close-orphaned-prs semantics untouched",
+        "item_id": "auto-revert-signature-attribution"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/develop-post-merge.yml:112-229 close-orphaned-prs - same close-PRs-with-comment shape to reuse for green-run cleanup",
+        "decision": "reuse",
+        "item_id": "auto-revert-signature-attribution",
+        "path": ".github/workflows/develop-post-merge.yml:112-229"
+      },
+      {
+        "concept": ".github/workflows/develop-post-merge.yml:231-430 auto-revert-on-failure - extend, keep conflict-issue fallback and idempotency guards",
+        "decision": "extend",
+        "item_id": "auto-revert-signature-attribution",
+        "path": ".github/workflows/develop-post-merge.yml:231-430"
+      },
+      {
+        "concept": ".github/workflows/develop-post-merge.yml:325-366 open_manual_action_issue - existing issue-dedup-by-search pattern to generalize for the incident issue upsert",
+        "decision": "reuse",
+        "item_id": "auto-revert-signature-attribution",
+        "path": ".github/workflows/develop-post-merge.yml:325-366"
+      },
+      {
+        "concept": ".github/workflows/develop-post-merge.yml:432-552 metrics job - stale MEDIUM_TEST_RESULT comment lives here; metrics JSON schema must stay backward-compatible",
+        "decision": "reuse",
+        "item_id": "auto-revert-signature-attribution",
+        "path": ".github/workflows/develop-post-merge.yml:432-552"
+      },
+      {
+        "concept": "scripts/path_filter_decision.py - precedent for workflow logic extracted to a stdlib-only tested script instead of inline bash (pr.yml ci-paths job)",
+        "decision": "reuse",
+        "item_id": "auto-revert-signature-attribution",
+        "path": "scripts/path_filter_decision.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "auto-revert-signature-attribution",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "auto-revert-signature-attribution",
+        "kind": "only_modify",
+        "path_glob": "scripts/post_merge_signature.py"
+      },
+      {
+        "item_id": "auto-revert-signature-attribution",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_post_merge_signature.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_post_merge_signature.py -q",
+        "description": "New signature build/diff unit tests are green.",
+        "expected": "all pass",
+        "item_id": "auto-revert-signature-attribution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import yaml; yaml.safe_load(open('.github/workflows/develop-post-merge.yml'))\"",
+        "description": "The edited workflow still parses as YAML.",
+        "expected": "exit 0",
+        "item_id": "auto-revert-signature-attribution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh run list --workflow=develop-post-merge.yml --limit 1 (or GitHub MCP equivalent) after merge",
+        "description": "Post-merge observation: one develop-post-merge run opens no bogus revert PR on green and its metrics artifact still parses.",
+        "expected": "green run; no new auto-revert/* PR; metrics JSON parses",
+        "item_id": "auto-revert-signature-attribution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "auto-revert-signature-attribution",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "auto-revert-signature-attribution",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "auto-revert-signature-attribution",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "auto-revert-signature-attribution",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "auto-revert-signature-attribution",
+        "notes": "The CI run links (29097093548 etc.) expire; the durable pins are the\nrevert PRs themselves (#1099, #1104, #1107-#1112, #1115, #1120-#1122,\n#1125-#1127 - only #1099/#1112 blamed guilty commits) and the\nif-condition at develop-post-merge.yml:239. Record the re-check (SHA +\ncondition text) in the PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the incident evidence: confirm the auto-revert job's if-condition still fires on any gate failure at develop tip, and pin the 2026-07-10 facts.",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "auto-revert-signature-attribution",
+        "notes": "Set PYTEST_ADDOPTS=\"--junitxml=<file>\" as a step env in the workflow so\n`make ci-test` / `make test-medium` pick it up without changing local\ndeveloper behavior. Extract failed node IDs with a stdlib-only script\n(see w2); upload with actions/upload-artifact, if: always().\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Emit failure signatures: junit XML via PYTEST_ADDOPTS on the pytest gates plus an always-run signature-artifact upload step per gate job.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "auto-revert-signature-attribution",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add stdlib-only scripts/post_merge_signature.py: build a signature JSON from junit XML / job results, and diff two signatures returning the set of NEW failure IDs; unit-test both paths.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "auto-revert-signature-attribution",
+        "notes": "Previous-run lookup: gh api /actions/workflows/develop-post-merge.yml/runs\n?branch=develop&status=completed&per_page=1&created<... or walk runs and\npick the one whose run_number is highest below the current run. Missing\nartifact (expired, first run after this change) must fail open into\ntoday's behavior, never crash the job.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Gate auto-revert on the signature diff vs the previous run: revert PR only when new failure IDs exist, else upsert the incident issue.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "auto-revert-signature-attribution",
+        "notes": "Covers both incident:develop-red and incident:develop-red-revert-conflict\nissues. Reuse the close-orphaned-prs close-with-comment shape.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Green-run cleanup job: when all four gates succeed, close open auto-revert/* PRs and open incident issues, commenting the green run and SHA.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "auto-revert-signature-attribution",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix the stale metrics-job MEDIUM_TEST_RESULT comment; extend the metrics JSON with the signature outcome (new_failure_ids, revert_suppressed) as additive fields only.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

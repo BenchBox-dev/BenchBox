@@ -1,0 +1,183 @@
+{
+  "context": "Define minimum publishable required-table and compare-eligible counts, fail candidates before promotion, and preserve the last known-good output. Add an all-skipped corpus regression.",
+  "description": "The snapshot invariant accepts a fully empty DuckDB because COUNT(*) > 0 is only tested inside the nonempty branch. The browser requires nonempty results, platform, ranking, matrix, and detail scans. An all-invalid or all-private corpus can publish a database that passes the gate but cannot initialize the Explorer.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "accept empty DB as graceful",
+        "instead": "fail before promotion",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "why": "browser readiness requires nonempty scans"
+      },
+      {
+        "dont": "invent rows or weaken eligibility",
+        "instead": "report unpublishable corpus",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "why": "that fabricates evidence"
+      },
+      {
+        "dont": "test schema only",
+        "instead": "assert nonempty required scans and eligibility",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "why": "valid empty schemas reproduce the failure"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "needs_item": "results-explorer-snapshot-portability-and-wal-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "Data integrity",
+      "completed_at": "2026-08-09T23:59:03Z",
+      "completed_pr": 1665,
+      "created_at": "2026-08-02T16:26:59Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Failed candidates cannot replace last-good output",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802"
+      },
+      {
+        "behavior": "Gate matches browser readiness scans",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802"
+      },
+      {
+        "behavior": "Private/invalid bundles remain excluded",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802"
+      },
+      {
+        "behavior": "Small previews with one usable row remain valid",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Staged promotion",
+        "decision": "extend",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "path": "_project/scripts/explorer_pipeline/pipeline.py"
+      },
+      {
+        "concept": "Independent invariant gate",
+        "decision": "extend",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "path": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "concept": "Browser required nonempty scans",
+        "decision": "reuse",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "path": "results-explorer/src/db.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/pipeline.py"
+      },
+      {
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      },
+      {
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'from pathlib import Path; import tempfile; from _project.scripts.explorer_pipeline.duckdb_builder import DuckDBSnapshotBuilder; from _project.scripts.results_explorer_snapshot_invariants import check_snapshot; d=tempfile.TemporaryDirectory(); p=Path(d.name)/\"results.duckdb\"; DuckDBSnapshotBuilder().build_full([], {}, [], {}, {}, {}, \"bundles\", p); assert check_snapshot(p)'",
+        "description": "Empty built snapshot fails invariants",
+        "expected": "Exit 0 because errors are required",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "last_result": "pass",
+        "last_run": "2026-08-09T23:54:39Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline tests/unit/scripts/test_results_explorer_snapshot_invariants.py -q",
+        "description": "Focused pipeline and invariant tests pass",
+        "expected": "All focused tests pass",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "last_result": "pass",
+        "last_run": "2026-08-09T23:58:07Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Aligned the gate with results-explorer/src/db.ts SNAPSHOT_READY_SCANS: require nonempty results, platform_index_rows, benchmark_rankings, benchmark_matrix_cells, and result_detail_metrics, plus at least one display row with comparison_exclusion_reason IS NULL; staged validation already precedes _promote_staged_output.",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "notes": null,
+        "started_at": "2026-08-09T23:52:32Z",
+        "started_branch": "fix/results-explorer-empty-snapshot-gate-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Specify required-table and compare-eligible minimums",
+        "wid": "w0"
+      },
+      {
+        "evidence": "REQUIRED_NONEMPTY_SCANS now mirrors browser readiness: results, platform_index_rows, benchmark_rankings, benchmark_matrix_cells, and result_detail_metrics; compare eligibility requires a nonempty display row with no comparison exclusion; ExplorerPipeline already checks invariants before _promote_staged_output.",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "notes": null,
+        "started_at": "2026-08-09T23:54:14Z",
+        "started_branch": "fix/results-explorer-empty-snapshot-gate-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Implement empty/unusable rejection before promotion",
+        "wid": "w1"
+      },
+      {
+        "evidence": "336 focused tests passed; added one-usable-row required-scan coverage, all-skipped/corrupt corpus rejection, and last-good output byte-preservation regression; empty built snapshot invariant command reports required browser scan failures.",
+        "item_id": "results-explorer-empty-snapshot-gate-20260802",
+        "notes": null,
+        "started_at": "2026-08-09T23:54:24Z",
+        "started_branch": "fix/results-explorer-empty-snapshot-gate-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Add all-skipped, one-row, and rollback regressions",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #252 of results-explorer-uat-defect-spark-pyspark-expression-compat.\nDeferred: PySpark Parquet TIME(MILLIS,false) cache/loader compatibility\nReason deferred: Separate loader/cache conversion owner; do not mix with the shared Spark SQL schema retry fix.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:08Z",
+      "worktree": "main"
+    }
+  }
+}

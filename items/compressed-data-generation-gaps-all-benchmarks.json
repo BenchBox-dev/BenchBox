@@ -1,0 +1,10 @@
+{
+  "description": "- \"Priority: High\"\n- \"Status: Completed\"\n- \"Description: Implemented durable manifest-based data generation across benchmarks and hardened compressed output handling. No raw `.dat`/`.tbl` artifacts remain when compression is enabled; empty compressed files are disallowed; validators now prefer manifest and rebuild when missing.\"\n- \"Solution Delivered:\"\n- \"Files Affected:\"\n- \"Impact: Increases reliability of data reuse, accelerates preflight checks (manifest vs scan), and ensures consistent artifact formats for loaders and validators across all supported benchmarks.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Data Quality and Compatibility Issues",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "context": "Follow the existing pattern in pyproject.toml [tool.benchbox.complexity] exclude_functions.\nGroup new entries by the same category headings used for existing ones.\nEach entry: \"file/path.py:function_name\",  # NN - rationale\n",
+  "description": "19 functions flagged by make complexity-check have complexity that is genuinely\nirreducible - TPC spec implementations, interactive REPL state machines, multi-platform\nAPI dispatch, AST traversal, and thread-safety patterns. These must be added to the\nexclude_functions list in pyproject.toml with rationale comments so the warning count\naccurately reflects addressable complexity only.\n\nFunctions to add:\nScore 20:\n  benchbox/core/tpcdi/etl/batch.py:_execute_parallel_pipeline\n  benchbox/platforms/credentials/athena.py:setup_athena_credentials\n  benchbox/platforms/credentials/bigquery.py:setup_bigquery_credentials\n  benchbox/platforms/dataframe/unified_frame.py:sort\n\nScore 19:\n  benchbox/platforms/dataframe/unified_frame.py:_apply_datafusion_post_ops\n\nScore 18:\n  benchbox/core/runner/dataframe_runner.py:_execute_dataframe_queries\n  benchbox/core/tpcds/throughput_test.py:run\n  benchbox/core/tpcds_obt/query_conversion.py:_rewrite_select\n  benchbox/core/tpch/maintenance_test.py:_execute_rf1\n  benchbox/core/tpch/power_test.py:run\n  benchbox/core/tpch/throughput_test.py:run\n\nScore 17:\n  benchbox/core/expected_results/registry.py:_get_benchmark_results\n  benchbox/core/query_plans/parsers/datafusion.py:_convert_to_logical_operator\n  benchbox/core/tpch/throughput_test.py:_execute_stream\n  benchbox/core/transaction_primitives/benchmark.py:setup\n  benchbox/platforms/base/adapter.py:capture_query_plan\n\nScore 16:\n  benchbox/cli/commands/shell.py:_launch_sqlite_shell\n  benchbox/platforms/credentials/snowflake.py:setup_snowflake_credentials\n\nScore 15:\n  benchbox/cli/commands/shell.py:_launch_duckdb_shell",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add functions that are reducible",
+        "instead": "(not specified)",
+        "item_id": "complexity-ignores-w14",
+        "why": "only genuinely irreducible cases documented above"
+      },
+      {
+        "dont": "add module-level exclusions; per-function ignores only",
+        "instead": "(not specified)",
+        "item_id": "complexity-ignores-w14",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "remove or modify existing approved ignores",
+        "instead": "(not specified)",
+        "item_id": "complexity-ignores-w14",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-20T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All 19 functions remain behaviorally unchanged - this is annotation only",
+        "item_id": "complexity-ignores-w14"
+      },
+      {
+        "behavior": "Existing approved ignores in exclude_functions list are untouched",
+        "item_id": "complexity-ignores-w14"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "complexity-ignores-w14",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/check_complexity.py --top 150",
+        "description": "Complexity check passes with reduced warning count",
+        "expected": "PASSED: all functions within complexity limit of 20; warnings count drops by ~19",
+        "item_id": "complexity-ignores-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "complexity-ignores-w14",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "complexity-ignores-w14",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "complexity-ignores-w14",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "complexity-ignores-w14",
+        "notes": "Add these with rationale comments (pattern: # NN - brief rationale):\n- _execute_parallel_pipeline: async parallel ETL orchestration with future management\n- setup_athena_credentials: interactive credential wizard; branching is UX-required\n- setup_bigquery_credentials: same as Athena\n- sort: multi-platform dispatch (Polars/PySpark/DataFusion) with different sort APIs\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add score-20 TPC/platform required ignores to pyproject.toml",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-ignores-w14",
+        "notes": "Add these with rationale:\n- _apply_datafusion_post_ops (19): literal vs multi-agg arithmetic with distinct semantics\n- _execute_dataframe_queries (18): TPC power test methodology; phases are spec-ordered\n- tpcds/throughput_test.py:run (18): TPC-DS spec; threading is mandatory\n- _rewrite_select (18): AST rewriting with dependency ordering (role_map → column rewrite)\n- _execute_rf1 (18): TPC-H RF1 spec; SQL building depends on prior step results\n- tpch/power_test.py:run (18): TPC-H power test; spec mandates permutation order\n- tpch/throughput_test.py:run (18): TPC-H throughput; spec mandates TTT measurement\n- _get_benchmark_results (17): thread-safe single-flight cache pattern\n- _convert_to_logical_operator (17): AST node conversion with operator-specific properties\n- _execute_stream (17): TPC-H stream; 22 queries in spec permutation order\n- transaction_primitives/benchmark.py:setup (17): spec-required sequential dependency chain\n- capture_query_plan (17): multi-level filter chain (ID, iteration, sampling, EXPLAIN)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add score 17-19 TPC spec and AST ignores",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-ignores-w14",
+        "notes": "- _launch_sqlite_shell (16): user input dispatch loop; state machine is REPL-inherent\n- setup_snowflake_credentials (16): interactive wizard; multi-step validation with dependencies\n- _launch_duckdb_shell (15): same pattern as SQLite shell\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add score 15-16 interactive REPL and credential wizard ignores",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-ignores-w14",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify warning count drops and complexity-check still passes",
+        "wid": "w4"
+      }
+    ]
+  }
+}

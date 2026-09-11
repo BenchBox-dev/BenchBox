@@ -1,0 +1,249 @@
+{
+  "context": "Implement rollout planning, content-safe backup manifests, isolated restore verification, atomic-swap planning, and safety-only canary scoring against temporary fixtures. Commands default to dry-run and require explicit exact targets for any apply operation. Do not execute live promotion, settings changes, or deletion in this item.",
+  "description": "The Phase 4 item requires python -m memory_tooling.rollout but that module does not exist and its scope forbids creating it. Build and test content-safe rollout tooling in a successor item without touching live memory. The original Phase 4 item remains blocked until this prerequisite, the full behavioral gate, explicit promotion approval, and live-mutation authorization all pass.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "implement a broad recursive delete or home-directory swap",
+        "instead": "require an exact manifest and validated destination",
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "why": "an unresolved target could destroy unrelated state"
+      },
+      {
+        "dont": "make apply the default",
+        "instead": "emit a deterministic plan unless an explicit approved apply token is supplied",
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "why": "rollout tooling must fail safe"
+      },
+      {
+        "dont": "store memory contents in reports",
+        "instead": "store redacted paths and cryptographic metadata only",
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "why": "reports are durable and reviewable"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "needs_item": "memory-behavioral-independent-oracle-redesign"
+      }
+    ],
+    "item_meta": {
+      "category": "tooling",
+      "completed_at": "2026-07-28T14:56:49Z",
+      "created_at": "2026-07-28T14:18:28Z",
+      "worktree": "memory-rollout"
+    },
+    "preserves": [
+      {
+        "behavior": "Atomic promotion and deletion remain separately human-authorized operations",
+        "item_id": "memory-rollout-tooling-prerequisites"
+      },
+      {
+        "behavior": "Backup manifests contain hashes, counts, sizes, and redacted paths but no memory text",
+        "item_id": "memory-rollout-tooling-prerequisites"
+      },
+      {
+        "behavior": "Every command is dry-run by default and exact-target scoped",
+        "item_id": "memory-rollout-tooling-prerequisites"
+      },
+      {
+        "behavior": "No live memory, settings, source sessions, transcripts, history, or credentials are changed",
+        "item_id": "memory-rollout-tooling-prerequisites"
+      },
+      {
+        "behavior": "Restore verification occurs only in isolated temporary fixtures",
+        "item_id": "memory-rollout-tooling-prerequisites"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/src/memory_tooling/rollout.py"
+      },
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/tests/test_rollout.py"
+      },
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "kind": "only_modify",
+        "path_glob": "reports/rollout/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling -- python -m pytest memory_tooling/tests/test_rollout.py -q",
+        "description": "Rollout tooling tests pass",
+        "expected": "exit 0",
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling -- python -m memory_tooling.rollout self-test-safety",
+        "description": "Broad or live apply targets fail closed",
+        "expected": "exit 0; mutation probes are rejected",
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling -- python -m memory_tooling.rollout self-test-restore",
+        "description": "Backup restore drill passes on isolated fixtures",
+        "expected": "exit 0; restored fixture hashes equal source",
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && grep -q 'explicit promotion approval' docs/operations/memory-rollout.md && grep -q 'exact deletion ledger' docs/operations/memory-rollout.md",
+        "description": "Documentation retains all human gates",
+        "expected": "exit 0",
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "43c6cb1: dry-run plans for all five operations, exact target validation, broad-target rejection, no execution path",
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "notes": null,
+        "started_at": "2026-07-28T14:56:21Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Implement dry-run planning and exact target validation for backup, canary, promotion, rollback, and cleanup",
+        "wid": "w0"
+      },
+      {
+        "evidence": "43c6cb1: content-free manifests with relative paths, bytes, counts and SHA-256; isolated two-step restore self-test is hash-identical",
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "notes": null,
+        "started_at": "2026-07-28T14:56:26Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Implement content-safe backup manifests and hash-identical isolated restore verification",
+        "wid": "w1"
+      },
+      {
+        "evidence": "43c6cb1: promotion and rollback plans bind exact target, reviewed manifest digest, and operation-specific approval token; execution_supported=false",
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "notes": null,
+        "started_at": "2026-07-28T14:56:30Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Implement atomic-swap and rollback plan validation without executing live mutations",
+        "wid": "w2"
+      },
+      {
+        "evidence": "43c6cb1: canary fails closed on missing or failed isolation, categorical safety, eligibility, or privacy fields",
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "notes": null,
+        "started_at": "2026-07-28T14:56:35Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Implement safety-only canary result checks with categorical failure handling",
+        "wid": "w3"
+      },
+      {
+        "evidence": "15 focused rollout tests cover broad/relative targets, altered backup, unsafe/missing canary, dry-run default, token binding, sensitive/unsafe manifest mutations, invalid digest",
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "notes": null,
+        "started_at": "2026-07-28T14:56:39Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add mutations for broad targets, altered backups, unsafe canaries, apply defaults, and sensitive fields",
+        "wid": "w4"
+      },
+      {
+        "evidence": "43c6cb1: operator document records explicit promotion approval, exact deletion ledger, retention, rollback triggers, and non-actions",
+        "item_id": "memory-rollout-tooling-prerequisites",
+        "notes": null,
+        "started_at": "2026-07-28T14:56:43Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Document operator commands, approval gates, backup retention, rollback triggers, and non-actions",
+        "wid": "w5"
+      }
+    ]
+  }
+}

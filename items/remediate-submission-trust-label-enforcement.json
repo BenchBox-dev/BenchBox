@@ -1,0 +1,263 @@
+{
+  "description": "Source: _project/audits/results-explorer-publication-adversarial-review.md\n(develop_sha fddedf26), findings §2.1, §2.2, §2.3, §2.4 (all Required).\n\nThe community-vs-maintainer trust label is derived solely from the presence\nof a `.manifest.json` sidecar and defaults to the most-trusted tier when the\nsidecar is absent, and nothing in CI requires the sidecar:\n  - _project/scripts/explorer_pipeline/pipeline.py:458-460 — trust stays the\n    build default unless a manifest sidecar exists.\n  - _project/scripts/explorer_publish.py:45-46 defaults --trust-label to\n    \"maintainer-run\"; docs.yml:112 runs the build with no --trust-label.\n  - scripts/generate_corpus_inventory.py:41-52 — same sidecar-or-default rule.\n  - benchbox/validation/bundle.py:718-726 validates the manifest hash only\n    `if manifest_path is not None`; a bundle with no sidecar yields no error.\n  - models.py:82-89 — RANKING_ELIGIBLE_TRUST_LABELS = {maintainer-run,\n    ci-verified}, so a mislabel flips a result from \"displayed\" to \"ranked\".\n§2.1: a community bundle submitted without a sidecar is badged maintainer-run\nand made ranking-eligible. §2.2: the explorer build discards the publish-time\nlabel entirely (an `unofficial-research` bundle — required by\npublish.py:97-110 for non-compliant TPC results — is re-badged maintainer-run;\nthe pipeline never reads a per-bundle label). §2.3: bundle_publisher.py:88\nsilently coerces an unknown label to maintainer-run for programmatic callers.\n§2.4: a present-but-empty manifest emits only `vr.warn` and returns\n(bundle.py:594-602); ValidationResult.ok ignores warnings (bundle.py:170-172),\nso the sidecar grants the community label without the hash ever being verified.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "infer trust from build-time CLI defaults",
+        "instead": "fail closed to community-submission on the submission path.",
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "why": "a missing sidecar then silently means maintainer-run"
+      },
+      {
+        "dont": "keep manifest-missing as a warning",
+        "instead": "make it an error on the corpus path.",
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "why": "ValidationResult.ok ignores warnings and the bundle merges unverified"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "remediate-submission-trust-label-enforcement",
+        "id": 473,
+        "reason": "Explorer-render concerns; tracked in remediate-explorer-trust-label-vocabulary, whose w1 defines the canonical vocabulary (that item deps.needs this one so the fail-closed trust derivation lands first).",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Owning item remediate-explorer-trust-label-vocabulary is DONE; its w1 defines the canonical vocabulary as required.",
+        "summary": "§2.20 label-vocabulary unification and §2.21 TrustBadge empty-state"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "remediate-submission-trust-label-enforcement",
+        "id": 474,
+        "reason": "Audit rates §2.5 'verified — no defect'; optional robustness only. Recorded here so the audit item is not silently dropped; fix opportunistically if touching store.py.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Audit rated this section 'verified -- no defect'; explicitly optional/opportunistic-only, not a real actionable task.",
+        "summary": "§2.5 optional dedup-string normalization and 0.0-republish scale_factor nit"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Already-merged community bundles keep their community-submission label (legacy singleton submission-manifest.json still honored).",
+        "item_id": "remediate-submission-trust-label-enforcement"
+      },
+      {
+        "behavior": "Existing manifest-hash traversal and symlink defenses in bundle.py.",
+        "item_id": "remediate-submission-trust-label-enforcement"
+      },
+      {
+        "behavior": "The maintainer-run local publish flow (benchbox publish with a valid label) is unaffected.",
+        "item_id": "remediate-submission-trust-label-enforcement"
+      },
+      {
+        "behavior": "`benchbox submit --dry-run` still succeeds against a source bundle whose `<bundle>.manifest.json` sidecar does not exist yet -- the new missing-sidecar hard error is scoped to the submission-corpus CI path, not validate_bundles() unconditionally.",
+        "item_id": "remediate-submission-trust-label-enforcement"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/scripts/explorer_pipeline/pipeline.py:_find_submission_manifest — extend: keep sidecar detection but stop treating absence as maintainer-run.",
+        "decision": "extend",
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "path": "_project/scripts/explorer_pipeline/pipeline.py:_find_submission_manifest"
+      },
+      {
+        "concept": "benchbox/cli/commands/publish.py:97-110 — reuse the existing compliance_class guardrail as the provenance source of truth for w2.",
+        "decision": "reuse",
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "path": "benchbox/cli/commands/publish.py:97-110"
+      },
+      {
+        "concept": "benchbox/validation/bundle.py:_is_safe_bundle_filename / symlink guard — reuse the existing attacker-facing hardening; extend, do not replace.",
+        "decision": "extend",
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "path": "benchbox/validation/bundle.py:_is_safe_bundle_filename"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/publishing/bundle_publisher.py"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "kind": "only_modify",
+        "path_glob": "benchbox/validation/bundle.py"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_corpus_inventory.py"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/publishing/"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/validation/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py -q",
+        "description": "A bundle with no sidecar fails submission validation",
+        "expected": "new test: missing/empty manifest → FAIL (non-zero validator exit)",
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ -k trust -q",
+        "description": "An unofficial-research bundle is not maintainer-run in the built snapshot",
+        "expected": "trust reflects per-bundle provenance, not the build default",
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/publishing/ -k label -q",
+        "description": "Invalid publisher label raises",
+        "expected": "BundlePublisher(label='bogus') raises ValueError",
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "notes": "Capture to /tmp/remediate-trust-w0.log (do not commit); summarize here:\n  - A bundle with no sidecar → validate_submission.py exits 0 AND the\n    pipeline/inventory assign the build-default (maintainer-run).\n  - A bundle published `--label unofficial-research` → its explorer\n    trust_label comes out maintainer-run (label discarded).\n  - BundlePublisher(label=\"bogus\") → stored label == \"maintainer-run\".\n  - A `<stem>.manifest.json` missing bundle_hash → validate_bundles\n    returns ok (warning only), pipeline assigns community-submission.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce the four trust-label failures with fixtures before changing code",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "notes": "In benchbox/validation/bundle.py: when a primary bundle has no paired\nmanifest, emit an ERROR (not silent pass) for the submission-corpus path;\nand promote the \"manifest present but missing bundle_file/bundle_hash\"\ncase (594-602) from warn to error. Keep the existing traversal/symlink\nhardening. Ensure validate-submission.yml surfaces the new error.\n\nDo NOT make this a blanket rule inside validate_bundles() itself:\n`benchbox submit --dry-run` calls that same shared validator on the\nSOURCE bundle before its `<bundle>.manifest.json` sidecar is generated,\nso a valid local dry-run would start failing the no-sidecar check too.\nScope the new hard error to the submission-corpus CI entrypoint\n(scripts/validate_submission.py, now in scope_limit below) — e.g. an\nexplicit flag/mode passed into validate_bundles(), or a corpus-only\nwrapper check in validate_submission.py itself — so `benchbox submit\n--dry-run` keeps working on a bundle whose sidecar doesn't exist yet.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Require a complete, verifying manifest sidecar for every primary bundle under results-data/bundles/",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "notes": "_project/scripts/explorer_pipeline/{pipeline,transformer}.py and\nscripts/generate_corpus_inventory.py: derive trust from the bundle's own\nprovenance (compliance_class and/or a label field carried in the manifest)\nso an unofficial-research/community bundle cannot inherit maintainer-run.\nFail closed: a submission-path bundle with missing provenance is treated\nas community-submission, never maintainer-run.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Carry per-bundle provenance into the explorer pipeline instead of stamping one build-wide label",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "notes": "benchbox/core/publishing/bundle_publisher.py:88 — raise ValueError for a\nlabel not in VALID_LABELS; only default when the caller passed None. The\nCLI is already guarded by click.Choice; this protects publish_bundle /\nrun --publish / API callers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make BundlePublisher raise on an out-of-vocabulary label instead of coercing to maintainer-run",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-submission-trust-label-enforcement",
+        "notes": "tests/unit/validation + tests/unit/core/publishing +\ntests/unit/core/explorer_pipeline: no-sidecar → validation error;\nunofficial-research bundle → non-maintainer trust in the built snapshot;\ninvalid label → ValueError; empty manifest → validation error.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression tests pinning each corrected behavior",
+        "wid": "w4"
+      }
+    ]
+  }
+}

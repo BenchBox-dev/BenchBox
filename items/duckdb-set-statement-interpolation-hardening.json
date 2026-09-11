@@ -1,0 +1,188 @@
+{
+  "context": "Coerce and validate where the value ENTERS the adapter, in __init__, not at the point of use, so every consumer of the attribute sees an already-safe value and a later call site cannot reintroduce the hole. thread_limit: int() it and raise a ValueError naming the option when it is not integral. memory_limit and max_temp_directory_size: prefer DuckDB's parameterised SET where the pinned version supports it; where it does not, validate against the same bounded memory-size pattern MCP already applies (benchbox/mcp/schemas.py MEMORY_LIMIT_PATTERN) before interpolating. Fix all three in one pass -- leaving two of three hardened is a worse state than none, because it implies the file was reviewed.",
+  "description": "benchbox/platforms/duckdb.py:667 reads `self.thread_limit = config.get('thread_limit')` with no coercion, and :800 applies it as `conn.execute(f'SET threads TO {self.thread_limit}')` -- raw interpolation of a config-supplied value into SQL. Two sibling settings have the same shape: :790 `SET memory_limit = '{self.memory_limit}'` and :795 `SET max_temp_directory_size = '{self.max_temp_directory_size}'`.\n\nThis is a consequence of my own change and I am logging it against myself. Before #1514, DuckDBAdapter.from_config omitted `thread_limit` from its pass-through key list, so the only way to reach :800 was to construct the adapter directly. Adding it to that list -- which is what made MCP's duckdb.threads actually apply -- also connected the unified-config and config-file paths to the interpolation.\n\nNOT an MCP escalation: MCP_PLATFORM_OPTION_ALLOWLIST bounds duckdb.threads to an int in 1..256 and _prepare_adapter_platform_options renames it, so nothing string-shaped survives that boundary. The exposure is the non-MCP path -- a benchmark config or profile YAML carrying `thread_limit: '4; ATTACH ...'` is interpolated verbatim. Config files are comparatively trusted, hence medium.\n\nWHY THIS IS SEQUENCED FIRST IN THE DUCKDB CHAIN: [duckdb-from-config-drops-constructor-read-keys] proposes adding `max_temp_directory_size` and `progress_bar` to the same pass-through list. Doing that before this hardening lands repeats the exact mistake #1514 made -- it makes :795's unhardened f-string live from config. That item is blocked on this one.\n\nIdentified 2026-08-04 during the adversarial review of the mcp-v2-platform-options batch.\n\nSUPERSEDES `duckdb-thread-limit-raw-sql-interpolation`, which was dropped minutes after creation on 2026-08-04 to attach anti-patterns, sequenced work units, prior art and dependency edges. `drop` is a soft state change rather than a delete, so the original id could not be reused; the dropped item carries the reason and links back here.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix this by escaping or quote-doubling the interpolated string",
+        "instead": "validate and coerce once in __init__ so the attribute itself is trustworthy",
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "why": "escaping is a defence against one syntax at one call site and silently rots when a fourth SET statement is added; it also leaves the attribute holding an unvalidated value for every other reader"
+      },
+      {
+        "dont": "harden thread_limit alone because it is the one this batch touched",
+        "instead": "fix all three interpolations in one change",
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "why": "memory_limit and max_temp_directory_size share the identical shape, and a partial pass signals to the next reader that the file was already reviewed and is safe"
+      },
+      {
+        "dont": "import benchbox.mcp from benchbox.platforms to reuse MEMORY_LIMIT_PATTERN",
+        "instead": "lift the pattern into a shared location below both, or duplicate it with a comment pointing at the source of truth",
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "why": "it inverts the layering (surfaces sit above platforms) and would make an MCP-scoped policy constant load-bearing for CLI runs"
+      },
+      {
+        "dont": "narrow the MCP allow-list bound to compensate for the adapter accepting anything",
+        "instead": "harden the adapter, and leave the MCP bound exactly where it is",
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "why": "MCP is already the tightest path and is not the exposed one; tightening it hides the real gap on the config-file path and makes the adapter look safe when it is not"
+      }
+    ],
+    "item_meta": {
+      "category": "platforms",
+      "created_at": "2026-08-04T23:48:50Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "An absent thread_limit still means 'emit no SET threads at all', not 'emit a default'",
+        "item_id": "duckdb-set-statement-interpolation-hardening"
+      },
+      {
+        "behavior": "Existing DuckDB adapter defaults are unchanged when no key is supplied (memory_limit still defaults to 4GB)",
+        "item_id": "duckdb-set-statement-interpolation-hardening"
+      },
+      {
+        "behavior": "MCP duckdb.threads still reaches the effective DuckDB SET threads statement -- TestMCPThreadsReachTheEffectiveSetting from #1514 must stay green",
+        "item_id": "duckdb-set-statement-interpolation-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "MEMORY_LIMIT_PATTERN and _validate_memory_limit define the bounded memory-size grammar; reuse the grammar but relocate it, because benchbox.platforms must not import benchbox.mcp",
+        "decision": "extend",
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "path": "benchbox/mcp/schemas.py"
+      },
+      {
+        "concept": "the SET block carries three raw f-string interpolations of adapter config; supersede all three in one pass rather than hardening only the one this batch touched",
+        "decision": "supersede",
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "path": "benchbox/platforms/duckdb.py:786-802"
+      },
+      {
+        "concept": "the connection spy built for TestMCPThreadsReachTheEffectiveSetting (#1514) is what the new negative test needs",
+        "decision": "reuse",
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "path": "tests/unit/platforms/test_duckdb_adapter.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/**"
+      },
+      {
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_duckdb_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/platforms/test_duckdb_adapter.py -q -n 0",
+        "description": "A non-integral thread_limit is rejected at construction and never reaches conn.execute",
+        "expected": "exits 0 with a new case proving construction fails AND the connection spy recorded no SET statement -- asserting only on the raised error would pass even if the statement had already been sent",
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/platforms/test_duckdb_adapter.py -q -n 0 -k MCPThreadsReachTheEffectiveSetting",
+        "description": "The MCP path still applies the requested thread count end to end",
+        "expected": "exits 0",
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "bash -c '! grep -nE \"conn.execute\\\\(f.SET (threads|memory_limit|max_temp_directory_size)\" benchbox/platforms/duckdb.py'",
+        "description": "No raw f-string interpolation of adapter config remains in the SET block",
+        "expected": "exits 1 today (all three present); exits 0 once the values are parameterised or provably bounded before interpolation",
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Characterize current behaviour: prove a non-integral thread_limit reaches conn.execute today, with a connection spy",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide where the bounded memory-size grammar lives without inverting the mcp/platforms layering",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Coerce thread_limit and validate the two memory-size settings in __init__",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-set-statement-interpolation-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add the negative spy test and confirm the #1514 effective-setting coverage still passes",
+        "wid": "w3"
+      }
+    ]
+  }
+}

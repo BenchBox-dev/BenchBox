@@ -1,0 +1,224 @@
+{
+  "context": "For each adapter, wrap cursor usage in try/finally blocks. Follow the pattern\nalready established in StarRocks (starrocks/workload.py) which uses:\n  cursor = connection.cursor()\n  try:\n      cursor.execute(query)\n      ...\n  finally:\n      cursor.close()\n\nFor mogrify calls, reuse the existing cursor variable instead of creating a new one.\nFor Databend client leaks, add try/finally around BlockingDatabendClient usage.\n",
+  "description": "Adversarial code reviews of PRs #27-33 identified cursor and connection resource\nleaks in 5 of 6 new platform adapters: QuestDB, Databend, pg_duckdb, pg_mooncake,\nand StarRocks. Common patterns:\n\n1. **Cursor not closed on exception**: When cursor.execute() raises in execute_query(),\n   the except block returns without calling cursor.close(). Under sustained query\n   failures (common in benchmarking), this leaks server-side cursors.\n2. **Orphaned cursors from mogrify()**: pg_duckdb and pg_mooncake create new cursors\n   via conn.cursor().mogrify() for credential escaping, but never close them.\n3. **Connection leaks in test/check methods**: Databend's test_connection() and\n   check_server_database_exists() create BlockingDatabendClient instances without\n   closing them.\n\nThese leaks accumulate during long benchmark runs and can exhaust server-side\nconnection/cursor limits.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "catch BaseException for cleanup",
+        "instead": "use finally blocks which handle this correctly",
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "why": "cursor.close() itself might fail"
+      },
+      {
+        "dont": "use context managers (with conn.cursor() as cur)",
+        "instead": "use explicit try/finally",
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "why": "not all database drivers support cursor as context manager"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-16T00:00:00Z",
+      "created_at": "2026-02-15T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter unit tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "platform-adapter-cursor-resource-leaks"
+      },
+      {
+        "behavior": "create_connection() return value unchanged - valid connection object",
+        "item_id": "platform-adapter-cursor-resource-leaks"
+      },
+      {
+        "behavior": "execute_query() return values unchanged - dict with 'rows', 'execution_time_seconds', etc.",
+        "item_id": "platform-adapter-cursor-resource-leaks"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/postgres.py"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend/adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_duckdb.py"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_mooncake.py"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/questdb.py"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_databend_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_pg_duckdb_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_pg_mooncake_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_questdb_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "All platform adapter tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_questdb_adapter.py -v --tb=short",
+        "description": "QuestDB cursor lifecycle test",
+        "expected": "all tests pass",
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_pg_duckdb_adapter.py tests/unit/platforms/test_pg_mooncake_adapter.py -v --tb=short",
+        "description": "pg extension cursor lifecycle tests",
+        "expected": "all tests pass",
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "notes": "questdb.py:500-542 - cursor not closed when cursor.execute() or cursor.fetchall() raises",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix QuestDB execute_query cursor leak - add try/finally around cursor lifecycle",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "notes": "questdb.py:246-266 - KeyboardInterrupt/SystemExit bypass cursor.close()",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix QuestDB create_schema cursor leak - ensure cursor.close() on non-Exception errors",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "notes": "databend/adapter.py:594-603, 654-668 - BlockingDatabendClient never closed",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix Databend test_connection and check_server_database_exists connection leaks",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "notes": "pg_duckdb.py:255 - use existing cursor variable instead of creating new one",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix pg_duckdb orphaned cursor from conn.cursor().mogrify() in create_connection",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "notes": "pg_mooncake.py:165 - same pattern as pg_duckdb",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix pg_mooncake orphaned cursor from conn.cursor().mogrify() in create_connection",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-cursor-resource-leaks",
+        "notes": "StarRocks already has test_cursor_closed_on_execute_query_failure - replicate pattern",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests verifying cursor.close() is called on exception paths",
+        "wid": "w6"
+      }
+    ]
+  }
+}

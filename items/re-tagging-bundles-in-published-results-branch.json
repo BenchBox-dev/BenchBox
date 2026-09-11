@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #416 of joinorder-canonical-cutover.\nDeferred: Re-tagging bundles in published-results branch\nReason deferred: The published-results branch is the community submission target; bundle re-tagging there requires a separate PR with curation review. This TODO only renames in develop's results-data/bundles/ tree.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:11Z",
+      "worktree": "main"
+    }
+  }
+}

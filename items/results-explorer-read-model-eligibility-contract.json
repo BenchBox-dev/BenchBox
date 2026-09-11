@@ -1,0 +1,437 @@
+{
+  "context": "Implement the read-model fields from the policy gate first, then update\ntests and snapshot checks before changing frontend components. Keep frontend\nproduction component changes out of scope, but require browser helper\nprojections and TypeScript fixtures to use the new columns because the\nfeature has not shipped yet. Treat AMPLab as a regression fixture because it\nexercises no-timing rows, zero timings, and all-unrankable cohorts in one\nplace.\n",
+  "description": "The Results Explorer DuckDB snapshot currently exposes enough raw data for\npages to infer eligibility, but it does not provide a single authoritative\nrow-level contract for display, ranking, and comparison. Frontend components\ntherefore render no-timing rows, zero timings, and all-unrankable cohorts as\nif they were normal.\n\nThis TODO implements the backend/read-model side of the policy defined by\n`results-explorer-display-contract-policy-gate`. The output should be a\nbrowser DuckDB snapshot that explicitly identifies timing availability,\nranking eligibility, comparison eligibility, and exclusion reasons so the\nfrontend does not invent these semantics locally.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "derive rankability separately in each React component",
+        "instead": "emit explicit read-model fields.",
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "why": "pages will diverge again"
+      },
+      {
+        "dont": "redefine `validation_status=passed` to mean compare-safe",
+        "instead": "add separate fields.",
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "why": "validation and timing quality are separate concerns"
+      },
+      {
+        "dont": "remove bad rows from the snapshot entirely",
+        "instead": "mark them excluded from ranking/comparison.",
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "why": "receipt/provenance still matters"
+      },
+      {
+        "dont": "silently ignore zero timings in some aggregate and include them in another",
+        "instead": "centralize the valid-timing predicate.",
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "why": "Compare and charts will contradict each other"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "needs_item": "results-explorer-display-contract-policy-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-11T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Measured positive sub-millisecond timings remain representable as positive values.",
+        "item_id": "results-explorer-read-model-eligibility-contract"
+      },
+      {
+        "behavior": "New generated snapshot tables expose required eligibility columns without TypeScript fallbacks to pre-contract snapshots.",
+        "item_id": "results-explorer-read-model-eligibility-contract"
+      },
+      {
+        "behavior": "No arbitrary replacement or rounding of zero timings is introduced.",
+        "item_id": "results-explorer-read-model-eligibility-contract"
+      },
+      {
+        "behavior": "Ranking rules keep standard competition ranking for rows that remain rankable.",
+        "item_id": "results-explorer-read-model-eligibility-contract"
+      },
+      {
+        "behavior": "Result detail and receipt pages can still show provenance for excluded rows.",
+        "item_id": "results-explorer-read-model-eligibility-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/explorer_pipeline/ranking.py:rank_platforms — extend for row/cohort exclusion reasons.",
+        "decision": "extend",
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "path": "benchbox/core/explorer_pipeline/ranking.py:rank_platforms"
+      },
+      {
+        "concept": "benchbox/core/explorer_pipeline/transformer.py:_query_display_ms and _display_geomean_ms — extend rather than adding a parallel timing reducer.",
+        "decision": "extend",
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "path": "benchbox/core/explorer_pipeline/transformer.py:_query_display_ms"
+      },
+      {
+        "concept": "benchbox/core/results/status.py:bundle_is_clean_pass and result_is_clean_pass — reuse for validation cleanliness without conflating with eligibility.",
+        "decision": "reuse",
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "path": "benchbox/core/results/status.py:bundle_is_clean_pass"
+      },
+      {
+        "concept": "docs/development/browser-duckdb-schema.sql:browser snapshot DDL — update as the frontend contract.",
+        "decision": "reuse",
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "path": "docs/development/browser-duckdb-schema.sql:browser"
+      },
+      {
+        "concept": "results-explorer/src/lib/duckdbQueries.ts:typed query helpers — later TODO consumes the new fields from here.",
+        "decision": "reuse",
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "path": "results-explorer/src/lib/duckdbQueries.ts:typed"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/components/ production implementations"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/ production implementations"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/planning/results-explorer-read-model-eligibility-contract.yaml"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-read-model-eligibility-contract/"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/contract.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/models.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/ranking.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/transformer.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/status.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/ComparabilityReceipt.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/CompareSummary.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MethodologyDisclosure.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryDiffTable.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/RunReceipt.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/charts.smoke.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartRegistry.ts"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/types.ts"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_explorer_build_contract.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/conftest.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_duckdb_builder.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_ranking.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_read_model_contract.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_transformer.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/explorer/test_results_explorer_audit_manifest.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k 'explorer_pipeline or browser_duckdb or results_explorer' --tb=short",
+        "description": "Explorer pipeline and schema-focused tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/timing_policy_check.py --strict",
+        "description": "Timing policy remains strict",
+        "expected": "strict timing policy passes",
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb",
+        "description": "DuckDB snapshot invariants pass",
+        "expected": "snapshot invariant command exits 0 and reports no contradictory display/rank/compare states",
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "notes": "Convert the policy artifact into a field list for each relevant table.\nAt minimum evaluate:\n  - `has_display_timing`;\n  - `valid_query_count`;\n  - `missing_query_count`;\n  - `zero_timing_count`;\n  - `ranking_exclusion_reason`;\n  - `comparison_exclusion_reason`;\n  - `display_exclusion_reason`;\n  - `cohort_ranked_count`.\nDecide exact field names, types, nullability, and which tables own each\nfield. Prefer fields in canonical pipeline outputs over frontend-only\nderivation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Map the policy gate decisions onto concrete read-model fields",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "notes": "Update explorer pipeline models and `BundleTransformer` output so each\nresult row carries timing and exclusion metadata. Use `_query_display_ms()`\nas the canonical place to distinguish missing, zero, failed, skipped, and\nmeasured-positive timing rows. Do not change result validation semantics\nexcept where the policy requires a separate publish/rank/compare status.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend pipeline models and transformer outputs with eligibility fields",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "notes": "Update ranking generation so rows and cohorts explicitly expose why they\nare not ranked. A cohort with `total_ranked = 0` must be machine-detectable\nwithout recomputing from row fields. Rows with null/non-positive primary\nmetrics or `is_ranking_eligible=false` must have a specific exclusion\nreason that the UI can render.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend ranking generation with unrankable cohort metadata",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "notes": "Update `docs/development/browser-duckdb-schema.sql` and snapshot generation\nso the new eligibility/exclusion fields are available in all tables needed\nby explorer pages:\n  - `results`;\n  - `benchmark_rankings`;\n  - `benchmark_matrix_cells` if cell-level timing state is needed;\n  - `platform_index_rows`;\n  - `cohort_metadata`;\n  - `meta_leaderboard`;\n  - `result_detail_metrics`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update browser DuckDB schema and snapshot writer",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "notes": "Add a repeatable check that fails the build or release gate if the snapshot\ncontains contradictory states. Required checks:\n  - compare-eligible rows must have enough valid timings;\n  - rankable rows must have a valid primary metric;\n  - no ranked cohort can report `total_ranked = 0` without an explicit\n    unrankable cohort state;\n  - no row can be both `has_display_timing=false` and compare-eligible;\n  - no result can have `query_count=0` and appear as normal ranked evidence.\nImplement this as\n`_project/scripts/results_explorer_snapshot_invariants.py` with a DuckDB\npath argument so release gates can re-run the exact same invariant suite.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add snapshot invariant checks for invalid display-safe states",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-read-model-eligibility-contract",
+        "notes": "Regenerate the local Results Explorer snapshot. Verify that AMPLab no-timing\nrows are still present for provenance but have explicit exclusion reasons,\nthat zero timings follow the policy decision, and that all-unrankable\ncohorts are detectable from snapshot fields.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate fixture snapshot and verify AMPLab state is explicit",
+        "wid": "w6"
+      }
+    ]
+  }
+}

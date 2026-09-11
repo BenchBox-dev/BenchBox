@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #555 of results-explorer-uat-corpus-integrate-validated-bundles.\nDeferred: Throughput-phase corpus expansion\nReason deferred: The sweep only ran load,power phases. Throughput bundles belong in a separate sweep and are out of scope here.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:52Z",
+      "worktree": "main"
+    }
+  }
+}

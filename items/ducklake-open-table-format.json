@@ -1,0 +1,11 @@
+{
+  "description": "Implement DuckLake open table format support on par with existing Delta Lake\nand Iceberg implementations. DuckLake is DuckDB's native open table format\nthat provides ACID transactions, time travel, and schema evolution.\n\nThis integration follows the established pattern for open table formats in\nBenchBox, including:\n- Format converter for TBL to DuckLake conversion\n- Format capability registration with platform support matrix\n- Maintenance operations for ACID workloads\n- CLI integration for the convert command\n- Comprehensive test coverage",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-03T00:00:00Z",
+      "created_at": "2026-01-31T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

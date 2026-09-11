@@ -1,0 +1,148 @@
+{
+  "context": "make agent-write-preflight; make skill-sync; make skill-sync-check; make skill-sync-verify; review generated diff; stage explicit authorized paths only; extend contract test with capability-declaration parsing and negative cases.",
+  "description": "Predecessor canonicalize-benchbox-agent-instructions-and-add-evaluation-gate was marked done on 2026-07-27 while PR #1318 is red: TestSkillThinness.test_skill_body_is_thin (52>40) and test_skill_references_only_real_commands ('todo update' not in the wrapper handler set) fail in medium-test, blocking auto-merge. After the canonical fix lands on main, regenerate all four mirror trees via make targets (never hand-edit generated files) and update tests/unit/scripts/test_todo_wrapper.py to a principled boundary: every 'todo <cmd>' referenced by the skill package must be wrapper-supported OR explicitly declared standalone-only via the skill's machine-readable capability declaration; add negative tests for both failure directions (undeclared unsupported command fails; declared standalone-only command presented as wrapper-invocable fails). Do not weaken the test or raise the 40-line thinness budget. Also document in the PR body that the docs-skill manifest removal (skill-sync.yaml) mirrors the canonical working tree where skills/docs is deleted as Joe's WIP; kept because mirroring a deleted source is impossible, and reversible by restoring the source and re-adding the manifest entry.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "needs_item": "land-canonical-todo-db-capability-boundary-on-main"
+      }
+    ],
+    "item_meta": {
+      "completed_at": "2026-07-28T13:16:12Z",
+      "completed_pr": 1318,
+      "created_at": "2026-07-28T12:50:42Z",
+      "worktree": "agent-instructions"
+    },
+    "preserves": [
+      {
+        "behavior": "Generated mirror files are never hand-edited",
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary"
+      },
+      {
+        "behavior": "The 40-line thinness budget and the command-contract test keep their teeth (no blanket allowlist, no budget bump)",
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary"
+      },
+      {
+        "behavior": "The _project/scripts/todo wrapper handler set is unchanged",
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "kind": "only_modify",
+        "path_glob": ".antigravity/skills/**"
+      },
+      {
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "kind": "only_modify",
+        "path_glob": ".codex/skills/**"
+      },
+      {
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "kind": "only_modify",
+        "path_glob": ".gemini/skills/**"
+      },
+      {
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.lock"
+      },
+      {
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.yaml"
+      },
+      {
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_wrapper.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py -q -n 0",
+        "description": "todo wrapper contract tests pass",
+        "expected": "all pass including new negative tests",
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:16:06Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make skill-sync-verify",
+        "description": "tracked mirror snapshot is internally consistent",
+        "expected": "exit 0",
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:16:08Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make skill-sync-check",
+        "description": "mirrors match canonical source",
+        "expected": "exit 0",
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:16:10Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "commit 0c100d210: make agent-write-preflight OK, make skill-sync updated only todo-db from canonical main content (c52db1d), skill-sync-check and skill-sync-verify pass; .gitattributes positional churn reverted as out-of-scope no-op",
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "notes": null,
+        "started_at": "2026-07-28T13:15:45Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Regenerate mirrors from canonical main content via make skill-sync and verify with skill-sync-check/skill-sync-verify",
+        "wid": "w1"
+      },
+      {
+        "evidence": "commit 0c100d210: test_todo_wrapper.py reads standalone_only_commands from the skill sidecar; 4 new tests incl. negative directions (undeclared unsupported command flagged; declared verb never shown as wrapper invocation; declaration/handler sets disjoint); 33 wrapper tests pass",
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "notes": null,
+        "started_at": "2026-07-28T13:15:47Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Extend test_todo_wrapper.py with the capability-declaration boundary and negative tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1318 body now records the docs-skill manifest removal decision with reversal path; canonical retirement is in progress upstream and BenchBox follows the canonical manifest",
+        "item_id": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary",
+        "notes": null,
+        "started_at": "2026-07-28T13:15:50Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Document the docs-skill manifest removal decision in the PR #1318 body",
+        "wid": "w3"
+      }
+    ]
+  }
+}

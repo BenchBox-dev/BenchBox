@@ -1,0 +1,75 @@
+{
+  "context": "Build a minimal combined run whose maintenance phase measurably changes a table's\ncardinality, capture a read query in the power/throughput phase, and assert the\ncaptured plan (or a proxy such as an estimate visible only pre-mutation) reflects the\npre-mutation state. Use the existing spy pattern from the divergence test but wire it\nthrough the real driver entry point rather than calling the checkpoint directly.\n",
+  "description": "The post-measurement divergence fix depends on `_plan_capture_checkpoint(connection)`\nfiring at the top of `_execute_tpch_maintenance_test` (benchbox/platforms/base/execution.py:537)\nand `_execute_tpcds_maintenance_test` (:445), so read-phase plans are captured against\npre-mutation data state. But tests/integration/test_plan_capture_combined_divergence.py\ndrives `_plan_capture_checkpoint` / `_capture_plans_post_measurement` BY HAND and never\nroutes through the production call site.\n\nProof of the blind spot: deleting the checkpoint call at execution.py:537 - i.e. fully\nreverting the fix - leaves all of that file's tests green, because no test runs a real\n`_execute_combined_test` -> `_execute_tpch_maintenance_test` lifecycle under\ncapture_plans=True. The slow regression guard (`test_real_tpch_power_capture_attaches_plans`)\nruns power-only with a read-only query_subset and never reaches the checkpoint.\n\nAdd a real (DuckDB, in-memory or file-based, no external services) combined\npower->maintenance run with --capture-plans that asserts a read-phase plan reflects\nPRE-mutation cardinality (i.e. the checkpoint fired before the maintenance mutation),\nso removing/reordering the checkpoint call actually fails a test.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "test-real-combined-plan-capture-checkpoint",
+        "needs_item": "fix-multistream-throughput-plan-attachment"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-07-05T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No external services; DuckDB only; keep it in the fast/integration lane if runtime allows, else mark slow.",
+        "item_id": "test-real-combined-plan-capture-checkpoint"
+      },
+      {
+        "behavior": "The test must exercise the real _execute_combined_test / _execute_*_maintenance_test path, not hand-built buffers.",
+        "item_id": "test-real-combined-plan-capture-checkpoint"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "test-real-combined-plan-capture-checkpoint",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "test-real-combined-plan-capture-checkpoint",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_plan_capture_combined_divergence.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_plan_capture_combined_divergence.py -n 0 -q",
+        "description": "New test passes with the checkpoint in place",
+        "expected": "passed",
+        "item_id": "test-real-combined-plan-capture-checkpoint",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "# temporarily delete the checkpoint call, run the new test, confirm it fails, then restore",
+        "description": "New test FAILS when the checkpoint call at execution.py:537 is temporarily removed (manual mutation check during implementation)",
+        "expected": "the new test fails",
+        "item_id": "test-real-combined-plan-capture-checkpoint",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "test-real-combined-plan-capture-checkpoint",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a real combined power->maintenance capture test that fails if the checkpoint call site is removed or reordered",
+        "wid": "w1"
+      }
+    ]
+  }
+}

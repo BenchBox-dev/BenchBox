@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: High\"\n- \"**Status**: ✅ Completed\"\n- \"**Description**: Prevent benchmark queries from running when database is empty due to data loading failures, ensuring accurate PASS/FAIL reporting\"\n- \"**Context**: Previously, when data loading failed (e.g., UTF-8 decode errors in ClickBench), benchmarks would continue to execute queries against empty databases and incorrectly report \\\"PASSED\\\" status. This misled users about benchmark validity and database performance.\"\n- \"**Root Cause Analysis**:\"\n- \"**Tasks**:\"\n- \"**Files Affected**:\"\n- \"**Success Criteria**:\"\n- \"**Impact**: Prevents misleading benchmark results, improves user experience by providing clear error feedback, ensures benchmark validity and reliability, reduces time wasted running queries against empty databases. The system now properly validates data integrity before executing expensive query workloads, providing trustworthy benchmark results.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

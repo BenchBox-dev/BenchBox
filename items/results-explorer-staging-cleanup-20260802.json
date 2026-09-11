@@ -1,0 +1,153 @@
+{
+  "context": "Cover the entire staged build lifetime with one finally, re-raise the original exception, preserve last-good output, and fault-inject every pre-promotion phase.",
+  "description": "PR #1483 starts cleanup only around DuckDB construction and promotion. Bundle loading, copying, summaries, and metadata happen before that block, so early OSError or unexpected exceptions can leak staging directories across retries.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "catch exceptions and return successful empty build",
+        "instead": "cleanup in finally and re-raise",
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "why": "that hides data loss"
+      },
+      {
+        "dont": "delete staging before diagnostics",
+        "instead": "retain context and remove only exact temp path",
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "why": "failure evidence would be lost"
+      },
+      {
+        "dont": "globally clean /tmp",
+        "instead": "track this build’s mkdtemp path",
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "why": "it could delete another process’s data"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "needs_item": "results-explorer-snapshot-stale-wal-cleanup-20260802"
+      }
+    ],
+    "item_meta": {
+      "category": "Build hygiene",
+      "completed_at": "2026-08-12T13:46:17Z",
+      "completed_pr": 1699,
+      "created_at": "2026-08-02T16:27:21Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Failed build cannot replace last-good output",
+        "item_id": "results-explorer-staging-cleanup-20260802"
+      },
+      {
+        "behavior": "Original exception remains visible",
+        "item_id": "results-explorer-staging-cleanup-20260802"
+      },
+      {
+        "behavior": "Successful stale-artifact cleanup remains unchanged",
+        "item_id": "results-explorer-staging-cleanup-20260802"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Current staging lifetime",
+        "decision": "extend",
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "path": "_project/scripts/explorer_pipeline/pipeline.py"
+      },
+      {
+        "concept": "Fault-injection patterns",
+        "decision": "reuse",
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "path": "tests/unit/scripts/explorer_pipeline"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/pipeline.py"
+      },
+      {
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q",
+        "description": "All staged-build failure paths clean their exact temp directory",
+        "expected": "Fault-injection tests pass",
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "last_result": "fail",
+        "last_run": "2026-08-12T13:41:48Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Mapped staged lifetime from tempfile.mkdtemp through bundle processing, snapshot construction, invariant validation, and _promote_staged_output; the existing outer finally is the single cleanup boundary and re-raises all failures.",
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "notes": null,
+        "started_at": "2026-08-12T13:39:35Z",
+        "started_branch": "fix/results-explorer-staging-cleanup-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-staging-cleanup-20260812",
+        "status": "done",
+        "summary": "Map every exception boundary after staging creation",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Existing atomic-publish implementation c2f41b082 wraps the complete staged lifetime in try/finally and removes only the exact mkdtemp path with shutil.rmtree(ignore_errors=True); no global cleanup.",
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "notes": null,
+        "started_at": "2026-08-12T13:41:04Z",
+        "started_branch": "fix/results-explorer-staging-cleanup-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-staging-cleanup-20260812",
+        "status": "done",
+        "summary": "Wrap full staged lifetime in cleanup",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added fault-injection coverage for staged bundle copy, transformer, summary construction, and promotion failures; uv run -- python -m pytest tests/unit/scripts/explorer_pipeline/test_pipeline.py::TestStagedOutputGuards -q passed 6 tests, including original exception preservation and exact staging cleanup.",
+        "item_id": "results-explorer-staging-cleanup-20260802",
+        "notes": null,
+        "started_at": "2026-08-12T13:41:10Z",
+        "started_branch": "fix/results-explorer-staging-cleanup-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-staging-cleanup-20260812",
+        "status": "done",
+        "summary": "Inject copy, transform, summary, and promotion failures",
+        "wid": "w2"
+      }
+    ]
+  }
+}

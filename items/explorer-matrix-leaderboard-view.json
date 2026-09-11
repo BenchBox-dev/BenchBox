@@ -1,0 +1,267 @@
+{
+  "context": "The heatmap is a single component with no internal state beyond\nselection. All data comes from the summary prop. Filter controls\nlive in BenchmarkIndex and drive the (sf, phase) → artifact URL\nselection + client-side filtering of rows by tuning/trust.\n\nFor coloring: write a pure function colorForCell(ms, minInCol,\nmaxInCol) → CSSValue. Unit-test it directly with known inputs before\nwiring it to the component. The color math is where a proposal most\neasily goes wrong; keep it isolated and snapshot-tested.\n\nFor the log-ratio color: clamp the ratio at 10x so a 100x-slower\noutlier doesn't compress everything else. Values above the clamp\nstill render red but don't stretch the scale further.\n",
+  "description": "The strategy review (2026-04-15) concluded that the explorer's primary\nsurface per benchmark must be a Platform × Query matrix leaderboard,\nmodelled on ClickBench but adapted to BenchBox's multi-dimensional data\n(trust tiers, tuning modes, phases). The current BenchmarkIndex.tsx\nrenders a sorted list - this TODO replaces it with the matrix.\n\nThe matrix is the product definition: arriving at /results/tpch/ should\nimmediately answer \"which engine wins, and by how much, on each query?\"\nwithout navigating further.\n\nLayout:\n\n  [Scale ▾] [Tuning ▾] [Phase ▾] [Trust ▾]  [View: Matrix | List]\n\n  Platform      Trust    Power/Geomean  Cost   Q1    Q2   ... Q22\n  ──────────────────────────────────────────────────────────────────\n  DuckDB        maintainer   3184.9 / 11.5ms  $0    18ms  4ms  ... 6ms\n  Polars        maintainer   --     / 8.2ms   $0    12ms  3ms  ... 4ms\n  DataFusion    community    2847.1 / 13.7ms  $0    22ms  6ms  ... 9ms\n\nHeat coloring rules (corrected from the original proposal):\n\n- Per-column normalization (each query independently).\n- **Log scale**, not linear - SQLite at 892ms vs DuckDB at 11ms would\n  collapse the DuckDB/Polars/DataFusion gradation under linear.\n- Scale is **ratio-to-fastest-in-column** (ClickBench-style),\n  not min-max.\n- Null cells render \"-\" in muted gray with `aria-label=\"no data\"`.\n\nRow selection: checkboxes on each row feed the existing Compare page\nvia URL-encoded IDs. See explorer-compare-url-short-ids for the ID\nencoding concern.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "default the ranking metric to geomean_ms for TPC-H/DS",
+        "instead": "use the benchmark-aware choice from explorer-align-ranking-metric-with-tpc-standards",
+        "item_id": "explorer-matrix-leaderboard-view",
+        "why": "those benchmarks define power_score as the standard metric"
+      },
+      {
+        "dont": "emit color via hard-coded hex",
+        "instead": "use CSS custom properties",
+        "item_id": "explorer-matrix-leaderboard-view",
+        "why": "dark mode and high-contrast accessibility settings need to override"
+      },
+      {
+        "dont": "hide community-tier rows by default",
+        "instead": "render them with a visible tier badge instead",
+        "item_id": "explorer-matrix-leaderboard-view",
+        "why": "hiding them defeats the trust model"
+      },
+      {
+        "dont": "omit aria-label on heat cells",
+        "instead": "always include numeric + relative label",
+        "item_id": "explorer-matrix-leaderboard-view",
+        "why": "colored cells alone are invisible to screen readers"
+      },
+      {
+        "dont": "use linear min-max coloring",
+        "instead": "use log10(ratio-to-fastest) with a 10x clamp",
+        "item_id": "explorer-matrix-leaderboard-view",
+        "why": "linear compresses sub-2x gaps when a 80x outlier is present"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "needs_item": "explorer-align-ranking-metric-with-tpc-standards"
+      },
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "needs_item": "explorer-emit-benchmark-summary-artifact"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-15T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "BenchmarkIndex list view remains available via a toggle for mobile users",
+        "item_id": "explorer-matrix-leaderboard-view"
+      },
+      {
+        "behavior": "Compare page contract - selection emits URLs the Compare page already understands",
+        "item_id": "explorer-matrix-leaderboard-view"
+      },
+      {
+        "behavior": "Existing /results/:benchmark/ route - do not change URL pattern, only the rendered content",
+        "item_id": "explorer-matrix-leaderboard-view"
+      },
+      {
+        "behavior": "Existing manifest.json consumers - this TODO adds a new loader, does not remove the existing one",
+        "item_id": "explorer-matrix-leaderboard-view"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+      },
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/manifest.ts"
+      },
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/queryReduction.ts"
+      },
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/types.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "TypeScript compiles",
+        "expected": "no errors",
+        "item_id": "explorer-matrix-leaderboard-view",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- QueryHeatmap",
+        "description": "Snapshot tests pass",
+        "expected": "all tests pass",
+        "item_id": "explorer-matrix-leaderboard-view",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'QueryHeatmap' results-explorer/src/pages/BenchmarkIndex.tsx",
+        "description": "BenchmarkIndex renders QueryHeatmap by default",
+        "expected": "imported and rendered as default view",
+        "item_id": "explorer-matrix-leaderboard-view",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -nE 'export.*colorForCell' results-explorer/src/components/QueryHeatmap.tsx",
+        "description": "Color function is pure and exported for testing",
+        "expected": "function is exported",
+        "item_id": "explorer-matrix-leaderboard-view",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-matrix-leaderboard-view",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-matrix-leaderboard-view",
+        "notes": "Mirror the Pydantic model in src/types.ts. Loader fetches and\ndecompresses the gzipped artifact via DecompressionStream API.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add BenchmarkSummary TS type and getBenchmarkSummary(benchmark, sf, phase) loader in src/lib/manifest.ts",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-matrix-leaderboard-view",
+        "notes": "Props: summary (BenchmarkSummary), rankingMetric ('power_score' |\n'geomean_ms'). Sticky left-column (platform + trust badge +\nmetric), horizontally scrollable query cells, row-level checkbox.\n\nColor math: per column, log10(ms / min_in_column) mapped to hsl\nhue 120° (green) → 0° (red) across [0, log10(10)] clamped.\nCSS custom properties for the color so high-contrast and dark\nmodes can override. Each cell emits numeric text AND\n`aria-label=\"${ms}ms, ${ratio}× slowest\"` for screen readers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build QueryHeatmap component at src/components/QueryHeatmap.tsx with log-ratio heat coloring",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-matrix-leaderboard-view",
+        "notes": "Cases: (a) known timings produce stable color classes; (b) null\ncells render '-'; (c) single-platform matrix degrades gracefully;\n(d) empty matrix shows empty state; (e) ratio calculation matches\nexpected values for a 10x-range fixture.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write snapshot tests at src/components/__tests__/QueryHeatmap.test.tsx",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-matrix-leaderboard-view",
+        "notes": "Load BenchmarkSummary and render QueryHeatmap. Keep existing\nsorted-list behind a 'List view' toggle for mobile. Add\nScale/Tuning/Phase/Trust filter controls; Scale and Phase are\nrequired (one value each); Tuning and Trust default to 'All'.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rewrite BenchmarkIndex.tsx to render QueryHeatmap as default view with filter controls",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-matrix-leaderboard-view",
+        "notes": "Selecting ≥2 rows reveals a sticky button that navigates to\n/results/compare?ids=<selected>. Uses short IDs once\nexplorer-compare-url-short-ids lands; until then falls back to\nfull result_ids.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire row checkboxes to Compare URL with sticky 'Compare N selected' button",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-matrix-leaderboard-view",
+        "notes": "When only 1 platform has run a (benchmark, scale, phase) tuple,\nhide heat coloring and show 'Only 1 result in this cohort - add\nmore with benchbox run ...'. When 0 query overlap across\nplatforms, show 'No shared queries to compare'.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Empty-state + single-platform handling with guidance banners",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-matrix-leaderboard-view",
+        "notes": "The current Compare.tsx calls find() to get the first QueryTiming\nrow for each query (Compare.tsx:107, :350). This returns the\ncold-cache outlier when multiple measurement iterations exist (e.g.,\n[16, 11, 11, 11] → 16ms displayed).\n\nFix: read `display_timings` (list[QueryDisplayTiming]) from the\ndetail JSON instead of scanning the raw `queries` array. The\n`display_ms` value per query_id is the median of successful runs,\ncomputed by the pipeline (see explorer-fix-read-model-contract).\n\nAdd a helper in src/lib/queryReduction.ts:\n  `getDisplayMs(detail: DetailResult, queryId: string): number | null`\nIt reads `detail.display_timings.find(t => t.query_id === queryId)?.display_ms ?? null`.\nReplace both find() call-sites in Compare.tsx with this helper.\n\nThis makes the matrix and the Compare page agree on what a query's\nperformance is - they will now both use the same canonical reduced\nvalue from the pipeline.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix Compare.tsx to use display_ms from DetailResult instead of first-row raw duration_ms",
+        "wid": "w7"
+      }
+    ]
+  }
+}

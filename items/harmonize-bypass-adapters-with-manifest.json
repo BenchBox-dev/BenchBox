@@ -1,0 +1,523 @@
+{
+  "context": "Reuse, do not invent. The framework already has the right shapes — the\nbypass adapters just don't consult them. Concretely:\n\n- DataSource extension follows the same idiom DataSourceResolver already\n  uses for table_formats: default factory + injection at resolve() time\n  so all three providers (BenchmarkTablesSource, BenchmarkImplTablesSource,\n  ManifestFileSource) yield the same shape.\n- resolve_csv_dialect() precedence (manifest > benchmark > defaults)\n  mirrors how table_formats already work: manifest is authoritative,\n  benchmark attributes are fallback for legacy paths.\n- prepare_local_load_file() is a thin wrapper around the existing\n  CompressionHandler family; it does not duplicate that logic, it\n  composes it with TPC-specific transforms.\n- Adapter migration follows the working-tree pattern from singlestore.py\n  that already replaced ZstdCompressor with CompressionManager — but lifts\n  ONE level higher to FileFormatRegistry.get_compression_handler().\n- Sequential migration with hard gates: SingleStore is the canary because\n  it has the most band-aids and the most stress-test coverage. If\n  SingleStore goes green, the same pattern works for the others.\n\nReference implementations to copy from:\n- DuckDB adapter (benchbox/platforms/duckdb.py:784) for canonical\n  DataLoader use.\n- DelimitedFileHandler (benchbox/platforms/base/data_loading.py:752) for\n  the pattern of consulting compression_handler then schema_inspector\n  then row_processor.\n",
+  "description": "Four platform adapters — SingleStore, PostgreSQL, Doris, QuestDB — bypass\n``benchbox.platforms.base.data_loading.DataSourceResolver`` and iterate\n``benchmark.tables`` directly. They reinvent four primitives that already\nexist in the framework, in slightly different ways:\n\n- **Compression**: each hardcodes ``data_file.suffix.lower() == \".zst\"`` plus\n  a direct ``ZstdCompressor`` call. Gzip is silently ignored.\n  ``benchbox/platforms/base/data_loading.py`` already exposes a full\n  ``CompressionHandler`` family (``CompressionHandler`` ABC L521,\n  ``GzipHandler`` L537, ``ZstdHandler`` L547, ``NoCompressionHandler`` L604)\n  and ``FileFormatRegistry.get_compression_handler()``. None of the four\n  bypass adapters use them.\n- **Trailing-pipe strip**: PostgreSQL L532–541, SingleStore L536–573,\n  QuestDB L1133–1146. Three slightly different inline implementations of the\n  same TPC-H rule (.tbl rows end in a literal ``|`` terminator that must be\n  stripped; .dat rows can have the same shape but the trailing field is\n  semantically NULL and must NOT be stripped).\n- **CSV dialect**: each adapter does\n  ``getattr(benchmark, \"csv_delimiter\" / \"csv_has_header\" /\n  \"csv_normalize_booleans\", default)`` — same pattern, four times.\n- **Format detection**: each guesses ``.tbl`` vs ``.csv`` vs ``.parquet``\n  from filename suffixes when ``_datagen_manifest.json`` already records the\n  canonical format per file via ``ManifestTableEntry.format``.\n\nThis work moves those four primitives into base helpers, extends the\nmanifest metadata schema to carry CSV dialect (delimiter, has_header,\nnull_marker, normalize_booleans, quote), threads that metadata through\n``DataSource``/``DataSourceResolver``, annotates the six CSV-bearing\ngenerators, and migrates all four bypass adapters to consume the\nauthoritative metadata instead of guessing from filenames.\n\nThis replaces band-aid commits a1bc0dba2, d24ced0a3, a7acce14b (plus\nuncommitted working-tree edits) which fixed real bugs but landed in the\nwrong layer — at the leaf rather than in the framework.\n\n**Decisions baked in (confirmed with user before authoring):**\n\n- Scope: all four bypass adapters in one harmonization effort.\n- CSV dialect lives in manifest ``metadata`` (not in a benchmark-instance\n  helper). The data-on-disk artifact is the source of truth; generators\n  write metadata, adapters read it.\n\nGenuinely platform-specific code that STAYS in adapters: DDL transforms\n(FK strip, SHARD KEY/SORT KEY on SingleStore, DUPLICATE KEY/DISTRIBUTED BY\non Doris); dialect-specific LOAD syntax (``OPTIONALLY ENCLOSED BY '\"'``,\n``NULL DEFINED BY ''``, ``IGNORE 1 LINES``, COPY HEADER, Stream Load HTTP,\nREST ingestion); boolean rewrite for STRICT_ALL_TABLES.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "batch all four adapter migrations into one commit",
+        "instead": "commit per adapter with the per-platform Docker stress check between each.",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "why": "if one regresses, the others are stuck behind it"
+      },
+      {
+        "dont": "change DDL transforms (FK strip, SHARD KEY, DUPLICATE KEY)",
+        "instead": "leave them where they are.",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "why": "each platform genuinely needs different DDL and prior audit confirmed intentional divergence"
+      },
+      {
+        "dont": "detect compression by suffix string compare (data_file.suffix.lower() == '.zst')",
+        "instead": "call FileFormatRegistry.get_compression_handler(file_path).",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "why": "it silently ignores .gz and any future format"
+      },
+      {
+        "dont": "raise on unannotated benchmarks",
+        "instead": "emit logger.warning naming the unannotated table, fall back to format-derived defaults, keep going.",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "why": "that breaks every TPC benchmark on day one"
+      },
+      {
+        "dont": "revert prior fix commits (a1bc0dba2, d24ced0a3, a7acce14b)",
+        "instead": "move the logic up, don't lose the fix.",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "why": "the bug fixes themselves were correct, only the layer was wrong"
+      },
+      {
+        "dont": "touch TPC-style generators (tpch, tpcds, ssb, datavault) to add metadata",
+        "instead": "annotating them adds noise without information.",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "why": "resolve_csv_dialect() derives the right defaults from format=='tbl'/'dat'"
+      },
+      {
+        "dont": "walk path.suffixes in adapter code",
+        "instead": "call get_data_extension() once in file_format.py.",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "why": "it duplicates the same logic in three places already and keeps drifting"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "harmonize-bypass-adapters-with-manifest",
+        "id": 190,
+        "reason": "Those adapters use ``DataSourceResolver`` already and are not currently\nbroken. Whether they should consume ``table_metadata`` (for tighter\ncontracts) or keep the current ``getattr(benchmark, ...)`` fallback can\nbe decided once this work has bedded in. Out of scope for this PR.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Vague 'decide once this has bedded in' with no criteria or owner; the ~25 adapters function correctly today via the existing fallback.",
+        "summary": "Migrate the remaining ~25 adapters that already use DataSourceResolver to consume table_metadata for dialect"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "harmonize-bypass-adapters-with-manifest",
+        "id": 191,
+        "reason": "DDL is genuinely platform-specific (SHARD vs DUPLICATE vs DISTRIBUTED\nKEY etc.) and prior audit confirmed adapters intentionally diverge.\nNot the same problem class as data-loading.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Prior audit confirmed DDL is intentionally platform-specific (SHARD vs DUPLICATE vs DISTRIBUTED KEY); not a genuine follow-up task.",
+        "summary": "DDL transform consolidation (FK strip, etc.) into shared helpers"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "harmonize-bypass-adapters-with-manifest",
+        "id": 192,
+        "reason": "``ManifestFileSource`` already handles cloud paths; cloud-using\nadapters (Snowflake, Athena, BigQuery, Redshift) already use\n``DataSourceResolver`` and don't need migration. Out of scope.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason states cloud/remote-storage manifests are already handled by ManifestFileSource/DataSourceResolver; explicitly out of scope, no action needed.",
+        "summary": "Cloud / remote-storage manifests"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-25T00:00:00Z",
+      "created_at": "2026-04-25T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "13-benchmark SingleStore matrix that the band-aid commits fixed: TPC-H/DS NULL semantics, datavault quoting, TPC-DI True/False booleans, ClickBench empty-string preservation, Parquet skip-with-warning, header-bearing CSV (tsbs_devops, nyctaxi, flightdata) loads, OPTIONALLY ENCLOSED BY '\"' for quoted fields",
+        "item_id": "harmonize-bypass-adapters-with-manifest"
+      },
+      {
+        "behavior": "Doris fixes documented in project_doris_platform_fixes.md memory entry — none should regress",
+        "item_id": "harmonize-bypass-adapters-with-manifest"
+      },
+      {
+        "behavior": "Existing DataSourceResolver.resolve() callers (DuckDB, Snowflake, BigQuery, Athena, Redshift, etc.) keep working unchanged — DataSource.table_metadata gets a default factory so unannotated paths produce {} not None",
+        "item_id": "harmonize-bypass-adapters-with-manifest"
+      },
+      {
+        "behavior": "Live ./scripts/local_stress_test.sh --scale 1 --platform singlestore exit code 0 after w6 (HARD GATE)",
+        "item_id": "harmonize-bypass-adapters-with-manifest"
+      },
+      {
+        "behavior": "ZstdHandler in base/data_loading.py:547 continues to use the system zstd command (its current implementation) — do not switch to python-zstandard mid-migration",
+        "item_id": "harmonize-bypass-adapters-with-manifest"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/datavault/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/ssb/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/athena.py"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/databricks/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/redshift.py"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/clickbench/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/manifest/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tsbs_devops/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/vector_search/"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/doris.py"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/postgresql.py"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/questdb.py"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/singlestore.py"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/datagen_manifest.py"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/file_format.py"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_manifest_driven_loading.py"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_data_loading.py -q -k table_metadata",
+        "description": "DataSource.table_metadata round-trips through DataSourceResolver from a manifest with metadata populated (test file created in w1)",
+        "expected": "all green",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_data_loading.py -q -k backwards_compat",
+        "description": "Backwards compat — DataSourceResolver against a benchmark with no manifest still resolves with table_metadata={} (test file created in w1)",
+        "expected": "all green",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_csv_dialect.py -q",
+        "description": "CsvDialect resolution precedence (manifest > benchmark > defaults) (test file created in w2)",
+        "expected": "all green",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_prepare_local_load_file.py -q",
+        "description": "prepare_local_load_file handles gzip + zstd + uncompressed; strips trailing pipe only when asked; rewrites booleans only when asked (test file created in w3)",
+        "expected": "all green",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_singlestore_adapter.py tests/unit/platforms/test_postgresql_adapter.py tests/unit/platforms/test_doris_adapter.py tests/unit/platforms/test_questdb_adapter.py -q",
+        "description": "All four adapters' unit suites green after each migration commit",
+        "expected": "all green",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Project-wide fast suite stays green per commit",
+        "expected": "all green",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "./scripts/local_stress_test.sh --scale 1 --platform singlestore",
+        "description": "SingleStore live stress (HARD GATE between w6 and w7)",
+        "expected": "exit code 0; full benchmark matrix passes",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check . && uv run ty check",
+        "description": "Lint + typecheck per commit",
+        "expected": "All checks passed!",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_manifest_driven_loading.py -q",
+        "description": "Integration test asserts manifest-driven loading; negative case proves adapter reads manifest, not filename (test file created in w10)",
+        "expected": "all green; negative case fails when an adapter falls back to filename guessing",
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "notes": "Land the schema extension first; nothing downstream uses it yet, so\nrollout is safe.\n\n1. Extend ``DataSource`` (benchbox/platforms/base/data_loading.py:109)\n   with a new field:\n      ``table_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)``\n   Default factory keeps every existing caller working unchanged.\n2. ``ManifestFileSource._try_manifest_v2()`` (L297) populates\n   ``table_metadata`` from ``ConvertedFileEntry.conversion_options`` (or\n   the equivalent ``ManifestTableEntry.metadata`` on the v2 read side)\n   per table.\n3. ``DataSourceResolver.resolve()`` (L486) injects ``table_metadata``\n   even when the source is ``BenchmarkTablesSource`` /\n   ``BenchmarkImplTablesSource`` — same pattern used today for\n   ``table_formats`` via ``read_format_hints`` at L512.\n4. Document the standardized metadata keys in\n   ``benchbox/utils/datagen_manifest.py`` near the ``add_entry()``\n   signature (L208):\n      csv_delimiter: str\n      csv_has_header: bool\n      csv_null_marker: str | None  ('' = empty→NULL; None = no conversion)\n      csv_normalize_booleans: bool\n      csv_quote: str | None  (defaults to '\"' when None)\n5. **Decision gate** before merging: write a unit test that calls\n   ``DataSourceResolver.resolve()`` against a benchmark + manifest with\n   metadata populated and asserts ``table_metadata`` round-trips.\n   Then write a SECOND test against a benchmark with NO manifest and\n   confirm ``table_metadata == {}`` (default factory) — proves the\n   schema change is backwards-compatible for the 25 adapters that\n   already use ``DataSourceResolver``.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Manifest metadata schema + DataSource.table_metadata plumbing",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "notes": "1. Audit unit tests under tests/unit/platforms/ for any remaining\n   tests that mock ``is_tpc_format``/``get_delimiter_for_file``/\n   ``detect_compression`` directly. Rewrite to inject ``DataSource``.\n2. New integration test\n   ``tests/integration/test_manifest_driven_loading.py``: build a\n   real ``_datagen_manifest.json`` in a tempdir using\n   ``DataGenerationManifest`` with each dialect permutation and\n   assert each of the four migrated adapters emits the right\n   LOAD/COPY/Stream-Load/REST payload — without inspecting filenames.\n3. **Mandatory negative case**: write a manifest where the dialect\n   metadata DELIBERATELY contradicts the filename (e.g. a file named\n   ``data.csv`` with manifest metadata claiming ``has_header=False``\n   and a manifest declaring it format=tbl). Assert the adapter emits\n   SQL matching the MANIFEST not the filename. If the adapter still\n   emits CSV-shaped SQL, it's still guessing — fail the test.\n4. Re-run all four adapters' Docker stress tests once more after the\n   test refactor to confirm no regressions slipped in.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test rewrites + integration coverage with negative case",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "notes": "Add to ``benchbox/platforms/base/data_loading.py``:\n\n1. ``CsvDialect`` dataclass with fields delimiter (str), has_header\n   (bool), null_marker (str | None), normalize_booleans (bool),\n   quote (str | None).\n2. ``resolve_csv_dialect(data_source, table_name, file_path,\n   benchmark) -> CsvDialect`` with this precedence:\n     a) manifest metadata (data_source.table_metadata[name]) — wins.\n     b) benchmark instance attributes (csv_delimiter, csv_has_header,\n        csv_normalize_booleans) — fallback for benchmarks not yet\n        annotated.\n     c) format-derived defaults via ``get_data_extension(file_path)``\n        and ``data_source.table_formats``: .tbl/.dat → delimiter='|',\n        has_header=False, null_marker='', normalize_booleans=False;\n        .csv → delimiter from get_delimiter_for_file(), has_header\n        False, null_marker=None, normalize_booleans=False.\n   When falling back to (b) or (c), emit a ``logger.warning`` naming\n   the table — surfaces unannotated benchmarks without breaking them.\n\nUnit tests required (create tests/unit/platforms/test_csv_dialect.py):\n- manifest metadata wins over benchmark attribute wins over format default.\n- benchmark attribute wins over format default when no manifest.\n- format-derived defaults correct for .tbl, .dat, and .csv.\n- logger.warning emitted on fallback; not emitted when manifest wins.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "CsvDialect dataclass + resolve_csv_dialect() with precedence unit tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "notes": "Add to ``benchbox/platforms/base/data_loading.py``:\n\n``prepare_local_load_file(file_path, *, dialect, strip_trailing_delim)\n-> contextmanager[Path]``:\n  - Decompresses via ``FileFormatRegistry.get_compression_handler(file_path)``\n    — handles zstd, gzip, etc. uniformly.\n  - Strips trailing delim per-line if requested.\n  - Rewrites True/False → 1/0 if dialect.normalize_booleans.\n  - Writes a temp file in file_path.parent only when transformation\n    is required; yields original path otherwise (no spurious copies).\n  - Cleans up on exit.\n\nUnit tests required (create tests/unit/platforms/test_prepare_local_load_file.py):\n- gzip input decompresses correctly; zstd input decompresses correctly.\n- uncompressed pass-through yields original path (no temp file written).\n- trailing-pipe stripped only when strip_trailing_delim=True.\n- True/False → 1/0 only when dialect.normalize_booleans is True.\n- context manager cleans up temp file on exit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "prepare_local_load_file() + compression/strip/boolean unit tests",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "notes": "For each generator below, find the ``manifest.add_entry()`` call (or\nequivalent ``write_generator_manifest()`` invocation) and pass\n``metadata={...}`` matching what the generator actually writes. List\nbased on grep for ``csv_has_header`` / ``csv_delimiter`` /\n``csv_normalize_booleans`` (commit only changes that compile + tests\nstay green per generator):\n\n- benchbox/core/nyctaxi/         → has_header=True, null_marker=None\n- benchbox/core/tsbs_devops/     → has_header=True\n- benchbox/core/flightdata/      → has_header=True\n- benchbox/core/vector_search/   → has_header=True\n- benchbox/core/clickbench/      → delimiter='|', null_marker=None\n- benchbox/core/tpcdi/           → normalize_booleans=True, null_marker=''\n\nTPC-style generators (tpch, tpcds, ssb, datavault) are intentionally\nNOT annotated — ``resolve_csv_dialect()`` derives correct defaults\nfrom format=='tbl' / 'dat' via the format-derived fallback. Avoids\ntouching every TPC generator and keeps the diff scoped.\n\n**Decision gate** per generator: after annotating, run that\nbenchmark's data generation in a tempdir and load the resulting\n``_datagen_manifest.json`` via ``benchbox.core.manifest.io.load_manifest``;\nassert each table's metadata round-trips. Don't mark this work unit\ndone until all six round-trip.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Annotate CSV-bearing benchmark generators with manifest metadata",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "notes": "Sequence within this work unit:\n\n1. Replace the manual ``for table_name, table_path in benchmark.tables.items()``\n   loop in ``_load_data_infile`` (singlestore.py:492) with\n   ``DataSourceResolver(...).resolve(benchmark, data_dir)``. Iterate\n   ``data_source.tables`` and consult ``data_source.table_formats``\n   and ``data_source.table_metadata``.\n2. For each file, ``dialect = resolve_csv_dialect(data_source, name,\n   file, benchmark)`` then ``with prepare_local_load_file(file,\n   dialect=dialect, strip_trailing_delim=should_strip_trailing) as\n   load_path:`` and use the yielded path in the LOAD DATA SQL.\n3. Build the LOAD DATA clauses from dialect: ``IGNORE 1 LINES`` if\n   dialect.has_header; ``NULL DEFINED BY '<marker>'`` if\n   dialect.null_marker is not None; ``FIELDS TERMINATED BY\n   '<dialect.delimiter>' OPTIONALLY ENCLOSED BY '\"'`` always (the\n   OPTIONALLY ENCLOSED is SingleStore-specific for datavault quoted\n   fields and stays).\n4. Delete: hand-rolled ``is_zst``/``CompressionManager`` block,\n   ``should_strip_trailing`` suffix walk, the\n   ``getattr(benchmark, \"csv_delimiter\")`` /\n   ``getattr(benchmark, \"csv_has_header\")`` /\n   ``getattr(benchmark, \"csv_normalize_booleans\")`` chain, the inline\n   temp-file rewrite (now in prepare_local_load_file).\n5. Keep: FK strip (``_strip_foreign_keys``), SHARD KEY/SORT KEY\n   injection, REFERENCE TABLE for nation/region, lowercase backtick\n   quoting, OPTIONALLY ENCLOSED BY '\"', Parquet skip-with-warning.\n   These are genuinely SingleStore-specific.\n\nDecision gate before marking w5 done and proceeding to w6:\n- ``uv run -- python -m pytest -m fast -q`` stays green.\n- ``uv run ruff check . && uv run ty check`` passes clean.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate SingleStore adapter data-loading logic",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "notes": "1. Rewrite the 6 SQL-assertion tests in\n   tests/unit/platforms/test_singlestore_adapter.py to inject a fake\n   ``DataSource`` with known ``table_metadata`` instead of mocking\n   ``is_tpc_format``/``get_delimiter_for_file``.\n2. Run full SingleStore unit suite and confirm 80/80 green (the\n   73 pre-existing + 6 SQL-assertion + 1 gzip integration test from\n   the working-tree changes).\n\n**HARD DECISION GATE — no proceeding to w7 until both pass:**\n\n- ``uv run -- python -m pytest tests/unit/platforms/test_singlestore_adapter.py -q``\n  → 80/80 green.\n- ``./scripts/local_stress_test.sh --scale 1 --platform singlestore``\n  → end-to-end pass against live SingleStore 9.1.1 in Docker. This\n  is the same matrix that validated the band-aid commits being\n  replaced; it MUST still pass after the framework move.\n\nIf the live stress regresses, do NOT proceed to PostgreSQL — root-cause\nthe regression in the SingleStore migration first.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rewrite SingleStore SQL-assertion tests to inject DataSource (HARD GATE: live stress)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "notes": "Same pattern as w5 against ``benchbox/platforms/postgresql.py``:\nreplace the ``benchmark.tables`` loop with ``DataSourceResolver``\n+ ``resolve_csv_dialect`` + ``prepare_local_load_file``. Drop the\nhardcoded ``is_zst`` block (L525) and the inline trailing-pipe strip\n(L532–541). Build the COPY clauses from dialect — keep the\nPostgres-specific ``FORMAT csv``/``FORMAT text`` distinction and the\n``HEADER true`` / ``NULL ''`` translation. Rewrite the equivalent\nPostgres unit tests to inject ``DataSource``.\n\nDecision gate before declaring w7 done: run a Postgres benchmark via\ndocker compose against ClickBench (csv with empty strings) and TPC-DS\n(.dat with NULL trailing field) — both must load correctly without\nmanual intervention.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate PostgreSQL adapter + Postgres Docker stress verification",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "notes": "Same pattern against ``benchbox/platforms/doris.py``. Doris uses\nStream Load HTTP, not LOAD DATA, so the ``prepare_local_load_file``\noutput feeds an HTTP POST body rather than a SQL string. Drop Doris's\ninline gzip+zst contextmanagers (L847, L869) and the duplicated\ngetattr block (L782+). Keep DUPLICATE KEY / DISTRIBUTED BY DDL\ntransforms.\n\nDecision gate: run Doris docker-compose stress test on ClickBench\nand TPC-DS. The Doris fix matrix is documented in\n``project_doris_platform_fixes.md`` (memory) — none of those fixes\nshould regress.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate Doris adapter + Doris Docker stress verification",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-bypass-adapters-with-manifest",
+        "notes": "Same pattern against ``benchbox/platforms/questdb.py``. QuestDB uses\nREST ingestion via ``_load_table_via_rest_api`` (L847+). Replace\n``_open_normalized_csv_stream`` (L1118+) entirely with\n``prepare_local_load_file``. Drop the inline ``is_zst`` checks\n(L1121, L1131, L1135).\n\nDecision gate: run QuestDB docker-compose stress test on tsbs_devops\n(header-bearing CSV) and TPC-H (.tbl trailing pipe) — both must\nload.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate QuestDB adapter + QuestDB Docker stress verification",
+        "wid": "w9"
+      }
+    ]
+  }
+}

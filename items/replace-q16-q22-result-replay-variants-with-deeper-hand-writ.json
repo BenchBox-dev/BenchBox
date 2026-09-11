@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #389 of df-support-tpchavoc.\nDeferred: Replace Q16-Q22 result-replay variants with deeper hand-written structural rewrites\nReason deferred: The first complete registry covers Q16-Q22 with canonical execution plus final projection/order replay to preserve equivalence. Deeper variants for Q19 condition unions, Q20 semi-join ordering, Q21 anti-join alternatives, and Q22 materialized average balance should be developed with broader equivalence coverage.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:02Z",
+      "worktree": "main"
+    }
+  }
+}

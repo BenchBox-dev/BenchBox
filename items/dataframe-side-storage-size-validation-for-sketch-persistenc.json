@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #533 of write-primitives-sketch-pyspark-dataframe-surface.\nDeferred: DataFrame-side storage-size validation for sketch persistence\nReason deferred: Storage-size methodology is being added in `write-primitives-sketch-clickhouse-and-storage-metrics` for the SQL surface. Once that lands, mirror it for the DataFrame surface — but do that as a follow-up, not in this TODO.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:50Z",
+      "worktree": "main"
+    }
+  }
+}

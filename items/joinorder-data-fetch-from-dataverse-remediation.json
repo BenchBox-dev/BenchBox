@@ -1,0 +1,247 @@
+{
+  "context": "Preserve the current BenchBox-hosted Parquet default unless written permission\nor a separate product decision changes the data-delivery model. Treat direct\nDataverse conversion as an explicit advanced/maintainer path because it\npreserves canonical source provenance but imposes a poor first-run experience.\n",
+  "description": "Follow-up to `_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md`.\nThe ADR concluded that BenchBox should not describe its GitHub Release re-host\nof `joinorder-imdb-2013-v1.tar.zst` as clearly permitted for broad commercial\nredistribution. Harvard Dataverse declares the `imdb_pg11` deposit for DOI\n`10.7910/DVN/2QYZBT` as `CC0 1.0`, but IMDb's current dataset terms and the JOB\npaper describe the underlying IMDb data as non-commercial and restrict\nrepublishing / repurposing.\n\nThe project-owner decision is to accept the residual redistribution risk for\nthis 2013 academic benchmark dataset and keep the verified BenchBox-hosted\nParquet archive as the default fast path. This TODO is therefore not\nrelease-blocking for canonical `joinorder`; it tracks optional hardening such\nas written permission, an explicit direct-Dataverse conversion path, or a\ndocumented BYO-data path.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make direct Dataverse restore/convert the silent default first-run user experience without separate product approval",
+        "instead": "(not specified)",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "modify the canonical query corpus as part of licensing hardening",
+        "instead": "(not specified)",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "remove the current fast Parquet path in this TODO unless the replacement UX is explicitly accepted",
+        "instead": "(not specified)",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "silently weaken the canonical data contract to avoid a heavy first run",
+        "instead": "(not specified)",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-data-fetch-from-dataverse-remediation",
+        "id": 422,
+        "reason": "This TODO tracks engineering/product hardening; formal legal review remains a project-owner decision.",
+        "resolution": "promoted",
+        "resolved_item": "seek-formal-legal-review-of-imdb-dataverse-terms",
+        "resolved_reason": null,
+        "summary": "Seek formal legal review of IMDb / Dataverse terms"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-15T00:00:00Z",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Public `joinorder` remains canonical IMDb 2013 / JOB-only at `--scale 1`",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation"
+      },
+      {
+        "behavior": "The 113 query texts and reference cardinality files remain unchanged unless a separate data mismatch is proven",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation"
+      },
+      {
+        "behavior": "The IMDb attribution string remains visible in DATA-LICENSE.md and user-facing docs",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md -- accepted-risk decision that creates this optional hardening follow-up",
+        "decision": "reuse",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "path": "_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md"
+      },
+      {
+        "concept": "_project/scripts/build_joinorder_data.py -- existing restore/convert/verify pipeline to reuse instead of creating a parallel path",
+        "decision": "reuse",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "path": "_project/scripts/build_joinorder_data.py"
+      },
+      {
+        "concept": "benchbox/core/data_fetch/ -- existing manifest download/cache/verification helper path",
+        "decision": "reuse",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "path": "benchbox/core/data_fetch/"
+      },
+      {
+        "concept": "benchbox/core/joinorder/data_manifest.toml -- current BenchBox-hosted archive URL and pinned source/archive hashes",
+        "decision": "reuse",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "path": "benchbox/core/joinorder/data_manifest.toml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "_project/joinorder/reference_cardinalities.json"
+      },
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "_project/joinorder/tiny_reference_cardinalities.json"
+      },
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/queries.py"
+      },
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/"
+      },
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/joinorder/"
+      },
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/build_joinorder_data.py"
+      },
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/data_fetch/"
+      },
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/"
+      },
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/join-order.md"
+      },
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/joinorder/"
+      },
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_joinorder_benchmark.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -i 'Dataverse\\|redistribut\\|permission\\|BYO' _project/decisions/joinorder-canonical-data-licensing-2026-05-12.md _project/DONE/main/planning/joinorder-data-fetch-from-dataverse-remediation.yaml",
+        "description": "Accepted-risk decision and optional hardening paths are recorded",
+        "expected": "ADR and TODO both state that the current fast path is accepted risk and list optional hardening alternatives",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -R \"releases/download/data%2Fjoinorder\" -n benchbox/core/joinorder benchbox/core/data_fetch || echo CLEAN",
+        "description": "Runtime fast path remains intentional unless a later PR changes it",
+        "expected": "Current manifest URL is still present, or a later approved replacement documents the UX tradeoff",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/joinorder tests/unit/core/test_joinorder_benchmark.py -q && make docs-validate",
+        "description": "JoinOrder canonical tests and docs still pass",
+        "expected": "passes",
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "notes": "Default runtime remains the BenchBox-hosted Parquet archive. Acceptable\nhardening exits are: seek written permission, add an explicit advanced\ndirect-Dataverse restore/convert path, document a BYO-data path, or record\nthat the accepted-risk posture remains sufficient for now.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose whether to pursue any hardening path",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "notes": "If an advanced Dataverse path is selected, update the joinorder\ndata-fetch/build pipeline so an explicit command downloads `imdb_pg11`\nfrom Dataverse, verifies the Dataverse MD5 and pinned pg_dump SHA256,\nrestores/converts to Parquet locally, then verifies the existing table row\ncounts and hashes. Cache under BenchBox's normal data directory. Do not\nmake this heavy restore/convert path the silent first-run default without a\nseparate product decision. Do not change the 113 canonical queries or the\n`--scale 1` public contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the selected optional path without changing canonical query semantics",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "notes": "Update DATA-LICENSE.md, docs, and any first-run data-fetch notice so users\nsee the Dataverse DOI, IMDb attribution, IMDb non-commercial restriction,\nand the fact that BenchBox keeps the verified hosted archive as an\naccepted-risk fast path unless a later hardening decision changes it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Surface the governing terms and selected posture",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-data-fetch-from-dataverse-remediation",
+        "notes": "Run the joinorder data-fetch/unit coverage, docs validation, and the\nmanifest/provenance checks needed to prove that any selected optional path\nstill yields the canonical 21-table / 113-query JOB dataset.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify integrity, docs, and regression coverage",
+        "wid": "w4"
+      }
+    ]
+  }
+}

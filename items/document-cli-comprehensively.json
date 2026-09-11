@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: Critical\"\n- \"**Status**: Completed ✅\"\n- \"**Description**: CLI documentation is severely inadequate, covering only basic usage while the CLI has extensive functionality including subcommands, platform-specific options, and advanced features\"\n- \"**Context**: Poor CLI documentation creates barriers to adoption and prevents users from utilizing powerful features\"\n- \"**Tasks**:\"\n- \"**Files Affected**:\"\n- \"**Success Metrics**:\"\n- \"**Impact**: CRITICAL - Poor CLI documentation prevents effective tool usage and adoption\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (COMPLETED)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

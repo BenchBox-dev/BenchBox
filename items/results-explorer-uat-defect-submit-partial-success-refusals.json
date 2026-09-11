@@ -1,0 +1,228 @@
+{
+  "description": "In the 2026-05-05 tuned UAT sweep, 27 of 114 result JSONs from\n\"passed\" cells were refused by `benchbox submit --output` during the\npackage phase. Most refusals were for query-level failures hidden\ninside otherwise-successful runs, with a smaller share for\nunofficial TPC-DS compliance classes (`unofficial_subscale`,\n`unofficial_nonstandard`).\n\nAffected benchmarks/platforms in the dominant refusals:\n  - DataVault\n  - FlightData / DataFusion\n  - JoinOrder / DataFusion\n  - metadata, read, write, transaction primitives\n  - TPC-DI\n  - TPC-DS OBT\n  - TPCHavoc\n  - TSBS / DataFusion\n\nSource: `_project/handoffs/results-explorer-uat-tuned-followup-20260505.md`\n(\"Submission And Validation\" + \"Defect Classification →\nSubmission-contract\"). Follow-up to PR #235.\n\nToday the UAT cell-level outcome is \"passed\" if the run produced a\nresult JSON, even when individual queries inside the run failed. The\npackage phase is the first place these are caught — too late for the\nvalidator-clean rate to mean what it claims, and too late for an\noperator to triage during the sweep.\n\nThis TODO makes the UAT execute phase classify a cell as failed\nwhenever its result JSON contains query-level errors (or any other\ncondition `benchbox submit` would refuse), so the sweep terminal\nstate matches the submittable-bundle reality.\n\nOut of scope: TPC-DS compliance-class refusals are deliberate and\ncorrect — those cells should not be force-promoted; they remain as\n\"passed but unofficial\" in the matrix and are excluded from\nsubmission packaging by design.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a config flag to opt out of the new classifier",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "why": "opting out re-creates the gap; if a future contract change is needed, it lives in the classifier itself."
+      },
+      {
+        "dont": "branch off submit.py's refusal logic",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "why": "duplicating predicates means the next refusal-rule change diverges UAT from submit. Import where possible; document each mirror as 'mirror of submit.py:<line>'."
+      },
+      {
+        "dont": "mark `unofficial` cells as FAILED",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "why": "they ran, they just are not submittable. Conflating these obscures real query-level failures."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-06T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Direction of dependency: `tests/uat/runner.py` may IMPORT public predicates from `benchbox.cli.commands.submit`, but never the reverse. The CLI must not depend on the UAT framework.",
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals"
+      },
+      {
+        "behavior": "`benchbox submit --output` remains the source of truth for refusals — UAT mirrors it, does not override it.",
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals"
+      },
+      {
+        "behavior": "`unofficial` compliance-class cells continue to PASS at the cell level (they ran successfully; they are simply not submittable).",
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals"
+      },
+      {
+        "behavior": "validator-clean-rate floor enforcement; tightening the cell-level pass criterion does not weaken the validator gate.",
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/_cli.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/package.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/runner.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_runner.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'from tests.uat.runner import classify_for_submit, SubmitTerminalState; print(SubmitTerminalState.__members__.keys())'",
+        "description": "Classifier is importable and has the expected vocabulary",
+        "expected": "submittable, unofficial, query_failure, schema_violation, missing_manifest",
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_runner.py -m fast -k classify_for_submit -q",
+        "description": "Synthetic-failure fixture produces FAILED at the execute phase",
+        "expected": "all green",
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m tests.uat._cli replay-classify --coverage-cells ~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/coverage_cells.tsv --results-root ~/Developer/benchmark_runs/results",
+        "description": "Replay against 2026-05-05 passed-result paths matches handoff numbers",
+        "expected": "114 passed-result paths; 87 submittable; 27 non-submittable split by classifier",
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "head -1 ~/Developer/benchmark_runs/logs/<latest-sweep>/coverage_cells.tsv",
+        "description": "Cell-level coverage TSV exposes `submit_terminal_state` column",
+        "expected": "header includes submit_terminal_state",
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "notes": "Evidence-durability gate per `_project/verification-logs/README.md`.\nThe whole TODO turns on the \"27 of 114 refused\" figure; pin it now\nso the implementer (and the w5 sanity check) can compare against a\ncaptured baseline:\n\n  LOGS=~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun\n  RESULT_LIST=$(mktemp)\n  awk -F'\\t' 'NR>1 && $4==\"passed\" && $6 {print $6}' \\\n    \"$LOGS/coverage_cells.tsv\" > \"$RESULT_LIST\"\n  echo \"passed-result-paths $(wc -l < \"$RESULT_LIST\")\"\n  while IFS= read -r source_path; do\n    result_path=\"$source_path\"\n    if [ ! -f \"$result_path\" ]; then\n      result_path=\"$HOME/Developer/benchmark_runs/results/$(basename \"$source_path\")\"\n    fi\n    out_dir=$(mktemp -d)\n    if uv run -- benchbox submit \"$result_path\" --output \"$out_dir\" --dry-run \\\n        > \"$out_dir/submit.log\" 2>&1; then\n      echo submittable\n    else\n      reason=$(grep -E 'Submission refused:' \"$out_dir/submit.log\" \\\n        | sed -E 's/.*Submission refused: //; s/\\x1b\\[[0-9;]*m//g' \\\n        | head -1)\n      echo \"refused:${reason:-unknown}\"\n    fi\n    rm -rf \"$out_dir\"\n  done < \"$RESULT_LIST\" | sort | uniq -c\n  rm -f \"$RESULT_LIST\"\n\nExpected (handoff anchor): 114 passed-result paths; 87 submittable;\n27 refused split between unofficial compliance and non-clean/query-level\nfailures; validator-clean rate 95.4% on the staged subset. Capture stdout under\n`_project/verification-logs/results-explorer-uat-defect-submit-partial-success-refusals/w0.log`\nand commit. If the refusal count has drifted (submit.py rules\nchanged since 2026-05-05), update the description's count and the\nw5 expected split before proceeding.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replay current `benchbox submit --output` against the 2026-05-05 corpus and capture the refusal split",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "notes": "Read `benchbox/cli/commands/submit.py` end-to-end. List the explicit\nrefusal predicates (compliance class, query-level failure markers,\nmissing manifest fields, etc.) and the result-JSON fields each\nconsults. Output: short table in this TODO (or a captured log)\nkeyed by predicate → result-JSON path. This is the contract the\nexecute phase must replicate to detect-early.\n\nImplemented contract:\n- missing file / absent result path → `missing_manifest`.\n- `load_result_file()` `UnsupportedSchemaError` / `ResultLoadError` →\n  `schema_violation`.\n- `benchmark.compliance_class in {unofficial_nonstandard,\n  unofficial_subscale}` → `unofficial` (cell remains passed, package can\n  skip it).\n- `result_failed_query_count(result) > 0` / `result_non_clean_reason()` →\n  `query_failure` for failed-query counts, otherwise `schema_violation`\n  for non-clean validation statuses.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Catalogue every condition `benchbox submit --output` refuses today",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "notes": "Function: `classify_for_submit(result_json) -> SubmitTerminalState`\nwhere `SubmitTerminalState ∈ {submittable, unofficial,\nquery_failure, schema_violation, missing_manifest}`. Call after\nevery cell's runner exit. The classifier reuses the predicates\ncatalogued in w1; do NOT branch off `submit.py`'s implementation —\ndelegate where possible (import the public predicate functions),\nmirror only what cannot be imported. Refusing to package an\nunsubmittable cell is a feature, not a regression — operators see\nit during execute, not at the package boundary.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `submit_terminal_state` classifier in `tests/uat/runner.py` (or new module) that mirrors the submit refusals",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "notes": "`tests/uat/phases/execute.py` per-cell terminal-state computation\nconsumes `classify_for_submit` and downgrades the cell. Cells with\n`unofficial` stay PASSED but are tagged so the package phase still\nexcludes them with a clear reason. Update the per-platform/per-\nbenchmark coverage TSV columns accordingly. Update existing\npackage-phase refusal logging to reference the upstream classify\nresult rather than re-deriving.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update execute phase: cells whose `submit_terminal_state` is `query_failure` or `schema_violation` are reported FAILED, not PASSED",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "notes": "Fast-marked. Two fixture JSONs: (a) clean → submittable + PASSED,\n(b) clean shape but one query has `error: ...` → query_failure +\nFAILED. Assert both runner output and package-phase refusal list\nagree. Prevents regression of the \"passed but refused\" gap.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regression test: synthetic result JSON with a query failure → execute phase reports FAILED, package phase agrees",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-submit-partial-success-refusals",
+        "notes": "Sanity check that the implementation matches the observed defect.\nRe-read the 114 `status=passed` result JSON paths from\n`~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/coverage_cells.tsv`,\nresolving pool-local paths to same-name files under\n`~/Developer/benchmark_runs/results/` when needed. Assert: 87\nsubmittable + 27 non-submittable = 114, and the 27 split into\n`unofficial` versus `query_failure`/`schema_violation` according to\nthe classifier. Only the non-clean (`query_failure` ∪\n`schema_violation`) subset should flip from PASSED to FAILED;\n`unofficial` remains PASSED but tagged. Capture the exact split into\nthe verification log under `_project/verification-logs/<this-id>/`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replay 2026-05-05 passed-result paths through the new classifier and compare the refusal split",
+        "wid": "w5"
+      }
+    ]
+  }
+}

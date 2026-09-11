@@ -1,0 +1,920 @@
+{
+  "context": "Work from the dependency graph, but treat W0 as the implementation gate.\nRevalidate current readers first, then land small PR-sized slices that remove\nan old surface in the same change that installs its replacement. Favor\ntyped config and registry-owned metadata over extra compatibility layers.\nWhen current develop contradicts the 2026-05-05 review evidence, update this\nTODO and implementation plan instead of forcing stale deletes through code.\n",
+  "description": "Closes the simplification + de-duplication findings surfaced by the\nprincipal-engineer review of PR #205 (UAT framework W2-W11) on\n2026-05-05. The review delivered 16 simplification findings + 3\nde-duplication candidates; this TODO addresses every one.\n\n## Posture: forward-fix, no backward-compat surface\n\nPer explicit user direction at TODO-creation time: this work does NOT\npreserve old surfaces. We do not deprecate, we delete; we do not\nthin-delegate, we cut over; we do not hedge schemas, we flatten. Each\nwork unit removes the prior surface in the same change that lands the\nreplacement. There is no \"Tier 2\" cleanup TODO behind this one.\n\nConcrete consequences:\n  - `scripts/local_stress_test.sh` is deleted (not thin-delegated).\n  - `tests/uat/test_matrix.py::test_bash_parity_*` is deleted (no\n    surface to be parity-tested against).\n  - `tests/fixtures/published_results_validator.py` is deleted in\n    favour of a proper `benchbox/validation/bundle.py` library.\n  - `config.raw: dict[str, Any]` and `apply_stress_overrides` are\n    deleted in favour of typed dataclasses + `dataclasses.replace`.\n  - `cleanup.SOURCE_REUSE_GRAPH`, `KNOWN_SQL_ONLY_BENCHMARKS`,\n    `enumerate` phase, `.frozen-hashes.json`, the `# FROZEN` ceremony,\n    `apply_stress_overrides`, and confirmed-unused YAML fields all leave\n    the tree.\n  - The `benchbox/cli/` surface constraint gains a real test guard\n    with an explicit exception for the internal submit-validator wiring\n    moved by W4.\n\n## Evidence base\n\nReview output (in conversation transcript 2026-05-05). Sweep this\nfile alongside the four blind-spot captures:\n  - `_project/blind-spots/2026-05-05-154305-uat-orphan-yaml-fields.md`\n  - `_project/blind-spots/2026-05-05-154306-uat-noisy-neighbor-invocation-divergence.md`\n  - `_project/blind-spots/2026-05-05-154307-uat-tpcds-obt-reuse-graph-asymmetry.md`\n  - `_project/blind-spots/2026-05-05-154308-uat-cli-surface-constraint-no-enforcement.md`\nAnd the two pre-existing UAT blind-spots that this TODO also resolves:\n  - `_project/blind-spots/2026-05-05-080138-uat-bash-parity-structural-only.md`\n    (resolved by deleting the bash + parity test in W3)\n  - `_project/blind-spots/2026-05-05-080138-uat-frozen-config-replay-not-runnable.md`\n    (resolved by W6's frozen-ceremony retirement)\n\nCurrent-state note (2026-05-21): this TODO was created against PR #205\nreview evidence, but the branch has since gained Docker lifecycle cleanup\nfields and additional UAT configs. W0 must revalidate every path/reader\nclaim against the implementation branch before code edits. Do not carry\nforward deletion claims just because they were true on 2026-05-05.\n\n## Decisions this TODO commits to (no further user gates required)\n\n  1. **Bash retirement direction.** The framework owns matrix\n     iteration. `scripts/local_stress_test.sh` is deleted. The\n     2026-05-02 adoption criterion (\"two-plus subsequent UATs\") is\n     superseded — adoption is now mandatory, not measured.\n  2. **Frozen-config ceremony retirement.** The freeze + hash JSON +\n     three-test guard buys nothing once the structural-parity replay\n     (W4 of the parent TODO) is corrected to actually replay. Demote\n     to a plain `# HISTORICAL` comment.\n  3. **Validator library extraction.** `benchbox/validation/bundle.py`\n     becomes the single source of truth. Both\n     `scripts/validate_submission.py` and the published-results-branch\n     copy become thin entrypoints (~30 lines).\n  4. **Schema is fully typed.** No `raw: dict[str, Any]` passthrough,\n     no W3/W4 staging artifact, no scattered defaults.\n\n## What this TODO does NOT do\n\n  - Add new UAT phases. Scope is simplification + de-duplication of\n    what shipped in W2-W11.\n  - Change the `submit_terminal_state` vocabulary. That contract is\n    stable.\n  - Touch the parallel-platforms discipline as a behaviour. The\n    triple-guard is reduced to two guards (YAML validator + runtime\n    assert) but the discipline stands.\n  - Re-evaluate the spec's \"UAT is developer concern, benchbox is\n    user concern\" line. W17 enforces it; it does not relitigate it.\n  - Migrate `tests/integration/test_local_platform_benchmark_matrix.py`\n    into the framework. The boundary is documented (W18); the test\n    stays; only `LOCAL_SQL_PLATFORMS` deduplicates.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a blanket `benchbox/cli/` diff-is-empty gate while W4 intentionally changes submit.py internals; guard user-visible CLI surface instead.",
+        "instead": "(not specified)",
+        "item_id": "uat-framework-review-followups",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "create a second bundle-validation implementation under tests/ or scripts/ after extracting benchbox/validation/bundle.py.",
+        "instead": "(not specified)",
+        "item_id": "uat-framework-review-followups",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "delete cleanup fields that current UAT execution paths read or validate; stale orphan-field evidence must be corrected, not implemented.",
+        "instead": "(not specified)",
+        "item_id": "uat-framework-review-followups",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "preserve old bash, frozen-config, raw-config, or duplicate-validator surfaces as compatibility shims unless the TODO is explicitly revised.",
+        "instead": "(not specified)",
+        "item_id": "uat-framework-review-followups",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "rely on raw stdout transcripts as durable evidence; keep raw logs in /tmp, CI artifacts, or BENCHBOX_OUTPUT_DIR and commit compact summaries only.",
+        "instead": "(not specified)",
+        "item_id": "uat-framework-review-followups",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-21T00:00:00Z",
+      "created_at": "2026-05-05T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All eight Make targets (uat-cell, uat-stress, uat-sweep, uat-execute, uat-validate, uat-package, uat-explorer-smoke, uat-report) continue to work; argument syntax unchanged",
+        "item_id": "uat-framework-review-followups"
+      },
+      {
+        "behavior": "Fast-test wall time stays under the existing budget (no new slow tests added; new fast tests must justify their cost)",
+        "item_id": "uat-framework-review-followups"
+      },
+      {
+        "behavior": "Sequential platform execution discipline (no parallel_platforms; YAML validator + runtime assert remain)",
+        "item_id": "uat-framework-review-followups"
+      },
+      {
+        "behavior": "The published-results-branch validation contract (the library API replaces the script byte-identity, but the contract is preserved)",
+        "item_id": "uat-framework-review-followups"
+      },
+      {
+        "behavior": "submit_terminal_state vocabulary in tests/uat/phases/package.py",
+        "item_id": "uat-framework-review-followups"
+      },
+      {
+        "behavior": "tests/integration/test_local_platform_benchmark_matrix.py query-cardinality and row-count assertions",
+        "item_id": "uat-framework-review-followups"
+      },
+      {
+        "behavior": "validator-clean-rate floor enforcement semantics",
+        "item_id": "uat-framework-review-followups"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/active/uat-docker-platform-switch-cleanup.yaml: post-PR-205 Docker cleanup fields and validation requirements -- preserve these live fields and coordinate config cleanup with them.",
+        "decision": "reuse",
+        "item_id": "uat-framework-review-followups",
+        "path": "_project/DONE/main/active/uat-docker-platform-switch-cleanup.yaml"
+      },
+      {
+        "concept": "benchbox/core/publishing/bundle_publisher.py: companion suffix handling and bundle publishing contract -- reuse constants or document why validation needs a narrower policy.",
+        "decision": "reuse",
+        "item_id": "uat-framework-review-followups",
+        "path": "benchbox/core/publishing/bundle_publisher.py"
+      },
+      {
+        "concept": "benchbox/core/results/integrity_validator.py: result integrity checks used by internal validation -- reuse concepts, but do not merge user-submission policy into integrity checks unless W0 proves the contracts match.",
+        "decision": "reuse",
+        "item_id": "uat-framework-review-followups",
+        "path": "benchbox/core/results/integrity_validator.py"
+      },
+      {
+        "concept": "benchbox/core/results/schema.py: schema-v2 required-key validation -- consolidate constants only if the production validator and published-results contract stay aligned.",
+        "decision": "reuse",
+        "item_id": "uat-framework-review-followups",
+        "path": "benchbox/core/results/schema.py"
+      },
+      {
+        "concept": "scripts/validate_submission.py: current published-results validator CLI and validation helper surface -- extract shared logic instead of reimplementing bundle validation.",
+        "decision": "reuse",
+        "item_id": "uat-framework-review-followups",
+        "path": "scripts/validate_submission.py"
+      },
+      {
+        "concept": "tests/fixtures/published_results_validator.py: vendored published-results copy -- supersede with a mirrored library plus thin entrypoint, then delete the duplicate fixture.",
+        "decision": "supersede",
+        "item_id": "uat-framework-review-followups",
+        "path": "tests/fixtures/published_results_validator.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/sync-results-data-to-published.yml"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/planning/uat-framework-review-followups.yaml"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/uat-framework-review-followups.yaml"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-methodology-blind-spot-remediation.md"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/publishing/bundle_publisher.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/validation/"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "scripts/local_stress_test.sh"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "scripts/uat-bring-up/uat_bring_up.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "scripts/uat_validator_rollup.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/published_results_validator.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_cross_branch_validator_contract.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_local_platform_benchmark_matrix.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/README.md"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/_cli.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/cleanup.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/config.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/matrix.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/orchestrator.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/__init__.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/enumerate.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/explorer_smoke.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/package.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/preflight.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/report.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/validate.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/runner.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_config.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_matrix.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_no_cli_surface_drift.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_orchestrator.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_replay_2026_05_02.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_validate.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_submit.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_uat_validator_rollup.py"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_validate_submission.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/active/uat-framework-review-followups.yaml &&\nuv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph\n",
+        "description": "TODO schema and work graph remain valid before implementation starts",
+        "expected": "TODO validation and graph checks pass",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat -m fast -q",
+        "description": "All UAT fast tests pass after each work unit",
+        "expected": "all green",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check tests/uat benchbox/validation && uv run -- ty check tests/uat benchbox/validation",
+        "description": "Lint + typecheck clean across the touched paths",
+        "expected": "All checks passed",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py tests/unit/scripts/test_uat_validator_rollup.py tests/unit/cli/commands/test_submit.py tests/integration/test_cross_branch_validator_contract.py -q\n",
+        "description": "Submission validator and submit dry-run contracts pass after W4/W5",
+        "expected": "validator extraction, rollup, submit, and cross-branch contract tests pass",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test ! -f scripts/local_stress_test.sh && echo OK",
+        "description": "Bash script is gone",
+        "expected": "OK",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test ! -f tests/uat/configs/.frozen-hashes.json && test ! -f tests/uat/test_frozen_configs.py && echo OK",
+        "description": "Frozen-config ceremony is gone",
+        "expected": "OK",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'from benchbox.validation.bundle import validate_bundles, REQUIRED_TOP_KEYS; print(\"OK\")'\n",
+        "description": "Validator library exists and is the source of truth",
+        "expected": "OK",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test ! -f tests/fixtures/published_results_validator.py && echo OK",
+        "description": "Vendored validator fixture is gone",
+        "expected": "OK",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -rn 'config.raw\\|raw: dict' tests/uat/ --include='*.py'",
+        "description": "config.raw is gone",
+        "expected": "no matches (exit 0)",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -rn 'apply_stress_overrides' tests/uat/ benchbox/ --include='*.py'",
+        "description": "apply_stress_overrides is gone",
+        "expected": "no matches (exit 0)",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 10,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -rn 'KNOWN_SQL_ONLY_BENCHMARKS' tests/ benchbox/",
+        "description": "KNOWN_SQL_ONLY_BENCHMARKS is gone",
+        "expected": "no matches (exit 0)",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 11,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -rn 'SOURCE_REUSE_GRAPH' tests/uat/ --include='*.py'",
+        "description": "SOURCE_REUSE_GRAPH is gone (lifted to registry)",
+        "expected": "no matches (exit 0)",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 12,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_no_cli_surface_drift.py -q",
+        "description": "CLI surface drift test exists and passes",
+        "expected": "1 passed",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 13,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make -n uat-cell uat-stress uat-sweep uat-execute uat-validate uat-package uat-explorer-smoke uat-report 2>&1 | head -1\n",
+        "description": "All Make targets still resolve (dry-help)",
+        "expected": "no error",
+        "item_id": "uat-framework-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 14,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w1",
+        "wid": "w10"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w1",
+        "wid": "w11"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w0",
+        "wid": "w12"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w0",
+        "wid": "w13"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w0",
+        "wid": "w14"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w0",
+        "wid": "w15"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w0",
+        "wid": "w16"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w0",
+        "wid": "w17"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w0",
+        "wid": "w18"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w1",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w10",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w11",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w12",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w13",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w14",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w15",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w16",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w17",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w18",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w2",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w3",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w4",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w5",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w6",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w7",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w8",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w9",
+        "wid": "w19"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w0",
+        "wid": "w6"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "uat-framework-review-followups",
+        "needs_wid": "w2",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "Required first step. The original review evidence is pinned to PR #205\n/ commit d78b06588 on 2026-05-05, while current develop has additional\nUAT cleanup fields, configs, tests, and docs.\n\nMinimum revalidation:\n  - Run targeted grep/path checks for every removal claim in this TODO:\n    `local_stress_test.sh`, `published_results_validator.py`,\n    `.frozen-hashes.json`, `test_frozen_configs.py`, `config.raw`,\n    `apply_stress_overrides`, `KNOWN_SQL_ONLY_BENCHMARKS`,\n    `SOURCE_REUSE_GRAPH`, `reset_reachability_cache`,\n    `extract_result_path`, `cleanup.preserve_datagen`,\n    `cleanup.prune_databases`, and `package.pr_target_branch`.\n  - Read the current readers before deleting YAML fields. In particular,\n    `cleanup.prune_databases` is currently read by UAT execution paths,\n    and Docker lifecycle fields from `uat-docker-platform-switch-cleanup`\n    must be preserved.\n  - Record a compact summary in the implementation PR body: command(s),\n    checked develop SHA, which claims stayed true, which changed, and\n    which W units were adjusted.\n\nThis work unit may edit this TODO before implementation if current code\ninvalidates a planned deletion. It must not make runtime changes.\n\nCompleted evidence (2026-05-21, develop c0837d4e2):\n  Commands run:\n    - `git rev-parse HEAD`\n    - path existence check for the claimed removed/added files\n    - `rg -n` sweep for `config.raw`, `raw: dict`,\n      `apply_stress_overrides`, `KNOWN_SQL_ONLY_BENCHMARKS`,\n      `SOURCE_REUSE_GRAPH`, `reset_reachability_cache`,\n      `extract_result_path`, `local_stress_test.sh`, `# FROZEN`,\n      `pr_target_branch`, `preserve_datagen`, `prune_databases`,\n      and validator-library symbols.\n\n  Current-state findings:\n    - Still present and eligible for planned removal/refactor:\n      `scripts/local_stress_test.sh`,\n      `tests/fixtures/published_results_validator.py`,\n      `tests/uat/configs/.frozen-hashes.json`,\n      `tests/uat/test_frozen_configs.py`, `UATConfig.raw`,\n      `apply_stress_overrides`, `KNOWN_SQL_ONLY_BENCHMARKS`,\n      `SOURCE_REUSE_GRAPH`, `reset_reachability_cache`,\n      `extract_result_path`, and the validate-phase\n      subprocess/TSV parse path.\n    - Still absent and needs W4/W17:\n      `benchbox/validation/bundle.py` and\n      `tests/uat/test_no_cli_surface_drift.py`.\n    - Stale deletion claim corrected by this TODO remains correct:\n      `cleanup.prune_databases` is live at\n      `tests/uat/orchestrator.py:256` and `tests/uat/_cli.py:452`.\n      Do not delete it in W10.\n    - `cleanup.preserve_datagen` is not a runtime action reader, but it\n      is an explicit rejected safety knob at\n      `tests/uat/config.py:244-246`. W10 must either document that\n      reserved contract or deliberately remove the field with tests.\n    - Docker lifecycle cleanup fields are live at config validation and\n      execution sites (`tests/uat/config.py:247-282`,\n      `tests/uat/phases/execute.py:231-284`, `:469`). W10 must\n      preserve them.\n    - `package.pr_target_branch` has only a spec hit\n      (`_project/specs/uat-framework.md:305`) and remains the only\n      clear orphan-field deletion candidate from W10.\n    - TPC-DS OBT really uses TPC-DS source data\n      (`benchbox/core/tpcds_obt/benchmark.py:123-150`, `:246-249`),\n      while registry metadata lacks a corresponding `data_source`\n      entry (`benchbox/core/benchmark_registry.py:138-152`).\n      W15 remains valid.\n    - PR #502 already added benchmark support-status metadata and\n      registry summary helpers, but no platform helper methods named\n      `get_sql_platforms`, `get_dataframe_platforms`, or\n      `get_self_hosted_platforms` exist yet. W16 remains valid.\n\n  Resulting plan update:\n    W0 unblocks W1, W2, W4, W6, and W12-W18. W10 remains scoped to\n    current orphan-field reconciliation rather than deleting live\n    cleanup fields.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate review findings against current develop before deleting or extracting anything",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "Replaces the W3/W4 staging artifact in `tests/uat/config.py`. After\nthis work unit, `UATConfig.raw: dict[str, Any]` does not exist;\nevery YAML section has a typed dataclass (`PreflightConfig`,\n`ValidateConfig`, `PackageConfig`, `ExplorerSmokeConfig`,\n`ReportConfig`, `ScalesConfig`, `PlatformsConfig`,\n`BenchmarksConfig`, `CleanupConfig`).\n\nConcrete deletions:\n  - `tests/uat/config.py:6-9` and `:140-143` W3/W4 comments.\n  - `tests/uat/config.py:176-205` `apply_stress_overrides` function\n    and its docstring lying about env vars.\n  - All `config.raw.get(\"...\") or {}` patterns at\n    `_cli.py:303-305`, `orchestrator.py:66,107,145,154,157`,\n    `phases/package.py:46,56`, `phases/enumerate.py:51-53`.\n  - All scattered defaults (e.g. `5.0` GiB free at both\n    `_cli.py:304` and `orchestrator.py:69`); each typed config\n    owns its own default in one place.\n\nConcrete additions:\n  - Each typed config dataclass uses `frozen=True` to prevent\n    post-construction mutation.\n  - `_cli.stress_main` builds the modified config via\n    `dataclasses.replace(config, scales=replace(config.scales,\n    override=scale))` etc. — no helper, no env-var translation in\n    Python.\n  - YAML validator at `config.py:84-91` rejects unknown sections\n    AND unknown fields-within-sections.\n\nDeps: w0 (current config readers must be revalidated first).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Promote every UAT YAML section to a typed dataclass; delete config.raw and apply_stress_overrides",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "Closes blind-spot `2026-05-05-154305-uat-orphan-yaml-fields.md`\nand F10 without deleting live cleanup controls introduced after the\noriginal review.\n\nCurrent-state correction: the original deletion plan is stale on\n2026-05-21. `cleanup.prune_databases` is read by execute/orchestrator\npaths, `cleanup.preserve_datagen` is part of config validation, and\nDocker cleanup fields from `uat-docker-platform-switch-cleanup` are\nlive. Do not remove those fields as \"orphans\".\n\nConcrete:\n  - Re-run the W0 grep/readers check immediately before editing.\n  - Keep `cleanup.prune_databases` and all Docker lifecycle cleanup\n    fields unless W0 finds the current implementation no longer reads\n    them.\n  - Keep or deliberately remove `cleanup.preserve_datagen` based on\n    current code reality: if it remains a rejected safety knob, document\n    that contract; if it is truly inert, delete it from config/spec in\n    the same PR.\n  - Delete `package.pr_target_branch` from the spec/configs only if W0\n    still proves it has no reader.\n\nConcrete additions:\n  - `tests/uat/test_config.py` regression: every field present\n    in `tests/uat/configs/stress-default.yaml` MUST have a\n    reader, explicit validator rejection, or documented reserved-field\n    reason under `tests/uat/` or `benchbox/`. Mechanical grep plus an\n    exception map, fast-marked. Prevents future orphan fields without\n    treating reserved safety fields as accidental noops.\n\nResolves: blind-spot\n  `2026-05-05-154305-uat-orphan-yaml-fields.md` (status ->\n  actioned: current orphan fields deleted or explicitly documented,\n  regression guard added).\n\nDeps: w1 (typed schema makes orphan fields impossible at the\ndataclass level; this work unit cleans up the YAML and spec\nside).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reconcile orphan YAML fields; delete only fields still proven unused on current develop",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "F6. The triple-guard is two-and-a-half: site (2) at\n`config.py:113` unconditionally overwrites the dataclass field,\nmaking YAML `false` and `true` indistinguishable inside the\ndataclass. Removing site (2) lets test code construct\n`parallel_platforms=True` to actually exercise site (3) at\n`execute.py:52`.\n\nConcrete:\n  - `tests/uat/config.py:113` hardcode → use input value (which\n    the validator at `config.py:95-99` has already rejected if\n    True; the validator stands).\n  - New regression test: construct\n    `UATConfig(execute=ExecuteConfig(parallel_platforms=True))`\n    directly (bypassing YAML validation), assert the runtime\n    assert at `execute.py:52` fires. Fast-marked.\n\nDeps: w1 (typed schema is in place; this is a small follow-up).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Drop the constructor's parallel_platforms=False hardcode; keep YAML validator + runtime assert; add bypass test",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "F12. The constant at `tests/uat/matrix.py:233` is documented as a\n\"fallback\" but actually runs as an OR-shortcut before the registry\nis consulted. Identical behaviour with or without it.\n\nConcrete deletions:\n  - `tests/uat/matrix.py:229-233`: `KNOWN_SQL_ONLY_BENCHMARKS`\n    constant.\n  - `tests/uat/phases/enumerate.py:30-33`: `_is_sql_only` becomes\n    `return not info.supports_dataframe`.\n\nDeps: w0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete KNOWN_SQL_ONLY_BENCHMARKS OR-shortcut; phases/enumerate.py uses registry truth directly",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "F4. `reset_reachability_cache()` at `matrix.py:181-183` claims\nto be a \"sweep-restart hook\" but is called only from tests.\nSequential platform execution + no orchestrator invalidation\nmeans the cache is process-lifetime by behaviour.\n\nCurrent-state correction (2026-05-21): W0 proved the \"called only\nfrom tests\" claim is stale. UAT-managed platform bring-up and Docker\nstartup now need runtime invalidation so a cached negative probe does\nnot survive after the framework changes service state.\n\nConcrete:\n  - Delete `reset_reachability_cache` from\n    `tests/uat/matrix.py:181-183`.\n  - Replace runtime callers with\n    `invalidate_reachability_cache_after_lifecycle_change()`, whose\n    name documents that cache clearing is only for UAT-managed\n    platform state changes. This includes the current runtime\n    callers in preflight, execute, and `scripts/uat-bring-up`.\n  - Add a UAT test fixture that clears `_REACHABILITY_CACHE`\n    directly before/after each test; delete explicit test calls to\n    the old helper.\n  - Comment on `_REACHABILITY_CACHE` updated to say\n    the cache is process-lifetime except for explicit lifecycle\n    invalidation after UAT-managed platform changes.\n\nDeps: w0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete reset_reachability_cache; document module-level dict as process-lifetime cache",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "F5. `tests/uat/runner.py:24-26` regex\n`(?:/[^\\s]+/)?benchmark_runs/results/[^\\s]+\\.json` mirrors the\nbash script's `grep -oE | tail -1` and is vulnerable to log\nre-prints. `benchbox run --quiet` (`run.py:1506-1507`) emits\njust the path.\n\nConcrete:\n  - `tests/uat/matrix.py::benchbox_run_argv` (lines 381-415):\n    add `--quiet` to the argv.\n  - `tests/uat/runner.py:24-26,43-53,101-102`: replace\n    `extract_result_path` with `last_nonempty_line(stdout)`.\n    Delete the regex.\n  - Update tests that fixture-mock CLI output to mock just the\n    path, not log noise.\n\nDeps: w0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pass --quiet to benchbox run; take last stdout line as result path; delete the regex",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "F9 + blind-spot\n`2026-05-05-154307-uat-tpcds-obt-reuse-graph-asymmetry.md`.\n\nStep 1 — verification (gates Step 2):\n  Read `benchbox/core/tpcds_obt/benchmark.py` end-to-end and\n  confirm whether tpcds_obt actually reuses tpcds-generated data\n  files. The cleanup graph claims it does; production code's\n  `get_data_source_benchmark()` does not declare it.\n\nStep 2a — if reuse is real:\n  - Override `get_data_source_benchmark()` on TPCDSOBTBenchmark\n    to return `\"tpcds\"` (matches the read/write/ai primitives\n    pattern).\n  - Add `data_source: str | None` field to every\n    `BENCHMARK_METADATA[bid]` entry. Auto-populate from the\n    benchmark instance during a metadata-build step at\n    registry-import time.\n  - Replace `tests/uat/cleanup.py:23-32` SOURCE_REUSE_GRAPH\n    with a `defaultdict(list)` built from\n    `BENCHMARK_METADATA` at import time.\n  - Delete the test-side hardcoded constant.\n\nStep 2b — if reuse is NOT real:\n  - Remove `tpcds_obt` from `SOURCE_REUSE_GRAPH[\"tpcds\"]`.\n  - Document the cleanup behaviour change in the spec.\n  - Then proceed with Step 2a for the remaining (real)\n    relationships.\n\nResolves: blind-spot\n  `2026-05-05-154307-uat-tpcds-obt-reuse-graph-asymmetry.md`.\n\nCompleted evidence (2026-05-21):\n  - `benchbox/core/tpcds_obt/benchmark.py` confirms TPC-DS OBT\n    generates/reads base TPC-DS data from `tpcds_source_dir` and\n    transforms it into OBT output, so the reuse claim is real.\n  - `TPCDSOBTBenchmark.get_data_source_benchmark()` now declares\n    `\"tpcds\"`.\n  - `BENCHMARK_METADATA` now has `data_source` on every entry and\n    populates the known runtime sharing declarations from benchmark\n    instances during registry metadata normalization.\n  - UAT cleanup now derives the source-consumer graph from registry\n    metadata; the test-local hardcoded reuse graph is gone.\n\nDeps: w0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add data_source to BENCHMARK_METADATA; delete cleanup.SOURCE_REUSE_GRAPH; verify tpcds_obt claim",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "F15 + F16. `PLATFORM_GROUPS` and `CATEGORY_GROUPS` in\n`tests/uat/matrix.py:127-142,271-290` reinvent or shim taxonomies\nthe registry already has.\n\nConcrete:\n  - `benchbox/core/platform_registry.py`: add\n    `get_sql_platforms()`, `get_dataframe_platforms()`,\n    `get_self_hosted_platforms()` derived from\n    `PlatformCapability.supports_sql`,\n    `.supports_dataframe`, and\n    `DeploymentCapability.mode == \"self-hosted\"`.\n  - `tests/uat/matrix.py:127-142`: PLATFORM_GROUPS keys \"sql\",\n    \"dataframe\", \"docker\", \"docker-fast\", \"docker-slow\", \"all\"\n    derive from registry helpers. Keys \"fast\", \"slow\" remain\n    UAT-private (the timing-budget axis genuinely doesn't\n    belong in the platform registry).\n  - `tests/uat/matrix.py:271-290`: CATEGORY_GROUPS\n    auto-generated from `benchbox/core/benchmark_registry.py:18`\n    `CATEGORY_ORDER` via slug-derivation helper.\n\nCompleted evidence (2026-05-21):\n  - Platform registry now exposes `get_sql_platforms()`,\n    `get_dataframe_platforms()`, and `get_self_hosted_platforms()`.\n  - Server-style platforms that UAT manages through Docker now have\n    explicit self-hosted deployment metadata, and deprecated\n    `clickhouse` stays out of the default helpers.\n  - UAT still owns fast/slow timing buckets, but the `sql`,\n    `dataframe`, `docker`, and `all` groups are derived from\n    registry-backed platform sets.\n  - Category groups are generated from `CATEGORY_ORDER` with a\n    slug helper.\n\nDeps: w0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Lift sql/dataframe/docker derivations into platform_registry; auto-generate CATEGORY_GROUPS; keep fast/slow UAT-private",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "F14 + blind-spot\n`2026-05-05-154308-uat-cli-surface-constraint-no-enforcement.md`.\n\nThe spec asserts \"no benchbox CLI surface change\" but the only\nenforcement was a one-shot verification block in the parent TODO\n(now in DONE/, no longer evaluated). W4 intentionally changes\n`benchbox/cli/commands/submit.py` internals so `git diff --name-only\norigin/develop -- benchbox/cli/` cannot be required to be empty.\nGuard the user-visible surface instead.\n\nConcrete:\n  - New test `tests/uat/test_no_cli_surface_drift.py`:\n        def test_uat_did_not_modify_benchbox_cli_surface():\n            base = os.environ.get(\"BENCHBOX_BASE_REF\",\n                                   \"origin/develop\")\n            changed = subprocess.check_output(\n                [\"git\", \"diff\", \"--name-only\", base, \"--\",\n                 \"benchbox/cli/\"],\n                cwd=REPO_ROOT, text=True\n            ).splitlines()\n            allowed_internal = {\"benchbox/cli/commands/submit.py\"}\n            unexpected = set(changed) - allowed_internal\n            assert not unexpected\n\n            diff = subprocess.check_output(\n                [\"git\", \"diff\", \"--unified=0\", base, \"--\",\n                 \"benchbox/cli/commands/submit.py\"],\n                cwd=REPO_ROOT, text=True\n            )\n            changed_lines = [\n                line for line in diff.splitlines()\n                if line.startswith((\"+\", \"-\"))\n                and not line.startswith((\"+++\", \"---\"))\n            ]\n            assert not any(\"@click.option\" in line for line in changed_lines)\n            assert not any(\"@click.command\" in line for line in changed_lines)\n            assert not any(\n                line[1:].lstrip().startswith(\"def submit(\")\n                for line in changed_lines\n            )\n    Fast-marked. Skips when not in a git repo or origin missing.\n    This test allows W4's internal validator import change while\n    failing if UAT follow-up work adds/removes CLI commands, options,\n    or the submit command signature.\n  - Update `_project/specs/uat-framework.md:371-373`: replace\n    \"enforced by the verification block in the parent TODO\" with\n    \"enforced by `tests/uat/test_no_cli_surface_drift.py`, which\n    permits only the internal submit-validator refactor.\"\n\nResolves: blind-spot\n  `2026-05-05-154308-uat-cli-surface-constraint-no-enforcement.md`.\n\nDeps: w0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add fast-marked CLI surface guard with a submit-validator internal exception",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "De-duplication candidate #2 from the review. The integration test\n`tests/integration/test_local_platform_benchmark_matrix.py` is a\nspec gap, not a duplicate — it asserts query cardinality and\nper-query row-count invariants that the UAT execute phase\ndeliberately does not.\n\nConcrete:\n  - New section in `_project/specs/uat-framework.md` §10 \"What\n    UAT does NOT assert\" pointing readers at the integration\n    test for query-level invariants. ~half a page.\n  - Move `LOCAL_SQL_PLATFORMS = (\"duckdb\", \"sqlite\",\n    \"datafusion\")` from\n    `tests/integration/test_local_platform_benchmark_matrix.py:36`\n    to `tests/uat/matrix.py` as a public constant.\n  - Update the integration test to import from\n    `tests.uat.matrix`. Single source of truth for the local-SQL\n    platform set.\n  - Cross-reference comment in `tests/uat/matrix.py` near the\n    constant: \"consumed by both the UAT framework and the\n    integration matrix test; align with both before changing.\"\n\nDeps: w0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add spec §10 documenting what UAT does NOT assert; dedupe LOCAL_SQL_PLATFORMS",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "Final pass to make the docs match the post-refactor reality. The\nearlier work units update spec sections opportunistically; this\nwork unit is the comprehensive sweep.\n\nConcrete updates:\n  - `_project/specs/uat-framework.md`: rewrite §1.4, §5, §9, §11,\n    §12 to reflect the new shape. Remove all \"two-plus subsequent\n    UATs\" hedge language. Add §10.\n  - `docs/operations/uat-framework.md`: update the operator\n    flow diagram; remove bash references; document the new\n    `python -m tests.uat._cli --help` discoverability.\n  - `tests/uat/README.md`: align with the new module shape\n    (typed configs, library-call validate phase, no enumerate\n    phase in canonical list).\n  - `_project/specs/uat-methodology-blind-spot-remediation.md`:\n    no rewrite; cross-reference to this TODO's outcome.\n  - `CLAUDE.md` `## Pre-approved Commands` section: ensure the\n    `make uat-*` allowlist is still accurate (no targets\n    removed, no commands renamed).\n\nDeps: every code-touching work unit so this lands last.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Bring docs/operations/uat-framework.md, uat-methodology.md, and the spec in line with the new shape",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "Removes the non-uniform exit-code conventions documented in F7 of\nthe review.\n\nNew ABC in `tests/uat/phases/__init__.py`:\n    @dataclass(frozen=True)\n    class PhaseResult:\n        phase: str\n        exit_code: int        # 0=ok, 1=fail, 2=abort\n        aborted: bool = False\n        abort_reason: str | None = None\n\nEach phase result dataclass extends or aliases this. Concrete:\n  - `PreflightResult`: gains `exit_code` derived from `aborted`\n    (no more `orchestrator.py:73` inline computation).\n  - `ExecuteOutcome`: gains `exit_code()` derived from per-cell\n    results (no more duplicate logic at `orchestrator.py:103` and\n    `_cli.py:334`).\n  - `ValidateResult`: keeps existing `exit_code()`; the\n    `FileNotFoundError` raise in `validate.py:51` becomes\n    `ValidateResult(aborted=True, abort_reason=\"rollup script\n    missing\")` — phases never raise for expected error states.\n  - `PackageResult`: same change for `PackagePhaseError` raises at\n    `package.py:42-43,49,51,59,83`.\n\nOrchestrator becomes:\n    for phase in cfg.phases:\n        result = PHASE_DISPATCH[phase](cfg, ...)\n        phase_results[phase] = result\n        if result.aborted:\n            aborted_phase = phase\n            abort_reason = result.abort_reason\n            break\n\nDeps: w0. Lands before W7 (centralize preflight) and W9\n(argparse subparsers) so they consume the unified contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define PhaseResult ABC; every phase returns one; orchestrator drops inline exit-code logic",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "Commits to the framework as the sole matrix-iteration surface.\n\nConcrete deletions:\n  - `scripts/local_stress_test.sh` (entire file, 607 lines).\n  - `tests/uat/test_matrix.py` `test_bash_parity_*` functions and\n    the `_parse_bash_case` helper (~73 lines).\n  - `tests/unit/scripts/test_local_stress_test.py`, whose fast\n    tests targeted timeout behavior in the deleted shell surface.\n  - All \"Mirrors scripts/local_stress_test.sh:NNN\" header comments\n    in `tests/uat/matrix.py` (lines 23, 43, 75, 84, 91, 190-193,\n    204, 322, 373, 394). The dicts remain — they are now primary\n    truth, not mirrors.\n\nConcrete updates:\n  - `_project/specs/uat-framework.md` §1.4 (deprecation criterion),\n    §5 (migration plan), §11 verification block, §12 risks: rewrite\n    to reflect that the bash is gone. The \"two-plus subsequent\n    UATs\" criterion is removed; it was a hedge against a decision\n    we are now making.\n  - `docs/operations/uat-framework.md`: drop any reference to\n    `local_stress_test.sh`.\n  - `Makefile`: ensure no target invokes the bash. (Inspect for\n    hidden references; the eight `uat-*` targets all go through\n    `tests.uat._cli`.)\n\nResolves: blind-spots\n  `2026-05-05-080138-uat-bash-parity-structural-only.md` (status →\n  actioned: parity test deleted because surface deleted).\n\nDeps: w1 (so the cutover happens against a clean schema, not a\nhalf-flat one).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete scripts/local_stress_test.sh, the parity test, and the bash-mirror documentation in matrix.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "Eliminates the largest single duplication in the project: the\nbyte-identical `tests/fixtures/published_results_validator.py` (798\nLOC) and the three independent schema-v2 `REQUIRED_KEYS` lists.\n\nNew module `benchbox/validation/bundle.py` contains:\n  - `validate_bundles(paths) -> list[ValidationResult]`\n  - `discover_bundles(path)`\n  - `format_summary`, `format_pr_comment`\n  - `_validate_bundle`, `_validate_*` per-section helpers\n  - `_validate_manifest_hash`, `_hash_file`\n  - Constants: `REQUIRED_TOP_KEYS`, `COMPANION_SUFFIXES`,\n    `SUBMISSION_MANIFEST_SUFFIX`, `KNOWN_BENCHMARKS`,\n    `KNOWN_PLATFORMS`, `MAX_TOTAL_DURATION_MS`,\n    `MAX_QUERY_DURATION_MS`, `CLI_REFUSED_COMPLIANCE_CLASSES`.\n\nConcrete deletions:\n  - `tests/fixtures/published_results_validator.py` (798 LOC,\n    byte-identical duplicate).\n  - `benchbox/cli/commands/submit.py:155-170`\n    `_load_submission_validator_module` (no more dynamic\n    importlib loading; direct `from benchbox.validation.bundle\n    import ...`).\n  - `benchbox/cli/commands/submit.py:120-127` duplicate\n    `_compute_file_hash` (use library's `_hash_file`).\n  - Duplicate `CLI_REFUSED_COMPLIANCE_CLASSES` literal at\n    `submit.py:609`.\n  - Duplicate `(\"/.plans.json\", \".tuning.json\")` at\n    `submit.py:633`.\n  - The third schema-v2 `REQUIRED_KEYS` at\n    `benchbox/core/results/schema.py:186` consolidates with the\n    library's `REQUIRED_TOP_KEYS` (single source).\n\nConcrete additions:\n  - `scripts/validate_submission.py` becomes a ~30-line CLI\n    entrypoint: parse argv, call library, format output. Its\n    public callable surface is preserved for the\n    published-results-branch contract.\n  - `tests/integration/test_cross_branch_validator_contract.py`\n    updates: `test_vendored_validator_matches_develop_script` is\n    deleted (no fixture to compare to). The remaining 6 tests\n    target the library directly via in-process import.\n  - The published-results-branch sync workflow\n    (`.github/workflows/sync-results-data-to-published.yml`)\n    continues to mirror `scripts/validate_submission.py` AND\n    gains a mirror of `benchbox/validation/bundle.py`. Document\n    the dual-mirror in the workflow comments.\n\nDeps: w0. Independent of other UAT framework changes after the\nvalidator/source-of-truth evidence is refreshed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Carve benchbox/validation/bundle.py; delete the 798-LOC byte-identical fixture; thin entrypoint scripts",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "Closes the C3 finding (3-hop subprocess → script → library) by\nimporting the library directly.\n\nConcrete:\n  - `tests/uat/phases/validate.py:53-61` subprocess call →\n    `from benchbox.validation.bundle import validate_bundles,\n    discover_bundles` and direct call.\n  - `tests/uat/phases/validate.py:65-109` `parse_rollup` is\n    DELETED. Counts come from the library's\n    `format_footer`-equivalent (or directly by counting\n    `ValidationResult` objects). No more TSV → re-parse\n    round-trip.\n  - `scripts/uat_validator_rollup.py` either (a) becomes a thin\n    CLI wrapper around the library counts logic if the standalone\n    TSV emit is still operationally useful, or (b) is deleted if\n    `make uat-validate` is the only consumer. Prefer (b) — the\n    rollup is currently used only by the UAT phase.\n  - `tests/uat/_cli.py::validate_main` and `make uat-validate`\n    adapt to whatever survives.\n\nDeps: w4 (library exists), w2 (PhaseResult contract defines\nabort semantics — `FileNotFoundError` becomes\n`ValidateResult(aborted=True, ...)`).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Convert tests/uat/phases/validate.py from subprocess to in-process import; delete parse_rollup TSV re-derivation",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "F13 + blind-spot\n`2026-05-05-080138-uat-frozen-config-replay-not-runnable.md`. The\nfreeze + hash + three-test policy guards one config (1 hash entry)\nagainst whitespace edits while the structural-parity replay test\nonly asserts column headers under `dry_run=True`. The ceremony\ncosts more than it provides.\n\nConcrete deletions:\n  - `tests/uat/configs/.frozen-hashes.json`\n  - `tests/uat/test_frozen_configs.py` (entire file)\n  - The three test functions therein\n  - `_project/specs/uat-framework.md` §9 frozen-config policy\n    (rewrite as: \"configs starting with `# HISTORICAL` are\n    evidence; do not edit, but no automated guard\").\n\nConcrete updates:\n  - `tests/uat/configs/uat-2026-05-02.yaml:1` header changes from\n    `# FROZEN — do not edit. Clone to a new file for new sweeps.`\n    to `# HISTORICAL — record of the 2026-05-02 sweep. Do not\n    edit; if behaviour drifts from this config, fix the framework\n    OR clone to a dated successor.`\n  - `tests/uat/test_replay_2026_05_02.py` docstring corrected to\n    say it asserts column-header structure, not row-count\n    replay. The slow-marked test stays as-is.\n\nResolves: blind-spot\n  `2026-05-05-080138-uat-frozen-config-replay-not-runnable.md`\n  (status → actioned: ceremony retired; replay test docstring\n  corrected to match its actual assertion).\n\nDeps: w0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retire the frozen-config ceremony; replace with plain # HISTORICAL header; delete .frozen-hashes.json and the three-test guard",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "Closes blind-spot\n`2026-05-05-154306-uat-noisy-neighbor-invocation-divergence.md`\nand F11 of the review.\n\nConcrete:\n  - Add `preflight_kwargs_from_config(config: UATConfig) ->\n    dict[str, Any]` in `tests/uat/phases/preflight.py`.\n  - `tests/uat/orchestrator.py:66-72` calls the helper.\n  - `tests/uat/_cli.py:301-311` calls the helper. The inline\n    `(config.raw.get(\"preflight\") or {}).get(...)` block is\n    DELETED.\n  - Regression test: same config file, both `make uat-execute`\n    and `make uat-sweep` paths produce identical preflight\n    kwargs. Fast-marked, mocks `run_preflight` and asserts the\n    call args.\n\nResolves: blind-spot\n  `2026-05-05-154306-uat-noisy-neighbor-invocation-divergence.md`.\n\nDeps: w1 (typed `PreflightConfig` exists).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Single helper for preflight kwargs; both invocation paths use it; delete _cli.execute_main inline preflight block",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "F1: `enumerate` does no real work in the orchestrator — its\neffect is realised inside `execute.py:54`. Folding it removes\ndead orchestrator surface.\n\nConcrete deletions:\n  - `tests/uat/orchestrator.py:78-79` no-op branch.\n  - `enumerate` from canonical phase list in\n    `_project/specs/uat-framework.md`.\n  - `enumerate` from `tests/uat/configs/stress-default.yaml`\n    `phases:` list.\n\nConcrete updates:\n  - `tests/uat/phases/enumerate.py` stays as a module (its\n    `enumerate_cells` function is still called from\n    `execute.py:54`); it just is not a public phase.\n  - `tests/uat/configs/uat-2026-05-02.yaml` phases list updated\n    in place (allowed because w6 retired the freeze).\n  - `tests/uat/test_orchestrator.py`: assertion that\n    `enumerate` is not in canonical phases.\n\nDeps: w6 (the historical config was frozen; w6 unfreezes it so\nwe can edit in place rather than cloning).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Drop enumerate from the canonical phase list; orchestrator no-op branch deleted; corrected 2026-05-02 historical config",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-framework-review-followups",
+        "notes": "F8. Mechanical refactor; no behaviour change for users.\n\nConcrete:\n  - `tests/uat/_cli.py:337-352` if-chain dispatcher → single\n    `argparse.ArgumentParser` with `add_subparsers(dest=\"cmd\",\n    required=False)` and `cell` as the default when no\n    subcommand is given.\n  - Each `*_main` becomes `_handle_<cmd>(args)` taking parsed\n    args, not raw argv.\n  - Shared options (`--config` is currently in 4 mains) become\n    subparser-local; common options (e.g. logging) become\n    parent-parser-shared.\n  - Help text becomes consistent: `python -m tests.uat._cli\n    --help` lists all subcommands.\n  - Exit codes unchanged (each subcommand returns the same\n    codes via the PhaseResult contract from w2).\n\nDeps: w2 (PhaseResult unifies exit-code computation; subparsers\ninvoke phases through it).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate _cli.py from 8 main_* functions + hand-rolled if-chain to argparse.add_subparsers",
+        "wid": "w9"
+      }
+    ]
+  }
+}

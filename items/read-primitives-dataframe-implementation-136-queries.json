@@ -1,0 +1,11 @@
+{
+  "description": "Promoted from deferral #92 of implement-dataframe-benchmarks.\nDeferred: Read Primitives DataFrame implementation (136 queries)\nReason deferred: 136 queries are catalog-driven with different architecture (programmatic query generation from schema introspection). Many test DB-specific features (INFORMATION_SCHEMA, SHOW commands). Needs separate evaluation and likely a different implementation approach.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-29T14:02:26Z",
+      "completed_pr": 891,
+      "created_at": "2026-07-19T12:33:37Z",
+      "worktree": "dataframe-benchmarks"
+    }
+  }
+}

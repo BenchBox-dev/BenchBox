@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #438 of non-dataframe-test-coverage.\nDeferred: Remaining cloud platform adapters (firebolt, questdb, trino, etc.)\nReason deferred: The top 6 cloud adapters in w20-w22 cover the most-used platforms. Remaining adapters can be covered incrementally after the 80% target.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:17Z",
+      "worktree": "main"
+    }
+  }
+}

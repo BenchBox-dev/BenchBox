@@ -1,0 +1,133 @@
+{
+  "context": "Add the primary-clone check to the pre-commit hook chain (or a dedicated commit-time guard) so the refusal happens before the commit object exists, not after. Keep the existing BENCHBOX_EPHEMERAL_CLONE and BENCHBOX_ALLOW_MAIN_CLONE_WRITE escape hatches working identically at commit time.",
+  "description": "The primary-clone write guard fires from make pr-open (via agent-write-preflight), which refuses with 'Refusing BenchBox write preflight in the primary clone'. It does NOT fire on git commit. In this session the enclosing git worktree was deleted mid-task, which dropped the agent into /Users/joe/Developer/BenchBox; a full commit (staging, pre-commit hooks, commit-msg hook, commit object) then succeeded in the primary clone, and the guard only surfaced later at pr-open. Recovery cost a push, a local branch delete, a pool claim, a hard reset to the pushed commit, and a rebase. The .git/hooks pre-commit chain already runs on every commit and is the natural enforcement point, so the guard is one hook away from covering the path it is meant to protect. Reproduction: from the primary clone on a feature branch, git commit succeeds; make pr-open then fails with the refusal message.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-13T14:05:02Z",
+      "completed_pr": 1707,
+      "created_at": "2026-08-06T00:45:28Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1 continues to allow authorized emergency main-clone hotfix work.",
+        "item_id": "agent-write-preflight-commit-path-gap"
+      },
+      {
+        "behavior": "BENCHBOX_EPHEMERAL_CLONE=1 continues to bypass the guard in disposable clones and CI runners, and remains ignored where a worktree pool is present.",
+        "item_id": "agent-write-preflight-commit-path-gap"
+      },
+      {
+        "behavior": "Read-only review and research in the primary clone stay unblocked; only write paths are gated.",
+        "item_id": "agent-write-preflight-commit-path-gap"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agent-write-preflight-commit-path-gap",
+        "kind": "only_modify",
+        "path_glob": ".pre-commit-config.yaml"
+      },
+      {
+        "item_id": "agent-write-preflight-commit-path-gap",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "agent-write-preflight-commit-path-gap",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "agent-write-preflight-commit-path-gap",
+        "kind": "only_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "agent-write-preflight-commit-path-gap",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_agent_write_preflight.py -q",
+        "description": "Focused write-preflight tests",
+        "expected": "15 passed",
+        "item_id": "agent-write-preflight-commit-path-gap",
+        "last_result": "pass",
+        "last_run": "2026-08-13T13:42:32Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- pre-commit run agent-write-preflight --all-files",
+        "description": "Configured hook runs for every pre-commit",
+        "expected": "Passed",
+        "item_id": "agent-write-preflight-commit-path-gap",
+        "last_result": "pass",
+        "last_run": "2026-08-13T13:42:39Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo check-scope agent-write-preflight-commit-path-gap --base origin/develop",
+        "description": "Tracker scope matches the branch",
+        "expected": "scope OK (2 changed file(s))",
+        "item_id": "agent-write-preflight-commit-path-gap",
+        "last_result": "pass",
+        "last_run": "2026-08-13T13:42:46Z",
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agent-write-preflight-commit-path-gap",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "agent-write-preflight-commit-path-gap",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inspection showed the always-run pre-commit chain invoked agent-identity-check but never scripts/agent_write_preflight.sh; a primary-clone commit therefore had no location guard.",
+        "item_id": "agent-write-preflight-commit-path-gap",
+        "notes": null,
+        "started_at": "2026-08-13T13:33:49Z",
+        "started_branch": "fix/agent-write-preflight-commit-guard",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-agent-write-preflight-commit-guard",
+        "status": "done",
+        "summary": "Reproduce the missing commit-time primary-clone refusal and bind the hook contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": ".pre-commit-config.yaml now has an always-run pre-commit-stage agent-write-preflight hook that directly invokes the existing guard and accepts its existing declaration environment unchanged.",
+        "item_id": "agent-write-preflight-commit-path-gap",
+        "notes": null,
+        "started_at": "2026-08-13T13:35:51Z",
+        "started_branch": "fix/agent-write-preflight-commit-guard",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-agent-write-preflight-commit-guard",
+        "status": "done",
+        "summary": "Wire the existing write preflight into the always-run pre-commit chain",
+        "wid": "w1"
+      },
+      {
+        "evidence": "15 focused tests pass. Actual installed pre-commit fixture refuses an ordinary primary commit before HEAD changes, permits BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1 and BENCHBOX_EPHEMERAL_CLONE=1, and permits a linked-worktree commit.",
+        "item_id": "agent-write-preflight-commit-path-gap",
+        "notes": null,
+        "started_at": "2026-08-13T13:36:02Z",
+        "started_branch": "fix/agent-write-preflight-commit-guard",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-agent-write-preflight-commit-guard",
+        "status": "done",
+        "summary": "Add negative controls for primary, linked, emergency, and ephemeral commit-time behavior",
+        "wid": "w2"
+      }
+    ]
+  }
+}

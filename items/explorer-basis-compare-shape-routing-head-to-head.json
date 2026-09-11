@@ -1,0 +1,336 @@
+{
+  "context": "Keep one route. `/results/compare` continues to accept two to four ids and selects its layout from the count, which matches the existing router and the existing compare-builder flow. The multi-run layout lands in a sibling item behind the same routing decision.\n\nBuild every figure through the basis model rather than reading display_timings directly, so the shared-basis invariant is enforced by construction. Render the basis bar as a single control with an explicit lock affordance and a plain-language sentence naming what is being measured, because the current page's silence about its own reduction is the defect this design exists to fix.\n\nCorrect the two chart-math errors found while prototyping: gridlines drawn at 25% and 75% must correspond to the ratios they are labelled with, and a Top-N filter labelled 'speedups' must not be able to list slowdowns.",
+  "description": "`/results/compare` today renders one layout for any selection of two to four runs: a decision summary, a Baseline selector, a chart panel, a row of run cards and a flat `QueryDiffTable` that emits one row per (query x non-baseline candidate). With four runs and 103 queries that is 309 undifferentiated rows. The page also has no metric control, no query filter and no sorting.\n\nThe approved design routes by selection shape instead. Two runs get a head-to-head layout; three or four get a multi-run layout with a baseline and a heatmap; one run with several bases gets its own route. Selection count picks the layout, so nobody has to choose a page before choosing runs, and `MAX_COMPARE_SELECTIONS = 4` and the existing `?ids=` URL grammar keep working unchanged.\n\nThis item delivers the routing decision and the two-run layout: run cards carrying engine version and hardware identity, one shared measurement-basis bar with a visible lock, the six-axis engine-and-hardware strip that marks which axes actually differ, a log-scaled diverging speedup chart, and a Top-N limiter over the per-query table.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add a second route such as /results/compare/ab and make the user pick a layout before picking runs.",
+        "instead": "Keep one route and select the layout from the selection count.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "why": "The layout is a consequence of what was selected, not a prior decision. Forcing the choice up front puts a question to the user that the data already answers."
+      },
+      {
+        "dont": "Draw gridlines at fixed 25% and 75% positions and label them 0.5x and 2x without checking the scale.",
+        "instead": "Derive the gridline positions from the same log scale the bars use, or label them with the ratios that scale actually puts there.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "why": "With a log2(5) half-width, 75% is 2.24x, not 2x. The prototype shipped mislabelled gridlines until the arithmetic was checked."
+      },
+      {
+        "dont": "Let a component read display_timings directly for convenience on one panel.",
+        "instead": "Route every figure through the basis model.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "why": "One direct read reintroduces the possibility of a panel showing a different basis from the bar that claims to govern the page."
+      },
+      {
+        "dont": "Let the shared basis bar and the run cards overflow horizontally on a phone because the desktop layout is the real target.",
+        "instead": "Stack the controls at the mobile breakpoint and confine wide content to its own scroll container.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "why": "The explorer already ships a responsive contract with a mobile breakpoint and an existing responsive spec; a compare page that breaks below 48rem regresses a shipped guarantee."
+      },
+      {
+        "dont": "Rewrite Compare.tsx from scratch to make the new layout cleaner.",
+        "instead": "Restructure in place, keeping the guardrail summary, receipt and share-URL behaviour intact.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "why": "That file carries claim-suppression and cohort-lock behaviour earned through prior remediation items; a rewrite silently drops those protections."
+      },
+      {
+        "dont": "Sort by ratio and take the first ten for a control labelled 'Top 10 speedups'.",
+        "instead": "Filter to genuine speedups, then take up to ten, and say how many were found.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "why": "Under a basis where nothing is faster, an unfiltered slice lists ten slowdowns under a speedups label. This exact bug was caught in the design prototype."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "needs_item": "explorer-basis-frontend-model-and-invariant"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-08-30T06:55:33Z",
+      "completed_pr": 1957,
+      "created_at": "2026-08-29T19:12:31Z",
+      "worktree": "explorer-measurement-basis"
+    },
+    "preserves": [
+      {
+        "behavior": "A page opened with no basis parameter must render the default basis and show figures identical to today's.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head"
+      },
+      {
+        "behavior": "Any query-limiting control must state how many of how many queries are shown, in every state including the empty one.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head"
+      },
+      {
+        "behavior": "Chart gridlines must correspond to the ratios they are labelled with.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head"
+      },
+      {
+        "behavior": "Comparability guardrails and claim suppression must still fire: a cohort mismatch that suppresses winner language today must still suppress it.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head"
+      },
+      {
+        "behavior": "Every figure must come from the basis model so the shared-basis invariant cannot be bypassed by a component reading display_timings directly.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head"
+      },
+      {
+        "behavior": "Existing keyboard and screen-reader behaviour of reused controls must be preserved, including the segmented control's roving tabindex.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head"
+      },
+      {
+        "behavior": "The /results/compare route, the ?ids= grammar, short-id canonicalisation and MAX_COMPARE_SELECTIONS = 4 must all keep working; existing shared compare links must resolve to the same runs.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head"
+      },
+      {
+        "behavior": "The ComparabilityReceipt, ProvenanceLegend and trust, funding and tuning badges must remain on the page; adding the identity strip must not remove the receipt.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head"
+      },
+      {
+        "behavior": "The head-to-head layout must remain usable at the mobile breakpoint (--bb-bp-mobile, 48rem): run cards and the basis bar stack, the per-query chart and table scroll inside their own container rather than the page scrolling horizontally, and interactive controls keep a hit target of at least 44px.",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing log2 speedup bars with SPEEDUP_GRID_STOPS and FASTER_FILL/SLOWER_FILL. Reuse its scale and palette for the diverging per-query chart.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "path": "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+      },
+      {
+        "concept": "Existing per-query diff table with buildQueryDiffRows, status tones and scroll hint. Extend it with basis-aware columns, pass counts and Top-N rather than writing a second table.",
+        "decision": "extend",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "path": "results-explorer/src/components/QueryDiffTable.tsx"
+      },
+      {
+        "concept": "Existing radiogroup segmented control with roving tabindex and arrow-key handling. Reuse for the Top-N limiter and the statistic control.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "path": "results-explorer/src/components/SegmentedControl.tsx"
+      },
+      {
+        "concept": "MAX_COMPARE_SELECTIONS and buildCompareUrl define the compare URL grammar and the four-run cap. Reuse unchanged.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "path": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "concept": "The existing compare view and its guardrail summary, share-URL, run cards and receipt ordering. Restructure this page rather than adding a parallel route.",
+        "decision": "extend",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "path": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "concept": "Open medium-high closure gate over D1-D16 and N1-N4 adversarial findings, which own accessibility and product-claim obligations on this page. Restructuring Compare must not reopen a closed finding; check that list before changing claim-suppression or receipt behaviour.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "path": "todo:results-explorer-release-readiness-remediation-closeout"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/measurementBasis.ts"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/explorer-basis-compare-shape-routing-head-to-head/**"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/**"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ComparabilityReceipt.tsx"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/IdentityDiffStrip.tsx"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MeasurementBasisBar.tsx"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryDiffTable.tsx"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/**"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test",
+        "description": "Explorer unit and page tests pass, including Compare page tests and the reused component tests",
+        "expected": null,
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "last_result": "pass",
+        "last_run": "2026-08-30T06:48:27Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Explorer typechecks",
+        "expected": null,
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "last_result": "pass",
+        "last_run": "2026-08-30T06:48:32Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/Compare.a11y.test.tsx",
+        "description": "Accessibility tests still pass for the restructured Compare page",
+        "expected": null,
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "last_result": "pass",
+        "last_run": "2026-08-30T06:48:34Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --workers=1 e2e/routes/",
+        "description": "Route-level end-to-end tests pass for compare",
+        "expected": null,
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "last_result": "pass",
+        "last_run": "2026-08-30T06:54:06Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cat _project/verification-logs/explorer-basis-compare-shape-routing-head-to-head/w0.log",
+        "description": "Behaviour that had to survive the restructure is enumerated and confirmed",
+        "expected": null,
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "last_result": "pass",
+        "last_run": "2026-08-30T06:54:07Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --workers=1 e2e/responsive.spec.ts",
+        "description": "Responsive behaviour of the restructured Compare page",
+        "expected": "responsive specs pass; the compare page has no horizontal page scroll at mobile width and its controls meet the 44px hit-target floor",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "last_result": "pass",
+        "last_run": "2026-08-30T06:55:30Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "_project/verification-logs/explorer-basis-compare-shape-routing-head-to-head/w0.log - read Compare.tsx (1181 lines) at 8c4cb6cfd; 6 behaviour groups enumerated; decision gate: restructure IN PLACE; found that PR 1950's basis axis is currently inert on this page (cohortSignature built without a basis) - w2 wires it",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "notes": "Capture the current rendered behaviour of /results/compare for a two-run selection from the committed corpus: the headline figures, the diff-table row count, which guardrails fire, and the receipt fields. Store in `_project/verification-logs/explorer-basis-compare-shape-routing-head-to-head/w0.log`.\n\nRe-read `results-explorer/src/pages/Compare.tsx` as it stands rather than relying on any description of it, including this item's, and list every behaviour that must survive the restructure. In particular enumerate the claim-suppression paths and the cohort-lock paths, because those were added by earlier remediation work and are easy to lose.\n\nDECISION GATE: confirm here whether the compare builder's retired candidate table -- currently dead code behind `{false && (...)}` with `candidates` hard-coded to null -- should be deleted in this item or left alone. If deleting it is not strictly required by this layout change, leave it and note it as separate cleanup. Do not expand scope on discovery.",
+        "started_at": "2026-08-30T03:22:31Z",
+        "started_branch": "feat/explorer-basis-compare-shape-routing",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-compare-shape-routing",
+        "status": "done",
+        "summary": "Pin current Compare behaviour before restructuring",
+        "wid": "w0"
+      },
+      {
+        "evidence": "compareLayoutForSelection exported from Compare.tsx, keyed on DISTINCT runs and documented to run on the recovered set; 7 tests incl. alias-collapse and empty-selection",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "notes": "Select the layout from the number of distinct runs in the selection: two runs render head-to-head, three or four render the multi-run layout owned by the sibling item, and a selection resolving to a single distinct run redirects to the within-run route.\n\nUntil the sibling multi-run item lands, three-or-four-run selections must keep rendering today's layout rather than a broken or empty one. Land the routing seam so the sibling item can fill it without touching this file's head-to-head code.",
+        "started_at": "2026-08-30T06:18:56Z",
+        "started_branch": "feat/explorer-basis-compare-shape-routing",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-compare-shape-routing",
+        "status": "done",
+        "summary": "Route by selection shape",
+        "wid": "w1"
+      },
+      {
+        "evidence": "MeasurementBasisBar with shared-basis lock affordance + collapsed statistic as its own branch (control absent, not disabled); basis round-trips via the model's basisSerde on the single BASIS_URL_KEY; availability intersected across runs; 11 component tests",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "notes": "Add the basis bar: pass selection, statistic, a visible lock affordance stating the basis applies to both runs, and a plain-language sentence naming what is being measured over how many comparable queries.\n\nThe statistic control must collapse to a locked, non-interactive display when the pass selection yields a single execution, and must say why. Do not implement that by setting a disabled attribute from a boolean expression; render the locked state as its own branch so it cannot fail open.\n\nWire basis state into the URL through the model's serde so a shared link reproduces the figures exactly.",
+        "started_at": "2026-08-30T06:18:58Z",
+        "started_branch": "feat/explorer-basis-compare-shape-routing",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-compare-shape-routing",
+        "status": "done",
+        "summary": "Build the shared measurement-basis bar",
+        "wid": "w2"
+      },
+      {
+        "evidence": "IdentityDiffStrip (6 axes, reads the same buildComparabilityFields output as the receipt so the two cannot disagree; 'Not recorded' where CPU data is absent) + headline tie band reusing COMPARE_TIE_THRESHOLD; 21 tests; explorer suite 1059 passed",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "notes": "Rebuild the run cards to lead with engine, engine version and hardware identity, and add the six-axis engine-and-hardware strip marking which axes differ between the two runs.\n\nThe strip must consume the per-axis comparability fields from the hardware read-model item and must render 'not recorded' where a run has no CPU data. It must not duplicate or replace the ComparabilityReceipt, which stays on the page.\n\nHeadline figures must apply a tie band so a ratio inside the band is not labelled a win in either direction.",
+        "started_at": "2026-08-30T06:22:38Z",
+        "started_branch": "feat/explorer-basis-compare-shape-routing",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-compare-shape-routing",
+        "status": "done",
+        "summary": "Run cards, identity strip and headline figures",
+        "wid": "w3"
+      },
+      {
+        "evidence": "applyQueryDiffLimiter + queryDiffCountSentence shared by chart and table; pass-count column; explicit 'Not comparable' marker with uncomparable rows SHOWN not dropped; 15 QueryDiffTable tests; explorer suite 1069 passed",
+        "item_id": "explorer-basis-compare-shape-routing-head-to-head",
+        "notes": "Render the per-query speedup chart on the shared log scale from chartMath, with gridlines whose positions match their labels.\n\nAdd the Top-N limiter -- all, largest speedups, largest slowdowns, largest movement either way -- applied consistently to both the chart and the table. Every state must state how many of how many queries are shown, including when a filter matches nothing.\n\nExtend QueryDiffTable with the basis-aware value columns, a pass-count column, and an explicit marker for a query that cannot be compared under the current basis. A query missing a pass on either side must be shown and marked, not silently dropped.",
+        "started_at": "2026-08-30T06:26:49Z",
+        "started_branch": "feat/explorer-basis-compare-shape-routing",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-compare-shape-routing",
+        "status": "done",
+        "summary": "Diverging per-query chart and Top-N limiter",
+        "wid": "w4"
+      }
+    ]
+  }
+}

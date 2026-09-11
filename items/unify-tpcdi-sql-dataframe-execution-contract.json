@@ -1,0 +1,130 @@
+{
+  "context": "Establish a canonical TPC-DI ETL executor boundary first, then route both\nSQL and DataFrame entry points through it. Keep mode-specific behavior limited\nto connection acquisition and output envelope formatting.\n\nIntroduce a connection-provider protocol in core dataframe abstractions, update\nadapters/contexts to satisfy it, and remove fallback/sniffing logic. Then add\nparity tests that compare stage-level outcomes from SQL and DataFrame callers\nunder controlled fixtures.\n",
+  "description": "TPC-DI currently exposes separate execution paths for SQL and DataFrame modes,\nand DataFrame mode discovers platform SQL connections via attribute sniffing.\nThis creates correctness risk (behavioral drift between modes), weakens\nadapter contracts, and complicates future maintenance.\n\nThis TODO standardizes TPC-DI execution on one shared ETL orchestration path,\nintroduces an explicit connection-provider contract for DataFrame adapters,\nand removes ambiguous API behavior in execute_dataframe_workload().\n\nScope focuses on runtime correctness and contract clarity for TPC-DI.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "encode mode-specific semantics in shared ETL internals",
+        "instead": "isolate mode differences to thin adapters",
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "why": "this recreates divergence"
+      },
+      {
+        "dont": "keep separate ETL orchestration logic for SQL and DataFrame paths",
+        "instead": "route both through one shared executor",
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "why": "drift is the root issue"
+      },
+      {
+        "dont": "use hasattr/getattr sniffing for connection discovery",
+        "instead": "enforce a typed provider contract",
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "why": "adapter behavior is implicit and brittle"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-07T00:00:00Z",
+      "created_at": "2026-02-07T00:00:00Z",
+      "worktree": "dataframe-benchmarks"
+    },
+    "preserves": [
+      {
+        "behavior": "DataFrame benchmark mixin query filtering semantics remain unchanged for non-TPC-DI benchmarks",
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract"
+      },
+      {
+        "behavior": "Existing TPC-DI benchmark metrics export structure remains backward-compatible for existing result consumers",
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract"
+      },
+      {
+        "behavior": "TPC-DI transactional capability gating (transactions + incremental + SCD2) remains enforced before ETL stage execution",
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/"
+      },
+      {
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/"
+      },
+      {
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/"
+      },
+      {
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpcdi/"
+      },
+      {
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpcdi/test_tpcdi_dataframe_workload.py -q",
+        "description": "TPC-DI DataFrame workload tests pass with contract-based connection resolution",
+        "expected": "all tests pass",
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpcdi/test_tpcdi_sql_dataframe_parity.py -q",
+        "description": "TPC-DI SQL/DataFrame parity tests pass",
+        "expected": "all tests pass",
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/test_connection_provider_contract.py -q",
+        "description": "Connection-provider contract tests pass",
+        "expected": "all tests pass",
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make lint && make typecheck-uv",
+        "description": "Lint and typecheck are clean for touched files",
+        "expected": "lint passes; no new type diagnostics in changed files",
+        "item_id": "unify-tpcdi-sql-dataframe-execution-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

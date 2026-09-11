@@ -1,0 +1,42 @@
+{
+  "context": "Do not chase on one occurrence. If it recurs, correlate the two runs: same node, same worker index, same concurrency? The monitoring import gate manipulates module import state, which is a plausible source of a worker-level crash under parallel import. Capturing the worker's stderr/crash output is the first useful step.",
+  "description": "One occurrence, PR #1358 run 30565190866 job 90947982404 (2026-07-30): the fast-lane job died with 'INTERNALERROR> assert not crashitem' naming tests/unit/monitoring/test_monitoring_import_gate.py::TestRunnerMonitoringGate::test_no_monitor_created_when_monitoring_unavailable on WorkerController gw1. That is an xdist worker DEATH, not an assertion failure, so it takes the whole job down rather than reporting one failing test. Verified not caused by the PR: the node passed 3/3 locally with -n 0, the whole tests/unit/monitoring module passed (152 tests), the PR touched nothing under monitoring, and the job passed on re-run with no code change to that area. Logged so a second occurrence has something to attach to - a sibling item xdist-worker-crash-on-utils-runner-cli-subset is already done, so this class recurs.",
+  "legacy": {
+    "item_meta": {
+      "category": "flake",
+      "created_at": "2026-07-30T18:16:08Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "The monitoring import-gate tests keep asserting what they assert today",
+        "item_id": "xdist-internalerror-monitoring-import-gate"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/monitoring/ -q",
+        "description": "The named node survives repeated parallel runs",
+        "expected": "passes under the default xdist parallelism",
+        "item_id": "xdist-internalerror-monitoring-import-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "xdist-internalerror-monitoring-import-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "On recurrence, capture the worker crash output and correlate the two runs",
+        "wid": "w1"
+      }
+    ]
+  }
+}

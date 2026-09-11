@@ -1,0 +1,194 @@
+{
+  "context": "This is a research-then-write task: w1 collects the operative clauses\nverbatim, w2 makes the call and records it in the same place/shape as the\nexisting scale-stress licensing decision doc, w3 reconciles the user-facing\nfiles, w4 escalates if the call is negative. No platform code, no data\nchanges. If at any point the conclusion is uncertain, escalate to the user\nrather than guessing — this is a liability question, not an engineering one.\n",
+  "description": "Follow-up to the merged canonical-JOB foundation (issue #289 Step 1). The\nblind-spot audit flagged a redistribution-liability question that the earlier\nsynthetic generator specifically avoided:\n\nThe public `joinorder` benchmark now downloads a Parquet conversion of the\n2013 IMDb snapshot from a BenchBox-hosted GitHub release asset\n(`releases/download/data%2Fjoinorder-imdb-2013-v1/joinorder-imdb-2013-v1.tar.zst`,\npinned in `benchbox/core/joinorder/data_manifest.toml`). BenchBox is\ndocumented and marketed for commercial cloud-warehouse benchmarking. The\n\"Information courtesy of IMDb (https://www.imdb.com). Used with permission.\"\nattribution traces to permission granted to the JOB paper authors / for the\nacademic 2013 snapshot deposited on Harvard Dataverse (DOI 10.7910/DVN/2QYZBT)\nunder that deposit's terms. It is not currently established that BenchBox\nre-hosting and redistributing that data, via a benchmarking tool used in\ncommercial contexts, is within IMDb's data terms or the Dataverse deposit's\nlicense -- as opposed to BenchBox piggybacking on a permission that does not\nextend to it.\n\nThis is a small, standalone TODO whose output is a decision record, not code\n(except a possible `DATA-LICENSE.md` correction). It is RELEASE-RELEVANT: if\nthe review concludes re-hosting is not clearly permitted, the project must\neither accept that risk explicitly or change the archive-fetch design (e.g.\nfetch directly from Dataverse, drop the re-host, or restrict usage). Do not\nleave that unresolved or silently shipped.\n\nIndependent of `joinorder-canonical-data-assurance` (data integrity),\n`joinorder-accessibility-and-comparability`, and `joinorder-step1-housekeeping`.\n`joinorder-scale-stress-decision-framework` establishes a\n`_project/decisions/joinorder-scale-stress-licensing-<date>.md` convention for\nthe Step-2 (scale-stress) licensing question; this TODO is the Step-1 /\ncanonical-data counterpart -- put its ADR in the same `_project/decisions/`\ndirectory with the same decision-doc shape.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change benchbox/core/joinorder/data_manifest.toml `url` or the data-fetch path in this TODO",
+        "instead": "(not specified)",
+        "item_id": "joinorder-redistribution-license-adr",
+        "why": "changing where the data comes from is the remediation TODO's job, gated on the ADR conclusion"
+      },
+      {
+        "dont": "conclude 'it's probably fine' without quoting the governing clauses",
+        "instead": "quote IMDb's terms and the Dataverse license verbatim in the ADR",
+        "item_id": "joinorder-redistribution-license-adr",
+        "why": "the whole point is a recorded, evidence-backed determination"
+      },
+      {
+        "dont": "silently ship a 'not clearly permitted' conclusion",
+        "instead": "(not specified)",
+        "item_id": "joinorder-redistribution-license-adr",
+        "why": "record either an explicit project-owner risk acceptance or a release-blocking remediation decision"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DATA-LICENSE.md keeps the IMDb attribution string ('Information courtesy of IMDb ... Used with permission.') — refine the surrounding context, do not drop the attribution",
+        "item_id": "joinorder-redistribution-license-adr"
+      },
+      {
+        "behavior": "If the conclusion is 'permitted', no functional change — the data-fetch path and manifest URL stay as-is",
+        "item_id": "joinorder-redistribution-license-adr"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/decisions/ (directory exists; the joinorder-scale-stress-licensing-<date>.md naming/shape convention is documented in _project/TODO/main/planning/joinorder-scale-stress-decision-framework.yaml) — put the Step-1 licensing ADR here, same shape",
+        "decision": "reuse",
+        "item_id": "joinorder-redistribution-license-adr",
+        "path": "_project/decisions/"
+      },
+      {
+        "concept": "benchbox/core/joinorder/DATA-LICENSE.md + docs/benchmarks/join-order.md 'License And Attribution' — existing data-licensing surfaces; reconcile (don't duplicate) with the ADR conclusion",
+        "decision": "reuse",
+        "item_id": "joinorder-redistribution-license-adr",
+        "path": "benchbox/core/joinorder/DATA-LICENSE.md"
+      },
+      {
+        "concept": "benchbox/core/joinorder/data_manifest.toml `url` field (the GitHub release asset) — the artifact whose redistribution is in question; if remediation is 'fetch from Dataverse', this is what changes",
+        "decision": "reuse",
+        "item_id": "joinorder-redistribution-license-adr",
+        "path": "benchbox/core/joinorder/data_manifest.toml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-redistribution-license-adr",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/benchmark.py"
+      },
+      {
+        "item_id": "joinorder-redistribution-license-adr",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/data_manifest.toml"
+      },
+      {
+        "item_id": "joinorder-redistribution-license-adr",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/joinorder.py"
+      },
+      {
+        "item_id": "joinorder-redistribution-license-adr",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/"
+      },
+      {
+        "item_id": "joinorder-redistribution-license-adr",
+        "kind": "only_modify",
+        "path_glob": "_project/joinorder/"
+      },
+      {
+        "item_id": "joinorder-redistribution-license-adr",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/DATA-LICENSE.md"
+      },
+      {
+        "item_id": "joinorder-redistribution-license-adr",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/join-order.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "ls _project/decisions/joinorder-canonical-data-licensing-*.md && grep -il 'imdb\\|dataverse' _project/decisions/joinorder-canonical-data-licensing-*.md",
+        "description": "The ADR exists in _project/decisions/ and states a determination with quoted governing terms",
+        "expected": "an ADR file exists; it quotes IMDb's data terms and the Dataverse deposit license and states permitted / conditional / not-clear",
+        "item_id": "joinorder-redistribution-license-adr",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -i 'dataverse\\|10.7910\\|non-commercial\\|redistribut' benchbox/core/joinorder/DATA-LICENSE.md docs/benchmarks/join-order.md && make docs-validate",
+        "description": "DATA-LICENSE.md and join-order.md reflect the ADR conclusion",
+        "expected": "both cite the specific governing terms / conditions identified by the ADR; docs-validate passes",
+        "item_id": "joinorder-redistribution-license-adr",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run _project/scripts/todo_cli.py list --worktree=main | grep -i 'dataverse\\|redistribut' || echo 'no remediation TODO (conclusion was positive)'",
+        "description": "If conclusion is negative, a remediation or hardening TODO exists and the decision is explicit",
+        "expected": "either a hardening TODO is listed with accepted-risk language, or the conclusion was positive and no remediation TODO is needed",
+        "item_id": "joinorder-redistribution-license-adr",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-redistribution-license-adr",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-redistribution-license-adr",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "joinorder-redistribution-license-adr",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-redistribution-license-adr",
+        "notes": "Produce a short evidence digest (in the eventual ADR's appendix): for each\nsource, the URL, the retrieval date, and the verbatim clause(s) that bear\non redistribution / commercial use / attribution. Done in\n`_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Gather and summarize the governing terms: IMDb data terms, Dataverse deposit license/ToU, JOB paper + gregrahn repo statements, current BenchBox framing",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-redistribution-license-adr",
+        "notes": "Output: `_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md`\n(the `_project/decisions/` directory exists; the\n`joinorder-scale-stress-licensing-<date>.md` naming/shape convention is\ndocumented in `_project/TODO/main/planning/joinorder-scale-stress-decision-framework.yaml`\n-- mirror its structure). Link the ADR from\n`_project/joinorder/migration-plan.md`. Done: determination is \"not\nclearly permitted\" for broad commercial redistribution; follow-up amended\nthe ADR to keep the current fast Parquet path as an accepted project-owner\nrisk, with written permission, direct-Dataverse conversion, or BYO data as\noptional hardening paths.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write the ADR: determination + rationale + (if needed) remediation options and recommendation",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-redistribution-license-adr",
+        "notes": "Update `benchbox/core/joinorder/DATA-LICENSE.md` and the \"License And\nAttribution\" section of `docs/benchmarks/join-order.md` so they cite the\nspecific governing terms and any conditions the ADR identified (instead of\nthe current generic \"Used with permission\" line). If the data-fetch\nfirst-run path should surface a terms acknowledgement, note that as a\nfollow-up requirement (or file it as a TODO) rather than implementing it\nhere. Run `make docs-validate`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reconcile DATA-LICENSE.md and the user-facing attribution with the ADR conclusion",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-redistribution-license-adr",
+        "notes": "Conditional. If w2 lands on PERMITTED or PERMITTED-UNDER-CONDITIONS-already-\nmet, this work unit is a no-op (mark done with a note). If it lands on NOT\nCLEARLY PERMITTED or CONDITIONS-NOT-MET, create a new TODO for the\nrecommended remediation (e.g. `joinorder-data-fetch-from-dataverse`) or\nrecord the project-owner risk acceptance, then notify the user of the\nresidual risk.\nDone: filed\n`_project/TODO/main/planning/joinorder-data-fetch-from-dataverse-remediation.yaml`;\nfollow-up amended the ADR to keep the fast Parquet path as an accepted\nproject-owner redistribution risk and downgraded the remediation TODO to\noptional hardening.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "If the ADR concludes 'not clearly permitted': file the implementing/remediation TODO or record accepted risk",
+        "wid": "w4"
+      }
+    ]
+  }
+}

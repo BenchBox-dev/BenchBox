@@ -1,0 +1,175 @@
+{
+  "context": "Do (a) immediately (one-line workflow change, not owner-gated); wire (b) into the existing dev_loop_pr_metrics.py job-timing collection; defer (c) until 2 weeks of trend data exist per the WS9 cadence.",
+  "description": "Observed live 2026-07-23: PR #1288's medium-test job was cancelled at exactly 30:03 (the job's timeout-minutes: 30 in .github/workflows/pr.yml), failing ci-required-result, while the same PR's every other job was green and sibling runs that day completed medium-test in ~29 minutes (#1282: 20:31->21:00). The tier has grown to the edge of its own timeout: normal runtime ~29min vs 30min cap leaves <1 minute of scheduling headroom, so runner-side noise converts a healthy lane into a cancelled required check - the same failure symptom class as FAST_LANE_VIOLATION (budget outgrown by organic growth), but for wall-clock.\n\nSame remediation shape as the fast-lane work (fast-lane-decouple-ceiling-contention-2): (a) immediate mechanical fix - raise timeout-minutes to restore real headroom (e.g. 45); (b) durable fix - record medium-tier wall time in dev-loop-metrics (the WS9 script already records the fast-test job; add the medium job name) and add a warning threshold well before the timeout, so growth is visible before it cancels runs; (c) consider whether the medium tier needs splitting/parallelizing (pytest-xdist or job sharding) once the trend data exists.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Bump the timeout to a huge value (e.g. 120) to never think about it again",
+        "instead": "Size to observed p95 + >=30% and add the trend metric so the next resize is proactive",
+        "item_id": "medium-test-timeout-headroom",
+        "why": "The timeout is the only backstop against a genuinely hung medium tier; a huge value converts hangs into 2-hour queue stalls"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-25T17:36:38Z",
+        "from_item": "medium-test-timeout-headroom",
+        "id": 651,
+        "reason": "Rung 1 runs: grep -A1 'medium-test' .github/workflows/pr.yml | grep timeout-minutes. In pr.yml, timeout-minutes sits 5 lines below 'name: medium-test' (now 15 with the required inline comment), so -A1 can never reach it. Verified by git-stashing all changes and running the rung against the ORIGINAL file: exit 1 there too. The rung is also self-contradictory -- its expectation demands 'value > 30 WITH inline comment', and adding the inline comment necessarily pushes the value further from the match. Intent verified manually instead: grep -A12 '^  medium-test:' finds timeout-minutes: 40 plus 6 inline comment lines, and pr.yml still parses as YAML. Same defect class as todo-verify-grades-only-on-exit-code: a rung whose command does not express its stated intent; verifications are create-time-only so it cannot be repaired in place.",
+        "resolution": "promoted",
+        "resolved_item": "verification-rungs-authored-with-unsatisfiable-commands",
+        "resolved_reason": null,
+        "summary": "Verification rung 1's grep is unsatisfiable and always was, on the unmodified file too"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-07-25T17:41:49Z",
+      "completed_pr": 1308,
+      "created_at": "2026-07-23T21:34:30Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "No test reclassification in this item - budget/observability only",
+        "item_id": "medium-test-timeout-headroom"
+      },
+      {
+        "behavior": "medium-test remains a required (blocking) member of ci-required-result",
+        "item_id": "medium-test-timeout-headroom"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "medium-test-timeout-headroom",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "medium-test-timeout-headroom",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "medium-test-timeout-headroom",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "medium-test-timeout-headroom",
+        "kind": "do_not_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "medium-test-timeout-headroom",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "medium-test-timeout-headroom",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/**"
+      },
+      {
+        "item_id": "medium-test-timeout-headroom",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/dev_loop_pr_metrics.py"
+      },
+      {
+        "item_id": "medium-test-timeout-headroom",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -A1 'medium-test' .github/workflows/pr.yml | grep timeout-minutes",
+        "description": "Timeout raised with rationale",
+        "expected": "value > 30 with inline comment",
+        "item_id": "medium-test-timeout-headroom",
+        "last_result": "fail",
+        "last_run": "2026-07-25T17:34:56Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'medium-test' _project/scripts/dev_loop_pr_metrics.py",
+        "description": "Medium job timing in metrics script",
+        "expected": ">= 1 (exit 0)",
+        "item_id": "medium-test-timeout-headroom",
+        "last_result": "pass",
+        "last_run": "2026-07-25T17:34:58Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "medium-test-timeout-headroom",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "medium-test-timeout-headroom",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "medium-test-timeout-headroom",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "medium-test-timeout-headroom",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Confirmed .github/workflows/pr.yml:564 timeout-minutes: 30 for medium-test. Sampled the last 20 pr.yml runs via the Actions API: 19 succeeded, 1 cancelled at 30.3min (PR #1306, twice). Successful wall times (min): 20.2 21.4 21.5 21.8 26.5 26.8 26.8 26.9 26.9 27.4 27.6 29.2 29.5 29.6 29.6 29.8 29.8 29.9 29.9 -- min=20.2, median=27.4, max=29.9, p95=29.9. Eight of nineteen runs land at >=29.2min, i.e. within 48s of the cap; the max successful run finished 6s under it. IMPORTANT caveat: this distribution is CENSORED -- any run that would have exceeded 30min was cancelled and is excluded from the successful set, so the true upper tail is unknown and >=30. p95*1.3 = 38.9min, so 40 is the smallest round value meeting the >=30% headroom rule without the 'huge value' anti-pattern.",
+        "item_id": "medium-test-timeout-headroom",
+        "notes": null,
+        "started_at": "2026-07-25T17:31:31Z",
+        "started_branch": "chore/medium-test-timeout-headroom",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Re-validate: confirm current medium-test timeout-minutes and the latest 5 runs' wall times (Actions API) before choosing the new value",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Raised .github/workflows/pr.yml medium-test timeout-minutes 30 -> 40, sized to observed p95 29.9min * 1.3 = 38.9 rounded up. Six-line inline comment records the sizing RULE, the 2026-07-25 measurement, the metrics warning hook and a pointer to docs/operations/fast-lane-budget.md for the censoring caveat and resize history. Explicitly not a 'never think about it again' value per the anti-pattern -- 40 keeps the timeout meaningful as a hang backstop. Verified: value>30 present, 6 inline comment lines, pr.yml still parses as YAML.",
+        "item_id": "medium-test-timeout-headroom",
+        "notes": null,
+        "started_at": "2026-07-25T17:32:39Z",
+        "started_branch": "chore/medium-test-timeout-headroom",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Raise medium-test timeout-minutes to restore >=30% headroom over observed p95; note rationale inline",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added medium-test wall time to _project/scripts/dev_loop_pr_metrics.py: MEDIUM_TEST_JOB_NAME constant, medium_test_job_seconds field on PrMetrics, generalised first_pass_green_and_job_seconds() to collect BOTH required lanes in one jobs pass (returns a 3-tuple), and medium_test_job_seconds_avg/_p95 in summarize() printed beside the fast-test figures and in the per-PR lines. Added _medium_budget_warning(): emits MEDIUM_TEST_BUDGET_WARNING once p95 reaches 75% of MEDIUM_TEST_TIMEOUT_MINUTES (=40), i.e. at 30min -- deliberately the exact point at which the OLD cap began cancelling, so the next regression of this shape is flagged with ~10min still in hand. Verified across p95 = 20/27.4/29.9/30/31/36 min: silent below 30, warns at and above, None-safe. ruff clean.",
+        "item_id": "medium-test-timeout-headroom",
+        "notes": null,
+        "started_at": "2026-07-25T17:36:20Z",
+        "started_branch": "chore/medium-test-timeout-headroom",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Add medium-test job wall time to dev_loop_pr_metrics.py output (alongside the fast-test job timing)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added a 'medium-test wall-clock budget' section to docs/operations/fast-lane-budget.md, explicitly separated from the deferred w6 gate above it (w6 is about REPLACING the fast lane's count ceiling; this is the medium lane's hard-cancel timeout). Documents: the p95+>=30% sizing rule and why not a huge value; the 2026-07-25 30->40 resize with the measurement; the censoring caveat (a cancelled job never reports a true wall time, so the successful sample's p95 is bounded by the timeout and looks healthy right up to the moment the lane starts cancelling); and the review hook -- make dev-loop-metrics reports medium-test avg/p95 and prints MEDIUM_TEST_BUDGET_WARNING at 75% of the timeout, with the note that MEDIUM_TEST_TIMEOUT_MINUTES must be updated alongside the workflow so metric and budget cannot drift.",
+        "item_id": "medium-test-timeout-headroom",
+        "notes": null,
+        "started_at": "2026-07-25T17:36:36Z",
+        "started_branch": "chore/medium-test-timeout-headroom",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Document the wall-clock budget warning threshold + review hook in the WS9 re-measure cadence",
+        "wid": "w3"
+      }
+    ]
+  }
+}

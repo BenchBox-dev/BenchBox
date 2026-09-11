@@ -1,0 +1,204 @@
+{
+  "context": "Build on the Phase 1 foundation. The static build pipeline already transforms\nbundles into read models - Phase 2 just adds more bundles from community PRs.\nThe `benchbox submit` command is a thin packaging layer, not a new code path.\n",
+  "description": "Phase 2 of the results platform: enable community contributions via a\nPR-based submission model. Instead of building a hosted API, contributors\nuse `benchbox submit --output ./submission/` to package a result bundle\nwith a submission manifest, then open a PR against this repository touching\n`results-data/`.\n\nGitHub Actions CI validates the submission (schema, hash, cohort, sanity).\nMaintainers review and merge. Merge triggers a rebuild of derived read\nmodels and redeployment of the explorer.\n\nThis model uses GitHub as the auth, moderation, and audit layer - zero\nhosted services required. It scales to ~100s of submissions/month before\nmaintainer review becomes a bottleneck.\n\n**Contingency:** This TODO should only be started after Phase 1 has launched\nand the explorer UX is validated with real users. If Phase 1 reveals that\nthe data model or explorer architecture needs significant changes, those\nchanges should be made before opening community contributions.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "auto-merge community submissions without maintainer review",
+        "instead": "require human approval",
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "why": "unreviewed results degrade trust"
+      },
+      {
+        "dont": "build a hosted API for Phase 2",
+        "instead": "avoid premature infrastructure",
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "why": "PR-based submission is sufficient until volume demands it"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "needs_item": "launch-results-explorer-acceptance-and-seed"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-04T00:00:00Z",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing benchbox run/export workflows are not modified",
+        "item_id": "implement-pr-based-result-submission-workflow"
+      },
+      {
+        "behavior": "Phase 1 explorer continues to work for maintainer-curated results",
+        "item_id": "implement-pr-based-result-submission-workflow"
+      },
+      {
+        "behavior": "The canonical schema-v2 bundle remains the submission artifact - no alternative format",
+        "item_id": "implement-pr-based-result-submission-workflow"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -q",
+        "description": "benchbox submit --output packages a valid submission bundle",
+        "expected": "All tests pass",
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py -q",
+        "description": "CI validation workflow catches invalid submissions",
+        "expected": "All tests pass",
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build && grep -l 'Community Submitted' dist/r/*/index.html | head -1",
+        "description": "Trust labels render correctly in the explorer",
+        "expected": "At least one detail page with community label",
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "notes": "Define the submission package format:\n- Canonical schema-v2 bundle (required)\n- Companion files: .plans.json, .tuning.json (optional)\n- submission-manifest.json:\n  - contributor: name/handle (from git config or explicit)\n  - context: why this result is interesting (optional free text)\n  - platform_notes: hardware/cloud context not captured in bundle\n  - submission_date: ISO timestamp\nThe package is a directory that can be directly committed to the data repo.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design submission manifest schema and packaging format",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "notes": "Add a CLI command that packages an existing exported result bundle into\nthe submission format:\n1. Takes a result bundle path (or --last to use most recent)\n2. Prompts for optional contributor info and context\n3. Writes submission package to the specified output directory\n4. Prints instructions for opening a PR against the current results corpus location\n\nThis command does NOT upload anything. It only packages locally.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement `benchbox submit --output` CLI command",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "notes": "Create a GitHub Actions workflow in this repo that runs on PRs touching\n`results-data/`:\n- Schema validation: bundle conforms to schema-v2\n- Hash verification: bundle content matches declared hash\n- Cohort compatibility: benchmark/scale/query-set are valid\n- Sanity checks: no absurd timings (e.g., 0ms for all queries),\n  valid platform names, reasonable environment metadata\n- Diff summary: comment on PR with what would be added to the explorer\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build CI validation workflow for submission PRs",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "notes": "Update the static build pipeline and explorer to show trust labels:\n- \"Maintainer Run\" badge for results generated by BenchBox CI\n- \"Community Submitted\" badge for results from merged PRs\nThe source is determined by commit author or a field in the submission manifest.\nBadges appear on detail pages, browse pages, and compare views.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add trust labels to the explorer for community-submitted results",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-pr-based-result-submission-workflow",
+        "notes": "Document:\n- How to generate and export benchmark results\n- How to use `benchbox submit --output`\n- How to open a submission PR\n- What the CI checks validate\n- What makes a good submission (full benchmark, stable environment, etc.)\n- Contribution license and data usage terms\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write contributor guidelines and submission documentation",
+        "wid": "w5"
+      }
+    ]
+  }
+}

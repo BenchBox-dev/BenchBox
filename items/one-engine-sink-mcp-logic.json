@@ -1,0 +1,255 @@
+{
+  "context": "Six independent sub-moves, each landable alone; order by risk: (6) system profiler, (5) complexity table, (2) exporters, (3) dry-run, (4) validation, (1) analytics assembly. For each: characterize current MCP output shape, move logic to core, keep the MCP tool as schema-validation + core call + response envelope. Where CLI has a parallel implementation (exporters, dryrun), converge on one and delete the other in the same sub-move.",
+  "description": "Relocate MCP-layer business logic that has no core counterpart, per the review. (1) analyze_results modes regressions/trends/aggregate (benchbox/mcp/tools/analytics.py:533-601, :678-731, :787-857) move to a core results-analysis module (statistics and policy already unified by prior items; this moves file discovery/grouping/assembly). (2) results.py exporters: _export_results_impl CSV/HTML/JSON (:216-296), _generate_html_report (:299-357), _export_summary_impl text/markdown (:360-408) reconcile with core/results/exporter.py and benchbox/cli/output.py ResultExporter -- one exporter family in core serves both surfaces (pick per-format winners; delete the losers). (3) _dry_run_impl estimation (benchmark.py:612-710: memory heuristic :694, hardcoded phases :684) merges into core/dryrun.py alongside the CLI's dryrun path. (4) _validate_config_impl (benchmark.py:713-817) second validation implementation merges into core schema validation. (5) _get_query_complexity_hints 90-line TPC-H table (benchmark.py:965-1059) moves into benchmark registry/metadata. (6) system_profile switches from raw psutil (discovery.py:113-139) to core/system.py SystemProfiler; the _recommend_max_scale_factor heuristic (:402-415) moves to core beside it. Truncation limits (query lists 30, files 20, inline content 50000) stay at the MCP layer as protocol-scoped presentation.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "keep both HTML generators because their outputs differ",
+        "instead": "pick one, port any missing feature, delete the other, and note the visual delta in the PR",
+        "item_id": "one-engine-sink-mcp-logic",
+        "why": "two report generators is exactly the drift this program removes"
+      },
+      {
+        "dont": "move tenant path containment or truncation into core",
+        "instead": "keep protocol/security concerns at the MCP layer; move only the domain logic",
+        "item_id": "one-engine-sink-mcp-logic",
+        "why": "those are interface-necessary per the scoped-surfaces contract"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "needs_item": "one-engine-unify-regression-policy"
+      },
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "needs_item": "one-engine-unify-statistics"
+      }
+    ],
+    "item_meta": {
+      "category": "MCP",
+      "completed_at": "2026-08-09T13:39:53Z",
+      "completed_pr": 1652,
+      "created_at": "2026-08-04T17:15:10Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "HTML export keeps html.escape XSS handling wherever the generator ends up.",
+        "item_id": "one-engine-sink-mcp-logic"
+      },
+      {
+        "behavior": "MCP tool response schemas and docs tables stay in sync (schema-derived docs tests green).",
+        "item_id": "one-engine-sink-mcp-logic"
+      },
+      {
+        "behavior": "MCP truncation limits keep their current values (protocol-scoped, ledger-documented).",
+        "item_id": "one-engine-sink-mcp-logic"
+      },
+      {
+        "behavior": "Path-traversal and tenant-containment checks in results.py (:170-175, :254-270) remain at the MCP layer.",
+        "item_id": "one-engine-sink-mcp-logic"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Single source of truth for benchmark metadata -- complexity hints belong here",
+        "decision": "extend",
+        "item_id": "one-engine-sink-mcp-logic",
+        "path": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "concept": "Core DryRunExecutor already called by MCP's _dry_run_impl; absorb the estimation layer",
+        "decision": "extend",
+        "item_id": "one-engine-sink-mcp-logic",
+        "path": "benchbox/core/dryrun.py"
+      },
+      {
+        "concept": "Canonical exporter to absorb MCP's format writers",
+        "decision": "extend",
+        "item_id": "one-engine-sink-mcp-logic",
+        "path": "benchbox/core/results/exporter.py"
+      },
+      {
+        "concept": "SystemProfiler that system_profile currently bypasses",
+        "decision": "reuse",
+        "item_id": "one-engine-sink-mcp-logic",
+        "path": "benchbox/core/system.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/security.py"
+      },
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/output.py"
+      },
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/"
+      },
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -n '_generate_html_report\\|_get_query_complexity_hints\\|_recommend_max_scale_factor' benchbox/mcp/tools/*.py",
+        "description": "MCP layer no longer holds the six logic bodies",
+        "expected": "Report generation, complexity hints, and scale heuristics are core-owned.",
+        "item_id": "one-engine-sink-mcp-logic",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -q 'SystemProfiler' benchbox/mcp/tools/discovery.py",
+        "description": "system_profile uses core SystemProfiler",
+        "expected": "Raw psutil profiling replaced by the core profiler.",
+        "item_id": "one-engine-sink-mcp-logic",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp tests/unit/cli -m fast -q",
+        "description": "MCP + CLI fast suites green with unchanged response schemas",
+        "expected": "No schema or behavior regressions on either surface.",
+        "item_id": "one-engine-sink-mcp-logic",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "one-engine-sink-mcp-logic",
+        "needs_wid": "w0",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "sink via PR #1652: ! grep MCP bodies passes; SystemProfiler in discovery.py; 2313 fast tests passed",
+        "item_id": "one-engine-sink-mcp-logic",
+        "notes": null,
+        "started_at": "2026-08-09T13:39:35Z",
+        "started_branch": "fix/one-engine-sink-mcp",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.muse/worktrees/subagent-v2-80bfa6a4-65af-4462-a477-fbf02d1ea0ce-019fe6b6-28a6-7493-92ac-c42de3c9825f",
+        "status": "done",
+        "summary": "Re-verify all six logic bodies at HEAD; characterize output shapes",
+        "wid": "w0"
+      },
+      {
+        "evidence": "sink via PR #1652: ! grep MCP bodies passes; SystemProfiler in discovery.py; 2313 fast tests passed",
+        "item_id": "one-engine-sink-mcp-logic",
+        "notes": null,
+        "started_at": "2026-08-09T13:39:38Z",
+        "started_branch": "fix/one-engine-sink-mcp",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.muse/worktrees/subagent-v2-80bfa6a4-65af-4462-a477-fbf02d1ea0ce-019fe6b6-28a6-7493-92ac-c42de3c9825f",
+        "status": "done",
+        "summary": "system_profile -> core SystemProfiler + scale heuristic to core",
+        "wid": "w1"
+      },
+      {
+        "evidence": "sink via PR #1652: ! grep MCP bodies passes; SystemProfiler in discovery.py; 2313 fast tests passed",
+        "item_id": "one-engine-sink-mcp-logic",
+        "notes": null,
+        "started_at": "2026-08-09T13:39:40Z",
+        "started_branch": "fix/one-engine-sink-mcp",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.muse/worktrees/subagent-v2-80bfa6a4-65af-4462-a477-fbf02d1ea0ce-019fe6b6-28a6-7493-92ac-c42de3c9825f",
+        "status": "done",
+        "summary": "Complexity hints -> benchmark registry metadata",
+        "wid": "w2"
+      },
+      {
+        "evidence": "sink via PR #1652: ! grep MCP bodies passes; SystemProfiler in discovery.py; 2313 fast tests passed",
+        "item_id": "one-engine-sink-mcp-logic",
+        "notes": null,
+        "started_at": "2026-08-09T13:39:43Z",
+        "started_branch": "fix/one-engine-sink-mcp",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.muse/worktrees/subagent-v2-80bfa6a4-65af-4462-a477-fbf02d1ea0ce-019fe6b6-28a6-7493-92ac-c42de3c9825f",
+        "status": "done",
+        "summary": "Exporter convergence (MCP writers + cli/output.py -> core exporter family)",
+        "wid": "w3"
+      },
+      {
+        "evidence": "sink via PR #1652: ! grep MCP bodies passes; SystemProfiler in discovery.py; 2313 fast tests passed",
+        "item_id": "one-engine-sink-mcp-logic",
+        "notes": null,
+        "started_at": "2026-08-09T13:39:46Z",
+        "started_branch": "fix/one-engine-sink-mcp",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.muse/worktrees/subagent-v2-80bfa6a4-65af-4462-a477-fbf02d1ea0ce-019fe6b6-28a6-7493-92ac-c42de3c9825f",
+        "status": "done",
+        "summary": "Dry-run estimation + validate_config merge into core",
+        "wid": "w4"
+      },
+      {
+        "evidence": "sink via PR #1652: ! grep MCP bodies passes; SystemProfiler in discovery.py; 2313 fast tests passed",
+        "item_id": "one-engine-sink-mcp-logic",
+        "notes": null,
+        "started_at": "2026-08-09T13:39:49Z",
+        "started_branch": "fix/one-engine-sink-mcp",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.muse/worktrees/subagent-v2-80bfa6a4-65af-4462-a477-fbf02d1ea0ce-019fe6b6-28a6-7493-92ac-c42de3c9825f",
+        "status": "done",
+        "summary": "Analytics regressions/trends/aggregate assembly -> core analysis module",
+        "wid": "w5"
+      }
+    ]
+  }
+}

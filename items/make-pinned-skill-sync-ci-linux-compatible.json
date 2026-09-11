@@ -1,0 +1,88 @@
+{
+  "context": "Checkout the public verifier at the full merged SHA without persisted credentials; run npm ci and the built CLI from the isolated checkout; pin the complete workflow contract in the CI parity test and update its operations rationale.",
+  "description": "PR 1318 CI proved that npm GitFetcher cannot package the newly pinned Git dependency on the Ubuntu runner (GitFetcher requires an Arborist constructor). Preserve the immutable skill-sync SHA while avoiding npm GitFetcher: use a separate actions/checkout, build with npm ci, and run the verifier against the BenchBox root.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-28T16:20:20Z",
+      "completed_pr": 1318,
+      "created_at": "2026-07-28T15:36:59Z",
+      "worktree": "chore/agent-instruction-todos"
+    },
+    "preserves": [
+      {
+        "behavior": "Verifier source remains pinned to full commit 7e8926ae3ee03c8b0cc7c0fab498e5ed1917638b",
+        "item_id": "make-pinned-skill-sync-ci-linux-compatible"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "make-pinned-skill-sync-ci-linux-compatible",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "make-pinned-skill-sync-ci-linux-compatible",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/ci-local-parity.md"
+      },
+      {
+        "item_id": "make-pinned-skill-sync-ci-linux-compatible",
+        "kind": "only_modify",
+        "path_glob": "tests/system/test_ci_lint_parity.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/system/test_ci_lint_parity.py -q -n 0",
+        "description": "CI parity and pin contract",
+        "expected": "exit 0",
+        "item_id": "make-pinned-skill-sync-ci-linux-compatible",
+        "last_result": "pass",
+        "last_run": "2026-07-28T15:37:11Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- pre-commit run check-yaml --files .github/workflows/pr.yml",
+        "description": "workflow YAML",
+        "expected": "exit 0",
+        "item_id": "make-pinned-skill-sync-ci-linux-compatible",
+        "last_result": "pass",
+        "last_run": "2026-07-28T15:37:13Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "make-pinned-skill-sync-ci-linux-compatible",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Commit 1403f226e replaces the failing npx GitFetcher path with actions/checkout at the full skill-sync PR 9 SHA, persist-credentials false, npm ci, and built CLI verify.",
+        "item_id": "make-pinned-skill-sync-ci-linux-compatible",
+        "notes": null,
+        "started_at": "2026-07-28T15:37:05Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Replace npm GitFetcher invocation with immutable verifier checkout",
+        "wid": "w1"
+      },
+      {
+        "evidence": "test_ci_lint_parity pins checkout repository/SHA/path/credentials and exact verifier commands; ci-local-parity documents the immutable checkout and rejected fail-open probe. 7 tests pass.",
+        "item_id": "make-pinned-skill-sync-ci-linux-compatible",
+        "notes": null,
+        "started_at": "2026-07-28T15:37:07Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add workflow-contract regression test and update parity documentation",
+        "wid": "w2"
+      }
+    ]
+  }
+}

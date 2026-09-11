@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #598 of starburst-platform-adapter.\nDeferred: Live integration tests with Starburst Galaxy (w22-w24)\nReason deferred: Requires Starburst Galaxy account and running cluster - not available in local dev",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:37:11Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

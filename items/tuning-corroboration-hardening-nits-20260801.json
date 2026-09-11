@@ -1,0 +1,174 @@
+{
+  "context": "For each nit: first write the pinning test that documents today's behavior, then either fix minimally or record the wontfix rationale next to the pin. N1's minimal fix is stripping quoted strings and comments before regex classification (shared helper, applied in _classify and _statement_table). N2 is a two-line guard in _match_object. N3 replaces the substring check with the same clause-shape regex the classifier uses. N5 is a design note decision (qualify table identity through the Introspector contract) - likely wontfix-with-pin at this priority.",
+  "description": "From the 2026-07-31 adversarial review: fail-closed-in-practice smells worth guarding so they cannot silently become defects. Land after tuning-corroboration-gate-failed-and-dropped-20260801 (same files). Each may individually be closed as wontfix with a recorded rationale + pinning test; the deliverable is that none of these behaviors is LATENT anymore.\n\nN1: _classify's key-clause regexes (_ORDER_BY_RE etc., introspection.py:239-253) match text inside string literals/comments - probe: CREATE TABLE t (c String DEFAULT 'order by (l_shipdate)') ... ORDER BY (real_col) parses the LITERAL as the sort clause (first match wins) and never sees the real clause. Direction today is fail-closed (catalog reflects the real clause -> mismatch), unreachable from shipped generators - but it is a correctness landmine for any future schema carrying such text.\n\nN2: _match_object corroborates an empty-columns intent against an empty-columns fact (probe: ORDER BY () vs a fact with columns=()). Unreachable today - all three shipped introspectors skip empty keys - but a future introspector emitting an empty-columns fact would create trivial corroboration. Guard: intents/facts with no columns never corroborate.\n\nN3: _record_tuned_sort_key_op early-returns on the substring check '\"ORDER BY\" in original_statement.upper()' (clickhouse/workload.py:223): a partition-only tuned table whose SOURCE DDL contains that substring anywhere (literal, comment) is applied but never recorded - under-recording that lets sibling tables carry the run to verified without this table's partition being corroborated. Not constructible from shipped schemas.\n\nN5: introspector fact matching is bare-table-name only (all three introspectors filter/emit unqualified names; _match_object compares normalized names) - a cross-schema shadow object with the same name and columns can supply the corroborating fact. No realistic false-verified constructed (an executed statement implies the real table's catalog fact), but schema-qualified matching would remove the ambiguity class.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not bring in a SQL parser dependency to fix N1",
+        "instead": "strip literals/comments with a small, tested tokenizer before applying the existing regexes",
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "why": "the classifier's value is that it is a small, auditable shape-matcher; a parser trades a latent nit for a dependency surface"
+      },
+      {
+        "dont": "Do not loosen table matching to fix N5's ambiguity",
+        "instead": "either qualify identity through the Introspector contract or pin the current bare-name semantics",
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "why": "set/suffix matching would widen corroboration, the forbidden direction"
+      },
+      {
+        "dont": "Do not silently close a nit without a pinning test",
+        "instead": "every closed nit leaves behind a test that documents the accepted behavior",
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "why": "the review's point is that these behaviors are latent; undocumented wontfix keeps them latent"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "needs_item": "tuning-corroboration-gate-failed-and-dropped-20260801"
+      }
+    ],
+    "item_meta": {
+      "category": "Robustness",
+      "completed_at": "2026-08-01T17:41:36Z",
+      "completed_pr": 1425,
+      "created_at": "2026-08-01T12:30:03Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Classification stays platform-agnostic generic-SQL-shape; no per-platform parsing enters _classify.",
+        "item_id": "tuning-corroboration-hardening-nits-20260801"
+      },
+      {
+        "behavior": "Every change keeps or strengthens fail-closed direction; nothing widens what can corroborate.",
+        "item_id": "tuning-corroboration-hardening-nits-20260801"
+      },
+      {
+        "behavior": "Shipped-generator behavior is bit-identical: these guards must not change any current verdict for statements the generators emit (pin with regression vectors).",
+        "item_id": "tuning-corroboration-hardening-nits-20260801"
+      },
+      {
+        "behavior": "The gate semantics from tuning-corroboration-gate-failed-and-dropped-20260801 are untouched.",
+        "item_id": "tuning-corroboration-hardening-nits-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/introspection.py"
+      },
+      {
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/workload.py"
+      },
+      {
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/development/tuning-introspection-receipts.md"
+      },
+      {
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/**"
+      },
+      {
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.tuning.applied_ledger import PHASE_DDL, AppliedStatement; from benchbox.core.tuning.introspection import _classify; k,i = _classify(AppliedStatement(statement=chr(34)+'x'+chr(34), phase=PHASE_DDL)); import benchbox.core.tuning.introspection as m; k2,i2 = m._classify(AppliedStatement(statement=\\\"CREATE TABLE t (c String DEFAULT 'order by (decoy)') ENGINE=MergeTree ORDER BY (real_col)\\\", phase=PHASE_DDL)); assert i2 and i2[0].columns == ('real_col',), (k2, i2)\"",
+        "description": "Literal-decoy statement no longer classified from string contents (post-fix probe)",
+        "expected": "exit 0: the real clause is classified, the literal decoy is ignored",
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T17:39:54Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.tuning.introspection import IntrospectedObject, IntrospectedState, KIND_SORT_KEY, _match_object, _Intent; v,_ = _match_object(_Intent(kind=KIND_SORT_KEY, table='t', columns=()), IntrospectedState(platform='x', objects=[IntrospectedObject(kind=KIND_SORT_KEY, table='t', columns=())])); assert v != 'corroborated', v\"",
+        "description": "Empty-columns never corroborates (post-fix probe)",
+        "expected": "exit 0",
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T17:39:57Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning tests/unit/platforms/test_clickhouse_introspection.py -q",
+        "description": "Tuning suites green",
+        "expected": "all pass, shipped-generator verdicts unchanged",
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T17:40:06Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added small offset-preserving literal/comment scanner before generic shape regexes; decoy and shipped-shape regression vectors pass.",
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "notes": "N1: strip string literals and comments before classification (shared helper used by _classify and _statement_table); regression vectors for the DEFAULT-literal probe and for every shipped-generator statement shape (verdicts unchanged).",
+        "started_at": "2026-08-01T17:39:10Z",
+        "started_branch": "fix/tuning-corroboration-hardening-nits-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "N1: strip string literals/comments before classification (shared helper); regression vectors incl. the DEFAULT-literal probe and shipped-generator shapes",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Empty intent columns now return fail-closed mismatch against a present fact; empty==empty can never corroborate.",
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "notes": "N2: guard _match_object so empty-columns intents/facts never corroborate; pin with the ORDER BY () probe.",
+        "started_at": "2026-08-01T17:39:18Z",
+        "started_branch": "fix/tuning-corroboration-hardening-nits-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "N2: _match_object guard - empty-columns intents/facts never corroborate; pin with the ORDER BY () probe",
+        "wid": "w2"
+      },
+      {
+        "evidence": "ClickHouse original-statement guard now uses literal/comment-aware ORDER BY clause detection; partition-only literal-decoy test records correctly.",
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "notes": "N3: replace the ORDER BY substring early-return in _record_tuned_sort_key_op with clause-shape detection consistent with the classifier; test the partition-only-with-literal case records correctly.",
+        "started_at": "2026-08-01T17:39:26Z",
+        "started_branch": "fix/tuning-corroboration-hardening-nits-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "N3: replace the ORDER BY substring early-return with clause-shape detection; test partition-only-with-literal recording",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Kept exact normalized table identity: schema-qualified intent does not suffix-match bare fact; pinned ABSENT behavior and documented rationale.",
+        "item_id": "tuning-corroboration-hardening-nits-20260801",
+        "notes": "N5: decide schema-qualified fact identity vs wontfix-with-pin; record the decision in the receipts design note either way.",
+        "started_at": "2026-08-01T17:39:35Z",
+        "started_branch": "fix/tuning-corroboration-hardening-nits-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "N5: decide schema-qualified fact identity vs wontfix-with-pin; record the decision in the design note",
+        "wid": "w4"
+      }
+    ]
+  }
+}

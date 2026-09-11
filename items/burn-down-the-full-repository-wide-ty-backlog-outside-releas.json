@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #118 of close-pre-beta-release-blockers.\nDeferred: Burn down the full repository-wide `ty` backlog outside release-critical entrypoints\nReason deferred: Useful follow-up work, but larger than a Beta-release blocker once the critical gate is ratcheted.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:33:56Z",
+      "worktree": "main"
+    }
+  }
+}

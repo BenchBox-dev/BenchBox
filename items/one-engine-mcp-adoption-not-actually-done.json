@@ -1,0 +1,91 @@
+{
+  "context": "Either (a) do the adoption the item describes -- route MCP run_benchmark and the durable-jobs worker through execute_run, delete the three private translators, and add the cross-surface RunPlan equivalence tests rung 2 expects -- or (b) reopen the item honestly, record that MCP adoption was not attempted, and re-scope it. Do not narrow the rungs to match the current state; rung 1 and rung 2 are exactly the checks that caught this.",
+  "description": "Merged PR #1692, merge commit 54ffe68605e25b8bd61a86c8786750d496a7b3b1, routed normal synchronous MCP execution and durable workers through benchbox.core.run_service.execute_run and established exhaustive execution-type parity for all 127 phase subsets. A 2026-08-13 adversarial review found that mode=data_only still bypasses the shared service through MCP-local _generate_data_impl in both synchronous and durable paths, and that tests/unit/test_runplan_equivalence.py simulates MCP by calling core directly. The successor mcp-adversarial-review-runtime-remediation-20260813 owns data-only adoption and real surface-level parity oracles. This historical done record proves the PR #1692 slice only; it no longer claims complete adoption across data_only. External deployment acceptance and the final release gate remain separate.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-12T21:38:47Z",
+      "completed_pr": 1692,
+      "created_at": "2026-08-11T12:55:53Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "Durable jobs keep lease/fencing, idempotency, and staging->os.replace publication semantics.",
+        "item_id": "one-engine-mcp-adoption-not-actually-done"
+      },
+      {
+        "behavior": "MCP security invariants stay at the MCP layer: allowlist, admission, tenancy, scale clamp, sync-execution block in remote mode.",
+        "item_id": "one-engine-mcp-adoption-not-actually-done"
+      },
+      {
+        "behavior": "benchbox.mcp still never imports benchbox.cli.",
+        "item_id": "one-engine-mcp-adoption-not-actually-done"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-mcp-adoption-not-actually-done",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/**"
+      },
+      {
+        "item_id": "one-engine-mcp-adoption-not-actually-done",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "one-engine-mcp-adoption-not-actually-done",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/run_service.py"
+      },
+      {
+        "item_id": "one-engine-mcp-adoption-not-actually-done",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "one-engine-mcp-adoption-not-actually-done",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "one-engine-mcp-adoption-not-actually-done",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -rq 'run_service' benchbox/mcp/ && printf '%s\\n' 'MCP imports the shared engine.'",
+        "description": "MCP actually references the run service",
+        "expected": "MCP imports the shared engine.",
+        "item_id": "one-engine-mcp-adoption-not-actually-done",
+        "last_result": "pass",
+        "last_run": "2026-08-12T22:51:17Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "if ! grep -nE '_map_phases_to_test_execution_type|_prepare_adapter_platform_options|_validate_and_resolve_mode' benchbox/mcp/tools/benchmark.py; then printf '%s\\n' 'No MCP-side rewrite layer remains.'; else exit 1; fi",
+        "description": "The three private translators are gone",
+        "expected": "No MCP-side rewrite layer remains.",
+        "item_id": "one-engine-mcp-adoption-not-actually-done",
+        "last_result": "pass",
+        "last_run": "2026-08-12T21:38:19Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'runplan and (equivalence or parity)' -q && printf '%s\\n' 'Selects a non-empty set and exits 0.'",
+        "description": "Cross-surface equivalence tests exist and pass",
+        "expected": "Selects a non-empty set and exits 0.",
+        "item_id": "one-engine-mcp-adoption-not-actually-done",
+        "last_result": "pass",
+        "last_run": "2026-08-12T21:38:38Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "description": "Partial progress after #1581 (expose-update-verb-in-project-wrapper).\n\nAlready done in BenchBox mirrors (PR #1581):\n- .claude/skills/todo-db/skill.yaml has standalone_only_commands: {}\n- SKILL.md no longer claims update is standalone-only\n- tests/unit/scripts/test_todo_wrapper.py expects update as a real handler\n- medium-lane wrapper tests are green with that surface\n\nStill open (this item):\n- Canonical skill-sync source (/Users/joe/.skill-sync/skills/todo-db or skill-sync-skills git) still listed update as standalone before the pin\n- Bump skill-sync.yaml pin + skill-sync.lock, make skill-sync, confirm multi-agent mirrors (.codex/.gemini/.antigravity) stay consistent\n- queries.md / skill references: no residual \"standalone-only update\" gating language at the source of truth\n\nWithout the pin bump, the next make skill-sync may reintroduce the old declaration and re-break medium tests.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-10T14:36:14Z",
+      "completed_pr": 1607,
+      "created_at": "2026-07-29T11:42:32Z",
+      "worktree": "agent-instructions"
+    },
+    "preserves": [
+      {
+        "behavior": "The contract test keeps its teeth: no allowlisting, no test deletion",
+        "item_id": "wrapper-update-verb-capability-declaration-handoff"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "wrapper-update-verb-capability-declaration-handoff",
+        "kind": "only_modify",
+        "path_glob": ".antigravity/skills/todo-db/**"
+      },
+      {
+        "item_id": "wrapper-update-verb-capability-declaration-handoff",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/todo-db/**"
+      },
+      {
+        "item_id": "wrapper-update-verb-capability-declaration-handoff",
+        "kind": "only_modify",
+        "path_glob": ".codex/skills/todo-db/**"
+      },
+      {
+        "item_id": "wrapper-update-verb-capability-declaration-handoff",
+        "kind": "only_modify",
+        "path_glob": ".gemini/skills/todo-db/**"
+      },
+      {
+        "item_id": "wrapper-update-verb-capability-declaration-handoff",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.skill-sync/skills/todo-db/**"
+      },
+      {
+        "item_id": "wrapper-update-verb-capability-declaration-handoff",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.lock"
+      },
+      {
+        "item_id": "wrapper-update-verb-capability-declaration-handoff",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.yaml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py -q -n 0",
+        "description": "wrapper contract tests pass",
+        "expected": "all pass with update as a real wrapper handler",
+        "item_id": "wrapper-update-verb-capability-declaration-handoff",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "skill-sync-skills #21 @ 76ef27b0; BenchBox pin PR #1607",
+        "item_id": "wrapper-update-verb-capability-declaration-handoff",
+        "notes": null,
+        "started_at": "2026-08-05T23:55:08Z",
+        "started_branch": "fix/todo-update-capability-handoff",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/batch2-handoff",
+        "status": "done",
+        "summary": "Drop update from standalone_only_commands + queries.md gating at canonical source, land on main, bump BenchBox pin, resync mirrors",
+        "wid": "w1"
+      }
+    ]
+  }
+}

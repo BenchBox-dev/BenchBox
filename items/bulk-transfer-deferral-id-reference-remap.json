@@ -1,0 +1,34 @@
+{
+  "description": "PR #1544 excluded deferrals from the reassignable-PK allowlist because deferrals.id is referenced by value from places SQLite does not police: defer_work, promote_deferral and dismiss_deferral write it into events.detail as deferral_id, and promote_deferral embeds it in the promoted item's description as 'Promoted from deferral #N'. Reassigning it would not raise, it would silently re-point transferred audit rows at whatever deferral already held that id. Excluding it restores the loud abort, which is safe but leaves the original collision hazard open for deferrals specifically. Closing it needs a consistent remap: rewrite events.detail JSON and the interpolated description text alongside the new ids, in the same transaction.",
+  "legacy": {
+    "item_meta": {
+      "category": "Data integrity",
+      "created_at": "2026-08-04T17:22:59Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "bulk-transfer-deferral-id-reference-remap",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "bulk-transfer-deferral-id-reference-remap",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_hosted.py -q -k deferral",
+        "description": "an additive transfer with colliding deferral ids succeeds AND its event payloads still resolve",
+        "expected": "exits 1 on an unfixed tree - the current test asserts the transfer RAISES on collision, so it must be rewritten to assert success plus reference integrity",
+        "item_id": "bulk-transfer-deferral-id-reference-remap",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

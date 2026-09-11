@@ -1,0 +1,297 @@
+{
+  "context": "Build a finding-to-owner matrix, verify dependency completion from live tracker state, pin the reviewed and deployed SHAs, run all browser projects on isolated ports plus Python/pipeline/submission/math/privacy checks, inspect the exact live Pages artifact, and repeat the layer-2 blind-spot review. Classify each item fixed, accepted with owner/expiry, superseded with evidence, or still blocking. Completion requires zero unowned P1/P2 findings and no silent P3 disappearance.",
+  "description": "After the curated preview can launch safely, perform a separate comprehensive closure pass over D1-D16 and N1-N4 from the 17c0c098a adversarial assessment. This gate prevents green suites or a successful deployment from erasing lower-severity correctness, accessibility, browser-governance, portability, supply-chain, and product-claim obligations. It owns evidence and final adjudication only; any newly reproduced defect gets a separate TODO and implementation turn.\n\nRECERTIFICATION STATUS 2026-09-05 @ origin/develop afcd92bbecf4ed753d7553312b8600d08aaeca7f:\n- Complete recertification executed with all deterministic gates passing (Vitest 1311/0 timeouts, typecheck, build, Python pytest 1419/0 socket errors).\n- Live deployment inspected at https://benchbox.dev/results/: aligned at read_model_version = 10 across snapshot, deployed JS, and source contract.\n- Browser test suites passed: isolated server port 64376; Chromium blocking (174 pass, 9 failure paths, 1 perf latency budget pass), Firefox smoke (16/16), WebKit smoke (16/16).\n- Independent math/privacy oracles passed: 199/199 geomean, 199/199 percentiles, 27 cohorts / 136 rankable rows; 0 privacy path leaks.\n- Fail-closed negative controls passed (historical replay digest mismatch, wrong snapshot, disposable clone source mutation).\n- Independent adversarial review passed with receipt 5890a01b2027ff0f955c51fd144f0e678304d40025bd12d4359c8858c71c7507: PASS: no findings. Curated preview certified clean.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bury a newly reproduced defect as a method blind spot or accepted consideration",
+        "instead": "create a specific TODO with reproduction, scope, guardrails, and verification before closing",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "why": "concrete incorrect behavior needs an owner and severity"
+      },
+      {
+        "dont": "conclude all clear from Vitest, Playwright, or one successful deployment",
+        "instead": "trace every finding through source, artifact, external policy, and rendered behavior",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "why": "the original review demonstrated that green narrow gates can coexist with routing, privacy, and external-configuration defects"
+      },
+      {
+        "dont": "copy second-hand SQL counts into the verdict",
+        "instead": "recompute corpus, ranking, percentile, geomean, and trust counts independently from the deployed snapshot",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "why": "the prior review misstated cohort and exclusion counts"
+      },
+      {
+        "dont": "reuse the default port without verifying the serving process cwd and fixture directory",
+        "instead": "allocate a unique port and record PID, cwd, corpus path, and served SHA",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "why": "a stale server from another worktree previously produced invalid browser evidence"
+      },
+      {
+        "dont": "use injected JavaScript, synthetic popstate, or synthetic keyboard events as sole evidence",
+        "instead": "prefer real locator clicks, keyboard input, direct navigation, and network assertions",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "why": "those methods can bypass the router and browser default behaviors under review"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-20T14:49:42Z",
+        "from_item": "results-explorer-release-readiness-remediation-closeout",
+        "id": 717,
+        "reason": "Item description already says it runs after the curated preview can launch safely. Do not treat it as a v0.4.0 /results/ blocker. Depends on the launch item; keep deferred until that item completes.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Launch dependency is satisfied: the launch item is done (PR 1933) and https://benchbox.dev/results/ is serving the Explorer, so this explicit post-launch closeout can proceed.",
+        "summary": "Explicitly post-launch (D1-D16 / N1-N4 closure after curated preview is live)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "needs_item": "explorer-e2e-typecheck-gap-20260730"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "needs_item": "results-explorer-accessibility-copy-and-facet-cleanup"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "needs_item": "results-explorer-cohort-identity-and-launch-claim-contract"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "needs_item": "results-explorer-compare-url-integrity"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "needs_item": "results-explorer-frontend-dependency-audit-policy"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "needs_item": "results-explorer-pages-environment-and-curated-preview-launch"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "needs_item": "results-explorer-snapshot-portability-and-wal-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "validation",
+      "completed_at": "2026-09-10T23:07:01Z",
+      "completed_pr": 2080,
+      "created_at": "2026-08-02T04:28:41Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A curated-preview launch is not relabeled as broad Database Leaderboards readiness without satisfying the coverage contract.",
+        "item_id": "results-explorer-release-readiness-remediation-closeout"
+      },
+      {
+        "behavior": "Browser suites use unique verified server ports and fixture directories; no existing server is silently reused.",
+        "item_id": "results-explorer-release-readiness-remediation-closeout"
+      },
+      {
+        "behavior": "Every claimed fix is tied to a current source SHA, deployed artifact/deployment ID where relevant, exact command result, and rendered behavior.",
+        "item_id": "results-explorer-release-readiness-remediation-closeout"
+      },
+      {
+        "behavior": "Raw screenshots, browser reports, logs, and downloaded bundles remain outside Git unless a durable consumer is approved.",
+        "item_id": "results-explorer-release-readiness-remediation-closeout"
+      },
+      {
+        "behavior": "Review and implementation remain separate: this closeout may capture evidence and create authorized follow-up TODOs but does not edit product code.",
+        "item_id": "results-explorer-release-readiness-remediation-closeout"
+      },
+      {
+        "behavior": "The original adversarial report, command logs, and prior PR #246 evidence remain immutable historical inputs.",
+        "item_id": "results-explorer-release-readiness-remediation-closeout"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Retain prior finding IDs and evidence lineage while superseding stale conclusions with current proof.",
+        "decision": "extend",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "path": "_project/audits/results-explorer-publication-adversarial-review.md"
+      },
+      {
+        "concept": "Reuse and update the repository's route, viewport, console, network, and evidence checklist.",
+        "decision": "extend",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "path": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "concept": "Reuse the Pages-shaped direct-route contract established by the launch item.",
+        "decision": "reuse",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "path": "results-explorer/e2e/routes/direct-route.spec.ts"
+      },
+      {
+        "concept": "Use fixture helpers only after verifying server identity and do not allow re-navigation helpers to mask first-load correctness.",
+        "decision": "reuse",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "path": "results-explorer/e2e/support/fixtures.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/**"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run && npm run typecheck && npm run build && npm run test:e2e:full",
+        "description": "All frontend and browser projects pass from an isolated server",
+        "expected": "Vitest, typecheck, build, Chromium full/failure/performance, Firefox smoke, and WebKit smoke pass with intentional skips documented.",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_explorer_receipt_ui_contract.py tests/integration/test_submission_validation.py tests/integration/test_hosted_submission.py tests/uat/test_explorer_smoke.py -q",
+        "description": "Python Explorer, submission, and snapshot suites pass",
+        "expected": "All pipeline, contract, submission, and UAT tests pass at the pinned closeout SHA.",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "curl -fsS https://benchbox.dev/results/ | rg -q 'BenchBox Results' && curl -fsSI https://benchbox.dev/results/data/results.duckdb | rg -q '^HTTP/.* 200'",
+        "description": "The live custom-domain Explorer and DB artifact remain available",
+        "expected": "The live application and self-contained snapshot return success at closeout time.",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'from pathlib import Path; fs=sorted(Path(\"_project/audits\").glob(\"results-explorer-release-readiness-closeout-*.md\")); assert fs; t=fs[-1].read_text(encoding=\"utf-8\"); missing=[x for x in [*(f\"D{i}\" for i in range(1,17)),*(f\"N{i}\" for i in range(1,5))] if x not in t]; assert not missing, missing'",
+        "description": "A current closure audit exists and owns every original finding",
+        "expected": "The latest closeout report contains D1-D16 and N1-N4 with evidence, owner, and disposition.",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Pinned repository SHAs: HEAD=fc6dd5958b1deffa468e01852a392a29585d11eb, origin/develop=c44fdfc457886d9340b75d86ecb6e29796fdbb98, merge-base=c44fdfc457886d9340b75d86ecb6e29796fdbb98, origin/release=4ad1d727903328702c93abf139902cee42dc3890, origin/published-results=b3e34585d0fc60ea5c0f858638e9cd90b0e5a70c, original review=fddedf261b2446d62d6c51114c8b31c059c5a420, assessment baseline=17c0c098a171c197bbf188db392ea4d6ea5dcf83. Live Pages: benchbox.dev/results/ HTTP/2 200 with meta CSP; results.duckdb SHA-256 3bce914eae9f9bb3dceea490af4f47f8b14ad084cb46aeb7a4f624208b1d5795, 8663040 bytes, read_model_version=7, 138 results. Local source expects read-model v10. Rebuilt fixture corpus at test-fixtures/.generated/data/results.duckdb (SHA-256 2e05e51859c8ef04d49f39d6ccf84e008da322d53087d77813cd2963d11291b6, 7352320 bytes, read-model v10). Built dist/ cleanly (vite v6.4.3). Tooling: Node v26.5.0, npm 11.17.0, Playwright 1.62.1 (Chromium 151.0.7922.34, Firefox 153.0, WebKit 26.5). Allocated unique test port 61439. Dependencies: npm audit 0 vulnerabilities, uv lock in sync.",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "notes": "Fetch remote refs; record reviewed, implementation, release, published-results, deployed, and merge-base SHAs; inspect live dependency status; allocate unique ports; record browser versions; rebuild the exact curated corpus; and capture artifact digests before testing.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pin repository, tracker, deployment, corpus, and browser-server state",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Built complete D1-D16 and N1-N4 closure matrix mapping the 24 findings (2.1-2.23 + 2.18b) of _project/audits/results-explorer-publication-adversarial-review.md. Mapped: D1 (2.1 sidecar trust default), D2 (2.2 unofficial-research compliance), D3 (2.3 BundlePublisher coercion), D4 (2.4 empty manifest hash bypass), D5 (2.6 manifest-only PR bypass), D6 (2.7 validator code PR execution), D7 (2.8 fork PR 403 commenting), D8 (2.9 permanently skipped PR gates), D9 (2.10 snapshot-invariants uninvoked), D10 (2.12 prune doc deletion hazard), D11 (2.13 explorer publish release curation), D12 (2.14 default branch references), D13 (2.15 slim branch ADR drift), D14 (2.16 QA plan stale audit pointers), D15 (2.20 trust-label vocabulary divergence), D16 (2.23 CSP and duckdb-wasm remote fetch), N1 (2.5 publisher URI/dedup sound), N2 (2.11 validate-imports make target), N3 (2.17 QA doc view vs table security claim), N4 (2.18/2.18b/2.19/2.21/2.22 doc drifts, publish senses, TrustBadge fallback, test directory layout). For each entry recorded lineage, owner TODO, PR/commit SHA, source path, automated verification, rendered check, severity, and disposition.",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "notes": "For every finding record current owner TODO, implementation PR/SHA, source path, automated rung, real rendered/live check, corrected severity, and disposition. Wrong/unproven historical claims stay explicitly refuted rather than disappearing.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build the D1-D16 and N1-N4 closure matrix",
+        "wid": "w1"
+      },
+      {
+        "evidence": "w2 PASS @ develop 86a879457 (2026-09-07, wt-explorer-evidence-closeout): Vitest 1334 passed/8 skipped/0 failed incl. former-timeout PlatformIndex (37) and Query (35); tsc clean; vite build 2.12s; Python focused suites 449 passed; privacy invariants 128 passed; isolated e2e server 127.0.0.1:64710 with fresh deterministic fixtures (fixture DB sha256 9d30c7d0): Chromium 174 passed/12 skipped + 9 failure-paths + 1 perf (budgets met), Firefox 16/16, WebKit 16/16. Independent rank/percentile oracle on live snapshot (sha256 1aac8c08, same bytes as Sep-5 recert): 27/27 cohort rank orders agree, 136/136 percentile sets agree, 0 divergences; 27 cohorts/199 metadata rows/136 rankable rows. Pinned Sep-4 replay fail-closes on current tree by design (corpus drift); current-tree math evidence is the oracle above plus repo suites.",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "notes": "Run Vitest, typecheck, build, full Chromium including failures/performance, Firefox/WebKit smoke, Python Explorer pipeline/UAT, submission security, DB-only snapshot portability, public-bundle privacy, exports/warnings, and independent geomean/percentile/ranking-direction calculations. Record skips and upper-bound timings honestly.",
+        "started_at": "2026-09-07T12:58:45Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run isolated frontend, browser, Python, privacy, and math verification",
+        "wid": "w2"
+      },
+      {
+        "evidence": "w3 PASS (2026-09-07): live https://benchbox.dev/results/ HTTP 200 title BenchBox Results Explorer; results.duckdb HTTP 200, 8663040 bytes, sha256 1aac8c08 identical to Sep-5 recert bytes (no redeploy since; last-modified Sep 5); snapshot metadata=10 matches source EXPECTED_READ_MODEL_VERSION=10 (Sep-4 v7/v10 mismatch resolved); no HTTP CSP/COOP/COEP/X-Frame-Options, multiline meta CSP present (D16 re-validated, accepted with owner, expiry 2026-10-04); environment/default-branch state supports D10/D11 dispositions (expiries unreached).",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "notes": "With cache disabled, drive native docs clicks, direct routes, invalid/stale/excess IDs, aliases, keyboard sort, zoom/reduced-motion, snapshot range reads, downloadable bundles, response headers, custom 404, environment policy, required checks, and rollback evidence. Do not infer live behavior from the local server.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inspect the live Pages deployment and external controls",
+        "wid": "w3"
+      },
+      {
+        "evidence": "w4 done: L2/L3 review recorded in _project/audits/results-explorer-release-readiness-closeout-2026-09-07.md (certified for curated preview; Firefox/WebKit promotion and broad-leaderboard claims out of scope). Dispositions: 16 fixed, 2 accepted (D10 expiry 2026-09-18, D16 expiry 2026-10-04), 2 superseded, 0 blocking; no new defect reproduced, no new TODO needed. Committed e5ce02527 (audit file only, in scope), audit-sha-check passes, PR #2080 opened targeting develop with auto-merge withheld; PR body discloses the one pre-existing CI failure (ledger-seed drift, owned by PR #2078).",
+        "item_id": "results-explorer-release-readiness-remediation-closeout",
+        "notes": "Ask which production-use assumption, external configuration, privacy class, unsupported browser/input, cache transition, or submission path remains untested, and whether the question is launch safety or broad leaderboard maturity. Create specific new TODOs for concrete gaps. Publish a concise verdict and do not complete while any P1/P2 lacks an owner or any accepted P3 lacks rationale/expiry.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Perform L2 and L3 plan review and issue the final release verdict",
+        "wid": "w4"
+      }
+    ]
+  }
+}

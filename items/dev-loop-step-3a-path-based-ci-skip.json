@@ -1,0 +1,482 @@
+{
+  "context": "Minimum implementation surface: `.github/path-filters.yml`\n(ruleset), the PR-tier workflow (`test.yml` or `pr.yml`) that adds\n`ci-paths`, `content-guard`, `code-lint`, `code-test`, and\n`ci-required-result`, plus a small local helper for `make pr-preflight`\nand the pre-push hook.\n\nFinal implementation uses `scripts/path_filter_decision.py`, a stdlib-only\nhelper, instead of a third-party path-filter action. That keeps CI and local\n`make pr-preflight` on the same code path, avoids a mutable action tag, and\nlets content-only PRs classify paths before dependency installation.\n\nRequired-check aggregation has one hard GitHub Actions constraint:\n`needs:` only works inside one workflow. If the required `lint` gate\nstays in `.github/workflows/lint.yml`, `ci-required-result` cannot\nobserve it. Move/duplicate the required develop PR lint/type work into\nthe umbrella workflow before making `ci-required-result` the only\nrequired check.\n\nFor the umbrella aggregation step, the explicit pass/fail script\n(rather than relying on `needs:` propagation alone) is intentional:\nit makes the \"content-only can pass without Python tests\" semantic visible in the workflow\nlog, and it correctly handles the case where `needs.lint.result` is\nthe literal string `\"skipped\"` (which evaluates truthy in some\ncomparison contexts).\n\nSequence the rollout: workflow changes first (w6 merged to develop),\nTHEN branch-protection/ruleset change (w7). Reverse order leaves develop\nunmergeable for whatever interval because the required umbrella check name\nwill not exist on the base branch yet.\n",
+  "description": "Companion to Step 3. After Step 3 removes broad non-required lanes\nfrom routine develop PR CI while preserving the existing lint +\nUbuntu 3.12 fast-test required contexts, this step closes the remaining waste:\nPRs that touch zero code (TODOs, blind-spots, decisions, blog drafts,\nagent-doc edits) still run the surviving 2-3 jobs unnecessarily.\n\nEvidence: PR #66 and PR #67 — both pure `_project/TODO/**` changes —\ntriggered ~16 jobs each (full matrix + integration + parity + PySpark)\npre-Step-3, and would still trigger ~3 jobs post-Step-3. Both rounds\nof waste are unnecessary; nothing in those PRs could possibly affect\nthe test suite.\n\nApproach: introduce a single always-reporting required check\n(`ci-required-result`) that classifies the PR's diff, runs a cheap\ncontent guard for content-only PRs, and dispatches the Step-3 code\nPR-tier (`lint`/type + Ubuntu 3.12 fast tests) only when code paths\nchanged. For TODO/blog/agent-doc-only PRs, the required check should\nreport green in <60 seconds without running Python fast tests.\n\nBranch protection contract: `ci-required-result` becomes the required\nstatus check on develop. Any jobs whose failures should block merge\nmust be in the same workflow dependency graph as the result job, because\nGitHub Actions `needs:` cannot aggregate jobs from separate workflows.\nThe current `lint.yml` workflow therefore moves its develop PR gate\nunder the umbrella. Leave `lint.yml` for main/push/manual use, or for\nnon-required reporting only.\n\nSingle PR via `make pr-open`. Independently shippable AFTER Step 3\nlands so the PR-tier workflow shape is stable. The starting required-checks\nlist is already established by the live `develop` ruleset; Step 3a is the\nlater step that changes it to the umbrella result check.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "apply branch-protection changes before the workflow PR lands",
+        "instead": "merge workflow changes first, then patch branch protection/rulesets",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "why": "the required check name will not exist on develop yet"
+      },
+      {
+        "dont": "assume docs.yml protects develop docs PRs",
+        "instead": "add develop content validation or classify docs/** as code",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "why": "it currently triggers PR checks for main only"
+      },
+      {
+        "dont": "classify unknown paths as non-code",
+        "instead": "default unknown paths to full PR-tier",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "why": "new top-level areas can affect builds/tests and a false green weakens branch protection"
+      },
+      {
+        "dont": "duplicate the path ruleset between CI and local pr-preflight",
+        "instead": "share via `.github/path-filters.yml` or a single shell helper",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "why": "they will drift and the local skip will lie to agents"
+      },
+      {
+        "dont": "make ci-required-result the only required check while required lint remains isolated in lint.yml",
+        "instead": "move the develop PR lint gate under the umbrella first",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "why": "the result job cannot aggregate another workflow"
+      },
+      {
+        "dont": "mark .gitignore or .gitattributes as safe content-only",
+        "instead": "route them through full PR-tier or a blocking gitignore-lint aggregation",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "why": "they affect repository behavior and tracked-file conflict guardrails"
+      },
+      {
+        "dont": "mark Makefile changes as non-code",
+        "instead": "keep Makefile in the code path list",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "why": "Makefile edits change developer-facing surface and have caused real regressions"
+      },
+      {
+        "dont": "pin `dorny/paths-filter@v3` by tag",
+        "instead": "pin by SHA",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "why": "tags are mutable and a compromised release could exfil secrets"
+      },
+      {
+        "dont": "skip all validation on content-only PRs",
+        "instead": "run a cheap content guard while skipping Python fast tests",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "why": "markdown/YAML/TODO/docs errors are relevant and PR #66/#67 surfaced exactly that class of issue"
+      },
+      {
+        "dont": "skip the smoke-test (w4)",
+        "instead": "fork-test before enabling on develop",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "why": "a buggy umbrella that always greens would make develop unprotected and you would not notice until something breaks"
+      },
+      {
+        "dont": "use top-level `paths:` / `paths-ignore:` filters on the workflow `on:` block",
+        "instead": "use job-level `if:` with an umbrella instead",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "why": "GitHub treats workflows-not-run as 'pending' for required-checks, leaving the PR unmergeable"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-3a-path-based-ci-skip",
+        "id": 144,
+        "reason": "Post-merge runs are the safety net; skipping them based on paths could mask a code regression that only manifests when a doc-only commit lands on top of an existing code change. Keep post-merge always-runs.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Deliberately rejected: post-merge CI is kept always-on as the regression safety net, explicitly not path-skipped.",
+        "summary": "Path-based skip on Step 4 develop-post-merge.yml"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-3a-path-based-ci-skip",
+        "id": 145,
+        "reason": "Nightly is scheduled, not PR-triggered. The 'doc-only' question doesn't apply — nightly runs the full matrix regardless of recent commits.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly states path-based skip does not apply to nightly.yml since it's schedule-triggered and always runs full matrix.",
+        "summary": "Path-based skip on nightly.yml"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-3a-path-based-ci-skip",
+        "id": 146,
+        "reason": "Premature optimization. dorny/paths-filter completes in seconds; caching adds complexity for negligible gain.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicitly called premature optimization (dorny/paths-filter already completes in seconds); no need signal.",
+        "summary": "Cache the path-filter ruleset across steps for performance"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-3a-path-based-ci-skip",
+        "id": 147,
+        "reason": "Bigger redesign than the umbrella. Step 3a only separates safe content-only PRs from everything else. Revisit only if Step 5 metrics show it's worth the complexity.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Per-path CI matrix beyond content-vs-code gated on Step 5 metrics; dev-loop-step-5-measurement-window is still open/active, condition unevaluated.",
+        "summary": "Per-path matrix dispatch beyond content-vs-code (e.g., only run explorer tests for results-explorer changes)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "needs_item": "dev-loop-step-1-local-loop-cleanup"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "needs_item": "dev-loop-step-3-ci-rebalance-and-strict-base-off"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-30T00:00:00Z",
+      "created_at": "2026-04-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Branch-protection contract — required check always reports a status; the umbrella is the new required check, not a removal of all required checks",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip"
+      },
+      {
+        "behavior": "Code-touching PRs continue to run full PR-tier CI as today (post-Step-3 narrowed) — the skip applies only when every changed path is in the safe content-only allowlist",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip"
+      },
+      {
+        "behavior": "Content validation — content-only PRs skip Python fast tests but still run cheap TODO/markdown/docs hygiene relevant to the changed paths",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip"
+      },
+      {
+        "behavior": "Existing PR-tier code checks from Step 3 — Step 3a gates them, it does not remove lint/type or Ubuntu 3.12 fast tests for code/infra/unknown-path PRs",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip"
+      },
+      {
+        "behavior": "Fail-closed path behavior — unknown paths, .gitignore, .gitattributes, workflow/config/tooling changes run full PR-tier unless explicitly and safely reclassified",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip"
+      },
+      {
+        "behavior": "Single source of truth for the path ruleset — `path-filters.yml` is referenced by both CI and local pr-preflight; do not duplicate the rules",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip"
+      },
+      {
+        "behavior": "Step 4's develop-post-merge.yml safety net is unchanged — post-merge auto-revert still runs on every landed SHA, doc-only or not",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml (Step 4 owns this; post-merge runs on every SHA, doc-only or not)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/nightly.yml (Step 3 owns this; nightly always runs the full matrix)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml (release CI is unchanged)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub branch protection / rulesets — Step 3a w7 IS the rule edit, but the edit is to the required-checks list only; do not change strict-base, dismiss-stale-reviews, enforce-admins, etc."
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile pr-fanout target (Step 1 owns this)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile worktree-add, worktree-claim, worktree-pool-*, worktree-release targets (Step 2 owns these)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "do_not_modify",
+        "path_glob": "tests/ (no test changes; only CI orchestration and a tiny local helper)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "only_modify",
+        "path_glob": ".claude/commands/pr.md (one-shot PR command summary)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "only_modify",
+        "path_glob": ".github/path-filters.yml (new path-filter ruleset)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/lint.yml (remove/disable duplicated develop PR trigger after its required gate moves under the umbrella, or leave as non-required reporting only)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/test.yml or .github/workflows/pr.yml (whichever Step 3 ended up with as PR-tier; add umbrella/result/content/code jobs)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "only_modify",
+        "path_glob": ".pre-commit-config.yaml (pr-preflight-fast-tests hook — add path-filter shortcut)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md (umbrella + local skip paragraph)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md (umbrella + local skip paragraph)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "only_modify",
+        "path_glob": "CONTRIBUTING.md (required-check and preflight prose)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "only_modify",
+        "path_glob": "Makefile (pr-preflight target — add path-filter shortcut)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/dev-loop-path-filter-smoke-test-*.md (smoke-test evidence)"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "kind": "only_modify",
+        "path_glob": "scripts/path_filter_decision.sh or scripts/path_filter_decision.py (new local helper)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f .github/path-filters.yml && grep -cE 'safe[-_]?content|content[-_]?only|needs[-_]?code|code[-_]?ci|unknown' .github/path-filters.yml",
+        "description": "Path filter ruleset exists and has safe-content plus fail-closed code categories",
+        "expected": ">= 1",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'ci-paths:|ci-required-result:|content-guard:' .github/workflows/test.yml .github/workflows/pr.yml 2>/dev/null | awk -F: '{s+=$2}END{print s}'",
+        "description": "ci-required umbrella/result jobs and content guard are present in PR-tier workflow",
+        "expected": ">= 3",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE \"if:.*needs\\.ci-paths\\.outputs\\.needs-code-ci.*true\" .github/workflows/test.yml .github/workflows/pr.yml 2>/dev/null | awk -F: '{s+=$2}END{print s}'",
+        "description": "Code jobs gate on the fail-closed classifier output",
+        "expected": ">= 2",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'needs: \\[.*code-lint|code-lint:|ci-required-result:' .github/workflows/test.yml .github/workflows/pr.yml 2>/dev/null | awk -F: '{s+=$2}END{print s}'",
+        "description": "Develop PR lint/type failures are aggregated by the required result check",
+        "expected": ">= 2",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)\nfound=0\nfor ruleset_id in $(gh api \"repos/${repo}/rulesets\" --jq '.[] | select(.target == \"branch\" and ((.conditions.ref_name.include // []) | any(. == \"refs/heads/develop\"))) | .id'); do\n  found=1\n  gh api \"repos/${repo}/rulesets/${ruleset_id}\" --jq '[.rules[] | select(.type == \"required_status_checks\") | .parameters.required_status_checks[]?.context]'\ndone\ntest \"$found\" = \"1\"\n",
+        "description": "Branch-protection required check is the umbrella, not the subordinate jobs",
+        "expected": "list contains 'ci-required-result' and does NOT contain bare 'lint' or 'test (ubuntu-latest, 3.12)'",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'TODO.only|docs/|under 60 seconds|unknown.*full|gitignore|code-lint|code-test|content guard' _project/decisions/dev-loop-path-filter-smoke-test-*.md",
+        "description": "Smoke-test decision record proves content-only skip, code fallback, unknown fallback, and gitignore handling",
+        "expected": ">= 6",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight 2>&1 | grep -cE 'No code changes detected|skipping fast tests' || echo 'requires a doc-only diff to demonstrate'",
+        "description": "Local pr-preflight skips only fast tests for content-only diffs",
+        "expected": ">= 1 when run on a doc-only branch; absent on a code-changed branch",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'ci-required-result|path-filters\\.yml|content-only|path.*filter|skipping fast tests' CLAUDE.md AGENTS.md CONTRIBUTING.md .claude/commands/pr.md",
+        "description": "Agent and contributor docs document the new required check and path behavior",
+        "expected": ">= 4",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -R \"dorny/paths-filter@v3\" .github/workflows",
+        "description": "No mutable dorny/paths-filter v3 tag is present",
+        "expected": "no matches",
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "notes": "Decide what is explicitly safe to treat as content-only. The rule is\nfail-closed: a PR can skip code CI only when EVERY changed path is in\nthe safe content-only allowlist. Any path outside that allowlist is a\ncode/infra path and runs the full post-Step-3 PR-tier.\n\nSafe content-only paths (skip Python fast tests; run content guard):\n  - `_project/TODO/**`, `_project/DONE/**`\n  - `_project/blind-spots/**`\n  - `_project/decisions/**`\n  - `_project/handoffs/**`\n  - `_project/notes/**`, `_project/research/**`, `_project/planning/**`\n  - `_blog/**`\n  - `docs/**` ONLY if the content guard includes docs validation for\n    develop PRs; `docs.yml` currently runs PR checks for `main`, not\n    `develop`, so do not rely on it as-is.\n  - `*.md` at repo root (README.md, CONTRIBUTING.md, etc.)\n  - `CLAUDE.md`, `AGENTS.md`\n\nExamples that MUST run full PR-tier (non-exhaustive; unknown paths\nalso run full PR-tier):\n  - `benchbox/**`, `tests/**`, `scripts/**`, `examples/**`\n  - `landing/**`, `results-data/**`, `results-explorer/**`, `docker/**`\n  - `_binaries/**`, `_sources/**`\n  - `_project/scripts/**`, `_project/config/**`, `_project/compat/**`\n  - `pyproject.toml`, `uv.lock`, `Makefile`\n  - `.github/workflows/**`, `.pre-commit-config.yaml`\n  - `.claude/commands/**` (slash-command behavior affects agents)\n  - `.gitignore`, `.gitattributes` (repo behavior and tracked-file\n    conflict guardrails; `.gitignore` also has gitignore-lint)\n\nEdge case: a single PR that touches BOTH categories runs full\nPR-tier (failsafe). The filter is \"all paths safe → skip code CI\";\nanything else runs code CI.\n\nDocument the ruleset in `.github/path-filters.yml` (a reusable\nfilter file referenced by the umbrella and local helper) so it has\na single source of truth.\n\nImplementation record (2026-04-30):\n  - Added `.github/path-filters.yml` with a `safe-content` allowlist\n    covering TODO/DONE records, blind spots, decisions, handoffs, notes,\n    research/planning records, blog drafts, docs, root markdown, and\n    agent docs.\n  - Added `content-guard` patterns matching the safe content surface so\n    content-only PRs still run targeted validation before the umbrella\n    can report green.\n  - Added explicit `code-ci` examples for code, tests, tooling, workflow,\n    Makefile, config, lockfile, git behavior, and agent-command paths.\n  - Kept unknown paths implicit and fail-closed so a new top-level path\n    runs full PR-tier CI instead of silently skipping code checks.\n  - W1 review issue fixed: removed a broad `**` code-ci pattern because\n    it would make path-filter tooling report code CI for every content\n    change and defeat the skip.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define a fail-closed path-filter ruleset",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "notes": "Edit the workflow that runs on `pull_request` to develop (Step 3\nmay have split test.yml; if so, edit the new pr-tier workflow;\notherwise edit test.yml). Add:\n\n  - `ci-paths`: always runs, checks out the PR, uses\n    `dorny/paths-filter@<pinned-sha>` (not `@v3`) or the shared helper\n    to emit:\n      - `safe-content-only: true|false`\n      - `needs-code-ci: true|false`\n      - `changed-paths` / optional debug summary\n      - optional metric line/artifact: content-only?, skipped code\n        CI?, estimated runner minutes saved (for Step 5)\n  - `content-guard`: runs when a PR contains safe content paths. This\n    is intentionally cheap and targeted: TODO YAML validation,\n    markdown/YAML hygiene, docs validation for `docs/**` develop PRs,\n    and gitignore-lint if `.gitignore` is ever routed through this\n    workflow. It must catch the kind of markdown/YAML errors that\n    mattered on PR #66/#67.\n  - `code-lint`: the post-Step-3 lint/type gate, gated on\n    `needs-code-ci == 'true'`.\n  - `code-test`: Ubuntu 3.12 fast tests, gated on\n    `needs-code-ci == 'true'`.\n  - `ci-required-result`: always runs, aggregates all of the above,\n    and is the required check name.\n\nDo not try to aggregate the existing `.github/workflows/lint.yml`\n`lint` job from `ci-required-result`: `needs:` cannot cross workflow\nboundaries. Move/duplicate the required develop PR lint/type gate\ninto the umbrella workflow before making `ci-required-result` the\nsole required check. Leave `lint.yml` for main/push/manual surfaces\nor non-required reporting only.\n\nRequired behavior:\n  1. `ci-paths` and `ci-required-result` always run (no `if:`\n     condition on those jobs).\n  2. Content-only PRs run `content-guard`, skip `code-lint` and\n     `code-test`, and pass only if `content-guard` succeeds.\n  3. Code/infra/unknown-path PRs run `content-guard` as applicable\n     plus `code-lint` and `code-test`.\n  4. If `needs-code-ci == true`, `ci-required-result` fails unless\n     both `code-lint` and `code-test` succeeded.\n  5. If `needs-code-ci == false`, `ci-required-result` fails unless\n     `content-guard` succeeded or no content guard was needed.\n\nConcrete shape (sketch):\n\n  jobs:\n    ci-paths:\n      runs-on: ubuntu-latest\n      outputs:\n        needs-code-ci: ${{ steps.classify.outputs.needs-code-ci }}\n        safe-content-only: ${{ steps.classify.outputs.safe-content-only }}\n      steps:\n        - uses: actions/checkout@v4\n        - uses: dorny/paths-filter@<pinned-sha>\n          id: filter\n          with:\n            filters: .github/path-filters.yml\n        - id: classify\n          run: scripts/path_filter_decision.sh\n\n    content-guard:\n      needs: ci-paths\n      if: needs.ci-paths.outputs.safe-content-only == 'true' ||\n          needs.ci-paths.outputs.needs-code-ci == 'true'\n      ...\n\n    code-lint:\n      needs: ci-paths\n      if: needs.ci-paths.outputs.needs-code-ci == 'true'\n      ...\n\n    code-test:\n      needs: ci-paths\n      if: needs.ci-paths.outputs.needs-code-ci == 'true'\n      ...\n\n    ci-required-result:\n      needs: [ci-paths, content-guard, code-lint, code-test]\n      if: always()\n      runs-on: ubuntu-latest\n      steps:\n        - run: |\n            set -euo pipefail\n            if [ \"${{ needs.ci-paths.outputs.needs-code-ci }}\" = \"false\" ]; then\n              if ! { test \"${{ needs.content-guard.result }}\" = \"success\" ||\n                     test \"${{ needs.content-guard.result }}\" = \"skipped\"; }; then\n                echo \"content-guard=${{ needs.content-guard.result }}\"\n                exit 1\n              fi\n              echo \"Content-only PR — skipped Python code CI.\"\n              exit 0\n            fi\n            if [ \"${{ needs.code-lint.result }}\" = \"success\" ] && \\\n               [ \"${{ needs.code-test.result }}\" = \"success\" ]; then\n              exit 0\n            fi\n            echo \"code-lint=${{ needs.code-lint.result }} code-test=${{ needs.code-test.result }}\"\n            exit 1\n\nThe required check on develop branch protection becomes\n`ci-required-result`, NOT bare `lint` or `test` directly, only after\nthe workflow has landed on develop.\n\nImplementation record (2026-04-30):\n  - Added `.github/workflows/pr.yml` for `pull_request` events targeting\n    `develop`; `.github/workflows/test.yml` and\n    `.github/workflows/lint.yml` now keep main/push surfaces while this\n    workflow owns the develop PR gate.\n  - Added always-reporting `ci-paths` and `ci-required-result` jobs.\n    `ci-paths` writes a JSON decision artifact and exposes\n    `safe-content-only`, `needs-code-ci`, `content-guard-needed`,\n    changed paths, code paths, and unknown paths as job outputs.\n  - Added `content-guard` for content paths. It validates changed YAML\n    with `check-yaml`, markdown with the existing markdownlint hook,\n    TODO/DONE YAML with `validate_todo.py` plus `todo_cli.py check-graph`,\n    and `docs/**` changes with `make docs-validate`.\n  - Added gated `code-lint` and `code-test` jobs. Their displayed check\n    names remain `lint` and `test (ubuntu-latest, 3.12)` so the current\n    pre-W7 ruleset still receives the required contexts until the\n    post-merge ruleset edit switches to `ci-required-result`.\n  - Added `scripts/path_filter_decision.py`, a stdlib-only classifier\n    that reads `.github/path-filters.yml`, fails closed on unknown\n    paths, writes GitHub outputs, emits helper path lists, and supports\n    local/CI callers without duplicating rules.\n  - W2 review issue fixed: added explicit `git fetch` steps for the base\n    branch before diff classification so Actions runners do not depend\n    on checkout-specific remote-ref behavior.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ci-required umbrella, content guard, and gated code jobs",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "notes": "Step 1 made pre-push hooks opt-in via BENCHBOX_PREPUSH=1. When\nhumans/agents DO opt in (e.g. running `make pr-preflight`), the\nfast-test lane still runs even on content-only changes — same waste,\njust locally instead of in CI.\n\nAdd a check at the top of `pr-preflight` and the\npr-preflight-fast-tests pre-commit hook that runs the same path\ndecision against `git diff --name-only origin/develop...HEAD`. If\nno code paths matched, run the cheap content guard, print\n\"No code changes detected; skipping fast tests.\", and skip only the\nPython fast-test lane.\n\nReuse the path-filter ruleset from `.github/path-filters.yml`\nvia a small helper (`scripts/path_filter_decision.sh` or Python if\nYAML parsing is needed) so the rule lives in exactly one place.\n\nImplementation record (2026-04-30):\n  - Updated `make pr-preflight` so lint/type checks still run first,\n    then the Python fast-test lane delegates to `make\n    pr-preflight-fast-tests`.\n  - Added `pr-preflight-fast-tests`, which classifies\n    `origin/develop...HEAD` with `scripts/path_filter_decision.py`.\n    Code/infra/unknown-path diffs still run `uv run -- python -m pytest\n    -m fast -q`; content-only diffs run the cheap content guard and\n    print `No code changes detected; skipping fast tests.`\n  - Added `pr-content-guard` so local preflight mirrors CI content\n    validation for YAML, markdown, TODO/DONE graph, and docs reference\n    checks.\n  - Updated the opt-in `pr-preflight-fast-tests` pre-push hook to call\n    the same Make target when `BENCHBOX_PREPUSH=1`, avoiding a separate\n    hook-only path decision.\n  - Extended `scripts/path_filter_decision.py` with `--json-in` and\n    `--check` so Makefile logic can consume the same classifier output\n    without duplicating JSON parsing in shell.\n  - W3 review found no actionable issues after checking quoting,\n    content-only guard behavior, and code-path fallback behavior.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add the equivalent local skip in pr-preflight",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "notes": "In a fork or via `act` locally, simulate two PR diffs:\n  1. Touch only `_project/TODO/foo.yaml` — confirm\n     `ci-required-result` reports green in under 60 seconds, the\n     content guard runs, and code-lint/code-test do not run.\n  2. Touch `docs/development/foo.md` — confirm docs/content\n     validation runs for develop PRs without Python fast tests.\n  3. Touch `benchbox/cli/run.py` — confirm full PR-tier runs as\n     today and umbrella aggregates correctly.\n  4. Touch an unknown top-level path (e.g., `quality/example.txt`)\n     — confirm the classifier fails closed and runs full PR-tier.\n  5. Touch `.gitignore` — confirm full PR-tier or gitignore-lint is\n     included in the blocking aggregation.\nDocument the test in `_project/decisions/dev-loop-path-filter-\nsmoke-test-<date>.md` with workflow run URLs and timings.\n\nImplementation record (2026-04-30):\n  - Checked for `act`; it is not installed in this environment, so a\n    local classifier/content-guard smoke run was used before the workflow\n    PR exists on GitHub.\n  - Added `_project/decisions/dev-loop-path-filter-smoke-test-2026-04-30.md`\n    with the five required cases: TODO-only, `docs/**`, code,\n    unknown top-level path, and `.gitignore`.\n  - Confirmed TODO-only and docs paths classify as safe content-only,\n    run content validation, and skip Python fast tests.\n  - Confirmed code, unknown, and `.gitignore` paths classify as\n    `needs_code_ci=true`, routing through `code-lint` and `code-test`.\n  - W4 review caveat recorded: GitHub workflow run URLs are not available\n    until the workflow PR is opened; W6 must use the branch PR run as the\n    first hosted workflow evidence.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a tiny test that proves the skip path works",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "notes": "Update every place that currently hard-codes the old\n`lint` + `test (ubuntu-latest, 3.12)` contract:\n  - `CLAUDE.md`\n  - `AGENTS.md`\n  - `CONTRIBUTING.md`\n  - `.claude/commands/pr.md`\n\nRequired prose:\n  - Develop PRs report through `ci-required-result`.\n  - Content-only PRs run content validation and skip Python fast\n    tests.\n  - Code/infra/unknown-path PRs run the post-Step-3 lint/type +\n    Ubuntu 3.12 fast-test gate.\n  - The shared path ruleset is `.github/path-filters.yml`.\n  - Local `make pr-preflight` uses the same classifier.\n\nImplementation record (2026-04-30):\n  - Updated `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, and\n    `.claude/commands/pr.md` to describe `ci-required-result` as the\n    develop PR umbrella.\n  - Documented `.github/path-filters.yml` as the shared path ruleset.\n  - Documented that content-only PRs run content validation and skip\n    Python fast tests, while code/infra/workflow/tooling/unknown paths run\n    the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate.\n  - Documented that local `make pr-preflight` uses the same classifier\n    and skips only the Python fast-test lane on content-only branches.\n  - W5 review found no stale docs that still describe the develop\n    required gate as bare `lint` + `test (ubuntu-latest, 3.12)`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the umbrella in agent and contributor docs",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "notes": "`make lint format typecheck`; `BENCHBOX_PREPUSH=1 make pr-preflight`;\n`make pr-open`. The PR description must state that the branch\nprotection/ruleset edit happens AFTER this PR merges, because the\nnew required check name does not exist on develop until then.\n\nInclude smoke-test fork run URLs and confirmation that PR\n#66/#67-style TODO-only PRs would now skip Python code CI while\nstill running content validation.\n\nImplementation record (2026-04-30):\n  - Rebased the branch onto `origin/develop` after PR #78 landed.\n    Resolved the Makefile conflict by preserving upstream worktree-pool\n    targets and Step 3a's `pr-preflight-fast-tests` / `pr-content-guard`\n    targets in the same phony lists.\n  - Ran `make lint format typecheck`; ruff passed, format left files\n    unchanged, and `ty check` exited 0 while reporting the repo's existing\n    426 diagnostics.\n  - Ran `BENCHBOX_PREPUSH=1 make pr-preflight`; CI lint checks passed,\n    timing policy reported 0 violations, dependency audit reported 0\n    violations, and the path-aware fast-test lane ran because this branch\n    touches code/workflow paths.\n  - Fast tests reported `21268 passed, 6 skipped, 41 warnings, 4 subtests\n    passed in 63.30s`.\n  - Final W6 review confirmed the branch classifies as\n    `needs_code_ci=true`, develop PR checks moved out of `lint.yml` and\n    `test.yml`, and `.github/workflows/pr.yml` supplies `lint`,\n    `test (ubuntu-latest, 3.12)`, and `ci-required-result`.\n  - Hosted PR run #25186848736 exposed one W6 issue:\n    `content-guard` ran `pre-commit` without first syncing dev\n    dependencies. Fixed by adding `uv sync --group dev` to the\n    `content-guard` job before YAML/markdown validation.\n  - Hosted push runs exposed a second W6 issue: a reusable rules file\n    under `.github/workflows/` is treated by GitHub as a workflow file.\n    Moved the shared ruleset to `.github/path-filters.yml` and updated\n    the classifier/docs to avoid an invalid workflow named after the\n    rules file.\n  - Hosted PR run #25187095898 exposed a third W6 issue: the project\n    environment did not include the `pre-commit` executable, so\n    `uv run -- pre-commit` resolved only on machines with a global\n    install. Added `pre-commit` to the dev dependency group and refreshed\n    `uv.lock` so CI and local content guard runs use the locked CLI;\n    also documented/allowlisted it as a CLI-only dev dependency.\n  - W6 follow-up for PR creation: after this commit, run `make pr-open`\n    and set the PR body to state that the required-check ruleset edit is\n    W7 and happens only after this workflow PR lands.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Open and merge the workflow PR before touching branch protection",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-3a-path-based-ci-skip",
+        "notes": "Apply via `gh api -X PATCH repos/joeharris76/BenchBox/branches/\ndevelop/protection` (or the Step-0-found ruleset). Required\nchecks before this step (post-Step-3): `lint`, `test (ubuntu-latest, 3.12)`.\nRequired checks after this step: `ci-required-result`.\n\nThe workflow changes from w6 MUST already be on develop. Do not make\nthis branch-protection edit a prerequisite for opening or merging\nthe workflow PR.\n\nRecord the before/after JSON in `_project/decisions/\ndev-loop-path-filter-smoke-test-<date>.md` or a follow-up decision\nrecord for audit. Do not change strict-base, dismiss-stale-reviews,\nenforce-admins, or review settings in this step.\n\nImplementation record (2026-04-30):\n  - Confirmed PR #79 merged to `develop` at `2026-04-30T20:29:55Z`\n    as squash commit `9c82b61f5be83cf018af216a7cf99866b7a4da04`.\n  - Captured ruleset `develop-squash-only` (`15611785`) before the edit:\n    required checks were `lint` and `test (ubuntu-latest, 3.12)`;\n    `strict_required_status_checks_policy` was already `false`.\n  - Updated the repository ruleset with a full `PUT` body derived from\n    the live ruleset JSON, changing only the required status check list\n    to `ci-required-result`.\n  - Re-read the live ruleset after the update and confirmed required\n    checks now contain only `ci-required-result`; squash-only review\n    settings, strict-base policy, linear history, non-fast-forward, and\n    deletion rules were preserved.\n  - Recorded the before/after JSON in\n    `_project/decisions/dev-loop-path-filter-smoke-test-2026-04-30.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Post-merge: update branch-protection required checks",
+        "wid": "w7"
+      }
+    ]
+  }
+}

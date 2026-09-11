@@ -1,0 +1,275 @@
+{
+  "context": "Implement the validation-query schema extension first because it is\na narrow catalog/runtime change with clear unit-test coverage. Then\nadd the DataFrame aggregate-state op types, designing the registration\nand dispatch API around the PySpark HLL consumer but keeping the\nshape engine-neutral enough for later Polars, DataFusion, or\nClickHouse-style aggregate-state work.\n\nTreat the two fixes as one architectural pass: both require deciding\nhow write_primitives expresses non-default runtime behavior without\nhiding it inside ad hoc SQL strings or engine-specific branches.\nKeep the implementation small, explicit, and documented.\n",
+  "description": "Fix two write_primitives architecture gaps that surfaced in the\n2026-05-02 sketch TODO batch:\n\n- SQL-mode validation queries cannot vary by platform, so a\n  ClickHouse override for a sketch op can still fail by running a\n  DuckDB-only `validation_query.sql` body on ClickHouse.\n- DataFrame-mode write operations are limited to row-level mutation\n  shapes, so PySpark HLL persist/merge sketches cannot be expressed\n  without expanding the execution model.\n\nThese gaps blocked separate sketch TODOs, but they touch the same\nwrite_primitives schema, loader, execution, validation, docs, and\ntest plumbing. A single fix-class TODO is cheaper and safer than two\nseparate TODOs because it forces the validation contract and the\nDataFrame aggregate-state contract to be designed together, then\nupdates the blocked sketch TODOs once the shared architecture is in\nplace. Splitting this work would duplicate test scaffolding and\nlikely leave the second pass re-opening decisions made by the first.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "copy read_primitives' `expression_impl` / `pandas_impl` shape without accounting for write-side cleanup, durability, validation, and partitioning",
+        "instead": "(not specified)",
+        "item_id": "write-primitives-architecture-fixes",
+        "why": "write_primitives has lifecycle responsibilities read_primitives does not."
+      },
+      {
+        "dont": "express aggregate-state DataFrame ops as INSERT or MERGE",
+        "instead": "add explicit `AGGREGATE_PERSIST` / `AGGREGATE_MERGE` types and route them separately.",
+        "item_id": "write-primitives-architecture-fixes",
+        "why": "sketch persist/merge is not row-level mutation"
+      },
+      {
+        "dont": "make `validation_query.platform_overrides` silently skip validation unless `null` skip semantics are documented and tested",
+        "instead": "require a clear reason in logs/results.",
+        "item_id": "write-primitives-architecture-fixes",
+        "why": "a skipped validation can hide a broken op"
+      },
+      {
+        "dont": "solve validation-query portability by embedding CASE logic or dialect probes in SQL strings",
+        "instead": "add explicit `validation_query.platform_overrides` and test resolution centrally.",
+        "item_id": "write-primitives-architecture-fixes",
+        "why": "validation semantics belong in the catalog model"
+      },
+      {
+        "dont": "unblock or rewrite the four sketch TODOs before the architecture tests are green",
+        "instead": "(not specified)",
+        "item_id": "write-primitives-architecture-fixes",
+        "why": "their BLOCKED state is a guardrail against repeating the failed implementation attempts."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "write-primitives-architecture-fixes",
+        "id": 527,
+        "reason": "PR #133's extension-drift blind spot is real, but vendoring or replacing DuckDB's community extension is a separate dependency-management decision from the write_primitives architecture fixes.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "DuckDB datasketches extension stabilization"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "write-primitives-architecture-fixes",
+        "id": 528,
+        "reason": "`write-primitives-sketch-cloud-verification` remains blocked by live cloud access and per-engine runtime checks, not by the two schema/model gaps covered here.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Reason explicitly states this remains blocked by/owned by open item write-primitives-sketch-cloud-verification.",
+        "summary": "Cloud credential setup for sketch verification"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-04T00:00:00Z",
+      "created_at": "2026-05-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Blocked sketch TODO scopes remain intact until their dedicated implementation PRs resume.",
+        "item_id": "write-primitives-architecture-fixes"
+      },
+      {
+        "behavior": "Existing DataFrame INSERT, BULK_LOAD, UPDATE, DELETE, MERGE, and TRANSACTION paths keep their current dispatch behavior and result contracts.",
+        "item_id": "write-primitives-architecture-fixes"
+      },
+      {
+        "behavior": "Existing write_primitives operations without validation_query.platform_overrides validate exactly as they do today.",
+        "item_id": "write-primitives-architecture-fixes"
+      },
+      {
+        "behavior": "Operation-level platform_overrides behavior remains unchanged.",
+        "item_id": "write-primitives-architecture-fixes"
+      },
+      {
+        "behavior": "SQL write_primitives execution remains independent from DataFrame aggregate-state operation support.",
+        "item_id": "write-primitives-architecture-fixes"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "_project/TODO/main/planning/write-primitives-sketch-cloud-verification.yaml"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/write-primitives-sketch-clickhouse-and-storage-metrics.yaml"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/write-primitives-sketch-duckdb-cpc-req-families.yaml"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/write-primitives-sketch-parameter-sweeps.yaml"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/write-primitives-sketch-pyspark-dataframe-surface.yaml"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/dataframe_operations.py"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/schema.py"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/write-primitives-sketch-functions.md"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/write_primitives/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/write-primitives-architecture-fixes.yaml",
+        "description": "New TODO validates against the project schema",
+        "expected": "✅ Valid",
+        "item_id": "write-primitives-architecture-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/write_primitives/test_validation_query_overrides.py -q",
+        "description": "Validation-query override unit tests cover default, override, and null behavior",
+        "expected": "all tests pass",
+        "item_id": "write-primitives-architecture-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/write_primitives/test_dataframe_aggregate_state_ops.py -q",
+        "description": "DataFrame aggregate-state unit tests cover enum and manager dispatch",
+        "expected": "all tests pass",
+        "item_id": "write-primitives-architecture-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/write_primitives -q",
+        "description": "Existing write_primitives unit suite stays green",
+        "expected": "all tests pass",
+        "item_id": "write-primitives-architecture-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/generate_indexes.py --todo-only",
+        "description": "TODO indexes regenerate after status/dependency updates",
+        "expected": "indexes generated without errors",
+        "item_id": "write-primitives-architecture-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "write-primitives-architecture-fixes",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-architecture-fixes",
+        "notes": "Add optional `platform_overrides` support to each\n`ValidationQuery` entry, mirroring the operation-level override\nsemantics:\n\n  validation_queries:\n    - id: scalar_bounds\n      sql: \"DuckDB/default SQL\"\n      platform_overrides:\n        clickhouse: \"ClickHouse SQL\"\n        redshift: null\n\nImplement in the catalog model and loader, and update\n`_run_operation_validation` so it resolves the active platform's\nvalidation SQL before execution. Preserve the current default\nbehavior when no override exists. Define `null` override semantics\nexplicitly: either skip that validation with a reason or inherit\ndefault SQL, but do not leave it ambiguous.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend validation_queries schema with platform_overrides",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-architecture-fixes",
+        "notes": "Extend `WriteOperationType` with `AGGREGATE_PERSIST` and\n`AGGREGATE_MERGE`, then add manager dispatch paths that can\nexpress sketch-shaped DataFrame work without abusing INSERT,\nMERGE, or maintenance hooks.\n\nThe design should be analogous to read_primitives'\n`expression_impl` / `pandas_impl` registration pattern, but not\ncopied blindly. Write-side aggregate-state ops need durable\noutput paths, cleanup behavior, partition awareness, validation\ncontracts, and skip/capability handling. PySpark HLL should be\nthe first implementation target because it is the immediate\nblocked consumer.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add DataFrame aggregate-state write operation types",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-architecture-fixes",
+        "notes": "Add unit tests for validation-query override resolution,\nincluding default inheritance, platform-specific SQL, and null\nbehavior. Add DataFrame write-operation tests that prove the new\naggregate-state operation types route through their own manager\nmethods and do not reuse row-level maintenance operations.\n\nUpdate write_primitives developer docs so future catalog authors\nknow when to use `validation_query.platform_overrides` and when\nto use aggregate-state DataFrame operation types.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add focused tests and docs for both new extension points",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-architecture-fixes",
+        "notes": "Once the code/docs/tests land, update these four TODOs:\n\n  - `write-primitives-sketch-clickhouse-and-storage-metrics`\n  - `write-primitives-sketch-pyspark-dataframe-surface`\n  - `write-primitives-sketch-duckdb-cpc-req-families`\n  - `write-primitives-sketch-parameter-sweeps`\n\nConfirm each has a `deps.needs` edge to this TODO, flip status\nfrom `Blocked` back to `Not Started`, and replace the prepended\nBLOCKED sections with concise \"unblocked by\nwrite-primitives-architecture-fixes\" notes. Do not alter their\noriginal implementation scopes except where needed to remove the\nhard-block language.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Restore the four blocked sketch TODOs to ready follow-up state",
+        "wid": "w4"
+      }
+    ]
+  }
+}

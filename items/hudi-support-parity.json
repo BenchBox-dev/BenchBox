@@ -1,0 +1,10 @@
+{
+  "description": "Implement comprehensive Apache Hudi support to achieve feature parity with\nexisting Delta Lake and Iceberg implementations. Currently Hudi is ~85-90%\nunimplemented compared to these formats.\n\nIMPORTANT: BenchBox supports TWO execution modes that require separate implementations:\n1. DataFrame mode: Uses *_maintenance.py classes for ACID operations\n2. SQL mode: Uses SparkDDLGeneratorMixin for DDL/tuning generation\nBoth modes must be supported for Hudi parity.\n\nCurrent State:\n- Basic CLI support (table format selection)\n- Quanton platform has hardcoded DDL with assumptions about 'id' and 'ts' columns\n- No format converter (TBL → Hudi)\n- No maintenance operations (INSERT/DELETE/UPDATE/MERGE)\n- No tuning support in SparkDDLGeneratorMixin\n- No comprehensive tests\n\nKey Architectural Decision:\nUnlike Delta Lake (delta-rs) and Iceberg (pyiceberg), Hudi has NO pure Python\nmaintenance library. All maintenance operations MUST use PySpark SQL, which\nrequires an active SparkSession. This affects both execution modes.\n\nReference Implementations:\n- Delta Lake: delta_converter.py (~190 LOC), delta_lake_maintenance.py (full ACID)\n- Iceberg: iceberg_converter.py (~320 LOC), iceberg_maintenance.py (full ACID)\n\nCode Reuse Strategy:\nHudi implementation should leverage existing abstractions to minimize duplication:\n- BaseDataFrameMaintenanceOperations: ~150 LOC of wrapper/timing logic\n- BaseFormatConverter: ~300 LOC of TBL parsing, schema validation\n- ArrowTypeMapper: ~100 LOC of SQL→Arrow type mapping\n- SparkDDLGeneratorMixin: ~80 LOC of DDL structure\n\nEstimated reuse: ~680 LOC inherited, ~400-450 LOC new = 60% code reuse",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-02-03T00:00:00Z",
+      "worktree": "table-format-parity"
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "description": "Add a second inventory to architecture and complexity reviews: test:source ratio, Make targets that tests parse as text, overlapping architecture docs, Results Explorer/Python contract surfaces, and the agent-instruction surface. Any simplification plan must name what happens to those surfaces, not only to benchbox/. Do not start a shrink campaign from this item. Anti-pattern: treating radon/cloc over benchbox/ as the whole complexity picture.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-17T14:45:26Z",
+      "completed_pr": 1762,
+      "created_at": "2026-08-17T13:16:07Z",
+      "worktree": "quality-governance"
+    },
+    "scope_rules": [
+      {
+        "item_id": "architecture-review-ops-corpus-inventory",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "architecture-review-ops-corpus-inventory",
+        "kind": "do_not_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "architecture-review-ops-corpus-inventory",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.skill-sync/skills/**"
+      },
+      {
+        "item_id": "architecture-review-ops-corpus-inventory",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/review-protocol.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'operational corpus|test:source' docs/agent/review-protocol.md",
+        "description": "Protocol names the operational-corpus inventory",
+        "expected": "match",
+        "item_id": "architecture-review-ops-corpus-inventory",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "architecture-review-ops-corpus-inventory",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Listed operational-corpus surfaces in docs/agent/review-protocol.md: test:source ratio, parsed Make API, overlapping docs, explorer/Python contracts, agent-instruction surface.",
+        "item_id": "architecture-review-ops-corpus-inventory",
+        "notes": null,
+        "started_at": "2026-08-17T14:30:17Z",
+        "started_branch": "docs/review-protocol-axes-20260817",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-review-protocol-axes-20260817",
+        "status": "done",
+        "summary": "List the operational-corpus surfaces a project-scope complexity review must inventory",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added the second-inventory requirement and the rule that simplification plans must name those surfaces.",
+        "item_id": "architecture-review-ops-corpus-inventory",
+        "notes": null,
+        "started_at": "2026-08-17T14:32:51Z",
+        "started_branch": "docs/review-protocol-axes-20260817",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-review-protocol-axes-20260817",
+        "status": "done",
+        "summary": "Add the second-inventory requirement to the architecture/complexity review binding",
+        "wid": "w1"
+      }
+    ]
+  }
+}

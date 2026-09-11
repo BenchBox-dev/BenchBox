@@ -1,0 +1,77 @@
+{
+  "description": "Non-required nits and improvements surfaced by the code review of\nexplorer-surface-trust-tiers-as-badges.  The Required issue (ListTable\nmissing trustFilter propagation) was fixed immediately post-review.\nThis item tracks the three remaining nit/consider findings.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Trust chip behavior for all current labels - maintainer, community, ci-verified, local",
+        "item_id": "explorer-trust-tiers-review-followups"
+      },
+      {
+        "behavior": "TrustBadge rendering for all labels in TrustBadge.test.tsx - all 13 tests must pass",
+        "item_id": "explorer-trust-tiers-review-followups"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- TrustBadge BenchmarkIndex",
+        "description": "TrustBadge and BenchmarkIndex tests pass",
+        "expected": "all tests pass",
+        "item_id": "explorer-trust-tiers-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Full test suite green",
+        "expected": "all green",
+        "item_id": "explorer-trust-tiers-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-trust-tiers-review-followups",
+        "notes": "BenchmarkIndex.tsx:270 - chip label uses `.split(\"-\")[0]` which extracts\nonly the first hyphen-delimited word.  Works for current labels\n(\"maintainer-run\" → \"maintainer\", \"community-submission\" → \"community\")\nbut would silently misbehave for a multi-word label like\n\"internal-team-verified\" → \"internal\" instead of a meaningful abbreviation.\n\nFix: create an explicit TRUST_LABEL_ABBREV map:\n  const TRUST_LABEL_ABBREV: Record<string, string> = {\n    \"maintainer-run\": \"Maintainer\",\n    \"community-submission\": \"Community\",\n    \"ci-verified\": \"CI\",\n    \"local\": \"Local\",\n  };\nFall back to the full label or first word for unknown tiers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make trust chip label abbreviation explicit rather than split('-')[0]",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-trust-tiers-review-followups",
+        "notes": "TrustBadge.tsx:57 - unknown labels fall back to DEFAULT_CONFIG whose title\nis \"Trust level not recorded\".  But unknown labels ARE recorded - the issue\nis they aren't in the registry yet.  The tooltip is misleading.\n\nFix: generate a dynamic tooltip for the fallback path:\n  title: `Trust tier: ${trustLabel} (unrecognised - contact maintainers)`\nThis tells users the value was present, just unrecognised by the frontend.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Improve tooltip text for unrecognised trust labels in TrustBadge",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-trust-tiers-review-followups",
+        "notes": "TrustBadge.tsx:51 - no input guard; arbitrary strings render as-is.\nIf manifest.json is malformed or a future field is null, the component\nwould either crash (null/undefined) or render garbage.\n\nFix: add a short-circuit at the top of TrustBadge:\n  if (!trustLabel) return null;\nThis prevents crashes from null/undefined trust_label in manifest rows.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add light input guard for empty/null trustLabel in TrustBadge",
+        "wid": "w3"
+      }
+    ]
+  }
+}

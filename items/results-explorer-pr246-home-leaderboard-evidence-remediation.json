@@ -1,0 +1,292 @@
+{
+  "context": "Start from the existing Home and MetaLeaderboard tests, then make the smallest\ndesign-system-aligned changes that remove the PR #246 interpretation risks.\nUse shared tokens/primitives from the retheme foundation. Keep the dense\ndata table scannable; do not trade metric clarity for a marketing-style\nlayout.\n",
+  "description": "PR #246 added a focused Results Explorer audit for visual hierarchy,\nusability, and data-presentation quality. The Home leaderboard remains the\npublic first read of BenchBox results, and the audit found that its focus\nstate, metric context, filter/control hierarchy, heatmap, links, and badge\ntreatments compete in ways that can mislead users.\n\nThis TODO turns the PR #246 evidence into an implementation plan for Home and\nMetaLeaderboard. It should be executed with the existing retheme foundation,\nbut the acceptance criteria here are deliberately screenshot-bound: the\nimplementation is not done until the named PR #246 screenshots can be\nrecaptured without the observed issues.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hide metric direction in title attributes only; use visible text or a visible legend.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make missing runs look like zero-duration or slow-duration runs.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make trust, validation, computed, warning, and success states all green pills.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "remove keyboard grid navigation while fixing focus styling.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use focus rings to indicate best value, active mode, selected data, hover, or loaded state.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "needs_item": "results-explorer-retheme-theme-system-foundation"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Clickable cohort headers and receipt/result links.",
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation"
+      },
+      {
+        "behavior": "Coverage semantics: missing cohorts are not scored and remain visible separately.",
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation"
+      },
+      {
+        "behavior": "Existing `/results/` route and Home URL mode contract.",
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation"
+      },
+      {
+        "behavior": "High-contrast/reduced-color path for leaderboard heatmaps.",
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation"
+      },
+      {
+        "behavior": "Keyboard navigation for the leaderboard grid.",
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TrustBadge.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TuningBadge.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartMath.ts"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/MetaLeaderboard.a11y.test.tsx src/pages/__tests__/Home.test.tsx",
+        "description": "Home and MetaLeaderboard unit/a11y tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --grep home",
+        "description": "Home browser smoke covers all modes",
+        "expected": "Chromium Home smoke passes for times, ranks, and speedup modes",
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: recapture /results/ at 390, 768, 1280, 1600 in times/ranks/speedup and compare against PR #246 Home screenshots'",
+        "description": "Manual PR #246 evidence recapture is clean",
+        "expected": "manual evidence shows VH-1, VH-2, DQ-1, and DQ-2 resolved or explicitly deferred",
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "notes": "Open the PR #246 audit and inspect the named screenshots at 390px, 768px,\n1280px, and 1600px. Record the current DOM/CSS owners for the observed\nHome issues:\n  - initial active-looking blue ring on the first leaderboard cell;\n  - duplicated dark filter/summary surfaces;\n  - visually heavy `Avg rank over covered cohorts` control;\n  - missing visible metric/unit/direction labels in cohort headers;\n  - speedup ratios below `1.00x` without visible meaning;\n  - trust and validation badges using similar green semantics inside\n    quantitative cells.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce and annotate the PR #246 Home evidence before editing",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "notes": "Update `MetaLeaderboard.tsx` so the first cell does not show a visible\nfocus ring on initial render. Internal roving-grid coordinates may still\nexist, but the ring must be visible only after true keyboard focus enters\nthe grid. Active mode, hovered cells, selected/clicked cells, best values,\nand focus-visible must have different visual treatments.\n\nAcceptance evidence:\n- recaptured `home-390.png` and `home-1280.png` equivalents show no\n  initial blue ring before user input;\n- keyboard Tab/arrow traversal still exposes a clear focus-visible state;\n- screen-reader/ARIA grid behavior is not removed to fix styling.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Separate roving focus, keyboard focus, selected state, and analytical emphasis",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "notes": "Every cohort header must make the comparison contract visible without\nrelying on title attributes. Include compact labels for benchmark, scale,\nphase, metric family, unit, and direction. Examples:\n  - TPC-H SF0.01, power score, higher is better;\n  - geomean latency, ms, lower is faster;\n  - speedup, ratio, above `1.00x` is faster and below `1.00x` is worse.\n\nKeep labels short enough for 390px and 768px layouts. If the header\nbecomes too dense, use an adjacent visible legend rather than hiding the\nmeaning in tooltips.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add visible metric, unit, phase, and direction labels to cohort headers",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "notes": "Consolidate the active summary and cohort/filter selector into a single\nanalytical toolbar. The toolbar should make the primary page action\nobvious: browse leaderboard, change metric mode, narrow cohorts, then\ninspect or compare results. The sort control should not visually dominate\nmode selection, especially on mobile.\n\nPreserve URL contracts for `?mode=ranks` and `?mode=speedup`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rebalance Home mode, sort, cohort, and filter controls",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "notes": "Define a cell hierarchy where the numeric value is the primary read,\nheatmap color is secondary, and trust/validation/source metadata is\ntertiary. Trust, validation, tuning, missing data, warning, and focus\nstates must not all use the same green or blue visual semantics.\n\nInclude a visible legend that explains heatmap meaning, missing runs,\ncoverage, validation/trust glyphs, and speedup values below `1.00x`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Redesign quantitative cells so values outrank heat, links, and badges",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "notes": "Add or update unit/a11y/e2e coverage for:\n  - no initial visual focus ring before user input;\n  - keyboard focus-visible appears after Tab/arrow entry;\n  - cohort header labels include metric, unit, and direction text;\n  - speedup legend explains below-`1.00x` values;\n  - high-contrast mode still provides non-color meaning;\n  - missing data remains distinct from zero or slow values.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add focused Home and MetaLeaderboard regression coverage",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-home-leaderboard-evidence-remediation",
+        "notes": "Capture Home screenshots at 390px, 768px, 1280px, and 1600px in times,\nranks, and speedup modes. Store evidence under `_project/audits/` and\nexplicitly compare against the PR #246 filenames listed in this TODO.\nAny remaining Major issue must be fixed or represented by a follow-up\nTODO before this item is completed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Recapture PR #246 Home evidence and update the remediation notes",
+        "wid": "w7"
+      }
+    ]
+  }
+}

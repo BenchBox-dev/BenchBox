@@ -1,0 +1,269 @@
+{
+  "context": "Lock path selection first, then generate the selected implementation TODO.\nDo not put both implementations into this item's `work[]`; the local TODO\nmodel cannot represent branch choice without a skipped status. If the\ngenerated TODO needs to differ from the locked spec, cite the Step 5\nmeasurement or Step 0 availability evidence that forced the change.\n\nPath A is significantly simpler if available. Path B is a real software\nproject (workflow + bot credentials + state machine) and needs fork smoke\ntesting before enabling on develop.\n",
+  "description": "Deferred queue gate and spec handoff. This TODO does NOT implement a\nqueue directly. If Step 5 measurement returns BUILD QUEUE, this item\nchooses the viable path and creates exactly one follow-up implementation\nTODO from the locked spec below:\n\n  - Path A: native GitHub Merge Queue\n  - Path B: BenchBox Merge Steward\n\nThis shape is intentional. The TODO work-unit graph only supports\n`pending`, `in_progress`, and `done`, so mutually exclusive Path A/Path B\nimplementation units cannot live in the same flat DAG without deadlocking\ndownstream work. The generated follow-up TODO becomes the executable\nimplementation item; this gate records the path and prevents re-debating\nsettled design decisions.\n\nStatus starts as Blocked (on Step 5). Three resolution paths:\n  - Step 5 -> DO NOT BUILD: this TODO moves to DONE with completion note\n    \"queue not needed; closed by Step 5 measurement <date>\"\n  - Step 5 -> BUILD QUEUE: this TODO unblocks, status -> Not Started,\n    work units below create the selected implementation TODO\n  - Step 5 -> REASSESS: stays Blocked, deps point to next measurement\n\n--- REFRESH 2026-07-23 (dev-loop-step-6-gate-refresh) ---\nRe-homed from the retired YAML tracker (_project/TODO/**, removed in the hosted-DB migration) with design content preserved verbatim. Mechanics changes only: the selected-path implementation TODO is created via `todo create` (not a YAML file); validation uses `todo show`/`todo lint` (not validate_todo.py). NEW decision input per _project/planning/ci-failure-reduction-plan.md (WS2/WS9): the w1 BUILD/DO-NOT-BUILD decision must read the CI-failure baseline and 2-week re-measure produced by dev-loop-metrics-ci-failure-baseline-2 (fix-forward pushes/PR, first-pass green rate, fast-lane policy-file touch rate, open-to-merge time) as primary evidence alongside Step 5's measurement window.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add both Path A and Path B implementation units to this TODO",
+        "instead": "create exactly one selected-path TODO",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "why": "the flat work DAG cannot mark the unchosen path skipped"
+      },
+      {
+        "dont": "add full matrix to queue-tier CI",
+        "instead": "keep queue light, heavy stays nightly",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "why": "that's exactly the over-engineering Steps 3-5 prevented"
+      },
+      {
+        "dont": "begin queue work without Step 5 saying BUILD",
+        "instead": "premature start wastes effort",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "why": "Step 5 might say DO NOT BUILD"
+      },
+      {
+        "dont": "remove develop-post-merge.yml just because the queue runs queue-tier CI",
+        "instead": "both protect different failure modes",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "why": "queue-tier and post-merge check different SHAs"
+      },
+      {
+        "dont": "skip trust lanes",
+        "instead": "`pull_request_target` is forbidden anywhere in steward workflows",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "why": "public repos with write-token automation are an exfiltration risk"
+      },
+      {
+        "dont": "use a long-lived PAT for the steward",
+        "instead": "use App with scoped permissions",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "why": "rotation burden and audit trail are worse than a GitHub App"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "needs_item": "dev-loop-metrics-ci-failure-baseline-2"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "needs_item": "dev-loop-step-5-measurement-window"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-23T18:55:06Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing pr-open semantics during deprecation period — do not break in-flight workflows mid-rollout",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2"
+      },
+      {
+        "behavior": "Heavy validation stays in nightly — do not move it back to the queue path",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2"
+      },
+      {
+        "behavior": "Only one path implementation TODO exists — no flat-DAG deadlock from mutually exclusive Path A/Path B work",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2"
+      },
+      {
+        "behavior": "Step 3's lightweight PR-tier CI — the queue does not promote develop to release-grade gating",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2"
+      },
+      {
+        "behavior": "develop-post-merge.yml safety net from Step 4 remains active even with a queue",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "kind": "do_not_modify",
+        "path_glob": ".pre-commit-config.yaml"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "kind": "do_not_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "kind": "do_not_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "kind": "do_not_modify",
+        "path_glob": "CONTRIBUTING.md"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "kind": "do_not_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/dev-loop-queue-path-*.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -cE '^Selected path: (A|B) \\(' _project/decisions/dev-loop-queue-path-*.md",
+        "description": "Path A or Path B chosen with rationale recorded",
+        "expected": "1 (exit 0; fails until the decision record exists)",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test \"$(_project/scripts/todo list --state planning | grep -c 'dev-loop-step-6[ab]-')\" = \"1\"",
+        "description": "Exactly one selected-path implementation TODO exists in the tracker",
+        "expected": "exit 0",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "sel=$(_project/scripts/todo list --state planning | grep -oE 'dev-loop-step-6[ab]-[a-z0-9-]+' | head -1); test -n \"$sel\" && test \"$(_project/scripts/todo show \"$sel\" --json | grep -cE 'queue-tier|pr-submit|pull_request_target|develop-post-merge|Pre-approved')\" -ge 4",
+        "description": "Selected-path TODO carries the common queue policy vocabulary",
+        "expected": "exit 0",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "sel=$(_project/scripts/todo list --state planning | grep -oE 'dev-loop-step-6[ab]-[a-z0-9-]+' | head -1); test -n \"$sel\" && _project/scripts/todo lint \"$sel\" | grep -q '^0 finding'",
+        "description": "Selected-path TODO lints clean",
+        "expected": "exit 0",
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "notes": "Inputs: Step 5 measurement window AND the WS9 CI-failure baseline + 2-week re-measure (dev-loop-metrics-ci-failure-baseline-2). Step 5 might say DO NOT BUILD.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm BUILD decision and choose native MQ vs steward",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "notes": "New file _project/decisions/dev-loop-queue-path-<a|b>.md containing a line matching '^Selected path: (A|B) (' with rationale.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Write queue path decision record",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Create exactly one selected-path implementation TODO via `todo create` (Path A native merge queue OR Path B merge steward - never both)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add common queue policy requirements to the selected TODO (queue-tier CI, pr-submit handoff, trust lanes, develop-post-merge retention, docs ownership)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-6-queue-decision-gate-2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Validate the generated TODO (todo show + todo lint clean) and close this gate",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,355 @@
+{
+  "context": "Two independent tracks under one TODO. Track A (w1-w3): a recorded design\ndecision first (the user picks a/b/c), then implement only if a/b. Track B\n(w4-w5): verify first, fix only if needed, and reuse the explorer/compare\ncomparability machinery the team already built rather than inventing a\njoinorder-specific one. Read benchmark_registry.py's scale-validation path\nand the explorer leaderboard-scope logic before touching either.\n",
+  "description": "Follow-up to the merged canonical-JOB foundation (issue #289 Step 1). The\nblind-spot audit surfaced two user-facing gaps the cutover introduced:\n\n(A) NO REACHABLE SMALL VERSION OF THE REAL JOB WORKLOAD. The old synthetic\n    generator scaled down to SF 0.001 so CI, laptops, and metered-egress\n    cloud accounts could run \"joinorder\". Public `joinorder` is now a hard\n    `--scale 1`: a ~1.2 GB download and ~5 GB working set (74,190,187 rows\n    across 21 tables), with no smaller option. The fallback offered\n    (`joinorder_synthetic`) is *different data* -- uniformly random, so it\n    does not exercise the optimizer the way correlated IMDb data does -- and\n    is `surface: \"internal\"`. The `tests/fixtures/joinorder_canonical_tiny`\n    fixture exists but is a test artifact, not user-selectable. So today there\n    is no quick-iteration path for the *actual* JOB workload. For a\n    benchmarking tool whose users include people on laptops and metered cloud\n    egress, that is a real ergonomics regression and should be a deliberate,\n    recorded decision -- not an accident of the cutover.\n\n(B) PARTIAL-MODE COMPARABILITY FOOTGUN. The DataFrame registry registers all\n    113 canonical JOB query IDs, but only 13 have real translations; the other\n    100 raise `NotImplementedError` and are in the default DataFrame skip list\n    (`get_dataframe_skip_queries`). Previously the synthetic benchmark *had*\n    only 13 queries, so DataFrame mode was 100% parity; now the public\n    benchmark advertises 113 and DataFrame mode covers ~11.5%. If a\n    `benchbox run --benchmark joinorder --mode dataframe` result (13/113, 100\n    skipped) lands in results / leaderboard / compare looking like a complete\n    `joinorder` run, that is exactly the comparability hazard the explorer\n    work has been fixing for other benchmarks (PRs #361, #363, #367, #370 --\n    leaderboard scope filters, compare comparability warnings, unranked\n    evidence). This TODO verifies whether that hazard is already mitigated for\n    joinorder and, if not, fixes it.\n\nTwo phases plus a conditional third. Phase 1 (A) ends in a recorded design\ndecision (with a decision gate -- AskUserQuestion). Phase 2 (B) is a\nverification spike. Phase 3 (B) is conditional on Phase 2 finding a gap. The\nphases are independent of each other and can be done in either order.\n\nRelated TODOs: `track2-joinorder-dataframe-coverage` (the actual translation\nof the 100 stubs -- distinct from this TODO's \"mark partial runs\" concern;\ncross-reference it from Phase 3). `joinorder-scale-stress-decision-framework`\nand `joinorder-replicated-imdb-scale-prototype` are the *up*-scale (10x\nbigger JOB) line of work; Phase 1 here is the *down*-scale (CI/dev ergonomics)\ncounterpart -- note the relationship so the two scale decisions stay\nconsistent, but do not merge them. Independent of\n`joinorder-canonical-data-assurance`, `joinorder-redistribution-license-adr`,\n`joinorder-step1-housekeeping`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a small scale by truncating each table to the first N rows",
+        "instead": "derive a transitively-closed sub-universe (or reuse the tiny-fixture build)",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "why": "that orphans foreign keys and the JOB queries return empty"
+      },
+      {
+        "dont": "build a joinorder-specific 'partial run' marker",
+        "instead": "reuse it",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "why": "the explorer already has leaderboard-scope + compare-warning machinery (PRs #361/#363/#367/#370)"
+      },
+      {
+        "dont": "change default_scale away from 1.0",
+        "instead": "a small scale is strictly opt-in",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "why": "canonical JOB is the point of the public benchmark"
+      },
+      {
+        "dont": "make joinorder_synthetic the 'small JOB' answer",
+        "instead": "it stays internal/smoke-only",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "why": "it is uncorrelated random data and does not exercise the optimizer like JOB"
+      },
+      {
+        "dont": "skip the w4 verification and jump straight to building a marker",
+        "instead": "verify, then fix only the actual gap",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "why": "the explorer work may already cover this"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-accessibility-and-comparability",
+        "id": 411,
+        "reason": "Owned by track2-joinorder-dataframe-coverage; this TODO only marks partial runs safely until that lands",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Owning item track2-joinorder-dataframe-coverage is DONE; its w1 notes confirm all 100 stub DataFrame queries were translated and validated.",
+        "summary": "Actually translating the 100 stub DataFrame queries"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-accessibility-and-comparability",
+        "id": 412,
+        "reason": "Owned by joinorder-scale-stress-decision-framework / joinorder-replicated-imdb-scale-prototype; Phase 1 here is the down-scale counterpart only",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Reason states this is explicitly owned by joinorder-replicated-imdb-scale-prototype, which is open and matches exactly.",
+        "summary": "Up-scale (10x bigger) JOB-derived benchmark"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The 13 real DataFrame translations and the 100 NotImplementedError stubs / skip list keep behaving as today; Phase 3 only adds run-level partiality metadata",
+        "item_id": "joinorder-accessibility-and-comparability"
+      },
+      {
+        "behavior": "default_scale for joinorder stays 1.0 (canonical is the default); a small scale is opt-in",
+        "item_id": "joinorder-accessibility-and-comparability"
+      },
+      {
+        "behavior": "joinorder_synthetic stays surface=internal and is not repurposed as the 'small JOB' answer",
+        "item_id": "joinorder-accessibility-and-comparability"
+      },
+      {
+        "behavior": "scale_factor=1.0 keeps fetching/verifying the canonical archive exactly as today; any small-scale path is additive",
+        "item_id": "joinorder-accessibility-and-comparability"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "BENCHMARK_METADATA['joinorder']['scale_options']=[1.0] in benchbox/core/benchmark_registry.py + validate_scale_factor() — the scale gate; a new small scale extends this list and the JoinOrderBenchmark scale->archive mapping",
+        "decision": "reuse",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "path": "BENCHMARK_METADATA['joinorder']['scale_options']=[1.0]"
+      },
+      {
+        "concept": "Explorer leaderboard scope + compare comparability-warning machinery (PRs #361/#363/#367/#370, results-explorer/) — reuse for partial joinorder DataFrame runs rather than a new mechanism",
+        "decision": "reuse",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "path": "Explorer"
+      },
+      {
+        "concept": "_project/joinorder/reference_cardinalities.json (full) — the reference-cardinalities format; a JOB-light subset gets its own committed file in the same shape",
+        "decision": "reuse",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "path": "_project/joinorder/reference_cardinalities.json"
+      },
+      {
+        "concept": "benchbox/core/joinorder/dataframe_queries.py:get_untranslated_dataframe_query_ids + JoinOrderBenchmark.get_dataframe_skip_queries — the existing skip-list source the partial-run marker reads from",
+        "decision": "reuse",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "path": "benchbox/core/joinorder/dataframe_queries.py:get_untranslated_dataframe_query_ids"
+      },
+      {
+        "concept": "tests/fixtures/joinorder_canonical_tiny/ + _project/joinorder/tiny_reference_cardinalities.json + tests/unit/core/joinorder/test_canonical_queries.py — existing tiny-correlated-fixture pattern; option (b) promotes it, option (a) reuses its build logic",
+        "decision": "reuse",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "path": "tests/fixtures/joinorder_canonical_tiny/"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "do_not_modify",
+        "path_glob": "_project/joinorder/reference_cardinalities.json"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/queries.py"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder_synthetic/"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "_project/joinorder/"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/build_joinorder_data.py"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/benchmarks.py"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/index.md"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/join-order.md"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/cli/run.md"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "examples/unified_runner_README.md"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/joinorder_canonical_tiny/"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/joinorder/"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/explorer/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "ls _project/decisions/joinorder-small-workload-*.md && grep -il 'joinorder\\|JOB' _project/decisions/joinorder-small-workload-*.md",
+        "description": "Phase 1 decision is recorded as an ADR in _project/decisions/",
+        "expected": "an ADR records the choice among (a) build JOB-light, (b) promote the tiny fixture, (c) document no small path -- with rationale",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.benchmark_registry import BENCHMARK_METADATA as m; print(m['joinorder']['scale_options'])\" && uv run -- python -m pytest tests/unit/core/joinorder -q",
+        "description": "If a small scale was added: it is in scale_options, resolves to the light archive, and all 113 queries run on it",
+        "expected": "scale_options shows the new small value (or [1.0] unchanged if option (c) was chosen); joinorder unit tests pass including the new subset test",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -RiE 'partial|skip|unrank|113|comparab' _project/joinorder",
+        "description": "Phase 2 verification summary exists and states the partiality finding",
+        "expected": "the summary shows whether a joinorder --mode dataframe run is marked partial across result metadata / leaderboard / compare",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/joinorder tests/unit -k 'joinorder and (partial or skip or comparab)' -q || echo 'no gap found / no Phase 3 needed'",
+        "description": "If a gap was found: partial joinorder DataFrame runs are marked and comparison-guarded; tests cover it",
+        "expected": "either Phase 3 tests pass, or Phase 2 found no gap and Phase 3 was correctly skipped",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make docs-validate",
+        "description": "Docs build clean after any doc updates",
+        "expected": "passes",
+        "item_id": "joinorder-accessibility-and-comparability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "joinorder-accessibility-and-comparability",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-accessibility-and-comparability",
+        "notes": "Capture (the durable baseline for the facts this TODO cites):\n  - `uv run -- python -c \"from benchbox.core.benchmark_registry import BENCHMARK_METADATA as m; import json; print(json.dumps({k: m['joinorder'][k] for k in ('default_scale','scale_options','min_scale','num_queries','surface')}))\"`\n    (expect scale_options == [1.0]);\n  - `uv run -- python -c \"from benchbox.core.joinorder.dataframe_queries import get_dataframe_queries, get_untranslated_dataframe_query_ids; r=get_dataframe_queries(); print('registered', len(list(r.get_query_ids()))); print('untranslated', len(get_untranslated_dataframe_query_ids()))\"`\n    (expect registered 113, untranslated 100);\n  - the merge state of PRs #361/#363/#367/#370 (`gh pr view <N> --json state,mergedAt` each) so the \"reuse the explorer comparability machinery\" premise is recorded.\nKeep raw output in `/tmp`, CI artifacts, or `BENCHBOX_OUTPUT_DIR`; commit\nonly a compact summary with command, checked SHA, PASS/FAIL, and key\ncounts in the TODO, ADR, or `_project/joinorder/` evidence note.\nNo code changes.\nDone: compact summary records `scale_options == [1.0]`, DataFrame\nregistry coverage 113 registered / 100 untranslated, and PRs\n#361/#363/#367/#370 merged.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Snapshot the current accessibility/coverage state before any change",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-accessibility-and-comparability",
+        "notes": "Lay out the options and put the decision to the user (AskUserQuestion):\n  (a) BUILD \"JOB-LIGHT\": a sampled-but-correlated subset selectable as a\n      new small scale (e.g. `--scale 0.05`). Requires: a deterministic\n      subset-build step (extend `_project/scripts/build_joinorder_data.py`),\n      a `joinorder-imdb-2013-v1-light` archive + manifest entry, a\n      `light_reference_cardinalities.json`, `scale_options` += that scale\n      in `benchmark_registry.py`, `JoinOrderBenchmark` mapping the scale\n      to the light archive, tests, and docs. Acceptance criteria for\n      \"correlated enough\" as in the context section above.\n  (b) PROMOTE THE TINY FIXTURE: expose `joinorder_canonical_tiny` as a\n      user-selectable scale with documented \"smoke only -- not a JOB\n      measurement, not comparable\" semantics (and make sure such a run is\n      marked unranked/partial like Phase 2/3 below).\n  (c) DOCUMENT \"NO SMALL PATH\": accept that canonical `joinorder` is\n      `--scale 1` only and `joinorder_synthetic` is uncorrelated\n      smoke-only; make `docs/benchmarks/join-order.md` say so explicitly\n      and close. (Lowest effort; leaves the ergonomics regression.)\nRecord the decision as an ADR regardless of which option wins:\n`_project/decisions/joinorder-small-workload-2026-05-12.md` (the\n`_project/decisions/` directory exists; mirror the decision-doc shape used\nby `joinorder-scale-stress-decision-framework`). w2/w3 below are\noption-(a)/(b)-only; if (c) wins, w2/w3 collapse to \"update docs + close\"\nand Phase 2/3 (the comparability work) still proceed independently.\nDone: option (c) selected in\n`_project/decisions/joinorder-small-workload-2026-05-12.md`. Public\n`joinorder` remains `--scale 1` only; the tiny fixture is not promoted\nwhile the IMDb-derived data redistribution remediation remains open.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Phase 1 decision gate: choose how (if at all) to provide a reachable small JOB workload; record an ADR",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-accessibility-and-comparability",
+        "notes": "Only if w1 chose (a) or (b). Reuse the `joinorder_canonical_tiny` build\nlogic if it's coherent; otherwise add a deterministic subset extractor to\n`build_joinorder_data.py` that picks a transitively-closed sub-universe.\nWire the new scale into `BENCHMARK_METADATA[\"joinorder\"][\"scale_options\"]`\nand have `JoinOrderBenchmark`/data-fetch resolve it to the light archive\nand manifest section. Generate + commit the subset's reference\ncardinalities. Keep `default_scale` at 1.0 (canonical stays the default).\nANNOUNCE any heavy build step (it touches the full dataset to derive the\nsubset).\nDone: no-op because w1 selected option (c). `scale_options` stays `[1.0]`\nand no new archive/manifest/reference-cardinality artifact is added.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Phase 1 build (option a/b only): implement the small selectable scale -- subset build, archive+manifest, reference cardinalities, scale_options, benchmark mapping",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-accessibility-and-comparability",
+        "notes": "Add a test (fast tier) that runs all 113 canonical queries against the\nsubset via DuckDB and checks they return the expected shape vs the new\nreference; assert the row-count-ratio tolerance. Update\n`docs/benchmarks/join-order.md`, `docs/benchmarks/index.md`, the registry\n`query_description`/`scale_options`, `examples/unified_runner_README.md`,\nand `docs/reference/cli/run.md` to document the small scale, what it is\nfor (quick iteration / CI), and that results at it are NOT comparable to\n`--scale 1` (and are marked partial/unranked -- see Phase 2/3). Run\n`make docs-validate` + the joinorder unit tests.\nDone: no-op for small-scale implementation because w1 selected option\n(c). `docs/benchmarks/join-order.md` now states there is no public small,\ncomparable JOB workload and links the ADR.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Phase 1 tests + docs (option a/b only): all 113 queries run on the subset; docs describe the small scale and its 'not comparable to --scale 1' status",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-accessibility-and-comparability",
+        "notes": "Run (or inspect, if a heavy run is impractical -- use the tiny fixture or\na dry-run) `benchbox run --benchmark joinorder --mode dataframe` and\nexamine the produced result JSON: does `BenchmarkResults` record\nqueries-executed vs queries-defined and the skip list? Then check: does\nthe explorer leaderboard treat such a run as unranked/partial (the machinery\nfrom PRs #363/#367)? Does `compare` / `analyze_results` warn when comparing\nit against a 113-query SQL run (the machinery from #361/#370)? Capture the\nfindings (stdout / screenshots / file excerpts) to\na compact committed summary under `_project/joinorder/`.\nGATE: if partiality IS clearly surfaced end-to-end -> record the evidence,\nmark w5 a no-op, done. If there is ANY surface where a 13/113 joinorder\nDataFrame run looks complete/comparable -> w5.\nDone: compact summary records a gap. Schema-v2 export dropped\n`dataframe_skip_summary`, causing the explorer to infer 13 logical\nqueries instead of 113.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Phase 2 verification spike: does a joinorder --mode dataframe run get marked partial (13/113, 100 skipped) in result metadata / leaderboard / explorer / compare?",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-accessibility-and-comparability",
+        "notes": "Only if w4 found a gap. Add result-metadata + explorer/compare signalling\nthat the run executed N/113 queries with a named skip list, reusing the\ncomparability-warning machinery added for other benchmarks (PRs #361/#363/\n#367/#370) rather than a joinorder-specific mechanism. Prevent or flag\ncomparison against complete runs. Add tests for the new metadata and the\nexplorer/compare behavior. Cross-reference `track2-joinorder-dataframe-coverage`\n(which removes the gap entirely once translations land) so this is\nunderstood as the interim guard.\nDone: schema-v2 result export preserves `dataframe_skip_summary`; the\nexplorer transformer uses executed+skipped as the logical query\ndenominator; metadata/summary skipped rows no longer count as failures;\nranking exclusion reuses the existing comparison exclusion reason. Tests\ncover the 13-of-113 JoinOrder DataFrame case.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Phase 3 (conditional on w4): mark partial joinorder DataFrame runs and guard comparison against complete runs; tests",
+        "wid": "w5"
+      }
+    ]
+  }
+}

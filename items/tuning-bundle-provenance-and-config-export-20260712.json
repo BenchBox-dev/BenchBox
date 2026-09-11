@@ -1,0 +1,225 @@
+{
+  "context": "Name the new hash field explicitly (e.g. requested_config_hash) so ADR-1's\nlater applied-ledger hash can coexist without semantic collision. Reuse\nBenchmarkTunings-style canonical JSON hashing (sort_keys, separators) but hash\nthe full UnifiedTuningConfiguration.to_dict().\n",
+  "description": "From the 2026-07-12 tuning review, findings C2/C3/C4 ungated parts (evidence\npinned to commit acfb8992). The evaluator-facing evidence chain is broken:\n\n- tuning_config_hash and tuning_source_file are read from kwargs no call site\n  passes (benchbox/base.py:757-761; the adapter call at\n  platforms/base/adapter.py:851-881 omits both) -> bundle hash always absent,\n  source always \"auto\" (core/results/schema.py:1234). Corpus: 0/528 bundles\n  carry a hash.\n- build_tuning_payload/_build_tuning_summary extract keys\n  (indexes/statistics/configuration) that UnifiedTuningConfiguration.to_dict()\n  never produces (schema.py:1250-1258, 1364-1374) -> clauses always empty and\n  the requested config is dropped at export entirely.\n- TuningResolution provenance (mode/source enum/config file/searched paths) is\n  display-only (cli/tuning_resolver.py); TuningSource.INTERACTIVE_WIZARD is\n  never assigned.\n\nFix (decision-safe under ADR-1, which may later ADD an applied-side hash):\nthread TuningResolution provenance into run_config -> result capture; export\nthe requested config canonically (to_dict) plus a clearly-named\nrequested-config hash; replace the dead clauses extraction with the real\nconfig structure. Record source as the enum value, template as a repo-relative\nref or content hash - never a raw local path.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "export repr() strings anywhere (see tuning-repr-serialization-leak-fix-20260712)",
+        "instead": "(not specified)",
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "reuse the ambiguous 'hash' key for the new value without qualifying its object",
+        "instead": "(not specified)",
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "tuning-bundle-provenance-and-config-export-20260712",
+        "id": 281,
+        "reason": "Gated on ADR-1; owned by tuning-applied-ledger-and-validation-status-20260712",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Reason explicitly states this is owned by tuning-applied-ledger-and-validation-status-20260712, which is open (planning, critical).",
+        "summary": "Applied-side ledger, dual-hash, validation_status overhaul"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing bundle schema keys remain readable by the explorer pipeline (additive change; no key renames)",
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712"
+      },
+      {
+        "behavior": "No raw local filesystem paths in exported bundles",
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/results/schema.py build_plan_payload / .plans.json companion: existing companion-file + summary-block pattern — reuse for the tuning companion",
+        "decision": "reuse",
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "path": "benchbox/core/results/schema.py"
+      },
+      {
+        "concept": "benchbox/core/tuning/interface.py get_configuration_hash: existing canonical-JSON hash recipe — extend to full unified config",
+        "decision": "extend",
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "path": "benchbox/core/tuning/interface.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/tuning_resolver.py"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/builder.py"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/loader.py"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/models.py"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/interface.py"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=/tmp/tuning-export-check uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --non-interactive && uv run -- python -c \"import json,glob; b=json.load(open(sorted(glob.glob('/tmp/tuning-export-check/results/*.json'))[-1])); print(json.dumps(b['platform']['tuning'], indent=2))\"",
+        "description": "End-to-end: tuned duckdb run at SF 0.01 produces a bundle whose tuning block contains source enum, template ref, requested_config_hash, and the full requested config",
+        "expected": "tuning block with source, template ref/hash, requested_config_hash, and requested config structure",
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results tests/unit/core/tuning tests/unit/cli/test_tuning* -q",
+        "description": "Unit suites green",
+        "expected": "All passing",
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "notes": "Re-validated against origin/develop @ aea5881c (acfb8992 evidence had moved):\n- benchbox/base.py:757-761 (`_populate_builder`) still reads\n  `kwargs.get(\"tuning_config_hash\")`/`kwargs.get(\"tuning_source_file\")`\n  with no caller passing them - BUT this method (and\n  `_create_result_builder`) is dead code with zero production callers\n  (only exercised by tests/unit/test_base_advanced.py). The live path is\n  `benchbox/core/benchmark_result_validation.py:26` ->\n  `benchbox/core/results/result_factory.py:build_enhanced_benchmark_result`\n  (`_apply_optional_builder_data`, ~line 122-126), which had the\n  identical bug. result_factory.py was added to scope (see deviation\n  note) since it is the actual call site the evidence describes, just\n  relocated by an intervening refactor.\n- adapter.py's `run_enhanced_benchmark` (~line 851-881, was ~743-747/\n  851-881 pre-refactor) omitted tuning_config_hash/tuning_source_file/\n  tuning_source exactly as described.\n- build_tuning_payload/_build_tuning_summary (schema.py, was ~1250-1258/\n  1364-1374, now ~1208-1332/1427-1471) extracted\n  indexes/statistics/configuration - keys UnifiedTuningConfiguration.\n  to_dict() never produces (its keys: primary_keys, foreign_keys,\n  unique_constraints, check_constraints, platform_optimizations,\n  table_tunings) - confirmed dead, clauses always empty.\n- TuningSource.INTERACTIVE_WIZARD (tuning_resolver.py:46) was indeed\n  never assigned; both wizard call sites (run.py's\n  `_load_unified_tuning_config` fallback branch, and\n  `_interactive_tuning_step`) left the resolution's source at its\n  pre-wizard value.\nADDITIONAL finding beyond the pinned evidence (confirmed empirically,\nnot just by inspection - a real `--tuning tuned` duckdb run produced\n`platform.tuning: null`, not merely hash-absent): `tuning_enabled` and\n`unified_tuning_configuration` never reached the adapter's `__init__`\nAT ALL for the CLI's non-interactive/direct run path (`_run_direct`,\ndry-run, load-only) - `db_manager.create_config()` only folds\noverrides into `DatabaseConfig.options` (nested), while\n`PlatformAdapter.__init__` reads them as top-level kwargs via\n`from_config()`. This meant `effective_tuning_config` was always None\nand no tuning was ever physically applied for these paths (confirmed\nfor duckdb and postgresql; only questdb's from_config already forwarded\nboth keys correctly). This is a genuinely separate, more severe,\npre-existing defect from what this TODO's evidence anticipated - fixing\nit was a hard prerequisite for verifying w1-w4 end-to-end (otherwise\n`effective_tuning_config` is always None and there is nothing to attach\nprovenance to). Fixed narrowly: run.py now promotes tuning_enabled/\ntuning_source/tuning_source_file onto top-level DatabaseConfig fields\n(mirroring the interactive wizard path, which already did this for\ntuning_enabled), and adapter.py/duckdb.py read them back correctly.\nDeliberately did NOT promote unified_tuning_configuration itself onto\nDatabaseConfig: it is a pydantic model, and model_dump() (used\ndownstream to build platform_config) recursively serializes\ndataclass-valued extra fields to plain dicts, which would hand the\nadapter a dict instead of a UnifiedTuningConfiguration instance. Fixed\nadapter.py to read the config object from the existing, already-\nreliable `tuning_config` kwarg channel instead (get_platform_config()\nalways passes it through as a live object reference).\nA companion systemic gap - the SAME tuning_enabled/\nunified_tuning_configuration forwarding bug exists in ~48 other\nplatforms' from_config() methods (confirmed for postgresql.py,\nsqlite.py, clickhouse/workload.py, starrocks/workload.py,\ndatafusion.py, motherduck.py; only questdb.py already does it\ncorrectly) - out of scope for this TODO (would touch dozens of files\nwell beyond scope_limit); flagged for a dedicated follow-up TODO.\nDeviations from scope_limit (all narrow, single-purpose, documented in\nthe PR body): benchbox/core/results/result_factory.py (live call-site\ncounterpart of base.py's dead code), benchbox/platforms/duckdb.py\n(from_config key-forwarding fix, needed to exercise ANY tuning path\nend-to-end).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate pinned evidence at current HEAD (grep the kwarg call sites and clauses key extraction; note line refs in PR)",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "notes": "From run.py through run_config into create_enhanced_benchmark_result kwargs; template ref repo-relative or hashed, never a raw local path; assign INTERACTIVE_WIZARD where the wizard produces the config.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Thread provenance (source enum, template ref, requested-config hash) into result capture kwargs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "notes": "Export constraints, platform_optimizations, table_tunings; drop the dead indexes/statistics/configuration extraction that never matches to_dict() keys.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rewrite build_tuning_payload/_build_tuning_summary to export the requested config's real structure",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Schema/docs: document the new fields as REQUESTED (self-attested) values; bump/annotate bundle schema notes; loader round-trip support",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-bundle-provenance-and-config-export-20260712",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tests: bundle for a template run carries source=yaml + template ref + hash; fallback run carries source=fallback; hash is stable across dict ordering and distinct across differing configs",
+        "wid": "w4"
+      }
+    ]
+  }
+}

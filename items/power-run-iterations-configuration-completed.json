@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: Medium\"\n- \"**Status**: ✅ Completed\"\n- \"**Description**: Add configurable query iterations for power tests with statistical analysis and performance profiles\"\n- \"**Tasks**:\"\n- \"**Files Affected**: `benchbox/cli/config.py`, `benchbox/utils/execution_manager.py`, `benchbox/utils/config_helpers.py`, documentation, examples\"\n- \"**Impact**: ✅ Provides professional-grade benchmarking with statistical confidence, eliminates outliers, enables regression testing with statistical significance, and supports publication-quality benchmark reports with confidence intervals.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "New Feature Requests",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

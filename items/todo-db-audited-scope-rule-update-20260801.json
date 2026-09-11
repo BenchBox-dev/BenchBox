@@ -1,0 +1,114 @@
+{
+  "context": "Extend the standalone update CLI and tracker transaction with explicit add/drop scope flags, immutable audit diffs, validation, hosted parity tests, and documentation. Do not expose raw SQL or bypass project identity.",
+  "description": "Add a supported, audit-chained update operation for adding or removing only_modify/do_not_modify scope rules on an existing item. Required to resolve the internally contradictory explorer-receipt-bounds-and-bundle-discovery-20260801 work order without direct hosted-database mutation.",
+  "legacy": {
+    "item_meta": {
+      "category": "tracker-infrastructure",
+      "completed_at": "2026-08-01T20:20:19Z",
+      "completed_pr": 3,
+      "created_at": "2026-08-01T20:03:19Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing update operations remain one atomic audit event and project identity remains mandatory.",
+        "item_id": "todo-db-audited-scope-rule-update-20260801"
+      },
+      {
+        "behavior": "Scope removals require an explicit reason and cannot silently broaden a done item.",
+        "item_id": "todo-db-audited-scope-rule-update-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-db-audited-scope-rule-update-20260801",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "todo-db-audited-scope-rule-update-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "todo-db-audited-scope-rule-update-20260801",
+        "kind": "only_modify",
+        "path_glob": "src/todo_db/**"
+      },
+      {
+        "item_id": "todo-db-audited-scope-rule-update-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k \"update and scope\" -q",
+        "description": "Focused update and audit tests pass",
+        "expected": "all scope-update and audit-chain tests pass",
+        "item_id": "todo-db-audited-scope-rule-update-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:20:00Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check . && uv run -- ruff format --check . && uv run -- python -m pytest -q",
+        "description": "Package quality gates pass",
+        "expected": "lint format and full tests green",
+        "item_id": "todo-db-audited-scope-rule-update-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:20:09Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-db-audited-scope-rule-update-20260801",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "todo-db-audited-scope-rule-update-20260801",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "RED: uv run -- python -m pytest tests/test_update.py -q -> 3 failed, 8 passed; missing API kwargs, CLI flag, and audit behavior reproduced.",
+        "item_id": "todo-db-audited-scope-rule-update-20260801",
+        "notes": null,
+        "started_at": "2026-08-01T20:09:37Z",
+        "started_branch": "codex/fix-pr1436",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-completion-20260801",
+        "status": "done",
+        "summary": "Add RED CLI and tracker tests for adding and removing scope rules",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Merged todo-db PR #3 (commit dfef9ca): atomic audited add/drop scope updates with mandatory reasons, validation, rollback coverage, and audit payload fields; 109 full tests passed and Ruff check/format passed.",
+        "item_id": "todo-db-audited-scope-rule-update-20260801",
+        "notes": null,
+        "started_at": "2026-08-01T20:10:35Z",
+        "started_branch": "codex/fix-pr1436",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-completion-20260801",
+        "status": "done",
+        "summary": "Implement atomic audited scope-rule updates",
+        "wid": "w2"
+      },
+      {
+        "evidence": "README documents the four scope mutation flags, mandatory --reason behavior, atomicity, and audit payload fields; delivered in merged todo-db PR #3.",
+        "item_id": "todo-db-audited-scope-rule-update-20260801",
+        "notes": null,
+        "started_at": "2026-08-01T20:19:17Z",
+        "started_branch": "docs/cutover-adr-update",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Document the supported flags and hosted usage",
+        "wid": "w3"
+      }
+    ]
+  }
+}

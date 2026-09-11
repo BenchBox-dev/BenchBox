@@ -1,0 +1,247 @@
+{
+  "context": "Use native buttons inside scoped table headers, put aria-sort on the active column header, and rely on native keyboard activation. Centralize count-aware noun and verb phrases. Derive facet affordance from distinct effective options so a one-value corpus shows explanatory metadata without a fake filter. Validate at keyboard-only traversal, 200 percent zoom, reduced motion, and high contrast without redesigning unrelated pages.",
+  "description": "Real keyboard input confirmed that Result Detail sort controls do not expose aria-sort and raw-table Space both changes sort and scrolls the page. Copy pluralizes verbs but not benchmark/result nouns, and the current corpus exposes a tuning filter whose only effective value is Not Recorded. Correct these low-severity issues as one interaction-semantics pass, with keyboard, screen-reader, reduced-motion, and zoom guardrails.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add aria-sort to role=button th elements while retaining custom Space handling",
+        "instead": "use a real button within a scoped th and expose sort state on the header",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "why": "that keeps fragile non-native interaction semantics and the scrolling defect"
+      },
+      {
+        "dont": "fix each grammar string with an inline ternary",
+        "instead": "centralize count-aware phrases with singular and plural tests",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "why": "the same noun/verb disagreement already appears in multiple copy paths"
+      },
+      {
+        "dont": "invent tuning labels or synthetic options to make the filter useful",
+        "instead": "suppress the filter when it cannot narrow and retain honest explanatory copy",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "why": "that would misrepresent the corpus"
+      }
+    ],
+    "item_meta": {
+      "category": "Accessibility",
+      "completed_at": "2026-08-02T14:44:15Z",
+      "completed_pr": 1485,
+      "created_at": "2026-08-02T04:28:01Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Every interactive control remains reachable and visibly focused by keyboard.",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup"
+      },
+      {
+        "behavior": "Existing design tokens and high-contrast overrides remain authoritative.",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup"
+      },
+      {
+        "behavior": "Reduced-motion behavior continues to disable nonessential animation and no horizontal page scroll appears at 200 percent zoom.",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup"
+      },
+      {
+        "behavior": "Sort order, sort direction toggling, column scope, and table data remain unchanged.",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup"
+      },
+      {
+        "behavior": "Tuning metadata remains visible even when the filter is hidden or disabled because it has no discriminating value.",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Reuse the existing reduced-motion and high-contrast media-query strategy.",
+        "decision": "reuse",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "path": "results-explorer/src/index.css"
+      },
+      {
+        "concept": "Centralize noun and verb agreement in the existing copy formatter layer.",
+        "decision": "extend",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "path": "results-explorer/src/lib/copyFormatters.ts"
+      },
+      {
+        "concept": "The median table already uses native buttons; normalize both sortable tables to one accessible pattern.",
+        "decision": "extend",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "path": "results-explorer/src/pages/ResultDetail.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/capability/**"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/**"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/copyFormatters.test.ts"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/facetModel.test.ts"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/copyFormatters.ts"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/facetModel.ts"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'from pathlib import Path; t=Path(\"results-explorer/src/pages/ResultDetail.tsx\").read_text(); assert \"aria-sort\" in t'",
+        "description": "Result Detail exposes sortable-column state",
+        "expected": "Fails on the unfixed tree; exits 0 when sortable headers expose their state.",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "last_result": "pass",
+        "last_run": "2026-08-02T14:40:30Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Home.test.tsx src/lib/__tests__/copyFormatters.test.ts src/lib/__tests__/facetModel.test.ts",
+        "description": "Focused component and formatting tests pass",
+        "expected": "Sort semantics, grammar for zero/one/many, and single-option facet behavior pass.",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "last_result": "pass",
+        "last_run": "2026-08-02T14:40:54Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --workers=1 e2e/capability e2e/routes",
+        "description": "Keyboard and responsive browser regressions pass",
+        "expected": "Space does not scroll, aria-sort changes correctly, focus remains visible, and zoom/reduced-motion checks pass.",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "last_result": "pass",
+        "last_run": "2026-08-02T14:43:18Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventory found three raw-sample th role=button headers with custom Enter/Space handlers and no aria-sort; median headers already use native buttons but no announced sort state. Home benchmark copy builds \"public benchmark have/has results\" with an unpluralized noun, and the tuning filter always renders even when every row shares one tuning bucket.",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "notes": "Cover median and raw Result Detail tables, every Home benchmark/result phrase, and all facets whose effective option count can collapse to one. Record expected roles, names, aria-sort transitions, focus order, Space behavior, and filter visibility.",
+        "started_at": "2026-08-02T14:24:38Z",
+        "started_branch": "fix/results-explorer-accessibility-copy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Inventory sortable tables, count phrases, and one-option facets",
+        "wid": "w0"
+      },
+      {
+        "evidence": "ResultDetail now uses native buttons inside scoped th elements for both median and raw tables; every header exposes aria-sort=none/ascending/descending and custom Space handlers/role=button wrappers are removed. Focused ResultDetail tests pass.",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "notes": "Use th scope=col with aria-sort=ascending/descending/none as appropriate and a real button for activation. Verify Enter and Space toggle exactly once, prevent page scrolling, retain focus, and announce the updated state.",
+        "started_at": "2026-08-02T14:26:03Z",
+        "started_branch": "fix/results-explorer-accessibility-copy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Normalize native sort controls and announced state",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Centralized count-plus-verb copy formatting so benchmark and tuning messages pluralize both noun and verb; the tuning filter now hides when the view has one metadata bucket while the scope summary and explanatory note remain visible. Focused Home/copy/facet tests pass (70 tests).",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "notes": "Cover zero, one, and many for benchmark/result nouns and verbs. Hide or disable the tuning selector when every visible row is unlabelled, while retaining the Not Recorded explanation and restoring the filter automatically when multiple effective values exist.",
+        "started_at": "2026-08-02T14:26:46Z",
+        "started_branch": "fix/results-explorer-accessibility-copy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Centralize plural copy and remove zero-information filtering",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added real Playwright checks for aria-sort/native Space behavior, keyboard focus under reduced-motion and forced-colors, and 200% zoom containment. Full Chromium capability/routes suite passed 70 tests with one pre-existing intentionally skipped range-read-budget target; typecheck/build and focused tests also pass.",
+        "item_id": "results-explorer-accessibility-copy-and-facet-cleanup",
+        "notes": "Use real keyboard input, inspect accessible roles/state, assert no Space scroll, test 200 percent zoom and narrow viewport without page-level horizontal overflow, and emulate prefers-reduced-motion/high contrast. Do not claim screen-reader certification from DOM assertions alone; record a concise manual traversal.",
+        "started_at": "2026-08-02T14:39:59Z",
+        "started_branch": "fix/results-explorer-accessibility-copy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Add keyboard, zoom, contrast, and reduced-motion browser checks",
+        "wid": "w3"
+      }
+    ]
+  }
+}

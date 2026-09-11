@@ -1,0 +1,204 @@
+{
+  "description": "Session 01a07292 repeatedly collided with the shared test lock and confused agent-write-preflight, optional pre-push checks, and full pr-preflight. Extend tests/conftest.py's existing flock and Make targets; do not add another lock service. Reuse local results only to avoid a duplicate invocation with identical command and complete input identity, never to satisfy hosted required checks or reuse evidence across changed integration trees.\n\nFEATURE-BATCH EXTENSION: receipts may coalesce only identical validated inputs. Member preparation evidence never certifies the later integrated tree. Include member base/head, scope/config identity and integration content in invalidation; conflict edits and changed predecessor content invalidate affected member and downstream contracts. Account for worker plus integration checks in the same frozen feature delivery record; do not omit pre-PR checks when reporting savings.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Treat a snapshot, a queued review, a skipped hook or an unbound passing check as completion",
+        "instead": "Bind actual evidence to the relevant PR/head/input and retain an explicit owned next action",
+        "item_id": "pr-local-validation-singleflight",
+        "why": "The observed session repeatedly lost asynchronous work or overstated evidence"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "needs_item": "ci-baseline-representative-remeasure-sample"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-09-08T02:40:42Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "KEEP_IDLE and SHADOW_ONLY remain in force for skip/shard/demotion/reduced-refresh proposals; this plan does not activate them.",
+        "item_id": "pr-local-validation-singleflight"
+      },
+      {
+        "behavior": "Keep GitHub native merge queue as the only merger; no privileged steward, bypass actor, direct protected-branch push, or new bot credential.",
+        "item_id": "pr-local-validation-singleflight"
+      },
+      {
+        "behavior": "Preserve required PR, merge_group, and post-merge coverage, soundness maintainer review, explicit user authority, and durable hold labels.",
+        "item_id": "pr-local-validation-singleflight"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "pr-local-validation-singleflight",
+        "path": ".pre-commit-config.yaml"
+      },
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "pr-local-validation-singleflight",
+        "path": "tests/conftest.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "kind": "do_not_modify",
+        "path_glob": ".agents/skills/**"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "kind": "do_not_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "kind": "only_modify",
+        "path_glob": ".pre-commit-config.yaml"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "kind": "only_modify",
+        "path_glob": "docs/development/pytest-xdist-safety.md"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/dev-loop-worktrees.md"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "kind": "only_modify",
+        "path_glob": "scripts/local_validation.py"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "kind": "only_modify",
+        "path_glob": "tests/conftest.py"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_local_validation.py"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_local_validation.py tests/unit/test_release_infrastructure.py -q",
+        "description": "Local validation preserves lock safety and evidence identity",
+        "expected": "exit 0; behavioral negative controls fail on the prior implementation",
+        "item_id": "pr-local-validation-singleflight",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "pr-local-validation-singleflight",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "pr-local-validation-singleflight",
+        "notes": "Measure lock refusals, actual command counts and local gate wall time before changes using the existing session/metric evidence. Define one ordered focused-check then required-preflight path and explicit actual gate names; hooks that do no work report skipped, never tested/passed.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Measure duplicate gate work and define exact gate reporting",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-local-validation-singleflight",
+        "notes": "Extend the existing lock acquisition with bounded waiting, owner/progress visibility, cancellation and timeout behavior. Do not delete active locks, bypass CPU protection, spawn concurrent xdist suites, or add another cross-process lock authority.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add bounded owner-aware waiting to the existing test lock",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-local-validation-singleflight",
+        "notes": "Coalesce duplicate same-input gate requests using a completed local receipt bound to working-tree content (including relevant untracked files), base/input SHAs, command, config, lockfile/tool versions and exit status. Unknown identity, changed files/ref/tool, incomplete/cancelled run or different gate requires execution. Never reuse cross-tree or hosted certification.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Coalesce duplicate same-input local checks using complete evidence identities",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-local-validation-singleflight",
+        "notes": "Test two worktrees, timeout/cancel, dead owner, changed HEAD/base/untracked input/tool, skipped hooks, failed prior run and successful identical request. Measure after: one actual execution for simultaneous identical requests, no repeated lock-error retry loop, no lost gate coverage, and bounded added waiting.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify contention, invalidation, failure and skipped-hook behavior and measure savings",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-local-validation-singleflight",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify batch member and combined-tree receipt invalidation without hiding pre-PR effort",
+        "wid": "w4"
+      }
+    ]
+  }
+}

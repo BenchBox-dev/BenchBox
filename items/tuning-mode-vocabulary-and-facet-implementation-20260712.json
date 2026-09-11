@@ -1,0 +1,182 @@
+{
+  "description": "From the 2026-07-12 tuning review, findings C4/C6 (rule side) and product\nquestions 3-4 (evidence pinned to commit acfb8992). GATED on ADR-2\n(tuning-adr-mode-vocabulary-fallback-facets-20260712).\n\nImplements whatever ADR-2 decides across the whole pipeline:\n- resolver/runner: distinct mode/source for template-less tuned runs; wizard\n  provenance assigned; --official policy; raw file paths replaced by a\n  canonical mode + template ref (no local path leakage via\n  config.tuning_mode - run.py:311, schema.py:854);\n- schema/loader: pinned vocabulary enforced at emission;\n- explorer: facet rule per ADR-2 (mechanism-set warning in\n  ComparabilityReceipt, physical_rendering_id as secondary facet for TPC,\n  profile-version visibility), TuningBadge entries for any new mode values,\n  self-attested labeling per ADR-1 if decided;\n- external-mode guard completeness: reject external+tuning for custom-file\n  mode too, not just the literal string \"tuned\" (run.py:617,2302).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "No facet rule changes beyond what ADR-2 records",
+        "instead": "(not specified)",
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "needs_item": "tuning-adr-mode-vocabulary-fallback-facets-20260712"
+      },
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "needs_item": "tuning-explorer-ingest-mode-extraction-20260712"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing facet behavior for non-tuning facets untouched",
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712"
+      },
+      {
+        "behavior": "Old-generation bundles keep loading and displaying (not-recorded state)",
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/**"
+      },
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/**"
+      },
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/schemas.py"
+      },
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark ssb --scale 0.01 --tuning tuned --non-interactive --output /tmp/fallback-check",
+        "description": "Fallback run end-to-end carries the decided distinct labeling into bundle and explorer",
+        "expected": "Bundle mode/source reflect fallback per ADR-2 (ssb has no duckdb template only if removed; else use a templateless platform/benchmark pair from w1 analysis)",
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit -q -k tuning && cd results-explorer && npm test -- --run 2>&1 | tail -3",
+        "description": "Python + TS suites green against shared vocabulary pin",
+        "expected": "All passing",
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "notes": "TuningResolution.canonical_mode property added (tuning_resolver.py):\nTUNED+FALLBACK -> tuned-fallback, CUSTOM_FILE -> custom, else mode.value.\nWizard branches (run.py _load_unified_tuning_config fallback-wizard path\nand the standalone interactive _interactive_tuning_step) now rebuild\nTuningResolution with source=INTERACTIVE_WIZARD (mode TUNED) or\nBASELINE (mode NOTUNING) instead of leaving the stale pre-wizard\nresolution in place. _reject_official_fallback() added and called from\n_resolve_tuning(): --official + canonical_mode==tuned-fallback exits(1)\nbefore touching the tuning config, for both direct/data_or_load and\ninteractive paths (checked before the wizard offer, so official runs\nnever even get prompted). _canonical_tuning_mode(s) helper reads\ns.tuning_resolution.canonical_mode for all 3 _build_execution_context()\ncall sites (was raw s.tuning, i.e. keyword or local path) - ExecutionContext\n/run_config tuning_mode now never carries a raw path. Quick-restart\n(_interactive_try_quick_restart) re-resolves via resolve_tuning() with\nnon_interactive=True (no wizard re-prompt) so its canonical mode is\naccurate for the restored platform/benchmark rather than stale.\nPR #1176 conflict note: NOT present on this branch (tuning_source/\nhash threading absent from run.py/schema.py/loader.py as checked) -\nwizard provenance implemented directly on TuningResolution.source per\nthis TODO's fallback instructions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolver/runner: implement decided fallback labeling + provenance assignment + official-mode policy; kill raw-path mode values",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "notes": "benchbox/core/tuning/modes.py added (constants module: TUNED,\nTUNED_FALLBACK, NOTUNING, AUTO, CUSTOM, MODES tuple, NOT_RECORDED\nsentinel, is_canonical_mode()) - the production vocabulary source the\nshared YAML fixture pins against. NOT in the TODO's declared\nscope_limit (only_modify lists benchbox/cli/**, benchbox/core/results/**,\nnot benchbox/core/tuning/**) but this exact path is what the TODO body\nitself specifies for the constants module; kept as clearly intentional,\nflagged here for visibility.\nExplorer ingest (_project/scripts/explorer_pipeline/transformer.py\n_tuning_mode()) now validates config/execution tuning_mode against\nis_canonical_mode() before accepting it - per ADR-2's *consequences*\nsection (not literally the TODO description text, which said legacy\npaths \"load as custom\"): a legacy raw file path or the old \"balanced\"\nwizard string is treated as not-recorded (None), never guessed into\n`custom`, matching \"ingest treats unrecognized values as not recorded\nrather than guessing which bucket they belong in.\" Config.tuning_mode\nin the SQL/DataFrame run_config path (schemas.py RunConfig /\nbuilder.py RunConfigInput) was confirmed dead/never-populated in\ncurrent production code on this branch (benchmark_config.options\nnever gets a \"tuning_mode\" key set anywhere) - so no raw-path leak\nexists there today; left as-is rather than newly wiring it up (out of\nADR-2's stated scope, which only requires no raw-path leak wherever\ntuning_mode IS emitted).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Schema + loader: enforce pinned vocabulary; emit new mode/source values; migration note for old bundles",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "notes": "TuningBadge.tsx: added tuned-fallback (warning tone) and custom\n(warning tone, distinct from the generic unknown-mode fallback bucket)\nentries. Home.tsx: unified the null-state wording to \"Not Recorded\"/\n\"not recorded\" across the tuning facet chip, dropdown option, and\ndescriptive copy (previously \"not labelled\"/\"no tuning label\" -\ninconsistent with TuningBadge's already-fixed #1170 wording).\nComparabilityReceipt.tsx: new \"Physical tuning mechanisms\" field -\nwarns (status \"diff\", never a match failure) when 2+ results labeled\n`tuned` have non-identical physical_mechanisms sets; omitted when\nfewer than two tuned results are present or any tuned result predates\nphysical_mechanisms ingest (undefined, distinct from a recorded empty\nset). Data plumbed end-to-end: platform.tuning.logical_profile.\n{physical_mechanisms,physical_rendering_id} (already emitted by\nschema.py, previously unread by the explorer) -> transformer.py\nDetailResult fields -> duckdb_builder.py `results` table + views ->\nduckdbQueries.ts -> types.ts DetailResult (both fields optional, like\nthe existing plans_published precedent, to avoid touching ~10\nDetailResult test factories). physical_rendering_id: added as a\nmatchable *predicate* physicalRenderingIdsMatch() in facetMatching.ts\n(absent on either side -> matches; both present -> must be equal) plus\na ResultRow/FacetMatchRow field - NOT wired as a full URL-persisted\nFACET_KEYS chip (ADR-2 frames it as an on-demand secondary narrowing\ntool, not a change to the default coarse facet UI); no facetModel.ts/\nHome.tsx chip UI added for it. Self-attested labeling (ADR-1) was not\npart of ADR-2's decision text and is out of scope here.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Explorer: facet rule, receipt mechanism warning, badge entries, self-attested label per ADRs",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "notes": "All 4 call sites (_parse_plat_bench_options, _interactive_try_quick_restart,\n_interactive_collect_flags, _interactive_tuning_step - originally at\n617/1954/2201/2302, shifted slightly after edits) now use\n_tuning_arg_is_tuning_bearing(s.tuning) instead of the literal\n`s.tuning.strip().lower() == \"tuned\"` check: any raw --tuning value\nother than \"notuning\" (tuned, tuned-fallback's own trigger \"tuned\",\nauto, or a custom file path) is rejected under --table-mode external.\nError message generalized from \"--tuning tuned\" to \"tuning enabled\".\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Complete the external-table guard for all tuning-bearing modes",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "notes": "test_tuning_mode_vocabulary.py: added TestProductionConstantsMatchTheSharedFixture\n(modes.py against the fixture), TestCanonicalModeMapsResolutionsOntoTheSharedVocabulary\n(all TuningMode x TuningSource pairs -> canonical_mode is always in the\npinned set), and TestFallbackLabelingEndToEnd (CliRunner-driven: asserts\nexecution_context.tuning_mode == \"tuned-fallback\" for a --tuning tuned\nrun with template discovery forced to miss via BENCHBOX_TUNING_PATH +\ntmp cwd, and that --official refuses it with exit_code != 0 and\n\"tuned-fallback\" in the error). test_transformer.py: legacy raw-path\nand \"balanced\" -> not-recorded regression tests, tuned-fallback/custom\npassthrough test, physical_mechanisms/physical_rendering_id extraction\ntests. test_duckdb_browser_contract.py: new columns added to the\nEXPECTED_TABLES/EXPECTED_VIEWS contract sets. TuningBadge.test.tsx:\ntuned-fallback and custom cases. facetMatching.test.ts: tuned-fallback/\ncustom exact-match cases, physicalRenderingIdsMatch cases.\nComparabilityReceipt.test.tsx: mechanism-match/diff/omitted cases.\nHome.test.tsx: updated 2 assertions for the \"Not Recorded\" wording\nunification.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cross-language vocabulary tests updated against the shared pin",
+        "wid": "w5"
+      }
+    ]
+  }
+}

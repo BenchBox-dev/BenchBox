@@ -1,0 +1,188 @@
+{
+  "context": "Do not fix 65 bundles one at a time. Group the failures by error text first -- the write_primitives DataFusion and SQLite clusters alone are five of the worst bundles -- and establish for each cluster whether it is an unimplemented operation (in which case the honest answer may be to withdraw those cells rather than fix them), a query-translation defect, or a real engine limit worth recording. Only then decide per cluster: fix, withdraw, or document as a known limitation. The corpus validator's >=3-platform rule means withdrawing a platform from a cohort may drop the whole cohort, so check that before withdrawing anything.",
+  "description": "MEASURED 2026-08-24 by building the Explorer snapshot from develop's corpus and querying it directly, not estimated.\n\n  ranking-eligible                 82 of 211\n  excluded: failed_queries         65\n  excluded: no_queries             60\n  excluded: insufficient_query_coverage   3\n  excluded: insufficient_valid_queries    1\n  trust labels                     211/211 maintainer-run, zero trust_not_rankable\n\nThe 60 no_queries bundles belong to dataframe-results-can-never-be-submitted-no-compliance-class (all DataFrame, root-caused, fixed forward in PR #1866). THIS item is the other 65: bundles that executed queries and had some fail. They are all validation=partial.\n\nThe exclusions are correct and specific -- the leaderboard is honest, and nothing here misleads a reader. The problem is depth: the public corpus advertises 211 results and ranks 82.\n\nWorst offenders by failure count:\n  write_primitives DataFusion SQL   324/351 failed, three bundles across SF0.01/0.1/1\n  write_primitives SQLite SQL       252/351 failed, two bundles\n  clickbench DataFusion DataFrame   129/129 failed, total\n  read_primitives SQLite SQL        120/456 failed\n  tpcdi DataFusion SQL               78/114 failed\n\nBy execution mode the split is even: 36 SQL, 29 DataFrame -- so unlike the no_queries class this is not a DataFrame-path defect. The concentration in write_primitives and read_primitives on DataFusion and SQLite suggests unimplemented operations rather than a single wiring bug, but that is a hypothesis and has not been verified.\n\nNot filed as a launch blocker: the site is accurate today. Filed because 61 percent of the corpus not ranking is a product-quality question a reader will notice.\n\n---\n\n## LARGELY SUPERSEDED BY THE 2026-08-23 TRUST CUT — re-measure before acting (noted 2026-08-29)\n\nThe 2026-08-24 measurement above is against a corpus that no longer exists. PRs #1939 (develop) and #1940 (published-results) withdrew all 130 bundles run before 2026-08-23.\n\nRe-measured against the post-cut snapshot built from the 9 surviving bundles:\n\n  ranking-eligible          8 of 9\n  excluded: failed_queries  1\n  excluded: no_queries      0\n\nOf the 65 failed-query bundles this item was opened for, exactly ONE survives: tpcds_sf10_spark_sql_20260823_233540_e9faf36f.json, with a single failed query. The write_primitives DataFusion and SQLite clusters named in the approach are gone with the bundles.\n\nThe item is not fully obsolete: the class of problem returns as soon as coverage is rebuilt, and the surviving Spark SF10 failure is a live instance worth root-causing on its own. But the cluster analysis in the work log describes data that is no longer checked in, so do not act on those groupings directly.\n\nSuggest re-scoping to the one surviving failure plus a policy for new results, and re-measuring after restore-corpus-coverage-after-20260823-trust-cut adds cohorts back.",
+  "legacy": {
+    "item_meta": {
+      "category": "results",
+      "completed_at": "2026-08-29T13:05:16Z",
+      "completed_pr": 1909,
+      "created_at": "2026-08-24T12:15:28Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/**"
+      },
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/benchmark_mixin.py"
+      },
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "kind": "only_modify",
+        "path_glob": "benchbox/validation/"
+      },
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "kind": "only_modify",
+        "path_glob": "benchbox/validation/**"
+      },
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "kind": "only_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "kind": "only_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python results-data/validate_corpus.py",
+        "description": "Retained partials are documented and excluded from ranking",
+        "expected": "exit 0 and every actual failed-query bundle is non-ranking",
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "last_result": "pass",
+        "last_run": "2026-08-25T22:58:47Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import duckdb;c=duckdb.connect('results-explorer/public/data/results.duckdb',read_only=True);print(c.execute(\\\"select count(*) from results where ranking_exclusion_reason='failed_queries' and is_ranking_eligible\\\").fetchone())\"",
+        "description": "Failed-query evidence never ranks",
+        "expected": "0",
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "last_result": "pass",
+        "last_run": "2026-08-25T22:58:50Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Grouped all 69 bundles in results-data/ carrying failed queries into 9 distinct error clusters: SQL dialect incompatibilities (23), Other/Uncategorized (15), DataFusion/UnifiedExpr translation (15), Transaction Primitives/DDL (5), Spark/DataVault column unresolved (3), TPCHavoc unsupported routines (2), PySpark window functions (2), Spark Flight Data type translation (2), Spark internal error (1), Query validation failure (1).",
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "notes": null,
+        "started_at": "2026-08-24T13:05:20Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Group the 65 bundles by failure error text and report the cluster sizes",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Categorized root causes across clusters: (1) SQL dialect/unsupported functions: engine limit/dialect gap (e.g. DATE_TRUNC, COPY in SQLite); (2) UnifiedExpr/DataFusion: translation bugs/unimplemented operators; (3) DataVault/load_end_dts: schema column naming mistranslation; (4) Spark Flight Data: PySpark type argument error in adapter; (5) DDL/Write primitives: missing DDL features in embedded engines (SQLite/DataFusion).",
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "notes": null,
+        "started_at": "2026-08-24T13:05:24Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "For each cluster, establish whether it is unimplemented, mistranslated, or a real engine limit",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Approved 2026-08-24: retain truthful partial results as non-ranking capability evidence; fix and regenerate BenchBox defects; document genuine engine/version limits; withdraw invalid or false metadata only. Reject blanket withdrawal because it would collapse or shallow cohorts without creating clean ranked results.",
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "notes": null,
+        "started_at": "2026-08-24T22:01:53Z",
+        "started_branch": "fix/corpus-authority-integrity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-authority-integrity",
+        "status": "done",
+        "summary": "DECISION GATE - per cluster, fix / withdraw / document as a known limitation",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Live 213-bundle cohort analysis at origin/develop da03e4c14: blanket removal of 66 actual failed-query bundles would affect 28 of 47 cohorts, leave 8 below the three-platform floor, and remove 10 cohorts entirely. Decision therefore retains truthful partials; any invalid-bundle withdrawal must add replacements or remove the whole cohort without weakening the gate.",
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "notes": null,
+        "started_at": "2026-08-24T22:04:03Z",
+        "started_branch": "fix/corpus-authority-integrity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-authority-integrity",
+        "status": "done",
+        "summary": "Check the >=3-platform cohort rule before any withdrawal, so removing a platform does not silently drop a cohort",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #1909 documents retained partial dispositions in results-data/CORPUS_NOTES.md, preserves all 59 failed-query bundles, excludes every failed-query bundle from ranking, and adds fail-closed admission for inconsistent clean validation metadata.",
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "notes": null,
+        "started_at": "2026-08-25T17:42:01Z",
+        "started_branch": "chore/v0-4-0-non-uat-integration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-v0-4-0-non-uat-integration",
+        "status": "done",
+        "summary": "Document retained partial dispositions and reject inconsistent clean metadata",
+        "wid": "w4"
+      },
+      {
+        "evidence": "commit 865b4376c; 155 focused tests passed; live Polars and PySpark SF1 exports now carry summary.validation=passed and phases.validation.status=PASSED",
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "notes": null,
+        "started_at": "2026-08-25T22:47:09Z",
+        "started_branch": "fix/corpus-validation-claim-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-validation-claim-policy",
+        "status": "done",
+        "summary": "Record DataFrame query validation in phases.validation before replacing rerun bundles",
+        "wid": "w5"
+      },
+      {
+        "evidence": "commit 8d401682d; 172 focused tests passed; documented driver_memory=8g and shuffle_partitions=8 reached PySpark and the SF1 retry completed 66/66 with validation passed",
+        "item_id": "corpus-65-bundles-carry-failed-queries",
+        "notes": null,
+        "started_at": "2026-08-25T22:51:07Z",
+        "started_branch": "fix/corpus-validation-claim-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-validation-claim-policy",
+        "status": "done",
+        "summary": "Make documented PySpark DataFrame memory and shuffle controls reachable through benchbox run",
+        "wid": "w6"
+      }
+    ]
+  }
+}

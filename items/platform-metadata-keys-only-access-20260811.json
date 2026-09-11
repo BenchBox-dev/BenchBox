@@ -1,0 +1,205 @@
+{
+  "context": "Inventory keys-only callers, add get_platform_names backed by the cached metadata without copying nested values, migrate the enumeration callers, and keep the existing mutation-isolation behavioral tests green.",
+  "description": "From the 2026-08-09 adversarial review of PR #1644, deferred at merge without a tracker record. PlatformRegistry.get_all_platform_metadata deep-copies the entire nested metadata for roughly fifty platforms on every call (benchbox/core/platform_registry.py:634); the deepcopy is deliberate mutation isolation from PR #1644 and must stay for full-metadata consumers. However benchbox/cli/platform.py and benchbox/cli/database.py only call list(...keys()) to enumerate names, paying the full copy of every deployment_modes and libraries subtree on repeated CLI and MCP listing paths. Add a cached keys-only accessor named get_platform_names and migrate enumeration callers to it.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Deep-copy inside the names accessor.",
+        "instead": "Copy only the key list into a fresh list.",
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "why": "That defeats the purpose of the accessor."
+      },
+      {
+        "dont": "Return the cached nested structure without a copy from the full-metadata API.",
+        "instead": "Keep the deepcopy for full-metadata consumers and add a names-only path.",
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "why": "PR #1644 fixed registry aliasing deliberately."
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Governance and Efficiency",
+      "completed_at": "2026-08-13T22:59:21Z",
+      "completed_pr": 1719,
+      "created_at": "2026-08-11T12:40:02Z",
+      "worktree": "platform-governance"
+    },
+    "preserves": [
+      {
+        "behavior": "Platform SDK imports remain lazy during enumeration.",
+        "item_id": "platform-metadata-keys-only-access-20260811"
+      },
+      {
+        "behavior": "Returned name ordering and content match the metadata key set.",
+        "item_id": "platform-metadata-keys-only-access-20260811"
+      },
+      {
+        "behavior": "get_all_platform_metadata keeps returning a mutation-isolated deep copy with an unchanged public shape.",
+        "item_id": "platform-metadata-keys-only-access-20260811"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Mutation-isolated metadata projections from PR #1644.",
+        "decision": "extend",
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "path": "benchbox/core/platform_registry.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/**"
+      },
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/baseline_tool.py"
+      },
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      },
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/**"
+      },
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.platform_registry import PlatformRegistry; assert hasattr(PlatformRegistry, 'get_platform_names')\"",
+        "description": "Keys-only accessor exists",
+        "expected": "Exits nonzero on the unfixed tree; exits 0 once the accessor lands.",
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "last_result": "pass",
+        "last_run": "2026-08-13T22:59:01Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_platform_registry.py tests/unit/core/test_platform_registry_behavioral.py -q",
+        "description": "Registry and mutation-isolation tests pass",
+        "expected": "Registry behavior including mutation isolation is unchanged.",
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "last_result": "pass",
+        "last_run": "2026-08-13T22:59:08Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_run_command_options.py tests/unit/mcp -q",
+        "description": "CLI and MCP listing surfaces pass",
+        "expected": "Enumeration surfaces list identical platform names.",
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "last_result": "pass",
+        "last_run": "2026-08-13T22:59:17Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/core/platform_registry.py benchbox/cli benchbox/mcp",
+        "description": "Touched paths satisfy Ruff",
+        "expected": "Ruff exits zero.",
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "last_result": "pass",
+        "last_run": "2026-08-13T22:59:19Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Repository-wide rg found four production keys-only callers: benchbox/cli/platform.py default/fallback enabled lists, benchbox/cli/database.py additional-platform enumeration, and benchbox/sql_compat/baseline_tool.py benchmark-gate enumeration. MCP resources/registry.py and tools/discovery.py require nested metadata values and remain on get_all_platform_metadata. Other callers likewise consume values. Added the omitted SQL-compat file to scope with an audited reason.",
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "notes": null,
+        "started_at": "2026-08-13T22:49:49Z",
+        "started_branch": "fix/platform-metadata-names-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-platform-metadata-names-20260813",
+        "status": "done",
+        "summary": "Inventory every caller of get_all_platform_metadata and classify keys-only versus full-metadata usage",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added PlatformRegistry.get_platform_names returning a fresh list from the internal metadata cache without deepcopying nested values. Added a test proving ordering/content parity with get_all_platform_metadata keys and mutation isolation of the returned list. Scoped Ruff passed; registry behavioral suite exited 0.",
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "notes": null,
+        "started_at": "2026-08-13T22:50:32Z",
+        "started_branch": "fix/platform-metadata-names-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-platform-metadata-names-20260813",
+        "status": "done",
+        "summary": "Add the cached get_platform_names accessor without copying nested metadata",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Migrated all four production keys-only callers in CLI platform config, database selection, and SQL-compat baseline enumeration. MCP resource/discovery callers remain on full metadata because they consume nested values. Added ordering, fresh-list, and mocked-deepcopy negative controls. Ruff and ty passed; related registry/CLI/MCP suite: 962 passed; compat docs and DDL drift checks clean.",
+        "item_id": "platform-metadata-keys-only-access-20260811",
+        "notes": null,
+        "started_at": "2026-08-13T22:51:49Z",
+        "started_branch": "fix/platform-metadata-names-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-platform-metadata-names-20260813",
+        "status": "done",
+        "summary": "Migrate keys-only callers and add an equivalence test that names match the metadata key set",
+        "wid": "w2"
+      }
+    ]
+  }
+}

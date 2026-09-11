@@ -1,0 +1,232 @@
+{
+  "context": "For _compare_operator_properties, use a COMPARE_DISPATCH: dict[str, Callable] pattern\nmapping operator type strings to small comparison functions. For _format_operator_properties,\nthe _format_truncated_list(label, items, max_display=3) helper eliminates the repeated\ntruncation pattern. For run_streams, the key insight is that the sequential loop body\nand the concurrent StreamExecutor._run_single_stream do the same thing - factor into one.\n",
+  "description": "Six core functions at CC=14 in query plans and TPC-DS modules can be decomposed.\n\nTarget functions:\n1. _compare_operator_properties (comparison.py:288) - replace if/elif dispatch with registry dict\n2. _format_operator_properties (visualization.py:297) - extract _format_truncated_list() helper\n3. load_operations_catalog (primitives/catalog/loader.py:24) - extract _parse_operation_entry()\n4. run_streams (tpcds/benchmark/runner.py:687) - extract sequential stream runner, share with concurrent\n5. run (tpcds/maintenance_test.py:131) - split loop from finalization logic\n6. run_official_benchmark (tpcds/official_benchmark.py:97) - extract _extract_metric() helper",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change TPC-DS spec-mandated behavior in run_streams or maintenance_test",
+        "instead": "only restructure the code",
+        "item_id": "complexity-plans-tpcds-w15",
+        "why": "TPC compliance depends on exact execution semantics"
+      },
+      {
+        "dont": "create new files for extracted helpers",
+        "instead": "keep them in the same module",
+        "item_id": "complexity-plans-tpcds-w15",
+        "why": "these are small private functions"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-21T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "QphDS@Size composite metric calculation in run_official_benchmark unchanged",
+        "item_id": "complexity-plans-tpcds-w15"
+      },
+      {
+        "behavior": "TPC-DS maintenance test success criteria (>=90% success rate) unchanged",
+        "item_id": "complexity-plans-tpcds-w15"
+      },
+      {
+        "behavior": "_compare_operator_properties() returns identical diff dict for all operator types",
+        "item_id": "complexity-plans-tpcds-w15"
+      },
+      {
+        "behavior": "_format_operator_properties() truncation behavior (max 3 items + '... and N more')",
+        "item_id": "complexity-plans-tpcds-w15"
+      },
+      {
+        "behavior": "load_operations_catalog() validation error messages and error types unchanged",
+        "item_id": "complexity-plans-tpcds-w15"
+      },
+      {
+        "behavior": "run_streams() concurrent and sequential execution produce identical result structures",
+        "item_id": "complexity-plans-tpcds-w15"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "complexity-plans-tpcds-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "complexity-plans-tpcds-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/comparison.py"
+      },
+      {
+        "item_id": "complexity-plans-tpcds-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/visualization.py"
+      },
+      {
+        "item_id": "complexity-plans-tpcds-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/benchmark/runner.py"
+      },
+      {
+        "item_id": "complexity-plans-tpcds-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/maintenance_test.py"
+      },
+      {
+        "item_id": "complexity-plans-tpcds-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/official_benchmark.py"
+      },
+      {
+        "item_id": "complexity-plans-tpcds-w15",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/query_plans/ -v",
+        "description": "Query plan tests pass",
+        "expected": "all tests pass",
+        "item_id": "complexity-plans-tpcds-w15",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k tpcds",
+        "description": "TPC-DS tests pass",
+        "expected": "all tests pass",
+        "item_id": "complexity-plans-tpcds-w15",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make complexity-check",
+        "description": "Complexity check passes",
+        "expected": "PASSED; these functions no longer in top-20",
+        "item_id": "complexity-plans-tpcds-w15",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "complexity-plans-tpcds-w15",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-plans-tpcds-w15",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-plans-tpcds-w15",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-plans-tpcds-w15",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-plans-tpcds-w15",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-plans-tpcds-w15",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "complexity-plans-tpcds-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace if/elif chain in _compare_operator_properties with dispatch dict pattern",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-plans-tpcds-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _format_truncated_list() from _format_operator_properties in visualization.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-plans-tpcds-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _parse_operation_entry() from load_operations_catalog in primitives/catalog/loader.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-plans-tpcds-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _run_single_stream() and _aggregate_stream_results() from run_streams in runner.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-plans-tpcds-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _run_maintenance_loop() and _finalize_maintenance_result() from run() in maintenance_test.py",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-plans-tpcds-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _extract_metric() helper from run_official_benchmark in official_benchmark.py",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-plans-tpcds-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run complexity check and full test suite to verify no regressions",
+        "wid": "w7"
+      }
+    ]
+  }
+}

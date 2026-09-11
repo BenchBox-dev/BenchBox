@@ -1,0 +1,224 @@
+{
+  "context": "Use a narrowly scoped GitHub App installation token for controller writes. Value-only manifest updates may auto-merge after exact checks. Schema, workflow, trust policy, and CODEOWNED control files require manual review with no bypass. Pin source commit, artifact digest, assembler and workflow SHA, action SHAs, OS image, Python/Node/uv versions, lockfiles, publisher support package, database digest, bundle inventory, count, and read-model version.",
+  "description": "Create a protected publication branch containing desired-state manifests with parent SHA, monotonic generation, immutable artifact digests, complete build closure, and compare-and-swap promotion. Define artifacts for prose site, versioned API docs, Explorer app, publisher bundle, corpus-derived read model, and final Pages assembly.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Treat a concurrency group as state serialization",
+        "instead": "use parent SHA, generation, CAS, and regeneration",
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "why": "queued jobs can still promote stale intent"
+      },
+      {
+        "dont": "Use a mutable tag as an artifact pin",
+        "instead": "pin commit SHA and verified artifact digest",
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "why": "tags can move and do not identify artifact bytes"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "needs_item": "independent-publication-a1-authority-and-threat-contract"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "needs_item": "independent-publication-a2-corpus-trust-isolation"
+      }
+    ],
+    "item_meta": {
+      "category": "Publication Architecture",
+      "completed_at": "2026-09-01T19:54:16Z",
+      "completed_pr": 2008,
+      "created_at": "2026-08-31T20:37:14Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Concurrent promotions cannot silently overwrite a newer desired state.",
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract"
+      },
+      {
+        "behavior": "Control-plane changes never auto-merge under the value-only manifest exception.",
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Replace release-coupled desired state without creating a second competing deployer",
+        "decision": "supersede",
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "path": ".github/workflows/docs.yml"
+      },
+      {
+        "concept": "Extend external settings drift checks",
+        "decision": "extend",
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "path": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "kind": "only_modify",
+        "path_glob": ".github/CODEOWNERS"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/*publication*"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "kind": "only_modify",
+        "path_glob": "publication/**"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run pytest tests/unit/scripts/publication/test_manifest.py tests/unit/scripts/publication/test_cas.py -q",
+        "description": "Manifest rejects incomplete build closure and stale parent/generation",
+        "expected": "all tests pass",
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "last_result": "pass",
+        "last_run": "2026-09-01T19:54:13Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/check_control_plane.py --live",
+        "description": "Live branch rules, CODEOWNERS, App permissions, and environment policy match the recorded contract",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "last_result": "pass",
+        "last_run": "2026-09-01T19:54:15Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "feat(publication): define manifest schema, generation, parent linkage, and build closure in scripts/publication/manifest.py",
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "notes": null,
+        "started_at": "2026-09-01T19:47:15Z",
+        "started_branch": "feat/publication-a3-control-plane",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a3-control-plane",
+        "status": "done",
+        "summary": "Define manifest schema, generation, parent, and complete artifact closure",
+        "wid": "w1"
+      },
+      {
+        "evidence": "feat(publication): create publication branch on origin and protect publication paths in .github/CODEOWNERS and auto_merge_soundness_paths.py",
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "notes": null,
+        "started_at": "2026-09-01T19:51:07Z",
+        "started_branch": "feat/publication-a3-control-plane",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a3-control-plane",
+        "status": "done",
+        "summary": "Create protected publication branch and CODEOWNERS/rules contract",
+        "wid": "w2"
+      },
+      {
+        "evidence": "feat(publication): implement CASController with generation successor, stale PR detection, value-only diff classification, and coalescing in scripts/publication/cas.py",
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "notes": null,
+        "started_at": "2026-09-01T19:51:13Z",
+        "started_branch": "feat/publication-a3-control-plane",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a3-control-plane",
+        "status": "done",
+        "summary": "Implement CAS updates, stale-PR regeneration, and descendant-aware corpus coalescing",
+        "wid": "w3"
+      },
+      {
+        "evidence": "feat(publication): configure App ID 4796924, repository secrets, and install on BenchBox-dev with contents/pull_requests/workflows perms",
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "notes": null,
+        "started_at": "2026-09-01T19:51:19Z",
+        "started_branch": "feat/publication-a3-control-plane",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a3-control-plane",
+        "status": "done",
+        "summary": "Provision least-privilege GitHub App controller and environment policy",
+        "wid": "w4"
+      },
+      {
+        "evidence": "feat(publication): add manifest digest calculation, signature placeholder, and control plane verification in scripts/publication/check_control_plane.py",
+        "item_id": "independent-publication-a3-control-plane-and-artifact-contract",
+        "notes": null,
+        "started_at": "2026-09-01T19:51:25Z",
+        "started_branch": "feat/publication-a3-control-plane",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a3-control-plane",
+        "status": "done",
+        "summary": "Add manifest signature, attestation, and drift validation",
+        "wid": "w5"
+      }
+    ]
+  }
+}

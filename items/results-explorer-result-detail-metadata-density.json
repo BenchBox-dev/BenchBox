@@ -1,0 +1,234 @@
+{
+  "context": "Use progressive disclosure for missing data, not deletion of provenance.\nReuse display-label formatting from Query Workbench instead of local string\nreplacements. w4 must run only after the parent TODO's formatter (w6 of\nresults-explorer-query-workbench-controls-and-facets) is in place; the\ninter-item dep above enforces ordering.\n",
+  "description": "Make Result Detail metadata and receipt sections useful when many fields are\nnot recorded, while preserving provenance access. Defects this item\naddresses were flagged in the 2026-05-08 Results Explorer follow-up review\n(chat-only artifact, not committed to _project/audits/). w0 rebinds the\nreview evidence against develop tip and captures it to\n_project/verification-logs/results-explorer-result-detail-metadata-density/w0.log\nbefore any other work unit runs; that log replaces the previous \"review row\n#41\" citation (and the shared row #30 enum-label cleanup) as the durable\nreference.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hide recorded metadata to make sparse pages look cleaner.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "render raw enum strings in user-facing detail sections.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "needs_item": "results-explorer-query-workbench-controls-and-facets"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend UX",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Complete metadata results still show their full useful details.",
+        "item_id": "results-explorer-result-detail-metadata-density"
+      },
+      {
+        "behavior": "Deep links to result detail pages remain unchanged.",
+        "item_id": "results-explorer-result-detail-metadata-density"
+      },
+      {
+        "behavior": "Receipt/provenance remains available for audit.",
+        "item_id": "results-explorer-result-detail-metadata-density"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "kind": "do_not_modify",
+        "path_glob": "Generated result snapshots unless a required recorded field is missing from the export."
+      },
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RunReceipt.tsx"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/RunReceipt.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/displayLabels.test.ts"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayLabels.ts"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/ResultDetail.test.tsx src/lib/__tests__/displayLabels.test.ts",
+        "description": "Result Detail metadata tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: browser-check /results/r/<sparse-id> and /results/r/<complete-id> for first-viewport metadata density'",
+        "description": "Manual Result Detail browser check is complete",
+        "expected": "manual evidence captured in PR notes or audit artifact",
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "notes": "Walk /results/r/<sparse-id> and /results/r/<complete-id> against the\ncurrent develop tip and capture (a) the count and grouping of \"Not\nrecorded\" rows in the first viewport, (b) raw enum strings still shown\nto users, and (c) which provenance fields are recorded vs missing per\nexample. Write findings to\n_project/verification-logs/results-explorer-result-detail-metadata-density/w0.log.\nOutput is the rebind reference for w1-w5 acceptance.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rebind Result Detail review evidence against develop tip",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "notes": "Audit environment, source, validation, cost, and receipt sections for\nfields that frequently render as \"Not recorded\" or raw internal enum\nvalues. Identify essential summary metadata versus expandable\nprovenance detail.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit Result Detail metadata and receipt fields",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "notes": "Already-fixed on develop (no diff in this PR). w0 confirmed that\n`ResultDetail.tsx:184-194` filters missing environment fields out\nof the rendered list and the template at lines 273-281 already\nrenders a single \"Environment metadata was not recorded for this\nrun.\" row when every field is missing. The \"multiple adjacent\ncards repeating missing values\" anti-pattern this work unit\ntargeted is not present in the current code. Verdict recorded in\n_project/verification-logs/results-explorer-result-detail-metadata-density/w0.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Collapse empty or nearly empty environment summaries",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "notes": "In the receipt/provenance section, show recorded fields first and\ngroup missing fields behind a \"Show missing metadata\" disclosure. The\ndefault view must prioritize run date, platform, benchmark,\ntrust/validation, source, and receipt link when present.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Group missing receipt fields behind disclosure",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "notes": "Reuse the shared display-label formatter from Query Workbench\n(results-explorer-query-workbench-controls-and-facets w6) for raw\nenums in Result Detail and receipts. Values such as not_applicable and\ncommunity-submission must render as concise user-facing labels.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply shared display labels to Result Detail enums",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-result-detail-metadata-density",
+        "notes": "Add tests for a result with complete metadata and a result with sparse\nmetadata. Assert the sparse case does not repeat \"Not recorded\" across\nthe first viewport and that recorded provenance remains visible.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover complete and sparse Result Detail metadata cases",
+        "wid": "w5"
+      }
+    ]
+  }
+}

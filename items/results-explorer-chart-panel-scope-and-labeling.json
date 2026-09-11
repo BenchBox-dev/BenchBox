@@ -1,0 +1,306 @@
+{
+  "context": "Prefer hiding or disabled states for tabs with no data over rendering blank\npanels. Make copy depend on the displayed metric instead of the page-level\nbenchmark score. Use small localized layout changes inside the current chart\npanel information architecture. Run after compare-flow-entrypoints and\nrun-identity-disambiguation so Compare.tsx and NormalizedSpeedupChart.tsx\nare not edited by three concurrent worktrees.\n",
+  "description": "Remove chart-panel dead space, hide or clarify empty/duplicate chart views, and\nfix metric/contrast copy that contradicts rendered data. Defects this item\naddresses were flagged in the 2026-05-08 Results Explorer follow-up review\n(chat-only artifact, not committed to _project/audits/). w0 rebinds the\nreview evidence against develop tip and captures it to\n_project/verification-logs/results-explorer-chart-panel-scope-and-labeling/w0.log\nbefore any other work unit runs; that log replaces the previous \"review row\n#21/#22/#23/#37/#38/#39\" citations as the durable reference.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "call greyscale high contrast unless measured contrast actually improves.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "create new pages or a redesigned chart explorer.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "keep duplicate matrix views unless the duplicate has a distinct scope.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_item": "results-explorer-compare-flow-entrypoints"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_item": "results-explorer-run-identity-disambiguation"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend UX",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Benchmark matrix data and chart data must continue to derive from the same cohort.",
+        "item_id": "results-explorer-chart-panel-scope-and-labeling"
+      },
+      {
+        "behavior": "Color palettes must keep readable text contrast.",
+        "item_id": "results-explorer-chart-panel-scope-and-labeling"
+      },
+      {
+        "behavior": "Existing chart tabs that contain data must remain reachable.",
+        "item_id": "results-explorer-chart-panel-scope-and-labeling"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "kind": "do_not_modify",
+        "path_glob": "Generated result data unless cost availability flags are missing from presentation data."
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CostScatter.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/QueryHeatmap.test.tsx src/components/__tests__/charts.smoke.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/pages/__tests__/Compare.test.tsx",
+        "description": "Chart panel and heatmap tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: browser-check /results/tpch/ chart Overview, Per-query, Distribution, Cost, Trend, Rank, and Compare normalized speedup'",
+        "description": "Manual chart browser check is complete",
+        "expected": "manual evidence captured in PR notes or audit artifact",
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_wid": "w0",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_wid": "w0",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "notes": "Walk Charts > Overview, Per-query (Heatmap, Histogram), Cost, Trend,\nRank, and Compare > Normalized Speedup against the current develop tip\nusing a benchmark detail with cost data and one without. Capture\nobserved defects (chart-panel header height, empty/duplicate Per-query\nheatmap, Cost-tab behavior with no normalized cost, heatmap legend copy\nvs rendered cells, contrast/reduced-color visual delta, Compare\nnormalized-speedup row count and dash density) to\n_project/verification-logs/results-explorer-chart-panel-scope-and-labeling/w0.log.\nOutput is the rebind reference for w1-w7 acceptance.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rebind chart-panel review evidence against develop tip",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "notes": "ChartPanel header restructured from a two-column \"title left, controls\nstacked right\" layout into a single `flex flex-wrap items-center`\nband. Title, group tablist, active-group subtabs, and the Compare\nbaseline select share one row and wrap together on narrow screens.\nThe empty band that sat to the right of the H2 (caused by\n`sm:items-start` against a tall right column) is gone; the baseline\nselect uses `ml-auto` to float right when present. Click targets\nkeep `min-h-9` so accessibility is not regressed. The\n\"responsive segmented chart controls\" test was updated to assert\n`flex flex-wrap` instead of the prior mobile grid (no assertion\nweakened — the contract is still \"controls render with short\nvisible labels at a touch-friendly height\"). Verification log:\n_project/verification-logs/results-explorer-chart-panel-scope-and-labeling/w1.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Compact the chart panel header and tab band",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "notes": "ChartPanel grew an `excludeChartIds?: readonly string[]` prop. Excluded\nids are filtered from the `applicableCharts` result before grouping\nso they do not appear in the tablist, subtabs, or initial-active\nselection. BenchmarkIndex now passes\n`excludeChartIds={[\"query_heatmap\"]}` whenever\n`viewMode === \"matrix\"` so the page-level QueryHeatmap above the\nCharts panel is not duplicated as a Per-query > Heatmap subtab. In\nranks/list view modes the chart panel keeps its full set so the\nheatmap stays accessible. Histogram remains available in the\nPer-query group either way. Test added in\nsrc/components/__tests__/ChartPanel.test.tsx asserts the Heatmap\nbutton disappears while the Per-query group is still selectable.\nVerification log:\n_project/verification-logs/results-explorer-chart-panel-scope-and-labeling/w2.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove or rescope the duplicate Per-query heatmap",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "notes": "When no normalized cost data exists for the current cohort, disable or\nhide the Cost chart tab and show a short unavailable-cost note in a\npredictable place. Do not let users open a selectable blank panel.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Hide or disable Cost tabs when no cost data exists",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "notes": "Change the Benchmark heatmap legend heading from \"Power Score: higher is\nbetter\" when cells are per-query latency values. The visible heading\nmust name the metric actually rendered, for example \"Per-query latency\n(ms): lower is better\", while the power-score column keeps its own\nexplanation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Correct heatmap metric copy for latency cells",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "notes": "Either implement a true high-contrast heatmap palette with stronger\nluminance separation and accessible text contrast, or rename the control\nto \"Reduced color\" if the intended behavior is greyscale. The selected\nmode must visibly improve contrast or accurately describe the rendered\nheatmap.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Repair or rename high-contrast heatmap mode",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "notes": "`NormalizedSpeedupChart.tsx` now computes a fully-comparable subset\n(every non-baseline speedup non-null) alongside the original entry\nlist. When at least one fully-comparable query and at least one\npartial query coexist, the chart defaults to the comparable-only\nview and surfaces a compact toggle\n(`data-testid=\"normalized-speedup-comparable-only-toggle\"`) plus\na count summary above the SVG. When every query is comparable\n(or none are) the toggle hides itself — no useful state to swap\nto. Verification log:\n_project/verification-logs/results-explorer-chart-panel-scope-and-labeling/w67.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Constrain long Compare normalized-speedup charts",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-panel-scope-and-labeling",
+        "notes": "Per-work-unit coverage shipped with each preceding PR:\nw1 (header) + w2 (heatmap dedup) — `ChartPanel.test.tsx`\nflex-wrap and excludeChartIds assertions.\nw3 (Cost tab gating) — already covered by the chartRegistry\ncost gating tests.\nw4 (heatmap legend metric) + w5 (reduced-color mode) — covered\nby `QueryHeatmap.test.tsx` legend heading and palette assertions.\nw6 — new test in `NormalizedSpeedupChart.test.tsx` exercises\ndefault-hide-partials and toggle-to-show-all behavior. Browser\nscreenshots are deferred to TODO #8 (release-gate w3 Playwright\nwalk) so the screenshot bundle ships once for the whole effort\nrather than per work unit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover chart panel scope, labels, and contrast behavior",
+        "wid": "w7"
+      }
+    ]
+  }
+}

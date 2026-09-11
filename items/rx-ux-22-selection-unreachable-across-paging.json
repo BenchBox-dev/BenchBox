@@ -1,0 +1,186 @@
+{
+  "context": "Make the selected set directly manipulable wherever it is shown. Add a remove control to CompareTray chips, which already carry the identity needed to label it. Give Query a selected-run list so off-page selections stay visible and removable. Do not make capped checkboxes focusable and do not evict selections automatically.",
+  "description": "Query gained SQL-backed paging and search in #1841. Compare selections are held in a Map<string, ResultRow> at Query.tsx:147 that deliberately survives paging, but visibleRows at :232 contains only the current page and the tray at :826-856 renders a count string plus a Clear-selection button - no per-run list and no per-run remove. Select four rows, page forward, and every checkbox on the new page is disabled by the cap while none of the four selected rows is on screen. The only recovery is Clear selection, which discards all four; a user wanting to swap one run must rebuild the entire set. CompareTray.tsx:64-80 already renders one chip per selected run carrying platform, benchmark, scale, phase, date and public ID, but those chips are display-only and Query does not use the tray at all. This was surfaced by adversarial review, not by the original audit. Note the framing correction it forced - selected checkboxes already stay enabled because the cap reason is applied only when !isSelected, so uncheck-then-check IS a working swap on any page where the selection is visible; paging is the case that breaks it, and the fix is a manipulable selected set, not focusable dead checkboxes. Verified at HEAD 39ead3a41.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Implement FIFO eviction so a fifth selection replaces the oldest",
+        "instead": "INSTEAD keep the hard cap and make removal explicit",
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "why": "the first pick locks the comparable cohort, so silent eviction can change the locked ranking without an explicit clear and makes selection order semantically significant"
+      },
+      {
+        "dont": "Make capped checkboxes focusable via aria-disabled so users can evaluate a swap",
+        "instead": "INSTEAD make the selected set manipulable in the tray",
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "why": "selected checkboxes already stay enabled and the real gap is off-page selections, not focus"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "needs_item": "rx-ux-21-selection-status-copy"
+      }
+    ],
+    "item_meta": {
+      "category": "bug",
+      "created_at": "2026-08-24T12:30:03Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Selected checkboxes stay enabled so uncheck-then-check keeps working as a swap",
+        "item_id": "rx-ux-22-selection-unreachable-across-paging"
+      },
+      {
+        "behavior": "Selections continue to survive paging and search - the Map at Query.tsx:147 is deliberate",
+        "item_id": "rx-ux-22-selection-unreachable-across-paging"
+      },
+      {
+        "behavior": "The hard cap of MAX_COMPARE_SELECTIONS stays hard - no automatic eviction",
+        "item_id": "rx-ux-22-selection-unreachable-across-paging"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "selected-run chips with full identity, currently display-only",
+        "decision": "extend",
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "path": "results-explorer/src/components/CompareTray.tsx"
+      },
+      {
+        "concept": "Map-backed selection that survives paging",
+        "decision": "reuse",
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "path": "results-explorer/src/pages/Query.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/queryFilters.ts"
+      },
+      {
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CompareTray.tsx"
+      },
+      {
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/**"
+      },
+      {
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Query.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/Query.test.tsx",
+        "description": "Swap one run while its row is off-page",
+        "expected": "pass - remove one selected run from page two without Clear selection",
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/components/__tests__",
+        "description": "Chip remove has an accessible name",
+        "expected": "pass - remove control names the run",
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run",
+        "description": "Explorer unit suite green",
+        "expected": "all pass",
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a per-chip remove control to CompareTray with an accessible name naming the run",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "GATE - decide whether Query gets the shared tray or an inline selected-run list before building it, given the review recommendation to stop tray adoption at two of four surfaces",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Give Query a selected-run list that survives paging and search per the w2 decision",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "rx-ux-22-selection-unreachable-across-paging",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Tests covering select four then page forward then remove one then select a replacement",
+        "wid": "w4"
+      }
+    ]
+  }
+}

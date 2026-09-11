@@ -1,0 +1,240 @@
+{
+  "context": "Extend the unified tuning model with an explicit Databricks clustering strategy\nrepresentation rather than inferring from generic sorting fields. Apply the strategy\nin Databricks adapter lifecycle points where table format/state is known.\n\nKeep precedence rules explicit: liquid clustering, z-order, and none must be mutually\nunderstandable with clear conflict handling and warnings.\n\nAdd result metadata so downstream analysis can segment runs by applied strategy.\n",
+  "description": "Expand Databricks tuning support so Liquid Clustering is a first-class,\nconfigurable strategy in BenchBox, not a secondary/implicit path behind\nZ-ORDER/OPTIMIZE workflows.\n\nRationale:\n- Databricks guidance is increasingly steering users toward Liquid Clustering.\n- Current BenchBox tuning emphasizes Z-ORDER and OPTIMIZE behaviors.\n- Users need direct control and comparability for Liquid Clustering in the\n  unified tuning model and CLI/platform-option workflows.\n\nScope:\n- Add explicit Liquid Clustering representation in tuning configuration.\n- Implement Databricks adapter execution paths for create-time and post-load\n  Liquid Clustering operations.\n- Preserve backwards compatibility for existing Z-ORDER-based configs.\n- Expose strategy metadata in results to support fair comparisons.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "implement Databricks-only behavior in platform-agnostic base classes without guards",
+        "instead": "keep logic adapter-scoped where possible",
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "why": "it risks cross-platform regressions"
+      },
+      {
+        "dont": "ship strategy parsing without conflict validation",
+        "instead": "fail fast with clear remediation",
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "why": "mixed config states become non-reproducible"
+      },
+      {
+        "dont": "silently reinterpret existing Z-ORDER configs as liquid clustering",
+        "instead": "require explicit strategy selection",
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "why": "it changes benchmark semantics"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "needs_item": "cloud-dw-sorted-data-ingestion"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "needs_item": "ctas-sort-cloud-platforms"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-20T00:00:00Z",
+      "created_at": "2026-02-20T00:00:00Z",
+      "worktree": "physical-tuning"
+    },
+    "preserves": [
+      {
+        "behavior": "Databricks adapter error messages remain actionable when strategy prerequisites are missing",
+        "item_id": "databricks-liquid-clustering-tuning-support"
+      },
+      {
+        "behavior": "Dry-run output remains deterministic and includes all emitted Databricks tuning actions",
+        "item_id": "databricks-liquid-clustering-tuning-support"
+      },
+      {
+        "behavior": "Existing Databricks runs using Z-ORDER tuning continue to execute without config migration",
+        "item_id": "databricks-liquid-clustering-tuning-support"
+      },
+      {
+        "behavior": "Non-Databricks platforms ignore Databricks-specific liquid clustering settings cleanly",
+        "item_id": "databricks-liquid-clustering-tuning-support"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run _project/scripts/validate_todo.py _project/DONE/physical-tuning/active/databricks-liquid-clustering-tuning-support.yaml",
+        "description": "New TODO validates against schema",
+        "expected": "Validation passed",
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_databricks_liquid_clustering.py -v --tb=short",
+        "description": "Databricks liquid clustering tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -k databricks -v --tb=short",
+        "description": "Existing Databricks adapter tests remain green",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define tuning schema updates for Databricks liquid clustering strategy and validation rules",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add config parsing/normalization for liquid clustering in CLI and tuning loader paths",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Databricks adapter support for liquid clustering DDL/DML lifecycle operations",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Maintain backward compatibility path for existing Z-ORDER configs with explicit precedence rules",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add result metadata fields for applied Databricks clustering strategy and maintenance operations",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit/integration tests for config validation and adapter SQL/action generation",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-liquid-clustering-tuning-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docs/examples for liquid clustering usage, migration guidance, and A/B comparison with Z-ORDER",
+        "wid": "w7"
+      }
+    ]
+  }
+}

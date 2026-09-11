@@ -1,0 +1,193 @@
+{
+  "context": "MCP registration functions: use factory functions that close over data, returning the\ninner handler. This is the same pattern as existing MCP tools in discovery.py\n(already approved as ignore, but the factory approach is worth borrowing).\n\nAnalytics functions: three-phase pattern - load files, compute metric, format output.\nExtract each phase. Avoid shared mutable state between phases.\n",
+  "description": "8 MCP tool and analytics functions mix phase logic (file enumeration, metric extraction,\naggregation, formatting) in single long functions. Extracting phases to private helpers\nreduces complexity while keeping the MCP-registered tool function as a readable summary.\n\nTarget functions:\n  benchbox/mcp/resources/registry.py:register_all_resources       (20)\n  benchbox/mcp/tools/analytics.py:_get_performance_trends_impl    (20)\n  benchbox/mcp/tools/analytics.py:_aggregate_results_impl         (18)\n  benchbox/mcp/tools/analytics.py:_detect_regressions_impl        (17)\n  benchbox/mcp/tools/analytics.py:get_query_plan                  (15)\n  benchbox/mcp/prompts/registry.py:register_all_prompts           (15)\n  benchbox/mcp/tools/benchmark.py:_run_benchmark_impl             (16)\n  benchbox/mcp/tools/benchmark.py:_validate_config_impl           (15)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add async to sync functions or remove async from async functions",
+        "instead": "(not specified)",
+        "item_id": "complexity-mcp-analytics-w14",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "change the JSON response structure of any MCP tool or resource",
+        "instead": "(not specified)",
+        "item_id": "complexity-mcp-analytics-w14",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "merge analytics impl functions",
+        "instead": "(not specified)",
+        "item_id": "complexity-mcp-analytics-w14",
+        "why": "keep them separate (each serves a different MCP tool)"
+      },
+      {
+        "dont": "rename MCP tool/resource/prompt names",
+        "instead": "(not specified)",
+        "item_id": "complexity-mcp-analytics-w14",
+        "why": "they're part of the public API"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-22T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "_detect_regressions_impl: regression detection logic and threshold comparison unchanged",
+        "item_id": "complexity-mcp-analytics-w14"
+      },
+      {
+        "behavior": "_get_performance_trends_impl: trend values and structure must be numerically identical",
+        "item_id": "complexity-mcp-analytics-w14"
+      },
+      {
+        "behavior": "_validate_config_impl: validation error messages must be identical (MCP clients may parse them)",
+        "item_id": "complexity-mcp-analytics-w14"
+      },
+      {
+        "behavior": "register_all_prompts: all prompt names, descriptions, and argument specs unchanged",
+        "item_id": "complexity-mcp-analytics-w14"
+      },
+      {
+        "behavior": "register_all_resources: all MCP resource URIs and JSON shapes must be identical",
+        "item_id": "complexity-mcp-analytics-w14"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "complexity-mcp-analytics-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/prompts/registry.py"
+      },
+      {
+        "item_id": "complexity-mcp-analytics-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/resources/registry.py"
+      },
+      {
+        "item_id": "complexity-mcp-analytics-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/analytics.py"
+      },
+      {
+        "item_id": "complexity-mcp-analytics-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Smoke tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "complexity-mcp-analytics-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'mcp or analytics or benchmark_tool' -q",
+        "description": "MCP-specific tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "complexity-mcp-analytics-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/check_complexity.py --top 150 2>&1 | grep -E '(register_all_resources|performance_trends|aggregate_results|detect_regressions|get_query_plan|register_all_prompts|run_benchmark_impl|validate_config_impl)'",
+        "description": "Target functions below warn threshold",
+        "expected": "No WARN entries for the 8 target functions",
+        "item_id": "complexity-mcp-analytics-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "complexity-mcp-analytics-w14",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "complexity-mcp-analytics-w14",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "complexity-mcp-analytics-w14",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "complexity-mcp-analytics-w14",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "complexity-mcp-analytics-w14",
+        "notes": "benchbox/mcp/resources/registry.py:34 - nested function definitions for\nlist_benchmarks, get_benchmark, list_platforms, get_platform each follow\nidentical fetch → JSON structure pattern. Extract resource factories:\n- _make_list_resource(fetch_fn, formatter_fn) → Callable\n- _make_get_resource(fetch_fn, formatter_fn) → Callable\nRegistration becomes: server.register_resource(uri, _make_list_resource(...))\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decompose register_all_resources: extract per-resource handler factories",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-mcp-analytics-w14",
+        "notes": "benchbox/mcp/tools/analytics.py:435 - phases:\n- _load_result_files(result_dir, platform_filter) → list[RunResult]\n- _extract_metric(result, metric_name) → float | None\n- _compute_trends(grouped_runs, metric) → TrendResult\nMain function: load → filter → extract per run → group → compute trends.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decompose _get_performance_trends_impl into load/filter/extract/aggregate phases",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-mcp-analytics-w14",
+        "notes": "_aggregate_results_impl (analytics.py:566):\n- Extract _build_group_key(result, group_by) → str (3-way dispatch → dict)\n- Extract _extract_timings(result) → list[float]\n_detect_regressions_impl (analytics.py:278):\n- Extract _load_result_pair(file1, file2) → (RunResult, RunResult)\n- Extract _detect_query_regression(q1, q2, threshold) → Regression | None\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decompose _aggregate_results_impl and _detect_regressions_impl",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-mcp-analytics-w14",
+        "notes": "get_query_plan (analytics.py:101): extract _resolve_result_file(name) → Path,\n  _extract_plan(result, query_id, format) → str\nregister_all_prompts (prompts/registry.py:20): similar to resources - extract\n  _make_benchmark_prompt(template_fn) factory; repeated @mcp.prompt() patterns.\n_run_benchmark_impl (benchmark.py:239): extract _validate_and_build_config,\n  _execute_and_format_result.\n_validate_config_impl (benchmark.py:545): extract per-phase validators as small helpers:\n  _validate_platform, _validate_mode, _validate_benchmark each return error | None.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Simplify get_query_plan, register_all_prompts, _run_benchmark_impl, _validate_config_impl",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-mcp-analytics-w14",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run smoke tests and complexity check; verify all 8 functions below warn threshold",
+        "wid": "w5"
+      }
+    ]
+  }
+}

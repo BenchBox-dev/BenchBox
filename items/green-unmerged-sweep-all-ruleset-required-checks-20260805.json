@@ -1,0 +1,105 @@
+{
+  "context": "Either enumerate ruleset required contexts (from runbook pin / API) or accept an explicit multi-name list including Results Explorer browser gate. Prefer reading the same source as ruleset drift docs so contexts do not drift. Tests for multi-check green vs partial green.",
+  "description": "`_project/scripts/green_unmerged_sweep.py` uses REQUIRED_CHECK_NAME = \"ci-required-result\" (or equivalent) as \"required lane green\". Develop ruleset also requires \"Results Explorer browser gate\". A PR can be classified sweep-green while the browser gate is red; GitHub auto-merge still waits on all required checks so merge safety is intact, but the sweep's \"green\" label and any --apply logic are incomplete.\n\nIdentified in browser-gate adversarial review (C3) and overall batch residual audit 2026-08-05. Sibling of green-unmerged-sweep-intentional-hold-false-positives-20260805 (classifier semantics); this item is specifically multi-context required-check completeness.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci-integrity",
+      "completed_at": "2026-08-06T14:26:13Z",
+      "completed_pr": 1633,
+      "created_at": "2026-08-05T23:40:07Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Never classify soundness PRs as auto-arm candidates",
+        "item_id": "green-unmerged-sweep-all-ruleset-required-checks-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "green-unmerged-sweep-all-ruleset-required-checks-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "green-unmerged-sweep-all-ruleset-required-checks-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/fixtures/green_unmerged_fixture.json"
+      },
+      {
+        "item_id": "green-unmerged-sweep-all-ruleset-required-checks-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/green_unmerged_sweep.py"
+      },
+      {
+        "item_id": "green-unmerged-sweep-all-ruleset-required-checks-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "green-unmerged-sweep-all-ruleset-required-checks-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n \"Results Explorer browser gate|required_status|REQUIRED_CHECK\" _project/scripts/green_unmerged_sweep.py",
+        "description": "Sweep source mentions browser gate or multi-context required checks",
+        "expected": null,
+        "item_id": "green-unmerged-sweep-all-ruleset-required-checks-20260805",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "green-unmerged-sweep-all-ruleset-required-checks-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "green-unmerged-sweep-all-ruleset-required-checks-20260805",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "docs/operations/repo-admin-settings.md ruleset develop-squash-only (id 15611785) lists exactly two required status contexts: ci-required-result and 'Results Explorer browser gate' (added 2026-08-03). Confirmed against scripts/ruleset_drift_check.py's parse_expected_rulesets(), which reads the same runbook block. No third context.",
+        "item_id": "green-unmerged-sweep-all-ruleset-required-checks-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T14:26:00Z",
+        "started_branch": "claude/green-unmerged-required-checks-283797",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/green-unmerged-required-checks-283797",
+        "status": "done",
+        "summary": "Inventory all develop ruleset required status contexts",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR https://github.com/joeharris76/BenchBox/pull/1633, commit 0aa4770. REQUIRED_CHECK_NAMES tuple + latest_check_run(runs,name); is_required_lane_green now requires EVERY context latest-success, missing runs fail closed. Dropped required_lane_check_run() (no callers; its [0] indexing made tuple order load-bearing). Ladder step 1: rg matched REQUIRED_CHECK_NAMES and 'Results Explorer browser gate' at lines 16,18,126,128,218,220.",
+        "item_id": "green-unmerged-sweep-all-ruleset-required-checks-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T14:26:03Z",
+        "started_branch": "claude/green-unmerged-required-checks-283797",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/green-unmerged-required-checks-283797",
+        "status": "done",
+        "summary": "Teach sweep to require all of them (or document deliberate subset with reason)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/scripts/test_green_unmerged_sweep.py: 61 passed (uv run -- python -m pytest ... -n 0). Partial-green covered at predicate level (each context absent / failure,cancelled,timed_out,skipped,neutral / still-running) and end-to-end via test_classify_pr_partial_green_is_not_stranded. Fixture PRs 2011/2012 added as not_green exclusions; self-test passes 12 PRs / 3 stranded (2008,2009,2010 unchanged). Ruleset pin parses the runbook instead of restating names. Negative-tested: reverting the constant fails the pin, both regressions and the self-test.",
+        "item_id": "green-unmerged-sweep-all-ruleset-required-checks-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T14:26:06Z",
+        "started_branch": "claude/green-unmerged-required-checks-283797",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/green-unmerged-required-checks-283797",
+        "status": "done",
+        "summary": "Tests for partial-green vs full-green",
+        "wid": "w2"
+      }
+    ]
+  }
+}

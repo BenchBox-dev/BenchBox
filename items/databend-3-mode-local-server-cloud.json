@@ -1,0 +1,307 @@
+{
+  "context": "Follow the ClickHouse 3-mode pattern precisely:\n  - deployment_mode.py for normalization/resolution (clickhouse/deployment_mode.py)\n  - Thin first-class adapters that force their mode (clickhouse_local.py)\n  - Mode-specific setup methods inside the base adapter (clickhouse/setup.py)\n  - No eager process startup - start the standalone binary only inside\n    create_connection(), not in __init__\nUnlike ClickHouse local mode (chDB, in-process), standalone requires external\nprocess lifecycle via process_manager.py. Treat this as the most complex part:\nwrite it defensively with timeouts, port conflict detection, and clean failure\nmodes. Do not attempt to make process management \"clever\" - sequential start\nwith polling is correct and sufficient.\n",
+  "description": "Databend currently supports two implicit modes - remote self-hosted (Docker +\nMinIO) and Databend Cloud - but they aren't modelled as distinct deployment\nmodes. This TODO adds a ClickHouse-style 3-mode architecture:\n\n  standalone  Native macOS binary, local disk storage, no Docker or object\n              store required. Manages databend-meta and databend-query\n              processes in-process during the benchmark run.\n  server      Current Docker-based mode (MinIO + databend-query). Unchanged.\n  cloud       Databend Cloud managed service (HTTPS, existing credential\n              flow). Promoted to a first-class named platform.\n\n--- COMPLEXITY NOTICE ---\nThis is significantly harder than the ClickHouse equivalent. ClickHouse local\nmode uses chDB, an embedded in-process Python library with zero binary\nmanagement. Databend standalone requires managing TWO separate external OS\nprocesses with ordered startup and teardown:\n\n  1. databend-meta  (Raft consensus / metadata service, gRPC port 9191)\n  2. databend-query (compute / SQL layer, HTTP port 8000)\n\nThe meta service must be healthy before the query service starts. Shutdown\nmust be reversed. Both binaries must be downloaded and cached per architecture\n(arm64 vs x86_64). Two TOML config files must be generated per run. This is\ncloser in complexity to an embedded-PostgreSQL lifecycle manager than to\nDuckDB or chDB. The work should not begin until the validation gate (w2)\nconfirms the standalone mode is reliable enough to be worth this investment.\n\n--- KEY RESEARCH FINDINGS (2026-04-20) ---\nFrom prior conversation analysis:\n  - Databend releases macOS arm64 + x86_64 binaries on GitHub releases\n  - supports storage_type = \"disk\" (no MinIO) for development/testing\n  - DSN format unchanged: databend+http://user:pass@localhost:8000/db\n  - adapter.py create_connection(), create_schema(), load_data() all survive\n    unchanged - they already use the DSN, no mode-specific logic needed\n  - deployment_mode.py, process_manager.py, config_generator.py are all new\n    files (none exist today); pattern follows clickhouse/deployment_mode.py\n  - Raft data dir, ports 9191 (meta gRPC), 8000 (query HTTP), 3307 (MySQL)\n    all need to be configurable and default to localhost with no port\n    conflicts against other platforms\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the default deployment_mode from 'server'",
+        "instead": "(not specified)",
+        "item_id": "databend-3-mode-local-server-cloud",
+        "why": "existing users who rely on Docker + MinIO must not be affected by any implicit mode change"
+      },
+      {
+        "dont": "hardcode binary download URLs in the adapter",
+        "instead": "use a version-pinned constant in process_manager.py with a clear upgrade path",
+        "item_id": "databend-3-mode-local-server-cloud",
+        "why": "Databend releases frequently"
+      },
+      {
+        "dont": "implement standalone mode for Linux in this TODO",
+        "instead": "(not specified)",
+        "item_id": "databend-3-mode-local-server-cloud",
+        "why": "the scope is macOS (the user-identified gap); Linux users already have Docker"
+      },
+      {
+        "dont": "skip the validation gate (w2)",
+        "instead": "if w2 reveals flakiness, park the remaining work",
+        "item_id": "databend-3-mode-local-server-cloud",
+        "why": "the process lifecycle complexity is only worth adding if standalone mode is actually reliable"
+      },
+      {
+        "dont": "start Databend processes in __init__",
+        "instead": "start only in create_connection()",
+        "item_id": "databend-3-mode-local-server-cloud",
+        "why": "the adapter may be constructed for introspection/dry-run without a real benchmark"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing databend unit tests continue to pass after deployment_mode changes",
+        "item_id": "databend-3-mode-local-server-cloud"
+      },
+      {
+        "behavior": "Databend Cloud credential flow (DATABEND_HOST, DATABEND_USER, DATABEND_PASSWORD, DATABEND_SSL env vars) continues to work for existing users",
+        "item_id": "databend-3-mode-local-server-cloud"
+      },
+      {
+        "behavior": "Docker docker-compose.yml for databend is not modified or removed",
+        "item_id": "databend-3-mode-local-server-cloud"
+      },
+      {
+        "behavior": "Existing 'databend' platform behavior (server/Docker mode) is completely unchanged - default deployment_mode must remain 'server'",
+        "item_id": "databend-3-mode-local-server-cloud"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/platform_defaults.py"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend/"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend_cloud.py"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend_standalone.py"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/databend-standalone.md"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/databend.md"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "kind": "only_modify",
+        "path_glob": "examples/getting_started/local/"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/test_databend_smoke.py"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_databend_adapter.py"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_databend_deployment_mode.py"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_databend_standalone.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_databend_adapter.py -q",
+        "description": "Existing Databend unit tests unaffected by deployment_mode changes",
+        "expected": "All tests pass with 0 failures",
+        "item_id": "databend-3-mode-local-server-cloud",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_databend_deployment_mode.py -q",
+        "description": "New deployment_mode unit tests pass",
+        "expected": "All tests pass with 0 failures",
+        "item_id": "databend-3-mode-local-server-cloud",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms import get_platform_adapter; a = get_platform_adapter('databend-standalone'); print(a.deployment_mode)\"",
+        "description": "databend-standalone platform is registered and listed",
+        "expected": "standalone",
+        "item_id": "databend-3-mode-local-server-cloud",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms import get_platform_adapter; a = get_platform_adapter('databend-cloud'); print(a.deployment_mode)\"",
+        "description": "databend-cloud platform is registered and listed",
+        "expected": "cloud",
+        "item_id": "databend-3-mode-local-server-cloud",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/platforms/test_databend_smoke.py::test_standalone_mode -q",
+        "description": "TPC-H Q1 via standalone mode completes correctly (requires w2 environment)",
+        "expected": "1 passed",
+        "item_id": "databend-3-mode-local-server-cloud",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "databend-3-mode-local-server-cloud",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "databend-3-mode-local-server-cloud",
+        "notes": "This is a mandatory gate. Do not proceed to w2 or later without completing\nthis step. The findings here update the KNOWN UNKNOWNS below.\n\nSteps:\n  1. Find the latest stable Databend release with macOS binaries on GitHub\n     (datafuselabs/databend). Record the exact binary names, URLs, and sizes\n     for arm64 and x86_64.\n  2. Confirm the standalone deployment model: does it require both\n     databend-meta and databend-query, or is there a single \"standalone\"\n     binary that bundles both? (Check the latest docs/releases carefully -\n     some versions ship databend-standalone or an all-in-one binary.)\n  3. Confirm whether storage_type = \"disk\" is still supported in the\n     current release and what the exact TOML config key is.\n  4. Read the current BenchBox databend adapter fully to check if anything\n     has changed since the prior research (adapter.py, __init__.py,\n     docker-compose.yml).\n  5. Update this TODO's KNOWN UNKNOWNS section with your findings. If any\n     finding materially changes the implementation plan, update w3-w8\n     accordingly before proceeding.\n\nKNOWN UNKNOWNS (to be resolved in w1):\n  - Whether a single \"databend-standalone\" binary exists (simplifies\n    lifecycle management to 1 process instead of 2)\n  - Exact TOML config keys for disk storage in the current release\n  - Whether Raft state is required even for single-node dev mode or if\n    there is a simpler embedded meta option\n  - Minimum macOS version required for the binaries\n  - Whether the databend-driver Python package version pinned in BenchBox\n    (>=0.28.0) is compatible with the latest databend binary protocol\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Research gate: re-validate Databend Mac binary capabilities before any code changes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-3-mode-local-server-cloud",
+        "notes": "This is a go/no-go gate. If Databend standalone cannot complete TPC-H Q1\nreliably, the remaining work items (w3-w8) should be parked and this TODO\nupdated with the blocker. Do not write implementation code until w2 passes.\n\nSteps:\n  1. Download the Databend macOS binary identified in w1 to a temp dir.\n  2. Write minimal databend-meta.toml and databend-query.toml using local\n     disk storage (path: /tmp/benchbox_databend_validation/).\n  3. Start databend-meta; poll until port 9191 responds.\n  4. Start databend-query; poll until port 8000 responds.\n  5. Run a minimal TPC-H SF 0.01 benchmark:\n       benchbox run --platform databend \\\n         --benchmark tpch --scale 0.01 \\\n         --queries Q1\n     (using DATABEND_HOST=localhost, DATABEND_PORT=8000,\n      DATABEND_USER=benchbox, DATABEND_PASSWORD=benchbox,\n      DATABEND_SSL=false)\n  6. Confirm Q1 returns correct results (use --validation loose).\n  7. Shut down query then meta; confirm clean exit.\n  8. Record: startup time, Q1 execution time, any errors or warnings.\n  9. Update this TODO with validation results before marking w2 done.\n\nGO criteria: Q1 completes with correct results, clean startup/shutdown.\nNO-GO criteria: startup fails, Q1 crashes, results are incorrect, or\nprocess cleanup leaves zombie processes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Validation gate: manually run TPC-H Q1 against Databend standalone on macOS before writing code",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-3-mode-local-server-cloud",
+        "notes": "New file. Model directly on benchbox/platforms/clickhouse/deployment_mode.py.\n\nContents:\n  - DATABEND_DEPLOYMENT_MODES = frozenset({\"standalone\", \"server\", \"cloud\"})\n  - DEFAULT_DATABEND_DEPLOYMENT_MODE = \"server\"  (preserve existing default)\n  - normalize_databend_deployment_mode(value) → canonical string or raises\n  - resolve_databend_deployment_mode(config) → reads config keys in priority:\n      1. \"deployment_mode\" (canonical)\n      2. \"mode\" (legacy alias)\n      default: \"server\"\n  - Unit tests in tests/unit/platforms/test_databend_deployment_mode.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add deployment_mode.py to benchbox/platforms/databend/",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-3-mode-local-server-cloud",
+        "notes": "New file: benchbox/platforms/databend/process_manager.py\n\nResponsibilities:\n  - _detect_arch() → \"aarch64\" or \"x86_64\" for macOS\n  - _binary_cache_dir() → ~/.benchbox/binaries/databend/{version}/\n  - download_databend_binaries(version) → downloads meta + query (or standalone\n    binary if w1 confirms a single-binary option exists), verifies checksums\n  - generate_meta_config(data_dir, ports) → writes databend-meta.toml\n  - generate_query_config(data_dir, meta_port, query_port) → writes databend-query.toml\n  - start_standalone(data_dir, ports) → starts meta, polls 9191, starts query,\n    polls 8000; returns (meta_proc, query_proc) handles\n  - stop_standalone(meta_proc, query_proc) → SIGTERM query, wait, SIGTERM meta, wait;\n    raises if either exits non-zero\n  - Context manager: DatabendStandaloneProcess for use in adapter lifecycle\n\nPort defaults: meta_grpc=9191, query_http=8000, query_mysql=3307\nConfig must be parameterizable to avoid conflicts with other running platforms.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement process_manager.py: download, start, health-check, stop databend processes",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-3-mode-local-server-cloud",
+        "notes": "Modify benchbox/platforms/databend/adapter.py:\n  - Import resolve_databend_deployment_mode from deployment_mode\n  - In __init__: resolve deployment_mode early, store as self.deployment_mode\n  - Add _setup_standalone_mode(config): reads database_path, configures\n    local ports, invokes process_manager to prepare (but not start -\n    start happens in create_connection or a lifecycle hook)\n  - create_connection() dispatch: standalone → start process, build DSN to\n    localhost; server/cloud → existing behavior unchanged\n  - disconnect() / cleanup: standalone → stop_standalone(); others → no change\n  - database_path handling: use benchbox.utils.path_utils pattern like\n    ClickHouse local mode; generate per-benchmark path from benchmark name\n    + scale factor\n\nModify benchbox/platforms/databend/__init__.py:\n  - Pass deployment_mode and database_path through _build_databend_config()\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Integrate standalone mode into DatabendAdapter (adapter.py + __init__.py)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-3-mode-local-server-cloud",
+        "notes": "New files (thin wrappers, mirror clickhouse_local.py and clickhouse_cloud.py):\n\nbenchbox/platforms/databend_standalone.py:\n  - class DatabendStandaloneAdapter(DatabendAdapter)\n  - __init__ forces config[\"deployment_mode\"] = \"standalone\"\n  - Exposes database_path option\n\nbenchbox/platforms/databend_cloud.py:\n  - class DatabendCloudAdapter(DatabendAdapter)\n  - __init__ forces config[\"deployment_mode\"] = \"cloud\", ssl=True, port=443\n  - Required credentials: DATABEND_HOST, DATABEND_PASSWORD (env vars)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add databend_standalone.py and databend_cloud.py first-class adapters",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-3-mode-local-server-cloud",
+        "notes": "benchbox/platforms/__init__.py:\n  - Add \"databend-standalone\" → DatabendStandaloneAdapter\n  - Add \"databend-cloud\" → DatabendCloudAdapter\n  - Keep \"databend\" → DatabendAdapter (unchanged, defaults to server mode)\n\nbenchbox/cli/platform_defaults.py (or equivalent registration point):\n  - Add option specs for \"databend\": deployment_mode (standalone|server|cloud)\n  - Add option specs for \"databend-standalone\": database_path\n  - Add option specs for \"databend-cloud\": host, warehouse, ssl\n\nbenchbox/core/platform_registry.py:\n  - Register databend-standalone and databend-cloud metadata entries\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Register databend-standalone and databend-cloud in platform registry and CLI",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-3-mode-local-server-cloud",
+        "notes": "Unit tests:\n  - tests/unit/platforms/test_databend_deployment_mode.py (new)\n  - tests/unit/platforms/test_databend_standalone.py (new)\n  - Extend tests/unit/platforms/test_databend_adapter.py: mode resolution,\n    standalone setup, cloud setup\n\nIntegration tests:\n  - tests/integration/platforms/test_databend_smoke.py: add standalone mode\n    smoke (requires binaries; mark @pytest.mark.live_integration)\n\nDocs:\n  - docs/platforms/databend.md: update to describe all 3 modes\n  - docs/platforms/databend-standalone.md (new): quick start, binary\n    download, ports, limitations vs server mode\n\nExamples:\n  - examples/getting_started/local/databend_standalone_tpch.py (new)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Tests, docs, and examples for 3-mode Databend",
+        "wid": "w8"
+      }
+    ]
+  }
+}

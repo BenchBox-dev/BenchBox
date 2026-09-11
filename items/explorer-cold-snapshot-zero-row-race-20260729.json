@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #663 of explorer-e2e-dataload-flakiness-20260724.\nDeferred: Fix the cold-snapshot zero-row race in results-explorer/src: gate the first keyed DuckDB-WASM query on a queryable snapshot, or re-query when it returns zero rows instead of rendering the empty state permanently\nReason deferred: Root cause is in results-explorer/src/**, which this item lists as do_not_modify. The e2e change is mitigation only (re-navigation retries); residual flake remains at any data-bound assertion still waiting single-shot.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-29T12:48:12Z",
+      "worktree": "main"
+    }
+  }
+}

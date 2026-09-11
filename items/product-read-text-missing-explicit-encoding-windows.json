@@ -1,0 +1,41 @@
+{
+  "context": "Add encoding=\"utf-8\" to both call sites. pyproject.toml is UTF-8 by spec (PEP 518), and TPC-DS query files are ASCII/UTF-8, so this is a correctness tightening with no behaviour change on Linux/macOS. Consider a lint rule or ratchet forbidding bare read_text()/open() without encoding in benchbox/ so the next one is caught at review time - quality-bulk-fix-encoding-lint-and-ratchet (done) may already provide the mechanism to extend rather than build.",
+  "description": "Latent Windows defects in benchbox/, distinct from the test-side family. Path.read_text() with no encoding uses locale.getpreferredencoding(), which is cp1252 on Windows, so any non-ASCII byte raises UnicodeDecodeError ('charmap' codec can't decode byte ...). Two unguarded call sites: benchbox/utils/dependencies.py:37 reading pyproject.toml, and benchbox/core/tpcds_obt/query_conversion.py:161 reading a query file into self.raw_text. Found while triaging the Windows nightly; NOT currently covered by any failing test, which is why it is latent rather than red. Deliberately filed separately from windows-explicit-utf8-source-and-plan-fixtures: that item's only_modify is tests/** only, so it cannot carry a benchbox/ fix. The charmap failure that IS red (test_cloud_storage_gate_deployment_aware.py:131) is test-side and belongs to that other item.",
+  "legacy": {
+    "item_meta": {
+      "category": "core-functionality",
+      "created_at": "2026-07-30T12:06:38Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Behaviour on Linux/macOS is unchanged; no new hard dependency on file locale",
+        "item_id": "product-read-text-missing-explicit-encoding-windows"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "product-read-text-missing-explicit-encoding-windows",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds_obt/query_conversion.py"
+      },
+      {
+        "item_id": "product-read-text-missing-explicit-encoding-windows",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/dependencies.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! rg -n 'read_text\\(\\)' benchbox/",
+        "description": "no bare read_text() remains in benchbox/",
+        "expected": "exit 0",
+        "item_id": "product-read-text-missing-explicit-encoding-windows",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

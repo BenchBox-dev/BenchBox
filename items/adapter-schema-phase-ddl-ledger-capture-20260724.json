@@ -1,0 +1,122 @@
+{
+  "context": "Wrap the create_schema call in _setup_fresh_database_phases with the same recording connection used for the post-load phases (or initialize the ledger before schema creation and pass the recorder through). Confirm no statement is recorded twice when a platform also records DDL itself.",
+  "description": "chatgpt-codex-connector review finding on merged PR #1261 (P1, benchbox/platforms/base/adapter.py:790). Deferred from the PR-review sweep in PR #1292 because it is an adapter-lifecycle change affecting exported evidence and needs live verification on a schema-tuned platform; tracked in GitHub issue #1293.\n\nFor platforms whose tuning is rendered into CREATE TABLE during schema creation, the ledger is initialized in the adapter but _setup_fresh_database_phases still calls create_schema with the RAW connection, before any DDL-recording wrapper is in play. ClickHouse injects tuned PARTITION BY / ORDER BY clauses in create_schema and executes them directly, so a run whose physical tuning is ONLY schema DDL can export noop / no applied_ledger_hash even though the database was genuinely tuned.\nThread: https://github.com/joeharris76/BenchBox/pull/1261#discussion_r3630131939\n\nRelated: clickhouse-applied-ledger-fidelity-20260724 covers the ClickHouse-side recording; this item covers the base-adapter lifecycle seam. Sequence them to avoid double-recording the same DDL.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify benchbox/platforms/base/result_capture.py",
+        "instead": "keep the change in the adapter lifecycle seam",
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "why": "it is a CODEOWNERS soundness path and would withhold auto-merge"
+      },
+      {
+        "dont": "record the same CREATE TABLE from both the base wrapper and the platform mixin",
+        "instead": "pick one owner per statement and assert single-recording in a test",
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "why": "duplicate statements change the order-sensitive applied_ledger_hash"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-09T18:29:45Z",
+      "completed_pr": 1664,
+      "created_at": "2026-07-24T16:23:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No statement is recorded twice when a platform already records its own schema DDL",
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724"
+      },
+      {
+        "behavior": "Platforms with no schema-phase tuning export exactly the ledger they do today",
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/equivalence/**"
+      },
+      {
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/expected_results/**"
+      },
+      {
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/**"
+      },
+      {
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/**"
+      },
+      {
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/**"
+      },
+      {
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ tests/unit/core/tuning/ -q",
+        "description": "Base adapter + tuning tests pass",
+        "expected": "all pass",
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "last_result": "pass",
+        "last_run": "2026-08-09T18:26:15Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "uv run -- python -m pytest tests/unit/core/tuning/test_requested_vs_applied_capture.py tests/unit/platforms/test_clickhouse_introspection.py -q (27 passed); uv run -- python -m pytest tests/unit/platforms/ tests/unit/core/tuning/ -q (8846 passed)",
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "notes": null,
+        "started_at": "2026-08-09T18:11:24Z",
+        "started_branch": "fix/schema-phase-ledger-capture-20260809",
+        "started_worktree": "/private/tmp/benchbox-batch-core-pool/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Route create_schema in _setup_fresh_database_phases through the DDL-recording connection so schema-phase tuning DDL enters the ledger",
+        "wid": "w1"
+      },
+      {
+        "evidence": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_introspection.py::TestTunedSortKeyFold::test_schema_phase_tuning_exports_hash_without_duplicate_ddl -q (passed; local fake ClickHouse lifecycle proves one schema DDL ledger record and non-null applied_ledger_hash; no live cloud run authorized)",
+        "item_id": "adapter-schema-phase-ddl-ledger-capture-20260724",
+        "notes": null,
+        "started_at": "2026-08-09T18:17:57Z",
+        "started_branch": "fix/schema-phase-ledger-capture-20260809",
+        "started_worktree": "/private/tmp/benchbox-batch-core-pool/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Prove on ClickHouse (schema-DDL-only tuning) that the run exports a real applied_ledger_hash instead of noop, with no duplicated statements",
+        "wid": "w2"
+      }
+    ]
+  }
+}

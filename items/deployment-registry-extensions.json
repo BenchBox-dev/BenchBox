@@ -1,0 +1,10 @@
+{
+  "description": "Extend the PlatformRegistry to support deployment mode awareness, enabling BenchBox\nto model platforms with local/remote/managed variants (e.g., DuckDB → MotherDuck,\nClickHouse local → ClickHouse Cloud).\n\nThis is the foundational work that enables the deployment dimension architecture,\nfollowing the successful pattern of the SQL/DataFrame split. The registry will\ndeclare deployment capabilities per platform, allowing the factory and CLI to\nroute to appropriate adapters.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-14T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

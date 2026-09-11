@@ -1,0 +1,183 @@
+{
+  "description": "Follow-up from the qpc-05 (#1032) review, F4.4. qpc-05 stopped the DataFrame\nplan-capture path from swallowing exceptions at DEBUG — it now records the\nreal cause on the query row (plan_capture_error) and a per-run adapter list\n(self.plan_capture_errors) and warns once per run. But two gaps remain, both\nout of qpc-05's scope_limit:\n\n1. The cause never reaches the persisted files. run_benchmark calls\n   compute_plan_capture_stats(query_results, capture_plans) WITHOUT\n   existing_errors= (benchbox/platforms/dataframe/benchmark_mixin.py:~397), so\n   schema.py emits the generic {\"error\": \"Query plan not captured\"} instead of\n   the real cause. And row[\"plan_capture_error\"] is dropped by\n   normalize_query_result / QueryResultInput (not in its field set), so it\n   isn't in the main results file either. Durable improvement today = the\n   warn-once log only.\n2. ExpressionFamilyAdapter does not inherit the SQL mixin's\n   _reset_plan_capture_stats, so neither plan_capture_errors nor\n   _plan_capture_warning_emitted is reset per run. A reused DF adapter\n   instance accumulates errors and permanently suppresses warn-once from run 2\n   on. Low impact today (module entrypoints construct a fresh adapter per run).\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "reset capture state per-query (breaks warn-once/accumulation within a run)",
+        "instead": "(not specified)",
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "why": "reset once per run."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "needs_item": "qpc-05-silent-failure-surfacing"
+      }
+    ],
+    "item_meta": {
+      "category": "Observability / Data Integrity",
+      "created_at": "2026-07-07T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "SQL-path plan-capture stats/errors behavior unchanged",
+        "item_id": "qpc-15-dataframe-capture-error-persistence"
+      },
+      {
+        "behavior": "compute_plan_capture_stats iteration-stable semantics",
+        "item_id": "qpc-15-dataframe-capture-error-persistence"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/results/query_normalizer.py QueryResultInput (drops plan_capture_error)",
+        "decision": "reuse",
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "path": "benchbox/core/results/query_normalizer.py"
+      },
+      {
+        "concept": "benchbox/platforms/base/result_capture.py::_reset_plan_capture_stats — the SQL-side per-run reset the DF adapter lacks",
+        "decision": "reuse",
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "path": "benchbox/platforms/base/result_capture.py::_reset_plan_capture_stats"
+      },
+      {
+        "concept": "benchbox/platforms/dataframe/benchmark_mixin.py:~397 compute_plan_capture_stats call (missing existing_errors=)",
+        "decision": "reuse",
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "path": "benchbox/platforms/dataframe/benchmark_mixin.py:~397"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/query_normalizer.py"
+      },
+      {
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/benchmark_mixin.py"
+      },
+      {
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/expression_family.py"
+      },
+      {
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe -q -k 'capture or plan'",
+        "description": "DF capture cause persists to companion + row; warn-once resets per run",
+        "expected": "all pass, including new persistence/reset tests",
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Thread existing_errors=self.plan_capture_errors into the DF compute_plan_capture_stats call so the real cause reaches the .plans.json errors list.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "notes": "Allow plan_capture_error through normalize_query_result/QueryResultInput (currently dropped); add a per-run reset of plan_capture_errors and _plan_capture_warning_emitted for ExpressionFamilyAdapter (it doesn't inherit the SQL mixin's _reset_plan_capture_stats).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Persist plan_capture_error on the main-file row and add a per-run reset of the DF adapter's capture-error/warn-once state.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test: a DF capture failure's real cause appears in the companion errors + row; warn-once resets across two runs on a reused adapter.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Review: adversarial code review (SQL path unaffected; no schema break).",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Fix review findings; re-run verification.",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-15-dataframe-capture-error-persistence",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Submit PR referencing qpc-15.",
+        "wid": "w6"
+      }
+    ]
+  }
+}

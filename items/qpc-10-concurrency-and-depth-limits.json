@@ -1,0 +1,205 @@
+{
+  "description": "Concurrency: throughput streams run on a ThreadPoolExecutor\n(tpc_patterns.py:664) against one shared adapter; capture mutates\nplan_capture_failures += 1, plan_capture_errors.append,\n_plan_capture_iteration_counts, query_plans_captured += 1 with no lock\n(result_capture.py:541-542,591-592,700). Exported headline stats are\nrecomputed iteration-stably (builder.py:498) so main-file numbers are\nmostly immune; the damage is live progress logs, plan_capture_errors\nordering/loss, and plan_first_n over/under-capture. Strict-mode\nPlanCaptureError raised in a stream thread surfaces as a generic stream\nfailure instead of aborting the run.\n\nDepth limits: plans deeper than 50 are dropped whole (to_dict raises,\nestimate_serialized_size -> serialization_error failure); the 50-depth and\n100KB thresholds are hardcoded; the \"consider external plan storage\" hint\nreferences a feature that does not exist.\n\nFindings: F6.1, F5.3.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fingerprint a truncated tree as if complete",
+        "instead": "(not specified)",
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "why": "mark it."
+      },
+      {
+        "dont": "serialize captures globally",
+        "instead": "(not specified)",
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "why": "lock only the counter/list mutations."
+      }
+    ],
+    "item_meta": {
+      "category": "Reliability / Concurrency",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "No lock held during get_query_plan (EXPLAIN I/O)",
+        "item_id": "qpc-10-concurrency-and-depth-limits"
+      },
+      {
+        "behavior": "compute_plan_capture_stats iteration-stable semantics",
+        "item_id": "qpc-10-concurrency-and-depth-limits"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/results/builder.py:498 stats recomputation",
+        "decision": "reuse",
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "path": "benchbox/core/results/builder.py:498"
+      },
+      {
+        "concept": "benchbox/core/results/query_plan_models.py:155-158,406-418 depth guard",
+        "decision": "reuse",
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "path": "benchbox/core/results/query_plan_models.py:155-158,406-418"
+      },
+      {
+        "concept": "benchbox/core/tpc_patterns.py:655-690 stream executor",
+        "decision": "reuse",
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "path": "benchbox/core/tpc_patterns.py:655-690"
+      },
+      {
+        "concept": "benchbox/platforms/base/result_capture.py:541-542,591-592,682-700",
+        "decision": "reuse",
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "path": "benchbox/platforms/base/result_capture.py:541-542,591-592,682-700"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/query_plan_models.py"
+      },
+      {
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpc_patterns.py"
+      },
+      {
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_plan_capture_stats.py tests/unit/platforms/test_plan_capture_errors.py -q",
+        "description": "Concurrent capture stress test keeps counts exact",
+        "expected": "all pass, including new concurrency test",
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_query_plan_models.py -q -k depth",
+        "description": "Deep plan exports with truncation marker instead of disappearing",
+        "expected": "all pass",
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "notes": "Already landed on develop prior to this PR: _plan_capture_lock guards the capture-stat mutation sites (the per-iteration/per-stream plan_first_n sampling machinery was retired by the canonical capture-once-per-query model, so there is no counter left to make atomic). No change in this PR.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: one threading.Lock in the capture mixin around the three mutation sites (rare, contention-free); make plan_first_n check-and-increment atomic under the lock.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "notes": "Already landed prior to this PR (strict-mode PlanCaptureError propagation). No change in this PR.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: define and implement strict-mode semantics under throughput (recommended: abort the run — propagate PlanCaptureError distinctly from generic stream failure); document the choice.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "notes": "Implemented here: LogicalOperator.to_dict emits a truncated_at_depth marker (with children_omitted) beyond max_depth instead of raising SerializationError; QueryPlanDAG.to_dict/to_json/estimate_serialized_size default to DEFAULT_PLAN_MAX_DEPTH (50). plan_max_depth is exposed in adapter config next to plan_capture_timeout_seconds and threaded into the capture-time size guard. The plan_fingerprint is computed over the full in-memory tree, so truncation never changes fingerprint equality. Removed the dangling \"external plan storage\" hint.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: deep plans serialize with a truncated_at_depth marker instead of being dropped; make plan_max_depth configurable.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Review: adversarial code review (lock scope vs EXPLAIN duration — never hold the lock across I/O; truncation-marker round-trip).",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix: address review findings; re-run verification.",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-10-concurrency-and-depth-limits",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Submit PR referencing qpc-10.",
+        "wid": "w6"
+      }
+    ]
+  }
+}

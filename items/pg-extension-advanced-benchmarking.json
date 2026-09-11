@@ -1,0 +1,130 @@
+{
+  "context": "- For w1: emit the compatibility matrix as a YAML file at\n  benchbox/platforms/pg_mooncake_type_compat.yaml, version-tagged. Read the\n  pg_mooncake changelog/release notes for the version in use to enumerate\n  supported column types. Do not modify the adapter itself.\n- For w2: add an optional MigrationPhase dataclass to benchbox/core/results/models.py\n  (alongside existing SetupPhase fields). In pg_mooncake.py, add a run_migration_phase()\n  method that executes ALTER TABLE ... SET ACCESS METHOD columnar, records wall time\n  and storage delta, and returns a MigrationPhase instance or None. The runner skips\n  this phase when not configured - use the NOT_RUN stub pattern (status=\"not_run\",\n  duration_ms=0) already present in benchbox/core/runner/runner.py (LifecyclePhases).\n  Update _build_phases_block() in schema.py to conditionally include the migration\n  phase using the \"Omit Empty\" principle.\n- For w3: add a NativeComparison dataclass to benchbox/core/results/models.py with\n  a list of per-query delta entries {query_id, pg_duckdb_ms, duckdb_ms, delta_ms}.\n  In pg_duckdb.py, add an optional run_native_comparison() method triggered by a\n  --platform-option compare_native=true flag. Serialize via a new top-level\n  \"comparisons\" key in schema.py using the \"Omit Empty\" pattern (omit if None).\n  Do NOT add --compare-native as a top-level CLI flag - use the existing\n  --platform-option K=V mechanism already in benchbox run.\n",
+  "description": "Advanced benchmarking features for PostgreSQL extension adapters that go\nbeyond basic query execution.\n\nFrom pg-mooncake-platform-adapter (completed 2026-02-15):\n- Data type compatibility matrix documentation\n- Heap-to-columnstore migration benchmarking (measuring conversion overhead)\n\nFrom pg-duckdb-platform-adapter (completed 2026-02-15):\n- pg_duckdb vs native DuckDB automated comparison reports\n\nThese are benchmarking enhancements, not integration tests (those are in\ncloud-integration-test-infrastructure).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hardcode type lists for w1",
+        "instead": "(not specified)",
+        "item_id": "pg-extension-advanced-benchmarking",
+        "why": "pull from pg_mooncake release notes or a live information_schema query, so the matrix stays accurate across versions"
+      },
+      {
+        "dont": "modify pg_mooncake or pg_duckdb connection/auth code",
+        "instead": "(not specified)",
+        "item_id": "pg-extension-advanced-benchmarking",
+        "why": "these are read-only enhancements; touching connection paths risks breaking live adapters with no benefit"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-04-04T00:00:00Z",
+      "created_at": "2026-02-18T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "pg_duckdb adapter: existing query execution and schema load paths",
+        "item_id": "pg-extension-advanced-benchmarking"
+      },
+      {
+        "behavior": "pg_mooncake adapter: existing query execution, connection management, and TPC-H/TPC-DS run paths",
+        "item_id": "pg-extension-advanced-benchmarking"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pg-extension-advanced-benchmarking",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/models.py"
+      },
+      {
+        "item_id": "pg-extension-advanced-benchmarking",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "pg-extension-advanced-benchmarking",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_duckdb.py"
+      },
+      {
+        "item_id": "pg-extension-advanced-benchmarking",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_mooncake.py"
+      },
+      {
+        "item_id": "pg-extension-advanced-benchmarking",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_mooncake_type_compat.yaml"
+      },
+      {
+        "item_id": "pg-extension-advanced-benchmarking",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_pg_duckdb_adapter.py"
+      },
+      {
+        "item_id": "pg-extension-advanced-benchmarking",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_pg_mooncake_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_pg_mooncake_adapter.py -x -q",
+        "description": "Existing pg_mooncake tests still pass after any changes",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "pg-extension-advanced-benchmarking",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_pg_duckdb_adapter.py -x -q",
+        "description": "Existing pg_duckdb tests still pass after any changes",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "pg-extension-advanced-benchmarking",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "pg-extension-advanced-benchmarking",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write pg_mooncake type compatibility matrix to pg_mooncake_type_compat.yaml - enumerate supported column types for the pinned version from release notes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-extension-advanced-benchmarking",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add optional migration phase to pg_mooncake adapter - ALTER TABLE heap→columnar, record wall time and storage delta, emit as a phase result in the result bundle",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-extension-advanced-benchmarking",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add pg_duckdb vs native DuckDB comparison output - run identical TPC-H queries on both platforms, write per-query timing delta JSON into the result bundle",
+        "wid": "w3"
+      }
+    ]
+  }
+}

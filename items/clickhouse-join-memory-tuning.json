@@ -1,0 +1,98 @@
+{
+  "context": "Simple parameter change in tuning.py. Check the max_bytes_in_join calculation\nand restore to 50% multiplier. Then grep for join_algorithm across the ClickHouse\nadapter to verify grace_hash isn't overridden by session-level settings.\n",
+  "description": "ClickHouse SF1 Q5 fails across TPC-H, tpchavoc, and tpch_skew with:\n\"Limit for JOIN exceeded, max bytes: 2.00 GiB, current bytes: 2.72 GiB\"\n\nRoot cause: benchbox/platforms/clickhouse/tuning.py ~line 91 sets max_bytes_in_join\nto 25% of max_memory_usage. With a 2 GB default, that's 512 MB - too low for Q5's\nmulti-table join at SF1 which needs 2.72 GB.\n\nAdditionally, join_algorithm should be set to \"grace_hash\" (~line 105) which spills\nto disk and should avoid this limit entirely. Need to verify grace_hash is actually\ntaking effect and not being overridden.\n\nSingle fix resolves 9 failures across 3 benchmarks.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "lower max_bytes_in_join below 0.5 × max_memory_usage",
+        "instead": "keep at 50% minimum",
+        "item_id": "clickhouse-join-memory-tuning",
+        "why": "SF1 Q5 multi-table join needs 2.72 GiB and 25% cap caused OOM"
+      },
+      {
+        "dont": "remove grace_hash join_algorithm",
+        "instead": "verify it takes effect",
+        "item_id": "clickhouse-join-memory-tuning",
+        "why": "grace_hash spills to disk and is the safety net when memory limits are hit"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-04-08T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All other tuning parameters (max_memory_usage, max_threads, etc.) retain current values",
+        "item_id": "clickhouse-join-memory-tuning"
+      },
+      {
+        "behavior": "Tuning applies correctly for both SF0.01 and SF1 scales",
+        "item_id": "clickhouse-join-memory-tuning"
+      },
+      {
+        "behavior": "grace_hash join algorithm setting is not overridden by adapter session defaults",
+        "item_id": "clickhouse-join-memory-tuning"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'clickhouse and tuning and (join or memory)'",
+        "description": "Tuning tests pass with updated max_bytes_in_join multiplier",
+        "expected": "Tests pass confirming 0.5 multiplier and grace_hash settings",
+        "item_id": "clickhouse-join-memory-tuning",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-join-memory-tuning",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "clickhouse-join-memory-tuning",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "clickhouse-join-memory-tuning",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "In tuning.py, change max_bytes_in_join multiplier from 0.25 to 0.5 of max_memory_usage",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-join-memory-tuning",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify join_algorithm = 'grace_hash' is being applied - check for overrides in adapter or session settings",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-join-memory-tuning",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add/update unit tests for tuning parameter values",
+        "wid": "w3"
+      }
+    ]
+  }
+}

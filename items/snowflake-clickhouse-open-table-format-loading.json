@@ -1,0 +1,189 @@
+{
+  "context": "Snowflake Iceberg: Use CREATE ICEBERG TABLE or ALTER TABLE ... SET TABLE_FORMAT = ICEBERG\nwith external volume pointing to staged data.  Reference Snowflake docs for Iceberg\nTables support.\n\nClickHouse Iceberg: Use iceberg() table function to read Iceberg data from S3/GCS.\nExample: SELECT * FROM iceberg('s3://bucket/path/', ...) to create table from Iceberg.\n\nDelta support for both platforms is lower priority - Iceberg is the primary open table\nformat for both.\n",
+  "description": "Snowflake and ClickHouse both support open table formats on the platform but their\nBenchBox adapters only load parquet/CSV.  These platforms were removed from\nDELTA_CAPABILITY and ICEBERG_CAPABILITY in format_capabilities.py (commit 9be7d5b70)\nto prevent the fail-fast check from passing when loading would fail.\n\nCompleted closure:\n- Snowflake external Iceberg now maps staging_root into BASE_LOCATION and only\n  advertises support when the required external volume config is present.\n- ClickHouse capability registration now distinguishes ClickHouse Cloud from\n  ClickHouse Local/Server in format selection.\n- Snowflake Delta remains external-mode only and is advertised only when the run\n  has the required external-table configuration.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "attempt Delta loading for ClickHouse",
+        "instead": "focus on Iceberg only",
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "why": "ClickHouse has no native delta support"
+      },
+      {
+        "dont": "register platforms in format_capabilities.py before loading code is tested",
+        "instead": "implement and test first",
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "why": "the fail-fast check will pass but load will fail at runtime"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "snowflake-clickhouse-open-table-format-loading",
+        "id": 573,
+        "reason": "Requires cloud credentials and running instances",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Integration tests with real Snowflake/ClickHouse instances"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "snowflake-clickhouse-open-table-format-loading",
+        "id": 574,
+        "reason": "ClickHouse lacks native Delta support; would need Parquet conversion layer",
+        "resolution": "promoted",
+        "resolved_item": "clickhouse-delta-support-via-conversion-or-external-tooling",
+        "resolved_reason": null,
+        "summary": "ClickHouse Delta support via conversion or external tooling"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ClickHouse Cloud parquet loading via S3/GCS staging must remain unchanged",
+        "item_id": "snowflake-clickhouse-open-table-format-loading"
+      },
+      {
+        "behavior": "Snowflake parquet/CSV COPY INTO loading path must remain unchanged",
+        "item_id": "snowflake-clickhouse-open-table-format-loading"
+      },
+      {
+        "behavior": "format_capabilities.py fail-fast check: only re-register after loading code works",
+        "item_id": "snowflake-clickhouse-open-table-format-loading"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/format_capabilities.py"
+      },
+      {
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse_cloud.py"
+      },
+      {
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      },
+      {
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v -k 'snowflake or clickhouse' --no-header -q",
+        "description": "Snowflake and ClickHouse adapter tests pass",
+        "expected": "All tests pass",
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base/test_format_capabilities.py -v --no-header -q",
+        "description": "Format capabilities tests pass with re-registered platforms",
+        "expected": "All tests pass",
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Finish Snowflake Iceberg loading as an end-to-end usable BenchBox path",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Keep ClickHouse Cloud Iceberg loading path and tests green",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Establish whether Snowflake Delta has a BenchBox-usable supported path",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make capability registration mode-aware or keep it conservative",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "snowflake-clickhouse-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Expand tests to cover final Snowflake/ClickHouse closure criteria",
+        "wid": "w5"
+      }
+    ]
+  }
+}

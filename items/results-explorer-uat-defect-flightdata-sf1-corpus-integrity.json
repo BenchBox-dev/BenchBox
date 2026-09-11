@@ -1,0 +1,175 @@
+{
+  "context": "Treat the current SF1 file as a cache-layout compatibility defect, not as\nmalformed CSV rows: `zstd -t` succeeds for flights/airlines/airports, and a\nstreaming Python CSV scan reads 25,457,793 data rows with 28 columns and no\nmalformed rows.\n\nRepair the shared source path by replacing or quarantining the legacy single\nlarge `flights.csv.zst` layout with deterministic FlightData `flights` shards\nrecorded as multiple manifest entries with explicit CSV dialect metadata.\nKeep the fix at the source/manifest contract where practical so DataFusion,\nClickHouse local, DuckDB, and DataFrame loaders resolve the same repaired\ntable mapping.\n",
+  "description": "FlightData SF 1.0 failed across several SQL and DataFrame platforms during the\nUAT sweep. Representative logs include\n`datafusion_flightdata_1.0_20260502_182841.log:13`,\n`clickhouse-local_flightdata_1.0_20260502_185846.log:15`, and\n`polars-df_flightdata_1.0_20260502_211319.log:8`, all pointing at the\n`flightdata_1.0/flights.csv.zst` source file being truncated, incomplete, or\notherwise unreadable.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "patch individual adapters to ignore bad rows",
+        "instead": "validate or repair the shared source data.",
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "why": "the same corpus failed across engines"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Data generation/cache reuse remains deterministic.",
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity"
+      },
+      {
+        "behavior": "Existing smaller FlightData scales continue to load.",
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity"
+      },
+      {
+        "behavior": "Reusable datagen corpora stay reusable; cleanup removes run-owned databases, spill directories, and output artifacts, not shared source corpora such as TPC-H reused by read primitives.",
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "kind": "do_not_modify",
+        "path_glob": "Platform-specific row-skipping logic outside the shared loading contract"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/benchmark.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/dataframe_queries.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/downloader.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/workload.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/shared_loading.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/flightdata/"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_runner_manifest_reuse.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_data_loading.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs uv run -- benchbox run --platform duckdb --benchmark flightdata --scale 1.0 --phases load,power --non-interactive",
+        "description": "FlightData SF1 smoke succeeds on at least one SQL and one DataFrame platform.",
+        "expected": "run completes without source-file corruption errors",
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs uv run -- benchbox run --platform polars-df --benchmark flightdata --scale 1.0 --phases load,power --non-interactive",
+        "description": "FlightData SF1 DataFrame smoke succeeds.",
+        "expected": "run completes without source-file corruption errors",
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast tests remain green.",
+        "expected": "all selected tests pass",
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm source-file integrity and exact affected loader paths",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Repair or quarantine the bad FlightData SF1 corpus path",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add integrity/preflight coverage for FlightData source files",
+        "wid": "w3"
+      }
+    ]
+  }
+}

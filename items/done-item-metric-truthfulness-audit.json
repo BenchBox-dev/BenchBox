@@ -1,0 +1,131 @@
+{
+  "description": "Follow-up to holistic-review-followup-metadata-truth (#938), which corrected metric\nand scope truth defects (overstated success_metrics, scope_limit omissions, stale\nMakefile comments) for the specific DONE items the holistic review examined. That\nitem scoped itself to the holistic-review effort and deferred the broad sweep.\n\nDo the full audit: for every historical DONE item, verify its success_metrics,\nscope_limit.only_modify, and any counts against the item's actually-merged diff, and\ncorrect any that overstate, understate, or omit. Then systematize it so future\nclose-outs cannot silently drift — a lightweight check that flags a DONE item whose\nscope_limit does not cover its merged diff, or whose metric claims a state its diff\ndid not deliver. Metadata-only; no source-code behavior change.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "invert or weaken a merged item's actual guarantees",
+        "instead": "(not specified)",
+        "item_id": "done-item-metric-truthfulness-audit",
+        "why": "only align the recorded text with the merged diff."
+      },
+      {
+        "dont": "reopen or re-run the merged items; correct their recorded metadata only.",
+        "instead": "(not specified)",
+        "item_id": "done-item-metric-truthfulness-audit",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "STILL BLOCKED (hard/stale substrate) — re-validated 2026-07-22T22:31:51Z against origin/develop@3be9de39. Condition UNCHANGED: the item's substrate stays removed by the hosted-DB migration — _project/DONE/ YAML tree, validate_todo.py, and todo_cli.py check-graph (its verification ladder) are all absent on develop; DONE-item metadata now lives in the hosted todo-db so corrections are DB writes, not git-committable PR content; the repo is a shallow clone so the ~1264 DONE items' merged diffs cannot be reconstructed to audit metric/scope-vs-diff truthfulness; a recurrence guard would have no stored diff to check against (a vacuous assertion, forbidden). Needs re-specification against the DB tracker model before it is actionable. [Original w0 finding same date.]",
+      "category": "Documentation",
+      "created_at": "2026-07-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Metadata/documentation only — no source-code behavior change.",
+        "item_id": "done-item-metric-truthfulness-audit"
+      },
+      {
+        "behavior": "Validator and TODO graph stay green after the DONE-YAML edits.",
+        "item_id": "done-item-metric-truthfulness-audit"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': 'AGENTS.md (Default write-task close-out, guard+wiring rule added by #938)', 'note': 'House-rules home for any new close-out discipline this audit surfaces.'}",
+        "decision": "reuse",
+        "item_id": "done-item-metric-truthfulness-audit",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': '_project/DONE/main/planning/holistic-review-followup-metadata-truth.yaml (#938)', 'note': 'The pattern to generalize: reword overstated metrics to the accurate scoped claim, add omitted scope_limit paths, refresh stale comments; metadata-only.'}",
+        "decision": "reuse",
+        "item_id": "done-item-metric-truthfulness-audit",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': '_project/scripts/validate_todo.py', 'note': 'Where a recurrence guard (scope_limit-vs-diff / metric-vs-diff check) could live or be invoked from.'}",
+        "decision": "reuse",
+        "item_id": "done-item-metric-truthfulness-audit",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "done-item-metric-truthfulness-audit",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "done-item-metric-truthfulness-audit",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "done-item-metric-truthfulness-audit",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "Amended DONE YAMLs validate and the graph is intact",
+        "expected": "all files valid; no cycles/dangling refs; sampled DONE metrics match their merged diffs",
+        "item_id": "done-item-metric-truthfulness-audit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "done-item-metric-truthfulness-audit",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "done-item-metric-truthfulness-audit",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "done-item-metric-truthfulness-audit",
+        "notes": "For each DONE item, resolve the merging PR and compare the recorded metrics,\nscope_limit.only_modify, and any counts against the diff --name-only / content.\nRecord mismatches (overstated / understated / omitted).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Enumerate DONE items and diff each item's success_metrics / scope_limit / counts vs its merged PR diff",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "done-item-metric-truthfulness-audit",
+        "notes": "Reword metrics to the accurate claim, add omitted scope paths, fix stale\ncounts/comments. No source or behavior change; re-run validate_todo on each.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Correct the mismatches (metadata-only), like #938 did for the holistic-review subset",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "done-item-metric-truthfulness-audit",
+        "notes": "A lightweight script/guardrail (invoked from validate_todo or the todo review\naction) that catches scope_limit-vs-diff and metric-vs-diff drift on close-out,\nso this cannot silently recur.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a recurrence guard that flags a DONE item whose scope_limit doesn't cover its diff",
+        "wid": "w3"
+      }
+    ]
+  }
+}

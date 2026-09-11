@@ -1,0 +1,126 @@
+{
+  "context": "Reproduce under Linux WebKit (container or CI re-run with tracing and video), determine whether the benchmark-index query, the DuckDB-WASM worker variant, or a WebKit-specific timing path returns zero rows, and fix the underlying cause. Treat budget changes as forbidden.",
+  "description": "CI run 30812774015 (WebKit @smoke, non-blocking) failed e2e/routes/benchmark-index.spec.ts on /results/tpch/ with getByText(/TPC-H Results/) element(s) not found, after 3 attempts across a 26.2s budget. The harness message is explicit that this is NOT the cold-snapshot zero-row race the budget is sized for, because re-navigation did not help. This is the only failure in the current batch with no known cause. It is NOT the skeleton-headline defect: local WebKit passes 16/16 @smoke on macOS (verified 2026-08-03 against develop 3af42e29b), so the failure is specific to Linux CI WebKit and is not reproducible locally.",
+  "legacy": {
+    "item_meta": {
+      "category": "Explorer cross-browser correctness",
+      "created_at": "2026-08-03T23:37:07Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Any fix is a real cause fix, not a retry or budget change",
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803"
+      },
+      {
+        "behavior": "Chromium and Firefox lanes keep passing throughout",
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803"
+      },
+      {
+        "behavior": "The documented distinction between this failure and the cold-snapshot zero-row race stays accurate",
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/browser-ci.md"
+      },
+      {
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -q -F \"DATA_ATTEMPT_BUDGETS_MS = [10_000, 8_000, 8_000]\" results-explorer/e2e/support/fixtures.ts",
+        "description": "Data wait budgets were not widened to mask the failure",
+        "expected": "Exit 0 while the three attempt budgets remain unchanged",
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=webkit --workers=1 --retries=0 e2e/routes/benchmark-index.spec.ts",
+        "description": "Benchmark index smoke passes on WebKit",
+        "expected": "WebKit resolves TPC-H Results on the benchmark index",
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=webkit --workers=1 --retries=0",
+        "description": "Full WebKit smoke subset passes",
+        "expected": "All WebKit @smoke tests pass",
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reproduce the failure under Linux WebKit with tracing enabled",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Identify why the benchmark-index query returns no rows in that environment",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-webkit-tpch-databind-rootcause-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Fix the root cause and record the distinction from the cold-snapshot race",
+        "wid": "w2"
+      }
+    ]
+  }
+}

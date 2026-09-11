@@ -1,0 +1,10 @@
+{
+  "description": "Enhance the Metadata Primitives benchmark to stress-test metadata operations with\ncomplex catalog scenarios that reflect real-world data warehouse characteristics.\n\nThe current implementation tests basic INFORMATION_SCHEMA queries against simple\nschemas (TPC-H with 8 tables, ~60 columns total). Real production data warehouses\nhave significantly more complex metadata:\n\n- Wide tables (100-1000+ columns) common in analytics/ML feature stores\n- Nested view hierarchies (3-4+ levels) from BI tools like Looker, dbt, Tableau\n- Complex data types (STRUCT, ARRAY, MAP, JSON) in modern data platforms\n- Large catalogs (100s-1000s of tables) in multi-tenant environments\n- Deep constraint/FK graphs in normalized operational databases\n\nThese complexity factors cause 5-100x slower metadata operations that are not\ncaptured by the current benchmark. This enhancement adds a MetadataGenerator\ncomponent and new query categories to measure these performance characteristics.",
+  "legacy": {
+    "item_meta": {
+      "category": "Benchmark Development",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "benchmark-expansion"
+    }
+  }
+}

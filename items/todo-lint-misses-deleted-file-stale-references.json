@@ -1,0 +1,98 @@
+{
+  "context": "For an unresolved literal on an open item, check git log --all -1 -- <path>; existed-then-deleted becomes a finding ('references a deleted file'). Bound the git cost (one batched lookup per lint run, or cache per path). Do not lower the ratio cutoff.",
+  "description": "Swept 2026-08-01: _project/scripts/todo_cli.py (6 open items) and _project/scripts/validate_todo.py (5 open items) both existed and were deleted in the G5 cutover (#1232); their difflib ratios to surviving siblings (0.74-0.76) sit below the 0.87 near-miss cutoff, interleaved with genuinely planned new files at the same ratios (test_databend_deployment_mode.py 0.76). No ratio cutoff separates the two populations; git history does exactly: a path that once existed and was deleted is a stale reference, not a plan.",
+  "legacy": {
+    "item_meta": {
+      "category": "Tracker integrity",
+      "completed_at": "2026-08-01T19:48:38Z",
+      "completed_pr": 1431,
+      "created_at": "2026-08-01T12:42:03Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Lint runtime stays acceptable - git lookups must be batched or cached",
+        "item_id": "todo-lint-misses-deleted-file-stale-references"
+      },
+      {
+        "behavior": "Planned new files (never existed in git) stay legal on open items",
+        "item_id": "todo-lint-misses-deleted-file-stale-references"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-lint-misses-deleted-file-stale-references",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "todo-lint-misses-deleted-file-stale-references",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_v2.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo lint done-item-metric-truthfulness-audit | grep -qi 'todo_cli'",
+        "description": "lint reports the deleted-script reference on a real item",
+        "expected": "exits 1 on the unfixed tree (verified 2026-08-01, hosted backend); exits 0 once deleted-file references are flagged. Needs the hosted tracker env.",
+        "item_id": "todo-lint-misses-deleted-file-stale-references",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q -k 'deleted_path or stale_reference'",
+        "description": "the new check has dedicated tests",
+        "expected": "exits 5 on the unfixed tree (no tests collected, verified 2026-08-01); all pass once w1 lands",
+        "item_id": "todo-lint-misses-deleted-file-stale-references",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q -k lint",
+        "description": "existing lint suite still green",
+        "expected": "all pass before and after - regression guard, not a gate",
+        "item_id": "todo-lint-misses-deleted-file-stale-references",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-lint-misses-deleted-file-stale-references",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated 2026-08-01: todo_cli.py (6 items) and validate_todo.py (5 items) deleted in #1232, ratios 0.74-0.76 below cutoff, interleaved with planned files at the same ratios; hosted lint printed nothing for them",
+        "item_id": "todo-lint-misses-deleted-file-stale-references",
+        "notes": null,
+        "started_at": "2026-08-01T18:53:09Z",
+        "started_branch": "fix/todo-lint-deleted-file-refs",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Re-validate the todo_cli.py/validate_todo.py populations on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "_existed_then_deleted (git log --all -1, cached per root+path) fires only for unresolved open-item literals with no near-miss; finding 'references a file that was deleted from the tree'; 3 tests (-k deleted_path/stale_reference); hosted rung 1 now exits 0 on done-item-metric-truthfulness-audit; lint suite 43 passed",
+        "item_id": "todo-lint-misses-deleted-file-stale-references",
+        "notes": null,
+        "started_at": "2026-08-01T18:53:14Z",
+        "started_branch": "fix/todo-lint-deleted-file-refs",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Add the existed-then-deleted check with bounded git lookups and tests",
+        "wid": "w1"
+      }
+    ]
+  }
+}

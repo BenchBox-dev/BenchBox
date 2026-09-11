@@ -1,0 +1,143 @@
+{
+  "context": "Give both paths an explicit hold they honour, and evaluate the newly added gate rather than the base-ref copy on synchronize, so a gate added mid-flight applies to PRs already open.",
+  "description": "auto-merge-on-open.yml re-arms auto-merge on synchronize using the base-ref copy of its predicate, and nightly.yml runs green_unmerged_sweep.py --apply, so gh pr merge --disable-auto is undone by the next push or the next night. Draft status is the only durable hold, because both paths skip drafts. This is not theoretical: #1528 auto-merged without the owner review #1529 had just added, because a follow-up push re-armed it while the base-ref predicate was still the pre-#1529 copy.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci-defect",
+      "completed_at": "2026-08-06T00:58:33Z",
+      "completed_pr": 1622,
+      "created_at": "2026-08-04T23:43:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Auto-merge still arms by default for ordinary PRs; this adds a hold, it does not disable the feature",
+        "item_id": "auto-merge-explicit-hold-is-not-durable"
+      },
+      {
+        "behavior": "Drafts continue to be skipped by both paths",
+        "item_id": "auto-merge-explicit-hold-is-not-durable"
+      },
+      {
+        "behavior": "Evaluating the PR copy of a predicate must not let a PR weaken its own gate",
+        "item_id": "auto-merge-explicit-hold-is-not-durable"
+      },
+      {
+        "behavior": "The gate machinery stays self-protecting - a change to it still requires review",
+        "item_id": "auto-merge-explicit-hold-is-not-durable"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/green_unmerged_sweep.py"
+      },
+      {
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_auto_merge_hold_is_durable.py -q",
+        "description": "a durability guard exists and passes",
+        "expected": "Fails on the unfixed tree today (measured non-zero - the guard does not exist)",
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "last_result": "fail",
+        "last_run": "2026-08-06T00:58:24Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py -q",
+        "description": "the existing soundness suite stays green",
+        "expected": "Passes today and must stay passing - this is the regression rung, not the falsifying one",
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "last_result": "fail",
+        "last_run": "2026-08-06T00:58:30Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Implemented no-auto-merge label hold in auto-merge-on-open.yml (check+disable steps; ready_for_review enable gated; labeled trigger)",
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "notes": null,
+        "started_at": "2026-08-06T00:56:40Z",
+        "started_branch": "fix/auto-merge-durable-hold",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Choose and implement an explicit hold that both re-arming paths honour",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Sweep: AUTO_MERGE_HOLD_LABEL + has_auto_merge_hold_label; is_stranded excludes explicit_hold; --apply still issue-only never enables auto-merge; nightly comment pin",
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "notes": null,
+        "started_at": "2026-08-06T00:56:47Z",
+        "started_branch": "fix/auto-merge-durable-hold",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Stop the nightly sweep re-arming a hold it did not set",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Soundness check unions base-ref predicate_base.py with PR checkout copy (OR); enable requires both false; self-touch override retained",
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "notes": null,
+        "started_at": "2026-08-06T00:56:56Z",
+        "started_branch": "fix/auto-merge-durable-hold",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Evaluate the PR copy of the soundness predicate alongside the base-ref copy on synchronize",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Documented durable holds (draft + no-auto-merge) in docs/operations/pr-triage.md and repo-admin-settings.md",
+        "item_id": "auto-merge-explicit-hold-is-not-durable",
+        "notes": null,
+        "started_at": "2026-08-06T00:57:04Z",
+        "started_branch": "fix/auto-merge-durable-hold",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Document the durable hold in operations docs",
+        "wid": "w3"
+      }
+    ]
+  }
+}

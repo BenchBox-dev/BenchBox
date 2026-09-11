@@ -1,0 +1,152 @@
+{
+  "description": "release-tag-publish-hardening (DONE, PR #952) closed the workflow-level\nhalf of the stray-publish problem: release.yml's verify-tag-on-main job\nrefuses refs that are not main/ancestor-of-main, and the real-PyPI publish\nstep additionally requires a refs/tags/v* ref. The repo-admin half was\nexplicitly deferred and is documented with live-state notes in\ndocs/operations/repo-admin-settings.md (\"Tag creation and\nrelease-environment protections\", ~lines 260-340):\n\n  (a) TAG-CREATION RULESET — live state 2026-07-03: no ruleset with\n      target \"tag\" exists (the similarly-named v-release-branches-minimal\n      ruleset targets refs/heads/v*, not tags). Residual risk left open:\n      any collaborator with push access can create a v* tag ON an\n      existing main commit out of band (re-tag an old main commit, or tag\n      a version out of sequence); verify-tag-on-main passes such a tag\n      (it IS an ancestor of main) and release.yml proceeds toward\n      publish. The runbook has a draft `gh api -X POST .../rulesets`\n      payload; bypass_actors needs finalizing with the admin.\n\n  (b) PYPI ENVIRONMENT REQUIRED REVIEWERS — release.yml already scopes\n      publish to `environment: pypi`, but whether that environment has\n      `required_reviewers` protection configured was NOT verifiable from\n      the sandbox (no admin-scope API access) and no prior record exists\n      in _project/decisions/. Treat as absent until verified. Residual\n      risk: no human approval gate at the actual publish step.\n\nBoth are the same class of deferred admin action as\nauto-merge-review-gate-admin-enforcement's ruleset PUT (the develop-PR\nGITHUB_TOKEN has no administration scope), so this TODO follows that\nitem's shape: agent-side work is verification, runbook recording, and\ndrift-check coverage; the PUT/POST themselves are maintainer actions.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "apply the draft POST payload verbatim without settling bypass_actors",
+        "instead": "dry-run the actor list against how release-finalize actually pushes tags.",
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "why": "a creation ruleset with no bypass path bricks the release flow itself"
+      },
+      {
+        "dont": "record 'likely configured' in the runbook",
+        "instead": "only dated, observed API output goes in the live-state sections.",
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "why": "unverified-optimistic notes are how the pypi-environment question got here"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-08-05T23:07:27Z",
+      "completed_pr": 1598,
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The legitimate release flow (make release-cut / release-finalize) can still create v* tags after the ruleset applies — bypass_actors must cover whichever identity release-finalize tags with, verified before enforcement.",
+        "item_id": "tag-and-pypi-environment-admin-hardening"
+      },
+      {
+        "behavior": "release.yml's existing verify-tag-on-main and tag-shaped-ref publish conditions — the admin layers are additive; do not loosen the workflow-level checks because the ruleset now exists.",
+        "item_id": "tag-and-pypi-environment-admin-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/planning/auto-merge-review-gate-admin-enforcement.yaml — reuse: the established pattern for admin-blocked work (agent verifies + records + adds CI detection; admin applies).",
+        "decision": "reuse",
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "path": "_project/TODO/main/planning/auto-merge-review-gate-admin-enforcement.yaml"
+      },
+      {
+        "concept": "_project/scripts/ruleset_review_enforcement.py — extend: the existing ruleset-drift checker that already reads live rulesets in release-canary; add tag-ruleset presence to its findings rather than writing a second checker.",
+        "decision": "extend",
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "path": "_project/scripts/ruleset_review_enforcement.py"
+      },
+      {
+        "concept": "docs/operations/repo-admin-settings.md:260-340 — the runbook sections with verify commands, live-state notes, and the draft ruleset payload; this TODO executes and then updates them (single source of truth, per that doc's convention).",
+        "decision": "reuse",
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "path": "docs/operations/repo-admin-settings.md:260-340"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/ruleset_review_enforcement.py"
+      },
+      {
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/release/test_ruleset_drift_review_coverage.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | select(.target==\"tag\") | {id, enforcement, conditions}'",
+        "description": "Tag ruleset live",
+        "expected": "one active ruleset including refs/tags/v* with a creation rule",
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/joeharris76/BenchBox/environments/pypi --jq '.protection_rules'",
+        "description": "pypi environment protection observed",
+        "expected": "contains type=required_reviewers with non-empty reviewers (or a dated runbook entry documenting the accepted alternative)",
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/release/test_ruleset_drift_review_coverage.py -q",
+        "description": "Drift check covers the tag ruleset",
+        "expected": "all pass including the new tag-ruleset finding coverage",
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Applied and recorded. Live: gh api repos/joeharris76/BenchBox/rulesets -> ruleset 'v-tag-restricted' id=18774756 target=tag enforcement=active. Runbook docs/operations/repo-admin-settings.md:343 records 'Applied 2026-07-10: v-tag-restricted (id 18774756) is live and active' with the applied payload at :277 and conditions at :339. Re-verified live 2026-07-29.",
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "notes": "Start from the runbook's draft POST (target=tag, enforcement=active,\ninclude refs/tags/v*, rules[type]=creation); finalize bypass_actors\nwith the admin (who may legitimately tag: release automation identity\nand/or the maintainer). Verify with\n`gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | select(.target==\"tag\")'`\nand paste the id + conditions into repo-admin-settings.md's live-state\nnote with a date.\n",
+        "started_at": "2026-07-29T11:49:46Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "ADMIN: create the v* tag-creation ruleset; record the applied payload and resulting ruleset id in the runbook",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Live API 2026-08-05:\n  gh api repos/joeharris76/BenchBox/environments/pypi --jq '{name, protection_rules: [.protection_rules[] | {type, reviewers: [.reviewers[]?.reviewer.login]}]}'\n  -> {\"name\":\"pypi\",\"protection_rules\":[{\"reviewers\":[\"joeharris76\"],\"type\":\"required_reviewers\"}]}\n  test-pypi protection_rules=[] (intentional lower friction, documented)\n  tag ruleset v-tag-restricted id=18774756 enforcement=active (reconfirm w1/w3)\nRunbook: replaced ### pypi environment required-reviewers gate (verify/pending) with dated observed state (enforced) in docs/operations/repo-admin-settings.md — no \"likely configured\".\nTests: BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest tests/unit/release/test_ruleset_drift_review_coverage.py -q → 26 passed\nNo ruleset_review_enforcement.py / test thrash (w3 already complete).\nPR: https://github.com/joeharris76/BenchBox/pull/1598",
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "notes": "`gh api repos/joeharris76/BenchBox/environments/pypi` — inspect\nprotection_rules for type=required_reviewers with a non-empty\nreviewers list. If absent, configure via the environments API/UI with\nthe maintainer as reviewer. Either way, replace the runbook's\n\"not independently re-verified\" caveat with the dated observed state.\nConsider the same check for the test-pypi environment and record the\ndecision (it is deliberately lower-friction; documenting \"no gate,\nintentional\" is an acceptable outcome there).\n",
+        "started_at": "2026-08-05T23:03:02Z",
+        "started_branch": "fix/pypi-env-reviewers-live-state",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "ADMIN: verify (and if absent, configure) required_reviewers on the pypi environment; record the live state",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tag-and-pypi-environment-admin-hardening",
+        "notes": "In _project/scripts/ruleset_review_enforcement.py (or a sibling\nfunction it calls), assert a target=\"tag\" ruleset covering\nrefs/tags/v* with a creation rule exists; mirror the (since-removed,\n2026-07-18 — the develop review rule it flagged was retired)\nDEVELOP_REVIEW_RULE_ENFORCED warn-until-enforced flag pattern so the\ncheck lands before the admin acts without going red. Extend\ntests/unit/release/test_ruleset_drift_review_coverage.py for the new\nfinding. NOTE: this check only executes when release-canary actually\nruns — see release-canary-scheduled-activation; that TODO is a hard\ndependency for the check being live, though the code change itself\ncan land first.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend the ruleset-drift check to flag a missing v*-tag ruleset (WARN-until-applied, then enforce)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

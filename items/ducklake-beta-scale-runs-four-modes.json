@@ -1,0 +1,164 @@
+{
+  "context": "Run each mode at SF>=1 through the normal benchmark path with the correctness gate enabled; record run ids and outcomes on this item. w1-w5 are runs and may produce no repo diff at all - only w6 edits files, hence the narrow scope. Live PostgreSQL is reachable via a container (Apple Containerization -p forwarding does NOT work; use the container IP via PG_DUCKLAKE_HOST). S3 needs a real bucket and credentials.",
+  "description": "The single unmet criterion keeping DuckLake at support_status=experimental, per docs/development/adr/adr-ducklake-maturity-and-publishability.md decision w11. Criteria 1, 2 and 4 are met (PR-lane coverage #1357; live PostgreSQL 18.4 + real-S3 runs 2026-07-30; server-side reuse/force verified). Criterion 3 is not: every DuckLake execution to date is SF=0.01 smoke, which exercises correctness but says nothing about behaviour at benchmark scale. Needed: a full TPC-H SF>=1 run on each of local, local_catalog_s3, postgres_catalog and postgres_catalog_s3, validated through the standard correctness gate. Without this the ADR names a blocker nobody tracks. (Supersedes dropped ducklake-beta-blocker-scale-runs-all-deployment-modes, which had no scope rules.)",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-30T19:31:01Z",
+        "from_item": "ducklake-beta-scale-runs-four-modes",
+        "id": 671,
+        "reason": "fix belongs in benchbox/platforms/ducklake.py, outside this item's only_modify (registry + ADR)",
+        "resolution": "promoted",
+        "resolved_item": "ducklake-postgres-reuse-keys-off-local-metadata-path",
+        "resolved_reason": null,
+        "summary": "BLOCKER for w3/w4, found by the first SF=1 postgres run: handle_existing_database() still keys off the LOCAL metadata_path for catalog=postgres. metadata_path always resolves to a default (/Users/joe/Developer/benchmark_runs/databases/tpch_sf1/....ducklake), so a leftover file from a duckdb-catalog run at the same benchmark/scale makes the adapter set database_was_reused=True, skip schema creation and data loading, and then fail validation against an EMPTY PostgreSQL catalog: 'Empty tables detected: region, nation, supplier...'. PR #1358's w6 added post-ATTACH resolution for postgres but did not stop the meaningless pre-connection check from firing, and the docstring I wrote there claims a postgres catalog 'never has' a local metadata file - that is false, it is always computed. Fix: early-return from handle_existing_database when catalog == postgres and leave the decision to _resolve_postgres_catalog_reuse. Verified repro: metadata_path exists True -> database_was_reused True on a fresh PG catalog whose ducklake_table is empty"
+      }
+    ],
+    "item_meta": {
+      "category": "validation",
+      "completed_at": "2026-07-30T20:31:55Z",
+      "completed_pr": 1370,
+      "created_at": "2026-07-30T18:18:07Z",
+      "worktree": "ducklake-platform"
+    },
+    "preserves": [
+      {
+        "behavior": "The w11 criteria are not weakened to make the flip possible",
+        "item_id": "ducklake-beta-scale-runs-four-modes"
+      },
+      {
+        "behavior": "support_status stays experimental until every w11 criterion in the ADR is met",
+        "item_id": "ducklake-beta-scale-runs-four-modes"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/adr-ducklake-maturity-and-publishability.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "<record the four run ids and correctness-gate outcomes on this item>",
+        "description": "TPC-H SF>=1 completes and validates on all four deployment modes",
+        "expected": "four green runs, one per deployment mode",
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "last_result": "fail",
+        "last_run": "2026-07-30T20:31:52Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "TPC-H SF=1 on local mode (duckdb-file catalog + local Parquet): PASSED. Stream 0 validated against the TPC-H answer set, data validation passed, Power@Size 98645.76 / 97515.07 / 98317.07 across three streams, ~43s wall clock. Log: w1-local.log",
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "notes": null,
+        "started_at": "2026-07-30T19:25:05Z",
+        "started_branch": "chore/ducklake-beta-scale-runs",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "TPC-H SF>=1 on local (duckdb-file catalog + local Parquet)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "TPC-H SF=1 on local_catalog_s3 (duckdb-file catalog + S3 DATA_PATH, credential_chain): PASSED. Data validation passed, Power@Size 76542.40/74441.75/73297.13. Confirmed genuinely S3-backed: 8 Parquet objects / 331,629,221 bytes under s3://benchbox-athena/benchbox_ducklake_beta/beta-w2-153711/. Log: w2-s3.log",
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "notes": null,
+        "started_at": "2026-07-30T19:37:08Z",
+        "started_branch": "fix/ducklake-pg-reuse-ignores-local-metadata",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "TPC-H SF>=1 on local_catalog_s3",
+        "wid": "w2"
+      },
+      {
+        "evidence": "TPC-H SF=1 on postgres_catalog (PostgreSQL 18.4 via Apple Containerization at 192.168.64.3, local Parquet): PASSED after the blocking fix in PR #1367. Data validation passed, Power@Size 72118.63/76298.44/85338.69 across three streams. Notably slower than the local mode (~98k) as expected - catalog metadata round-trips to PG. First attempt FAILED and produced PR #1367. Log: w3-pgcatalog2.log",
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "notes": null,
+        "started_at": "2026-07-30T19:27:50Z",
+        "started_branch": "chore/ducklake-beta-scale-runs",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "TPC-H SF>=1 on postgres_catalog",
+        "wid": "w3"
+      },
+      {
+        "evidence": "TPC-H SF=1 on postgres_catalog_s3 (PostgreSQL 18.4 catalog + S3 DATA_PATH) - the combination the pre-#1358 three-mode model could not even express: PASSED. Data validation passed, Power@Size 63623.36/67238.02/59809.55. The w7 cloud-DATA_PATH warning fired correctly under --force in a real run. Log: w4-pg-s3.log",
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "notes": null,
+        "started_at": "2026-07-30T19:38:39Z",
+        "started_branch": "fix/ducklake-pg-reuse-ignores-local-metadata",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "TPC-H SF>=1 on postgres_catalog_s3",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Reproducibility measured at SF=1 (Power@Size, n=3-5 per mode): local CV 12.9% / spread 24.5%; local_catalog_s3 CV 2.2% / 4.3%; postgres_catalog CV 8.7% / 17.0%; postgres_catalog_s3 CV 5.1% / 12.8%. CONCLUSION: remote-backed runs are NOT materially less reproducible than local on this evidence - LOCAL had the WIDEST spread. ADR decision w12 is CONFIRMED, not revised. Important caveat recorded: the local numbers are bimodal (98.6k/97.5k/98.3k on the first run vs 77.5k/76.6k on repeats), which is a systematic first-run-vs-later split, not random variance - almost certainly host contention from concurrent agent sessions on this laptop, not a property of any backing. The measurement environment is too noisy to make a strong claim in either direction; redo on a quiet machine before treating these CVs as authoritative",
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "notes": null,
+        "started_at": "2026-07-30T19:40:07Z",
+        "started_branch": "fix/ducklake-pg-reuse-ignores-local-metadata",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Assess remote-backed run-to-run reproducibility; confirm or revise ADR decision w12",
+        "wid": "w5"
+      },
+      {
+        "evidence": "All five w11 criteria verified met; support_status flipped experimental -> beta in platform_registry.py (both occurrences), ADR Status section updated with the promotion + the measured Power@Size/CV table + the host-contention caveat. Cascading updates required to land it: the pinned support-status test, the hardcoded support_status distribution in test_platform_registry.py (experimental 18->17, beta 27->28), and the count markers in README.md, docs/platforms/support-status.md and comparison-matrix.md, plus docs/platforms/ducklake.md and the CHANGELOG bullet. 25878 unit tests pass, docs-check green",
+        "item_id": "ducklake-beta-scale-runs-four-modes",
+        "notes": null,
+        "started_at": "2026-07-30T20:11:22Z",
+        "started_branch": "chore/ducklake-experimental-to-beta",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "If every criterion is met, flip support_status to beta and update the ADR status",
+        "wid": "w6"
+      }
+    ]
+  }
+}

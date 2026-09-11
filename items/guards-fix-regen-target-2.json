@@ -1,0 +1,179 @@
+{
+  "description": "WS5 of _project/planning/ci-failure-reduction-plan.md. The allowlist/drift guard class (dependency inventory DRIFT, oracle coverage map, parity fixtures, UAT LOC table, release curation list, skill-sync lock, module-size allowlist, DDL governance aliases, CLI-surface allowlist) produces a steady trickle of one-full-CI-round-trip failures, each fixed by a known mechanical action that agents currently rediscover from a hand-carried triage prompt.\n\nThree parts: (1) `make guards-fix` runs every regenerable-artifact fixer (dependency_audit/parse_deps.py, oracle coverage map regen, parity fixtures, uat_loc_table, curation list, skill-sync) then prints git status; (2) remediation-message audit: every drift guard's failure output prints the exact command or ready-to-paste line (DDL check names _DDL_GOVERNANCE_TRANSFORMER_ALIASES; module-size guard prints the allowlist entry with current line count per its re-baseline convention), pinned by asserting the message in each guard's unit test; (3) worktree-claim ensures pre-commit hooks (incl. codespell) are installed in pool worktrees, so spelling never reaches CI.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Auto-run guards-fix in CI to self-heal drift",
+        "instead": "CI fails with the message; the author runs guards-fix locally and commits the diff",
+        "item_id": "guards-fix-regen-target-2",
+        "why": "Drift signals a decision (a dependency added, a surface changed); silent regen hides it from review"
+      },
+      {
+        "dont": "Free-text the remediation messages without tests",
+        "instead": "Assert the remediation text in each guard's unit test",
+        "item_id": "guards-fix-regen-target-2",
+        "why": "Messages rot as scripts move (the disease this item treats)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-23T20:03:42Z",
+        "from_item": "guards-fix-regen-target-2",
+        "id": 644,
+        "reason": "Platform-dependent float rendering in the regen path; discovered during guards-fix no-op verification on clean develop. Out of guards-fix scope (tests/parity/** not in only_modify). Needs a determinism look (round-trip formatting) or a documented tolerance.",
+        "resolution": "promoted",
+        "resolved_item": "parity-fixture-regen-float-determinism",
+        "resolved_reason": null,
+        "summary": "parity-fixtures regen emits last-digit float diff vs committed geomean_ms.json in the cloud sandbox while CI parity-check is green"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-07-23T20:04:44Z",
+      "completed_pr": 1286,
+      "created_at": "2026-07-23T13:51:28Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Each guard still fails CI on drift; guards-fix is remediation, not suppression",
+        "item_id": "guards-fix-regen-target-2"
+      },
+      {
+        "behavior": "guards-fix only regenerates artifacts - it never edits allowlists/ceilings (those stay deliberate human/agent edits with rationale)",
+        "item_id": "guards-fix-regen-target-2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/**"
+      },
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/decision.py"
+      },
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/resolver.py"
+      },
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/rules/_registration.py"
+      },
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/pr.md"
+      },
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/inventory.py"
+      },
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "kind": "only_modify",
+        "path_glob": "tests/system/**"
+      },
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_no_cli_surface_drift.py"
+      },
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make guards-fix && test -z \"$(git status --porcelain)\"",
+        "description": "guards-fix runs clean on develop and is a no-op",
+        "expected": "exit 0",
+        "item_id": "guards-fix-regen-target-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rl 'make guards-fix' tests/unit tests/system | grep -q .",
+        "description": "Remediation-message assertions pin the guards-fix pointer in tests",
+        "expected": "exit 0 (fails today: string does not exist yet)",
+        "item_id": "guards-fix-regen-target-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "guards-fix-regen-target-2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "make guards-fix: runs all 5 existing regens (audit-raw, oracle-coverage-map, parity-fixtures, compat-docs, uat_loc_table) + skill-sync (no-ops with notice if absent); echoes 3 no-regen guards; ends with git status; crash aborts nonzero, drift regens+exit 0. Opus verified each invocation is genuine write mode",
+        "item_id": "guards-fix-regen-target-2",
+        "notes": "The pr skill is the FILE .claude/skills/pr.md (not a directory), and .claude/skills is skill-sync-managed - route the edit through the skill-sync source/flow (make skill-sync) or CI's skill-sync tracked-snapshot verify will fail on a hand edit.",
+        "started_at": "2026-07-23T20:03:26Z",
+        "started_branch": "chore/guards-fix-regen",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-guardsfix",
+        "status": "done",
+        "summary": "Inventory regenerable guards + regen commands; wire `make guards-fix`; mention it in the pr skill and failure messages",
+        "wid": "w1"
+      },
+      {
+        "evidence": "remediation messages: module-size prints ready-to-paste ALLOWLIST snippet w/ current line count (no off-by-one vs ALLOWLIST_HEADROOM, Opus-verified); DDL-drift names _DDL_GOVERNANCE_TRANSFORMER_ALIASES + _DDL_DRIFT_EXEMPTIONS (inventory.py hunk verified message-only); parse_deps/oracle/uat_loc cross-ref make guards-fix; 22 pinning tests pass, fast+unit marked",
+        "item_id": "guards-fix-regen-target-2",
+        "notes": null,
+        "started_at": "2026-07-23T20:03:31Z",
+        "started_branch": "chore/guards-fix-regen",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-guardsfix",
+        "status": "done",
+        "summary": "Remediation-message audit across all drift guards; add message assertions to their unit tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": "worktree-claim-attempt installs pre-commit hooks in the claimed worktree after uv sync, guarded by config existence, non-fatal on failure; not in any CI path",
+        "item_id": "guards-fix-regen-target-2",
+        "notes": null,
+        "started_at": "2026-07-23T20:03:36Z",
+        "started_branch": "chore/guards-fix-regen",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-guardsfix",
+        "status": "done",
+        "summary": "worktree-claim installs pre-commit hooks in pool worktrees (codespell coverage at commit time)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

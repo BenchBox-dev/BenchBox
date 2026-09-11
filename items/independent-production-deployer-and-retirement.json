@@ -1,0 +1,299 @@
+{
+  "context": "Use the numeric candidate artifact ID as the only operator selector. Derive source pins, generation, and parent from the current journal; reject stale, substituted, expired, unsafe, incomplete, or producer-mismatched candidates before approval and again after approval. Keep journal CAS and retained exact artifacts for rollback. Make the watchdog observational, quarantine unknown provider outcomes, and require a fresh protected transaction for restoration. Retire legacy Pages writers only after a verified production publication, independent monitor evidence, exact restoration test, and unknown-outcome quarantine test.",
+  "description": "Implement and prove one normal production writer for benchbox.dev. A candidate builder resolves current source and corpus commits, creates one immutable artifact, and records complete provenance and route checksums. A protected github-pages environment supplies the single human publication approval; the transaction writer revalidates the same artifact, records journal intent, deploys exact bytes, verifies the public routes, and advances the durable head only after an attested receipt. Keep the explicit approved-manifest fallback until the replacement is proven and external monitoring is active. The former timed soak entry is historical and must not be treated as completion evidence.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Close mirror PRs based on age or naming",
+        "instead": "prove exact set and digest replacement before closure",
+        "item_id": "independent-production-deployer-and-retirement",
+        "why": "a newer mirror can still omit published-only paths; freeze-closure transferred this constraint with the retirement rows"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "needs_item": "publication-ledger-reproducible-inputs"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "needs_item": "publication-pages-deploy-nonterminal-and-journal-split-brain"
+      }
+    ],
+    "item_meta": {
+      "category": "Publication Architecture",
+      "claim_token": "4dc21bfc61b1ced002a7f3d8c1b9597c",
+      "claimed_at": "2026-09-08T16:23:25Z",
+      "claimed_branch": "develop",
+      "claimed_by": "mcp:tbh:joe@joe-mac-mini.local",
+      "claimed_session": "0725f013ee314755a675c0956ea91017",
+      "claimed_worktree": "/Users/joe/Developer/BenchBox",
+      "created_at": "2026-09-04T19:36:56Z",
+      "git_baseline": "b1f793889b12fc611e721f4ba28451c4ed2d42f8",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A package release produces tool artifacts and API docs without deploying the site, Explorer, or corpus",
+        "item_id": "independent-production-deployer-and-retirement"
+      },
+      {
+        "behavior": "Coordinate publication-ledger-reproducible-inputs with the live claim holder before overlapping edits. PR2079 is a merged regeneration, not immutable-input recurrence prevention. Preserve the active soak work, its artifact/digest evidence, and separate maintainer retirement approval; final retirement closeout must reconcile the corrected ledger input/freshness contract.",
+        "item_id": "independent-production-deployer-and-retirement"
+      },
+      {
+        "behavior": "Every accepted bundle path and published-only path stays recoverable with its original bytes",
+        "item_id": "independent-production-deployer-and-retirement"
+      },
+      {
+        "behavior": "Never close a corpus mirror PR merely because a newer one exists; require exact path-set and content-digest replacement",
+        "item_id": "independent-production-deployer-and-retirement"
+      },
+      {
+        "behavior": "benchbox.dev serves the site, /results/, and /results/data/results.duckdb without an outage window",
+        "item_id": "independent-production-deployer-and-retirement"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "kind": "only_modify",
+        "path_glob": "publication/**"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/**"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run pytest tests/unit/scripts/publication tests/unit/workflows/test_publication_transaction.py tests/unit/workflows/test_publication_recover.py tests/unit/workflows/test_publication_soak_monitor.py -q",
+        "description": "Candidate provenance, route completeness, transaction CAS, approval, restoration, and watchdog tests pass",
+        "expected": "all tests pass",
+        "item_id": "independent-production-deployer-and-retirement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make docs-validate && uv run python scripts/publication/check_workflow_permissions.py --workflow .github/workflows/publication-transaction.yml",
+        "description": "Publication workflow YAML, action pins, permissions, and documentation checks pass",
+        "expected": "exit 0",
+        "item_id": "independent-production-deployer-and-retirement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "human activation and evidence review",
+        "description": "External monitor is active with five-minute observations, ten-minute missing-observation alerting, hourly full-route checks, and retained evidence",
+        "expected": "current independent monitor evidence is retained",
+        "item_id": "independent-production-deployer-and-retirement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "independent-production-deployer-and-retirement",
+        "needs_wid": "w3",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "feat/pub-lanes-deployer 382bf6d404a8907abef263efd42a3198ea906a72: dispatch-only publication-deploy.yml with Pages deploy, signed live receipts, pages-deploy concurrency. uv run pytest tests/unit/scripts tests/unit/workflows -q -> 2285 passed. docs.yml release Pages deploy retained. No live dispatch.",
+        "item_id": "independent-production-deployer-and-retirement",
+        "notes": null,
+        "started_at": "2026-09-04T20:09:16Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Arm publication-deploy.yml as a real production Pages deployer issuing attested live receipts",
+        "wid": "w1"
+      },
+      {
+        "evidence": "September 5 production run 33965322865 deployed site artifact publication-pages-1 with manifest digest 0ea96b52b816ef7e1e9ac327c30e4100e35005844af67bb9f372766b7db47111. Live probe verification (verify_live.py --manifest desired-manifest.json --require-receipt) confirmed 100% digest equivalence across all 5 live endpoints (/, /docs/, /docs/api.html, /results/, /results/data/results.duckdb). Ed25519 signature verified against docs/operations/publication-attestor-public-key.pem with zero drift. Controller PR #2060 merged into develop as c2a91e4c728210ecc6f664be5c42a41fdd18199c with fresh-job manifest transfer and rollback verification. 2,445 unit and workflow tests pass.",
+        "item_id": "independent-production-deployer-and-retirement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prove digest equivalence with the release lane over a bounded production soak",
+        "wid": "w2"
+      },
+      {
+        "evidence": "feat/pub-lanes-deployer b69558de6dbc32e481638d186a16043f2c65afbb: reconciliation.py verifies Ed25519 live-receipt signatures against docs/operations/publication-attestor-public-key.pem; missing/empty/wrong signatures fail closed. tests/unit/scripts/publication/test_reconciliation.py passed.",
+        "item_id": "independent-production-deployer-and-retirement",
+        "notes": null,
+        "started_at": "2026-09-04T20:28:57Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Verify live-receipt signatures against an attestor key instead of presence only",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "independent-production-deployer-and-retirement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Remove the release-to-Pages coupling and retire sync-results-data-to-published.yml",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "independent-production-deployer-and-retirement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Remove develop from the github-pages branch policy",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "independent-production-deployer-and-retirement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reconcile open corpus mirror PRs by exact path set and content digest",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "independent-production-deployer-and-retirement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Lift the carried restrictions and close out A10 and A11",
+        "wid": "w7"
+      },
+      {
+        "evidence": "Soak-entry dispatch attempted 2026-09-08: fresh candidate validated (develop fdc513320, pub-results 086cb68, digest-bound manifest with 5 route checksums, digest recompute match). Attempt 1 failed on transient artifact-download 403; attempt-2 correctly refused by fail-closed design; attempt 3 (run 34250429921) passed prepare, downloaded permit, and failed ONLY at authenticate-approval: no approval object exists because github-pages environment has branch_policy rule only and zero required reviewers, so the deploy job never pauses and approval can never be granted. Journal untouched (no active tx, durable still genesis, next_gen 2); live site untouched; no partial writes. Soak entry now structurally blocked on adding required reviewer(s) to the github-pages environment, then a fresh dispatch.",
+        "item_id": "independent-production-deployer-and-retirement",
+        "notes": null,
+        "started_at": "2026-09-08T01:08:29Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Enter bounded soak: entry gates green, monitor armed, first promotion dispatched and sampling (retirement w4 stays pending until soak passes + approval)",
+        "wid": "w8"
+      }
+    ]
+  }
+}

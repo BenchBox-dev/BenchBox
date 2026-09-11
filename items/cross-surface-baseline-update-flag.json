@@ -1,0 +1,168 @@
+{
+  "description": "Follow-up to cross-surface-known-divergence-baseline-hygiene (PR #903, DONE). The\ndefault-FAIL half (a known divergence that no longer reproduces fails the gate\ninstead of silently passing) landed correctly. But the YAML also promised a\nmaintenance affordance — a flag/Make target to drop a resolved baseline entry —\nand that was NOT built: removing a resolved known-divergence entry from the\nbaseline is fully manual. Makefile was in the item's only_modify list but is\nuntouched in the #903 diff. Manual baseline pruning is exactly the toil that lets\nbaselines rot, so this completes the promised affordance.\n\nCOMPLETED via #935 (merged 2026-07-05). Shipped as a YAML data-file baseline\n(benchbox/core/equivalence/cross_surface_baseline.yaml) loaded and pruned by\nbenchbox/core/equivalence/known_divergences_baseline.py, plus the\n`cross-surface-update-baseline` Make target and golden tests -- NOT the in-source\nAST rewrite the original prior_art assumed (that first cut was redesigned in review).\nThe writer lives under core/equivalence/, not benchbox/cli/ as scope_limit listed,\nto satisfy the utils<core<platforms<cli import layering enforced by #952's lint-imports.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "auto-prune the baseline as a side effect of the normal gate run",
+        "instead": "(not specified)",
+        "item_id": "cross-surface-baseline-update-flag",
+        "why": "keep removal explicit and operator-driven."
+      },
+      {
+        "dont": "reformat or reorder surviving baseline entries",
+        "instead": "(not specified)",
+        "item_id": "cross-surface-baseline-update-flag",
+        "why": "minimal, surgical rewrite only."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "cross-surface-baseline-update-flag",
+        "id": 365,
+        "reason": "Out of scope; this item only provides the manual affordance. Automation is a separate hygiene item.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Exact match: open item is literally 'auto-detect and PR resolved cross-surface baseline entries on a schedule'. (tracked by cross-surface-baseline-stale-entry-autodetect)",
+        "summary": "Auto-detect-and-PR stale baseline entries on a schedule."
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Tooling",
+      "completed_at": "2026-07-05T00:00:00Z",
+      "created_at": "2026-06-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A still-reproducing divergence is never removed; only entries that no longer diverge are dropped.",
+        "item_id": "cross-surface-baseline-update-flag"
+      },
+      {
+        "behavior": "The default gate behavior is unchanged: --update-baseline is an explicit opt-in writer, never invoked by the blocking gate run.",
+        "item_id": "cross-surface-baseline-update-flag"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': 'Makefile', 'note': 'Existing cross-surface gate Make targets (correctness-gate region); add cross-surface-update-baseline next to them, matching their uv run invocation style.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-baseline-update-flag",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/core/equivalence/cross_surface.py:1421', 'note': 'The known-divergence baseline read/emit path from #903; the --update-baseline writer goes here, reusing the existing baseline file format and loader.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-baseline-update-flag",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cross-surface-baseline-update-flag",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "cross-surface-baseline-update-flag",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "cross-surface-baseline-update-flag",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/equivalence/cross_surface.py"
+      },
+      {
+        "item_id": "cross-surface-baseline-update-flag",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "cross-surface-baseline-update-flag",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/equivalence/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/equivalence/ -k update_baseline -q",
+        "description": "Update-baseline drops only resolved entries and is idempotent",
+        "expected": "stale entry removed, live entry preserved, second run no-op",
+        "item_id": "cross-surface-baseline-update-flag",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cross-surface-baseline-update-flag",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "cross-surface-baseline-update-flag",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "cross-surface-baseline-update-flag",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "cross-surface-baseline-update-flag",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cross-surface-baseline-update-flag",
+        "notes": "grep Makefile for update-baseline (expect: absent) and locate the current\nknown-divergence baseline read/emit site in cross_surface.py (line numbers in\nthis TODO are origin/develop at review time and drift). Record the live\nfile:line in the PR body before editing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-confirm on fresh develop that no --update-baseline affordance exists and locate the live baseline path",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-baseline-update-flag",
+        "notes": "Implement the writer that rewrites the baseline file removing entries that no\nlonger reproduce a divergence, preserving every still-live entry and the file's\nexisting ordering/format. Must be a no-op (idempotent) on a second run when no\nentries changed. Reuse the #903 loader; do not fork the format.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add --update-baseline to the cross-surface gate CLI that drops only no-longer-diverging entries",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-baseline-update-flag",
+        "notes": "Wire a Makefile target invoking the flag, placed beside the existing\ncorrectness-gate / cross-surface targets and following their style.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a make cross-surface-update-baseline target",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-baseline-update-flag",
+        "notes": "Seed a baseline with one stale (now-resolved) and one live divergence; run\n--update-baseline; assert only the stale entry is removed and the live one is\nbyte-preserved; assert a second run is a no-op. Mark fast.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Golden test: stale entry dropped, live entry preserved, second run idempotent",
+        "wid": "w3"
+      }
+    ]
+  }
+}

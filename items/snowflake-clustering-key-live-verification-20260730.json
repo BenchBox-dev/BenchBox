@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #673 of snowflake-cluster-key-corroboration-20260730.\nDeferred: Confirm against a live Snowflake which text INFORMATION_SCHEMA.TABLES.CLUSTERING_KEY actually returns (LINEAR(A, B) vs (A, B)) and that a clustered table reaches applied_verified\nReason deferred: w3 needs live Snowflake credentials; AGENTS.md requires explicit approval for live cloud tests and none was given. parse_clustering_key accepts both documented forms defensively, but the guess is unverified — and it fails CLOSED (runs silently never verify), so it must not be assumed correct.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-30T23:41:00Z",
+      "worktree": "main"
+    }
+  }
+}

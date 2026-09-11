@@ -1,0 +1,10 @@
+{
+  "description": "Fix critical bugs discovered in adversarial review that cause silent failures,\nincorrect behavior, and potential performance/security issues. These are P0\nissues that must be fixed before the query plan feature can be considered\nproduction-ready.\n\n**Problems Addressed**:\n- Silent capture failures (no error signaling to user)\n- Operator ID counter leakage across queries (breaks comparison)\n- Unbounded serialization (can cause memory/storage issues)\n- Inefficient BFS queue (O(n) pop operations)\n- No timeout protection on EXPLAIN queries (can hang benchmarks)",
+  "legacy": {
+    "item_meta": {
+      "category": "Bug Fixes",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-remediation"
+    }
+  }
+}

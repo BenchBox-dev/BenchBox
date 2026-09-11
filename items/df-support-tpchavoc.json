@@ -1,0 +1,351 @@
+{
+  "context": "Create a dataframe_queries/ subdirectory (like clickbench) with per-query modules\n(q01.py through q22.py). Each module exports 10 DataFrameQuery objects.\n\nImport the base TPC-H DataFrame implementation as v1 (baseline) for each query from\ntpch/dataframe_queries.py, then define v2-v10 as structural alternatives.\n\nA central registry.py aggregates all queries into a single QueryRegistry with\nIDs like \"Q1v1\", \"Q1v2\", etc. The benchmark's get_dataframe_queries() returns\nthis registry.\n\nDesign the variant categories based on actual TPC-H query structure - not all\nvariant types apply to all queries (e.g., join-reorder only applies to multi-join\nqueries). Document which variant strategies apply to which queries in\nDATAFRAME_VARIANTS.md.\n\nUse the existing TPC-H parameter override system (set_parameter_overrides) for\nseed-based reproducibility.\n",
+  "description": "Add DataFrame variant implementations for TPC-Havoc, enabling execution of\nstructurally diverse TPC-H query variants on Polars, PySpark, DataFusion, Pandas,\nModin, cuDF, and Dask platforms.\n\nTPC-Havoc generates 10 structural SQL variants per TPC-H query (22 queries x 10\nvariants = 220 total). Each variant is semantically equivalent but uses different\nSQL constructs (CTEs, scalar subqueries, window functions, UNION, etc.) to stress\ndifferent optimizer components.\n\nFor DataFrame execution, the concept translates differently: instead of varying SQL\nsyntax, DataFrame variants vary the API call sequence - different join orders,\ndifferent aggregation strategies (pre-filter vs post-filter), lazy vs eager\nevaluation patterns, and different window function formulations. The goal shifts\nfrom \"stress the SQL optimizer\" to \"measure how different DataFrame API patterns\naffect execution performance on the same logical query.\"\n\nTPC-H already has DataFrame queries (tpch/dataframe_queries.py) with 22 queries\nin both expression and pandas families. TPC-Havoc DataFrame extends these with\nalternative implementations that use structurally different DataFrame API patterns.\n\nThis is architecturally unique - no other benchmark has the variant concept in\nDataFrame mode. Requires designing a new variant registration pattern for\nDataFrameQuery objects.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create trivial variants (e.g., just renaming aliases)",
+        "instead": "each variant must use a genuinely different execution strategy",
+        "item_id": "df-support-tpchavoc",
+        "why": "the point is structural diversity"
+      },
+      {
+        "dont": "create variants that produce different results",
+        "instead": "every variant must produce identical output for the same input data and parameters",
+        "item_id": "df-support-tpchavoc",
+        "why": "semantic equivalence is the core property"
+      },
+      {
+        "dont": "modify tpch/dataframe_queries.py",
+        "instead": "import base implementations and build variants on top",
+        "item_id": "df-support-tpchavoc",
+        "why": "TPC-Havoc extends TPC-H, not modifies it"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "df-support-tpchavoc",
+        "id": 387,
+        "reason": "Full equivalence testing is expensive (220 queries x 2 families). Start with Q1-Q3 equivalence in unit tests, defer comprehensive testing to integration suite.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: A 220-variant equivalence gate already exists in CI (tests/integration/test_tpchavoc_variant_equivalence.py: 'full gate sweeps all 220 variants'); already done.",
+        "summary": "Automated variant equivalence testing across all 22 queries at SF=0.01"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "df-support-tpchavoc",
+        "id": 388,
+        "reason": "Analysis tooling is follow-up work after the implementations exist and have been benchmarked.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: 'Variant performance analysis tooling - fastest DataFrame patterns per platform' is a vague future-analysis idea with no concrete design, scope, or committed demand.",
+        "summary": "Variant performance analysis tooling - identify which DataFrame patterns are fastest per platform"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "df-support-tpchavoc",
+        "id": 389,
+        "reason": "The first complete registry covers Q16-Q22 with canonical execution plus final projection/order replay to preserve equivalence. Deeper variants for Q19 condition unions, Q20 semi-join ordering, Q21 anti-join alternatives, and Q22 materialized average balance should be developed with broader equivalence coverage.",
+        "resolution": "promoted",
+        "resolved_item": "replace-q16-q22-result-replay-variants-with-deeper-hand-writ",
+        "resolved_reason": null,
+        "summary": "Replace Q16-Q22 result-replay variants with deeper hand-written structural rewrites"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-10T00:00:00Z",
+      "created_at": "2026-04-10T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ResultValidator variant equivalence checking still works for SQL mode",
+        "item_id": "df-support-tpchavoc"
+      },
+      {
+        "behavior": "TPCHBenchmark base class DataFrame queries (tpch/dataframe_queries.py) are NOT modified - TPC-Havoc imports them as baselines",
+        "item_id": "df-support-tpchavoc"
+      },
+      {
+        "behavior": "TPCHavocBenchmark SQL variant generation unchanged - all 220 SQL variants still work via VariantGenerator/StaticSQLVariant",
+        "item_id": "df-support-tpchavoc"
+      },
+      {
+        "behavior": "benchbox run --platform duckdb --benchmark tpchavoc still runs SQL variants",
+        "item_id": "df-support-tpchavoc"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "df-support-tpchavoc",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/dataframe_queries.py"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpchavoc/"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpchavoc/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.tpchavoc.dataframe_queries import get_dataframe_queries; r = get_dataframe_queries(); print(f'{len(r)} variants registered'); assert len(r) == 220\"",
+        "description": "All 220 DataFrame variants are registered",
+        "expected": "220 variants registered",
+        "item_id": "df-support-tpchavoc",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.benchmark_registry import BENCHMARK_METADATA; print(BENCHMARK_METADATA['tpchavoc']['supports_dataframe'])\"",
+        "description": "TPC-Havoc benchmark reports supports_dataframe=True",
+        "expected": "True",
+        "item_id": "df-support-tpchavoc",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpchavoc/test_tpchavoc_dataframe_queries.py -k 'q1_equivalence' -v",
+        "description": "Q1 variants produce equivalent results",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "df-support-tpchavoc",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "df-support-tpchavoc",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "df-support-tpchavoc",
+        "notes": "Design how DataFrame variants integrate with the existing DataFrameQuery/QueryRegistry\nsystem. Key decisions:\n\n1. Query ID scheme: Use \"Q1v1\", \"Q1v2\", ... \"Q1v10\" or \"Q1-scalar-subquery\",\n   \"Q1-cte-rewrite\"? The former is consistent with SQL variant IDs; the latter\n   is more descriptive for DataFrame where structural names matter.\n\n2. Registry structure: One flat QueryRegistry with all 220 entries, or a nested\n   structure (VariantRegistry wrapping QueryRegistry)? Flat is simpler and works\n   with the existing dataframe_runner dispatch.\n\n3. Variant categories for DataFrame (map from SQL variant types):\n   - join-reorder: Different .join() sequences for same result\n   - pre-filter: Filter before join vs after join\n   - window-alternative: Window function vs groupby+join for same logic\n   - cte-inline: Intermediate DataFrame vs chained expression\n   - aggregation-strategy: Multiple small groupbys vs single large groupby\n   - broadcast-hint: Explicit broadcast for small tables vs default\n   - lazy-eager: .collect() placement variations (expression family only)\n\n4. How variants relate to base TPC-H queries: Import from tpch/dataframe_queries.py\n   as the \"v0\" baseline, then define v1-v10 as alternatives.\n\nWrite a short design doc in benchbox/core/tpchavoc/DATAFRAME_VARIANTS.md\ndocumenting the chosen approach before implementation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design DataFrame variant architecture and registration pattern",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-tpchavoc",
+        "notes": "Integration:\n1. Add get_dataframe_queries() method to TPCHavocBenchmark\n   - Must return all variants (not just base queries)\n   - Consider whether to return all 220 at once or support filtering by query/variant\n2. Set supports_dataframe: True in benchmark_registry.py for tpchavoc\n3. Add variant equivalence validation for DataFrame results\n   (extend ResultValidator to handle DataFrame output comparison)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire up TPC-Havoc benchmark class and registry for DataFrame dispatch",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-tpchavoc",
+        "notes": "Create tests/unit/core/tpchavoc/test_dataframe_queries.py:\n- Test variant registration (220 total, 10 per query)\n- Test all variants for Q1 produce identical results on small TPC-H data\n- Test expression_impl and pandas_impl for at least Q1-Q3 variants\n- Test variant metadata (description, categories)\n- Mark equivalence tests @pytest.mark.slow (they need TPC-H SF=0.01 data)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for TPC-Havoc DataFrame variants",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-tpchavoc",
+        "notes": "Create benchbox/core/tpchavoc/dataframe_queries/ directory with per-query modules\n(q01.py, q02.py, q03.py). For each query, create 10 expression_impl variants.\n\nQ1 (Pricing Summary - filter + groupby + aggregation):\n- v1: Baseline (import from tpch dataframe Q1)\n- v2: Pre-compute aggregation columns before groupby\n- v3: Window functions instead of groupby (partition + distinct)\n- v4: Two-pass: compute sums first, then averages from sums\n- v5: Filter using .when().then() instead of boolean mask\n- v6: Explicit column selection before groupby (projection pushdown hint)\n- v7: Sort before groupby (tests sort-based aggregation)\n- v8: Intermediate DataFrame for filtered data (CTE equivalent)\n- v9: Compute each aggregate separately then join results\n- v10: Reverse sort order then reverse at end\n\nQ2 (Minimum Cost Supplier) and Q3 (Shipping Priority) follow similar variant\naxes but emphasize join-reorder variants due to multi-table joins.\n\nEach variant must produce identical results to the base query.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement expression-family variants for Q1-Q3 (30 variants)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-tpchavoc",
+        "notes": "Continue with q04.py, q05.py, q06.py.\n\nQ4 (Order Priority Checking - EXISTS subquery):\n- Variant axes: semi-join vs filter-join, pre-filter lineitem dates vs post-filter\nQ5 (Local Supplier Volume - 6-table join + groupby):\n- Variant axes: join order (6 permutations), pre-filter nation/region before join\nQ6 (Forecasting Revenue Change - single-table filter + sum):\n- Variant axes: filter order, compound vs chained filters, pre-select columns\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement expression-family variants for Q4-Q6 (30 variants)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-tpchavoc",
+        "notes": "q07.py through q10.py. These are join-heavy queries where the primary variant\naxis is join order:\n- v1: Baseline join order from tpch/dataframe_queries.py\n- v2-v4: Alternative join orders (small-to-large, large-to-small, star-join)\n- v5-v7: Pre-filter variants (filter dimension tables before joining)\n- v8-v10: Aggregation strategy variants\n\nQ7 (Volume Shipping), Q8 (National Market Share), Q9 (Product Type Profit),\nQ10 (Returned Item Reporting).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement expression-family variants for Q7-Q10 (40 variants)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-tpchavoc",
+        "notes": "q11.py through q14.py. Mix of subquery-heavy and aggregation-heavy queries.\n\nQ11 (Important Stock Identification - HAVING with subquery):\n- Variant axes: subquery as intermediate DF vs inline, threshold pre-compute\nQ12 (Shipping Modes and Order Priority - CASE + groupby):\n- Variant axes: CASE as .when() chain vs boolean masks, filter-first vs agg-first\nQ13 (Customer Distribution - LEFT JOIN + groupby + groupby):\n- Variant axes: two-stage vs single-stage aggregation, NOT LIKE as anti-join\nQ14 (Promotion Effect - CASE inside SUM):\n- Variant axes: conditional sum vs filter+sum+join, pre-filter parts\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement expression-family variants for Q11-Q14 (40 variants)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-tpchavoc",
+        "notes": "q15.py through q18.py. Complex subquery patterns.\n\nQ15 (Top Supplier - subquery for max revenue):\n- Variant axes: intermediate DF vs chained, top-1 vs filter-to-max\nQ16 (Parts/Supplier Count - DISTINCT, NOT IN):\n- Variant axes: anti-join vs ~isin(), distinct before vs after join\nQ17 (Small Quantity Order Revenue - correlated subquery):\n- Variant axes: join-with-avg vs window function, filter timing\nQ18 (Large Volume Customer - HAVING):\n- Variant axes: filter-after-groupby vs pre-aggregate, join order\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement expression-family variants for Q15-Q18 (40 variants)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-tpchavoc",
+        "notes": "q19.py through q22.py. Most complex query patterns.\n\nQ19 (Discounted Revenue - compound OR conditions):\n- Variant axes: union of filtered sets vs single complex filter, per-brand subframes\nQ20 (Potential Part Promotion - multi-level subquery):\n- Variant axes: join chain vs nested intermediates, semi-join vs filter\nQ21 (Suppliers Who Kept Orders Waiting - EXISTS/NOT EXISTS):\n- Variant axes: semi-join + anti-join vs boolean masks, join order for 4 tables\nQ22 (Global Sales Opportunity - nested subqueries):\n- Variant axes: intermediate DFs vs chained, avg pre-compute vs inline\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement expression-family variants for Q19-Q22 (40 variants)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-tpchavoc",
+        "notes": "Add pandas_impl variants to q01.py through q11.py, paralleling expression_impl.\nMany variant strategies translate directly (join reorder, pre-filter, etc.).\n\nReplace expression-specific variants (lazy/eager, collect placement) with\npandas-specific alternatives:\n- .apply() vs vectorized operations\n- pd.merge() vs df.join() (index-based)\n- .groupby().agg() vs .pivot_table()\n- iterative merge chain vs reduce(merge, tables)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement pandas-family variants for Q1-Q11 (110 variants)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-tpchavoc",
+        "notes": "Add pandas_impl variants to q12.py through q22.py.\n\nFor the complex subquery patterns (Q15-Q22), pandas variants emphasize:\n- Intermediate DataFrames vs chained operations\n- .merge() join order permutations\n- .pipe() chains vs sequential assignment\n- Index-based operations vs column-based\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement pandas-family variants for Q12-Q22 (110 variants)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

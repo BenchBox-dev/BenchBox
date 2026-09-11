@@ -1,0 +1,199 @@
+{
+  "context": "Do w1 (the exit-code policy decision) first since it gates w4 and shapes\nwhether other UAT automation call sites need updates. w2 and w3 can\nproceed in parallel once w1 lands since they're independent accounting\nadditions (benchmark-not-in-registry vs scale-ladder-pruned). w5 is\nindependent of the others and can land any time - it only adds a new\nfield, it doesn't change existing report.py counting logic. Reuse the\nexisting CompatibilityPrunedCell / compatibility_pruned.jsonl pattern\nfor w2/w3 rather than inventing a parallel accounting file format,\nunless the shape genuinely doesn't fit (e.g. a benchmark-level rather\nthan platform+benchmark-pair-level drop).\n",
+  "description": "Test-strategy review of the UAT harness (`tests/uat/`) found four\nindependent ways the accounting can overstate corpus coverage or hide\nfailures - none of them are individually catastrophic, but together they\nmean the \"total_defined\" denominator and the report exit code cannot be\ntrusted at face value:\n\n(a) `tests/uat/phases/enumerate.py:94-95` - `enumerate_cells_with_pruning`\n    iterates `benchmark_list` and does `info = benchmarks.get(benchmark);\n    if info is None: continue` for benchmarks named in the config that\n    are absent from the registry. This is a silent drop: no\n    `CompatibilityPrunedCell` row, no log line, no accounting entry at\n    all - the benchmark simply vanishes from both `cells` and\n    `compatibility_pruned`, and downstream `total_defined_count`\n    (report.py:165, `attempted + skipped + unreachable`) never knew it\n    was supposed to exist. A typo'd benchmark name in a sweep config\n    fails this way with zero signal.\n\n(b) `tests/uat/matrix.py:302-319` (`filter_scales_by_registry`) drops\n    requested scales that fall outside a benchmark's declared\n    `scale_options` (\"ladder pruning\"). Confirmed via\n    `tests/uat/phases/enumerate.py:108-111`: the filtered-out scales are\n    just absent from `filtered` - there is no equivalent of\n    `compatibility_pruned` for registry/ladder-based drops. Only\n    compatibility-RULE prunes (platform/benchmark incompatibility) get an\n    accounting row; ladder prunes (scale outside registry bounds) get\n    none. `tests/uat/phases/report.py` has no ladder-pruned counter\n    field/parameter at all, so this class of denominator shrinkage cannot\n    even be reported if a caller wanted to.\n\n(c) Regenerating a report from a `cells.jsonl` whose sidecar\n    `cells.jsonl.accounting.json` is missing silently reports\n    `unreachable=0` and drops the `release_gate_attention` flag. This\n    is DELIBERATE and already pinned by\n    `tests/uat/test_report_accounting.py:116-143`\n    (`test_report_cli_without_sidecar_defaults_unreachable_zero`,\n    docstring: \"Older artifacts predate the sidecar; the report must\n    still regenerate.\") - flagged here as a real gap worth revisiting,\n    not a bug to fix outright: silently defaulting to 0 for OLDER\n    artifacts trades one risk (crashing on legitimate legacy re-runs)\n    for another (a report that looks clean when unreachable-ness was\n    simply never computed). Decide in w1 whether the harness should\n    instead surface a visible \"sidecar missing, unreachable count\n    unknown\" marker distinct from \"sidecar present, unreachable=0\" for\n    genuinely clean runs.\n\n(d) `tests/uat/phases/report.py:54-57` -\n    `ReportSummary.exit_code()` returns `2` if aborted, else `1` only\n    if `cross_scale_floor_breached` (an OPT-IN check - `cross_scale_floor`\n    defaults to `None` at report.py:51/142 and is only enforced when a\n    caller explicitly passes it), else `0`. This means a report full of\n    `fail`/`timeout`/`unreachable` cells still exits `0` unless the\n    caller happens to have opted into the cross-scale floor check - CI\n    or a human eyeballing an exit code alone would see \"success\" for a\n    corpus that mostly failed.\n\nDEDUPE NOTE: existing `uat-*.yaml` planning TODOs\n(uat-certification-rerun-ordering-and-gate,\nuat-clickhouse-server-data-and-timeout-tail,\nuat-clickhouse-server-ddl-compatibility,\nuat-clickhouse-server-loader-type-coverage,\nuat-clickhouse-server-query-compatibility, uat-docker-stack-recovery) are\nall about specific run evidence, platform defects, or re-run ordering -\nnone touch the enumerate/matrix/report accounting code itself, so there\nis no overlap. Blind-spots\n`_project/blind-spots/2026-05-03-081920/081921/081922-*.md` are related\nin spirit (all about UAT reporting overstating what was actually\nexercised/validated) but cover different axes - cross-scale checklist\nenforcement, validator-clean-rate tracking, and submission terminal-state\nambiguity, respectively - not the enumerate/ladder/sidecar/exit-code\nissues here. No true duplicate found.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "invent a second, differently-shaped accounting file format for ladder-pruned or registry-absent cells",
+        "instead": "extend the existing one.",
+        "item_id": "uat-accounting-hardening",
+        "why": "compatibility_pruned.jsonl already exists and downstream tooling (matrix_summary.tsv rendering) expects one pruned-accounting shape"
+      },
+      {
+        "dont": "make --strict (if chosen in w1) the implicit default for existing Makefile/CI callers without checking whether any of them rely on today's lenient exit code",
+        "instead": "check call sites first.",
+        "item_id": "uat-accounting-hardening",
+        "why": "that would silently turn a previously-green UAT pipeline red"
+      },
+      {
+        "dont": "silently change tests/uat/test_report_accounting.py's pinned unreachable=0-without-sidecar assertion in w5",
+        "instead": "add a new field instead of changing the existing default.",
+        "item_id": "uat-accounting-hardening",
+        "why": "that test intentionally documents backward-compat behavior for older artifacts per its own docstring"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-04T00:00:00Z",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing compatibility-rule pruning behavior and CompatibilityPrunedCell accounting rows continue to work unchanged - w2/w3 add coverage, they don't replace the existing mechanism.",
+        "item_id": "uat-accounting-hardening"
+      },
+      {
+        "behavior": "tests/uat/cli.py's existing report/enumerate subcommand argument surface stays backward compatible - if w1 picks the --strict-flag option, it must be additive (default off) unless explicitly decided otherwise.",
+        "item_id": "uat-accounting-hardening"
+      },
+      {
+        "behavior": "tests/uat/test_report_accounting.py:116-143 (test_report_cli_without_sidecar_defaults_unreachable_zero) - the pinned unreachable=0-without-sidecar behavior for legacy artifact regeneration must not silently break; w5 adds visibility, it does not remove the default.",
+        "item_id": "uat-accounting-hardening"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-accounting-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "uat-accounting-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/compatibility.py (rule definitions themselves - only how prunes from filter_scales_by_registry are recorded)"
+      },
+      {
+        "item_id": "uat-accounting-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/runner.py"
+      },
+      {
+        "item_id": "uat-accounting-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/cli.py"
+      },
+      {
+        "item_id": "uat-accounting-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/matrix.py"
+      },
+      {
+        "item_id": "uat-accounting-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/enumerate.py"
+      },
+      {
+        "item_id": "uat-accounting-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/report.py"
+      },
+      {
+        "item_id": "uat-accounting-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_matrix.py"
+      },
+      {
+        "item_id": "uat-accounting-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_report_accounting.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_report_accounting.py tests/uat/test_matrix.py -v",
+        "description": "Existing UAT accounting tests still pass",
+        "expected": "All tests pass, including the pinned no-sidecar-defaults-zero test",
+        "item_id": "uat-accounting-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/ -k 'enumerate and registry' -v",
+        "description": "A config referencing a benchmark absent from the registry now produces a visible accounting row, not a silent drop",
+        "expected": "New/updated test asserts a non-empty pruned/dropped record for the unknown benchmark",
+        "item_id": "uat-accounting-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/ -k 'exit_code' -v",
+        "description": "A report over a cells.jsonl with fail/timeout cells exits non-zero under the chosen policy",
+        "expected": "New/updated tests assert the w1-decided exit-code behavior",
+        "item_id": "uat-accounting-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-accounting-hardening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-accounting-hardening",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-accounting-hardening",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-accounting-hardening",
+        "notes": "Two options, pick one and document the decision inline in\nreport.py's module docstring:\n  1. Change `ReportSummary.exit_code()` default behavior so any\n     `fail_count > 0 or timeout_count > 0 or unreachable_count > 0`\n     returns non-zero (e.g. `1`), independent of the opt-in\n     cross_scale_floor check. This makes \"report exit code == 0\"\n     mean \"everything attempted actually passed.\"\n  2. Keep today's lenient default (exit 0 unless cross-scale floor\n     breached) but add an explicit `--strict` CLI flag to the report\n     phase that opts into failing on any fail/timeout/unreachable\n     count, for callers (e.g. release-gate automation) that want a\n     hard gate.\nRecommendation: prefer option 2 (additive `--strict` flag) if any\nexisting caller currently depends on today's lenient default (check\n`tests/uat/cli.py` and any Makefile targets that call `uat report`\nbefore deciding) - otherwise option 1 is the more honest default.\nThis decision blocks w4 (exit_code implementation/tests).\n\nDECISION (2026-07-04): Option 1 (default-strict), no --strict flag.\nEvidence gathered before deciding:\n  - The UAT CLI file is actually `tests/uat/_cli.py` (the YAML's\n    `tests/uat/cli.py` does not exist - naming drift; `_cli.py` is the\n    argparse entry point `make uat-report` calls via\n    `python -m tests.uat._cli report`). Its `_handle_report` prints\n    the report's exit code straight through (`return summary.exit_code()`)\n    with no branching, `|| true`, or exit-code interpretation.\n  - `Makefile`'s `uat-report` target (~line 1983) just shells out to\n    `python -m tests.uat._cli report ...`; it does not inspect or\n    branch on the resulting exit code either.\n  - Grepped `.github/workflows/` for `uat-report`/`uat report`/`_cli\n    report`: no matches. No CI workflow parses or gates on this exit\n    code today.\n  - The UAT orchestrator (`tests/uat/orchestrator.py`, out of scope)\n    already folds the report phase's `exit_code()` into\n    `SweepResult.exit_code()` via `max(phase_exit_codes.values())`; no\n    orchestrator or e2e test (`test_orchestrator.py`,\n    `test_e2e_integration.py`) asserts `exit_code() == 0` for a run\n    containing an actual fail/timeout/unreachable cell outside of the\n    aborted/cross-scale-floor-breached cases that already return\n    nonzero.\n  - The only place that DID rely on the old lenient default was this\n    TODO's own test suite: `tests/uat/test_report_accounting.py`'s\n    `test_report_cli_reconciles_skipped_and_unreachable_fixture`\n    (fixture has a failed + an unreachable cell) and\n    `test_report_cli_reads_skipped_unreachable_sidecar` (sidecar\n    reports 3 unreachable) both asserted `exit_code == 0` - updated to\n    `exit_code == 1` as part of w4, per the anti-pattern's own carve-out\n    for updating tests, not because anything outside the test suite\n    depended on the leniency.\nConclusion: no real caller depends on \"exit 0 despite failures,\" so\noption 1 (the more honest default) was chosen over the additive\n`--strict` flag. Full reasoning is duplicated in\n`tests/uat/phases/report.py`'s module docstring.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide (d) exit-code policy: non-zero exit on failures by default, or an explicit --strict flag",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-accounting-hardening",
+        "notes": "In `enumerate_cells_with_pruning` (tests/uat/phases/enumerate.py:94-95),\nreplace the bare `continue` with an accounting entry. Reuse the\nexisting `CompatibilityPrunedCell` shape if it fits (e.g. a\nsynthetic `rule_id=\"benchmark-not-in-registry\"`), or add a small\nsibling record type if `CompatibilityPrunedCell`'s fields don't\nnaturally fit a benchmark-level (not platform+benchmark-pair) drop.\nEither way, the config-benchmark-not-in-registry case must show up\nsomewhere in `EnumerationResult` so it's visible in accounting output\nand can be surfaced in the report, not just silently absent.\n\nIMPLEMENTATION NOTE: investigation found the real silent drop happens\none layer earlier than the cited line. `resolve_benchmarks`\n(tests/uat/matrix.py) already filters `benchmarks.include` down to\n`bid in benchmarks` before returning `benchmark_list`, so\n`enumerate_cells_with_pruning`'s `info = benchmarks.get(benchmark);\nif info is None` can never actually fire for a typo'd `include` entry\nin current code - `benchmark_list` never contains an id absent from\n`benchmarks` to begin with. Fixed at the true source: added\n`matrix.missing_benchmarks_from_include(include, benchmarks)` (new,\ntested function) to expose exactly which `include` ids `resolve_benchmarks`\nsilently dropped; `enumerate_cells_with_pruning` now calls it and emits\none `CompatibilityPrunedCell` row per platform x requested scale with\n`rule_id=\"benchmark-not-in-registry\"`, `status=\"pruned-registry\"` (kept\nthe original `if info is None` line too, now also building the same\nkind of row, as a defensive no-op in case a future caller passes a\n`benchmark_list`/`benchmarks` pair that diverges). Reused\n`CompatibilityPrunedCell` as-is (no sibling type needed) - the\nplatform+benchmark+scale shape fits fine when applied once per\nplatform for a benchmark-level drop.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "(a) Record registry-absent benchmarks as an accounting row instead of a silent continue",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-accounting-hardening",
+        "notes": "`filter_scales_by_registry` (tests/uat/matrix.py:302-319) currently\nonly returns the surviving scales. Change the call site in\n`enumerate_cells_with_pruning` (tests/uat/phases/enumerate.py:108-111)\nto also capture the DROPPED scales (`set(requested) - set(filtered)`)\nand record them as accounting rows (reuse or extend the same\nstructure introduced in w2 if appropriate - a \"pruned\" superset\ncovering both compatibility-rule and ladder-registry reasons keeps\nreport.py's counting logic simpler than two parallel lists).\nAdd a `ladder_pruned_count` (or a unified `registry_pruned_count`)\nfield to `ReportSummary` and thread it through\n`total_defined_count`'s computation (report.py:165) so pruned-by-\nladder cells count toward the true denominator instead of vanishing.\n\nIMPLEMENTATION NOTE: `enumerate_cells_with_pruning` now computes\n`dropped = [s for s in requested if s not in filtered]` at the call\nsite and emits one `CompatibilityPrunedCell` per dropped scale\n(`rule_id=f\"uat.ladder.{benchmark}.scale-not-in-registry\"`,\n`status=\"pruned-registry\"`) into the SAME `compatibility_pruned` list\nas w2 and the existing compatibility-rule prunes - this means\n`execute.py`/`orchestrator.py` (both out of scope, untouched) already\nforward and count these rows for free via their existing\n`len(execute_outcome.compatibility_pruned)` wiring, so real sweeps get\nthe denominator fix with zero changes to those files. Deliberately\nSKIPPED emitting a row when the min_scale fallback\n(`if not filtered and ... info.min_scale is not None: filtered =\n[info.min_scale]`) substitutes a whole-ladder-invalid benchmark's\ncanonical scale (e.g. joinorder/tpcds_obt requested at the 0.01 smoke\nscale but only valid at 1.0) - that path still produces an executed\ncell with signal, it is a substitution not a silent drop, and treating\nit as \"pruned\" broke `test_phases.py::\ntest_enumerate_keeps_release_gate_runtime_envelopes_for_diagnostic_sweeps`'s\n`all(rule_id.endswith(\".benchmark_gate\"))` assertion for no real\naccounting benefit. Also added `ReportSummary.registry_pruned_count`\n(default 0) threaded into `skipped_count`/`total_defined_count` in\n`report.py`, plus a `registry_pruned=N` field in both TSV footer\nlines. Known limitation, documented rather than worked around: since\n`orchestrator.py` is out of scope, it still only passes\n`compatibility_pruned_count=len(execute_outcome.compatibility_pruned)`\n(which now already includes the w2/w3 rows) and never populates the\nnew, separate `registry_pruned_count` parameter - so for real sweeps\nthe denominator is already correct via the shared bucket, but the\ngranular \"how many were registry/ladder vs. compatibility-rule\"\nbreakdown in the report needs a follow-up orchestrator.py change to\npopulate `registry_pruned_count` from a filtered subset of\n`compatibility_pruned` (e.g. by `status == \"pruned-registry\"`) to be\nvisible end-to-end.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "(b) Add ladder-pruned accounting: record registry-filtered scales and thread through report.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-accounting-hardening",
+        "notes": "Implement whichever policy w1 selected. If option 2 (--strict flag),\nwire it through the report phase's CLI argument parsing and\n`ReportSummary.exit_code()` (or a new `exit_code(strict: bool)`\nparameter/method). If option 1 (default-strict), update\n`exit_code()` directly and update any existing tests\n(`tests/uat/test_report_accounting.py`,\n`tests/uat/phases/test_report.py` if it exists) that currently assert\n`exit_code == 0` for runs containing failures.\n\nIMPLEMENTATION NOTE: `tests/uat/phases/test_report.py` does not exist;\nthe existing suite is `tests/uat/test_report.py` (out of scope for\nthis TODO, not modified) - its `exit_code()` assertions only cover the\naborted/cross-scale-floor-breached/all-passed cases, none of which\nchanged behavior, so nothing there needed updating.\n`ReportSummary.exit_code()` updated directly to\n`2 if aborted else (1 if fail_count>0 or timeout_count>0 or\nunreachable_count>0 or cross_scale_floor_breached else 0)`. Updated\ntwo tests in `tests/uat/test_report_accounting.py` that asserted\n`exit_code == 0` for fixtures containing real failures/unreachable\ncells (`test_report_cli_reconciles_skipped_and_unreachable_fixture`,\n`test_report_cli_reads_skipped_unreachable_sidecar`) to expect `1`,\nand added new dedicated `exit_code`-named tests covering\nfail/timeout/unreachable/aborted-still-wins/all-clean.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "(d) Implement the exit-code policy decided in w1",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-accounting-hardening",
+        "notes": "This is the most delicate change since\n`tests/uat/test_report_accounting.py:116-143` currently PINS\n`unreachable == 0` with no sidecar as intended behavior for\n\"older artifacts.\" Do not silently change that pinned test's\nexpected value. Instead, add a way to distinguish \"sidecar present,\nconfirmed unreachable=0\" from \"sidecar absent, unreachable\nunknown/assumed 0\" - e.g. a new `unreachable_count_is_estimated: bool`\nfield on `ReportSummary`, surfaced in both the JSON payload\n(`payload[\"unreachable_is_estimated\"]`) and the TSV comment line\n(alongside the existing `# UNREACHABLE_CELLS=N release_gate_attention=...`\ncomment at report.py:194). Update\n`test_report_cli_without_sidecar_defaults_unreachable_zero` to also\nassert the new estimated flag is `True`, and add a companion\nassertion to the WITH-sidecar test that it's `False`. This is\nadditive (keeps the pinned default-zero behavior) rather than a\nbreaking change to the existing contract.\n\nIMPLEMENTATION NOTE: `ReportSummary.unreachable_count_is_estimated`\n(default False) added and threaded through `write_report()`'s new\n`unreachable_count_is_estimated` parameter. The sidecar-presence\nsignal has to originate in `tests/uat/_cli.py` (report.py's\n`write_report()` only ever sees an already-resolved int, it has no\nway to know whether that int came from a real sidecar) - so\n`_read_skipped_unreachable_sidecar` was changed from returning just\n`int` to returning `tuple[int, bool]` (count, sidecar_present), and\n`_handle_report` passes `unreachable_count_is_estimated=not\nsidecar_present` into `write_report()` and adds\n`\"unreachable_is_estimated\"` to the printed JSON payload. The TSV\n`# UNREACHABLE_CELLS=...` line's guard changed from `if\nunreachable_count:` to `if unreachable_count or\nunreachable_count_is_estimated:` so the line now also appears (with\n`release_gate_attention=not_required unreachable_is_estimated=true`)\nfor the confirmed-zero-but-estimated case, which previously printed no\nline at all; the confirmed-zero-and-not-estimated case is unchanged\n(still prints nothing). Pinned test\n`test_report_cli_without_sidecar_defaults_unreachable_zero` keeps its\n`exit_code == 0` and `unreachable == 0` assertions unchanged, only\ngaining the new `unreachable_is_estimated is True` assertion per the\ninstructions; the WITH-sidecar test\n(`test_report_cli_reads_skipped_unreachable_sidecar`) gained the\ncompanion `unreachable_is_estimated is False` assertion.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "(c) Revisit sidecar-missing default: add a visible unreachable-unknown marker",
+        "wid": "w5"
+      }
+    ]
+  }
+}

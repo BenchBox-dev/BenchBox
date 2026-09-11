@@ -1,0 +1,155 @@
+{
+  "context": "Use the UAT framework entrypoint and the selected compose memory, preserve the result-path contract, record all cell/log/artifact paths, and run the release preflight only after every prior gate is green. Never retry by switching to RowBatchProcessor or a 1,000-row batch.",
+  "description": "Run the final ClickHouse server certification in strict gates: SF0.01 exact manifest rows and nonzero stats with one streaming insert per table; SF1 load with sampled telemetry, selected memory envelope, responsive server, exact row counts, and no failure sidecar; then SF1 power with valid result JSON and metadata. Route loader failures to the loader artifact TODO, resource/timeouts to calibration/admission, and query failures to the existing query-compatibility pending retest.\n\nRECONCILED 2026-08-23 after PR #1835 merged as 4f8c580f7: selected ClickHouse policy is now 5.25 GiB. Current host still cannot admit the managed server cell: 5.40 GiB available versus 6.89 GiB required including the 2.00 GiB reserve, with 67.9% swap. The prior 8 GiB/10 GiB blocker is superseded; SF1 w2 remains operator-host blocked.\n\nCURRENT 2026-08-24: merged request-only smoke exposed the LakeSail endpoint-option registration defect; PR #1875 fixes it. Do not treat the managed release-gate chain as runnable until #1875 merges and a host sustains ClickHouse's measured 5.25 GiB request.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-13T17:16:53Z",
+        "from_item": "uat-clickhouse-server-sf1-streaming-certification",
+        "id": 710,
+        "reason": "Certification exact-row gate correctly rejects preserved SF0.01/SF1 manifests: generator.py uses expected_rows_total // shard_count for every shard, losing remainders and disagreeing with actual compressed file rows (lineitem SF0.01 60010 vs 60175; SF1 6001210 vs 6001215). Generator source is outside this TODO's authorized tests/uat and docs scope. Fix generator manifest accounting in a follow-up TODO, regenerate artifacts, then rerun certification; do not widen tolerance or bypass the exact gate.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Resolved by merged PR #1718 (9c017efc8e0f69c8585e7ac8bf13f8c4c9756e75), which records actual per-shard TPC-H row counts and preserves the measured-manifest reuse fast path. Regenerate preserved SF0.01/SF1 artifacts and rerun exact-row certification.",
+        "summary": "Correct sharded TPC-H manifest row accounting before SF1 certification"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "needs_item": "uat-clickhouse-server-compose-memory-admission"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "PR #1875 merged at 5a474457599dcabe606da9e87f9065a96579d3d4, so the prior endpoint-option dependency is cleared. The current 2026-08-26 ordered release-gate attempt at SHA 713618943f955091daa03699c87a78956b00ce13 stopped in native Stage 1 after 166 cells (157 passed, 9 failed), before any Docker/ClickHouse-server stage. Complete this SF1 certification only inside the ordered release-gate rerun after Stage 1 is green, with host capacity sustaining the 5.25 GiB ClickHouse request; do not use the incomplete Stage 1 as certification evidence.",
+      "category": "correctness",
+      "claimed_at": "2026-08-17T13:02:46Z",
+      "claimed_by": "joe@joe-mac-mini.local",
+      "created_at": "2026-08-12T22:58:12Z",
+      "worktree": "clickhouse-sf1-streaming-certification"
+    },
+    "scope_rules": [
+      {
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -q tests/uat/test_runner.py tests/uat/test_phases.py tests/uat/test_report.py",
+        "description": "Focused UAT correctness tests",
+        "expected": "pass",
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "last_result": "pass",
+        "last_run": "2026-08-17T00:24:59Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Final release gate",
+        "expected": "pass",
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "last_result": "pass",
+        "last_run": "2026-08-13T17:52:52Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -q tests/uat/test_clickhouse_certification.py",
+        "description": "Exact manifest row-count gate unit tests",
+        "expected": "test_exact_row_gate_compares_each_table tests/uat/test_clickhouse_certification.py",
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "last_result": "pass",
+        "last_run": "2026-08-17T00:25:18Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Reconciled PR #1706 head 3326a34f3/base 040e39774, clean compose branch 3a394fd0f, and current host memory; dependency remains open and certification host gate requires >=10 GiB for 8g+2g reserve.",
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "notes": null,
+        "started_at": "2026-08-13T17:00:38Z",
+        "started_branch": "fix/clickhouse-sf1-streaming-certification",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-clickhouse-sf1-streaming-certification",
+        "status": "done",
+        "summary": "Reconcile calibration and compose dependency plus current develop gate",
+        "wid": "w0"
+      },
+      {
+        "evidence": "SF0.01 smoke passed on mocker at baseline-1g (commit 36c9d179d): uat-cell clickhouse-server/tpch/0.01 status=passed 66/66 queries validation=passed; exact-row gate PASS for 8 tables (lineitem=60175) via tests.uat.clickhouse_certification --manifest ~/Developer/benchmark_runs/datagen/tpch_sf001/_datagen_manifest.json --table-format tbl --result ~/Developer/benchmark_runs/results/tpch_sf001_clickhouse_server_sql_20260817_091139_046f1c3d.json; memory trace ~/Developer/benchmark_runs/clickhouse-certification-20260817/clickhouse-memory-sf001-1g.json outcome=passed native_streaming=true application_batch_rows=null valid_for_calibration=true runtime_limit=1g peak_engine=754800000. Log: /tmp/clickhouse-sf001-smoke-20260817.log",
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "notes": null,
+        "started_at": "2026-08-17T13:06:20Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run SF0.01 smoke with exact manifest rows and native streaming contract",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "notes": null,
+        "started_at": "2026-08-17T13:12:52Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "in_progress",
+        "summary": "Run SF1 load with selected memory, telemetry, row counts, and no failure sidecar",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run SF1 power and validate result JSON, metadata, and query outcomes",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-server-sf1-streaming-certification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record certification evidence and final release-gate preflight",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "context": "Verification-first. w1 is the real work -- confirm the loss is real before\nrestoring. Keep additions to concise orientation context (category maps,\nquery-group labels), not prose.\n",
+  "description": "The dataframe-query body-removal PRs (#599-#602) deleted query\nimplementations and, per the shrink-campaign review, some orientation\ncontext with them -- e.g. PR #599 was said to remove the ClickBench category\ngroupings (\"Basic aggregation Q1-Q7\", \"Text/pattern Q21-Q27\", etc.) that\nhelp a reader navigate the query set.\n\nIMPORTANT -- verify before acting. A quick check found the ClickBench\ncategory grouping still present at benchbox/core/clickbench/queries.py:6\n(\"Basic aggregations and counting\"). The original review used a diff-only\nmethodology that already produced two retracted findings, so the grouping\nmay survive and this Nit may be partly moot. Confirm what #599 actually\nremoved (likely from the dataframe_queries package docstring specifically,\nnot queries.py) before restoring anything.\n\nThe JoinOrder optimizer-vs-execution semantic note (PR #588) is intentionally\nNOT handled here -- it is the documentation deliverable of\n[[shrink-followup-joinorder-benchmark-semantics]] w2 (path a). This item\ncovers ClickBench and any other genuinely-lost orientation context in\n#599-#602, to avoid double-touching the joinorder surface. That separation is\nenforced structurally by scope_limit below: benchbox/core/joinorder/ is\ndeliberately NOT in only_modify, so this item cannot edit the joinorder\ndocstrings even by accident.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "reintroduce removed query bodies",
+        "instead": "comments and docstrings only",
+        "item_id": "shrink-followup-restore-dataframe-orientation-docs",
+        "why": "that reverses the shrink"
+      },
+      {
+        "dont": "restore docs that already survive elsewhere",
+        "instead": "grep first (the ClickBench grouping survives at clickbench/queries.py:6)",
+        "item_id": "shrink-followup-restore-dataframe-orientation-docs",
+        "why": "that is redundant noise"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-05-24T00:00:00Z",
+      "created_at": "2026-05-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not re-add any removed CODE -- this is docstrings/comments only",
+        "item_id": "shrink-followup-restore-dataframe-orientation-docs"
+      },
+      {
+        "behavior": "The Python-line reductions from #599-#602 are not undone",
+        "item_id": "shrink-followup-restore-dataframe-orientation-docs"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/clickbench/queries.py:6 — the surviving category grouping; mirror its wording if restoring to the dataframe_queries docstring",
+        "decision": "reuse",
+        "item_id": "shrink-followup-restore-dataframe-orientation-docs",
+        "path": "benchbox/core/clickbench/queries.py:6"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "shrink-followup-restore-dataframe-orientation-docs",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/clickbench/"
+      },
+      {
+        "item_id": "shrink-followup-restore-dataframe-orientation-docs",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/"
+      },
+      {
+        "item_id": "shrink-followup-restore-dataframe-orientation-docs",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -rnE 'aggregation|Text/pattern|category|Q1-Q7|Q21-Q27' benchbox/core/clickbench/dataframe_queries/",
+        "description": "Restored orientation context is present where it was genuinely lost",
+        "expected": "category grouping present in the dataframe_queries package docstring (only if w1 confirmed it was lost there)",
+        "item_id": "shrink-followup-restore-dataframe-orientation-docs",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "shrink-followup-restore-dataframe-orientation-docs",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-restore-dataframe-orientation-docs",
+        "notes": "For ClickBench, compare the pre-#599 module docstring against the\ncurrent benchbox/core/clickbench/dataframe_queries/ modules. Confirm the\ncategory grouping is genuinely gone from where a reader of the dataframe\nqueries would look (not merely surviving in queries.py:6). Repeat the\ncheck for flightdata/nyctaxi/taxi/tsbs/ssb dataframe-query modules\ntouched by #600-#602.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify what orientation context #599-#602 actually removed (vs what survives)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-restore-dataframe-orientation-docs",
+        "notes": "Re-add category groupings / orientation comments where they no longer\nexist and help navigation. Do not restore anything that already survives\nelsewhere.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Restore only the orientation docstrings that are genuinely lost and aid navigation",
+        "wid": "w2"
+      }
+    ]
+  }
+}

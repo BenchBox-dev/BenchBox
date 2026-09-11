@@ -1,0 +1,172 @@
+{
+  "description": "Code review (2026-02-27) found that the current get_query_plan() uses EXPLAIN (FORMAT JSON)\nwithout ANALYZE, capturing ESTIMATED plans only - timing and cardinality fields are absent\nin stored plans. Switching to EXPLAIN ANALYZE (FORMAT JSON) by default will capture actual\nper-operator execution statistics while keeping the existing JSON schema intact.\n\nDecision: EXPLAIN ANALYZE is the new default for capture_plans=True.\nPRAGMA enable_profiling was rejected (different JSON schema, version-dependent inline\nreading, not thread-safe in file mode) - see context_sections for full rationale.\n\nSchema compatibility: EXPLAIN ANALYZE (FORMAT JSON) produces the same field names as\nEXPLAIN (FORMAT JSON): name / timing / cardinality / extra_info / children.\nThe DuckDBQueryPlanParser already handles timing+cardinality when present - proven by\nthe DUCKDB_1_0_JSON_WITH_TIMING fixture (tests/fixtures/duckdb_plans_by_version.py:177).\nThe core get_query_plan() change is one word: EXPLAIN → EXPLAIN ANALYZE.\n\nTrade-off acknowledged: EXPLAIN ANALYZE re-executes each query (2× cost per captured\nquery). This is acceptable for plan capture runs where rich operator data is the goal.\nAn opt-out config key (analyze_plans: false) must be available for users who want\nstructural-only plan capture without the execution overhead.\n\nNote: plan fingerprinting is unaffected - it already excludes timing/cardinality by\ndesign (structural comparison only).\n\nReference: /Users/joe/.claude/plans/temporal-kindling-tarjan.md",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the fingerprinting algorithm to include timing",
+        "instead": "keep timing out of fingerprints",
+        "item_id": "duckdb-explain-analyze-default",
+        "why": "fingerprints are used for plan-change detection across runs, and timing varies between identical plans"
+      },
+      {
+        "dont": "remove the analyze_plans opt-out",
+        "instead": "always keep the escape hatch",
+        "item_id": "duckdb-explain-analyze-default",
+        "why": "concurrent throughput benchmarks and CI speed runs need lightweight structural-only plan capture"
+      },
+      {
+        "dont": "switch to PRAGMA enable_profiling",
+        "instead": "EXPLAIN ANALYZE is sufficient and schema-compatible",
+        "item_id": "duckdb-explain-analyze-default",
+        "why": "it uses a different JSON schema (operator_type vs name) requiring full parser rewrite"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-27T00:00:00Z",
+      "created_at": "2026-02-27T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Opt-out path MUST remain available: analyze_plans: false in config (or equivalent) restores EXPLAIN without ANALYZE for users who need minimal overhead",
+        "item_id": "duckdb-explain-analyze-default"
+      },
+      {
+        "behavior": "Parser behavior for plans without timing fields MUST continue working unchanged (backwards compatibility with stored plans from before this change)",
+        "item_id": "duckdb-explain-analyze-default"
+      },
+      {
+        "behavior": "Plan fingerprinting MUST NOT include timing/cardinality (QueryPlanDAG.compute_plan_fingerprint excludes these by design - structural comparison only)",
+        "item_id": "duckdb-explain-analyze-default"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import duckdb, json; con = duckdb.connect(); con.execute('CREATE TABLE t AS SELECT range AS id FROM range(1000)'); rows = con.execute('EXPLAIN ANALYZE (FORMAT JSON) SELECT count(*) FROM t').fetchall(); plan = json.loads(rows[0][1]); print('timing present:', 'timing' in json.dumps(plan))\"",
+        "description": "EXPLAIN ANALYZE (FORMAT JSON) populates timing fields - confirms schema compatibility",
+        "expected": "timing present: True",
+        "item_id": "duckdb-explain-analyze-default",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/query_plans/parsers/test_duckdb_parser.py -v",
+        "description": "All parser tests pass (fingerprint stability, WITH_TIMING fixture handling)",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "duckdb-explain-analyze-default",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_duckdb_plan_capture.py tests/unit/core/query_plans/parsers/test_duckdb_parser.py -v",
+        "description": "All plan capture tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "duckdb-explain-analyze-default",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "duckdb-explain-analyze-default",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "duckdb-explain-analyze-default",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "duckdb-explain-analyze-default",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "duckdb-explain-analyze-default",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "duckdb-explain-analyze-default",
+        "needs_wid": "w3",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "duckdb-explain-analyze-default",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update get_query_plan() to use EXPLAIN ANALYZE (FORMAT JSON) by default; update docstring to reflect ANALYZE-by-default and the opt-out",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-explain-analyze-default",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add analyze_plans: bool config field to PlatformAdapter.__init__ (default True, read from config dict)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-explain-analyze-default",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Gate EXPLAIN ANALYZE in get_query_plan() behind self.analyze_plans; fall back to EXPLAIN when False",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-explain-analyze-default",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update tests in test_duckdb_plan_capture.py: assert timing fields present in default capture",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-explain-analyze-default",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add test: with analyze_plans=False, captured plan has no timing/cardinality fields",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-explain-analyze-default",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update capture_query_plan() docstring and CLI --capture-plans help text to mention EXPLAIN ANALYZE default and analyze_plans opt-out",
+        "wid": "w6"
+      }
+    ]
+  }
+}

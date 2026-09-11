@@ -1,0 +1,142 @@
+{
+  "context": "Extend agent_instruction_audit.py to scan all governed docs for authority claims and fail when more than one document claims to win or a superseded doc self-describes as canonical; repoint test_blind_spot_tools.py and AGENTS.md bindings to the selected authority; update the SHARED/review-protocol canonical skill lockstep reference if it names the legacy path (canonical-side edit rides the item-1 promotion flow).",
+  "description": "PR #1318 introduces docs/development/agent-review-protocol.md claiming to supersede docs/development/review-protocol.md, but the legacy doc still declares itself 'Canonical, unabridged form' and says it wins conflicts, and active consumers (.claude/commands/blind-spot.md, tests/unit/scripts/test_blind_spot_tools.py:37-42 which ASSERTS the legacy binding, _project/blind-spots/README.md, _project/specs/findings-domain.md) still bind to the legacy path. The audit script only inspects the new doc and cannot see the conflict. This item covers the audit-side surfaces; the legacy doc, command, README, validator and specs surfaces belong to existing item blind-spot-command-protocol-alignment-20260724 (scope is create-time-only, so the split is structural). Both items MUST land in the same PR (#1318) - the blind-spot item's own anti-pattern forbids flipping surfaces in separate commits; one PR for two TODOs is the documented exception to one-TODO-per-PR, justified by the no-contradiction-window invariant. Decision: demote the legacy doc to an explicitly non-authoritative historical pointer rather than delete (external references exist, e.g. user-global config and the SHARED/review-protocol canonical skill lockstep note); rejected alternative: deletion, which breaks inbound references and loses the unabridged rationale.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-28T13:17:59Z",
+      "completed_pr": 1318,
+      "created_at": "2026-07-28T12:51:14Z",
+      "worktree": "agent-instructions"
+    },
+    "preserves": [
+      {
+        "behavior": "All stable REVIEW-* policy IDs remain present in the selected authority and the canonical generated skill",
+        "item_id": "review-protocol-authority-single-source-cutover"
+      },
+      {
+        "behavior": "Blind-spot capture path remains ~/.benchbox/finding-drafts (drafts-only, zero-credential)",
+        "item_id": "review-protocol-authority-single-source-cutover"
+      },
+      {
+        "behavior": "Exactly one non-contradictory behavioral authority exists at every commit on the branch",
+        "item_id": "review-protocol-authority-single-source-cutover"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.skill-sync/skills/SHARED/review-protocol/**"
+      },
+      {
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "kind": "only_modify",
+        "path_glob": "docs/development/agent-review-protocol.md"
+      },
+      {
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_agent_instruction_audit.py"
+      },
+      {
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_blind_spot_tools.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_agent_instruction_audit.py -q -n 0",
+        "description": "blind-spot and audit tests pass",
+        "expected": "all pass",
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:17:51Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -qi 'this file wins' docs/development/review-protocol.md",
+        "description": "legacy doc no longer claims to win conflicts",
+        "expected": "demoted or removed self-canonical claim",
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:17:52Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make agent-instructions-check",
+        "description": "instruction audit passes with contradiction detection active",
+        "expected": "exit 0",
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:17:54Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "commit 6df7e57bd: audit gains LEGACY_REVIEW_DOC banner check, AUTHORITY_CONFLICT_MARKERS scan, and command-binding check; 3 new negative tests in test_agent_instruction_audit.py prove contradictory mutations fail the audit",
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "notes": null,
+        "started_at": "2026-07-28T13:04:33Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Extend agent_instruction_audit.py to detect contradictory authority claims across governed docs, with tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": "commit 6df7e57bd: test_blind_spot_tools.py asserts active-doc binding and legacy demotion; AGENTS.md already selected agent-review-protocol.md (verified, no edit); CLAUDE.md has no protocol reference (verified)",
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "notes": null,
+        "started_at": "2026-07-28T13:04:35Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Repoint test_blind_spot_tools.py and any AGENTS.md/CLAUDE.md bindings to agent-review-protocol.md",
+        "wid": "w2"
+      },
+      {
+        "evidence": "verified ~/.skill-sync/skills/SHARED/review-protocol/SKILL.md contains no docs/development/review-protocol.md reference (rg match only on its own frontmatter name); no canonical edit needed",
+        "item_id": "review-protocol-authority-single-source-cutover",
+        "notes": null,
+        "started_at": "2026-07-28T13:04:37Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Check SHARED/review-protocol canonical skill for legacy-path references and align via the canonical repo flow",
+        "wid": "w3"
+      }
+    ]
+  }
+}

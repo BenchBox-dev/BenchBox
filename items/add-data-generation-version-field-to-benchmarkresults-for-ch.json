@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #193 of harmonize-scale-factor-baselines.\nDeferred: Add data_generation_version field to BenchmarkResults for change tracking\nReason deferred: Currently, changing base constants silently invalidates comparisons between old and new SF=1 results. Adding a version field would allow detecting incompatible comparisons. Not needed in beta, but important for GA.\n",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:31Z",
+      "worktree": "main"
+    }
+  }
+}

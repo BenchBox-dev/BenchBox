@@ -1,0 +1,71 @@
+{
+  "context": "Extend test_submit_classifier_contract fixtures with uncertain+fallback (and translation-only if not already covered); assert terminal state, CLI message branch, and UAT cell-failure bool. Prefer documenting current precedence over changing it unless product requires otherwise.",
+  "description": "Adversarial review of #1577 Required R2 residual: contract matrix pins bare uncertain/unknown and not_validated/not_run, but not validation_status=uncertain combined with execution.translation.status=fallback. Pre-fix both collapsed to schema_violation; post-fix result_non_clean_reason hits validation first so classify yields unvalidated while translation alone would be non-clean. CLI exit and UAT cell-failure posture need an explicit matrix row so a future reorder of non-clean checks cannot drift silently.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "submit-contract-uncertain-with-translation-fallback",
+        "needs_item": "unvalidated-results-misclassified-as-schema-violations-20260805"
+      }
+    ],
+    "item_meta": {
+      "category": "testing",
+      "completed_at": "2026-08-05T21:47:50Z",
+      "completed_pr": 1588,
+      "created_at": "2026-08-05T20:50:06Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Publication refusal for non-clean results is not loosened",
+        "item_id": "submit-contract-uncertain-with-translation-fallback"
+      },
+      {
+        "behavior": "unvalidated remains excluded from submit_state_is_cell_failure",
+        "item_id": "submit-contract-uncertain-with-translation-fallback"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "submit-contract-uncertain-with-translation-fallback",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_runner.py"
+      },
+      {
+        "item_id": "submit-contract-uncertain-with-translation-fallback",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_status.py"
+      },
+      {
+        "item_id": "submit-contract-uncertain-with-translation-fallback",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_submit_classifier_contract.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_submit_classifier_contract.py -q",
+        "description": "Contract suite includes uncertain+fallback case and passes",
+        "expected": "exit 0",
+        "item_id": "submit-contract-uncertain-with-translation-fallback",
+        "last_result": "pass",
+        "last_run": "2026-08-05T21:45:02Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Contract matrix adds translation_fallback→schema_violation and uncertain+fallback→unvalidated; UAT cell asserts unvalidated not cell-failure, fallback alone fails cell",
+        "item_id": "submit-contract-uncertain-with-translation-fallback",
+        "notes": null,
+        "started_at": "2026-08-05T21:44:53Z",
+        "started_branch": "fix/submit-contract-uncertain-fallback",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Add uncertain+translation-fallback contract cases and UAT cell-failure asserts",
+        "wid": "w0"
+      }
+    ]
+  }
+}

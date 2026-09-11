@@ -1,0 +1,202 @@
+{
+  "context": "Revalidate effective configuration first. Remove only stale, duplicate, garbage, or rejected entries. Keep personal settings uncommitted and smoke-test with non-mutating commands.",
+  "description": "Executable personal configuration conflicts with the current BenchBox workflow: a user-global Claude hook blocks push origin and requires the retired benchbox-private repository; local Claude permissions allow broad checkout and destructive removals; edit hooks are duplicated; Gemini trust choices may be inert; and the Codex BenchBox MCP is coupled to the Oxbow environment. Remediate these personal surfaces outside repository PRs without exposing credentials.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Commit personal settings",
+        "instead": "Keep them local and report validation results",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "why": "They encode personal trust decisions"
+      },
+      {
+        "dont": "Replace the stale hook with a broader bypass",
+        "instead": "Delete the retired rule and rely on current project guards",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "why": "That weakens all repository safety"
+      }
+    ],
+    "item_meta": {
+      "category": "Agent infrastructure",
+      "completed_at": "2026-07-27T15:54:24Z",
+      "created_at": "2026-07-27T15:45:18Z",
+      "worktree": "agent-config"
+    },
+    "preserves": [
+      {
+        "behavior": "No credential values are printed, copied into chat, or committed",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state"
+      },
+      {
+        "behavior": "No force-push, recursive deletion, or direct protected-branch push becomes auto-approved",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state"
+      },
+      {
+        "behavior": "Personal configuration remains outside BenchBox and skill-sync commits",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Cross-agent permission classification",
+        "decision": "extend",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "path": "/Users/joe/.skill-sync/skills/tidy-perms"
+      },
+      {
+        "concept": "BenchBox worktree and PR safety",
+        "decision": "reuse",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "path": "/Users/joe/Developer/BenchBox/AGENTS.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.gemini/settings.json"
+      },
+      {
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.gemini/trustedFolders.json"
+      },
+      {
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/.claude/settings.local.json"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "jq -e . /Users/joe/.claude/settings.json /Users/joe/Developer/BenchBox/.claude/settings.local.json /Users/joe/.gemini/settings.json /Users/joe/.gemini/trustedFolders.json >/dev/null",
+        "description": "Personal JSON settings are valid",
+        "expected": "exit 0",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "last_result": "pass",
+        "last_run": "2026-07-27T15:54:18Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n --fixed-strings benchbox-private /Users/joe/.claude/settings.json /Users/joe/Developer/BenchBox/.claude/settings.local.json",
+        "description": "Retired repository model is absent",
+        "expected": "exit 0",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "last_result": "pass",
+        "last_run": "2026-07-27T15:54:20Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "codex --version >/dev/null",
+        "description": "Codex configuration remains loadable",
+        "expected": "exit 0; residual risk documented",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "last_result": "pass",
+        "last_run": "2026-07-27T15:54:22Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated current Claude, Codex, and Gemini configuration; confirmed stale hook, duplicate edit hooks, broad local permissions, inert Gemini trust, and Oxbow-coupled BenchBox MCP.",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "notes": null,
+        "started_at": "2026-07-27T15:51:45Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Revalidate active Claude, Codex, and Gemini settings and identify the owner of each effective rule",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Removed retired benchbox-private hook and all three broad/destructive local Claude allow entries; jq and fixed-string checks pass.",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "notes": null,
+        "started_at": "2026-07-27T15:53:35Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Remove the retired private-public Claude hook and garbage or destructive local permissions",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Removed duplicate user-global mutating Python hooks; BenchBox project hook hardening remains explicitly owned by canonicalize-benchbox-agent-instructions-and-add-evaluation-gate:w3.",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "notes": null,
+        "started_at": "2026-07-27T15:53:40Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Deduplicate edit hooks and make failures observable without mutating incomplete edits",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Enabled Gemini folder trust; preserved explicit Codex never/danger-full-access choice; moved BenchBox MCP launch from Oxbow venv to uv in BenchBox with mcp extra.",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "notes": null,
+        "started_at": "2026-07-27T15:53:45Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Decide Gemini folder trust and Codex sandbox, approval, and MCP coupling explicitly",
+        "wid": "w3"
+      },
+      {
+        "evidence": "jq, retired-string, MCP import, codex --version, and gemini --version smoke checks all exited 0; no credentials printed or committed.",
+        "item_id": "remove-conflicting-personal-agent-config-and-trust-state",
+        "notes": null,
+        "started_at": "2026-07-27T15:53:50Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Run non-mutating cross-agent configuration smoke checks and document residual risk",
+        "wid": "w4"
+      }
+    ]
+  }
+}

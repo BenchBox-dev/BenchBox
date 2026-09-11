@@ -1,0 +1,121 @@
+{
+  "description": "The `scripts/validate_submission.py` on the `published-results` branch\n(pinned at v0.2.1, commit `0182c9556`) uses a per-DIRECTORY hash\nalgorithm (`hashlib.sha256()` over `path.encode() + file.read_bytes()`\nfor every file in `bundle_dir` excluding the manifest). The same\nscript on `develop` (post-PR #33) uses a per-FILE hash (just\n`sha256(bundle_file)` plus a `companion_hashes` map). The writer in\n`develop`'s `submit.py` also uses per-file. Result: a bundle produced\nby current `develop`'s `benchbox submit` will fail CI on\n`published-results` with `Bundle hash mismatch: manifest says XXXX,\ncomputed YYYY`.\n\nThis was confirmed empirically during the 2026-04-29 Codex\nagent-proxy dry-run:\n  - Codex's manifest: `bundle_hash: 799c80a2...` (per-file SHA-256)\n  - Validator on published-results computed: `8a89ab6f...` (per-dir)\n  - `shasum -a 256` on the actual bundle file: `799c80a2...` (matches\n    the manifest exactly)\n\nForensic and full reproduction at\n`_project/handoffs/external-dry-run-retrospective-2026-04-29.md`\n(Appendix B).\n\nThis is a release-blocker for the community submission flow: until\nthe validator on `published-results` matches the writer's contract,\nno contributor can successfully submit a result regardless of how\nclosely they follow the docs. The bug is invisible to maintainers\nwho only run the validator inside `develop`, because both sides\nagree there.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "revert develop's writer to per-directory hash",
+        "instead": "fix the validator instead",
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch",
+        "why": "per-file is the right contract for individually-addressable bundles"
+      },
+      {
+        "dont": "skip the cross-branch contract test (w3)",
+        "instead": "the test is the regression-prevention story for this whole class of bug",
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch",
+        "why": "the same drift will happen again the next time either side changes"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-30T00:00:00Z",
+      "created_at": "2026-04-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Backwards-compat with already-merged community submissions in results-data/bundles/ (zero exist today, so this is theoretical)",
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch"
+      },
+      {
+        "behavior": "develop's per-file hash contract (per-file is the right design -- bundles are individually addressable in results-data/bundles/)",
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_submission.py (on published-results branch)"
+      },
+      {
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/ (only if w3 vendors the validator instead of pulling live)"
+      },
+      {
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_cross_branch_validator_contract.py (new file, w3)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git fetch --quiet origin published-results && \\\nTMP=$(mktemp) && \\\ngit show origin/published-results:scripts/validate_submission.py > \"$TMP\" && \\\npython3 \"$TMP\" /Users/joe/Developer/BenchBox/submission/bundle/tpch_sf001_duckdb_sql_20260428_205018_e4f24ee2.json 2>&1 | tail -3; \\\nrc=$?; rm -f \"$TMP\"; exit $rc\n",
+        "description": "Validator on published-results passes against a develop-submitted bundle",
+        "expected": "0 error(s), 0 warning(s)",
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_cross_branch_validator_contract.py -q",
+        "description": "Cross-branch contract test (added by w3) passes",
+        "expected": "All tests pass (test file is created by w3; this verification only meaningful after w3 lands)",
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch",
+        "notes": "DECISION: choose path A -- update the `published-results`\nvalidator directly.\n\nRationale:\n  - This is a production submission-flow blocker independent of\n    the Python package release cadence: GitHub Actions executes\n    `scripts/validate_submission.py` from the PR checkout of the\n    `published-results` branch.\n  - `develop` already has the correct per-file writer and\n    validator contract. Waiting for the release-flow dry run would\n    delay contributor submissions without improving the contract.\n  - The branch-specific validator fix can be verified immediately\n    by running the `published-results` validator against the\n    Codex dry-run bundle cited in the retrospective.\n\n`/code review W1`: no required issues. The rejected path B remains\nthe longer-term release hygiene path, but it is not the fastest\nunblock for external contributors.\n\nTwo paths:\nA. Cherry-pick the post-PR-#33 `scripts/validate_submission.py`\n   (and any related changes) onto `published-results`. Quickest\n   unblock; doesn't depend on a release.\nB. Cut the next benchbox release (per\n   `release-flow-dry-run-rc1`) which propagates the validator\n   to v0.x.y, then sync `published-results` from the release tag.\nRecommend A for speed (the validator is a script, not a wheel\nartefact -- it runs from the PR's checkout of published-results\nregardless of whether benchbox is installed). B is cleaner long\nterm but blocks on the release-flow dry-run already in flight.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide path: cherry-pick develop's validator to published-results, or land a release first",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch",
+        "notes": "Applied path A in branch\n`fix/published-results-validator-manifest` and opened PR #87\nagainst `published-results`:\nhttps://github.com/joeharris76/BenchBox/pull/87\n\nScope of the branch-specific patch:\n  - `scripts/validate_submission.py` now skips `*.manifest.json`\n    during bundle discovery.\n  - The validator prefers `<bundle-stem>.manifest.json`, while\n    preserving the legacy `submission-manifest.json` fallback.\n\nVerification run against the Codex dry-run bundle cited in the\nretrospective:\n  - legacy `submission-manifest.json` layout: 0 errors,\n    0 warnings.\n  - per-bundle `<stem>.manifest.json` layout: 0 errors,\n    0 warnings.\n\n`/code review W2`: no required issues. The patch is branch-local,\npreserves legacy manifests, and does not touch the writer.\n\nAfter sync, re-run the validator on `published-results` against\na freshly-submitted bundle:\n  cd <published-results checkout>\n  python3 scripts/validate_submission.py /path/to/bundle.json\nExpected: 0 errors, 0 warnings.\nUse the artefacts Codex left at\n`/Users/joe/Developer/BenchBox/submission/` (or regenerate via\n`benchbox submit --last`) for the round-trip.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply chosen path; verify with a round-trip test",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-validator-hash-contract-mismatch",
+        "notes": "Already landed before this TODO cleanup:\n  - `tests/integration/test_cross_branch_validator_contract.py`\n  - `tests/fixtures/published_results_validator.py`\n\nEvidence:\n  - `git log -- tests/integration/test_cross_branch_validator_contract.py tests/fixtures/published_results_validator.py`\n    shows the contract test and vendored validator landed in\n    prior dry-run follow-up commits (#49, #51, #45).\n  - `cmp -s scripts/validate_submission.py tests/fixtures/published_results_validator.py`\n    returns 0, so the vendored validator matches the develop\n    validator byte-for-byte.\n  - The test covers writer output, companion hashes, symlink\n    rejection, missing-manifest-field UX, and validator drift.\n\n`/code review W3`: no required issues. The original TODO\nsuggested fetching `origin/published-results` live; the landed\ntest intentionally vendors the validator to keep the fast lane\ndeterministic and avoid network/branch-state flake.\n\nAdd `tests/integration/test_cross_branch_validator_contract.py`\nthat validates the writer's emitted hashes match what the\nvalidator on `published-results` computes. Implementation shape:\n  - Run `benchbox submit` to produce a bundle + manifest in a\n    temp dir.\n  - Fetch `scripts/validate_submission.py` from\n    `origin/published-results` (via `git show\n    origin/published-results:scripts/validate_submission.py`)\n    and exec it against the freshly-emitted bundle.\n  - Assert no hash mismatch.\nVendor the published-results validator into\n`tests/fixtures/` if pulling it live makes the test flaky\n(network, branch state). Prevents the same drift from\nhappening again the next time either side of the contract\nchanges.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a CI cross-branch contract test to prevent recurrence",
+        "wid": "w3"
+      }
+    ]
+  }
+}

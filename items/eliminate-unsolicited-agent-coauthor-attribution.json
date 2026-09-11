@@ -1,0 +1,164 @@
+{
+  "context": "Pin BenchBox to canonical skill-sync-skills merge 6073ea72e0b29f72d1e111f3209e1604ea8eccd8; regenerate mirrors; add COMMIT-IDENTITY-001 co-author consent language; strengthen deterministic audit and scenario schema; update the isolated external runner; verify and publish a narrow follow-up PR.",
+  "description": "Live Claude Code evaluation of merged PR #1318 preserved Joe as Git author but proposed an unsolicited Claude Co-Authored-By trailer based on a purported standard convention. Canonical skill-sync-skills PR #9 fixes the shared commit skill. Materialize that immutable canonical fix into BenchBox, make the repository policy explicit, eliminate ambiguous eval labels and tracked-content mutation wording, add a co-author intent field and deterministic invariants, then rerun both-agent evaluation before closure.",
+  "legacy": {
+    "item_meta": {
+      "category": "Agent infrastructure",
+      "completed_at": "2026-07-28T22:55:16Z",
+      "completed_pr": 1319,
+      "created_at": "2026-07-28T17:45:02Z",
+      "worktree": "agent-instructions"
+    },
+    "preserves": [
+      {
+        "behavior": "Git author and committer remain Joe Harris <joeharris76@gmail.com> unless the exact current task explicitly requests another identity",
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution"
+      },
+      {
+        "behavior": "No agent or service co-author trailer is added without exact current-task consent",
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution"
+      },
+      {
+        "behavior": "Raw model transcripts remain outside Git and evaluation clones cannot reach remotes or hosted tracker",
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/SHARED/commit-framework/**"
+      },
+      {
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "kind": "only_modify",
+        "path_glob": "_project/evals/agent-instructions/**"
+      },
+      {
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/agent-instruction-evaluation.md"
+      },
+      {
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.lock"
+      },
+      {
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.yaml"
+      },
+      {
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_agent_instruction_audit.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_agent_instruction_audit.py -q -n 0",
+        "description": "focused audit tests",
+        "expected": "all pass",
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make agent-instructions-check && make skill-sync-check",
+        "description": "instruction and skill provenance gates",
+        "expected": "exit 0",
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "sh -c 'test \"$(gh pr list --repo joeharris76/BenchBox --state merged --search \"head:fix/explicit-coauthor-consent\" --json number --jq length)\" -ge 1'",
+        "description": "follow-up PR merged",
+        "expected": "merged PR exists",
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "skill-sync-skills PR #9 merged as 6073ea72; BenchBox pinned that immutable revision, regenerated the tracked commit-framework mirror, and AGENTS.md now forbids agent/service co-author attribution without exact current-task consent",
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "notes": null,
+        "started_at": "2026-07-28T17:45:12Z",
+        "started_branch": "fix/explicit-coauthor-consent",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Materialize canonical co-author consent policy and add active BenchBox policy",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Scenario/action taxonomy now uses one human-identity action, separates tracked-content changes from commit metadata, and independently scores agent co-author intent. Audit enforces canonical and project co-author anchors; 26 focused tests pass including two new negative mutation tests.",
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "notes": null,
+        "started_at": "2026-07-28T17:49:12Z",
+        "started_branch": "fix/explicit-coauthor-consent",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Make evaluation schema unambiguous and add deterministic negative tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Focused audit 28 passed, fast suite 25,898 passed, clean exact-head preflight 25,884 passed + artifact hygiene OK; Claude 14/14 at exact head 73de8fd88, Codex 14/14 at preceding head dce86f90f (summary: ~/.benchbox/agent-instruction-evals/2026-07-28-final-summary-73de8fd88/summary.md). Exact-head Codex repeat waived by explicit user decision 2026-07-28: preceding-head evidence accepted, dce86f90f->73de8fd88 diff is review-boundary hardening covered by deterministic anchors",
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "notes": null,
+        "started_at": "2026-07-28T17:49:46Z",
+        "started_branch": "fix/explicit-coauthor-consent",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Run focused, fast, preflight, and both-agent behavioral evaluation",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #1319 MERGED (b466c4d70) with auto-merge after green CI; develop post-merge run success at b466c4d70",
+        "item_id": "eliminate-unsolicited-agent-coauthor-attribution",
+        "notes": null,
+        "started_at": "2026-07-28T22:55:13Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Land the follow-up PR and close tracker evidence",
+        "wid": "w4"
+      }
+    ]
+  }
+}

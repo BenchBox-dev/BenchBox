@@ -1,0 +1,77 @@
+{
+  "context": "Test shell logic through a deterministic Git-Bash discovery/helper or port pure filters to Python; assert the shell implementation actually ran so a launcher failure cannot masquerade as business-logic output.",
+  "description": "Run 30434746317 has eight PR workflow classifier failures and one release-branch sweep failure whose subprocess output is UTF-16 'Windows Subsystem for Linux has no installed distributions'. Python subprocess(['bash', ...]) resolves the Windows WSL stub rather than Git Bash, so the tests never exercise the shell snippets.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-30T12:06:52Z",
+        "from_item": "windows-bash-invocations-hit-wsl-stub",
+        "id": 665,
+        "reason": "Independent triage of Nightly run 30473819253 (both Windows jobs) found test_validate_submission_changed_bundles.py failing from the same WSL-stub cause (2 failures: test_applied_only_change_discovers_paired_primary_bundle, test_applied_companion_rename_discovers_the_source_primary_bundle), but that file is absent from this item's only_modify list, so a claimant would be blocked from fixing it. Also confirming the mechanism for whoever picks this up: the garbled assertion text is UTF-16LE and decodes to 'Windows Subsystem for Linux ... <Distro> to install.', i.e. bash resolved to C:\\\\Windows\\\\System32\\\\bash.exe (WSL launcher, no distro) and exited 1 - a wrong-interpreter bug, NOT the missing-encoding family it superficially resembles. Git Bash IS on the runner (actions/checkout invokes C:\\\\Program Files\\\\Git\\\\bin\\\\git.exe), so resolving it explicitly instead of trusting PATH order is viable.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Merged implementation covers the additional submission-validator workflow test through the shared verified-shell helper; the old item scope gap no longer represents open work.",
+        "summary": "Add tests/unit/workflows/test_validate_submission_changed_bundles.py to this item's scope"
+      }
+    ],
+    "item_meta": {
+      "completed_at": "2026-08-01T14:22:16Z",
+      "completed_pr": 1352,
+      "created_at": "2026-07-29T13:05:12Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "tests continue executing the same required-result and release-ref filtering logic used by CI",
+        "item_id": "windows-bash-invocations-hit-wsl-stub"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-bash-invocations-hit-wsl-stub",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-pr.yml"
+      },
+      {
+        "item_id": "windows-bash-invocations-hit-wsl-stub",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "windows-bash-invocations-hit-wsl-stub",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "item_id": "windows-bash-invocations-hit-wsl-stub",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_pr_workflow_path_classifier.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/test_release_infrastructure.py tests/unit/workflows/test_pr_workflow_path_classifier.py -q",
+        "description": "Release and PR workflow shell-contract tests pass",
+        "expected": "exit 0",
+        "item_id": "windows-bash-invocations-hit-wsl-stub",
+        "last_result": "pass",
+        "last_run": "2026-08-01T14:22:13Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Merged PR #1352 adds a capability-probed Git Bash resolver used by release, PR workflow, and submission bundle shell-contract tests; 182-test combined verification passed and current Nightly has no WSL-stub family.",
+        "item_id": "windows-bash-invocations-hit-wsl-stub",
+        "notes": null,
+        "started_at": "2026-08-01T14:21:59Z",
+        "started_branch": "fix/windows-canonical-newlines",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Make release and workflow shell-contract tests use a verified shell on Windows",
+        "wid": "w1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "context": "Land the smallest compatibility-only dependency change first. Constrain the MCP extra to mcp>=1.28.1,<2, regenerate the lock with uv, and prove both the resolved major version and the existing MCP suite. Record in the dependency comment or adjacent migration documentation that the cap is temporary and owned by mcp-sdk-v2-server-migration.",
+  "description": "BenchBox declares mcp>=1.28.1 in pyproject.toml while uv.lock currently retains 1.28.1. MCP Python SDK 2 is a breaking release that removes the mcp.server.fastmcp import used throughout benchbox/mcp, so a fresh or upgraded resolution can make benchbox.mcp fail to import even though the checked-in lock masks the incompatibility. Add an explicit temporary <2 boundary as an immediate compatibility fix; remove it only in the dedicated SDK-v2 migration item.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "combine the SDK-v2 code migration with this emergency resolver guard",
+        "instead": "land the <2 cap independently and remove it in mcp-sdk-v2-server-migration",
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "why": "the current unbounded dependency can break fresh installs before the larger migration is ready"
+      },
+      {
+        "dont": "edit uv.lock by hand",
+        "instead": "use uv lock with the updated project constraint",
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "why": "manual lock edits can leave inconsistent metadata and hashes"
+      }
+    ],
+    "item_meta": {
+      "category": "dependencies",
+      "created_at": "2026-08-01T15:44:03Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing stdio MCP behavior and public tool, resource, and prompt schemas remain unchanged",
+        "item_id": "mcp-sdk-v1-major-version-cap"
+      },
+      {
+        "behavior": "The mcp optional-dependency group remains installable on every currently supported Python version",
+        "item_id": "mcp-sdk-v1-major-version-cap"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing MCP optional dependency declaration",
+        "decision": "extend",
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "path": "pyproject.toml"
+      },
+      {
+        "concept": "current reproducible MCP 1.28.1 resolution",
+        "decision": "extend",
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "path": "uv.lock"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      },
+      {
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -q 'mcp>=1\\.28\\.1,<2' pyproject.toml",
+        "description": "Project metadata explicitly excludes MCP major version 2",
+        "expected": "the MCP dependency has an explicit temporary <2 upper bound",
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv lock --check",
+        "description": "The lockfile is internally consistent",
+        "expected": "uv reports the lockfile is current",
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from importlib.metadata import version; assert version('mcp').split('.')[0] == '1'; import benchbox.mcp\"",
+        "description": "The locked environment imports BenchBox MCP on SDK major version 1",
+        "expected": "the version assertion and import both succeed",
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -q",
+        "description": "Existing MCP unit coverage remains green",
+        "expected": "all MCP unit tests pass",
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add the temporary mcp>=1.28.1,<2 compatibility boundary with migration ownership",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Regenerate uv.lock through uv and confirm the selected MCP release remains on major version 1",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-sdk-v1-major-version-cap",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run import and focused MCP regression checks and document the fresh-resolution failure being prevented",
+        "wid": "w3"
+      }
+    ]
+  }
+}

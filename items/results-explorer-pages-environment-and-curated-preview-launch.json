@@ -1,0 +1,414 @@
+{
+  "context": "Use the existing docs.yml release-push deploy. Do not add a second Pages deployer and do not mutate github-pages policy again. After make release-finalize, probe the live custom domain.",
+  "description": "REVALIDATED 2026-08-20 against live GitHub/Pages/workflow, not tracker prose.\n\nCustomer-visible defect: https://benchbox.dev/results/ returns HTTP 404. The homepage and README still link it. Last github-pages deployment is 2026-07-09 (v0.3.1). docs.yml builds the explorer on develop, then skips deploy because deploy is `push && ref == refs/heads/release` (.github/workflows/docs.yml:298-299). Custom domain benchbox.dev is already verified; github-pages branch policy already permits release (w2 done, verify seq 1 passed 2026-08-13). Live /404.html is also 404, so the SPA fallback is not on the currently deployed site.\n\nAuthoritative ship posture: Amendment 2026-08-13 in _project/decisions/single-repo-migration.md and PR #1712 retain results-explorer/, results-data/, and the three publication helpers on release as a Curated Preview. _project/planning/v0.4.0-release-readiness.md still says OUT OF SCOPE (stale 2026-07-31); reconcile that on cut-v0-4-0-release, not by more Pages policy work.\n\nw3 (in_progress) is the remaining engineering action: cut v0.4.0 / push release so the deploy job runs. w4 is live custom-domain acceptance. Do not redo environment policy. Do not block on independent-oracles, D1-D16 closeout, a second GitHub account, or TPC-DS corpus expansion.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Deploy the curated preview on the current snapshot",
+        "instead": "INSTEAD land the corpus and facet fixes first",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "why": "the leaderboard renders 15 of 207 rows, 60 results are undisplayable, 142 rows assert validation that 112 bundles never ran, and the SQL/DataFrame facet is empty"
+      },
+      {
+        "dont": "Treat the privacy scrubber or the rollback target as ceremony to be dropped",
+        "instead": "INSTEAD trim only the evidence-transcription requirements, never the safety checks",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "why": "they exist for real leak and recovery reasons"
+      },
+      {
+        "dont": "block launch on independent-oracles or D1-D16 closeout",
+        "instead": "INSTEAD close this item on live /results/ 200 and range-readable snapshot",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "why": "those items are post-live certification, not the 404"
+      },
+      {
+        "dont": "change the external environment policy without a fresh read and maintainer change window",
+        "instead": "capture current policy, exact requested delta, rollback command, and maintainer authorization at execution time",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "why": "external settings drift and the mutation affects production publication"
+      },
+      {
+        "dont": "redo the github-pages environment policy",
+        "instead": "INSTEAD push release via the v0.4.0 cut and probe the live URL",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "why": "w2 already aligned it to release and verify seq 1 passed"
+      },
+      {
+        "dont": "serve direct routes with an e2e-only rewrite and infer GitHub Pages parity",
+        "instead": "test the exact site directory and workflow-produced fallback with a static Pages-shaped server",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "why": "Pages uses the assembled root 404.html artifact"
+      },
+      {
+        "dont": "test only workflow_dispatch",
+        "instead": "prove the actual release-push event and environment-protected deploy path",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "why": "the current workflow can build on dispatch without executing the deployment job"
+      },
+      {
+        "dont": "use can_admins_bypass to make one successful deployment and call the pipeline fixed",
+        "instead": "update and verify the github-pages deployment branch policy itself",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "why": "future automated release pushes would remain ineligible"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_item": "chromium-blocking-suite-not-in-required-checks"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_item": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_item": "cut-v0-4-0-release"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_item": "explorer-execution-mode-facet-null-for-every-bundle"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_item": "remediate-explorer-deploy-path-reconciliation"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_item": "results-explorer-curated-corpus-path-sanitization"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_item": "results-explorer-route-navigation-recovery-hardening"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_item": "results-explorer-vitest-required-develop-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-08-29T12:40:32Z",
+      "completed_pr": 1933,
+      "created_at": "2026-08-02T04:28:29Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A rollback target, previous deployment ID, deployed commit SHA, workflow run, artifact digest, and custom-domain smoke evidence are captured before declaring success.",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch"
+      },
+      {
+        "behavior": "Develop remains the authoritative development branch and release remains the curated publication branch.",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch"
+      },
+      {
+        "behavior": "No deployment begins until the exact corpus being published passes the public path-privacy gate.",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch"
+      },
+      {
+        "behavior": "Protected branches are never direct-pushed and the github-pages environment is not bypassed as routine deployment machinery.",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch"
+      },
+      {
+        "behavior": "The launch is labeled curated preview until the cohort/coverage contract permits a broader leaderboard claim.",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch"
+      },
+      {
+        "behavior": "The root documentation site and existing /docs routes remain byte/functionally intact apart from the deliberate Explorer addition.",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Extend the existing single Pages build/deploy workflow; do not add a second competing deployer.",
+        "decision": "extend",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "path": ".github/workflows/docs.yml"
+      },
+      {
+        "concept": "Use the existing release-cut curation decision from remediate-explorer-deploy-path-reconciliation rather than bypassing release assembly.",
+        "decision": "reuse",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "path": "Makefile"
+      },
+      {
+        "concept": "Record the external github-pages environment branch policy beside other repository-admin invariants.",
+        "decision": "extend",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "path": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "concept": "Reuse the direct-route matrix against the exact assembled Pages artifact.",
+        "decision": "extend",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "path": "results-explorer/e2e/routes/direct-route.spec.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": ".github/RELEASE_PR_TEMPLATE.md"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/single-repo-migration.md"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/release-guide.md"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-phase-2-runbook.md"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "make/inventory.json"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/direct-route.spec.ts"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/serve-browser-tests.mjs"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "scripts/check_release_curation.py"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_check_release_curation.py"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test \"$(gh api repos/joeharris76/BenchBox/environments/github-pages/deployment-branch-policies --jq '[.branch_policies[] | select(.type==\"branch\" and .name==\"release\")] | length')\" -ge 1",
+        "description": "GitHub Pages permits the release branch used by the deploy job",
+        "expected": "Fails on the unfixed main-only environment policy; exits 0 when release is explicitly permitted.",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "last_result": "pass",
+        "last_run": "2026-08-13T18:14:42Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "curl -fsS https://benchbox.dev/results/ | rg -q 'BenchBox Results' && curl -fsSI https://benchbox.dev/results/data/results.duckdb | rg -q '^HTTP/.* 200'",
+        "description": "Live Explorer route and snapshot are served from the custom domain",
+        "expected": "Fails before launch; exits 0 only when the live Explorer HTML and DuckDB snapshot are both available.",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q",
+        "description": "Deployment and workflow contract tests pass",
+        "expected": "Release curation, trigger, branch policy documentation, assembled artifact, and deploy ordering remain aligned.",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "last_result": "pass",
+        "last_run": "2026-08-13T18:14:56Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -n \"${E2E_SITE_DIR:-}\" && cd results-explorer && E2E_PAGES_SHAPED=1 npx playwright test --project=chromium --workers=1 e2e/routes/direct-route.spec.ts",
+        "description": "Pages-shaped direct routes and documentation clicks pass",
+        "expected": "The exact assembled site and root 404 artifact pass direct-route and native-doc acceptance",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "last_result": "pass",
+        "last_run": "2026-08-10T15:43:24Z",
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "for u in https://benchbox.dev/ https://benchbox.dev/results/; do curl -sS -o /dev/null -w \"$u %{http_code}\\n\" -L \"$u\"; done",
+        "description": "The live site never advertises a dead route",
+        "expected": "either /results/ returns 200, or the homepage no longer links it",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Live contract re-derived: default_branch=develop; docs.yml builds on release pushes plus release/develop PRs and deploys only github.ref==refs/heads/release; github-pages environment has branch_policy only for main; release-cut still strips results-data and results-explorer. No external policy or deployment mutation performed.",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "notes": "Fetch release/develop/published-results, inspect docs workflow at the deployment SHA, list Pages build settings, github-pages branch policies, current deployments, CNAME/DNS, custom-domain HTTPS, required checks, and branch protections. Stop on any unexplained drift and record the exact before state.",
+        "started_at": "2026-08-10T15:36:06Z",
+        "started_branch": "fix/results-explorer-pages-acceptance-20260810",
+        "started_worktree": "/private/tmp/bb-explorer-pages-acceptance-20260810",
+        "status": "done",
+        "summary": "Re-derive the complete live Pages deployment contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added E2E_SITE_DIR/E2E_PAGES_SHAPED support to serve-browser-tests.mjs and an assembled-artifact direct-route/native-doc test. Verified against a site assembled from the built Explorer, generated DuckDB snapshot, built docs, and root 404.html: 6 Chromium tests passed. tests/unit/workflows: 191 passed.",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "notes": "Build docs, snapshot, Explorer, copied public bundles, and the root 404 file using the same workflow commands. Serve as a static Pages-shaped artifact and run direct-route, docs CTA, range-read, privacy, asset-base, and unknown-route tests without server-side SPA rewrites.",
+        "started_at": "2026-08-10T15:42:05Z",
+        "started_branch": "fix/results-explorer-pages-acceptance-20260810",
+        "started_worktree": "/private/tmp/bb-explorer-pages-acceptance-20260810",
+        "status": "done",
+        "summary": "Add an exact assembled-site and custom-404 acceptance test",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Fresh live read on 2026-08-12: github-pages deployment_branch_policy has custom_branch_policies=true, protected_branches=false, and deployment-branch-policies contains exactly release (id 57091086, type branch). Exact verification command passed. No mutation was needed; the required release policy is already aligned. Current policy was re-read after the check and no wildcard/tag policy was introduced.",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "notes": "In a maintainer-approved change window, replace or extend the stale main-only policy with the exact release branch policy required by the workflow. Re-read after mutation, document rollback, and verify no wildcard or unintended tag policy was introduced.",
+        "started_at": "2026-08-12T13:33:21Z",
+        "started_branch": "fix/results-explorer-pages-environment-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-pages-environment-20260812",
+        "status": "done",
+        "summary": "Align the github-pages environment policy with release",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Release PR #1933 deployed commit f841b85f1 to GitHub Pages environment",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "notes": "Use the real release-push path, never a manual bypass. Record source SHA, artifact digest, workflow/deployment IDs, environment approvals, duration, and rollback target. A pending/failing dependency or privacy check is a hard stop; do not publish a partial site.",
+        "started_at": "2026-08-17T13:15:58Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Deploy one known release SHA through the normal protected workflow",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Live custom domain acceptance passed: https://benchbox.dev/results/ (200) and /results/data/results.duckdb (200)",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "notes": "Cold-load /results/, platform/result/direct routes, docs CTAs, compare/query, root 404 recovery, range reads, and bundle downloads with cache disabled. Capture response status/headers, final URL, title/H1, console/network errors, snapshot model version, corpus counts, and privacy scan. Roll back on any P1 failure; otherwise publish the curated-preview wording and evidence.",
+        "started_at": "2026-08-29T12:40:25Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run live custom-domain acceptance and decide launch",
+        "wid": "w4"
+      },
+      {
+        "evidence": "PR #1712 (a429f84d6) retains results-data, results-explorer, and the three curated Explorer publication helpers in release curation; docs workflow now verifies inputs and rejects an empty snapshot; release-curation and workflow contract tests pass; make pr-preflight passed.",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "notes": null,
+        "started_at": "2026-08-13T16:01:48Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Retain and validate curated-preview publication inputs in release curation",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Launch completed with v0.4.0 release, interim link removal not needed",
+        "item_id": "results-explorer-pages-environment-and-curated-preview-launch",
+        "notes": null,
+        "started_at": "2026-08-29T12:40:27Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "INTERIM - if the launch slips past the next release, remove or relabel the homepage and README links to /results/ so the live site stops advertising a 404",
+        "wid": "w6"
+      }
+    ]
+  }
+}

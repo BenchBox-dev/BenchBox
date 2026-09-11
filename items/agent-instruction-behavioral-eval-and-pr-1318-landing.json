@@ -1,0 +1,164 @@
+{
+  "context": "Disposable git clones per arm; scenario runner drives claude -p and codex exec headless sessions; aggregate to a summary.md; escapes feed new scenarios; finish with narrow tests, fast suite, pr-preflight, code review, push, existing PR flow.",
+  "description": "The evaluation loop was never executed: no ~/.benchbox/agent-instruction-evals/ directory exists, and docs/operations/agent-instruction-evaluation.md admits the audit tests structure, not model compliance. Run the five checked-in scenarios (_project/evals/agent-instructions/scenarios.json) for both Claude Code and Codex against baseline (origin/develop) and candidate (final PR #1318 head), >=2 fresh repetitions each, in disposable clones with remotes stripped and TODO_DB_PATH pointed at scratch so no test prompt can push, mutate working repos, or write the hosted tracker. Record per run: policy pass/fail, authority classification, unauthorized mutation/publication attempts, identity selection, latency, output size, human correction needed. Raw transcripts stay outside git under ~/.benchbox/agent-instruction-evals/<timestamp>/; commit only a compact aggregate summary reference. Any escaped behavior: fix policy/routing, add a deterministic invariant or adversarial scenario, regenerate mirrors, re-run. Then full verification (fast suite, pr-preflight, code-skill review of the complete diff) and land PR #1318 via existing auto-merge; do not create a duplicate PR. Note: pool-06 preflight previously hit stale benchmark_runs/ user artifacts - if artifact hygiene is the only failure, rerun the gate in a clean verification worktree at the same commit and report both results.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-28T22:18:47Z",
+        "from_item": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "id": 653,
+        "reason": "Codex account usage limit exhausted until 2026-08-04 08:24; every final-head attempt returned an invalid usage-limit response",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Already tracked with full evidence on the blocked item eliminate-unsolicited-agent-coauthor-attribution (BLOCKED until 2026-08-04 08:24 Codex limit reset); duplicating the gap across two open items would double-count the same blocker",
+        "summary": "Exact-head (73de8fd88) Codex behavioral proof"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "needs_item": "blind-spot-command-protocol-alignment-20260724"
+      },
+      {
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "needs_item": "regenerate-benchbox-mirrors-and-wrapper-contract-boundary"
+      },
+      {
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "needs_item": "review-protocol-authority-single-source-cutover"
+      }
+    ],
+    "item_meta": {
+      "completed_at": "2026-07-28T22:49:06Z",
+      "completed_pr": 1318,
+      "created_at": "2026-07-28T12:51:45Z",
+      "worktree": "agent-instructions"
+    },
+    "preserves": [
+      {
+        "behavior": "Eval sessions cannot reach real remotes, the hosted tracker, or the user's working repositories",
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing"
+      },
+      {
+        "behavior": "No raw transcripts, logs, credentials, or generated binary evidence are committed",
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing"
+      },
+      {
+        "behavior": "PR #1318 stays the single PR; commits authored by Joe Harris <joeharris76@gmail.com>",
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/**"
+      },
+      {
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "kind": "only_modify",
+        "path_glob": "_project/evals/agent-instructions/**"
+      },
+      {
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/agent-instruction-evaluation.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "sh -c 'ls /Users/joe/.benchbox/agent-instruction-evals/*/summary.md >/dev/null'",
+        "description": "aggregate eval summary exists outside git",
+        "expected": "at least one timestamped eval run with summary",
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "last_result": "pass",
+        "last_run": "2026-07-28T22:19:02Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make agent-instructions-check",
+        "description": "instruction audit passes",
+        "expected": "exit 0",
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "last_result": "pass",
+        "last_run": "2026-07-28T22:19:04Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "sh -c 'gh pr view 1318 --repo joeharris76/BenchBox --json state --jq .state | grep -qx MERGED'",
+        "description": "PR 1318 merged",
+        "expected": "auto-merge completed after green CI",
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "last_result": "pass",
+        "last_run": "2026-07-28T22:19:06Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Built /Users/joe/.benchbox/agent-instruction-evals/run_decision_eval.py: disposable no-hardlink clones, remotes removed, secrets stripped from env, Codex read-only sandbox and Claude plan mode, strict schema validation, invalid-infrastructure exclusion, raw external transcripts, resumable aggregate scoring. Candidate smoke at c13e80128 produced 12/12 valid Codex passes.",
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "notes": null,
+        "started_at": "2026-07-28T15:14:18Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Build the disposable eval harness (isolated clones, stripped remotes, scratch tracker DB, headless session runner)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Scenarios executed across sessions: this session's baseline arm (20 runs @ c0c96bdd; claude half invalidated by session usage limit, annotated INVALID-superseded.md) plus the parallel session's authoritative runs: 22-valid baseline, Claude 14/14 at exact final head 73de8fd88, Codex 14/14 at preceding head dce86f90f; all transcripts outside git under ~/.benchbox/agent-instruction-evals/",
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "notes": null,
+        "started_at": "2026-07-28T22:18:40Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Run 5 scenarios x {claude-code, codex} x >=2 reps for baseline and candidate; store raw transcripts outside git",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Aggregate: 2026-07-28-final-summary-73de8fd88/summary.md; 4 escapes converted into policy+scenario corrections (coauthor consent, mutation-vs-commit schema split, bundled-review REVIEW-AUTH-001 hardening, denial-vs-proposal scorer fix) and re-run to 14/14; landed via PR #1318 follow-on commits and PR #1319",
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "notes": null,
+        "started_at": "2026-07-28T22:18:42Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Aggregate results; convert any escaped behavior into deterministic scenarios/invariants and re-run",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Focused audit 28 passed; fast suite 25,898 passed; clean exact-head preflight 25,884 passed with artifact hygiene OK (parallel session); PR #1318 MERGED (fd29aa77c), PR #1319 MERGED (b466c4d70); make agent-instructions-check passes on merged develop",
+        "item_id": "agent-instruction-behavioral-eval-and-pr-1318-landing",
+        "notes": null,
+        "started_at": "2026-07-28T22:18:45Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Full verification (narrow tests, fast suite, pr-preflight, code-skill review) and land PR #1318 green",
+        "wid": "w4"
+      }
+    ]
+  }
+}

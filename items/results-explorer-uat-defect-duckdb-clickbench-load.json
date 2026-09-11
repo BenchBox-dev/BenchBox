@@ -1,0 +1,135 @@
+{
+  "description": "DuckDB ClickBench SF 1.0 failed during load in the UAT sweep with\n`NOT NULL constraint failed: hits.Referer`\n(`duckdb_clickbench_1.0_20260502_164814.log:10`). The load then halted with\nempty `hits`, making the cell unusable for Explorer coverage.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "coerce nulls silently",
+        "instead": "resolve the schema/data contract explicitly.",
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "why": "that changes benchmark semantics"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ClickBench schema compatibility for other platforms is not regressed.",
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load"
+      },
+      {
+        "behavior": "DuckDB load errors continue to surface exact constraint context.",
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/clickbench/generator.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/clickbench/schema.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/active/results-explorer-uat-defect-duckdb-clickbench-load.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/results-explorer-uat-defect-duckdb-clickbench-load.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_clickbench_csv_loading.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs uv run -- benchbox run --platform duckdb --benchmark clickbench --scale 1.0 --phases load,power --non-interactive",
+        "description": "DuckDB ClickBench SF1 load/power smoke reaches a classified terminal result.",
+        "expected": "completed result or explicit classified corpus/schema failure",
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast tests remain green.",
+        "expected": "all selected tests pass",
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "notes": "UAT log evidence: `/Users/joe/Developer/benchmark_runs/logs/uat_20260502/duckdb_clickbench_1.0_20260502_164814.log`\nreused `/Users/joe/Developer/benchmark_runs/datagen/clickbench_sf1/hits.csv.zst`, then failed bulk load with\n`NOT NULL constraint failed: hits.Referer`.\n\nThe ClickBench contract allows empty Referer strings, not NULLs: `Referer` is column 14 in\n`benchbox/core/clickbench/schema.py`, is `TEXT NOT NULL`, and Q29 filters `Referer <> ''`. The generator\nintentionally emits empty referers, and the SF1 corpus contains an empty field in column 14. The ClickBench benchmark\nadvertises pipe-delimited CSV with `csv_null_marker: None` in the manifest and `nullstr='__NULL__'` in\n`get_csv_loading_config()` to preserve empty strings.\n\nThe DuckDB handler factory resolves the CSV dialect but passes only `dialect.delimiter` into\n`DuckDBNativeHandler`. `DuckDBNativeHandler` then hardcodes `nullstr=''` on pipe-delimited `read_csv` branches in\n`benchbox/platforms/base/data_loading.py`, so DuckDB converts empty Referer fields to NULL before enforcing the\nNOT NULL schema constraint. W2 should fix the loader null-marker propagation rather than changing the ClickBench\nschema or mutating the reusable corpus.\n\nCleanup boundary: this work item did not create loaded database artifacts. Subsequent load/power verification should\npreserve reusable source data under `/Users/joe/Developer/benchmark_runs/datagen/` and remove only run-owned loaded\ndatabase/output artifacts created by this TODO after they are no longer needed. Do not delete reusable TPC-H datagen\ncorpora, because read primitives and related benchmarks reuse them.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Trace ClickBench schema/data nullability for DuckDB",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "notes": "Implemented the loader fix instead of classifying the corpus invalid. DuckDB handler construction now passes the\nresolved CSV `null_marker` into `DuckDBNativeHandler`. Pipe-delimited DuckDB native loads use `nullstr=''` when\nthe dialect says empty fields are NULL, and use the shared `__NULL__` sentinel when `null_marker` is `None` so\nempty ClickBench fields remain empty strings. The same sentinel handling was applied to DuckDB external text scans\nso `CsvDialect.null_marker=None` has one meaning across DuckDB read paths.\n\nW2 review found and fixed the external-scan gap; no remaining actionable W2 review issues. Verification passed:\ntargeted ruff, ruff format --check, ty check (with the existing optional `vortex` unresolved-import diagnostic),\n`tests/unit/platforms/base/test_trailing_delimiter_loading.py`, `tests/unit/platforms/test_duckdb_operations.py`,\n`tests/unit/test_clickbench_csv_loading.py`, the shared-root DuckDB ClickBench SF1 load/power smoke, and the\n10-worker fast suite. The smoke produced result JSON\n`/Users/joe/Developer/benchmark_runs/results/clickbench_sf1_duckdb_sql_20260503_030728_b19d7d6d.json`.\nRun-owned loaded database artifacts under `/Users/joe/Developer/benchmark_runs/databases/clickbench_sf1` were\ndeleted after verification; reusable datagen was preserved.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix the loader/schema mismatch or classify the corpus as invalid",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-duckdb-clickbench-load",
+        "notes": "Added targeted regression coverage in `tests/unit/test_clickbench_csv_loading.py`: an in-memory DuckDB native pipe\nload verifies an empty ClickBench `Referer` field survives insertion into a NOT NULL table as `''`, and an external\nscan SQL test verifies `csv_null_marker: None` emits the no-null-conversion sentinel instead of DuckDB's default\nempty-string null marker.\n\nW3 review found no actionable issues. Verification passed: ruff, ruff format --check, ty check, targeted\n`tests/unit/test_clickbench_csv_loading.py`, shared-root DuckDB ClickBench SF1 load/power smoke, and the 10-worker\nfast suite. The smoke produced result JSON\n`/Users/joe/Developer/benchmark_runs/results/clickbench_sf1_duckdb_sql_20260503_031240_722b7b76.json`.\nRun-owned loaded database artifacts under `/Users/joe/Developer/benchmark_runs/databases/clickbench_sf1` were\ndeleted after verification; reusable datagen was preserved.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add targeted ClickBench DuckDB regression coverage",
+        "wid": "w3"
+      }
+    ]
+  }
+}

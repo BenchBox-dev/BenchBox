@@ -1,0 +1,409 @@
+{
+  "description": "Coverage is at 71.4% (81,722 / 109,707 stmts). Target is 80% (87,766 covered).\nGap: 6,044 more lines to cover.\n\nTwo-pronged strategy:\n1. SCOPE REFINEMENT: Omit 3,526 stmts of untestable bulk (TPC-DI ETL complex\n   transformations that require full CDC infrastructure, experimental concurrency\n   code, ClickBench DF queries). This immediately adjusts the denominator and\n   boosts measured coverage to ~76.3%. Gap after omit: 3,928 lines.\n2. TARGETED TESTS: Cover ~4,130 additional lines (5% buffer over gap) from\n   high-value locally-testable files across 5 categories:\n   - Core/CLI/DF framework: ~1,600 lines (base adapter, unified_frame, CLI\n     commands, DF benchmark_suite, runner, base.py, utils)\n   - Cloud SQL generation (top 4): ~1,000 lines (Redshift, Databricks, BigQuery,\n     Snowflake - config validation + SQL string assertions)\n   - Cloud SQL generation (tier 2): ~500 lines (Athena, Synapse, Firebolt,\n     ClickHouse, PostgreSQL, Trino)\n   - DF query implementations: ~280 lines (read_primitives DF queries)\n   - Remaining high-miss modules: ~350 lines (metadata_primitives, DataFusion\n     adapter, TPC-DS runner gaps)\n\nAnti-coverage-theater principles:\n- Every test must call a function and assert on specific output values\n- Use real engines (DuckDB, Polars, DataFusion) not mocks where possible\n- Test behavior not implementation - if the function changes how it works but\n  produces the same result, the test should still pass\n- No import-only tests, no `assert result is not None`, no `assert True`\n- Cloud platform tests assert on generated SQL strings, not mock.called\n- Mark genuinely untestable code for exclusion rather than writing useless tests",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add tests just to hit line coverage",
+        "instead": "every test should fail if the code under test is broken",
+        "item_id": "coverage-to-80-percent",
+        "why": "a test that can never fail is worse than no test"
+      },
+      {
+        "dont": "mock internal methods to test dispatchers",
+        "instead": "use real DuckDB/Polars/DataFusion wherever possible",
+        "item_id": "coverage-to-80-percent",
+        "why": "you're testing mock wiring not behavior"
+      },
+      {
+        "dont": "omit files from coverage just because they are hard to test",
+        "instead": "only omit genuinely untestable code (external infrastructure, experimental, bulk mechanical translations)",
+        "item_id": "coverage-to-80-percent",
+        "why": "that hides real gaps"
+      },
+      {
+        "dont": "put 'coverage' in test filenames",
+        "instead": "name after the behavior being tested",
+        "item_id": "coverage-to-80-percent",
+        "why": "test names should describe what they verify"
+      },
+      {
+        "dont": "test cloud SQL generation by asserting mock.called",
+        "instead": "assert the generated SQL string contains expected clauses",
+        "item_id": "coverage-to-80-percent",
+        "why": "that doesn't verify SQL correctness"
+      },
+      {
+        "dont": "write import-only tests",
+        "instead": "every test must call a function and assert on its output",
+        "item_id": "coverage-to-80-percent",
+        "why": "importing a module is not testing it"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "coverage-to-80-percent",
+        "id": 131,
+        "reason": "Requires full CDC/SCD pipeline infrastructure with staged incremental loads. 2,226 missing statements but extremely high effort. Omitted from scope and deferred until TPC-DI ETL testing infrastructure is built.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Gated on TPC-DI ETL testing infrastructure being built first; no evidence that infra exists yet, premature to promote.",
+        "summary": "TPC-DI ETL deep coverage (transformations.py, batch.py, scd_processor.py)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "coverage-to-80-percent",
+        "id": 132,
+        "reason": "Require real cloud Spark sessions or complex mocking. Better covered by platform-live-integration-tests TODO.",
+        "resolution": "promoted",
+        "resolved_item": "cloud-spark-adapters-emr-serverless-dataproc-serverless-syna",
+        "resolved_reason": null,
+        "summary": "Cloud Spark adapters (EMR Serverless, Dataproc Serverless, Synapse Spark)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "coverage-to-80-percent",
+        "id": 133,
+        "reason": "Require external engines (Spark, LakeSail server). Config/validation logic was covered in dataframe-test-coverage w13; remaining gaps are engine-specific.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "PySpark and LakeSail DataFrame adapters"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "coverage-to-80-percent",
+        "id": 134,
+        "reason": "Experimental code changes frequently. Testing to 80% is wasted effort if modules are restructured. Cover after modules graduate from experimental.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly deferred until GPU-benchmark/NL2SQL modules graduate from experimental; no evidence that has happened.",
+        "summary": "Experimental modules (GPU benchmark, NL2SQL evaluator)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_item": "dataframe-test-coverage"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_item": "non-dataframe-test-coverage"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-03-26T00:00:00Z",
+      "created_at": "2026-03-25T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing tests must continue to pass - new tests are additive",
+        "item_id": "coverage-to-80-percent"
+      },
+      {
+        "behavior": "Cloud adapter tests must not require real credentials",
+        "item_id": "coverage-to-80-percent"
+      },
+      {
+        "behavior": "Coverage config in pyproject.toml remains source of truth for local dev",
+        "item_id": "coverage-to-80-percent"
+      },
+      {
+        "behavior": "No `assert True`, `assert result is not None`, or `hasattr`-only assertions",
+        "item_id": "coverage-to-80-percent"
+      },
+      {
+        "behavior": "Test suite speed: `make test-fast` must complete in < 90 seconds",
+        "item_id": "coverage-to-80-percent"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w8",
+        "wid": "w12"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w1",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w10",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w11",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w12",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w13",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w14",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w15",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w16",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w2",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w3",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w4",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w5",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w6",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w7",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w8",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w9",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "coverage-to-80-percent",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Omit untestable bulk from coverage scope",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test BigQuery SQL generation and config validation",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test Snowflake SQL generation and config validation",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test remaining cloud platforms and adapters",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test base.py BaseBenchmark abstract methods",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test remaining utils and supporting modules",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test read_primitives remaining DF query implementations",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test DataFusion adapter expression and write paths",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align CI coverage config and ratchet fail_under to 80",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test base adapter concrete methods to 85%",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test unified_frame.py string, date, and subquery operations",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test CLI run command option parsing and validation",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test CLI compare and benchmarks commands",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test DataFrame benchmark_suite orchestration",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test core runner orchestration and config",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test Redshift SQL generation and config validation",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-to-80-percent",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test Databricks SQL generation and config validation",
+        "wid": "w9"
+      }
+    ]
+  }
+}

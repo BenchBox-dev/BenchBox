@@ -1,0 +1,221 @@
+{
+  "context": "Wait for confirmation that one release has cut from develop AND that\nno in-flight branches are still using legacy non-pool worktrees\nbefore deleting the alias. The deprecation notice gives users one\nrelease to migrate; this TODO is the deletion that follows.\n",
+  "description": "After Step 2 (PR #73) introduced the retained worktree pool, four\nworktree creation paths now coexist (raw `git worktree add`,\n`make worktree-add` [deprecated], `make worktree-claim` [preferred],\n`make worktree-pool-init` [bootstrap]). Captured as L2 blind-spot\nfinding `2026-04-30-143501-four-worktree-creation-paths`.\n\nPR #73 added a stderr deprecation notice to `make worktree-add`\npromising removal \"in the next release\". This TODO tracks that\nremoval so the deprecation marker doesn't rot indefinitely.\n\nRemove the alias one release after the pool model lands. Concretely:\nopen this PR after the next release is cut from develop and any\ndownstream tooling has had a release cycle to migrate to\n`worktree-claim`.\n\nRelated blind-spot finding:\n  `_project/blind-spots/2026-04-30-143501-four-worktree-creation-paths.md`",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "also touch `worktree-prune`",
+        "instead": "leave it for a separate cleanup if the legacy paths ever go to zero",
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "why": "it still serves legacy worktrees that exist outside the pool"
+      },
+      {
+        "dont": "remove `worktree-add` before one release ships",
+        "instead": "wait for the deprecation window",
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "why": "in-flight non-pool worktrees may still be in use"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "remove-worktree-add-deprecated-alias",
+        "id": 475,
+        "reason": "Both still serve legitimate cases (non-pool worktrees, status inspection). Revisit only if all non-pool worktree usage goes to zero, which is unlikely while the legacy paths remain part of the toolkit.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Removal of worktree-prune/worktree-list explicitly deferred until non-pool usage drops to zero, which the reason itself calls 'unlikely'.",
+        "summary": "Removing `make worktree-prune` and `make worktree-list`"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-26T00:00:00Z",
+      "created_at": "2026-04-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing pool worktrees on the workstation — removing `worktree-add` does not affect any worktree already on disk",
+        "item_id": "remove-worktree-add-deprecated-alias"
+      },
+      {
+        "behavior": "`make worktree-claim`, `make worktree-release`, `make worktree-pool-status`, `make worktree-pool-init`, `make worktree-pool-reset`, `make worktree-pool-sweep-stale` — the pool-managed surface remains the canonical path",
+        "item_id": "remove-worktree-add-deprecated-alias"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "kind": "do_not_modify",
+        "path_glob": "Any other Makefile target"
+      },
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "kind": "do_not_modify",
+        "path_glob": "Pool worktree directories on the workstation"
+      },
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/_with_pool_lock.sh, scripts/_pool_lock.py"
+      },
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-04-30-143501-four-worktree-creation-paths.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! rg -n '^worktree-add:|^\\.PHONY.*worktree-add|make worktree-add' Makefile",
+        "description": "Makefile no longer references worktree-add",
+        "expected": "no matches",
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n 'worktree-add' CLAUDE.md",
+        "description": "CLAUDE.md no longer mentions worktree-add",
+        "expected": "no matches",
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n 'worktree-add' AGENTS.md",
+        "description": "AGENTS.md no longer mentions worktree-add",
+        "expected": "no matches",
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'todo_id: remove-worktree-add-deprecated-alias' _project/blind-spots/2026-04-30-143501-four-worktree-creation-paths.md",
+        "description": "Blind-spot file 143501 marked actioned with todo_id",
+        "expected": "1",
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "notes": "Check that `git tag --list 'v*'` has at least one tag created\nafter PR #73 merged. Search the codebase and `_project/scripts/`\nfor any remaining references to `worktree-add` (excluding the\ndeprecation paragraphs in CLAUDE.md and AGENTS.md, which this\nTODO will remove). Confirm the help table and pre-approved\ncommand bucket no longer have downstream consumers expecting\n`worktree-add`.\nAs of the 2026-05-26 TODO review, PR #73 had merged on\n2026-04-30 and v0.3.0 had published on 2026-05-20; re-check\nbefore implementation and include the current tag/PR evidence in\nthe PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm one release has cut since PR #73 and any callers have migrated",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "notes": "Edit Makefile:\n  - Delete the `worktree-add:` recipe (lines around the deprecation echo).\n  - Remove `worktree-add` from the .PHONY declarations.\n  - Remove the `make worktree-add BRANCH=name` row from the help text.\nConfirm `make help` no longer mentions worktree-add and the\ndeprecated section header can also be removed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove `worktree-add` Make target and its .PHONY entry",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "notes": "Both files currently say `make worktree-add BRANCH=fix/foo`\nremains as a deprecated one-release compatibility path for legacy\nnon-pool worktrees. Remove those sentences entirely; the pool\npath is now the only path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Strip remaining `worktree-add` paragraphs from CLAUDE.md and AGENTS.md",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "notes": "Update the frontmatter:\n  status: actioned (was: actioned with future work pending)\n  todo_id: remove-worktree-add-deprecated-alias\nTick the \"After one release...\" checkbox in the body's\n\"Suggested next steps\".\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Mark blind-spot 2026-04-30-143501 as actioned + reference this TODO",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-worktree-add-deprecated-alias",
+        "notes": "Standard cycle: `make lint format typecheck`,\n`BENCHBOX_PREPUSH=1 make pr-preflight`, then `make pr-open`.\nAuto-merge will land it once the PR-tier checks pass.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run pr-preflight and open the PR",
+        "wid": "w5"
+      }
+    ]
+  }
+}

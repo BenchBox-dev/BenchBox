@@ -1,0 +1,262 @@
+{
+  "description": "Implement a Stack Overflow benchmark using the publicly available Stack Exchange\ndata dumps. This benchmark provides a realistic multi-table OLAP workload based\non one of the world's largest Q&A platforms, featuring rich analytical patterns\nincluding tag analysis, reputation systems, and temporal trends.\n\nStack Overflow is an excellent benchmark dataset because:\n- Real-world data with natural distributions (highly skewed, long-tail)\n- Multi-table schema with diverse join patterns\n- Large scale: 630M+ rows across 7 tables, ~150-200 GB\n- Rich analytical patterns: tags, reputation, temporal, text search\n- Publicly accessible via multiple sources (BigQuery, ClickHouse, dumps)\n\nUse cases covered:\n- Tag popularity and co-occurrence analysis\n- User reputation progression and engagement metrics\n- Question/answer quality metrics\n- Temporal trends and seasonal patterns\n- Multi-table aggregations with complex joins\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "parse XML dumps at benchmark runtime",
+        "instead": "always pre-convert to Parquet in the data generation phase",
+        "item_id": "stackoverflow-benchmark",
+        "why": "XML parsing is 10-100x slower than Parquet reads"
+      },
+      {
+        "dont": "require internet access for benchmark execution",
+        "instead": "only the data acquisition phase should download",
+        "item_id": "stackoverflow-benchmark",
+        "why": "air-gapped environments exist"
+      }
+    ],
+    "item_meta": {
+      "category": "Benchmark Development",
+      "created_at": "2026-01-12T00:00:00Z",
+      "worktree": "benchmark-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "BaseBenchmark interface contract unchanged",
+        "item_id": "stackoverflow-benchmark"
+      },
+      {
+        "behavior": "Platform registry backward compatible",
+        "item_id": "stackoverflow-benchmark"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "stackoverflow-benchmark",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "stackoverflow-benchmark",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/stackoverflow/"
+      },
+      {
+        "item_id": "stackoverflow-benchmark",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/stackoverflow/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.stackoverflow import StackOverflowBenchmark; print('OK')\"",
+        "description": "StackOverflow benchmark module imports",
+        "expected": "OK",
+        "item_id": "stackoverflow-benchmark",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/stackoverflow/ -v --tb=short",
+        "description": "Unit tests pass",
+        "expected": "all tests pass",
+        "item_id": "stackoverflow-benchmark",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "Options:\nA) Download XML dumps and convert to Parquet\nB) Export from BigQuery to GCS then download\nC) Use ClickHouse pre-converted Parquet files\n\nRecommendation: Option C (ClickHouse Parquet) for simplicity,\nwith Option B as fallback for freshest data\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Design data acquisition strategy",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- so_score_distribution: Post score histogram\n- so_acceptance_rate: Answer acceptance by tag\n- so_view_answer_ratio: Views per answer\n- so_edit_frequency: Edits per post by age\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement content quality queries",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- so_user_impact: Combined reputation + votes + badges\n- so_post_lifecycle: Creation -> votes -> edits timeline\n- so_expert_identification: Multi-factor expertise scoring\n- so_community_health: Aggregated engagement metrics\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement complex multi-table queries",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- Inherit from BaseBenchmark\n- Handle multi-table data loading\n- Manage foreign key relationships\n- Implement phases: generate, load, warmup, power\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement StackOverflowBenchmark class",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- Add to platform_registry.py\n- Add to benchbox run --benchmark stackoverflow\n- Add scale factor validation\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Register benchmark with CLI",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- Handle text search differences (Body, Comments)\n- Handle datetime functions across platforms\n- Handle string operations (Tags parsing)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add platform-specific query variants",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- Schema parsing tests\n- Query syntax validation\n- Scale factor calculation tests\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Create unit tests",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- DuckDB full workflow test\n- Data loading verification\n- Query execution and result validation\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Create integration tests",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- Query catalog documentation\n- Scale factor recommendations\n- Platform compatibility matrix\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document benchmark",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- benchbox/core/stackoverflow/__init__.py\n- benchbox/core/stackoverflow/schema.py\n- benchbox/core/stackoverflow/downloader.py\n- benchbox/core/stackoverflow/queries.py\n- benchbox/core/stackoverflow/benchmark.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Create stackoverflow module structure",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "Define dataclasses/schemas for all 7 tables:\n- Posts: Id, PostTypeId, CreationDate, Score, ViewCount, Body, Title, Tags, OwnerUserId, AnswerCount\n- Users: Id, Reputation, DisplayName, Views, UpVotes, DownVotes, Location, CreationDate\n- Votes: Id, PostId, VoteTypeId, UserId, CreationDate\n- Comments: Id, PostId, Score, Text, UserId, CreationDate\n- Badges: Id, UserId, Name, Class, Date\n- PostLinks: Id, PostId, RelatedPostId, LinkTypeId\n- PostHistory: Id, PostId, PostHistoryTypeId, UserId, CreationDate\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement schema definitions",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- Download from ClickHouse S3 bucket or similar source\n- Validate checksums and file integrity\n- Support incremental download for large files\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement Parquet downloader",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- Time-based sampling (e.g., last N years)\n- Maintain referential integrity across tables\n- Generate reproducible subsets with seed\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement scale factor sampling",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- DuckDB: Direct Parquet loading\n- PostgreSQL: COPY from Parquet via DuckDB export\n- ClickHouse: Native Parquet import\n- Snowflake: Stage and COPY INTO\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement data loading for platforms",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- so_top_tags: Top 20 tags by question count\n- so_tag_trends: Tag popularity over time (monthly)\n- so_tag_cooccurrence: Common tag pairs\n- so_tag_answer_rate: Answer rate by tag\n- so_tag_score_distribution: Score distribution by top tags\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement tag analysis queries",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- so_top_users: Highest reputation users\n- so_user_growth: Reputation progression over time\n- so_user_by_tag: Top answerers per tag\n- so_badge_rarity: Badge distribution by class\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement user reputation queries",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "stackoverflow-benchmark",
+        "notes": "- so_activity_by_month: Questions/answers over time\n- so_response_time: Time to first answer\n- so_seasonal_patterns: Day-of-week, hour patterns\n- so_yoy_growth: Year-over-year metrics\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement temporal analysis queries",
+        "wid": "w9"
+      }
+    ]
+  }
+}

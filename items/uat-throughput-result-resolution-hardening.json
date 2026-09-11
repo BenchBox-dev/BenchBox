@@ -1,0 +1,173 @@
+{
+  "context": "Small PR. w1 is reading, not code. The runner passes platform, benchmark,\nand scale into run_cell already (runner.py:145-154); threading scale to\nthe resolver is mechanical. For w4, the workflow step ordering makes a\n$GITHUB_ENV timestamp trivial.\n",
+  "description": "The official/throughput cell path resolves its result JSON by\nfilename-glob + mtime instead of the stdout contract every other cell\nuses (because `run-official` has no --quiet; documented at\ntests/uat/throughput.py:13-16). The resolver has two real weaknesses,\nverified on develop @ fc31f3604:\n\n1. SUBSTRING PLATFORM MATCH (tests/uat/throughput.py:60-66): the glob\n   `f\"{benchmark_token}_*{platform_token}*.json\"` with platform=\"duckdb\"\n   matches `tpch_sf1_pg_duckdb_sql_20260709.json`. The existing\n   false-positive test (test_throughput.py:62-71) only checks\n   postgresql (not a substring); the pg_duckdb->duckdb collision\n   direction is untested. The glob also carries no scale token, so SF is\n   entirely unfiltered.\n\n2. ARBITRARY TIE-BREAK + WIDE CI WINDOW: max-mtime tie-break\n   (throughput.py:70) is arbitrary within filesystem mtime granularity.\n   Mitigated in production by sequential execution and per-cell\n   started_after (captured before the subprocess launches,\n   runner.py:157), but the nightly assert step widens the window to a\n   full hour over a shared results dir\n   (.github/workflows/nightly.yml:607-612) -- safe on a fresh CI runner,\n   wrong-file-prone on any persistent runner or multi-cell sweep.\n\nContext: #1119 (d48231a3b) fixed a genuine TEST-only mtime race\n(_MTIME_SLACK backdating); production was mostly sound. This TODO fixes\nthe remaining production weaknesses.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "parse result JSON contents to disambiguate candidates",
+        "instead": "(not specified)",
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "why": "filename + window must suffice; content-sniffing hides grammar drift."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-throughput-result-resolution-hardening",
+        "id": 49,
+        "reason": "Requires a benchbox CLI surface change (run-official output contract) which the no-CLI-surface-drift constraint makes a bigger conversation; the hardened glob is sufficient for sequential UAT. Promoted to [[uat-throughput-result-path-manifest]] (2026-07-16), which needs this item.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Reason states this was explicitly 'Promoted to uat-throughput-result-path-manifest', which is an open tracked item.",
+        "summary": "Replace glob resolution entirely with a result-path manifest emitted by run-official"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "needs_item": "tpch-throughput-seed-validation-fix"
+      },
+      {
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "needs_item": "uat-status-taxonomy-exit-code-fixes"
+      }
+    ],
+    "item_meta": {
+      "category": "Bug Fix / Data Pipeline",
+      "completed_at": "2026-07-19T23:50:49Z",
+      "completed_pr": 1228,
+      "created_at": "2026-07-11T00:00:00Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "The started_after >= semantics from #1119 (with test-side _MTIME_SLACK) keep working.",
+        "item_id": "uat-throughput-result-resolution-hardening"
+      },
+      {
+        "behavior": "resolve_official_result_path signature stays backward-compatible (new scale param optional/keyword).",
+        "item_id": "uat-throughput-result-resolution-hardening"
+      },
+      {
+        "behavior": "validate_stream_count / validate_throughput_metric split (nightly hard-gates stream count independently) unchanged here.",
+        "item_id": "uat-throughput-result-resolution-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox result filename convention (e.g. tpch_sf1_duckdb_sql_<date>.json) -- derive the exact token grammar from the exporter that writes these names (find it via the existing test fixtures in tests/uat/test_throughput.py) rather than guessing.",
+        "decision": "reuse",
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "path": "benchbox"
+      },
+      {
+        "concept": "tests/uat/throughput.py:resolve_official_result_path -- the resolver being hardened; keep its signature so runner.py:246-251 and nightly.yml consumers do not churn. Extend.",
+        "decision": "extend",
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "path": "tests/uat/throughput.py:resolve_official_result_path"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/runner.py"
+      },
+      {
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_runner.py"
+      },
+      {
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_throughput.py"
+      },
+      {
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/throughput.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_throughput.py tests/uat/test_runner.py -q",
+        "description": "Resolver collision + determinism tests",
+        "expected": "pass, including pg_duckdb/duckdb collision and equal-mtime determinism tests",
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1228: pinned filename grammar (filenames.py::build_result_filename_base) in resolver docstring",
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:18Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Pin the filename grammar: locate the exporter that writes result filenames, document the token order (benchmark, sf, platform, mode, date) in the resolver docstring",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1228: exact variable-length token-prefix matching; pg_duckdb/duckdb collision tests both directions",
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:20Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Exact-token platform matching: split filename on underscores and require the platform token sequence to match exactly (pg_duckdb no longer matches duckdb); add the collision-direction regression test",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1228: scale token filter threaded from run_cell; (mtime,filename) deterministic tie-break",
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:23Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add a scale token to the filter (scale param threaded from run_cell, which knows it); tie-break by (mtime, filename) so equal-mtime resolution is deterministic",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #1228: nightly window via THROUGHPUT_UAT_STARTED_AT UTC-anchored",
+        "item_id": "uat-throughput-result-resolution-hardening",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:25Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Narrow the nightly assert window: capture a start timestamp before the sweep step and pass it through instead of now()-1h (nightly.yml)",
+        "wid": "w4"
+      }
+    ]
+  }
+}

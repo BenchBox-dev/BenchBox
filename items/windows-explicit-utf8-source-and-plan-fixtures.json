@@ -1,0 +1,63 @@
+{
+  "context": "Specify encoding='utf-8' at repository source and UTF-8 fixture reads; add a regression proving Databend connectors survive a non-UTF-8 locale assumption without changing fixture bytes.",
+  "description": "Run 30434746317 has three UnicodeDecodeError failures reading repository Python files through the Windows codepage and four Databend plan failures where UTF-8 box-drawing connectors decode as mojibake, leaving only the Sort root. All seven loaders use Path.read_text() without encoding.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-29T13:04:56Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "source scanners and plan conformance assertions examine the same committed content",
+        "item_id": "windows-explicit-utf8-source-and-plan-fixtures"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-explicit-utf8-source-and-plan-fixtures",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_no_cli_surface_drift.py"
+      },
+      {
+        "item_id": "windows-explicit-utf8-source-and-plan-fixtures",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cloud_storage_gate_deployment_aware.py"
+      },
+      {
+        "item_id": "windows-explicit-utf8-source-and-plan-fixtures",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_misc_plan_capture.py"
+      },
+      {
+        "item_id": "windows-explicit-utf8-source-and-plan-fixtures",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/query_plans/test_cross_engine_conformance.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/uat/test_no_cli_surface_drift.py tests/unit/cli/test_cloud_storage_gate_deployment_aware.py tests/unit/platforms/test_misc_plan_capture.py tests/unit/query_plans/test_cross_engine_conformance.py -q",
+        "description": "Source scanners and plan corpus pass",
+        "expected": "exit 0",
+        "item_id": "windows-explicit-utf8-source-and-plan-fixtures",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-explicit-utf8-source-and-plan-fixtures",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add explicit UTF-8 decoding to source scanners and Databend fixture loaders",
+        "wid": "w1"
+      }
+    ]
+  }
+}

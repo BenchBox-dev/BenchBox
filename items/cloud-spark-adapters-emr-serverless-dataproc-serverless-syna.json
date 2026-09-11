@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #132 of coverage-to-80-percent.\nDeferred: Cloud Spark adapters (EMR Serverless, Dataproc Serverless, Synapse Spark)\nReason deferred: Require real cloud Spark sessions or complex mocking. Better covered by platform-live-integration-tests TODO.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:02Z",
+      "worktree": "main"
+    }
+  }
+}

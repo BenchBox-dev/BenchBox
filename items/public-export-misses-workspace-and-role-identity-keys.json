@@ -1,0 +1,93 @@
+{
+  "context": "Add the three compact keys to the public identifier pseudonymization spec (role-class keys hash like the existing role/iam_role entries). Internal export keeps real values - identifiers are pseudonymized publicly, not redacted internally, per the documented asymmetry.",
+  "description": "Sentinel-driven 2026-08-01 through the production wiring (sanitize_platform_options at capture, anonymize_result_payload at public export): workspace_name (azure/synapse_spark_adapter.py:757), job_role (aws/glue_adapter.py:168 - an IAM role, often a full ARN carrying the 12-digit account id) and application_id (aws/emr_serverless_adapter.py:731) all appear verbatim in the public payload. The public spec covers 'workspace'/'workspaceid' but not 'workspacename' - near-miss variants of covered keys are the recurring failure pattern. Sibling finding to public-export-pg-user-and-tenant-id-bypass-pseudonymization, which covers tenant_id/pg_user.",
+  "legacy": {
+    "item_meta": {
+      "category": "security",
+      "completed_at": "2026-08-01T17:12:05Z",
+      "completed_pr": 1396,
+      "created_at": "2026-08-01T12:41:47Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing pseudonymization for already-covered identifier keys is unchanged",
+        "item_id": "public-export-misses-workspace-and-role-identity-keys"
+      },
+      {
+        "behavior": "Internal export keeps real identifier values (documented internal-vs-public asymmetry)",
+        "item_id": "public-export-misses-workspace-and-role-identity-keys"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "public-export-misses-workspace-and-role-identity-keys",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "public-export-misses-workspace-and-role-identity-keys",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization_specs.yaml"
+      },
+      {
+        "item_id": "public-export-misses-workspace-and-role-identity-keys",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_anonymization.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import json;from benchbox.core.results.anonymization import AnonymizationManager,AnonymizationConfig as C;m=AnonymizationManager(C());out=json.dumps(m.anonymize_result_payload({'platform_metadata':{'platform_raw_config':{'workspace_name':'WSN-SENTINEL','job_role':'JR-SENTINEL','application_id':'APP-SENTINEL'}}}),default=str);assert 'WSN-SENTINEL' not in out and 'JR-SENTINEL' not in out and 'APP-SENTINEL' not in out\"",
+        "description": "the public path no longer emits the three identity sentinels",
+        "expected": "exits 1 on an unfixed tree (verified 2026-08-01), 0 once the keys are pseudonymized",
+        "item_id": "public-export-misses-workspace-and-role-identity-keys",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py -q",
+        "description": "anonymization suite still green",
+        "expected": "all pass before and after - regression guard",
+        "item_id": "public-export-misses-workspace-and-role-identity-keys",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "public-export-misses-workspace-and-role-identity-keys",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on develop 3c46d7736 (post-#1389) 2026-08-01: all three sentinels survive the public path",
+        "item_id": "public-export-misses-workspace-and-role-identity-keys",
+        "notes": null,
+        "started_at": "2026-08-01T13:29:59Z",
+        "started_branch": "fix/public-export-identity-key-gaps",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Re-validate the three sentinels still survive the public path on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "identifier_keys: workspacename->workspace, jobrole->role, applicationid->application; 3 regression tests; suite 76 passed; rung 1 exits 0",
+        "item_id": "public-export-misses-workspace-and-role-identity-keys",
+        "notes": null,
+        "started_at": "2026-08-01T13:30:05Z",
+        "started_branch": "fix/public-export-identity-key-gaps",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Extend the identifier spec and add regression tests for the three keys",
+        "wid": "w1"
+      }
+    ]
+  }
+}

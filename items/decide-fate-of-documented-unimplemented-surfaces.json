@@ -1,0 +1,103 @@
+{
+  "context": "Treat each independently. For benchbox admin, decide whether Phase 3 is still planned; if so mark the runbook explicitly as not-yet-implemented, if not delete it. For the explorer ADR, at minimum correct the present-tense Context so an Accepted record stops describing deleted files as current. For TPC-DI, either build a configuration API matching the documented shape or delete the section and document the real enable_parallel/max_workers interface.",
+  "description": "Surfaced 2026-08-17/18 by the documentation audit, which deliberately left these alone because each needs a build-or-delete decision rather than a doc edit. (1) benchbox admin: docs/operations/results-phase-3-runbook.md documents admin revoke-token, review, promote, reject, withdraw, verify-window, revoke-all-tokens, block-actor and withdraw-all across lines 47-396, plus benchbox result withdraw at :164, and docs/reference/threat-model.md:31 lists the surface in its Phase column. No admin command is registered on the CLI. (2) benchbox explorer build / build-contract: docs/development/adr/adr-explorer-cli-surface.md describes it across lines 13-218 and the ADR is marked Accepted, but no explorer command is registered - only an explorer extra in pyproject.toml:110. The ADR's Context section also describes benchbox/cli/commands/explorer.py and benchbox/core/explorer_pipeline/ in the present tense; both paths have since been deleted, so an Accepted ADR now makes false statements about the current tree. (3) TPC-DI parallel execution: docs/guides/tpc/tpc-di-deployment-guide.md builds six code blocks across lines 336-835 on ParallelBenchmarkConfig, ParallelExecutionMode and ParallelWorkloadType, none of which exist. The real API is TPCDIBenchmark(enable_parallel: bool, max_workers: int); ParallelProcessingConfig exists at benchbox/core/tpcdi/etl/parallel_batch_processor.py:102 but is constructed internally and shares none of the documented fields. Each case teaches a reader a surface that will fail the moment they use it.",
+  "legacy": {
+    "item_meta": {
+      "category": "docs",
+      "created_at": "2026-08-18T21:33:48Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "decide-fate-of-documented-unimplemented-surfaces",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/"
+      },
+      {
+        "item_id": "decide-fate-of-documented-unimplemented-surfaces",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "decide-fate-of-documented-unimplemented-surfaces",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpcdi/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "extract benchbox invocations from docs/ and check against the Click surface",
+        "description": "No documented command is unregistered",
+        "expected": "0 unregistered",
+        "item_id": "decide-fate-of-documented-unimplemented-surfaces",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "decide-fate-of-documented-unimplemented-surfaces",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "decide-fate-of-documented-unimplemented-surfaces",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "decide-fate-of-documented-unimplemented-surfaces",
+        "needs_wid": "w0",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "decide-fate-of-documented-unimplemented-surfaces",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate each of the three surfaces against the current tree",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "decide-fate-of-documented-unimplemented-surfaces",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide build-or-delete for benchbox admin and apply it",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "decide-fate-of-documented-unimplemented-surfaces",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Correct the explorer ADR so it does not describe deleted paths in the present tense",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "decide-fate-of-documented-unimplemented-surfaces",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide build-or-delete for the TPC-DI parallel API and apply it",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,275 @@
+{
+  "context": "This is a deliberately low-effort TODO. The work is \"wait, then look\nat numbers and write down the answer.\" The goal is a forcing\nfunction: without this gate, Step 6 might get built reflexively\n(\"we said we would\") rather than because it's needed.\n\nBe honest about what the metrics show. If the numbers are clearly\nbelow threshold (e.g., P95 PR-to-merged is 8 minutes), DO NOT BUILD\nis the correct call. If they're clearly above, BUILD. If they're\nambiguous, REASSESS — don't force a binary decision on noisy data.\n\nFor \"sustained\" interpretation: use 70% of days above threshold as\nthe rule. One bad week shouldn't trigger a queue; sustained pain\nshould. Adjust if 70% turns out wrong empirically.\n",
+  "description": "Decision-gate item that decides whether Step 6 (queue) is needed.\nRuns after Steps 1-4 plus Step 3a have been merged for ~30 days.\nAggregates the metrics emitted by Step 4 against pre-defined thresholds\nand produces a written go/no-go recommendation.\n\nNo code changes during the window itself; the deliverable is a\ndecision record. If all thresholds are below trigger, Step 6 is\ncancelled and the simplification effort is closed. If one or more\ntrigger, Step 6 is unblocked.\n\nThis TODO is intentionally LOW-effort but HIGH-leverage — it prevents\nbuilding queue infrastructure for a problem that doesn't exist at\nscale.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "begin Step 6 planning during the measurement window",
+        "instead": "wait for the data",
+        "item_id": "dev-loop-step-5-measurement-window",
+        "why": "that primes the conclusion"
+      },
+      {
+        "dont": "redefine thresholds during evaluation",
+        "instead": "if thresholds were wrong, that's a separate REASSESS conclusion, not a silent edit",
+        "item_id": "dev-loop-step-5-measurement-window",
+        "why": "that's confirmation bias dressed as analysis"
+      },
+      {
+        "dont": "shorten the measurement window because it feels long",
+        "instead": "wait the full window",
+        "item_id": "dev-loop-step-5-measurement-window",
+        "why": "30 days captures within-month variability (releases, vacations, etc.) that shorter windows miss"
+      },
+      {
+        "dont": "skip writing the decision record",
+        "instead": "a verbal 'we measured and it was fine' loses information",
+        "item_id": "dev-loop-step-5-measurement-window",
+        "why": "future re-evaluation needs to know what was decided and why"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-5-measurement-window",
+        "id": 18,
+        "reason": "That's Step 6, gated on this step's recommendation. Keeping the decision/build separation prevents 'might as well build it while I'm here.'",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Explicitly named as Step 6, which is already an open tracked item gated on Step 5's recommendation. (tracked by dev-loop-step-6-queue-decision-gate)",
+        "summary": "Building infrastructure based on measurement findings"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-5-measurement-window",
+        "id": 19,
+        "reason": "If measurement reveals we want continuous tracking, that's a follow-up. For Step 5, the 90-day artifact retention from Step 4 is sufficient.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Speculative follow-up gated on 30-day measurement findings; parent Step 5 item is still open/active, so the condition hasn't been evaluated. (tracked by dev-loop-step-5-measurement-window)",
+        "summary": "Long-term metrics retention beyond 90-day artifact window"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "needs_item": "dev-loop-step-1-local-loop-cleanup"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "needs_item": "dev-loop-step-2-worktree-pool"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "needs_item": "dev-loop-step-3-ci-rebalance-and-strict-base-off"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "needs_item": "dev-loop-step-3a-path-based-ci-skip"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "needs_item": "dev-loop-step-4-post-merge-safety-net"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-10T15:56:14Z",
+      "completed_pr": 1681,
+      "created_at": "2026-04-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing dev-loop metrics emission — if Step 4 metrics break mid-window, fix forward; do not roll back",
+        "item_id": "dev-loop-step-5-measurement-window"
+      },
+      {
+        "behavior": "Steps 1-4 implementation untouched during measurement — no code changes during the window",
+        "item_id": "dev-loop-step-5-measurement-window"
+      },
+      {
+        "behavior": "Threshold definitions from this TODO — if measurement is ambiguous, use REASSESS rather than redefining thresholds post-hoc",
+        "item_id": "dev-loop-step-5-measurement-window"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "kind": "do_not_modify",
+        "path_glob": "tests/conftest.py"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/dev-loop-step-6-queue-decision-gate.yaml"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/dev-loop-measurement-*.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "ls _project/decisions/dev-loop-measurement-*.md && grep -cE '^### (P95|Post-merge|Time-to-recover|Cross-PR|Orphaned|Runner)' _project/decisions/dev-loop-measurement-*.md",
+        "description": "Measurement record exists with all six metrics evaluated",
+        "expected": ">= 6",
+        "item_id": "dev-loop-step-5-measurement-window",
+        "last_result": "pass",
+        "last_run": "2026-08-10T15:49:15Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE '^Recommendation: (BUILD QUEUE|DO NOT BUILD QUEUE|REASSESS)' _project/decisions/dev-loop-measurement-*.md",
+        "description": "Recommendation section is present and unambiguous",
+        "expected": "1",
+        "item_id": "dev-loop-step-5-measurement-window",
+        "last_result": "pass",
+        "last_run": "2026-08-10T15:49:17Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'Dev-loop status \\(as of|P95 PR-to-merged|post-merge red rate|BUILD QUEUE|DO NOT BUILD QUEUE|REASSESS' CLAUDE.md AGENTS.md",
+        "description": "Agent docs include current dev-loop status summary",
+        "expected": ">= 3",
+        "item_id": "dev-loop-step-5-measurement-window",
+        "last_result": "pass",
+        "last_run": "2026-08-10T15:49:20Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo show dev-loop-step-6-queue-decision-gate --json | jq -e '.state == \"dropped\"'",
+        "description": "Step 6 tracker state remains dropped after REASSESS",
+        "expected": "exit 0",
+        "item_id": "dev-loop-step-5-measurement-window",
+        "last_result": "pass",
+        "last_run": "2026-08-10T15:49:23Z",
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dev-loop-step-5-measurement-window",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Prerequisite dates were 2026-04-30; the required 30 calendar days elapsed, but the protected-surface audit shows the rolling sample is contaminated by subsequent CI, Make, workflow, and test changes. REASSESS is required rather than treating it as causal.",
+        "item_id": "dev-loop-step-5-measurement-window",
+        "notes": "The measurement window is 30 days of normal usage AFTER both\nStep 3a and Step 4 have landed. Prior data is contaminated by the\nold workflow. Mark this TODO Blocked until that date.\n\nTo start the timer: when both Step 3a and Step 4 PRs have merged,\nset the window start timestamp to the later of `step3a_merged_at`\nand `step4_merged_at`, comment on this TODO with the merge dates,\nand update `metadata.due_date` to start_date + 30 calendar days.\n\nImplementation record (2026-04-30):\n  - Step 3a PR #80 merged to `develop` at `2026-04-30T20:36:27Z`.\n  - Step 4 PR #81 merged to `develop` at `2026-04-30T21:33:45Z`.\n  - Step 4 is the later prerequisite, so the measurement window\n    starts at `2026-04-30T21:33:45Z`.\n  - Set `metadata.due_date` to `2026-05-30`; the existing date\n    remains correct because Step 4 merged after Step 3a.\n  - Set this TODO status to `Blocked` and left W1 `in_progress`\n    until the due date. No code or workflow changes are allowed\n    during the measurement window.\n",
+        "started_at": "2026-08-10T15:43:03Z",
+        "started_branch": "fix/fast-lane-reservation-erosion-20260810",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Wait for 30 calendar days after Step 3a and Step 4 have both merged before starting w2",
+        "wid": "w1"
+      },
+      {
+        "evidence": "402/403 metrics artifacts (99.75%) aggregated for 2026-07-11..2026-08-10 with cross-run recovery pairing; raw evidence directory /tmp/dev-loop-metrics-raw-20260810.6JMgZA and decision record.",
+        "item_id": "dev-loop-step-5-measurement-window",
+        "notes": "Run `make dev-loop-metrics DEV_LOOP_METRICS_DAYS=30\nDEV_LOOP_METRICS_LIMIT=500`. The target downloads `metrics`\nartifacts from `develop-post-merge.yml` runs in the window and\nprints PR-to-merge P50/P95, post-merge red rate, conflict rate,\nand runner-minutes total. Capture stdout to the measurement\nrecord below.\n\nOutput is plain text only; the target does not emit JSON. To\ncompute additional aggregates beyond the printed lines, download\nthe raw artifacts and aggregate with `jq`:\n\n  gh run list --workflow develop-post-merge.yml --branch develop \\\n    --event push --created \">=<start>\" --limit 500 \\\n    --json databaseId --jq '.[].databaseId' \\\n  | xargs -I{} gh run download {} -n metrics -D /tmp/metrics/{}\n  jq -s '...' /tmp/metrics/*/*.json\n\nIf artifact coverage is below 80% of merges (i.e., emission\nfailures), extend the window 7 days and retry.\n\nCross-run derivation needed for Step 4 placeholder fields:\n`next_green_develop_run_at` and `time_to_recover_red_seconds` are\nemitted as `null` in each per-SHA metrics file because recovery\ncan only be observed on a *later* SHA's run. W2 must pair each\n`post_merge_red=true` artifact with the next chronologically\nnewer artifact whose `lint` and `fast-test` jobs succeeded, and\nderive `time_to_recover_red_seconds` from the gap between\n`develop_red_detected_at` and the next-green run's `merged_at`.\nStore the derived series in the measurement record alongside the\nraw printout.\n\nMetrics must combine:\n  - Step 4 metrics artifacts (PR open->merged, post-merge red,\n    time-to-revert-PR, runner minutes; recovery time derived as\n    above)\n  - PR audit for the same window:\n    `gh pr list --state all --base develop --search \"updated:>=<start>\"`\n    and labels/comments containing `queue:conflict`,\n    `conflict`, `pr-refresh`, `auto-revert`, or\n    `incident:develop-red`\n  - Post-merge workflow runs:\n    `gh run list --workflow develop-post-merge.yml --created\n    <start>..<end> --json conclusion,createdAt,updatedAt,url`\nSave raw aggregation to `_project/decisions/\ndev-loop-measurement-<window-end>.md`.\n",
+        "started_at": "2026-08-10T15:45:25Z",
+        "started_branch": "fix/dev-loop-measurement-reassess-20260810",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Aggregate dev-loop metrics for the 30-day window",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Threshold matrix evaluated: P95 merge and recovery triggers fail; sustained daily red trigger, conflicts, and orphaned-PR triggers pass; causal-validity audit requires REASSESS.",
+        "item_id": "dev-loop-step-5-measurement-window",
+        "notes": "Apply the trigger matrix from the plan:\n  | Metric                                | Trigger threshold |\n  | P95 PR open → merged                  | sustained > 1h    |\n  | Post-merge red rate on develop        | sustained > 5%    |\n  | Time-to-recover red develop (P95)     | > 30 min          |\n  | Cross-PR conflict repairs / week      | > 2/week          |\n  | Orphaned failed PRs (no resub <24h)   | any pattern       |\n  | Runner minutes total                  | budget signal     |\nFor each metric: PASS (below trigger) / FAIL (at or above).\n\"Sustained\" means >= 70% of days in the window above threshold;\nnot just one outlier week.\n\nData-source rules:\n  - Use Step 4 artifacts for PR open->merged, post-merge red,\n    time-to-revert-PR, and runner minutes.\n  - Use the cross-run derivation from w2 for time-to-recover red\n    develop. The per-SHA `time_to_recover_red_seconds` field is\n    emitted as `null` by Step 4 by design; the value is computed\n    in w2 by pairing red runs with the next green run.\n  - Use the PR audit from w2 for cross-PR conflict repairs/week.\n  - Count orphaned failed PRs from PRs labeled/commented as failed,\n    conflicted, auto-reverted, or develop-red with no new commit,\n    review response, or replacement PR within 24h.\n  - If a metric cannot be computed because Step 4 did not emit the\n    required fields, mark REASSESS and create a follow-up to fix\n    metrics emission; do not silently drop the metric.\n",
+        "started_at": "2026-08-10T15:45:31Z",
+        "started_branch": "fix/dev-loop-measurement-reassess-20260810",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Evaluate against queue-trigger thresholds",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Decision record _project/decisions/dev-loop-measurement-2026-08-10.md recommends REASSESS and keeps Step 6 dropped pending a fresh frozen window.",
+        "item_id": "dev-loop-step-5-measurement-window",
+        "notes": "Single markdown file appended to the measurement record from w2.\nSections:\n  - Window: <start> to <end>\n  - Per-metric PASS/FAIL with raw numbers\n  - Recommendation: BUILD QUEUE | DO NOT BUILD QUEUE | REASSESS\n  - If BUILD: which queue path (native vs steward), rationale\n    tied to Step 0 w6 finding\n  - If DO NOT BUILD: cancel Step 6 TODO, close the simplification\n    effort\n  - If REASSESS: extend window 30 days, identify which\n    measurements were ambiguous, and what would resolve them\nCommit the record. Update Step 6 TODO status (unblock or close).\n",
+        "started_at": "2026-08-10T15:45:37Z",
+        "started_branch": "fix/dev-loop-measurement-reassess-20260810",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Write decision record with go/no-go for Step 6",
+        "wid": "w4"
+      },
+      {
+        "evidence": "AGENTS.md and CLAUDE.md carry Dev-loop status (as of 2026-08-10): REASSESS with current P95 and red-rate findings.",
+        "item_id": "dev-loop-step-5-measurement-window",
+        "notes": "Add a one-paragraph \"Dev-loop status (as of <date>)\" note in\nboth files that documents:\n  - Whether the queue is being built or not\n  - Current P95 PR-to-merged time\n  - Current post-merge red rate\nFuture agents read this to understand the state of the merge\nmachinery without re-running the analysis.\n",
+        "started_at": "2026-08-10T15:45:43Z",
+        "started_branch": "fix/dev-loop-measurement-reassess-20260810",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Update CLAUDE.md / AGENTS.md with measurement findings",
+        "wid": "w5"
+      }
+    ]
+  }
+}

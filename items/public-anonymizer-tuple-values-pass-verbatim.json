@@ -1,0 +1,88 @@
+{
+  "context": "Treat tuples (and other non-str sequences) like lists in _anonymize_public_value.",
+  "description": "Driven 2026-08-01: a {'userid': sentinel} dict inside a TUPLE exports verbatim through anonymize_result_payload while the identical dict inside a list is pseudonymized. _anonymize_public_value (anonymization.py:328-342) recurses into dict and list only; a tuple falls through to the scalar branch untouched. Mitigated on the platform_raw_config branch because internal sanitize converts tuples to lists first, but any payload branch fed directly to the public anonymizer hits the gap.",
+  "legacy": {
+    "item_meta": {
+      "category": "security",
+      "completed_at": "2026-08-01T18:08:16Z",
+      "completed_pr": 1419,
+      "created_at": "2026-08-01T12:41:43Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "List/dict recursion behavior is unchanged",
+        "item_id": "public-anonymizer-tuple-values-pass-verbatim"
+      },
+      {
+        "behavior": "Scalar handling is unchanged",
+        "item_id": "public-anonymizer-tuple-values-pass-verbatim"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "public-anonymizer-tuple-values-pass-verbatim",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "public-anonymizer-tuple-values-pass-verbatim",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_anonymization.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import json;from benchbox.core.results.anonymization import AnonymizationManager,AnonymizationConfig as C;m=AnonymizationManager(C());out=json.dumps(m.anonymize_result_payload({'platform_metadata':{'nested':({'userid':'TUP-SENTINEL'},)}}),default=str);assert 'TUP-SENTINEL' not in out\"",
+        "description": "tuple-nested identifier no longer survives the public path",
+        "expected": "exits 1 on an unfixed tree (verified 2026-08-01), 0 once tuples recurse",
+        "item_id": "public-anonymizer-tuple-values-pass-verbatim",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py -q",
+        "description": "anonymization suite still green",
+        "expected": "all pass before and after - regression guard",
+        "item_id": "public-anonymizer-tuple-values-pass-verbatim",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "public-anonymizer-tuple-values-pass-verbatim",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on develop 4934e847d 2026-08-01: tuple-nested userid sentinel survived the public path",
+        "item_id": "public-anonymizer-tuple-values-pass-verbatim",
+        "notes": null,
+        "started_at": "2026-08-01T17:19:49Z",
+        "started_branch": "fix/public-anonymizer-tuple-branch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Re-validate the tuple sentinel still survives on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Sequence branch now covers tuple/set/frozenset (serialized as JSON arrays); 3 tests incl. secret-key-in-tuple; suite 79 passed; rung 1 exits 0",
+        "item_id": "public-anonymizer-tuple-values-pass-verbatim",
+        "notes": null,
+        "started_at": "2026-08-01T17:19:55Z",
+        "started_branch": "fix/public-anonymizer-tuple-branch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add the tuple branch plus a regression test covering tuple and nested mixed structures",
+        "wid": "w1"
+      }
+    ]
+  }
+}

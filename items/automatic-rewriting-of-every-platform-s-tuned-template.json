@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #188 of generalize-tpc-tuning-base.\nDeferred: Automatic rewriting of every platform's tuned template\nReason deferred: First land validation and explicit mapping decisions; generation can follow after the checker is stable.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:27Z",
+      "worktree": "main"
+    }
+  }
+}

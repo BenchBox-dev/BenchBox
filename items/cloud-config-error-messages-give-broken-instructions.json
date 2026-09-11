@@ -1,0 +1,211 @@
+{
+  "context": "Decide the intended contract first: either accept connection keys through --platform-option (widening the per-adapter allowlists) or keep configuration to benchbox setup plus environment variables. Then make every error message and docstring match the decision. Prefer the narrower fix - correct the messages to the routes that work - unless there is a real need to pass credentials on the command line, which is itself a security consideration. Add a test that executes the remedies an error message advertises so this class of defect cannot regrow.",
+  "description": "REVALIDATED 2026-08-23 after adversarial review. w0-w3 are done and the ORIGINAL citations in this item are now STALE -- do not act on them:\n - benchbox/platforms/snowflake.py:144-149 now lists TWO remedies and the first, 'benchbox setup --platform snowflake', is correct.\n - redshift.py:196-201 lists CLI setup plus environment variables and carries no --platform-option advice.\n - starburst.py:132 is STARBURST_USER env-var text; presto_trino_adapter_base.py:391 is a connection-refused hint about --platform-option catalog=, which is a real accepted key.\nAnyone re-reading the original description will chase fixes that already landed.\n\nTHE DEFECT CLASS SURVIVES. Reproduced 2026-08-23 on develop:\n  $ uv run -- benchbox run --platform bigquery --benchmark tpch --scale 0.01 --platform-option project_id=foo\n  Unknown platform option 'project_id' for platform 'bigquery'. Available: <empty>\nyet benchbox/platforms/bigquery.py:140 advertises exactly '3. CLI option: --platform-option project_id=<your-project>'.\n\nThe same advertise-then-reject shape is still present but UNVERIFIED because the drivers are not installed locally, so each must be tested rather than assumed:\n - azure_synapse.py:153 and :164 ('--platform-option server=...')\n - fabric_warehouse.py:175, :176, :197, :217 ('workspace=', 'server=', 'client_id=', 'tenant_id=', 'warehouse=')\n - clickhouse_cloud.py:78-87 module docstring ('host=', 'password=', 'oauth_token=', 's3_staging_url=')\n\nA second, separate UX defect surfaced in the same review: two different commands are named 'setup'. 'benchbox setup --platform <name>' works; 'benchbox platforms setup' exists and takes only --interactive/--non-interactive, so 'benchbox platforms setup --platform snowflake' fails with \"No such option '--platform'\". A reader who half-remembers the remedy lands on the wrong one.\n\nVerification seq 1 ('Advertised remedies parse') passed while bigquery.py:140 was still broken, so the existing test does not cover this class.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Close this on the strength of verification seq 1",
+        "instead": "INSTEAD require the strengthened w6 test",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "why": "it passed while bigquery.py:140 was broken"
+      },
+      {
+        "dont": "Trust the stale snowflake/redshift/starburst/presto citations in the original description",
+        "instead": "INSTEAD start from the w4 re-derivation",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "why": "those were fixed by w2 and re-fixing them wastes the cycle"
+      },
+      {
+        "dont": "Widen the platform-option allowlists to accept account, password or other secrets so the advertised text becomes true",
+        "instead": "INSTEAD correct the advice to setup plus environment variables",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "why": "it puts credentials in shell history and process listings"
+      }
+    ],
+    "item_meta": {
+      "category": "cli",
+      "completed_at": "2026-08-24T12:30:40Z",
+      "completed_pr": 1844,
+      "created_at": "2026-08-18T01:36:29Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Credentials are never required on the command line; environment variables and benchbox setup remain the supported routes for secrets",
+        "item_id": "cloud-config-error-messages-give-broken-instructions"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "extract commands from adapter ConfigurationError messages and check each against the Click surface",
+        "description": "Advertised remedies parse",
+        "expected": "0 invalid",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- pytest tests/unit/platforms -k advertised_option",
+        "description": "Every advertised --platform-option key is actually accepted",
+        "expected": "passes, and fails when an adapter advertises a key outside its allowlist",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform bigquery --benchmark tpch --scale 0.01 --platform-option project_id=foo",
+        "description": "The bigquery case specifically",
+        "expected": "not rejected as an unknown platform option, or the advice no longer names it",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated 2026-08-18: `benchbox platforms setup --platform snowflake` exits 2 because the platforms subcommand has no --platform option; `benchbox setup --platform snowflake --help` is valid. `benchbox run --platform snowflake ... --platform-option account=x` exits 1 with Unknown platform option. Fabric warehouse accepts --platform-option warehouse=x, while Snowflake, Redshift, Starburst, and ClickHouse Server do not expose connection-key specs.",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "notes": null,
+        "started_at": "2026-08-18T23:51:41Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Revalidate the accepted-option lists and reproduce both failing Snowflake remedies",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Decision: connection keys remain on --platform-option only for platforms whose registry explicitly registers them (for example fabric_dw and clickhouse-cloud). Snowflake, Redshift, Starburst, and ClickHouse Server route users through environment variables or saved platform configuration instead.",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "notes": null,
+        "started_at": "2026-08-18T23:51:59Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Decide whether connection keys belong in --platform-option or only in setup and environment variables",
+        "wid": "w1"
+      },
+      {
+        "evidence": "RESOLVED, KNOWN_MISMATCHES now empty. PR #1844 commit 0b1a6b4df. Thirteen non-secret keys the adapters already read from config but had never declared as option specs are now declared, which makes the advertised advice true: athena aws_profile/s3_bucket/s3_staging_dir/staging_root, motherduck database, pg-duckdb duckdb_db_path, redshift iam_role/s3_bucket/staging_root, snowflake iceberg_external_volume/staging_root, spark java_home, synapse staging_root. One is secret-bearing -- pg-duckdb motherduck_token -- and its message now names MOTHERDUCK_TOKEN and states why it is not an option; the codebase already carries a dedicated redaction regex for that value. CORRECTION to w4: redshift.iam_role was classified secret-bearing in the first audit and that was wrong -- it is a role ARN, an identifier, and it exists precisely so the caller does NOT pass aws_secret_access_key; declared with the other non-secret config. Also velox.jar was a FALSE POSITIVE in the guard: the velox spec has declared aliases=('jar',) all along and --platform-option jar=<path> exits 0; list_option_specs returns primary names only, so the guard now resolves aliases. Verified by invoking the real CLI: before, 'Unknown platform option' for all 14; after, exit 0. 33 tests pass; pr-preflight exit 0.",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "notes": null,
+        "started_at": "2026-08-23T21:20:38Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "DECISION GATE - resolve the 17 remaining pairs. SECRET-BEARING (correct the message, never make CLI-passable)",
+        "wid": "w10"
+      },
+      {
+        "evidence": "Corrected Snowflake and Redshift setup commands, removed invalid connection-option advice from Snowflake/Redshift/Starburst/ClickHouse Server/Presto-family guidance, and retained valid staging/configuration options.",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "notes": null,
+        "started_at": "2026-08-18T23:52:05Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Correct every adapter error message and docstring to the routes that actually work",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added tests/unit/cli/test_configuration_guidance.py: 7 tests verify forbidden connection keys are not advertised and that Fabric/ClickHouse Cloud options parse through the real CLI dry-run surface.",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "notes": null,
+        "started_at": "2026-08-18T23:52:11Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add a test asserting that commands advertised in adapter error messages parse against the real CLI surface",
+        "wid": "w3"
+      },
+      {
+        "evidence": "AUDIT COMPLETE (PR #1844): 18 advertised-but-rejected (platform, key) pairs across 8 platforms, verified against the live CLI. Key nuance: the adapters DO consume these keys (config.get('project_id') etc) via env vars / credentials files - what is missing is the --platform-option SPEC declaration. Note: option specs are registered by benchbox/cli/platform_defaults.py at import; an audit that does not import it reads empty allowlists and over-reports (my first pass wrongly claimed 22 pairs across 11 platforms).",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "notes": null,
+        "started_at": "2026-08-23T18:16:41Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-derive the accepted platform-option allowlist for EVERY cloud adapter and diff it against every --platform-option string in that adapter's error messages and module docstring",
+        "wid": "w4"
+      },
+      {
+        "evidence": "PR #1844 (commit 77d787af9). bigquery.project_id: message now names 'benchbox setup --platform bigquery' + BIGQUERY_PROJECT and no longer advertises --platform-option (per w1 decision; 'benchbox platforms setup' has no --platform option, exits 2). bigquery.biglake_connection: registered as a real option spec beside staging_root/storage_bucket/storage_prefix -- deleting the advice would have left external Delta mode with no documented route. Also fixed a blind spot in the w6 guard: _module_to_platform_key matched the exact module, but the manifest names the package benchbox.platforms.databricks while the error text is in .adapter, so that file was skipped; walking up to the nearest named ancestor exposed databricks.server_hostname and databricks.http_path, both fixed (env-var route already listed) rather than added. KNOWN_MISMATCHES 17 -> 15. Stale negative control replaced with a synthetic one. pr-preflight green.",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "notes": null,
+        "started_at": "2026-08-23T19:03:44Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Fix bigquery.py",
+        "wid": "w5"
+      },
+      {
+        "evidence": "PR #1844 adds tests/unit/platforms/test_advertised_platform_options.py which checks the advertised KEY against the adapter allowlist (the old test only checked that a command parsed, which is why it passed while bigquery.project_id was broken). Negative control asserts the bigquery case is detected; positive control asserts an accepted key is never flagged; KNOWN_MISMATCHES may only shrink.",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "notes": null,
+        "started_at": "2026-08-23T18:16:44Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Strengthen the w3 test so it fails on the bigquery case",
+        "wid": "w6"
+      },
+      {
+        "evidence": "DECISION: delegate, do not rename. PR #1844 commit ab0b79ae8. 'benchbox platforms setup' gains --platform, validated by click.Choice(SUPPORTED_SETUP_PLATFORMS), which delegates to 'benchbox setup'; both help texts now cross-reference each other. Reason: renaming a public command breaks working invocations in order to fix confusing ones, whereas delegating makes years of wrong advice start working -- 'benchbox platforms setup --platform snowflake' previously exited 2 with 'No such option'. Rejected (a) rename benchbox platforms setup and (c) documentation-only cross-reference, which would have left the command a dead end. Caught during implementation: ctx.invoke skips Click parameter processing, so the first version passed an unknown name straight to the credential wizard, which printed a confident 'Nonesuch Credentials Setup' panel and exited 0; the Choice is what makes the delegation honest, and a test asserts that specific failure mode. 3 new tests; pr-preflight exit 0.",
+        "item_id": "cloud-config-error-messages-give-broken-instructions",
+        "notes": null,
+        "started_at": "2026-08-23T21:22:52Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "DECISION GATE - resolve the two commands named setup",
+        "wid": "w7"
+      }
+    ]
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "description": "WS3 of _project/planning/ci-failure-reduction-plan.md. Guards that run in CI but not locally fire for the first time in CI, costing a full remote round trip each. Current gaps (verified 2026-07-23): `make ci-lint` omits `make lint-imports`, the public-contract drift check, `make audit-raw-check`, the release-curation-list drift check (scripts/check_release_curation.py), and the untracked skill-mirror drift guard; `make pr-preflight` skips the content-guard suite (YAML/markdown/docs-refs hygiene) whenever code changes are present; codespell runs only in docs.yml/pre-commit, never in the develop-PR lane locally.\n\nFix: (1) sync ci-lint to the pr.yml lint job's full guard list (add spellcheck too - it is fast); (2) make pr-preflight always run pr-content-guard; (3) pin the parity with the repo's own idiom - a fast test that parses .github/workflows/pr.yml, extracts the lint job's make/script invocations, and asserts each appears in the ci-lint recipe (mirror of tests/unit/test_auto_merge_soundness_paths.py::test_codeowners_covers_soundness_paths).\n\nDesign constraints found by adversarial review: (a) three CI lint guards have no make/script form to mirror - the public-contract drift check is a ~50-line inline Python heredoc in pr.yml (its ONLY implementation), the untracked skill-mirror guard is inline bash, and skill-sync verify is a pinned `npx github:...#sha`. Parity therefore requires extracting the inline guards into scripts/ invoked by BOTH pr.yml and ci-lint - duplicating them into the Makefile is the drift disease this item treats. (b) The parity test must assert the invoked COMMANDS match, not just target names: local `skill-sync-check` (doctor; exits 0 when the tool is absent) differs behaviorally from CI's pinned `npx ... verify`. (c) codespell asymmetry: make spellcheck's skip list is byte-identical to docs.yml's, but the docs.yml job is continue-on-error - adding blocking spellcheck to ci-lint makes local STRICTER than CI; note this in the recipe comment (strict-local is acceptable; silent-CI-only is not).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Hand-maintain a second list of guards in the parity test",
+        "instead": "Parse pr.yml as the single source of truth",
+        "item_id": "ci-lint-parity-pin-2",
+        "why": "Two lists drift; that is the disease being treated"
+      },
+      {
+        "dont": "Weaken a CI guard to make it pass locally",
+        "instead": "Fix the local invocation or environment; if truly CI-only, exclude it explicitly in the parity test with a comment",
+        "item_id": "ci-lint-parity-pin-2",
+        "why": "The point is parity, not green"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "needs_item": "dev-loop-metrics-ci-failure-baseline-2"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-07-24T00:39:45Z",
+      "completed_pr": 1291,
+      "created_at": "2026-07-23T13:51:05Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "ci-lint stays runnable offline-ish (no guard added that requires network beyond what CI lint already needs)",
+        "item_id": "ci-lint-parity-pin-2"
+      },
+      {
+        "behavior": "pr-preflight wall time stays reasonable - note any guard adding > 60s in the PR body",
+        "item_id": "ci-lint-parity-pin-2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "kind": "only_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "kind": "only_modify",
+        "path_glob": "tests/system/**"
+      },
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/system/test_ci_lint_parity.py -q",
+        "description": "Parity test passes",
+        "expected": "passed",
+        "item_id": "ci-lint-parity-pin-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make ci-lint",
+        "description": "Full local lint mirror passes on develop",
+        "expected": "exit 0",
+        "item_id": "ci-lint-parity-pin-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ci-lint-parity-pin-2",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "public-contract heredoc -> scripts/check_public_contract_drift.py (verbatim logic, SystemExit->stderr+rc, REPO_ROOT anchoring); skill-mirror bash -> scripts/check_untracked_skill_mirrors.sh; pr.yml steps now invoke scripts; YAML parses; diff = 2 step bodies only",
+        "item_id": "ci-lint-parity-pin-2",
+        "notes": null,
+        "started_at": "2026-07-23T21:35:39Z",
+        "started_branch": "chore/ci-lint-parity-pin",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-parity",
+        "status": "done",
+        "summary": "Extract the three inline pr.yml guards (public-contract heredoc, untracked skill-mirror bash, skill-sync verify invocation) into scripts/ files invoked by both pr.yml and ci-lint",
+        "wid": "w1"
+      },
+      {
+        "evidence": "ci-lint gained lint-imports, uat_loc_table --check (extra gap found beyond the briefed five), public-contract script, audit-raw-check, release-curation check, skill-mirror script, spellcheck; skill-sync npx verify EXCLUDED with tested rationale (hangs w/o npm network; guard would swallow real failures); full make ci-lint exit 0 twice",
+        "item_id": "ci-lint-parity-pin-2",
+        "notes": null,
+        "started_at": "2026-07-23T21:35:43Z",
+        "started_branch": "chore/ci-lint-parity-pin",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-parity",
+        "status": "done",
+        "summary": "Add the five missing guards + spellcheck to the ci-lint recipe; confirm each runs clean on develop",
+        "wid": "w2"
+      },
+      {
+        "evidence": "pr-preflight-fast-tests runs pr-content-guard unconditionally before the needs-code-ci branch; verified by source + partial live run (make -n unusable due to documented GNU make $(MAKE)-under--n quirk, pre-existing)",
+        "item_id": "ci-lint-parity-pin-2",
+        "notes": null,
+        "started_at": "2026-07-23T21:35:48Z",
+        "started_branch": "chore/ci-lint-parity-pin",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-parity",
+        "status": "done",
+        "summary": "pr-preflight always runs pr-content-guard (not only on docs-only diffs)",
+        "wid": "w3"
+      },
+      {
+        "evidence": "tests/system/test_ci_lint_parity.py: PyYAML-parses pr.yml code-lint steps, command-level assertion vs ci-lint recipe (name-only cannot satisfy), EXCLUDED_STEPS with rot-check test; 2 passed; fast-marked per sibling convention; lane 25537 vs cap 25545 on this base",
+        "item_id": "ci-lint-parity-pin-2",
+        "notes": null,
+        "started_at": "2026-07-23T21:35:52Z",
+        "started_branch": "chore/ci-lint-parity-pin",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-parity",
+        "status": "done",
+        "summary": "Parity pin test: parse pr.yml lint steps, assert every guard's command appears in ci-lint (command-level match; explicit documented-exclusion list for anything genuinely CI-only)",
+        "wid": "w4"
+      }
+    ]
+  }
+}

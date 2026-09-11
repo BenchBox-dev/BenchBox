@@ -1,0 +1,149 @@
+{
+  "context": "w0 must NOT reuse the commit-split figure quoted anywhere in this project's review history without re-deriving it. A 2026-08-23 review pass produced '714 of 991 commits (72%) touched only process files' and that figure is WRONG: the classifier used 'grep -qv', and this machine's grep is ugrep, where -q reports whether any line MATCHED and ignores the -v inversion, so any commit containing a process path scored process-only. Two independent adversarial reviewers caught it.\n\nCorrected, reproducible measurements over 991 commits since 2026-06-01:\n - Process-only commits: 208 of 991 (21%). An independent reviewer got ~200 by the same definition.\n - Commits touching benchbox/: 373 of 991 (37.6%).\n - Line churn excluding the bulk results-data/ JSON: agent and tracker process files 389,833 (60.7%); shipped Python package 65,051 (10.1%); process-scaffolding tests 57,286 (8.9%); results explorer 6,038 (0.9%); user docs 4,226 (0.7%).\n - Standing surface: 31 CI workflows; 151 Makefile targets (191 in make/inventory.json); 1,796-line Makefile plus 584 lines across make/*.mk; 133 of 1,343 test_*.py files (9.9%) test process scaffolding.\n\nSo the commit-count story is unremarkable and the CHURN story is the real one: roughly six lines of hand-written change go into tracker and agent-process files for every one that goes into the thing customers install. Frame w3's re-measure on churn, not commit counts.\n\nDECISION GATE at w2: choose ratio cap, freeze list, or no cap, and record the reason. No cap is a legitimate outcome; leaving it unexamined is not.\n\nKeep every safety gate. The target is discretionary process ENGINEERING, not the checks that protect releases and privacy: the UAT release-gate evidence, corpus privacy scrubbing, submission validation and release rollback targets all stay. Adversarial review on 2026-08-23 specifically rejected removing them, because v0.3.0 shipped a broken install.",
+  "description": "REVALIDATED 2026-08-20. Customer-facing queue is: cut-v0-4-0-release (also deploys /results/), fix-customer-facing-cli-url-and-help-defects, raise-public-corpus-scale-ceiling w3, add-third-benchmark-cohort-to-corpus w4, first-live-cloud-benchmark-run-and-publish, honest-platform-list-and-unproven-corpus-markers.\n\nDeferred this session as non-blocking internals: documentation-accuracy-drift-burndown, external-contributor-submission-dry-run, results-explorer-pages-artifact-semantic-acceptance-20260802, results-explorer-release-certification-independent-oracles-20260802, results-explorer-release-readiness-remediation-closeout.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Cite the 72% process-only figure",
+        "instead": "INSTEAD use 21% of commits and the 60.7%/10.1% churn split",
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "why": "it was an artifact of ugrep's -qv semantics and is wrong"
+      },
+      {
+        "dont": "Delete or disable the UAT, privacy, submission or release-evidence gates under this item",
+        "instead": "INSTEAD target only discretionary process engineering",
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "why": "they exist because v0.3.0 shipped a broken install and adversarial review rejected removing them"
+      },
+      {
+        "dont": "Implement a blocking CI gate that fails builds on a churn ratio",
+        "instead": "INSTEAD make it an observable report",
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "why": "that adds process to solve a process problem"
+      }
+    ],
+    "item_meta": {
+      "category": "process",
+      "created_at": "2026-08-17T23:30:10Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Every existing safety gate stays: UAT release-gate evidence, corpus privacy scrubbing, submission validation, release rollback targets",
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship"
+      },
+      {
+        "behavior": "Worktree write policy, commit identity policy and the no-agent-attribution rule are unaffected",
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git log --since='4 weeks ago' --pretty=format:%s | grep -icE '\\((todo|tracker|skills|ci|agents?)\\)'",
+        "description": "Internal-work share of commits falls",
+        "expected": "materially below the 30 percent baseline",
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "run the w0 script over git history since 2026-06-01",
+        "description": "The churn measurement reproduces",
+        "expected": "process-to-product churn ratio reported and matching the recorded figure within rounding",
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate the commit-split measurement on the current develop history before acting on it",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "List the internal-surface items in the tracker and mark which ones actively block a customer-facing item",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Defer every internal item that blocks nothing customer-facing",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-measure the commit split after four weeks and report whether the ratio moved",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "pause-internal-tooling-work-until-customer-items-ship",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide whether _project/todo-db-export/ is refreshed on a schedule, clearly marked as a dated snapshot, or withdrawn",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,211 @@
+{
+  "context": "1. Confirm no session is mid-write: run sweep-stale, then re-read stats and check no foreign actor holds a live claim. 2. Take the rollback artifact: '_project/scripts/todo export --out DIR' writes items.jsonl + events.jsonl + index.md; keep it OUT of the repo. 3. Rehearse against a scratch local SQLite DB first: 'todo-db --db SCRATCH restore-legacy --project-id benchbox --input DIR --replace', then verify counts and 'audit verify' there. 4. Only once the rehearsal is clean, repeat against the hosted DSN. 5. Re-verify counts, claims and audit verify on the hosted DB. 6. Record the runbook, the credential change (TODO_DB_RO_AUTH_TOKEN) and the rollback procedure as an ADR under _project/decisions/.",
+  "description": "The hosted tracker runs the embedded schema (meta.schema_version=3). todo-db >= 0.3 expects a schema_migrations table plus an event hash chain, so EVERY standalone command fails against it today: 'Hrana: SQLite error: no such table: schema_migrations'. It also wants hosted read credentials in TODO_DB_RO_AUTH_TOKEN alongside TODO_DB_AUTH_TOKEN. This blocks BOTH adoption paths - full CLI replacement and delegate-only routing of the standalone-only 'update' verb - so it must land before either. The DB is live and shared: at filing it holds 1627 items (42 active / 228 planning / 1333 done / 24 dropped) and 11 open claims across three actors (joe 8, codex 2, claude 1). Migration is destructive (restore-legacy --replace) and must not run while another session is mid-write. Supersedes the DB half of the dropped item adopt-todo-db-standalone-cli-for-amendable-items.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-29T23:38:00Z",
+        "from_item": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "id": 664,
+        "reason": "Found by rehearsing on a scratch SQLite DB, which is why the plan had a rehearsal step. The standalone's restore_legacy(snapshot: dict) at src/todo_db/database.py:463 requires a single JSON object containing 12 NORMALIZED tables: items, events, work_units, work_needs, item_deps, scope_rules, verifications, preserves, anti_patterns, prior_art, deferrals, meta. The legacy 'todo export' emits a DIRECTORY of items.jsonl + events.jsonl + index.md - 2 of the 12 - and items.jsonl is denormalized, carrying work, deps, scope, verifications, preserves, anti_patterns, prior_art and deferrals as nested collections. restore_legacy explicitly strips exactly those nested keys and expects them as separate tables, so the exporter's output is structurally invalid as importer input. The legacy CLI has no raw-table dump mode. Confirmed by running it: 'error: Extra data: line 2' when fed items.jsonl (it json.load's a single object), and 'Is a directory' when fed the export dir. The failure occurs at input parsing, before any write, so a live attempt would have failed safely - but it would have failed. Two further facts: the standalone now reports 'schema v4 ready', not the v3 this item assumed; and findings-schema-v4-lossless-legacy-fields is claimed and active in another session right now, so the destination schema is being changed concurrently.",
+        "resolution": "promoted",
+        "resolved_item": "legacy-tracker-snapshot-export-for-restore-legacy",
+        "resolved_reason": null,
+        "summary": "No working export->restore-legacy path exists; the two formats do not line up"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-11T18:00:16Z",
+      "created_at": "2026-07-29T11:33:20Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "no item id changes and no open claim is silently dropped across the migration",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema"
+      },
+      {
+        "behavior": "the hosted DB is never restored with --replace while a leased maintenance freeze is not held (claim-check alone is insufficient)",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema"
+      },
+      {
+        "behavior": "the pre-migration export is retained until audit verify passes against the hosted DB",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/"
+      },
+      {
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -s \"$TODO_MIGRATION_BACKUP/items.jsonl\" && test -s \"$TODO_MIGRATION_BACKUP/events.jsonl\" && test -s \"$TODO_MIGRATION_BACKUP/index.md\"",
+        "description": "Pre-migration export captured and all three files non-empty",
+        "expected": "exit 0",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "last_result": "pass",
+        "last_run": "2026-07-29T23:37:34Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "todo-db --db \"$TODO_SCRATCH_DB\" restore-legacy --project-id benchbox --input \"$TODO_MIGRATION_BACKUP\" --replace && todo-db --db \"$TODO_SCRATCH_DB\" audit verify",
+        "description": "Restore rehearsed on a scratch local DB and its hash chain verifies",
+        "expected": "exit 0",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "last_result": "fail",
+        "last_run": "2026-07-29T23:37:36Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "for s in planning active done dropped; do test \"$(todo-db --db \"$TODO_SCRATCH_DB\" --project-id benchbox list --state $s --json | jq length)\" -eq \"$(jq -s --arg s $s '[.[]|select(.state==$s)]|length' \"$TODO_MIGRATION_BACKUP/items.jsonl\")\" || exit 1; done",
+        "description": "Scratch restore preserves the item count for every state",
+        "expected": "exit 0",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "todo-db --project-id benchbox stats >/dev/null",
+        "description": "todo-db 0.3 can read the migrated hosted DB",
+        "expected": "exit 0",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "for s in planning active done dropped; do test \"$(todo-db --project-id benchbox list --state $s --json | jq length)\" -eq \"$(jq -s --arg s $s '[.[]|select(.state==$s)]|length' \"$TODO_MIGRATION_BACKUP/items.jsonl\")\" || exit 1; done",
+        "description": "Hosted item counts match the pre-migration backup for every state",
+        "expected": "exit 0",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "todo-db --project-id benchbox audit verify",
+        "description": "Hosted event hash chain verifies after migration",
+        "expected": "exit 0",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- todo-db --version",
+        "description": "Canonical package release is available before migration rehearsal",
+        "expected": "exit 0",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_shadow.py -q -k \"protected or existing or empty or zero\"",
+        "description": "Migration tooling refuses a non-empty protected-target shortcut",
+        "expected": "exit 0",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Release v0.3.1 tag resolves to 75cf990094dea33a151d99192ffc57df0dba7682; published wheel sha256 785879ee2380fb1ff337a766b3d331e6e3337add001f8a91d4bd645e64332e0d; package schema v5 and all 17 snapshot tables reconciled; locked Git-source build matched 15 wheel code/migration files byte-for-byte; 17 shadow tests passed.",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "notes": null,
+        "started_at": "2026-08-11T17:39:32Z",
+        "started_branch": "fix/todo-db-shadow-cutover",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-shadow-cutover",
+        "status": "done",
+        "summary": "Reconcile the current package release, source-of-truth, export format, findings tables, and destination schema before any destructive operation",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Restored the durable 17-table legacy snapshot twice into a non-empty scratch database; normalized all-table row parity, project identity, 8,330-event audit head 09057415365c95ec6488ccdf3ddbac744811105899247fee4e6df345a04d9ab1, canonical export SHA-256 0a64b26c2bac34d6491f3653482c29cb3ae0f6ec8d2842611c67d20fa118b98c, and temporary hosted rehearsal all passed.",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "notes": null,
+        "started_at": "2026-08-11T17:39:46Z",
+        "started_branch": "fix/todo-db-shadow-cutover",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-shadow-cutover",
+        "status": "done",
+        "summary": "Run a fresh non-empty scratch rehearsal with normalized all-table parity, project identity binding, and audit verification",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Freeze acquired at 2026-08-11T17:41:01Z after a fresh consistent backup; two independent corrected 60-second probes stayed stable at item event 8331 and finding event 354 through the destructive window.",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "notes": null,
+        "started_at": "2026-08-11T17:59:12Z",
+        "started_branch": "fix/todo-db-shadow-cutover",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-shadow-cutover",
+        "status": "done",
+        "summary": "Acquire and hold the leased maintenance freeze for the entire snapshot-to-restore window and corroborate a stable event fingerprint",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Invalidated the sole default-group token key, replaced benchbox-todo from the verified scratch database, re-enabled delete protection, preserved the hosted URL, and changed database identity from 019f76a4-5d01-71ae-ba27-5496969f10eb to 019ff1f1-f601-7b72-a160-e2bb06fc667c.",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "notes": null,
+        "started_at": "2026-08-11T17:59:21Z",
+        "started_branch": "fix/todo-db-shadow-cutover",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-shadow-cutover",
+        "status": "done",
+        "summary": "Execute the approved hosted migration with read-only pre-snapshot, explicit target, and no automatic fallback",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Post-reopen verification passed: 2,172 items, 7 exact claims, 71 findings, 8 finding sections, 44 finding links, 354 finding events, exact benchbox identity, intact 8,330-event audit chain, and byte-identical canonical export. Rotated GitHub TODO_DB_RO_AUTH_TOKEN and retained durable JSON/SQLite backups plus the old replica.",
+        "item_id": "migrate-hosted-tracker-db-to-todo-db-0-3-schema",
+        "notes": null,
+        "started_at": "2026-08-11T17:59:29Z",
+        "started_branch": "fix/todo-db-shadow-cutover",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-shadow-cutover",
+        "status": "done",
+        "summary": "Recheck item IDs, claims, state counts, findings, identity, audit chain, export digest, and retained rollback artifacts",
+        "wid": "w4"
+      }
+    ]
+  }
+}

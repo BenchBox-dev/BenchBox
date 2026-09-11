@@ -1,0 +1,387 @@
+{
+  "context": "Follow the TimescaleDB pattern (benchbox/platforms/timescaledb.py) with key\ndifferences in schema creation:\n\n1. Create PgMooncakeAdapter(PostgreSQLAdapter) in benchbox/platforms/pg_mooncake.py\n2. Override create_connection() to verify pg_mooncake extension is installed\n3. Override create_schema() to modify DDL: add \"USING columnstore\" to\n   CREATE TABLE statements. This is the critical difference - tables must use\n   the columnstore access method for pg_mooncake to activate.\n4. Inherit load_data() from PostgreSQLAdapter - COPY works on columnstore\n   tables but internally creates Parquet files\n5. Override configure_for_benchmark() for pg_mooncake-specific GUCs\n6. Register in platform_registry.py with metadata (category: \"olap-columnstore\",\n   platform_family: \"pg_mooncake\")\n\nFor the DDL generator (benchbox/core/tuning/generators/pg_mooncake.py),\nextend PostgreSQLDDLGenerator and add USING columnstore to all CREATE TABLE\nstatements. Handle unsupported data types by mapping them to supported types\nor raising clear errors.\n\nStorage configuration:\n- Default: local disk (simplest for benchmarking)\n- Optional: S3/GCS backend via mooncake.default_bucket GUC\n- CLI flags: --mooncake-storage=local|s3 --mooncake-bucket=<url>\n",
+  "description": "Add a pg_mooncake platform adapter that enables benchmarking PostgreSQL with\nthe pg_mooncake extension installed. pg_mooncake adds native columnstore\ntables (Iceberg/Delta Lake backed, Parquet storage) with DuckDB-powered\nvectorized execution to PostgreSQL, achieving top-10 ClickBench performance.\n\nUnlike pg_duckdb which accelerates queries on regular heap tables,\npg_mooncake uses a custom \"columnstore\" table access method (CREATE TABLE ...\nUSING columnstore) that stores data in Parquet format with Iceberg metadata.\nThis gives true columnar compression (5:1 to 20:1) and DuckDB-native\nexecution on columnar data.\n\nThis adapter should inherit from PostgreSQLAdapter and override schema\ncreation to use columnstore tables, handle the different data loading path\n(COPY into columnstore creates Parquet files), and configure pg_mooncake-\nspecific GUC parameters.\n\nKey benchmarking scenarios:\n- pg_mooncake columnstore vs PostgreSQL heap tables (same queries)\n- pg_mooncake vs native DuckDB (columnar vs columnar)\n- pg_mooncake vs ClickHouse (ClickBench comparison - pg_mooncake is top 10)\n- pg_mooncake with object storage backend (S3/GCS) vs local disk",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle or install pg_mooncake via the adapter",
+        "instead": "only verify it exists and raise a clear error if missing",
+        "item_id": "pg-mooncake-platform-adapter",
+        "why": "extension installation requires server admin privileges and Docker setup"
+      },
+      {
+        "dont": "modify the PostgreSQL adapter's create_schema()",
+        "instead": "override in the pg_mooncake adapter class",
+        "item_id": "pg-mooncake-platform-adapter",
+        "why": "pg_mooncake needs USING columnstore only for its own tables"
+      },
+      {
+        "dont": "silently fall back to heap tables on unsupported types",
+        "instead": "raise a clear error listing which columns have unsupported types",
+        "item_id": "pg-mooncake-platform-adapter",
+        "why": "this would produce misleading benchmark results"
+      },
+      {
+        "dont": "try to ALTER existing heap tables to columnstore in-place",
+        "instead": "create tables with columnstore from the start",
+        "item_id": "pg-mooncake-platform-adapter",
+        "why": "pg_mooncake requires CREATE TABLE ... USING columnstore"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "pg-mooncake-platform-adapter",
+        "id": 586,
+        "reason": "Requires specific PostgreSQL WAL configuration - advanced use case for later",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Vague, speculative advanced-use-case note (pg_moonlink WAL replication) with no concrete scope; premature to promote.",
+        "summary": "pg_moonlink WAL-based replication for real-time analytics benchmarking"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "pg-mooncake-platform-adapter",
+        "id": 587,
+        "reason": "Requires cloud storage credentials - handle in live-platform-test workflow",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Needs cloud storage credentials; reason defers to a 'live-platform-test workflow' that has no matching open tracker item.",
+        "summary": "Object storage (S3/GCS) integration testing"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "pg-mooncake-platform-adapter",
+        "id": 588,
+        "reason": "pg_mooncake is actively evolving - type support changes frequently",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Type compatibility matrix docs explicitly deferred because pg_mooncake type support is still evolving; premature to document now.",
+        "summary": "Data type compatibility matrix documentation"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "pg-mooncake-platform-adapter",
+        "id": 589,
+        "reason": "Specialized benchmark scenario - handle as a separate benchmark type",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Heap-to-columnstore migration benchmarking is a specialized benchmark-type idea; fits the open Future Ideas Backlog rather than warranting its own item. (tracked by future-ideas-backlog)",
+        "summary": "Heap-to-columnstore migration benchmarking (measuring conversion overhead)"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-15T00:00:00Z",
+      "created_at": "2026-02-14T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing PostgreSQL adapter tests pass: uv run -- python -m pytest tests/unit/platforms/test_postgresql_adapter.py -v",
+        "item_id": "pg-mooncake-platform-adapter"
+      },
+      {
+        "behavior": "Platform registry autodiscovery for all existing platforms unaffected",
+        "item_id": "pg-mooncake-platform-adapter"
+      },
+      {
+        "behavior": "PostgreSQLAdapter.execute_query() return format unchanged",
+        "item_id": "pg-mooncake-platform-adapter"
+      },
+      {
+        "behavior": "PostgreSQLAdapter.load_data() COPY pipeline unchanged - pg_mooncake inherits it but COPY targets columnstore tables",
+        "item_id": "pg-mooncake-platform-adapter"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/postgresql.py"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/timescaledb.py"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/pg_mooncake.py"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_mooncake.py"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/pg_mooncake.md"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_pg_mooncake_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.pg_mooncake import PgMooncakeAdapter; print('import OK')\"",
+        "description": "pg_mooncake adapter module imports without error",
+        "expected": "import OK",
+        "item_id": "pg-mooncake-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "All existing platform tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "pg-mooncake-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_pg_mooncake_adapter.py -v --tb=short",
+        "description": "pg_mooncake unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "pg-mooncake-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.platform_registry import PlatformRegistry; print('pg-mooncake' in PlatformRegistry.list_platforms())\"",
+        "description": "Platform registry lists pg-mooncake",
+        "expected": "True",
+        "item_id": "pg-mooncake-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w6",
+        "wid": "w10"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w3",
+        "wid": "w11"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w5",
+        "wid": "w11"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w3",
+        "wid": "w9"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w4",
+        "wid": "w9"
+      },
+      {
+        "item_id": "pg-mooncake-platform-adapter",
+        "needs_wid": "w5",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create PgMooncakeAdapter class extending PostgreSQLAdapter with platform_name, get_target_dialect, and basic class structure",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write platform registration tests and CLI integration tests",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write platform documentation (docs/platforms/pg_mooncake.md) covering setup, Docker usage, storage backends, and ClickBench comparison notes",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement create_connection() override to verify pg_mooncake extension is installed and set default GUC parameters",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-platform-adapter",
+        "notes": "This is the critical differentiator - all tables must use columnstore access method",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement create_schema() override to add USING columnstore to CREATE TABLE statements and handle unsupported data types",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement configure_for_benchmark() override for pg_mooncake-specific OLAP optimizations",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-platform-adapter",
+        "notes": "Optional feature - local disk is default; S3 requires MOONCAKE_S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add object storage configuration support (mooncake.default_bucket GUC, S3/GCS credential handling via env vars)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register pg-mooncake in platform_registry.py with metadata (display_name, category, libraries, storage_modes: local + s3)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add CLI config builder and hook registration in platforms/__init__.py with pg-mooncake-specific arguments (--mooncake-storage, --mooncake-bucket)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create PgMooncakeDDLGenerator extending PostgreSQLDDLGenerator that adds USING columnstore to all CREATE TABLE DDL",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write unit tests: adapter creation, extension verification mock, columnstore DDL generation, storage config, unsupported type handling",
+        "wid": "w9"
+      }
+    ]
+  }
+}

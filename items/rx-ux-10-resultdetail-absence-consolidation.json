@@ -1,0 +1,223 @@
+{
+  "context": "Suppress the primary-metric tile when the value is absent rather than printing N/A. Merge the Environment card into the receipt's environment block. Consolidate the three not-recorded counters into one, behind the existing 'Show missing metadata' disclosure. Suppress the empty Query Timings table for zero-timing results. Apply rx-ux-05's badge rule to the title pills.",
+  "description": "On a zero-timing result the hero's primary-metric tile reads N/A - the most prominent number on the page is a non-value. A half-width 'Environment' card says 'Environment metadata was not recorded for this run' while the receipt beside it says 'No environment metadata recorded' (ResultDetail.tsx:281-318, RunReceipt.tsx:129-137). Three separate 'N fields not recorded' counters appear (15, 7, 2) alongside a 'Show missing metadata' link. The title row carries three pills including the invariant `passed`. A result with Query count 0 and Measurement samples 0 still renders an empty Query Timings table.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "hide the fact that metadata is missing",
+        "instead": "state it once instead of three times",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "why": "the disclosure is a product value; only its repetition is the defect"
+      },
+      {
+        "dont": "regenerate the public-site visual baseline inside the PR",
+        "instead": "name which e2e/captures specs the change invalidates and update those deliberately",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "why": "the baseline is an external CI artifact tied to a base SHA, not a checked-in snapshot"
+      },
+      {
+        "dont": "suppress the timings table for results that have timings",
+        "instead": "branch on zero timings specifically",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "why": "the table is the point of the page for normal results"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T20:31:52Z",
+      "completed_pr": 1828,
+      "created_at": "2026-08-22T14:49:14Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Every fact currently reachable stays reachable; this consolidates presentation, it does not drop provenance",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation"
+      },
+      {
+        "behavior": "The receipt's public ID and result identity remain fully visible",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation"
+      },
+      {
+        "behavior": "Trust is per-result. hosted-results-contract.md:687-698 forbids an aggregate trust badge on a mixed-trust set.",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/generate-browser-fixtures.mjs"
+      },
+      {
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RunReceipt.tsx"
+      },
+      {
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/RunReceipt.test.tsx"
+      },
+      {
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "last_result": "pass",
+        "last_run": "2026-08-22T20:26:00Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium",
+        "description": "Chromium browser suite passes against a fresh build",
+        "expected": "fixtures verified, build succeeds, chromium suite green",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "last_result": "pass",
+        "last_run": "2026-08-22T20:31:42Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'result detail zero timing'",
+        "description": "Zero-timing result renders without N/A hero or empty timings table",
+        "expected": "no N/A tile, no empty timings table, absence stated once",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "last_result": "pass",
+        "last_run": "2026-08-22T20:31:51Z",
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "needs_wid": "w4",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "ResultDetail omits the primary metric card when the canonical metric is absent; focused Vitest coverage passes",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "notes": null,
+        "started_at": "2026-08-22T19:57:37Z",
+        "started_branch": "fix/rx-ux-10-resultdetail-absence-consolidation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-10-resultdetail-absence-consolidation",
+        "status": "done",
+        "summary": "Suppress primary-metric tile when value absent",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Removed the duplicate Environment card; RunReceipt remains the single environment metadata surface",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "notes": null,
+        "started_at": "2026-08-22T19:57:40Z",
+        "started_branch": "fix/rx-ux-10-resultdetail-absence-consolidation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-10-resultdetail-absence-consolidation",
+        "status": "done",
+        "summary": "Merge Environment card into receipt environment block",
+        "wid": "w2"
+      },
+      {
+        "evidence": "RunReceipt now presents one aggregate missing-metadata count and no per-section counters",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "notes": null,
+        "started_at": "2026-08-22T20:03:23Z",
+        "started_branch": "fix/rx-ux-10-resultdetail-absence-consolidation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-10-resultdetail-absence-consolidation",
+        "status": "done",
+        "summary": "Consolidate three not-recorded counters into one disclosure",
+        "wid": "w3"
+      },
+      {
+        "evidence": "ResultDetail gates charts and Query Timings on actual display or raw timing rows; focused Vitest coverage passes",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "notes": null,
+        "started_at": "2026-08-22T19:57:43Z",
+        "started_branch": "fix/rx-ux-10-resultdetail-absence-consolidation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-10-resultdetail-absence-consolidation",
+        "status": "done",
+        "summary": "Suppress empty Query Timings table for zero-timing results",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Result summary suppresses pass/passed validation badges while preserving failed status; focused Vitest coverage passes",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "notes": null,
+        "started_at": "2026-08-22T19:57:46Z",
+        "started_branch": "fix/rx-ux-10-resultdetail-absence-consolidation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-10-resultdetail-absence-consolidation",
+        "status": "done",
+        "summary": "Apply status-badge rule to title pills",
+        "wid": "w5"
+      },
+      {
+        "evidence": "RunReceipt tests assert exactly one aggregate missing-metadata count; 46 focused tests pass",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "notes": null,
+        "started_at": "2026-08-22T20:03:34Z",
+        "started_branch": "fix/rx-ux-10-resultdetail-absence-consolidation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-10-resultdetail-absence-consolidation",
+        "status": "done",
+        "summary": "Update RunReceipt assertions for one consolidated missing-metadata disclosure",
+        "wid": "w6"
+      },
+      {
+        "evidence": "Additive zeroTiming fixture role generated deterministically; isolated Chromium scenario passes",
+        "item_id": "rx-ux-10-resultdetail-absence-consolidation",
+        "notes": null,
+        "started_at": "2026-08-22T20:03:39Z",
+        "started_branch": "fix/rx-ux-10-resultdetail-absence-consolidation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-10-resultdetail-absence-consolidation",
+        "status": "done",
+        "summary": "Add a deterministic zero-timing fixture role and browser scenario",
+        "wid": "w7"
+      }
+    ]
+  }
+}

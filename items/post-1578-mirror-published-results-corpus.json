@@ -1,0 +1,110 @@
+{
+  "context": "After #1578 is on develop - workflow_dispatch the sync workflow, verify tip has zero drop-field keys and still satisfies find_public_path_leaks, merge draft mirror PR. Do not force-push history.",
+  "description": "PR #1578 re-derives results-data (207 result_id rotations, six identifier fields omitted). Until develop is mirrored, origin/published-results tip can lag and still serve pre-drop public bytes. The class of failure fixed by #1535/#1538 (stale public corpus) recurs operationally if the sync is skipped. After #1578 merges to develop, trigger sync-results-data-to-published.yml (draft PR, never auto-merge), review, and merge the mirror. Coordinate with corpus-drift-canary-direction-and-leak-check so community submissions on published-results are not clobbered. Replaces dropped id mirror-published-results-after-identifier-field-drop (recreate after bad work-unit parse).",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "post-1578-mirror-published-results-corpus",
+        "needs_item": "published-pseudonym-oracle-and-field-set"
+      }
+    ],
+    "item_meta": {
+      "category": "privacy",
+      "completed_at": "2026-08-05T21:08:57Z",
+      "completed_pr": 1583,
+      "created_at": "2026-08-05T20:51:28Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The mirror PR stays a draft until human review - it must never auto-merge",
+        "item_id": "post-1578-mirror-published-results-corpus"
+      },
+      {
+        "behavior": "published-results history is not rewritten as a side effect",
+        "item_id": "post-1578-mirror-published-results-corpus"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "post-1578-mirror-published-results-corpus",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "post-1578-mirror-published-results-corpus",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f .github/workflows/corpus-drift-check.yml",
+        "description": "corpus-drift canary path still exists",
+        "expected": "exit 0",
+        "item_id": "post-1578-mirror-published-results-corpus",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -q draft .github/workflows/sync-results-data-to-published.yml",
+        "description": "sync workflow still opens draft mirrors only",
+        "expected": "exit 0",
+        "item_id": "post-1578-mirror-published-results-corpus",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "post-1578-mirror-published-results-corpus",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "post-1578-mirror-published-results-corpus",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1578 merged 2026-08-05T21:04:30Z as fb4f053b61; PR #1577 merged as b946f47cc9. origin/develop results-data tree 3c3e32b3c3 vs origin/published-results ae4734232a; git diff --name-only reports 400 corpus paths drifted. published tip sample still carries machine_id/engine_host/working_dir/driver_runtime_python_executable drop-field keys (pre-#1578).",
+        "item_id": "post-1578-mirror-published-results-corpus",
+        "notes": null,
+        "started_at": "2026-08-05T21:06:04Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm PR 1578 is on develop and measure tip drift vs published-results",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Dispatched sync-results-data-to-published.yml; draft PR #1583 opened for develop@fb4f053b (400 paths). Content review: develop corpus 0 drop-field keys, 0 path leaks. Validation check red solely for 65 pre-existing seed bundles with summary.validation=partial (community rule from validate_submission applied to maintainer corpus after #1573). Marked ready and squash-merged #1583 as 203bf2b42d without history rewrite.",
+        "item_id": "post-1578-mirror-published-results-corpus",
+        "notes": null,
+        "started_at": "2026-08-05T21:08:44Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Trigger sync-results-data-to-published and land the draft mirror after review",
+        "wid": "w1"
+      },
+      {
+        "evidence": "origin/published-results@203bf2b42d: 203 primary bundles, 0 drop-field key occurrences (machine_id/working_dir/engine_host/database_path/data_path/driver_runtime_python_executable); find_public_path_leaks over all published results-data/bundles JSON surfaces: 0 offenders.",
+        "item_id": "post-1578-mirror-published-results-corpus",
+        "notes": null,
+        "started_at": "2026-08-05T21:08:50Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Verify published-results tip has no drop-field keys and path leaks are clean",
+        "wid": "w2"
+      }
+    ]
+  }
+}

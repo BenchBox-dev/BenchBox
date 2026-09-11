@@ -1,0 +1,10 @@
+{
+  "description": "Dask runs fail on all 22 TPC-H queries due to API incompatibilities between\nDask and Pandas. The root cause is that pandas_impl query functions call\n.groupby(as_index=False) directly, which Dask doesn't support.\n\nErrors by category:\n- as_index=False not supported: Q1-Q5, Q10-Q13, Q15-Q18, Q20, Q22 (16 queries)\n- .dt.year on DatetimeIndex: Q7, Q8, Q9 (3 queries)\n- nunique aggregate: Q16, Q21 (2 queries)\n- Lazy scalar conversion: Q6, Q14, Q19 (3 queries)\n\nSolution: Created UnifiedPandasFrame wrapper (following Expression family pattern)\nthat intercepts DataFrame operations and routes to adapter for platform-specific\nhandling. Also made minor query adaptations to handle lazy scalar computations.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-01-03T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

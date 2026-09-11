@@ -1,0 +1,10 @@
+{
+  "description": "The codebase has ~15 locations that duplicate TPC file format detection\nusing patterns like `\".tbl\" in file_str or \".dat\" in file_str`.\n\nNew utility functions were added in commit XXXX:\n- `is_tpc_format(path)` - returns True for .tbl/.dat files\n- `get_delimiter_for_file(path)` - returns \"|\" for TPC formats, \",\" otherwise\n- `TPC_FORMAT_EXTENSIONS` - frozenset({\".tbl\", \".dat\"})\n\nThese should replace the duplicated or-chains across platform adapters.",
+  "legacy": {
+    "item_meta": {
+      "category": "Code Quality",
+      "created_at": "2026-01-27T00:00:00Z",
+      "worktree": "core-functionality"
+    }
+  }
+}

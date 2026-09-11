@@ -1,0 +1,16 @@
+{
+  "description": "Implement DDL generation for PostgreSQL and TimescaleDB (which extends PostgreSQL)\nwith support for their native partitioning, clustering, and time-series features.\n\n## PostgreSQL Physical Tuning Features\n\n### Declarative Partitioning (10+)\nPostgreSQL supports three partitioning strategies:\n- **RANGE**: Partition by value ranges (dates, numeric)\n- **LIST**: Partition by discrete values\n- **HASH**: Partition by hash of column(s)\n\n### CLUSTER Command\nPhysically reorders table data according to an index:\n```sql\nCREATE INDEX idx ON table (col1, col2);\nCLUSTER table USING idx;\n```\nNote: This is a one-time operation, not maintained on inserts.\n\n### No Distribution\nPostgreSQL is single-node - distribution tuning not applicable.\n\n## TimescaleDB Extensions\n\n### Hypertables\nTime-partitioned tables optimized for time-series:\n```sql\nSELECT create_hypertable('table', 'time_column');\n```\n\n### Chunk Intervals\nControl partition (chunk) size:\n```sql\nSELECT create_hypertable('table', 'time_column',\n    chunk_time_interval => INTERVAL '1 day');\n```\n\n### Compression\nTimescaleDB native compression:\n```sql\nALTER TABLE table SET (timescaledb.compress);\nSELECT add_compression_policy('table', INTERVAL '7 days');\n```\n\n## Current Gap\n\nPostgreSQL adapter has no DDL tuning support. TimescaleDB adapter (if exists)\nlikewise has no tuning integration.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pt-05-postgresql-timescaledb-ddl",
+        "needs_item": "pt-01-ddl-generator-protocol"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-01-03T00:00:00Z",
+      "worktree": "physical-tuning"
+    }
+  }
+}

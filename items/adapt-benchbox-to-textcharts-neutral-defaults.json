@@ -1,0 +1,264 @@
+{
+  "context": "This is a low-risk follow-up to the textcharts neutralization. Most changes are\nmechanical renames (old factory → new factory) and verification-only (confirming\nnew params with defaults don't change behavior). The golden snapshot tests are\nthe primary safety net.\n",
+  "description": "textcharts has a planned 5-group neutralization pass (see\n`_project/prompts/textcharts-neutralize-defaults.md`). Current status:\n\nCompleted in textcharts:\n- Group 2 partial: `value_formatter` added to SummaryStats and StackedBar\n- Group 2 partial: `_format_metric()` dispatch in SummaryBox\n\nNOT yet completed in textcharts (blocked):\n- Group 1: Default labels/titles still domain-specific\n- Group 3: `lower_is_better` parameter not added\n- Group 4: Factory function renames not done (no generic names, no deprecation)\n- Group 5: Outlier cap not configurable\n\nBenchBox-side work that CAN proceed now:\n- Verify `value_formatter` addition doesn't affect existing behavior\n- Verify golden test parity with current textcharts\n- Run full test suite to confirm no regressions\n\nBenchBox-side work BLOCKED on textcharts:\n- Migrate factory calls to new generic names (Group 4)\n- Update scatter param names cost→x, performance→y (Group 4)\n- Update compatibility shim re-exports (Groups 1, 4)\n\nRelated: extract-ascii-charting-into-standalone-library (parent extraction TODO)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "adopt value_formatter or lower_is_better without a concrete use case",
+        "instead": "adopt when Power@Size or throughput metrics are added",
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "why": "these are available for future use but BenchBox's latency-focused defaults are correct today"
+      },
+      {
+        "dont": "remove deprecated factory function aliases from the shim",
+        "instead": "keep re-exports of both old and new names",
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "why": "external callers may still use old names through the BenchBox compatibility layer"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-03-09T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing golden snapshot tests pass unchanged (or with reviewed regeneration)",
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults"
+      },
+      {
+        "behavior": "BenchBox CLI and MCP chart output unchanged for latency-metric benchmarks",
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults"
+      },
+      {
+        "behavior": "Compatibility shim continues working for any external callers using old import paths",
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults"
+      },
+      {
+        "behavior": "No DeprecationWarning emitted during normal BenchBox operation",
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "kind": "do_not_modify",
+        "path_glob": "packages/textcharts/"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/__init__.py"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii_api.py"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii_runtime.py"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/exporters.py"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/post_run_summary.py"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "kind": "only_modify",
+        "path_glob": "tests/contracts/visualization/"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/golden/ascii/"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -q",
+        "description": "Full test suite passes with updated textcharts",
+        "expected": "All tests pass",
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -v",
+        "description": "Golden snapshot parity maintained",
+        "expected": "All snapshot tests pass",
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -W error::DeprecationWarning -m pytest tests/unit/visualization/ -q",
+        "description": "No deprecation warnings from textcharts",
+        "expected": "All tests pass without DeprecationWarning",
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox/core/visualization/ && uv run ty check",
+        "description": "Lint and typecheck pass",
+        "expected": "No errors",
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "notes": "1. Bump textcharts version in pyproject.toml\n2. Run full test suite: `uv run -- python -m pytest -q`\n3. Run golden snapshot tests specifically:\n   `uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -v`\n4. If any golden tests fail, inspect output changes - they should only affect\n   charts rendered WITHOUT explicit labels (i.e., test-only fixtures, not\n   BenchBox production paths). Regenerate with `--update-golden` after review.\n5. Run BenchBox smoke test to confirm CLI output unchanged:\n   `benchbox run --platform duckdb --benchmark tpch --scale 0.01 --dry-run /tmp/verify`\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update textcharts dependency and verify golden test parity",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "notes": "textcharts renamed benchmark-specific factory functions and deprecated the old\nnames. BenchBox call sites in `ascii_runtime.py` need updating to silence\nDeprecationWarnings:\n\n| Old name                      | New name        | Call site in ascii_runtime.py |\n|-------------------------------|-----------------|------------------------------|\n| from_query_results()          | from_series()   | _render_cdf, _render_percentile |\n| from_normalized_results()     | from_ratios()   | _render_speedup              |\n| from_heatmap_data()           | from_matrix()   | _render_rank_table           |\n| from_bar_data()               | from_data()     | _render_bar                  |\n| from_comparison_data()        | from_data()     | _render_comparison           |\n| from_query_latency_data()     | from_data()     | _render_histogram            |\n| from_regression_data()        | from_data()     | _render_diverging            |\n| from_time_series_points()     | from_points()   | _render_line                 |\n| from_distribution_series()    | from_series()   | _render_box_plot             |\n| from_cost_performance_points()| from_points()   | _render_scatter              |\n| from_phase_data()             | from_data()     | _render_stacked              |\n| from_metrics()                | (unchanged)     | _render_sparkline            |\n\nAlso check: post_run_summary.py, exporters.py for any factory calls.\nAfter migration, run: `python -W error::DeprecationWarning -m pytest -q` to\nconfirm no remaining deprecation warnings from textcharts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Migrate factory function calls to new generic names",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "notes": "The renamed `from_points()` in scatter_plot uses `x_label`/`y_label` instead\nof `cost_label`/`performance_label`. Check `_render_scatter` in ascii_runtime.py\nand update kwargs accordingly.\n\nSimilarly check if any other factory parameter names changed and update.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update factory function parameter names (scatter cost→x, performance→y)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "notes": "textcharts added `value_formatter: Callable[[float], str] | None = None` to:\n- ASCIIStackedBar.__init__()\n- SummaryStats dataclass\n\nBenchBox does NOT set value_formatter, so it defaults to None. When None AND\nmetric_label is \"ms\" (BenchBox's default), the existing _format_time() is used\n- behavior is identical.\n\nAdditionally, ASCIISummaryBox now routes _format_time() through _format_metric()\ndispatch. When metric_label != \"ms\", total_time and best/worst values use\n_format_value() + metric_label instead of hardcoded ms→s→min. Since BenchBox\nalways uses metric_label=\"ms\", this is a no-op for us.\n\nVerification:\n1. Grep BenchBox for all SummaryStats and ASCIIStackedBar construction sites\n2. Confirm each uses metric_label=\"ms\" (or omits it, defaulting to \"ms\")\n3. Golden tests should already cover this from w1\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify value_formatter has no impact on existing behavior",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "notes": "textcharts has NOT yet added `lower_is_better`. When it does, verify:\n- ComparisonBar.__init__() default True matches BenchBox latency semantics\n- DivergingBar.__init__() default True matches BenchBox latency semantics\n- SummaryStats dataclass default True matches BenchBox latency semantics\n- Color coding for regression/improvement annotations is unchanged\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify lower_is_better has no impact on existing behavior",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "notes": "The BenchBox compatibility shim in `benchbox/core/visualization/ascii/__init__.py`\nre-exports textcharts symbols. If textcharts added new public names (e.g.,\n`from_data`, `from_series`, `from_points`, `from_ratios`), decide whether to\nre-export them through the shim or only use them via direct textcharts import.\n\nRecommendation: re-export new factory names to keep the shim complete, but\ndon't re-export `lower_is_better` or `value_formatter` (they're constructor\nparams, not standalone symbols).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update compatibility shim re-exports if textcharts added new public names",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "adapt-benchbox-to-textcharts-neutral-defaults",
+        "notes": "If w6 added new re-exports to the shim, ensure `ascii_api.py` picks them up.\nThe facade does `from benchbox.core.visualization.ascii import *` so it should\nbe automatic, but verify `__all__` is updated if explicit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update ascii_api.py facade if new exports were added",
+        "wid": "w7"
+      }
+    ]
+  }
+}

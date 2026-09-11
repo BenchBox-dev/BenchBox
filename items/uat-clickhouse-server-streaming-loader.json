@@ -1,0 +1,177 @@
+{
+  "context": "Add regression tests for parser equivalence, generator identity/closure, multi-shard and Parquet streaming, exact row counts, dry-run semantics, and failure propagation before changing production code. Then implement the shared delimited/Parquet streaming path in ClickHouseNativeHandler and pass per-execute driver settings for insert_block_size, integer-byte max_memory_usage, and max_execution_time=0. Keep local/chDB and non-server bulk behavior unchanged.",
+  "description": "Implement the ClickHouse server-mode host-local data loader as one real Python GeneratorType per table, with the pinned clickhouse-driver performing bounded transport blocks. Preserve parser and type-conversion semantics, close generators explicitly, propagate typed load failures, and make server-mode dry runs explicit. The runtime path must never instantiate RowBatchProcessor, use range(..., 1000), delegate to super().load_table_bulk(), or retry a failed stream through the legacy path. This item owns the loader and driver contract only; resource-rung selection and UAT certification are downstream gates.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Keep super().load_table_bulk() as a server-mode fallback",
+        "instead": "Raise a typed ClickHouse load error and stop.",
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "why": "It re-enters the legacy per-shard loader and recreates the 1,000-row path"
+      },
+      {
+        "dont": "Materialize SF1 tables with pq.read_table() or a full Python row list",
+        "instead": "Use ParquetFile.iter_batches() and a bounded generator.",
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "why": "Peak client memory becomes part of the failure"
+      },
+      {
+        "dont": "Treat a zero row count after an exception as success",
+        "instead": "Propagate the typed error through both DataLoader entry points.",
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "why": "The benchmark could continue against an empty or partial table"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-12T23:17:42Z",
+      "completed_pr": 1704,
+      "created_at": "2026-08-12T21:38:11Z",
+      "worktree": "clickhouse-streaming-load"
+    },
+    "preserves": [
+      {
+        "behavior": "A streaming insert failure is terminal for the table and must never retry through 1,000-row application batches.",
+        "item_id": "uat-clickhouse-server-streaming-loader"
+      },
+      {
+        "behavior": "Do not change ClickHouse local/chDB file() loading.",
+        "item_id": "uat-clickhouse-server-streaming-loader"
+      },
+      {
+        "behavior": "Do not change non-server dry-run placeholder behavior in unrelated handlers.",
+        "item_id": "uat-clickhouse-server-streaming-loader"
+      },
+      {
+        "behavior": "Do not change the global RowBatchProcessor default or semantics for other platforms.",
+        "item_id": "uat-clickhouse-server-streaming-loader"
+      },
+      {
+        "behavior": "The native driver must receive an actual Python GeneratorType, not merely an arbitrary iterable.",
+        "item_id": "uat-clickhouse-server-streaming-loader"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/setup.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/base/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/base/test_data_loading_operations.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_clickhouse_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/base/test_data_loading_operations.py -q",
+        "description": "ClickHouse loader and RowBatchProcessor unit tests",
+        "expected": "passed",
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "last_result": "pass",
+        "last_run": "2026-08-12T23:13:09Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/platforms/base/data_loading.py benchbox/platforms/clickhouse/setup.py tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/base/test_data_loading_operations.py",
+        "description": "Changed loader and setup code passes lint",
+        "expected": "All checks passed!",
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "last_result": "pass",
+        "last_run": "2026-08-12T23:13:14Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py -q -k 'server or stream or fallback or failure or dry_run'",
+        "description": "Server path has no legacy delegation or 1,000-row runtime fallback",
+        "expected": "passed",
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "last_result": "pass",
+        "last_run": "2026-08-12T23:13:22Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/base/test_data_loading_operations.py -q (221 passed); uv run -- ruff check benchbox/platforms/base/data_loading.py benchbox/platforms/clickhouse/setup.py tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/base/test_data_loading_operations.py (pass)",
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "notes": null,
+        "started_at": "2026-08-12T23:00:29Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add parser, generator, no-fallback, dry-run, and typed-error regression tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py -q (87 passed); server delimited and Parquet paths send GeneratorType params and never call RowBatchProcessor",
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "notes": null,
+        "started_at": "2026-08-12T23:06:32Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement delimited and Parquet GeneratorType streaming for ClickHouse server mode",
+        "wid": "w2"
+      },
+      {
+        "evidence": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py -q (87 passed); per-execute insert_block_size=65536, configured send_receive_timeout, generator closure, and Parquet metadata row parity covered",
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "notes": null,
+        "started_at": "2026-08-12T23:07:10Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Pass per-execute driver settings and enforce explicit generator closure and row-count parity",
+        "wid": "w3"
+      },
+      {
+        "evidence": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/base/test_data_loading_operations.py -q (224 passed); typed ClickHouseServerLoadError is rethrown by both DataLoader single-file and sharded paths, preventing zero-row success or legacy retry",
+        "item_id": "uat-clickhouse-server-streaming-loader",
+        "notes": null,
+        "started_at": "2026-08-12T23:07:34Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Propagate ClickHouse server load failures through DataLoader without legacy retry",
+        "wid": "w4"
+      }
+    ]
+  }
+}

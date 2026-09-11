@@ -1,0 +1,163 @@
+{
+  "description": "The Phase 2 CI validation workflow (`.github/workflows/validate-submission.yml`)\nwas merged in PR #53 with 28 unit tests but has never been triggered by an\nactual PR against `published-results`. Test PR #54 (`test/ci-submission-validation`)\nwas opened then closed without confirming the workflow's PR-comment flow.\n\nWithout a real end-to-end exercise we don't know whether:\n  - the workflow trigger filter (`paths: results-data/bundles/**` on PRs to\n    `published-results`) actually fires,\n  - the markdown PR comment renders correctly (create + idempotent update),\n  - hash-mismatch and schema failures produce clear, actionable error output,\n  - permissions allow the workflow to comment on PRs from forks.\n\nThis item runs the workflow against a maintainer-controlled PR with both a\npassing case and a tampered failure case, capturing the resulting comments\nas evidence and filing follow-up bugs for any defects observed.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify the validation workflow or validator script during this task",
+        "instead": "(not specified)",
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "why": "the goal is to observe real behavior, not patch around it; file follow-up TODOs for any fixes needed."
+      },
+      {
+        "dont": "push test bundles to `main` or `published-results` directly",
+        "instead": "(not specified)",
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "why": "that pollutes the curated corpus; PRs only, and close without merging."
+      },
+      {
+        "dont": "use `--no-verify` or skip the CI step locally to \"shortcut\" the test",
+        "instead": "(not specified)",
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "why": "the entire point is to exercise the GitHub Actions runner, not the local validator."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "needs_item": "implement-pr-based-result-submission-workflow"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All test PRs are CLOSED, never merged, so the corpus stays clean.",
+        "item_id": "verify-ci-validation-workflow-end-to-end"
+      },
+      {
+        "behavior": "The `published-results` branch as the protected target for community submissions.",
+        "item_id": "verify-ci-validation-workflow-end-to-end"
+      },
+      {
+        "behavior": "The existing `validate-submission.yml` workflow filename and trigger paths (downstream consumers may already reference them).",
+        "item_id": "verify-ci-validation-workflow-end-to-end"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/"
+      },
+      {
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/ci-validation-evidence-*.md"
+      },
+      {
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/results-publishing-handoff-2026-04-04.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/handoffs/ci-validation-evidence-*.md && grep -c '^## ' _project/handoffs/ci-validation-evidence-*.md",
+        "description": "Evidence file exists with at least 3 captured PR-comment markdown blocks (1 pass, 2 fail)",
+        "expected": "count >= 3",
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "notes": "1. Run a small bundle locally:\n   `benchbox run --platform duckdb --benchmark tpch --scale 0.01 --queries Q1,Q6`\n2. Package it: `benchbox submit --last --output /tmp/submission-test/`\n3. Verify the package contains: bundle .json, optional companions,\n   submission-manifest.json with valid SHA256.\n4. Save the package outside the repo for use in w2.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prepare a known-good submission package for the happy-path test PR",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "notes": "1. From a fresh branch off `published-results`, copy the bundle into\n   `results-data/bundles/tpch/duckdb/sf0.01/<bundle-id>/` along with the\n   `submission-manifest.json` sidecar.\n2. Push to private remote and open PR against `published-results`:\n   `gh pr create --repo joeharris76/benchbox-private --base published-results ...`\n3. Confirm `validate-submission` workflow auto-triggers (no manual dispatch).\n4. Capture the rendered PR comment (paste markdown into evidence file at\n   `_project/handoffs/ci-validation-evidence-<date>.md`).\n5. Push a no-op change (touch the manifest description) to confirm the\n   comment is UPDATED in place rather than duplicated.\n6. Close the PR without merging.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Open a happy-path PR against published-results and capture workflow output",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "notes": "1. Branch off `published-results` again with the same bundle.\n2. Mutate the bundle file AFTER the manifest hash is computed (e.g.,\n   change a single timing value) so SHA256 no longer matches.\n3. Open PR against `published-results`.\n4. Confirm workflow fails and PR comment cites the hash mismatch with the\n   offending file path.\n5. Repeat with a schema-invalid bundle (e.g., delete a required schema-v2\n   field) and capture the schema validation error message.\n6. Append both failure-case comments to the same evidence file.\n7. Close PRs without merging.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Open a tampered-bundle PR and verify CI rejects with a clear error",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "notes": "Open one happy-path PR from a fork (use a personal fork or a throwaway\nGitHub account if required) and confirm the workflow's\n`pull-requests: write` permission is sufficient for a fork PR. Document\nin the evidence file. If posting fails, capture the error and file a\nfollow-up TODO to switch to `pull_request_target` (with the usual\nsecurity caveats).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify fork-PR permissions allow comment posting",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "verify-ci-validation-workflow-end-to-end",
+        "notes": "- For each defect observed (missing comment, wrong status, unclear error),\n  create a focused bug TODO under `_project/TODO/main/planning/`.\n- Update `_project/handoffs/results-publishing-handoff-2026-04-04.md`\n  step #2 (\"Test CI Workflow on a Real PR\") to mark it complete and link\n  to the evidence file.\n- Mark this TODO Completed only when the evidence file exists and at\n  least one passing + one failing PR comment have been observed in\n  production.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "File follow-up TODOs for any defects, attach evidence to PR description",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Code review of PostgreSQL and TimescaleDB integrations identified several\nissues that should be addressed to improve code quality and prevent bugs.\n\nIssues identified:\n1. CRITICAL: Duplicate dictionary key \"CTE Scan\" in query plan parser\n2. WARNING: Missing exception chain in parser ValueError\n3. WARNING: Unused ConfigurationError import\n4. WARNING: SET commands use f-strings for config values (potential injection)\n\nAll issues are straightforward fixes that can be completed quickly.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2024-12-24T00:00:00Z",
+      "created_at": "2024-12-24T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

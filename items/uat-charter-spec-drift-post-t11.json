@@ -1,0 +1,94 @@
+{
+  "description": "Three low-severity spec-vs-code drifts in _project/specs/uat-framework.md, residual after T11 (#1234), found in the UAT-hardening batch final validation. Docs only. (1) Section 2 module LOC table records matrix.py=511 but wc -l is 515 (T11 edited matrix.py after the snapshot); cascades to the core-exercise bucket (2322 to 2326) and total (~9774 to 9778). (2) Section 3 schema table row claims preflight.free_space_min_gib <= 0 is a validation error, but config.py only rejects < 0; = 0 is the documented disk-gate opt-out (config.py ~154-182). (3) Section 6 calls test_replay_config_has_expected_shape a second fast test, but tests/uat/test_replay_2026_05_02.py is module-level pytest.mark.slow (deselected under -m fast). The still-open item uat-spec-module-loc-table-autogen would prevent drift (1).",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-07-21T21:37:52Z",
+      "completed_pr": 1252,
+      "created_at": "2026-07-19T21:46:23Z",
+      "worktree": "uat-hardening"
+    },
+    "scope_rules": [
+      {
+        "item_id": "uat-charter-spec-drift-post-t11",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git diff --name-only",
+        "description": "spec numbers and labels match code",
+        "expected": "only _project/specs/uat-framework.md",
+        "item_id": "uat-charter-spec-drift-post-t11",
+        "last_result": "pass",
+        "last_run": "2026-07-21T21:36:54Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-charter-spec-drift-post-t11",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-charter-spec-drift-post-t11",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-charter-spec-drift-post-t11",
+        "needs_wid": "w0",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-confirmed on develop@6a20f2923: (1) LOC table drifted - matrix.py 511->515 and 5 others (execute 985->997, enumerate 269->275, config 741->751, orchestrator 751->747, throughput 293->318); (2) schema row said free_space_min_gib<=0->error but code (_require_nonnegative_float) rejects only <0 and treats =0 as an explicit disk-gate opt-out; (3) test_replay_2026_05_02.py is pytestmark=slow-only but W10 row said 'Slow + fast'.",
+        "item_id": "uat-charter-spec-drift-post-t11",
+        "notes": null,
+        "started_at": "2026-07-21T21:36:31Z",
+        "started_branch": "fix/uat-charter-spec-drift-post-t11",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Re-confirm all three drifts against current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Corrected the 6 drifted per-module LOC rows (wc -l), recomputed the affected buckets (plumbing 2248->2254, core-exercise 2322->2344, throughput 293->318) and total (9774->9827); refreshed the column header date to 2026-07-21 with a drift-correction note. Extended beyond matrix.py because leaving the other drifted rows would make the recomputed bucket/total dishonest.",
+        "item_id": "uat-charter-spec-drift-post-t11",
+        "notes": null,
+        "started_at": "2026-07-21T21:36:36Z",
+        "started_branch": "fix/uat-charter-spec-drift-post-t11",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Re-measure and correct the matrix.py LOC, bucket subtotal and total",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Schema table: replaced 'free_space_min_gib <= 0 -> Validation error' with two rows: '< 0 -> Validation error (non-negative, _require_nonnegative_float)' and '== 0 -> disk-gate opt-out (loud [disk-gate] DISABLED warning), not an error', matching config.py.",
+        "item_id": "uat-charter-spec-drift-post-t11",
+        "notes": null,
+        "started_at": "2026-07-21T21:36:42Z",
+        "started_branch": "fix/uat-charter-spec-drift-post-t11",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Correct the free_space_min_gib schema row to < 0 error and = 0 disk-gate opt-out",
+        "wid": "w2"
+      },
+      {
+        "evidence": "W10 row label 'Slow + fast' -> 'Slow' to match tests/uat/test_replay_2026_05_02.py module-level pytestmark = pytest.mark.slow.",
+        "item_id": "uat-charter-spec-drift-post-t11",
+        "notes": null,
+        "started_at": "2026-07-21T21:36:47Z",
+        "started_branch": "fix/uat-charter-spec-drift-post-t11",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Correct the replay test fast to slow label",
+        "wid": "w3"
+      }
+    ]
+  }
+}

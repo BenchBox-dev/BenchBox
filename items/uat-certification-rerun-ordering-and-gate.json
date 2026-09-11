@@ -1,0 +1,230 @@
+{
+  "context": "This is the integration/sign-off item: it should be worked LAST, after the\nfive upstream fixes merge (see deps). Clone a config template, encode the\nfour-stage ordering and scales, add a lightweight ordering check and the\napproval-gate checklist (reuse cross_scale_coverage_min_pairs for teeth),\ndocument the runbook, then execute into a fresh root. The deliverable is a\nCOMPLETED report per config with a commit SHA — the artifact the original\nreview found missing.\n",
+  "description": "Once the framework and defect fixes land, a clean release-gate sweep must\nbe run — and its ordering and approval criteria must be explicit, because\nthe 2026-05-28/29 evidence had two structural problems beyond cell\nfailures:\n\n- Ordering: the docker non-OLTP run started 2026-05-28 23:14, but a\n  native-execution dataframe sweep ran afterwards (2026-05-29 01:17-07:50).\n  A Docker stack began before all native/dataframe platforms had completed,\n  so cross-run release-gate value is compromised.\n- Completeness: no run reached validate/package/explorer_smoke/report; no\n  matrix_summary.tsv or validator_rollup.tsv exists for any run.\n\nRelease-gate re-run contract:\n  1. native SQL platforms first\n  2. dataframe (native-execution) platforms second\n  3. Docker non-OLTP stacks third\n  4. Docker OLTP stacks last\nRun sequentially, one platform at a time; lifecycle logs must prove native\ncompletion before any Docker stack starts. Use a FRESH run root (not the\nfailed 2026-05-28 dirs), BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs,\na recorded seed, non-OLTP scales 0.01/0.1/1, OLTP scale 0.01.\n\nAPPROVAL GATE — APPROVE only if every non-blocked locally-testable platform\nreaches the report phase and all required, non-pruned cells pass. HOLD if\nANY of: missing manifests, missing commit SHA, DuckDB reference failures,\na Docker zero-cell run, a hung platform, or a NO_JSON without error text.\n\nCHARTER-VOCABULARY RECONCILIATION (decided 2026-05-31 by\n[[uat-certification-wording-charter-decision]], Path A): \"certification\" is\nNOT a chartered term in _project/specs/uat-framework.md;\nthe chartered name is \"release-gate orchestration\". This work owns the\nrenamed release-gate surface (tests/uat/configs/release-gate-0{1,2,3}-*.yaml,\ntests/uat/phases/report.py:release_gate_ordering_violations,\ntests/uat/test_config.py, and the docs \"Release-gate re-run\" section), so\nthe rename to release-gate-orchestration vocabulary landed WITH this change\nrather than as a competing PR (which would break test_config.py and collide\nhere). Do not introduce a standing cert-operations surface beyond the named\nevidence artifacts.\n\nREVALIDATED 2026-08-23 after PR #1835 merged as 4f8c580f7: managed smoke resolves clickhouse_memory_limit=5.25g. LakeSail startup/readiness and teardown pass; the run then aborts before ClickHouse startup at the current host-memory gate: 5.40 GiB available versus 6.89 GiB required (5.25 GiB request plus 2.00 GiB reserve), with 67.9% swap. Evidence: /Users/joe/Developer/benchmark_runs/logs/uat_docker_managed_20260823/uat_lifecycle.log and matrix_summary.partial.tsv.\n\nRECONCILED 2026-08-24: the calibration established the 5.25 GiB ClickHouse runtime request but did not validate the additional 2 GiB host reserve. Follow-up PR #1867 removes that unvalidated default, retains explicit nonzero overrides, and adds regression coverage. The prior 6.89 GiB admission blocker must not be treated as a measured requirement; rerun the merged request-only policy after #1867 lands.\n\nSTAGE 1 ATTEMPT 2026-08-24: release-gate-01-native-dataframe dry-run passed, then the actual run on PR #1867 head e70f2ff59 was capped at 7200s after 166 cell records while processing sqlite SF1. No completed matrix_summary.tsv, validator rollup, or stage report was produced; this is incomplete evidence and cannot advance the gate. Run root: /Users/joe/Developer/benchmark_runs/logs/uat_20260824_081349. Command log: /tmp/uat-release-gate-stage1-20260824.log.\n\nCURRENT 2026-08-24: merged request-only smoke exposed the LakeSail endpoint-option registration defect; PR #1875 fixes it. Do not treat the managed release-gate chain as runnable until #1875 merges and a host sustains ClickHouse's measured 5.25 GiB request.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "APPROVE on a partial run",
+        "instead": "(not specified)",
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "why": "the gate requires the report phase to complete with all required non-pruned cells green."
+      },
+      {
+        "dont": "resume into the failed 2026-05-28 dirs",
+        "instead": "(not specified)",
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "why": "treat them as non-evidentiary; use a fresh root."
+      },
+      {
+        "dont": "start a Docker stack before native + dataframe platforms finish",
+        "instead": "(not specified)",
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "why": "that contaminated the 2026-05-28 evidence."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "needs_item": "uat-artifact-integrity-and-failure-capture"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "needs_item": "uat-cross-engine-dataframe-defects"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "needs_item": "uat-docker-stack-recovery"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "needs_item": "uat-duckdb-reference-triage"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "needs_item": "uat-native-dataframe-compatibility-rules"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "needs_item": "uat-preflight-disk-headroom-gate"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Live state 2026-08-26T20:53:55Z: final protected develop candidate is cf1f799ad79469eb3b4309102bb12d141fddc46a; PR #1921 and #1922 are merged and protected Develop PR run 32996416086 passed. A fresh Stage 1 sweep is actively running from /Users/joe/Developer/BenchBox.wt-v0-4-0-uat-final-evidence at the final SHA, root /Users/joe/Developer/benchmark_runs/logs/uat_20260826_162031, with no Docker stage started. It has 80 completed cells so far: 79 passed and 1 failed, all source_commit_sha=cf1f799; the failure is DataFusion TPC-H SF1 query 18 resource exhaustion (12GB pool). Current process is datafusion joinorder SF1; do not start a second sweep or Docker stage. No matrix_summary.tsv, validator_rollup.tsv, report, or committed gate summary exists yet. The host is concurrently running other heavy workloads, so treat this as in-progress non-green evidence until completion and report review. SQLite advanced read/write policy remains unresolved; PR #1909 exact-head visual approval remains absent.",
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The 2026-05-28/29 run dirs are retained as failed-evidence reference, not reused as the release-gate root.",
+        "item_id": "uat-certification-rerun-ordering-and-gate"
+      },
+      {
+        "behavior": "execute.parallel_platforms stays hard-rejected; one platform / one Docker stack at a time.",
+        "item_id": "uat-certification-rerun-ordering-and-gate"
+      },
+      {
+        "behavior": "preserve_datagen:true; datagen reuse and reuse-aware pruning are unchanged.",
+        "item_id": "uat-certification-rerun-ordering-and-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "docs/operations/uat-framework.md 'Sequential platform execution' + 'Cross-scale coverage assertion (opt-in)' — reuse the report.cross_scale_coverage_min_pairs teeth; extend the doc with the ordering + approval-gate runbook",
+        "decision": "extend",
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "path": "docs/operations/uat-framework.md"
+      },
+      {
+        "concept": "tests/uat/configs/ historical + template configs — clone a template for the release-gate config rather than authoring from scratch",
+        "decision": "reuse",
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "path": "tests/uat/configs/"
+      },
+      {
+        "concept": "tests/uat/phases/report.py REPORT_HEADER / footer — the report-phase artifact the approval gate reads",
+        "decision": "reuse",
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "path": "tests/uat/phases/report.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/config.py"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/report.py"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_config.py"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_report.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_config.py tests/uat/test_report.py -q",
+        "description": "Config validation + report-teeth tests pass",
+        "expected": "all pass; cross_scale_coverage teeth exercised",
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make uat-sweep CONFIG=<release-gate-config.yaml>",
+        "description": "Release-gate re-run reaches report phase for every config",
+        "expected": "each run dir has matrix_summary.tsv + validator_rollup.tsv + a COMPLETED report footer with commit SHA",
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Release-gate configs encode native/dataframe then Docker non-OLTP then Docker OLTP ordering, required scales, fresh root, and recorded seed procedure; config tests pass (136 UAT config/report tests). Live w5 remains dependency-blocked.",
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "notes": "Three stage-ordered configs cloned from uat-enabled-platforms-full.yaml:\nrelease-gate-01-native-dataframe.yaml (groups native-sql+dataframe, 0.01/0.1/1),\nrelease-gate-02-docker-nonoltp.yaml (docker-fast, 0.01/0.1/1),\nrelease-gate-03-docker-oltp.yaml (docker-slow, 0.01). Numeric prefixes +\nrunbook encode the run order. Fresh-root + recorded-seed are documented in\nthe configs and runbook (config schema has no seed field; the operator\nrecords BENCHBOX_SEED). Validated in tests/uat/test_config.py.\n",
+        "started_at": "2026-08-12T12:45:44Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Author/refresh the release-gate config(s) cloned from a template: scales 0.01/0.1/1 (non-OLTP), 0.01 (OLTP), recorded seed, fresh run root",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Report parses Docker up events and flags startup before native/dataframe completion; ordering regression tests pass. Live w5 remains dependency-blocked.",
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "notes": "report.parse_docker_up_events + report.release_gate_ordering_violations:\nparse Docker action=up timestamps from each stage's uat_lifecycle.log and\nflag any that precede the native+dataframe completion boundary. Stage 1 is\nDocker-free (docker_manage_platforms=false), so it emits no action=up\nevents. Tested in tests/uat/test_report.py. Cross-stage order is also\nenforced by the runbook (separate sequential invocations).\n",
+        "started_at": "2026-08-12T12:45:56Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add an ordering assertion/lint: native completes before any Docker stack starts, provable from lifecycle logs",
+        "wid": "w2"
+      },
+      {
+        "evidence": "cross_scale_coverage_min_pairs is armed in all three release-gate configs and APPROVE/HOLD checklist is documented; live w5 remains dependency-blocked.",
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "notes": "cross_scale_coverage_min_pairs armed in all three configs (report-phase\nteeth: a floor breach forces a non-zero report exit). APPROVE/HOLD\nchecklist written in the runbook.\n",
+        "started_at": "2026-08-12T12:46:02Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Encode the APPROVE/HOLD gate as a checklist + optional report teeth (cross_scale_coverage_min_pairs)",
+        "wid": "w3"
+      },
+      {
+        "evidence": "docs/operations/uat-framework.md documents four-stage ordering, fresh root, seed, timeout measurement, ordering check, coverage teeth, and APPROVE/HOLD criteria; live w5 remains dependency-blocked.",
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "notes": "\"Release-gate re-run\" section added: four-stage ordering, fresh root +\nseed, one-stack-at-a-time, measure-then-set Docker timeout, the ordering-\ncheck snippet, the cross-scale teeth, and the APPROVE/HOLD gate checklist.\n",
+        "started_at": "2026-08-12T12:46:09Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Write the release-gate runbook section in docs/operations/uat-framework.md",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-certification-rerun-ordering-and-gate",
+        "notes": "OPERATIONAL / live-environment sign-off step (deferred; not runnable in the\nimplementation sandbox). Requires all platforms incl. built/pulled Docker\nstacks (LakeSail Spark image etc.) and a long multi-stage sweep. This is\nwhere [[uat-docker-stack-recovery]] w3/w4 (the Docker re-runs) are\nexecuted; they are marked \"VIA cert-rerun w5 — NOT standalone\" there so\nthey are not picked up as an independent Docker-only sweep.\nRequired terminal artifacts per run: cells.jsonl, compatibility_pruned.jsonl,\nresume.json (if aborted), matrix_summary.tsv, validator_rollup.tsv,\nuat_lifecycle.log, final report with COMPLETED footer + commit SHA. The\ncode scaffolding (configs, ordering check, gate teeth, runbook) is in place\nso this becomes a run-and-evaluate step.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Execute the full release-gate re-run into a fresh root and confirm every config reaches the report phase",
+        "wid": "w5"
+      }
+    ]
+  }
+}

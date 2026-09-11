@@ -1,0 +1,100 @@
+{
+  "context": "Add SF10 and SF100 rungs for the local engines that can hold them (DuckDB, DataFusion, Polars, ClickHouse local) before spending cloud trial credits, so the harness is proven at scale on free compute first. Cloud SF100 is covered by first-live-cloud-benchmark-run-and-publish. Check the datagen and disk budget before committing to SF100 across the full benchmark set - scope to TPC-H and TPC-DS rather than all 19 benchmarks.",
+  "description": "REVALIDATED 2026-08-20. Public corpus (results-data/corpus-inventory.json, generated 2026-08-06, 207 bundles) still maxes at scale_factor 1.0. Newest public bundle is 2026-07-30.\n\nLocal unpublished bundles already exist and are the remaining publish action:\n- benchmark_runs/results/tpch_sf10_duckdb_sql_20260817_210939_80e1274f.json (TPC-H SF10 DuckDB)\n- benchmark_runs/results/tpch_sf100_duckdb_sql_20260817_214011_d40cb760.json (TPC-H SF100 DuckDB)\n\nExplorer curated-preview launch does not wait on this item. Publishing these bundles is still a required customer-value action (corpus currently reads as a 1 GB toy).",
+  "legacy": {
+    "item_meta": {
+      "category": "results",
+      "completed_at": "2026-08-20T19:07:49Z",
+      "completed_pr": 1786,
+      "created_at": "2026-08-17T23:29:44Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "raise-public-corpus-scale-ceiling",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "raise-public-corpus-scale-ceiling",
+        "kind": "only_modify",
+        "path_glob": "results-data/corpus-inventory.json"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "ls results-data/bundles/ | grep -cE '_sf(10|100)_'",
+        "description": "Corpus contains results above SF1",
+        "expected": "greater than 0",
+        "item_id": "raise-public-corpus-scale-ceiling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "raise-public-corpus-scale-ceiling",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "raise-public-corpus-scale-ceiling",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "raise-public-corpus-scale-ceiling",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "2026-08-20: corpus-inventory.json still max scale_factor 1.0 (207 bundles, generated 2026-08-06); local SF10/SF100 DuckDB TPC-H JSON exists under ~/Developer/benchmark_runs/results/",
+        "item_id": "raise-public-corpus-scale-ceiling",
+        "notes": null,
+        "started_at": "2026-08-20T14:52:04Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Revalidate",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Local bundle tpch_sf10_duckdb_sql_20260817_210939_80e1274f.json with benchmark.scale_factor=10.0",
+        "item_id": "raise-public-corpus-scale-ceiling",
+        "notes": null,
+        "started_at": "2026-08-20T14:52:06Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "DONE 2026-08-17: TPC-H SF10 on DuckDB measured - 7.3 GB datagen, 33.0s load for 86,586,082 rows, 61.8s total run",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Local bundle tpch_sf100_duckdb_sql_20260817_214011_d40cb760.json with benchmark.scale_factor=100.0; remaining engines still unpublished; w3 is submit",
+        "item_id": "raise-public-corpus-scale-ceiling",
+        "notes": null,
+        "started_at": "2026-08-20T14:52:09Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "DONE 2026-08-17 for TPC-H on DuckDB: SF10 and SF100 both produced and both validator-clean; remaining engines pending",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1786: benchbox submit of tpch_sf10 and tpch_sf100 DuckDB; validate_submission PASS; inventory max_sf=100.0",
+        "item_id": "raise-public-corpus-scale-ceiling",
+        "notes": null,
+        "started_at": "2026-08-20T16:52:50Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Submit the existing TPC-H SF10 and SF100 DuckDB bundles to published-results; do not re-run them unless submit refuses",
+        "wid": "w3"
+      }
+    ]
+  }
+}

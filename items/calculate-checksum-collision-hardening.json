@@ -1,0 +1,167 @@
+{
+  "description": "SOUNDNESS-CRITICAL COMPARATOR SURFACE: benchbox/core/tpchavoc/validation.py\nis CODEOWNERS-covered; this TODO's PR requires code-owner review.\n\nvalue-digest-collision-pinning (DONE, PR #952) took the deliberate\npin-only half of its \"pin (or fix)\" mandate: three verified collisions in\n`calculate_checksum`'s raw str-join digest are now pinned as accepted\nproperties in tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py:144-193:\n  1. cell-separator aliasing: [(\"a|b\",\"c\")] == [(\"a\",\"b|c\")]\n  2. row-separator aliasing:  [(\"a\\nb\",)]  == [(\"a\",),(\"b\",)]\n  3. dtype aliasing:          [(\"1\",)]     == [(1,)]\nplus the pre-existing NULL-vs-\"NULL\" pin (same file, :133-141). The pins\nmake the weakness conscious; they do not remove it. The digest backs BOTH\nTPC-Havoc's validate_results_checksum comparator AND the bounded\ncorrectness gate's value-digest oracle (one shared definition, per\nvalidation.py's module docstring), so a colliding regression on either\npath is invisible today. The DONE notes' stated reason for not fixing was\nscope, not design: any rendering change invalidates the committed\nreference benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json,\nand regeneration machinery discipline was the riskier part at the time.\nThat machinery now exists and is contract-tested\n(`make correctness-gate-digests-regen`, Makefile:147-160, idempotent on a\nclean tree), which is what makes the real fix cheap now.\n\nFix shape: render each cell with a type tag and escape the separator\ncharacters (e.g. escape `\\`, `|`, `\\n` in string payloads; prefix a\none-byte type marker for str/int/float/Decimal/date/NULL), keeping\n_row_sort_key's None-safe ordering untouched. Every pinned collision then\nbecomes a distinctness assertion.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hand-edit tpch_value_digests_sf1.json",
+        "instead": "only correctness-gate-digests-regen writes it.",
+        "item_id": "calculate-checksum-collision-hardening",
+        "why": "the file is generated with provenance from a live gate run"
+      },
+      {
+        "dont": "ship the renderer change and the reference regen in separate PRs",
+        "instead": "same change, per the Makefile's documented contract.",
+        "item_id": "calculate-checksum-collision-hardening",
+        "why": "the window between them is a red gate on a correct tree"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "calculate-checksum-collision-hardening",
+        "id": 308,
+        "reason": "Separately pinned accepted property with its own DuckDB-pinned-oracle rationale; only touch it here if w3 shows the renderers are actually shared.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: In scope only 'if w3 shows renderers are shared' -- unresolved speculative condition; digest rendering already separately pinned.",
+        "summary": "Reworking result_digest.py's int-vs-float/Decimal rendering asymmetry"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-05T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "_row_sort_key's None-safe row ordering semantics are unchanged (ordering is not part of this fix).",
+        "item_id": "calculate-checksum-collision-hardening"
+      },
+      {
+        "behavior": "make test-correctness-gate passes on a correct tree after the same-change regen (Makefile:150-160 idempotency contract: regen && git diff --exit-code is clean).",
+        "item_id": "calculate-checksum-collision-hardening"
+      },
+      {
+        "behavior": "validate_results_checksum and the correctness gate's value-digest oracle keep sharing exactly one digest definition — no forked renderer.",
+        "item_id": "calculate-checksum-collision-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Makefile:correctness-gate-digests-regen (147-160) — reuse: the exact same-change regen mechanism this fix's reference-invalidation depends on; its idempotency contract is the post-fix verification.",
+        "decision": "reuse",
+        "item_id": "calculate-checksum-collision-hardening",
+        "path": "Makefile:correctness-gate-digests-regen"
+      },
+      {
+        "concept": "benchbox/core/results/result_digest.py:_normalize_cell — the gate-side cell renderer with its own documented int-vs-float rendering asymmetry (pinned in tests/unit/test_correctness_gate_value_oracle.py::test_digest_couples_value_with_numeric_type); align the two renderers' type-tagging decisions or document divergence explicitly.",
+        "decision": "reuse",
+        "item_id": "calculate-checksum-collision-hardening",
+        "path": "benchbox/core/results/result_digest.py:_normalize_cell"
+      },
+      {
+        "concept": "tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py:133-193 — supersede: the four collision pins flip from equality-asserts to inequality-asserts with their docstrings rewritten from 'accepted property' to 'fixed, distinctness guaranteed'.",
+        "decision": "supersede",
+        "item_id": "calculate-checksum-collision-hardening",
+        "path": "tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py:133-193"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "calculate-checksum-collision-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "calculate-checksum-collision-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/result_digest.py"
+      },
+      {
+        "item_id": "calculate-checksum-collision-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json"
+      },
+      {
+        "item_id": "calculate-checksum-collision-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpchavoc/validation.py"
+      },
+      {
+        "item_id": "calculate-checksum-collision-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py -q",
+        "description": "Former collisions now distinct",
+        "expected": "all pass with the flipped distinctness assertions",
+        "item_id": "calculate-checksum-collision-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make correctness-gate-digests-regen && git diff --exit-code benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json && make test-correctness-gate",
+        "description": "Gate green with regenerated reference, regen idempotent",
+        "expected": "second regen produces no diff; gate exits 0 with ran=1 skipped=0",
+        "item_id": "calculate-checksum-collision-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "calculate-checksum-collision-hardening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "calculate-checksum-collision-hardening",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "calculate-checksum-collision-hardening",
+        "notes": "Keep the digest definition in exactly one place. Decide the NULL\nhandling consciously: the NULL-vs-\"NULL\" pin can be fixed by the same\ntype tag (NULL marker vs str tag) — fixing it is preferred; if kept,\nre-justify in the pin's docstring why it survives a fix that makes\nthe other three distinct.\nDONE 2026-07-05: _render_cell + _escape_cell_text in validation.py.\nTags: z (NULL), s (str), i (int; bool folds in, matching\n_cell_sort_key's numeric bucket), f (float), d (Decimal), t\n(date/time/datetime), o:<typename> fallback. Escapes backslash, |,\nnewline in string payloads. NULL-vs-\"NULL\" FIXED by the same tags\n(z: vs s:NULL) - preferred option taken.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement escaped, type-tagged cell rendering in calculate_checksum",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "calculate-checksum-collision-hardening",
+        "notes": "Each former collision asserts digests now differ; add cases where the\nescape character itself appears in payloads (backslash-containing\nstrings) so the escaping is exercised, not just the happy path.\nDONE 2026-07-05: all four pins flipped to distinctness asserts with\nrewritten docstrings; added escape round-trip cases (literal\nbackslash-n vs newline, trailing backslash vs escaped separator,\ndoubled backslash, escape-before-separator across shapes) and\nfloat-vs-Decimal / str-vs-date dtype distinctness. 41 tests pass.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Flip the collision pins to distinctness tests; extend with escape-char round-trip cases",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "calculate-checksum-collision-hardening",
+        "notes": "`make correctness-gate-digests-regen` then\n`git diff --exit-code benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json`\nmust be dirty exactly once (the regen) and clean on a second regen.\nThen `make test-correctness-gate` green. Check whether\nresult_digest.py's oracle path shares the changed renderer — if the\ntwo renderers are independent, say so in the PR body and leave\nresult_digest's asymmetry to its own pin (deferred below).\nDONE 2026-07-05: regen produced exactly one dirty diff (18/18 digest\nvalues changed, provenance stable, DuckDB 1.3.2); second and third\nregens byte-identical (git diff --exit-code clean vs staged copy).\nmake test-correctness-gate green (ran=1 skipped=0 failures=0\nerrors=0). make tpchavoc-equivalence-report green (220/220\nequivalent). Renderer-sharing answer: result_digest.py REUSES\ncalculate_checksum after numeric normalization (composition, not a\nfork), so the regen covers the gate path; result_digest's own\nint-vs-float pre-normalization asymmetry remains its separately\npinned accepted property (deferred, per this TODO's deferred list).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate the committed reference digests in the SAME change and prove gate + idempotency",
+        "wid": "w3"
+      }
+    ]
+  }
+}

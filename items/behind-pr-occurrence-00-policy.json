@@ -1,0 +1,169 @@
+{
+  "context": "Extend the strict-base-refresh policy family with a new decision under _project/decisions/. Reuse pr-refresh as the intended one-at-a-time absorb. Explicitly reject treating allow_update_branch as automatic branch update, reject bulk auto-refresh (refresh storm), and reject arming auto-merge at pr-open as the fix for this class. Point implementers at 01 for the currency gate and 02 for the throughput measurement that is the only authority to recommend reopening 07a or 07b.",
+  "description": "Write one decision record that restates the #1751 BEHIND diagnosis after adversarial review. The binding constraint is required-gate duration versus develop merge interarrival under a strict current-base lock. Opening a stale worktree made #1751 behind before it existed; auto-merge withhold and allow_update_branch did not cause that state. SHADOW_ONLY remains in force. This item does not change workflows, Makefile merge behavior, GitHub settings, or the blocked 07a/07b items.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Blame auto-merge withhold for PRs that were already behind at open",
+        "instead": "separate open-stale from post-green interarrival staleness",
+        "item_id": "behind-pr-occurrence-00-policy",
+        "why": "counterfactual sufficiency: #1751 had no green-and-current window"
+      },
+      {
+        "dont": "Recommend updating every open develop PR when develop moves",
+        "instead": "refresh one stale PR at a time",
+        "item_id": "behind-pr-occurrence-00-policy",
+        "why": "Makefile and policy already call multi-PR refresh self-defeating under strict checks"
+      },
+      {
+        "dont": "Treat allow_update_branch as automatic PR update",
+        "instead": "name the actual updater if one is later selected (merge queue or explicit pr-refresh)",
+        "item_id": "behind-pr-occurrence-00-policy",
+        "why": "the GitHub field is the Update-branch suggestion affordance, not an updater"
+      },
+      {
+        "dont": "Unblock 07a or 07b from this policy item",
+        "instead": "leave 07a/07b blocked and send the measurement to behind-pr-occurrence-02",
+        "item_id": "behind-pr-occurrence-00-policy",
+        "why": "06 selected SHADOW_ONLY; 07a/07b stay blocked until a later measurement-backed activation"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-17T00:50:31Z",
+      "completed_pr": 1753,
+      "created_at": "2026-08-17T00:38:08Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "SHADOW_ONLY remains the selected refresh path until a later activation supersedes strict-base-refresh-06",
+        "item_id": "behind-pr-occurrence-00-policy"
+      },
+      {
+        "behavior": "make pr-ready remains the only local auto-merge arm path",
+        "item_id": "behind-pr-occurrence-00-policy"
+      },
+      {
+        "behavior": "strict_required_status_checks_policy stays the race lock",
+        "item_id": "behind-pr-occurrence-00-policy"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "pr-refresh exact merge and refresh-storm warning",
+        "decision": "reuse",
+        "item_id": "behind-pr-occurrence-00-policy",
+        "path": "Makefile"
+      },
+      {
+        "concept": "arm auto-merge only when the branch is final",
+        "decision": "reuse",
+        "item_id": "behind-pr-occurrence-00-policy",
+        "path": "_project/decisions/auto-merge-policy-consolidation-2026-08-06.md"
+      },
+      {
+        "concept": "SHADOW_ONLY selection and blocked 07a/07b",
+        "decision": "reuse",
+        "item_id": "behind-pr-occurrence-00-policy",
+        "path": "_project/decisions/strict-base-refresh-activation-2026-08-14.md"
+      },
+      {
+        "concept": "strict current-base lock and one-at-a-time pr-refresh shape",
+        "decision": "extend",
+        "item_id": "behind-pr-occurrence-00-policy",
+        "path": "_project/decisions/strict-base-refresh-policy-2026-08-14.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "behind-pr-occurrence-00-policy",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "behind-pr-occurrence-00-policy",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "behind-pr-occurrence-00-policy",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "behind-pr-occurrence-00-policy",
+        "kind": "do_not_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "behind-pr-occurrence-00-policy",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "behind-pr-occurrence-00-policy",
+        "kind": "do_not_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "behind-pr-occurrence-00-policy",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/behind-pr-occurrence-*.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'open-stale|interarrival|allow_update_branch|refresh storm|SHADOW_ONLY|pr-refresh' _project/decisions/behind-pr-occurrence-*.md",
+        "description": "Decision names both causes and rejects the wrong mechanisms",
+        "expected": "all policy concepts present",
+        "item_id": "behind-pr-occurrence-00-policy",
+        "last_result": "pass",
+        "last_run": "2026-08-17T00:50:24Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo show strict-base-refresh-07a-reduced-fast-refresh-rollout --json | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get(\"blocked_reason\")'",
+        "description": "07a and 07b remain blocked after this item",
+        "expected": "exit 0",
+        "item_id": "behind-pr-occurrence-00-policy",
+        "last_result": "pass",
+        "last_run": "2026-08-17T00:50:28Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "behind-pr-occurrence-00-policy",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated 2026-08-16: ruleset 15611785 strict=true checks=[browser gate, ci-required-result, ruleset-drift]; allow_update_branch=false (suggestion affordance); allow_auto_merge=true; 07a/07b still blocked on 06; #1751 created 22:54:06Z still OPEN; origin/develop=44e35d65c",
+        "item_id": "behind-pr-occurrence-00-policy",
+        "notes": null,
+        "started_at": "2026-08-17T00:43:06Z",
+        "started_branch": "docs/behind-pr-occurrence-00-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-behind-pr-00",
+        "status": "done",
+        "summary": "Revalidate live ruleset strictness, allow_update_branch meaning, #1751 timeline, and 07a/07b blocked reasons",
+        "wid": "w0"
+      },
+      {
+        "evidence": "_project/decisions/behind-pr-occurrence-2026-08-16.md; todo verify --run 1 and 2 pass; check-scope OK",
+        "item_id": "behind-pr-occurrence-00-policy",
+        "notes": null,
+        "started_at": "2026-08-17T00:43:55Z",
+        "started_branch": "docs/behind-pr-occurrence-00-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-behind-pr-00",
+        "status": "done",
+        "summary": "Write the decision record with accepted/rejected mechanisms and residual risk",
+        "wid": "w1"
+      }
+    ]
+  }
+}

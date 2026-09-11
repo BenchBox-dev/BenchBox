@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: Medium\"\n- \"**Status**: Completed ✅\"\n- \"**Description**: Create databases with distinct naming that reflects scale factor and tuning configurations, enabling users to understand essential configurations from the database name alone\"\n- \"**Tasks**:\"\n- \"**Files Affected**: `benchbox/platforms/base.py`, all platform adapters, `benchbox/cli/config.py`, database validation utilities, CLI modules\"\n- \"**Implementation Strategy**:\"\n- \"**Implementation Summary**:\"\n- \"**Impact**: Enables users to easily identify database configurations from names alone, facilitates database organization and management, supports parallel testing of different configurations, improves debugging and troubleshooting by making configuration visible in database listings\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

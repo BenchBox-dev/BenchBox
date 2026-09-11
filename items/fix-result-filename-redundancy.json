@@ -1,0 +1,10 @@
+{
+  "description": "Result filenames contain redundant and inconsistent elements that make them\nunnecessarily long and confusing:\n\n1. **Double benchmark name**: `tpc_h_benchmark_sf001_..._tpc-h_benchmark_1768439424.json`\n   - `tpc_h_benchmark` in the benchmark component\n   - `tpc-h_benchmark` in the execution_id component\n\n2. **Double \"df\"**: `tpcds_sf1_datafusion-df_..._df_tpcds_1768423101.json`\n   - `-df` in platform name (`datafusion-df`)\n   - `df_` prefix in execution_id (`df_tpcds_...`)\n\nThe filename template is: `{benchmark}_{sf}_{platform}_{timestamp}_{execution_id}.json`\n\nThe execution_id redundantly includes the benchmark name and df prefix:\n- SQL runner: `{benchmark_name}_{timestamp}`\n- DataFrame runner: `df_{benchmark_name}_{timestamp}`\n\nSolution: Simplify execution_id to be just a unique 8-character hex UUID since\nbenchmark name and platform are already in the filename.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-14T00:00:00Z",
+      "worktree": "core-functionality"
+    }
+  }
+}

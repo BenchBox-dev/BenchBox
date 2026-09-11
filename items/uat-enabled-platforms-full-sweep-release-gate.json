@@ -1,0 +1,299 @@
+{
+  "context": "Treat this as the integration gate for the remediation chain. First prove the\nmatrix and compatibility accounting are correct, then run the full sweep, then\ncommit only the compact durable facts needed for release readiness.\n",
+  "description": "After auth propagation, explicit compatibility rules, LakeSail remediation,\ntimeout hardening, and Explorer external-corpus smoke are implemented, rerun\nthe corrected enabled-platform UAT for `lakesail`, `pg-duckdb`, `pg-mooncake`,\nand `timescaledb`.\n\nThe goal is not merely a green command. The release gate must prove that every\nnon-compatibility-blocked benchmark runs for each enabled platform, validation\nis clean wherever validators exist, packaging/report phases complete, Explorer\nsmoke passes against the packaged corpus, and any excluded benchmark has a\ndurable compatibility rule.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "accept a green run that skipped failed benchmarks without compatibility rules",
+        "instead": "(not specified)",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "commit raw `cells.jsonl`, screenshots, Playwright reports, command logs, or binary result bundles",
+        "instead": "(not specified)",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "run multiple Docker stacks concurrently or use global Docker prune commands",
+        "instead": "(not specified)",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-enabled-platforms-full-sweep-release-gate",
+        "id": 609,
+        "reason": "The requested enabled platforms are local Docker-managed platforms; cloud/live sweeps require separate approval.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Run cloud/live platform UAT"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-enabled-platforms-full-sweep-release-gate",
+        "id": 610,
+        "reason": "Release cutting is separate from this remediation batch and requires an explicit release turn.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Cutting a release is an operational maintainer action, not an engineering TODO; open human-action-required queue is the right home if needed.",
+        "summary": "Cut release after green enabled-platform gate"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "needs_item": "lakesail-benchmark-sql-compatibility-remediation"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "needs_item": "uat-explorer-smoke-external-corpus"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "needs_item": "uat-matrix-compatibility-policy"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "needs_item": "uat-pg-extension-auth-propagation"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "needs_item": "uat-timeout-enforcement-hardening"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "uat-enabled-platforms-remediation"
+    },
+    "preserves": [
+      {
+        "behavior": "Docker stacks run sequentially and are torn down through project targets",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate"
+      },
+      {
+        "behavior": "No live cloud tests run without explicit approval",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate"
+      },
+      {
+        "behavior": "Only explicitly justified compatibility rules may exclude benchmark/platform combinations",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate"
+      },
+      {
+        "behavior": "Raw UAT evidence remains under `/Users/joe/Developer/benchmark_runs` or `/tmp`, not committed",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/command-status.json -- prior corrected run returned 2 after 1036.4s",
+        "decision": "reuse",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "path": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/command-status.json"
+      },
+      {
+        "concept": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/matrix_summary.tsv -- prior run had 13 passed and 83 failed executed cells",
+        "decision": "reuse",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "path": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/matrix_summary.tsv"
+      },
+      {
+        "concept": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/playwright_smoke.log -- prior Explorer smoke build passed but route smoke failed",
+        "decision": "reuse",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "path": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/playwright_smoke.log"
+      },
+      {
+        "concept": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/uat_lifecycle.log -- prior Docker lifecycle succeeded for targeted platforms",
+        "decision": "reuse",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "path": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/uat_lifecycle.log"
+      },
+      {
+        "concept": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/validator_rollup.tsv -- prior clean validation only covered 13 LakeSail result bundles",
+        "decision": "reuse",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "path": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/validator_rollup.tsv"
+      },
+      {
+        "concept": "docs/operations/uat-framework.md -- long-running UAT command, logging, and cleanup expectations",
+        "decision": "reuse",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "path": "docs/operations/uat-framework.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "docker/"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/playwright-report/"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/test-results/"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/uat-enabled-platforms-remediation/"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-sweep CONFIG=tests/uat/configs/uat-enabled-platforms-full.yaml",
+        "description": "Full enabled-platform UAT sweep completes with explicit coverage accounting",
+        "expected": "`command-status.json` returns 0, or any nonzero exit is tied only to explicitly accepted compatibility-blocked cells",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -n \"$BENCHBOX_UAT_RUN_DIR\" && uv run -- python - <<'PY'\nimport os\nfrom pathlib import Path\nrun = Path(os.environ['BENCHBOX_UAT_RUN_DIR'])\nfor name in ['matrix_summary.tsv', 'validator_rollup.tsv', 'uat_lifecycle.log', 'playwright_smoke.log']:\n    print(name, (run / name).exists())\nPY",
+        "description": "Validator rollup and matrix accounting are clean",
+        "expected": "All required summary artifacts exist; matrix counts match every candidate/executed/pruned cell",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "Planning/TODO schema and graph remain valid after summary updates",
+        "expected": "passes",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Final branch passes project preflight before PR",
+        "expected": "passes",
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "notes": "Added `tests/uat/configs/uat-enabled-platforms-full.yaml` and ran with\n`BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs`. Raw logs and\nbrowser artifacts remained under the run root.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prepare the final enabled-platform UAT config and run directory",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "notes": "Ran all non-compatibility-blocked benchmarks for `lakesail`,\n`pg-duckdb`, `pg-mooncake`, and `timescaledb` with Docker managed\nsequentially and early-stop disabled. Docker lifecycle was clean.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the full enabled-platform sweep sequentially",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "notes": "Checked `matrix_summary.tsv`, `validator_rollup.tsv`,\n`uat_lifecycle.log`, package output, and `playwright_smoke.log`.\nExplorer external-corpus smoke passed. Matrix accounting reported\n88 candidates, 84 executed, 4 compatibility-pruned, 33 passed,\n50 failed, and 1 timed out. The timed-out cell was\n`timescaledb/tpchavoc` at the configured 600s timeout.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate result integrity, packaging, reports, and Explorer smoke",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "notes": "Added `_project/audits/uat-enabled-platforms-full-release-gate-2026-05-13.md`\nwith command, checked SHA, run path, counts, compatibility-pruned cells,\nvalidator rollup summary, and remaining failures. No raw logs,\nscreenshots, browser reports, or generated binary evidence were committed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Commit a compact durable UAT summary",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-enabled-platforms-full-sweep-release-gate",
+        "notes": "The final 2026-05-14 sweep on this branch passed every executed cell.\nThe last remediation pass fixed FlightData CSV NULL handling for\nPostgreSQL-family COPY, kept real `.csv` inputs in CSV COPY mode when\n`csv_null_marker=\"\"`, added emitted pg-extension platform names\n(`pg_duckdb`, `pg_mooncake`) to the submission validator allow-list, and\npromoted LakeSail `vector_search` from an all-query compatibility skip to\nan explicit benchmark gate. Evidence-backed benchmark gates also cover\nPostgreSQL-family `joinorder` and `tpcds_obt`, pg_mooncake `tpcds`, and\nTimescaleDB `datavault`.\n\nFinal full gate:\n`/Users/joe/Developer/benchmark_runs/logs/uat_enabled_platforms_full_20260514/`.\nPhase exit codes were all zero. Matrix accounting reported 88 candidates,\n64 executed, 24 compatibility-pruned, 64 passed, 0 failed, 0 timed out.\nValidator clean rate met the 1.0 floor for submittable bundles; three\nTPC-DS subscale bundles were visible as `refused-by-cli` because they are\nintentionally unofficial subscale outputs. Explorer external-corpus smoke\npassed in Chromium against the packaged corpus. UAT Docker lifecycle was\nsequential and clean; post-run `make uat-docker-cleanup APPLY=1` removed\nthe UAT-owned LakeSail image and left only non-UAT base images.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remediate remaining PG extension and TimescaleDB red cells",
+        "wid": "w4"
+      }
+    ]
+  }
+}

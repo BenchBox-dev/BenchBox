@@ -1,0 +1,364 @@
+{
+  "context": "Treat Step 3 as a workflow routing change. Required checks are already\nminimal, so the implementation should not touch GitHub protection/ruleset\nsettings. The highest-risk design point is check-name stability: GitHub\nrequired contexts are name-sensitive, and Step 3a may later add an umbrella\nresult check. Keep the existing required context names stable during Step 3\nunless the implementation deliberately leaves rulesets untouched and proves\nGitHub still reports the required checks.\n\nPrefer moving whole non-required lanes to a nightly/manual workflow over\nsprinkling branch conditions through every job. A split workflow makes\nownership visible: routine develop PR checks prove fast code health, while\nnightly/manual checks preserve compatibility and release confidence. If a\njob must stay in `test.yml` for status-name compatibility, gate it narrowly\nand document the reason next to the condition.\n",
+  "description": "Step 0 invalidated the original strict-base diagnosis. `develop` has no\nclassic branch protection object, and the active `develop-squash-only`\nruleset already requires only `lint` and `test (ubuntu-latest, 3.12)`;\n`strict_required_status_checks_policy` is already `false`.\n\nThe remaining load-bearing Step 3 work is CI-cost reduction, not branch\nprotection. `.github/workflows/test.yml` still runs a broad non-required\nPR-tier workflow on pull requests to `develop`: a multi-version/OS test\nmatrix, security, smoke/integration lanes, table-format checks, package\ninstall validation, parity, and non-blocking PySpark. The Step 0 baseline\nmeasured recent `Tests` runs at P50 16.70 minutes and P95 19.47 minutes.\n\nReplanned Step 3 should keep the existing required contexts unchanged and\nmove or gate only non-required heavy lanes so ordinary `develop` PRs stop\nspending runner time on release-grade validation. Full validation must\nremain available through nightly and workflow_dispatch, and `main` PR/tag\nrelease coverage must remain release-grade.\n\nDesigned-together follow-up: Step 3a (`dev-loop-step-3a-path-based-ci-skip`)\nremains valid after this replan. Step 3 reduces non-required job breadth for\ncode PRs; Step 3a separately adds path-aware behavior for content-only PRs\nwhile preserving the already-minimal required contexts.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "block Step 3 on Step 3a's path umbrella",
+        "instead": "keep Step 3 scoped to non-required job cost",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "why": "content-only skip is a separate follow-up"
+      },
+      {
+        "dont": "delete heavy checks outright",
+        "instead": "keep them in nightly/workflow_dispatch or an explicit opt-in lane",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "why": "moved checks still catch compatibility regressions"
+      },
+      {
+        "dont": "deprecate or remove `make pr-refresh` in Step 3",
+        "instead": "keep it as a rare branch-drift escape hatch",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "why": "the old rationale was stale strict-base churn"
+      },
+      {
+        "dont": "introduce many copy-pasted branch conditions without a design note",
+        "instead": "prefer split workflows or a small documented condition pattern",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "why": "future jobs will drift"
+      },
+      {
+        "dont": "lighten main PR or tag-release validation",
+        "instead": "preserve release-grade coverage there",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "why": "main is release-only and tags publish artifacts"
+      },
+      {
+        "dont": "patch develop branch protection or rulesets in Step 3",
+        "instead": "record the live state and leave it unchanged",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "why": "Step 0 already found strict-base false and required checks reduced"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "id": 378,
+        "reason": "Separate TODO already exists and must preserve the required contexts once Step 3's CI routing is stable.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: _project/DONE/main/active/dev-loop-step-3a-path-based-ci-skip.yaml confirms the referenced separate TODO exists and is already Completed.",
+        "summary": "Step 3a path-aware required-check umbrella"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "id": 379,
+        "reason": "Step 6 territory, and Step 0 found no current strict-base re-CI pain plus no exposed merge-queue rule for this user-owned repository.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Merge Queue migration is explicitly 'Step 6 territory', which is the open dev-loop-step-6-queue-decision-gate item.",
+        "summary": "Native GitHub Merge Queue migration"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "id": 380,
+        "reason": "Could reduce cost, but adds operational burden. Revisit only if Step 5 runner-minute metrics justify it.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Self-hosted runner adoption is explicitly gated on dev-loop Step 5 runner-minute metrics justifying it; Step 5 measurement is still in progress (dev-loop-step-5-measurement-window).",
+        "summary": "Self-hosted runner adoption"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "needs_item": "dev-loop-step-0-verify-assumptions"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-30T00:00:00Z",
+      "created_at": "2026-04-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Full validation for main PRs and tag releases remains release-grade and must not be lightened as a side effect of reducing develop PR cost",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off"
+      },
+      {
+        "behavior": "Heavy checks removed from routine develop PR execution remain runnable through nightly/workflow_dispatch or an explicit opt-in label",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off"
+      },
+      {
+        "behavior": "No Step 3 branch-protection or ruleset PATCH; Step 0 already found the intended strict-base and required-check state live",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off"
+      },
+      {
+        "behavior": "The develop required contexts remain exactly `lint` and `test (ubuntu-latest, 3.12)` unless a separate Step 3a deployment explicitly changes the ruleset required-check list",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off"
+      },
+      {
+        "behavior": "`make pr-refresh` remains available as an escape hatch for real branch drift; Step 3 must not remove or deprecate it based on the stale strict-base premise",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml (Step 4 owns this)"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/lint.yml unless w1 proves required-check naming requires it"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "kind": "do_not_modify",
+        "path_glob": ".pre-commit-config.yaml (Step 1 owns pre-push gating)"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub branch protection / rulesets (read-only verification only)"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile pr-refresh, pr-open, pr-fanout, and worktree targets"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "kind": "do_not_modify",
+        "path_glob": "tests/ (no product test changes for CI routing)"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml (new or updated)"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/release.yml (audit/comment only if needed)"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md (CI guidance only)"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md (CI guidance only)"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/dev-loop-step-3-ci-rebalance-and-strict-base-off.yaml (replan only)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)\nfound=0\nfor ruleset_id in $(gh api \"repos/${repo}/rulesets\" --jq '.[] | select(.target == \"branch\" and ((.conditions.ref_name.include // []) | any(. == \"refs/heads/develop\"))) | .id'); do\n  found=1\n  gh api \"repos/${repo}/rulesets/${ruleset_id}\" --jq '.rules[] | select(.type == \"required_status_checks\") | .parameters'\ndone\ntest \"$found\" = \"1\"\n",
+        "description": "Develop ruleset still has strict-base off with only the two lightweight required contexts",
+        "expected": "strict_required_status_checks_policy is false; required_status_checks are the lightweight develop PR contexts",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/joeharris76/BenchBox/branches/develop/protection --jq '.required_status_checks' 2>/dev/null || echo classic-protection-not-configured",
+        "description": "Classic branch protection is absent or has no conflicting required-check policy",
+        "expected": "classic-protection-not-configured OR no broader/strict required checks",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "branch=$(git branch --show-current)\npr_base=$(gh pr view \"$branch\" --json baseRefName --jq .baseRefName)\n[ \"$pr_base\" = \"develop\" ] || { echo \"PR for $branch targets $pr_base, not develop\"; exit 1; }\nrun_id=$(gh run list --workflow test.yml --branch \"$branch\" --event pull_request --limit 1 --json databaseId --jq '.[0].databaseId')\ngh run view \"$run_id\" --json jobs --jq '[.jobs[] | select(.conclusion != \"skipped\") | .name] | sort[]'\n",
+        "description": "Routine develop PR Tests workflow no longer queues broad non-required lanes",
+        "expected": "Only non-skipped required/lightweight develop PR job names, plus any explicitly documented lightweight umbrella/content jobs",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh workflow list --json name,state,path --jq '.[] | select((.name | test(\"nightly|Nightly\")) or (.path | test(\"nightly\")))'",
+        "description": "Nightly/manual workflow exists and is active for broad validation",
+        "expected": "nightly workflow exists and state is active",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'pull_request:|branches:|main|tags:|matrix:|macos-latest|windows-latest|test-package|release' .github/workflows/test.yml .github/workflows/nightly.yml .github/workflows/release.yml",
+        "description": "Main PR and release paths still expose full validation coverage",
+        "expected": "main/tag release validation paths and full validation lanes are present outside nightly-only execution",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'strict-base|strict|required checks|nightly|workflow_dispatch|release-grade|pr-refresh' CLAUDE.md AGENTS.md",
+        "description": "Agent docs describe the current CI contract without stale strict-base/deprecation claims",
+        "expected": "docs state strict-base is already off, required checks are minimal, nightly/manual carries heavy validation, and pr-refresh remains an escape hatch",
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "notes": "Start from `_project/decisions/dev-loop-verification-2026-04-30.md`,\nthen re-read live GitHub state before editing workflows. Record:\n  - Classic branch protection for `develop` remains absent or has no\n    required-check drift.\n  - Ruleset `develop-squash-only` still requires exactly `lint` and\n    `test (ubuntu-latest, 3.12)`.\n  - `strict_required_status_checks_policy` remains `false`.\n  - Every job in `.github/workflows/test.yml` is classified as required,\n    non-required PR-tier, push/main, label-gated, or manual/nightly.\n\nThis is a gate for the rest of Step 3. If required contexts changed\nafter Step 0, stop and re-evaluate rather than editing CI around stale\nassumptions.\n\nImplementation record (2026-04-30):\n  - `gh api repos/joeharris76/BenchBox/branches/develop/protection`\n    returned HTTP 404, so classic branch protection remains absent.\n  - `gh api repos/joeharris76/BenchBox/rulesets/15611785` returned\n    required status checks `lint` and `test (ubuntu-latest, 3.12)`;\n    `strict_required_status_checks_policy` is `false`.\n  - Required PR contexts: `lint` from `.github/workflows/lint.yml` and\n    `test (ubuntu-latest, 3.12)` from the `Tests` matrix.\n  - Non-required routine PR contexts in `.github/workflows/test.yml`:\n    `test (ubuntu-latest, 3.10)`, `test (ubuntu-latest, 3.13)`,\n    `test (macos-latest, 3.12)`, `test (windows-latest, 3.12)`,\n    `test (windows-latest, 3.10)`, `check-test-patterns`, `security`,\n    `integration-smoke` on Ubuntu and Windows, `integration-table-formats`,\n    `test-package` on Ubuntu and Windows, `parity`, and `pyspark-tests`.\n  - Label-gated/push-main context: `integration` runs on `push` or PRs\n    carrying `run-integration`; it is skipped for ordinary develop PRs.\n  - Manual/nightly broad validation does not exist yet; Step 3 must add\n    it before removing non-required routine PR lanes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reconfirm protection/ruleset state and classify PR-tier jobs by requirement status",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "notes": "Choose the smallest maintainable workflow shape that keeps the two\nrequired contexts stable. The default recommendation is:\n  - Keep `lint` in its existing workflow.\n  - Keep `test (ubuntu-latest, 3.12)` reporting under the existing Tests\n    workflow/job identity for code PRs.\n  - Remove, split, or job-gate non-required develop PR lanes from the\n    routine `pull_request` path.\n  - Preserve label-gated/manual execution for heavier checks when a PR\n    intentionally needs them.\n\nPrefer a clear workflow split (`test.yml` for PR-tier required checks,\n`nightly.yml` for broad validation) over repeating fragile job-level\nconditions everywhere. If a split would break required check names,\nuse targeted conditions instead and document why.\n\nImplementation record (2026-04-30):\n  - Kept `.github/workflows/lint.yml` unchanged so the required `lint`\n    context stays stable.\n  - Replaced the broad `test` matrix with one explicit required job named\n    `test (ubuntu-latest, 3.12)`, preserving the required context while\n    avoiding matrix evaluation for routine develop PRs.\n  - Added `compat-test` for non-required OS/Python combinations on\n    main/push surfaces.\n  - Added develop-PR gates to non-required `test.yml` jobs:\n    `compat-test`, `check-test-patterns`, `security`,\n    `integration-smoke`, `integration-table-formats`, `test-package`,\n    `parity`, and `pyspark-tests`.\n  - Left `integration` label-gated as-is so `run-integration` can still\n    opt a PR into the heavier integration lane intentionally.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design the develop PR trigger policy for non-required test.yml jobs",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "notes": "Add or update `.github/workflows/nightly.yml` so the jobs removed from\nroutine develop PRs still run on:\n  - `workflow_dispatch`\n  - a low-contention nightly schedule\n\nThe nightly/manual path should cover the multi-OS/Python matrix,\nintegration smoke and table-format checks, package install validation,\nparity, security audit, and PySpark lane unless w1 finds a specific lane\nbelongs somewhere else. Use existing commands and dependency setup from\n`test.yml`; do not invent a parallel test stack.\n\nIf failure issue automation is added, keep it narrow and idempotent:\none open issue per failing nightly class, labeled `incident:nightly-red`,\nwith the run URL and failing job names. If that automation is too large\nfor this PR, defer it explicitly and ensure nightly failures are still\nvisible through GitHub notifications.\n\nImplementation record (2026-04-30):\n  - Added `.github/workflows/nightly.yml` with `workflow_dispatch` and a\n    daily 06:00 UTC schedule.\n  - Nightly coverage includes the full OS/Python fast-test matrix,\n    patch-safety check, security audit, integration smoke,\n    table-format integration, full local integration, package install,\n    parity, and non-blocking PySpark lanes.\n  - Reused the existing `uv` setup and test commands from `test.yml`.\n  - Deferred automatic issue creation to keep this PR scoped; failures\n    remain visible through GitHub Actions notifications and manual\n    workflow dispatch is available for reruns.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move broad validation to nightly/workflow_dispatch without losing coverage",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "notes": "Audit `.github/workflows/test.yml`, `.github/workflows/nightly.yml`, and\n`.github/workflows/release.yml` after the split/gating work. Confirm\n`pull_request` to `main` and `push`/tag release paths still run\nrelease-grade coverage automatically, not only through nightly:\n  - Full OS/Python compatibility coverage remains on a main/release path.\n  - Package build/install validation remains on a main/release path.\n  - Release-flow checks are unchanged.\n\nA comment in the workflow is acceptable when it prevents future drift,\nbut avoid comment-only churn unless it clarifies a real branch-specific\ninvariant.\n\nImplementation record (2026-04-30):\n  - Audited `.github/workflows/test.yml`: `pull_request` to `main` and\n    `push` to `main` still run the required Ubuntu 3.12 fast-test job,\n    the additional compatibility matrix, package install, security,\n    smoke/table-format, and parity lanes. The new gates exclude only\n    `pull_request` events whose base branch is `develop`.\n  - Audited `.github/workflows/validate-main-pr.yml`: main PRs remain\n    restricted to release branches through `validate-base`.\n  - Audited `.github/workflows/release.yml`: `push` tags matching `v*`\n    still run dependency bounds, reproducible build, package checks,\n    publish, GitHub release creation, and post-publish installation\n    across Ubuntu/macOS/Windows and Python 3.10/3.12/3.13 coverage.\n  - No release workflow edits were needed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Preserve main PR and tag-release validation semantics",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "notes": "Update `CLAUDE.md` and `AGENTS.md` only where the workflow contract is\nwrong or incomplete. The guidance should say:\n  - Develop required checks are already minimal: `lint` and\n    `test (ubuntu-latest, 3.12)`.\n  - Strict-base is already off for `develop`; do not describe Step 3 as\n    a strict-base deployment.\n  - Heavy non-required lanes moved out of routine develop PR execution\n    remain available through nightly/workflow_dispatch or explicit labels.\n  - `main` PRs and tag releases retain release-grade validation.\n  - `make pr-refresh` remains an escape hatch for genuine branch drift;\n    do not deprecate it solely because strict-base was already off.\n\nImplementation record (2026-04-30):\n  - Updated `CLAUDE.md` and `AGENTS.md` to state that develop required\n    checks are intentionally minimal and strict-base is already off.\n  - Documented the split between routine develop PR gates and broad\n    nightly/workflow_dispatch validation.\n  - Preserved `make pr-refresh` as an escape hatch rather than a\n    deprecated path.\n  - Documented that main PRs and tag releases keep release-grade\n    validation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update agent docs for the replanned CI contract",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-3-ci-rebalance-and-strict-base-off",
+        "notes": "Run focused workflow/TODO validation first, then the repo preflight\nappropriate to the code touched. For workflow-only changes, at minimum:\n  - YAML validation on edited workflow and TODO files\n  - `uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph`\n  - `make pr-preflight`\n  - `/code review W6` or equivalent adversarial review of the diff\n  - `make pr-open`\n\nThe PR description must state that no branch-protection or ruleset PATCH\nis part of Step 3 because Step 0 already proved the desired required\ncontexts and strict-base setting are live on `develop`.\n\nImplementation record (2026-04-30):\n  - Rebased the implementation branch onto `origin/develop` after the\n    Step 3 replan PR merged.\n  - Validated edited YAML files with `pre-commit` `check-yaml`.\n  - Ran `todo_cli.py check-graph`; graph validation passed.\n  - Reconfirmed the live `develop-squash-only` ruleset still requires\n    only `lint` and `test (ubuntu-latest, 3.12)` with strict-base off.\n  - Reconfirmed classic branch protection remains absent.\n  - Ran `make pr-preflight`; CI lint checks passed and fast tests\n    reported `21268 passed, 6 skipped`.\n  - Final branch review found no blocking issues.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify locally, review the change, and open the PR",
+        "wid": "w6"
+      }
+    ]
+  }
+}

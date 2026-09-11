@@ -1,0 +1,132 @@
+{
+  "description": "Follow-up governance defect from register-adapter-ddl-rewrites-under-sql-compat (deferral #233). SCHEMA_EMIT is now enforced by scripts/compat_lint.py, but QUERY_ADAPTER still lacks a settled detector boundary and negative-control acceptance test. Current inventory includes registered ClickHouse/StarRocks query rewrites and platform-local Firebolt/Redshift cache-session settings whose inclusion or exemption must be explicit. Group the boundary decision, registry/inventory enforcement, exemptions, negative controls, and CI wiring in this item.",
+  "legacy": {
+    "item_meta": {
+      "blocked_reason": "SCHEMA_EMIT is already enforced by scripts/compat_lint.py. QUERY_ADAPTER needs one policy decision before implementation: should drift detection cover only dialect branches, or every platform-local rewrite/session-setting function discovered by inventory.py? The broader choice currently includes ClickHouse/StarRocks registered rewrites plus unregistered Firebolt/Redshift cache-session settings that may require explicit exemptions. Because this is a soundness gate, the detector boundary and exemption policy must be specified with a negative control before fail-CI wiring.",
+      "created_at": "2026-07-19T12:34:57Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/**"
+      },
+      {
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/README.md"
+      },
+      {
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "kind": "only_modify",
+        "path_glob": "make/**"
+      },
+      {
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "kind": "only_modify",
+        "path_glob": "scripts/compat_lint.py"
+      },
+      {
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/compat_lint.py",
+        "description": "Compatibility lint clean",
+        "expected": "exit 0",
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/sql_compat/test_registry_integrity_resource_heavy.py tests/unit/core/sql_compat/test_schema_emit_rules_resource_heavy.py tests/integration/test_compat_lint_clean.py -q",
+        "description": "Registry and schema phase controls",
+        "expected": "all tests pass, including an unregistered QUERY_ADAPTER negative control",
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document and encode whether QUERY_ADAPTER drift detection covers dialect branches only or every platform-local rewrite/session-setting, including explicit Firebolt/Redshift treatment",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Keep existing SCHEMA_EMIT enforcement covered while adding QUERY_ADAPTER inventory-to-registry drift detection",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add positive registered-rule fixtures and negative unregistered rewrite/session-setting controls",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-compat-lint-to-enforce-query-adapter-and-schema-e",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wire the guard into required local/CI lint in the same change and update compatibility documentation",
+        "wid": "w4"
+      }
+    ]
+  }
+}

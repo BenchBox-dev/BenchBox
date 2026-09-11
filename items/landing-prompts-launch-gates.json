@@ -1,0 +1,391 @@
+{
+  "context": "Treat launch integration as a release gate, not a place to expand product\nscope. Make the route discoverable, wire stale-catalog checks into CI, verify\nthe page works at a basic level, and record how the team will judge whether\nthe marketing surface is worth maintaining.\n",
+  "description": "Launch the `/prompts/` landing route responsibly after the decision,\ngenerator, and static route TODOs are complete.\n\nThis item covers integration points that make the page discoverable and\nmaintainable: nav links, docs workflow checks, accessibility/mobile smoke\nchecks, analytics or explicit analytics deferral, and launch/kill criteria.\nIt should not expand the feature scope or add new runtime BenchBox surfaces.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add CI checks that depend on live cloud credentials",
+        "instead": "keep verification local/static.",
+        "item_id": "landing-prompts-launch-gates",
+        "why": "this is a static marketing route"
+      },
+      {
+        "dont": "add `/prompts/` to docs nav with a temporary label after the decision record chooses a final label",
+        "instead": "use the selected label consistently.",
+        "item_id": "landing-prompts-launch-gates",
+        "why": "public nav copy is part of the launch contract"
+      },
+      {
+        "dont": "commit screenshot batches or raw logs",
+        "instead": "summarize evidence instead.",
+        "item_id": "landing-prompts-launch-gates",
+        "why": "project artifact hygiene forbids durable raw evidence without a reader-facing consumer"
+      },
+      {
+        "dont": "invoke the generator with `uv run --project _project/scripts",
+        "instead": "because that env lacks `benchbox` - use `uv run -- python scripts/generate_landing_quickstarts.py --check`.",
+        "item_id": "landing-prompts-launch-gates",
+        "why": "...` in CI"
+      },
+      {
+        "dont": "silently ship without analytics or an explicit analytics deferral",
+        "instead": "make measurement posture visible.",
+        "item_id": "landing-prompts-launch-gates",
+        "why": "this feature's value is conversion"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-launch-gates",
+        "id": 329,
+        "reason": "MVP should start with focused smoke/a11y checks; full browser matrix can follow if the route becomes high traffic.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Full cross-browser matrix explicitly conditioned on /prompts/ becoming high traffic; no evidence that threshold was reached.",
+        "summary": "Automated cross-browser matrix for `/prompts/`"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-launch-gates",
+        "id": 330,
+        "reason": "Useful later, but premature before baseline copy/click measurement exists.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: A/B testing prompt copy is explicitly premature until baseline copy/click measurement exists; owning TODO landing-prompts-launch-gates is already done with no baseline-metrics open item.",
+        "summary": "A/B testing prompt copy"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-launch-gates",
+        "id": 331,
+        "reason": "Not applicable while catalog data is inline implementation detail.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Standalone catalog API docs only needed if catalog data stops being an inline implementation detail; it still is.",
+        "summary": "Standalone public catalog API documentation"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-launch-gates",
+        "id": 332,
+        "reason": "Filed as follow-up unless added during w3; manual checklist covers MVP.",
+        "resolution": "promoted",
+        "resolved_item": "automated-a11y-tooling-pa11y-axe",
+        "resolved_reason": null,
+        "summary": "Automated a11y tooling (pa11y/axe)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "needs_item": "landing-prompts-static-route"
+      }
+    ],
+    "item_meta": {
+      "category": "Product and Documentation",
+      "completed_at": "2026-05-13T00:00:00Z",
+      "created_at": "2026-05-13T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Docs build and GitHub Pages assembly continue to publish root landing, `/docs/`, `/blog/`, and `/results/`.",
+        "item_id": "landing-prompts-launch-gates"
+      },
+      {
+        "behavior": "Existing unrelated worktree changes are not reverted or staged as part of this TODO.",
+        "item_id": "landing-prompts-launch-gates"
+      },
+      {
+        "behavior": "No live cloud platform tests are introduced by launch verification.",
+        "item_id": "landing-prompts-launch-gates"
+      },
+      {
+        "behavior": "No raw screenshots, browser reports, or generated evidence blobs are committed without a durable reader-facing purpose.",
+        "item_id": "landing-prompts-launch-gates"
+      },
+      {
+        "behavior": "The docs workflow remains reasonably fast; prompt checks should fail early and emit compact output.",
+        "item_id": "landing-prompts-launch-gates"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/docs.yml:docs build and landing assembly — extend with prompt catalog check",
+        "decision": "extend",
+        "item_id": "landing-prompts-launch-gates",
+        "path": ".github/workflows/docs.yml:docs"
+      },
+      {
+        "concept": "docs/_templates/page.html:docs nav — extend after label decision",
+        "decision": "extend",
+        "item_id": "landing-prompts-launch-gates",
+        "path": "docs/_templates/page.html:docs"
+      },
+      {
+        "concept": "docs/conf.py:custom CSS/JS wiring for docs — consider only for docs nav, not prompt page runtime",
+        "decision": "reuse",
+        "item_id": "landing-prompts-launch-gates",
+        "path": "docs/conf.py:custom"
+      },
+      {
+        "concept": "landing/index.html:site-wide nav and MCP section — extend with `/prompts/` CTA",
+        "decision": "extend",
+        "item_id": "landing-prompts-launch-gates",
+        "path": "landing/index.html:site-wide"
+      },
+      {
+        "concept": "results-explorer/docs and browser tests — reference for visual QA discipline, not as required MVP scope",
+        "decision": "reuse",
+        "item_id": "landing-prompts-launch-gates",
+        "path": "results-explorer/docs"
+      },
+      {
+        "concept": "tests/docs/test_sphinx_warnings.py:slow docs verification pattern — reuse for docs build expectations if needed",
+        "decision": "reuse",
+        "item_id": "landing-prompts-launch-gates",
+        "path": "tests/docs/test_sphinx_warnings.py:slow"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/catalog.generated.js"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/catalog.yaml"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/index.html"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/prompts.css"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/prompts.js"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/generate_landing_quickstarts.py"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "only_modify",
+        "path_glob": "docs/_templates/page.html"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "only_modify",
+        "path_glob": "docs/conf.py"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "only_modify",
+        "path_glob": "landing/index.html"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/a11y-checklist.md"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/landing/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/generate_landing_quickstarts.py --check",
+        "description": "Generator check passes in the same form CI will run",
+        "expected": "exit 0",
+        "item_id": "landing-prompts-launch-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/landing/test_landing_quickstarts.py -q",
+        "description": "Focused prompt route tests pass",
+        "expected": "all tests pass",
+        "item_id": "landing-prompts-launch-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd docs && uv run sphinx-build -b html --keep-going . _build/html",
+        "description": "Docs build succeeds",
+        "expected": "build succeeds without new prompt-related warnings",
+        "item_id": "landing-prompts-launch-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'generate_landing_quickstarts.py --check|prompt-quickstarts-check' .github/workflows/docs.yml && ! rg -n '--project _project/scripts.*generate_landing_quickstarts' .github/workflows/docs.yml",
+        "description": "Docs workflow contains the prompt catalog check (and uses the correct uv form)",
+        "expected": "exit 0; check is present and uses main-project uv env",
+        "item_id": "landing-prompts-launch-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f landing/prompts/a11y-checklist.md || rg -n 'pa11y|axe-core' .github/workflows/docs.yml",
+        "description": "Manual a11y checklist is present (or automated a11y tooling is wired)",
+        "expected": "exit 0; at least one a11y path exists",
+        "item_id": "landing-prompts-launch-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "landing-prompts-launch-gates",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-launch-gates",
+        "notes": "Update `landing/index.html` and `docs/_templates/page.html` after the\ndecision record chooses the public label. Keep nav concise. Add a root\nlanding CTA near the MCP/agent section that drives users to `/prompts/`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add /prompts/ links to landing and docs navigation using the chosen public label",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-launch-gates",
+        "notes": "Add the generator `--check` command to `.github/workflows/docs.yml` in a\nstage that already installs project dependencies. Prefer failing before\nsite assembly. Use the same invocation as local:\n`uv run -- python scripts/generate_landing_quickstarts.py --check`\n(NOT `--project _project/scripts`, which lacks `benchbox`). If the\ncatalog-generator TODO added a `make prompt-quickstarts-check` target,\ncall that instead. Keep output compact; redirect noisy logs if needed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire generated catalog validation into docs CI",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-launch-gates",
+        "notes": "Add the narrowest practical smoke coverage. At minimum verify the page\nexists in assembled site output, selector state can render the default\nprompt, and mobile/desktop layouts avoid obvious overflow. For\naccessibility, add a manual checklist file at\n`landing/prompts/a11y-checklist.md` (focus order, label coverage,\n`aria-live` copy feedback, color contrast, keyboard-only flow) and file\na follow-up TODO for automated a11y tooling if it is not added now.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add launch smoke checks for routing, copy behavior, and mobile layout",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-launch-gates",
+        "notes": "Follow the decision record. If analytics are approved, instrument:\npage load, agent selection, surface selection, prompt copy, CLI command\ncopy, MCP setup copy, docs link click, and cloud platform selection.\n\nIf analytics are deferred, add a durable note to the decision record or\nlaunch notes with revisit date, owner, and qualitative review plan.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement analytics hooks or record an explicit analytics deferral",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-launch-gates",
+        "notes": "Run the focused generator/tests first, then docs build. Do not run live\ncloud tests. Do not commit browser screenshots or raw stdout logs unless\nthey are deliberate product docs assets.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run final docs build and prompt-specific verification",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-launch-gates",
+        "notes": "Following the policy set by `landing-prompts-decision-gates` w5, record\nthe concrete launch values in a compact launch note or update to the\ndecision record:\n- final public label\n- default state\n- analytics or deferral status (with revisit date)\n- cloud safety behavior\n- known limitations\n- kill criteria thresholds (prompt-copy events, MCP-vs-CLI selection\n  ratio, docs-click-throughs) and reevaluation date\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Record final launch values, known limits, and kill criteria",
+        "wid": "w6"
+      }
+    ]
+  }
+}

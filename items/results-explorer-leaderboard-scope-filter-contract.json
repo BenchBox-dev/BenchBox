@@ -1,0 +1,297 @@
+{
+  "context": "Treat filter options as evidence states, not static lists. First identify the\ndenominator and inclusion rule from the snapshot, then update filter copy and\noption states so the visible UI can explain its scope.\n",
+  "description": "The latest review raised unresolved UI questions on the Leaderboards page:\nonly SSB and TPC-H appear in the benchmark filter, only four platforms render\nin the cross-benchmark table, and the tuning filter shows `All tuning`\nwithout explaining whether tuning labels are absent, hidden, or collapsed.\nThese are not just copy issues. They reveal a scope contract gap between the\ncorpus, the rankable leaderboard subset, the public-coverage subset, and the\nfilter controls.\n\nThis TODO makes the homepage leaderboard scope auditable and explicit. Users\nshould understand why an option is present, absent, disabled, or counted, and\nthe UI should not silently imply that the whole corpus is represented when it\nis only showing rankable/public-coverage cohorts.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a generic `limited data` note without naming which denominator is limited.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make disabled options look selectable.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "silently omit unavailable benchmarks or platforms when the UI claims `All benchmarks` or `All public coverage`.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use tuning labels as free-form display strings without normalizing empty and unknown values.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "needs_item": "results-explorer-leaderboard-rank-evidence-semantics"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "results-explorer-followup-todo-review"
+    },
+    "preserves": [
+      {
+        "behavior": "Counts shown in the UI must be derivable from the current snapshot.",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract"
+      },
+      {
+        "behavior": "Do not broaden the leaderboard to unrankable or non-public cohorts just to make filters look complete.",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract"
+      },
+      {
+        "behavior": "Do not hide the distinction between full corpus, public result corpus, and leaderboard-eligible subset.",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract"
+      },
+      {
+        "behavior": "Do not remove existing benchmark, scale, phase, trust, tuning, date, or deployment filters.",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/scripts/results_explorer_snapshot_invariants.py can host count consistency checks.",
+        "decision": "reuse",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "path": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "concept": "docs/development/browser-duckdb-schema.sql documents table fields that can expose corpus vs leaderboard scope.",
+        "decision": "reuse",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "path": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "concept": "results-explorer/src/components/MetaLeaderboard.tsx renders the cross-benchmark leaderboard and scope counts.",
+        "decision": "reuse",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "path": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "concept": "results-explorer/src/lib/duckdbQueries.ts owns leaderboard, cohort, platform, and filter option queries.",
+        "decision": "reuse",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "path": "results-explorer/src/lib/duckdbQueries.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-leaderboard-scope-filter-contract/"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/facetDisplay.test.ts"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/copyFormatters.ts"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayLabels.ts"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/facetDisplay.ts"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/components/__tests__/MetaLeaderboard.test.tsx src/pages/__tests__/Home.test.tsx",
+        "description": "Leaderboard scope and filter tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb",
+        "description": "Snapshot scope/count invariants pass",
+        "expected": "exit 0 with consistent leaderboard scope, platform, benchmark, and tuning counts",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"benchmark options|platform scope|public coverage|tuning|PASS|FAIL\" _project/verification-logs/results-explorer-leaderboard-scope-filter-contract/",
+        "description": "Browser evidence confirms scope questions are answered",
+        "expected": "logs include pass/fail evidence for benchmark, platform, public-coverage, and tuning explanations",
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "notes": "Query the current DuckDB snapshot on the checked git SHA and capture:\n  - total benchmark count in the corpus;\n  - benchmarks with any published result;\n  - benchmarks with rankable cohorts;\n  - benchmarks included in the cross-benchmark leaderboard;\n  - total platform count in the corpus;\n  - platforms with any public result;\n  - platforms included in the visible leaderboard table;\n  - tuning mode values, including null/empty/unknown counts.\nStore SQL, snapshot path/checksum, checked SHA, and output in\n`_project/verification-logs/results-explorer-leaderboard-scope-filter-contract/w0.log`.\nDecision gate: if the UI intentionally shows only rankable/public-coverage\ncohorts, record the exact inclusion rule before editing controls.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rebind leaderboard scope evidence on the checked snapshot",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "notes": "Define a small homepage contract for each filter family:\n  - visible selectable option;\n  - disabled option with explanation;\n  - omitted option with explicit count in scope copy;\n  - empty/unknown tuning label;\n  - public-coverage vs full-corpus counts.\nThe header and table count must answer the observed questions directly:\nwhy only these benchmarks, why only these platforms, and whether tuning\nlabels are unavailable or filtered out. Decision gate: do not implement\nuntil the contract names the denominator for every displayed count.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define filter option states and scope copy",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "notes": "Update the Leaderboards filters so users can see whether SSB/TPC-H are the\nonly eligible leaderboard cohorts or merely the currently selected subset.\nIf other benchmarks/platforms exist but are not leaderboard-eligible, show\na compact availability message or disabled options with reason text instead\nof silently omitting them. Counts such as `Showing 4 of 4 platforms` must\nspecify the denominator, for example `4 leaderboard-eligible platforms`\nwhen the full corpus is larger.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update benchmark and platform filters to expose availability",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "notes": "Replace ambiguous `All tuning` with copy that distinguishes all tuning\nmodes from unknown/unlabelled tuning metadata. If tuning labels are absent\nfor the visible cohorts, show `Tuning: not labelled` or an equivalent\npassive state with a short explanation. If tuning labels exist, expose\nselectable labels and counts without changing the cohort metric contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add explicit tuning-mode labels and unknown handling",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "notes": "Add tests for:\n  - full corpus contains more benchmarks/platforms than leaderboard scope;\n  - filters show, disable, or explain unavailable options according to the\n    contract;\n  - tuning labels render labelled and unlabelled states correctly;\n  - table count copy names the correct denominator;\n  - changing filters updates counts without implying hidden full-corpus\n    coverage.\nInclude one fixture where the full corpus contains benchmarks/platforms\nthat are not leaderboard-eligible, so the test proves the scope copy rather\nthan simply matching the current small seed corpus.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for leaderboard scope counts and filter states",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-leaderboard-scope-filter-contract",
+        "notes": "In a browser at standard desktop width, verify the Leaderboards page\nanswers:\n  - why the benchmark filter has the displayed options;\n  - why the table has the displayed platforms;\n  - what `public coverage` means for the current table;\n  - whether tuning metadata is labelled or unavailable.\nCapture text evidence and screenshots in the verification log directory.\nDecision gate: do not complete if the page still leaves those questions to\ninference or if counts disagree with the SQL from w0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Browser-check the Leaderboards page answers the scope questions",
+        "wid": "w5"
+      }
+    ]
+  }
+}

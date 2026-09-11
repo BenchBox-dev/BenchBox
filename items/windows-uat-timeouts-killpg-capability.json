@@ -1,0 +1,53 @@
+{
+  "context": "Model killpg availability explicitly in the test and keep the production fallback for platforms without POSIX process groups.",
+  "description": "Run 30434746317 fails test_kill_process_group_uses_killpg_when_available before exercising behavior because monkeypatch.setattr(os, 'killpg', ...) requires an attribute Windows os does not expose.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-29T13:04:59Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "POSIX uses process-group termination and Windows retains its supported fallback",
+        "item_id": "windows-uat-timeouts-killpg-capability"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-uat-timeouts-killpg-capability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_timeouts.py"
+      },
+      {
+        "item_id": "windows-uat-timeouts-killpg-capability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/timeouts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/uat/test_timeouts.py -q",
+        "description": "Timeout process-group tests pass",
+        "expected": "exit 0",
+        "item_id": "windows-uat-timeouts-killpg-capability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-uat-timeouts-killpg-capability",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Cover both killpg-present and killpg-absent branches without assuming the host os module shape",
+        "wid": "w1"
+      }
+    ]
+  }
+}

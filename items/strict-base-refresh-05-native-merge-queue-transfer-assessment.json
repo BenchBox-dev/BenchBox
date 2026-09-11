@@ -1,0 +1,278 @@
+{
+  "context": "Write a decision record grounded in official GitHub documentation and live repository inventory. Enumerate every repository workflow and hosted setting that must change, the exact operator sequence, negative controls, rollback limits, and migration downtime. Include Pages/CNAME, redirects, Actions secrets/variables, rulesets, apps, webhooks, packages, environments, badges, clones, and external integrations. Compare one final merge_group full validation per queued group with the custom reduced-refresh residual risk.",
+  "description": "Determine whether transferring BenchBox from a user account to a free organization and adopting GitHub's native merge queue is preferable to permanent custom refresh logic. This is an assessment and migration handoff only: do not transfer the repository, change settings, create an organization, or enable a queue. Verify current GitHub availability, squash compatibility, merge_group behavior, required check topology, auto-merge/Codex workflow effects, and all transfer side effects.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Call repository transfer a one-afternoon zero-risk operation",
+        "instead": "inventory and gate each migration surface",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "why": "Pages, secrets, URLs, integrations, and permissions can change"
+      },
+      {
+        "dont": "Claim merge queue eliminates final CI",
+        "instead": "compare where and how often full integration runs",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "why": "it validates temporary merge groups against the latest base"
+      },
+      {
+        "dont": "Combine native queue and a privileged custom steward",
+        "instead": "keep the steward rejected and select one mechanism",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "why": "that creates two merge authorities"
+      },
+      {
+        "dont": "Enable merge queue before merge_group workflows report every required context",
+        "instead": "rehearse and verify all contexts first",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "why": "the queue will wait or fail on missing checks"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "needs_item": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-14T13:09:18Z",
+      "completed_pr": 1733,
+      "created_at": "2026-08-14T12:13:43Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Every required context must support merge_group before queue activation",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment"
+      },
+      {
+        "behavior": "No repository transfer or hosted setting mutation occurs in this TODO",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment"
+      },
+      {
+        "behavior": "Squash-only history and no-bypass protection remain mandatory in any queue design",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment"
+      },
+      {
+        "behavior": "develop-post-merge remains a separate safety net",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "auto-merge revocation and soundness controls",
+        "decision": "supersede",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "path": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "concept": "trusted ruleset-drift context",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "path": ".github/workflows/develop-ruleset-drift.yml"
+      },
+      {
+        "concept": "ci-required-result required context",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "path": ".github/workflows/pr.yml"
+      },
+      {
+        "concept": "browser required context",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "path": ".github/workflows/results-explorer-browser.yml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings, ownership, rulesets, secrets, variables, apps, webhooks, Pages, packages, and environments"
+      },
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "kind": "do_not_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "kind": "do_not_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/strict-base-refresh-merge-queue-*.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'organization|merge_group|squash|Pages|CNAME|secret|variable|ruleset|app|webhook|package|environment|redirect|rollback|operator|GO|NO_GO|DEFER' _project/decisions/strict-base-refresh-merge-queue-*.md",
+        "description": "Assessment records all migration and merge_group surfaces",
+        "expected": "All required sections are present",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "last_result": "pass",
+        "last_run": "2026-08-14T13:09:07Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/joeharris76/BenchBox --jq '.owner.type + \" \" + (.private|tostring)'",
+        "description": "Live repository remains user-owned during assessment",
+        "expected": "User false",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "last_result": "pass",
+        "last_run": "2026-08-14T13:09:09Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --name-only origin/develop...HEAD -- .github/workflows",
+        "description": "No workflow change is present in the assessment diff",
+        "expected": "no output",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "last_result": "pass",
+        "last_run": "2026-08-14T13:09:11Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo lint strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "description": "This TODO passes tracker quality lint",
+        "expected": "0 findings",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "last_result": "pass",
+        "last_run": "2026-08-14T13:09:15Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "live User false; squash on; no merge_group; queue unavailable until organization transfer",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "notes": "Use official GitHub docs and live APIs. Record what is unavailable while user-owned and what becomes available after transfer.",
+        "started_at": "2026-08-14T13:04:11Z",
+        "started_branch": "docs/strict-base-refresh-05-merge-queue",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-docs-strict-base-refresh-05",
+        "status": "done",
+        "summary": "Verify live owner type, public visibility, queue availability, squash support, merge_group requirements, and queue settings",
+        "wid": "w0"
+      },
+      {
+        "evidence": "inventory Pages/CNAME benchbox.dev, 5 secrets, 0 variables, 4 rulesets, 3 environments, 0 webhooks",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "notes": "Do not expose secret values. Record names and required operator checks only.",
+        "started_at": "2026-08-14T13:05:28Z",
+        "started_branch": "docs/strict-base-refresh-05-merge-queue",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-docs-strict-base-refresh-05",
+        "status": "done",
+        "summary": "Inventory transfer-sensitive repository surfaces including Pages, secrets, variables, rulesets, apps, webhooks, packages, environments, and URLs",
+        "wid": "w1"
+      },
+      {
+        "evidence": "all three required contexts lack merge_group; post-merge stays a tip net",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "notes": "At minimum cover pr.yml, results-explorer-browser.yml, develop-ruleset-drift.yml, auto-merge-on-open.yml, and develop-post-merge.yml.",
+        "started_at": "2026-08-14T13:05:39Z",
+        "started_branch": "docs/strict-base-refresh-05-merge-queue",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-docs-strict-base-refresh-05",
+        "status": "done",
+        "summary": "Map merge_group support for every required context and current auto-merge, soundness, and post-merge control",
+        "wid": "w2"
+      },
+      {
+        "evidence": "operator sequence, abort, and rollback recorded; no settings changed",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "notes": "Include a test branch/ruleset rehearsal if GitHub permits it; no develop activation before all required merge_group contexts report.",
+        "started_at": "2026-08-14T13:05:50Z",
+        "started_branch": "docs/strict-base-refresh-05-merge-queue",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-docs-strict-base-refresh-05",
+        "status": "done",
+        "summary": "Design staged transfer and merge-queue rollout, negative controls, rollback boundaries, and operator-only actions",
+        "wid": "w3"
+      },
+      {
+        "evidence": "comparison table: shadow vs reduced vs native; steward rejected",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "notes": "Do not describe transfer as zero-cost or queue CI as eliminating final integration validation.",
+        "started_at": "2026-08-14T13:06:02Z",
+        "started_branch": "docs/strict-base-refresh-05-merge-queue",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-docs-strict-base-refresh-05",
+        "status": "done",
+        "summary": "Compare native queue safety, latency, maintenance, and migration cost with shadow-only and reduced-refresh options",
+        "wid": "w4"
+      },
+      {
+        "evidence": "verdict DEFER; TODO 06 still selects the path",
+        "item_id": "strict-base-refresh-05-native-merge-queue-transfer-assessment",
+        "notes": "The report must end in GO, NO_GO, or DEFER with explicit evidence gaps.",
+        "started_at": "2026-08-14T13:06:13Z",
+        "started_branch": "docs/strict-base-refresh-05-merge-queue",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-docs-strict-base-refresh-05",
+        "status": "done",
+        "summary": "Publish and independently review the operator-ready queue assessment",
+        "wid": "w5"
+      }
+    ]
+  }
+}

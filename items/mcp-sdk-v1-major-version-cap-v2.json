@@ -1,0 +1,174 @@
+{
+  "context": "Land the smallest compatibility-only dependency change first. Constrain the MCP extra to mcp>=1.28.1,<2, regenerate the lock with uv, and prove both the resolved major version and the existing MCP suite. Record in the dependency comment or adjacent migration documentation that the cap is temporary and owned by mcp-sdk-v2-server-migration.",
+  "description": "BenchBox declares mcp>=1.28.1 in pyproject.toml while uv.lock currently retains 1.28.1. MCP Python SDK 2 is a breaking release that removes the mcp.server.fastmcp import used throughout benchbox/mcp, so a fresh or upgraded resolution can make benchbox.mcp fail to import even though the checked-in lock masks the incompatibility. Add an explicit temporary <2 boundary as an immediate compatibility fix; remove it only in the dedicated SDK-v2 migration item.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "combine the SDK-v2 code migration with this emergency resolver guard",
+        "instead": "land the <2 cap independently and remove it in mcp-sdk-v2-server-migration",
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "why": "the current unbounded dependency can break fresh installs before the larger migration is ready"
+      },
+      {
+        "dont": "edit uv.lock by hand",
+        "instead": "use uv lock with the updated project constraint",
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "why": "manual lock edits can leave inconsistent metadata and hashes"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-01T19:22:10Z",
+        "from_item": "mcp-sdk-v1-major-version-cap-v2",
+        "id": 677,
+        "reason": "make pr-preflight fails audit-raw-check because docs/development/dependency-audit-raw.md is generated from pyproject.toml, but that file is outside this TODO's allowed scope.",
+        "resolution": "promoted",
+        "resolved_item": "mcp-sdk-v1-cap-dependency-audit-artifact",
+        "resolved_reason": null,
+        "summary": "Regenerate the dependency-audit raw artifact after adding the MCP major-version cap"
+      }
+    ],
+    "item_meta": {
+      "category": "dependencies",
+      "completed_at": "2026-08-01T19:35:28Z",
+      "completed_pr": 1435,
+      "created_at": "2026-08-01T15:47:44Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing stdio MCP behavior and public tool, resource, and prompt schemas remain unchanged",
+        "item_id": "mcp-sdk-v1-major-version-cap-v2"
+      },
+      {
+        "behavior": "The mcp optional-dependency group remains installable on every currently supported Python version",
+        "item_id": "mcp-sdk-v1-major-version-cap-v2"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing MCP optional dependency declaration",
+        "decision": "extend",
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "path": "pyproject.toml"
+      },
+      {
+        "concept": "current reproducible MCP 1.28.1 resolution",
+        "decision": "extend",
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "path": "uv.lock"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      },
+      {
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -q 'mcp>=1\\.28\\.1,<2' pyproject.toml",
+        "description": "Project metadata explicitly excludes MCP major version 2",
+        "expected": "Fails on the unfixed tree before this item is implemented; the MCP dependency has an explicit temporary <2 upper bound",
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T19:34:43Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv lock --check",
+        "description": "The lockfile is internally consistent",
+        "expected": "uv reports the lockfile is current",
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T19:34:46Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from importlib.metadata import version; assert version('mcp').split('.')[0] == '1'; import benchbox.mcp\"",
+        "description": "The locked environment imports BenchBox MCP on SDK major version 1",
+        "expected": "the version assertion and import both succeed",
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T19:34:49Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -q",
+        "description": "Existing MCP unit coverage remains green",
+        "expected": "all MCP unit tests pass",
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T19:35:19Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "pyproject.toml now declares mcp>=1.28.1,<2 and names mcp-sdk-v2-server-migration-v2 as the cap-removal owner; recorded rung 1 passes.",
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "notes": null,
+        "started_at": "2026-08-01T19:17:14Z",
+        "started_branch": "fix/mcp-sdk-v1-major-version-cap",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add the temporary mcp>=1.28.1,<2 compatibility boundary with migration ownership",
+        "wid": "w1"
+      },
+      {
+        "evidence": "uv lock --upgrade-package mcp resolved MCP 1.29.0 under <2 and updated the project dependency metadata; uv lock --check passes.",
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "notes": null,
+        "started_at": "2026-08-01T19:17:40Z",
+        "started_branch": "fix/mcp-sdk-v1-major-version-cap",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Regenerate uv.lock through uv and confirm the selected MCP release remains on major version 1",
+        "wid": "w2"
+      },
+      {
+        "evidence": "uv run imported benchbox.mcp with mcp 1.29.0; uv run -- python -m pytest tests/unit/mcp -q completed 502 passed in 16.33s.",
+        "item_id": "mcp-sdk-v1-major-version-cap-v2",
+        "notes": null,
+        "started_at": "2026-08-01T19:18:02Z",
+        "started_branch": "fix/mcp-sdk-v1-major-version-cap",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Run import and focused MCP regression checks and document the fresh-resolution failure being prevented",
+        "wid": "w3"
+      }
+    ]
+  }
+}

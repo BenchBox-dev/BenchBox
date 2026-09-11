@@ -1,0 +1,11 @@
+{
+  "description": "Define how Write Primitives should execute in DataFrame mode.\n\nThe benchmark includes DML/DDL-style operations that do not fit the current\nread-query DataFrameContext contract. A clear write-capable execution model is\nrequired before implementation under this initiative.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-07T00:00:00Z",
+      "created_at": "2026-02-07T00:00:00Z",
+      "worktree": "dataframe-benchmarks"
+    }
+  }
+}

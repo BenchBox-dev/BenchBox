@@ -1,0 +1,11 @@
+{
+  "description": "Integrate Onehouse Quanton as a supported BenchBox platform for high-performance\nmanaged Spark benchmarking with multi-table-format support.\n\nOnehouse Quanton is a serverless managed Spark compute runtime that delivers:\n- **2-3x better price-performance** vs AWS EMR and Databricks\n- **No per-cluster fees** unlike Databricks Photon\n- **Multi-table-format support**: Apache Hudi, Apache Iceberg, and Delta Lake\n- **Apache XTable integration**: Cross-format metadata translation\n- **OneSync catalog sync**: Tables accessible from Snowflake, Databricks, Trino, Ray\n- **Serverless architecture**: Auto-scaling with intelligent cluster management\n- **100% open-source compatible**: Standard Spark/SQL interfaces, no vendor lock-in\n\nKey technical characteristics:\n- Spark 3.x runtime with Quanton execution engine optimizations\n- Serverless clusters in Onehouse Compute Runtime\n- AWS-first with S3 integration (potentially multi-cloud)\n- Smart ETL processing with incremental operations\n- Proven TPC-DS, TPCx-BB, TPC-DI benchmark performance (3x faster on Iceberg)\n\nThis is a strategic platform addition because:\n1. Growing enterprise interest in open lakehouse alternatives\n2. Direct EMR/Databricks comparison validates performance claims\n3. Multi-table-format support enables format comparison benchmarking\n4. Founded by Apache Hudi creators - deep lakehouse expertise\n5. Unique XTable integration for cross-format interoperability testing\n\nTechnical approach:\n- Leverage existing managed Spark patterns (EMR Serverless, Dataproc Serverless)\n- Compose CloudSparkConfigMixin and SparkTuningMixin\n- Use Onehouse API/SDK for cluster and job management\n- Support multiple table formats via configuration\n- SQLGlot 'spark' dialect for query translation\n\nReference implementations:\n- benchbox/platforms/aws/emr_serverless_adapter.py (serverless Spark pattern)\n- benchbox/platforms/gcp/dataproc_serverless_adapter.py (serverless pattern)\n- benchbox/platforms/base/cloud_spark/ (shared Spark infrastructure)",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-03T00:00:00Z",
+      "created_at": "2026-01-31T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

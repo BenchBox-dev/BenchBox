@@ -1,0 +1,85 @@
+{
+  "description": "## Background\n\nPR #180 (`write-primitives-sketch-clickhouse-and-storage-metrics`)\nshipped 8 ClickHouse-native sketch overrides plus per-engine\nstorage-size validations. SQL syntax was verified end-to-end via\nchDB 26.1.0 inside the implementation session\n(`uniqMerge`/`quantileTDigestMerge(0.5)`/`topKMerge(8)` plus\nstate-byte sizes), but **no real\n`benchbox run --platform clickhouse-local`** was executed.\n\nThe follow-up PR\n(`fix/write-primitives-review-followups`) split the storage-size\nvalidations into per-engine variants, which adds new validation\nbodies to dispatch through the ClickHouse adapter. Both changes\nbenefit from a live benchbox-driven smoke test before users\nencounter adapter-level bugs in the wild.\n\n## What this delivers\n\n1. A real `benchbox run --platform clickhouse-local --benchmark\n   write_primitives --scale 0.01 --queries\n   sketch_query_theta_union_merge,sketch_query_kll_quantiles_merge,sketch_query_topk_combine`\n   against a clickhouse-local install.\n\n2. Confirmation that:\n   - Multi-statement SQL bodies (DROP/CREATE/INSERT/SELECT inside\n     one `write_sql` override) dispatch through the BenchBox\n     ClickHouse adapter without statement splitting issues.\n   - The new per-engine `*_storage_size_clickhouse` validations\n     fall through correctly: ClickHouse picks them up (default\n     `null` skip on duckdb / databricks / snowflake / bigquery /\n     redshift / datafusion / sqlite / starrocks), and DuckDB picks\n     up the `*_storage_size_duckdb` siblings.\n   - The `length(toString(<agg>MergeState(...)))` idiom returns a\n     value within the per-engine bounds.\n\n3. Per-engine bound retuning if the live observation drifts\n   materially from the chDB-spike numbers (theta ~60KB, KLL ~3.8KB,\n   topK ~294B) recorded in the documentation.\n\n## Verification\n\n```bash\nuv run -- benchbox run --platform clickhouse-local --benchmark write_primitives \\\n  --scale 0.01 \\\n  --queries sketch_ddl_create_persistent_table,sketch_insert_theta_per_partition,sketch_insert_kll_per_partition,sketch_insert_topk_per_shard,sketch_query_theta_union_merge,sketch_query_kll_quantiles_merge,sketch_query_topk_combine,sketch_drop_persistent_table\n```\n\nExpected: 8/8 ops pass; both scalar-bounds and storage-size\nvalidations report passed (storage-size on ClickHouse, not DuckDB).",
+  "legacy": {
+    "item_meta": {
+      "category": "Verification",
+      "completed_at": "2026-05-04T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-sketch-clickhouse-local-smoke",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-local-smoke",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/dataframe_operations.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-local-smoke",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-local-smoke",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-local-smoke",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/write-primitives-sketch-functions.md"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-primitives-sketch-clickhouse-local-smoke",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-local-smoke",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-clickhouse-local-smoke",
+        "notes": "Install clickhouse-local locally (homebrew or container).\nRun the full 8-op verification set at SF=0.01. If anything\nfails, capture the error, identify whether it's syntax,\nadapter, or bound, and decide: fix-here vs file-fix-class TODO.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the verification command against a clickhouse-local install",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-clickhouse-local-smoke",
+        "notes": "Replace \"verified chDB\" comments in the storage-size validation\nblocks with \"verified clickhouse-local SF=0.01\" plus the actual\nobservation. If the observation falls outside the current\nbounds, retune the per-engine bounds to bracket the live value\n±20%.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update inline tolerance comments with live observed values",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-clickhouse-local-smoke",
+        "notes": "`docs/benchmarks/write-primitives-sketch-functions.md` should\ngain a \"Try it locally\" snippet for clickhouse-local so users\ncan reproduce the headline numbers without cloud creds.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a ClickHouse-only fast-test invocation to the docs",
+        "wid": "w3"
+      }
+    ]
+  }
+}

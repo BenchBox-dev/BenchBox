@@ -1,0 +1,198 @@
+{
+  "context": "Banner reads findings counts via the same connection the command already holds (zero extra round-trips on the hosted path — piggyback the existing query batch); unsynced-draft count is a local directory glob, no credentials needed. Skill edits go through skill-sync (todo-db skill source in ~/.skill-sync; PR carries skill-sync.lock). AGENTS.md + CLAUDE.md edits follow the docs-brevity house style: dense, no repeated content.",
+  "description": "Requirement 2 (findings naturally considered during planning) is satisfied by riding the commands agents already run, NOT by a new entry-point command — 'todo ready' is hardcoded as the planning entry in at least a dozen surfaces (todo-db SKILL.md:19, references/implement.md:1-3, references/batch.md:62-66, AGENTS.md:307, spec :210,:231, CLAUDE.md allowlist), and agents follow skills mechanically, so a 'todo plan' command they are never routed to would never run. Precedent that surfacing-in-existing-commands works: deferrals appear in the claim work order and stats counts today. This phase adds a one-line banner to 'todo ready' and 'todo stats' output — 'N open findings, M unsynced drafts — todo finding candidates' — suppressed cleanly when both counts are zero, and updates every routing surface in the same change. 'todo plan' is explicitly DEFERRED until the banner is measured insufficient (success metrics in the findings-domain spec).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Break ready's machine-readable output by interleaving the banner",
+        "instead": "Banner on stderr or as a clearly-separated trailing line; pin with a test",
+        "item_id": "findings-phase4-surfacing",
+        "why": "Automation and batch scheduling parse ready output"
+      },
+      {
+        "dont": "Ship a 'todo plan' command as the primary surfacing mechanism",
+        "instead": "Banner on ready/stats; defer plan until metrics show the banner insufficient",
+        "item_id": "findings-phase4-surfacing",
+        "why": "A dozen surfaces route agents to 'ready'; a parallel entry point splits the flow and goes unused — the adversarial review's M2"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "findings-phase4-surfacing",
+        "needs_item": "findings-phase3-schema-cli"
+      }
+    ],
+    "item_meta": {
+      "category": "planning",
+      "completed_at": "2026-07-29T12:14:11Z",
+      "completed_pr": 1325,
+      "created_at": "2026-07-22T12:51:13Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "Read commands (incl. finding list/candidates) work against the local replica/fallback without write creds",
+        "item_id": "findings-phase4-surfacing"
+      },
+      {
+        "behavior": "ready/claim ordering and filtering semantics byte-identical",
+        "item_id": "findings-phase4-surfacing"
+      },
+      {
+        "behavior": "todo ready output contract for automation: existing lines/JSON unchanged; banner is additive and suppressed at zero",
+        "item_id": "findings-phase4-surfacing"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "claim work order prints deferrals — surfacing rides existing flow",
+        "decision": "extend",
+        "item_id": "findings-phase4-surfacing",
+        "path": "AGENTS.md:312-313"
+      },
+      {
+        "concept": "stats.deferrals_by_resolution — observation counts surfaced in a command agents already run — findings_by_disposition + banner follow the same pattern",
+        "decision": "extend",
+        "item_id": "findings-phase4-surfacing",
+        "path": "_project/scripts/todo_db.py:1651"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-phase4-surfacing",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "findings-phase4-surfacing",
+        "kind": "do_not_modify",
+        "path_glob": "_project/blind-spots/**"
+      },
+      {
+        "item_id": "findings-phase4-surfacing",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "findings-phase4-surfacing",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "findings-phase4-surfacing",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-phase4-surfacing",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_findings.py"
+      },
+      {
+        "item_id": "findings-phase4-surfacing",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.lock"
+      },
+      {
+        "item_id": "findings-phase4-surfacing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts -k 'banner or findings_stats' -q",
+        "description": "Banner + stats tests green",
+        "expected": "all passed",
+        "item_id": "findings-phase4-surfacing",
+        "last_result": "pass",
+        "last_run": "2026-07-29T00:20:50Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts -k 'surfacing_flow' -q",
+        "description": "Documented-flow encounter test: agent following AGENTS.md planning flow sees findings when count>0",
+        "expected": "all passed",
+        "item_id": "findings-phase4-surfacing",
+        "last_result": "pass",
+        "last_run": "2026-07-29T00:20:55Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-fast",
+        "description": "Fast lane green",
+        "expected": "exit 0",
+        "item_id": "findings-phase4-surfacing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-phase4-surfacing",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "findings-phase4-surfacing",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "findings-phase4-surfacing",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Banner in ready+stats: todo_findings.{open_findings_count,findings_by_disposition,surfacing_banner}; _cmd_ready/_cmd_stats emit to stderr via _emit_findings_banner (defensive); stats() gains additive findings_by_disposition. Zero-state suppressed.",
+        "item_id": "findings-phase4-surfacing",
+        "notes": null,
+        "started_at": "2026-07-29T00:20:03Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Banner in ready+stats: open findings + unsynced drafts counts, zero-state suppressed; stats gains findings_by_disposition",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/scripts/test_todo_findings.py: TestSurfacingBanner (content, zero-state, single-aggregate query, no-new-connection, stderr-not-stdout, hint-never-breaks-ready), TestFindingsStats (shape+empty), TestSurfacingFlow. Updated phase3 test_stats_open_counts_exclude_findings + test_todo_wrapper skill-thinness for . seq1=12 pass, seq2=2 pass.",
+        "item_id": "findings-phase4-surfacing",
+        "notes": null,
+        "started_at": "2026-07-29T00:20:06Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Tests: banner rendering, zero-state, stats shape, statement-count assertion (no extra hosted round-trip)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "REDONE properly after review R1: routing authored upstream in skill-sync-skills#12 (squashed a48d0c0, exactly 3 files/13 insertions), then re-materialized here via make skill-sync with pinned ref bumped b98bf274->a48d0c0. Mirror byte-identical to merged source; skill-sync verify OK; lock audit + wrapper suites 20 pass. Hand-editing the mirror would have been silently reverted by the next sync (both gates compare mirror<->lock, not mirror<->source).",
+        "item_id": "findings-phase4-surfacing",
+        "notes": null,
+        "started_at": "2026-07-29T00:20:08Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Skill routing via skill-sync: todo-db SKILL.md + implement.md + batch.md include finding candidates/triage in planning flow",
+        "wid": "w3"
+      },
+      {
+        "evidence": "AGENTS.md TODO-tracker section documents the ready/stats findings banner + finding list/show/candidates as read-only triage. CLAUDE.md 'auto-allowed reads' half is OBSOLETE: develop restructured CLAUDE.md to a 7-line pointer (no command allowlist; none in settings.json), so there is no allowlist to amend.",
+        "item_id": "findings-phase4-surfacing",
+        "notes": null,
+        "started_at": "2026-07-29T00:20:11Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "AGENTS.md planning section + CLAUDE.md auto-allowed reads gain finding list|show|candidates",
+        "wid": "w4"
+      }
+    ]
+  }
+}

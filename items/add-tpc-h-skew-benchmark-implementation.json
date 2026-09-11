@@ -1,0 +1,10 @@
+{
+  "description": "Implement TPC-H Skew benchmark based on the research published at\nhttps://www.tpc.org/tpctc/tpctc2011/slides_and_papers/introducing_skew_into_the_tpc_h_benchmark.pdf\nand reference implementation at https://github.com/YSU-Data-Lab/TPC-H-Skew\n\nARCHITECTURAL CONSTRAINT: TPC-H Skew is ONLY responsible for the skewed data variant.\nFor comparative analysis (uniform vs skewed), the existing TPCHBenchmark must be used\nfor uniform data generation and execution. Do NOT duplicate TPC-H functionality within\nTPC-H Skew - instead, orchestrate both benchmarks when comparison is needed.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "benchmark-expansion"
+    }
+  }
+}

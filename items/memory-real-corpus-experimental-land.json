@@ -1,0 +1,113 @@
+{
+  "context": "Restore parked diffs onto a branch; keep --corpus synthetic default; document caution; pin tree_sha256 via tree_manifest; tests for selector and drift detection.",
+  "description": "Parked under ~/Developer/memory-governance-artifacts/parked-20260805-real-corpus/: real_corpus.py, runner --corpus real wiring, tests, evaluate.md sections. Land only after scoring bridge design, with default synthetic and loud warnings that real is experimental until bridge proves non-zero informativeness.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make real the default corpus",
+        "instead": "opt-in --corpus real only",
+        "item_id": "memory-real-corpus-experimental-land",
+        "why": "breaks re-score of historical evidence and overclaims readiness"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-real-corpus-experimental-land",
+        "needs_item": "memory-real-corpus-scoring-bridge"
+      }
+    ],
+    "item_meta": {
+      "category": "Evaluation",
+      "created_at": "2026-08-05T22:11:17Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Default synthetic path remains the promotion-path corpus until a later contract says otherwise",
+        "item_id": "memory-real-corpus-experimental-land"
+      },
+      {
+        "behavior": "Prompt contract hash for synthetic stays stable",
+        "item_id": "memory-real-corpus-experimental-land"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Parked implementation",
+        "decision": "extend",
+        "item_id": "memory-real-corpus-experimental-land",
+        "path": "/Users/joe/Developer/memory-governance-artifacts/parked-20260805-real-corpus/"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-real-corpus-experimental-land",
+        "kind": "do_not_modify",
+        "path_glob": "reports/ab-results-*.json"
+      },
+      {
+        "item_id": "memory-real-corpus-experimental-land",
+        "kind": "only_modify",
+        "path_glob": "docs/manual/evaluate.md"
+      },
+      {
+        "item_id": "memory-real-corpus-experimental-land",
+        "kind": "only_modify",
+        "path_glob": "docs/manual/reference.md"
+      },
+      {
+        "item_id": "memory-real-corpus-experimental-land",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/behavioral/src/memory_tooling/**"
+      },
+      {
+        "item_id": "memory-real-corpus-experimental-land",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q",
+        "description": "Full behavioral suite passes",
+        "expected": "All scorer tests green including real-corpus experimental cases",
+        "item_id": "memory-real-corpus-experimental-land",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-real-corpus-experimental-land",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "memory-real-corpus-experimental-land",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Restore parked code with synthetic default and experimental warnings",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-real-corpus-experimental-land",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Tests for identity pin, determinism, synthetic byte-stability",
+        "wid": "w1"
+      }
+    ]
+  }
+}

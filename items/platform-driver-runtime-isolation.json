@@ -1,0 +1,426 @@
+{
+  "context": "Build on existing driver metadata plumbing instead of replacing it:\n\n1. Extend runtime_env to support explicit runtime-isolation strategy and\n   package+version selection suitable for per-run execution.\n2. Keep shared platform adapter hooks generic (package name + requested version +\n   resolved version + runtime-actual version), add DuckDB-specific runtime\n   validation from live context (module + connection), then apply the same\n   contract to other package-based platforms.\n3. Ensure results schema captures both intent and truth:\n   - requested driver version\n   - resolved install/runtime version\n   - actual live runtime version used by execution\n4. Guard default behavior: if no requested version is provided, do not force\n   isolation changes that alter existing run flow.\n5. Validate with two real DuckDB versions in separate runs and assert distinct\n   actual versions in exported JSON, plus at least one non-DuckDB platform\n   contract verification in the same delivery.\n",
+  "description": "Correctness bug discovered on 2026-02-20: versioned DuckDB benchmark runs\nproduced result artifacts showing DuckDB 1.4.3 for every run, even when runs\nwere intended for versions like 0.9.2 and 1.2.2. This invalidates cross-version\nbenchmark comparisons.\n\nRoot cause:\n- BenchBox execution and metadata both used the same in-process imported\n  `duckdb` module from the BenchBox environment.\n- Existing driver metadata plumbing (`driver_version`, `driver_version_resolved`)\n  did not guarantee runtime isolation for execution.\n- External invocation patterns (`uv run --python <env> ...`) were not a reliable\n  per-run isolation contract for BenchBox.\n\nNon-negotiable requirement:\n- A benchmark run must be able to request a specific platform driver/library\n  version and execute using that actual runtime version.\n- DuckDB is first implementation target, and the same delivery must roll the\n  mechanism out across other supported package-based platforms (not DuckDB-only).\n- Results must persist both requested and actual resolved runtime versions.\n- Runtime version must be verified from live execution context (DuckDB connection),\n  not only static config values.\n- Default behavior must remain unchanged when no explicit version is requested.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "break default no-version runs",
+        "instead": "make version isolation opt-in when explicit version is requested.",
+        "item_id": "platform-driver-runtime-isolation",
+        "why": "existing users depend on current behavior"
+      },
+      {
+        "dont": "defer non-DuckDB rollout into a follow-up item",
+        "instead": "land shared integration for other package-based platforms in this same TODO.",
+        "item_id": "platform-driver-runtime-isolation",
+        "why": "runtime correctness is platform-wide"
+      },
+      {
+        "dont": "hardcode DuckDB-only logic in shared interfaces",
+        "instead": "keep package/version/runtime strategy generic with platform-specific adapters.",
+        "item_id": "platform-driver-runtime-isolation",
+        "why": "other platforms need the same mechanism"
+      },
+      {
+        "dont": "rely on external `uv run --python ...` process wrapping as the product contract",
+        "instead": "provide first-class in-product version selection.",
+        "item_id": "platform-driver-runtime-isolation",
+        "why": "it is not reliably enforced inside BenchBox execution"
+      },
+      {
+        "dont": "treat requested version as proof of execution version",
+        "instead": "validate from live runtime/connection.",
+        "item_id": "platform-driver-runtime-isolation",
+        "why": "config intent can diverge from runtime imports"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-20T00:00:00Z",
+      "created_at": "2026-02-20T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Default runs without explicit requested version continue working for DuckDB and use current environment behavior.",
+        "item_id": "platform-driver-runtime-isolation"
+      },
+      {
+        "behavior": "Existing CLI/platform option compatibility for driver metadata is preserved (no breaking change to current workflows).",
+        "item_id": "platform-driver-runtime-isolation"
+      },
+      {
+        "behavior": "Platform adapter factory remains generic and does not regress non-DuckDB adapters or platform-specific connection flows.",
+        "item_id": "platform-driver-runtime-isolation"
+      },
+      {
+        "behavior": "Result JSON remains backward-compatible: platform.version and platform.client_version still present.",
+        "item_id": "platform-driver-runtime-isolation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/ssb/benchmark.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/ssb/queries.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/benchmark/runner.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/queries.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/benchmark.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/queries.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/database.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/execution_pipeline.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/platform_info.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/pandas_df.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/polars_df.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/runtime_env.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_duckdb_version_isolation.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_execution_pipeline_driver_metadata.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_duckdb_adapter.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_platform_driver_runtime_contract.py"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/test_runtime_env.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/utils/test_runtime_env.py tests/unit/platforms/test_duckdb_adapter.py tests/unit/cli/test_execution_pipeline_driver_metadata.py -v --tb=short",
+        "description": "Unit tests for runtime version selection and DuckDB adapter path pass",
+        "expected": "all targeted tests pass with 0 failures",
+        "item_id": "platform-driver-runtime-isolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_platform_driver_runtime_contract.py -v --tb=short",
+        "description": "Cross-platform runtime contract tests pass for non-DuckDB adapters that declare driver metadata",
+        "expected": "contract tests pass and enforce requested/resolved/actual metadata behavior across platforms",
+        "item_id": "platform-driver-runtime-isolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_duckdb_version_isolation.py -v --tb=short",
+        "description": "Integration-style isolation test passes for two distinct requested versions",
+        "expected": "test verifies separate runs and distinct actual runtime versions in JSON metadata",
+        "item_id": "platform-driver-runtime-isolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_benchmark_duckdb_execution.py -k 'smoke or basic' -v --tb=short",
+        "description": "Default behavior regression check (no explicit driver version) still passes",
+        "expected": "existing default DuckDB execution path remains green",
+        "item_id": "platform-driver-runtime-isolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --platform duckdb --benchmark ssb --scale 0.01 --queries Q1 --platform-option driver_version=0.9.2 --non-interactive --quiet && f_092=$(ls -t benchmark_runs/results/*duckdb_sql*.json | sed -n '1p') && echo \"$f_092\" && jq '{platform_version:.platform.version,client_version:.platform.client_version,requested:(.execution.driver_version_requested // .execution_metadata.driver_version_requested),resolved:(.execution.driver_version_resolved // .execution_metadata.driver_version_resolved),actual:(.execution.driver_version_actual // .execution_metadata.driver_version_actual // .execution.runtime_version_actual // .execution_metadata.runtime_version_actual)}' \"$f_092\"",
+        "description": "Manual DuckDB 0.9.2 run includes inspected JSON fields for requested/resolved/actual and platform/client versions",
+        "expected": "command prints result file path and JSON object where requested/resolved/actual/platform/client versions all match 0.9.2",
+        "item_id": "platform-driver-runtime-isolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --platform duckdb --benchmark ssb --scale 0.01 --queries Q1 --platform-option driver_version=1.2.2 --non-interactive --quiet && f_new=$(ls -t benchmark_runs/results/*duckdb_sql*.json | sed -n '1p') && f_prev=$(ls -t benchmark_runs/results/*duckdb_sql*.json | sed -n '2p') && jq '{platform_version:.platform.version,client_version:.platform.client_version,requested:(.execution.driver_version_requested // .execution_metadata.driver_version_requested),resolved:(.execution.driver_version_resolved // .execution_metadata.driver_version_resolved),actual:(.execution.driver_version_actual // .execution_metadata.driver_version_actual // .execution.runtime_version_actual // .execution_metadata.runtime_version_actual)}' \"$f_prev\" \"$f_new\" && test \"$(jq -r '.platform.version' \"$f_new\")\" != \"$(jq -r '.platform.version' \"$f_prev\")\"",
+        "description": "Manual DuckDB 1.2.2 run includes inspected JSON fields and proves version differs from prior run",
+        "expected": "jq output shows one result with 0.9.2 and one with 1.2.2, and final version-inequality test exits successfully",
+        "item_id": "platform-driver-runtime-isolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w7",
+        "wid": "w9"
+      },
+      {
+        "item_id": "platform-driver-runtime-isolation",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "platform-driver-runtime-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define per-run driver version contract and runtime-isolation extension points (package, requested, resolved, runtime-actual, strategy)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-runtime-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add integration-style test proving two requested DuckDB versions produce distinct actual runtime versions in separate result JSON files",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-runtime-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run verification matrix (DuckDB 0.9.2 + 1.2.2 and at least one non-DuckDB platform), collect command output proving runtime isolation and metadata correctness",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-runtime-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement runtime_env contract types and resolver primitives for requested/resolved versions and isolation strategy selection",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-runtime-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement runtime environment materialization path for Python driver packages with strict unavailable-version error handling",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-runtime-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire first-class per-run version selection through CLI/config and platform factory while keeping default no-version behavior unchanged",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-runtime-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement DuckDB runtime execution path bound to requested driver runtime for actual query execution",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-runtime-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture and validate actual DuckDB runtime version from live connection context and expose it through adapter metadata",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-runtime-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Persist requested, resolved, and actual runtime versions in result metadata and JSON export without breaking existing fields",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-runtime-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Roll out the shared runtime-isolation contract to other package-based platforms and define explicit behavior for non-isolatable adapters",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-runtime-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for runtime_env, DuckDB version-selection path, unavailable-version errors, default behavior, and cross-platform contract enforcement",
+        "wid": "w9"
+      }
+    ]
+  }
+}

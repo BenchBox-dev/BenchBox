@@ -1,0 +1,135 @@
+{
+  "context": "Add narrowly-scoped parts ('apikey', 'accountkey') to the shared secret-key source established by the predecessor item. Do NOT add bare 'key': it would over-redact sort_key/partition_key/primary_key-class options. Guard lookalikes with tests.",
+  "description": "Found 2026-07-31 by a sentinel sweep that constructed every registered adapter and drove the real export entry points. The keys api_key / onehouse_api_key (quanton's ONLY credential - benchbox/platforms/onehouse/quanton_adapter.py:616, sent as a Bearer header by onehouse_client.py:191) and storage_account_key (a full-access Azure storage account key - azure_synapse.py:125, interpolated into AccountKey=... connection strings at :740) are exported VERBATIM by BOTH sanitize_platform_options (internal result metadata via runtime_metadata.py:105) AND anonymize_result_payload (the public/anonymized export, exporter.py:320, default anonymize=True): neither secret-key list contains a matching part - 'apikey' and 'accountkey' match nothing in platform_options._SECRET_KEY_PARTS or anonymization_specs.yaml secret_key_parts. Driven proof: sanitize_platform_options({'api_key':'X','storage_account_key':'Y'}) returns both verbatim; anonymize_result_payload on the same payload returns both verbatim. Unlike the keyid gap (which the capture-time sanitize masks on the standard path), THESE keys leak on the public path with no upstream mask - this is the live end-to-end variant of the defect family. Depends on anonymization-path-misses-key-id-secrets so the one-source-of-truth list lands first and this becomes a narrow addition to a single list.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "needs_item": "anonymization-path-misses-key-id-secrets"
+      }
+    ],
+    "item_meta": {
+      "category": "security",
+      "completed_at": "2026-08-01T00:18:57Z",
+      "completed_pr": 1384,
+      "created_at": "2026-07-31T23:34:17Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing redaction/pseudonymization behavior for already-covered keys",
+        "item_id": "public-export-misses-api-key-and-storage-account-key"
+      },
+      {
+        "behavior": "Non-credential lookalikes (sort_key, partition_key, primary_key, user_agent) keep exporting real values",
+        "item_id": "public-export-misses-api-key-and-storage-account-key"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization_specs.yaml"
+      },
+      {
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/platform_options.py"
+      },
+      {
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_anonymization.py"
+      },
+      {
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_platform_options_capture.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import json;from benchbox.core.results.anonymization import AnonymizationManager,AnonymizationConfig as C;m=AnonymizationManager(C());out=json.dumps(m.anonymize_result_payload({'platform_metadata':{'platform_raw_config':{'api_key':'APIKEY-SENTINEL','storage_account_key':'AZKEY-SENTINEL'}}}),default=str);assert 'APIKEY-SENTINEL' not in out and 'AZKEY-SENTINEL' not in out\"",
+        "description": "the public anonymization path no longer emits api_key/storage_account_key sentinels",
+        "expected": "exits 1 on an unfixed tree (verified 2026-07-31), 0 once fixed",
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.results.platform_options import sanitize_platform_options as s;r=s({'api_key':'APIKEY-SENTINEL','storage_account_key':'AZKEY-SENTINEL'});assert r['api_key']!='APIKEY-SENTINEL' and r['storage_account_key']!='AZKEY-SENTINEL'\"",
+        "description": "the internal metadata path redacts both keys",
+        "expected": "exits 1 on an unfixed tree (verified 2026-07-31), 0 once fixed",
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py tests/unit/core/results/test_platform_options_capture.py -q",
+        "description": "both suites still green",
+        "expected": "all pass before and after - regression guard",
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on merged develop (post-#1379 shared list): both sentinels still leaked on both paths, exit 1 each",
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "notes": null,
+        "started_at": "2026-08-01T00:18:23Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-apikey",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Re-validate both leaks on current develop by driving sanitize_platform_options and anonymize_result_payload",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added api_key and account_key parts to the single shared _SECRET_KEY_PARTS list - one edit now covers both consumers, exactly the point of #1379",
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "notes": null,
+        "started_at": "2026-08-01T00:18:26Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-apikey",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Add apikey/accountkey to the shared secret-key source so both consumers redact them",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Tests on both paths: api_key variants (incl. camelCase and onehouse_ prefix), storage_account_key, and over-redaction guards for sort/partition/primary_key and account; 121 passed combined, 778+ in full results suite",
+        "item_id": "public-export-misses-api-key-and-storage-account-key",
+        "notes": null,
+        "started_at": "2026-08-01T00:18:29Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-apikey",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Tests: both keys redacted on both paths; sort_key/partition_key/user_agent lookalikes still exported",
+        "wid": "w2"
+      }
+    ]
+  }
+}

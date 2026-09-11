@@ -1,0 +1,10 @@
+{
+  "description": "Add support for data generation directly to open file formats (Parquet) and open table formats (Delta Lake, Iceberg) with benchmarks running against these formats on supporting platforms",
+  "legacy": {
+    "item_meta": {
+      "category": "Performance and Efficiency",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "benchmark-expansion"
+    }
+  }
+}

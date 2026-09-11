@@ -1,0 +1,286 @@
+{
+  "context": "Fix the cheap, proven cause first and re-measure before touching anything else -- the three workflows may not share a root cause.\n\nDECISION GATE w3: after the 3.10 and Windows causes are addressed, decide per still-red workflow whether it is (a) a real product defect to fix, (b) a genuinely environment-specific test to gate to the platforms it supports, or (c) a check to retire. Record the choice and reason. A perma-red required-adjacent workflow is not an acceptable steady state; neither is silencing a check that is catching a real defect.",
+  "description": "MEASURED 2026-08-23. Three develop workflows have failed every scheduled run for at least five days:\n - Nightly Validation: failure on 2026-08-19/20/21/22/23\n - Release Canary: failure 2026-08-22 and 2026-08-23, cancelled 08-19 through 08-21\n - Corpus Drift Check: failure on 2026-08-19 through 2026-08-23\n\nOne root cause is identified and is a one-line fix. tests/uat/clickhouse_memory.py:309 calls _dt.datetime.now(_dt.UTC). datetime.UTC is Python 3.11+, and the project declares Python 3.10+ support (README, pyproject requires-python). Every test in tests/uat/test_clickhouse_memory.py fails on ubuntu-latest/3.10 with AttributeError: module 'datetime' has no attribute 'UTC'. This is TEST-ONLY: grep for datetime.UTC across benchbox/ returns zero hits, so the shipped package is not affected on 3.10 -- but the gate stays red.\n\nWindows 3.10/3.12 also fail, on a different cause: benchbox.mcp.jobs durable jobs do not reach 'completed' (tests/... assert job state 'queued'/'failed' != 'completed', ExceptionGroup at benchbox/mcp/jobs.py:771). Release Canary fails in 'credential-free non-fast canary (shard 4/6)'. These are separate root causes and must not be assumed fixed by the 3.10 fix.\n\nWhy this is customer-facing rather than process hygiene: docs/operations/release-guide.md:80-88 requires committed UAT evidence at _project/release-evidence/uat-gate-summary.json with a green verdict, at most 21 days old, or validate-base fails the release PR. That directory contains only README.md today. cut-v0-4-0-release therefore cannot proceed, and v0.4.0 is how benchbox.dev/results/ and 45 days of product work reach users.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assume one root cause fixes all three workflows",
+        "instead": "INSTEAD confirm each independently in w0",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "why": "the 3.10, Windows-MCP and canary-shard failures are demonstrably different"
+      },
+      {
+        "dont": "Bump the project's Python floor to 3.11 to make the nightly pass",
+        "instead": "INSTEAD fix the test",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "why": "it drops supported users to avoid a one-line test fix"
+      },
+      {
+        "dont": "Hand-write uat-gate-summary.json to satisfy validate-base",
+        "instead": "INSTEAD produce it from a real green sweep",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "why": "the gate exists to prove a sweep actually ran"
+      },
+      {
+        "dont": "Mark the failing jobs continue-on-error or remove them from the schedule",
+        "instead": "INSTEAD apply the w3 decision with a recorded reason",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "why": "the release gate then reports green on unverified ground"
+      },
+      {
+        "dont": "treat a green make pr-preflight as covering integration tests",
+        "instead": "INSTEAD when a change edits user-visible CLI text, grep tests/integration and tests/e2e for the old string before opening the PR",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "why": "pr-preflight runs the fast lane only, so PR #1844's docstring edit passed preflight and broke Release Canary shard 4/6 on tests/integration/test_platforms_cli_integration.py"
+      },
+      {
+        "dont": "write a version-floor guard that checks only the one construct you just saw",
+        "instead": "INSTEAD cover the whole class (attributes AND stdlib module imports), and verify on the real floor with 'uv run --python 3.10' rather than reasoning about it",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "why": "the #1838 guard checked ATTRIBUTE ACCESS only (datetime.UTC) and missed a bare 'import tomllib' three days later, taking ubuntu-latest/3.10 red again"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "needs_item": "nightly-throughput-operator-green-run"
+      },
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "needs_item": "nightly-windows-mcp-durable-fsync-followup"
+      },
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "needs_item": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed"
+      },
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "needs_item": "nightly-windows-release-curation-skip-count"
+      },
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "needs_item": "nightly-windows-trust-gate-subprocess-env"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "created_at": "2026-08-23T13:09:06Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "No check is retired merely because it is red; retirement requires the w3 decision and a recorded reason",
+        "item_id": "nightly-red-blocks-release-evidence"
+      },
+      {
+        "behavior": "Python 3.10 stays supported for as long as pyproject requires-python says so; the fix is to the test, not to the support floor",
+        "item_id": "nightly-red-blocks-release-evidence"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "UAT release-gate evidence contract (green, <=21 days, ancestor SHA, not dirty)",
+        "decision": "reuse",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "path": "docs/operations/release-guide.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "kind": "only_modify",
+        "path_glob": "_project/release-evidence/"
+      },
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import ast,pathlib,sys; sys.exit(any('UTC'==getattr(n,'attr','') for p in pathlib.Path('tests').rglob('*.py') for n in ast.walk(ast.parse(p.read_text()))))\"",
+        "description": "Python 3.10 no longer breaks on 3.11-only stdlib",
+        "expected": "exit 0 (no datetime.UTC usage under tests/)",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh run list --branch develop --workflow 'Nightly Validation' --limit 3",
+        "description": "Nightly Validation is green on a scheduled run",
+        "expected": "most recent conclusion is success",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh run list --branch develop --workflow 'Release Canary' --limit 3",
+        "description": "Release Canary is green on a scheduled run",
+        "expected": "most recent conclusion is success",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/release_readiness_check.py",
+        "description": "The release gate has fresh evidence",
+        "expected": "green verdict, source_dirty false, evidence at most 21 days old",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "nightly-red-blocks-release-evidence",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Live gh run list 2026-08-23: Nightly Validation failure on 08-19..08-23; Release Canary failure 08-22/08-23, cancelled 08-19..08-21; Corpus Drift Check failure 08-19..08-23. Distinct root causes: (1) tests/uat/clickhouse_memory.py:309 _dt.UTC on py3.10, (2) Windows durable MCP jobs not reaching completed (benchbox/mcp/jobs.py:771), (3) canary shard 4/6, (4) corpus drift = develop behind published-results by 8 bundles",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "notes": null,
+        "started_at": "2026-08-23T14:12:55Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-derive current red/green state for Nightly Validation, Release Canary and Corpus Drift Check from live runs, and list distinct root causes",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Fixed in PR #1838: _dt.timezone.utc, plus tests/unit/test_python_version_floor_guard.py (AST-based, reads floor from pyproject, negative control proves it fires on the original line). make pr-preflight green: 28,010 passed.",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "notes": null,
+        "started_at": "2026-08-23T14:12:58Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Fix tests/uat/clickhouse_memory.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": "DIAGNOSED 2026-08-23 from run 32622645993 (Nightly) and 32628137865 (Release Canary). These are NOT one cause.\n\nRELEASE CANARY shard 4/6: a single hanging test, not a timeout-config problem. Other shards finish in 13-21 min; shard 4 ran 53 min and was killed with exit 143. The log's last line is 'tests/uat/test_cli_dispatch.py' at 08:38:40 with no dot before the 09:18 kill. The only non-fast test in that module is test_completeness_gate_digest_provenance. Its comment says 'Using 0-scale tpch with local-only platform keeps the sweep cheap', but validate_config({'name':..., 'phases':[...]}) leaves platforms.include=() with include_was_specified=False, so no filter applies and orchestrator.run_sweep runs the FULL platform matrix at SF0.01 with no time bound. Reproduced locally: the test ran over 27 minutes before I killed it. Fix is small -- pin platforms.include and benchmarks.include to what the comment already claims.\n\nNIGHTLY: 5 failing jobs, at least 5 distinct causes. 'test (ubuntu-latest, 3.10)' is the datetime.UTC break already fixed in PR #1838. The Windows failures (3.10, 3.12, plus integration-smoke 3.12) are ~24 tests in at least five groups: (1) MCP durable jobs never reach 'completed' (7 tests, jobs stay queued/failed, plus one rate-limit ExceptionGroup) -- the only genuinely product-facing group; (2) worktree make targets, 11 tests, all failing on shell/awk/make assumptions that do not hold on Windows ('awk: escape sequence \\\\U', 'fatal: could not create leading directories'); (3) POSIX path assumptions ('\\\\tmp\\\\db.duckdb' == '/tmp/db.duckdb', makefile inventory symlink resolution); (4) signal.SIGKILL, which does not exist on Windows; (5) a pytest-benchmark/xdist warning surfacing as a failure. Groups 2, 3 and 5 are agent-tooling tests, not shipped-product tests. 'scheduled-workflow-liveness' is a separate job and untriaged.\n\nFeeds w3: my recommendation is to scope groups 2/3/5 to POSIX (they gate make targets that only ever run on the maintainer machine and Linux CI, and no Windows support is claimed for them), fix the shard 4 hang, and treat the MCP durable-jobs group as the one real Windows product question.",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "notes": null,
+        "started_at": "2026-08-23T19:39:06Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Diagnose the Windows durable-MCP-job failure and the Release Canary shard 4/6 failure as separate causes",
+        "wid": "w2"
+      },
+      {
+        "evidence": "DECISION recorded, PR #1853. Four of the five Windows failure groups handled, and two turned out to be real test defects rather than platform limits, so they are FIXED rather than skipped -- better than the fix/scope/retire framing assumed.\n\nFIXED, coverage kept: (1) test_a_path_object_is_stringified asserted the literal '/tmp/db.duckdb'; the property under test is 'a Path becomes a str', not the host separator, and str(Path('/tmp/db.duckdb')) is '\\\\tmp\\\\db.duckdb' on Windows with the behaviour correct -- now compares against str(database_path). (2) test_timeout_path_drains_using_the_reap_timeout_constant patched os.killpg with raising=False but not the signals; the ladder evaluates signal.SIGKILL as an ARGUMENT to os.killpg, so Windows raised AttributeError before the call. Injecting both signals is the technique the two sibling tests in that module already use, and their comments say explicitly that a skipif would drop the POSIX branch under test.\n\nSCOPED TO POSIX: tests/integration/worktree/test_worktree_release_dirty_guard.py (module) -- it drives make worktree-create/remove, maintainer and agent tooling with no claimed Windows support, failing in the tooling (awk escape sequences, could not create leading directories) rather than the behaviour, 11 of 18 red. This also drops the 7 that currently pass; recorded as an explicit trade, not hidden. And test_absolute_symlink_makefile_preserves_module_resolution, since creating a symlink on Windows needs elevation.\n\nNOT TOUCHED, deliberately: the MCP durable-jobs group (7 tests, jobs never reaching 'completed') is the one genuinely product-facing Windows question and needs a decision, not a skip. A NoneType.splitlines() in the makefile inventory guard and a pytest-benchmark/xdist warning surfacing as a failure in the release curation guard are not honestly diagnosable from a log without a Windows machine; guessing is how a skip lands on a test that would have passed.\n\npr-preflight 28042 passed, exit 0. Release Canary shard 4/6 is PR #1849. Nightly's ubuntu-3.10 job is PR #1838.",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "notes": null,
+        "started_at": "2026-08-23T21:29:54Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "DECISION GATE - for each workflow still red after w1 and w2, decide fix / scope to supported platforms / retire, with the reason recorded",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "nightly-red-blocks-release-evidence",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Drive Nightly Validation and Release Canary to green on consecutive scheduled runs",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "nightly-red-blocks-release-evidence",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Produce and commit the UAT release-gate evidence that release-guide.md requires, coordinating with uat-release-gate-first-evidence-bootstrap rather than duplicating it",
+        "wid": "w5"
+      },
+      {
+        "evidence": "ROOT CAUSE CONFIRMED IN PRODUCTION, 2026-08-23T20:12. PR #1847 fixes it.\n\nOriginal diagnosis: the mirror to published-results last succeeded 2026-08-06; PR #1614 (2026-08-05 client_host strip) rewrote bundle bytes without rerunning _project/scripts/results_explorer_corpus_migrate.py, leaving 105 sidecar bundle_hash values stale, and the mirror's own validation refuses to open on a hash mismatch.\n\nIndependent confirmation later the same day: merging #1843 to develop touched results-data/ -- the first push to that path since 2026-08-05 -- which fired the mirror's push trigger. Run 32663701598 opened mirror PR #1851 and posted commit status corpus-mirror/validate-bundles = FAILURE with exactly 105 'Bundle hash mismatch' errors, the same 105. So the mirror was never disabled or misconfigured; it simply had no trigger for 17 days, and the moment it got one it failed for precisely the recorded reason.\n\nCORRECTION to the earlier wording: 'the mirror has not run since 2026-08-06' was accurate when written but is now superseded -- it ran on 2026-08-23 and failed.\n\nCONSEQUENCE: mirror PR #1851 currently carries the stale hashes and a failing validation status. It must be regenerated after #1847 merges (gh workflow run sync-results-data-to-published.yml --ref develop) rather than merged as it stands.\n\nFix in #1847: rerun the migration tool -- 105 manifests, one line each, plus a migration ledger; changed_bundles=0, so develop's bundle bytes were already correct and only the recorded hashes were stale. scripts/validate_submission.py --allow-partial-validation now 207/207 PASS exit 0. Guard added to the whole-corpus lane with two synthetic negative controls.",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "notes": null,
+        "started_at": "2026-08-23T19:12:32Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Corpus Drift Check root cause is NOT a test defect",
+        "wid": "w6"
+      },
+      {
+        "evidence": "MEASURED: Release Canary did NOT stay green. Run 32628137865 (2026-08-23) passed after the shard-4 hang fix in #1849, but run 32707614817 (2026-08-24 08:41) failed again -- on a DIFFERENT cause. Shard 4 is healthy: 08:43-08:58, 15 minutes, versus the 53-minute hang before #1849, so that fix held. The new failure is tests/integration/test_platforms_cli_integration.py::test_platforms_setup_help asserting the old summary line 'Interactive platform setup wizard', which PR #1844 rewrote when it added --platform delegation. My regression. Fixed in PR #1868; tracked as w8. Not a second consecutive green run, so w4 remains open.",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "notes": null,
+        "started_at": "2026-08-24T12:24:41Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm Release Canary stays green on a second consecutive run",
+        "wid": "w7"
+      },
+      {
+        "evidence": "PR #1868 MERGED at 2026-08-24T15:49:13Z; head 69d8414e00e6e183fd06a6a275f8de1236396091; merge 77896f41b86cb6c3ae8974c611d9aeb73bbbc352; https://github.com/BenchBox-dev/BenchBox/pull/1868",
+        "item_id": "nightly-red-blocks-release-evidence",
+        "notes": null,
+        "started_at": "2026-08-25T17:10:28Z",
+        "started_branch": "chore/v0-4-0-non-uat-integration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-v0-4-0-non-uat-integration",
+        "status": "done",
+        "summary": "Land PR #1868 so Release Canary shard 4/6 stops failing on the platforms-setup help assertion",
+        "wid": "w8"
+      }
+    ]
+  }
+}

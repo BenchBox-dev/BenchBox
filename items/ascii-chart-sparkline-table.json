@@ -1,0 +1,210 @@
+{
+  "context": "Build as a table renderer with inline mini-bars rather than a traditional chart:\n\n1. Create SparklineColumn (name, values dict[platform, float], higher_is_better) and\n   SparklineTableData (platforms, columns) dataclasses.\n2. Create ASCIISparklineTable(ASCIIChartBase) with render().\n3. For each column, normalize values to 0.0-1.0 range and render as a 1-4 character\n   vertical block using LOWER_BLOCK_CHARS (▁▂▃▄▅▆▇█).\n4. Respect higher_is_better flag: for latency metrics (lower is better), invert the\n   normalization so the best platform gets the tallest bar.\n5. Color the best value green (#1b9e77) and worst red (#d95f02) per column.\n6. Add from_normalized_results() factory that populates columns from standard metrics.\n\nColumn width calculation should be dynamic: metric name width + sparkline bar width +\nvalue width, constrained to fit within terminal width. If too many columns, truncate\nlower-priority columns with \"...\" indicator.\n",
+  "description": "Add a new ASCII chart type that displays a compact leaderboard table where each row\nis a platform and each column is a metric, with inline sparkline-style mini-bars\nshowing relative values. This combines the information density of a table with\nvisual comparison cues.\n\nThis is the format used by ClickBench's dashboard and most database comparison sites.\nWhen comparing many platforms across many dimensions (total time, geometric mean, P99,\ncost, success rate, data load time), a pure table is hard to scan visually, while\nindividual charts for each metric create information overload.\n\nExample output:\n```\nPlatform Comparison Overview\n──────────────────────────────────────────────────────────────\nPlatform   Total(ms)   GeoMean    P99(ms)   Load(s)   Success\nDuckDB     ▇  1,240    ▇  56      ▅ 120     ▂  2.1    ████ 100%\nPolars     ▆  1,580    ▆  72      ▇ 310     ▁  1.2    ████ 100%\nSQLite     ▃  4,820    ▃ 219      ▃ 450     ▅  8.4    ███░  95%\nPandas     ▁ 12,300    ▁ 559      ▁ 980     ▃  5.2    ██░░  82%\n──────────────────────────────────────────────────────────────\n▇=best  ▁=worst  (bars scaled per column)\n```\n\nThis is distinct from the Summary Box (single run stats), the Heatmap (query-level\ndetail), and the Bar Chart (one metric at a time). The sparkline table uniquely\ncombines multiple aggregate metrics in a single compact view with embedded\nvisual encoding.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hardcode metric columns",
+        "instead": "accept a flexible list of SparklineColumn instances",
+        "item_id": "ascii-chart-sparkline-table",
+        "why": "different benchmarks expose different metrics"
+      },
+      {
+        "dont": "use full-width bar charts per cell",
+        "instead": "use 1-4 character sparkline bars only",
+        "item_id": "ascii-chart-sparkline-table",
+        "why": "the value of this chart is compactness"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-15T00:00:00Z",
+      "created_at": "2026-02-14T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "ASCIISummaryBox behavior unchanged (sparkline table is multi-platform overview, summary box is single-run aggregate stats)",
+        "item_id": "ascii-chart-sparkline-table"
+      },
+      {
+        "behavior": "All 9 existing chart types continue to render identically",
+        "item_id": "ascii-chart-sparkline-table"
+      },
+      {
+        "behavior": "render_ascii_chart() in exporters.py handles all existing chart_type strings",
+        "item_id": "ascii-chart-sparkline-table"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ascii-chart-sparkline-table",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/"
+      },
+      {
+        "item_id": "ascii-chart-sparkline-table",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/exporters.py"
+      },
+      {
+        "item_id": "ascii-chart-sparkline-table",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/templates.py"
+      },
+      {
+        "item_id": "ascii-chart-sparkline-table",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/ascii/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.visualization.ascii.sparkline_table import ASCIISparklineTable, SparklineColumn, SparklineTableData; cols = [SparklineColumn('Total(ms)', {'DuckDB': 1240, 'Polars': 1580}, False), SparklineColumn('Success', {'DuckDB': 100, 'Polars': 100}, True)]; data = SparklineTableData(['DuckDB', 'Polars'], cols); chart = ASCIISparklineTable(data=data); print(chart.render())\"",
+        "description": "New chart class renders without error",
+        "expected": "Rendered table with sparkline bars and values",
+        "item_id": "ascii-chart-sparkline-table",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v",
+        "description": "Existing chart tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "ascii-chart-sparkline-table",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ascii-chart-sparkline-table",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ascii-chart-sparkline-table",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ascii-chart-sparkline-table",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ascii-chart-sparkline-table",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ascii-chart-sparkline-table",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "ascii-chart-sparkline-table",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ascii-chart-sparkline-table",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ascii-chart-sparkline-table",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ascii-chart-sparkline-table",
+        "needs_wid": "w5",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-sparkline-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create SparklineColumn, SparklineTableData dataclasses and ASCIISparklineTable class",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-sparkline-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement per-column normalization with higher_is_better inversion and sparkline bar rendering",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-sparkline-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement dynamic column width calculation with truncation for narrow terminals",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-sparkline-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add from_normalized_results() factory that populates standard benchmark metrics",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-sparkline-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register chart in __init__.py and add 'sparkline_table' case to render_ascii_chart() in exporters.py",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-sparkline-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests (multi-platform, mixed higher/lower-is-better, edge cases, narrow terminal)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-sparkline-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add sparkline_table to flagship template in templates.py",
+        "wid": "w7"
+      }
+    ]
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "context": "Early-return from handle_existing_database when catalog == 'postgres' so the decision is made solely post-ATTACH by _resolve_postgres_catalog_reuse, and correct the false docstring claim. Consider whether reuse should require the benchmark's EXPECTED tables rather than 'any user table present' - other adapters check expected tables - but that is a wider change; keep this fix to the postgres path.",
+  "description": "handle_existing_database() decides reuse from self.metadata_path.exists(). For catalog=postgres that path is meaningless but still computed to a default, so a leftover .ducklake file from an earlier duckdb-catalog run at the same benchmark/scale sets database_was_reused=True. The runner then skips schema creation and data loading, and validation fails against an empty PostgreSQL catalog. Reproduced at TPC-H SF=1 on 2026-07-30: 'Empty tables detected: region, nation, supplier, part, partsupp, customer, orders...' with a genuinely fresh PG catalog (ducklake_table empty). PR #1358 added post-ATTACH reuse resolution for postgres (_resolve_postgres_catalog_reuse) but did not stop the pre-connection check firing, and its docstring wrongly claims a postgres catalog never has a local metadata file. This blocks any real postgres-catalog benchmark run.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-07-30T19:36:36Z",
+      "completed_pr": 1367,
+      "created_at": "2026-07-30T19:31:26Z",
+      "worktree": "ducklake-platform"
+    },
+    "preserves": [
+      {
+        "behavior": "_resolve_postgres_catalog_reuse keeps its reuse/force semantics",
+        "item_id": "ducklake-postgres-reuse-keys-off-local-metadata-path"
+      },
+      {
+        "behavior": "duckdb/sqlite catalogs keep deciding reuse from metadata_path exactly as today",
+        "item_id": "ducklake-postgres-reuse-keys-off-local-metadata-path"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ducklake-postgres-reuse-keys-off-local-metadata-path",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/ducklake.py"
+      },
+      {
+        "item_id": "ducklake-postgres-reuse-keys-off-local-metadata-path",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_ducklake_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_ducklake_adapter.py -q",
+        "description": "A stale local metadata file no longer makes a postgres-catalog run skip loading",
+        "expected": "all pass; new test has metadata_path exist and asserts database_was_reused stays False for catalog=postgres",
+        "item_id": "ducklake-postgres-reuse-keys-off-local-metadata-path",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "benchbox/platforms/ducklake.py handle_existing_database(): early-return for catalog=postgres so the local metadata_path can no longer stand in for a server-side catalog; corrected the false docstring claim that a postgres catalog 'never has' a local metadata file (it is always computed to a default). PROOF: the TPC-H SF=1 postgres run that failed with 'Empty tables detected: region, nation, supplier...' now PASSES - data validation passed, Power@Size 72118.63/76298.44/85338.69",
+        "item_id": "ducklake-postgres-reuse-keys-off-local-metadata-path",
+        "notes": null,
+        "started_at": "2026-07-30T19:33:24Z",
+        "started_branch": "fix/ducklake-pg-reuse-ignores-local-metadata",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Early-return from handle_existing_database for the postgres catalog; fix the docstring",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/platforms/test_ducklake_adapter.py: test_stale_local_metadata_file_does_not_mark_a_postgres_run_reused (writes a stale .ducklake then asserts database_was_reused stays False and the file is left alone) + test_local_catalog_still_decides_reuse_from_metadata_path (must-preserve). 107 pass. Mutation: removing the early-return fails the new test",
+        "item_id": "ducklake-postgres-reuse-keys-off-local-metadata-path",
+        "notes": null,
+        "started_at": "2026-07-30T19:35:44Z",
+        "started_branch": "fix/ducklake-pg-reuse-ignores-local-metadata",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Regression test",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "context": "Rewrite against whatever surface survives the field-set decision, then decide whether the examples should be executed rather than merely proofread - this page drifted silently once already, and #1512 found an example in result-formats.md that raised TypeError on develop.",
+  "description": "docs/reference/python-api/result-analysis.rst still names sanitize_path, anonymize_system_profile, validate_anonymization and anonymize_execution_metadata, and the config fields include_machine_id and anonymize_hostnames, all removed in #1528 (measured - the symbols are present). Rewriting it now would be wasted work if the field-set decision changes the surface again, which is why this follows that decision rather than leading it.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "python-api-reference-documents-deleted-anonymization-api",
+        "needs_item": "published-pseudonym-oracle-and-field-set"
+      }
+    ],
+    "item_meta": {
+      "category": "docs",
+      "created_at": "2026-08-04T23:43:21Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No documented example raises on the live API",
+        "item_id": "python-api-reference-documents-deleted-anonymization-api"
+      },
+      {
+        "behavior": "The public surface described stays exactly what the module exports",
+        "item_id": "python-api-reference-documents-deleted-anonymization-api"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "python-api-reference-documents-deleted-anonymization-api",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/python-api/**"
+      },
+      {
+        "item_id": "python-api-reference-documents-deleted-anonymization-api",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/result-formats.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -qE 'sanitize_path|anonymize_system_profile|validate_anonymization|anonymize_execution_metadata|include_machine_id|anonymize_hostnames' docs/reference/python-api/result-analysis.rst",
+        "description": "no deleted symbol remains in the reference",
+        "expected": "Fails on the unfixed tree today (measured exit 1)",
+        "item_id": "python-api-reference-documents-deleted-anonymization-api",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "python-api-reference-documents-deleted-anonymization-api",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "python-api-reference-documents-deleted-anonymization-api",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Rewrite the anonymization sections against the live API",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "python-api-reference-documents-deleted-anonymization-api",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide whether Sphinx examples should be executed against the live API",
+        "wid": "w1"
+      }
+    ]
+  }
+}

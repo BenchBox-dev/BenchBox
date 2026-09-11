@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #383 of df-support-joinorder.\nDeferred: Add remaining JOB queries beyond the core 13\nReason deferred: The full JOB has 113 queries; current benchmark embeds 13 representative ones. Extending is separate scope.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:56Z",
+      "worktree": "main"
+    }
+  }
+}

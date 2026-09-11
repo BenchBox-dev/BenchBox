@@ -1,0 +1,441 @@
+{
+  "description": "Add ClickHouse Cloud deployment mode to the existing ClickHouse adapter,\nenabling benchmarking of ClickHouse's managed cloud service via the\nclickhouse:cloud syntax.\n\nThis completes the ClickHouse platform family: local (chDB), server\n(self-hosted), and cloud (managed).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "break existing ClickHouse self-hosted modes (server, chdb)",
+        "instead": "add cloud mode as a new code path alongside existing modes",
+        "item_id": "clickhouse-cloud-deployment",
+        "why": "self-hosted users must not be affected"
+      },
+      {
+        "dont": "refactor existing ClickHouse connection logic",
+        "instead": "add cloud authentication as an additional branch",
+        "item_id": "clickhouse-cloud-deployment",
+        "why": "server and chdb modes are stable"
+      },
+      {
+        "dont": "require cloud credentials for non-cloud modes",
+        "instead": "gate cloud config behind deployment mode checks",
+        "item_id": "clickhouse-cloud-deployment",
+        "why": "self-hosted users should not need cloud configuration"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-16T00:00:00Z",
+      "created_at": "2026-01-14T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "clickhouse-cloud-deployment"
+      },
+      {
+        "behavior": "Existing ClickHouse unit and integration tests continue to pass",
+        "item_id": "clickhouse-cloud-deployment"
+      },
+      {
+        "behavior": "Existing clickhouse:server and chdb modes unchanged",
+        "item_id": "clickhouse-cloud-deployment"
+      },
+      {
+        "behavior": "Platform registry autodiscovery continues working for all existing platforms",
+        "item_id": "clickhouse-cloud-deployment"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/firebolt.py"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/credentials/clickhouse_cloud.py"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_clickhouse_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.credentials.clickhouse_cloud import *; print('import OK')\"",
+        "description": "Cloud module imports correctly",
+        "expected": "import OK",
+        "item_id": "clickhouse-cloud-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py -v --tb=short",
+        "description": "ClickHouse adapter unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "clickhouse-cloud-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "Existing platform tests unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "clickhouse-cloud-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "needs_wid": "w12",
+        "wid": "w13"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "needs_wid": "w12",
+        "wid": "w14"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "needs_wid": "w16",
+        "wid": "w17"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "needs_wid": "w16",
+        "wid": "w18"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "needs_wid": "w16",
+        "wid": "w19"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "clickhouse-cloud-deployment",
+        "needs_wid": "w5",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'cloud' deployment mode to ClickHouse registry metadata",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement OAuth token authentication",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add credential setup wizard for ClickHouse Cloud",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support environment variables",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "CLICKHOUSE_CLOUD_ENDPOINT",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "CLICKHOUSE_CLOUD_API_KEY",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement cloud endpoint connection",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement cloud storage upload for data loading",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support S3 staging",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support GCS staging",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement COPY FROM for cloud data",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set requires_credentials=True",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure result caching behavior",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit tests for cloud authentication",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integration tests with ClickHouse Cloud (requires account)",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test TPC-H benchmark at scale 0.1",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Compare results with self-hosted ClickHouse",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set requires_cloud_storage=True",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define auth_methods=['api_key', 'oauth']",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add cloud-specific configuration options",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cloud endpoint URL",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Organization/service ID",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "API key or OAuth token",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement API key authentication",
+        "wid": "w9"
+      }
+    ]
+  }
+}

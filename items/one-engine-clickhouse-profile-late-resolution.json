@@ -1,0 +1,176 @@
+{
+  "context": "Decide the seam before writing the adoption, not during. The shape that satisfies both rules: the RunRequest carries the profile NAME, and the core run service resolves connection policy through a surface-supplied resolver it invokes at adapter-construction time -- MCP passes one that reads BENCHBOX_MCP_CLICKHOUSE_PROFILES, CLI passes one that resolves from its own config or refuses. Policy stays surface-scoped, the execution path is shared, and resolution stays late. Port test_clickhouse_profile_withdrawn_by_the_operator_fails_closed to the new call site BEFORE deleting the translator, and prove the ported test still fails when resolution is hoisted -- a ported test that passes under a hoisted implementation has stopped testing the property.",
+  "description": "one-engine-mcp-run-service-adoption's rung 1 requires _prepare_adapter_platform_options to be gone from benchbox/mcp/tools/benchmark.py, and its anti-patterns say option translation belongs below both surfaces while security policy stays at the MCP layer. Those two rules collide on one line of that function, and the collision is security-relevant.\n\n_prepare_adapter_platform_options is not purely translation. For ClickHouse it calls resolve_clickhouse_connection_profile(name) -> {'port', 'secure'}, reading the operator-owned BENCHBOX_MCP_CLICKHOUSE_PROFILES registry. It does that deliberately at EXECUTION time, not admission, so only the profile NAME is ever persisted in a durable job and a queued retry re-resolves against current policy -- withdrawing a profile fails closed for work already in the queue. That is the documented contract in docs/operations/mcp-remote-security.md, 'Server-owned ClickHouse connection profiles'.\n\nThe adoption item's own approach text already picks the risky side: 'ClickHouse profile resolution stays MCP-side ... but its OUTPUT feeds the service's standard option path'. If that output is computed when the RunRequest is built, the resolved destination is what gets persisted, and the withdrawal guarantee is gone.\n\nASYMMETRIC TEST COVER, which is the real risk. The persistence half is pinned by tests/integration/mcp/test_durable_jobs.py:196, which asserts persisted.request['platform_options'] == {'connection_profile': 'reviewed'} -- hoisting resolution to admission breaks that test loudly. The execution-time half is pinned by tests/unit/mcp/test_benchmark_tools.py:364 test_clickhouse_profile_withdrawn_by_the_operator_fails_closed, which drives _prepare_adapter_platform_options DIRECTLY -- the very function rung 1 mandates deleting. Whoever does the adoption must rewrite that test, and a rewrite aimed at the new call site without preserving WHEN resolution happens loses the guarantee with no failing test to show for it.\n\nRaised 2026-08-04 from the mcp-v2-platform-options side (#1510 built this boundary) after the one-engine coordination brief.\n\nSUPERSEDES `one-engine-clickhouse-profile-resolution-timing`, which was dropped minutes after creation on 2026-08-04 to attach anti-patterns, sequenced work units, prior art and dependency edges. `drop` is a soft state change rather than a delete, so the original id could not be reused; the dropped item carries the reason and links back here.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "materialize port/secure into the RunRequest at admission so the service sees a plain option dict",
+        "instead": "persist the profile name and resolve through a surface-supplied resolver at adapter-construction time",
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "why": "the resolved destination then lands in durable job storage, and a retry replays a destination the operator has since withdrawn -- the exact failure the profile design exists to prevent"
+      },
+      {
+        "dont": "move the BENCHBOX_MCP_CLICKHOUSE_PROFILES registry into benchbox.core with the rest of the translation",
+        "instead": "keep the registry at the MCP surface and inject only the resolver",
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "why": "it pushes an MCP-scoped security policy below the surface boundary and hands CLI runs an env registry that was never reviewed for them, contradicting the ADR's own scoping rule"
+      },
+      {
+        "dont": "port test_clickhouse_profile_withdrawn_by_the_operator_fails_closed by pointing it at the new call site and confirming it goes green",
+        "instead": "port it, then temporarily hoist resolution to admission and confirm the ported test FAILS before keeping it",
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "why": "green proves the new call site exists, not that resolution is still late; the test passes under a hoisted implementation too, so porting it that way silently deletes the guarantee"
+      }
+    ],
+    "item_meta": {
+      "category": "MCP",
+      "created_at": "2026-08-04T23:49:03Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "A profile withdrawn by the operator fails closed for work already queued, not only for new admissions",
+        "item_id": "one-engine-clickhouse-profile-late-resolution"
+      },
+      {
+        "behavior": "Durable jobs persist only the profile name; the resolved port/secure tuple is never written to job storage",
+        "item_id": "one-engine-clickhouse-profile-late-resolution"
+      },
+      {
+        "behavior": "Rejections still never echo the requested profile name or enumerate configured profiles",
+        "item_id": "one-engine-clickhouse-profile-late-resolution"
+      },
+      {
+        "behavior": "benchbox.mcp still never imports benchbox.cli, and the profile registry stays MCP-scoped rather than becoming a core concern",
+        "item_id": "one-engine-clickhouse-profile-late-resolution"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "the injected-factory pattern that keeps benchbox.core free of benchbox.platforms is the precedent for a surface-supplied connection resolver",
+        "decision": "reuse",
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "path": "benchbox/core/"
+      },
+      {
+        "concept": "execution-time profile resolution (#1510); the timing must survive the run-service move even though the function will not",
+        "decision": "supersede",
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "path": "benchbox/mcp/tools/benchmark.py:98-110"
+      },
+      {
+        "concept": "pins that only the profile name is persisted; it is the loud half of the cover and must stay green throughout",
+        "decision": "reuse",
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "path": "tests/integration/mcp/test_durable_jobs.py:196"
+      },
+      {
+        "concept": "pins execution-time re-resolution but drives the function slated for deletion; port it to the new seam and re-prove it fails when resolution is hoisted",
+        "decision": "extend",
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "path": "tests/unit/mcp/test_benchmark_tools.py:364"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/run_service.py"
+      },
+      {
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/integration/mcp/test_durable_jobs.py -q -n 0 -k profile",
+        "description": "Only the profile name is persisted in a durable job",
+        "expected": "exits 0 both before and after adoption; a failure here means the destination was materialized at admission",
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/mcp -q -n 0 -k withdrawn",
+        "description": "A withdrawn profile still fails closed on replay after the translator moves",
+        "expected": "exits 0 -- and the test must still FAIL when resolution is hoisted to admission; verify that by hoisting it temporarily, not by reading the test",
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm the two-halves cover at HEAD and write down which test pins which property",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide and record the resolver seam (surface-supplied resolver vs alternatives) before any code moves",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "one-engine-clickhouse-profile-late-resolution",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Port the withdrawal test to the new seam and prove it fails under a hoisted implementation",
+        "wid": "w2"
+      }
+    ]
+  }
+}

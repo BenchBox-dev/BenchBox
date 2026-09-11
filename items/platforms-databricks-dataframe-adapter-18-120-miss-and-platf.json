@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #304 of bottom-25-module-coverage.\nDeferred: platforms/databricks/dataframe_adapter (18%, 120 miss) and platforms/dataframe/pyspark_df (23%, 200 miss)\nReason deferred: Both require Spark session setup (SparkContext or SparkSession). PySpark tests already have a 1046-line test file at 23% because most tests skip when PySpark is not installed. Meaningful coverage requires a PySpark fixture or the separate dataframe platform CI environment. Cover in the dataframe-platform testing initiative, not here.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:25Z",
+      "worktree": "main"
+    }
+  }
+}

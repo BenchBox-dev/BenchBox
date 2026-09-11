@@ -1,0 +1,121 @@
+{
+  "context": "Add 'audit' to COMMANDS and fix the test to expect (0,'audit'). Decide config.json handling: either honor its URL in the routability check (mirroring _resolve_backend precedence) or delegate when a config file exists; name config.json in the refusal text. Delete the shadowed refusal branch. Fix the stale test comment and make its assertion unconditional. Assert no .todo-db/todo.sqlite in the refusal test. Add an env-passthrough test asserting TODO_DB_FINDING_DRAFTS_DIR and TODO_DB_RO_AUTH_TOKEN reach the delegated child env.",
+  "description": "Adversarial review of PR-1642 batch (H1/H3/M3/M4): 'audit' is in the shim refusal set but not COMMANDS, so _command_index(['audit','verify']) returns (1,'verify') and legacy mode injects --db BETWEEN the two-level words (test line 155 codifies the bug). Standalone refusal ignores .todo-db/config.json — the repo default backend selection — so every verb exits 2 in the default configuration and the error never mentions config.json. The unroutable_no_db branch is fully shadowed dead code; the w3 test comment claims finding/doctor are not in COMMANDS (false) with a tautological either-way assertion; the refusal test never asserts todo.sqlite was not created; the claimed RO/RW-token + TODO_DB_FINDING_DRAFTS_DIR mapping is comment-only with no passthrough test.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-08T16:45:48Z",
+      "completed_pr": 1643,
+      "created_at": "2026-08-08T15:02:11Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "legacy non-standalone default path stays byte-identical",
+        "item_id": "todo-db-shim-audit-routing-and-config-refusal"
+      },
+      {
+        "behavior": "standalone mode never creates .todo-db/todo.sqlite",
+        "item_id": "todo-db-shim-audit-routing-and-config-refusal"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-db-shim-audit-routing-and-config-refusal",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "todo-db-shim-audit-routing-and-config-refusal",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_standalone_compat.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd $(git rev-parse --show-toplevel) && uv run -- python -c \"import sys; sys.path.insert(0,'_project/scripts'); import todo_db_standalone_compat as c; sys.exit(0 if c._command_index(['audit','verify'])==(0,'audit') else 1)\"",
+        "description": "audit routes as top-level command at index 0",
+        "expected": "_command_index treats audit as the command, not verify",
+        "item_id": "todo-db-shim-audit-routing-and-config-refusal",
+        "last_result": "pass",
+        "last_run": "2026-08-08T16:43:18Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd $(git rev-parse --show-toplevel) && uv run -- python -m pytest tests/unit/scripts/test_todo_db_standalone_compat.py -q",
+        "description": "shim contract suite passes",
+        "expected": "all tests pass including new placement, refusal-no-file, and passthrough tests",
+        "item_id": "todo-db-shim-audit-routing-and-config-refusal",
+        "last_result": "pass",
+        "last_run": "2026-08-08T16:43:26Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-db-shim-audit-routing-and-config-refusal",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "audit added to COMMANDS, _command_index(['audit','verify'])==(0,'audit') BEFORE top-level, test updated, verify --run 1 pass",
+        "item_id": "todo-db-shim-audit-routing-and-config-refusal",
+        "notes": null,
+        "started_at": "2026-08-08T16:41:06Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add audit to COMMANDS; two-level audit flag placement BEFORE top-level; fix test expecting (1,'verify')",
+        "wid": "w1"
+      },
+      {
+        "evidence": "standalone refusal honors .todo-db/config.json and names it in message; _has_config_json added, 51 passed",
+        "item_id": "todo-db-shim-audit-routing-and-config-refusal",
+        "notes": null,
+        "started_at": "2026-08-08T16:43:10Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Standalone refusal accounts for .todo-db/config.json; refusal message names it",
+        "wid": "w2"
+      },
+      {
+        "evidence": "already done earlier, 49 passed",
+        "item_id": "todo-db-shim-audit-routing-and-config-refusal",
+        "notes": null,
+        "started_at": "2026-08-08T16:41:39Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Remove shadowed unroutable_no_db branch; fix stale w3 test comment and tautological assertion; refusal test asserts no todo.sqlite created",
+        "wid": "w3"
+      },
+      {
+        "evidence": "env passthrough test for TODO_DB_FINDING_DRAFTS_DIR + TODO_DB_RO_AUTH_TOKEN, _delegate env copy, 1 passed",
+        "item_id": "todo-db-shim-audit-routing-and-config-refusal",
+        "notes": null,
+        "started_at": "2026-08-08T16:42:10Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Env passthrough test for TODO_DB_FINDING_DRAFTS_DIR and TODO_DB_RO_AUTH_TOKEN (or strike the mapping claim)",
+        "wid": "w4"
+      },
+      {
+        "evidence": "doctor without DB diagnoses no-backend-configured, not refuse exit-2; legacy doctor still routes via --db pin, 51 passed",
+        "item_id": "todo-db-shim-audit-routing-and-config-refusal",
+        "notes": null,
+        "started_at": "2026-08-08T16:42:33Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Standalone doctor without a DB diagnoses no-backend-configured instead of exit-2 refusal (legacy doctor works throughout) — review finding L1",
+        "wid": "w5"
+      }
+    ]
+  }
+}

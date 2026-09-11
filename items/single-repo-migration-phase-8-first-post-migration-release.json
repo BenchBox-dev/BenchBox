@@ -1,0 +1,270 @@
+{
+  "description": "End-to-end validation that the new flow works in the now-canonical\nsingle-repo state, with all old tooling deleted and all docs aligned.\nThis is the first release where there is no fallback - the old\nautomate_release.py is gone, and the retired private clone is no\nlonger a viable working copy.\n\nIf anything is still missing or broken in the new flow, this is where\nit surfaces. Fixes are quick because the surface area is small (a\nMakefile target, one workflow file, one changelog generator).\n\nRun from ~/Developer/benchbox-public (the new dev locus).\n\nPlan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 8).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "release a marketing or major-feature version here unless it was already planned",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "why": "this release is a process validation, not a product event; keep the user-facing change small."
+      },
+      {
+        "dont": "resurrect deleted scripts as a \"just in case\" workaround",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "why": "the entire point of the migration was to delete them; if the new flow has a gap, fix the gap, do not regrow the old surface."
+      },
+      {
+        "dont": "skip the smoke test (w6)",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "why": "release.yml going green proves the workflow ran, not that the wheel is functional; only a fresh pip install does."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "needs_item": "single-repo-migration-phase-4-test-release-with-new-flow"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "needs_item": "single-repo-migration-phase-6-delete-obsolete-tooling"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "needs_item": "single-repo-migration-phase-7-docs-cleanup"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All previously published versions on PyPI remain installable; this release is purely additive.",
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release"
+      },
+      {
+        "behavior": "The new release flow is the ONLY release flow now. There is no fallback. If something breaks, fix it in the new flow.",
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/single-repo-migration.md"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "kind": "only_modify",
+        "path_glob": "benchbox/__init__.py"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "kind": "only_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --isolated --with pip -- python -m pip index versions benchbox 2>&1 | head -1",
+        "description": "PyPI has the new version",
+        "expected": "shows the new version",
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --isolated --no-project --with 'benchbox==<version>' -- python -c 'import benchbox; print(benchbox.__version__)'",
+        "description": "Wheel installs and imports cleanly from PyPI",
+        "expected": "<version>",
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh run list --workflow=release.yml --limit 1 --json conclusion --jq '.[0].conclusion'",
+        "description": "release.yml succeeded",
+        "expected": "success",
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -l 'automate_release|prepare_release|benchbox-sync|benchbox\\.release\\.workflow' | wc -l",
+        "description": "No remaining references to deleted modules anywhere in the repo",
+        "expected": "0 (or only this TODO file itself)",
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh pr view <release-pr> --json body --jq '.body' | grep -c '## API surface diff'",
+        "description": "Release PR includes the migration API surface diff gate",
+        "expected": ">= 1",
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "notes": "release-recovery-v0-3-1 cuts and verifies v0.3.1 as the first real\nrelease on the new flow with no fallback — the exact exercise this phase\nwas created to perform. Before any release work here, make the call\nexplicit (record it in _project/decisions/single-repo-migration.md):\n  - RETIRE: if the v0.3.1 recovery release already exercised the new flow\n    end-to-end, move this TODO to DONE as \"satisfied by v0.3.1\" and skip\n    w1-w7.\n  - SEPARATE: if a distinct later validation release is still wanted,\n    proceed to w1-w7 using v0.3.2+ (v0.3.1 is consumed by recovery).\nMirrors the decision required by release-recovery-v0-3-1 w7; do not leave\nit implicit in the dependency graph.\n\nDECISION 2026-07-09 (maintainer-approved): RETIRE — Phase 8 is satisfied\nby the v0.3.1 recovery release. w1-w7 are deliberately skipped, not\nforgotten.\n\nRationale: this phase exists to prove the new flow works end-to-end in the\ncanonical single-repo state with no fallback. v0.3.1 did precisely that —\n`make release-cut VERSION=0.3.1` off `develop`, curation, squash-merge to\n`main` (`7550c423d`), tag, and `release.yml` run 29055922350 publishing to\nPyPI with green cross-platform install smoke — with `automate_release.py`\nalready deleted (Phase 6) and docs aligned (Phase 7). Phase 4 closed the\nsame day as recovery-complete. Cutting a v0.3.2 solely to re-run a passed\nexercise would add a public release with no user-facing content.\n\nThe exercise did surface two real gaps, both recorded in\n_project/decisions/single-repo-migration.md (2026-07-09 amendment):\n`release-cut` did not perform the `-s ours` history alignment that a\n`vX.Y.Z -> main` PR needs, and the `validate-base` bootstrap failed to\nrestore `auto_merge_soundness_paths`. Both are now fixed and\nregression-tested — the alignment merge was folded into `release-cut`\nitself (PR #1089), so a future cut no longer performs it by hand.\nRecorded in _project/decisions/single-repo-migration.md, not left implicit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide: is Phase 8 satisfied by the v0.3.1 recovery release, or is a separate release needed?",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "notes": "git checkout main && git pull\nCheck the latest CI run is green: gh run list --branch main --limit 1\nConfirm Phase 6 deletions and Phase 7 docs are merged to main.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm main is green and all migration phases are merged",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "notes": "git describe --tags --abbrev=0\nv0.3.1 is consumed by release-recovery-v0-3-1, so the next version here is\nv0.3.2 unless a new feature warrants a minor bump.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Pick the next version (v0.3.2+, since v0.3.1 is the recovery release)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "notes": "The release target now runs without any fallback. If it fails,\nthe failure is in the new flow itself - not because of stale old\ncode. Fix and retry.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run make release VERSION=X.Y.Z",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "notes": "By this point the changelog generator has been exercised at least\nonce (Phase 4). Output should be reasonable. Spend a few minutes\npolishing the user-facing bullets.\n\nThe release PR body must include the API surface diff section from\n`_project/specs/migration-api-surface-gate.md` before this work unit\ncan be marked done:\n  - New CLI commands\n  - New console_script entry points\n  - New public Python imports\n  - New file-system conventions\n  - Approval / ADR link for any non-empty entry\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Review the release PR, edit changelog if needed, squash-merge",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "notes": "git checkout main && git pull\ngit tag vX.Y.Z\ngit push origin vX.Y.Z\nWatch release.yml run. Should complete green and publish to PyPI.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Tag the merge commit, push, watch release.yml",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "notes": "uv run --isolated --no-project --with 'benchbox==X.Y.Z' -- benchbox --help\nuv run --isolated --no-project --with 'benchbox==X.Y.Z' -- python -c 'import benchbox; print(benchbox.__version__)'\nVerify wheel contents have no maintainer scaffolding (Phase 1 excludes\nare still in effect).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Smoke test from PyPI in an isolated environment",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-8-first-post-migration-release",
+        "notes": "Append a brief retrospective to _project/decisions/single-repo-migration.md:\n  - What worked\n  - What surprised\n  - What would do differently\nUseful future-you reference if a similar migration ever comes up\n(it might not - but the discipline of writing it down is cheap).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Declare migration complete; record retrospective notes",
+        "wid": "w7"
+      }
+    ]
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "context": "The fix is a targeted refactor of a single try/except block in result_capture.py.\nReplace the context manager with explicit executor lifecycle management. The\nnon-timeout path (successful EXPLAIN) is unchanged in observable behavior.\n",
+  "description": "benchbox/platforms/base/result_capture.py:606-624 wraps get_query_plan() in a\nThreadPoolExecutor to implement plan_capture_timeout_seconds. The timeout works\ncorrectly at the Python call level — future.result(timeout=N) raises TimeoutError\nand the code records a failure and returns None. However, the surrounding `with`\nblock immediately calls executor.shutdown(wait=True) on exit (Python's default),\nwhich blocks the calling thread until the EXPLAIN thread completes regardless of\nthe TimeoutError.\n\nCurrent code (simplified):\n  with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:\n      future = executor.submit(self.get_query_plan, connection, query)\n      try:\n          explain_output = future.result(timeout=self.plan_capture_timeout_seconds)\n      except concurrent.futures.TimeoutError:\n          self._record_plan_capture_failure(...)\n          return None, capture_time_ms   # ← returns None to the caller...\n  # ...but __exit__ here calls executor.shutdown(wait=True), blocking until\n  # the EXPLAIN thread finishes before this frame actually unwinds.\n\nThe practical consequence: a query whose EXPLAIN takes 60s with a 5s timeout\nstill blocks the benchmark runner for 60s before the next query is issued. The\nonly observable difference from no timeout is that the failure is recorded in\nthe metadata at 5s; the actual delay is unchanged.\n\nFix: use shutdown(wait=False) so the executor does not block on teardown.\nThe abandoned thread holds the database connection until the EXPLAIN finishes,\nbut the benchmark runner is no longer blocked. Connections are not reused\nwithin capture_query_plan() so there is no connection-reuse hazard.\n\nTwo options:\n  A) Explicit shutdown: replace the `with` block with manual executor management\n     using executor.shutdown(wait=False) after catching TimeoutError.\n  B) cancel_futures=True: Python 3.9+ supports\n     executor.shutdown(wait=False, cancel_futures=True) which requests\n     thread cancellation (best-effort; EXPLAIN threads that are already running\n     will not be interrupted, but threads not yet started can be cancelled).\nOption A is simpler and more readable; option B has no additional benefit for\nsingle-worker executors where the future is already submitted.\n\nNote: database-level query cancellation (e.g., PostgreSQL pg_cancel_backend)\nis out of scope for this TODO — that would require a second connection and\nseparate cancellation signalling, which is a much larger change.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add database-level EXPLAIN cancellation",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-timeout-mechanism-fix",
+        "why": "that requires a second connection and out-of-band signalling; out of scope."
+      },
+      {
+        "dont": "change the timeout semantics",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-timeout-mechanism-fix",
+        "why": "plan_capture_timeout_seconds should still be the time until failure is recorded, not the time until the DB returns."
+      },
+      {
+        "dont": "set cancel_futures=True",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-timeout-mechanism-fix",
+        "why": "it has no effect on an already-running thread; it only prevents not-yet-started futures from starting."
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-06-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Plan capture failure reason='timeout' must still be logged and stored in plan capture metadata.",
+        "item_id": "query-plan-capture-timeout-mechanism-fix"
+      },
+      {
+        "behavior": "The abandoned EXPLAIN thread will continue running until the DB returns — this is expected and acceptable.",
+        "item_id": "query-plan-capture-timeout-mechanism-fix"
+      },
+      {
+        "behavior": "plan_capture_timeout_seconds setting must still bound the time until failure is recorded.",
+        "item_id": "query-plan-capture-timeout-mechanism-fix"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Python concurrent.futures docs — shutdown(wait=False) semantics",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-timeout-mechanism-fix",
+        "path": "Python"
+      },
+      {
+        "concept": "benchbox/platforms/base/result_capture.py:606-624 — current timeout implementation",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-timeout-mechanism-fix",
+        "path": "benchbox/platforms/base/result_capture.py:606-624"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-timeout-mechanism-fix",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/query-plan-capture-timeout-mechanism-fix.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-timeout-mechanism-fix",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "query-plan-capture-timeout-mechanism-fix",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -k 'capture_timeout' -v",
+        "description": "Timed-out capture returns in under 1s when get_query_plan sleeps 10s",
+        "expected": "Timeout test completes in under 1 second wall-clock time",
+        "item_id": "query-plan-capture-timeout-mechanism-fix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -k 'plan_capture' -q",
+        "description": "Full capture pipeline tests still pass",
+        "expected": "0 failures",
+        "item_id": "query-plan-capture-timeout-mechanism-fix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-timeout-mechanism-fix",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-timeout-mechanism-fix",
+        "notes": "Refactor result_capture.py:606-624:\n  executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)\n  future = executor.submit(self.get_query_plan, connection, query)\n  try:\n      explain_output = future.result(timeout=self.plan_capture_timeout_seconds)\n  except concurrent.futures.TimeoutError:\n      executor.shutdown(wait=False)  # abandon the thread; do not block\n      capture_time_ms = (time.perf_counter() - start_time) * 1000\n      self.logger.warning(...)\n      self._record_plan_capture_failure(...)\n      return None, capture_time_ms\n  except Exception:\n      executor.shutdown(wait=False)\n      raise\n  else:\n      executor.shutdown(wait=False)\nThis eliminates the blocking shutdown on all exit paths.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace the with-block with explicit executor.shutdown(wait=False) on timeout",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-timeout-mechanism-fix",
+        "notes": "Mock get_query_plan() to sleep for 10s. Set plan_capture_timeout_seconds=0.1.\nAssert capture_query_plan() returns (None, approx_0.1ms) in under 1 second\nwall-clock time. This test fails on the current code because shutdown(wait=True)\nblocks for the full 10s sleep.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit test asserting that a timed-out capture returns promptly",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "context": "Reuse execute_run and its existing data_only lifecycle. Add a surface-owned response adapter only if needed to preserve the MCP data_generation envelope. Exercise the public MCP handler and durable worker rather than calling core helpers as a simulated surface. Add DuckDB to the mcp extra with the repository's existing >=1.0.0,<2.0.0 bound and regenerate uv.lock. Verify focused MCP, core lifecycle, package metadata, Ruff, and fast tests before publication.",
+  "description": "Successor remediation for the 2026-08-13 adversarial review of merged PR #1692 and the staged MCP candidate. Route synchronous and durable MCP data_only execution through benchbox.core.run_service instead of the MCP-local generator, replace simulated RunPlan parity tests with real MCP surface and durable-worker routing oracles, and make the benchbox[mcp] install path include the advertised DuckDB runtime so the staged image can execute DuckDB. Keep admission, tenancy, durable publication, response compatibility, optional dependency bounds, and CLI behavior unchanged. External deployment evidence and publication approval remain owned by mcp-stateless-external-deployment-acceptance-v2-4.",
+  "legacy": {
+    "item_meta": {
+      "category": "architecture",
+      "completed_at": "2026-08-13T22:22:08Z",
+      "completed_pr": 1716,
+      "created_at": "2026-08-13T21:50:35Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "DuckDB keeps the repository's supported >=1.0.0,<2.0.0 dependency range and adapter imports remain lazy",
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813"
+      },
+      {
+        "behavior": "External production publication remains blocked and no deployment evidence is fabricated",
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813"
+      },
+      {
+        "behavior": "MCP response envelopes, tenant-scoped paths, admission revalidation, durable staging-to-final publication, and error scrubbing remain compatible",
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/run_service.py"
+      },
+      {
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "kind": "only_modify",
+        "path_glob": "docs/development/dependency-audit-raw.md"
+      },
+      {
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'import tomllib; data=tomllib.load(open(\"pyproject.toml\", \"rb\")); assert any(dep.startswith(\"duckdb>=1.0.0,<2.0.0\") for dep in data[\"project\"][\"optional-dependencies\"][\"mcp\"])'",
+        "description": "MCP package extra includes an executable DuckDB runtime",
+        "expected": "exits 0",
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "last_result": "pass",
+        "last_run": "2026-08-13T22:21:52Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_run_service_surface_equivalence.py tests/unit/mcp/test_mcp_tool_handlers.py tests/unit/mcp/test_surface_defect_regressions.py tests/unit/mcp/test_benchmark_tools.py -q",
+        "description": "Focused core and MCP data_only routing",
+        "expected": "exits 0",
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "last_result": "pass",
+        "last_run": "2026-08-13T22:22:03Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/core/run_service.py benchbox/mcp tests/unit/test_run_service_surface_equivalence.py tests/unit/mcp",
+        "description": "Scoped lint",
+        "expected": "exits 0",
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "last_result": "pass",
+        "last_run": "2026-08-13T22:22:05Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "needs_wid": "w0",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Current branch routes synchronous _run_benchmark_impl and DurableJobWorker data_only requests through _execute_mcp_run_via_core and benchbox.core.run_service.execute_run; rg finds no _generate_data_impl. Focused suite: 153 passed in 17.19s (/tmp/mcp-review-data-only-focused.log). Real TPCH SF0.01 MCP data_only execution completed through core with 10 generated files (/tmp/mcp-review-data-only-live.log).",
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "notes": null,
+        "started_at": "2026-08-13T21:57:37Z",
+        "started_branch": "fix/mcp-review-findings-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-mcp-review-findings-20260813",
+        "status": "done",
+        "summary": "Route synchronous and durable MCP data_only through the shared core run service",
+        "wid": "w0"
+      },
+      {
+        "evidence": "tests/unit/test_runplan_equivalence.py now exercises the actual synchronous MCP request boundary and DurableJobWorker boundary, and asserts their execute_run inputs; the unused expect_execute parameter and simulated via-core MCP call are removed. Focused routing suite: 153 passed in 17.19s.",
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "notes": null,
+        "started_at": "2026-08-13T21:58:13Z",
+        "started_branch": "fix/mcp-review-findings-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-mcp-review-findings-20260813",
+        "status": "done",
+        "summary": "Replace simulated RunPlan parity with real synchronous and durable MCP surface oracles",
+        "wid": "w1"
+      },
+      {
+        "evidence": "pyproject.toml mcp extra now includes duckdb>=1.0.0,<2.0.0 and uv.lock was regenerated. Fresh isolated no-dev MCP environment imported duckdb 1.3.2 and mcp successfully (/tmp/mcp-review-isolated-extra.log).",
+        "item_id": "mcp-adversarial-review-runtime-remediation-20260813",
+        "notes": null,
+        "started_at": "2026-08-13T21:58:24Z",
+        "started_branch": "fix/mcp-review-findings-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-mcp-review-findings-20260813",
+        "status": "done",
+        "summary": "Include the advertised DuckDB runtime in the MCP install extra and lockfile",
+        "wid": "w2"
+      }
+    ]
+  }
+}

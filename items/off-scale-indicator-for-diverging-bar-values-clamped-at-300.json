@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #173 of explorer-unify-visualization-foundations.\nDeferred: Off-scale indicator for diverging-bar values clamped at 300%\nReason deferred: Nice-to-have polish; ship after the foundational architecture is unified - chart coverage gaps are higher priority",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:18Z",
+      "worktree": "main"
+    }
+  }
+}

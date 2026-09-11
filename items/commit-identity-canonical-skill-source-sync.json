@@ -1,0 +1,168 @@
+{
+  "context": "Edit the canonical source at /Users/joe/.skill-sync/skills/SHARED/commit-framework/SKILL.md so its [COMMIT-IDENTITY-001] bullet matches what develop's mirror now says: authorship is what the policy binds, an agent identity is rejected as author, and a commit-signing service may hold the committer slot behind a human author. Leave the following Co-Authored-By bullet untouched, since the audit pins its anchors. Then run `make skill-sync` from a claimed worktree and confirm the mirror is unchanged relative to develop -- an empty diff is the success condition, because the mirror is already correct and the point is that regeneration must not alter it. Run `make skill-sync-verify` locally where the CLI exists and confirm it actually runs rather than printing a skipping line. Commit only the mirror and lock if the sync legitimately changes them. The source repository is a separate project with unrelated dirty files: do not commit, stash, or discard anything there.",
+  "description": "PR #1494 merged to develop as d8afb2fa, and the in-repo generated mirror .claude/skills/SHARED/commit-framework/SKILL.md now carries the amended [COMMIT-IDENTITY-001] wording ('a commit-signing service may hold the committer slot behind a human author'), verified present on origin/develop. The CANONICAL SOURCE it is generated from, /Users/joe/.skill-sync/skills/SHARED/commit-framework/SKILL.md, still carries the old 'human author and committer identity' wording. That source is absent from every cloud clone, so no cloud session could edit it and the mirror was amended without its source. The next local `make skill-sync` therefore REGENERATES THE MIRROR FROM THE STALE SOURCE and silently reverts merged repository policy. This is time-sensitive: any routine skill-sync on the maintainer's machine triggers it, and nothing in the tracker records it -- the only record is a comment on a now-merged PR, which is not a durable work item. Partial mitigation already exists: the same PR added a canonical anchor, so a reverted mirror now fails agent-instructions-check with 'canonical COMMIT-IDENTITY-001 semantics drifted; missing anchors: committer slot behind a human author' rather than drifting undetected. That converts a silent revert into a loud one; it does not prevent it. Note also that make skill-sync-verify SKIPS rather than passes wherever the skill-sync CLI is absent, so a cloud session cannot detect this condition at all.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Accept a skipping line from make skill-sync-verify as a pass",
+        "instead": "Confirm the verifier actually ran on a machine where the CLI is installed",
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "why": "The target exits 0 when the CLI is absent, which is exactly how this drift went unnoticed"
+      },
+      {
+        "dont": "Commit, stash, or clean the unrelated dirty files in the skill-sync source project",
+        "instead": "Touch only the one SKILL.md bullet and leave everything else alone",
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "why": "That project is out of scope and its working state belongs to other work"
+      },
+      {
+        "dont": "Hand-edit .claude/skills/SHARED/commit-framework/SKILL.md to keep the mirror correct",
+        "instead": "Edit the canonical source and regenerate through make skill-sync",
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "why": "It is generated; the stale source remains the real defect and the next sync reverts the hand edit again"
+      },
+      {
+        "dont": "Run make skill-sync before amending the source",
+        "instead": "Amend the source first, then sync, then confirm the mirror is unchanged",
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "why": "That is precisely the action that reverts merged policy, and it would land the revert in the working tree"
+      }
+    ],
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-04T12:51:52Z",
+      "completed_pr": 1522,
+      "created_at": "2026-08-04T11:53:58Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The Co-Authored-By bullet and its pinned anchors (exact trailer, not authorization) are unchanged",
+        "item_id": "commit-identity-canonical-skill-source-sync"
+      },
+      {
+        "behavior": "The amended wording already merged to develop stays byte-identical after regeneration; this item makes the source agree with the mirror, it does not change policy again",
+        "item_id": "commit-identity-canonical-skill-source-sync"
+      },
+      {
+        "behavior": "Unrelated dirty files in the separate skill-sync source project are left exactly as they are",
+        "item_id": "commit-identity-canonical-skill-source-sync"
+      },
+      {
+        "behavior": "make agent-instructions-check continues to pass before and after the sync",
+        "item_id": "commit-identity-canonical-skill-source-sync"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "kind": "do_not_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.lock"
+      },
+      {
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.yaml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -q 'committer slot behind a human author' \"$HOME/.skill-sync/skills/SHARED/commit-framework/SKILL.md\"",
+        "description": "Unfixed-tree gate: the canonical source carries the amended authorship wording",
+        "expected": "exits 1 on an unfixed tree - the source still says 'human author and committer identity' today, so the pattern is absent until it is amended",
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make skill-sync >/dev/null 2>&1; git diff --quiet -- .claude/skills/SHARED/commit-framework/SKILL.md",
+        "description": "Regenerating from source leaves the tracked mirror byte-identical to develop",
+        "expected": "an empty diff, proving the source and the merged mirror now agree",
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make agent-instructions-check",
+        "description": "The instruction audit passes, so the canonical anchors did not drift",
+        "expected": "agent-instructions PASS with no canonical COMMIT-IDENTITY-001 drift finding",
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Amended the CANONICAL source upstream, not the local working copy: skill-sync-skills#16 (merged, db3957a) applies the merged wording to skills/SHARED/commit-framework/SKILL.md and regenerates that repo lock in the same commit per its same-commit lock invariant. Correction to the item premise: the stale text was at the ref pinned in skill-sync.yaml; ~/.skill-sync already carried the amendment as an UNCOMMITTED edit, so rung 1 as written passed against a file the sync never reads.",
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "notes": null,
+        "started_at": "2026-08-04T12:29:27Z",
+        "started_branch": "fix/commit-identity-canonical-skill-source-sync",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/benchbox-git-identity-fix-2d9e93",
+        "status": "done",
+        "summary": "Amend the [COMMIT-IDENTITY-001] bullet in the canonical source to match develop's mirror wording",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Bumped skill-sync.yaml ref a48d0c0 -> db3957a and ran make skill-sync from this claimed worktree. RUNG 2 PASS: git diff --quiet -- .claude/skills/SHARED/commit-framework/SKILL.md is empty, so regeneration is a no-op. Stronger corroboration: the skill-sync.lock diff changes only ref/revision/fetchedAt/lockedAt with ZERO sha256 entries changed, proving no mirrored file content moved. Reverted an incidental .gitattributes block reorder the sync tool made, keeping the change set inside the allowlist (check-scope: scope OK, 2 files).",
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "notes": null,
+        "started_at": "2026-08-04T12:29:33Z",
+        "started_branch": "fix/commit-identity-canonical-skill-source-sync",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/benchbox-git-identity-fix-2d9e93",
+        "status": "done",
+        "summary": "Run make skill-sync from a claimed worktree and confirm the mirror does not change relative to develop",
+        "wid": "w2"
+      },
+      {
+        "evidence": "make skill-sync-verify GENUINELY RAN (skill-sync CLI present at /Users/joe/Developer/skill-sync/dist/cli/index.js): output \"OK 1 tracked target(s) verified (claude): committed snapshot matches lock + config.\" — not the \"skipping\" no-op the anti-pattern warns about. make skill-sync-check also ran. make agent-instructions-check: PASS, active_bytes=15714 agents_lines=168. make pr-preflight: pass, 26629 passed / 19 skipped. PR #1522.",
+        "item_id": "commit-identity-canonical-skill-source-sync",
+        "notes": null,
+        "started_at": "2026-08-04T12:29:35Z",
+        "started_branch": "fix/commit-identity-canonical-skill-source-sync",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/benchbox-git-identity-fix-2d9e93",
+        "status": "done",
+        "summary": "Run make skill-sync-verify locally and confirm it runs rather than skips",
+        "wid": "w3"
+      }
+    ]
+  }
+}

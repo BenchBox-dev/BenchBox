@@ -1,0 +1,11 @@
+{
+  "description": "Promoted from deferral #619 of uat-disk-gate-always-on.\nDeferred: Pre-cell (predictive) disk check so one oversized cell cannot fill the disk before the post-cell watch fires\nReason deferred: Needs per-cell size prediction; the advisory budget table is (platform, benchmark, scale)-keyed and could feed this, but prediction accuracy work is out of scope for a gate-wiring fix.",
+  "legacy": {
+    "item_meta": {
+      "claimed_at": "2026-08-18T00:54:30Z",
+      "claimed_by": "joe@joe-mac-mini.local",
+      "created_at": "2026-07-19T12:37:16Z",
+      "worktree": "uat-hardening"
+    }
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "context": "Put the three checks in tests/integration/ (new file, e.g.\ntest_joinorder_full_archive.py), each marked @pytest.mark.slow +\n@pytest.mark.integration and skipped unless the canonical archive is present.\nDrive assertions off the committed reference artifacts under _project/joinorder/\nand a durable allowed-dangling FK source, so the tests re-express build-time\nguarantees at load time without hiding policy in test code.\n",
+  "description": "Adversarial review finding (2026-07-02, joinorder Track-2 review). The strong\nJOB-grade assurances (FK integrity, 113-query reference cardinalities, UTF-8\nfidelity) run only at BUILD time (_project/scripts/build_joinorder_data.py) and\nagainst the 50-row tiny fixture (tests/unit/core/joinorder/\ntest_canonical_queries.py). No automated test reproduces them on the FULL\ncanonical archive a user actually loads; full-data reproduction is currently\ngated only by manual UAT (cutover w17). Three specific gaps:\n\n  a. No FK referential-integrity test for canonical joinorder anywhere in\n     tests/. NOTE: schema.py:67-68 documents that the canonical data has\n     LEGITIMATE dangling references and FKs are opt-in -- so the test must pin\n     WHICH references are legitimately dangling vs corruption, using the build\n     pipeline's known set, not assert full closure.\n  b. No automated full-archive cardinality test. The 113-query oracle\n     (_project/joinorder/reference_cardinalities.json, an independent\n     PostgreSQL 16.2 oracle) is asserted only against the tiny fixture at\n     unit-test time.\n  c. No runtime encoding/normalization assertion on the full archive\n     (transitively covered by SHA256 today, but not directly tested).\n\nThese tests need the downloaded ~GB archive, so they REUSE the existing\nopt-in markers (`slow` + `integration`, or `stress` for the heaviest;\nregistered in pyproject.toml:429-455, excluded from default CI) rather than\ninventing a new marker, and live under tests/integration/. Intent: a\nCI-gateable reproduction of the build-time assurances, replacing reliance on\nmanual UAT.\n\nRe-review correction (2026-07-03): the FK gap is confirmed, but this seed's\noriginal w2 overstated implementation readiness. The current build pipeline\nhas FK closure logic for tiny-fixture construction, but no committed\nallow-list artifact or helper that names the full canonical archive's\nlegitimate dangling references. Do not implement the FK assertion by burying a\nnewly-derived policy inside an integration test; first make the allowed\ndangling set durable, reviewed, and re-runnable, or split that prerequisite\ninto its own TODO.\n\nTriage re-verification (2026-07-03, Track-2 review triage): all three gaps\n(a/b/c) re-confirmed against develop. HOWEVER, implementation is currently\nBLOCKED: the canonical archive is not downloadable -- the manifest URL\nreturns 404 because no GitHub Release exists at tag\ndata/joinorder-imdb-2013-v1 (see\njoinorder-canonical-release-asset-restore). Full-archive tests must be\nauthored AND executed against the real archive before committing (the\nreference cardinalities come from a PostgreSQL 16.2 oracle; DuckDB\nagreement at full scale is asserted, not assumed, and w3's pinned\nfidelity values can only be derived from the archive itself). w0's\nprerequisite is split into joinorder-fk-allowed-dangling-artifact per its\nown instruction; both new items are now deps.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assert full FK closure",
+        "instead": "(not specified)",
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "why": "schema.py:67-68 documents legitimate dangling references; pin the known set instead."
+      },
+      {
+        "dont": "register a new pytest marker",
+        "instead": "(not specified)",
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "why": "the opt-in markers already exist in pyproject.toml."
+      },
+      {
+        "dont": "run these full-archive tests in the default unit suite",
+        "instead": "(not specified)",
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "why": "they need the ~GB download; reuse the existing slow/integration/stress markers."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "needs_item": "joinorder-canonical-cutover"
+      },
+      {
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "needs_item": "joinorder-canonical-release-asset-restore"
+      },
+      {
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "needs_item": "joinorder-fk-allowed-dangling-artifact"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-07-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The default `uv run -- python -m pytest` unit run stays fast; the new tests are opt-in behind the existing slow/integration (or stress) markers and do not run by default.",
+        "item_id": "joinorder-canonical-validation-test-coverage"
+      },
+      {
+        "behavior": "The existing tiny-fixture oracle test tests/unit/core/joinorder/test_canonical_queries.py is unchanged.",
+        "item_id": "joinorder-canonical-validation-test-coverage"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/joinorder/reference_cardinalities.json -- reuse the independent PostgreSQL oracle as the expected values for w1.",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "path": "_project/joinorder/reference_cardinalities.json"
+      },
+      {
+        "concept": "_project/scripts/build_joinorder_data.py:validate_encoding_round_trip -- reuse the build-time fidelity check as the reference for w3.",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "path": "_project/scripts/build_joinorder_data.py:validate_encoding_round_trip"
+      },
+      {
+        "concept": "pyproject.toml:429-455:markers (slow/integration/stress) -- reuse the existing opt-in markers; DO NOT register a new one.",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "path": "pyproject.toml:429-455:markers"
+      },
+      {
+        "concept": "tests/integration/test_joinorder_synthetic_cross_surface_equivalence.py -- reuse the tests/integration/ location and marker style for the new full-archive tests.",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "path": "tests/integration/test_joinorder_synthetic_cross_surface_equivalence.py"
+      },
+      {
+        "concept": "tests/unit/core/joinorder/test_canonical_queries.py -- extend its cardinality/known-zero/null-empty assertions from the tiny fixture to the full archive.",
+        "decision": "extend",
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "path": "tests/unit/core/joinorder/test_canonical_queries.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/"
+      },
+      {
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/joinorder/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -k joinorder_full_archive -q",
+        "description": "New full-archive tests are deselected by default (slow marker), not merely collected -- a plain pytest run (no --collect-only) so a missing/wrong marker would actually execute and be caught, instead of only being importable",
+        "expected": "\"0 selected, N deselected\" (or \"no tests ran (N deselected)\") -- N equals the new full-archive test count; 0 tests actually execute",
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/joinorder/ -q",
+        "description": "Default joinorder unit tests still pass and stay fast",
+        "expected": "0 failures",
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "notes": "Done 2026-07-03: verified no committed allowed-dangling set exists\n(searched _project/joinorder/ and the build pipeline; only tiny-fixture\nFK closure machinery at build_joinorder_data.py:2651). Created the\nprerequisite TODO joinorder-fk-allowed-dangling-artifact to generate and\nreview that artifact; it is now in this item's deps.needs and w2 must\nsource the allowed set from its committed artifact.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pin or create a durable source for legitimate full-archive dangling FKs",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "notes": "Load the canonical archive into DuckDB, run the 113 queries, assert\nunderlying/reference cardinalities match\n_project/joinorder/reference_cardinalities.json (including the 5 known-zero\nqueries 2c/5a/5b/10b/32a). Mark with the existing `slow`+`integration`\nmarkers (or `stress`); do not run by default. Mirror\ntest_canonical_queries.py assertions at full scale.\n\nDONE 2026-07-10: tests/integration/test_joinorder_full_archive.py, marked\n@slow @integration @duckdb (deselected by default). The parametrized\ncardinality test loads all 21 verified Parquet as DuckDB views and asserts\neach query's row_count==1 and underlying_row_count == the PostgreSQL 16.2\noracle in reference_cardinalities.json, with the 5 known-zero queries\npinned to 0 -- mirroring test_canonical_queries.py at full scale. Executed\nagainst the real 74M-row archive: 113/113 match the PG oracle.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add an opt-in full-archive cardinality test against reference_cardinalities.json",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "notes": "Assert each declared FK resolves EXCEPT the documented legitimate dangling\nreferences (schema.py:67-68). Source the allowed-dangling set from a\ncommitted artifact/helper produced or verified by w0; do not re-derive or\nhardcode the exception policy directly in this test. Same existing opt-in\nmarkers.\n\nDONE 2026-07-10: test_full_archive_fk_integrity_matches_allowed_dangling_set\nsources the allowed set from the committed _project/joinorder/\nallowed_dangling_fks.json (from joinorder-fk-allowed-dangling-artifact),\nasserts the artifact is hash-locked to the shipped manifest\n(data_archive_hash), asserts its FK set equals the schema's declared FKs\n(no drift), then recomputes each FK's live dangling count over the archive\nand asserts it equals the reviewed allowed value. Exception policy lives in\nthe reviewed artifact, not the test. Executed at full scale: all 27 FKs\nmatch (only aka_title.movie_id->title dangles, 93 rows).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add an FK referential-integrity test pinning the legitimate dangling-ref set",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-validation-test-coverage",
+        "notes": "Reproduce the build-time encoding round-trip check\n(build_joinorder_data.py validate_encoding_round_trip) on the loaded\narchive for the name/title tables. Same existing opt-in markers.\n\nDONE 2026-07-10: two assertions, values derived from the hash-locked\narchive. NULL-vs-empty: movie_companies.note / cast_info.note /\ntitle.episode_of_id NULL counts match the build pipeline's\nCANONICAL_NULL_COUNTS oracle, with 0 empty-strings (NULL never coerced to\n''). UTF-8: for title.title / char_name.name / aka_title.title, the count\nof non-ASCII rows and a sha256 over the ordered id/value stream are pinned\n-- a latin1 misread, truncation, or re-encode would change either. Executed\nat full scale: passes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a full-archive UTF-8 / NULL-vs-empty fidelity assertion",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "context": "Trim ~88+ bytes from the active instruction surface (AGENTS.md and the CLAUDE.md/GEMINI.md/ANTIGRAVITY.md adapters) or raise the budget deliberately with a recorded justification. Prefer trimming: the budget exists to keep the always-loaded instruction surface small. Separately, make the hook's failure message name the actual failing check, since 'reject stale agent Git identity' pointed at the wrong cause.",
+  "description": "As of develop@916d9533ab the pre-commit hook 'reject stale agent Git identity' (hook id agent-git-identity, which runs make agent-identity-check) FAILS on a clean checkout with: 'ERROR: active instruction bytes 16088 exceed budget 16000' (active_bytes=16088, agents_lines=167). Because it is a pre-commit hook rather than a CI-only gate, this blocks EVERY commit in every worktree until the instruction files are trimmed back under budget. Verified on a pristine 'git reset --hard origin/develop' with no local changes, so it is not caused by any in-flight branch. The immediately preceding commit is 916d9533ab 'docs(agents): record that the agent-identity instruction is external (#1541)', which added instruction prose - the overshoot is 88 bytes. Note the hook's NAME is misleading: it reports a stale-agent-identity failure while the actual cause is the instruction byte budget, which cost real diagnosis time.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "created_at": "2026-08-04T17:24:54Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The instruction-byte budget stays enforced; do not simply delete the gate",
+        "item_id": "develop-red-agent-instruction-byte-budget"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "develop-red-agent-instruction-byte-budget",
+        "kind": "only_modify",
+        "path_glob": ".pre-commit-config.yaml"
+      },
+      {
+        "item_id": "develop-red-agent-instruction-byte-budget",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "develop-red-agent-instruction-byte-budget",
+        "kind": "only_modify",
+        "path_glob": "ANTIGRAVITY.md"
+      },
+      {
+        "item_id": "develop-red-agent-instruction-byte-budget",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "develop-red-agent-instruction-byte-budget",
+        "kind": "only_modify",
+        "path_glob": "GEMINI.md"
+      },
+      {
+        "item_id": "develop-red-agent-instruction-byte-budget",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make agent-identity-check",
+        "description": "the agent instruction audit passes on a clean tree",
+        "expected": "Exits 0 once active bytes are under budget",
+        "item_id": "develop-red-agent-instruction-byte-budget",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "develop-red-agent-instruction-byte-budget",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "develop-red-agent-instruction-byte-budget",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Bring active instruction bytes back under budget",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "develop-red-agent-instruction-byte-budget",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make the hook report the check that actually failed",
+        "wid": "w1"
+      }
+    ]
+  }
+}

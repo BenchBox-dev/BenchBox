@@ -1,0 +1,152 @@
+{
+  "context": "Do not introduce a custom forked build of duckdb-wasm unless every\nother avenue fails. Prefer a library upgrade, then a supported config\nentry point, then an upstream fix. The goal is to keep the explorer's\nHTTP attach logic conventional so future maintainers do not carry a\nprivate patch.\n",
+  "description": "The explorer attaches `results.duckdb` at\n`results-explorer/src/db.ts` via\n`registerFileURL(\"results.duckdb\", url, DuckDBDataProtocol.HTTP, true)`\nfollowed by `ATTACH 'results.duckdb' AS bench (READ_ONLY)`. The RG-2\ngate for the canonical browser read model requires that a cold\nsingle-row lookup transfers ≤10% of the on-disk DB, i.e. DuckDB-WASM\nshould use HTTP `Range:` requests rather than a single whole-file GET.\n\nIn practice, with duckdb-wasm 1.32.0, the runtime's HTTP file-info\ndefaults (`reliableHeadRequests=false`, `allowFullHttpReads=true`)\nshort-circuit the Range probe even when `directIO=true` is passed to\n`registerFileURL`, and the runtime falls back to a single whole-file\nGET on ATTACH. There is no stable per-URL API to override those\ndefaults from the main thread:\n\n- `db.open({filesystem: {reliableHeadRequests: true, allowFullHTTPReads: false}})`\n  resets the WebFileSystem and breaks the already-registered URL.\n- `SET reliable_head_requests = true` affects only the httpfs extension\n  HTTP client, not the runtime's built-in HTTP file reader.\n- The per-file `_globalFileInfo` object that carries these flags lives\n  inside the DuckDB-WASM worker and is not reachable from the page.\n\nThe e2e harness already serves the snapshot with `Accept-Ranges: bytes`\nand honours `Range: bytes=...` with `206 Partial Content` (see\n`results-explorer/scripts/serve-browser-tests.mjs` and\n`results-explorer/e2e/capability/range-read-budget.spec.ts`), so the\nmoment the browser runtime starts issuing range reads, the RG-2\nbyte-budget assertion can be re-introduced without any server change.\n\nDeliverables:\n1. Confirm the library-level behaviour against the current\n   duckdb-wasm version at the time of work start (it may have\n   gained a supported override by then).\n2. Pick a path from: (a) upgrade duckdb-wasm to a version that\n   supports per-URL range-read flags, (b) patch the runtime via a\n   supported entry point such as a config object accepted by\n   `registerFileURL`, or (c) file an upstream issue/PR and pin to a\n   build that includes the fix.\n3. Re-enable the byte-budget assertion in\n   `results-explorer/e2e/capability/range-read-budget.spec.ts` using\n   the server-side `/__test/transfers` accounting already in place.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "monkey-patch `BROWSER_RUNTIME._globalFileInfo` from the page",
+        "instead": "solve the problem via a supported configuration surface instead.",
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "why": "it lives inside the DuckDB-WASM worker and crosses a private API boundary"
+      },
+      {
+        "dont": "move the explorer off DuckDB-WASM's HTTP attach to regain range reads",
+        "instead": "fix the range-read path rather than replacing it.",
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "why": "the canonical browser read model depends on it"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "needs_item": "implement-results-explorer-browser-functional-tests"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "imported from YAML status: Blocked",
+      "category": "Performance",
+      "created_at": "2026-04-19T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The server-side transfer log at `/__test/transfers` remains available for the re-enabled assertion.",
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls"
+      },
+      {
+        "behavior": "The test server's `Accept-Ranges`/`Range` handling in `results-explorer/scripts/serve-browser-tests.mjs` is not regressed.",
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls"
+      },
+      {
+        "behavior": "`results-explorer/src/db.ts` continues to ATTACH the snapshot READ_ONLY and must not fall back to a JSON-only path.",
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/scripts/serve-browser-tests.mjs"
+      },
+      {
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/capability/range-read-budget.spec.ts"
+      },
+      {
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package-lock.json"
+      },
+      {
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package.json"
+      },
+      {
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml",
+        "description": "The TODO item itself validates cleanly",
+        "expected": "Validation passes with no schema or DAG errors",
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium -- --grep \"RG-2 range-read\"",
+        "description": "After the fix lands, a cold explorer load transfers ≤10% of the snapshot",
+        "expected": "The byte-budget assertion is re-enabled and passes",
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "notes": "Audited duckdb-wasm 1.32.0 (latest stable as of 2026-04-27;\n1.33.x exists only as dev pre-release builds). Findings:\n\n- `DuckDBConfig.filesystem` in\n  `dist/types/src/bindings/config.d.ts` exposes three booleans:\n  `reliableHeadRequests`, `allowFullHTTPReads`, and\n  `forceFullHTTPReads`. There is no per-URL override on\n  `registerFileURL`.\n- `db.open({filesystem: {...}})` is the public entry point.\n- Order matters: `open` AFTER `registerFileURL` resets the\n  WebFileSystem and breaks the registration; `open` BEFORE\n  registration is the supported sequence.\n- `allowFullHTTPReads: false` makes the runtime error on\n  first ATTACH (\"IO Error: Cannot open database 'results.duckdb'\n  in read-only mode: database does not exist\"). This matches\n  upstream issue duckdb/duckdb-wasm#1984's analysis: when the\n  flag is false the runtime \"always errors\". So we cannot use it\n  to force range-only reads.\n- With `reliableHeadRequests: true` + `forceFullHTTPReads: false`\n  + the default `allowFullHTTPReads: true`, the page loads but\n  the runtime still issues a single whole-file GET against the\n  registered URL (verified by the test harness transfer log:\n  total 6,565,888 bytes = full DB size, no 206 responses).\n- Issue #1984 documents the underlying buggy code path: even\n  when the runtime first attempts a range read, an extra \"full\n  GET anyway\" code block runs after. This block has not been\n  removed in 1.32.0.\n\nConclusion: there is no flag combination on duckdb-wasm 1.32.0\nthat yields range-only reads against an HTTP-registered URL.\nThe fix must come from upstream (or from a 1.33.x stable\nrelease once one ships). The byte-budget assertion has been\nadded to range-read-budget.spec.ts under `test.skip` so it\nauto-enables when the runtime starts issuing 206s.\n\nUpdate 2026-04-27: also verified against `@duckdb/duckdb-wasm@\n1.33.1-dev53.0` (the latest dev pre-release). Same behavior —\nwhole-file GET on ATTACH, zero 206 responses, byte-budget\nexceeded by 10x. Upstream has not addressed this in any 1.33.x\nbuild to date. Reverted to 1.32.0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-audit duckdb-wasm runtime flags and the HTTP file-reader code path for the current version",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "notes": "Update 2026-05-01: still blocked on upstream. Current npm metadata\nshows no stable `@duckdb/duckdb-wasm` release beyond `1.32.0`; the\npackage dist-tags point at dev builds (`latest=1.33.1-dev45.0`,\n`next=1.33.1-dev53.0`). Upstream issue duckdb/duckdb-wasm#1984 is\nstill open, with no maintainer resolution or release note indicating\na supported range-only path for HTTP-registered URLs.\n\n`/code review W2`: no required code changes are available under the\nTODO guardrails. Upgrading to a dev pre-release or carrying a private\npatched runtime would violate the `approach` constraint unless the\nmaintainer explicitly accepts that tradeoff.\n\nOf the three candidate paths:\n\n1. **Library upgrade** — no stable 1.33.x release is available\n   (only dev builds 1.33.1-dev1 through 1.33.1-dev53 as of\n   2026-05-01). Pinning to a dev pre-release violates the\n   `approach` constraint (\"Do not introduce a custom forked build\n   of duckdb-wasm unless every other avenue fails\").\n2. **Supported runtime API** — w1 verified that no flag\n   combination on the public `DuckDBConfig.filesystem` API yields\n   range-only reads. The buggy \"Perform a full GET anyways\" code\n   path in runtime_browser.ts is not toggleable from the page.\n3. **Upstream issue/PR** — this is the path forward. File or\n   comment on duckdb/duckdb-wasm#1984 with a minimal repro\n   showing that even `reliableHeadRequests: true` +\n   `forceFullHTTPReads: false` produces a whole-file GET on\n   ATTACH against an `HTTP, directIO=true` registration. Pin to\n   the first 1.33.x stable that includes the fix.\n\nThis work unit unblocks once a 1.33.x stable release with the\nfix is published OR a private patched build is acceptable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Pick an unblock path and prototype it",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "enable-duckdb-wasm-http-range-reads-for-registered-urls",
+        "notes": "Partially landed: the byte-budget assertion is now coded in\n`results-explorer/e2e/capability/range-read-budget.spec.ts`\nunder `test.skip`. It asserts after a cold `goto` of `/results/`\nfollowed by `waitForDataLoaded` that:\n  - the sum of `Content-Length` transfers under\n    `/results/data/results.duckdb` is ≤10% of the on-disk DB\n    size, and\n  - at least one transfer is a 206 ranged response.\n\nThe test is currently `.skip` because w2 is blocked. Removing\n`.skip` is a one-line change once the runtime issues range\nreads. The capability tests survive as a diagnostic.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-enable the byte-budget assertion and close the RG-2 gate",
+        "wid": "w3"
+      }
+    ]
+  }
+}

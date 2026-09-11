@@ -1,0 +1,17 @@
+{
+  "description": "Add Amazon EMR Serverless managed Spark platform adapter. EMR Serverless provides\ntrue serverless Spark with sub-second startup and automatic resource scaling.\n\nImplementation reuses S3 staging and IAM auth patterns from AWS Glue adapter.\nUses EMR Serverless API for application and job management.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "emr-serverless-platform",
+        "needs_item": "aws-glue-platform"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2025-12-24T00:00:00Z",
+      "created_at": "2025-12-24T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

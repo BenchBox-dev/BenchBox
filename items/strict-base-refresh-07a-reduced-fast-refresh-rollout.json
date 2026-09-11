@@ -1,0 +1,395 @@
+{
+  "context": "Reuse the shadow classifier and evidence. Make the minimum workflow changes needed to consume a trusted exact-refresh decision. Do not introduce an integration-domain map or split ci-lint. Add a third explicit aggregate mode for integration refresh. Keep ruleset 15611785 strict and retain ci-required-result, Results Explorer browser gate, and ruleset-drift. Activate in stages: dark evaluation, operator-enabled canary, bounded cohort, then default-on only after acceptance.",
+  "description": "Conditional implementation path for REDUCED_FAST_REFRESH only. Preserve strict current-base enforcement and the existing required context names. On a same-repository, single exact develop merge into a previously fully certified head, always rerun the complete code-lint job and only waive the exact long lanes authorized by the activation decision. Every waiver must be typed and bound to trusted certification evidence; generic skipped, missing, cancelled, fork, stale, or ambiguous results fail closed to full CI. Roll out with an immediate kill switch, full-rerun path without a source commit, negative controls, and measured acceptance.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add or revive .github/integration-domains.yml",
+        "instead": "use conservative invalidators and the exact waived-lane decision",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "why": "path domains cannot prove semantic coupling"
+      },
+      {
+        "dont": "Allow chained fast refreshes in version 1",
+        "instead": "require a new full certification",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "why": "pairwise evidence loses cumulative base interactions"
+      },
+      {
+        "dont": "Change ruleset settings as part of workflow code rollout",
+        "instead": "preserve live settings",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "why": "rollback must remain a repository workflow revert plus kill switch"
+      },
+      {
+        "dont": "Count any skipped job as success",
+        "instead": "validate exact mode-specific allowed skips",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "why": "skips can mean path filtering, cancellation, missing evidence, or workflow failure"
+      },
+      {
+        "dont": "Skip code-lint or type checking on refresh",
+        "instead": "always run the existing lint job intact",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "why": "that removes cheap combined-tree protection"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "needs_item": "strict-base-refresh-06-activation-decision-and-selected-path-handoff"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Blocked until strict-base-refresh-06-activation-decision-and-selected-path-handoff selects REDUCED_FAST_REFRESH and explicitly unblocks this item.",
+      "category": "Dev Loop",
+      "created_at": "2026-08-14T12:15:57Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Auto-merge and soundness-path review controls remain effective",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout"
+      },
+      {
+        "behavior": "Full CI remains the default for forks, workflow or classifier changes, dependencies, merge drivers, generated data, schemas, migrations, shared fixtures, unknown paths, and ambiguous evidence",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout"
+      },
+      {
+        "behavior": "Only one fast refresh may follow a full certification",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout"
+      },
+      {
+        "behavior": "Strict current-base enforcement, squash-only merging, no bypass, and all live required contexts remain active",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout"
+      },
+      {
+        "behavior": "The full code-lint job, including ruff, ty, import layering, complexity, and every guard, always runs on certified refreshes",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "current code lanes and ci-required-result aggregate",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "path": ".github/workflows/pr.yml"
+      },
+      {
+        "concept": "always-reporting path-aware browser gate",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "path": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "concept": "pr-refresh and operator publication commands",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "path": "Makefile"
+      },
+      {
+        "concept": "trusted exact-refresh and certification proof",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "path": "scripts/pr_refresh_certification.py"
+      },
+      {
+        "concept": "complete lint-guard parity",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "path": "tests/system/test_ci_lint_parity.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "do_not_modify",
+        "path_glob": ".github/integration-domains.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-ruleset-drift.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub ruleset required-context names, strictness, merge methods, and bypass actors"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "only_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-refresh-shadow.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/fast-lane-budget.md"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "only_modify",
+        "path_glob": "scripts/path_filter_decision.py"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "only_modify",
+        "path_glob": "scripts/pr_refresh_certification.py"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_pr_refresh_certification.py"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows tests/unit/scripts/test_pr_refresh_certification.py -q",
+        "description": "Workflow and aggregate regression suite passes",
+        "expected": "all relevant tests pass",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/system/test_ci_lint_parity.py -q",
+        "description": "Lint parity remains complete and unchanged in principle",
+        "expected": "all tests pass",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/joeharris76/BenchBox/rulesets/15611785 --jq '{bypass:[.bypass_actors[]?.actor_type],checks:[.rules[]|select(.type==\"required_status_checks\")|.parameters.required_status_checks[].context],strict:[.rules[]|select(.type==\"required_status_checks\")|.parameters.strict_required_status_checks_policy]}'",
+        "description": "Live ruleset stays strict with the decision-record contexts and no bypass",
+        "expected": "bypass empty, contexts unchanged, strict true",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q -k 'refresh and (negative or fail or cancel or missing or tamper or chain or race)'",
+        "description": "Negative controls cannot produce a green required aggregate",
+        "expected": "all selected tests pass",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'kill switch|same head|full rerun|run URL|head SHA|result' _project/decisions/strict-base-refresh-activation-*.md docs/operations/repo-admin-settings.md",
+        "description": "Kill switch and same-head full rerun are proven in a real canary PR",
+        "expected": "Durable canary and rollback evidence is recorded",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo lint strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "description": "This TODO passes tracker quality lint",
+        "expected": "0 findings",
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "notes": "Stop if this item is still blocked, the decision selected another outcome, or required contexts/workflows drifted.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate the REDUCED_FAST_REFRESH decision, exact waived-lane list, live required contexts, and trusted evidence path",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "notes": "Full mode is today's graph. Integration mode exists only with a valid one-refresh attestation. Missing or invalid evidence runs full CI.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add trusted refresh-mode consumption and fail-closed long-lane conditions while keeping the full lint job unconditional",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "notes": "Content-only, full code, and certified integration refresh each get separate predicates. Cancellation, missing jobs, unexpected skip, and failed attestation exit nonzero.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Rewrite ci-required-result as a typed three-mode aggregate with explicit allowed skips and no generic skipped-as-pass path",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "notes": "Browser gate must always report. Rerun Chromium when either certified PR delta or intervening base delta affects its contract. Do not weaken ruleset-drift.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Apply combined-delta browser and optional non-required workflow policy exactly as authorized by the decision",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "notes": "Validate actual GitHub rerun semantics. If repository variables are used, document the protected operator action and fail full when unavailable.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement an immediate operator kill switch and prove full rerun on the same PR head without adding a commit",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "notes": "A deleted predicate, unexpected skipped job, workflow self-change, fork, or base movement must prevent a required green result.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add aggregate, classifier, browser, workflow, tamper, race, chained-refresh, and kill-switch regression tests",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "notes": "No default-on activation until required-gate latency, hit rate, full-only failures, and whole-event fan-out meet the decision thresholds.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run staged canary rollout with full comparison retained and explicit stop conditions",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07a-reduced-fast-refresh-rollout",
+        "notes": "Separate repository changes from settings actions. Record the exact kill, full-rerun, and re-enable procedures.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update runbooks and operator commands, execute rollback drill, and obtain final independent review",
+        "wid": "w7"
+      }
+    ]
+  }
+}

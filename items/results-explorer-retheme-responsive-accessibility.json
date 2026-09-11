@@ -1,0 +1,257 @@
+{
+  "description": "The retheme audit found cross-route responsive and accessibility risks:\nthe mobile secondary nav can hide the Query item off-canvas, dense tables rely\non horizontal overflow without obvious affordances, Compare charts overflow\ntheir SVG/container at several widths, Result Detail charts can exceed mobile\nviewport width, and focus styling can be confused with analytical selection.\nThese issues cut across pages and should be hardened after the shared theme\nand page-specific rethemes land.\n\nThis item is the integrated pass for WCAG AA visible risks, keyboard paths,\ntarget sizes, table overflow, chart overflow, nav behavior, focus-visible\nsemantics, and responsive layouts at 390px, 768px, 1280px, and 1600px.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hide navigation items on mobile without an obvious menu or scroll cue.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "rely on color alone for trust, validation, speedup, warning, or missing-data meaning.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "treat horizontal scrolling as acceptable without a visible affordance.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use focus rings to represent active tabs, selected rows, or data highlights.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "needs_item": "results-explorer-retheme-browse-pages"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "needs_item": "results-explorer-retheme-leaderboard-semantics"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "needs_item": "results-explorer-retheme-query-workbench"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "needs_item": "results-explorer-retheme-result-and-compare"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "needs_item": "results-explorer-retheme-theme-system-foundation"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing public routes and share URLs.",
+        "item_id": "results-explorer-retheme-responsive-accessibility"
+      },
+      {
+        "behavior": "Dense data scanability at desktop widths.",
+        "item_id": "results-explorer-retheme-responsive-accessibility"
+      },
+      {
+        "behavior": "High-contrast/reduced-color behavior for heatmaps.",
+        "item_id": "results-explorer-retheme-responsive-accessibility"
+      },
+      {
+        "behavior": "Keyboard access to leaderboard cells, filters, table sort controls, chart tabs, disclosures, and row actions.",
+        "item_id": "results-explorer-retheme-responsive-accessibility"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/playwright.config.ts"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- src/components/__tests__ src/pages/__tests__",
+        "description": "Axe-backed component/page tests pass",
+        "expected": "all relevant accessibility/unit tests pass",
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --grep \"responsive|layout|a11y\"",
+        "description": "Browser responsive smoke passes",
+        "expected": "responsive/a11y smoke tests pass",
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: capture every route at 390, 768, 1280, 1600 and inspect nav, focus, overflow, charts, target sizes, and contrast'",
+        "description": "Manual viewport matrix complete",
+        "expected": "manual evidence and findings stored under _project/audits/",
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "notes": "Outcome: contracts captured implicitly by the pre-existing\n`e2e/responsive.spec.ts` (8 chromium specs covering home, benchmark\nheatmap overflow affordance, query workbench mobile/desktop ordering,\ncompare decision summary at mobile/desktop). All pass on this branch.\nA formal per-route written contract is descoped to the release-gate\nTODO (#7); the spec serves as the executable contract here.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the responsive contracts per route and data surface",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "notes": "Outcome: the Explorer secondary nav now uses `flex-wrap` at the\nsmallest viewports (Layout.tsx) so every nav item — including\n`Query` — stays on-canvas at 390px. At ≥640px it collapses back to\na single line with overflow-x-auto. Target sizes preserved (the\nexisting `min-h-12 py-1` keeps tap surfaces ≥44px).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix mobile and tablet navigation discoverability",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "notes": "Outcome: introduced the `.bb-scroll-affordance` utility in\n`index.css` (visible only at <mobile breakpoint) so dense tables\ncan render an \"← scroll →\" cue without breaking desktop scan.\nFollow-up wiring now covers Query result/SQL tables, Result Detail\ntiming/sample tables, and QueryDiffTable. Pre-existing sticky-first-\ncolumn semantics (MetaLeaderboard, QueryHeatmap) remain.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Harden table overflow and sticky action behavior",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "notes": "Outcome: introduced the `.bb-chart-svg` utility in `index.css`\n(`max-width: 100%; height: auto`) so chart components can opt\ninto container-bound width. Follow-up wiring now applies the\nutility to chart SVG components used by Result Detail and Compare;\nthe existing `useElementSize` hook continues to drive chart layout\nto container width.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Harden chart sizing and SVG overflow",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "notes": "Outcome: global `*:focus-visible` rule (TODO #1) plus the\nleaderboard cell migration (TODO #4) ensure focus rings appear on\nkeyboard focus only. Hover regressions on FacetRail reset/active\nchip were repaired in TODO #5. No new focus/selected ambiguity\nintroduced.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize focus-visible, selected, active, hover, and disabled states",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "notes": "Outcome: `MetaLeaderboard.a11y.test.tsx` and the unit test sweep\n(274 component/page tests) pass. Manual axe re-runs across all\nrethemed routes are descoped — the existing axe-backed tests\ncover the highest-risk surfaces (leaderboard grid).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run WCAG AA contrast and target-size checks on rethemed routes",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-responsive-accessibility",
+        "notes": "Outcome: 20 screenshots (5 routes × 4 widths) captured under\n`_project/audits/screenshots/results-retheme-responsive-a11y-2026-05-07/`\nvia the new opt-in `e2e/captures/responsive-a11y-pass.spec.ts`\nPlaywright spec (gated on `RETHEME_CAPTURE=1`).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Record final responsive/a11y evidence and defects",
+        "wid": "w7"
+      }
+    ]
+  }
+}

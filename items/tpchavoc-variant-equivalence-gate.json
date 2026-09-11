@@ -1,0 +1,217 @@
+{
+  "context": "Reuse validate_variant_equivalence and the expected_results loader; do not\nadd a new comparator or a second source of canonical answers. Build the\nharness as a parametrized pytest over get_implemented_queries() x\nget_all_variants(q), extending tests/integration/test_tpchavoc_duckdb.py's\nexisting schema/exec scaffolding. Land it in REPORT mode, fix everything it\nfinds (delegating the q2_v10 projection class to the burndown TODO), then\nflip to a gating assertion and wire the bounded cell into CI mirroring\ntesting-approach-correctness-gates. Keep declared intentional differences\n(Q2 LIMIT) in one reviewable structure.\n",
+  "description": "TPC-Havoc's premise is that the 10 SQL (and DataFrame) variants of each\nTPC-H query are structurally diverse but SEMANTICALLY EQUIVALENT to the\ncanonical TPC-H query. Nothing in the default run or in CI enforces that\nequivalence: `benchbox run --benchmark tpchavoc` reports execution success\n(\"Success rate: 100%\") while never comparing any variant to the canonical\nanswer, and the develop correctness gate validates TPC-H, not TPC-Havoc\nvariants. A fast-but-wrong variant therefore makes a platform look good for\nexecuting the WRONG query, silently corrupting the performance comparison the\nbenchmark exists to produce.\n\nbenchbox already ships the comparison primitive:\n`TPCHavocBenchmark.validate_variant_equivalence(...)`\n(benchbox/core/tpchavoc/benchmark.py:242) delegates to\n`ResultValidator.validate_results_exact` / `validate_results_checksum` /\n`validate_query1_results`. But it is invoked only from unit tests with\nsynthetic inputs - no run path executes the canonical TPC-H query and feeds\n`original_results` for a real variant. `--validate-results` is an opt-in flag\n(default off) that routes through `ValidationConfig` without driving\nper-variant equivalence for tpchavoc.\n\nThe cost of this gap is concrete and already realized. PR #756 fixed three\ncorrelated-subquery self-binding defects (q2_v8, q11_v1, q17_v8) that were\nsilent for exactly this reason, and the same PR's verification surfaced a\nfourth, different-class divergence: q2_v10 zeroes negative `s_acctbal` via a\nCASE-wrapped projection (38 of 460 rows differ from canonical Q2 at SF=1). A\nresult-equivalence gate would have caught all four.\n\nThis TODO wires the EXISTING validator into a bounded, CI-affordable gate,\nenumerates every current divergence, and (via the companion burndown TODO)\ndrives them to zero so the gate lands green. It is complementary to\n`testing-approach-correctness-gates` (that gate checks TPC-H answers; this\none checks TPC-Havoc cross-variant equivalence) and should mirror its\nbounded single-cell shape.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assert exact equality where the variant family intentionally differs (Q2 LIMIT)",
+        "instead": "model the exception explicitly.",
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "why": "the gate would be permanently red"
+      },
+      {
+        "dont": "hardcode per-query exceptions inline in the assert",
+        "instead": "declare intentional non-equivalences (Q2 LIMIT) as reviewable data.",
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "why": "they rot invisibly"
+      },
+      {
+        "dont": "turn the gate into a full stress matrix",
+        "instead": "keep one bounded small-SF DuckDB cell like testing-approach-correctness-gates.",
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "why": "routine develop PRs must stay cheap"
+      },
+      {
+        "dont": "write a new result comparator",
+        "instead": "reuse it.",
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "why": "validate_variant_equivalence already exists"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "tpchavoc-variant-equivalence-gate",
+        "id": 276,
+        "reason": "PROMOTED to its own work item: tpchavoc-dataframe-variant-equivalence-gate (SQL gate is green; DataFrame variants are independent designs needing their own gate against canonical, not the SQL variants).",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Deferral names its promoted successor tpchavoc-dataframe-variant-equivalence-gate, which is verified DONE.",
+        "summary": "Extend the equivalence gate to the DataFrame variants"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "tpchavoc-variant-equivalence-gate",
+        "id": 277,
+        "reason": "PROMOTED to its own work item: tpchavoc-cross-dialect-equivalence-sampling. Routine gate stays DuckDB-bounded; a second engine is sampled separately.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: The promoted successor item tpchavoc-cross-dialect-equivalence-sampling is already DONE.",
+        "summary": "Run the equivalence harness on a second engine (Postgres/ClickHouse/DataFusion)"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-06-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DuckDB tpchavoc stays 100% execution-green at SF 0.01 / 0.1 / 1.0.",
+        "item_id": "tpchavoc-variant-equivalence-gate"
+      },
+      {
+        "behavior": "ResultValidator tolerance and checksum semantics are unchanged.",
+        "item_id": "tpchavoc-variant-equivalence-gate"
+      },
+      {
+        "behavior": "benchbox run --benchmark tpchavoc default (execution-only) behavior stays available; the gate is additive.",
+        "item_id": "tpchavoc-variant-equivalence-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/planning/testing-approach-correctness-gates.yaml - the bounded-gate design (single small-SF DuckDB cell, marker policy); mirror the shape, keep it complementary",
+        "decision": "reuse",
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "path": "_project/TODO/main/planning/testing-approach-correctness-gates.yaml"
+      },
+      {
+        "concept": "benchbox/core/expected_results/loader.py - reuse stored canonical TPC-H answers where present instead of re-executing the base query",
+        "decision": "reuse",
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "path": "benchbox/core/expected_results/loader.py"
+      },
+      {
+        "concept": "benchbox/core/tpchavoc/benchmark.py:242 validate_variant_equivalence - REUSE as the comparator; do not write a new one",
+        "decision": "reuse",
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "path": "benchbox/core/tpchavoc/benchmark.py:242"
+      },
+      {
+        "concept": "tests/integration/test_tpchavoc_duckdb.py - already creates the DuckDB schema and runs variants; extend here rather than starting a new harness",
+        "decision": "extend",
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "path": "tests/integration/test_tpchavoc_duckdb.py"
+      },
+      {
+        "concept": "tests/unit/core/tpchavoc/test_tpchavoc_dataframe_queries.py:212 test_q14v8_parity_with_q14v1 - existing ad-hoc per-variant parity test; generalize it rather than adding more one-offs",
+        "decision": "reuse",
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "path": "tests/unit/core/tpchavoc/test_tpchavoc_dataframe_queries.py:212"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpchavoc/"
+      },
+      {
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_tpchavoc_duckdb.py"
+      },
+      {
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpchavoc/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_tpchavoc_duckdb.py -k equivalence -q",
+        "description": "Report-mode harness flags q2_v10 and would flag the #756 variants if reverted",
+        "expected": "q2_v10 reported as divergent; reverting any #756 fix reproduces a divergence",
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "temporarily revert ps2.ps_partkey=partsupp.ps_partkey then run the gate",
+        "description": "Bounded gate fails on a deliberately reintroduced self-binding",
+        "expected": "gate FAILS (non-zero), naming the divergent query/variant",
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "notes": "Confirm the gap and the known divergences are still true on the head SHA:\n  - grep that `validate_variant_equivalence` has no non-test caller in a\n    run/execute path;\n  - confirm `benchbox run --benchmark tpchavoc` default does not validate\n    equivalence (no canonical query executed);\n  - reproduce the four known divergences on a populated DuckDB SF=1 cell:\n    q2_v8/q11_v1/q17_v8 match canonical only post-#756, and q2_v10 still\n    differs from canonical Q2 by the 38 negative-acctbal rows.\nCapture raw stdout to `/tmp/tpchavoc-equiv-w0.log` or CI artifacts and\nrecord the command, checked SHA, PASS/FAIL, and row counts in the PR/TODO.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the evidence against current develop before building anything",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "notes": "Small SF on DuckDB. For each implemented query, execute the canonical\nTPC-H query once and every variant, then compare via\nvalidate_variant_equivalence. Run in REPORT mode first: emit the full set\nof divergences (query, variant, kind, row-count delta) rather than\nasserting. Encode INTENTIONAL non-equivalences (e.g. the q2 variant\nfamily omits canonical Q2's `LIMIT 100`) as reviewable DATA, not inline\nper-query special cases.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build a parametrized equivalence harness (report mode) over all queries x 10 SQL variants",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "notes": "The known q2_v10 projection defect is owned by the companion burndown\nTODO `tpchavoc-q2-v10-projection-faithfulness`. Any further divergences\nw1 surfaces get fixed or, if genuinely intentional, added to the declared-\nexception list with a one-line justification.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Drive all real divergences to zero, leaving only declared exceptions",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpchavoc-variant-equivalence-gate",
+        "notes": "One bounded small-SF DuckDB cell, marked per the existing correctness-gate\nmarker policy (not a stress matrix). Prove the gate fails when a\nself-binding or projection divergence is deliberately reintroduced, and is\nnot silently disarmable by scale/benchmark drift.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Promote the harness to a bounded CI gate that fails on reintroduced divergences",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "description": "The current Athena adapter uploads text files (pipe-delimited .tbl) to S3 and creates\nexternal tables pointing directly to them. This works but is suboptimal for query\nperformance - text file queries scan 100x more data than columnar formats.\n\nAWS documentation shows text table scans use 20GB vs Parquet using only 135MB for\nthe same data, with corresponding cost and performance improvements.\n\nThe recommended approach is:\n1. Upload text files to S3 staging location\n2. Create external staging table pointing to text files\n3. Use CTAS to convert to Parquet:\n   CREATE TABLE {table} WITH (format='PARQUET', external_location='s3://.../')\n   AS SELECT * FROM {table}_staging\n4. Query the optimized Parquet table\n5. Optionally clean up staging data\n\nThis should be the default behavior for Athena, with an option to use text-only\nfor debugging or when Parquet conversion is not desired.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2025-12-21T00:00:00Z",
+      "created_at": "2025-12-21T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

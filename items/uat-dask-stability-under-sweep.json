@@ -1,0 +1,168 @@
+{
+  "context": "Localize whether the worker deaths are OOM (most likely for groupby/concat\non tpcds) and cap worker memory / spill behaviour for the UAT Dask client.\nIndependently, harden the cell runner so a dead cluster surfaces as a FAIL\ncell carrying the scheduler error (depends on failure-capture) rather than\nending the sweep. If tpcds cannot fit local Dask within UAT constraints,\nprune it via a model-level rule (coordinate with\nuat-native-dataframe-compatibility-rules) or cap its scale — do not leave\nit as a silent hang.\n",
+  "description": "In the 2026-05-29 dataframe sweep, dask-df produced only 5 per-cell logs\n(tpch 0.01/0.1/1.0, tpcds 0.01/0.1) before the run stopped — it was the\nlast platform by wall-clock and the sweep ended there with no resume.json\nand no abort_reason. The dask tpcds 0.1 log ends with:\n\"distributed.scheduler - ERROR - Task ('_groupby_apply_funcs-...', 0)\nmarked as failed because 4 workers died while trying to run it\".\n\nTwo problems: (a) tpcds on local Dask kills workers (likely memory\npressure during groupby/concat), and (b) a Dask cluster death did not\ncleanly record FAIL and advance — it left the sweep truncated. A worker\ndeath must terminate the cell as FAIL (with the captured scheduler error)\nand the sweep must move on, never hang or silently stop.\n\nNOTE: the plan draft cited \"KeyError('ca_county')\" for Dask; that is NOT\nin the evidence. The verified Dask signature is the \"4 workers died\"\nscheduler error on tpcds; \"KeyError 'd_date_sk'\" was the pandas-df tpcds\nfailure (tracked in uat-cross-engine-dataframe-defects). Use the verified\nsignatures.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "chase the phantom 'ca_county' KeyError",
+        "instead": "the real signal is '4 workers died' on tpcds.",
+        "item_id": "uat-dask-stability-under-sweep",
+        "why": "it is not in the evidence"
+      },
+      {
+        "dont": "let a cluster death stop the whole sweep",
+        "instead": "(not specified)",
+        "item_id": "uat-dask-stability-under-sweep",
+        "why": "one platform's failure must not truncate the matrix."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-dask-stability-under-sweep",
+        "needs_item": "uat-artifact-integrity-and-failure-capture"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-05-29T00:00:00Z",
+      "created_at": "2026-05-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Sequential platform execution and per-cell timeout semantics are unchanged.",
+        "item_id": "uat-dask-stability-under-sweep"
+      },
+      {
+        "behavior": "dask-df cells that pass (tpch 0.01/0.1/1.0) must not regress.",
+        "item_id": "uat-dask-stability-under-sweep"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/ dask-df adapter + LocalCluster/Client setup (locate via the dask platform module) — reuse existing client lifecycle; add bounded resources",
+        "decision": "reuse",
+        "item_id": "uat-dask-stability-under-sweep",
+        "path": "benchbox/"
+      },
+      {
+        "concept": "tests/uat/timeouts.py — per-cell timeout mechanism; ensure a dask worker death trips a clean FAIL within the timeout, not a hang",
+        "decision": "reuse",
+        "item_id": "uat-dask-stability-under-sweep",
+        "path": "tests/uat/timeouts.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-dask-stability-under-sweep",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/orchestrator.py"
+      },
+      {
+        "item_id": "uat-dask-stability-under-sweep",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "uat-dask-stability-under-sweep",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/dask_df.py"
+      },
+      {
+        "item_id": "uat-dask-stability-under-sweep",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox run --platform dask-df --benchmark tpch --scale 0.1 --non-interactive --phases load,power",
+        "description": "dask tpch cells still pass",
+        "expected": "0 query failures",
+        "item_id": "uat-dask-stability-under-sweep",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat -m fast -k 'dask or cluster or worker' -q",
+        "description": "A simulated dask cluster failure records FAIL and the runner continues",
+        "expected": "test asserts FAIL recorded with captured error, no hang",
+        "item_id": "uat-dask-stability-under-sweep",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-dask-stability-under-sweep",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-dask-stability-under-sweep",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-dask-stability-under-sweep",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-dask-stability-under-sweep",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-dask-stability-under-sweep",
+        "notes": "REFRAME (evidence, 2026-05-29): the worker deaths NO LONGER REPRODUCE on\ncurrent develop. `benchbox run --platform dask-df --benchmark tpcds\n--scale 0.1 --phases load,power` completed all 103 queries across 3\niterations with ZERO worker-death/OOM/exit-137 signals and no\ntruncation. The \"4 workers died\" failure mode was eliminated upstream by\nthe dask resource-envelope caps (2GB/worker, worker cap, spill) that\nlanded in the cross-engine dataframe work (#692). The 23 residual tpcds\nfailures are dataframe-TRANSLATION defects ('Series' has no attribute\n'rank'/'iloc'/'notna', 'diff', unknown aggregate lambda, lazy-boolean\nconversions), not resource instability; those belong to the\ncross-engine/native-dataframe-compat track, not this stability item.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce dask tpcds 0.1 worker deaths locally and capture the scheduler/worker logs",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-dask-stability-under-sweep",
+        "notes": "Already present on develop (#692): _DEFAULT_LOCAL_MEMORY_LIMIT=2GB,\n_DEFAULT_LOCAL_WORKER_CAP, _cap_default_memory_limit, spill-to-disk with\ntarget=0.6/pause=0.8. Confirmed effective by the w0 reproduction (tpcds\n0.1 no longer kills workers). No further limits needed at swept scales.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add bounded memory/worker resource limits + timeouts to the dask client lifecycle under UAT",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-dask-stability-under-sweep",
+        "notes": "Mechanism existed (DaskResourceEnvelopeError -> build_failure_result_dict\nvia execute_query's except), but (a) was untested under tests/uat and (b)\nthe verified scheduler signature \"4 workers died\" (plural) was not matched\nby the \"worker died\" (singular) substring pattern - only via the\nKilledWorker exception type name. Added the plural \"workers died\" pattern\nand a regression suite tests/uat/test_dask_cluster_failure.py proving each\ndeath signature is classified and that a dying compute yields a FAILED\nresult dict (no hang/uncaught crash). Satisfies the verification's\n`pytest tests/uat -m fast -k 'dask or cluster or worker'` (was 0 tests).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Ensure a dask cluster failure records FAIL with the captured error and the sweep advances (no truncation/hang)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-dask-stability-under-sweep",
+        "notes": "DECISION: dask-df tpcds is SUPPORTED locally and is resource-stable at the\nswept scales (0.01/0.1) - no prune or scale-cap needed for stability. tpcds\ncells run to completion and any future cluster death records a clean FAIL\nand advances. The remaining tpcds query failures are translation-coverage\ngaps tracked under the dataframe-compat track, not a dask stability/UAT\ngating concern. tpch cells continue to pass at 100% (Q10 skipped by the\nexisting local-envelope guard; see follow-up TODO on that guard's staleness).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide and document whether dask tpcds@0.1/1.0 is supported locally under UAT constraints (support, prune, or scale-cap)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Define a dedicated architecture for TPC-DI DataFrame support.\n\nTPC-DI includes mutation-heavy ETL semantics (SCD Type 2, incremental loads,\nstateful transforms) that do not fit the current read-oriented DataFrameQuery/\nDataFrameContext pattern used for analytical query benchmarks.\n\nThis item designs a fit-for-purpose model before implementation.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-07T00:00:00Z",
+      "created_at": "2026-02-07T00:00:00Z",
+      "worktree": "dataframe-benchmarks"
+    }
+  }
+}

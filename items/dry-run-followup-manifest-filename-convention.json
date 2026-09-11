@@ -1,0 +1,163 @@
+{
+  "description": "`benchbox submit` always writes the submission manifest as the literal\nfilename `submission-manifest.json` (constant\n`SUBMISSION_MANIFEST_FILENAME` in\n`benchbox/core/explorer_pipeline/pipeline.py:39`, also used in\n`benchbox/cli/commands/submit.py:338`). The doc instruction is \"copy\n`submission/submission-manifest.json` alongside the bundle files\" into\n`results-data/bundles/`. `results-data/bundles/` currently contains\nzero manifest files, but two community PRs landing in the same window\nwould conflict on the same filename. The doc names no convention for\nresolving the collision.\n\nProposal: emit `<result_basename>.manifest.json` so the manifest's\nfilename inherits the bundle's uniqueness (timestamp + hash). Update\ndoc, in-bundle CONTRIBUTING.md, validators, and the inventory generator\nif any of them filter by exact filename.\n\nSurfaced by the agent-proxy dry-run on 2026-04-28\n(see `_project/handoffs/external-dry-run-retrospective-2026-04-28.md`).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the writer without updating every reader in the same PR",
+        "instead": "audit consumers first (w1)",
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "why": "mid-flight readers will fail to find the manifest"
+      },
+      {
+        "dont": "silently break already-merged manifests in results-data/bundles/",
+        "instead": "if any exist with the old name, support both during a transition window",
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "why": "that erodes trust in already-published submissions"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "needs_item": "dry-run-followup-package-canonical-contributing"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-28T00:00:00Z",
+      "created_at": "2026-04-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Backwards-compat for any already-merged community submissions that used the old filename",
+        "item_id": "dry-run-followup-manifest-filename-convention"
+      },
+      {
+        "behavior": "The trust-label resolution path in `explorer_pipeline/pipeline.py` continues to find manifests for existing bundles",
+        "item_id": "dry-run-followup-manifest-filename-convention"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/pipeline.py"
+      },
+      {
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_corpus_inventory.py"
+      },
+      {
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox submit --last --output /tmp/dry-run-mft && ls /tmp/dry-run-mft | grep -c '\\.manifest\\.json$'",
+        "description": "Submit emits per-bundle manifest filenames",
+        "expected": "1",
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'manifest.json' scripts/generate_corpus_inventory.py",
+        "description": "Inventory generator resolves manifests by glob",
+        "expected": ">= 1",
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "notes": "Grep for `submission-manifest.json` and `SUBMISSION_MANIFEST_FILENAME`\nacross:\n  - benchbox/cli/commands/submit.py (writer)\n  - benchbox/core/explorer_pipeline/pipeline.py (reader, trust-label resolver)\n  - scripts/validate_submission.py\n  - scripts/generate_corpus_inventory.py\n  - .github/workflows/validate-submission.yml (if it references the filename)\nDocument everywhere the filename is hard-coded so the rename is\natomic.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit consumers of submission-manifest.json filename",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "notes": "Update the writer to emit `<bundle_stem>.manifest.json`. Update\nreaders to resolve manifests by glob (`*.manifest.json`) rather\nthan by literal name. Update the inventory generator's filter\nrules if it currently filters by exact filename.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename to <bundle-stem>.manifest.json and update consumers",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "notes": "`docs/contributing-results.md` Step 2 / Step 3.3 both name the\nfile. The in-bundle CONTRIBUTING.md is being rewritten in\n`dry-run-followup-package-canonical-contributing` — coordinate\nso both land consistent.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docs (canonical + in-bundle) to reflect the new filename",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-manifest-filename-convention",
+        "notes": "Two consecutive `benchbox submit --output ./submission` calls\nagainst different result files should not overwrite each other's\nmanifests. Test asserts both manifests exist after the second\ncall.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a regression test for two consecutive submits",
+        "wid": "w4"
+      }
+    ]
+  }
+}

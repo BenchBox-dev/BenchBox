@@ -1,0 +1,120 @@
+{
+  "context": "One-line fix to timezone.utc plus a repo audit for the same pattern; verify on a 3.10 interpreter.",
+  "description": "2026-07-21 adversarial UAT review finding (P2): scripts/release_readiness_check.py:35 uses `from datetime import UTC` (Python 3.11+) while pyproject.toml:26 declares requires-python >= 3.10. Result: ~13 TestUATGateReleaseEvidence failures on the nightly test(ubuntu, 3.10) and test(windows, 3.10) lanes - nightly has been red partly because of release-gate code itself. CI's release path runs 3.12 so the gate still functions there, but the declared floor is broken and the red noise masks real failures.\n\nAlso audit for sibling 3.11+-isms in scripts/ (other `from datetime import UTC`, datetime.UTC usage) while in there.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix the import in one file and skip the audit",
+        "instead": "rg 'from datetime import.*UTC' repo-wide and fix all under-the-floor uses",
+        "item_id": "release-readiness-py310-utc-compat",
+        "why": "the same pattern recurs; nightly only surfaces the files its tests import"
+      },
+      {
+        "dont": "raise requires-python to 3.11 to dodge the one-line fix",
+        "instead": "use timezone.utc",
+        "item_id": "release-readiness-py310-utc-compat",
+        "why": "3.10 support is a declared floor; raising it is a product decision, not a bug fix"
+      }
+    ],
+    "item_meta": {
+      "category": "Bug Fixes",
+      "completed_at": "2026-08-09T02:03:55Z",
+      "created_at": "2026-07-21T11:44:43Z",
+      "worktree": "release-tooling"
+    },
+    "preserves": [
+      {
+        "behavior": "Gate semantics unchanged: green verdict, clean tree, <=21d freshness, ancestor-of-release-head checks behave identically on 3.12.",
+        "item_id": "release-readiness-py310-utc-compat"
+      },
+      {
+        "behavior": "Naive->UTC timestamp interpretation for completed_at unchanged.",
+        "item_id": "release-readiness-py310-utc-compat"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "the CI surface that catches the floor violation",
+        "decision": "reuse",
+        "item_id": "release-readiness-py310-utc-compat",
+        "path": ".github/workflows/nightly.yml (test matrix 3.10 lanes)"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "release-readiness-py310-utc-compat",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "release-readiness-py310-utc-compat",
+        "kind": "only_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "release-readiness-py310-utc-compat",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --python 3.10 -- python -m pytest tests -k 'release_readiness or UATGateReleaseEvidence' -q",
+        "description": "3.10 import + gate tests pass",
+        "expected": "all pass on CPython 3.10; no ImportError",
+        "item_id": "release-readiness-py310-utc-compat",
+        "last_result": "pass",
+        "last_run": "2026-07-21T13:16:38Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "release-readiness-py310-utc-compat",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "release-readiness-py310-utc-compat",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "uv run --python 3.10 -- python -c 'import scripts.release_readiness_check' reproduced ImportError before the source import change; scripts/release_readiness_check.py now uses timezone.utc.",
+        "item_id": "release-readiness-py310-utc-compat",
+        "notes": null,
+        "started_at": "2026-07-21T12:06:12Z",
+        "started_branch": "fix/uat-remediation-py310-utc-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Replace `from datetime import UTC` with timezone.utc in scripts/release_readiness_check.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": "rg audit across scripts _project/scripts benchbox tests found no remaining from datetime import ... UTC or datetime.UTC; the remaining datetime.datetime.utcnow is available on Python 3.10 and is not part of this 3.11-only defect. Targeted uv run --python 3.10 -- python -m pytest tests/unit/test_release_readiness.py tests/unit/test_release_infrastructure.py -q -n 0: 83 passed, 2 deselected.",
+        "item_id": "release-readiness-py310-utc-compat",
+        "notes": null,
+        "started_at": "2026-07-21T12:07:05Z",
+        "started_branch": "fix/uat-remediation-py310-utc-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "rg audit for other 3.11+-only datetime imports under the 3.10 floor (scripts/, _project/scripts/, benchbox/); fix any found",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Verified on 2026-08-09: no from datetime import UTC in repo, timezone.utc used, requires-python still 3.10, ImportError fixed; nightly 3.10 lane evidence will be confirmed on next run",
+        "item_id": "release-readiness-py310-utc-compat",
+        "notes": "The 2 remaining 3.10 failures (RecursionError in test_phases_data_reuse, dataframe CLI mock-attr) are separate defects - do not fold them into this item.",
+        "started_at": "2026-08-09T02:03:52Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm the next nightly 3.10 lanes drop the 13 TestUATGateReleaseEvidence failures",
+        "wid": "w3"
+      }
+    ]
+  }
+}

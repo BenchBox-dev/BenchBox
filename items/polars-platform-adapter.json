@@ -1,0 +1,10 @@
+{
+  "description": "Implement Polars adapter for the fastest-growing DataFrame library\n(23K+ GitHub stars), positioning as \"Pandas but 10x faster.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "platform-expansion-polars"
+    }
+  }
+}

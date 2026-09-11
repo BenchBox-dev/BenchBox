@@ -1,0 +1,233 @@
+{
+  "context": "Keep the normal writer and the observer separate. The writer validates one immutable candidate artifact, obtains one protected github-pages approval, deploys through journal CAS, and issues the signed live receipt. The observer reads the durable head and records retained outcomes. Require an external monitor for independent five-minute observations and ten-minute missing-observation alerting; GitHub Actions scheduling alone does not satisfy that dependency. Use outcome-based evidence for restoration, unknown provider quarantine, and legacy retirement.",
+  "description": "Operationalize the simplified publication contract with a scheduled availability observer, full route and DuckDB checks, durable journal reconciliation, retention, and incident evidence. Five-minute observations may report availability, but active transactions and missing observations remain unknown or failed. Full content identity runs hourly and after transactions. The observer cannot deploy, sign, compensate, or finalize.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Let canaries mutate production without normal gates",
+        "instead": "run canaries through the same controller, environment, verification, and rollback controls",
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "why": "that creates a privileged bypass path"
+      },
+      {
+        "dont": "Treat a green build as production proof",
+        "instead": "require the live receipt and endpoint probes",
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "why": "build state does not prove deployment or observation"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "needs_item": "independent-publication-a10-release-and-mirror-retirement"
+      }
+    ],
+    "item_meta": {
+      "category": "Publication Architecture",
+      "created_at": "2026-08-31T20:38:20Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Canaries cannot bypass CODEOWNERS, environment protection, attestation, compatibility, or rollback gates.",
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout"
+      },
+      {
+        "behavior": "Only a verified live receipt is reported as production state.",
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Extend live settings and ruleset drift operations",
+        "decision": "extend",
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "path": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "concept": "Reuse evidence and stop-condition conventions for production canaries",
+        "decision": "reuse",
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "path": "docs/operations/uat-framework.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/*publication*"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "kind": "only_modify",
+        "path_glob": "publication/**"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run pytest tests/unit/workflows/test_publication_soak_monitor.py tests/unit/workflows/test_publication_recover.py tests/unit/scripts/publication/test_transaction_executor.py -q",
+        "description": "Availability observer and watchdog record unknown, stale, failed, and full-content outcomes without write capability",
+        "expected": "all tests pass",
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run pytest tests/unit/scripts/publication/test_candidate.py tests/unit/scripts/publication/test_transaction.py tests/unit/workflows/test_publication_transaction.py -q",
+        "description": "Candidate and transaction checks prove exact artifact binding, complete routes, CAS, restoration, and attestation",
+        "expected": "all tests pass",
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "human activation and evidence review",
+        "description": "Independent monitor activation proves five-minute observations, ten-minute missing-observation alerting, hourly full checks, and 30-day retention",
+        "expected": "current independent monitor evidence is retained",
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add scheduled desired-built-deployed-observed reconciliation and drift checks",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add lane-specific canaries and capacity/retention alerts",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run one independent production update for package, site, Explorer, and corpus",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run failure injection and incident response exercise for each lane",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "independent-publication-a11-operations-canaries-and-closeout",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Publish final evidence matrix and lift migration freeze",
+        "wid": "w5"
+      }
+    ]
+  }
+}

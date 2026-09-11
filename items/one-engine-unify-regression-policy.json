@@ -1,0 +1,182 @@
+{
+  "context": "Depends on one-engine-unify-statistics for the underlying metric computation. Characterize current classifications on fixtures; unify defaults (decide: keep MCP's ladder as the canonical severity taxonomy, keep CLI's threshold override semantics); migrate the three call sites; add a parity test asserting all three surfaces classify a shared fixture identically. Also migrate MCP's _classify_query_changes (analytics.py:484-530) and _compute_trend_direction onto the core policy.",
+  "description": "Three inconsistent regression/trend policies answer the same question today: CLI compare's threshold + exit-code logic (benchbox/cli/commands/compare.py:1116-1128, :1333-1373), report's hardcoded -5% IMPROVED cutoff (benchbox/cli/commands/report.py:186-191), and MCP's severity ladder critical>=100%/high>=50%/medium>=25%/low (benchbox/mcp/tools/analytics.py:920-929) plus +/-5% trend thresholds (analytics.py:618-633). An agent via MCP and a human via CLI can reach different regression verdicts from the same files. Create one core policy module (thresholds, severity ladder, trend classification, improved cutoff) with a single set of defaults; all three call sites consume it. Caller-supplied thresholds (CLI --fail-on-regression / threshold_percent MCP param) remain as overrides mapping onto the same core defaults.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "average the three policies into new blended thresholds",
+        "instead": "pick one canonical policy and document the choice in the core module + ADR reference",
+        "item_id": "one-engine-unify-regression-policy",
+        "why": "a fourth policy is worse than any of the three"
+      },
+      {
+        "dont": "hardcode display-layer cutoffs (report's -5% IMPROVED) in the command file again",
+        "instead": "expose it as a named core constant the display imports",
+        "item_id": "one-engine-unify-regression-policy",
+        "why": "display constants are policy too; that is how this drift started"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "one-engine-unify-regression-policy",
+        "needs_item": "one-engine-unify-statistics"
+      }
+    ],
+    "item_meta": {
+      "category": "core",
+      "completed_at": "2026-08-04T20:47:08Z",
+      "completed_pr": 1554,
+      "created_at": "2026-08-04T17:14:28Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI compare's --fail-on-regression exit-code contract (non-zero on regression) is unchanged for scripts that depend on it.",
+        "item_id": "one-engine-unify-regression-policy"
+      },
+      {
+        "behavior": "MCP analyze_results response schema keeps its field names; only the numbers' provenance moves to core.",
+        "item_id": "one-engine-unify-regression-policy"
+      },
+      {
+        "behavior": "report's DB-backed detect_regressions API keeps its signature.",
+        "item_id": "one-engine-unify-regression-policy"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "ResultDatabase.detect_regressions already exists as a core regression entry point for report",
+        "decision": "extend",
+        "item_id": "one-engine-unify-regression-policy",
+        "path": "benchbox/core/results/database.py"
+      },
+      {
+        "concept": "Severity ladder and trend thresholds to be relocated, not reinvented",
+        "decision": "reuse",
+        "item_id": "one-engine-unify-regression-policy",
+        "path": "benchbox/mcp/tools/analytics.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-unify-regression-policy",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/security.py"
+      },
+      {
+        "item_id": "one-engine-unify-regression-policy",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "one-engine-unify-regression-policy",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "one-engine-unify-regression-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/compare.py"
+      },
+      {
+        "item_id": "one-engine-unify-regression-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/report.py"
+      },
+      {
+        "item_id": "one-engine-unify-regression-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "one-engine-unify-regression-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/analytics.py"
+      },
+      {
+        "item_id": "one-engine-unify-regression-policy",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'regression and parity' -q",
+        "description": "Three-surface classification parity on shared fixtures",
+        "expected": "compare, report, and MCP analytics classify a shared fixture identically.",
+        "item_id": "one-engine-unify-regression-policy",
+        "last_result": "pass",
+        "last_run": "2026-08-04T19:46:46Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -rn '_classify_regression_severity\\|_compute_trend_direction' benchbox/mcp/tools benchbox/cli/commands",
+        "description": "No local severity/trend constants remain in surface layers",
+        "expected": "Severity and trend policy live only in core.",
+        "item_id": "one-engine-unify-regression-policy",
+        "last_result": "pass",
+        "last_run": "2026-08-04T19:46:49Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli -k 'fail_on_regression or regression_exit' -q",
+        "description": "compare exit-code contract intact",
+        "expected": "Existing exit-code behavior tests pass.",
+        "item_id": "one-engine-unify-regression-policy",
+        "last_result": "pass",
+        "last_run": "2026-08-04T19:46:56Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-unify-regression-policy",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-unify-regression-policy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-verified at HEAD and found a FOURTH policy site the review missed: benchbox/core/results/database.py:898 hardcodes is_regression = change > 10, and detect_regressions then requires BOTH that flag and change_pct > threshold_pct, so any --threshold below 10 was silently inert (a 7% slowdown could never be reported at --threshold 5). Characterized all four on a shared delta matrix including every band boundary.",
+        "item_id": "one-engine-unify-regression-policy",
+        "notes": null,
+        "started_at": "2026-08-04T20:46:39Z",
+        "started_branch": "refactor/one-engine-residual-dedup",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Re-verify the three policies at HEAD; characterize classifications on shared fixtures",
+        "wid": "w0"
+      },
+      {
+        "evidence": "benchbox/core/results/regression_policy.py: DEFAULT_REGRESSION_THRESHOLD_PERCENT, TREND_SIGNIFICANCE_PERCENT, SEVERITY_LADDER, percent_change, classify_severity, classify_change, is_regression, classify_trend, is_meaningful_improvement. MCP's ladder chosen canonical per the approach note; CLI threshold overrides preserved.",
+        "item_id": "one-engine-unify-regression-policy",
+        "notes": null,
+        "started_at": "2026-08-04T20:46:42Z",
+        "started_branch": "refactor/one-engine-residual-dedup",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Core policy module with canonical defaults + override hooks",
+        "wid": "w1"
+      },
+      {
+        "evidence": "compare/report/MCP analytics/database migrated; _classify_regression_severity and _compute_trend_direction deleted. Three-surface parity test over a boundary matrix, plus the exit-code contract tests rung 3 expected but which did not exist. PR #1554.",
+        "item_id": "one-engine-unify-regression-policy",
+        "notes": null,
+        "started_at": "2026-08-04T20:46:45Z",
+        "started_branch": "refactor/one-engine-residual-dedup",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Migrate compare/report/MCP analytics; delete local policy constants; three-surface parity test",
+        "wid": "w2"
+      }
+    ]
+  }
+}

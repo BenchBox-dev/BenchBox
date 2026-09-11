@@ -1,0 +1,207 @@
+{
+  "description": "The 2026-05-05 tuned UAT follow-up sweep stopped at 141 of 1,503 candidate\ncells when free disk crossed the 5 GiB safety boundary. 435 cells were\nmarked \"resource-budget blocked\" and never attempted; the remaining native\nslow platforms (sqlite, spark, clickhouse-local tail) and every DataFrame\nplatform (polars-df, pandas-df, modin-df, pyspark-df, dask-df,\ndatafusion-df) were untouched.\n\nThe framework today has a `preflight.min_free_gib` floor and aborts the\nsweep when it is crossed, but it does not estimate the disk budget for a\ngiven config up front, and it cannot resume a partially complete sweep —\nreaching the floor truncates the run and discards the remaining cells.\n\nSource: `_project/handoffs/results-explorer-uat-tuned-followup-20260505.md`.\nFollow-up to PR #235 (chore/results-explorer-tuned-followup-resume-20260505).\n\nW0 revalidation kept the coverage TSV counts stable, but the pool-02\ndatagen/database footprint had already drifted to the surviving 3.1 MiB /\n36 KiB trees captured in\n`_project/verification-logs/results-explorer-uat-defect-disk-budget-resume-plan/w0.log`.\nThe checked-in disk table therefore inventories the surviving shared/pool\ntelemetry and leaves absent cells visible as `unknown` in the estimator.\n\nThis TODO adds two capabilities so a multi-day sweep on a constrained host\ncan complete:\n\n  1. Preflight disk-budget estimator that, given a config, predicts peak\n     disk (datagen + transient growth + result/log artifacts) before the\n     sweep begins, and either gates execution or partitions the cells into\n     resumable batches.\n  2. Resumable execution: a sweep that hits the disk floor records a\n     resume manifest (cells attempted, cells remaining) so a subsequent\n     invocation picks up where it stopped after operator cleanup.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make the preflight estimator a hard gate",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "why": "it must be advisory, because per-platform disk envelopes drift faster than the table can be re-inventoried, and a bad estimate must not block a deliberate operator."
+      },
+      {
+        "dont": "reuse `tests/uat/configs/.frozen-hashes.json`-style ceremony for the disk budget table",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "why": "refresh is operator-driven and the table is allowed to drift; a stale-table warning is sufficient."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-06T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing `preflight.min_free_gib` abort semantics: framework still aborts when the floor is crossed.",
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan"
+      },
+      {
+        "behavior": "Validator-clean-rate floor enforcement; nothing about resumability bypasses validation.",
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan"
+      },
+      {
+        "behavior": "datagen reuse across cells (e.g., tpcds_obt → tpcds, write_primitives → tpch) — resume must not invalidate cached datagen.",
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/_cli.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/data/disk_budget_table.tsv"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/orchestrator.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/preflight.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/preflight_budget.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_orchestrator.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_preflight_budget.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m tests.uat._cli preflight --config tests/uat/configs/stress-default.yaml",
+        "description": "Preflight estimator runs and prints a non-empty disk budget",
+        "expected": "Disk budget estimate: ... GiB",
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_orchestrator.py -m fast -k resume -q",
+        "description": "Resume manifest round-trips a partial sweep",
+        "expected": "1 passed",
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f tests/uat/data/disk_budget_table.tsv && echo OK",
+        "description": "Disk budget table is checked in",
+        "expected": "OK",
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "notes": "Evidence-durability gate per `_project/verification-logs/README.md`.\nBefore w1, confirm the handoff figures still reproduce by inspecting\nthe captured sweep artifacts:\n\n  LOGS=~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun\n  wc -l \"$LOGS/coverage_cells.tsv\"\n  awk -F'\\t' 'NR>1 {print $4}' \"$LOGS/coverage_cells.tsv\" | sort | uniq -c\n  du -sh /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen \\\n          /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases\n\nExpected (handoff anchor): 1,504 TSV lines (header + 1,503\ncandidate cells); status split: 114 passed, 25 failed, 2 timed-out,\n72 ladder-pruned, 435 resource-budget-blocked, 855 skipped-unreachable;\n8.6 GiB datagen + 21 GiB databases on pool-02. Capture stdout under\n`_project/verification-logs/results-explorer-uat-defect-disk-budget-resume-plan/w0.log`\nand commit. If the figures have already drifted (e.g., pool-02\ncleanup ran first), update the description and gate w1 on what\nsurvives.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate cited 2026-05-05 sweep evidence and capture to verification log",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "notes": "Goal: a per-(platform, benchmark, scale) datagen + transient growth\ntable that the estimator can consume. Sources:\n  - `/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen`\n    and `/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases`\n    from the 2026-05-05 sweep (handoff anchor: 8.6 GiB datagen,\n    21 GiB databases — see `pool02-artifact-cleanup` TODO).\n  - Shared-root mirrors under `~/Developer/benchmark_runs/` when the\n    pool-local tree has already drifted, plus per-cell logs under\n    `~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/`.\nOutput: `tests/uat/data/disk_budget_table.tsv` keyed by\n`(platform, benchmark, scale_factor)` with `peak_datagen_gib`,\n`peak_database_gib`, `transient_growth_gib`. Land as a checked-in\nartifact; updaters write a follow-up.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory current disk consumption per platform/benchmark/scale from the 2026-05-02 + 2026-05-05 sweep telemetry",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "notes": "New module exposes `estimate_peak_disk(config) -> DiskBudget` with\nfields: `cells`, `est_peak_gib`, `est_steady_gib`, `unknown_cells`.\nWire into `tests/uat/phases/preflight.py` so `make uat-preflight`\nand `make uat-sweep` print the estimate before any cell runs.\nFast-marked unit test using a fixture config.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `tests/uat/preflight_budget.py` that consumes the table and reports estimated peak free-disk demand for a config",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "notes": "`tests/uat/orchestrator.py` writes a JSON manifest with attempted\ncells (cell_key + terminal_state + result_path) when execution\naborts on `min_free_gib`. `tests/uat/_cli.py::execute_main` and\n`sweep_main` accept `--resume <path>` and skip cells already in\n`attempted`. Fast-marked test: simulated abort writes manifest;\nsecond invocation with `--resume` enumerates the complement.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add resume manifest: orchestrator writes `<log-dir>/resume.json` on disk-floor abort; `--resume <manifest>` skips already-attempted cells",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-disk-budget-resume-plan",
+        "notes": "Operator-facing: how to read the preflight estimate, when to partition\ninto batches, how `--resume` interacts with `preserve_datagen` and\ndatagen reuse. Spec-side: contract for the resume manifest and\nbackwards-compat posture (none — new file format).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the new flow in `docs/operations/uat-framework.md` and `_project/specs/uat-framework.md`",
+        "wid": "w4"
+      }
+    ]
+  }
+}

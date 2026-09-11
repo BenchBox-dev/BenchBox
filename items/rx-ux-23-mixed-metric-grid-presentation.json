@@ -1,0 +1,224 @@
+{
+  "context": "Read D1 from rx-ux-00 first and implement only the branch it selects. Do not implement both. Whichever branch runs, the reading rule must be stated once and be true, which is why this item depends on rx-ux-04 having already made the legend truthful.",
+  "description": "F7. In the default `times` mode the cross-benchmark matrix places columns with opposite directions of good side by side: 'Geomean latency, lower is better' (1.8 ms) next to 'Power score, higher is better' (3,185), four orders of magnitude apart. Direction is disclosed only in an 11px sub-header, so a row cannot be scanned left to right under one rule.\n\nThis item was missing from the first cut of the sequence: plan v4 deferred F7 to Phase 0 D1 but no item existed to act on either outcome, so the finding would have been gated and then dropped. Found by the post-creation review.\n\nThe work depends on D1:\n\nIf D1 keeps `times` as default (the recommendation): F7 is mitigated in place. Strengthen per-column direction disclosure so the rule is legible at a glance rather than in an 11px sub-header, without changing the default or the URL contract.\n\nIf D1 reverses the default to `speedup`: implement the default change, update docs/operations/results-explorer-qa.md S2.2, and confirm what a shared link without `?mode=` now renders. The data supports this - speedup_vs_best is populated for every ranking-eligible row (verified: 9 of 9 ascending, 6 of 6 descending) - and the convention is 1.00x for the ranking best with worse values below 1.00x.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "'fix' cellShadeMetric's ascending branch because it returns metric_value rather than speedup_vs_best",
+        "instead": "leave it alone",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "why": "lightnessForCell normalises by column minimum, so value/min equals 1/speedup_vs_best exactly; the branch is correct and was confirmed by three reviewers"
+      },
+      {
+        "dont": "change the default mode without updating the QA doc in the same change",
+        "instead": "treat it as a documented-contract reversal",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "why": "results-explorer-qa.md S2.2 pins `times` as default"
+      },
+      {
+        "dont": "implement both D1 branches to keep options open",
+        "instead": "implement the one D1 selected",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "why": "carrying both leaves the reading rule ambiguous, which is the defect"
+      },
+      {
+        "dont": "invert the speedup convention so bigger means worse",
+        "instead": "keep 1.00x as the ranking best with worse values below it",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "why": "that is the shipped convention in MetaLeaderboard and the pipeline's speedup_vs_best"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "needs_item": "rx-ux-00-phase0-contract-decisions"
+      },
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "needs_item": "rx-ux-04-matrix-legend-truthfulness"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-24T06:56:28Z",
+      "completed_pr": 1842,
+      "created_at": "2026-08-22T14:55:20Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Heat direction: lightnessForCell maps fastest to 95% lightness and 10x slower to 25% (chartMath.ts:199-204), pinned by tests/parity/fixtures/lightness_for_cell.json. Darker means slower/worse in both matrices.",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation"
+      },
+      {
+        "behavior": "The native metric value stays visible in the cell under either branch",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation"
+      },
+      {
+        "behavior": "`?mode=` URL state and mode persistence across reload",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation"
+      },
+      {
+        "behavior": "docs/operations/results-explorer-qa.md S2.2 three-mode contract; if D1 reverses the default, the doc changes in the same PR",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/ranking.py"
+      },
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/chartMath.ts"
+      },
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "kind": "do_not_modify",
+        "path_glob": "tests/parity/fixtures/**"
+      },
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/**"
+      },
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "last_result": "pass",
+        "last_run": "2026-08-24T06:48:54Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'matrix direction'",
+        "description": "Direction is legible for every visible column",
+        "expected": "each column states its direction and the stated rule matches the rendered heat",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "last_result": "fail",
+        "last_run": "2026-08-24T06:48:56Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git -C /Users/joe/Developer/BenchBox status --short tests/parity/fixtures",
+        "description": "Chart parity fixtures unchanged",
+        "expected": "empty output",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "last_result": "pass",
+        "last_run": "2026-08-23T17:22:09Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'S2.2' -A 6 docs/operations/results-explorer-qa.md",
+        "description": "QA doc and code agree on the default mode",
+        "expected": "documented default matches the implemented default",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "last_result": "pass",
+        "last_run": "2026-08-23T17:22:11Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "rx-ux-00-phase0-contract-decisions w1 selected Branch B: default speedup; rejected keep-times; shared no-mode links intentionally reverse to speedup",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "notes": null,
+        "started_at": "2026-08-23T12:43:02Z",
+        "started_branch": "feat/rx-ux-23-mixed-metric-grid",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-23-mixed-metric-grid",
+        "status": "done",
+        "summary": "Read D1 from rx-ux-00 and record which branch applies",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Not applicable by D1: Branch A rejected; no times-mode header implementation made",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "notes": null,
+        "started_at": "2026-08-23T12:43:07Z",
+        "started_branch": "feat/rx-ux-23-mixed-metric-grid",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-23-mixed-metric-grid",
+        "status": "done",
+        "summary": "Branch A (keep times): strengthen per-column direction disclosure in the header",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Implemented D1 Branch B: Home now defaults omitted/unknown mode to speedup, writes explicit ?mode=times or ?mode=ranks only, and removes mode when returning to speedup. MetaLeaderboard speedup columns present the shared 1.00x-is-best/lower-is-worse rule plus each column native metric and native direction. Updated QA S2.2. Focused Home and MetaLeaderboard tests passed: 51/51.",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "notes": null,
+        "started_at": "2026-08-23T12:43:12Z",
+        "started_branch": "feat/rx-ux-23-mixed-metric-grid",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-23-mixed-metric-grid",
+        "status": "done",
+        "summary": "Branch B (default speedup): change default, update QA doc S2.2, confirm no-mode link behaviour",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Added mixed-direction component coverage (latency ascending and power descending) and Playwright route coverage that iterates every visible ranking column, asserting the common speedup reading rule plus native context. Browser proof passed on Chromium: 1/1. Full Vitest suite passed: 73 files, 904 tests. Typecheck, deterministic E2E fixture generation, and production build passed.",
+        "item_id": "rx-ux-23-mixed-metric-grid-presentation",
+        "notes": null,
+        "started_at": "2026-08-23T12:48:13Z",
+        "started_branch": "feat/rx-ux-23-mixed-metric-grid",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-23-mixed-metric-grid",
+        "status": "done",
+        "summary": "Test that one reading rule holds across every visible column",
+        "wid": "w4"
+      }
+    ]
+  }
+}

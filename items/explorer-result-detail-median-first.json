@@ -1,0 +1,121 @@
+{
+  "context": "display_timings[] is already the authoritative median-of-passing feed\nused by every aggregate page (see getDisplayMs() and\nBenchmarkIndex/PlatformIndex/Compare call sites). This item is a\nstraight data-source swap at ResultDetail.tsx lines 63/111/288 plus a\nnew drill-down section - not a new abstraction.\n",
+  "description": "Phase A of the Results Explorer strategy revision (plans/purring-jingling-petal-ultraplan).\n\n`ResultDetail.tsx` is the only surface that currently violates the\n\"median at high level, samples on drill-down\" contract: it renders the\nraw per-sample `DetailResult.queries[]` array (every iter/stream) as\nthe default query table, while every other page (BenchmarkIndex,\nPlatformIndex, Compare, Home) already reads the canonical median from\n`DetailResult.display_timings[]`.\n\nThis item fixes that drift. The raw samples do not disappear - they\nmove behind an \"Individual samples\" expander so audit is still\npossible without polluting the default view.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "drop the raw queries[] rendering",
+        "instead": "move it behind a <details> expander instead",
+        "item_id": "explorer-result-detail-median-first",
+        "why": "per-sample data is needed for audit/debugging"
+      },
+      {
+        "dont": "introduce a new aggregation helper",
+        "instead": "just read it",
+        "item_id": "explorer-result-detail-median-first",
+        "why": "display_timings[] is already the precomputed median"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-17T00:00:00Z",
+      "created_at": "2026-04-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "QueryTimingChart visual output matches display_timings median values (matches what CLI reports)",
+        "item_id": "explorer-result-detail-median-first"
+      },
+      {
+        "behavior": "Raw per-sample table remains reachable via the drill-down expander (no data removal)",
+        "item_id": "explorer-result-detail-median-first"
+      },
+      {
+        "behavior": "fmtGeomean call sites on this page continue to consume detail.geomean_ms / display_geomean_ms unchanged",
+        "item_id": "explorer-result-detail-median-first"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-result-detail-median-first",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "explorer-result-detail-median-first",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Explorer typecheck + Vitest suites stay green",
+        "expected": "all green",
+        "item_id": "explorer-result-detail-median-first",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run dev",
+        "description": "Visual: default table for a sample result shows one row per query, Individual samples expander reveals per-iter/stream rows",
+        "expected": "/results/r/<id> renders median-first default, drill-down expander works",
+        "item_id": "explorer-result-detail-median-first",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-result-detail-median-first",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-result-detail-median-first",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-result-detail-median-first",
+        "notes": "ResultDetail.tsx lines 63, 111, 288 - swap `detail.queries` for\n`detail.display_timings`. Row shape becomes\n`{query_id, display_ms, sample_count}`. Sort key changes from\n`duration_ms` → `display_ms`. Drop the Status column (no per-run\nstatus at the median level) and replace it with a \"Samples\" column\nbacked by `sample_count`. `QueryTimingChart` likewise reads\n`display_timings`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Switch default query table + QueryTimingChart to display_timings[]",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-result-detail-median-first",
+        "notes": "Below the main table, add a `<details>` / expander that, when\nopened, renders the existing raw `detail.queries[]` table\n(per-sample rows with iter/stream/status). Keep the current\ncolumns and sort behavior so nothing is lost - only demoted from\ndefault to drill-down.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add collapsible 'Individual samples' section rendering raw queries[]",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-result-detail-median-first",
+        "notes": "Extend `ResultDetail.test.tsx` to assert:\n  - default table rows == display_timings.length (not queries.length)\n  - sample_count cell matches display_timings[i].sample_count\n  - opening the expander reveals a second table whose row count\n    matches the raw queries[] length\n  - QueryTimingChart bars correspond to display_ms values\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Vitest coverage for default-median table and samples expander",
+        "wid": "w3"
+      }
+    ]
+  }
+}

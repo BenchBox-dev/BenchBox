@@ -1,0 +1,117 @@
+{
+  "context": "Add structure-aware handling for requested primary_keys and foreign_keys (including mapping keys and list values), then drive the real companion writer and retain the existing generic secret/path policy.",
+  "description": "The shipped anonymized .tuning.json path hashes table_tunings keys and column names but leaves requested constraint mappings under tables and their column list verbatim. A driven origin/develop payload retained orders and o_orderkey in the public companion. Extend the tuning-specific anonymizer to cover constraint table and column identifiers while preserving enabled flags, tuning values, normalized source references, and byte-for-byte raw output when anonymize=False.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "results-anonymize-tuning-constraint-identifiers",
+        "needs_item": "result-export-explicit-raw-config-egress-sentinel-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "Security",
+      "created_at": "2026-08-02T01:42:27Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "normalized repository-relative source references",
+        "item_id": "results-anonymize-tuning-constraint-identifiers"
+      },
+      {
+        "behavior": "raw tuning companions when anonymize=False",
+        "item_id": "results-anonymize-tuning-constraint-identifiers"
+      },
+      {
+        "behavior": "tuning enabled flags and non-identifier tuning values",
+        "item_id": "results-anonymize-tuning-constraint-identifiers"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-anonymize-tuning-constraint-identifiers",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "results-anonymize-tuning-constraint-identifiers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_anonymization.py"
+      },
+      {
+        "item_id": "results-anonymize-tuning-constraint-identifiers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_export_anonymization_surfaces.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "PYTHONPATH=. uv run --all-extras -- python -c 'import json; from benchbox.core.results.anonymization import AnonymizationManager; out=AnonymizationManager().anonymize_tuning_payload({\"requested\":{\"constraints\":{\"primary_keys\":{\"enabled\":True,\"tables\":{\"orders\":[\"o_orderkey\"]}}},\"table_tunings\":{\"orders\":{\"name\":\"o_orderkey\"}}}}); text=json.dumps(out); assert \"orders\" not in text and \"o_orderkey\" not in text'",
+        "description": "public tuning payload contains no raw requested constraint table or column identifiers",
+        "expected": "exits 1 on an unfixed tree because requested constraint identifiers remain public; exits 0 after structure-aware tuning anonymization",
+        "item_id": "results-anonymize-tuning-constraint-identifiers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run --all-extras -- pytest tests/unit/core/results/test_anonymization.py tests/unit/core/results/test_export_anonymization_surfaces.py -q",
+        "description": "existing result anonymization and companion tests pass",
+        "expected": "passes before and after as a regression guard",
+        "item_id": "results-anonymize-tuning-constraint-identifiers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-anonymize-tuning-constraint-identifiers",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-anonymize-tuning-constraint-identifiers",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-anonymize-tuning-constraint-identifiers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-drive anonymized tuning companion leakage across constraint shapes",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-anonymize-tuning-constraint-identifiers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Hash constraint table and column identifiers without changing tuning semantics",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-anonymize-tuning-constraint-identifiers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run anonymization and export companion regressions",
+        "wid": "w2"
+      }
+    ]
+  }
+}

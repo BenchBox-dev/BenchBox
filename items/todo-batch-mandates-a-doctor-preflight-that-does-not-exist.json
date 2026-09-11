@@ -1,0 +1,77 @@
+{
+  "context": "Decide which is true and make the contract and the tooling agree: either implement 'doctor' as a real preflight on the project wrapper (and/or expose 'batch'), or amend the batch contract so its preflight names a check that actually exists here. Do not leave a mandated gate that no operator can execute.",
+  "description": "The todo-db batch workflow requires a 'doctor' preflight before batch execution, but no reachable CLI implements it. Confirmed by enumeration, not by a failed lookup: '_project/scripts/todo --help' lists init, import-yaml, create, show, claim, release, renew, deps, unblock, start, done, defer, promote, dismiss, complete, drop, block, list, ready, stats, check-scope, verify, lint, sweep-stale, migrate, config, freeze, export, finding -- there is no 'doctor', and no 'batch' either. So the mandated preflight cannot be run by anyone following the contract, and sessions record it as 'skipped', which quietly converts a required gate into an optional one. Also note 'update' is absent from this wrapper (standalone-only), which is what makes malformed verification ladders unrepairable in place and forces drop+recreate under a new id.",
+  "legacy": {
+    "item_meta": {
+      "category": "framework-gap",
+      "created_at": "2026-08-01T12:57:59Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "No change to the standalone-only command boundary: standalone-only actions must still not be routed to the project wrapper",
+        "item_id": "todo-batch-mandates-a-doctor-preflight-that-does-not-exist"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-batch-mandates-a-doctor-preflight-that-does-not-exist",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo doctor --help >/dev/null 2>&1",
+        "description": "the project wrapper exposes the mandated preflight",
+        "expected": "exit 0",
+        "item_id": "todo-batch-mandates-a-doctor-preflight-that-does-not-exist",
+        "last_result": "pass",
+        "last_run": "2026-08-01T13:32:28Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo --help 2>&1 | grep -qE 'doctor|batch'",
+        "description": "the batch contract no longer names an unavailable preflight, or batch is itself exposed",
+        "expected": "exit 0",
+        "item_id": "todo-batch-mandates-a-doctor-preflight-that-does-not-exist",
+        "last_result": "pass",
+        "last_run": "2026-08-01T13:32:30Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-batch-mandates-a-doctor-preflight-that-does-not-exist",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "todo-batch-mandates-a-doctor-preflight-that-does-not-exist",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Establish whether doctor/batch belong on the project wrapper or only standalone",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-batch-mandates-a-doctor-preflight-that-does-not-exist",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reconcile the batch contract with the tooling that actually exists",
+        "wid": "w2"
+      }
+    ]
+  }
+}

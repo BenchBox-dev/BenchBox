@@ -1,0 +1,11 @@
+{
+  "description": "The Modin, cuDF, and Dask DataFrame adapters have skeleton implementations\nbut are not production-ready. These platforms are essential for:\n\n- Modin: Drop-in Pandas acceleration (multi-core/distributed)\n- cuDF: GPU-accelerated DataFrames for NVIDIA hardware\n- Dask: Distributed DataFrame processing for large-scale workloads\n\nCurrent state: Skeleton files exist in benchbox/platforms/dataframe/ but lack\nfull TPC-H query implementations and production testing.\n\nThe dataframe-performance Phase 9.3 comparative benchmarking was explicitly\ndeferred until these adapters are complete.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2025-12-13T00:00:00Z",
+      "created_at": "2025-12-13T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

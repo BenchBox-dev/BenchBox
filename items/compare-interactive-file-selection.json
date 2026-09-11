@@ -1,0 +1,11 @@
+{
+  "description": "The `benchbox compare` command's interactive file comparison mode needs significant\nUX improvements. Currently it shows a flat list of JSON files with just paths,\nrequiring users to manually identify which results they want to compare.\n\nUsers should be able to either:\nA) Specify files directly by path (keep existing behavior)\nB) Interactively filter by benchmark/platform/scale, then select from the 10\n   most recent matching results\n\nThis makes the compare workflow much more intuitive for users with many result\nfiles accumulated over time.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2025-12-15T00:00:00Z",
+      "created_at": "2025-12-15T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

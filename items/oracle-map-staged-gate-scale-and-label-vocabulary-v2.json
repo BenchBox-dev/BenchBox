@@ -1,0 +1,90 @@
+{
+  "context": "Resolve GATES or STAGED_GATES in _bounded_value_gate_scale, matching oracle_surface_provenance. Validate gate.surface_independence against a closed _KNOWN_PROVENANCE_LABELS set and raise with an actionable message naming both edits a new label needs. Pin each with a test that fails only against its own defect.",
+  "description": "generate_oracle_coverage_map.py has two holes in how it reads live cross-surface gate metadata. (1) _bounded_value_gate_scale() resolves only GATES, but classify_oracles() already treats a STAGED gate as a cross-surface oracle, so a staged gate declaring its own scale_factor renders the shared EQUIVALENCE_SCALE instead -- overstating the scale at which the gate holds, on the exact path every gate takes before promotion. oracle_surface_provenance() twelve lines away already resolves GATES or STAGED_GATES, so the two are inconsistent. Reproduced by staging a probe gate with scale_factor=0.001: the row rendered SF=0.1. (2) The provenance label is returned straight from gate.surface_independence with no vocabulary check. The tests pin the three PROVENANCE_* constants to the live SURFACE_INDEPENDENCE_* constants, which catches a RENAME but not an ADDITION, so a newly registered gate carrying a new label renders into the table while the map's own Surface-provenance prose still defines only three -- legend contradicting row. Reproduced by adding SURFACE_INDEPENDENCE_TRANSPILED: it rendered silently. Both latent today (STAGED_GATES is empty) and neither changes the committed artifact. Supersedes the dropped oracle-map-staged-gate-scale-and-label-vocabulary, whose ladder was malformed.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-01T13:26:07Z",
+      "completed_pr": 1390,
+      "created_at": "2026-08-01T12:54:19Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Provenance stays READ LIVE from gate metadata; the guard validates the value, it does not hand-map it",
+        "item_id": "oracle-map-staged-gate-scale-and-label-vocabulary-v2"
+      },
+      {
+        "behavior": "The committed artifacts do not change: STAGED_GATES is empty and every live label is known, so make oracle-coverage-map-check stays green",
+        "item_id": "oracle-map-staged-gate-scale-and-label-vocabulary-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "oracle-map-staged-gate-scale-and-label-vocabulary-v2",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/generate_oracle_coverage_map.py"
+      },
+      {
+        "item_id": "oracle-map-staged-gate-scale-and-label-vocabulary-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_oracle_coverage_map.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_oracle_coverage_map.py -k test_staged_gate_scale_is_read_from_its_own_metadata -q -n 0",
+        "description": "staged gate scale is read from its own metadata",
+        "expected": "exit 0",
+        "item_id": "oracle-map-staged-gate-scale-and-label-vocabulary-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T12:54:35Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_oracle_coverage_map.py -k test_unknown_surface_provenance_label_is_rejected -q -n 0",
+        "description": "an unknown provenance label is rejected loudly",
+        "expected": "exit 0",
+        "item_id": "oracle-map-staged-gate-scale-and-label-vocabulary-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T12:54:39Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_oracle_coverage_map.py -q -n 0",
+        "description": "the whole oracle-map suite still passes",
+        "expected": "exit 0",
+        "item_id": "oracle-map-staged-gate-scale-and-label-vocabulary-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T12:54:42Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make oracle-coverage-map-check",
+        "description": "the committed map is unchanged by the fix",
+        "expected": "exit 0",
+        "item_id": "oracle-map-staged-gate-scale-and-label-vocabulary-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T12:54:45Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Both fixes landed with a test each. Mutation-proved not decorative: reverting ONLY the staged-gate lookup fails only test_staged_gate_scale_is_read_from_its_own_metadata (1 failed, 21 passed); reverting ONLY the vocabulary guard fails only test_unknown_surface_provenance_label_is_rejected (1 failed, 21 passed); with both fixes 22 passed. make oracle-coverage-map-check stays green and the regenerated body hash is unchanged, so the committed artifact does not move.",
+        "item_id": "oracle-map-staged-gate-scale-and-label-vocabulary-v2",
+        "notes": null,
+        "started_at": "2026-08-01T12:54:57Z",
+        "started_branch": "fix/oracle-coverage-map-followups",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Resolve staged gates in the scale lookup and guard the provenance vocabulary, with a test per defect",
+        "wid": "w1"
+      }
+    ]
+  }
+}

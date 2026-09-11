@@ -1,0 +1,219 @@
+{
+  "context": "Pin source, corpus, artifact, browsers, and deployment; scan public bundles for leaks; exercise fork/vendor/manifest/companion submission cases; recompute metrics with independent oracles; run all browser projects; classify each failure as product, infrastructure, or policy with owner.",
+  "description": "The prior review did not independently certify deployed CSP headers, submission validation end-to-end, real-corpus geomean/percentile/ranking direction, or observed WebKit failures. Close these dimensions without treating green Vitest or one Chromium run as universal evidence.\n\nRECERTIFIED 2026-09-05 @ origin/develop afcd92bbecf4ed753d7553312b8600d08aaeca7f:\n- Live Pages HTML/DuckDB (HTTP 200, 8663040 bytes, SHA-256 1aac8c08acf3f102f39e1bdb7dc37bc074fceb74ee8309c5479bebea4e45a9ed) aligned at read_model_version = 10 matching deployed JS and source contract.\n- Local gates: Vitest 1,311 passed, 0 timeouts (PlatformIndex row expansion and Query off-page selection did not reproduce); TypeScript 0 errors; Vite build 245 modules in 2.17s; Python focused pytest 1,419 passed, 10 skipped, 0 failed, 0 socket PermissionError (PYTEST_EXIT=0).\n- Browser suites: Local isolated server port 64376 (PID 17250); Chromium blocking 174 passed, 12 skipped, 9 failure paths passed, 1 perf passed (all latency budgets met); Firefox smoke 16/16 passed; WebKit smoke 16/16 passed.\n- Oracles & negative controls: 199/199 geomean, 199/199 percentiles, 27 cohorts / 136 rankable rows (0 divergences); privacy scan 0 leaks across 14 tables and 391 bundles. Fail-closed verified on historical replay digest check, wrong-snapshot control, and disposable clone source-mutation control.\n- Independent adversarial review: content receipt 5890a01b2027ff0f955c51fd144f0e678304d40025bd12d4359c8858c71c7507 verified; verdict PASS: no findings.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "copy second-hand corpus counts",
+        "instead": "recompute from pinned artifacts",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "why": "counts can drift from deployed snapshot"
+      },
+      {
+        "dont": "declare all clear from Vitest or Chromium",
+        "instead": "require cross-browser, pipeline, submission, privacy, and math evidence",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "why": "green narrow gates can coexist with external defects"
+      },
+      {
+        "dont": "ignore or overstate every WebKit timeout",
+        "instead": "reproduce, classify, and assign owner/policy",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "why": "failures may be infrastructure or races"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-20T14:49:39Z",
+        "from_item": "results-explorer-release-certification-independent-oracles-20260802",
+        "id": 716,
+        "reason": "2026-08-20: CSP headers, WebKit, and independent math oracles were not re-certified on current develop and must not block cutting v0.4.0. The launch item's live acceptance (w4) is the customer-visible gate. Re-open this certification after benchbox.dev/results/ returns 200.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Curated preview is live: results-explorer-pages-environment-and-curated-preview-launch completed in PR 1933 and https://benchbox.dev/results/ returns HTTP 200 with title BenchBox Results Explorer.",
+        "summary": "Does not block curated-preview launch; run after /results/ is live"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "needs_item": "results-explorer-ci-path-filter-closure-20260802"
+      },
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "needs_item": "results-explorer-companion-publication-contract-20260802"
+      },
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "needs_item": "results-explorer-read-model-version-literal-pin-20260802"
+      }
+    ],
+    "item_meta": {
+      "category": "Release certification",
+      "completed_at": "2026-09-10T23:07:03Z",
+      "completed_pr": 2047,
+      "created_at": "2026-08-02T16:27:57Z",
+      "worktree": "/Users/joe/Developer/BenchBox.wt-explorer-evidence-recertification"
+    },
+    "preserves": [
+      {
+        "behavior": "Browser promotion waits for evidence, not a short green sample",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802"
+      },
+      {
+        "behavior": "Independent calculations detect divergence rather than replace production logic",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802"
+      },
+      {
+        "behavior": "Raw reports remain outside Git unless approved",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802"
+      },
+      {
+        "behavior": "Security tests never use real credentials",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Production metric calculations",
+        "decision": "reuse",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "path": "_project/scripts/explorer_pipeline/transformer.py"
+      },
+      {
+        "concept": "Path-leak detector",
+        "decision": "reuse",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "path": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "concept": "Route/network/evidence checklist",
+        "decision": "extend",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "path": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "concept": "Existing closure matrix",
+        "decision": "extend",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "path": "results-explorer-release-readiness-remediation-closeout"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/**"
+      },
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/**"
+      },
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/**"
+      },
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration tests/uat/test_explorer_smoke.py tests/unit/scripts/explorer_pipeline -q",
+        "description": "Focused submission, privacy, and pipeline tests pass",
+        "expected": "Focused certification tests pass",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium",
+        "description": "Chromium blocking suite runs and other browser outcomes are recorded",
+        "expected": "Chromium passes; Firefox/WebKit outcomes are classified",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "w0 PASS @ fc6dd5958b1deffa468e01852a392a29585d11eb pin matrix in _project/audits/results-explorer-release-certification-independent-oracles-2026-09-04.md verified on live Pages HTML/DB",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "notes": null,
+        "started_at": "2026-09-04T20:09:01Z",
+        "started_branch": "feat/explorer-evidence-certification",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-evidence-certification",
+        "status": "done",
+        "summary": "Pin source, corpus, artifact, browser, and deployment identities",
+        "wid": "w0"
+      },
+      {
+        "evidence": "w1 PASS @ fc6dd5958b1deffa468e01852a392a29585d11eb independent oracles 138/138 geomean+percentile, 55/55 rankable, Chromium 168+9+1, Firefox/WebKit smoke 16 each; pytest 1 unrelated CLI ANSI fail classified",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run privacy, submission, independent-math, and browser checks",
+        "wid": "w1"
+      },
+      {
+        "evidence": "w2 PASS @ fc6dd5958b1deffa468e01852a392a29585d11eb classified product/infra/policy residuals; audit SHA-stamped; make audit-sha-check PASS",
+        "item_id": "results-explorer-release-certification-independent-oracles-20260802",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Classify failures and update evidence matrix",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "context": "Treat this as the honest bookkeeping the family rollout skipped: mark what is synthetic\n(w1), add the live hooks so it can be closed later (w2), and remove the most likely silent\nfailure mode — row-shape assumptions — with real unit coverage now (w3). w3 is the only part\nthat delivers value without credentials and should be prioritized.\n",
+  "description": "Several plan parsers were implemented and their TODOs marked Completed without ever being\nrun against real EXPLAIN output, because no live instance was available:\n  - PrestoTrinoQueryPlanParser (#773): fixtures synthesized from documented FORMAT JSON\n  - ClickHouseQueryPlanParser (#775): fixtures synthesized from documented EXPLAIN PLAN\n  - SparkQueryPlanParser / Databricks (#778): fixture synthesized from documented EXPLAIN EXTENDED\n\nEach parser and its test fixtures encode the SAME assumptions about output shape, so green\nunit tests prove self-consistency, not correctness against a real engine. Two concrete risks:\n  1. Field-shape drift: the parser assumes, e.g., \"Trino returns the JSON in one row\",\n     \"ClickHouse returns one row per plan line\", \"Spark EXPLAIN EXTENDED has a single\n     == Physical Plan == section\". If a real driver chunks rows differently or a newer\n     engine version changes wording, get_query_plan's joined text is wrong, the parser\n     returns None, and capture silently degrades — with every unit test still green.\n  2. \"Completed\" overstates reality: the TODO state cannot distinguish code-merged from\n     validated-against-a-real-engine.\n\nThis TODO does NOT require provisioning clusters now. It makes the gap explicit and\ntrackable, and adds the validation hooks so it can be closed when credentials exist.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete the synthetic fixtures when live ones arrive",
+        "instead": "keep both and mark provenance.",
+        "item_id": "query-plan-capture-parser-live-validation",
+        "why": "they provide fast no-credential coverage"
+      },
+      {
+        "dont": "hard-fail CI when an engine is unavailable",
+        "instead": "gate every one on an explicit credential/host env var.",
+        "item_id": "query-plan-capture-parser-live-validation",
+        "why": "these are opt-in live tests"
+      },
+      {
+        "dont": "mark this Completed until at least the row-shape hardening (w3) lands",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-parser-live-validation",
+        "why": "that is the part that does not need a live cluster and removes a real silent-failure path."
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-06-11T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing synthetic-fixture unit tests remain as fast, no-credential coverage.",
+        "item_id": "query-plan-capture-parser-live-validation"
+      },
+      {
+        "behavior": "Live integration tests must skip gracefully (not fail) when credentials/instances are absent.",
+        "item_id": "query-plan-capture-parser-live-validation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/query_plans/parsers/presto_trino.py, clickhouse.py, spark.py — synthetic-fixture parsers",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-parser-live-validation",
+        "path": "benchbox/core/query_plans/parsers/presto_trino.py"
+      },
+      {
+        "concept": "tests/fixtures/query_plans/ — recorded (synthetic) EXPLAIN samples",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-parser-live-validation",
+        "path": "tests/fixtures/query_plans/"
+      },
+      {
+        "concept": "tests/integration/test_postgresql_plan_capture_integration.py (#768) — skipif(POSTGRESQL_HOST) live-integration pattern to replicate",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-parser-live-validation",
+        "path": "tests/integration/test_postgresql_plan_capture_integration.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/_spark_helpers.py"
+      },
+      {
+        "item_id": "query-plan-capture-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/athena.py"
+      },
+      {
+        "item_id": "query-plan-capture-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/adapter.py"
+      },
+      {
+        "item_id": "query-plan-capture-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databricks/adapter.py"
+      },
+      {
+        "item_id": "query-plan-capture-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/presto_trino_adapter_base.py"
+      },
+      {
+        "item_id": "query-plan-capture-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/query_plans/"
+      },
+      {
+        "item_id": "query-plan-capture-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "query-plan-capture-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration -k plan_capture -v",
+        "description": "Live integration tests skip cleanly without credentials",
+        "expected": "Tests skipped with a clear 'live <engine> not available' message",
+        "item_id": "query-plan-capture-parser-live-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms -k 'plan and (row_shape or chunk)' -v",
+        "description": "get_query_plan row-shape unit tests pass for single-row and per-line shapes",
+        "expected": "Both driver row shapes parse to non-empty plan text",
+        "item_id": "query-plan-capture-parser-live-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-parser-live-validation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-parser-live-validation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-parser-live-validation",
+        "notes": "Annotate each tests/fixtures/query_plans/*.json|*.txt with provenance (synthetic vs\ncaptured-from <engine> <version>), e.g. a sibling .meta.json or a header comment. Add a\nsmall doc/table (docs or a module constant) listing each parser and whether it has been\nvalidated against real output, so \"Completed\" can be read against ground truth.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a fixture-provenance marker and a parser validation-status registry",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-parser-live-validation",
+        "notes": "Mirror tests/integration/test_postgresql_plan_capture_integration.py: one file per engine,\nmodule-level skipif on the relevant *_HOST/credentials env var. Each runs a real\nEXPLAIN over a live instance and asserts the parser yields a non-None QueryPlanDAG with a\nfingerprint. Skipped by default; runnable in a UAT/CI job that provisions the engine.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add CI-gated live integration tests for Presto/Trino, ClickHouse, and Spark",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-parser-live-validation",
+        "notes": "Audit the get_query_plan implementations (Presto base, ClickHouse adapter, Databricks,\nSpark helper) for the assumption about how many rows the driver returns. Make the text\njoin robust to both single-row-full-text and one-row-per-line shapes, and add a unit\ntest for each shape so a future driver change cannot silently zero out capture.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Harden get_query_plan row-shape handling against driver chunking differences",
+        "wid": "w3"
+      }
+    ]
+  }
+}

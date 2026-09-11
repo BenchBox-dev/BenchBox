@@ -1,0 +1,341 @@
+{
+  "context": "Follow the platform support-status pattern, but keep the benchmark-specific\npolicy honest: benchmark support depends on product guarantees, dataset\ncontract, validation coverage, and public discovery promises, not just on\nwhether the benchmark class imports.\n",
+  "description": "The public contract map defines `support_status` for platforms and benchmarks.\nPlatform metadata already carried support status; this item closed the\nbenchmark half by adding benchmark-level support status to the benchmark\nmetadata source of truth, defining how it interacts with `surface` and\n`supports_dataframe`, and wiring the count/status claims through tested\ndiscovery paths.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make MCP or explorer invent their own benchmark support tiers",
+        "instead": "(not specified)",
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "why": "they must consume registry metadata or documented helper output."
+      },
+      {
+        "dont": "mark every benchmark stable just because it is runnable",
+        "instead": "(not specified)",
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "why": "support status should reflect docs, validation, data contract, and maintenance commitment."
+      },
+      {
+        "dont": "use support_status as a replacement for surface",
+        "instead": "(not specified)",
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "why": "internal smoke benchmarks can remain runnable by explicit ID without becoming public discovery entries."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-support-status-and-discovery-policy",
+        "id": 356,
+        "reason": "Explorer UX changes should follow the metadata contract and public discovery decision.",
+        "resolution": "promoted",
+        "resolved_item": "use-benchmark-support-status-to-redesign-the-explorer-benchm",
+        "resolved_reason": null,
+        "summary": "Use benchmark support status to redesign the explorer benchmark browser"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-support-status-and-discovery-policy",
+        "id": 357,
+        "reason": "Support status is not a visibility or deprecation decision by itself.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: The item deliberately decoupled support-status from visibility (L108-110: do not hide/remove a public benchmark solely on support status; visibility changes need explicit per-benchmark surface/deprecation decision). No standing action; it's a per-case decision made at deprecation time.",
+        "summary": "Remove or hide public benchmark facades based on support status"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "needs_item": "benchmark-api-and-core-boundary-cleanup"
+      }
+    ],
+    "item_meta": {
+      "category": "Benchmark Architecture",
+      "completed_at": "2026-05-21T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not create a second benchmark catalogue outside benchbox/core/benchmark_registry.py.",
+        "item_id": "benchmark-support-status-and-discovery-policy"
+      },
+      {
+        "behavior": "Do not equate benchmark category with support_status without an explicit product decision.",
+        "item_id": "benchmark-support-status-and-discovery-policy"
+      },
+      {
+        "behavior": "Do not hide, remove, or deprecate existing public benchmarks solely as a side effect of adding metadata.",
+        "item_id": "benchmark-support-status-and-discovery-policy"
+      },
+      {
+        "behavior": "Do not treat supports_dataframe as support_status; it is a capability flag.",
+        "item_id": "benchmark-support-status-and-discovery-policy"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/benchmark_registry.py: current benchmark metadata and discovery source of truth -- extend in place.",
+        "decision": "extend",
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "path": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "concept": "benchbox/core/platform_registry.py: platform support_status validation and summary helpers -- reuse the pattern, not the platform-specific metadata.",
+        "decision": "reuse",
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "path": "benchbox/core/platform_registry.py"
+      },
+      {
+        "concept": "docs/reference/public-contracts.md: public support taxonomy and drift-check ownership -- extend rather than creating separate status language.",
+        "decision": "extend",
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "path": "docs/reference/public-contracts.md"
+      },
+      {
+        "concept": "tests/unit/core/test_benchmark_api_contract.py: existing wrapper/loader/registry count drift tests -- extend with support-status assertions.",
+        "decision": "extend",
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "path": "tests/unit/core/test_benchmark_api_contract.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/contract.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/models.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/transformer.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/__init__.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_loader.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/resources/registry.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/discovery.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_benchmark_api_contract.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_discovery_tools.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_mcp_tool_handlers.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_resources.py"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_run_surface_contract.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_benchmark_api_contract.py tests/unit/mcp -k 'benchmark or discovery or support_status' --tb=short",
+        "description": "Run benchmark API and discovery contract tests after metadata migration.",
+        "expected": "Benchmark support-status, count, and discovery tests pass or skip only for missing optional MCP SDK.",
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline -k 'benchmark or read_model' --tb=short",
+        "description": "Run explorer pipeline tests if benchmark status is exported to explorer inputs.",
+        "expected": "Explorer benchmark label/read-model tests pass.",
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "Validate TODO graph and schema after adding or completing this item.",
+        "expected": "TODO validation and graph checks pass.",
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "notes": "Completed 2026-05-21 at checked SHA\nd8102e8fd7c6a216f5af18fd1d0c1c55db1a4c69.\n\nRevalidation summary:\n  - `benchbox/core/benchmark_registry.py` had 23 metadata entries, 23 loader\n    IDs, 22 public discovery IDs, 21 top-level facades, and one internal\n    benchmark (`joinorder_synthetic`).\n  - MCP discovery and resources consumed registry metadata but did not expose\n    support status.\n  - Explorer pipeline code did not maintain an independent benchmark support\n    catalogue; no explorer code change was needed to prevent classification\n    drift.\n  - `docs/reference/public-contracts.md` still described benchmark\n    `support_status` as pending.\n\nCapture a compact summary of checked SHA, current benchmark counts,\ndiscovery surfaces, docs claims, and any line-number drift. Do not commit\nraw command transcripts.\n\nMinimum evidence to re-check:\n  - `benchbox/core/benchmark_registry.py` metadata, `surface`, and list helpers.\n  - `benchbox/__init__.py` wrapper facade exports.\n  - `benchbox/core/benchmark_loader.py` loader reachability.\n  - MCP benchmark discovery tools and docs.\n  - Explorer pipeline benchmark labels and any \"supported benchmark\" copy.\n  - `docs/reference/public-contracts.md` count and support taxonomy.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate benchmark discovery and support-claim evidence before editing",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "notes": "Completed with the shared taxonomy values: stable, beta, experimental,\nrepo_only, deprecated, and document_only.\n\nCurrent product decision:\n  - stable: tpch, tpcds, ssb, clickbench, joinorder.\n  - beta: tpcdi, h2odb, amplab, read_primitives, write_primitives,\n    metadata_primitives, transaction_primitives, coffeeshop, tsbs_devops,\n    nyctaxi, flightdata, vector_search.\n  - experimental: tpcds_obt, ai_primitives, tpchavoc, tpch_skew, datavault.\n  - repo_only: joinorder_synthetic.\n  - deprecated/document_only: none.\n\nReuse the public taxonomy values: stable, beta, experimental, repo_only,\ndeprecated, and document_only. Spell out how they apply to benchmark\nfamilies, data availability, official-vs-development scale factors, and\nDataFrame support.\n\nKeep `support_status` distinct from:\n  - `surface`, which controls discovery visibility.\n  - `supports_dataframe`, which is a capability flag.\n  - dataset availability or local optional dependency availability.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define benchmark-specific support_status semantics",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "notes": "Completed by adding `support_status` to every `BENCHMARK_METADATA` entry,\nvalidating at import time, and adding registry helpers:\n`get_benchmark_support_status()`, `get_benchmarks_by_support_status()`, and\n`get_benchmark_registry_summary()`.\n\nEvery `BENCHMARK_METADATA` entry should have exactly one valid\n`support_status`. Add helper accessors or summary functions only where\ndiscovery/docs/tests need them; avoid introducing a second benchmark\ncatalogue.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add support_status metadata and validation to benchmark_registry",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "notes": "Completed for MCP discovery/resources and docs. `list_available`,\n`get_benchmark_info`, benchmark resources, and query-detail benchmark info\nnow project registry `support_status`. CLI display was left unchanged because\nit does not make support-level claims, and explorer code was left unchanged\nbecause it has no separate benchmark support catalogue.\n\nUpdate CLI, MCP, explorer, and docs only where they make support-level\nclaims. Do not hide or remove an existing public benchmark solely because\nits support status is clarified; visibility changes need an explicit\nsurface/deprecation decision.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Propagate benchmark support status to discovery surfaces",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-and-discovery-policy",
+        "notes": "Completed by extending benchmark API contract tests and MCP discovery/resource\ntests. The contract map and benchmark docs now state support-status counts\nfrom registry metadata instead of treating benchmark status as pending.\n\nExtend benchmark API contract coverage so registry count, wrapper count,\nloader count, public discovery count, and support-status summary claims\ncannot drift silently. Exact user-facing count tables should derive from\nbenchmark registry metadata or be marked editorial.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add drift checks for benchmark status and count claims",
+        "wid": "w4"
+      }
+    ]
+  }
+}

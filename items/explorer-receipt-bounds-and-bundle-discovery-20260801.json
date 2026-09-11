@@ -1,0 +1,215 @@
+{
+  "context": "Bound at the earliest trusted chokepoint: submission validation gets a companion size cap and a receipt entry-count cap (explicit, documented limits with clear error text), and the pipeline enforces the same caps defensively with an explicit truncation marker so the UI can say 'receipt truncated'. Discovery: add is_file() to the two unguarded copies (or extract the shared discovery helper the three copies obviously want). Label: rename to 'Receipt entries (N)'. Seam: smallest honest fix - annotate the diff row when requested_config_hash matches.",
+  "description": "From the 2026-07-31 adversarial review of the #1343 receipt ingestion and #1331 consumer sweep.\n\nE4 (adversarial-input, merge-gated): the .applied.json receipt is unbounded end-to-end. Bundle validation checks companion filename/symlink/hash only (benchbox/validation/bundle.py:660-680); the explorer pipeline re-serializes receipt verbatim into results.applied_receipt (_project/scripts/explorer_pipeline/transformer.py:303-332); RunReceipt.tsx:345 maps every entry into the DOM. A community submission with a valid bundle plus a 500k-entry receipt (matching companion_hashes digest) passes validation, bloats every snapshot consumer, and janks/OOMs viewers.\n\nF9 (discovery inconsistencies): the pipeline's bundle discovery guards path.is_file() (pipeline.py:429) but the other two copies do not - benchbox/validation/bundle.py:728-739 and scripts/generate_corpus_inventory.py:54-63 - so a directory named x.json in a community submission tree raises IsADirectoryError (unhandled traceback in a workflow that runs on contributor-controlled trees, scripts/validate_submission.py:84). Companion-suffix matching is case-sensitive everywhere (a hand-renamed foo.APPLIED.json becomes a bundle candidate and fails loudly downstream - confusing error, not corruption).\n\nRR1 (label accuracy): RunReceipt.tsx:342 renders 'Statement receipt ({entries.length})' but post-#1331 entries are per-INTENT - a dual-key ClickHouse CREATE TABLE emits two entries with duplicated statement text, so the count over-states statements.\n\nX1 (hash seam, smell): ComparabilityReceipt.tsx:283-301 folds applied_ledger_hash into the compared Tuning value; pre- vs post-#1331 runs of the SAME logical ClickHouse tuning show 'Tuning ... differs' warnings with no seam explanation (policy_generation.py:38 unbumped; its scope is policy seams, this is a hash seam). Decide: annotate the warning when requested_config_hash matches but applied hash differs, or document the seam in the receipt UI help text.\n\nXSS explicitly disproven during review: all receipt fields render as JSX text children; no innerHTML in results-explorer/src. Do not add sanitization theater.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not fix the two unguarded discovery copies with divergent local patches",
+        "instead": "extract or align on a single shared discovery helper with tests",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "why": "three hand-rolled copies is how the is_file() inconsistency happened"
+      },
+      {
+        "dont": "Do not silently truncate oversized receipts",
+        "instead": "cap with a loud validation error at submission time and an explicit truncation marker at the defensive pipeline layer",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "why": "silent truncation reads as 'covered everything' and hides the adversarial input"
+      },
+      {
+        "dont": "Do not suppress the applied-hash diff row entirely to fix the seam warning",
+        "instead": "annotate the row when requested_config_hash matches instead of hiding it",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "why": "physically different applied statements across runs is real signal"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-01T20:03:00Z",
+        "from_item": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "id": 678,
+        "reason": "Item w4 requires updating two component tests that the hosted only_modify rules exclude. BenchBox wrapper has no update verb; standalone todo-db 0.3 update advertises metadata/work/verification edits but no scope-rule mutation. Direct database writes are forbidden.",
+        "resolution": "promoted",
+        "resolved_item": "todo-db-audited-scope-rule-update-20260801",
+        "resolved_reason": null,
+        "summary": "Add audited scope-rule mutation to todo-db update"
+      },
+      {
+        "created_at": "2026-08-01T20:20:56Z",
+        "from_item": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "id": 679,
+        "reason": "todo-db PR #3 implements the rule in the standalone schema, but live BenchBox remains on the guarded legacy schema and standalone correctly refuses it; the embedded CLI is therefore the only authorized hosted write path that can unblock this item.",
+        "resolution": "promoted",
+        "resolved_item": "benchbox-embedded-audited-scope-rule-update-20260801",
+        "resolved_reason": null,
+        "summary": "Add audited scope-rule mutation to the embedded BenchBox tracker CLI"
+      }
+    ],
+    "item_meta": {
+      "category": "Robustness",
+      "completed_at": "2026-08-01T20:55:21Z",
+      "completed_pr": 1444,
+      "created_at": "2026-08-01T12:29:47Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Bundle discovery keeps rejecting companions as result bundles (the #1343 fix) across all three copies.",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801"
+      },
+      {
+        "behavior": "Rendering stays JSX-text-only for receipt fields; no innerHTML introduced.",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801"
+      },
+      {
+        "behavior": "Valid receipts of realistic size ingest byte-identical (verbatim contract) - caps must sit far above any legitimate run's entry count.",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801"
+      },
+      {
+        "behavior": "applied_ledger_hash remains display/warning-only - never a match, dedup, or facet key.",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/validation/bundle.py"
+      },
+      {
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ComparabilityReceipt.tsx"
+      },
+      {
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RunReceipt.tsx"
+      },
+      {
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/ComparabilityReceipt.test.tsx"
+      },
+      {
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/RunReceipt.test.tsx"
+      },
+      {
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_corpus_inventory.py"
+      },
+      {
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k \"bundle or submission or inventory\" -q",
+        "description": "Submission validation rejects oversized receipts and crafted directory trees cleanly",
+        "expected": "new cap and is_file tests pass; no unhandled tracebacks",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T17:14:20Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Explorer typecheck + unit tests green",
+        "expected": "all pass with the renamed label and seam annotation",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:40:45Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite green",
+        "expected": "no regressions",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:54:45Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added failing cap, crafted-directory, mixed-case discovery, receipt-label, hash-seam, and truncation-marker tests; each failed on the prior implementation.",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "notes": "Add failing tests: oversized companion (entry-count and byte caps) must fail submission validation with clear error text; directory named x.json in the tree must produce a clean validation error, not IsADirectoryError, in bundle.py and generate_corpus_inventory.py.",
+        "started_at": "2026-08-01T17:12:38Z",
+        "started_branch": "fix/explorer-receipt-bounds-bundle-discovery-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Failing tests: oversized companion (entry/byte caps) rejected with clear error; directory named x.json yields a clean validation error in both unguarded copies",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Submission rejects >8 MiB or >10000-entry applied companions; pipeline emits explicit bounded truncation metadata; operations limit documented.",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "notes": "Implement the caps in benchbox/validation/bundle.py and the defensive cap + truncation marker in the explorer pipeline transformer; document the limits.",
+        "started_at": "2026-08-01T17:12:46Z",
+        "started_branch": "fix/explorer-receipt-bounds-bundle-discovery-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Implement caps in bundle validation plus a defensive pipeline cap with an explicit truncation marker; document the limits",
+        "wid": "w2"
+      },
+      {
+        "evidence": "All three discovery consumers now call benchbox.validation.bundle.discover_bundles, which requires regular files and handles JSON/sidecar case consistently.",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "notes": "Align the three discovery copies on is_file() + case handling (shared helper preferred); cover with the crafted-tree tests.",
+        "started_at": "2026-08-01T17:12:53Z",
+        "started_branch": "fix/explorer-receipt-bounds-bundle-discovery-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Align the three discovery copies on is_file() and case handling (shared helper preferred); cover with crafted-tree tests",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Renamed drill-down to Receipt entries (N), surfaces truncation markers, and annotates same-request/different-applied Tuning diffs without suppressing them.",
+        "item_id": "explorer-receipt-bounds-and-bundle-discovery-20260801",
+        "notes": "UI: rename the drill-down header to 'Receipt entries (N)'; annotate the ComparabilityReceipt tuning diff when requested_config_hash matches but applied_ledger_hash differs (hash-seam explanation).",
+        "started_at": "2026-08-01T17:13:00Z",
+        "started_branch": "fix/explorer-receipt-bounds-bundle-discovery-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "UI: rename drill-down to 'Receipt entries (N)'; annotate the ComparabilityReceipt tuning diff when requested_config_hash matches (hash seam)",
+        "wid": "w4"
+      }
+    ]
+  }
+}

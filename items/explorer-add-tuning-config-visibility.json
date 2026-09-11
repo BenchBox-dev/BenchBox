@@ -1,0 +1,163 @@
+{
+  "context": "Tuning mode label is simple: read tuning_mode from manifest, render a\nstyled badge (Tuned=green, No Tuning=gray, Auto=blue). Mirror the\nTrustBadge component pattern.\n\nTuning config panel on detail page: lazy-fetch the .tuning.json sidecar\nURL (already derivable from bundle_path convention). Render as a\ncollapsible key-value table. Only fetch on expand - not on page load.\n\nCross-tuning comparison: the strategy doc says tuning_mode is a\ncomparability-breaking dimension that should warn, not hard-block. The\nwarning must be visually prominent (yellow banner) but must not prevent\nthe comparison from rendering - a user may intentionally compare tuned\nvs notuning to see the delta.\n",
+  "description": "Post-launch audit (2026-04-14) found that the explorer records only\n`has_tuning: boolean` despite tuning config being one of BenchBox's\nprimary differentiators. A visitor comparing DuckDB \"tuned\" vs \"notuning\"\nruns has no way to know they differ on this axis, let alone see what\ntuning was applied.\n\nThis TODO:\n  1. Surfaces tuning_mode (\"tuned\" / \"notuning\" / \"auto\") as a visible\n     label on result detail pages and browse tables\n  2. Loads and displays the tuning config summary from the .tuning.json\n     sidecar (if present) on the detail page\n  3. Enables the Compare view to show a tuning-mode label per result so\n     cross-tuning comparisons are legible (not blocked - just labeled)\n\nPrerequisite: explorer-extend-manifest-and-pipeline must land first\n(tuning_mode and tuning_hash must be in the manifest).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fetch the .tuning.json sidecar eagerly",
+        "instead": "lazy-fetch on expand only",
+        "item_id": "explorer-add-tuning-config-visibility",
+        "why": "most visitors won't expand the panel"
+      },
+      {
+        "dont": "hard-block cross-tuning comparisons",
+        "instead": "warn visibly but allow",
+        "item_id": "explorer-add-tuning-config-visibility",
+        "why": "intentional tuned vs notuning comparisons are valid and valuable"
+      },
+      {
+        "dont": "show tuning_hash to end users",
+        "instead": "show tuning_mode and tuning summary instead",
+        "item_id": "explorer-add-tuning-config-visibility",
+        "why": "it is an internal grouping key"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-add-tuning-config-visibility",
+        "needs_item": "explorer-extend-manifest-and-pipeline"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-04-14T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing compare view behavior when tuning is the same across both results (no regression)",
+        "item_id": "explorer-add-tuning-config-visibility"
+      },
+      {
+        "behavior": "Results without a .tuning.json sidecar render cleanly - tuning panel shows 'No tuning config recorded' not an error",
+        "item_id": "explorer-add-tuning-config-visibility"
+      },
+      {
+        "behavior": "TrustBadge layout unchanged - TuningBadge is a separate element",
+        "item_id": "explorer-add-tuning-config-visibility"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-add-tuning-config-visibility",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/ (covered by prerequisite TODO)"
+      },
+      {
+        "item_id": "explorer-add-tuning-config-visibility",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TuningBadge.tsx (new)"
+      },
+      {
+        "item_id": "explorer-add-tuning-config-visibility",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'TuningBadge\\|tuning_mode' results-explorer/src/pages/BenchmarkIndex.tsx",
+        "description": "Tuning badge renders in browse tables",
+        "expected": "TuningBadge imported and used",
+        "item_id": "explorer-add-tuning-config-visibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'tuning_mode\\|Different tuning' results-explorer/src/pages/Compare.tsx",
+        "description": "Cross-tuning warning renders in Compare",
+        "expected": "warning logic present",
+        "item_id": "explorer-add-tuning-config-visibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "TypeScript compiles cleanly",
+        "expected": "(no errors)",
+        "item_id": "explorer-add-tuning-config-visibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-add-tuning-config-visibility",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-add-tuning-config-visibility",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-add-tuning-config-visibility",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-add-tuning-config-visibility",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add tuning_mode label to BenchmarkIndex and PlatformIndex browse tables: small badge (styled like trust_label badge) showing 'Tuned' / 'No Tuning' / 'Auto'. Use tuning_mode from manifest.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-add-tuning-config-visibility",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add tuning section to ResultDetail.tsx: show tuning_mode prominently; collapsible panel lazy-fetches .tuning.json sidecar and renders key-value config.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-add-tuning-config-visibility",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update Compare.tsx: add tuning_mode label per result in the comparison header. If the two results have different tuning_mode values, show a visible 'Different tuning config' warning badge.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-add-tuning-config-visibility",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add tuning filter to DuckDB-WASM browse queries: allow filtering by tuning_mode in Browse pages (All / Tuned / No Tuning). Uses tuning_mode column added by pipeline extension.",
+        "wid": "w4"
+      }
+    ]
+  }
+}

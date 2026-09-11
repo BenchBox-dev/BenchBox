@@ -1,0 +1,244 @@
+{
+  "description": "Follow-ups from a deep post-merge review of the shipped DuckLake adapter\n(#1082 core adapter, #1096 catalog backends + S3; both in _project/DONE/).\nThe confirmed credential leak is tracked separately and gates this item\n(see deps.needs: ducklake-postgres-credential-leak-redaction).\n\nHeadline risk is COVERAGE, not code: the adapter's core live behavior runs in\nZERO CI lanes. tests/integration/test_ducklake_integration.py is module-marked\n`slow`; the core in-process ATTACH class (TestDuckLakeLiveConnection) and the\nPostgres/S3 classes additionally carry `live_integration`. Every default lane\nselects `not (slow or ... or live_integration)`; the `-m slow` PR jobs are\nfile-scoped to OTHER files; release-canary/validate-main-pr exclude\nlive_integration. Net: classes 1/3/4 run in no lane; the SQLite class runs only\nat the main-release gate -- never on the develop PR that merged it. Both feature\nPRs squash-auto-merged with no human review (platforms/ is not a CODEOWNERS\npath). The Postgres and S3 classes have never executed anywhere.\n\nTwo related process blind spots are recorded under _project/blind-spots/\n(auto-revert blame heuristic; slow+live_integration coverage theater).\n",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "ducklake-post-merge-review-followups",
+        "id": 5,
+        "reason": "Requires new phase instrumentation; the coarse ducklake-vs-duckdb comparison is available today. Track only if w11/w12 conclude attribution is required for beta.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Sub-task of the still-open parent item; belongs inside its existing work items rather than a new TODO. (tracked by ducklake-post-merge-review-followups)",
+        "summary": "Fine-grained attribution of catalog-metadata ops vs Parquet-scan vs engine time"
+      },
+      {
+        "created_at": "2026-07-30T17:16:01Z",
+        "from_item": "ducklake-post-merge-review-followups",
+        "id": 668,
+        "reason": "making deployment_mode functional is new behaviour, outside w10's modelling fix",
+        "resolution": "promoted",
+        "resolved_item": "ducklake-deployment-mode-selector-is-inert",
+        "resolved_reason": null,
+        "summary": "DuckLake deployment_modes are inert: adapter_factory resolves --platform ducklake:<mode> and passes config['deployment_mode'], but benchbox/platforms/ducklake.py never reads it. So 'ducklake:postgres_catalog_s3' silently runs a local duckdb-file catalog on local disk. w10 fixed the MODELLING (four modes on the real axes) and the descriptions now say selection is via --platform-option catalog= + the data_path scheme, but a user can still select a mode that does nothing. Either map modes to option defaults (explicit options winning) or reject a mode that contradicts the resolved axes"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "ducklake-post-merge-review-followups",
+        "needs_item": "ducklake-postgres-credential-leak-redaction"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-30T17:16:28Z",
+      "completed_pr": 1358,
+      "created_at": "2026-07-10T00:00:00Z",
+      "worktree": "ducklake-review-followups"
+    },
+    "prior_art": [
+      {
+        "concept": "benchbox/core/platform_registry.py:128 ducklake deployment_modes (two orthogonal axes encoded as three pseudo-modes) — SUPERSEDE/annotate (w10)",
+        "decision": "supersede",
+        "item_id": "ducklake-post-merge-review-followups",
+        "path": "benchbox/core/platform_registry.py:128"
+      },
+      {
+        "concept": "benchbox/platforms/ducklake.py:527-544 handle_existing_database local metadata_path reuse detection — SUPERSEDE for postgres with a server-side probe (w6)",
+        "decision": "supersede",
+        "item_id": "ducklake-post-merge-review-followups",
+        "path": "benchbox/platforms/ducklake.py:527-544"
+      },
+      {
+        "concept": "tests/integration/platforms/test_postgresql_live.py skip_unless_docker_service + the nightly live_postgresql job — REUSE the docker-service bring-up pattern for the PG class (w1)",
+        "decision": "reuse",
+        "item_id": "ducklake-post-merge-review-followups",
+        "path": "tests/integration/platforms/test_postgresql_live.py"
+      },
+      {
+        "concept": "tests/unit/test_marker_strategy.py + `make lint-markers` (CI-only marker gate) — EXTEND with a lane-coverage meta-check (w4)",
+        "decision": "extend",
+        "item_id": "ducklake-post-merge-review-followups",
+        "path": "tests/unit/test_marker_strategy.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_ducklake_integration.py -m live_integration -n 0",
+        "description": "PG and S3 live classes execute (not skip) against real infra and pass",
+        "expected": "PG + S3 classes run and pass (or reveal fixable failures), not silently skipped",
+        "item_id": "ducklake-post-merge-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "<new check added in w4>",
+        "description": "Lane-coverage meta-check flags any zero-lane integration module",
+        "expected": "test_ducklake_integration.py is selected by at least one lane after w3",
+        "item_id": "ducklake-post-merge-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Brought up PostgreSQL 18 via Apple Containerization (mocker run postgres:18; note -p forwarding does NOT work - reach it at the container IP, PG_DUCKLAKE_HOST=192.168.64.2). TestDuckLakePostgresCatalogLive PASSES. Verified w6 end-to-end: run1 reused=False, run2 no-force reused=True (was the crash), run3 force -> 0 tables left. ducklake_table rows are tombstoned via end_snapshot, not stranded. FOUND+FIXED a real defect: --force left local Parquet on disk for postgres catalogs (1 -> 0 files after fix)",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "Find the make docker-postgres target (e.g. make test-docker-up-postgresql).\nPre-create the ducklake_catalog database (adapter does NOT CREATE DATABASE).\nRun: uv run -- python -m pytest tests/integration/test_ducklake_integration.py -m live_integration -n 0 -k Postgres\nReport and fix every failure. This class has never executed against a real server.\n",
+        "started_at": "2026-07-30T16:54:04Z",
+        "started_branch": "fix/ducklake-reuse-force-semantics",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Bring up live PostgreSQL, pre-create the catalog DB, and run the DuckLake PG live_integration class; fix what breaks",
+        "wid": "w1"
+      },
+      {
+        "evidence": "platform_registry.py ducklake deployment_modes: 3 pseudo-modes -> 4 on the real axes (catalog backend x storage location). The old model had cloud_storage carrying mode=local and made postgres-catalog+S3 unrepresentable; new modes local, local_catalog_s3, postgres_catalog, postgres_catalog_s3 with accurate creds/cloud/network flags. notes rewritten to state the two axes; landing catalog.generated.js regenerated. 8246 tests pass",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "platform_registry.py:128 encodes catalog(duckdb/sqlite/postgres) x storage(local/s3)\nas local/postgres_catalog/cloud_storage. Consequence: `ducklake:postgres_catalog`\nvalidates (adapter_factory.py:190) but does nothing (adapter reads only\ncatalog=), and docs/platforms/comparison-matrix.md:81 lists them beside real\n:mode platforms as mutually exclusive. Collapse to one mode or mark the entries\ndescriptive-only; correct the matrix row.\n",
+        "started_at": "2026-07-30T17:06:00Z",
+        "started_branch": "fix/ducklake-reuse-force-semantics",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Fix the deployment_modes modeling: two orthogonal axes (catalog backend x storage location) presented as three exclusive pseudo-modes",
+        "wid": "w10"
+      },
+      {
+        "evidence": "docs/development/adr/adr-ducklake-maturity-and-publishability.md decision w11: 5 concrete criteria; 1/2/4 met (PR-lane coverage #1357, live PG+S3 2026-07-30, server-side reuse/force verified), criterion 3 (TPC-H SF>=1 on all four deployment modes through the correctness gate) NOT met and is now the single blocker - ducklake stays experimental",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "None exists (registry only records support_status: experimental). Write measurable criteria.",
+        "started_at": "2026-07-30T17:14:01Z",
+        "started_branch": "fix/ducklake-reuse-force-semantics",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Define the concrete experimental -> beta exit criterion for the ducklake platform",
+        "wid": "w11"
+      },
+      {
+        "evidence": "ADR decision w12: remote-backed runs ARE publishable and ranking-eligible under existing trust labels, but must record catalog backend + storage location; grounded in provenance.py mapping source (not infrastructure) to trust label. Reframed the risk as comparison-grouping, not publication. Revisit when w11 criterion 3 scale runs exist",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "Network variance sits inside every timed phase (per-query S3 GET in\nexecute_query; PG catalog round-trips in ATTACH/commit). No annotation flags\nremote-backed runs. Decide: quarantine/annotate vs allow to published-results.\n",
+        "started_at": "2026-07-30T17:14:04Z",
+        "started_branch": "fix/ducklake-reuse-force-semantics",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Decide the publishability policy for remote-backed (PG catalog / S3 storage) DuckLake results",
+        "wid": "w12"
+      },
+      {
+        "evidence": "ADR decision w13: NO. Decided on evidence that code-owner approval enforcement was RETIRED 2026-07-18 (repo-admin-settings.md) - CODEOWNERS now only mirrors SOUNDNESS_PREFIXES for auto-merge withholding + routes review. Adding benchbox/platforms/** would withhold auto-merge on the highest-churn tree for zero review benefit; adapters produce numbers, the owner-reviewed correctness gate adjudicates them",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "#1082/#1096 merged via squash auto-merge, no human review; platforms/ is not a\nsoundness path. Decide whether to add benchbox/platforms/** (or new adapters)\nto .github/CODEOWNERS + auto_merge_soundness_paths.py.\n",
+        "started_at": "2026-07-30T17:14:07Z",
+        "started_branch": "fix/ducklake-reuse-force-semantics",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Decide whether platform adapters that produce publishable numbers should be a CODEOWNERS owner-review path",
+        "wid": "w13"
+      },
+      {
+        "evidence": "ADR decision w14 + docs/platforms/ducklake.md caveat: DOCUMENT, not instrument. Verified BenchBox never invokes compaction/inlining and measured 5 INSERTs -> 5 parquet files. Bias direction stated: runs AGAINST DuckLake (numbers are a floor), so readers can reason about the gap; instrumenting would change what is measured or add result-schema surface",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "The adapter runs no compaction/merge/inlining between load and query; a\nmulti-batch load leaves many small Parquet files. If a competitor auto-compacts\nand DuckLake doesn't, scan-time comparisons are unfair. Settle with a\nload->compact->query vs load->query timing delta, then instrument or annotate.\n",
+        "started_at": "2026-07-30T17:14:10Z",
+        "started_branch": "fix/ducklake-reuse-force-semantics",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Decide whether absence of DuckLake compaction/inlining biases cross-engine comparisons; instrument or document",
+        "wid": "w14"
+      },
+      {
+        "evidence": "TestDuckLakeS3DataPathLive PASSES against real S3 (existing benchbox-athena bucket, unique benchbox_ducklake_test/<run_id> prefix, credential_chain provider; AWS creds passed by inline shell substitution, never written to a file). Nothing to fix - the class works as written. Also confirmed w7's premise empirically: after the test DROPped its table, the Parquet object remained in the bucket (1 object, 472B) - real orphaned storage. Test prefix deleted afterwards; bucket left as found",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "Set BENCHBOX_S3_TEST_BUCKET + AWS creds and run the S3 class\n(-m live_integration -k S3). Never executed. Exercise both credential_chain\nand explicit KEY_ID/SECRET paths, and force-recreate leaving orphaned Parquet (see w7).\n",
+        "started_at": "2026-07-30T17:00:09Z",
+        "started_branch": "fix/ducklake-reuse-force-semantics",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Run the DuckLake S3 data_path live_integration class against a real bucket; fix what breaks",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Dropped live_integration from TestDuckLakeLiveConnection (needs no external service, unlike the Postgres/S3 classes which keep it) + new pr.yml step running the module with -m 'slow and not live_integration'. Measured: non-fast lane collection 1/9 -> 7/9; the exact CI step passes locally 7 passed 2 deselected in 31s",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "TestDuckLakeLiveConnection needs only the ducklake extension (no external\nservice) yet is live_integration -> runs nowhere. Re-marker it (or add a\nlane) so core ATTACH/cursor-scoping/force-recreate/platform_info is exercised\non develop PRs. Keep PG/S3 classes live_integration.\n",
+        "started_at": "2026-07-30T15:58:26Z",
+        "started_branch": "fix/ducklake-ci-lane-coverage",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Give the extension-only in-process ATTACH class a marker a real lane runs, so core adapter behavior is gated in CI",
+        "wid": "w3"
+      },
+      {
+        "evidence": "tests/unit/test_marker_strategy.py: two meta-checks - test_every_integration_module_is_selected_by_at_least_one_lane (per-module, evaluates the 7 tree-wide lane expressions via a marker-namespace eval, exempts module-level opt-in and workflow-named paths) and test_opt_in_markers_below_module_level_are_declared_service_dependent (per-class, the one with real power). First design was per-module only and FAILED its own mutation test - restoring live_integration on the service-free class still passed because a sibling covered test hid it; the per-class check now fails naming the class. 10 passed, make lint-markers green, 4 genuinely service-dependent classes allowlisted with reasons",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "Resolve each test module's module+class markers against every workflow/Makefile\n`-m` expression; fail if any module matches no lane. Prevents future\ncoverage-theater. Model on test_marker_strategy.py / lint-markers.\n",
+        "started_at": "2026-07-30T16:04:10Z",
+        "started_branch": "fix/ducklake-ci-lane-coverage",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Add a CI meta-check that fails when an integration test module is selected by zero configured lanes",
+        "wid": "w4"
+      },
+      {
+        "evidence": "tests/integration/test_ducklake_integration.py: _probe_extension records the failure reason in _PROBE_FAILURES and warnings.warn()s once (cache makes one failure decide the session); _skip_unless_extensions now cites the recorded reason in every skip message it causes",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "tests/integration/test_ducklake_integration.py: DUCKLAKE_AVAILABLE =\n@cache _probe_extension('ducklake') runs at import/collection; a transient\nextension-repo blip caches False and silently skips even the SQLite class that\ngates release-canary. Emit a warning/xfail (not a silent skip) at the release gate.\n",
+        "started_at": "2026-07-30T15:58:21Z",
+        "started_branch": "fix/ducklake-ci-lane-coverage",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Make _probe_extension's cached-False outcome loud instead of a silent session-wide skip",
+        "wid": "w5"
+      },
+      {
+        "evidence": "benchbox/platforms/ducklake.py: _resolve_postgres_catalog_reuse() + _existing_lake_tables() resolve reuse/force post-ATTACH for catalog=postgres (the pre-connection hook cannot - no local metadata file); force drops the catalog's tables server-side, no-force sets database_was_reused=True so the runner skips the CREATE TABLE that crashed reruns",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "handle_existing_database keys off local metadata_path.exists(), never true for\na server-side PG catalog -> database_was_reused stays False -> second run hits\ninherited plain CREATE TABLE -> 'table already exists' crash; --force is a no-op.\nProbe the PG catalog server-side (ducklake metadata tables) for reuse; honor\n--force by dropping/recreating the catalog schema. NOTE: current behavior\ncrashes (safe) rather than silently misreporting cold-load timings -- confirmed.\n",
+        "started_at": "2026-07-30T16:20:34Z",
+        "started_branch": "fix/ducklake-reuse-force-semantics",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Postgres catalog reuse/force: server-side detection so reruns don't crash and --force works",
+        "wid": "w6"
+      },
+      {
+        "evidence": "benchbox/platforms/ducklake.py _reset_ducklake_catalog(): cloud DATA_PATH now emits an explicit logger.warning naming the prefix + the aws s3 rm remedy instead of silently leaving orphaned Parquet; docs/platforms/ducklake.md gains a what---force-clears table and a warning admonition. Chose the 'document' arm over 'clear the prefix': recursive object-store deletion is destructive, the prefix may hold data this run did not write, and results stay correct (the rebuilt catalog references only new files) - the harm is storage cost, not correctness",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "_reset_ducklake_catalog correctly guards rmtree with `not _data_path_is_cloud`\n(no dangerous deletion -- verified), but cloud data is never reset; new catalog\nonly references new files (results stay correct) yet storage leaks. Clear the\nprefix via the cloud client on force, or document the leak.\n",
+        "started_at": "2026-07-30T16:21:48Z",
+        "started_branch": "fix/ducklake-reuse-force-semantics",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "--force with cloud (s3) DATA_PATH leaves orphaned Parquet; clear the prefix or document",
+        "wid": "w7"
+      },
+      {
+        "evidence": "pyproject.toml: new 'ducklake' extra pinning duckdb>=1.3.0,<2.0.0 (the duckdb extra stays >=1.0 for results.duckdb on-disk-format compat); registry installation_command now 'uv add benchbox[ducklake]' instead of the floorless 'uv add duckdb'",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "pyproject pins duckdb>=1.0.0,<2.0.0; uv sync can resolve 1.2 which cannot load\nducklake. Mitigated by a clean runtime guard (ducklake.py:606) so it's not a\nconfusing failure -- but an optional-dependency extra `ducklake=[\"duckdb>=1.3,<2.0\"]`\nor a documented requirement would prevent a broken environment.\n",
+        "started_at": "2026-07-30T17:01:02Z",
+        "started_branch": "fix/ducklake-reuse-force-semantics",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Express the duckdb>=1.3 floor installably (ducklake extra) or document the requirement",
+        "wid": "w8"
+      },
+      {
+        "evidence": "CHANGELOG.md [Unreleased] DuckLake bullet now states the shipped feature: catalog backend x data_path axes (incl. postgres catalog + S3), reuse/--force, and the benchbox[ducklake] extra - was describing only the #1082 MVP (DuckDB-file catalog + local Parquet). Edit is in [Unreleased], not a retrospective edit to a shipped section",
+        "item_id": "ducklake-post-merge-review-followups",
+        "notes": "#1096's scope_limit forbade the CHANGELOG edit and no follow-up corrected it;\nthe unreleased notes still say 'DuckDB-file catalog + local Parquet storage'.\n",
+        "started_at": "2026-07-30T17:06:03Z",
+        "started_branch": "fix/ducklake-reuse-force-semantics",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Correct CHANGELOG.md to reflect the shipped feature (sqlite/postgres catalogs + S3), not just the #1082 MVP",
+        "wid": "w9"
+      }
+    ]
+  }
+}

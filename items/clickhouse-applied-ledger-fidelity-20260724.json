@@ -1,0 +1,145 @@
+{
+  "context": "For (1) record a separate partition-key intent (or require BOTH catalog facts to match before upgrading to applied_verified). For (2) record the DDL directly after connection.execute(optimized) in create_schema() instead of deferring it through the post-load accumulator. Confirm against a live ClickHouse run that a partitioned+sorted table reaches the intended verdict and that applied_ledger_hash orders CREATE TABLE before OPTIMIZE TABLE.",
+  "description": "Two chatgpt-codex-connector review findings on merged PR #1275 (both P2, both in benchbox/platforms/clickhouse/workload.py). Deferred from the PR-review sweep in PR #1292 because each changes what counts as *verified* tuning and needs a real ClickHouse run to confirm; tracked in GitHub issue #1293.\n\n(1) Partition keys are never corroborated. For tunings with BOTH partitioning and sorting (built-in ClickBench and TPC-DS table tunings), _optimize_table_definition() emits a single CREATE TABLE ... PARTITION BY ... ORDER BY ..., but the recorded op is tagged only as sort_key. The generic corroborator then checks only system.tables.sorting_key and can upgrade the run to applied_verified without ever matching the configured partition_key, so common partitioned layouts report as fully verified with one catalog-backed key never corroborated.\nThread: https://github.com/joeharris76/BenchBox/pull/1275#discussion_r3638089585\n\n(2) Sort DDL is recorded out of execution order. create_schema() executes the tuned CREATE TABLE immediately, but the DDL is queued into _applied_layout_operations; the base adapter folds that list only after data validation, while apply_unified_tuning() has already recorded later OPTIMIZE TABLE statements. The order-sensitive applied_ledger_hash and its companion statement list therefore show the later optimize before the earlier table-creation DDL, so the ledger no longer reflects physical execution chronology.\nThread: https://github.com/joeharris76/BenchBox/pull/1275#discussion_r3638089592\n\nNote both fixes touch the same file, so they must land as one PR to avoid conflicting edits.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "reorder the ledger by sorting the statement list after the fact",
+        "instead": "record each statement at the point it actually executes",
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "why": "the hash must reflect real execution chronology, not a normalized order"
+      },
+      {
+        "dont": "upgrade a run to applied_verified when only one of the configured keys was corroborated",
+        "instead": "require every configured catalog-backed key to match, or record each key as its own intent",
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "why": "that is exactly the over-certification this item exists to remove"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-24T16:22:48Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A run with no tuned keys reaches exactly the verdict it does today",
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724"
+      },
+      {
+        "behavior": "Untuned (notuning) ClickHouse runs still render engine-mandatory defaults only",
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724"
+      },
+      {
+        "behavior": "applied_ledger_hash stays byte-stable for runs whose physical DDL did not change",
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/equivalence/**"
+      },
+      {
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/expected_results/**"
+      },
+      {
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/**"
+      },
+      {
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/**"
+      },
+      {
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/**"
+      },
+      {
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/**"
+      },
+      {
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_tuning.py tests/unit/platforms/test_clickhouse_adapter.py -q",
+        "description": "ClickHouse tuning + workload unit tests pass",
+        "expected": "all pass",
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning/ -q",
+        "description": "Tuning introspection/corroboration tests pass",
+        "expected": "all pass",
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record a distinct partition-key intent (or require both partition+sort catalog facts) so a partitioned+sorted ClickHouse table cannot reach applied_verified on the sort key alone",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record tuned CREATE TABLE DDL at connection.execute(optimized) time so applied_ledger_hash reflects physical execution chronology",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-applied-ledger-fidelity-20260724",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify on a live ClickHouse server that a partitioned+sorted run reaches the intended verdict and the ledger statement order matches execution",
+        "wid": "w3"
+      }
+    ]
+  }
+}

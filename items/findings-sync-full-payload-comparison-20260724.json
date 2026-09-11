@@ -1,0 +1,107 @@
+{
+  "context": "Compare the full normalized draft payload (including evidence rows) before treating an existing finding as idempotent. Note this necessarily converts some previously-idempotent syncs into conflicts, so decide and document how an evidence-only edit should surface (update in place vs conflict) before implementing.",
+  "description": "chatgpt-codex-connector review finding on merged PR #1273 (P2, _project/scripts/todo_findings.py:416). Deferred from the PR-review sweep in PR #1292 because it changes sync/conflict semantics for the findings domain and belongs with that domain work; tracked in GitHub issue #1293.\n\nWhen a draft with an existing id is edited ONLY in child evidence or other parsed fields outside _CONTENT_FIELDS (evidence, urgency, breadth, confidence, disposition_reason), _finding_matches still returns true, so sync_drafts marks the edited draft .synced and never persists or reports the change. That silently drops audit evidence despite the sync path's same-id/different-content conflict contract.\nThread: https://github.com/joeharris76/BenchBox/pull/1273#discussion_r3634991147",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "mark a draft .synced when any parsed field differs from the stored finding",
+        "instead": "persist the change or report it as a conflict",
+        "item_id": "findings-sync-full-payload-comparison-20260724",
+        "why": "that is the silent evidence loss this item fixes"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-29T17:02:53Z",
+      "completed_pr": 1341,
+      "created_at": "2026-07-24T16:23:11Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "A genuinely unchanged draft is still idempotent and still marked .synced",
+        "item_id": "findings-sync-full-payload-comparison-20260724"
+      },
+      {
+        "behavior": "Existing same-id/different-content conflict reporting keeps working",
+        "item_id": "findings-sync-full-payload-comparison-20260724"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-sync-full-payload-comparison-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-sync-full-payload-comparison-20260724",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_findings.py"
+      },
+      {
+        "item_id": "findings-sync-full-payload-comparison-20260724",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q",
+        "description": "findings script tests pass",
+        "expected": "all pass",
+        "item_id": "findings-sync-full-payload-comparison-20260724",
+        "last_result": "pass",
+        "last_run": "2026-07-29T16:53:46Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-sync-full-payload-comparison-20260724",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "findings-sync-full-payload-comparison-20260724",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Owner decision 2026-07-29: prose (_CONTENT_FIELDS) differences stay a loud conflict; capture-owned payload outside the prose fields resolves as an in-place update recorded in finding_events. Documented in the sync_drafts docstring.",
+        "item_id": "findings-sync-full-payload-comparison-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T16:53:32Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Decide and document how an evidence-only edit should resolve (in-place update vs reported conflict)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added _EVIDENCE_FIELDS/_normalize_evidence/_evidence_differs/_reconcile_evidence; sync compares normalized evidence rows in order and replaces them in one write txn. Judgement fields deliberately excluded (_DB_OWNED_FIELDS) so a pre-triage draft cannot wipe triage values.",
+        "item_id": "findings-sync-full-payload-comparison-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T16:53:35Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Compare the full normalized payload including evidence rows in _finding_matches",
+        "wid": "w2"
+      },
+      {
+        "evidence": "TestSyncFullPayloadComparison: evidence-only edit persisted (not silently synced), reconcile recorded in finding_events, unchanged draft still skipped+marked synced, prose change still raises 'sync conflict', and triage judgement survives a resync. 1115 passed in tests/unit/scripts/.",
+        "item_id": "findings-sync-full-payload-comparison-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T16:53:38Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add regression coverage: an evidence-only draft edit is persisted or reported, never silently marked .synced",
+        "wid": "w3"
+      }
+    ]
+  }
+}

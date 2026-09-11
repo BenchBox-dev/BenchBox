@@ -1,0 +1,166 @@
+{
+  "context": "E2 and E3 are mechanical and land first (harness-only). E1 is a policy decision: prefer extending shouldRetryColdEmptyRead's window to also retry when the completeness probe contract is violated (or re-probing completeness on cold reads), else document the accepted gap in db.ts and browser-ci.md where the partial-row history is already told. Keep the e2e changes consistent with the post-soak cleanup question (whether #1340's re-navigation is redundant given #1368) - answer it in the PR with soak evidence if cheap, otherwise leave the tracked question open.",
+  "description": "From the 2026-07-31 adversarial review of the #1340/#1368 mitigations. Three defects and one cleanup:\n\nE1 (mitigation asymmetry): results-explorer/src/db.ts:410 returns any non-empty result immediately - the retry covers only ZERO-row cold reads. The repo's own record of the pass-1 bug says it surfaced as PARTIAL rows (e2e/failures/platform-index-cold-load.spec.ts:1-5; docs/operations/browser-ci.md: '1 of 5 rows'), and db.ts:444-450 itself argues readiness is not monotonic per query. A 3-of-5 cold read renders as truth. Probabilistic race - not deterministically reproducible; decide and document the policy (extend the cold-window retry to a completeness signal, or document explicitly why zero-only is the accepted trade-off).\n\nE2 (blocking-gate coverage): playwright.config.ts:38 sets retries:2 in CI; only performance.spec.ts is exempted (package.json:17). The cold-load spec inherits retries, and each Playwright retry is a fresh browser context - a fresh roll of the cold-load dice. A reintroduced ~30% first-load race passes the blocking Chromium gate ~97% of the time as 'flaky but green', silently voiding browser-ci.md's 'if it flakes, that is signal' contract. Fix: retries:0 carve-out for e2e/failures/ (like the performance invocation).\n\nE3 (helper contract): e2e/support/fixtures.ts:89 - waitForDataElement 'break's out of all remaining attempts when navigationKey(page.url()) changes, while its own docstring (lines 64-67) promises the remaining attempts just re-wait (naming app query-string canonicalization as the case). Effect: the #1368 mitigation is disabled for URL-rewriting routes and the thrown error ('Re-navigating between attempts did not help') is false. \n\nF4 (cleanup): db.ts:424-429 post-loop code is unreachable and the comment misattributes where the legit-empty return happens.\n\nDisproven during review (do not re-fix): snapshotReadyAt window-state across re-init/online is correct (single write site, dbInstance never nulled, online forces full re-init); bad-id retry cost is ~300ms worst case inside the 15s window.\n\nNote: results-explorer/e2e is not typechecked - tracked separately as explorer-e2e-typecheck-gap-20260730 (that item is slightly understated: playwright.config.ts is also unchecked and the package has no ESLint; src IS typechecked in CI via docs.yml).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not 'fix' E1 by retrying every non-empty result inside the window",
+        "instead": "retry on a violated completeness signal, not on success",
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "why": "re-running every successful cold query taxes the exact first-load path being protected"
+      },
+      {
+        "dont": "Do not blanket-disable Playwright retries for the whole suite",
+        "instead": "scope retries:0 to e2e/failures/ (or per-spec annotation)",
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "why": "the general suite legitimately uses retries for unrelated infra flake; only the cold-load contract requires flake-is-signal"
+      },
+      {
+        "dont": "Do not make waitForDataElement follow arbitrary cross-page navigations",
+        "instead": "re-wait only when the navigation key change is the app canonicalizing the same logical route, per its documented contract",
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "why": "re-waiting after a click to a DIFFERENT route would mask genuine navigation bugs"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-08-01T12:29:40Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Legitimately-empty results outside the cold window return immediately with zero retry cost (db.ts:459 behavior).",
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801"
+      },
+      {
+        "behavior": "Retry bounds stay finite and small; no unbounded loops or sleeps in queryRows.",
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801"
+      },
+      {
+        "behavior": "The cold-load spec stays genuinely cold: no helper it uses may navigate, retry, or warm the context before its first assertion.",
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801"
+      },
+      {
+        "behavior": "WebKit/Firefox @smoke graduation policy is not changed here (tracked separately in the post-soak cleanup question).",
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/browser-ci.md"
+      },
+      {
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package.json"
+      },
+      {
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/playwright.config.ts"
+      },
+      {
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Explorer unit/build gate green",
+        "expected": "typecheck and unit tests pass",
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -q \"retries=0\" results-explorer/package.json || grep -qE \"retries.*0\" results-explorer/playwright.config.ts",
+        "description": "Cold-load spec runs with zero retries in the CI invocation",
+        "expected": "exit 0: e2e/failures/ carve-out present in config or scripts",
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium",
+        "description": "Chromium e2e suite green locally",
+        "expected": "all specs pass including e2e/failures/ with retries disabled",
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "notes": "E3: fix waitForDataElement to re-wait per its documented contract when the URL change is same-route canonicalization, correct the error message, and add a harness self-test covering the canonicalization case.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "E3: waitForDataElement re-waits on same-route canonicalization per its contract; fix the false error message; add harness self-test",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "notes": "E2: add a retries:0 invocation for e2e/failures/ in CI (mirroring the performance.spec.ts exemption), and update browser-ci.md so the 'flake is signal' contract matches the config.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "E2: retries:0 carve-out for e2e/failures/ in CI (mirror the performance exemption); update browser-ci.md to match",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "notes": "E1: decide and implement the partial-row policy - either extend the cold-window retry to a violated-completeness signal or document the accepted gap in db.ts + browser-ci.md; record the decision rationale in the PR.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "E1: decide the partial-row policy - retry on a violated completeness signal or document the accepted gap; record rationale",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cold-read-retry-and-e2e-harness-fixes-20260801",
+        "notes": "F4: remove the unreachable post-loop code in queryRows and fix the misattributing comment.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "F4: remove the unreachable post-loop code in queryRows and fix the misattributing comment",
+        "wid": "w4"
+      }
+    ]
+  }
+}

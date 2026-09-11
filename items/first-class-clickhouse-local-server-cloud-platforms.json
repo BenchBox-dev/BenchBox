@@ -1,0 +1,515 @@
+{
+  "context": "Treat `standardize-clickhouse-deployment-mode-contract` as completed\ncompatibility groundwork: reuse its deployment normalizer and compatibility\nshims where they help, but do not leave `clickhouse:local/server` as the\nprimary documented UX.\n\nUse the split-platform pattern already established by `motherduck` versus\n`duckdb` for public naming, while borrowing deployment and testing discipline\nfrom `timescaledb` and `firebolt` where that still makes sense.\n\nKeep the ClickHouse family relationship in the registry so shared SQL dialect\nlogic and benchmark compatibility remain centralized, but move the public entry\npoints to thin `clickhouse-local` and `clickhouse-server` wrappers with explicit\nmode-specific connection and metadata behavior.\n\nTackle the migration in three layers:\n\n1. Registration and naming: make the new platform names real before rewriting\n   docs or tests.\n2. Runtime boundary: fix the adapter/client contract mismatch so local and\n   server no longer fake a shared connection API.\n3. Validation and UX: update install/dependency/help surfaces and promote real\n   Docker benchmark coverage for `clickhouse-server`.\n",
+  "description": "BenchBox currently treats ClickHouse as one base platform with mixed local/server\nbehavior, while ClickHouse Cloud is already a separate first-class platform. That\ndesign leaves the public contract and the implementation boundary out of sync:\n\n- `clickhouse` defaults to chDB local execution, but multiple registry/install\n  surfaces still present it as the `clickhouse-driver` platform\n- local and server execution use materially different client contracts, yet they\n  are forced through one adapter boundary\n- result, dependency, and CLI surfaces partially collapse `clickhouse` and `chdb`\n  while other code already treats `chdb` as a distinct label\n- the real ClickHouse Docker path exists, but its tests only validate connectivity\n  and trivial query execution rather than benchmark-level schema/load/query behavior\n\nThe new public naming contract must be three first-class platform identifiers:\n\n- `clickhouse-local` - chDB embedded/in-process ClickHouse\n- `clickhouse-server` - Docker-backed or self-hosted remote ClickHouse via `clickhouse-driver`\n- `clickhouse-cloud` - managed ClickHouse Cloud via `clickhouse-connect`\n\nUnder this contract, bare `clickhouse` is no longer the canonical server-facing\nname. If it remains temporarily accepted, it must be a compatibility alias with\nexplicit deprecation behavior rather than the primary documented selector.\n\nThis work turns the naming split into a real architectural split. It should create\nclear platform registration, dependency, packaging, testing, and documentation\nboundaries while preserving shared ClickHouse SQL/tuning/workload logic underneath.\n\nThis TODO builds on the compatibility groundwork from\n`standardize-clickhouse-deployment-mode-contract`, but it supersedes that item's\nremaining docs/help/test cleanup. The end-state is not \"keep\n`clickhouse:local/server` but make it cleaner\"; the end-state is explicit\nfirst-class platform names with legacy selectors handled only as migration\ncompatibility inputs.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "call the Docker/server path 'covered' with only `SELECT 1` or simple DDL smoke tests",
+        "instead": "require at least one real benchmark slice on `clickhouse-server`",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "why": "that misses schema/load/query/metadata regressions"
+      },
+      {
+        "dont": "continue exposing one public adapter boundary that branches internally between chDB and clickhouse-driver without fixing the connection contract",
+        "instead": "use platform-specific wrappers over shared internals",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "why": "the two clients expose materially different APIs"
+      },
+      {
+        "dont": "keep bare `clickhouse` as the canonical server platform name",
+        "instead": "make `clickhouse-server` the documented primary selector and keep bare `clickhouse` only as an explicit compatibility alias if needed",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "why": "that preserves the current ambiguity between chDB and real server ClickHouse"
+      },
+      {
+        "dont": "let `clickhouse-local` and `clickhouse-server` diverge in SQL semantics or benchmark tuning by copy-pasting logic",
+        "instead": "keep shared ClickHouse internals centralized",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "why": "the split is about platform identity and runtime contract, not benchmark behavior"
+      },
+      {
+        "dont": "update docs and CLI names without aligning packaging, install commands, and dependency checks",
+        "instead": "migrate those surfaces in the same change set",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "why": "users will keep installing the wrong driver for the named platform"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "first-class-clickhouse-local-server-cloud-platforms",
+        "id": 581,
+        "reason": "Existing configs, docs links, and historical habits may still rely on bare `clickhouse`; the first pass should migrate reads and messaging before hard removal",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Bare clickhouse alias already fully removed via clickhouse-alias-removal-post-deprecation (Completed 2026-07-16); the deferred removal already happened.",
+        "summary": "Remove temporary `clickhouse` compatibility aliases entirely after one deprecation window"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "first-class-clickhouse-local-server-cloud-platforms",
+        "id": 582,
+        "reason": "Runtime read compatibility matters immediately; bulk artifact migration can follow once the live platform contract is stable",
+        "resolution": "promoted",
+        "resolved_item": "backfill-or-rewrite-historical-result-artifacts-so-old-click",
+        "resolved_reason": null,
+        "summary": "Backfill or rewrite historical result artifacts so old `clickhouse` labels are normalized to new platform names in archived datasets"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_item": "migrate-clickhouse-firebolt-deployment"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_item": "standardize-clickhouse-deployment-mode-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-11T00:00:00Z",
+      "created_at": "2026-04-11T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing chDB persistence behavior and `.chdb` database naming continue to work for the local embedded path under `clickhouse-local`",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms"
+      },
+      {
+        "behavior": "Historical result files and configuration files using old ClickHouse labels remain readable during the migration window",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms"
+      },
+      {
+        "behavior": "Shared ClickHouse SQL transformation, workload loading, and tuning logic remain reusable across local, server, and cloud rather than forking benchmark semantics",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms"
+      },
+      {
+        "behavior": "The Docker testing harness for ClickHouse continues to use the existing compose stack and Makefile entrypoints rather than inventing a parallel ad-hoc test path",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms"
+      },
+      {
+        "behavior": "The deployment normalization and legacy-read compatibility introduced by `standardize-clickhouse-deployment-mode-contract` remain reusable during the platform-name migration rather than being reimplemented from scratch",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms"
+      },
+      {
+        "behavior": "`clickhouse-cloud` remains a separate first-class managed-service platform and must not be folded back into a mixed base ClickHouse selector",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/database.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/platform.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/platform_defaults.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/cost/"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/ddl_generator.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/adapter_factory.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse_cloud.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/dependencies.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "docs/testing/docker-integration-tests.md"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "tests/e2e/"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/test_clickhouse_live.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_clickhouse_local_cross_platform.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_ssb_clickhouse_integration.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_platform_info.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_platform_registration_alignment.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_platform_registry.py"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_platform_registry.py tests/unit/core/test_platform_registration_alignment.py tests/unit/platforms/test_adapter_factory_deployment.py tests/unit/cli/test_platform.py tests/unit/cli/test_platform_setup_ux.py -q",
+        "description": "Platform registry, adapter factory, and CLI naming slices recognize `clickhouse-local`, `clickhouse-server`, and `clickhouse-cloud` as the first-class ClickHouse family entries",
+        "expected": "All targeted registry and CLI tests pass with the new ClickHouse platform names",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/test_clickhouse_deployment_mode.py tests/unit/platforms/test_platform_info.py tests/unit/platforms/test_clickhouse_cloud_coverage.py -q",
+        "description": "ClickHouse adapter and platform-info tests pass after the local/server split and connection-contract cleanup",
+        "expected": "All targeted ClickHouse unit tests pass with no regressions in local, server, or cloud paths",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_deployment_mode.py tests/unit/platforms/test_clickhouse_diagnostics.py tests/unit/cli/test_example_argument_parser.py tests/unit/cli/test_platform.py -q",
+        "description": "Legacy selectors, deprecation warnings, and compatibility guidance are explicit instead of silently preserving old naming drift",
+        "expected": "Legacy `clickhouse`, `clickhouse:local/server`, and old `mode`/`embedded` inputs are either supported via explicit deprecation behavior or fail with clear migration guidance",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_platform_info.py tests/unit/platforms/test_platform_info.py tests/unit/core/test_platform_registration_alignment.py -q",
+        "description": "Historical config payloads and result/platform labels remain readable during the migration window",
+        "expected": "Historical ClickHouse labels and config payloads remain readable while canonical writes and reporting use the new platform names",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_clickhouse_local_cross_platform.py tests/integration/test_ssb_clickhouse_integration.py -q",
+        "description": "Embedded ClickHouse benchmark slices still pass under the new `clickhouse-local` identity",
+        "expected": "Local chDB integration tests pass when chdb is installed",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-docker-clickhouse",
+        "description": "Real ClickHouse server Docker tests validate schema creation, data loading, representative query execution, and platform-info capture via `clickhouse-server`",
+        "expected": "Docker-backed ClickHouse tests pass against a real server with more than trivial connectivity checks",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n -- 'clickhouse-local|clickhouse-server|clickhouse-cloud|deprecated|compatibility alias|legacy selector' README.md docs/platforms/",
+        "description": "A migration note documents the canonical names, accepted legacy selectors, deprecation messaging, and the alias-removal follow-up",
+        "expected": "README/docs contain one clear migration note or table covering canonical names, accepted legacy selectors, and the alias-removal follow-up",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n -- 'clickhouse:local|clickhouse:server|--platform clickhouse\\b' README.md docs/ benchbox/cli/",
+        "description": "Product docs no longer teach bare `clickhouse` or `clickhouse:local/server` as the canonical public selectors",
+        "expected": "No primary docs or CLI help examples present bare `clickhouse` or colon deployment syntax as the canonical selector; any remaining matches are migration notes only",
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "needs_wid": "w6",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "notes": "Inventory every surface that currently exposes `clickhouse`, `clickhouse:local`,\n`clickhouse:server`, `mode=local`, or `embedded`. Encode one explicit\nmigration decision before touching code: bare `clickhouse` remains accepted\nonly as a deprecating compatibility alias, with documented scope and\nremoval follow-up.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Publish the migration contract so `clickhouse-local`, `clickhouse-server`, and `clickhouse-cloud` are canonical and bare `clickhouse` is compatibility-only",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "notes": "Close or supersede overlapping ClickHouse naming TODOs once the new platform\nsplit is in place so the backlog reflects the new contract rather than the\nold deployment-mode framing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run targeted verification, retire overlapping ClickHouse naming TODOs, and leave only post-deprecation alias removal as follow-up",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "notes": "Local chDB needs its own public identity instead of leaking through mixed\n`clickhouse` naming or internal `chdb` labels.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register `clickhouse-local` as a first-class platform in registry, lazy imports, and platform-listing surfaces",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "notes": "Server ClickHouse must stop inheriting the canonical public name from the\nmixed base platform. Capability metadata, availability checks, and family\nrelationships should make the server identity explicit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register `clickhouse-server` as a first-class platform in registry, lazy imports, and platform-listing surfaces",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "notes": "Registration alone is not enough. The runtime entry points must default to\n`clickhouse-local` or `clickhouse-server` explicitly, while old selectors\neither warn-and-map or fail with clear migration guidance.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire adapter factory, platform defaults, and CLI selector resolution so the new names are canonical and legacy selectors route through compatibility handling",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "notes": "Shared SQL transformation, workload, and tuning code can stay shared, but the\npublic adapter/client contract must stop pretending chDB and clickhouse-driver\nare interchangeable. Fix metadata/version capture and connection handling as\npart of this split.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor the ClickHouse runtime boundary into explicit local/server wrappers over shared internals and fix mode-specific connection/metadata contracts",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "notes": "This includes dependency validation, install guidance, CLI database detection,\ncost categorization, DDL generator aliases, result/reporting labels, and any\npath or database naming helpers that assume one mixed ClickHouse identity.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align dependency/install, cost, DDL, result-label, and database naming surfaces that still conflate `clickhouse` and chDB",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "notes": "Product docs must stop teaching base `clickhouse`, auto-detect wording, or\nold deployment-mode syntax as the primary path. The migration note should\ndefine accepted legacy selectors, deprecation messaging, and the planned\nalias-removal follow-up.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rewrite CLI help, README, and platform docs to teach the explicit platform names and ship one migration note/deprecation table",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "notes": "If aliases are kept temporarily, test them explicitly and emit deprecation\nmessaging. Historical result artifacts and config files should remain readable\nduring the migration window.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add compatibility coverage for legacy selectors, deprecation warnings, and historical config/result readability",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-class-clickhouse-local-server-cloud-platforms",
+        "notes": "Existing Docker tests only prove connectivity. Acceptance for this item\nrequires a real ClickHouse server path test that catches contract drift\nbetween `clickhouse-server` and `clickhouse-local`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Upgrade `clickhouse-server` Docker validation from connectivity smoke to a real benchmark slice with schema/load/query/platform-info assertions",
+        "wid": "w9"
+      }
+    ]
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "description": "Phase 3 of the `tighten-dependencies-phase-plan` (DONE, 2026-04-15) was\nexplicitly held out of that work and deferred to a v0.3.0 release window.\nThe DONE file records it as: \"Tracked in release plan, not as a near-term\nTODO\" but no open TODO captures it.\n\nPhase 3 removes the plain-name extras (backwards-compatibility aliases) that\nwere retained in v0.2.x to give users a deprecation window:\n  - extras: pandas\n  - extras: polars\n  - extras: modin\n  - extras: dask\n  - extras: pyspark\n  - extras: cudf\n  - extras: databricks-connect (alias for cloud-spark-databricks)\n\nThese extras exist solely for backwards compatibility — they are thin aliases\nover the renamed cloud-* / dataframe-* extras introduced in an earlier phase.\nRemoving them is a breaking change requiring a major/minor release boundary\n(v0.3.0 milestone).\n\nThe tighten-dependencies DONE file's anti_pattern note: DO NOT execute Phase 3\noutside a v0.3.0 milestone — plain-name extras may be pinned in user installs\nin the wild — needs deprecation window.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle Phase 3 with unrelated pyproject.toml changes",
+        "instead": "(not specified)",
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "why": "keep one reviewable PR"
+      },
+      {
+        "dont": "execute w2 outside a v0.3.0 release",
+        "instead": "(not specified)",
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "why": "the deprecation window is not optional"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "tighten-dependencies-phase-3-extras-deprecation",
+        "id": 557,
+        "reason": "Audit finding F4 from tighten-dependencies: intentional belt-and-suspenders; removal would silently break minimal Azure/QuestDB installs.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason states this belt-and-suspenders requests declaration is intentional; removal would silently break minimal installs.",
+        "summary": "Removing requests declarations from extras:cloud-spark* / extras:questdb"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "tighten-dependencies-phase-3-extras-deprecation",
+        "id": 558,
+        "reason": "120 import sites in core; the duplicate declaration in extras (pyproject.toml:105) is a version-floor artifact, not waste.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly says the duplicate pyarrow declaration is a version-floor artifact, not waste -- nothing to fix.",
+        "summary": "Splitting pyarrow between core and dataframe extras"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All canonical extras (cloud-spark-databricks, dataframe-pandas, etc.) continue to work after removing aliases",
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation"
+      },
+      {
+        "behavior": "DO NOT remove plain-name extras before the v0.3.0 milestone — existing installs may be pinned to them",
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "CHANGELOG — record the breaking change before removing extras",
+        "decision": "reuse",
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "path": "CHANGELOG"
+      },
+      {
+        "concept": "pyproject.toml [project.optional-dependencies] — source of truth for extras definitions",
+        "decision": "reuse",
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "path": "pyproject.toml"
+      },
+      {
+        "concept": "tighten-dependencies-phase-plan DONE file — the phase plan; Phase 0 precedent for the per-PR model",
+        "decision": "reuse",
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "path": "tighten-dependencies-phase-plan"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "python -c \"import tomllib; d=tomllib.load(open('pyproject.toml','rb')); extras=list(d['project']['optional-dependencies'].keys()); bad=[e for e in ['pandas','polars','modin','dask','pyspark','cudf','databricks-connect'] if e in extras]; print(bad)\"",
+        "description": "No plain-name extras remain in pyproject.toml after w2",
+        "expected": "[]",
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "pip install -e '.[dataframe-pandas]' --dry-run 2>&1 | grep -c 'ERROR'",
+        "description": "benchbox install with a canonical extra succeeds",
+        "expected": "0",
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "notes": "grep -n 'extras.*pandas\\|extras.*polars\\|extras.*modin\\|extras.*dask\\|extras.*pyspark\\|extras.*cudf\\|databricks-connect' pyproject.toml\nConfirm which aliases remain. Some may have been removed in interim PRs.\nRecord the current set before writing the deprecation notice.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the plain-name extras still exist and inventory their current aliases",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "notes": "If pyproject.toml extras cannot carry deprecation warnings natively, add\na runtime warning in the __init__.py of any module installed by those\nextras, or document the deprecation in CHANGELOG and the migration guide.\nThe deprecation notice should name the replacement extra explicitly\n(e.g., 'Use extras: dataframe-pandas instead of extras: pandas').\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add deprecation warnings to the plain-name extras (at least one release before removal)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "notes": "Only execute this work unit when the v0.3.0 release is being cut.\nRemove all plain-name aliases from pyproject.toml [project.optional-dependencies].\nUpdate CHANGELOG with the breaking change. Update installation docs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove the plain-name extras from pyproject.toml at the v0.3.0 release boundary",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tighten-dependencies-phase-3-extras-deprecation",
+        "notes": "grep -rn 'extras.*pandas\\|extras.*polars\\|pip install.*\\[pandas\\]' .github/ docs/ Makefile\nReplace any remaining references with the canonical extra names.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update CI and any internal benchbox invocations that use plain-name extras",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "description": "`benchbox submit` writes a 16-line CONTRIBUTING.md into every submission\nbundle (hardcoded as `_CONTRIBUTING_TEXT` at\n`benchbox/cli/commands/submit.py:29-46`), and the CLI's \"Next step\"\nmessage tells contributors to follow it. That file does NOT include\nthree steps the canonical `docs/contributing-results.md` requires:\n\n  1. Regenerate `corpus-inventory.json` before commit.\n  2. Target the `published-results` branch (not `main`).\n  3. Optionally validate the bundle locally with\n     `scripts/validate_submission.py`.\n\nA contributor who reads only the in-bundle file will open a PR against\n`main` with a stale inventory. CI catches it, but that's wasted\nmaintainer cycles and a worse first-time UX. Surfaced by the\nagent-proxy dry-run on 2026-04-28\n(see `_project/handoffs/external-dry-run-retrospective-2026-04-28.md`).\n\nFix options (pick one):\n  A. Generate the in-bundle file from `docs/contributing-results.md`\n     at package-build time so the two cannot drift.\n  B. Replace the in-bundle file with a one-page checklist that points\n     to the canonical doc URL and lists the three required commands\n     inline.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "remove the in-bundle file entirely",
+        "instead": "ship a checklist + canonical URL instead",
+        "item_id": "dry-run-followup-package-canonical-contributing",
+        "why": "contributors offline / on planes still need a packaged copy of the steps"
+      },
+      {
+        "dont": "silently keep the in-bundle template diverged from the canonical doc",
+        "instead": "regenerate at build time or include a clear pointer",
+        "item_id": "dry-run-followup-package-canonical-contributing",
+        "why": "that is the exact failure mode this TODO exists to fix"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-28T00:00:00Z",
+      "created_at": "2026-04-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The CLI's existing 'Next step' message still points contributors at the in-bundle file",
+        "item_id": "dry-run-followup-package-canonical-contributing"
+      },
+      {
+        "behavior": "`benchbox submit --output` continues to package a self-contained bundle directory",
+        "item_id": "dry-run-followup-package-canonical-contributing"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dry-run-followup-package-canonical-contributing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "dry-run-followup-package-canonical-contributing",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "dry-run-followup-package-canonical-contributing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_submit.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox submit --last --output /tmp/dry-run-canonical && grep -cE 'published-results|generate_corpus_inventory|validate_submission|docs\\.benchbox\\.dev' /tmp/dry-run-canonical/CONTRIBUTING.md",
+        "description": "Packaged CONTRIBUTING.md mentions all four required items",
+        "expected": ">= 4",
+        "item_id": "dry-run-followup-package-canonical-contributing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -q",
+        "description": "Submit unit tests still pass",
+        "expected": "All tests pass",
+        "item_id": "dry-run-followup-package-canonical-contributing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dry-run-followup-package-canonical-contributing",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dry-run-followup-package-canonical-contributing",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-package-canonical-contributing",
+        "notes": "A vs B is a real architectural call:\n  - A: harder-to-drift but introduces a build-time read of\n    `docs/contributing-results.md` from `submit.py`. Requires\n    packaging the doc into the wheel or reading it relative to\n    the repo root.\n  - B: simpler; ships a checklist that names the four required\n    steps and points contributors to docs.benchbox.dev for the\n    full doc. Requires updating the checklist whenever the\n    canonical doc changes -- but the checklist is small and\n    stable.\nDefault recommendation: option B unless wheel-packaging the doc\nis already cheap. Document the choice + rationale in a one-line\ncomment above `_CONTRIBUTING_TEXT` so future maintainers don't\nre-litigate it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pick option A (regenerate from canonical doc at build time) or option B (static checklist + canonical URL)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-package-canonical-contributing",
+        "notes": "Touch `benchbox/cli/commands/submit.py` (`_CONTRIBUTING_TEXT`).\nThe new file content MUST include all four:\n  - `published-results` as the PR base branch (not `main`)\n  - `generate_corpus_inventory.py --write` before commit\n  - `validate_submission.py` for local pre-push check\n  - canonical doc URL (https://docs.benchbox.dev/contributing-results\n    or wherever the canonical doc lives at land time)\nCoordinate with `dry-run-followup-submitted-by-flag` and\n`dry-run-followup-manifest-filename-convention` since both\nwill edit the same template after this lands.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the chosen option in benchbox/cli/commands/submit.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-package-canonical-contributing",
+        "notes": "Add to `tests/unit/cli/commands/test_submit.py`: run\n`benchbox submit --last --output <tmp>` against a fixture result,\nread the resulting CONTRIBUTING.md, assert presence of\n`published-results`, `generate_corpus_inventory`,\n`validate_submission`, and the canonical doc URL. The test\npins the contract independent of which option (A or B) was\nchosen.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a regression test asserting the in-bundle file mentions all four required items",
+        "wid": "w3"
+      }
+    ]
+  }
+}

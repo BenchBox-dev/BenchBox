@@ -1,0 +1,74 @@
+{
+  "description": "Cutover UAT for `PLATFORM=datafusion BENCHMARK=joinorder SCALE=1`\nfailed 113/113 queries before execution because the DataFusion adapter\nregistered canonical Parquet tables with synthetic `f0` column names.\n\nEvidence:\n  /Users/joe/Developer/benchmark_runs/logs/uat_joinorder_cutover/datafusion_joinorder_1.0_20260511_135128.log\n\nThe immediate failure signature is:\n  Schema error: No field named <alias>.<column>. Valid fields are <alias>.f0 ...\n\nRevalidation on current `develop` (fa1df7359) with DataFusion 53.0.0 showed\nthis failure is no longer present with the current verified canonical\nJoinOrder Parquet cache. No adapter code change was required in this TODO.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Compatibility",
+      "completed_at": "2026-05-15T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "verifications": [
+      {
+        "command": "Run the w2 smoke command shape against the local canonical JoinOrder SF=1 cache, capture stdout under BENCHBOX_OUTPUT_DIR or /tmp, then verify it reports DataFusion 53.0.0 and LOAD tables=21 rows=74190187",
+        "description": "Regenerate the DataFusion canonical JoinOrder smoke and verify loaded schemas",
+        "expected": "DataFusion 53.0.0 and LOAD tables=21 rows=74190187",
+        "item_id": "joinorder-datafusion-dialect",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "Run the w2 smoke command shape against the local canonical JoinOrder SF=1 cache, capture stdout under BENCHBOX_OUTPUT_DIR or /tmp, then verify the final summary reports PASS queries=113",
+        "description": "Regenerate the DataFusion canonical JoinOrder smoke and verify all queries pass",
+        "expected": "PASS queries=113",
+        "item_id": "joinorder-datafusion-dialect",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/DONE/main/planning/joinorder-datafusion-dialect.yaml",
+        "description": "TODO graph remains valid after moving this item to DONE",
+        "expected": "passes",
+        "item_id": "joinorder-datafusion-dialect",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-datafusion-dialect",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-datafusion-dialect",
+        "notes": "The May 11 cutover log captured a real failure mode where every canonical\nJoinOrder query saw only synthetic `f0` fields after DataFusion table\nregistration. Current `develop` no longer reproduces that failure with the\nverified canonical Parquet cache: DataFusion registers all 21 tables with\nthe expected schema column names.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-check the historical DataFusion f0 schema failure",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-datafusion-dialect",
+        "notes": "A local DataFusion smoke loaded the current canonical cache from\n`/Users/joe/Developer/benchmark_runs/datagen/joinorder_sf1`, registered 21\ntables / 74,190,187 rows, and executed all 113 canonical JoinOrder SQL\nqueries successfully. The raw local transcript is intentionally kept out of\ngit under local ignored run logs.\n\nCommand shape:\n`uv run -- python` script instantiating `JoinOrderBenchmark(scale_factor=1.0,\noutput_dir=/Users/joe/Developer/benchmark_runs/datagen/joinorder_sf1)`,\ncalling `generate_data()`, `DataFusionAdapter.create_schema()`,\n`DataFusionAdapter.load_data()`, then iterating `bench.get_queries()` and\nfailing fast on any non-`SUCCESS` result.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify full canonical SQL execution",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,324 @@
+{
+  "context": "Start with policy, then align code. If the project wants sql_compat as an\naudit catalogue, make docs and check output say that. If it wants\nauthoritative governance, register or exempt the real DDL behavior and make\ndrift detection behavior-aware enough to earn CI status.\n",
+  "description": "The SQL compatibility architecture is a strong investment, but the DDL\ngovernance claim is currently stronger than enforcement. Some adapters\nperform local CREATE TABLE rewrites outside registered ddl_optimize rules,\nwhile the drift detector is based on method/function-name patterns and can\nreport clean despite known behavior.\n\nThis item decides whether sql_compat is authoritative execution machinery or\nan audit catalogue, then makes DDL drift detection and docs match that\ndecision.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add BigQuery/Athena rule files without proving the adapter uses or is covered by them",
+        "instead": "test runtime output and inventory together.",
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "why": "that preserves the false-clean failure mode"
+      },
+      {
+        "dont": "silence the benchmark-gate detector error without a regression test",
+        "instead": "(not specified)",
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "why": "false alarms are part of the governance trust problem."
+      },
+      {
+        "dont": "turn optional adapter import failures into hard import errors",
+        "instead": "inspect source/signatures where possible.",
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "why": "sql_compat scanning must respect lazy optional dependencies"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "sql-compat-governance-ddl-hardening",
+        "id": 490,
+        "reason": "The runtime resolver may be future infrastructure, but forcing it into production is larger than closing the DDL governance gap.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly rejects forcing all SQL transforms through the resolver as larger than the DDL governance gap being closed; deliberate scope decision.",
+        "summary": "Route every SQL transform through sql_compat resolver.build_plan"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      }
+    ],
+    "item_meta": {
+      "category": "SQL Compatibility",
+      "completed_at": "2026-05-21T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not break currently passing adapter DDL generation for BigQuery, Athena, or SingleStore.",
+        "item_id": "sql-compat-governance-ddl-hardening"
+      },
+      {
+        "behavior": "Do not claim compat_lint enforcement in docs unless the corrected check is actually run by CI.",
+        "item_id": "sql-compat-governance-ddl-hardening"
+      },
+      {
+        "behavior": "Do not make optional platform imports eager while scanning for DDL behavior.",
+        "item_id": "sql-compat-governance-ddl-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Makefile: compat-docs-check target -- reuse as the CI/doc drift gate where feasible.",
+        "decision": "reuse",
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "path": "Makefile"
+      },
+      {
+        "concept": "benchbox/platforms/base/ddl_optimizer.py: existing DDL optimizer protocol -- extend or document its limits.",
+        "decision": "extend",
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "path": "benchbox/platforms/base/ddl_optimizer.py"
+      },
+      {
+        "concept": "benchbox/sql_compat/rules/ddl_optimize/: existing registered intent catalogue -- reuse for platform behavior.",
+        "decision": "reuse",
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "path": "benchbox/sql_compat/rules/ddl_optimize/"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/athena.py"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_compat_lint_clean.py"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/sql_compat/"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/sql_compat/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift",
+        "description": "Run compat lint with DDL drift enabled.",
+        "expected": "DDL drift status reflects registered, exempt, or detected behavior without false-clean output.",
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests -k 'sql_compat or ddl_drift or ddl_optimize' --tb=short",
+        "description": "Run focused SQL compatibility governance tests.",
+        "expected": "Focused SQL compatibility tests pass.",
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make compat-docs-check",
+        "description": "Run CI-equivalent docs/check target if added.",
+        "expected": "Generated SQL compatibility docs are clean.",
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "notes": "Completed 2026-05-21 at checked SHA 15fedc5bfa6308a82a49b0398ee759b92077c97f.\n\nRevalidation summary before edits:\n  - `benchbox/platforms/base/ddl_optimizer.py` already implemented a\n    hybrid-compatible BaseDdlOptimizer dispatch path and skipped\n    `governance_only` payloads.\n  - BigQuery rewrote CREATE TABLE in `_convert_to_bigquery_table()` but\n    had no `ddl_optimize` rule; behavior includes `CREATE OR REPLACE`,\n    project/dataset qualification, and optional partition/cluster clauses.\n  - Athena rewrote CREATE TABLE in `_convert_to_external_table()` but had\n    no `ddl_optimize` rule; behavior includes external-table syntax, S3\n    LOCATION/storage clauses, Hive-compatible strings, and constraint\n    stripping.\n  - `benchbox/sql_compat/inventory.py` only detected a fixed method-name\n    set and reported DDL drift clean despite the BigQuery/Athena custom\n    method names.\n  - `.github/workflows/pr.yml` ran only `make compat-docs-check`; before\n    this item that target checked generated docs but not DDL drift.\n  - Baseline command:\n    `uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift`\n    exited 1 because the benchmark-gate detector missed the current\n    `getattr(caps, \"unsupported_benchmarks\", None)` shape while DDL drift\n    itself reported false-clean.\n\nCommit a compact summary of checked SHA, adapters inspected, current\ncompat_lint output, and whether CI runs the relevant checks.\n\nMinimum evidence to re-check:\n  - benchbox/platforms/base/ddl_optimizer.py.\n  - benchbox/platforms/bigquery.py CREATE TABLE rewrite behavior.\n  - benchbox/platforms/athena.py CREATE TABLE rewrite behavior.\n  - benchbox/sql_compat/inventory.py drift detector patterns.\n  - benchbox/sql_compat/rules/ddl_optimize/.\n  - .github/workflows/pr.yml and Makefile compat targets.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate DDL rewrite behavior, detector patterns, and CI coverage",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "notes": "Decision recorded in `docs/reference/public-contracts.md` and\n`benchbox/sql_compat/README.md`: sql_compat is a hybrid governance\ncatalog plus optional runtime dispatcher. `BaseDdlOptimizer` is preferred\nfor ordered statement-to-statement transforms, but local adapter rewrites\nare allowed when registered as `governance_only=True` or explicitly\nexempted. `compat_lint CLEAN` means no source-detected CREATE TABLE\nrewrite is unregistered or uninspectable; it does not mean every rewrite\nis dispatched through BaseDdlOptimizer.\n\nRecord the decision in docs/reference/public-contracts.md and the\nsql_compat README. The decision must answer:\n  - Must every adapter DDL rewrite be registered?\n  - Are governance_only rules allowed to represent runtime behavior?\n  - When may an adapter perform local rewrites outside BaseDdlOptimizer?\n  - What does compat_lint CLEAN actually guarantee?\n\nDo not implement detector changes until this decision is explicit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decision gate: classify sql_compat as authoritative execution, audit catalogue, or hybrid",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "notes": "Added governance-only DDL_OPTIMIZE rules:\n  - `benchbox/sql_compat/rules/ddl_optimize/bigquery_ddl_rewrites.py`\n  - `benchbox/sql_compat/rules/ddl_optimize/athena_ddl_rewrites.py`\n\nBoth rules describe real local runtime behavior and intentionally set\n`governance_only=True` because the adapters do not inherit\n`BaseDdlOptimizer`.\n\nIf sql_compat is authoritative or hybrid, add/adjust ddl_optimize rule\nentries and adapter wiring so BigQuery/Athena CREATE TABLE behavior is\nrepresented. If local rewrites are intentionally exempt, add explicit\nexemption metadata with rationale and tests so drift checks do not imply\nfalse coverage.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register or explicitly exempt BigQuery and Athena CREATE TABLE behavior",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "notes": "`collect_ddl_governance_statuses()` now detects known DDL optimizer\nmethod names, custom CREATE TABLE rewrite signatures, and the shared\nSpark-family helper mapping. Output distinguishes registered runtime\nbehavior, registered governance-only intent, explicit exemptions,\nunregistered detected behavior, and unknown/uninspectable behavior.\n\nDetect CREATE TABLE rewrite behavior regardless of method name. The\ndetector should catch inline .replace(), regex substitutions, helper\nfunctions, and BaseDdlOptimizer dispatch where practical.\n\nThe output must distinguish:\n  - registered runtime behavior,\n  - registered governance-only intent,\n  - explicit exemptions,\n  - unregistered detected behavior,\n  - unknown/uninspectable behavior.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace name-based DDL drift detection with behavior or signature detection",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "notes": "`_detect_unsupported_benchmarks()` now accepts the current CLI preflight\nshape: `getattr(caps, \"unsupported_benchmarks\", None)`. Regression test\n`test_current_run_benchmark_gate_shape_is_detected` proves mandatory\nvalidation no longer reports the false benchmark-gate miss.\n\nThe mandatory-site detector must accept the current supported benchmark\ngate shape or the runtime code must move to the detector's required\nshape. Do not leave compat_lint reporting a detector validation failure\nwhile DDL drift says clean.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Repair the benchmark-gate detector false alarm",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "notes": "Added regression coverage in `tests/integration/test_compat_lint_clean.py`\nfor:\n  - custom-named CREATE TABLE rewrite detection,\n  - BigQuery runtime output plus governance status,\n  - Athena runtime output plus governance status,\n  - SingleStore/BaseDdlOptimizer runtime status,\n  - Spark-family shared helper governance status,\n  - DuckDB as the no-local-rewrite platform.\n\nAdd tests with representative CREATE TABLE input for BigQuery, Athena,\nSingleStore/BaseDdlOptimizer, and one platform with no DDL rewrite. Tests\nshould assert both runtime output and governance inventory status.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add representative DDL behavior tests per affected platform",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "sql-compat-governance-ddl-hardening",
+        "notes": "`make compat-docs-check` now runs both generated compat-doc drift and\n`uv run -- python -m benchbox.sql_compat.inventory --output /tmp/benchbox-compat-inventory.jsonl --check-ddl-drift`.\nThe PR workflow step was renamed to \"Compatibility governance drift\ncheck\" and continues to call `make compat-docs-check`.\n\nIf the check is reliable, make it part of the PR gate. If the project\nintentionally keeps it advisory, update AGENTS.md and sql_compat docs so\nthey no longer claim enforcement.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire the corrected governance checks into CI or downgrade docs claims",
+        "wid": "w6"
+      }
+    ]
+  }
+}

@@ -1,0 +1,249 @@
+{
+  "context": "The event bridge verifies base branch and merged state, then dispatches the protected controller with the immutable merge SHA. The controller uses trusted validator and publisher artifacts, coalesces only descendant corpus states, computes exact inventory and read-model digests, runs compatibility and shadow assembly, and records promotion_pending or promotion_failed. No Pages deployment yet.",
+  "description": "Wire accepted published-results merges into a trusted promotion controller without claiming they are live. Use a tiny CODEOWNED merged-PR dispatcher that never checks out PR content, plus a scheduled reconciler fallback. Revalidate the exact merge SHA, preserve the accepted-path union, build the corpus artifact, and create a CAS-protected desired-state promotion.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Coalesce unrelated corpus SHAs by timestamp",
+        "instead": "coalesce only when the newer state is a verified descendant or set-preserving union",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "why": "that can lose accepted history"
+      },
+      {
+        "dont": "Put the full promotion workflow on the slim branch",
+        "instead": "keep only a tiny CODEOWNED event bridge and run the controller from protected code",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "why": "the branch intentionally excludes broad trusted code and workflows"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "needs_item": "independent-publication-a2-corpus-trust-isolation"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "needs_item": "independent-publication-a4-hermetic-build-and-shadow-assembly"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "needs_item": "independent-publication-a7-explorer-application-lane"
+      }
+    ],
+    "item_meta": {
+      "category": "Publication Architecture",
+      "completed_at": "2026-09-04T17:27:38Z",
+      "completed_pr": 2017,
+      "created_at": "2026-08-31T20:37:55Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A merged contribution can be pending or failed without being falsely represented as live.",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion"
+      },
+      {
+        "behavior": "Every accepted published-results path remains present unless an explicit authorized takedown says otherwise.",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Extend the slim branch with a metadata-only trusted dispatch path",
+        "decision": "extend",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "path": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "concept": "Reuse deterministic corpus inventory and digest calculation",
+        "decision": "reuse",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "path": "scripts/generate_corpus_inventory.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/*corpus*"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/*publication*"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "kind": "only_modify",
+        "path_glob": "publication/**"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run pytest tests/unit/workflows/test_corpus_event_bridge.py -q",
+        "description": "Merged-PR bridge never checks out PR content or receives deploy credentials",
+        "expected": "all tests pass",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run pytest tests/unit/scripts/publication/test_reconciler.py -q",
+        "description": "Scheduled reconciliation repairs missed and duplicate events without regressing desired generation",
+        "expected": "all tests pass",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/verify_corpus_promotion.py --shadow",
+        "description": "Shadow artifact has exact accepted-path inventory, zero skips, and supported Explorer compatibility",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "event bridge + reconciler: 30 unit tests green in-session",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "notes": null,
+        "started_at": "2026-09-02T14:11:51Z",
+        "started_branch": "feat/publication-a8-shadow-promotion",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a8",
+        "status": "done",
+        "summary": "Add minimal merged-PR event bridge and scheduled reconciler",
+        "wid": "w1"
+      },
+      {
+        "evidence": "merge-SHA revalidation: Corpus Reconciler CI green (run 33888979555)",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate immutable merge SHA with trusted validator",
+        "wid": "w2"
+      },
+      {
+        "evidence": "zero-skip union: G1 export + gen1 199-result preview build",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build zero-skip corpus artifact preserving accepted-path union",
+        "wid": "w3"
+      },
+      {
+        "evidence": "explorer compat PASS + 210 e2e (A7 evidence)",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run Explorer compatibility and shadow assembly",
+        "wid": "w4"
+      },
+      {
+        "evidence": "CAS promotion receipts: G2 four-state receipts + live receipt 13:11Z",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create CAS promotion and record pending/failed state with receipts",
+        "wid": "w5"
+      },
+      {
+        "evidence": "missed/dup/stale recovery: reconciler unit tests green",
+        "item_id": "independent-publication-a8-published-results-gate-and-shadow-promotion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prove missed, duplicated, stale, and out-of-order event recovery",
+        "wid": "w6"
+      }
+    ]
+  }
+}

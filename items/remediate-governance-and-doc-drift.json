@@ -1,0 +1,221 @@
+{
+  "description": "Source: _project/audits/results-explorer-publication-adversarial-review.md\n(develop_sha fddedf26), findings §2.16 (Required), §2.18b (Advisory, grouped),\nplus the ADR-index gap and §2.22 test-dir relocation.\n\n(§2.12 Critical — the prune-publishing doc hazard — was split into its own\nCritical item remediate-prune-publishing-doc-hazard; it is NOT covered here.)\n\n§2.16 (Required) — results-explorer-qa.md is billed as the maintained,\nreusable QA plan (:7-10) but hardcodes saving findings to the sealed\npass-2 file (:95,:392), says to update the completed pass-1 TODO (:369,:392),\nand points screenshots at a non-existent _project/audits/screenshots/ (:114).\n\n§2.18b (Advisory, grouped) — benchbox-results-platform-strategy.md:480 cites\npublishing/artifacts.py + permalink.py (deleted 2026-04-27) as current\nevidence; adr-explorer-cli-surface.md:38-41 and\nresults-explorer-browser-testing.md:70-72 misstate the docs.yml / browser\nworkflow triggers; results-explorer-token-scan.md:135-137 omits medium-test\nfrom the jq filter; repo-admin-settings.md:58-59 says ci-required-result\naggregates 4 jobs (it needs 10, pr.yml:916); results-phase-2-runbook.md:29-30\nsays the sync watches \"two vendored validators\" (three code files) and calls\nseed-corpus.yml a \"quarterly refresh\" (it is workflow_dispatch only).\n\nAlso: docs/development/adr/README.md indexes only 4 of the ADRs, omitting the\nthree Accepted ADRs with the most operational teeth (datasketches-vendoring,\nexplorer-cli-surface, published-results-slim-corpus-branch). And §2.22: the\nexplorer tests live under misleading paths (tests/unit/core/explorer_pipeline/\nimports _project.scripts.explorer_pipeline; tests/unit/cli/test_explorer_build_contract.py\ntests no CLI command) — a naming residue from the completed migration.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hand-edit generated _project/TODO/_indexes/",
+        "instead": "(not specified)",
+        "item_id": "remediate-governance-and-doc-drift",
+        "why": "regenerate via the todo CLI / make todo-reindex."
+      },
+      {
+        "dont": "run w5 before remediate-submission-trust-label-enforcement merges",
+        "instead": "the deps.needs edge enforces ordering so the move captures those tests too.",
+        "item_id": "remediate-governance-and-doc-drift",
+        "why": "that item adds tests under tests/unit/core/explorer_pipeline/"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "remediate-governance-and-doc-drift",
+        "id": 471,
+        "reason": "Content-accuracy of the QA doc body; tracked in remediate-qa-and-browser-test-doc-accuracy.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: _project/DONE/main/planning/remediate-qa-and-browser-test-doc-accuracy.yaml, the stated tracking target, is already DONE.",
+        "summary": "§2.17/§2.18 QA-doc S7.6 wording and fixture/route accuracy"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "remediate-governance-and-doc-drift",
+        "id": 472,
+        "reason": "Advisory nicety; the substantive publish-naming hazard is remediate-prune-publishing-doc-hazard. Left as a small follow-up so the audit item is not silently dropped.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Advisory nicety; the substantive publish-naming hazard (remediate-prune-publishing-doc-hazard) is already DONE.",
+        "summary": "§2.19 optional 'publish disambiguation' note in AGENTS.md / CLI docs"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "remediate-governance-and-doc-drift",
+        "needs_item": "remediate-submission-trust-label-enforcement"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Any trust tests added by remediate-submission-trust-label-enforcement (which lands first) are moved along with the rest of tests/unit/core/explorer_pipeline/.",
+        "item_id": "remediate-governance-and-doc-drift"
+      },
+      {
+        "behavior": "The 260 explorer_pipeline tests keep passing after the git mv (imports resolve via namespace packages).",
+        "item_id": "remediate-governance-and-doc-drift"
+      },
+      {
+        "behavior": "audit-sha frontmatter contract on _project/audits/ files.",
+        "item_id": "remediate-governance-and-doc-drift"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/ completed-item conventions — model for how a relocated/annotated item is recorded.",
+        "decision": "reuse",
+        "item_id": "remediate-governance-and-doc-drift",
+        "path": "_project/DONE/main/"
+      },
+      {
+        "concept": "docs/development/adr/README.md existing table format — extend with the three missing rows (w4).",
+        "decision": "extend",
+        "item_id": "remediate-governance-and-doc-drift",
+        "path": "docs/development/adr/README.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remediate-governance-and-doc-drift",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/publishing/"
+      },
+      {
+        "item_id": "remediate-governance-and-doc-drift",
+        "kind": "do_not_modify",
+        "path_glob": "docs/design/future-state/"
+      },
+      {
+        "item_id": "remediate-governance-and-doc-drift",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/"
+      },
+      {
+        "item_id": "remediate-governance-and-doc-drift",
+        "kind": "only_modify",
+        "path_glob": "docs/development/benchbox-results-platform-strategy.md"
+      },
+      {
+        "item_id": "remediate-governance-and-doc-drift",
+        "kind": "only_modify",
+        "path_glob": "docs/development/results-explorer-browser-testing.md"
+      },
+      {
+        "item_id": "remediate-governance-and-doc-drift",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "remediate-governance-and-doc-drift",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "item_id": "remediate-governance-and-doc-drift",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-token-scan.md"
+      },
+      {
+        "item_id": "remediate-governance-and-doc-drift",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-phase-2-runbook.md"
+      },
+      {
+        "item_id": "remediate-governance-and-doc-drift",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_explorer_build_contract.py"
+      },
+      {
+        "item_id": "remediate-governance-and-doc-drift",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "remediate-governance-and-doc-drift",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'pass2-findings\\|pass-1 TODO' docs/operations/results-explorer-qa.md",
+        "description": "QA plan has no hardcoded pass-2/pass-1 references",
+        "expected": "pass number parameterized; closed-TODO reference gone",
+        "item_id": "remediate-governance-and-doc-drift",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'adr-' docs/development/adr/README.md",
+        "description": "ADR index lists all Accepted ADRs",
+        "expected": ">= 7 ADR entries",
+        "item_id": "remediate-governance-and-doc-drift",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline/ -q",
+        "description": "Relocated tests still pass",
+        "expected": "all pass at the new path",
+        "item_id": "remediate-governance-and-doc-drift",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remediate-governance-and-doc-drift",
+        "notes": "results-explorer-qa.md — replace the hardcoded pass-2 file with\n\"results-explorer-qa-pass<N>-findings.md, next unused N\"; remove the\npass-1 TODO update instruction; either create _project/audits/screenshots/\nor change the retention line to match the \"not retained in git\" reality\nthe pass-2 findings already record.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make the QA plan reusable: parameterize the pass number, drop the closed pass-1 TODO reference, fix the screenshots path",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-governance-and-doc-drift",
+        "notes": "Strategy doc deleted-file evidence row (:480); ADR/browser-testing trigger\nclaims; token-scan jq (add medium-test); repo-admin-settings aggregator\ncount (4→10); runbook §1.2 validator count + seed-corpus cadence.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix the grouped §2.18b doc drifts against current YAML/tree",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-governance-and-doc-drift",
+        "notes": "Index adr-duckdb-datasketches-vendoring, adr-explorer-cli-surface,\nadr-published-results-slim-corpus-branch so they are discoverable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add the three missing Accepted ADRs to docs/development/adr/README.md",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-governance-and-doc-drift",
+        "notes": "git mv tests/unit/core/explorer_pipeline/ → tests/unit/scripts/explorer_pipeline/\nand tests/unit/cli/test_explorer_build_contract.py →\ntests/unit/scripts/. Update any import/collection config. Behavior\nunchanged (260 tests already pass); this is a naming fix only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Relocate the mislabeled explorer tests to mirror the migrated source layout",
+        "wid": "w5"
+      }
+    ]
+  }
+}

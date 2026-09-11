@@ -1,0 +1,146 @@
+{
+  "context": "Fix the comparison in the two query families -- build native date/datetime literals rather than strings -- then confirm at SF0.01 with polars-df. Check flightdata for the same pattern while there, since its gate is blocked on what sounds like the identical problem. Wiring a cross-surface gate for nyctaxi and tsbs_devops afterwards is the durable guard, and belongs to cross-surface-gate-rollout-followups rather than here.",
+  "description": "MEASURED 2026-08-24 on develop plus PR #1866. Once DataFrame query resolution reaches the registries these two families ship (previously it did not, so nothing executed and the defect was invisible):\n\n  nyctaxi      3 of 75 pass, exit 1\n  tsbs_devops  0 of 54 pass, exit 1\n\nEvery failure carries the same Polars error:\n  cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to ...)\n\nSo the DataFrame implementations compare a temporal column against a string literal instead of a native date/datetime. One class of defect across both families, not many.\n\nThe other five previously-unreachable families are clean at the same scale: amplab 24/24, coffeeshop 33/33, h2odb 30/30, ssb 39/39, tpch_skew 66/66.\n\nThe correlation is informative. amplab, coffeeshop, h2odb and ssb are covered by ENFORCED cross-surface equivalence gates and all pass. nyctaxi, tsbs_devops and tpch_skew have no gate; two of those three are broken and the third is unverified. This is direct evidence for the breadth rollout tracked in cross-surface-gate-rollout-followups.\n\nNote the same class is already recorded elsewhere: wire-the-flightdata-cross-surface-gate is blocked 'once its DataFrame date window is fixed'.",
+  "legacy": {
+    "item_meta": {
+      "category": "core",
+      "completed_at": "2026-08-24T22:59:54Z",
+      "completed_pr": 1883,
+      "created_at": "2026-08-24T12:10:08Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/dataframe_queries/"
+      },
+      {
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/dataframe_queries/**"
+      },
+      {
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tsbs_devops/dataframe_queries/"
+      },
+      {
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tsbs_devops/dataframe_queries/**"
+      },
+      {
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox run --platform polars-df --benchmark nyctaxi --scale 0.01 --non-interactive",
+        "description": "nyctaxi DataFrame runs clean",
+        "expected": "exit 0, 0 failed queries",
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "last_result": "pass",
+        "last_run": "2026-08-24T22:59:50Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform polars-df --benchmark tsbs_devops --scale 0.01 --non-interactive",
+        "description": "tsbs_devops DataFrame runs clean",
+        "expected": "exit 0, 0 failed queries",
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "last_result": "pass",
+        "last_run": "2026-08-24T22:59:53Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Located ISO string defaults in NYC Taxi and TSBS DevOps DataFrame parameter modules; FlightData already uses native dates.",
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "notes": null,
+        "started_at": "2026-08-24T22:55:11Z",
+        "started_branch": "fix/dataframe-temporal-literals",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-dataframe-temporal-literals",
+        "status": "done",
+        "summary": "Locate the string temporal literals in both query families",
+        "wid": "w0"
+      },
+      {
+        "evidence": "NYC Taxi Q1-Q24 defaults now materialize datetime values at parameter ingestion; production Polars timestamp-window regression passes.",
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "notes": null,
+        "started_at": "2026-08-24T22:55:13Z",
+        "started_branch": "fix/dataframe-temporal-literals",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-dataframe-temporal-literals",
+        "status": "done",
+        "summary": "Use native date/datetime literals in nyctaxi",
+        "wid": "w1"
+      },
+      {
+        "evidence": "TSBS DevOps Q1-Q18 start/end defaults now materialize datetime values at module initialization; production Polars timestamp-window regression passes.",
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "notes": null,
+        "started_at": "2026-08-24T22:55:16Z",
+        "started_branch": "fix/dataframe-temporal-literals",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-dataframe-temporal-literals",
+        "status": "done",
+        "summary": "Use native date/datetime literals in tsbs_devops",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Fresh Polars SF0.01 runs completed with NYC Taxi 25/25 and TSBS DevOps 18/18 successful in each of three measurement iterations.",
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "notes": null,
+        "started_at": "2026-08-24T22:55:19Z",
+        "started_branch": "fix/dataframe-temporal-literals",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-dataframe-temporal-literals",
+        "status": "done",
+        "summary": "Confirm both run clean at SF0.01 on polars-df",
+        "wid": "w3"
+      },
+      {
+        "evidence": "FlightData already uses native date defaults and converts stored ISO overrides in its benchmark; no temporal-literal change is needed, and its remaining gate blocker is a separate output-contract item.",
+        "item_id": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops",
+        "notes": null,
+        "started_at": "2026-08-24T22:55:21Z",
+        "started_branch": "fix/dataframe-temporal-literals",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-dataframe-temporal-literals",
+        "status": "done",
+        "summary": "Check flightdata for the same pattern and report whether it unblocks wire-the-flightdata-cross-surface-gate",
+        "wid": "w4"
+      }
+    ]
+  }
+}

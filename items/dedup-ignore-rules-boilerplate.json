@@ -1,0 +1,160 @@
+{
+  "context": "Add new entries to the existing ignore_rules list in pyproject.toml under\n[tool.benchbox.duplicates]. Follow the established pattern: group by\npath_contains scope, list specific function_names.\n\nStrategy per group type:\n1. Protocol/ABC stubs (G8,G9,G11,G22): Ignore by function name within\n   benchbox/core/dataframe/ and benchbox/platforms/dataframe/ paths\n2. Platform adapter wrappers (G3,G10,G14): Ignore by function name within\n   benchbox/platforms/ paths\n3. Benchmark facade methods (G2,G5): Ignore by function name (global or\n   path-scoped to core/*/benchmark.py and top-level modules)\n4. TPC-DS/TPC-DI domain (G1,G6,G7,G26,G28): Ignore by function name\n   within specific tpcds/tpcdi paths\n5. Multi-backend dispatch (G18,G20): Ignore within unified_frame.py and\n   expression_family.py\n6. Benchmark config methods (G16): Ignore get_schema/get_csv_loading_config\n   across benchmark modules\n\nAfter adding rules, run `make duplicate-check-verbose` to verify reduction,\nthen lower the threshold proportionally.\n",
+  "description": "The `make duplicate-check-verbose` report identifies 396 duplicate function groups\ntotaling 12,666 duplicated lines. Analysis of the top 30 groups reveals that 17 are\nintentional boilerplate - interface-conforming stubs, protocol/ABC declarations,\nplatform adapter wrappers, and TPC-DS spec-mandated query patterns.\n\nThese groups should be suppressed via ignore_rules in pyproject.toml\n[tool.benchbox.duplicates] to reduce noise and focus the duplicate checker on\ngenuine consolidation opportunities.\n\nGroups to ignore (by report rank):\n- G1  (344 lines): _fact_map/_role_aliases/_income_band_aliases in tpcds_obt/etl/transformer.py\n- G2  (180 lines): get_queries_by_category/get_query_info facade delegation methods across benchmark.py files\n- G3  (175 lines): _detect_format/col/get_dataframe_operations in dataframe platform adapters\n- G5  (140 lines): execute_rule/get_operation/get_table_row_count domain-specific manager protocols\n- G6  (132 lines): _load_base_queries/_load_etl_queries TPC-DI query dict builders\n- G7  (120 lines): get_queries_by_category/complexity/frequency in tpcdi/query_*.py\n- G8  (117 lines): cast_date/cast_string/col abstract stubs in dataframe context/protocols\n- G9  (116 lines): filter/limit/scalar_to_df abstract method declarations\n- G10 (100 lines): col/from_pandas/lit platform-specific thin wrappers\n- G11  (99 lines): can_provide/create_schema/date_add abstract method stubs across ABCs\n- G14  (91 lines): apply_platform_optimizations cloud platform stubs\n- G16  (90 lines): get_schema/get_csv_loading_config benchmark interface conformance\n- G18  (88 lines): first/floor/last multi-backend dispatch in unified_frame.py\n- G20  (87 lines): max_/mean/std multi-backend dispatch in expression_family.py\n- G22  (80 lines): _do_delete/delete_rows/generate_tuning_clauses Protocol+ABC stubs\n- G26  (75 lines): q33/q60 expression_impl TPC-DS spec-mandated query family\n- G28  (70 lines): q33/q60 pandas_impl TPC-DS spec-mandated query family\n\nAfter adding these rules, the threshold in pyproject.toml should be lowered to\nmatch the new effective duplicate count, preventing regressions.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "set threshold to exact current count",
+        "instead": "set it ~10% above baseline",
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "why": "normal development causes small fluctuations"
+      },
+      {
+        "dont": "use ignore_function_names (global) for functions that should only be ignored in specific paths",
+        "instead": "use ignore_rules with path_contains instead",
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "why": "it would suppress genuine duplicates elsewhere"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-21T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing ignore_rules in pyproject.toml continue to work (do not break current suppressions)",
+        "item_id": "dedup-ignore-rules-boilerplate"
+      },
+      {
+        "behavior": "make duplicate-check exit code behavior unchanged",
+        "item_id": "dedup-ignore-rules-boilerplate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make duplicate-check",
+        "description": "Duplicate check still passes with lowered threshold",
+        "expected": "PASS: N duplicated lines within threshold of M",
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make duplicate-check-verbose --top-n 10",
+        "description": "No false negatives - consolidation targets still appear in report",
+        "expected": "Report still shows consolidation candidates (Groups 4,12,13,17,19,21,23-25,27,29,30)",
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "notes": "Functions: cast_date, cast_string, col, filter, limit, scalar_to_df,\ncan_provide, create_schema, date_add, date_sub, _do_delete, delete_rows,\ngenerate_tuning_clauses.\nPaths: benchbox/core/dataframe/, benchbox/core/operations/,\nbenchbox/platforms/dataframe/, benchbox/core/tuning/ddl_generator.py,\nbenchbox/platforms/base/\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ignore rules for Protocol/ABC abstract stubs (G8,G9,G11,G22) - ~412 lines",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "notes": "Functions: _detect_format, col, from_pandas, lit, get_dataframe_operations,\napply_platform_optimizations (platform-level stubs).\nPaths: benchbox/platforms/dataframe/, benchbox/platforms/bigquery.py,\nbenchbox/platforms/databricks/, benchbox/platforms/snowflake.py, etc.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ignore rules for platform adapter wrappers (G3,G10,G14) - ~366 lines",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "notes": "Functions: get_queries_by_category, get_query_info, get_operations_by_category,\nexecute_rule, get_operation, get_table_row_count, get_schema,\nget_csv_loading_config, apply_platform_optimizations (benchmark-level).\nPaths: benchbox/core/*/benchmark.py, benchbox/core/*/dataframe_operations.py,\nbenchbox/*.py (top-level modules)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ignore rules for benchmark facade/delegation methods (G2,G5,G16) - ~410 lines",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "notes": "Functions: _fact_map, _role_aliases, _income_band_aliases, _load_base_queries,\n_load_etl_queries, get_queries_by_category, get_queries_by_complexity,\nget_queries_by_frequency, q33_expression_impl, q60_expression_impl,\nq33_pandas_impl, q60_pandas_impl.\nPaths: benchbox/core/tpcds_obt/etl/, benchbox/core/tpcdi/queries.py,\nbenchbox/core/tpcdi/query_*.py, benchbox/core/tpcds/dataframe_queries/\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ignore rules for TPC-DS/TPC-DI domain patterns (G1,G6,G7,G26,G28) - ~741 lines",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "notes": "Functions: first, floor, last, abs_, round_, ceil, sqrt, log, quantile,\nmax_, mean, std, sum, min_, count, var.\nPaths: benchbox/platforms/dataframe/unified_frame.py,\nbenchbox/platforms/dataframe/expression_family.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ignore rules for multi-backend dispatch methods (G18,G20) - ~175 lines",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-ignore-rules-boilerplate",
+        "notes": "Run make duplicate-check-verbose, verify suppressed groups are gone,\ncalculate new effective duplicate count, lower threshold to ~10% above\nthe new baseline. Current threshold: 13886, expect to drop significantly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify reduction and lower threshold in pyproject.toml",
+        "wid": "w6"
+      }
+    ]
+  }
+}

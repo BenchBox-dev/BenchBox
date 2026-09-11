@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #523 of visualization-suggestions-and-render-orchestration.\nDeferred: Add file-output support to MCP chart generation\nReason deferred: The current MCP implementation returns inline ASCII; this TODO only centralizes orchestration and messaging.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:48Z",
+      "worktree": "main"
+    }
+  }
+}

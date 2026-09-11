@@ -1,0 +1,246 @@
+{
+  "context": "Split infra hardening from re-runs. First confirm daemon + disk (w0) and\nthe real LakeSail startup time (w1). Then make a failed compose-up a\nrecorded, non-fatal event so the sweep advances (w2, depends on the\nfailure-capture/abort-safe work). The code work (w0-w2) is complete; the\nDocker re-runs (w3, w4) are deferred and executed ONLY as part of the\nfour-stage release-gate sweep [[uat-certification-rerun-ordering-and-gate]]\nw5 (into a fresh root, after native + dataframe stages), not as a standalone\nDocker sweep here. Both re-run dirs must be non-empty with up/run/down\nlifecycle lines.\n",
+  "description": "Managed UAT now uses an engine-resolved compose CLI: BENCHBOX_CONTAINER_CLI overrides the choice, and on macOS mocker is selected when present before docker. Native Apple container tooling is used for container-store cleanup. This TODO is therefore not a migration task; it closes the remaining gap between the engine-agnostic implementation and release-grade managed-stack evidence.\\n\\nThe historical 2026-05-28 evidence remains unusable: the managed non-OLTP cells.jsonl was empty after a LakeSail startup timeout, and the managed OLTP run root was empty. Revalidate under the resolved managed engine, using Mocker on the current macOS path, into a fresh run root. Measure a healthy LakeSail compose-up before changing cleanup.docker_start_timeout_s, preserve the failure-capture-and-advance behavior, and run the managed tiers only in the release-gate order after native and dataframe stages. Each stack remains serialized and must produce up, run, and down lifecycle records plus non-empty result artifacts.\\n\\nMocker coverage is partial: QuestDB and PostgreSQL lifecycle parity plus QuestDB end-to-end execution are validated; Databend’s separate MinIO dependency has a known Mocker failure, while Doris and StarRocks still need separate Mocker validation. Use BENCHBOX_CONTAINER_CLI=docker only for a stack with a documented Mocker incompatibility, and record the exception and evidence. Do not treat unit tests as full Mocker coverage.\\n\\nUnblock by confirming Apple container and Mocker storage and memory headroom, measuring healthy LakeSail startup, setting cleanup.docker_start_timeout_s above that measurement with evidence, then running the managed smoke and release-gate rerun into a fresh root.\n\nREVALIDATED 2026-08-23: under Mocker 0.7.2 / Apple Container 1.1.0, isolated LakeSail startup completed successfully in 5 seconds. After a 15-second post-start wait, `mocker compose ps -a` reported lakesail-connect `Up` on port 50051; teardown completed successfully. Evidence: /tmp/benchbox-lakesail-startup-20260823.log and /tmp/benchbox-lakesail-poststart-20260823.log. The 2026-08-17 memory-shortfall blocker is stale for this stack startup path. A full release-gate rerun and other managed stacks remain separate evidence requirements.\n\nREVALIDATED 2026-08-23 managed smoke: LakeSail startup/readiness passed and teardown succeeded, but the fresh-root smoke aborted before ClickHouse execution at the host-memory gate. On source d224a6932, clickhouse-server requested 7.451 GiB plus the 2.00 GiB reserve; only 5.34 GiB was available with 70.2% swap, so the required 9.45 GiB threshold failed. Evidence: /Users/joe/Developer/benchmark_runs/logs/uat_docker_managed_20260823/uat_lifecycle.log and matrix_summary.partial.tsv. This supersedes the old LakeSail-startup blocker; rerun after the 5.25 GiB ClickHouse policy PR is integrated and/or on a host with measured headroom.\n\nREVALIDATED 2026-08-23 after PR #1835 merged as 4f8c580f7: managed smoke resolves clickhouse_memory_limit=5.25g. LakeSail startup/readiness and teardown pass; the run then aborts before ClickHouse startup at the current host-memory gate: 5.40 GiB available versus 6.89 GiB required (5.25 GiB request plus 2.00 GiB reserve), with 67.9% swap. Evidence: /Users/joe/Developer/benchmark_runs/logs/uat_docker_managed_20260823/uat_lifecycle.log and matrix_summary.partial.tsv.\n\nRECONCILED 2026-08-24: the calibration established the 5.25 GiB ClickHouse runtime request but did not validate the additional 2 GiB host reserve. Follow-up PR #1867 removes that unvalidated default, retains explicit nonzero overrides, and adds regression coverage. The prior 6.89 GiB admission blocker must not be treated as a measured requirement; rerun the merged request-only policy after #1867 lands.\n\nPRE-MERGE REQUEST-ONLY RUN 2026-08-24 on PR #1867 head e70f2ff59: ClickHouse compose up succeeded and runtime stats matched the 5.25g request exactly with reserve=0.00 GiB. Post-start available memory fell to 4.78 GiB versus 4.889 GiB required, with 76.5% swap, so readiness failed closed; LakeSail also started/teardown-cleanly, while CedarDB/StarRocks had separate startup failures. Evidence: /Users/joe/Developer/benchmark_runs/logs/uat_docker_managed_20260824/uat_lifecycle.log and matrix_summary.tsv. This confirms the old 2 GiB reserve was not the ClickHouse requirement; remaining failure is genuine current-host pressure below the measured request.\n\nMERGED-STATE RUN 2026-08-24 on develop 466dd64c8 after PR #1867 merge 5479a967: LakeSail compose up and teardown succeeded, but its cell failed because generated UAT argv injected `--platform-option endpoint=sc://localhost:50051` and current CLI rejected endpoint for lakesail (only driver_auto_install/driver_version advertised). ClickHouse then reached request-only runtime admission with 5.25g/0.00 GiB reserve but failed closed at 4.73 GiB available < 4.889 GiB required, swap 64.0%. Evidence: /Users/joe/Developer/benchmark_runs/logs/uat_docker_managed_20260824/uat_lifecycle.log and lakesail_tpch_0.01_20260824_132920.log.\n\nFOLLOW-UP FIX 2026-08-24: PR #1875 (60e4363cb) registers the `endpoint` platform option for LakeSail and Velox, matching managed UAT Spark Connect endpoint injection. Focused tests: 152 passed; preflight passed. Await merge before the next authoritative managed run.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "let one compose-up timeout abort the entire Docker sweep.",
+        "instead": "(not specified)",
+        "item_id": "uat-docker-stack-recovery",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "raise docker_start_timeout_s until you have measured a healthy startup",
+        "instead": "(not specified)",
+        "item_id": "uat-docker-stack-recovery",
+        "why": "a longer timeout on a broken service just wastes 5+ minutes per attempt."
+      },
+      {
+        "dont": "reuse the empty 2026-05-28 oltp run dir as evidence",
+        "instead": "(not specified)",
+        "item_id": "uat-docker-stack-recovery",
+        "why": "it has none; re-run into a fresh root."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "needs_item": "uat-artifact-integrity-and-failure-capture"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-08-29T13:05:23Z",
+      "completed_pr": 1875,
+      "created_at": "2026-05-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Exactly one Docker stack runs at a time (sequential); PostgreSQL-family stacks sharing 5432 stay serialized.",
+        "item_id": "uat-docker-stack-recovery"
+      },
+      {
+        "behavior": "Existing compatibility_pruned rules for docker platforms are unchanged.",
+        "item_id": "uat-docker-stack-recovery"
+      },
+      {
+        "behavior": "UAT never runs docker system/volume/image prune or unqualified compose down; only project-scoped benchbox-uat-* teardown.",
+        "item_id": "uat-docker-stack-recovery"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "docs/operations/uat-framework.md 'Docker storage cleanup' — docker_manage_platforms up/run/down lifecycle, docker_start_timeout_s, make uat-docker-cleanup; reuse the managed-lifecycle contract",
+        "decision": "reuse",
+        "item_id": "uat-docker-stack-recovery",
+        "path": "docs/operations/uat-framework.md"
+      },
+      {
+        "concept": "tests/uat/docker_assets.py + tests/uat/docker_cleanup.py — existing UAT-owned compose project handling; extend, do not replace",
+        "decision": "extend",
+        "item_id": "uat-docker-stack-recovery",
+        "path": "tests/uat/docker_assets.py"
+      },
+      {
+        "concept": "uat_complete_docker_non_oltp_20260528 uat_lifecycle.log — reference for the docker action/status log line shape",
+        "decision": "reuse",
+        "item_id": "uat-docker-stack-recovery",
+        "path": "uat_complete_docker_non_oltp_20260528"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/cleanup.py"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/config.py"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/docker_assets.py"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/docker_cleanup.py"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_cleanup.py"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_docker_assets.py"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_docker_cleanup.py"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_docker_assets.py tests/uat/test_docker_cleanup.py tests/uat/test_cleanup.py -q",
+        "description": "Docker assets + cleanup tests pass",
+        "expected": "all pass",
+        "item_id": "uat-docker-stack-recovery",
+        "last_result": "pass",
+        "last_run": "2026-08-23T21:17:39Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_CONTAINER_CLI=mocker make uat-sweep CONFIG=tests/uat/configs/stress-docker-managed.yaml",
+        "description": "A managed container-engine smoke produces non-empty cells.jsonl with up, run, and down lifecycle lines",
+        "expected": "run dir contains non-empty cells.jsonl and uat_lifecycle.log with action=up/down status lines per platform",
+        "item_id": "uat-docker-stack-recovery",
+        "last_result": "fail",
+        "last_run": "2026-08-24T17:30:18Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-docker-stack-recovery",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #693 / merged preflight: managed mode checks Docker daemon health and Docker data-root free space before sweep; focused UAT Docker tests pass.",
+        "item_id": "uat-docker-stack-recovery",
+        "notes": "Satisfied upstream: the disk-headroom preflight gate landed in\nuat-preflight-disk-headroom-gate (#693, merged) and preflight treats\nDocker as required in managed mode (docker ps / docker compose). Docker\ndaemon confirmed available in the implementation environment.\n",
+        "started_at": "2026-08-12T12:45:05Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm Docker daemon health + Docker data-root free space as a precondition before a Docker sweep",
+        "wid": "w0"
+      },
+      {
+        "evidence": "docs/operations/uat-framework.md records measure-then-set LakeSail startup timeout; global timeout remains provisional until healthy live startup is measured. No live measurement is claimed here.",
+        "item_id": "uat-docker-stack-recovery",
+        "notes": "Mechanism + guidance delivered (CODE part). docs/operations/uat-framework.md\nnow documents the measure-then-set procedure: bring the stack up in\nisolation (make uat-bring-up PLATFORM=lakesail), confirm health, time it,\nthen set cleanup.docker_start_timeout_s above the observed healthy time.\nPer the anti-pattern the global default is NOT raised blindly. The actual\nLakeSail value must be set from a measured healthy startup during the\nrelease-gate bring-up (requires building the benchbox-lakesail Spark\nConnect image, which is the live-environment step folded into the\nrelease-gate re-run; see uat-certification-rerun-ordering-and-gate w5).\n",
+        "started_at": "2026-08-12T12:45:14Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Measure LakeSail normal compose-up time; raise docker_start_timeout_s only to a justified value",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/uat/phases/execute.py records managed compose-up failures as skipped-unreachable, tears down the half-started stack, and advances; focused Docker/UAT suite: 186 passed.",
+        "item_id": "uat-docker-stack-recovery",
+        "notes": "Fixed in tests/uat/phases/execute.py: a managed compose-up failure\n(cleanup_status == \"startup-failed\") now records the platform's cells as\nskipped-unreachable (the failure is captured in docker_events /\nuat_lifecycle.log action=up status=failed), tears down the half-started\nstack, and advances to the next stack — instead of breaking the whole\nsweep. Genuine global aborts (free space, teardown failure, fixed\ncontainer-name policy) still abort. Regression test:\ntests/uat/test_phases.py::test_execute_docker_startup_failure_records_and_advances_to_next_platform.\nNOTE: this required editing tests/uat/phases/execute.py + test_phases.py,\nwhich were outside the original scope_limit only_modify list (the FAIL-\nand-advance machinery was assumed owned by uat-artifact-integrity-and-\nfailure-capture #691, but #691 did not make compose-up failure non-fatal).\nscope_limit expanded below with this justification.\n",
+        "started_at": "2026-08-12T12:45:20Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Ensure a single platform's compose-up failure does not end the sweep; remaining stacks still attempt",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Fresh isolated Mocker/Apple Container LakeSail run: startup completed in 5 seconds; post-start ps -a after 15 seconds reported lakesail-connect Up; teardown succeeded. Logs: /tmp/benchbox-lakesail-startup-20260823.log and /tmp/benchbox-lakesail-poststart-20260823.log.",
+        "item_id": "uat-docker-stack-recovery",
+        "notes": "OPERATIONAL / live-environment step. NOT independently actionable and NOT\na standalone Docker-only rerun: it is executed ONLY inside the four-stage\nrelease-gate sweep [[uat-certification-rerun-ordering-and-gate]] w5\n(native -> dataframe -> docker non-OLTP -> docker OLTP), which runs the\nDocker OLTP stacks into a fresh root rather than running the re-run twice.\nRunning just the Docker stacks here would reproduce the ordering\ncontamination that w5's anti-pattern forbids (\"DO NOT start a Docker stack\nbefore native + dataframe platforms finish\"). Kept `status: pending`\n(the schema allows only pending/in_progress/done) but the summary and these\nnotes mark it as cert-w5-owned so the ready queue is not mistaken for a\nstandalone task. Requires built/pulled Docker images (OLTP stacks) + the\nlive Docker daemon. The empty 2026-05-28 oltp dir is non-evidentiary.\n",
+        "started_at": "2026-08-23T18:11:59Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "[VIA release-gate rerun] Re-run managed OLTP stacks under the resolved engine (Mocker on macOS) from a fresh run root with full lifecycle logs",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Mocker smoke 2026-08-12 from fresh managed root /Users/joe/Developer/benchmark_runs/logs/uat_docker_managed_20260812: lifecycle up/ps/down and scoped volume cleanup were recorded; ClickHouse TPCH passed, LakeSail query cell produced no JSON after grpcio install failure, StarRocks schema setup failed with no backends, CedarDB startup readiness failed and was captured/advanced. Final uat_gate_summary.json retained red verdict with attempted=3, passed=1, failed=2, startup_failed=1; no global abort.",
+        "item_id": "uat-docker-stack-recovery",
+        "notes": "OPERATIONAL / live-environment step. Same folding as w3: executed ONLY\ninside [[uat-certification-rerun-ordering-and-gate]] w5 into a fresh root,\nafter native + dataframe stages complete — not as a standalone Docker\nsweep. Kept `status: pending` per schema; the summary carries the\ncert-w5-owned guard. The w2 fix here guarantees a single stack's startup\nfailure no longer truncates the non-OLTP sweep, which was the root cause\nof the empty 2026-05-28 cells.jsonl.\n",
+        "started_at": "2026-08-12T12:55:12Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "[VIA release-gate rerun] Re-run managed non-OLTP stacks under the resolved engine (Mocker on macOS) and verify per-platform up, run, down and non-empty cells.jsonl",
+        "wid": "w4"
+      }
+    ]
+  }
+}

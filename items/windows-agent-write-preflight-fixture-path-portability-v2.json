@@ -1,0 +1,104 @@
+{
+  "context": "Reduce the mixed-path condition, then normalize the guard or fixture boundary and add a host-independent regression. Skipping Windows is forbidden.",
+  "description": "Run 30690807993 fails three safety tests: temporary plain clones and pool siblings are misclassified on Windows, yielding fail-open results. Localize mixed git rev-parse, realpath, dirname/find, and environment behavior; repair the narrow boundary while preserving that BENCHBOX_EPHEMERAL_CLONE cannot bypass a detected pool.",
+  "legacy": {
+    "item_meta": {
+      "category": "Safety test portability",
+      "completed_at": "2026-08-01T15:45:35Z",
+      "completed_pr": 1408,
+      "created_at": "2026-08-01T14:04:43Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Ephemeral declaration requires one worktree and zero pool siblings.",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability-v2"
+      },
+      {
+        "behavior": "Primary clone writes remain refused without explicit emergency authorization.",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-agent-write-preflight-fixture-path-portability-v2",
+        "kind": "only_modify",
+        "path_glob": "scripts/agent_write_preflight.sh"
+      },
+      {
+        "item_id": "windows-agent-write-preflight-fixture-path-portability-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_agent_write_preflight.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/test_agent_write_preflight.py -q",
+        "description": "Agent preflight suite",
+        "expected": "fails three tests on the unfixed Windows tree; exit 0 after repair",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make agent-write-preflight",
+        "description": "Claimed worktree preflight",
+        "expected": "exit 0",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-agent-write-preflight-fixture-path-portability-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-agent-write-preflight-fixture-path-portability-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Unfixed equivalent-path regression returned 0 and allowed a primary clone",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability-v2",
+        "notes": null,
+        "started_at": "2026-08-01T15:38:47Z",
+        "started_branch": "fix/windows-agent-preflight-fixture-path",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Reduce and localize the Windows fail-open path",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Primary comparison uses POSIX -ef filesystem identity; equivalent-spelling regression now refuses",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability-v2",
+        "notes": null,
+        "started_at": "2026-08-01T15:39:28Z",
+        "started_branch": "fix/windows-agent-preflight-fixture-path",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Normalize the affected production or fixture boundary without weakening policy",
+        "wid": "w1"
+      },
+      {
+        "evidence": "10 guard tests pass; sh -n clean; make agent-write-preflight passes in linked worktree",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability-v2",
+        "notes": null,
+        "started_at": "2026-08-01T15:40:14Z",
+        "started_branch": "fix/windows-agent-preflight-fixture-path",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Add a mixed Git-for-Windows and MSYS path regression",
+        "wid": "w2"
+      }
+    ]
+  }
+}

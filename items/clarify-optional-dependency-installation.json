@@ -1,0 +1,10 @@
+{
+  "description": "\"Added the `cloudstorage` extra, centralized dependency metadata, refreshed adapter errors, and documented an installation matrix so optional platform installs are predictable.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation and Developer Experience",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "docs-experience"
+    }
+  }
+}

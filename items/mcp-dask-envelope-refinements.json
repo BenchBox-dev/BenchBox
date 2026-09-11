@@ -1,0 +1,57 @@
+{
+  "context": "For (1): consider clamping the static defaults to observed host capacity (psutil is already a dependency of benchbox/mcp/security.py) while keeping the env overrides as an explicit operator ceiling, so the effective budget is min(configured, host). Keep the values deterministic under test by injecting capacity rather than reading it inside the validator. For (2): decide whether an inert-field rejection is worth relaxing at all; if it is, reject the contradiction explicitly (use_distributed=false with an explicit n_workers/threads_per_worker) rather than silently skipping the envelope, so no bypass shape is introduced.",
+  "description": "Two tradeoffs accepted deliberately when the aggregate envelope landed (PR #1511), recorded so they are decisions rather than oversights. (1) The budget defaults are static constants - 16 workers, 64 total threads, 64GB total - chosen for determinism and testability, not derived from host capacity. On a 4-core runner the default still admits a 64-thread request; on a 64-core host it under-uses the machine. Operators can retune via BENCHBOX_MCP_DASK_MAX_WORKERS / _MAX_TOTAL_THREADS / _MAX_TOTAL_MEMORY, but the out-of-box default is not capacity-aware. (2) The envelope is applied even when use_distributed is false, where DaskDataFrameAdapter creates no LocalCluster at all, so a request that would consume nothing can still be rejected for its worker count. Fail-closed was the deliberate choice - use_distributed=false combined with a large n_workers is a contradictory request, and making the guard conditional would add a bypass shape - but it is over-strict.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "mcp-dask-envelope-refinements",
+        "needs_item": "mcp-v2-dask-resource-envelope-v3"
+      }
+    ],
+    "item_meta": {
+      "category": "mcp",
+      "completed_at": "2026-08-08T18:12:27Z",
+      "created_at": "2026-08-04T12:36:32Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "No test starts a real Dask cluster",
+        "item_id": "mcp-dask-envelope-refinements"
+      },
+      {
+        "behavior": "The aggregate envelope stays enforced at the single validate_platform_options chokepoint reached by sync admission, durable persistence and worker replay",
+        "item_id": "mcp-dask-envelope-refinements"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-dask-envelope-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-dask-envelope-refinements",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "item_id": "mcp-dask-envelope-refinements",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_schemas.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_schemas.py -q -k DaskResourceEnvelope",
+        "description": "Budget resolution is deterministic under test and never exceeds the operator ceiling",
+        "expected": "exits 0 with boundary, override and malformed-override coverage intact",
+        "item_id": "mcp-dask-envelope-refinements",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

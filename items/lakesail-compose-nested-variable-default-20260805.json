@@ -1,0 +1,212 @@
+{
+  "context": "tests/uat/phases/execute.py already exports BENCHBOX_DATA_DIR for managed\nplatforms, so the default is redundant. Replace it with the required form\n${BENCHBOX_DATA_DIR:?...} so an unset variable fails loudly at compose parse time\ninstead of silently mounting the wrong path. Then sweep all compose files for the\nnested pattern and add a lint test rejecting it repo-wide.\n",
+  "description": "Supersedes lakesail-compose-nested-variable-default, dropped the same day: verification ladders are\ncreate-time-only in this tracker, so a lint finding on a rung can only be\nfixed by recreating the item.\n\ndocker/lakesail/docker-compose.yml line 23 nests defaults two deep:\n  - \"${BENCHBOX_DATA_DIR:-${PWD}/benchmark_runs}:${BENCHBOX_DATA_DIR:-${PWD}/benchmark_runs}:ro\"\n\nmocker's compose parser does not handle the nested form and resolves it to a\ndoubled path with a stray brace, failing with:\n  path '/Users/joe/Developer/benchmark_runs/benchmark_runs}' does not exist\n\nLakeSail therefore cannot start under mocker at all, independently of the\ncontainer-name and readiness defects.\n\nMEASURED 2026-08-05: the identical nested-default pattern is also present in\ndocker/velox/docker-compose.yml, so this is not a lakesail-only defect.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix only lakesail",
+        "instead": "sweep all compose files and add a lint that rejects the pattern",
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "why": "the same nested pattern may exist in other compose files and will fail identically the first time that platform runs under mocker"
+      },
+      {
+        "dont": "replace the nested default with a hardcoded absolute path",
+        "instead": "require the variable and let the caller supply it",
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "why": "it bakes one developer's directory layout into a committed compose file"
+      },
+      {
+        "dont": "silently default to ./benchmark_runs when the variable is unset",
+        "instead": "fail at parse time with a message naming the missing variable",
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "why": "a silently wrong mount path is how this defect stayed hidden -- the container started and read nothing"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-08-06T01:08:39Z",
+      "completed_pr": 1626,
+      "created_at": "2026-08-05T15:11:15Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "Behavior under real Docker is unchanged when BENCHBOX_DATA_DIR is exported, which UAT always does.",
+        "item_id": "lakesail-compose-nested-variable-default-20260805"
+      },
+      {
+        "behavior": "The LakeSail CSV compatibility symlink layout under the data directory is untouched.",
+        "item_id": "lakesail-compose-nested-variable-default-20260805"
+      },
+      {
+        "behavior": "The mount stays read-only and maps BENCHBOX_DATA_DIR to the identical absolute path inside the container, which is what makes server-side absolute paths resolve.",
+        "item_id": "lakesail-compose-nested-variable-default-20260805"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing helper module for compose path handling in UAT; the lint belongs with it or with the docker asset tests rather than in a new harness",
+        "decision": "reuse",
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "path": "tests/uat/docker_path_helpers.py"
+      },
+      {
+        "concept": "already exports BENCHBOX_DATA_DIR into the compose environment, which is why the in-file default can be removed rather than rewritten",
+        "decision": "reuse",
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "path": "tests/uat/phases/execute.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/mocker_compose_parity.sh"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "only_modify",
+        "path_glob": "docker/lakesail/.env"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "only_modify",
+        "path_glob": "docker/lakesail/docker-compose.yml"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "only_modify",
+        "path_glob": "docker/velox/.env"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "only_modify",
+        "path_glob": "docker/velox/README.md"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "only_modify",
+        "path_glob": "docker/velox/docker-compose.yml"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/velox_docker_dev.md"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/docker_path_helpers.py"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_docker_assets.py"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_docker_path_helpers.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run python -c \"import re,pathlib;bad=[str(p) for p in pathlib.Path('docker').rglob('docker-compose*.yml') if re.search(r'[\\$]\\{[^}]*[\\$]\\{', p.read_text())];assert not bad, bad\"",
+        "description": "No compose file under docker/ contains a nested variable default",
+        "expected": "FAILS (exit 1) on the unfixed tree: docker/lakesail and docker/velox both carry nested variable defaults that mocker misparses. Exits 0 once both are removed.",
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python -c \"import re,pathlib;bad=[str(p) for p in pathlib.Path('docker').rglob('docker-compose*.yml') if re.search(r'\\\\$\\\\{[^}]*\\\\$\\\\{', p.read_text())];assert not bad, bad\"",
+        "description": "No compose file under docker/ contains a nested variable default",
+        "expected": "exit 0; the nested-default pattern is absent repo-wide",
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_docker_path_helpers.py tests/uat/test_docker_assets.py -q",
+        "description": "Compose path helper tests pass including the nested-default lint",
+        "expected": "all pass; a test rejects the nested pattern",
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Nested default removed from docker/lakesail and docker/velox. NOT replaced with the required-variable form: review proved mocker 0.7.2 leaves the ${VAR:?msg} form completely unsubstituted even when the variable IS set, exiting 0. Landed as a flat no-default ${BENCHBOX_DATA_DIR} plus absolute-path validation at every bring-up path.",
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T01:08:29Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Replace the lakesail nested default with the required-variable form",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Swept every compose file under docker/: lakesail and velox both carried the nested pattern; both fixed. No others found.",
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T01:08:32Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Sweep every compose file for the nested pattern and fix any others",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Three repo-wide lint guards in tests/uat/docker_path_helpers.py: the pre-existing nested-default scan, plus find_non_flat_benchbox_data_dir_mounts (catches colon-less POSIX forms, no allowlist) and find_env_files_with_non_absolute_data_dir (globs *.env and .env.*, flags relative AND empty). Enforcement also moved into compose_environment(), the choke point uat_bring_up and the sweep both use. 7-case mutation matrix all caught; tests/uat 633 passed.",
+        "item_id": "lakesail-compose-nested-variable-default-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T01:08:36Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add a repo-wide lint test rejecting nested variable defaults",
+        "wid": "w2"
+      }
+    ]
+  }
+}

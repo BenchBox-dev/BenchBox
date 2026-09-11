@@ -1,0 +1,10 @@
+{
+  "description": "Complete the integration of query plan tracking with manifest v2 to enable\ncross-run plan comparison, regression detection, and plan versioning. Populate\nthe currently-empty plan_comparison_summary field and add plan metadata to\nmanifests.\n\n**Current State**: plan_comparison_summary field exists but is never populated\n**Target State**: Full cross-run comparison with regression detection",
+  "legacy": {
+    "item_meta": {
+      "category": "Feature Completion",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-remediation"
+    }
+  }
+}

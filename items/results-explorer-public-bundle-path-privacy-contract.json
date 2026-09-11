@@ -1,0 +1,238 @@
+{
+  "context": "Define one recursive public-egress policy that classifies values as credentials, identifying local paths, allowed non-identifying paths, URLs, or ordinary strings. Reuse the existing anonymization specifications and submission validator, then assert the same policy against exporter output, submitted bundles and companions, corpus inventory inputs, and the exact Explorer publication output. Reject rather than silently publish any residual user-home, private-volume, or Windows-profile path. Keep credential redaction distinct from path hashing.",
+  "description": "Release-readiness review evidence at 17c0c098a found 650 machine-local absolute-path values across 183 of 207 curated bundles, including working directories and driver-runtime executables. No email, credential-key, or URL-query secret was reproduced, but the path values conflict with the public anonymization contract and are copied into the Explorer download surface. This item prevents recurrence at the producer, submission validator, and Explorer publication boundary. It does not rewrite the existing corpus; that is owned by the dependent backfill item.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "patch only driver_runtime_python_executable or a short field-name allowlist",
+        "instead": "combine explicit semantic keys with recursive value classification at each public egress boundary",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "why": "the reproduced leak also occurs under working_dir, raw_config, database_path, and nested metadata and would recur under a new key"
+      },
+      {
+        "dont": "rewrite curated bundles in this item",
+        "instead": "leave corpus repair to results-explorer-curated-corpus-path-sanitization",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "why": "prevention must land and be tested before a content migration changes hashes and references"
+      },
+      {
+        "dont": "treat hashed credentials as safe public output",
+        "instead": "redact secrets and hash only approved identity/path values",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "why": "credential material must be removed, not converted into a stable correlation identifier"
+      },
+      {
+        "dont": "weaken submission hash, traversal, symlink, or trust checks while inserting the privacy scan",
+        "instead": "run the new check after safe parsing and before acceptance without reordering existing security checks",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "why": "privacy validation is additive to the existing hostile-input boundary"
+      }
+    ],
+    "item_meta": {
+      "category": "Security and Privacy",
+      "completed_at": "2026-08-02T12:58:20Z",
+      "completed_pr": 1464,
+      "created_at": "2026-08-02T04:27:05Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing hash, symlink, traversal, trust-label, and vendor-governance validation remains at least as strict.",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract"
+      },
+      {
+        "behavior": "Local-only anonymize=False consumers retain their documented non-secret diagnostic metadata; the fail-closed rule applies at public egress boundaries.",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract"
+      },
+      {
+        "behavior": "Secret-looking values remain redacted rather than reversibly hashed.",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract"
+      },
+      {
+        "behavior": "The public contract is recursive across bundle, manifest, and companion objects and cannot be bypassed by renaming a field.",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract"
+      },
+      {
+        "behavior": "URLs, SQL text, benchmark identifiers, and legitimate relative source references are not corrupted by a blanket slash regex.",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "The publication pipeline is the last chance to reject legacy curated data before it becomes directly downloadable.",
+        "decision": "extend",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "path": "_project/scripts/explorer_pipeline/pipeline.py"
+      },
+      {
+        "concept": "Existing recursive public anonymization and path-key classifier are the single policy seam; extend rather than parallelize them.",
+        "decision": "extend",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "path": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "concept": "Existing hostile-input and manifest validation is the public admission boundary; add the path-privacy decision there.",
+        "decision": "extend",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "path": "scripts/validate_submission.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/pipeline.py"
+      },
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization_specs.yaml"
+      },
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_submission_validation.py"
+      },
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_anonymization.py"
+      },
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_export_anonymization_surfaces.py"
+      },
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_validate_submission.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'import json,re; from pathlib import Path; bad=[str(p) for p in Path(\"results-data/bundles\").glob(\"*.json\") if re.search(r\"(?:/Users/|/home/|[A-Za-z]:\\\\Users\\\\)\", json.dumps(json.loads(p.read_text(encoding=\"utf-8\"))))]; assert not bad, f\"{len(bad)} bundles contain private home paths\"'",
+        "description": "The committed curated corpus contains no user-home path",
+        "expected": "Fails on the unfixed corpus; exits 0 only after no curated bundle contains a private home path.",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py tests/unit/core/results/test_export_anonymization_surfaces.py tests/unit/scripts/test_validate_submission.py tests/integration/test_submission_validation.py -q",
+        "description": "Public anonymization and submission security regressions pass",
+        "expected": "All focused tests pass after the privacy policy is enforced.",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "last_result": "pass",
+        "last_run": "2026-08-02T12:54:03Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q",
+        "description": "Explorer publication tests reject a residual path in copied output",
+        "expected": "Pipeline tests include and pass a negative fixture whose unexpected nested absolute path is rejected without echoing its value.",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "last_result": "pass",
+        "last_run": "2026-08-02T12:53:34Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "uv run -- python inventory over results-data/bundles: 179 primary JSON bundles contain 638 /Users, /home, or Windows home-path matches; sample captured in batch notes",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "notes": "At implementation time scan primary bundles, companions, manifests, origin/published-results, and a fresh Explorer output. Record counts by JSON key path and value class without printing raw home paths or credentials. Decide explicit treatment for POSIX homes, macOS private/volume paths, Windows profiles, file URLs, temporary paths, and repository-relative references.",
+        "started_at": "2026-08-02T12:47:12Z",
+        "started_branch": "feat/results-explorer-todo-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Re-derive the leak inventory and freeze the public path policy",
+        "wid": "w0"
+      },
+      {
+        "evidence": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py tests/unit/core/results/test_export_anonymization_surfaces.py -q: 211 tests passed, including generic nested path and false-positive regression coverage",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "notes": "Extend the canonical anonymization specification so executable and working-directory fields are covered, and add value-based fallback detection for renamed/nested fields. Add positive tests proving ordinary URLs, SQL, relative references, and approved non-identifying values survive unchanged.",
+        "started_at": "2026-08-02T12:47:44Z",
+        "started_branch": "feat/results-explorer-todo-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add recursive producer and anonymizer coverage for path-like values",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Explorer publication now anonymizes primary bundles and plan companions, rejects residual fields, and CLI submission validation fails closed; targeted pipeline + validator tests passed",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "notes": "Reject any bundle or companion that still contains a forbidden absolute path after public sanitization. Error output reports JSON key paths and counts but never echoes the sensitive value. The publication pipeline must validate the exact copied output, not only the source object before serialization.",
+        "started_at": "2026-08-02T12:52:47Z",
+        "started_branch": "feat/results-explorer-todo-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Fail closed in submission validation and Explorer publication",
+        "wid": "w2"
+      },
+      {
+        "evidence": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py tests/unit/core/results/test_export_anonymization_surfaces.py tests/unit/scripts/test_validate_submission.py tests/integration/test_submission_validation.py tests/unit/scripts/explorer_pipeline -q: verification runs passed (focused privacy/export/submit/publish coverage)",
+        "item_id": "results-explorer-public-bundle-path-privacy-contract",
+        "notes": "Drive POSIX, macOS, Windows, file-URL, nested raw-config, executable-path, and database-path sentinels through result export, submission validation, and a fresh Explorer build. Prove fail-closed behavior for an unexpected key and non-regression for non-sensitive values.",
+        "started_at": "2026-08-02T12:54:35Z",
+        "started_branch": "feat/results-explorer-todo-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add end-to-end privacy sentinels across export, submit, and publish",
+        "wid": "w3"
+      }
+    ]
+  }
+}

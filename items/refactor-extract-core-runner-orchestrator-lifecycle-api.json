@@ -1,0 +1,10 @@
+{
+  "description": "- \"Added `tests/unit/core/test_runner_lifecycle.py` covering data_only, load_only, and standard paths.\"\n- \"Updated `tests/unit/cli/test_cli_power_throughput.py` to assert adapter kwargs rather than internal run_config objects.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Architecture",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

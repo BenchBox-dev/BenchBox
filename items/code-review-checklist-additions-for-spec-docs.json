@@ -1,0 +1,189 @@
+{
+  "context": "Single bundled PR for the planning artifacts (TODO file + three\nblind-spot triage updates). The skill file edit lives in the\nuser-global `~/.claude/` directory; do that edit alongside the\nBenchBox commits but expect it not to land via the PR.\n\nPromotion via `sweep_blind_spots.py triage --action promote\n--todo-id <slug>` only updates frontmatter `status` / `todo_id` and\nappends a `## Triage log` entry — it does not author the TODO.\n",
+  "description": "Promotes three meta blind-spot findings produced *during* the\n2026-05-03 review of the UAT methodology remediation work — findings\nabout how proposals/spec docs were reviewed, not about the source\nUAT — into a single update to the `/code` review skill.\n\nSource findings (all currently `status: open` in\n`_project/blind-spots/`):\n\n1. `2026-05-03-083859-proposals-doc-decidability-gap` — proposals\n   reviewed via the five-axis rubric can pass on Correctness /\n   Readability while still failing the user-facing function: each\n   user-facing choice should ship with a default, a consequence, and\n   a recommendation, not just a question.\n\n2. `2026-05-03-084354-stress-test-self-bias` — when the proposer also\n   designs the stress-test, \"all proposals survive\" reads as\n   validation but is closer to a sanity check. Reviews of stress-test\n   handoffs should require a \"strongest argument against each\n   proposal\" subsection (or split designer/reviewer roles).\n\n3. `2026-05-03-084923-spec-approval-ergonomics` — specs with a\n   user-approval gate should declare the response shape (yes/no per\n   question, defaults, partial-acceptance cascades). Reviewers should\n   flag specs that ask questions without an approval protocol.\n\nImplementation surface: a single new \"Reviewing proposals/spec docs\"\nsection appended to `~/.claude/skills/references/five-axis-review.md`\nwith three checklist items. The skill file lives in the user-global\n`~/.claude/` directory and so the actual content edit ships outside\nany BenchBox PR; the BenchBox PR carries only the TODO record and\nthe three blind-spot frontmatter triage updates.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle the skill file edit into the BenchBox PR diff",
+        "instead": "the BenchBox PR ships only the TODO and triage updates.",
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "why": "the skill file lives outside the repo"
+      },
+      {
+        "dont": "generalise the proposals/spec checks into a sixth axis",
+        "instead": "keep them in their own subsection.",
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "why": "the five axes are stable and broadly applicable to code, while these checks apply specifically to proposals/spec docs"
+      },
+      {
+        "dont": "split into three separate TODOs",
+        "instead": "bundling avoids three PRs reviewing nearly-identical changes.",
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "why": "each finding produces a one-bullet edit to the same skill file"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "code-review-checklist-additions-for-spec-docs",
+        "id": 121,
+        "reason": "Premature generalisation. The five axes are stable; these checks apply only to proposals/spec docs. Promote to a sixth axis only if the subsection grows past three or four items and starts to show structural patterns of its own.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly premature: promote to a sixth rubric axis only if the proposals/spec subsection grows past 3-4 items; no evidence that threshold was reached.",
+        "summary": "Generalise the proposals/spec checks into a sixth axis of the rubric"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "code-review-checklist-additions-for-spec-docs",
+        "id": 122,
+        "reason": "Convention + reviewer attention is the proposed enforcement model, mirroring the parent UAT methodology spec's approach. Tooling is a lever to pull only if a future review shows the convention drifting.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Tooling enforcement explicitly deferred pending evidence of convention drift; no such evidence cited, no open item tracks it.",
+        "summary": "Tooling enforcement (e.g., a /code linter that flags spec docs missing an approval protocol)"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing blind-spot bodies — only `status` and `todo_id` (and the `## Triage log` entry) may change during promotion.",
+        "item_id": "code-review-checklist-additions-for-spec-docs"
+      },
+      {
+        "behavior": "The Severity Classification, Change Sizing, and Rules sections at the bottom of `five-axis-review.md`.",
+        "item_id": "code-review-checklist-additions-for-spec-docs"
+      },
+      {
+        "behavior": "The five existing axes (Correctness, Readability, Architecture, Security, Performance) and their bullets — the new section is additive.",
+        "item_id": "code-review-checklist-additions-for-spec-docs"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "kind": "do_not_modify",
+        "path_glob": "_project/handoffs/"
+      },
+      {
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "kind": "do_not_modify",
+        "path_glob": "_project/specs/"
+      },
+      {
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/active/code-review-checklist-additions-for-spec-docs.yaml"
+      },
+      {
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/code-review-checklist-additions-for-spec-docs.yaml"
+      },
+      {
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-05-03-083859-proposals-doc-decidability-gap.md"
+      },
+      {
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-05-03-084354-stress-test-self-bias.md"
+      },
+      {
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-05-03-084923-spec-approval-ergonomics.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py list --status merged-to-todo | grep -c code-review-checklist-additions-for-spec-docs",
+        "description": "All three blind-spots reach merged-to-todo status with todo_id set",
+        "expected": ">= 3",
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'Reviewing proposals/spec docs' ~/.claude/skills/references/five-axis-review.md",
+        "description": "Skill file gained a 'Reviewing proposals/spec docs' subsection",
+        "expected": ">= 1",
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "notes": "Append to `~/.claude/skills/references/five-axis-review.md` (under a\nnew \"Reviewing proposals/spec docs\" subsection) a bullet that says:\n\"for each user-facing choice, the doc should state a default, a\nconsequence, and a recommendation — conditional phrasing without a\ndefault pushes the decision back onto the user.\"\n\nThen promote the source blind-spot:\n  uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py \\\n    triage 2026-05-03-083859-proposals-doc-decidability-gap \\\n    --action promote --todo-id code-review-checklist-additions-for-spec-docs\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a 'decidability check' item for proposals/spec docs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "notes": "Add a sibling bullet under the same \"Reviewing proposals/spec docs\"\nsubsection: \"when a proposals doc includes a stress-test that\nconcludes 'all proposals survive', flag the self-grading risk and\nrequire either (a) a 'strongest argument against each proposal'\nsubsection in the same doc, or (b) an independent reviewer for the\nstress-test step.\"\n\nThen promote:\n  uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py \\\n    triage 2026-05-03-084354-stress-test-self-bias \\\n    --action promote --todo-id code-review-checklist-additions-for-spec-docs\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a 'self-bias guard' item for stress-test sections",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "code-review-checklist-additions-for-spec-docs",
+        "notes": "Add the third bullet: \"specs with a user-approval gate must declare\nthe response shape — yes/no per question, what 'accept defaults'\nselects, how partial acceptance cascades into downstream\nparameterised work — before reaching the open-questions section.\"\n\nThen promote:\n  uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py \\\n    triage 2026-05-03-084923-spec-approval-ergonomics \\\n    --action promote --todo-id code-review-checklist-additions-for-spec-docs\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add an 'approval ergonomics' item for specs with user-approval gates",
+        "wid": "w3"
+      }
+    ]
+  }
+}

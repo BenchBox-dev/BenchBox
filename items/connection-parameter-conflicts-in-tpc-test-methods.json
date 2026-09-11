@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: High\"\n- \"**Status**: ✅ Completed\"\n- \"**Description**: Fixed \\\"multiple values for keyword argument 'connection'\\\" errors when executing TPC power/throughput/maintenance tests through CLI\"\n- \"**Context**: The CLI orchestrator was passing connection parameters both explicitly (connection=connection) and within run_config dictionary, causing Python to receive duplicate keyword arguments when calling platform adapter test methods\"\n- \"**Root Cause**: In CLI orchestrator methods (`_execute_power_test`, `_execute_throughput_test`, `_execute_maintenance_test`), calls like `platform_adapter.run_power_test(benchmark, connection=connection, **run_config)` failed when run_config also contained a 'connection' key\"\n- \"**Tasks Completed**:\"\n- \"**Files Affected**:\"\n- \"**Impact**: ✅ **RESOLVED** - TPC test methods (power, throughput, maintenance) now execute successfully without parameter conflicts, ensuring reliable benchmark execution through CLI interface\"\n- \"**Validation**: SSB power test execution progresses past connection error to actual benchmark execution phase\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Bug Fixes",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

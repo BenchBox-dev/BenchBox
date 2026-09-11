@@ -1,0 +1,150 @@
+{
+  "description": "Re-review finding (2026-07-03, joinorder Track-2 review triage). The canonical\nJoinOrder data archive is not downloadable: the manifest URL\n(benchbox/core/joinorder/data_manifest.toml:6,\n`https://github.com/joeharris76/BenchBox/releases/download/data%2Fjoinorder-imdb-2013-v1/joinorder-imdb-2013-v1.tar.zst`)\nreturns HTTP 404. The git tag `data/joinorder-imdb-2013-v1` exists (at\n0182c955, the v0.2.1 commit), but the GitHub API lists NO release object for\nit -- the repo is public and an authenticated releases list shows only the\nv0.x.x package releases. Every `JoinOrderBenchmark.generate_data()` call on a\ncold cache therefore fails with `DownloadError ... returned status 404`\n(verified 2026-07-03 in a clean environment), so canonical joinorder is\nunusable for any user who has not previously cached the archive.\n\nThis contradicts the completed cutover item\n(_project/DONE/main/planning/joinorder-canonical-cutover.yaml), whose\nwork/verification recorded \"Promote DRAFT GitHub Release to published\" and\n\"asset is publicly downloadable without auth\" as done. Either the release was\nnever actually promoted, or it was deleted afterwards. The licensing decision\n(_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md:5,24)\nexplicitly accepted keeping the BenchBox-hosted archive as the default data\npath, so absence is a regression, not a deliberate takedown -- if a takedown\nWAS intended, that decision must be recorded and the manifest/fetch path\nchanged instead.\n\nThe same 404 was independently observed during ClickHouse server UAT and\ndeferred there (_project/TODO/main/planning/\nuat-clickhouse-server-data-and-timeout-tail.yaml:18-19); this item is the\ndedicated owner of the fix.\n\nOnly the project owner can restore the asset: the published archive\n(`joinorder-imdb-2013-v1.tar.zst`, ~1.2 GB, sha256\n`669c97ce7e9e7498c7ce0cad018153aa93a9b8eefff0f77e436d690f64ebc5fd` per the\nmanifest and _project/joinorder/release-notes.md:8) exists only in local\nbuild/UAT caches, not in the repo.\n\nRESOLVED 2026-07-09. The byte-identical archive was unrecoverable (no local\ncopy, no backup, non-deterministic rebuild), so the original \"re-upload the\nexact asset\" plan (w1-w3) was superseded by\n_project/decisions/joinorder-logical-verification-2026-07-08.md: adopt\nlogical row-content verification as the dataset identity, keep dataset_version\njoinorder-imdb-2013-v1 (a transport-wrapper rebuild, logical content\nunchanged), rebuild the archive via the foundation pipeline, and re-publish.\nOutcome: manifest is logical-mode (per-table logical_sha256; logical\nmanifest_hash/data_archive_hash stable across future rebuilds); new archive\n106ae78c published at tag data/joinorder-imdb-2013-v1 (asset URL now 200, not\n404); cold-cache generate_data() returns 21 tables and verify_logical_content\nreports ALL_MATCH on the full 74M-row dataset.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the manifest URL to a different host as a quick fix",
+        "instead": "(not specified)",
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "why": "the licensing ADR evaluated the GitHub Release path specifically; a host change is a new decision."
+      },
+      {
+        "dont": "regenerate manifest hashes to match a rebuilt archive without also regenerating reference_cardinalities.json and release-notes.md",
+        "instead": "(not specified)",
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "why": "they are cross-locked by manifest_hash/data_archive_hash."
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The licensing posture: DATA-LICENSE.md ships in the archive and the redistribution disclaimer stays in _project/joinorder/release-notes.md.",
+        "item_id": "joinorder-canonical-release-asset-restore"
+      },
+      {
+        "behavior": "data_manifest.toml hashes (archive_sha256, per-table sha256, manifest_hash) stay unchanged unless the uploaded archive genuinely differs -- in which case ALL dependent reference artifacts (reference_cardinalities.json, release-notes.md) must be regenerated together.",
+        "item_id": "joinorder-canonical-release-asset-restore"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/planning/joinorder-canonical-cutover.yaml -- the original publish + UAT checklist; reuse its promote/verify commands.",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "path": "_project/DONE/main/planning/joinorder-canonical-cutover.yaml"
+      },
+      {
+        "concept": "_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md -- the accepted-risk decision that authorizes hosting the archive.",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "path": "_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md"
+      },
+      {
+        "concept": "benchbox/core/data_fetch/manager.py:fetch_data -- the download path that currently fails; no code change expected here.",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "path": "benchbox/core/data_fetch/manager.py:fetch_data"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/data_fetch/"
+      },
+      {
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/data_manifest.toml"
+      },
+      {
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/joinorder-canonical-release-asset-restore.yaml"
+      },
+      {
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/uat-clickhouse-server-data-and-timeout-tail.yaml"
+      },
+      {
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "kind": "only_modify",
+        "path_glob": "_project/joinorder/release-notes.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "curl -sS -o /dev/null -w '%{http_code}' -I 'https://github.com/joeharris76/BenchBox/releases/download/data%2Fjoinorder-imdb-2013-v1/joinorder-imdb-2013-v1.tar.zst'",
+        "description": "Release asset URL resolves (302 to CDN or 200), not 404",
+        "expected": "302 or 200",
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import tempfile; from benchbox.core.joinorder.benchmark import JoinOrderBenchmark; d=tempfile.mkdtemp(); print(len(JoinOrderBenchmark(output_dir=d).generate_data()))\"",
+        "description": "Cold-cache canonical joinorder datagen succeeds end-to-end",
+        "expected": "21",
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "notes": "Check the GitHub audit log / release history for tag\ndata/joinorder-imdb-2013-v1. One line in this TODO's notes or the\nrelease-notes doc is enough; the point is to know whether cutover w-item\nverification was recorded without actually passing, since that affects\nhow much to trust the remaining cutover verifications.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Determine why the release object is missing (never promoted vs deleted) and record it",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "notes": "From a machine that has the built archive (owner's build cache or a\nrebuild via _project/scripts/build_joinorder_data.py):\n  1. Verify the local archive sha256 matches the manifest's\n     archive_sha256 669c97ce7e9e7498c7ce0cad018153aa93a9b8eefff0f77e436d690f64ebc5fd\n     BEFORE uploading; if it differs, the manifest/reference artifacts\n     must be regenerated instead (they are hash-locked).\n  2. gh release create data/joinorder-imdb-2013-v1 <archive> (published,\n     not draft) or gh release upload if the release object reappears.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-publish the release at tag data/joinorder-imdb-2013-v1 with the archive asset",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-release-asset-restore",
+        "notes": "curl -sSI on the manifest URL must return 302/200 (not 404), and a\ncold-cache `JoinOrderBenchmark.generate_data()` (or\n`benchbox run --platform duckdb --benchmark joinorder --data-only`)\nmust download, extract, and sha256-verify all 21 tables. Update the\ndeferred note in uat-clickhouse-server-data-and-timeout-tail.yaml to\npoint at this completed item.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify cold-cache fetch end-to-end and close the loop on the UAT deferral",
+        "wid": "w3"
+      }
+    ]
+  }
+}

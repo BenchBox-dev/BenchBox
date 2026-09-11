@@ -1,0 +1,142 @@
+{
+  "context": "Pick the semantics deliberately, document the choice at the call site, and collapse to a single dispatch with a regression test for adapters lacking the tuning mixin.",
+  "description": "From the 2026-08-09 adversarial review of PR #1644, deferred at merge without a tracker record. benchbox/core/runner/dataframe_runner.py _attach_applied_tuning_ledger resolves the ledger writer twice: a getattr/callable guard binds the member, then the verified local is discarded and as_tuning_ledger_writer(adapter)._write_applied_tuning_ledger re-validates the same member before an identical call (line 353). Decide whether this capability is optional-by-guard or contract-enforced, then dispatch once: either call the verified writer local directly, or drop the guard and let the capability view raise for adapters without the mixin.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Keep both the guard and the capability-view re-validation.",
+        "instead": "Dispatch once through whichever mechanism matches the decided semantics.",
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "why": "Double dispatch obscures whether the capability is optional or contract-enforced."
+      },
+      {
+        "dont": "Silently change behavior for adapters without the mixin while simplifying.",
+        "instead": "Cover the no-mixin adapter path with an explicit regression test.",
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "why": "A refactor and a contract change must be separately visible."
+      }
+    ],
+    "item_meta": {
+      "category": "Adapter Architecture and Simplification",
+      "created_at": "2026-08-11T12:40:09Z",
+      "worktree": "adapter-architecture"
+    },
+    "preserves": [
+      {
+        "behavior": "Adapters without the tuning mixin keep their current no-ledger behavior unless the contract decision explicitly changes it.",
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811"
+      },
+      {
+        "behavior": "Built results carry applied_tuning_ledger, applied_ledger_hash, and tuning_validation_status exactly as before.",
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811"
+      },
+      {
+        "behavior": "Dataframe runner lifecycle behavior is otherwise unchanged.",
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Completed capability-protocol item that introduced the capability view.",
+        "decision": "extend",
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "path": "adapter-capability-protocols-20260808"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/runner/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -q \"as_tuning_ledger_writer(adapter)._write_applied_tuning_ledger\" benchbox/core/runner/dataframe_runner.py",
+        "description": "Single dispatch at the ledger call site",
+        "expected": "Exits 1 on the unfixed tree while the double dispatch exists; exits 0 after the collapse.",
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/runner/test_dataframe_runner.py tests/unit/core/runner/test_dataframe_runner_lifecycle.py -q",
+        "description": "Dataframe runner tests pass",
+        "expected": "Ledger attachment and no-mixin behavior are unchanged.",
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/core/runner/dataframe_runner.py tests/unit/core/runner",
+        "description": "Touched paths satisfy Ruff",
+        "expected": "Ruff exits zero.",
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide optional-by-guard versus contract-enforced semantics and record the rationale at the call site",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-tuning-ledger-writer-dispatch-20260811",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Collapse to a single dispatch and add a regression test covering an adapter without the tuning mixin",
+        "wid": "w1"
+      }
+    ]
+  }
+}

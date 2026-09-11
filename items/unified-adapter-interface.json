@@ -1,0 +1,62 @@
+{
+  "description": "Implement a unified `run_benchmark()` interface across SQL and DataFrame adapters,\neliminating the design defect identified in code review where DataFrame adapters\nlack the same interface as SQL adapters.\n\nThe current architecture violates the Adapter pattern:\n\n| Aspect | SQL Adapters | DataFrame Adapters |\n|--------|-------------|-------------------|\n| Has `run_benchmark()` | YES | NO |\n| Entry point | `adapter.run_benchmark()` | `run_dataframe_benchmark()` function |\n| Caller branching | None (polymorphic) | Required (orchestrator:287, MCP:175) |\n\n**Design Violations:**\n- Liskov Substitution Principle (adapters not interchangeable)\n- Open/Closed Principle (new modes require caller changes)\n- Adapter Pattern (no unified interface)\n\n**Goal:** All adapters (SQL and DataFrame) should implement the same `run_benchmark()`\nmethod, allowing callers to use adapters polymorphically without type-checking or\nbranching logic.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-24T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/ -v",
+        "description": "uv run -- python -m pytest tests/unit/platforms/dataframe/ -v",
+        "expected": null,
+        "item_id": "unified-adapter-interface",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/ -v",
+        "description": "uv run -- python -m pytest tests/unit/mcp/ -v",
+        "expected": null,
+        "item_id": "unified-adapter-interface",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast",
+        "description": "uv run -- python -m pytest -m fast",
+        "expected": null,
+        "item_id": "unified-adapter-interface",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --platform polars-df --benchmark tpch --scale 0.01",
+        "description": "benchbox run --platform polars-df --benchmark tpch --scale 0.01",
+        "expected": null,
+        "item_id": "unified-adapter-interface",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --platform datafusion-df --benchmark tpch --scale 0.01",
+        "description": "benchbox run --platform datafusion-df --benchmark tpch --scale 0.01",
+        "expected": null,
+        "item_id": "unified-adapter-interface",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

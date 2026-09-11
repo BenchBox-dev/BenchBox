@@ -1,0 +1,194 @@
+{
+  "context": "One docs-focused PR. For each ADR: append dated addendum sections rather than rewriting decision history (ADRs pin decisions); the receipts design note is living documentation and is edited in place. The only code change permitted here is the A2 summary-key rename if that option is chosen (zero production consumers; update the pinned unit tests in the same commit).",
+  "description": "From the 2026-07-31 adversarial review doc-vs-code sweep. Fix after (and consistent with) tuning-corroboration-gate-failed-and-dropped-20260801, which changes the trust rule these docs describe.\n\nA1 (Required, doc contradicts code): docs/development/tuning-introspection-receipts.md:89-105 says DuckDB's CTAS 'drops that index... a sorting-only run honestly stays applied_unverified' and calls the fix out of scope - but benchbox/platforms/duckdb.py:961-1020 now re-creates idx_<table>_sort post-CTAS (_recreate_sort_index_after_ctas) and records it precisely so the run can verify. Stale at birth (both shipped in 30dcc8a).\n\nA2 (vocabulary): _VERIFIABLE_VERDICTS includes UNVERIFIABLE (introspection.py:64), so summary.verifiable_total (introspection.py:190) counts no-rule/blocked statements the doc defines as NOT verifiable (receipts doc:27-29,52). Gate outcome unaffected. Decide: rename the summary key (it has zero production consumers - verified in the review) or redefine it in the doc; either way make code and doc agree.\n\nA4: ADR-001:120-124 says the ledger is populated only via the recording proxy; the direct ClickHouse record-at-execute (workload.py:76) and the deferred _applied_layout_operations fold (adapter.py:1181-1206 - reconstructed position, not observed) are undocumented there.\n\nA5: receipts doc:44 'order- and case-normal' is ambiguous; comparison is order-sensitive for every kind (introspection.py:441-444). Say 'in order' on all four rows.\n\nA6: transient/maintenance prefix sets are wider than the doc table - RESET/USE transient, VACUUM/ANALYZE/COMPACT maintenance (introspection.py:264-265) - i.e. statements the doc routes to the blocking 'anything else' row are silently non-blocking. Document (or narrow) deliberately.\n\nA7: receipts doc:129 stale '~line 984' wiring pointer (now adapter.py:1017-1033/1097).\n\nA3: ADR-001:130-142 sample statement record shows 'mechanism': null fields the hashed to_dict() omits (applied_ledger.py:138-150) - the documented shape is not the hashed shape.\n\nA9: ADR-003 context is stale with no addendum: OLAP pack condition inverted (clickhouse/tuning.py:91 applies when tuning_enabled), generators now render in execution (workload.py per ADR-3 single renderer), generate_tuning_clause dead-code note obsolete.\n\nR6: document the Snowflake key-vs-physical-clustering semantics asymmetry if not already landed by snowflake-clustering-precheck-and-schema-filter-20260801.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not expand the transient/maintenance prefix sets while documenting them",
+        "instead": "document the current sets; any widening needs its own reviewed item",
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "why": "widening non-blocking classes silently weakens the upgrade gate"
+      },
+      {
+        "dont": "Do not fix doc drift by weakening claims into vagueness",
+        "instead": "state the exact current mechanism with file anchors",
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "why": "vague docs are how three of these drifts survived review"
+      },
+      {
+        "dont": "Do not rewrite ADR decision sections in place",
+        "instead": "append dated addenda marking what has since landed or inverted",
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "why": "ADRs are a decision log; history rewriting destroys their evidentiary value"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "needs_item": "snowflake-clustering-precheck-schema-filter-20260801"
+      },
+      {
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "needs_item": "tuning-corroboration-gate-failed-and-dropped-20260801"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-08-01T17:34:40Z",
+      "completed_pr": 1422,
+      "created_at": "2026-08-01T12:33:11Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ADR decision history stays intact - addenda only, no rewriting of recorded decisions.",
+        "item_id": "tuning-docs-adr-refresh-20260801"
+      },
+      {
+        "behavior": "Docs describe the POST-gate-change trust rule (failed/dropped blocking) - coordinate with the gate item to avoid documenting the old rule.",
+        "item_id": "tuning-docs-adr-refresh-20260801"
+      },
+      {
+        "behavior": "If verifiable_total is renamed, receipt summary changes are additive/renamed-with-tests only; the upgrade gate logic is untouched.",
+        "item_id": "tuning-docs-adr-refresh-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tuning/applied_ledger.py"
+      },
+      {
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/introspection.py"
+      },
+      {
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/development/tuning-adr-001-trust-and-hash-semantics.md"
+      },
+      {
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md"
+      },
+      {
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/development/tuning-adr-003-baseline-and-single-renderer.md"
+      },
+      {
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/development/tuning-introspection-receipts.md"
+      },
+      {
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/**"
+      },
+      {
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning -q",
+        "description": "Doc claims match code anchors cited in each section",
+        "expected": "pinned vocabulary/summary tests agree with the documented semantics",
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T17:29:23Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -n \"out of scope here\" docs/development/tuning-introspection-receipts.md",
+        "description": "Stale claims removed",
+        "expected": "exit 0: the stale DuckDB caveat framing is gone",
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T17:27:42Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite green (if A2 rename chosen)",
+        "expected": "no regressions",
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Replaced stale DuckDB caveat with post-CTAS index re-creation, layout-op fold, dry-run, and live full-flow verification anchors.",
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "notes": "Rewrite the DuckDB caveat (A1) to describe the post-CTAS index re-creation and its verification eligibility; verify against duckdb.py behavior and the existing unit tests.",
+        "started_at": "2026-08-01T17:26:58Z",
+        "started_branch": "docs/tuning-adr-refresh-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Rewrite the DuckDB caveat (A1) to match post-CTAS index re-creation and its verification eligibility",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Renamed misleading zero-consumer verifiable_total to gate_relevant_total with pinned tests; gate logic remains entry-verdict-based and unchanged.",
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "notes": "Resolve A2: rename verifiable_total to a gate-accurate name (updating pinned tests) OR redefine it in the doc; record the decision rationale.",
+        "started_at": "2026-08-01T17:27:04Z",
+        "started_branch": "docs/tuning-adr-refresh-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Resolve A2: rename verifiable_total (zero production consumers) or redefine it in the doc; record the rationale",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Documented exact prefix sets, gate-relevant summary/sample shape, order-preserving fold chronology, and current adapter wiring anchors; appended ADR-001 landed-state addendum.",
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "notes": "Fix A3/A4/A5/A6/A7 in the receipts doc and ADR-001 (fold path, sample shape, 'in order' wording, full prefix sets, wiring pointer).",
+        "started_at": "2026-08-01T17:27:10Z",
+        "started_branch": "docs/tuning-adr-refresh-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Fix A3/A4/A5/A6/A7 in the receipts doc and ADR-001 (fold path, sample shape, in-order wording, prefix sets, wiring pointer)",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Appended ADR-003 landed-state addendum; retained decision history; Snowflake key-metadata versus physical-reclustering limitation was already present and preserved.",
+        "item_id": "tuning-docs-adr-refresh-20260801",
+        "notes": "Append the ADR-003 addendum (A9: OLAP pack inversion, single-renderer landed, dead-code note obsolete) and, if not already landed, the Snowflake key-vs-physical semantics paragraph (R6).",
+        "started_at": "2026-08-01T17:27:15Z",
+        "started_branch": "docs/tuning-adr-refresh-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Append the ADR-003 addendum (A9) plus the Snowflake key-vs-physical paragraph if not already landed",
+        "wid": "w4"
+      }
+    ]
+  }
+}

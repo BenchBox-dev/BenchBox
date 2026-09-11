@@ -1,0 +1,204 @@
+{
+  "context": "Mostly CI-file surgery plus one helper. w3 is the real verification --\na green run with gating on. If the run is red for an environmental\nreason (runner disk, image pull), fix or scope that before merging; do\nnot re-add continue-on-error.\n",
+  "description": "The nightly throughput-uat job (.github/workflows/nightly.yml:550-624)\ncurrently discards the entire sweep exit code via\n`continue-on-error: true` (nightly.yml:596) because the TPC-H\nQ11/16/18/20 seed-derivation defect kept the cell permanently red. With\nthat defect fixed (tpch-throughput-seed-validation-fix), everything\n#1094 wired up -- the cell exit code, the validator_clean_rate_floor:\n1.0, the strict report exit policy -- can start gating.\n\nAlso strengthen the one check that stayed hard: validate_stream_count\n(tests/uat/throughput.py:96-106) counts a stream as \"executed\" if it has\nat least one query row REGARDLESS of status -- a stream whose every\nquery failed still counts (verified on develop @ fc31f3604). Keep the\nexisting wiring-defect check (distinct stream ids == requested) and add\na second assertion that every counted stream has at least one\nSUCCESSFUL query, so a total-failure stream cannot satisfy the gate.\n\nNote the core success gates remain deliberately tolerant (TPC-H 0.99,\nTPC-DS 0.70 per #1106) -- this TODO does not change them; it makes the\nUAT layer actually consume the sweep verdict.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "conflate the per-stream success check with the core min_success_rate gates",
+        "instead": "(not specified)",
+        "item_id": "nightly-throughput-gate-restoration",
+        "why": "UAT-layer check only."
+      },
+      {
+        "dont": "re-add continue-on-error as a 'temporary' measure",
+        "instead": "(not specified)",
+        "item_id": "nightly-throughput-gate-restoration",
+        "why": "that is the failure mode this TODO removes."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "nightly-throughput-gate-restoration",
+        "id": 40,
+        "reason": "Needs baseline data from several green nightly runs before a floor is defensible; premature thresholds create flake. Promoted to [[uat-throughput-regression-threshold-policy]] (2026-07-16), which needs this item.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Reason states this was already promoted to uat-throughput-regression-threshold-policy (2026-07-16), which is open and needs this content.",
+        "summary": "Throughput performance-regression thresholds (Throughput@Size floor per platform/scale)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "nightly-throughput-gate-restoration",
+        "id": 41,
+        "reason": "Runtime budget: the job has a 20-minute timeout; adding platforms belongs to a capacity decision, not this gate fix.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Widening nightly throughput platform coverage is explicitly a capacity decision deferred past the current gate fix; nightly-throughput-gate-restoration is itself still open/planning.",
+        "summary": "Widening nightly throughput coverage beyond DuckDB TPC-H SF1"
+      },
+      {
+        "created_at": "2026-07-19T23:54:11Z",
+        "from_item": "nightly-throughput-gate-restoration",
+        "id": 631,
+        "reason": "Post-merge operator verification (needs gh auth + CI dispatch); gating code shipped in #1231; batch recorded w3 as waiting.",
+        "resolution": "promoted",
+        "resolved_item": "nightly-throughput-operator-green-run",
+        "resolved_reason": null,
+        "summary": "Operator: workflow_dispatch nightly run confirming throughput-uat passes green with gating enabled"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "nightly-throughput-gate-restoration",
+        "needs_item": "tpch-throughput-seed-validation-fix"
+      },
+      {
+        "item_id": "nightly-throughput-gate-restoration",
+        "needs_item": "uat-throughput-result-resolution-hardening"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-19T23:54:22Z",
+      "completed_pr": 1231,
+      "created_at": "2026-07-11T00:00:00Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "The nightly job's 20-minute timeout and ubuntu-only footprint.",
+        "item_id": "nightly-throughput-gate-restoration"
+      },
+      {
+        "behavior": "The stream-count wiring-defect check stays independent of the sweep exit (defense-in-depth per the tests/uat/throughput.py docstring).",
+        "item_id": "nightly-throughput-gate-restoration"
+      },
+      {
+        "behavior": "streams: 3 in the config (deliberately above the 2-stream floor per the config comment).",
+        "item_id": "nightly-throughput-gate-restoration"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/nightly.yml:550-624 -- the job being changed; the inline assert step already imports tests.uat.throughput helpers, so extension is additive.",
+        "decision": "reuse",
+        "item_id": "nightly-throughput-gate-restoration",
+        "path": ".github/workflows/nightly.yml:550-624"
+      },
+      {
+        "concept": "tests/uat/throughput.py:validate_stream_count / validate_throughput_metric -- the deliberate split that lets CI hard-gate one invariant; keep the split, add the per-stream success check as a third function or a strict=True flag. Extend.",
+        "decision": "extend",
+        "item_id": "nightly-throughput-gate-restoration",
+        "path": "tests/uat/throughput.py:validate_stream_count"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "nightly-throughput-gate-restoration",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "nightly-throughput-gate-restoration",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/uat-throughput-duckdb-nightly.yaml"
+      },
+      {
+        "item_id": "nightly-throughput-gate-restoration",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_throughput.py"
+      },
+      {
+        "item_id": "nightly-throughput-gate-restoration",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/throughput.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_throughput.py -q",
+        "description": "Strict stream-success unit tests",
+        "expected": "pass including all-queries-failed stream rejection",
+        "item_id": "nightly-throughput-gate-restoration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh run list --workflow=nightly.yml --limit 1",
+        "description": "Nightly job green with gating enabled (operator-verified: requires gh auth + a dispatched/scheduled CI run; a batch agent records this as waiting, not failed)",
+        "expected": "completed success after the change (record run URL in work notes)",
+        "item_id": "nightly-throughput-gate-restoration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "nightly-throughput-gate-restoration",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "nightly-throughput-gate-restoration",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "nightly-throughput-gate-restoration",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1231: confirmed #1142 on develop; make uat-sweep ran clean (66/66 SUCCESS, 3 streams, exit 0)",
+        "item_id": "nightly-throughput-gate-restoration",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:29Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm tpch-throughput-seed-validation-fix landed and the sweep passes clean locally (make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml exits 0); record SHA + exit code",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1231: validate_stream_success() per-stream success + all-failed-stream rejection tests",
+        "item_id": "nightly-throughput-gate-restoration",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:31Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add strict per-stream success semantics: each counted stream needs >=1 successful query; unit tests cover the all-queries-failed stream case",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1231: removed continue-on-error; assert step if: ${{ !cancelled() }}; stale seed-defect comment deleted",
+        "item_id": "nightly-throughput-gate-restoration",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:34Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Remove continue-on-error from the sweep step; delete the stale known-defect comment block (nightly.yml:580-595); keep the independent stream-count assert step (now also strict) as defense-in-depth",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Code shipped in #1231; operator workflow_dispatch green-run verification re-homed to promoted item nightly-throughput-operator-green-run",
+        "item_id": "nightly-throughput-gate-restoration",
+        "notes": null,
+        "started_at": "2026-07-19T23:54:17Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Trigger a workflow_dispatch nightly run and verify the job passes with gating enabled; record the run URL (operator-verified: needs gh auth + CI dispatch; batch agents record as waiting)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

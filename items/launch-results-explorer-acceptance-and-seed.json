@@ -1,0 +1,224 @@
+{
+  "context": "Systematic verification of all launch criteria. No shortcuts - test every\npage, every browser, every deployment path. Fix issues found during acceptance\nbefore marking launch complete.\n",
+  "description": "Final launch gate for the Phase 1 results explorer. This TODO verifies that\nall launch criteria are met, the seed corpus is complete and correct, the\nexplorer works end-to-end in production, and the feature is ready for public\nannouncement.\n\nLaunch criteria (from strategy memo):\n1. Seed corpus has sufficient depth for the dynamic comparison tool: each\n   included benchmark has ≥3 comparable platforms at the same scale factor\n2. Compare view is the primary entry point and works end-to-end: select\n   benchmark/scale/platforms → query-level timing breakdown → shareable URL\n3. All explorer pages render correctly with real data\n4. DuckDB-WASM filtering works in Chrome, Firefox, Safari\n5. GitHub Pages deployment succeeds end-to-end from CI\n6. Explorer is navigable from the existing site header/nav\n7. Brand ownership decision is resolved and reflected in domain/hosting/identity",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "accept corpus depth below the ≥3-platforms threshold by shipping placeholder data",
+        "instead": "generate missing runs before launch",
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "why": "the compare view is the primary deliverable and requires depth"
+      },
+      {
+        "dont": "mark launch complete before all 7 criteria are verified",
+        "instead": "gate on all criteria passing",
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "why": "a partial launch is harder to fix than a delayed launch"
+      },
+      {
+        "dont": "merge the explorer into main without verifying existing benchbox.dev pages still work",
+        "instead": "always check sibling pages",
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "why": "a broken docs or landing deploy is a regression even if the explorer is perfect"
+      },
+      {
+        "dont": "skip cross-browser testing on the assumption that Chrome results cover Firefox and Safari",
+        "instead": "test each browser explicitly",
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "why": "DuckDB-WASM has browser-specific loading differences"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "needs_item": "generate-seed-corpus-for-results-explorer"
+      },
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "needs_item": "integrate-explorer-into-github-pages-deployment"
+      },
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "needs_item": "resolve-results-explorer-brand-ownership"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All seed corpus results must be accessible and renderable in the explorer",
+        "item_id": "launch-results-explorer-acceptance-and-seed"
+      },
+      {
+        "behavior": "Existing benchbox.dev pages (landing, docs, blog) must be verified as unaffected",
+        "item_id": "launch-results-explorer-acceptance-and-seed"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import json, collections; m = json.load(open('results-explorer/public/data/manifest.json')); cohorts = collections.defaultdict(set); [cohorts[(r['benchmark'], str(r.get('scale_factor','')))].add(r['platform']) for r in m['results']]; print(f'{len(m[\"results\"])} results across {len(cohorts)} cohorts'); [print(f'  {k}: {len(v)} platforms ({sorted(v)})') for k,v in sorted(cohorts.items())]; assert all(len(v) >= 3 for v in cohorts.values()), f'Cohorts with <3 platforms: {dict((k,len(v)) for k,v in cohorts.items() if len(v)<3)}'\"",
+        "description": "Seed corpus meets depth-per-benchmark criterion (≥3 platforms per benchmark×scale cohort)",
+        "expected": "All benchmark×scale cohorts have ≥3 comparable platforms",
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build && test -f dist/index.html && test -f dist/tpch/index.html && ls dist/r/*/index.html | wc -l",
+        "description": "Full site build succeeds (landing + docs + blog + explorer)",
+        "expected": "Build succeeds; index, benchmark, and result detail pages present",
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run build",
+        "description": "Explorer component test suite passes",
+        "expected": "Typecheck and build both pass",
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: verify Chrome, Firefox, Safari per w2 checklist'",
+        "description": "Cross-browser acceptance - manual",
+        "expected": "Manual verification - all browsers pass",
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "notes": "Run the corpus inventory validation:\n- Each included benchmark has ≥3 comparable platforms at the same scale factor\n- All bundles are schema-valid with valid query timings (no zero-duration or error-only runs)\n- Companion files present where expected (plans for DuckDB/DataFusion)\n- The dynamic comparison tool produces meaningful comparisons for every\n  benchmark×scale combination in the corpus\n\nIf gaps exist (e.g., a benchmark has only 2 platforms), generate additional\nruns to fill them before launch.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify seed corpus completeness and quality",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "notes": "Test the deployed explorer (or local preview) on:\n- Chrome (latest): all pages, DuckDB-WASM, compare view\n- Firefox (latest): all pages, DuckDB-WASM, compare view\n- Safari (latest): all pages, DuckDB-WASM, compare view\n- Mobile Chrome/Safari: basic navigation and detail pages\n\nVerify:\n- Pages load within 3 seconds on broadband\n- DuckDB-WASM initializes and filtering works\n- Compare view renders charts and tables correctly\n- Share URLs work when opened in a new tab/browser\n- Raw bundle download links work\n- No console errors or broken asset references\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run cross-browser acceptance testing",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "notes": "Push to main and verify the full GitHub Pages deployment:\n- Landing page still works at benchbox.dev\n- Docs still work at benchbox.dev/docs/\n- Blog still works at benchbox.dev/blog/\n- Explorer works at benchbox.dev/results/\n- All explorer routes resolve (home, browse, detail, compare)\n- \"Results\" nav link is visible on all site pages\n- No mixed content warnings or CORS errors\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify production deployment end-to-end",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "notes": "- Add changelog entry for the results explorer launch\n- Update README if it references the project's web presence\n- Update CLAUDE.md if any new commands or conventions were added\n- Verify docs/CLI_REFERENCE.md doesn't need updates\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write changelog entry and update project documentation",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "launch-results-explorer-acceptance-and-seed",
+        "notes": "- Mark `build-results-explorer-subsite-on-benchbox-dev` as complete\n- Move all completed Phase 1 implementation TODOs to DONE\n- Update the strategy memo with actual launch date and any deviations\n- Update `define-results-platform-product-and-launch-strategy` status\n- Regenerate TODO indexes\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Mark Phase 1 complete and update TODO cluster status",
+        "wid": "w5"
+      }
+    ]
+  }
+}

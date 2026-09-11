@@ -1,0 +1,156 @@
+{
+  "context": "Decide first whether develop should be authoritative for the corpus at all -- adr-published-results-slim-corpus-branch.md may already answer this, so read it before designing anything. If yes, the fix is a back-port: a workflow or make target that opens a PR onto develop for any published-only path, so the asymmetry closes rather than being tolerated. If community submissions are expected to live only on published-results, then say so explicitly in the ADR and downgrade the canary's notice, because today the report reads as drift that someone ought to fix.",
+  "description": "MEASURED 2026-08-23 from Corpus Drift Check run 32624926166, and again on the mirror branch on 2026-08-24.\n\nsync-results-data-to-published.yml mirrors develop's results-data/ ONTO published-results. There is no workflow in the other direction. Corpus Drift Check reports the asymmetry every night as a non-fatal notice:\n\n  published-results has 6 path(s) not on develop (published-only)\n    tpcds_sf1_duckdb_sql_20260818_093123_8c8b40ef.json (+ .manifest.json)\n    tpch_sf100_duckdb_sql_20260817_214011_d40cb760.json (+ .manifest.json)\n    tpch_sf10_duckdb_sql_20260817_210939_80e1274f.json  (+ .manifest.json)\n\nThree bundles, six paths. Two of them are the TPC-H SF10 and SF100 runs whose own TODO is marked done -- so work recorded as complete is present on the public branch and absent from the authoritative one.\n\nThe canary handles this correctly and deliberately: it classifies published-only paths as INFO, never recommends a wipe-based mirror that would delete them, and the sync workflow applies a union overlay so they survive. Confirmed on mirror PR #1857's branch, which carries 411 corpus files including the published-only tpcds_sf1_duckdb_20260818 bundle. So nothing is being lost today.\n\nThe gap is that develop is meant to be authoritative and is not, and the only thing keeping the public content alive is an overlay that no one has to think about. A future maintainer doing a legitimate full re-mirror, or a branch reset, would drop three bundles with no warning beyond a nightly notice.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-29T13:05:12Z",
+      "completed_pr": 1880,
+      "created_at": "2026-08-24T12:15:53Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "kind": "only_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "kind": "only_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh workflow run corpus-drift-check.yml --ref develop",
+        "description": "Corpus Drift Check reports no published-only paths",
+        "expected": "no published-only notice, or a notice the ADR explicitly sanctions",
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/workflows/test_published_results_base_ci.py -q",
+        "description": "Trusted mirror and community validation policies remain separated",
+        "expected": "focused workflow contract tests pass",
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "last_result": "pass",
+        "last_run": "2026-08-24T22:47:23Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Read docs/development/adr/adr-published-results-slim-corpus-branch.md. ADR establishes develop as canonical source of truth for code and tools, with published-results as a slim corpus-only downstream mirror, synced one-way via sync-results-data-to-published.yml. However, community contributions land on published-results per contributor flow, creating published-only bundles that have no automated develop-ward sync mechanism.",
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "notes": null,
+        "started_at": "2026-08-24T12:57:38Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Read adr-published-results-slim-corpus-branch.md and establish whether develop is meant to be authoritative",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Approved 2026-08-24: formalize split authority. develop owns code, validators, generators, and the curated maintainer seed; published-results owns the complete accepted Phase 2 archive, including published-only operator/community submissions. No reverse-sync or automatic backport. Existing union overlay preserves the three published-only bundles.",
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "notes": null,
+        "started_at": "2026-08-24T22:01:50Z",
+        "started_branch": "fix/corpus-authority-integrity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-authority-integrity",
+        "status": "done",
+        "summary": "DECISION GATE - back-port published-only paths to develop, or document that they legitimately live only on the public branch",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1880 commit 86a973c27 formalizes split authority in the ADR and docs: develop owns code/tooling/curated maintainer seed; published-results owns the complete accepted archive. Corpus Drift wording now treats published-only paths as sanctioned branch-local content.",
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "notes": null,
+        "started_at": "2026-08-24T22:36:16Z",
+        "started_branch": "fix/corpus-authority-integrity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-authority-integrity",
+        "status": "done",
+        "summary": "Act on w1 - build the back-port path, or amend the ADR and the canary's wording",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Not applicable by approved w1 decision: published-only operator/community bundles are authoritative on published-results and are intentionally not back-ported to develop.",
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "notes": null,
+        "started_at": "2026-08-24T22:36:19Z",
+        "started_branch": "fix/corpus-authority-integrity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-authority-integrity",
+        "status": "done",
+        "summary": "Back-port the three bundles currently published-only, if w1 chose that route",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #1880 aligns both trusted mirror waivers on three signals: same-repository head, auto/results-mirror-* branch, and github-actions[bot] PR author. Executable negative/positive matrices pass.",
+        "item_id": "published-results-has-no-develop-ward-sync-path",
+        "notes": null,
+        "started_at": "2026-08-24T22:36:21Z",
+        "started_branch": "fix/corpus-authority-integrity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-authority-integrity",
+        "status": "done",
+        "summary": "Align the trusted bot mirror PR validation policy while keeping community partial submissions rejected",
+        "wid": "w4"
+      }
+    ]
+  }
+}

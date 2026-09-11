@@ -1,0 +1,11 @@
+{
+  "description": "DataFusion DataFrame mode regressed after dependency updates: the CLI now\nfails to load TPC-H .tbl files (DataFusion enforces .csv extension), does not\ngenerate or convert data in the adapter execution path, and continues running\nqueries after load failures. The fix must target the actual adapter path\n(benchbox/platforms/dataframe/benchmark_mixin.py) and ensure robust behavior\nacross DataFusion versions.\n\nScope includes:\n- Add explicit .tbl support in the DataFusion adapter (version-aware handling).\n- Route DataFrame adapter loads through data preparation/conversion when\n  prefer_parquet is enabled.\n- Validate data availability before load; fail early with actionable guidance.\n- Fail fast on load errors to prevent query execution with empty tables.\n- Add tests that exercise the adapter path (not only dataframe_runner).",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-26T00:00:00Z",
+      "created_at": "2026-01-26T00:00:00Z",
+      "worktree": "main"
+    }
+  }
+}

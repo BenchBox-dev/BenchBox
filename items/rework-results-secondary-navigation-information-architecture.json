@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #483 of results-explorer-global-header-visual-parity-gate.\nDeferred: Rework Results secondary navigation information architecture\nReason deferred: The secondary Results nav is intentionally separate from global-header parity.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:26Z",
+      "worktree": "main"
+    }
+  }
+}

@@ -1,0 +1,200 @@
+{
+  "description": "Three platform adapters use HTTP APIs for bulk data loading but hardcode http://\nwith no option for HTTPS:\n\n1. **QuestDB** (PR #28): REST API for /imp endpoint - questdb.py:348, 382\n2. **Doris** (PR #30): Stream Load API - doris.py:418, 443-448\n   Also sends credentials via HTTP Basic Auth in plaintext.\n3. **Databend** (PR #29): DSN construction - databend/adapter.py:256-258\n   Password not URL-encoded either (separate issue).\n\nFor localhost/Docker development, HTTP is fine. But for remote or cloud deployments,\ncredentials and data are transmitted in cleartext. This is a security concern for\nproduction use.\n\nThe fix should add a use_tls or http_scheme configuration option to each adapter,\ndefaulting to http:// for backward compatibility but allowing https:// for remote\ndeployments.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "platform-adapter-http-tls-support",
+        "id": 565,
+        "reason": "Add if users request it - keep initial implementation simple",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Cert validation options explicitly gated on user demand ('add if users request it'); no evidence of such a request.",
+        "summary": "Certificate validation options (verify_ssl, ca_cert_path)"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-02-15T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing adapter tests pass without modification",
+        "item_id": "platform-adapter-http-tls-support"
+      },
+      {
+        "behavior": "Data loading still works for localhost/Docker setups",
+        "item_id": "platform-adapter-http-tls-support"
+      },
+      {
+        "behavior": "Default behavior unchanged - http:// by default for backward compatibility",
+        "item_id": "platform-adapter-http-tls-support"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend/adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/doris.py"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/questdb.py"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_databend_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_doris_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_questdb_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "All platform adapter tests pass",
+        "expected": "all tests pass",
+        "item_id": "platform-adapter-http-tls-support",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "platform-adapter-http-tls-support",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-http-tls-support",
+        "notes": "questdb.py - add config param, use https:// when enabled",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add use_tls config option to QuestDB adapter",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-http-tls-support",
+        "notes": "doris.py - add config param, use https:// when enabled",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add use_tls config option to Doris Stream Load",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-http-tls-support",
+        "notes": "databend/adapter.py:256-258 - use urllib.parse.quote(self.password, safe='')",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix Databend password URL-encoding in DSN construction",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-http-tls-support",
+        "notes": "databend/adapter.py - add config param for databend:// vs databends:// DSN scheme",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add use_tls config option to Databend adapter",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-http-tls-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add CLI arguments for TLS options",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-http-tls-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for TLS URL construction",
+        "wid": "w6"
+      }
+    ]
+  }
+}

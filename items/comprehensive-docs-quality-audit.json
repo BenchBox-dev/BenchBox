@@ -1,0 +1,11 @@
+{
+  "description": "Systematic review of human-authored documentation files in the BenchBox project\nto ensure accuracy, completeness, and quality. Each document will be\nreviewed using /docs-review, with all recommended fixes applied.\n\nFile Scope (249 total files):\n- Human-authored docs: ~170 files (IN SCOPE - full review)\n- Auto-generated _tags/: ~47 files (EXCLUDED - spot-check only)\n- Auto-generated reference/python-api/: ~30 files (EXCLUDED - verify build works)\n- Build artifacts (_build/, _static/): 2 files (EXCLUDED)\n\nThis audit addresses documentation quality issues discovered during\nthe performance.md review, which revealed critical issues including:\n- Non-existent CLI flags documented\n- Invalid import statements in code examples\n- Broken Unicode characters in headers\n- Misleading performance claims\n- Missing prerequisites sections\n\nThe goal is to bring all documentation to a consistent quality standard\nwith verified code examples, accurate CLI references, and working links.\n\nCommit Strategy: Per-phase commits for reviewability. Each phase completion\ngets its own commit with summary of changes made.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2025-01-12T00:00:00Z",
+      "created_at": "2025-01-12T00:00:00Z",
+      "worktree": "docs-experience"
+    }
+  }
+}

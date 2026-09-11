@@ -1,0 +1,61 @@
+{
+  "context": "Investigate whether the tracker accepts an admin/override correction path for terminal done records, or whether the correct fix is to reorder completion relative to merge and record the immutability decision. Do not use raw DB writes that break the audit chain.",
+  "description": "Adversarial review of the CI-efficiency batch surfaced tracker/evidence inconsistencies in the independent-publication A0 (independent-publication-a0-baseline-and-freeze) and A1 (independent-publication-a1-authority-and-threat-contract) completion records.\n\nFindings:\n- A0 is state=done with completed_pr=NULL even though it shipped via PR #1984 (merge 171a665fb). It was marked done before the PR merged (completed_at 2026-08-31T21:02:53Z vs merge 2026-08-31T22:04:03Z).\n- A1 is state=done with completed_pr=1987 while PR #1987 is still OPEN (unmerged; mergeCommit null).\n\nConstraint: the todo-db state machine only allows planning->active->done and planning/active->dropped (TRANSITIONS in _project/scripts todo_db tracker); done is terminal with no reopen, and completed_pr is only set by `complete --pr` which rejects non-active items. The supported CLI cannot amend completed_pr/completed_at on a done item without raw DB writes that would break the audit-hash chain and the 'CLI is the only write path' invariant.\n\nRequired fix path: decide and implement a supported mechanism (e.g. tracker config/decision, documented override, or correct ordering of done-vs-merge) so A0/A1 completion records correctly reference the shipping PR and any 'done-before-merge' or 'done-while-open' state is avoided or documented.",
+  "legacy": {
+    "item_meta": {
+      "category": "CI",
+      "completed_at": "2026-09-01T19:24:53Z",
+      "completed_pr": 2005,
+      "created_at": "2026-09-01T01:25:54Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "independent-publication-a0-a1-tracker-record-correction",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "independent-publication-a0-a1-tracker-record-correction",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/docs/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run pytest tests/unit/docs/test_publication_architecture.py -q",
+        "description": "Decision record verifies A0/A1 tracker evidence and invariants",
+        "expected": "all tests pass",
+        "item_id": "independent-publication-a0-a1-tracker-record-correction",
+        "last_result": "pass",
+        "last_run": "2026-09-01T19:24:52Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Authored _project/decisions/independent-publication-a0-a1-tracker-completion-evidence-2026-09-01.md documenting A0 (PR #1984 171a665fb) and A1 (PR #1987 7f26fc181) completion evidence, root causes, and tracker immutability invariant",
+        "item_id": "independent-publication-a0-a1-tracker-record-correction",
+        "notes": null,
+        "started_at": "2026-09-01T19:14:10Z",
+        "started_branch": "docs/a0-a1-tracker-record-correction",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-a0-a1-tracker-record-correction",
+        "status": "done",
+        "summary": "Author decision record documenting A0/A1 completion evidence and tracker immutability policy",
+        "wid": "w1"
+      },
+      {
+        "evidence": "uv run pytest tests/unit/docs/test_publication_architecture.py -q (10 passed) and uv run python scripts/check_decision_records.py exit 0",
+        "item_id": "independent-publication-a0-a1-tracker-record-correction",
+        "notes": null,
+        "started_at": "2026-09-01T19:14:42Z",
+        "started_branch": "docs/a0-a1-tracker-record-correction",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-a0-a1-tracker-record-correction",
+        "status": "done",
+        "summary": "Verify decision record and close tracker correction",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,251 @@
+{
+  "context": "Reuse the item-1 validators so the validator and CLI share one allowlist.\nDefault the submit path's result_source to 'community' (that is what the submit\nCLI is for); the vendor label never originates from the public submit CLI.\nFor the vendor gate, implement the resolved option (default A): detect vendor\nprovenance by bundle location/sidecar, and have the validator ERROR if a\ncommunity-located bundle asserts vendor. Add targeted unit tests that feed the\nvalidator hostile manifests (unknown funding, injected vendor label,\noversized notes) and assert rejection.\n",
+  "description": "Extend the submission path so contributors disclose funding and so the\nauthoritative vendor-supplied label can only be applied under maintainer\ncontrol. Today _build_submission_manifest (benchbox/cli/commands/submit.py:153-175)\nwrites submission_tool_version, submitted_at, bundle/companion hashes,\nbenchmark, platform, scale_factor, phase, submission_path, submitted_by — no\nfunding, no source, and (a pre-existing drift) no submission_notes even though\nthe contract (hosted-results-contract.md:5.1) lists it.\n\nscripts/validate_submission.py runs in CI on attacker-controlled PR JSON. It\nmust strictly validate the new enum fields and, critically, refuse a\nself-asserted vendor-supplied label so a vendor cannot open a community PR that\nlands in the ranking-eligible vendor tier without maintainer sign-off.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate the enum in validate_submission.py",
+        "instead": "(not specified)",
+        "item_id": "submit-manifest-and-validator",
+        "why": "import from provenance.py."
+      },
+      {
+        "dont": "let the public submit CLI or a community PR self-assert vendor-supplied",
+        "instead": "(not specified)",
+        "item_id": "submit-manifest-and-validator",
+        "why": "that defeats the whole governance point."
+      },
+      {
+        "dont": "make funding REQUIRED for community submissions (default 'unspecified'); DO require an explicit funding on the maintainer vendor path if the gate resolution says so.",
+        "instead": "(not specified)",
+        "item_id": "submit-manifest-and-validator",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "weaken or reorder the existing hash/path-traversal validation to slot in new checks.",
+        "instead": "(not specified)",
+        "item_id": "submit-manifest-and-validator",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "submit-manifest-and-validator",
+        "needs_item": "provenance-vocabulary-and-labels"
+      }
+    ],
+    "item_meta": {
+      "category": "Feature",
+      "completed_at": "2026-08-09T02:03:41Z",
+      "created_at": "2026-07-06T00:00:00Z",
+      "worktree": "results-labels-funding"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing manifests (no funding/result_source/submission_notes) still validate — new fields are optional except where the vendor gate requires them.",
+        "item_id": "submit-manifest-and-validator"
+      },
+      {
+        "behavior": "The bundle_hash / companion_hashes contract and path-traversal + symlink defenses in _validate_manifest_hash are unchanged.",
+        "item_id": "submit-manifest-and-validator"
+      },
+      {
+        "behavior": "The pinned submit checklist regression test (tests/unit/cli/commands/test_submit.py) keeps its four required tokens.",
+        "item_id": "submit-manifest-and-validator"
+      },
+      {
+        "behavior": "Unofficial-compliance and non-clean-run refusals in submit.py stay in force.",
+        "item_id": "submit-manifest-and-validator"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/commands/submit.py:153-175 _build_submission_manifest — extend (add funding, result_source, submission_notes)",
+        "decision": "extend",
+        "item_id": "submit-manifest-and-validator",
+        "path": "benchbox/cli/commands/submit.py:153-175"
+      },
+      {
+        "concept": "benchbox/cli/commands/submit.py:455-523 submit options — extend (add --funding, --notes; reuse existing --submitted-by/--visibility style)",
+        "decision": "extend",
+        "item_id": "submit-manifest-and-validator",
+        "path": "benchbox/cli/commands/submit.py:455-523"
+      },
+      {
+        "concept": "benchbox/core/results/provenance.py (item 1) — reference (FUNDING_SOURCES / validators)",
+        "decision": "reuse",
+        "item_id": "submit-manifest-and-validator",
+        "path": "benchbox/core/results/provenance.py"
+      },
+      {
+        "concept": "docs/reference/hosted-results-contract.md:5.1 submission manifest schema — reference (add funding/result_source; submission_notes already specified there)",
+        "decision": "reuse",
+        "item_id": "submit-manifest-and-validator",
+        "path": "docs/reference/hosted-results-contract.md:5.1"
+      },
+      {
+        "concept": "scripts/validate_submission.py:33-37 REQUIRED_* key sets + :517-603 _validate_manifest_hash — extend (add manifest field validation; the hash/path-traversal defenses are the security baseline to preserve)",
+        "decision": "extend",
+        "item_id": "submit-manifest-and-validator",
+        "path": "scripts/validate_submission.py:33-37"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "submit-manifest-and-validator",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "submit-manifest-and-validator",
+        "kind": "do_not_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "submit-manifest-and-validator",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/generate_corpus_inventory.py"
+      },
+      {
+        "item_id": "submit-manifest-and-validator",
+        "kind": "only_modify",
+        "path_glob": ".github/CODEOWNERS (only if resolved gate = Option A)"
+      },
+      {
+        "item_id": "submit-manifest-and-validator",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "submit-manifest-and-validator",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "submit-manifest-and-validator",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_submit.py"
+      },
+      {
+        "item_id": "submit-manifest-and-validator",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_validate_submission.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox submit --last --funding free-trial --dry-run",
+        "description": "Submit dry-run emits a manifest with funding + result_source",
+        "expected": "dry-run preview shows funding=free-trial; no bytes sent",
+        "item_id": "submit-manifest-and-validator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/validate_submission.py <fixture-bundle-with-manifest>",
+        "description": "Validator accepts a valid community manifest with funding",
+        "expected": "validation passes",
+        "item_id": "submit-manifest-and-validator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py -k vendor -q",
+        "description": "Validator REJECTS a self-asserted vendor label in a community bundle",
+        "expected": "test asserting hard rejection passes",
+        "item_id": "submit-manifest-and-validator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py -k 'funding or notes' -q",
+        "description": "Validator rejects unknown funding + oversized notes",
+        "expected": "all pass",
+        "item_id": "submit-manifest-and-validator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -q",
+        "description": "Submit contract + hash tests still pass",
+        "expected": "all pass",
+        "item_id": "submit-manifest-and-validator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "submit-manifest-and-validator",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "submit-manifest-and-validator",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "submit-manifest-and-validator",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "submit-manifest-and-validator",
+        "notes": "Default funding inherits from the bundle's provenance.funding when present, else 'unspecified'.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add --funding (Choice from FUNDING_SOURCES) and --notes (<=500 chars) to benchbox submit; thread into _build_submission_manifest.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "submit-manifest-and-validator",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add funding, result_source (default 'community' for the submit path), and submission_notes to the manifest envelope; keep field order deterministic (canonical JSON).",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "submit-manifest-and-validator",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "In validate_submission.py, strictly validate funding in FUNDING_SOURCES and result_source in {internal, community, vendor}; reject unknown values.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "submit-manifest-and-validator",
+        "notes": "Per the resolved gate: a self-asserted vendor label in an ordinary community submission is a hard validation error with a clear message.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enforce G-VENDOR-SIGNAL: vendor provenance is only valid via the maintainer-controlled path; a self-asserted vendor label is a hard validation error.",
+        "wid": "w4"
+      }
+    ]
+  }
+}

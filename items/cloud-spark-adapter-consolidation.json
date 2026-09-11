@@ -1,0 +1,10 @@
+{
+  "description": "Code review of the 7 cloud Spark platform adapters (5,358 LOC total) identified\nsignificant duplication opportunities. Approximately 1,100-1,400 lines of code\ncan be consolidated through mixins and improved base classes.\n\nAdapters reviewed:\n- Dataproc Serverless (710 LOC)\n- Athena Spark (858 LOC)\n- EMR Serverless (849 LOC)\n- Synapse Spark (888 LOC)\n- AWS Glue (841 LOC)\n- Snowpark Connect (690 LOC)\n- Databricks DataFrame (522 LOC)",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2025-12-26T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

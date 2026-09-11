@@ -1,0 +1,193 @@
+{
+  "context": "Close the gap between what the gate measures and what promotion changes, one layer at a time, without weakening any existing check. Render behavioral contexts from versioned generated records so the evaluated text is the candidate text. Extend the generator to the classes the scenarios actually exercise. Either exercise the product loader path end to end or state precisely, in the contract, which properties governance tooling cannot certify so no packet overclaims. Add a consistency check so prose that contradicts a claimed verification field cannot score as verified.",
+  "description": "Structural limitations recorded in reports/final-completion-plan.md and still open on main at 09dc563, so a fixture-passing candidate can pass while live behavior differs. One, behavioral treatment_memories are handcrafted string literals in corpus.py, not contexts rendered from the candidate records by a production renderer; v5 added a candidate fixture reference in runner.py but the corpus literals remain. Two, the Codex generator emits only historical_observation, expired_reverify_live, and searchable_historical classes and does not implement the durable-preference, repository-policy, or verified-low-drift classes the scenarios exercise. Three, the deterministic retriever is governance tooling rather than either product's loader and ranker, so index discovery, competition among many similar records, and automatic context budgets are never exercised. Four, free-text correctness is only indirectly scored, and relevant-retrieval r1 showed prose and tool evidence contradicting a claimed verification field. Five, candidate generation was pinned to a 2026-07-24 snapshot while the gate ran 2026-07-29, so reproducibility does not imply freshness at promotion. The source-to-candidate disposition ledger for the 43 live baseline files is already covered by memory-rollout-v2-system-split-execution and is deliberately not duplicated here.",
+  "legacy": {
+    "item_meta": {
+      "category": "evaluation",
+      "completed_at": "2026-08-04T01:33:36Z",
+      "created_at": "2026-08-04T00:11:00Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Arm blindness holds, so no arm receives text the others cannot receive",
+        "item_id": "memory-evaluation-live-transfer-validity"
+      },
+      {
+        "behavior": "Committed evidence from earlier generations is never rewritten to match a newer contract",
+        "item_id": "memory-evaluation-live-transfer-validity"
+      },
+      {
+        "behavior": "Live Codex and Claude memory and settings remain byte-unchanged",
+        "item_id": "memory-evaluation-live-transfer-validity"
+      },
+      {
+        "behavior": "Payload comparisons continue to measure complete rendered record text with no arm-specific hidden material",
+        "item_id": "memory-evaluation-live-transfer-validity"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v3/**"
+      },
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v4/**"
+      },
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v5/**"
+      },
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/**"
+      },
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q -k render",
+        "description": "Behavioral contexts derive from generated records",
+        "expected": "A test proves each treatment context is rendered from the candidate records rather than a literal",
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "last_result": "pass",
+        "last_run": "2026-08-04T01:33:24Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling/codex -- python -m pytest memory_tooling/codex/tests -q",
+        "description": "Generator covers the exercised record classes",
+        "expected": "Generator tests cover durable-preference, repository-policy, and verified-low-drift classes",
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "last_result": "pass",
+        "last_run": "2026-08-04T01:33:31Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q -k consistency",
+        "description": "Prose contradicting a verification claim is caught",
+        "expected": "A mutation test proves a contradicted verification claim cannot score as verified",
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "last_result": "pass",
+        "last_run": "2026-08-04T01:33:33Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "needs_wid": "w0",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "commit 5a77cc2. Verified first: v5 ALREADY renders treatment from the generated candidate fixture via the production compact renderer, so the premise that contexts are handcrafted was stale - BUT Case still carried a populated treatment_memories tuple that nothing read, which is precisely what made the earlier review conclude the eval measured handcrafted strings. Removed the field and its 12 literals (AST-located spans; all 12 cases verified intact with baseline memories). Added two guarantees: behavioral suite asserts treatment context matches the fixture rendering and that no such field returns; codex suite asserts the committed fixture is byte-identical to generator output, so a generator change cannot leave the gate measuring the previous candidate",
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "notes": null,
+        "started_at": "2026-08-04T01:23:58Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Render behavioral treatment contexts from the versioned generated candidate records instead of handcrafted corpus literals",
+        "wid": "w0"
+      },
+      {
+        "evidence": "commit 4fc52f4. Measured rather than guessed. The gate exercises 6 record classes; the promotable candidate is 39/39 historical_observation - 5 of 6 missing. Root cause differs per class: the generator DOES implement current_user_preference extraction but the live store has zero notes carrying the required approved frontmatter (verified read-only: no ad_hoc/notes dir, no 'approved: true' anywhere); repository_policy_reference and verified_code_observation have no candidate-side materialization path at all. Added class_coverage() + 2 tests pinning the gap. NOT closed deliberately: materializing these classes means classifying Joe's real memories, which changes what gets installed - recorded as a human decision rather than an agent guess",
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "notes": null,
+        "started_at": "2026-08-04T01:30:20Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Extend the Codex generator to the durable-preference, repository-policy, and verified-low-drift classes the scenarios exercise",
+        "wid": "w1"
+      },
+      {
+        "evidence": "commit 4cef516. Chose the honest half of the either/or: the contract now states the four properties governance tooling cannot certify - the product loader/ranker (retrieval.py is governance tooling, so index discovery, competition among similar records, and context budgeting are untested), the 5 of 6 record classes absent from the promotable candidate, behavior at live scale (43 files / ~535KB vs a handful of records), and freshness at promotion. Packets may not claim any of them",
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "notes": null,
+        "started_at": "2026-08-04T01:33:09Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Exercise the product loader and ranker path or state in the contract exactly which properties governance tooling cannot certify",
+        "wid": "w2"
+      },
+      {
+        "evidence": "commit 260da5b. _verification_prose_conflict flags a response whose answer denies the act of verifying while claiming verification_status satisfied - the v3 relevant-retrieval r1 failure mode where prose and tool evidence contradicted a claimed field. Pattern is deliberately narrow (must describe verify/confirm/determine/validate) and only fires on a satisfied claim; a test pins that calling a memory record 'unverified' does NOT fire. 3 tests",
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "notes": null,
+        "started_at": "2026-08-04T01:30:35Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Score free-text consistency so prose contradicting a claimed verification field cannot register as verified",
+        "wid": "w3"
+      },
+      {
+        "evidence": "commit 4cef516. candidate_staleness compares manifest generated_at against live source mtimes, read-only, fails closed on an unparseable timestamp. FINDING: the v5 candidate is STALE - generated 2026-07-27, and 49 live files have changed since, including MEMORY.md, memory_summary.md, raw_memories.md. Promoting it today would install a snapshot that no longer matches its source; this is now a material input to decision D2. 2 tests",
+        "item_id": "memory-evaluation-live-transfer-validity",
+        "notes": null,
+        "started_at": "2026-08-04T01:33:12Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Assert candidate freshness at gate time so a stale generation snapshot cannot silently back a promotion packet",
+        "wid": "w4"
+      }
+    ]
+  }
+}

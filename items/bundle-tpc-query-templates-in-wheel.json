@@ -1,0 +1,10 @@
+{
+  "description": "BenchBox v0.1.0 installed from PyPI (wheel) cannot run TPC-H or TPC-DS benchmarks.\nQuery template files (.sql for TPC-H, .tpl for TPC-DS) live in `_sources/` at the\nproject root - outside the `benchbox/` package tree - and are never included in the\nwheel. The pyproject.toml `[tool.setuptools.package-data]` `\"*\"` glob is ineffective\n(patterns are relative to package dirs, not project root). MANIFEST.in correctly\nincludes them for sdist only.\n\nRoot cause: wheels don't use MANIFEST.in; only package-data matters. Since `_sources/`\nis outside the package, setuptools cannot find the files.\n\nSolution: Create shared `templates/` directories inside `benchbox/_binaries/tpc-{h,ds}/`\n(already in the package tree and included in wheels). Update template resolution code\nto look there first, with `_sources/` fallback for development.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-23T00:00:00Z",
+      "worktree": "release-readiness"
+    }
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "context": "w1 fork preserving LICENSE and README credits chain (upstream is itself a fork of michaelhannecke/pi-container). w2 scripts/preflight.sh: Apple Silicon check, sw_vers >= 26, container --version >= pinned floor, live smoke (container network create preflight-int --internal; two containers ping each other; cleanup), PREFLIGHT_FORCE_OS env override so the negative path is testable. Anti-patterns: no git add -A; no edits to run.sh/Containerfile in this item; repo is public so never commit tokens or hostnames beyond what upstream already exposes.",
+  "description": "Fork https://github.com/0xKZ/pi-container (MIT, Zach Kehs) to ~/Developer/agent-container as the base for agent-agnostic sandboxed VM infra on the Mac Mini. This item ONLY forks and builds the gate script; no behavior changes. GATE RULE: the entire program is gated on the Mini running macOS >= 26 — on macOS 15 Apple container has no container-to-container networking, so the dual-homed egress design is impossible. If the Mini is on 15, STOP: write docs/alternatives.md recommending the Lima/Docker single-VM design and escalate to Joe instead of proceeding. Also warn (not fail) on macOS 26.1 publish bug apple/container#919.",
+  "legacy": {
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-07T00:42:30Z",
+      "created_at": "2026-08-06T23:59:37Z",
+      "worktree": "agent-container"
+    },
+    "preserves": [
+      {
+        "behavior": "Upstream pi-container behavior is untouched by this item",
+        "item_id": "agentbox-phase0-fork-and-preflight-gate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agentbox-phase0-fork-and-preflight-gate",
+        "kind": "do_not_modify",
+        "path_glob": "Containerfile"
+      },
+      {
+        "item_id": "agentbox-phase0-fork-and-preflight-gate",
+        "kind": "do_not_modify",
+        "path_glob": "LICENSE"
+      },
+      {
+        "item_id": "agentbox-phase0-fork-and-preflight-gate",
+        "kind": "do_not_modify",
+        "path_glob": "pi-config/**"
+      },
+      {
+        "item_id": "agentbox-phase0-fork-and-preflight-gate",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/run.sh"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd ~/Developer/agent-container && ./scripts/preflight.sh",
+        "description": "Preflight passes on the target Mini",
+        "expected": null,
+        "item_id": "agentbox-phase0-fork-and-preflight-gate",
+        "last_result": "pass",
+        "last_run": "2026-08-07T00:42:24Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd ~/Developer/agent-container && ! PREFLIGHT_FORCE_OS=15.6 ./scripts/preflight.sh",
+        "description": "Preflight hard-fails on simulated macOS 15",
+        "expected": null,
+        "item_id": "agentbox-phase0-fork-and-preflight-gate",
+        "last_result": "pass",
+        "last_run": "2026-08-07T00:42:26Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd ~/Developer/agent-container && grep -q \"macOS\" docs/spikes.md",
+        "description": "Host facts recorded in spikes doc",
+        "expected": null,
+        "item_id": "agentbox-phase0-fork-and-preflight-gate",
+        "last_result": "pass",
+        "last_run": "2026-08-07T00:42:28Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agentbox-phase0-fork-and-preflight-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "agentbox-phase0-fork-and-preflight-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "cloned 0xKZ/pi-container upstream 52a79f2b to ~/Developer/agent-container; LICENSE MIT Zach Kehs intact",
+        "item_id": "agentbox-phase0-fork-and-preflight-gate",
+        "notes": null,
+        "started_at": "2026-08-07T00:42:07Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Fork repo to ~/Developer/agent-container, keep LICENSE and credits intact",
+        "wid": "w1"
+      },
+      {
+        "evidence": "scripts/preflight.sh commits 7a23115b + b15c8015 (review fixes); shellcheck clean; OS/CLI/daemon/network gates + PREFLIGHT_FORCE_OS hook",
+        "item_id": "agentbox-phase0-fork-and-preflight-gate",
+        "notes": null,
+        "started_at": "2026-08-07T00:42:09Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Write scripts/preflight.sh with OS and container-version gates plus network smoke test and PREFLIGHT_FORCE_OS test hook",
+        "wid": "w2"
+      },
+      {
+        "evidence": "docs/spikes.md records macOS 26.6, container CLI 1.1.0, 2026-08-06; gate PASSES so no alternatives.md; program continues",
+        "item_id": "agentbox-phase0-fork-and-preflight-gate",
+        "notes": null,
+        "started_at": "2026-08-07T00:42:12Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "GATE - record Mini macOS and container versions in docs/spikes.md; if macOS 15 write docs/alternatives.md Lima decision doc and stop the program",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,153 @@
+{
+  "context": "Tiny, surgical change. Remove one line from pyproject.toml, refresh\nuv.lock, run fast tests. The risk is essentially zero because chdb-core\nis reachable via the existing chdb declarations in the extras that\nactually need it. If a future code path wants to import chdb_core\ndirectly, it should declare chdb (which transitively brings chdb-core)\nrather than depending on the leaked-into-core declaration.\n",
+  "description": "`chdb-core>=26.1.0` is declared on line 49 of `pyproject.toml` as a CORE\nruntime dep. It has zero direct `import chdb_core` sites anywhere in\n`benchbox/`, `tests/`, `scripts/`, or `docs/`. `uv tree` shows that\n`chdb-core` is a dep of `chdb v4.1.6`, which itself lives in optional\nextras (`extras:all`, `extras:clickhouse-local`, `dep-group:dev`).\n\nNet effect today: every minimal install of benchbox pulls `chdb-core`\n(a sizeable C++-bundled package, ~tens of MB) even when the user did\nnot ask for ClickHouse local mode. Moving `chdb-core` out of core deps\ntrims the install footprint and keeps the optional/required boundary\nhonest.\n\nSource for this finding: `docs/development/dependency-inventory.md` (F1),\nproduced by `audit-imported-dependencies-for-elimination`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add chdb to core deps to compensate",
+        "instead": "leave chdb in extras",
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "why": "that would defeat the optionality of ClickHouse"
+      },
+      {
+        "dont": "remove chdb-core from extras as well",
+        "instead": "(not specified)",
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "why": "chdb depends on it transitively, and uv tree would re-add it; the only goal is dropping the redundant *core* declaration"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "drop-chdb-core-from-core-dependencies",
+        "id": 151,
+        "reason": "Out of scope; covered by the parent audit-imported-dependencies-for-elimination.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Parent audit-imported-dependencies-for-elimination (DONE 2026-04-15) scopes 'every declared dep... does it belong in the manifest', covering transitive-only core deps. The deferral explicitly delegated to that now-completed parent.",
+        "summary": "Audit other transitive-only deps that may also be in core"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-15T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ClickHouse local extras (`extras:all`, `extras:clickhouse-local`, `dep-group:dev`) continue to install chdb (and therefore chdb-core)",
+        "item_id": "drop-chdb-core-from-core-dependencies"
+      },
+      {
+        "behavior": "Fast test suite green after the change",
+        "item_id": "drop-chdb-core-from-core-dependencies"
+      },
+      {
+        "behavior": "No new explicit `import chdb_core` is introduced",
+        "item_id": "drop-chdb-core-from-core-dependencies"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import tomllib, pathlib; deps = tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['dependencies']; assert not any('chdb-core' in d for d in deps), 'chdb-core still in core deps: ' + str([d for d in deps if 'chdb-core' in d]); print('OK: chdb-core removed from core')\"",
+        "description": "chdb-core no longer in [project] dependencies",
+        "expected": "OK: chdb-core removed from core",
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite passes",
+        "expected": "no failures",
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm zero direct `chdb_core` imports in shipped source: `grep -rn 'chdb_core' benchbox tests scripts docs`. Document the result in the commit message.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Edit pyproject.toml: remove `chdb-core>=26.1.0` from `[project] dependencies`. Refresh uv.lock with `uv lock`.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-chdb-core-from-core-dependencies",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run fast suite to confirm no regressions. Verify chdb-using extras still pull chdb-core transitively: `uv tree --depth 2 | grep -B1 chdb-core`.",
+        "wid": "w3"
+      }
+    ]
+  }
+}

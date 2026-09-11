@@ -1,0 +1,61 @@
+{
+  "context": "Run the existing dependency-audit generator; do not hand-edit generated rows or broaden the dependency change.",
+  "description": "The MCP v1 major-version cap changes pyproject.toml dependency metadata, causing make pr-preflight to fail audit-raw-check because docs/development/dependency-audit-raw.md is generated from that metadata. Regenerate only the checked-in audit artifact with the repository generator and prove it matches source.",
+  "legacy": {
+    "item_meta": {
+      "category": "documentation",
+      "completed_at": "2026-08-01T19:35:25Z",
+      "completed_pr": 1435,
+      "created_at": "2026-08-01T19:22:13Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "The audit artifact remains entirely generator-owned and reproducible from current project metadata",
+        "item_id": "mcp-sdk-v1-cap-dependency-audit-artifact"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-sdk-v1-cap-dependency-audit-artifact",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-sdk-v1-cap-dependency-audit-artifact",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "mcp-sdk-v1-cap-dependency-audit-artifact",
+        "kind": "only_modify",
+        "path_glob": "docs/development/dependency-audit-raw.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/dependency_audit/parse_deps.py --check",
+        "description": "Generated dependency audit matches project metadata",
+        "expected": "Fails on the unfixed tree before regeneration; exits 0 after the checked-in audit artifact matches pyproject.toml",
+        "item_id": "mcp-sdk-v1-cap-dependency-audit-artifact",
+        "last_result": "pass",
+        "last_run": "2026-08-01T19:35:22Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Ran uv run -- python _project/scripts/dependency_audit/parse_deps.py; the MCP audit row now records >=1.28.1,<2 for both dev and extras:mcp, and --check exits 0.",
+        "item_id": "mcp-sdk-v1-cap-dependency-audit-artifact",
+        "notes": null,
+        "started_at": "2026-08-01T19:22:28Z",
+        "started_branch": "fix/mcp-sdk-v1-major-version-cap",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Regenerate dependency-audit-raw.md with the repository generator and inspect the MCP row",
+        "wid": "w1"
+      }
+    ]
+  }
+}

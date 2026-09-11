@@ -1,0 +1,10 @@
+{
+  "description": "Complete redesign of the benchmark result JSON output schema from v1.1 to v2.0.\n\nThe current v1.1 schema has significant issues:\n- Extensive duplication (platform in 4 locations, timing in 2+ locations)\n- Poor organization (execution.metadata contains platform details)\n- Verbose structures with null-filled fields\n- Confusing metrics placement\n\nThis redesign creates a clean, non-duplicating schema with:\n- 70-85% smaller JSON output files\n- Single source of truth for all data\n- Compact query format (1 line vs 7 lines per query)\n- Companion files for query plans and tuning details\n- Support for multi-iteration, multi-stream, and query subset runs\n\n**Breaking change**: No backward compatibility with v1.x results.\n\nReference: /Users/joe/.claude/plans/radiant-stargazing-ember.md",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-04T00:00:00Z",
+      "worktree": "result-object-migration"
+    }
+  }
+}

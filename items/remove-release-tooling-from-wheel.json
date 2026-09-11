@@ -1,0 +1,145 @@
+{
+  "context": "Edit two config files and update CI references. No code moves, no new\npackages, no compatibility shims.\n",
+  "description": "BenchBox ships `benchbox/release/` (~2,300 lines) and the `benchbox-sync`\nconsole entry point to all users via MANIFEST.in and pyproject.toml. These\nare maintainer-only tools for release automation, repository sync, and\ncontent validation.\n\nCoupling analysis confirmed near-zero coupling: release imports only\n`benchbox.utils.printing.emit`, and core BenchBox never imports from release.\n\nThe fix is three small edits:\n1. Remove `benchbox-sync` from `[project.scripts]` in pyproject.toml.\n2. Add `prune benchbox/release` to MANIFEST.in so the wheel excludes it.\n3. Optionally add a `[maintainer]` extra that re-exposes the entry point for\n   explicit installs.\n\nA full `benchbox-maintainer` package is not needed given the near-zero\ncoupling. Maintainers can continue to use `benchbox-sync` from the source\ncheckout or via `uv run -- python -m benchbox.release.sync`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create a separate benchbox-maintainer package for this level of decoupling",
+        "instead": "(not specified)",
+        "item_id": "remove-release-tooling-from-wheel",
+        "why": "it is over-engineered"
+      },
+      {
+        "dont": "remove benchbox/release/ source code from the repo",
+        "instead": "exclude from wheel only",
+        "item_id": "remove-release-tooling-from-wheel",
+        "why": "maintainers need it for release automation from the source checkout"
+      }
+    ],
+    "item_meta": {
+      "category": "Maintainer Tooling",
+      "completed_at": "2026-03-23T00:00:00Z",
+      "created_at": "2026-03-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Ability to run release/sync from the source checkout via `uv run`",
+        "item_id": "remove-release-tooling-from-wheel"
+      },
+      {
+        "behavior": "Public `benchbox` CLI behavior for default installs",
+        "item_id": "remove-release-tooling-from-wheel"
+      },
+      {
+        "behavior": "Release test coverage (tests still run from source, just not shipped)",
+        "item_id": "remove-release-tooling-from-wheel"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remove-release-tooling-from-wheel",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "remove-release-tooling-from-wheel",
+        "kind": "only_modify",
+        "path_glob": "MANIFEST.in"
+      },
+      {
+        "item_id": "remove-release-tooling-from-wheel",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "remove-release-tooling-from-wheel",
+        "kind": "only_modify",
+        "path_glob": "scripts/sync_repos.py"
+      },
+      {
+        "item_id": "remove-release-tooling-from-wheel",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_package_exports.py"
+      },
+      {
+        "item_id": "remove-release-tooling-from-wheel",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_cli_documentation.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_cli_package_exports.py tests/unit/test_cli_documentation.py -q",
+        "description": "Public CLI and package-export tests still pass",
+        "expected": "All tests pass",
+        "item_id": "remove-release-tooling-from-wheel",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/release/test_workflow.py tests/unit/release/test_release_sync_unit.py tests/unit/test_release_sync.py -q",
+        "description": "Release and sync tests still pass from source checkout",
+        "expected": "All tests pass",
+        "item_id": "remove-release-tooling-from-wheel",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv venv /tmp/benchbox-wheel-test && uv build --wheel && uv pip install --python /tmp/benchbox-wheel-test dist/benchbox-*.whl --quiet && /tmp/benchbox-wheel-test/bin/benchbox-sync --help; rm -rf /tmp/benchbox-wheel-test",
+        "description": "benchbox-sync is not installed as a console script in a clean wheel install",
+        "expected": "benchbox-sync not found (exit code 1)",
+        "item_id": "remove-release-tooling-from-wheel",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv build --wheel && python -m zipfile -l dist/benchbox-*.whl | grep release",
+        "description": "benchbox.release is excluded from the wheel",
+        "expected": "No output (zero matches)",
+        "item_id": "remove-release-tooling-from-wheel",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remove-release-tooling-from-wheel",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remove-release-tooling-from-wheel",
+        "notes": "In pyproject.toml: remove `benchbox-sync = \"benchbox.release.sync:main\"`\nfrom `[project.scripts]`.\nIn MANIFEST.in: add `prune benchbox/release` after the existing\n`recursive-include benchbox` line.\nUpdate scripts/sync_repos.py to invoke the module directly instead of\nrelying on the installed entry point.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove benchbox-sync entry point and exclude benchbox/release/ from the wheel",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-release-tooling-from-wheel",
+        "notes": "Any test asserting `benchbox-sync` is an installed script should be updated\nto expect its absence in default installs. CI release jobs that use\n`benchbox-sync` should switch to `uv run -- python -m benchbox.release.sync`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update tests and CI to reflect the removed entry point",
+        "wid": "w2"
+      }
+    ]
+  }
+}

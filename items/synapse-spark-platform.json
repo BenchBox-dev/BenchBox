@@ -1,0 +1,16 @@
+{
+  "description": "Add Azure Synapse Spark platform adapter. Synapse Spark is used by existing\nenterprise deployments and provides integrated analytics with Synapse SQL pools.\n\nImplementation shares 70% code with Fabric Spark adapter (authentication,\nstaging, Livy protocol).",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "synapse-spark-platform",
+        "needs_item": "fabric-spark-platform"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2025-12-24T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Merged loader/nullability fixes eliminate the prior conversion failures, but the full TPC-DS SF=0.01 clickhouse-server cell still reaches the 600-second harness cap. Identify the slow query or phase, preserve correctness, and fix or add scoped diagnostics without raising the global UAT timeout.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-21T15:09:02Z",
+      "worktree": "uat-hardening"
+    }
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "context": "Narrow rung 4 to executable code rather than degrading the convert.py example: scope the grep to non-docstring lines, or restrict it to benchbox/cli/tuning.py and the run command where a hardcoded presort default would actually be a defect. Do not delete the rung -- it caught a real violation in tuning.py earlier. Then run each done item's ladder once via 'todo verify' so last_run stops being null and the recorded state matches reality, and record any rung that cannot pass with an explicit reason instead of leaving it silently red. Prior art: one-engine-unify-statistics shows what a fully-recorded ladder looks like; todo-complete-does-not-run-verification-ladder is the already-closed item that added the gate.",
+  "description": "Verified at develop 29380ce9e. Two coupled loose ends left by the one-engine program. FIRST: one-engine-core-run-service is state=done but its rung 4 ('! grep -rn l_shipdate|ss_sold_date_sk benchbox/cli/') still fails on benchbox/cli/commands/convert.py:166 and :170. Those two hits are '--partition l_shipdate' usage examples in a command docstring -- prose describing a user-supplied flag value, not a presort default -- so the rung greps prose it cannot distinguish from code. This was filed as deferral #699 during the program and dismissed without narrowing the rung, so the item carries a permanently-red gate. The other four keystone rungs pass (service exists and CLI consumes it, lint-imports 3 contracts kept, characterization suite green, full fast lane 27775 passed). SECOND, and the reason the first survived: 'todo verify <id>' reports last_run=null and last_result=null for nearly every rung on these items, so the ladders were never executed at all. Sampled one-engine items: core-run-service 5/5 rungs never run, mcp-run-service-adoption 4/4, sink-mcp-logic 3/3, parity-ledger 2/2, unify-statistics 0/3. unify-statistics is the control -- its rungs were run and recorded, so the recording path works and simply was not used elsewhere. The completion gate added later (todo complete --override-verification) only binds completions from that point forward, so it does not retroactively cover items already marked done.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "claimed_at": "2026-08-16T22:48:19Z",
+      "claimed_by": "joe@joe-mac-mini.local",
+      "created_at": "2026-08-14T00:53:58Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "Rung 4 still fails if a hardcoded benchmark presort default reappears in executable CLI code.",
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung"
+      },
+      {
+        "behavior": "The convert.py --partition documentation keeps a real, recognizable TPC-H column in its example; the rung is narrowed to fit the docs, not the docs rewritten to fit the rung.",
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/**"
+      },
+      {
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/convert.py"
+      },
+      {
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo verify one-engine-core-run-service",
+        "description": "Keystone rung 4 passes as narrowed",
+        "expected": "All five rungs pass.",
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo verify one-engine-core-run-service | grep -q '\"last_run\": null' && exit 1 || exit 0",
+        "description": "Keystone ladder results are recorded",
+        "expected": "No rung still reports last_run=null.",
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated at origin/develop 6a8c3098cffc6a920f95526fe1a90c1be1699f34: run_service exists and CLI consumes it; only benchbox/cli/commands/convert.py docstring examples contain l_shipdate, while tests/unit/core/test_presort_registry_defaults.py already proves executable run.py carries neither hardcoded presort column and reads registry metadata.",
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung",
+        "notes": null,
+        "started_at": "2026-08-16T22:49:04Z",
+        "started_branch": "fix/one-engine-verification-ladders-20260816",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-one-engine-verification-ladders-20260816",
+        "status": "done",
+        "summary": "Re-validate at HEAD before writing anything",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Updated hosted one-engine-core-run-service ladder: dropped overbroad grep seq 4 and added focused registry-ownership pytest verification, preserving convert.py --partition l_shipdate documentation while remaining red if executable run.py hardcodes either benchmark default.",
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung",
+        "notes": null,
+        "started_at": "2026-08-16T22:56:07Z",
+        "started_branch": "fix/one-engine-verification-ladders-20260816",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-one-engine-verification-ladders-20260816",
+        "status": "done",
+        "summary": "Narrow keystone rung 4 to executable CLI code so it stops matching the convert.py docstring examples, keeping it red if a hardcoded presort default reappears in real code",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "one-engine-unrun-ladders-and-red-presort-rung",
+        "notes": null,
+        "started_at": "2026-08-16T22:56:26Z",
+        "started_branch": "fix/one-engine-verification-ladders-20260816",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-one-engine-verification-ladders-20260816",
+        "status": "in_progress",
+        "summary": "Run each done one-engine item's ladder once via 'todo verify' so last_run stops being null, and record an explicit reason for any rung that cannot pass rather than leaving it silently red",
+        "wid": "w2"
+      }
+    ]
+  }
+}

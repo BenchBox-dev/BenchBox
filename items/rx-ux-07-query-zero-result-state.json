@@ -1,0 +1,144 @@
+{
+  "context": "Use the existing EmptyState component. Name the facets currently narrowing the result set and offer a one-click widen. Distinguish empty-by-filter from a load failure, which already has ErrorMessage handling.",
+  "description": "Query.tsx imports no EmptyState. When facet selection narrows to zero results the page renders the table shell with a zero count and no guidance (Query.tsx:725-846), so the reader cannot tell whether the query is loading, broken, or genuinely empty.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "invent a new empty-state visual",
+        "instead": "use components/EmptyState.tsx",
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "why": "it already carries the role=status semantics"
+      },
+      {
+        "dont": "show the empty state while the cold-snapshot retry window is still open",
+        "instead": "branch only once loading has settled",
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "why": "db.ts retries empty reads during a cold window; a premature empty state would be wrong"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T17:41:57Z",
+      "completed_pr": 1817,
+      "created_at": "2026-08-22T14:49:03Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing loading skeleton and error paths in Query; the empty state is a third branch, not a replacement",
+        "item_id": "rx-ux-07-query-zero-result-state"
+      },
+      {
+        "behavior": "The cold-read retry window in db.ts, which can legitimately return zero rows briefly",
+        "item_id": "rx-ux-07-query-zero-result-state"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/query.spec.ts"
+      },
+      {
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Query.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:37:13Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium",
+        "description": "Chromium browser suite passes against a fresh build",
+        "expected": "fixtures verified, build succeeds, chromium suite green",
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:41:52Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium e2e/capability/accessibility-regressions.spec.ts",
+        "description": "Accessibility regression suite passes",
+        "expected": "no new axe violations",
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:41:55Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Query renders the shared EmptyState only after loading settles and rows are empty.",
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "notes": null,
+        "started_at": "2026-08-22T17:24:15Z",
+        "started_branch": "fix/rx-ux-07-query-empty-state",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-07-query-empty-state",
+        "status": "done",
+        "summary": "Add zero-result branch using EmptyState after loading settles",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Empty state names active facet labels and Clear all filters calls the existing resetQueryFilters path.",
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "notes": null,
+        "started_at": "2026-08-22T17:27:20Z",
+        "started_branch": "fix/rx-ux-07-query-empty-state",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-07-query-empty-state",
+        "status": "done",
+        "summary": "Name narrowing facets and offer a widen action",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Unit and Playwright coverage distinguish empty-by-filter from load failure and verify clearing URL facets.",
+        "item_id": "rx-ux-07-query-zero-result-state",
+        "notes": null,
+        "started_at": "2026-08-22T17:27:25Z",
+        "started_branch": "fix/rx-ux-07-query-empty-state",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-07-query-empty-state",
+        "status": "done",
+        "summary": "Test: empty-by-filter vs load failure produce different states",
+        "wid": "w3"
+      }
+    ]
+  }
+}

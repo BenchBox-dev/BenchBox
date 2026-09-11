@@ -1,0 +1,155 @@
+{
+  "context": "Three independent work units, no shared state. Each is a single-file\nedit plus test verification:\n- w1: change one Literal in hash_functions.py; re-run datavault tests\n  to confirm no consumer was relying on the broader type.\n- w2: add one string to the no_acl set in ddl.py; re-run\n  metadata_primitives tests to confirm no test pinned\n  supports_acl(\"duckdb\") to True. If any does, the test was encoding\n  the bug and should update.\n- w3: mechanical replacement at five call sites; grep first for any\n  other connection.cursor() patterns outside execution.py and skip\n  those (scope is throughput paths only).\n",
+  "description": "The reconcile-docs-from-spec-gap-analysis TODO was scoped to docs-only\nedits; verification of those doc edits against benchbox/ surfaced three\ncode-level inconsistencies that were flagged but not fixed. Each is a\nsmall, independent cleanup. None are user-visible today - all would\nsurface only if a user trusted the \"wrong\" source of truth (a Literal\ntype, a helper predicate, or a code pattern) and hit the divergence.\n\n**C1 - datavault hash algorithm type vs runtime contract.**\n`benchbox/core/datavault/etl/hash_functions.py:16` declares\n`HashAlgorithm = Literal[\"md5\", \"sha1\", \"sha256\"]`, but\n`benchbox/core/datavault/benchmark.py:56` pins\n`SUPPORTED_HASH_ALGORITHMS = (\"md5\",)` and the validator at L89-92\nraises ValueError on anything else. The error message explains the\ncause (\"schema constraints\"), so the fix is to narrow the Literal to\nmatch runtime - not widen the allowlist.\n\n**C2 - DuckDB ACL classification disagrees between two sources.**\n`benchbox/core/metadata_primitives/ddl.py:583` defines\n`no_acl = {\"sqlite\", \"datafusion\", \"spark\", \"polars\"}`, so\n`supports_acl(\"duckdb\")` returns True. But the authoritative tier\nlegend in `benchbox/core/metadata_primitives/catalog/queries.yaml:1435-1438`\nlists DuckDB in Tier 4 (None - no SQL-level ACL support), and the four\nother `supports_*` predicates (introspection, role_hierarchy,\ncolumn_grants) all return False for DuckDB. Pick one authoritative\nsource: either add `\"duckdb\"` to the `no_acl` set or update the yaml\nlegend + metadata-primitives.md to match the predicate. The yaml is\nmore consistent with reality (DuckDB is embedded, single-user, no\npractical GRANT/REVOKE), so adding `\"duckdb\"` to `no_acl` is the\npreferred direction.\n\n**N1 - throughput stream cursor helper inconsistently adopted.**\n`benchbox/platforms/base/execution.py` has five throughput paths that\ncall `connection.cursor()` directly (lines 547, 673, 765, 854, 1534)\nand one (line 369) that uses the `_make_stream_cursor` wrapper. The\nwrapper falls back to `_NoCloseProxy` for connection types that don't\nimplement `.cursor()`, so the direct-call paths will break for such\nadapters. Standardise on `_make_stream_cursor` across all six.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change supports_acl_introspection/role_hierarchy/column_grants for DuckDB in w2",
+        "instead": "only the no_acl set needs 'duckdb' added",
+        "item_id": "reconcile-docs-review-code-followups",
+        "why": "those already correctly return False"
+      },
+      {
+        "dont": "refactor _make_stream_cursor's fallback behaviour in w3",
+        "instead": "just adopt the helper at the five call sites",
+        "item_id": "reconcile-docs-review-code-followups",
+        "why": "the proxy is load-bearing for adapters without .cursor()"
+      },
+      {
+        "dont": "widen SUPPORTED_HASH_ALGORITHMS to ('md5','sha1','sha256') for w1",
+        "instead": "narrow the Literal instead",
+        "item_id": "reconcile-docs-review-code-followups",
+        "why": "the schema uses fixed-width BINARY(16) columns sized for MD5 and the error message explicitly cites 'schema constraints'"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture & Refactoring",
+      "completed_at": "2026-04-16T00:00:00Z",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All five throughput paths in execution.py continue to produce an object with a .execute() method (the _NoCloseProxy fallback preserves this for non-cursor-capable connections)",
+        "item_id": "reconcile-docs-review-code-followups"
+      },
+      {
+        "behavior": "DataVaultBenchmark hash validation continues to reject sha1/sha256 with the existing error message at benchmark.py:89-92",
+        "item_id": "reconcile-docs-review-code-followups"
+      },
+      {
+        "behavior": "supports_acl_introspection/role_hierarchy/column_grants predicates unchanged - only the no_acl set in supports_acl changes",
+        "item_id": "reconcile-docs-review-code-followups"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "reconcile-docs-review-code-followups",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/datavault/benchmark.py"
+      },
+      {
+        "item_id": "reconcile-docs-review-code-followups",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/metadata_primitives/catalog/queries.yaml"
+      },
+      {
+        "item_id": "reconcile-docs-review-code-followups",
+        "kind": "do_not_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "reconcile-docs-review-code-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/datavault/etl/hash_functions.py"
+      },
+      {
+        "item_id": "reconcile-docs-review-code-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/metadata_primitives/ddl.py"
+      },
+      {
+        "item_id": "reconcile-docs-review-code-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -k datavault -m fast -q",
+        "description": "datavault tests pass after Literal narrowing (w1)",
+        "expected": "all tests pass",
+        "item_id": "reconcile-docs-review-code-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -k metadata_primitives -m fast -q",
+        "description": "metadata_primitives tests pass after no_acl update (w2)",
+        "expected": "all tests pass",
+        "item_id": "reconcile-docs-review-code-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'throughput or tpch or tpcds' -m fast -q",
+        "description": "throughput test suite passes after cursor helper adoption (w3)",
+        "expected": "all tests pass",
+        "item_id": "reconcile-docs-review-code-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ty check benchbox/core/datavault/",
+        "description": "type check clean after Literal change (w1)",
+        "expected": "no new errors introduced",
+        "item_id": "reconcile-docs-review-code-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-review-code-followups",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "C1 - narrow HashAlgorithm Literal in datavault/etl/hash_functions.py:16 to ('md5',) to match benchmark.py SUPPORTED_HASH_ALGORITHMS",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-review-code-followups",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "C2 - add 'duckdb' to no_acl set in metadata_primitives/ddl.py:583 so supports_acl('duckdb') returns False, matching the Tier 4 assignment in queries.yaml:1435-1438 and the other supports_* predicates",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-review-code-followups",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "N1 - replace connection.cursor() with _make_stream_cursor(connection) at platforms/base/execution.py lines 547, 673, 765, 854, 1534 for consistency with line 369",
+        "wid": "w3"
+      }
+    ]
+  }
+}

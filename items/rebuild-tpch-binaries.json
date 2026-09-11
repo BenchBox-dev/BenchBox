@@ -1,0 +1,16 @@
+{
+  "description": "After applying stdout patches to TPC-H source, rebuild dbgen binaries\nfor all supported platforms to enable streaming data generation.\n\nTarget platforms (6 total):\n- darwin-arm64 (macOS Apple Silicon)\n- darwin-x86_64 (macOS Intel)\n- linux-arm64 (Linux ARM64)\n- linux-x86_64 (Linux x86_64)\n- windows-arm64 (Windows ARM64)\n- windows-x86_64 (Windows x86_64)",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "rebuild-tpch-binaries",
+        "needs_item": "patch-tpch-source-stdout"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-15T00:00:00Z",
+      "worktree": "tpch-stdout-fix"
+    }
+  }
+}

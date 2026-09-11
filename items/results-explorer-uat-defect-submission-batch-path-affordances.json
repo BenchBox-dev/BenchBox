@@ -1,0 +1,181 @@
+{
+  "context": "Implement the narrower exact-path affordance rather than batch submission.\nReuse `ResultExporter.list_results()`, because it already filters primary\nschema-v2 result JSON files and excludes `.plans.json`, `.tuning.json`, and\nhosted `.submission.json` sidecars. Keep `benchbox submit RESULT.json\n--output DIR` unchanged, and keep hosted submission behind explicit\n`--service`.\n",
+  "description": "W5 had to loop `benchbox submit` over 388 captured result paths one file at a\ntime. A guessed result filename failed clearly, but the flow still lacks an\nobvious way for contributors to copy exact result paths from history or submit\na batch of successful local results.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make batch submission silently publish",
+        "instead": "default to local package output or explicit confirmation.",
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "why": "users need review before publication"
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Experience",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No hosted upload occurs unless `--service` is explicitly requested.",
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances"
+      },
+      {
+        "behavior": "Single-file `benchbox submit RESULT.json --output DIR` continues to work.",
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/submit_auth.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/submit_service.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "do_not_modify",
+        "path_glob": "docs/_build/"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/planning/results-explorer-uat-defect-submission-batch-path-affordances.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/results-explorer-uat-defect-submission-batch-path-affordances.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/results.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/cli/results.md"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/cli/submit.md"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_results.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_submit.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands/test_results.py tests/unit/cli/commands/test_submit.py -q",
+        "description": "CLI tests cover exact-path discovery or batch submission.",
+        "expected": "selected CLI tests pass",
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox submit --help",
+        "description": "Submit help remains terminating and documents the affordance.",
+        "expected": "help includes the new path or batch affordance",
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox results --help",
+        "description": "Results help remains terminating and documents path discovery.",
+        "expected": "help includes the exact-path discovery flag",
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "notes": "Inventory found `benchbox submit` already accepts one exact result path and\n`--last`, while `benchbox results` lists recent result metadata without the\nsource file paths that submit can consume. Hosted submission history is a\nseparate sidecar flow (`benchbox results --submitted`) and should not be\nconflated with local result discovery. The minimal unblocked affordance is\ntherefore exact path discovery in `benchbox results`, plus a submit help\ntip pointing contributors to that command.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory existing result discovery, history, and submit command paths",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "notes": "Own the CLI affordance only: add a copyable exact result-path view to\n`benchbox results` and update `benchbox submit --help` so users know how to\ndiscover the paths. Do not add batch hosted upload in this TODO; hosted\nsubmission stays explicit and one bundle at a time.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a minimal exact-path or batch-submission affordance",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-submission-batch-path-affordances",
+        "notes": "Document the exact-path discovery path in contributor-facing CLI docs and\nrun the focused CLI tests plus terminating help commands.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document and test the contributor-facing path",
+        "wid": "w3"
+      }
+    ]
+  }
+}

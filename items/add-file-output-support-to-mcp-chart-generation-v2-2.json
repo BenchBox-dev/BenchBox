@@ -1,0 +1,163 @@
+{
+  "context": "First inventory current chart rendering, result-file containment, tenant workspace roots, supported formats, artifact publication, and cleanup behavior. Choose an explicit response contract for inline content versus an opaque tenant-owned artifact handle/path; reject unsupported formats and traversal; never let caller-selected output_dir escape the server-owned chart root or leak another tenant. Preserve ASCII default compatibility. If file output is not justified for the supported MCP contract, document the intentional omission and close the item with evidence instead of adding a second publication model.",
+  "description": "Successor of add-file-output-support-to-mcp-chart-generation-v2, whose scope omitted the existing schema test file identified by todo lint. Successor of add-file-output-support-to-mcp-chart-generation, promoted from deferral #523 of visualization-suggestions-and-render-orchestration. BenchBox MCP currently returns inline ASCII from generate_chart and accepts output_dir only as a reserved, unused argument. Define whether and how remote clients may request durable chart files, then implement the smallest safe contract if approved. This is separate from the stateless transport migration but affects remote MCP usability.",
+  "legacy": {
+    "item_meta": {
+      "category": "feature",
+      "completed_at": "2026-08-02T13:07:31Z",
+      "completed_pr": 1466,
+      "created_at": "2026-08-02T01:30:12Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "Inline ASCII output and the existing generate_chart default remain backward compatible",
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2"
+      },
+      {
+        "behavior": "No bearer token, raw database URL, unbounded argument, or result payload is emitted into telemetry or shared cache",
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2"
+      },
+      {
+        "behavior": "Output paths stay inside server-owned tenant chart roots and cannot cross tenants or escape by traversal",
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2"
+      },
+      {
+        "behavior": "Unsupported formats and unsafe output requests fail closed with structured MCP errors",
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/visualization.py"
+      },
+      {
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp*.md"
+      },
+      {
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/**"
+      },
+      {
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_schemas.py"
+      },
+      {
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_visualization_tools.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -q \"file output|artifact handle|inline-only|output_dir\" docs/reference/mcp.md docs/operations/mcp*.md tests/unit/mcp/test_visualization_tools.py",
+        "description": "The output contract is specified and guarded by a regression marker",
+        "expected": "exits 1 on an unfixed tree; exits 0 once the approved contract is recorded and guarded",
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:06:03Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_visualization_tools.py -q",
+        "description": "Visualization unit tests cover safe output behavior",
+        "expected": "exits 1 on an unfixed tree if the approved output contract is absent or unsafe; exits 0 once the focused suite passes",
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:06:10Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp -q",
+        "description": "MCP integration tests cover output containment and transport behavior",
+        "expected": "exits 1 on an unfixed tree if file-output behavior is unguarded; exits 0 once the integration suite passes",
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:06:16Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated generate_chart in benchbox/mcp/tools/visualization.py: output_dir was ignored, format was not enforced, charts_dir was reserved, and all output was inline ASCII; reviewed tenant path providers and existing visualization tests",
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "notes": null,
+        "started_at": "2026-08-02T13:03:01Z",
+        "started_branch": "feat/mcp-chart-file-output-v2",
+        "started_worktree": "/private/tmp/benchbox-mcp-chart-file.QJhrtz",
+        "status": "done",
+        "summary": "Revalidate current generate_chart behavior, output_dir handling, chart-root containment, tenant ownership, formats, and artifact retention",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Approved inline-only decision: preserve default inline ASCII response; reject caller-selected output_dir and non-ascii formats until tenant artifact ownership, containment, overwrite, and retention semantics are separately designed",
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "notes": null,
+        "started_at": "2026-08-02T13:05:45Z",
+        "started_branch": "feat/mcp-chart-file-output-v2",
+        "started_worktree": "/private/tmp/benchbox-mcp-chart-file.QJhrtz",
+        "status": "done",
+        "summary": "Specify the remote file-output response, authorization, path-containment, format, overwrite, retention, and error semantics or document the intentional inline-only decision",
+        "wid": "w1"
+      },
+      {
+        "evidence": "generate_chart now fails closed for output_dir and non-ascii format before result-file resolution; inline ASCII rendering remains unchanged",
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "notes": null,
+        "started_at": "2026-08-02T13:05:51Z",
+        "started_branch": "feat/mcp-chart-file-output-v2",
+        "started_worktree": "/private/tmp/benchbox-mcp-chart-file.QJhrtz",
+        "status": "done",
+        "summary": "Implement the approved safe contract across MCP schemas, visualization handlers, and durable artifact publication without changing ASCII default behavior",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added file-output and format rejection tests plus explicit inline-only MCP reference contract; visualization unit suite 43 passed and MCP integration suite 19 passed",
+        "item_id": "add-file-output-support-to-mcp-chart-generation-v2-2",
+        "notes": null,
+        "started_at": "2026-08-02T13:05:56Z",
+        "started_branch": "feat/mcp-chart-file-output-v2",
+        "started_worktree": "/private/tmp/benchbox-mcp-chart-file.QJhrtz",
+        "status": "done",
+        "summary": "Add traversal, cross-tenant, overwrite, format, artifact-lifecycle, and transport tests plus reference documentation",
+        "wid": "w3"
+      }
+    ]
+  }
+}

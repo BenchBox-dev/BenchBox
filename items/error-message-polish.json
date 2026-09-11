@@ -1,0 +1,10 @@
+{
+  "description": "Systematic review and improvement of error messages across all platform adapters\nand CLI commands.\n\nRecent work (Presto/Trino catalog handling) demonstrated the value of actionable\nerror messages that suggest next steps. This pattern should be applied consistently\nacross the codebase.\n\nFocus areas:\n- Connection failures (credentials, network, permissions)\n- Missing dependencies (optional packages not installed)\n- Invalid configuration (wrong parameter combinations)\n- Data loading errors (file not found, format mismatch)",
+  "legacy": {
+    "item_meta": {
+      "category": "User Experience",
+      "created_at": "2025-12-12T00:00:00Z",
+      "worktree": "release-readiness"
+    }
+  }
+}

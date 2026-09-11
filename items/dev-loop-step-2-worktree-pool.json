@@ -1,0 +1,377 @@
+{
+  "context": "Build the targets in dependency order: pool-init (w1) is foundational,\nthen claim (w2) and release (w3) are the core lifecycle, then status\n(w4) and reset (w5) are operational tooling, then docs (w6) and\ndeprecation (w7-w8) update the rest of the surface.\n\nUse a portable lock wrapper for atomic claim. `flock(1)` is not present\non the macOS workstation, so the Makefile cannot assume it. Prefer\n`lockf` on macOS, `flock` on Linux when available, or a small Python\nhelper that calls `fcntl.flock`. Lock file stays at\n`<main-clone>/.git/pool.lock`. Single shared lock across all pool\nworktrees — claim is fast (seconds) so contention is fine.\n\nFor state detection in worktree-pool-status:\n  - free: `git symbolic-ref -q --short HEAD` is empty AND\n          `git rev-parse HEAD` == `git rev-parse origin/develop` AND\n          `git status --porcelain` is empty\n  - claimed: not on develop, working tree may or may not be clean\n  - stale: claimed AND `gh pr view --json state` returns MERGED\n  - dirty: claimed AND `git status --porcelain` non-empty\n\nRefer to existing `make worktree-add` and `make worktree-prune`\ntargets for patterns; reuse their git-worktree command structure.\n",
+  "description": "Replace the create-and-destroy worktree model with a retained pool of\nworktrees. Default pool size is 10 (`POOL_SIZE ?= 10`), but the targets\nmust keep the size configurable so the workstation can be tuned without\nediting Makefile logic. New agent sessions claim an available worktree,\nupdate it from current `develop`, work there until merge, then release\nit back to the pool.\n\nThis formalizes how concurrent agents share the workstation. The default\nsize of 10 bounds routine parallelism (which is also why Step 1 keeps\nthe test lock global — even with the pool bounded, 10 concurrent xdist\nruns would saturate the machine).\n\nSingle PR via `make pr-open`.\n\n## Post-merge runbook (not part of the PR diff)\n\nAfter this PR merges to develop, perform on Joe's workstation:\n\n  make worktree-pool-init\n\nThen verify:\n  - 10 worktrees present at `BenchBox.pool-01..10`\n  - Each is detached at `origin/develop` and clean\n  - Each has `.venv/` populated\n  - `make worktree-pool-status` shows all 10 free\n  - Each free worktree is detached and clean, NOT on the local\n    `develop` branch; claim refreshes free slots to current\n    `origin/develop`\n\nTracked as a follow-up checklist item in the PR description, not as a\nwork unit, because the work unit DAG is for code changes that can be\nmarked done by `todo-cli done <slug> <work-id>` against a commit.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "auto-reap stale claims",
+        "instead": "surface as 'stale' in status, require explicit `worktree-pool-reset` to free",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "why": "an agent crash mid-session may leave valuable uncommitted work"
+      },
+      {
+        "dont": "check out the local develop branch in pool worktrees",
+        "instead": "use detached origin/develop as the Free state",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "why": "the main clone owns develop and Git forbids the same branch in multiple worktrees"
+      },
+      {
+        "dont": "delete pool-NN worktrees in worktree-prune",
+        "instead": "prune is for legacy non-pool worktrees only",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "why": "the pool is the contract"
+      },
+      {
+        "dont": "hardcode pool size to 10",
+        "instead": "read POOL_SIZE ?= 10 from the environment",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "why": "the workstation may want a different cap"
+      },
+      {
+        "dont": "remove make worktree-add in this PR",
+        "instead": "deprecate-with-notice now, remove next release",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "why": "in-flight work in non-pool worktrees needs continuity"
+      },
+      {
+        "dont": "skip portable locking on claim selection",
+        "instead": "atomic selection is required",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "why": "two concurrent agents racing to claim would both pick pool-01 and one would clobber the other's branch"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-2-worktree-pool",
+        "id": 376,
+        "reason": "Reasonable enhancement but out of scope; claim already updates at claim-time. Revisit if pool-status shows worktrees consistently lagging develop.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Auto-update-while-idle was conditioned on pool-status showing worktrees lagging develop; no evidence that trigger occurred; claim-time update already mitigates.",
+        "summary": "Auto-update of pool worktrees while idle (background pull of develop)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-2-worktree-pool",
+        "id": 377,
+        "reason": "Pool size of 10 + global test lock is sufficient for now. Add only if metrics in Step 5 show resource-contention failures.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Gated on resource-contention data from Step 5 (open, active); measurement window hasn't concluded so trigger unmet. (tracked by dev-loop-step-5-measurement-window)",
+        "summary": "Per-worktree resource quotas (CPU/memory limits)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "needs_item": "dev-loop-step-0-verify-assumptions"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-30T00:00:00Z",
+      "created_at": "2026-04-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Atomic claim semantics — two concurrent `make worktree-claim` calls must always pick different pool-NN worktrees, never collide",
+        "item_id": "dev-loop-step-2-worktree-pool"
+      },
+      {
+        "behavior": "Existing make worktree-add target keeps working — only adds deprecation notice; do not break legacy non-pool worktree workflows mid-session",
+        "item_id": "dev-loop-step-2-worktree-pool"
+      },
+      {
+        "behavior": "Pool worktrees retain their .venv/ across release/claim cycles — uv sync only runs at claim time after a fetch, and only if pyproject.toml/uv.lock changed",
+        "item_id": "dev-loop-step-2-worktree-pool"
+      },
+      {
+        "behavior": "make worktree-pool-init is idempotent — re-running must not destroy or reset existing pool worktrees",
+        "item_id": "dev-loop-step-2-worktree-pool"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml (Step 4 owns this)"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/test.yml (Step 3 owns this)"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "kind": "do_not_modify",
+        "path_glob": ".pre-commit-config.yaml (Step 1 owns pre-push gating)"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub branch protection / rulesets (Step 3 manual deployment)"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile pr-* targets (Steps 1 and 3 own these)"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "kind": "do_not_modify",
+        "path_glob": "tests/conftest.py (Step 1 owns the test-lock helper)"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "kind": "only_modify",
+        "path_glob": ".gitignore (add .git/pool.lock if needed)"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md (Session start / Worktree section)"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md (Session start, Worktrees, and Pre-approved Commands sections)"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "kind": "only_modify",
+        "path_glob": "Makefile (worktree-* targets only)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "tmp=$(mktemp -d); WORKTREE_POOL_PARENT=$tmp POOL_SIZE=2 make worktree-pool-init && find \"$tmp\" -maxdepth 1 -type d -name 'BenchBox.pool-*' | wc -l && WORKTREE_POOL_PARENT=$tmp POOL_SIZE=2 make worktree-pool-init; for wt in \"$tmp\"/BenchBox.pool-*; do git worktree remove --force \"$wt\" >/dev/null 2>&1 || true; done; rm -rf \"$tmp\"",
+        "description": "make worktree-pool-init creates 10 worktrees idempotently",
+        "expected": "2 (first run) and second run completes without error; disposable worktrees are removed",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make worktree-claim BRANCH=bad-name 2>&1 | grep -c 'must match'",
+        "description": "worktree-claim refuses invalid branch names",
+        "expected": ">= 1",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "tmp=$(mktemp -d); WORKTREE_POOL_PARENT=$tmp POOL_SIZE=1 make worktree-pool-init >/dev/null && WORKTREE_POOL_PARENT=$tmp POOL_SIZE=1 make worktree-claim BRANCH=chore/test-pool-claim 2>&1 | tee /tmp/bb-pool-claim.out | grep -E 'WORKTREE_PATH=.*pool-[0-9]+'; wt=$(sed -n 's/^WORKTREE_PATH=//p' /tmp/bb-pool-claim.out); git worktree remove --force \"$wt\" >/dev/null 2>&1 || true; git branch -D chore/test-pool-claim >/dev/null 2>&1 || true; rm -rf \"$tmp\" /tmp/bb-pool-claim.out",
+        "description": "worktree-claim selects an available pool worktree",
+        "expected": "WORKTREE_PATH=<absolute path containing pool-NN>",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make worktree-pool-status 2>&1 | grep -cE '^pool-[0-9]+'",
+        "description": "worktree-pool-status reports all pool worktrees",
+        "expected": "10",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "tmp=$(mktemp -d); WORKTREE_POOL_PARENT=$tmp POOL_SIZE=3 make worktree-pool-init >/dev/null; for i in 1 2 3; do (WORKTREE_POOL_PARENT=$tmp POOL_SIZE=3 make worktree-claim BRANCH=chore/race-test-$i >\"$tmp/out-$i\" 2>&1 &); done; wait; cat \"$tmp\"/out-* | grep -E '^WORKTREE_PATH=' | sort -u | wc -l; for wt in \"$tmp\"/BenchBox.pool-*; do git worktree remove --force \"$wt\" >/dev/null 2>&1 || true; done; for i in 1 2 3; do git branch -D chore/race-test-$i >/dev/null 2>&1 || true; done; rm -rf \"$tmp\"",
+        "description": "Concurrent claims do not race",
+        "expected": "3 distinct claims, each on a different pool-NN worktree",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make worktree-prune 2>&1 | grep -c 'Skipping pool worktree'",
+        "description": "worktree-prune skips pool worktrees",
+        "expected": ">= 0 (skips logged for any pool worktrees on develop)",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make worktree-add BRANCH=chore/legacy-test 2>&1 | grep -c 'DEPRECATED'",
+        "description": "worktree-add prints deprecation notice",
+        "expected": ">= 1",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'worktree-claim|worktree-release|worktree-pool-status|worktree-pool-init|worktree-pool-reset' CLAUDE.md",
+        "description": "Claude command permissions list new pool commands explicitly",
+        "expected": ">= 5",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'worktree-claim|worktree-release|worktree-pool-status|worktree-pool-reset' CLAUDE.md AGENTS.md",
+        "description": "Agent-facing docs describe claim/release pool lifecycle",
+        "expected": ">= 8",
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "needs_wid": "w1",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "notes": "One-time bootstrap. Add `POOL_SIZE ?= 10` and\n`WORKTREE_POOL_PARENT ?= ..` so verification can create disposable\npools outside the normal sibling paths. With defaults, creates\n`BenchBox.pool-01` through `BenchBox.pool-10` as siblings of the\nmain clone, each in detached HEAD at `origin/develop`, each with\n`uv sync --group dev` run, each with `pre-commit install`.\nIdempotent: if a pool-NN worktree already exists, leave it alone\n(do not touch its branch state).\nPrint summary table at end: pool-NN | path | branch.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add make worktree-pool-init target — creates pool-01..POOL_SIZE from develop",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "notes": "Selects the first **Free** pool worktree (detached HEAD, working\ntree clean, no local feature branch checked out). Claim fetches\nand resets the selected worktree to current `origin/develop`\nbefore creating the branch. Pool worktrees must not check out the\nlocal `develop` branch because the main clone keeps `develop`\nchecked out and Git does not allow the same branch in multiple\nworktrees.\nSteps:\n  1. Acquire a portable file lock on `<main-clone>/.git/pool.lock`\n     (timeout 30s). Use `lockf` on macOS, `flock` on Linux if\n     available, or a tiny Python helper using `fcntl.flock` so the\n     target works on Joe's macOS workstation and CI.\n  2. Iterate pool-01..POOL_SIZE; first match is \"Free\"\n  3. In that worktree: `git fetch origin`, `git reset --hard\n     origin/develop`, `git checkout -b $BRANCH`, `uv sync --group dev`\n  4. Release flock\n  5. Print: `WORKTREE_PATH=<absolute-path>`\nRefuses (exit 1) if pool is fully claimed; suggests\n`make worktree-pool-status` to investigate.\nRefuses if BRANCH is empty or doesn't match `^(chore|fix|feat|docs)/.+`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add make worktree-claim BRANCH=<name> — atomic claim under portable lock",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "notes": "Run from inside a pool worktree (refuses if cwd is not a pool-NN\npath). Steps:\n  1. Identify current branch\n  2. Verify PR for this branch is in MERGED state via\n     `gh pr view --json state` (refuse if not, with explicit\n     \"open or close PR first\" message; FORCE=1 escapes)\n  3. `git checkout --detach origin/develop`\n  4. `git fetch origin`\n  5. `git reset --hard origin/develop`\n  6. `git branch -D <feature-branch>` (the one just released)\n  7. `git remote prune origin`\nWorktree returns to **Free** state.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add make worktree-release — verify merged, return to develop",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "notes": "Prints table with columns: pool-NN | path | branch | state |\nclaim_age. State is one of:\n  - free: detached HEAD, working tree clean, no untracked files\n          outside expected (`.benchbox/`, `.venv/`, etc.); claim\n          refreshes to current origin/develop before checkout\n  - claimed: HEAD on a non-develop branch\n  - stale: claimed branch has been merged upstream (gh pr view\n           returns MERGED) but worktree still on the branch\n  - dirty: claimed with uncommitted changes — needs review\nclaim_age is `git log -1 --format=%ar` of the most recent commit\non the current branch (or \"—\" for free).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add make worktree-pool-status — tabular state listing",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "notes": "Forcibly returns pool-NN to Free state. Refuses if working tree\nhas uncommitted changes UNLESS `FORCE=1` is set. Even with FORCE,\nprints what it's about to discard and requires interactive\nconfirmation (read -p). Useful when an agent died mid-session\nleaving the worktree in an inconsistent state.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add make worktree-pool-reset POOL=NN — manual escape hatch",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "notes": "Replace the existing \"Session start\" instructions:\n  - Old: `make worktree-add BRANCH=<type>/<short-slug>`\n  - New: `make worktree-claim BRANCH=<type>/<short-slug>`\nAdd a paragraph explaining the pool model: 10 worktrees,\nretained indefinitely, claim/release lifecycle. Document the\nStale recovery flow (run `worktree-pool-status`, then\n`worktree-pool-reset POOL=NN` if needed).\nNote that `make worktree-add` remains as a deprecated alias for\none release with a stderr deprecation notice.\n\nUpdate Claude-specific pre-approved command buckets in CLAUDE.md:\n  - Read-only: `make worktree-pool-status`, `make worktree-list`,\n    `git worktree list*`\n  - Write, feature/pool worktrees only: `make worktree-claim\n    BRANCH=...`, `make worktree-release`\n  - Manual/admin escape hatches, not broad auto-allow:\n    `make worktree-pool-init`, `make worktree-pool-reset POOL=NN`\nAGENTS.md should describe the same lifecycle in prose even though it\ndoes not have Claude's pre-approved-command table.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update Session-start docs in CLAUDE.md and AGENTS.md",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "notes": "`worktree-add` keeps current semantics but prints to stderr:\n\"DEPRECATED: use `make worktree-claim BRANCH=...` instead. The\npool model retains worktrees rather than creating new ones.\n`worktree-add` will be removed in the next release.\" Then\nproceeds normally. Pool-NN worktrees are never created via\nworktree-add; they only come from worktree-pool-init.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Mark worktree-add as deprecated alias of worktree-claim",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-2-worktree-pool",
+        "notes": "Pool worktrees are retained indefinitely; `worktree-prune` should\nno longer be a routine end-of-session command. Modify the target\nto:\n  1. Detect pool-NN paths and skip them\n  2. Print: \"Skipping pool worktree pool-NN (retained)\"\n  3. Continue pruning legacy non-pool worktrees as today\nUpdate help text to note: `worktree-prune` is for legacy\nworktrees only; pool worktrees are released via `worktree-release`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update worktree-prune to skip pool-NN worktrees",
+        "wid": "w8"
+      }
+    ]
+  }
+}

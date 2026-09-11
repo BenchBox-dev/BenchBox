@@ -1,0 +1,161 @@
+{
+  "context": "Drive the public anonymizer and each relevant CSV/HTML/tuning export path with a corpus of nested dict/list/scalar shapes. Implement recursive handling only for identifier-bearing companion fields, preserving structural shape and non-identifier values. Sequence after the existing tuning item and after the platform metadata boundary item to avoid simultaneous edits in results anonymization tests. Do not turn this into a blanket string hash of all tuning content. The corrected rungs instantiate AnonymizationManager and place constraints under requested, matching the production tuning payload contract.",
+  "description": "Complete tuning-constraint anonymization for untrusted companion shapes that remain reachable after #1479/#1486: constraints that are not dictionaries, lists of table/column dictionaries, local_table and references_table fields, and slash-delimited or mixed scalar collections. Current develop still leaks orders/o_orderkey and customers/c_custkey through these shapes even though the simple primary-key mapping is pseudonymized. Keep booleans, enabled flags, actions, and unrelated tuning values intact. This is the corrected successor of tuning-companion-constraint-shapes-v1; its stored rung was repaired during adversarial plan review.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not anonymize every string in the tuning payload.",
+        "instead": "Target identifier-bearing companion fields and assert preservation of representative non-identifiers.",
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "why": "That would destroy analysis configuration and action labels."
+      },
+      {
+        "dont": "Do not only add another top-level key to a deny-list.",
+        "instead": "Drive nested dict/list/scalar companion shapes through the public export chokepoints.",
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "why": "The residual defect is shape variation and value materialisation, not one missing key."
+      },
+      {
+        "dont": "Do not weaken the gate to the already-passing simple primary-key shape.",
+        "instead": "Keep the unfixed gate on list-of-dicts and mixed companion shapes.",
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "why": "That was the exact blind spot exposed by the adversarial sweep."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "needs_item": "credential-egress-platform-metadata-boundary-v3"
+      },
+      {
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "needs_item": "results-anonymize-tuning-constraint-identifiers-v2"
+      }
+    ],
+    "item_meta": {
+      "category": "security",
+      "created_at": "2026-08-02T20:28:48Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Constraint enabled/action/boolean semantics and nested collection shape.",
+        "item_id": "tuning-companion-constraint-shapes-v2"
+      },
+      {
+        "behavior": "Non-identifier tuning configuration needed for downstream analysis.",
+        "item_id": "tuning-companion-constraint-shapes-v2"
+      },
+      {
+        "behavior": "Pseudonym stability for repeated identifiers across all export formats.",
+        "item_id": "tuning-companion-constraint-shapes-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/environment.py"
+      },
+      {
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_anonymization.py"
+      },
+      {
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_results_exporter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --all-extras -- python -c 'import json; from benchbox.core.results.anonymization import AnonymizationManager; payload={\"requested\":{\"constraints\":{\"foreign_keys\":{\"tables\":[{\"table\":\"orders\",\"columns\":[\"o_orderkey\"],\"referenced_table\":\"customers\"]},\"local_table\":\"orders/o_orderkey\",\"references_table\":\"customers\"}}}; out=json.dumps(AnonymizationManager().anonymize_tuning_payload(payload)); assert all(x not in out for x in (\"orders\",\"o_orderkey\",\"customers\")), out'",
+        "description": "Unfixed-tree gate: nested table/column companion identifiers must not survive public anonymization; current develop leaks the orders and o_orderkey sentinels.",
+        "expected": "FAIL on unfixed develop: companion identifiers survive nested tuning shapes; exits 1 before the shape-complete fix and 0 after it.",
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --all-extras -- python -c 'from benchbox.core.results.anonymization import AnonymizationManager; p={\"requested\":{\"constraints\":{\"primary_keys\":{\"enabled\":True,\"tables\":{\"orders\":[\"o_orderkey\"]}}}}}; o=AnonymizationManager().anonymize_tuning_payload(p); c=o[\"requested\"][\"constraints\"][\"primary_keys\"]; table=next(iter(c[\"tables\"])); assert c[\"enabled\"] is True and table.startswith(\"table_\") and c[\"tables\"][table][0].startswith(\"column_\")'",
+        "description": "Regression guard: the already-supported simple mapping remains pseudonymized and boolean tuning semantics remain unchanged.",
+        "expected": "PASS on current develop and after the change: existing anonymization and tuning semantics remain intact.",
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-drive all remaining companion shapes on current develop and check related PRs.",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement recursive companion-field anonymization while preserving structure and non-identifiers.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-companion-constraint-shapes-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add public/export-format regression tests and run targeted result checks.",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "context": "The support decision is ALREADY made in pyproject.toml, which declares chdb>=0.10.0; sys_platform != 'win32' in three places with the comment 'not available on Windows'. So Windows is explicitly not a supported runtime for ClickHouse local mode and the correct fix is a platform skip with a recorded reason, NOT loosening assertions. Add a module-level pytest.mark.skipif keyed on importlib.util.find_spec('chdb') is None (not on sys.platform, so the guard stays honest if chdb ever ships Windows wheels) and cite the pyproject marker in the reason. Verify on Linux that the guard does NOT over-skip: chdb IS installed there, so these tests must still run and pass.",
+  "description": "17+ of the 56 Windows nightly failures (the largest single family) are ImportError: 'ClickHouse local mode requires chDB but it is not installed', raised by benchbox/platforms/clickhouse/adapter.py when importlib.util.find_spec('chdb') is None. Concentrated in tests/unit/platforms/test_clickhouse_introspection.py and tests/unit/platforms/test_clickhouse_plan_capture.py. Evidence: Nightly run 30473819253, jobs 'test (windows-latest, 3.10)' and 'test (windows-latest, 3.12)'.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci-failure-reduction",
+      "created_at": "2026-07-30T01:08:31Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Linux/macOS still RUN these tests - the skipif must key on chdb availability, not on being non-Windows",
+        "item_id": "windows-nightly-clickhouse-chdb-skip-guards"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-nightly-clickhouse-chdb-skip-guards",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_introspection.py tests/unit/platforms/test_clickhouse_plan_capture.py -q",
+        "description": "chdb-gated tests still execute on Linux where chdb is installed",
+        "expected": "not skipped on Linux",
+        "item_id": "windows-nightly-clickhouse-chdb-skip-guards",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

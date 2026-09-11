@@ -1,0 +1,147 @@
+{
+  "description": "Follow-up to dataframe-csv-empty-string-null-uniform (PR #904, DONE). The fix\nmade empty-string-vs-null CSV loading uniform, but the regression test covers\nonly DataFusion and PySpark. The success metric claims uniformity across ALL CSV\nadapters; pandas/polars/dask/modin/cudf empty-string -> \"\" (not null) parity is\nasserted nowhere new — it rests on untouched legacy behavior with no pin. #904\nalso landed the coercion per-adapter rather than as the single shared step the\nYAML specified (functionally equivalent, but it means each adapter is its own\nrisk surface). This item pins the contract for the remaining adapters and adds a\nCSV-path cross-surface case.\n\nTest-only by intent: if a parity gap surfaces for any adapter, STOP and file a\ndefect TODO — do not fix adapter behavior inside this coverage item.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix an adapter parity gap inside this test-only item",
+        "instead": "(not specified)",
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "why": "surface it as a defect TODO."
+      },
+      {
+        "dont": "introduce a new benchmark or heavyweight fixture for the cross-surface case; reuse a small existing one.",
+        "instead": "(not specified)",
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dataframe-csv-empty-string-parity-coverage",
+        "id": 367,
+        "reason": "Functionally equivalent today; consolidation is a separate maintainability item, not coverage.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Exact match: open item dataframe-csv-coercion-single-shared-step already tracks this consolidation.",
+        "summary": "Refactor the per-adapter coercion into the single shared step #904's YAML originally specified."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-06-30T00:00:00Z",
+      "created_at": "2026-06-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Fast lane stays green on a standard dev environment (availability skips for absent adapters).",
+        "item_id": "dataframe-csv-empty-string-parity-coverage"
+      },
+      {
+        "behavior": "No change to adapter CSV-loading behavior — this is coverage only.",
+        "item_id": "dataframe-csv-empty-string-parity-coverage"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': 'tests/integration/test_dataframe_csv_empty_string_null_semantics.py', 'note': 'The #904 regression test covering DataFusion+PySpark; parametrize its existing assertions across the remaining adapters rather than authoring a new harness.'}",
+        "decision": "reuse",
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_dataframe_csv_empty_string_null_semantics.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_dataframe_csv_empty_string_null_semantics.py -q",
+        "description": "Empty-string/null parity holds across installed adapters",
+        "expected": "per-adapter parametrized cells pass for pandas/polars/dask/modin; cudf skipped if absent",
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "notes": "grep tests/integration/test_dataframe_csv_empty_string_null_semantics.py for\nadapter imports/cases (review-time state: only DATAFUSION_DF_AVAILABLE and\nPYSPARK_AVAILABLE). If a later commit already added adapters, narrow w1 to the\nremaining ones. Record the live coverage in the PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-confirm on fresh develop that the #904 test still covers only DataFusion+PySpark",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "notes": "Extend the existing test to assert, per adapter, the null-marker-dependent\ncontract: a bare empty field loads as \"\" when csv_null_marker is None, and\nas null when csv_null_marker == \"\". This is not a single uniform outcome —\n\"uniform\" means the same null-marker-conditioned rule holds identically\nacross adapters, not that a bare empty field always loads as null. Guard\ncudf and any non-installed adapter with availability skips so the fast lane\nstays green on a standard dev env.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Parametrize empty-string/null CSV semantics across pandas, polars, dask, modin (cudf availability-skipped)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "notes": "Add at least one cross-surface equivalence case that forces the CSV load path\n(prefer_parquet=False) so SQL<->DataFrame empty-string/null parity is exercised\nend-to-end, not only per-adapter loading. Reuse an existing small cross-surface\nfixture rather than a new benchmark.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a cross-surface CSV-path case (prefer_parquet=False) exercising SQL<->DataFrame parity",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dataframe-csv-empty-string-parity-coverage",
+        "notes": "Ensure the parametrized cells are fast-marked and collected by the required\ncode-test fast lane (or an explicit node if a marker excludes them). Record\nthe lane membership in the PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm the new cells run in the required fast lane",
+        "wid": "w3"
+      }
+    ]
+  }
+}

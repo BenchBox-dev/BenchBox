@@ -1,0 +1,165 @@
+{
+  "context": "Treat this as an evidence-only task. Do not edit\n`results-explorer/src/` to make the capture pass — if the new\ncapture surfaces a regression, that's a separate bug TODO with the\nnew screenshot as evidence. The point of the re-run is to make the\non-disk artifact match the shipping tree, not to fix new bugs as a\nside-effect. Use `git mv` (not delete + add) so reviewers can\n`git log --follow` to recover the pre-#271 verdict if a future\npost-mortem needs it.\n",
+  "description": "The release-readiness artifact set under\n`_project/audits/results-explorer-retheme-final-2026-05-10.md` and\nits screenshots under\n`_project/audits/screenshots/results-explorer-retheme-final-2026-05-10/`\nwere generated against PR #269's branch tree. PR #268 had already\nintroduced literal-styled `Result summary` and `Compare guardrails`\nsections that survived PR #269's squash merge, contradicting the\nREADME's READY verdict. PR #271 (`274a4a11e`,\n`fix(explorer): retokenize result/compare panels reintroduced by\nPR #268/#269 squash race`) closed the regression on develop.\n\nThe artifact set on disk still describes the pre-#271 tree. Re-run\nthe release-final capture against the current develop tip,\nregenerate the screenshots, and replace (or supersede) the 2026-05-07\naudit so the on-disk artifacts reflect the shipped state. Once\n`audit-develop-sha-stamping-and-ci-gate` lands its `develop_sha:`\nfield requirement, this re-capture exercises and validates that\ncontract end-to-end.\n\nThis is a one-shot evidence task. It does not modify production\ncode, only audit artifacts and the capture spec's recorded\nmetadata.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle source-code edits with this re-capture",
+        "instead": "file any newly-surfaced regressions as separate TODOs with the new screenshots as evidence.",
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "why": "a re-capture's only job is to match the shipping tree"
+      },
+      {
+        "dont": "leave dangling links",
+        "instead": "grep the repo for the old filename and update every hit in the same commit as the rename.",
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "why": "cross-references from other TODOs/docs to the 2026-05-07 path will break when the file is renamed"
+      },
+      {
+        "dont": "run the capture from a stale worktree",
+        "instead": "verify `git rev-parse origin/develop` resolves at or after 274a4a11e before recording any screenshot.",
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "why": "that defeats the entire point"
+      },
+      {
+        "dont": "use `rm` + `add` to replace the 2026-05-07 audit",
+        "instead": "use `git mv` so the rename is recorded as a rename.",
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "why": "that breaks `git log --follow` and makes the pre-#271 verdict harder to recover for post-mortems"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "needs_item": "audit-develop-sha-stamping-and-ci-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-10T00:00:00Z",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cross-references from other repo files (TODO yamls, docs) — w2 must update every link to the renamed audit/screenshot paths in the same commit.",
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop"
+      },
+      {
+        "behavior": "Git history of the pre-#271 audit and screenshots — replacement uses `git mv` so the file's `git log` chain still resolves.",
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/"
+      },
+      {
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-05-07-211858-release-readiness-against-pre-merge-tree.md"
+      },
+      {
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/captures/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "bash -lc 'git fetch --no-tags origin develop >/dev/null && git merge-base --is-ancestor 274a4a11e $(git rev-parse origin/develop)'",
+        "description": "Captured tree is at or after PR #271",
+        "expected": "exit 0",
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make audit-sha-check FILE=_project/audits/results-explorer-retheme-final-<YYYY-MM-DD>.md",
+        "description": "New audit passes audit-sha-check",
+        "expected": "exit 0",
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "bash -lc 'set -e; cd results-explorer && grep -RnE \"text-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(50|100|200|300|400|500|600|700|800|900|950)\" e2e/captures/release-final-output/dom-snapshots/ResultDetail* e2e/captures/release-final-output/dom-snapshots/Compare* || true'",
+        "description": "Result Detail and Compare panels render no literal Tailwind palette classes in the captured DOM",
+        "expected": "no matches (or only allow-listed inline-SVG attributes)",
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "notes": "From a fresh worktree off `develop`:\n  - `git rev-parse origin/develop` -> capture SHA (must be\n    274a4a11e or a descendant).\n  - Run the release-final capture spec under\n    `results-explorer/e2e/captures/release-final.spec.ts` and\n    collect the resulting screenshot set.\nConfirm the captured Result Detail and Compare panels render\ntokenized colors (no literal `text-gray-*` / `bg-slate-*`\nclasses in the rendered DOM).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm post-#271 develop tip and regenerate screenshots",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "notes": "Overwrite `_project/audits/results-explorer-retheme-final-2026-05-10.md`\nwith the new audit body generated against the post-#271 develop\ntip. Required edits:\n  - Update the `date:` frontmatter to the recapture date.\n  - Add the `develop_sha:` frontmatter field per the contract\n    from `audit-develop-sha-stamping-and-ci-gate`.\n  - Rename the file to `results-explorer-retheme-final-<YYYY-MM-DD>.md`\n    where `<YYYY-MM-DD>` is the recapture date (use `git mv` so\n    history follows). Update any cross-references (TODO yamls,\n    docs) that link to the old filename.\n  - Replace the screenshot directory under\n    `_project/audits/screenshots/results-explorer-retheme-final-2026-05-10/`\n    with the new capture set (also `git mv` to the new dated\n    path).\nGit history preserves the pre-#271 version of the file —\nreviewers can `git log -p` the old path if the historical\nverdict is needed for a post-mortem.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace the 2026-05-07 audit in place with the post-#271 capture",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-recapture-against-post-271-develop",
+        "notes": "`make audit-sha-check FILE=_project/audits/results-explorer-retheme-final-<YYYY-MM-DD>.md`\nshould exit 0. Push the audit on a small PR and confirm the\npath-aware audit-sha-check CI job runs and passes. This is the\nend-to-end validation of the framework introduced by\n`audit-develop-sha-stamping-and-ci-gate`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run audit-sha-check on the new audit and confirm CI gate passes",
+        "wid": "w3"
+      }
+    ]
+  }
+}

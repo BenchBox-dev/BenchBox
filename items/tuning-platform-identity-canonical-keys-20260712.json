@@ -1,0 +1,153 @@
+{
+  "context": "Small, mechanical: one new property, call-site substitutions, plus explicit\nunknown-platform semantics. Do NOT consolidate the capability registries here\n(gated on ADR-3); this item only makes the existing lookups use the right key.\n",
+  "description": "From the 2026-07-12 tuning review, finding R1 (evidence pinned to commit acfb8992).\n\nbenchbox/platforms/base/adapter.py:714 calls\n`validate_for_platform(self.platform_name)` with the human display string\n(\"ClickHouse (Local)\", \"StarRocks\"). TuningType.is_compatible_with_platform\n(benchbox/core/tuning/interface.py:79-164) lowercases it and looks it up in a\nmap keyed by canonical types (\"clickhouse\"), so multi-word display names match\nnothing and every enabled tuning type errors -> ValueError after data\ngeneration. Verified empirically: a default-constructed config (constraints\ndefault enabled=True) yields 4 errors on StarRocks / \"ClickHouse (Local)\" /\nDoris / Trino; even the key \"clickhouse\" fails on default-enabled\nforeign_keys/check_constraints. TuningMetadataManager also persists the display\nname into the metadata table (benchbox/core/tuning/metadata.py:207).\n\nFix: introduce a canonical platform-type accessor on adapters (the CLI key,\ne.g. database_config.type) and route every tuning-capability lookup and\nmetadata persistence through it. Also decide-in-code the unknown-platform\nbehavior explicitly (warn + treat as no-capability, never a crash keyed on\nstring formatting).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add starrocks/doris/etc to the hardcoded compat map as a fix",
+        "instead": "(not specified)",
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "why": "that grows the drift problem this plan later removes"
+      },
+      {
+        "dont": "normalize display names with string surgery (strip parens); use the config type key",
+        "instead": "(not specified)",
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing passing validation behavior for duckdb/databricks tuned templates",
+        "item_id": "tuning-platform-identity-canonical-keys-20260712"
+      },
+      {
+        "behavior": "validate_for_platform's public signature (callers exist in cli/config.py and platforms/base/tuning_config.py)",
+        "item_id": "tuning-platform-identity-canonical-keys-20260712"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/config.py"
+      },
+      {
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/interface.py"
+      },
+      {
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/metadata.py"
+      },
+      {
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/tuning_config.py"
+      },
+      {
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.tuning.interface import UnifiedTuningConfiguration; c=UnifiedTuningConfiguration(); print(c.validate_for_platform('StarRocks'))\"",
+        "description": "Empirical probe passes",
+        "expected": "No spurious 'not supported by platform' errors caused purely by display-name formatting",
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning tests/unit/cli/test_tuning* -q",
+        "description": "Tuning unit suites stay green",
+        "expected": "All passing",
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "notes": "Evidence re-validated at HEAD cd9b26c4ed9450f910b6b898a1d3c57c65aa6fcf. Probe: uv run -- python -c \"from benchbox.core.tuning.interface import UnifiedTuningConfiguration as U; print(U().validate_for_platform('StarRocks'))\" -> FAIL (confirmed bug): 4 spurious errors (primary_keys, foreign_keys, unique_constraints, check_constraints \"not supported by platform 'StarRocks'\") from a default-constructed config. Line refs at HEAD: adapter.py:714 call site (validate_for_platform(self.platform_name)); interface.py:69-164 is_compatible_with_platform 9-key map; metadata.py:207 persists display name. After fix: probe returns [] for 'StarRocks', 'ClickHouse (Local)', 'Doris' - PASS.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate pinned evidence at current HEAD (validate_for_platform probe, line refs)",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "notes": "Added PlatformAdapter.canonical_platform_type: prefers platform_config['type'] (the CLI/DatabaseConfig canonical key), falls back to normalized platform_name (lowercase, spaces->hyphens; documented as best-effort). Switched the adapter execute-path validation call site, TuningConfigMixin.validate_* methods, and TuningMetadataManager (create-table/index dialect dispatch + persisted platform column via new _platform_key helper with getattr fallback for duck-typed stubs). ConfigManager._validate_unified_tuning_config default already uses the canonical 'database.preferred' key; docstring now pins that contract. Review follow-up (scope extension beyond only_modify, justified): the live CLI path strips 'type' from DatabaseConfig before construction (core/platform_config.py), so get_platform_adapter (platforms/__init__.py) now injects the resolved canonical registry key into the constructor config and restores it post-construction on platform_config for from_config implementations that rebuild their config with selected keys (e.g. DuckDB).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add canonical_platform_type to PlatformAdapter and switch tuning lookups to it",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "notes": "Added UnifiedTuningConfiguration.validate_for_platform_detailed(platform) -> (errors, warnings); validate_for_platform keeps its list-of-strings signature and now returns errors only. Constraint types (primary/foreign/unique/check) downgrade to warnings on ANY platform (they default enabled=True); table-layout and platform-specific types stay hard errors only for platforms present in the compat map (TuningType.is_known_platform), else warnings. Adapter logs warnings and raises only on errors; CLI ConfigManager prints warnings and fails only on errors. No platforms added to the compat map (per anti_patterns).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make unknown-platform capability lookups an explicit warning path, not an empty-set hard fail",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-platform-identity-canonical-keys-20260712",
+        "notes": "Added tests/unit/core/tuning/test_platform_identity_keys.py: display-name configs produce no errors (warnings only), known-platform layout incompatibilities still error (duckdb distribution/z_ordering, databricks liquid+partitioning), canonical_platform_type config-type/fallback behavior, and TuningMetadataManager.save_tunings persisting the canonical key via stub adapter. Updated 2 mock-based tests to the detailed validation API and 1 delegation test to the canonical key. Suites green: tests/unit/core/tuning + tests/unit/cli/test_tuning* + affected files (559 passed); wider platforms/base + dataframe tuning (1510 passed). Review follow-up tests: parenthesized display-name fallback pinned ('ClickHouse (Local)' -> 'clickhouse-(local)', not a canonical key), factory-built duckdb/sqlite3-alias adapters report canonical keys on the live path, and the compat-map key set is pinned in sync with _KNOWN_COMPATIBILITY_PLATFORMS (now derived from the module-level _PLATFORM_COMPATIBILITY_MAP - single source of truth, behavior identical). Post-review suites: tests/unit/core/tuning + tests/unit/cli/test_tuning* + tests/unit/platforms/base (1069 passed).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regression tests: tuned-mode validation on starrocks/clickhouse/doris display names no longer crashes on name formatting; canonical key persisted in metadata table",
+        "wid": "w3"
+      }
+    ]
+  }
+}

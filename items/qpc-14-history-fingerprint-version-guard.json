@@ -1,0 +1,167 @@
+{
+  "description": "Follow-up flagged by BOTH the qpc-08 (#1025) and qpc-03 (#1028) reviews. Now\nthat qpc-03 shipped fingerprint v2 (FINGERPRINT_VERSION=2) and the loader/\ncomparator gate fingerprint-equality on matching fingerprint_version,\nbenchbox/core/query_plans/history.py is the one remaining place that compares\nraw fingerprint strings with `!=` and ZERO version awareness:\n  - detect_plan_flapping (~history.py:192) counts transitions on raw fingerprints\n  - get_plan_version_history (~history.py:218) bumps a version on each raw != change\n  - PlanHistoryEntry (~history.py:27) does not store fingerprint_version at all —\n    it is dropped in add_run/to_dict/from_dict\nA single history directory that spans a v1->v2 tool upgrade will contain\nmixed-version fingerprints, so the v1->v2 encoding boundary registers as a\nspurious plan transition / version bump — exactly the \"never compare v1 vs v2\nfor equality, including history flap detection\" anti-pattern qpc-03 calls out.\nLow severity (a single boundary transition rarely breaches the flapping\nthreshold alone) but a genuine correctness gap.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "compare fingerprints across fingerprint_version for equality anywhere.",
+        "instead": "(not specified)",
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "drop pre-existing history entries that lack the field",
+        "instead": "(not specified)",
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "why": "treat them as v1."
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness / Data Integrity",
+      "created_at": "2026-07-07T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "Legacy history JSON without fingerprint_version still loads (default to 1)",
+        "item_id": "qpc-14-history-fingerprint-version-guard"
+      },
+      {
+        "behavior": "Within-a-single-version genuine flapping is still detected",
+        "item_id": "qpc-14-history-fingerprint-version-guard"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/query_plans/history.py:27 PlanHistoryEntry (drops fingerprint_version), :192 detect_plan_flapping, :218 get_plan_version_history",
+        "decision": "reuse",
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "path": "benchbox/core/query_plans/history.py:27"
+      },
+      {
+        "concept": "benchbox/core/results/query_plan_models.py FINGERPRINT_VERSION / fingerprint_version (from qpc-03 #1028)",
+        "decision": "reuse",
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "path": "benchbox/core/results/query_plan_models.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/history.py"
+      },
+      {
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/query_plans/test_plan_history.py -q",
+        "description": "Version boundary is not a spurious flap/version bump",
+        "expected": "all pass, including new version-boundary tests",
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Persist fingerprint_version on PlanHistoryEntry (add_run/record/to_dict/from_dict); default missing to 1 for legacy history files.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "In detect_plan_flapping / get_plan_version_history, segment by fingerprint_version: a version boundary is neither a flap transition nor counted as a plan change.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Test: a v1->v2 boundary in one query's history is not reported as flapping or a version bump; within-version flaps still detected.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Review: adversarial code review (legacy history files without the field still load; sort/order unaffected).",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Fix review findings; re-run verification.",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-14-history-fingerprint-version-guard",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Submit PR referencing qpc-14.",
+        "wid": "w6"
+      }
+    ]
+  }
+}

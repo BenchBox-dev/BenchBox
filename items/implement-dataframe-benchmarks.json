@@ -1,0 +1,1131 @@
+{
+  "context": "Follow the established TPC-DS modular pattern (not the older TPC-H single-file pattern):\n\nReference implementation: benchbox/core/tpcds/dataframe_queries/\n├── __init__.py           # Public API: get_tpcds_query(), list_tpcds_queries(), TPCDS_DATAFRAME_QUERIES\n├── registry.py           # QueryRegistry(\"tpcds\") instantiation and accessor functions\n├── queries.py            # Dual-family implementations: q{N}_expression_impl + q{N}_pandas_impl\n├── parameters.py         # get_parameters(query_id) for parameterized substitution\n├── channel_helper.py     # Benchmark-specific helper (reusable pattern logic)\n└── rollup_helper.py      # Benchmark-specific helper\n\nFor each new benchmark:\n1. Study the SQL queries in benchbox/core/{benchmark}/queries.py to understand schema, join patterns, and edge cases\n2. Create benchbox/core/{benchmark}/dataframe_queries/ directory following the TPC-DS structure\n3. Implement expression family first (ctx.col(), ctx.lit(), ctx.get_table() pattern) - see q3_expression_impl in tpcds/queries.py\n4. Implement pandas family second (string indexing, .merge(), .groupby() pattern) - see q3_pandas_impl in tpcds/queries.py\n5. Register via QueryRegistry(\"{benchmark_id}\") and wrap each pair in DataFrameQuery()\n6. Set supports_dataframe: True in benchmark_registry.py BENCHMARK_METADATA\n7. Write tests following tests/unit/core/tpcds/test_tpcds_dataframe_queries.py pattern\n8. Validate each query against SQL results at SF=0.01\n\nKey pattern differences per benchmark:\n- Single-table benchmarks (ClickBench, H2ODB): No joins, simpler - skip helpers.py\n- Star-schema (SSB): Reuse TPC-H join patterns but with different key columns\n- Time-series (TSBS): Need date_trunc/time-bucket helpers\n- ETL (TPC-DI, Write Primitives): Need write operation helpers (to_parquet, concat)\n- Variant benchmarks (TPC-H Skew, TPC-Havoc): Maximize reuse of TPC-H impls\n",
+  "description": "Extend BenchBox's DataFrame execution capability to all SQL-only benchmarks.\n\nCurrently, only TPC-H (22 queries) and TPC-DS (99 queries) have DataFrame support.\nThis initiative will add DataFrame implementations for the remaining 16 benchmarks\n(excluding only Transaction Primitives which require ACID guarantees), totaling\napproximately 700+ query/operation implementations across two execution families\n(expression-based and pandas-based).\n\nKey insight: DataFrames are NOT read-only. All major DataFrame libraries support\nwrite operations (to_parquet, write_csv, sink operations) and transformation\npatterns that map directly to SQL INSERT/UPDATE/DELETE/MERGE semantics. TPC-DI\nETL operations and Write Primitives are actually IDEAL DataFrame workloads since\nPandas/Polars/PySpark are the de facto ETL tools in the Python ecosystem.\n\nThis enables users to benchmark DataFrame libraries (Polars, Pandas, PySpark,\nDataFusion, Modin, cuDF, Dask) against SQL databases using a broader range of\nworkloads beyond the current TPC benchmarks.\n\nNOTE: This is a large tracking TODO. After Phase 1 completes, consider splitting\nTiers 2-4 into per-tier TODOs with their own guardrails and verification.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add DataFrame queries without validating against SQL results",
+        "instead": "validate every query against SQL output at SF=0.01 before committing",
+        "item_id": "implement-dataframe-benchmarks",
+        "why": "silent correctness bugs accumulate and are hard to find later"
+      },
+      {
+        "dont": "add benchmark-specific logic to platform adapters in benchbox/platforms/dataframe/",
+        "instead": "put benchmark-specific helpers in the benchmark's own dataframe_queries/helpers.py",
+        "item_id": "implement-dataframe-benchmarks",
+        "why": "adapters must remain benchmark-agnostic"
+      },
+      {
+        "dont": "copy TPC-H query implementations into other benchmarks verbatim",
+        "instead": "analyze the benchmark's SQL queries first and translate the logical operations",
+        "item_id": "implement-dataframe-benchmarks",
+        "why": "each benchmark has different schema semantics, column names, and join patterns"
+      },
+      {
+        "dont": "implement all 700+ queries in a single pass",
+        "instead": "implement one benchmark at a time with incremental commits and validation",
+        "item_id": "implement-dataframe-benchmarks",
+        "why": "review quality degrades with large changesets"
+      },
+      {
+        "dont": "modify DataFrameQuery, DataFrameContext, or DataFrameContextImpl classes",
+        "instead": "if new capabilities are needed, extend via subclass or helper functions",
+        "item_id": "implement-dataframe-benchmarks",
+        "why": "that risks breaking existing TPC-H/TPC-DS implementations and all 8 platform adapters"
+      },
+      {
+        "dont": "modify existing TPC-H/TPC-DS dataframe_queries files",
+        "instead": "new benchmarks get their own isolated dataframe_queries/ directories",
+        "item_id": "implement-dataframe-benchmarks",
+        "why": "those are stable and tested"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "implement-dataframe-benchmarks",
+        "id": 87,
+        "reason": "ETL pipeline with mutation-heavy operations (SCD Type 2, incremental loads). Requires fundamentally different DataFrame patterns (stateful transforms, write operations) beyond read-only query model. Needs separate TODO with dedicated architecture.",
+        "resolution": "promoted",
+        "resolved_item": "tpc-di-dataframe-implementation-38-operations",
+        "resolved_reason": null,
+        "summary": "TPC-DI DataFrame implementation (38 operations)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "implement-dataframe-benchmarks",
+        "id": 88,
+        "reason": "INSERT/UPDATE/DELETE/DDL operations don't map to DataFrame read-query model. Would need write-operation adapter layer not currently in DataFrameContext. Needs separate TODO.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Verified DONE: integrate-write-primitives-dataframe-mode.yaml and dataframe-write-primitives.yaml (both Completed) already implement Write Primitives DataFrame INSERT/UPDATE/DELETE/DDL/MERGE.",
+        "summary": "Write Primitives DataFrame implementation (109 operations)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "implement-dataframe-benchmarks",
+        "id": 89,
+        "reason": "89 SQL queries (not 17 as originally estimated) need significant adaptation from multi-table TPC-DS to single-table OBT schema. The queries reference a fully denormalized table that doesn't map cleanly to existing TPC-DS DataFrame implementations. Needs separate TODO.",
+        "resolution": "promoted",
+        "resolved_item": "tpc-ds-obt-dataframe-implementation-17-queries",
+        "resolved_reason": null,
+        "summary": "TPC-DS-OBT DataFrame implementation (17 queries)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "implement-dataframe-benchmarks",
+        "id": 90,
+        "reason": "220 query variants exist to test SQL optimizer behavior (syntax rewriting, predicate pushdown, etc.). These test SQL engine internals, not logical query semantics - DataFrame execution bypasses SQL parsing entirely. Minimal value for DataFrame benchmarking. Needs separate evaluation if desired.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: TPC-Havoc DataFrame impl judged 'minimal value' since it tests SQL-optimizer internals that DataFrame execution bypasses entirely; same conclusion as deferral 374.",
+        "summary": "TPC-Havoc DataFrame implementation (220 queries)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "implement-dataframe-benchmarks",
+        "id": 91,
+        "reason": "113 queries specifically designed to test SQL optimizer join ordering decisions. DataFrame libraries handle joins programmatically (user specifies order), making this benchmark meaningless for DataFrame evaluation. Needs separate TODO if desired.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicitly deemed benchmark-meaningless for DataFrame evaluation (JoinOrder tests SQL optimizer join-ordering); no open item wants it.",
+        "summary": "JoinOrder DataFrame implementation (113 queries)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "implement-dataframe-benchmarks",
+        "id": 92,
+        "reason": "136 queries are catalog-driven with different architecture (programmatic query generation from schema introspection). Many test DB-specific features (INFORMATION_SCHEMA, SHOW commands). Needs separate evaluation and likely a different implementation approach.",
+        "resolution": "promoted",
+        "resolved_item": "read-primitives-dataframe-implementation-136-queries",
+        "resolved_reason": null,
+        "summary": "Read Primitives DataFrame implementation (136 queries)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_item": "fix-dataframe-parameter-parity-follow-up-findings"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-18T00:00:00Z",
+      "created_at": "2026-01-19T00:00:00Z",
+      "worktree": "dataframe-benchmarks"
+    },
+    "preserves": [
+      {
+        "behavior": "DataFrameContext protocol in benchbox/core/dataframe/context.py - all 30+ methods (get_table, col, lit, window_*, union_all, scalar, etc.) must remain unchanged",
+        "item_id": "implement-dataframe-benchmarks"
+      },
+      {
+        "behavior": "DataFrameContextImpl abstract base class in benchbox/core/dataframe/context.py - Generic[DF] typing and abstract method signatures",
+        "item_id": "implement-dataframe-benchmarks"
+      },
+      {
+        "behavior": "DataFrameQuery API contract in benchbox/core/dataframe/query.py - constructor signature (query_id, query_name, description, categories, pandas_impl, expression_impl, sql_equivalent, skip_platforms) and execute(ctx, family) method",
+        "item_id": "implement-dataframe-benchmarks"
+      },
+      {
+        "behavior": "Platform adapter compatibility - all 8 adapters in benchbox/platforms/dataframe/ (polars_df, pandas_df, pyspark_df, datafusion_df, modin_df, cudf_df, dask_df) must work with new benchmark queries",
+        "item_id": "implement-dataframe-benchmarks"
+      },
+      {
+        "behavior": "QueryRegistry class interface in benchbox/core/dataframe/query.py - register(), get(), list_queries(), filter_by_category() methods",
+        "item_id": "implement-dataframe-benchmarks"
+      },
+      {
+        "behavior": "TPC-DS DataFrame query correctness - all 99 queries in benchbox/core/tpcds/dataframe_queries/queries.py must continue to produce correct results",
+        "item_id": "implement-dataframe-benchmarks"
+      },
+      {
+        "behavior": "TPC-DS parameter system - get_parameters() in benchbox/core/tpcds/dataframe_queries/parameters.py",
+        "item_id": "implement-dataframe-benchmarks"
+      },
+      {
+        "behavior": "TPC-H DataFrame query correctness - all 22 queries in benchbox/core/tpch/dataframe_queries.py must continue to produce correct results",
+        "item_id": "implement-dataframe-benchmarks"
+      },
+      {
+        "behavior": "TPC-H parameter system - TPCH_DEFAULT_PARAMS, get_tpch_parameters(), set_parameter_overrides() in benchbox/core/tpch/dataframe_queries.py",
+        "item_id": "implement-dataframe-benchmarks"
+      },
+      {
+        "behavior": "benchmark_registry.py BENCHMARK_METADATA - existing entries must not be modified beyond adding supports_dataframe: True",
+        "item_id": "implement-dataframe-benchmarks"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/context.py"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/query.py"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/dataframe_queries.py"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/*_df.py"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/amplab/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/clickbench/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/coffeeshop/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/data_loader.py"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/datavault/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/h2odb/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/metadata_primitives/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/ssb/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds_obt/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch_skew/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpchavoc/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tsbs_devops/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/dataframe_queries/"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/unified_frame.py"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/unified_pandas_frame.py"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/*/test_*dataframe*.py"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_datafusion_df.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpch/ -q",
+        "description": "Existing TPC-H DataFrame query tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "implement-dataframe-benchmarks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpcds/test_tpcds_dataframe_queries.py -v",
+        "description": "Existing TPC-DS DataFrame query tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "implement-dataframe-benchmarks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_dataframe_factory.py -v",
+        "description": "Platform adapter tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "implement-dataframe-benchmarks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/dataframe/ -q",
+        "description": "DataFrame core tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "implement-dataframe-benchmarks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.benchmark_registry import get_benchmark_metadata; m = get_benchmark_metadata('ssb'); print(m.get('supports_dataframe', False))\"",
+        "description": "New benchmark DataFrame queries are registered and discoverable",
+        "expected": "True (after SSB implementation)",
+        "item_id": "implement-dataframe-benchmarks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox/core/*/dataframe_queries/",
+        "description": "Lint and type checks pass",
+        "expected": "All checks passed",
+        "item_id": "implement-dataframe-benchmarks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w9",
+        "wid": "w11"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w12",
+        "wid": "w13"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w12",
+        "wid": "w14"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w12",
+        "wid": "w15"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w12",
+        "wid": "w16"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w17",
+        "wid": "w18"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w17",
+        "wid": "w19"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w17",
+        "wid": "w20"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w17",
+        "wid": "w21"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w17",
+        "wid": "w22"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w23",
+        "wid": "w24"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w23",
+        "wid": "w25"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w23",
+        "wid": "w26"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w23",
+        "wid": "w27"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w28",
+        "wid": "w29"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w28",
+        "wid": "w30"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w28",
+        "wid": "w31"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w32",
+        "wid": "w33"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w32",
+        "wid": "w34"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w32",
+        "wid": "w35"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w36",
+        "wid": "w37"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w36",
+        "wid": "w38"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w39",
+        "wid": "w40"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w39",
+        "wid": "w41"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w42",
+        "wid": "w43"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w42",
+        "wid": "w44"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w42",
+        "wid": "w45"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w46",
+        "wid": "w47"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w46",
+        "wid": "w48"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w46",
+        "wid": "w49"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "implement-dataframe-benchmarks",
+        "needs_wid": "w5",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract common patterns from TPC-H/TPC-DS DataFrame implementations",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": "Used unit tests with registry/registration validation pattern",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build SQL vs DataFrame result comparison tooling using DuckDB SQL execution as ground truth at SF=0.01",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create pytest fixtures for per-query correctness assertion (row count, column names, value tolerance)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SSB DataFrame implementation (13 queries)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SSB: Map star-schema join pattern - LINEORDER fact joins to DATE, CUSTOMER, SUPPLIER, PART dimensions via integer surrogate keys (lo_orderdate→d_datekey, lo_custkey→c_custkey)",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SSB: Implement expression family with multi-table hash joins (2-4 joins per query) and multi-dimensional GROUP BY (d_year, p_brand1, c_nation)",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SSB: Implement pandas family using .merge() chains on surrogate keys with column aliasing for disambiguation",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SSB: Validate all 13 queries across 4 flights against SQL results at SF=0.01",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "ClickBench DataFrame implementation (43 queries)",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "ClickBench: Implement single-table analytics on 108-column 'hits' table - no joins needed, focus on column selection and filtering",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "ClickBench: Handle string-heavy operations - REGEX_REPLACE, LIKE patterns, URL parsing (Q6-Q12) in both families",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Catalog reusable helpers from tpcds/dataframe_queries/channel_helper.py and rollup_helper.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "ClickBench: Implement Q30 mass-aggregation pattern (100+ SUM expressions) and OFFSET-based pagination (Q28-Q29)",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "ClickBench: Handle DATE_TRUNC temporal groupings and EXTRACT operations across both families",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "ClickBench: Validate all 43 queries against SQL results at SF=0.01",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "NYC Taxi DataFrame implementation (25 queries)",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "NYC Taxi: Implement LEFT JOIN pattern - trips fact table joins to taxi_zones dimension for pickup/dropoff location lookups",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "NYC Taxi: Handle parameterized date ranges (start_date/end_date template substitution) and DATE_TRUNC temporal aggregations",
+        "wid": "w25"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "NYC Taxi: Implement financial calculations with NULL-safe division (tip percentage with NULLIF protection)",
+        "wid": "w26"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "NYC Taxi: Validate all 25 queries across 7 categories (temporal, geographic, financial, characteristics, rates, vendor, complex)",
+        "wid": "w27"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "TSBS DevOps DataFrame implementation (18 queries)",
+        "wid": "w28"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "TSBS: Implement time-series helpers - date_trunc bucketing (minute/hour), per-hostname aggregation, composite (time, hostname) key handling",
+        "wid": "w29"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Identify common operations across TPC-H/TPC-DS (date filtering, multi-table joins, window functions, aggregation patterns)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "TSBS: Implement dual-family queries across cpu, mem, disk, net metric tables with tag-based filtering (region, datacenter, service)",
+        "wid": "w30"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "TSBS: Validate time-windowed aggregation correctness and last-point query semantics",
+        "wid": "w31"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "H2ODB DataFrame implementation (10 queries)",
+        "wid": "w32"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "H2ODB: Implement single-table aggregation queries (Q1-Q8) with GROUP BY on cardinality dimensions (passenger_count, vendor_id)",
+        "wid": "w33"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "H2ODB: Handle PERCENTILE_CONT (Q9) - map to polars quantile/pandas quantile with WITHIN GROUP ORDER BY semantics",
+        "wid": "w34"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "H2ODB: Validate all 10 queries including percentile edge cases",
+        "wid": "w35"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "AMPLab DataFrame implementation (8 queries)",
+        "wid": "w36"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "AMPLab: Analyze big-data query patterns and implement dual-family with appropriate join/aggregation strategies",
+        "wid": "w37"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "AMPLab: Validate all 8 queries against SQL results",
+        "wid": "w38"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "CoffeeShop DataFrame implementation (11 queries)",
+        "wid": "w39"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": "Not needed as separate module - helpers embedded per-benchmark where needed",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create benchbox/core/dataframe/benchmark_helpers.py with shared date_trunc, percentile, and join utilities",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "CoffeeShop: Implement order analytics queries - revenue aggregations, product rankings, temporal patterns",
+        "wid": "w40"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "CoffeeShop: Validate all 11 queries against SQL results",
+        "wid": "w41"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "TPC-H Skew DataFrame implementation (22 queries)",
+        "wid": "w42"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": "Confirmed: TPC-H Skew uses identical queries, only data generation differs (Zipfian distributions). Shared function objects via re-registration in separate QueryRegistry.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "TPC-H Skew: Evaluate direct reuse of TPC-H dataframe_queries.py implementations - same query logic, different data distribution",
+        "wid": "w43"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": "Not needed - uses same TPC-H parameters. Skew is purely in data distribution.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "TPC-H Skew: Adapt parameter defaults if skew-specific substitution values differ from standard TPC-H",
+        "wid": "w44"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": "40 unit tests passing including shared-implementation identity checks.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "TPC-H Skew: Validate all 22 queries produce correct results on skewed data (may expose join ordering issues)",
+        "wid": "w45"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "DataVault DataFrame implementation (22 queries)",
+        "wid": "w46"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": "Full implementation with current-record filtering (load_end_dts IS NULL), multi-hop join chains, anti-joins, semi-joins, correlated subquery decomposition.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "DataVault: Implement Hub-Link-Satellite navigation - multi-table joins through 21-table DV2.0 schema (7 Hubs + 6 Links + 8 Satellites)",
+        "wid": "w47"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "DataVault: Handle hash key matching (MD5 composite keys) and temporal satellite filtering (dv_load_datetime effective dating)",
+        "wid": "w48"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": "64 unit tests passing.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "DataVault: Validate all 22 queries - verify correct cardinality through many-to-many link table joins",
+        "wid": "w49"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create DataFrame query implementation template/generator",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update benchmark documentation with DataFrame support status",
+        "wid": "w50"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create DataFrame benchmark usage guide",
+        "wid": "w51"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add performance comparison examples (SQL vs DataFrame)",
+        "wid": "w52"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update MCP tools to reflect new DataFrame capabilities",
+        "wid": "w53"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Template for expression family: ctx.col()/ctx.lit()/ctx.get_table() pattern with .filter().group_by().agg().sort()",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Template for pandas family: string indexing, .merge(), .groupby().agg(), .sort_values() pattern",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Template for registry.py (QueryRegistry instantiation) and __init__.py (public API exports)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-dataframe-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Establish validation framework for DataFrame query correctness",
+        "wid": "w9"
+      }
+    ]
+  }
+}

@@ -1,0 +1,380 @@
+{
+  "context": "Schema-first: define the Pydantic model (w1) before any logic, so the\nexplorer team can stub the consumer in parallel. Build the disambiguator\n(w2) before the artifact builder (w3) because the builder calls it.\nWire the CLI subcommand (w4) before refactoring Compare (w5) so the\nartifact actually exists to fetch. Pipeline pre-emission for popular\ncombinations (w8) layers on top of the subcommand and is independent\nof the explorer refactor.\n\nSpeedup definition: use `slowest / this` per query (matches the current\nCompare.tsx breakdown table at line 392) for the `speedup_vs_slowest_per_row`\nfield. For the per-baseline view (NormalizedSpeedupChart), the artifact\nprovides the raw `display_ms_per_row` and the chart picks the baseline\nindex - this is the one piece of computation that cannot be pre-emitted\nbecause the user picks the baseline interactively.\n\nHOWEVER: the speedup math `baseline_ms / this_ms` becomes a 3-line\nreduce in the chart, calling the parity-tested `speedupRatio` helper.\nDefinition is unified, drift impossible.\n\nThe `ComparisonArtifact` schema field names mirror the explorer types\nexactly to avoid translation layer bugs (Compare.tsx already uses\n`display_timings`, `display_geomean_ms` from DetailResult - the\nartifact uses the same names).\n",
+  "description": "The 2026-04-15 review identified that `Compare.tsx` fetches N detail\nJSON files and recomputes everything per render: per-query speedups\n(line 388-393), diverging deltas (DivergingBarChart.tsx:49), normalized\nspeedups (NormalizedSpeedupChart.tsx:57), summary-card metrics\n(Compare.tsx:219-290), and the breakdown table (Compare.tsx:364-429).\n\nThis is the architectural root cause of the parity problem: when the\nCLI and explorer compute independently, drift is inevitable. The\nparity test infrastructure (`explorer-establish-cli-explorer-parity-tests`)\nproves equivalence today but does not eliminate the duplication.\n\nThe fix is to push computation into the pipeline. The pipeline already\nemits per-`(benchmark, sf, phase)` `BenchmarkSummary` artifacts via\n`transformer.py` → `pipeline.py`. Add a parallel `ComparisonArtifact`\nemitted per ordered set of result_ids: it carries display_timings,\nper-query speedup matrix (one row per (queryId, baselineIdx)),\ndiverging delta matrix, and pre-disambiguated platform display labels.\n\nCompare.tsx becomes a pure renderer that fetches one artifact and\niterates. The chart components stop computing - they receive\npre-computed numeric arrays.\n\nThis work also ports the platform-label disambiguation from\n`result_plotter.py:68-149` (driver version, execution mode, scale\nfactor suffixes) into the artifact, so the explorer no longer renders\nambiguous \"DuckDB / DuckDB\" rows when two results share a platform name.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the `geomean_ms` semantics",
+        "instead": "`display_geomean_ms` is the canonical comparison value, `geomean_ms` is preserved for audit",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "why": "legacy consumers depend on the raw-sample geomean"
+      },
+      {
+        "dont": "compute platform display labels in two places",
+        "instead": "disambiguate once in the pipeline and ship the result in the artifact",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "why": "that recreates the parity bug we just fixed"
+      },
+      {
+        "dont": "emit comparability_warnings as free-form strings",
+        "instead": "use a structured `{kind, severity, message}` shape if extending, but for v1 mirror the existing string output of buildComparabilityWarnings exactly",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "why": "the explorer needs to apply formatting/severity"
+      },
+      {
+        "dont": "emit comparison artifacts for every N-way combination",
+        "instead": "emit on-demand via CLI subcommand, pre-emit only popular combinations",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "why": "the combinatorics explode (100 results = millions)"
+      },
+      {
+        "dont": "remove the per-detail fallback in Compare.tsx during rollout",
+        "instead": "keep the fallback and log when it fires",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "why": "pre-emitted artifacts will not exist for every combination users click"
+      },
+      {
+        "dont": "skip the `schema_version` field on ComparisonArtifact",
+        "instead": "version field is mandatory and explorer hard-fails on mismatch",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "why": "explorer must reject artifacts written by an incompatible older pipeline"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-emit-comparison-artifact-from-pipeline",
+        "id": 166,
+        "reason": "Combinatorial - 100 results × C(100,4) = 3.9M comparisons is not\nreasonable to pre-compute. Address with a smart popularity heuristic\n(top-N most-clicked) once telemetry exists.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Pre-computing all N-way comparisons is explicitly combinatorial-infeasible; deferred pending telemetry to drive a popularity heuristic that doesn't exist yet.",
+        "summary": "Pre-emit comparison artifacts for arbitrary N-way combinations at pipeline time"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-emit-comparison-artifact-from-pipeline",
+        "id": 167,
+        "reason": "Requires turning the static site into an app with a backend.\nOut of scope for the static-hosted Phase 2 explorer. v1 ships\npre-emitted artifacts for popular combinations + browser fallback.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Requires turning the static-hosted explorer into a backend app; explicit architecture decision chose pre-emitted artifacts instead.",
+        "summary": "Server-side computation of comparison artifacts at request time"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "needs_item": "explorer-establish-cli-explorer-parity-tests"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "needs_item": "explorer-unify-visualization-foundations"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-16T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Comparison URL format `?ids=id1,id2` - short-id resolution behavior unchanged",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline"
+      },
+      {
+        "behavior": "Existing `BenchmarkSummary` artifact format and emission - this work adds a parallel artifact, does not modify the summary",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline"
+      },
+      {
+        "behavior": "Existing `ComparabilityBanner` UI - only the warning generation moves server-side; the component contract is unchanged",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline"
+      },
+      {
+        "behavior": "Existing `DetailResult` model and per-detail JSON file emission - Compare must still work via the fallback path during rollout",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline"
+      },
+      {
+        "behavior": "RANKING_METRIC_BY_FAMILY registry - the artifact reads from it but does not modify",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/**"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/explorer.py"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/models.py"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/pipeline.py"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/transformer.py"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/DivergingBarChart.tsx"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryTimingChart.tsx"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/manifest.ts"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/types.ts"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "only_modify",
+        "path_glob": "tests/parity/fixtures/comparison_artifact_*.json"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'class ComparisonArtifact' benchbox/core/explorer_pipeline/models.py",
+        "description": "ComparisonArtifact Pydantic model exists with the documented fields",
+        "expected": "class defined with schema_version, rows, query_cells, comparability_warnings, ranking_primary_metric",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline/test_transformer.py::test_disambiguate_platform_labels -v",
+        "description": "Disambiguator produces unique labels",
+        "expected": "passes for single, duplicate, and triple-collision cases",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline/test_comparison_artifact.py -v",
+        "description": "Comparison artifact builder unit tests pass",
+        "expected": "all cases pass",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox explorer build-comparison --ids <id1>,<id2> --out /tmp/cmp.json && uv run -- python -c 'import json; from benchbox.core.explorer_pipeline.models import ComparisonArtifact; ComparisonArtifact.model_validate(json.load(open(\"/tmp/cmp.json\")))'",
+        "description": "CLI subcommand emits a valid artifact",
+        "expected": "no exception - artifact validates against schema",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- Compare",
+        "description": "Compare.tsx prefers artifact when available",
+        "expected": "tests cover both artifact-present and fallback paths",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'slowestPrimary / primary\\|slowest / fastest' results-explorer/src/pages/Compare.tsx",
+        "description": "No two definitions of speedup remain in Compare.tsx",
+        "expected": "zero matches - both replaced with `row.speedup_vs_slowest_per_row` from the artifact",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q && cd results-explorer && npm test",
+        "description": "Full Python and Vitest suites pass",
+        "expected": "all tests pass",
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "needs_wid": "w4",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "notes": "Schema (must match what Compare.tsx will consume):\n\n  class ComparisonRow(BaseModel):\n      result_id: str\n      short_id: str\n      platform: str            # raw platform name\n      display_label: str       # disambiguated (e.g. \"DuckDB v1.2.0\")\n      platform_id: str\n      run_date: str\n      trust_label: str\n      tuning_mode: str | None\n      execution_mode: str | None\n      test_type: str | None\n      geomean_ms: float | None\n      display_geomean_ms: float | None\n      power_score: float | None\n      total_duration_s: float\n      driver_version: str | None\n      display_timings: list[QueryDisplayTiming]\n\n  class ComparisonQueryCell(BaseModel):\n      query_id: str\n      display_ms_per_row: list[float | None]   # one per ComparisonRow\n      fastest_ms: float | None\n      slowest_ms: float | None\n      speedup_vs_slowest_per_row: list[float | None]   # slowest/this\n\n  class ComparisonArtifact(BaseModel):\n      schema_version: int = 1\n      benchmark: str\n      scale_factor: float\n      generated_at: str\n      rows: list[ComparisonRow]\n      query_cells: list[ComparisonQueryCell]\n      comparability_warnings: list[str]\n      ranking_primary_metric: str   # \"geomean_ms\" or \"power_score\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define `ComparisonArtifact` Pydantic model in `benchbox/core/explorer_pipeline/models.py`",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "notes": "Algorithm (lifted from CLI, adapt for the artifact rows):\n  - Group rows by `platform_id`.\n  - If a group has size 1: `display_label = platform`.\n  - Else: progressively append disambiguators in priority order\n    (driver_version, execution_mode, scale_factor, run_date) until\n    all labels in the group are unique.\n  - Resulting label format: \"DuckDB v1.2.0\" or\n    \"DuckDB v1.2.0 (sql)\" or \"DuckDB v1.2.0 SF1.0\".\n\nAdd unit test in `tests/unit/core/explorer_pipeline/test_transformer.py`\nthat mirrors any tests for the CLI version - and add a parity\nfixture (per `explorer-establish-cli-explorer-parity-tests`) so\nboth sides assert the same labels.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement `_disambiguate_platform_labels(rows)` in transformer.py mirroring `result_plotter.py:68-149` logic",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "notes": "Inputs:  list of DetailResult (already fetched by caller),\n         list of corresponding ManifestEntry (for trust/short_id).\n\nAlgorithm:\n  1. Validate same benchmark + same scale_factor (raise on mismatch).\n  2. Build ComparisonRow per detail using disambiguated labels.\n  3. Compute union of all query_ids (sorted natural).\n  4. For each query_id:\n       - display_ms_per_row from row.display_timings\n       - fastest_ms = min of non-null, slowest_ms = max\n       - speedup_vs_slowest_per_row[i] = slowest_ms / display_ms[i]\n                                          if both present and >0 else None\n  5. Compute comparability_warnings (mirror\n     `buildComparabilityWarnings` in ComparabilityBanner.tsx so\n     both sides agree).\n  6. Determine ranking_primary_metric from\n     `RANKING_METRIC_BY_FAMILY[benchmark]` (already exists).\n\nPure function - no I/O. Caller writes the JSON.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `build_comparison_artifact(detail_results, manifest_entries)` in transformer.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "notes": "Strategy decision: v1 emits on-demand. The alternative (pre-emit\nevery N-way combination) is documented in `deferred` as\ncombinatorially infeasible.\n\nSubcommand contract:\n  benchbox explorer build-comparison \\\n    --ids id1,id2,id3 \\\n    --out data/compare/<hash>.json\n\nOutput path: `data/compare/<sha256(sorted_result_ids)[:16]>.json`.\nHash MUST be deterministic on sorted input ids (the explorer\ncomputes the same hash to fetch). Schema validates against\n`ComparisonArtifact` Pydantic model on emit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `benchbox explorer build-comparison` CLI subcommand emitting one artifact per --ids set",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "notes": "New explorer flow:\n  1. Resolve short IDs to full IDs (existing).\n  2. Compute deterministic comparison-artifact path:\n     `/results/data/compare/${sha256(sortedIds.join(',')).slice(0,16)}.json`.\n  3. Try to fetch it. If 200, render directly from artifact fields.\n  4. If 404, fall back to the current per-detail flow (back-compat\n     during rollout) - log a warning so we know when fallback fires.\n\nCharts no longer compute speedups/deltas locally - they receive\npre-computed numeric arrays from the artifact. Per the parity\ntest infrastructure, helper functions in `chartMath.ts` are still\nused for the *renderer* math (axis stops, bar widths) but never\nfor the values.\n\nRemove the dual `slowest/fastest` speedup definition from the\nsummary cards (Compare.tsx:225) and the breakdown table\n(Compare.tsx:392) - both now read `speedup_vs_slowest_per_row`\nfrom the artifact, which is the single source.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor `Compare.tsx` to fetch `ComparisonArtifact` instead of N `DetailResult` files",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "notes": "Cases:\n  - Same benchmark/SF passes; different benchmark raises\n  - Different SF raises\n  - Single result returns artifact with empty speedup_vs_slowest_per_row entries (None)\n  - All-failed query produces None entries, not zeros\n  - Disambiguation produces unique labels for 2 same-platform-different-driver results\n  - speedup_vs_slowest matches `slowest/this` definition exactly\n  - comparability_warnings list mirrors what ComparabilityBanner expects (cross-test_type, cross-tuning, query-count mismatch)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `tests/unit/core/explorer_pipeline/test_comparison_artifact.py` covering edge cases",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "notes": "Requires the parity infrastructure to exist - declared as a hard\ncross-item dep on `explorer-establish-cli-explorer-parity-tests`\nat the item level.\n\nFixture flow:\n  - Python emits `tests/parity/fixtures/comparison_artifact_*.json`\n    covering at least: 2-result baseline, 3-result baseline,\n    missing-query, all-failed-query, same-platform-different-version\n  - Vitest reads each fixture and asserts that mounting Compare\n    with the artifact produces the documented row counts, fastest\n    highlight positions, and speedup numbers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a parity fixture pair so the explorer's renderer assertions cover the artifact contract",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-emit-comparison-artifact-from-pipeline",
+        "notes": "Pipeline-level pre-emission for the static site:\n  - Config flag in `pipeline.py` (default 0 = off) for the\n    number of pre-emitted comparisons per benchmark\n  - \"Popular\" defined for v1 as: the N most-recent result\n    combinations per benchmark from the manifest. Telemetry-driven\n    popularity is deferred.\n  - Wired so a single pipeline run produces the artifacts under\n    `data/compare/` alongside the manifest.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire pipeline to optionally pre-emit comparison artifacts for top-N popular combinations per benchmark",
+        "wid": "w8"
+      }
+    ]
+  }
+}

@@ -1,0 +1,207 @@
+{
+  "description": "Native queue is active, yet pr-open requires current develop ancestry and agents refresh BEHIND branches repeatedly. GitHub documents that queue integration eliminates that author refresh requirement. Extend existing Make/ruleset checker, not refresh certification or a second merger. Prior decisions: native-merge-queue-activation-20260822.md amendment (ALLGREEN/60m/max5), strict-base-refresh-policy-2026-08-14.md, KEEP_IDLE. Only local ancestry handling changes; all hosted required lanes remain. New merge-group checks occur after admission, so do not require a nonexistent speculative head before opening the PR.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Treat a snapshot, a queued review, a skipped hook or an unbound passing check as completion",
+        "instead": "Bind actual evidence to the relevant PR/head/input and retain an explicit owned next action",
+        "item_id": "native-queue-local-landing",
+        "why": "The observed session repeatedly lost asynchronous work or overstated evidence"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "native-queue-local-landing",
+        "needs_item": "ci-baseline-representative-remeasure-sample"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "needs_item": "pr-revision-readiness-transaction"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-09-08T02:40:48Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "KEEP_IDLE and SHADOW_ONLY remain in force for skip/shard/demotion/reduced-refresh proposals; this plan does not activate them.",
+        "item_id": "native-queue-local-landing"
+      },
+      {
+        "behavior": "Keep GitHub native merge queue as the only merger; no privileged steward, bypass actor, direct protected-branch push, or new bot credential.",
+        "item_id": "native-queue-local-landing"
+      },
+      {
+        "behavior": "Preserve required PR, merge_group, and post-merge coverage, soundness maintainer review, explicit user authority, and durable hold labels.",
+        "item_id": "native-queue-local-landing"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "native-queue-local-landing",
+        "path": "_project/decisions/native-merge-queue-activation-20260822.md"
+      },
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "native-queue-local-landing",
+        "path": "scripts/ruleset_drift_check.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "do_not_modify",
+        "path_glob": ".agents/skills/**"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "do_not_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/native-queue-local-landing.md"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/dev-loop-worktrees.md"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/merge-queue-governance.md"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "only_modify",
+        "path_glob": "scripts/pr_landing.py"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "only_modify",
+        "path_glob": "scripts/ruleset_drift_check.py"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_pr_landing.py"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_ruleset_drift.py"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_develop_ruleset_drift.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_pr_landing.py tests/unit/test_ruleset_drift.py tests/unit/workflows/test_develop_ruleset_drift.py tests/unit/test_release_infrastructure.py -q",
+        "description": "Queue-aware opening preserves integration and drift protection",
+        "expected": "exit 0; behavioral negative controls fail on the prior implementation",
+        "item_id": "native-queue-local-landing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "native-queue-local-landing",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "native-queue-local-landing",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "native-queue-local-landing",
+        "notes": "Record the narrow superseding decision for local stale-base refusal under a verified native queue. Detect exact repository/target queue configuration and required-context merge_group wiring from trusted sources. Keep the existing conservative ancestry fallback if queue absent, unreadable, unsupported or misconfigured.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record queue-aware local publication policy with a conservative fallback",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "native-queue-local-landing",
+        "notes": "Allow conflict-free authored-head publication/admission without a refresh solely for BEHIND when that native queue contract is verified. Preserve explicit conflict resolution, final-head review and required checks. After admission require successful actual speculative merge-group checks before claiming merge; never credit predecessor checks to that head.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Avoid ancestry-only refreshes while preserving actual merge-group validation",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "native-queue-local-landing",
+        "notes": "Extend the existing required ruleset drift checker and its already-required workflow wiring to validate approved merge method, grouping, response timeout, build/merge limits, no bypass actors and required merge_group contexts. Keep one expected-policy source. Report protected setting changes for operator action, do not silently repair them.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Extend the existing ruleset drift check to approved queue parameters",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "native-queue-local-landing",
+        "notes": "Test queue present/absent/unknown/misconfigured, base changing during local validation, real conflict, two interacting non-additive changes, ordinary feature push cancellation and soundness PR. In an authorized isolated canary prove current-base integration remains enforced without a refresh commit. Record before/after refresh count and cancelled runner time, rollback to old local guard on failure.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify queue safety in fixtures and an authorized isolated canary",
+        "wid": "w3"
+      }
+    ]
+  }
+}

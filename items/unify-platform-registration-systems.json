@@ -1,0 +1,11 @@
+{
+  "description": "Resolve the architectural code smell of having two parallel platform registration systems\nthat can drift apart. Currently, new platforms must be registered in BOTH:\n\n1. `get_platform_adapter()` in `benchbox/platforms/__init__.py` (hardcoded dict, 22 entries)\n2. `PlatformRegistry.auto_register_platforms()` in `benchbox/core/platform_registry.py` (18 entries)\n\nThe systems serve different purposes:\n- `get_platform_adapter()`: CLI routing + adapter instantiation (with alias support)\n- `PlatformRegistry`: Metadata + discovery + availability (no alias support)\n\nThis has caused bugs where platforms were added to one system but not the other.",
+  "legacy": {
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2025-12-08T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "architecture-cleanup"
+    }
+  }
+}

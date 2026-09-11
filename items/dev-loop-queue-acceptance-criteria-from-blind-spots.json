@@ -1,0 +1,182 @@
+{
+  "context": "Do not resume historical queue-choice work. Use the named current implementation items and pr-process-low-drama-acceptance. Retain this blocked record as provenance until a separately authorized lifecycle reconciliation; no new steward, dropped reduced-refresh path, or YAML tracker is created.",
+  "description": "CURRENT DISPOSITION (2026-09-07): all four still-relevant concerns are rehomed into pr-process-low-drama-acceptance: test-lock CPU protection -> pr-local-validation-singleflight; coordinator failure/restart -> pr-followup-resumable-ownership; dwell-time contract -> ci-baseline-representative-remeasure-sample and integrated acceptance; post-merge safety -> post-merge-attribution-recovery. Native queue is already active; do not execute the old Step-5 wait, steward path, or retired YAML-edit instructions below. Preserve historical blind-spot records. Existing blocked lifecycle is retained; acceptance of the replacement work is not claimed.\n\nHISTORICAL CONTEXT (retained):\nThe 2026-04-30 L2 merge-loop audit produced four blind-spot findings\nthat all gate any future steward-queue implementation. They were\npromoted to `merged-to-todo` -> this TODO on 2026-05-11, so the\nblind-spot log records that they are integrated into a planned item\nrather than sitting in the `actionable` re-triage queue:\n\n  - 2026-04-30-114721-global-test-lock-cpu-protection — keep the\n    global lock default until measurement shows concurrent xdist\n    runs are CPU-safe.\n  - 2026-04-30-114722-queue-single-point-failure — require explicit\n    failure-mode analysis before adding a steward queue; prefer\n    native GitHub features if they appear.\n  - 2026-04-30-114723-queue-dwell-contract — treat dwell-time\n    targets as part of any queue acceptance criteria; update agent\n    handoff docs if dwell becomes materially longer than CI.\n  - 2026-04-30-114724-post-merge-safety-tension — define the exact\n    failure that develop-post-merge.yml handles; do not add a queue\n    unless Step 5 metrics show a pre-merge ordering problem.\n\nAll four are blocked on the same gate:\n`dev-loop-step-5-measurement-window` — a 30-day measurement window\nthat started 2026-04-30 and closes ~2026-05-30. Until Step 5\npublishes its decision record, none of these findings are\nindividually actionable, which is exactly why they belong to one\nhandoff TODO instead of four `actionable` log entries.\n\nThis TODO does NOT pre-build the queue (that anti-pattern is\nexplicit in Step 5's `do_not_modify` list). It exists to ensure\nthat, IF Step 5 returns BUILD QUEUE, Step 6 inherits these four\nfindings as named acceptance criteria — not as four ad-hoc reviewer\ncomments that get lost in the queue spec.\n\nIf Step 5 returns DO NOT BUILD or REASSESS, this TODO closes as\nsuperseded with a one-line note pointing to the Step 5 decision\nrecord; the four blind-spots stay `merged-to-todo` pointing here\n(this TODO's DONE record carries the outcome) — no further\nstatus flip is needed.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "collapse the four guardrails into a single bullet on Step 6",
+        "instead": "keep them as four named acceptance criteria so reviewers can trace each one back to its source.",
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "why": "each one cites a specific blind-spot and a specific failure mode"
+      },
+      {
+        "dont": "pre-author a steward-queue implementation TODO 'just in case'",
+        "instead": "wait for the verdict.",
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "why": "that primes the Step 5 decision and violates the Step 5 anti-pattern list"
+      },
+      {
+        "dont": "re-point the blind-spots' todo_id at dev-loop-step-6-queue-decision-gate before w2 has actually folded the guardrails into it",
+        "instead": "leave todo_id on this TODO until the queue spec demonstrably owns them.",
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "why": "Step 6 may resolve as DO NOT BUILD and never carry them"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "needs_item": "dev-loop-step-5-measurement-window"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "imported from YAML status: Blocked",
+      "category": "Process and Workflow",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All four blind-spots' historical record — the only mutations are the `status`/`todo_id` frontmatter line and append-only triage-log entries; the `## Finding` / `## Why this matters` body text is immutable.",
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots"
+      },
+      {
+        "behavior": "Superseded pending work and legacy notes are historical only; the named replacement items own the current outcome.",
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots"
+      },
+      {
+        "behavior": "The 'do not pre-build the queue during measurement' anti-pattern in Step 5.",
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots"
+      },
+      {
+        "behavior": "dev-loop-step-5-measurement-window's calendar-gated Blocked status — this TODO must not push Step 5 to publish early.",
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "kind": "do_not_modify",
+        "path_glob": "_project/TODO/main/planning/dev-loop-step-5-measurement-window.yaml"
+      },
+      {
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "kind": "do_not_modify",
+        "path_glob": "tests/conftest.py"
+      },
+      {
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/dev-loop-step-6-queue-decision-gate.yaml"
+      },
+      {
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-04-30-114721-global-test-lock-cpu-protection.md"
+      },
+      {
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-04-30-114722-queue-single-point-failure.md"
+      },
+      {
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-04-30-114723-queue-dwell-contract.md"
+      },
+      {
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-04-30-114724-post-merge-safety-tension.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "ls _project/decisions/dev-loop-measurement-*.md",
+        "description": "Step 5 decision record exists before this TODO begins w2",
+        "expected": "at least one file",
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -E '2026-04-30-114(721|722|723|724)-' _project/TODO/main/planning/dev-loop-step-6-queue-decision-gate.yaml",
+        "description": "If BUILD QUEUE: Step 6 YAML lists the four guardrails by blind-spot ID",
+        "expected": "four matching lines, one per blind-spot id",
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "for id in 2026-04-30-114721-global-test-lock-cpu-protection 2026-04-30-114722-queue-single-point-failure 2026-04-30-114723-queue-dwell-contract 2026-04-30-114724-post-merge-safety-tension; do uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py show $id | grep -E 'status:|todo_id:'; done",
+        "description": "Four blind-spots show status: merged-to-todo with todo_id populated",
+        "expected": "all four show status: merged-to-todo and a non-null todo_id",
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "notes": "Trigger: `dev-loop-step-5-measurement-window` publishes\n`_project/decisions/dev-loop-measurement-<window-end>.md` with a\nBUILD QUEUE / DO NOT BUILD / REASSESS verdict.\n  - BUILD QUEUE -> proceed to w2.\n  - DO NOT BUILD -> close this TODO as completed-via-supersede\n    with a one-line note citing the Step 5 decision SHA. The\n    four blind-spots stay `merged-to-todo` -> this TODO; the\n    DONE record is their disposition. (Optionally append a\n    one-line triage entry to each pointing at the decision SHA.)\n  - REASSESS -> stay Blocked; let Step 5's REASSESS path drive\n    the next iteration.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Watch Step 5 decision record; branch on outcome",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "notes": "Edit `_project/TODO/main/planning/dev-loop-step-6-queue-decision-gate.yaml`\n(only after Step 5 unblocks it) so its `success_metrics` /\n`must_preserve` explicitly include:\n  - \"CPU-protection default preserved: queue must not silently\n    flip the global test-lock default before concurrent-xdist\n    measurement clears it as safe.\"\n    Cites: 2026-04-30-114721-global-test-lock-cpu-protection.\n  - \"Failure-mode analysis is a prerequisite: a written analysis\n    of steward-queue failure modes (single-point-of-failure,\n    recovery, fallback commands) lands before the steward\n    implementation TODO is authored.\"\n    Cites: 2026-04-30-114722-queue-single-point-failure.\n  - \"Dwell-time SLO is a queue acceptance criterion: queue spec\n    names a target P50/P95 dwell-time and a triggering\n    measurement source; agent handoff docs update if dwell\n    becomes materially longer than current CI.\"\n    Cites: 2026-04-30-114723-queue-dwell-contract.\n  - \"Post-merge safety tension is resolved before queue lands:\n    queue spec states explicitly which failures\n    develop-post-merge.yml handles vs which the queue handles,\n    and does not duplicate safety machinery without measurable\n    recovery improvement.\"\n    Cites: 2026-04-30-114724-post-merge-safety-tension.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Fold the four guardrails into Step 6's acceptance criteria",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-queue-acceptance-criteria-from-blind-spots",
+        "notes": "The four blind-spots are already `merged-to-todo` ->\n`dev-loop-queue-acceptance-criteria-from-blind-spots` (promoted\n2026-05-11). On the BUILD QUEUE path, once w2 has folded the\nguardrails into Step 6, re-run the promote action so the link\npoints at the queue spec that now owns them:\n  `uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py triage <id> --action promote --todo-id dev-loop-step-6-queue-decision-gate`\nThe triage-log entry should cite Step 5's decision SHA and name\nthis TODO as the prior merge path. On any non-BUILD path this\nwork unit is a no-op — leave todo_id pointing here.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-point the four blind-spots' todo_id to Step 6 (BUILD QUEUE path only)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

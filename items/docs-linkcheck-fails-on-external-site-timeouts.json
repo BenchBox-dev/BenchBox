@@ -1,0 +1,61 @@
+{
+  "context": "Make external-link checking resilient rather than removing it. Options, roughly in order of preference: raise linkcheck_retries and linkcheck_timeout in the Sphinx config; add a linkcheck_ignore / linkcheck_allowed_redirects entry for domains that are chronically slow but known-good; or split external link checking into its own scheduled (non-PR) job so PR feedback stays deterministic while genuine rot is still caught daily. Verify by asserting the config actually carries retries plus either an ignore policy or a scheduled split - not merely that the file mentions linkcheck.",
+  "description": "The linkcheck job in the docs build fails the whole job when any external URL times out. Observed on PR #1510 (run 30905957137): 'broken https://www.hammerdb.com/ - HTTPSConnectionPool read timed out (read timeout=60)' from concepts/benchmarking-tools-compared.md line 212, a file that PR did not touch. Sphinx reported 'build finished with problems, 1 warning' and exited 1. The run also shows GitHub rate-limiting (-rate limited- ... sleeping) on github.com URLs, which adds minutes and makes the job flakier the more GitHub links the docs accumulate. Net effect: an unrelated PR gets a red job for a third-party site being slow, which trains reviewers to ignore linkcheck - the failure mode that hides a real broken link. ci-required-result passed independently, so this does not block merges today; it is noise that erodes signal.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-09-06T20:40:13Z",
+      "completed_pr": 1051,
+      "created_at": "2026-08-04T12:36:08Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Internal (relative) link breakage still fails CI - only external-host flakiness is softened",
+        "item_id": "docs-linkcheck-fails-on-external-site-timeouts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "docs-linkcheck-fails-on-external-site-timeouts",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "docs-linkcheck-fails-on-external-site-timeouts",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "docs-linkcheck-fails-on-external-site-timeouts",
+        "kind": "only_modify",
+        "path_glob": "docs/conf.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import pathlib, re; s = pathlib.Path('docs/conf.py').read_text(); assert re.search(r'linkcheck_retries\\s*=\\s*[2-9]', s), 'linkcheck_retries is unset or 1'; assert 'linkcheck_ignore' in s or 'linkcheck_timeout' in s, 'no ignore/timeout policy'\"",
+        "description": "Sphinx linkcheck is configured to retry rather than fail on first timeout",
+        "expected": "exits 1 on the unfixed tree where conf.py sets no retry policy; exits 0 once retries plus a timeout or ignore policy are configured",
+        "item_id": "docs-linkcheck-fails-on-external-site-timeouts",
+        "last_result": "pass",
+        "last_run": "2026-09-06T20:40:01Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Implemented in PR #1051 (commit 5b69a1dfe7187db4ca53bbd080023fd69cac2465). docs/conf.py:168-195 configures linkcheck_timeout=60, linkcheck_retries=2, linkcheck_report_timeouts_as_broken=True, curated linkcheck_ignore via docs/linkcheck_ignore.txt, and linkcheck_anchors_ignore_for_url for docs.snowflake.com. Acceptance verified via docs linkcheck verification regex and clean documentation CI run 34035817970 on develop.",
+        "item_id": "docs-linkcheck-fails-on-external-site-timeouts",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify linkcheck retry and timeout resilience controls in docs/conf.py against PR #1051",
+        "wid": "w1"
+      }
+    ]
+  }
+}

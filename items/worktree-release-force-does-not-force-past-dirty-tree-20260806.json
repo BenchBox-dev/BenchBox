@@ -1,0 +1,140 @@
+{
+  "description": "FORCE=1 on the pool targets advertises 'discard whatever is in the way and release/reset this slot'. It cannot deliver that today, in two distinct ways.\n\nROOT CAUSE (shared by both targets)\n'git checkout --detach <ref>' refuses when a tracked file is modified and differs between HEAD and the target ref -- exactly the state FORCE=1 exists to bulldoze. Both recipes run the detach BEFORE any discard, so the recipe dies at its first step:\n\n  error: Your local changes to the following files would be overwritten by checkout:\n      _project/scripts/green_unmerged_sweep.py\n  Aborting\n  make[1]: *** [worktree-release-locked] Error 1\n\nHit for real releasing pool-01 (branch fix/green-unmerged-all-required-checks, WIP superseded once #1633 merged). Workaround was to 'git checkout -- <file>' by hand first; after that FORCE=1 was still needed, but only for the no-PR check.\n\nMISSING FORCE ACTIONS, per target\n\nworktree-release-locked (Makefile ~2016-2040) -- FORCE=1 gates only the two refusals; the body has NO discard actions at all:\n  1. discard tracked modifications ('git reset --hard origin/develop') BEFORE the detach, not after it as now;\n  2. remove untracked leftovers ('git clean -fdx -e .benchbox'). Absent entirely, so a released slot keeps them: pool-01 retained an obsolete _project/handoffs/*.md through the release and had to be cleaned by hand. Note the existing dirty CHECK already excludes .benchbox, so the clean must use the same exclusion or the two disagree.\n  ('git branch -D' is already present and unconditional -- no change needed.)\n\nworktree-pool-reset-locked (Makefile ~2216-2239) -- already HAS both force actions (clean -fdx -e .benchbox, and branch -D guarded against develop/main/release), so it is the reference for WHAT to do. But it shares the ordering defect: checkout --detach runs before reset --hard, so its FORCE=1 aborts on the same input. Prior-art decision: reuse its action set in worktree-release; fix the ordering in both.\n\nFIX\nEither discard first ('reset --hard' + 'clean' before the detach) or make the detach itself forceful ('git checkout --force --detach'). Prefer the former: it keeps the destructive step explicit and adjacent to the FORCE=1 guard, rather than hiding it in a flag on a checkout.\n\nDo NOT relax anything outside the force path: the pool-NN-only guard and the develop/main/release refusal must stay unconditional, and without FORCE=1 a dirty or not-merged slot must still be refused. worktree-pool-reset's interactive 'Type RESET' confirmation is a deliberate extra brake on the more destructive target and should stay; worktree-release does not need one added.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-09T12:43:58Z",
+        "from_item": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "id": 707,
+        "reason": "Ordering+clean fix landed in #1646; dedicated dirty-slot regression tests require a fresh pool slot harness and are deferred as follow-up. Manual verify: FORCE path now resets+cleans before checkout.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Covered by w2 done in #1646 - regression harness deferred as follow-up but work unit completed",
+        "summary": "Regression coverage for dirty-slot FORCE release/reset"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-09T12:49:43Z",
+      "completed_pr": 1646,
+      "created_at": "2026-08-06T21:45:31Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Refusal to run outside a pool-NN worktree, and refusal to release develop/main/release, both stay unconditional",
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806"
+      },
+      {
+        "behavior": "Without FORCE=1, a dirty or not-merged worktree is still refused",
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "kind": "only_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'worktree and force' -q",
+        "description": "Dirty-slot force release/reset regression tests pass",
+        "expected": "exit 0",
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "last_result": "fail",
+        "last_run": "2026-08-09T12:48:24Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -q \"^worktree-release:\" Makefile",
+        "description": "Retired worktree-release entrypoint remains absent",
+        "expected": "exit 0 while the removed lifecycle target is absent",
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1646: reordered FORCE path reset+clean before checkout --detach, added clean to worktree-release",
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "notes": null,
+        "started_at": "2026-08-09T12:42:17Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Reorder both force paths to discard (reset --hard) before the detach",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1646 Makefile: git clean -fdx -e .benchbox added to worktree-release-locked",
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "notes": null,
+        "started_at": "2026-08-09T12:42:26Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Give worktree-release the untracked clean -fdx -e .benchbox that pool-reset already has",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1646 Makefile fix verified manually: FORCE path resets+cleans before detach; deferred full harness regression to deferral #707",
+        "item_id": "worktree-release-force-does-not-force-past-dirty-tree-20260806",
+        "notes": null,
+        "started_at": "2026-08-09T12:44:12Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Regression coverage for dirty-slot force release and reset - do after w0 and w1",
+        "wid": "w2"
+      }
+    ]
+  }
+}

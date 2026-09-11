@@ -1,0 +1,136 @@
+{
+  "context": "Centralize: one validation module exercised by one test over all catalogs,\nnot N copies. jsonschema is already a dependency; reuse it (or Pydantic,\nalso present). The broken-fixture assertion is what proves the gate has\nteeth.\n",
+  "description": "The shrink campaign migrated benchmark metadata, dependency metadata, and\nquery catalogs from Python literals (PRs #590-#593, #604) into YAML. The\nexisting catalog loaders already guard structurally (raise on non-mapping,\nparse into typed dataclass containers, and a cross-loader parity test exists\nat tests/unit/core/primitives/test_loader_parity.py), so this is NOT the\n\"silent KeyError\" free-for-all the original review implied.\n\nThe residual gap: there is no per-FIELD schema (JSON Schema / Pydantic\nmodel) validating the migrated catalogs as a CI gate. A typo in a category\nname, a missing required field, or a wrong type currently surfaces as a\nruntime error at first use rather than a CI failure. With data now in YAML\n(no Python parser type-checking it), a single shared validation step closes\nthe gap across all catalogs.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a separate ad-hoc validator to each of the 6+ loaders",
+        "instead": "define one shared schema/model and reuse it",
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "why": "that duplicates logic and drifts"
+      },
+      {
+        "dont": "validate only that the file is a mapping",
+        "instead": "validate required fields and types",
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "why": "that is the gap we already have"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-24T00:00:00Z",
+      "created_at": "2026-05-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing loader guards and typed dataclass containers keep working",
+        "item_id": "shrink-followup-catalog-schema-validation"
+      },
+      {
+        "behavior": "Loader public APIs unchanged",
+        "item_id": "shrink-followup-catalog-schema-validation"
+      },
+      {
+        "behavior": "tests/unit/core/primitives/test_loader_parity.py behavior is preserved",
+        "item_id": "shrink-followup-catalog-schema-validation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/write_primitives/catalog/loader.py — existing structural guards + typed container; extend with field-level schema",
+        "decision": "extend",
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "path": "benchbox/core/write_primitives/catalog/loader.py"
+      },
+      {
+        "concept": "jsonschema / pydantic (already in the dependency set) — reuse rather than adding a validation library",
+        "decision": "reuse",
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "path": "jsonschema"
+      },
+      {
+        "concept": "tests/unit/core/primitives/test_loader_parity.py — existing cross-loader test; extend with schema validation",
+        "decision": "extend",
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "path": "tests/unit/core/primitives/test_loader_parity.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/catalog_schema.py"
+      },
+      {
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -k 'catalog_schema or catalog_validation' -q",
+        "description": "Validator rejects a broken catalog fixture and accepts real catalogs",
+        "expected": "passing tests including a negative (broken-fixture) case",
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "notes": "Cover #590-593 + #604 catalogs and the six existing catalog/loader.py\nmodules. Note where dataclass containers already provide field-level\nsafety vs where validation is only structural (is-a-mapping).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory migrated catalogs and identify which lack per-field validation",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "notes": "Prefer one shared validator (Pydantic models, or jsonschema documents)\nreused across catalogs over per-loader ad-hoc checks. The test loads\nevery catalog YAML and asserts it validates; add a deliberately-broken\nfixture proving the validator rejects it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a shared schema/typed-model validation + a test that validates every catalog",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-catalog-schema-validation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire the validation test into CI / preflight",
+        "wid": "w3"
+      }
+    ]
+  }
+}

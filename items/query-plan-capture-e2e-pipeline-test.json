@@ -1,0 +1,158 @@
+{
+  "context": "The test is an integration test that stitches together existing components.\nNo new production code should be needed unless show-plan/compare-plans lack\na callable Python API (w1). Use DuckDB for zero external dependencies.\nThe test verifies the full serialization round-trip, which is the gap the\ncurrent unit tests do not cover.\n",
+  "description": "No test currently exercises the full plan capture pipeline end-to-end:\n  benchbox run --capture-plans\n  → result bundle (results.json / run_metadata.json with plan_fingerprints)\n  → benchbox show-plan <results-dir> <query-id>\n  → benchbox compare-plans <run1> <run2>\n\nUnit tests cover individual adapters (test_postgresql_plan_capture.py,\ntest_duckdb_plan_capture.py) and live integration tests cover the adapter\nagainst a real database. But none verify:\n  - That --capture-plans correctly propagates plan data into the result bundle\n  - That plan_fingerprints appear in run_metadata.json with the correct format\n  - That benchbox show-plan can read and display a captured plan from a bundle\n  - That benchbox compare-plans correctly identifies changed vs unchanged plans\n\nA regression in any intermediate serialization step (result dict → JSON\n→ ResultManifest → CLI display) would go undetected by the current test suite.\n\nThe test should use DuckDB (no external credentials, in-memory database) with\na small trivial workload (SELECT 1, SELECT 2+2) so it runs in unit/fast CI\nwithout service containers. The test is an integration test: it invokes the\nrun orchestrator via its Python API (not subprocess) and inspects the output.\n\nTest shape:\n  1. Run a minimal DuckDB benchmark with capture_plans=True\n  2. Assert run_metadata.json contains plan_fingerprints for each query_id\n  3. Assert each fingerprint is a 64-char hex string (SHA256)\n  4. Run the same benchmark again and assert fingerprints are identical (stability)\n  5. Invoke show-plan programmatically and assert it returns a non-empty plan\n  6. Invoke compare-plans on the two runs and assert \"unchanged\" for all queries\n\nThe show-plan and compare-plans steps (5 and 6) test the round-trip through the\nCLI layer. If those commands do not exist as testable Python entrypoints, add\nthin wrappers or test through the underlying functions directly.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add the E2E test to the live_postgresql or postgres-integration jobs",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "why": "DuckDB in-memory is the test platform."
+      },
+      {
+        "dont": "invoke benchbox run as a subprocess",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "why": "use the Python API to avoid subprocess marshaling complexity and make the test debuggable."
+      },
+      {
+        "dont": "use real TPC-H data in the E2E test",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "why": "SELECT 1 and SELECT 1+1 are sufficient to exercise plan capture; real data takes minutes."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-06-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing adapter-level plan capture unit tests must remain untouched.",
+        "item_id": "query-plan-capture-e2e-pipeline-test"
+      },
+      {
+        "behavior": "The E2E test must complete in under 30 seconds (fast marker; DuckDB SELECT 1 is sub-millisecond).",
+        "item_id": "query-plan-capture-e2e-pipeline-test"
+      },
+      {
+        "behavior": "The E2E test must not require network access or external credentials — DuckDB in-memory only.",
+        "item_id": "query-plan-capture-e2e-pipeline-test"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/manifest/plan_metadata_utils.py — plan_fingerprints serialization",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "path": "benchbox/core/manifest/plan_metadata_utils.py"
+      },
+      {
+        "concept": "benchbox/core/query_plans/comparison.py — plan comparison logic",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "path": "benchbox/core/query_plans/comparison.py"
+      },
+      {
+        "concept": "benchbox/core/query_plans/history.py — plan history comparison logic used by compare-plans",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "path": "benchbox/core/query_plans/history.py"
+      },
+      {
+        "concept": "tests/integration/platforms/test_postgresql_live.py:TestLivePostgreSQLQueryPlanCapture — live integration shape",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "path": "tests/integration/platforms/test_postgresql_live.py:TestLivePostgreSQLQueryPlanCapture"
+      },
+      {
+        "concept": "tests/unit/platforms/test_duckdb_plan_capture.py — adapter-level plan capture tests (DuckDB)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "path": "tests/unit/platforms/test_duckdb_plan_capture.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/query-plan-capture-e2e-pipeline-test.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_plan_capture_e2e.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/ -m 'integration and fast' --collect-only -q --override-ini='addopts='",
+        "description": "E2E test collects under integration + fast markers",
+        "expected": "test_plan_capture_e2e.py collected",
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_plan_capture_e2e.py -v",
+        "description": "E2E test passes with DuckDB in-memory",
+        "expected": "All E2E plan capture tests pass",
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "notes": "Locate benchbox/cli/commands/ for show-plan and compare-plans commands.\nIf they exist as Click commands, extract the underlying Python functions\nso they can be called from tests without invoking a subprocess.\nIf they don't exist as stable Python callables, add thin wrappers in\nbenchbox/core/query_plans/ that the CLI commands delegate to.\nThe goal: show_plan_for_run(results_dir, query_id) → str\n           compare_runs(run1_dir, run2_dir) → ComparisonReport\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Identify or create programmatic entrypoints for show-plan and compare-plans",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "notes": "Location: tests/integration/test_plan_capture_e2e.py or\ntests/integration/platforms/test_plan_capture_e2e.py.\nMark with: pytest.mark.integration, pytest.mark.fast (DuckDB in-memory).\nUse tmp_path fixture for the results directory.\nStep 1: Create DuckDBAdapter with capture_plans=True, run SELECT 1 and\n        SELECT 1+1 as a minimal two-query benchmark.\nStep 2-3: Assert run_metadata.json (or equivalent) contains\n          plan_fingerprints with 64-char hex strings.\nStep 4: Run the same two queries again with a fresh adapter, compare\n        fingerprints from run 1 and run 2 — must be identical.\nStep 5: Call show_plan_for_run() and assert non-empty string output.\nStep 6: Call compare_runs() and assert no plan changes detected.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Create tests/integration/test_plan_capture_e2e.py with the 6-step test shape",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-e2e-pipeline-test",
+        "notes": "The test is marked integration + fast, so it should run under the existing\nintegration job in pr.yml (which already runs integration tests). Verify it\nis collected by:\n  uv run -- python -m pytest tests/integration/ -m \"integration and fast\" --collect-only -q\nIf not collected, check pytest.ini addopts and markers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add the E2E test file to the integration CI gate (pr.yml fast-integration or integration job)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,287 @@
+{
+  "context": "Build on PlatformAdapter.apply_ctas_sort and existing cloud adapter tuning hooks,\nbut add an explicit strategy layer so sorted ingestion can be requested even on\nplatforms previously marked as CTAS-sort unsupported.\n\nStart with strategy selection and capability gating, then implement platform\nexecution paths one adapter at a time. Record selected strategy and overhead\nmetrics in results for downstream comparison analysis.\n\nKeep all cloud-platform behavior opt-in for safety and to preserve current defaults.\n",
+  "description": "Add explicit sorted data ingestion support for cloud data warehouse platforms as\na first-class benchmark strategy, even when platform-native tuning features\n(clustering keys, Z-ordering, partitioning, sort keys) already exist.\n\nRationale:\n- Deep sorting is an alternative physical layout strategy, not only a fallback.\n- Users need apples-to-apples performance and cost comparisons between:\n    1) deep sorted ingestion,\n    2) platform-native tuning features,\n    3) combined strategies where safe/valid.\n- Current cloud CTAS-sort decisions default to \"unsupported/no-op\" for several\n  platforms, which blocks this experiment design.\n\nScope:\n- Add an opt-in sorted ingestion mode for cloud platforms.\n- Implement per-platform sorted ingestion execution paths with clear capability\n  gates and documented behavior.\n- Capture benchmark metadata so result analysis can quantify value/cost trade-offs.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "mark a platform as supported without adapter-level tests",
+        "instead": "require platform-specific assertions",
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "why": "dry-run regressions would be invisible"
+      },
+      {
+        "dont": "overload existing CLUSTERING/Z_ORDERING semantics",
+        "instead": "add a dedicated sorted-ingestion strategy control",
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "why": "users need separate A/B dimensions"
+      },
+      {
+        "dont": "silently switch default cloud behavior to deep sort",
+        "instead": "require explicit opt-in",
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "why": "it can materially change runtime/cost"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_item": "ctas-sort-cloud-platforms"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_item": "ctas-sort-dataloader-connectivity"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-20T00:00:00Z",
+      "created_at": "2026-02-20T00:00:00Z",
+      "worktree": "physical-tuning"
+    },
+    "preserves": [
+      {
+        "behavior": "Default behavior for existing runs remains unchanged when sorted-ingestion mode is not enabled",
+        "item_id": "cloud-dw-sorted-data-ingestion"
+      },
+      {
+        "behavior": "Dry-run mode continues to capture all emitted SQL/actions without requiring live credentials",
+        "item_id": "cloud-dw-sorted-data-ingestion"
+      },
+      {
+        "behavior": "Platform-native tuning behavior (Snowflake clustering, Databricks Z-ORDER, BigQuery CLUSTER BY) remains available and testable",
+        "item_id": "cloud-dw-sorted-data-ingestion"
+      },
+      {
+        "behavior": "benchbox compare remains compatible with result schema changes",
+        "item_id": "cloud-dw-sorted-data-ingestion"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/benchmark.py"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run _project/scripts/validate_todo.py _project/DONE/physical-tuning/active/cloud-dw-sorted-data-ingestion.yaml",
+        "description": "New TODO validates against schema",
+        "expected": "Validation passed",
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_cloud_sorted_ingestion_strategy.py -v --tb=short",
+        "description": "Cloud strategy tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_cloud_platform_ctas_sort.py -v --tb=short",
+        "description": "Existing cloud CTAS sort tests stay green",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define sorted-ingestion strategy model and CLI/tuning config surface (force/auto/off, method selection)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement capability matrix + guardrails for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, Athena, Synapse, ClickHouse Cloud)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Snowflake/Databricks deep-sort ingestion paths with safe defaults and explicit method markers",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement BigQuery/Redshift deep-sort ingestion paths or explicit actionable errors",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Athena/Synapse deep-sort ingestion paths or explicit actionable errors",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement ClickHouse Cloud deep-sort ingestion path or explicit actionable error",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add result metadata for ingestion strategy, runtime overhead, and cost-impact comparability",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit/integration test coverage for strategy selection and SQL/action generation in dry-run mode",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-dw-sorted-data-ingestion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Documentation and examples: deep-sort vs native-tuning comparison workflow",
+        "wid": "w9"
+      }
+    ]
+  }
+}

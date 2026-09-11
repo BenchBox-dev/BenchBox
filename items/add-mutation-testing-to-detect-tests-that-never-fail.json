@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #183 of fix-coverage-theater.\nDeferred: Add mutation testing to detect tests that never fail\nReason deferred: mutmut or cosmic-ray can find tests that pass regardless of code changes. Useful as a second pass after fixing known theater, but expensive to run.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:24Z",
+      "worktree": "main"
+    }
+  }
+}

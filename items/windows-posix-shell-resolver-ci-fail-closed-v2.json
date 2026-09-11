@@ -1,0 +1,102 @@
+{
+  "context": "Centralize no-shell disposition, test it without host dependence, and keep the bashism probe unchanged.",
+  "description": "The resolver correctly rejects the WSL launcher and dash, but skip_without_posix_shell and requires_posix_shell can convert resolver regressions into green skips on Linux/macOS. Keep a narrow Windows no-Git-Bash skip; fail actionably where bash is a runner contract.",
+  "legacy": {
+    "item_meta": {
+      "category": "CI soundness",
+      "created_at": "2026-08-01T14:04:39Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Only shell-executing tests may skip on Windows without Git Bash.",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v2"
+      },
+      {
+        "behavior": "WSL bash stub and dash remain rejected.",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utilities/test_posix_shell.py"
+      },
+      {
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/utilities/posix_shell.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/utilities/test_posix_shell.py -q",
+        "description": "Resolver policy tests",
+        "expected": "fails on the unfixed tree when POSIX no-shell is simulated; exit 0 after repair",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/test_release_infrastructure.py tests/unit/workflows/test_validate_submission_changed_bundles.py -q",
+        "description": "Representative shell contracts",
+        "expected": "exit 0",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add host-independent skip-versus-fail policy tests",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement a shared unavailable-shell disposition",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run resolver and workflow shell-contract tests",
+        "wid": "w2"
+      }
+    ]
+  }
+}

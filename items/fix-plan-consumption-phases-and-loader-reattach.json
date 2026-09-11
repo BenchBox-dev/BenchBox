@@ -1,0 +1,173 @@
+{
+  "context": "Introduce a single accessor that walks execution over `execution_phases` and/or\n`query_results` (whichever the CLI needs), and repoint all six `.phases` consumers\nat it. In the loader, thread `plans_data` into `_reconstruct_query_results` so each\nquery result is rehydrated with its `query_plan` (QueryPlanDAG.from_dict) and\n`plan_fingerprint` keyed off the `.plans.json` companion. Re-point the coverage\ntests at the real reconstructed object (delete the fabricated `.phases` fake) and\nadd a real bundle round-trip test.\n",
+  "description": "Adversarial review of the query-plan-capture subsystem found the entire\nread/consume side is non-functional on real exported bundles. Two layered\ndefects:\n\n1. `.phases` does not exist. `BenchmarkResults` (benchbox/core/results/models.py:312)\n   exposes `execution_phases: ExecutionPhases` and `query_results: list`, NOT a\n   `phases` dict-of-`.queries`. Six consumers iterate `results.phases`:\n     - benchbox/cli/commands/show_plan.py:89          (crash -> exit 1)\n     - benchbox/cli/commands/compare_plans.py:76,128  (crash)\n     - benchbox/core/query_plans/comparison.py:758    (crash; compare-plans --summary)\n     - benchbox/cli/commands/compare.py:1227          (crash; `compare --include-plans`, the recommended path)\n     - benchbox/core/manifest/plan_metadata_utils.py:50  (getattr default {} -> SILENT empty metadata)\n     - benchbox/core/query_plans/history.py:97           (getattr default {} -> SILENT empty history)\n   The CLI paths raise AttributeError, which the bare `except Exception` swallows\n   into \"Error: 'BenchmarkResults' object has no attribute 'phases'\" + exit 1, so\n   the plan is never shown/compared. The metadata/history paths silently record\n   nothing.\n\n2. Plans are never reattached from the `.plans.json` companion. `load_result_file`\n   -> `reconstruct_benchmark_results` (benchbox/core/results/loader.py:208) calls\n   `_reconstruct_query_results(data[\"queries\"], data[\"errors\"])` WITHOUT plans_data;\n   `_extract_plans_info` (loader.py:426) reads only integer counts. So even after\n   fixing #1, every `query_plan` is None after a load.\n\nReproduced end-to-end (real DuckDB run -> real ResultExporter bundle -> real\nload_result_file -> real CLI): `has .phases attr: False`; show-plan and\ncompare-plans exit 1 with the AttributeError; loaded query_results carry no plan.\n\nExisting coverage tests hide this: tests/unit/cli/commands/test_show_plan_coverage.py:35\n(and test_compare_plans_coverage.py) monkeypatch `load_result_file` to return a\nhand-built object with a fabricated `.phases` dict; tests/integration/test_plan_capture_e2e.py\ndeliberately bypasses `load_result_file` and reads `.plans.json` directly via\n`QueryPlanDAG.from_dict`. Neither exercises the real CLI path.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a `phases` compatibility property that fabricates the old shape",
+        "instead": "repoint consumers explicitly.",
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "why": "it hides which real field (execution_phases vs query_results) each consumer needs"
+      },
+      {
+        "dont": "rely on getattr(results, 'phases', {}) defaults anywhere",
+        "instead": "(not specified)",
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "why": "they convert a hard error into silent empty output."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "fix-plan-consumption-phases-and-loader-reattach",
+        "id": 316,
+        "reason": "Staged locally (uncommitted); fold test_plan_capture_cli_realpath_review.py in as the w3 guard when implementing.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Notes describe folding a staged local test file into the parent item's own w3 guard; parent item is DONE so this was resolved during implementation.",
+        "summary": "Reproducing failing tests were captured during review under scratchpad/review-failing-tests/"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-05T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Bundles that legitimately have no plans still load and render without error.",
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach"
+      },
+      {
+        "behavior": "Non-plan fields of reconstruct_benchmark_results keep their current values.",
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach"
+      },
+      {
+        "behavior": "The .plans.json companion file format is unchanged (loader adapts to it, not vice versa).",
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/compare.py"
+      },
+      {
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/compare_plans.py"
+      },
+      {
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/show_plan.py"
+      },
+      {
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/manifest/plan_metadata_utils.py"
+      },
+      {
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/comparison.py"
+      },
+      {
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/history.py"
+      },
+      {
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/loader.py"
+      },
+      {
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_compare_plans_coverage.py"
+      },
+      {
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_show_plan_coverage.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/ -k 'plan and (show or compare or realpath)' -n 0 -q",
+        "description": "show-plan renders a plan from a real exported DuckDB bundle (exit 0)",
+        "expected": "passed",
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands/ tests/unit/core/results/ tests/integration/ -k plan -n 0 -q",
+        "description": "Full plan suites stay green",
+        "expected": "passed",
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Thread plans_data into _reconstruct_query_results so query_plan/plan_fingerprint are rehydrated on load",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Repoint the 6 results.phases consumers at execution_phases/query_results (no fabricated phases shim)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-plan-consumption-phases-and-loader-reattach",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace the mocked load_result_file in show/compare coverage tests with the real reconstructed object; add a real DuckDB bundle -> load_result_file -> show-plan/compare-plans round-trip test",
+        "wid": "w3"
+      }
+    ]
+  }
+}

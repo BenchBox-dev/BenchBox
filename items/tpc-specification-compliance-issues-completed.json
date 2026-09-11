@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: High\"\n- \"**Status**: ✅ Completed\"\n- \"**Description**: Critical compliance issues where TPC-H and TPC-DS implementations don't follow official specifications for query ordering in power and throughput tests\"\n- \"**Tasks**:\"\n- \"**Files Affected**: `benchbox/core/tpch/power_test.py`, `benchbox/core/tpch/throughput_test.py`, `benchbox/core/tpcds/power_test.py`, `benchbox/core/tpcds/throughput_test.py`, `benchbox/utils/execution_manager.py`\"\n- \"**Impact**: ✅ Successfully implemented TPC specification compliance across all power and throughput tests. TPC-H now uses the official 41-stream permutation matrix with proper query ordering starting with [14, 2, 9, 20, 6, 17, 18, 8, 21, 13, 3, 22, 16, 4, 11, 15, 1, 10, 19, 5, 7, 12] for stream 0. TPC-DS uses the standard permutation algorithm. Power run iterations now cycle through different stream permutations per iteration, and concurrent queries assign different stream IDs automatically. Results are now comparable to official TPC publications and provide valid statistical analysis.\"\n- \"**Rationale**: TPC specifications mandate specific query permutations for power tests and different permutations for concurrent streams in throughput tests. Sequential or simple random ordering violates the specification and reduces the validity of performance measurements for optimizer testing and database evaluation.\"\n- \"**Verification**: All compliance tests pass (`_project/test_tpc_compliance.py`), documentation updated (`_project/TPC_SPECIFICATION_COMPLIANCE.md`), and functionality validated with core TPC-H tests continuing to pass.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

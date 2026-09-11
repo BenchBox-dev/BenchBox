@@ -1,0 +1,134 @@
+{
+  "context": "Design one of: curated projection of live store into scenario-shaped records; content-hash disposition oracles; or dual-key scorer. Document mutation tests. No quota run in this item.",
+  "description": "reports/real-corpus-groundability.md: behavioral gate has never scored real records. Blockers: (1) live Codex records are 100% historical_observation while scenarios need six kinds; (2) oracles key relevant_recall on human semantic ids while real records use UUIDs. Parked real_corpus.py exists under artifacts; must not be used as a promotion gate until a bridge exists. Depends on ADR 0001 (hand-authored oracles stay).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "score --corpus real as promotion evidence before the bridge",
+        "instead": "experimental flag only after design lands",
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "why": "recall zeros are oracle mismatch not candidate failure"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "needs_item": "memory-adr-0001-oracle-grounding-decision"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Batch dependency blocker: depends on memory-adr-0001-oracle-grounding-decision, which requires Joe's ADR accept/amend/reject decision.",
+      "category": "Evaluation",
+      "created_at": "2026-08-05T22:11:09Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Oracles remain independent of generator metadata per ADR 0001",
+        "item_id": "memory-real-corpus-scoring-bridge"
+      },
+      {
+        "behavior": "Real record text is not committed into the repo",
+        "item_id": "memory-real-corpus-scoring-bridge"
+      },
+      {
+        "behavior": "Synthetic corpus default remains byte-stable for historical evidence",
+        "item_id": "memory-real-corpus-scoring-bridge"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Parked loader/renderer",
+        "decision": "reuse",
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "path": "/Users/joe/Developer/memory-governance-artifacts/parked-20260805-real-corpus/real_corpus.py"
+      },
+      {
+        "concept": "Groundability blockers",
+        "decision": "extend",
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "path": "/Users/joe/Developer/memory-governance/reports/real-corpus-groundability.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "kind": "do_not_modify",
+        "path_glob": "memory_tooling/codex/fixtures/**/records.jsonl"
+      },
+      {
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "kind": "only_modify",
+        "path_glob": "docs/decisions/**"
+      },
+      {
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/behavioral/src/memory_tooling/**"
+      },
+      {
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "kind": "only_modify",
+        "path_glob": "reports/real-corpus-groundability.md"
+      },
+      {
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && rg -q 'scoring bridge|identifier scheme|taxonomy' docs/evaluation docs/decisions reports 2>/dev/null; test -f reports/real-corpus-groundability.md",
+        "description": "Design doc exists and names both blockers resolved or deferred",
+        "expected": "Bridge design recorded and groundability report updated",
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Write design decision covering taxonomy and ID matching with rejected alternatives",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-real-corpus-scoring-bridge",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Prototype bridge offline against codex-treatment-20260804 without quota",
+        "wid": "w1"
+      }
+    ]
+  }
+}

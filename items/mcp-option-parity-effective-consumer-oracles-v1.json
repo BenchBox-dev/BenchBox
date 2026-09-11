@@ -1,0 +1,117 @@
+{
+  "description": "Add independent effective-consumer or safe-rejection observations for every MCP platform-option contract row. Preserve optional-engine skips as explicit, counted outcomes and keep the MCP release gate fail-closed until coverage is honest.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-10T14:42:04Z",
+      "completed_pr": 1673,
+      "created_at": "2026-08-10T14:22:23Z",
+      "worktree": "mcp-stateless"
+    },
+    "scope_rules": [
+      {
+        "item_id": "mcp-option-parity-effective-consumer-oracles-v1",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-option-parity-effective-consumer-oracles-v1",
+        "kind": "do_not_modify",
+        "path_glob": "tests/unit/mcp/test_schemas.py"
+      },
+      {
+        "item_id": "mcp-option-parity-effective-consumer-oracles-v1",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "mcp-option-parity-effective-consumer-oracles-v1",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_benchmark_tools.py"
+      },
+      {
+        "item_id": "mcp-option-parity-effective-consumer-oracles-v1",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_datafusion_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_benchmark_tools.py -q -k test_every_matrix_option_reaches_effective_preparation",
+        "description": "Effective-consumer matrix test passes",
+        "expected": "Every matrix row is observed or explicitly skipped; prepared-only fallback cannot satisfy the gate",
+        "item_id": "mcp-option-parity-effective-consumer-oracles-v1",
+        "last_result": "pass",
+        "last_run": "2026-08-10T14:35:01Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_benchmark_tools.py -q -k 'consumer or effective_preparation'",
+        "description": "MCP option consumer regression tests pass",
+        "expected": "The independent consumer and negative-control assertions pass",
+        "item_id": "mcp-option-parity-effective-consumer-oracles-v1",
+        "last_result": "pass",
+        "last_run": "2026-08-10T14:35:09Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check tests/unit/mcp/test_benchmark_tools.py",
+        "description": "Scoped test lint passes",
+        "expected": "No lint errors in the changed test",
+        "item_id": "mcp-option-parity-effective-consumer-oracles-v1",
+        "last_result": "pass",
+        "last_run": "2026-08-10T14:35:36Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-option-parity-effective-consumer-oracles-v1",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-option-parity-effective-consumer-oracles-v1",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Strict matrix implementation now uses actual adapter/configuration consumers; DataFusion target_partitions pass-through fixed in benchbox/platforms/datafusion.py with regression coverage in tests/unit/platforms/test_datafusion_adapter.py.",
+        "item_id": "mcp-option-parity-effective-consumer-oracles-v1",
+        "notes": null,
+        "started_at": "2026-08-10T14:31:36Z",
+        "started_branch": "chore/sync-code-five-axis-c49764b",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Replace prepared-only success paths with strict effective-consumer or safe-rejection observations; optional engines must be explicit counted skips",
+        "wid": "w1"
+      },
+      {
+        "evidence": "uv run -- python -m pytest tests/unit/mcp/test_benchmark_tools.py -q -k 'test_every_matrix_option_reaches_effective_preparation or test_effective_consumer_oracle_rejects_dropped_option' -n 0: 2 passed; the dropped thread_limit negative control fails the oracle as required.",
+        "item_id": "mcp-option-parity-effective-consumer-oracles-v1",
+        "notes": null,
+        "started_at": "2026-08-10T14:31:43Z",
+        "started_branch": "chore/sync-code-five-axis-c49764b",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Add a negative-control regression proving a dropped consumer fails the matrix sweep",
+        "wid": "w2"
+      },
+      {
+        "evidence": "scope check passed in /tmp/benchbox-mcp-option-oracles-20260810; focused and full affected tests passed (124 passed); ruff check and format check passed; make pr-preflight passed (27,731 passed, 19 skipped); code review completed; PR #1673 opened",
+        "item_id": "mcp-option-parity-effective-consumer-oracles-v1",
+        "notes": null,
+        "started_at": "2026-08-10T14:35:53Z",
+        "started_branch": "chore/sync-code-five-axis-c49764b",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Run scope and verification gates, perform code review, commit the test-only change, and open one PR",
+        "wid": "w3"
+      }
+    ]
+  }
+}

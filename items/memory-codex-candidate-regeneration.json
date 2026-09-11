@@ -1,0 +1,175 @@
+{
+  "description": "D2 ruled the v5 Codex candidate must be regenerated against current live memory before any re-gate. The committed candidate is schema 5, pins no source snapshot at all, and fails the new live-freshness check (STALE-001). It is also 39/39 historical_observation against six exercised record classes. This is the blocking prerequisite for spending the D5-authorized 180-session v6 matrix.",
+  "legacy": {
+    "item_meta": {
+      "category": "remediation",
+      "completed_at": "2026-08-04T13:15:47Z",
+      "created_at": "2026-08-04T13:13:03Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Live Codex memory and config remain byte-unchanged; generation is read-only",
+        "item_id": "memory-codex-candidate-regeneration"
+      },
+      {
+        "behavior": "No model quota is spent under this item; the v6 matrix is a separate authorization",
+        "item_id": "memory-codex-candidate-regeneration"
+      },
+      {
+        "behavior": "Promotion remains a separate explicit human decision",
+        "item_id": "memory-codex-candidate-regeneration"
+      },
+      {
+        "behavior": "The v5-gated candidate fixture is retained unmodified as the artifact v5 judged",
+        "item_id": "memory-codex-candidate-regeneration"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-codex-candidate-regeneration",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-codex-candidate-regeneration",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-codex-candidate-regeneration",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-codex-candidate-regeneration",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-codex-candidate-regeneration",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v3/**"
+      },
+      {
+        "item_id": "memory-codex-candidate-regeneration",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v4/**"
+      },
+      {
+        "item_id": "memory-codex-candidate-regeneration",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v5/**"
+      },
+      {
+        "item_id": "memory-codex-candidate-regeneration",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-codex-candidate-regeneration",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/behavioral/fixture/**"
+      },
+      {
+        "item_id": "memory-codex-candidate-regeneration",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/codex/**"
+      },
+      {
+        "item_id": "memory-codex-candidate-regeneration",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling/codex -- python -m pytest memory_tooling/codex/tests -q",
+        "description": "Codex candidate tests pass",
+        "expected": "All generator and audit tests pass",
+        "item_id": "memory-codex-candidate-regeneration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling/codex -- python -m memory_tooling.audit --system codex --strict --root memory_tooling/codex/fixtures/codex-treatment-20260804 --source-root \"$HOME/.codex/memories\"",
+        "description": "The regenerated candidate is fresh against the live store",
+        "expected": "Strict audit exits 0, including STALE-001",
+        "item_id": "memory-codex-candidate-regeneration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && git diff --quiet f801885 -- memory_tooling/codex/fixtures/codex-treatment",
+        "description": "The v5-gated candidate is untouched",
+        "expected": "The artifact v5 judged is byte-identical",
+        "item_id": "memory-codex-candidate-regeneration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -q '^Promotion decision' /Users/joe/Developer/memory-governance/reports/promotion-decision-codex-candidate.md",
+        "description": "A Codex candidate packet exists with an explicit recommendation",
+        "expected": "Packet names freshness, coverage, residual risks, and promote-eligible or no-promote",
+        "item_id": "memory-codex-candidate-regeneration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-codex-candidate-regeneration",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-codex-candidate-regeneration",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "de32cd4: codex-treatment-20260804 regenerated at schema 6, 45 records, pinned snapshot 05c6cace equals the live recomputation; --strict --source-root exits 0. v5-gated codex-treatment/ byte-identical (git diff --quiet vs f801885).",
+        "item_id": "memory-codex-candidate-regeneration",
+        "notes": null,
+        "started_at": "2026-08-04T13:13:26Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Regenerate the Codex candidate at schema 6 so it pins a live source snapshot, keeping the gated artifact intact",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Premise corrected, not executed as written: the behavioral fixture is NOT derived from the candidate. evaluation_runs/behavioral/fixture/codex-records-v5.json is hand-authored synthetic content from generator.behavioral_fixture_records(); there is nothing to regenerate from the candidate. Class-coverage gap recorded: 45/45 historical_observation vs 6 exercised classes. Filed as a missed-axis tracker finding ('The behavioral gate never exercises the artifact it certifies') and documented in the packet.",
+        "item_id": "memory-codex-candidate-regeneration",
+        "notes": null,
+        "started_at": "2026-08-04T13:15:42Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Regenerate the behavioral fixture from the fresh candidate and record the class-coverage gap",
+        "wid": "w1"
+      },
+      {
+        "evidence": "de32cd4: reports/promotion-decision-codex-candidate.md — no-promote (not yet gated). Names freshness (05c6cace, fresh), coverage (1 of 6 classes), the fixture/candidate disconnect, the Codex-vs-Claude store-stability asymmetry, and that it has been gated under NO contract.",
+        "item_id": "memory-codex-candidate-regeneration",
+        "notes": null,
+        "started_at": "2026-08-04T13:15:45Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Publish the Codex candidate packet naming its freshness, coverage, and the contract it has NOT been gated under",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "context": "Run a small decision review against the existing result-aware semantic chart contract and the textcharts dependency boundary. Do not modify runtime registration or packaging in this item.",
+  "description": "Make an explicit product, security, and support decision before any BenchBox distribution or server configuration begins bundling or proxying the external textcharts-mcp server. Compare separate-client configuration, opt-in bundled deployment, and server-side proxying; assess namespace collisions, tenant isolation, raw renderer input limits, package/licensing/support ownership, sessionless HTTP behavior, and rollback. Record the accepted/rejected option in an ADR or contract document, define acceptance tests and release/support consequences, and open implementation work only after approval.",
+  "legacy": {
+    "item_meta": {
+      "category": "architecture",
+      "completed_at": "2026-08-08T18:07:09Z",
+      "created_at": "2026-08-02T13:14:55Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "BenchBox MCP continues to publish only result-aware suggest_charts and generate_chart tools until an accepted decision and follow-on implementation item exist.",
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/**"
+      },
+      {
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2",
+        "kind": "do_not_modify",
+        "path_glob": "textcharts/**"
+      },
+      {
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/design/**"
+      },
+      {
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp*.md"
+      },
+      {
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -q \"textcharts.*(bundle|proxy|separate)|separate.*textcharts\" docs/reference/mcp.md docs/reference/public-contracts.md docs/design",
+        "description": "Decision record names the selected option and rejected alternatives",
+        "expected": null,
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --quiet -- benchbox/mcp benchbox/core/visualization textcharts",
+        "description": "No runtime registration changes are present",
+        "expected": null,
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventoried separate-server config at HEAD bf76b8ab8c: no bundle/proxy code present, benchbox.mcp publishes only suggest_charts/generate_chart, textcharts remains external boundary; documented in docs/design/textcharts-mcp-boundary.md Context.",
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2",
+        "notes": null,
+        "started_at": "2026-08-08T18:07:01Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Inventory current separate-server configuration and support/security assumptions",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Compared separate vs bundled vs proxied tradeoffs (namespace collisions, tenant isolation, licensing/support ownership, sessionless HTTP) in docs/design/textcharts-mcp-boundary.md; rejected bundle/proxy for same reasons.",
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2",
+        "notes": null,
+        "started_at": "2026-08-08T18:07:04Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Compare separate, bundled, and proxied options with namespace, tenant, licensing, and operational tradeoffs",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Recorded explicit accepted separate-client decision with rejection rationale, acceptance criteria, and follow-on boundary in docs/design/textcharts-mcp-boundary.md; verified rg -q textcharts.*(bundle|proxy|separate) passes and git diff --quiet benchbox/mcp benchbox/core/visualization textcharts is clean.",
+        "item_id": "mcp-textcharts-bundle-proxy-product-security-decision-v2",
+        "notes": null,
+        "started_at": "2026-08-08T18:07:07Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record the explicit decision, rejection rationale, acceptance criteria, and follow-on implementation boundary",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,323 @@
+{
+  "context": "Research units (w1, w3, w5, w7, w9) can all run in parallel - they are read-only.\nImplementation follows research findings. Where the answer is \"unsupported / return None\",\nthe implementation is 5-10 lines (override + docstring); prioritize getting the documentation\nright over speed.\n\nFor cloud platforms that are unsupported, rely on the existing base-class skip logging from\nctas-sort-dataloader-connectivity. If gaps are discovered, capture them as a follow-up TODO\ninstead of modifying base adapter code in this item.\n\nDo not attempt live platform tests - unit tests with mocked connections are sufficient\nfor verifying SQL generation. The verification commands use only unit tests.\n",
+  "description": "With the centralized apply_ctas_sort() in PlatformAdapter (ctas-sort-dataloader-connectivity),\ncloud data warehouse platforms gain sorted-data loading by overriding only\n_build_ctas_sort_sql(table_name, sort_columns). This item implements those overrides.\n\nEach cloud platform has a distinct approach to physical data ordering:\n\nSnowflake\n  Snowflake already applies SORT configuration via clustering keys in apply_unified_tuning().\n  A post-load CTAS (CREATE OR REPLACE TABLE t AS SELECT * FROM t ORDER BY col) will\n  re-materialize data sorted but without Automatic Clustering - this may be counterproductive.\n  Research whether post-load CTAS sort is beneficial in addition to or instead of clustering.\n  If clustering already covers the use case, _build_ctas_sort_sql should return None and the\n  sort should remain in apply_unified_tuning() / apply_table_tunings().\n\nDatabricks / Delta Lake\n  Delta Lake does not guarantee physical sort order on disk via CTAS ORDER BY.\n  Physical ordering is achieved post-load via OPTIMIZE ... ZORDER BY (Z-ordering) or\n  OPTIMIZE ... with liquid clustering. The _build_ctas_sort_sql hook is not the right\n  mechanism; instead, an apply_post_load_optimize() pattern may be needed, or the existing\n  Z_ORDERING TuningType support can be extended. Return None from _build_ctas_sort_sql\n  and document the correct path.\n\nBigQuery\n  BigQuery CTAS supports ORDER BY (CREATE OR REPLACE TABLE ... AS SELECT * FROM ... ORDER BY).\n  However, BigQuery is distributed and row order is not preserved after DML, so a post-load\n  CTAS sort does not produce persistent physical ordering. Clustering keys (via partition/\n  cluster config) are the correct mechanism. Return None and document.\n\nRedshift\n  Amazon Redshift supports SORT KEYS defined at table creation. A post-load CTAS\n  (CREATE TABLE t_sorted AS SELECT * FROM t ORDER BY col) followed by DROP+RENAME is\n  valid but loses distribution style and sort key metadata. The correct approach is to\n  define the SORT KEY in CREATE TABLE DDL. Investigate whether a VACUUM SORT ONLY t\n  command (which re-sorts in-place) is a better post-load mechanism than CTAS.\n\nClickHouse / ClickHouse Cloud\n  ClickHouse table ORDER BY is defined immutably at CREATE TABLE time (ENGINE = MergeTree\n  ORDER BY col). Post-load CTAS sort is not applicable. Return None from\n  _build_ctas_sort_sql and document. The correct path is to include ORDER BY in CREATE\n  TABLE DDL generation - this may require a separate tuning TODO for ClickHouse DDL.\n\nAthena\n  Athena (Presto/Trino-based) queries S3 directly. CTAS (CREATE TABLE ... AS SELECT ...\n  ORDER BY) writes new Parquet files to S3. This IS meaningful for query performance if\n  the output is partitioned or sorted - but Athena's distributed nature means ORDER BY in\n  CTAS only produces local file ordering, not global ordering across the dataset. Research\n  whether this provides zone-map-equivalent benefits for Athena queries.\n\nAzure Synapse\n  Azure Synapse Analytics supports CTAS (CREATE TABLE ... AS SELECT ... ORDER BY).\n  Physical ordering depends on the distribution style (hash, round-robin, replicated).\n  Investigate whether CTAS ORDER BY produces useful clustering for Synapse's columnar storage.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "implement BigQuery CTAS sort",
+        "instead": "use CLUSTER BY",
+        "item_id": "ctas-sort-cloud-platforms",
+        "why": "BigQuery does not preserve row order and the sorted output would revert to arbitrary order on subsequent DML"
+      },
+      {
+        "dont": "implement CTAS sort for Snowflake on top of existing clustering",
+        "instead": "if research confirms CTAS adds no value, return None",
+        "item_id": "ctas-sort-cloud-platforms",
+        "why": "Snowflake's Automatic Clustering already handles physical data ordering and a CTAS would recreate the table without the clustering metadata"
+      },
+      {
+        "dont": "skip research units to save time",
+        "instead": "validate physical sort behavior before coding any SQL",
+        "item_id": "ctas-sort-cloud-platforms",
+        "why": "incorrect assumptions for cloud warehouses could produce silently incorrect benchmark data"
+      },
+      {
+        "dont": "use CTAS for Databricks/Delta Lake",
+        "instead": "the correct mechanism is OPTIMIZE ZORDER BY",
+        "item_id": "ctas-sort-cloud-platforms",
+        "why": "CTAS creates an unmanaged table losing Delta transactional metadata"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "needs_item": "ctas-sort-dataloader-connectivity"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-19T00:00:00Z",
+      "created_at": "2026-02-18T00:00:00Z",
+      "worktree": "physical-tuning"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing cloud platform tests pass (no credential mocks broken)",
+        "item_id": "ctas-sort-cloud-platforms"
+      },
+      {
+        "behavior": "Databricks Z_ORDERING TuningType support in apply_unified_tuning() is not affected",
+        "item_id": "ctas-sort-cloud-platforms"
+      },
+      {
+        "behavior": "Platforms returning None from _build_ctas_sort_sql produce no SQL execution side effects",
+        "item_id": "ctas-sort-cloud-platforms"
+      },
+      {
+        "behavior": "Snowflake clustering key application in apply_unified_tuning() is not removed or bypassed",
+        "item_id": "ctas-sort-cloud-platforms"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/motherduck.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_cloud_platform_ctas_sort.py -v --tb=short",
+        "description": "Cloud platform CTAS sort unit tests pass (no live credentials needed)",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "ctas-sort-cloud-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "Existing cloud platform tests unaffected",
+        "expected": "0 failures",
+        "item_id": "ctas-sort-cloud-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check . && uv run ty check",
+        "description": "Lint and type check pass",
+        "expected": "no errors",
+        "item_id": "ctas-sort-cloud-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "needs_wid": "w10",
+        "wid": "w13"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "needs_wid": "w11",
+        "wid": "w13"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "needs_wid": "w12",
+        "wid": "w13"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "needs_wid": "w2",
+        "wid": "w13"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "needs_wid": "w4",
+        "wid": "w13"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "needs_wid": "w6",
+        "wid": "w13"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "needs_wid": "w8",
+        "wid": "w13"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ctas-sort-cloud-platforms",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ctas-sort-cloud-platforms",
+        "notes": "Snowflake apply_table_tunings() already handles TuningType.SORTING via clustering keys\n(benchbox/platforms/snowflake.py:~1570). Determine:\n- Does CTAS ORDER BY produce sorted micro-partitions independent of clustering?\n- Does it conflict with Automatic Clustering?\n- Is there a benchmark scenario where CTAS sort is better than ALTER TABLE CLUSTER BY?\nExpected outcome: return None (clustering already covers this) with doc comment.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research Snowflake: does post-load CTAS ORDER BY add value beyond clustering keys?",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sort-cloud-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement AzureSynapseAdapter._build_ctas_sort_sql or document as unsupported",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sort-cloud-platforms",
+        "notes": "ClickHouse MergeTree ENGINE requires ORDER BY at CREATE TABLE time. There is no\npost-load CTAS that changes physical ordering. Override _build_ctas_sort_sql in\nClickHouseAdapter to return None with a doc comment. Create a follow-up note\n(or separate TODO) for ensuring the ORDER BY clause from TuningType.SORTING is\nincluded in ClickHouse CREATE TABLE DDL generation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document ClickHouse Cloud as intentionally unsupported via _build_ctas_sort_sql = None",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sort-cloud-platforms",
+        "notes": "BigQuery does not preserve row order. Override to return None with a comment directing\nusers to BigQuery clustering (CLUSTER BY) configuration which is separate from SORTING.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document BigQuery as intentionally unsupported via _build_ctas_sort_sql = None",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sort-cloud-platforms",
+        "notes": "Each platform test: mock connection, call apply_ctas_sort with a tuning_config\ncontaining sort columns, assert correct SQL generated or assert returns False with\nno SQL executed for unsupported platforms. Tests should not require live cloud credentials.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit tests: verify each cloud platform returns expected SQL or None",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sort-cloud-platforms",
+        "notes": "If research shows CTAS ORDER BY is beneficial: return\n  CREATE OR REPLACE TABLE {t} AS SELECT * FROM {t} ORDER BY col;\nIf clustering already covers it: return None with log_debug message directing users\nto the clustering key configuration instead.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement SnowflakeAdapter._build_ctas_sort_sql based on w1 research",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sort-cloud-platforms",
+        "notes": "Delta Lake physical ordering mechanisms:\n- OPTIMIZE t ZORDER BY col (multi-dimensional Z-order clustering)\n- OPTIMIZE t (liquid clustering if enabled)\n- CTAS ORDER BY (creates new unmanaged table, loses Delta metadata)\nConfirm that _build_ctas_sort_sql returning None is correct; document the right\npath for Databricks (likely a separate apply_post_load_optimize hook or extending\nthe existing Z_ORDERING TuningType support in apply_unified_tuning()).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research Databricks/Delta Lake post-load sort mechanisms (OPTIMIZE ZORDER BY vs CTAS)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sort-cloud-platforms",
+        "notes": "In DatabricksAdapter (or pyspark adapter), override _build_ctas_sort_sql to return None\nwith an explanatory comment. If the existing Z_ORDERING TuningType handling in\napply_unified_tuning() already covers physical sort, confirm and document the connection.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document Databricks unsupported CTAS sort; note correct Z-ordering path in code",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sort-cloud-platforms",
+        "notes": "Redshift options:\n- VACUUM SORT ONLY table_name - re-sorts in-place using the table's defined SORT KEY.\n  Requires SORT KEY to be defined in CREATE TABLE. No DROP/RENAME needed.\n- CTAS+DROP+RENAME - loses SORT KEY definition and distribution style.\nIf VACUUM SORT ONLY is viable: implement _build_ctas_sort_sql to return\n  \"VACUUM SORT ONLY {table_name};\" (unconventional use of the hook, but works).\nIf not viable: return None and document.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research Redshift: VACUUM SORT ONLY vs CTAS+DROP+RENAME for post-load sorting",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sort-cloud-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement RedshiftAdapter._build_ctas_sort_sql based on w5 research",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sort-cloud-platforms",
+        "notes": "Athena CTAS writes Parquet files to S3. Key question: does ORDER BY in Athena CTAS\nproduce single sorted Parquet files, or distributed unsorted output across multiple\nfiles? Row group-level min/max statistics in Parquet enable Athena's predicate pushdown\n(equivalent to DuckDB zone maps). If ORDER BY produces sorted row groups within files,\nthis is beneficial.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research Athena CTAS ORDER BY: does it produce zone-map-equivalent file sorting?",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sort-cloud-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement AthenaAdapter._build_ctas_sort_sql or document as unsupported",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sort-cloud-platforms",
+        "notes": "Synapse columnar store uses columnstore indexes for compression and pushdown - physical\nrow order within a distribution affects rowgroup quality. CTAS ORDER BY may improve\nrowgroup delta store promotion. Verify against Synapse docs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research Azure Synapse CTAS ORDER BY effectiveness with hash/round-robin distribution",
+        "wid": "w9"
+      }
+    ]
+  }
+}

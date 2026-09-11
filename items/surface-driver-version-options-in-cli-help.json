@@ -1,0 +1,126 @@
+{
+  "context": "All changes are in benchbox/cli/help.py (HELP_TOPICS dict) and the --platform-option\nhelp string in benchbox/cli/commands/run.py lines 485-493.\n\nFor help.py: the HELP_TOPICS dict is ordered - move the \"Driver & Version Management\"\nkey to appear before \"Dry Run (Preview)\" (currently line 265). Python dicts are\ninsertion-ordered since 3.7, so the rendered order follows dict order.\n\nFor the expanded example content, the new scenario to add:\n  \"# uv run syncs your env to uv.lock - use driver_auto_install to reliably switch:\"\n  \"benchbox run --platform duckdb --benchmark tpch \\\\\"\n  \"  --platform-option driver_version=1.5.0 \\\\\"\n  \"  --platform-option driver_auto_install=true\"\n  \"# Or override inline without modifying the lock file:\"\n  \"uv run --with \\\"duckdb==1.5.0\\\" benchbox run --platform duckdb --benchmark tpch\"\n",
+  "description": "The --platform-option driver_version=X and --platform-option driver_auto_install=true\nflags are the correct mechanism for testing a specific driver version in BenchBox. However,\nthey're buried in the help system and not visible from the default --help output.\n\nCurrent state:\n  - --help output (benchbox run --help) shows --platform-option with a one-liner:\n    \"Well-known keys: driver_version (pin Python driver package version, e.g. '1.2.0'),\n     driver_auto_install (auto-install driver via uv if missing, true/false)\"\n  - --help-topic all and --help-topic examples show a \"Driver & Version Management\"\n    section (help.py lines 289-302) but it's one of ~15 sections, easy to miss\n  - No help text explains the uv.lock / uv run interaction or why manually installing\n    a version via `uv pip install` may not be honored\n\nTarget state:\n  1. Move \"Driver & Version Management\" to appear near the top of --help-topic examples\n     output (currently it appears after Validation, Plan Capture, Compression, Dry Run)\n  2. Expand the section with a concrete example that addresses the \"I installed X but\n     got Y\" scenario - include a note that uv run syncs to uv.lock and why\n     --platform-option driver_version + driver_auto_install is the reliable path\n  3. Add a one-line note to the --platform-option help string (run.py lines 485-493)\n     pointing to `--help-topic examples` for the driver versioning pattern\n  4. Add `uv run --with \"duckdb==X\"` as an alternative in the Driver & Version Management\n     section for users who want a one-off override without modifying the lock file",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add behavioral logic to help.py",
+        "instead": "keep all changes to string content only",
+        "item_id": "surface-driver-version-options-in-cli-help",
+        "why": "it is a pure text/data file"
+      },
+      {
+        "dont": "mention internal implementation details (uv.lock internals, sys.modules) in user-facing help",
+        "instead": "describe the observable behavior instead",
+        "item_id": "surface-driver-version-options-in-cli-help",
+        "why": "it's jargon"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-02-23T00:00:00Z",
+      "created_at": "2026-02-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing --help-topic sections remain present (reorder only, no removals)",
+        "item_id": "surface-driver-version-options-in-cli-help"
+      },
+      {
+        "behavior": "benchbox run --help output format and all existing option descriptions remain unchanged",
+        "item_id": "surface-driver-version-options-in-cli-help"
+      },
+      {
+        "behavior": "help.py is not a code-logic file - no behavioral changes, only text content",
+        "item_id": "surface-driver-version-options-in-cli-help"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "surface-driver-version-options-in-cli-help",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "surface-driver-version-options-in-cli-help",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/help.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run benchbox run --help-topic examples 2>&1 | grep -n 'Driver & Version' | awk -F: '{print $1}' | head -1",
+        "description": "Driver & Version Management section appears near top of help-topic examples output",
+        "expected": "A line number less than or equal to 10 (section header within first 10 output lines)",
+        "item_id": "surface-driver-version-options-in-cli-help",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox run --help-topic examples 2>&1 | grep 'uv run --with'",
+        "description": "uv run --with example is present in the section",
+        "expected": "Line containing 'uv run --with \"duckdb=='",
+        "item_id": "surface-driver-version-options-in-cli-help",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox run --help-topic all 2>&1 | grep -c 'Validation\\|Compression\\|Dry Run\\|Plan Capture'",
+        "description": "No existing help sections were removed",
+        "expected": "4 (all sections still present)",
+        "item_id": "surface-driver-version-options-in-cli-help",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "surface-driver-version-options-in-cli-help",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "surface-driver-version-options-in-cli-help",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reorder sections in HELP_TOPICS in benchbox/cli/help.py so 'Driver & Version Management' appears early (immediately after basic usage examples)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "surface-driver-version-options-in-cli-help",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Expand the Driver & Version Management section with: (a) uv run --with example, (b) note explaining uv.lock revert behavior and why driver_auto_install is the reliable path",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "surface-driver-version-options-in-cli-help",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Improve --platform-option help string in commands/run.py (lines 485-493) to reference --help-topic examples for the full driver versioning pattern",
+        "wid": "w3"
+      }
+    ]
+  }
+}

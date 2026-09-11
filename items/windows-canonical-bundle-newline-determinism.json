@@ -1,0 +1,58 @@
+{
+  "context": "Write canonical JSON as UTF-8 bytes or disable translation explicitly at the boundary; preserve deterministic byte identity across local and cloud outputs.",
+  "description": "Run 30434746317 shows canonical bundle export writing CRLF bytes on Windows while canonical_json_bytes defines LF output. The primary artifact is written through a text path that applies platform newline translation, so it differs from companion bytes.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-29T13:05:15Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "canonical formatting, trailing newline, anonymization, and cloud/local parity remain unchanged",
+        "item_id": "windows-canonical-bundle-newline-determinism"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-canonical-bundle-newline-determinism",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/canonical_json.py"
+      },
+      {
+        "item_id": "windows-canonical-bundle-newline-determinism",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "windows-canonical-bundle-newline-determinism",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_results_exporter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/test_results_exporter.py -q",
+        "description": "Canonical exporter tests pass",
+        "expected": "exit 0",
+        "item_id": "windows-canonical-bundle-newline-determinism",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-canonical-bundle-newline-determinism",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make canonical primary and companion JSON byte-for-byte platform independent",
+        "wid": "w1"
+      }
+    ]
+  }
+}

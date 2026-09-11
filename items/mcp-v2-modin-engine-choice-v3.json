@@ -1,0 +1,240 @@
+{
+  "context": "Reproduce the current schema-to-adapter behavior, align choices with the authoritative adapter/CLI contract, add negative and effective-backend tests, and update docs and the option matrix without starting Ray/Dask services.",
+  "description": "Adversarial review found that the MCP schema accepts engine=\\\"pandas\\\", while the Modin adapter and CLI registry support ray or dask. An accepted pandas value can therefore fail late or be interpreted inconsistently. Revalidate the installed Modin/backend contract and make the MCP schema reject unsupported engines or implement a deliberate backend with complete lifecycle and resource semantics; do not silently accept an invalid engine.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not broaden the MCP option to every backend accepted by an installed dependency",
+        "instead": "Allow only the reviewed ray/dask set",
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "why": "Backend support also requires resource, lifecycle, and security review"
+      },
+      {
+        "dont": "Do not keep pandas in the allowlist merely because it resembles a valid Modin engine name",
+        "instead": "Reject pandas or implement it completely with an explicit backend contract",
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "why": "An accepted but unsupported value fails late and creates an unreliable public contract"
+      },
+      {
+        "dont": "Do not use a mocked forwarded kwargs assertion as proof",
+        "instead": "Assert the effective backend selected by the adapter",
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "why": "Forwarding can succeed while the effective backend remains unchanged"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "needs_item": "mcp-v2-platform-option-contract-matrix-v3"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-04T12:10:32Z",
+      "completed_pr": 1515,
+      "created_at": "2026-08-02T20:24:43Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI-supported ray and dask behavior and existing Modin defaults remain compatible.",
+        "item_id": "mcp-v2-modin-engine-choice-v3"
+      },
+      {
+        "behavior": "No arbitrary package, driver, or backend installation control is added to MCP.",
+        "item_id": "mcp-v2-modin-engine-choice-v3"
+      },
+      {
+        "behavior": "Validation tests do not initialize a real Ray or Dask cluster.",
+        "item_id": "mcp-v2-modin-engine-choice-v3"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "CLI registry exposes ray and dask choices",
+        "decision": "extend",
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "path": "benchbox/cli"
+      },
+      {
+        "concept": "engine allowlist accepts pandas",
+        "decision": "supersede",
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "path": "benchbox/mcp/schemas.py"
+      },
+      {
+        "concept": "adapter supports ray and dask",
+        "decision": "extend",
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "path": "benchbox/platforms/dataframe/modin_df.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/security.py"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/dask_df.py"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "do_not_modify",
+        "path_glob": "docs/operations/mcp-production-readiness.md"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/modin_df.py"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/**"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_schemas.py tests/unit/platforms -q",
+        "description": "Unsupported pandas is rejected on the unfixed tree regression",
+        "expected": "exits 1 on the unfixed tree when pandas is asserted invalid; exits 0 after supported-engine validation is enforced",
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:09:04Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp tests/integration/mcp -q",
+        "description": "Durable and tool paths preserve effective engine selection",
+        "expected": "exits 1 on the unfixed tree if replay loses or changes the backend; exits 0 after focused coverage passes",
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:09:13Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/mcp benchbox/platforms/dataframe/modin_df.py tests/unit/mcp tests/unit/platforms tests/integration/mcp",
+        "description": "Scoped Modin and MCP checks are clean",
+        "expected": "exits 1 on the unfixed tree if the patch has lint defects; exits 0 after scoped checks pass",
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:09:15Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Schema half already closed by PR #1486, which narrowed modin engine choices from ('pandas','ray','dask') to ('ray','dask'); validate_platform_options('modin',{'engine':'pandas'}) already raises. NOT re-implemented. Remaining defect: ModinDataFrameAdapter.__init__ (modin_df.py:155-201) accepts any engine string with no validation -- self.engine = engine, then _configure_engine() does os.environ.setdefault('MODIN_ENGINE', self.engine), so 'pandas' or any typo is written straight into Modin's environment and fails late or silently mis-executes. Authoritative supported set confirmed as ray/dask from three independent sources: the MCP allowlist choices, _apply_tuning's engine_affinity filter (modin_df.py:214 accepts only ('ray','dask')), and the ImportError install hint naming modin[ray]/modin[dask].",
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "notes": null,
+        "started_at": "2026-08-04T12:05:03Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Reproduce invalid pandas behavior and confirm the authoritative supported backend set.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "w1: SUPPORTED_MODIN_ENGINES=frozenset({'ray','dask'}) + ModinDataFrameAdapter._validate_engine() called from __init__ BEFORE _configure_engine writes MODIN_ENGINE; _apply_tuning's engine_affinity filter now reads the same constant so the two allow-lists cannot drift. w2: tests/unit/platforms/dataframe/test_modin_df_coverage.py TestSupportedEngineIsFailClosed (pandas rejected by name, 5 unreviewed backends rejected, 4 accepted/normalized cases, adapter-vs-MCP-allowlist parity, constructor rejects before MODIN_ENGINE is set, engine_affinity shares the constant) plus tests/unit/mcp/test_benchmark_tools.py effective-backend test (adapter.engine=='dask', not a forwarded-kwargs assertion) and run-surface fail-closed test. Negative control: reverting only modin_df.py fails 13. w3: docs/reference/mcp.md records the reviewed ray/dask set and why pandas is rejected. Ladder rung1 8219 passed, rung2 684 passed, rung3 ruff clean. No Ray or Dask cluster is initialized by any test (_configure_engine patched).",
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "notes": null,
+        "started_at": "2026-08-04T12:09:31Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Make schema and factory validation fail closed for unsupported engines",
+        "wid": "w1"
+      },
+      {
+        "evidence": "w1: SUPPORTED_MODIN_ENGINES=frozenset({'ray','dask'}) + ModinDataFrameAdapter._validate_engine() called from __init__ BEFORE _configure_engine writes MODIN_ENGINE; _apply_tuning's engine_affinity filter now reads the same constant so the two allow-lists cannot drift. w2: tests/unit/platforms/dataframe/test_modin_df_coverage.py TestSupportedEngineIsFailClosed (pandas rejected by name, 5 unreviewed backends rejected, 4 accepted/normalized cases, adapter-vs-MCP-allowlist parity, constructor rejects before MODIN_ENGINE is set, engine_affinity shares the constant) plus tests/unit/mcp/test_benchmark_tools.py effective-backend test (adapter.engine=='dask', not a forwarded-kwargs assertion) and run-surface fail-closed test. Negative control: reverting only modin_df.py fails 13. w3: docs/reference/mcp.md records the reviewed ray/dask set and why pandas is rejected. Ladder rung1 8219 passed, rung2 684 passed, rung3 ruff clean. No Ray or Dask cluster is initialized by any test (_configure_engine patched).",
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "notes": null,
+        "started_at": "2026-08-04T12:09:36Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add effective-backend, invalid-value, alias, and durable replay tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": "w1: SUPPORTED_MODIN_ENGINES=frozenset({'ray','dask'}) + ModinDataFrameAdapter._validate_engine() called from __init__ BEFORE _configure_engine writes MODIN_ENGINE; _apply_tuning's engine_affinity filter now reads the same constant so the two allow-lists cannot drift. w2: tests/unit/platforms/dataframe/test_modin_df_coverage.py TestSupportedEngineIsFailClosed (pandas rejected by name, 5 unreviewed backends rejected, 4 accepted/normalized cases, adapter-vs-MCP-allowlist parity, constructor rejects before MODIN_ENGINE is set, engine_affinity shares the constant) plus tests/unit/mcp/test_benchmark_tools.py effective-backend test (adapter.engine=='dask', not a forwarded-kwargs assertion) and run-surface fail-closed test. Negative control: reverting only modin_df.py fails 13. w3: docs/reference/mcp.md records the reviewed ray/dask set and why pandas is rejected. Ladder rung1 8219 passed, rung2 684 passed, rung3 ruff clean. No Ray or Dask cluster is initialized by any test (_configure_engine patched).",
+        "item_id": "mcp-v2-modin-engine-choice-v3",
+        "notes": null,
+        "started_at": "2026-08-04T12:09:41Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run focused checks and reconcile docs and option matrix",
+        "wid": "w3"
+      }
+    ]
+  }
+}

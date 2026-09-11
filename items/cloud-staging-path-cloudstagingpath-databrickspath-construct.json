@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #355 of benchmark-output-root-resolve-at-construction-boundary.\nDeferred: Cloud staging path (CloudStagingPath/DatabricksPath) construction-time injection edge cases\nReason deferred: Cloud roots resolve later via credentials in _apply_default_cloud_output_dir; needs its own analysis once the local-path boundary is settled.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:44Z",
+      "worktree": "main"
+    }
+  }
+}

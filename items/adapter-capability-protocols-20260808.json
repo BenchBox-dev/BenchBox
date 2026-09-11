@@ -1,0 +1,279 @@
+{
+  "context": "Before defining protocols, compare at least four materially different implementations: a conventional SQL adapter, a dataframe/expression-family adapter, h2odb benchmark execution, and read_primitives execution, plus cloud lifecycle behavior where relevant. Build a capability matrix and classify semantic sameness versus genuinely different operations. Type consumers against the smallest capability they need. Preserve compatibility methods and registration; reduce type suppressions only when the underlying mismatch is removed.",
+  "description": "PlatformAdapter currently aggregates ten mixins while benchmark implementations expose incompatible run_benchmark and execute_query signatures that are suppressed as intentional LSP violations. Define narrow capability protocols based on real consumer needs while preserving the repository-required PlatformAdapter facade and @register_platform contract. This extends rather than repeats the completed physical adapter-base modularization and unified-interface work.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Create one protocol with every optional adapter method.",
+        "instead": "Define narrow consumer-driven protocols.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "why": "That reproduces the god-interface and hides real capabilities."
+      },
+      {
+        "dont": "Expand global type exclusions after migration.",
+        "instead": "Use strict islands and reduce suppressions as contracts become valid.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "why": "That would silence rather than repair substitutability defects."
+      },
+      {
+        "dont": "Rename specialized operations merely to make signatures look uniform.",
+        "instead": "Model genuinely different capabilities separately.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "why": "Syntactic uniformity can conceal semantic incompatibility."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "needs_item": "canonical-query-execution-result-contract-20260808"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "needs_item": "refactor-to-derive-cli-command-from-resolved-config-objects"
+      }
+    ],
+    "item_meta": {
+      "category": "Adapter Architecture and Typing",
+      "completed_at": "2026-08-08T23:59:40Z",
+      "created_at": "2026-08-08T19:51:32Z",
+      "worktree": "adapter-architecture"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing third-party adapter subclasses retain a compatibility path.",
+        "item_id": "adapter-capability-protocols-20260808"
+      },
+      {
+        "behavior": "New SQL platforms still subclass PlatformAdapter and register with @register_platform.",
+        "item_id": "adapter-capability-protocols-20260808"
+      },
+      {
+        "behavior": "Platform SDK imports remain lazy and registry discovery remains import-safe.",
+        "item_id": "adapter-capability-protocols-20260808"
+      },
+      {
+        "behavior": "Specialized benchmark operations are not forced into semantically false uniform signatures.",
+        "item_id": "adapter-capability-protocols-20260808"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Cohesive base modules produced by the completed adapter-base refactor.",
+        "decision": "extend",
+        "item_id": "adapter-capability-protocols-20260808",
+        "path": "benchbox/platforms/base/"
+      },
+      {
+        "concept": "Completed physical modularization with facade preservation.",
+        "decision": "extend",
+        "item_id": "adapter-capability-protocols-20260808",
+        "path": "quality-refactor-adapter-base-into-cohesive-modules"
+      },
+      {
+        "concept": "Completed SQL and dataframe interface unification attempt.",
+        "decision": "supersede",
+        "item_id": "adapter-capability-protocols-20260808",
+        "path": "unified-adapter-interface"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/benchmarks/"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_base_advanced.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base tests/unit/platforms/test_base_adapter.py tests/unit/platforms/dataframe/test_pandas_family_adapters.py -q",
+        "description": "Base and contrasting adapter tests pass",
+        "expected": "Selected adapter contract tests pass serially.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T23:58:49Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_platform_registry.py tests/unit/core/test_platform_registry_behavioral.py -q",
+        "description": "Platform registry still enumerates adapters lazily",
+        "expected": "Registry tests pass without eager SDK imports.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T23:58:53Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ty check benchbox/platforms/base benchbox/base.py",
+        "description": "Capability strict island passes type checking",
+        "expected": "Migrated capability modules report no type errors.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T23:58:55Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ty check benchbox/platforms/base benchbox/base.py",
+        "description": "Capability contract rejects an incompatible consumer signature",
+        "expected": "This command exits nonzero when an invalid migrated override or capability use is reintroduced and exits zero for valid protocols.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T23:59:09Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ty check benchbox/platforms/base benchbox/base.py",
+        "description": "Invalid-capability negative control",
+        "expected": "Exits 1 on an unfixed tree after reintroducing an incompatible migrated capability signature; exits 0 after restoring the protocol.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T23:59:11Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "adapter-capability-protocols-20260808",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Capability matrix documented in benchbox/core/contracts/platform_capabilities.py across DuckDB, Pandas, ReadPrimitives, and Databricks; lifecycle/loading/tuning/metrics/capture classified.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T23:58:08Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Build a four-or-more implementation capability and signature matrix for execution lifecycle loading tuning metrics and result capture.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Narrow consumer boundaries and rejected omnibus/renaming/nominal alternatives documented in platform_capabilities.py; Base/H2O intentionally remain distinct and unmodeled without a real consumer.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T23:58:13Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Classify shared semantics versus coincidentally similar method names and record protocol boundaries and rejected alternatives.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Structural protocols and guarded compatibility views implemented in platform_capabilities.py and platform_capability_views.py; runtime signature claims avoided, callable/data members validated, facade/registry untouched.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T23:58:18Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Define narrow static protocols and compatibility adapters without changing registry or lazy-import behavior.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Migrated SQL runner, DataFrame runner/query runtime, ReadPrimitives categorized direct-run seam, cloud plan-capture seam, and independent loading/statistics/tuning capabilities.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T23:58:23Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Migrate one SQL one dataframe one specialized benchmark and one cloud consumer slice.",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Strict capability ty island passes with warnings promoted to errors; real temporary incompatible DataFrame signature produced invalid-argument-type exit 1, then passed after restoration; removed two obsolete suppressions and added none.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T23:58:29Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Establish strict type-check islands and remove only suppressions made obsolete by migrated capability contracts.",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Third-party structural SQL/DataFrame, minimal supplied-connection plan capture, missing factory, non-callable operation, lazy registry, and BaseBenchmark compatibility regressions pass; facade extension rules documented in contract module.",
+        "item_id": "adapter-capability-protocols-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T23:58:34Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Verify third-party subclass compatibility and document the facade and protocol extension rules.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

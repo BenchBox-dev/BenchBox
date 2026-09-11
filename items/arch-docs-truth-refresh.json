@@ -1,0 +1,304 @@
+{
+  "context": "One PR, docs and fixtures only. Quote the live file:line you are correcting in the PR body. Do not change runtime behavior.",
+  "description": "Doc-only truth refresh at origin/develop 29380ce9e. Later agents must not plan from false claims.\n\nMUST edit (live text is wrong):\n1. docs/development/adapter-refactor-map.md:6 — facade is 1,291 lines, not ~600; list remaining fat modules (data_loading, result_capture, execution).\n2. docs/development/run-lifecycle-map.md — Canonical Runtime Today (:13-16), canonical path (:47), and post-refactor step 3 (:58) still omit execute_run. Mentions at :43 and :75 are footnotes. Insert CLI: orchestrator -> execute_run -> run_benchmark_lifecycle. Record MCP sync+durable adoption via _execute_mcp_run_via_core (benchmark.py:483, jobs.py:670).\n3. docs/development/duplication-residuals.md R-03 — LakeSail DF is a 156-line PySparkDataFrameAdapter subclass, not a 632-line fork.\n4. docs/concepts/architecture.md — replace Template Method-as-execution-model with lifecycle; distinguish QueryResult (schemas) vs QueryExecution/BenchmarkResults; keep BaseBenchmark as the public wrapper base (it is not retired).\n5. quality/complexity/classification-matrix.yaml — banner: historical, non-gating; authority is make complexity-check.\n6. docs/development/new-platform-acceptance-checklist.md:22-23 — do not say symbols are retired. _OPTIONAL_ADAPTERS and _build_platform_metadata are live pass-throughs (platform_registry.py:1075, :219). Rewrite to: register in platform_manifest.py, then registry projects from the manifest.\n7. docs/design/future-state/index.md — the 'evidence of need' sentence is unbacked by the proposal READMEs. Qualify it or point at arch-tier-commitment-decision / arch-future-state-index-reconciliation.\n8. docs/reference/mcp.md omission ledger — add the seven unledgered benchbox run flags (not MCP implementations): --show-plans, --normalize-plan-literals, --stats-per-table-timing, --strict-translation, --ignore-memory-warnings, --funding, --result-source. Tag each with one ratified tier.\n\nLink baseline: docs/concepts/architecture.md -> ../reference/result_schema_v1.md and docs/development/duplication-residuals.md -> ./duplication-inventory.csv are in scripts/doc_relative_link_baseline.txt. Repairing or touching those links requires check_doc_relative_links.py --update-baseline in the same commit.\n\nDO NOT edit docs/design/architecture.md count sentence 'currently N benchmarks' without updating tests/unit/core/test_benchmark_api_contract.py (pinned at line 381). Prefer not touching that file.\n\nVerification is make docs-validate and the relative-link checker, NOT make platform-manifest-check (that guards adding-new-platforms.md only).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "claim _OPTIONAL_ADAPTERS or _build_platform_metadata are deleted",
+        "instead": "tell authors to edit platform_manifest.py",
+        "item_id": "arch-docs-truth-refresh",
+        "why": "both are live pass-throughs"
+      },
+      {
+        "dont": "promote the seven CLI flags into MCP tools",
+        "instead": "add ledger rows with a ratified tier",
+        "item_id": "arch-docs-truth-refresh",
+        "why": "this is ledger work, not option parity"
+      },
+      {
+        "dont": "rewrite docs/design/architecture.md counts casually",
+        "instead": "leave that file alone unless the contract test is updated in the same PR",
+        "item_id": "arch-docs-truth-refresh",
+        "why": "test_benchmark_api_contract.py pins the literal"
+      },
+      {
+        "dont": "treat execute_run footnotes at run-lifecycle-map.md:43 and :75 as sufficient",
+        "instead": "edit :13-16, :47, and :58",
+        "item_id": "arch-docs-truth-refresh",
+        "why": "canonical path lists still omit it"
+      },
+      {
+        "dont": "use make platform-manifest-check as the proof",
+        "instead": "run make docs-validate and the relative-link checker",
+        "item_id": "arch-docs-truth-refresh",
+        "why": "it only guards adding-new-platforms.md"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-08-14T02:02:35Z",
+      "completed_pr": 1727,
+      "created_at": "2026-08-14T01:17:56Z",
+      "worktree": "arch-simplification"
+    },
+    "preserves": [
+      {
+        "behavior": "MCP omission ledger still uses only the three ratified tiers",
+        "item_id": "arch-docs-truth-refresh"
+      },
+      {
+        "behavior": "No runtime, CLI, or MCP tool behavior changes",
+        "item_id": "arch-docs-truth-refresh"
+      },
+      {
+        "behavior": "docs/design/architecture.md public-benchmark count claim remains registry-derived",
+        "item_id": "arch-docs-truth-refresh"
+      },
+      {
+        "behavior": "platform_manifest.py remains the static platform authority",
+        "item_id": "arch-docs-truth-refresh"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "ledgered CLI/MCP asymmetry",
+        "decision": "reuse",
+        "item_id": "arch-docs-truth-refresh",
+        "path": "docs/development/adr/adr-one-engine-scoped-surfaces.md"
+      },
+      {
+        "concept": "classification-matrix is historical",
+        "decision": "reuse",
+        "item_id": "arch-docs-truth-refresh",
+        "path": "docs/development/quality-gate-policy.md"
+      },
+      {
+        "concept": "canonical run path documentation",
+        "decision": "extend",
+        "item_id": "arch-docs-truth-refresh",
+        "path": "docs/development/run-lifecycle-map.md"
+      },
+      {
+        "concept": "baselined broken relative links",
+        "decision": "extend",
+        "item_id": "arch-docs-truth-refresh",
+        "path": "scripts/check_doc_relative_links.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "kind": "do_not_modify",
+        "path_glob": "docs/design/architecture.md"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "kind": "only_modify",
+        "path_glob": "docs/concepts/architecture.md"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/index.md"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adapter-refactor-map.md"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "kind": "only_modify",
+        "path_glob": "docs/development/duplication-residuals.md"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "kind": "only_modify",
+        "path_glob": "docs/development/new-platform-acceptance-checklist.md"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "kind": "only_modify",
+        "path_glob": "docs/development/run-lifecycle-map.md"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "kind": "only_modify",
+        "path_glob": "quality/complexity/classification-matrix.yaml"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "kind": "only_modify",
+        "path_glob": "scripts/doc_relative_link_baseline.txt"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_run_surface_contract.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make docs-validate",
+        "description": "Documentation validation",
+        "expected": "PASS",
+        "item_id": "arch-docs-truth-refresh",
+        "last_result": "pass",
+        "last_run": "2026-08-14T02:02:18Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/check_doc_relative_links.py",
+        "description": "Relative-link checker (update baseline only if those two docs changed)",
+        "expected": "no new broken links; baseline update only for intended repairs",
+        "item_id": "arch-docs-truth-refresh",
+        "last_result": "pass",
+        "last_run": "2026-08-14T02:02:20Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_run_surface_contract.py -q",
+        "description": "MCP ledger contract still holds",
+        "expected": "PASS; every omission has one ratified tier",
+        "item_id": "arch-docs-truth-refresh",
+        "last_result": "pass",
+        "last_run": "2026-08-14T02:02:27Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_benchmark_api_contract.py -q -k public_benchmark_count",
+        "description": "Public benchmark count claims still match the registry",
+        "expected": "PASS",
+        "item_id": "arch-docs-truth-refresh",
+        "last_result": "pass",
+        "last_run": "2026-08-14T02:02:32Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "arch-docs-truth-refresh",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated current origin/develop: cli/orchestrator.py:288 and core/run_service.py:302 are the CLI execute_run path; MCP benchmark.py:483 and mcp/jobs.py:670 converge on it; platform_manifest.py is the registry authority; seven CLI flags are present in run.py.",
+        "item_id": "arch-docs-truth-refresh",
+        "notes": null,
+        "started_at": "2026-08-14T01:48:44Z",
+        "started_branch": "docs/arch-docs-truth-refresh",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-docs-truth-refresh",
+        "status": "done",
+        "summary": "Re-validate cited lifecycle-map, checklist, and MCP line numbers on current origin/develop.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Updated docs/development/adapter-refactor-map.md to the current 1,291-line facade and recorded remaining data_loading.py (3,169), result_capture.py (2,015), and execution.py (1,618) module sizes.",
+        "item_id": "arch-docs-truth-refresh",
+        "notes": null,
+        "started_at": "2026-08-14T01:48:50Z",
+        "started_branch": "docs/arch-docs-truth-refresh",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-docs-truth-refresh",
+        "status": "done",
+        "summary": "Correct adapter-refactor-map facade size and remaining fat-module list.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Updated docs/development/run-lifecycle-map.md so CLI, sync MCP, and durable MCP paths name execute_run before run_benchmark_lifecycle, with current source references.",
+        "item_id": "arch-docs-truth-refresh",
+        "notes": null,
+        "started_at": "2026-08-14T01:55:52Z",
+        "started_branch": "docs/arch-docs-truth-refresh",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-docs-truth-refresh",
+        "status": "done",
+        "summary": "Put execute_run and MCP adoption on the canonical lifecycle path lists.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Corrected docs/development/duplication-residuals.md to describe LakeSailDataFrameAdapter as an approximately 156-line PySpark subclass and docs/concepts/architecture.md to separate the public BaseBenchmark wrapper from the core benchmark lifecycle and QueryExecution model.",
+        "item_id": "arch-docs-truth-refresh",
+        "notes": null,
+        "started_at": "2026-08-14T01:56:15Z",
+        "started_branch": "docs/arch-docs-truth-refresh",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-docs-truth-refresh",
+        "status": "done",
+        "summary": "Mark LakeSail DF residual as thin subclass; fix concepts lifecycle vs Template Method.",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Marked quality/complexity/classification-matrix.yaml as historical/non-gating and changed docs/development/new-platform-acceptance-checklist.md to use platform_manifest.py as canonical registration authority.",
+        "item_id": "arch-docs-truth-refresh",
+        "notes": null,
+        "started_at": "2026-08-14T01:56:25Z",
+        "started_branch": "docs/arch-docs-truth-refresh",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-docs-truth-refresh",
+        "status": "done",
+        "summary": "Banner the historical complexity matrix; rewrite checklist to manifest-first.",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Qualified docs/design/future-state/index.md priority labels as provisional and ledgered show-plans, normalize-plan-literals, stats-per-table-timing, strict-translation, ignore-memory-warnings, funding, and result-source in docs/reference/mcp.md plus the contract fixture with ratified tiers.",
+        "item_id": "arch-docs-truth-refresh",
+        "notes": null,
+        "started_at": "2026-08-14T01:56:36Z",
+        "started_branch": "docs/arch-docs-truth-refresh",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-docs-truth-refresh",
+        "status": "done",
+        "summary": "Qualify future-state 'evidence of need'; ledger seven MCP omissions with tiers.",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Checked the two baselined relative links; the edited documents retain their existing relative targets, so scripts/doc_relative_link_baseline.txt requires no change.",
+        "item_id": "arch-docs-truth-refresh",
+        "notes": null,
+        "started_at": "2026-08-14T01:56:47Z",
+        "started_branch": "docs/arch-docs-truth-refresh",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-docs-truth-refresh",
+        "status": "done",
+        "summary": "Update relative-link baseline only if the two baselined docs change.",
+        "wid": "w6"
+      }
+    ]
+  }
+}

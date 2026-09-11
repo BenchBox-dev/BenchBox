@@ -1,0 +1,126 @@
+{
+  "description": "CI run 25017675976 (push to `main`, 2026-04-27) saw the Chromium\nblocking job fail twice (initial + retry) on\n`e2e/routes/result-detail.spec.ts:27 - sorting the median table toggles\nthe indicator arrow`. The retry timed out at 60s waiting for\n`getByRole('columnheader', { name: /Median \\(ms\\)/ })` to be clickable\nbefore the click could fire.\n\nTwo failing tests in this run:\n  - e2e/routes/result-detail.spec.ts:27:3 - sort indicator\n  - e2e/failures/compare-hard-block.spec.ts:26:3 - mixing scale factors\n\nThis is the **blocking** Chromium suite, not the advisory Firefox/\nWebKit smoke jobs. A failure here gates the\n`graduate-browser-smoke-to-blocking-gates` TODO (which needs 10\nconsecutive green runs) and any release flow that requires green\nCI on `main`.\n\nSurfaced during the 2026-04-27 results-explorer-TODOs sweep.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a fixed-duration sleep",
+        "instead": "use a deterministic readiness signal instead.",
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "why": "flakes return at higher load"
+      },
+      {
+        "dont": "increase the test timeout to mask the issue",
+        "instead": "(not specified)",
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "why": "that hides the underlying race."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-04-27T00:00:00Z",
+      "created_at": "2026-04-27T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Chromium blocking gate behavior. Do not flip the test to .skip; that defeats the purpose.",
+        "item_id": "fix-chromium-result-detail-sort-flake"
+      },
+      {
+        "behavior": "The existing fixtures.waitForDataLoaded contract.",
+        "item_id": "fix-chromium-result-detail-sort-flake"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/playwright.config.ts"
+      },
+      {
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/failures/compare-hard-block.spec.ts"
+      },
+      {
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/result-detail.spec.ts"
+      },
+      {
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/support/fixtures.ts"
+      },
+      {
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/routes/ResultDetail.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && for i in 1 2 3 4 5 6 7 8 9 10; do npx playwright test --project=chromium --grep 'sorting the median table' || break; done",
+        "description": "The failing test passes 10 consecutive runs locally",
+        "expected": "no early break",
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "notes": "Run `cd results-explorer && npm run test:e2e:chromium -- --grep\n\"sorting the median table\"` in a loop (10x). Capture which retries\npass and which time out. If it does not reproduce locally, run\nunder load (`--workers=4` against the same fixture) since the CI\nrunner is more contended than a workstation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce locally and capture the flake signal",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "notes": "Two hypotheses:\n(a) The `getByRole('columnheader')` matches before DuckDB has\n    populated the table, so the click lands on a stale element\n    that does not have the sort handler attached yet.\n(b) The locator is correct but the click handler races a re-render\n    triggered by snapshot reload.\nDistinguish by replacing `await header.click()` with\n`await header.click({ trial: true })` and inspecting the locator\nstate at that point. Trial click does not actuate the handler.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Determine whether the locator or the data load is the cause",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-chromium-result-detail-sort-flake",
+        "notes": "Likely fix: gate the click on a stable readiness signal. Either a\n`data-loaded=\"true\"` attribute on the table, or\n`await page.waitForFunction(() => /* DuckDB attach complete */)`.\nThe fixtures.waitForDataLoaded helper already does the latter for\na different selector - extend it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Land a focused fix; add a deterministic data-load gate",
+        "wid": "w3"
+      }
+    ]
+  }
+}

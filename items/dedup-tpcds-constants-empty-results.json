@@ -1,0 +1,103 @@
+{
+  "context": "1. Create or add to `benchbox/core/tpcds/constants.py`:\n   `TPCDS_TABLE_NAMES: list[str] = [\"call_center\", \"catalog_page\", ...]`\n2. Replace the 3 copies with imports from constants module\n3. For _empty_results, determine the canonical location (likely tpc_patterns.py)\n   and have base.py import from there\n",
+  "description": "Group 15 from the duplicate-check report identifies two consolidation targets:\n\n1. TPC-DS canonical table names (~24-element list): duplicated identically in\n   - benchbox/core/tpcds/c_tools.py:136\n   - benchbox/core/tpcds/generator/manager.py:178\n   - benchbox/core/tpcds/benchmark/runner.py:404\n   This is a TPC-DS specification constant that should be defined once.\n\n2. _empty_results (zero-valued results dict): duplicated between\n   benchbox/core/tpc_patterns.py:559 and benchbox/base.py:178.\n   This is a shared result schema for stream/throughput result builders.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-22T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Table name list includes all 24 TPC-DS tables",
+        "item_id": "dedup-tpcds-constants-empty-results"
+      },
+      {
+        "behavior": "generator/manager.py copy includes 'dbgen_version' (25th entry) - handle separately",
+        "item_id": "dedup-tpcds-constants-empty-results"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dedup-tpcds-constants-empty-results",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "dedup-tpcds-constants-empty-results",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpc_patterns.py"
+      },
+      {
+        "item_id": "dedup-tpcds-constants-empty-results",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "dedup-tpcds-constants-empty-results",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k tpcds",
+        "description": "TPC-DS tests pass",
+        "expected": "all tests pass",
+        "item_id": "dedup-tpcds-constants-empty-results",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dedup-tpcds-constants-empty-results",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dedup-tpcds-constants-empty-results",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dedup-tpcds-constants-empty-results",
+        "notes": "constants.py already had TPCDS_TABLE_NAMES; c_tools.py and generator/manager.py\nalready imported it.  Replaced 3 hardcoded lists in runner.py (get_available_tables,\nget_table_loading_order, load method).  Added TPCDS_TABLE_LOADING_ORDER constant\nfor the two identical dependency-ordered lists.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create TPCDS_TABLE_NAMES constant and replace 3 copies",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-tpcds-constants-empty-results",
+        "notes": "_empty_results only exists in tpc_patterns.py (no duplicate in base.py).\nNo consolidation needed; the reported duplication does not exist in the\ncurrent codebase.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consolidate _empty_results to single canonical location",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-tpcds-constants-empty-results",
+        "notes": "538 passed in 141s",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run TPC-DS tests",
+        "wid": "w3"
+      }
+    ]
+  }
+}

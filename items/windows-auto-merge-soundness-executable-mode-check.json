@@ -1,0 +1,48 @@
+{
+  "context": "Assert the committed Git index mode (the workflow-relevant contract) instead of host filesystem stat mode.",
+  "description": "Run 30434746317 fails the executable-bit assertion because Windows stat does not expose the POSIX executable bit even though Git records _project/scripts/auto_merge_soundness_paths.py as mode 100755.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-29T13:05:10Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "the test still fails if the script is committed without executable mode",
+        "item_id": "windows-auto-merge-soundness-executable-mode-check"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-auto-merge-soundness-executable-mode-check",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_auto_merge_soundness_paths.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/test_auto_merge_soundness_paths.py -q",
+        "description": "Soundness-path tests pass and mutation to index mode is detectable",
+        "expected": "exit 0",
+        "item_id": "windows-auto-merge-soundness-executable-mode-check",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-auto-merge-soundness-executable-mode-check",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace the host-mode assertion with a Git-index executable-mode assertion",
+        "wid": "w1"
+      }
+    ]
+  }
+}

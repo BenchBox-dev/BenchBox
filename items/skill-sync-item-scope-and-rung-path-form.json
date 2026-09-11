@@ -1,0 +1,99 @@
+{
+  "context": "Add a lint rule for absolute-path only_modify/do_not_modify globs; either normalize them to repo-relative at check-scope time or reject at create time. Extend the existing unsatisfiable-rung lint to flag tests applied to string literals.",
+  "description": "skill-sync-untracked-config-provenance shipped with two unsatisfiable guardrails. (1) scope only_modify='/Users/joe/.skill-sync/**' is absolute, but check-scope matches 'git diff --name-only', which emits repo-relative paths; proven that even skills/code/SKILL.md reports 'outside only_modify allowlist', so no file can pass. (2) verification rung 1 was sh -c 'test -z \"?? skills/skill-sync.config.yaml\"', applying test -z to a non-empty literal, so it always exits 1 regardless of repo state - the class PR #1322 added lint for. Both fields are create-time-only, so the original id could not be repaired. Fix forward: teach todo lint to reject absolute-path scope globs for repos whose diffs are relative (or normalize absolute globs against the repo root at check-scope time), and extend the #1322 rung lint to catch constant-truth/constant-false shell tests.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-13T15:40:00Z",
+      "completed_pr": 8,
+      "created_at": "2026-07-29T12:17:34Z",
+      "worktree": "skill-sync-canonical"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing scope semantics for correctly-authored relative globs",
+        "item_id": "skill-sync-item-scope-and-rung-path-form"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "skill-sync-item-scope-and-rung-path-form",
+        "kind": "only_modify",
+        "path_glob": "src/todo_db/tracker.py"
+      },
+      {
+        "item_id": "skill-sync-item-scope-and-rung-path-form",
+        "kind": "only_modify",
+        "path_glob": "tests/test_tracker.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/test_tracker.py -q",
+        "description": "Focused canonical tracker tests",
+        "expected": "passed",
+        "item_id": "skill-sync-item-scope-and-rung-path-form",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:39:55Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check src/todo_db/tracker.py tests/test_tracker.py",
+        "description": "Canonical lint implementation remains formatted and clean",
+        "expected": "All checks passed",
+        "item_id": "skill-sync-item-scope-and-rung-path-form",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:39:57Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "skill-sync-item-scope-and-rung-path-form",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "skill-sync-item-scope-and-rung-path-form",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Absolute POSIX, Windows, and tilde scope globs are non-portable because changed paths are repository-relative. Constant test lint is limited to test/[ with unary -z/-n and a statically quoted or safe bare operand; variables, command substitutions, globs, and other test operators are excluded.",
+        "item_id": "skill-sync-item-scope-and-rung-path-form",
+        "notes": null,
+        "started_at": "2026-08-13T13:58:10Z",
+        "started_branch": "fix/scope-rung-path-lint",
+        "started_worktree": "/Users/joe/Developer/todo-db.wt-scope-rung-path-lint",
+        "status": "done",
+        "summary": "Define portable absolute-scope and constant-shell-test lint boundaries",
+        "wid": "w0"
+      },
+      {
+        "evidence": "TodoTracker.lint now reports POSIX, Windows-drive, and home-relative scope globs plus provably static unary -z/-n shell assertions, while leaving dynamic shell and non-unary file tests untouched.",
+        "item_id": "skill-sync-item-scope-and-rung-path-form",
+        "notes": null,
+        "started_at": "2026-08-13T13:58:31Z",
+        "started_branch": "fix/scope-rung-path-lint",
+        "started_worktree": "/Users/joe/Developer/todo-db.wt-scope-rung-path-lint",
+        "status": "done",
+        "summary": "Implement canonical todo-db lint findings for both invalid forms",
+        "wid": "w1"
+      },
+      {
+        "evidence": "19 focused tests pass, including three nonportable scope forms, three constant shell-test forms, and four dynamic/nonconstant negative controls.",
+        "item_id": "skill-sync-item-scope-and-rung-path-form",
+        "notes": null,
+        "started_at": "2026-08-13T14:00:13Z",
+        "started_branch": "fix/scope-rung-path-lint",
+        "started_worktree": "/Users/joe/Developer/todo-db.wt-scope-rung-path-lint",
+        "status": "done",
+        "summary": "Add positive and negative controls for POSIX, Windows, literal, and dynamic forms",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,404 @@
+{
+  "context": "Implement the classifier bucket, trusted source policy, required job, required-result wiring, lane-aware certification evidence, documentation correction, and regression/mutation pins atomically. The implementation PR itself runs full CI because it edits routing and policy. Use the existing path classifier and required umbrella; do not create a second classifier or required context.",
+  "description": "Pure generated-skill consumer updates currently classify as code because `.claude/skills/**`, `skill-sync.yaml`, and `skill-sync.lock` are in the binary code/content path model. The 2026-08-14 profile measures full refreshes at 80.4-83.7 successful runner-minutes and 27.0-31.4 minutes to merge-unblock, although BenchBox runtime code neither imports nor executes these artifacts. Add a first-class specialized classifier bucket and a required `skill-integrity` job that validates trusted source/target policy, immutable pins, lock/mirror equality, instruction authority, focused wrapper contracts, artifact hygiene, and commit identity. Preserve full CI for unknown, empty, self-editing, mixed product, and structural trust-boundary diffs; keep `ci-required-result` and strict-current-base policy unchanged.\n\nPath names alone are insufficient when `skill-sync.yaml` changes. The `ci-paths` decision must compare the head manifest with `git show <base>:skill-sync.yaml` through one deterministic policy parser. Missing/unparseable base or head input fails closed to `needs_code_ci=true`. A ref-only change remains eligible for the narrow lane only when every source URL, source name, subdir, target root, install mode, selected skill, and override mapping is unchanged and approved, and every new ref is a full immutable commit SHA. Any structural change to those fields, or any policy-module edit, selects full CI; the skill lane also runs when skill paths changed. Tests must cover ref-only, structural, parse-failure, missing-base, and mixed cases.\n\nThe independently fixed verifier pin is owned by BenchBox maintainers. Advance it when the supported skill-sync lock/config schema or the approved product CLI pin changes, or when the current verifier can no longer verify a valid lock. Every advancement must update the policy/docs/tests together, repeat the empty-HOME clean-runner clone/build/verify proof, and run full CI; it must never be inferred from the PR-edited manifest. Also correct the live false-coverage claim that `pr.yml` already contains `guard-skill-sync-verify`; it does not. Clean-runner feasibility for the initial pin is proven in `/tmp/skill-sync-clean-runner-spike.log`.\n\nMoving-head compatibility is bound by `_project/decisions/behind-pr-occurrence-2026-08-16.md`: keep strict current-base checks, `ci-required-result` as the required umbrella, one-at-a-time `make pr-refresh`, and `make pr-ready` as the only normal auto-merge arm path. The implementation PR intentionally runs full CI. If it becomes BEHIND, refresh only that PR; do not enable an auto-updater, refresh all open PRs, silently merge inside `pr-open`, or use `READY=1` at open unless the branch is actually final. This item must not unblock or implement strict-base-refresh 07a reduced-refresh modes or 07b `merge_group` support.\n\nIn GitHub Actions, every changed-path and semantic manifest decision must bind to immutable `${{ github.event.pull_request.base.sha }}` and the same event head/merge identity used by certification; it must never classify against a newly fetched mutable `origin/develop` tip. Local pre-open classification may use current `origin/develop`, after which publication remains subject to the ancestry gate from `behind-pr-occurrence-01-pr-open-currency`. Regression coverage must model event base A followed by `origin/develop` advancing to B: path classification, manifest comparison, and certification stay on A, while GitHub may correctly mark the PR BEHIND.\n\nSkill-only successful runs emit an explicit non-full `certification_kind`. Do not modify `scripts/pr_refresh_certification.py::pred_prior_full_checks` to accept it as `CERTIFICATION_FULL`; an exact refresh whose prior parent is skill-only must remain fail-closed with `prior_certification_not_full`. Full product/mixed runs may emit full certification only after all selected product and skill requirements pass. Required context names remain unchanged.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "accept skipped as success when skill-integrity-needed is true",
+        "instead": "fail the required umbrella for every non-success selected-lane result",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "why": "missing job output wiring has previously produced silently green required gates"
+      },
+      {
+        "dont": "add only an extra path-filter group and assume it narrows code_paths",
+        "instead": "implement a first-class specialized bucket explicitly excluded from code and unknown classification",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "why": "the current generic group machinery emits booleans but every non-safe path still becomes code"
+      },
+      {
+        "dont": "claim full certification or semantic approval for a skill-only run",
+        "instead": "record a distinct lane-aware certification kind and disclose semantic-review limits",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "why": "product tests did not run and integrity checks cannot judge arbitrary prose"
+      },
+      {
+        "dont": "execute a verifier revision or source repository chosen only by the PR",
+        "instead": "use an independent fixed verifier SHA and validate source/target structure against explicit policy before fetch",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "why": "lock equality without provenance can faithfully install hostile instructions"
+      },
+      {
+        "dont": "split the drift guard, required job, aggregator wiring, and tests across PRs",
+        "instead": "land the required-CI contract atomically",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "why": "half-wired required contexts can silently skip or deadlock merging"
+      },
+      {
+        "dont": "use labels, actors, commit messages, manual inputs, or a second shell classifier to select the lane",
+        "instead": "derive all routing from the existing merge-base changed-path decision and tested policy",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "why": "manual or duplicated routing drifts and creates bypasses"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-17T12:30:32Z",
+      "completed_pr": 1757,
+      "created_at": "2026-08-17T00:25:45Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "A selected skill lane cannot pass when its job is skipped, cancelled, omitted, or failed",
+        "item_id": "skill-integrity-specialized-ci-lane"
+      },
+      {
+        "behavior": "Generated mirror equality is not represented as proof of semantic safety or human review",
+        "item_id": "skill-integrity-specialized-ci-lane"
+      },
+      {
+        "behavior": "Mixed skill and product diffs require both skill-integrity and unchanged full product lanes",
+        "item_id": "skill-integrity-specialized-ci-lane"
+      },
+      {
+        "behavior": "Public fork PRs require no write permission or secret and fail closed on fetch/build/verify failure",
+        "item_id": "skill-integrity-specialized-ci-lane"
+      },
+      {
+        "behavior": "The verifier tool revision is independent of source revisions selected by skill-sync.yaml",
+        "item_id": "skill-integrity-specialized-ci-lane"
+      },
+      {
+        "behavior": "Unknown paths, empty diffs, classifier/workflow/policy edits, and product paths continue to run full product CI",
+        "item_id": "skill-integrity-specialized-ci-lane"
+      },
+      {
+        "behavior": "ci-required-result remains the stable required ruleset context and strict-current-base checks remain enabled",
+        "item_id": "skill-integrity-specialized-ci-lane"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing full-event latency and runner-minute baseline",
+        "decision": "reuse",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "path": "_project/decisions/strict-base-refresh-ci-profile-2026-08-14.md"
+      },
+      {
+        "concept": "deterministic instruction authority, policy-anchor, and commit-range checks",
+        "decision": "reuse",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "path": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "concept": "tracked-versus-untracked generated skill mirror boundary",
+        "decision": "reuse",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "path": "scripts/check_untracked_skill_mirrors.sh"
+      },
+      {
+        "concept": "single develop-PR changed-path classifier and generic extra-group outputs",
+        "decision": "extend",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "path": "scripts/path_filter_decision.py"
+      },
+      {
+        "concept": "existing TODO wrapper body-budget contract currently reached through medium-test",
+        "decision": "reuse",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "path": "tests/unit/scripts/test_todo_wrapper.py::TestSkillThinness"
+      },
+      {
+        "concept": "required-result shell matrix and output-reference lockstep regression tests",
+        "decision": "extend",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "path": "tests/unit/workflows/test_pr_workflow_path_classifier.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/dev_loop_pr_metrics.py"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "do_not_modify",
+        "path_glob": "tests/integration/**"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/ci_lint_environment_gate.py"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/ci-local-parity.md"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "scripts/path_filter_decision.py"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "scripts/skill_sync_ci_policy.py"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "tests/system/test_ci_lint_parity.py"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_agent_instruction_audit.py"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_ci_lint_environment_boundary.py"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_path_filter_decision.py"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_pr_refresh_certification.py"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_skill_sync_ci_policy.py"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_pr_workflow_outputs.py"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_pr_workflow_path_classifier.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_pr_refresh_certification.py tests/unit/workflows/test_pr_workflow_path_classifier.py tests/system/test_ci_lint_parity.py -q",
+        "description": "Classifier, workflow, trust-policy, parity, and certification regression suites pass",
+        "expected": "all selected tests pass",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "last_result": "pass",
+        "last_run": "2026-08-17T12:27:09Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py::TestSkillThinness -q",
+        "description": "Focused wrapper contracts fail independently of the medium lane when over budget",
+        "expected": "all thinness tests pass on the final tree; the recorded temporary over-budget mutation fails",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "last_result": "pass",
+        "last_run": "2026-08-17T12:27:19Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Final repository publication preflight passes without changing required ruleset contexts",
+        "expected": "exit 0; implementation PR intentionally receives full current-base CI",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "last_result": "pass",
+        "last_run": "2026-08-17T12:30:05Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_skill_sync_ci_policy.py -k 'manifest or trust_boundary or parse_failure or verifier_pin' -q",
+        "description": "Manifest semantic routing and verifier-pin lifecycle are mechanically pinned",
+        "expected": "ref-only approved changes select skill integrity; structural, missing, malformed, policy-pin, and mixed changes fail closed as specified",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "last_result": "pass",
+        "last_run": "2026-08-17T12:30:12Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_skill_sync_ci_policy.py -k 'skill_integrity or manifest or trust_boundary or unknown or empty or self_edit or mixed' -q",
+        "description": "Approved ref-only skill consumer updates select skill integrity while structural manifest changes fail closed",
+        "expected": "ref-only allowlisted manifest plus mirror/lock updates skip product CI; structural, malformed, missing-base, unknown, empty, self-editing, and mixed product cases select full CI as specified",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "last_result": "pass",
+        "last_run": "2026-08-17T12:30:17Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_path_filter_decision.py tests/unit/workflows/test_pr_workflow_path_classifier.py tests/unit/scripts/test_pr_refresh_certification.py -k 'event_base or base_sha or moving_base or head_drift' -q",
+        "description": "Classification and certification remain bound to the pull-request event base when origin/develop advances",
+        "expected": "event base A remains authoritative after the mutable remote tip advances to B; stale currency is left to GitHub strict checks",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "last_result": "pass",
+        "last_run": "2026-08-17T12:30:23Z",
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_pr_refresh_certification.py tests/unit/workflows/test_pr_workflow_path_classifier.py -k 'skill and (certification or prior_not_full or required_result)' -q",
+        "description": "Skill-only certification is non-full and remains ineligible for reduced-refresh reuse",
+        "expected": "skill-only emits a non-full kind and pred_prior_full_checks returns prior_certification_not_full; full product/mixed certification remains unchanged",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "last_result": "pass",
+        "last_run": "2026-08-17T12:30:28Z",
+        "seq": 8,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Baseline classifier fixture: needs_code_ci=true for .claude/skills + skill-sync.yaml/lock; full-code profile in _project/decisions/strict-base-refresh-ci-profile-2026-08-14.md; moving-head policy in _project/decisions/behind-pr-occurrence-2026-08-16.md; clean empty-HOME verifier spike exit 0 in /tmp/skill-sync-clean-runner-spike.log",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "notes": "Use PR #1750's eleven-path fixture, `_project/decisions/strict-base-refresh-ci-profile-2026-08-14.md`, and reproduce the clean-runner `skill-sync verify` command in a temporary directory. Do not rely on the developer global skill store.",
+        "started_at": "2026-08-17T01:22:51Z",
+        "started_branch": "fix/skill-integrity-specialized-ci-lane",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-skill-integrity-specialized-ci-lane",
+        "status": "done",
+        "summary": "Bind baseline evidence to behind-occurrence policy and immutable event base identity",
+        "wid": "w0"
+      },
+      {
+        "evidence": "41 classifier/policy tests passed; exact skill fixture emits needs_code_ci=false, skill_integrity_only=true, approved_ref_only_change",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "notes": "Extra groups alone do not subtract paths from code. Explicitly exclude specialized paths from code/unknown, while explicit code overlap wins. Preserve empty/unknown full CI and deletion/rename visibility. Add `.github/path-filters.yml` explicitly to code-ci.",
+        "started_at": "2026-08-17T01:23:25Z",
+        "started_branch": "fix/skill-integrity-specialized-ci-lane",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-skill-integrity-specialized-ci-lane",
+        "status": "done",
+        "summary": "Add a fail-closed specialized bucket with semantic base/head manifest routing",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Policy validates exact sources/targets/immutable refs; 6d09682 clean clone npm ci/build and empty-HOME verify passed against current BenchBox (/tmp/skill-sync-ci-pin-proof.log); current product pin 613908 was rejected as independent verifier because clean npm ci fails",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "notes": "Allow only exact approved HTTPS repositories, source names, subdirs, immutable full SHAs, tracked `.claude/skills` target roots, install mode, and override structure. Policy/self-edits and structural boundary changes remain full-CI review paths. Validate before network fetch.",
+        "started_at": "2026-08-17T01:26:58Z",
+        "started_branch": "fix/skill-integrity-specialized-ci-lane",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-skill-integrity-specialized-ci-lane",
+        "status": "done",
+        "summary": "Implement trusted source/target policy and maintainer-owned verifier-pin lifecycle",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Required read-only skill-integrity job added with 10-minute timeout, independent verifier, trust validation, mirror/audit/identity/wrapper/artifact controls; 284 workflow/contract tests passed",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "notes": "Use a separately fixed `skill-sync` verifier SHA; build with its Node lockfile and run verify on an empty-home-compatible runner. Run untracked mirror guard, instruction audit and focused audit tests, commit-range audit, TODO wrapper/thinness tests, and artifact hygiene. Timeout 10 minutes; no secrets or skip-on-fetch-failure path.",
+        "started_at": "2026-08-17T01:36:44Z",
+        "started_branch": "fix/skill-integrity-specialized-ci-lane",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-skill-integrity-specialized-ci-lane",
+        "status": "done",
+        "summary": "Add the required read-only skill-integrity workflow job",
+        "wid": "w3"
+      },
+      {
+        "evidence": "ci-required-result requires selected skill success before non-code exit; certification emits skill_integrity non-full and prior refresh test returns REASON_PRIOR_NOT_FULL; workflow suites green",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "notes": "Evaluate required skill success before non-code early exits. Pin content-only, skill-only, product, and mixed branches. A skill-only artifact must never use or satisfy `certification_kind=full`. Keep the existing required context name and strict-current-base semantics.",
+        "started_at": "2026-08-17T01:36:54Z",
+        "started_branch": "fix/skill-integrity-specialized-ci-lane",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-skill-integrity-specialized-ci-lane",
+        "status": "done",
+        "summary": "Wire skill results into the umbrella and non-full lane-aware certification",
+        "wid": "w4"
+      },
+      {
+        "evidence": "208 focused tests + 284 workflow/contract tests passed; expected-red mutation logs: /tmp/mutation-skill-{output-mapping,aggregate-needs,code-overlap,cert-kind}.log, /tmp/mutation-skill-lock.log, /tmp/mutation-skill-thinness.log; immutable event-base A test ignores moved origin/develop B",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "notes": "Include the exact PR #1750 fixture. Mutation-probe missing output mapping, missing aggregator need, required-but-skipped result, specialized subtraction, source allowlist, lock/mirror drift, wrapper budget, and certification kind; restore every mutation before commit. Update existing parity/environment tests rather than adding textual-only checks.",
+        "started_at": "2026-08-17T01:48:06Z",
+        "started_branch": "fix/skill-integrity-specialized-ci-lane",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-skill-integrity-specialized-ci-lane",
+        "status": "done",
+        "summary": "Add classifier, workflow, fork, deletion, mixed-diff, and mutation regression coverage",
+        "wid": "w5"
+      },
+      {
+        "evidence": "PR #1757 opened from current origin/develop after one-at-a-time make pr-refresh; auto-merge armed; implementation PR intentionally runs full required CI",
+        "item_id": "skill-integrity-specialized-ci-lane",
+        "notes": "Replace the nonexistent `guard-skill-sync-verify` claim only when the real job lands. State that generated skill Markdown has no generic markdownlint/spellcheck coverage and that verify does not prove prose semantics. Run required self-review and full PR preflight; this workflow/pinning guard and its required-CI wiring must land in the same PR.",
+        "started_at": "2026-08-17T01:52:45Z",
+        "started_branch": "fix/skill-integrity-specialized-ci-lane",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-skill-integrity-specialized-ci-lane",
+        "status": "done",
+        "summary": "Publish with full CI and one-at-a-time refresh while preserving blocked 07a and 07b",
+        "wid": "w6"
+      }
+    ]
+  }
+}

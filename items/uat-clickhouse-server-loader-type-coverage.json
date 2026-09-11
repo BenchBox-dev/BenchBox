@@ -1,0 +1,262 @@
+{
+  "context": "Treat this as a typed ingestion problem in BenchBox's ClickHouse-server\nclient-insert path. Use the corpus logs to select the minimal set of\nconversion cases, add targeted tests around the conversion and\nschema-introspection helpers, then prove with live representative cells. Fix\nDATETIME/TIMESTAMP ordering before DATE-prefix handling, add array parsing,\nand harden schema introspection for non-dict schemas. If a benchmark has\ninvalid source data rather than a loader gap, split that into a\nbenchmark-specific TODO instead of hiding it in the adapter.\n",
+  "description": "After PR #738 fixed the clickhouse-server provisioning/auth/database/load\npath, the 2026-06-01 corpus rerun no longer showed the original 57/57\nplatform wipeout. The largest remaining failure cluster is server-mode\nclient-side INSERT type conversion during load, not generic ClickHouse\ncompatibility.\n\nPR #738 introduced this path because Docker-backed ClickHouse server cannot\nread arbitrary host files through server-side `file()`. The path is\nBenchBox-side and gated to server deployment mode; clickhouse-local keeps the\nfaster `file()` load path. The review of the corpus found no silent\ncorruption: empty strings into String columns are preserved as empty strings,\nand every observed type gap fails loudly during load.\n\nCorpus evidence:\n  - Matrix: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/matrix_summary.tsv`\n  - Cells: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/cells.jsonl`\n\nRepresentative failures:\n  - `clickhouse-server_tpcds_0.01_20260601_120433.log`: `Code: 53. Type mismatch in VALUES section... Column c_current_cdemo_sk: required argument is not an integer`; TPC-DS then reports many empty tables.\n  - `clickhouse-server_clickbench_1.0_20260601_122208.log`: `ClickHouse file loading failed: 'str' object has no attribute 'tzinfo'`.\n  - `clickhouse-server_vector_search_0.01_20260601_133631.log`: `ClickHouse file loading failed: could not convert string to float: '[0.0206561,...]'`.\n  - `clickhouse-server_datavault_0.01_20260601_133545.log`: `ClickHouse file loading failed: argument of type 'Table' is not iterable`.\n\nObserved impact from the corpus classifier: roughly 22 of the 42 non-passing\ncells are loader type coverage. Bucket A is nullable numeric/date handling\nfor empty fields into non-Nullable ClickHouse columns (TPC-DS, NYC Taxi,\nFlightData, plus downstream TPC-DS OBT). Bucket B is DATETIME/TIMESTAMP\nconversion, currently falling through as strings and producing the `tzinfo`\nerror (ClickBench, H2O DB, TSBS). Bucket C is array/vector parsing for\nVector Search. Bucket D is Arrow/Table-valued schema introspection for\nDataVault. These are not platform lifecycle failures: Docker up/down\nsucceeded and the corpus executed all 57 cells.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fabricate default numeric/date values for fields that are genuinely nullable.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "fix only the first TPC-DS integer column; prove the conversion policy at the helper boundary.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "paper over DataVault by special-casing a benchmark name if the bug is schema-object introspection.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "restore server-side `file()` loading for Docker-backed clickhouse-server; it cannot read arbitrary host paths.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "route DATETIME/TIMESTAMP through date-only parsing; preserve the time component.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-clickhouse-server-loader-type-coverage",
+        "id": 36,
+        "reason": "datetime.fromisoformat covers the observed ISO forms; epoch-seconds or locale formats, if any benchmark emits them, would raise (loud, per guardrails) and can be handled when a real case appears.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Conditional sub-note ('handled when a real case appears') of the still-open, active parent item; not independently actionable yet. (tracked by uat-clickhouse-server-loader-type-coverage)",
+        "summary": "Bucket B follow-up: non-ISO / epoch-integer DateTime source formats"
+      },
+      {
+        "created_at": "2026-07-21T15:08:50Z",
+        "from_item": "uat-clickhouse-server-loader-type-coverage",
+        "id": 633,
+        "reason": "Merged-code run at origin/develop 9437334d1 timed out at exactly 600.21s with exit 124 and no adapter/product error; investigate query/runtime performance without raising the global timeout. Evidence: ~/Developer/benchmark_runs/logs/uat_20260721/clickhouse-server_tpcds_0.01_20260721_105652.log",
+        "resolution": "promoted",
+        "resolved_item": "uat-clickhouse-tpcds-sf001-runtime-cap",
+        "resolved_reason": null,
+        "summary": "TPC-DS SF=0.01 exceeds the 600-second UAT cell cap after loader fixes"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "needs_item": "uat-clickhouse-loader-empty-value-nullability"
+      },
+      {
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "needs_item": "uat-clickhouse-server-rc1-recovery"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-07-21T15:10:25Z",
+      "completed_pr": 1247,
+      "created_at": "2026-06-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not make clickhouse-local depend on clickhouse-driver server-only conversion behavior.",
+        "item_id": "uat-clickhouse-server-loader-type-coverage"
+      },
+      {
+        "behavior": "Do not silently coerce invalid data to zero or empty strings; nullability and parse failures must stay visible.",
+        "item_id": "uat-clickhouse-server-loader-type-coverage"
+      },
+      {
+        "behavior": "Empty strings into String columns must remain empty strings; do not turn them into NULL.",
+        "item_id": "uat-clickhouse-server-loader-type-coverage"
+      },
+      {
+        "behavior": "Keep the PR #738 server-mode contract: Docker-host data files load through client-side batches, not server-side `file()` paths.",
+        "item_id": "uat-clickhouse-server-loader-type-coverage"
+      },
+      {
+        "behavior": "The 15 passing corpus cells must keep passing: TPCH, SSB, AMPLab, AI primitives, and TPCH skew at all three scales.",
+        "item_id": "uat-clickhouse-server-loader-type-coverage"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml: records the fixed platform wipeout and corpus artifact paths",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "path": "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml"
+      },
+      {
+        "concept": "benchbox/platforms/base/data_loading.py: shared data-loading helpers and server-mode insertion path",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "path": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "concept": "benchbox/platforms/clickhouse/: ClickHouse adapter, metadata, setup, and shared local/server behavior",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "path": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "concept": "benchbox/utils/compression_mixin.py: existing file handling patterns that should remain untouched",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "path": "benchbox/utils/compression_mixin.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/uat-clickhouse-server-loader-type-coverage.yaml"
+      },
+      {
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_clickhouse_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py -q",
+        "description": "Focused ClickHouse loader conversion tests pass",
+        "expected": "tests pass, including nullable integer, datetime, array, and Table-schema conversion cases",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpcds SCALE=0.01",
+        "description": "TPC-DS small cell loads instead of failing on integer conversion",
+        "expected": "cell reaches query execution or passes; it must not fail with `required argument is not an integer` during load",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=h2odb SCALE=0.01",
+        "description": "DateTime-heavy representative cell loads",
+        "expected": "cell does not fail with `'str' object has no attribute 'tzinfo'` during load",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=vector_search SCALE=0.01",
+        "description": "Vector Search small cell parses vector arrays",
+        "expected": "cell does not fail converting bracketed vector values to scalar floats",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=datavault SCALE=0.01",
+        "description": "DataVault small cell handles benchmark Table schemas",
+        "expected": "cell does not fail with `argument of type 'Table' is not iterable` during load",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "notes": "Before changing code, drive the conversion/introspection helpers directly\nwhere possible and preserve a compact command/result summary in this\nTODO. Raw stdout belongs in `/tmp` or `BENCHBOX_OUTPUT_DIR`, not git.\nExpected signatures to re-confirm: empty numeric/date handling, raw\nDATETIME/TIMESTAMP string fallthrough, bracketed array/vector parsing,\nand Table-valued schema introspection.\n\nRE-VALIDATION (2026-07-16, helper boundary, no Docker). The conversion\nhelper is benchbox/platforms/base/data_loading.py:\nClickHouseNativeHandler._convert_field_for_clickhouse (landed in the Jul-10\nimport ded0a94b, AFTER this TODO's 2026-06-01 corpus evidence — the\n\"Identified\" status was stale). Driving the helper directly:\n  - Bucket A (empty numeric/date -> NULL): ALREADY IMPLEMENTED and matches\n    the ratified policy. `if value == \"\": return None if\n    needs_non_string_value else value`; empty String stays \"\". No change\n    needed.\n  - Bucket B (DATETIME/TIMESTAMP): BROKEN. \"DATETIME\".startswith(\"DATE\") is\n    True so `date.fromisoformat(\"2020-01-15 12:30:00\")` raised; bare\n    \"TIMESTAMP\" fell through as str -> driver 'str' has no 'tzinfo'.\n  - Bucket C (array/vector): PARTIAL. \"Array(...)\" parsed, but DuckDB\n    \"FLOAT[128]\" matched the FLOAT branch -> float(\"[...]\") raised.\n  - Bucket D (Table-valued schema introspection): crash site FOUND\n    statically (no live repro needed) — SchemaInspector.get_column_count\n    did `\"columns\" in table_schema`, which raises `'Table' is not\n    iterable` when get_schema returns {name: BaseSchemaTable} (DataVault).\n    `_get_column_type_names` separately no-op'd (returned []) for object\n    schemas. Both fixed in w2.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-derive the four loader buckets against current develop and pin compact evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "notes": "Cover nullable integer fields with blank/null-like inputs, Date and\nDateTime/DateTime64 values supplied as strings, ClickHouse arrays such\nas `Array(Float32)` from bracketed literals, and schemas represented by\nbenchmark `Table` objects instead of simple dicts.\n\nDONE for Buckets A/B/C/D in tests/unit/platforms/test_clickhouse_adapter.py:\ntest_empty_numeric_date_fields_become_null_not_default (A),\ntest_datetime_and_timestamp_conversion (B),\ntest_vector_bracket_type_parsed_to_list_not_float (C),\ntest_object_schema_table_column_count_and_types (D — uses the real\nDataVault BaseSchemaTable schema).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add focused unit coverage for ClickHouse-server value conversion",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "notes": "Keep server mode on client-side INSERT batches for Docker-host files;\ndo not revert to server-side `file()` loading. Preserve shared ClickHouse\nSQL behavior while making type conversion explicit for server inserts.\nImplement the ratified nullable-empty-field policy (see open_questions\nbelow): an empty numeric/date value becomes NULL with Nullable(T) DDL\nwhere the reference schema marks the column nullable; NEVER coerce to a\ntype default. An empty landing in a column the reference schema marks\nNOT NULL must fail loudly as a benchmark data defect, not be silently\ndefaulted.\n\nDONE (Buckets B + C): _convert_field_for_clickhouse now classifies\nDATETIME/DateTime64/TIMESTAMP before the DATE prefix and parses to Python\ndatetime; DuckDB bracketed vector/list types (FLOAT[128], INTEGER[]) route\nto array parsing via the new _CLICKHOUSE_VECTOR_TYPE_RE. Bucket A was\nalready correct (nullable-empty -> NULL, ratified policy) and is unchanged.\nAll at the helper boundary per anti_patterns; clickhouse-local path\nuntouched (server-mode-only helper).\nDONE (Bucket D): the crash was static, not needing live repro — SchemaInspector.\nget_column_count did `\"columns\" in table_schema`, which raised\n`argument of type 'Table' is not iterable` for object schemas (DataVault's\nget_schema returns {name: BaseSchemaTable}). Added _schema_table_columns /\n_resolve_table_schema helpers that read `.columns` from a BaseSchemaTable\nOR [\"columns\"] from a dict, used by both get_column_count and\n_get_column_type_names — so object-schema loads no longer crash AND get\nreal per-column types (DataVault TIMESTAMP now flows through the Bucket B\nfix). All four buckets now handled at code level; only w3 live-cell\nverification remains.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix the client-batch conversion path without regressing clickhouse-local",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Merged origin/develop 9437334d1: vector_search, datavault, and h2odb SF=0.01 all passed live and produced submittable results. TPC-DS no longer emitted conversion errors but reached the existing 600s cap; deferral #633 was promoted and quality-corrected as uat-clickhouse-tpcds-sf001-runtime-performance (lint clean). Logs: ~/Developer/benchmark_runs/uat-remediation-20260721/.",
+        "item_id": "uat-clickhouse-server-loader-type-coverage",
+        "notes": "Use UAT-managed Docker and the same benchmark output root. Representative\ncells should include TPC-DS SF=0.01, one DateTime-heavy cell, DataVault\nSF=0.01, and Vector Search SF=0.01 before broadening to the corpus.\n\nNOT RUN in the 2026-07-16 session: no Docker daemon in the remote\ncontainer, so live cells could not execute. Buckets A/B/C are proven at\nthe unit/helper boundary only; a live run of the TPC-DS, DateTime-heavy,\nand Vector Search cells is still required to close this. DataVault stays\nblocked on the Bucket D fix.\n\nCode-review checkpoints to confirm on the live run (from the w2 review):\n  - tz-AWARE datetime round-trip: a source timestamp with a 'Z'/offset\n    (e.g. TSBS RFC3339) parses to a tz-aware Python datetime;\n    clickhouse-driver converts it to the column timezone. Verify the\n    stored instant is NOT shifted vs the naive-string benchmarks (a\n    non-UTC DateTime column would otherwise corrupt time aggregates). If a\n    shift is observed, normalise to naive-UTC before insert.\n  - Non-ISO/epoch DateTime formats: datetime.fromisoformat parses only\n    ISO-8601, so epoch-seconds or locale timestamps raise (loud, per\n    guardrails). Confirm the actual ClickBench/TSBS/H2O timestamp formats\n    are ISO; if any emit epoch/other, extend the parser (tracked in\n    deferred).\n",
+        "started_at": "2026-07-21T15:10:22Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Verify representative failing cells live against ClickHouse server",
+        "wid": "w3"
+      }
+    ]
+  }
+}

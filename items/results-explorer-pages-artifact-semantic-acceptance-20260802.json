@@ -1,0 +1,206 @@
+{
+  "context": "Extend the existing Pages launch plan with assembled-site 404/direct-route checks, real native docs clicks, live response-header inspection, and an explicit release-scope decision when release-cut still curates Explorer out.",
+  "description": "The local e2e server rewrites unknown /results paths to index.html, while GitHub Pages relies on assembled root 404.html. Source CSP exists as a meta policy, but deployed response headers and clickjacking behavior were not verified. Prove external semantics or explicitly keep Explorer dormant.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "claim meta frame-ancestors protection",
+        "instead": "verify response headers or document limitation",
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "why": "meta CSP ignores it"
+      },
+      {
+        "dont": "silently re-enable Explorer in release-cut",
+        "instead": "record launch decision first",
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "why": "curation is explicit policy"
+      },
+      {
+        "dont": "treat local SPA fallback as Pages proof",
+        "instead": "test assembled artifact and live route",
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "why": "404 semantics differ"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-20T14:49:37Z",
+        "from_item": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "id": 715,
+        "reason": "2026-08-20 Explorer readiness review: assembled-artifact 404/direct-route acceptance already landed on results-explorer-pages-environment-and-curated-preview-launch w1 and exists as pages-artifact.spec.ts. Remaining live proof is launch w4 after the release-branch deploy. Duplicate planning item is not a second gate.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Covered by results-explorer-pages-environment-and-curated-preview-launch and verified live deployment",
+        "summary": "Covered by launch item w1 (done) and results-explorer/e2e/routes/pages-artifact.spec.ts"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "needs_item": "results-explorer-ci-gate-runtime-closure-20260802"
+      },
+      {
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "needs_item": "results-explorer-pages-environment-and-curated-preview-launch"
+      },
+      {
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "needs_item": "results-explorer-responsive-headline-contract-20260802"
+      }
+    ],
+    "item_meta": {
+      "category": "Release acceptance",
+      "created_at": "2026-08-02T16:27:49Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Assembled Pages artifact is acceptance target",
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802"
+      },
+      {
+        "behavior": "Dormant release posture remains explicit unless launch is approved",
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802"
+      },
+      {
+        "behavior": "Success is tied to pinned SHA and artifact digest",
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802"
+      },
+      {
+        "behavior": "WASM-required CSP directives remain intact",
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Root 404 and Pages deployment",
+        "decision": "extend",
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "path": ".github/workflows/docs.yml"
+      },
+      {
+        "concept": "Existing Pages launch plan",
+        "decision": "extend",
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "path": "results-explorer-pages-environment-and-curated-preview-launch"
+      },
+      {
+        "concept": "Static CSP policy",
+        "decision": "reuse",
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "path": "results-explorer/index.html"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/direct-route.spec.ts"
+      },
+      {
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/serve-browser-tests.mjs"
+      },
+      {
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --workers=1 e2e/routes/direct-route.spec.ts",
+        "description": "Pages-shaped direct routes and native docs navigation pass",
+        "expected": "Direct route and CTA tests pass",
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q",
+        "description": "Workflow assembly tests pass",
+        "expected": "Workflow tests pass",
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Pin release posture and Pages acceptance contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add assembled-site route, 404, CTA, and header checks",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pages-artifact-semantic-acceptance-20260802",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run live acceptance or record dormant decision",
+        "wid": "w2"
+      }
+    ]
+  }
+}

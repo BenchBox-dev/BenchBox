@@ -1,0 +1,112 @@
+{
+  "context": "This is a decision first, code second. Options: (a) extend restore-legacy in the todo-db repo to accept and load findings tables - correct if todo-db is meant to own the findings domain too, and the natural counterpart to the snapshot work; (b) migrate findings by a separate mechanism after the tracker cutover, accepting a window where they are absent; (c) accept the loss explicitly and record it, which is only defensible if the findings domain is being retired. Whichever is chosen, the importer should be made to REJECT unknown tables rather than ignore them, so a lossy snapshot can never again look like a successful migration. Coordinate with whoever owns the findings phases before choosing.",
+  "description": "todo-db's restore_legacy() (src/todo_db/database.py:463 in ~/Developer/todo-db) checks only that its 12 required tables are present and IGNORES every other key in the snapshot, then rebuilds the destination from base=self.export() with items/events/tracker_tables overwritten. Findings tables are not in the required set, so findings never transfer. Worse, because unknown keys are ignored rather than rejected, a snapshot that DID carry findings would be accepted while silently discarding them - a migration that reports success and loses a domain. The findings domain is active work, not vestigial: phases 3/4/5 landed across #1341 (lossless mapping), #1347 (schema v4) and #1351 (corpus importer), and the hosted tracker holds at least one open finding (2026-07-18-190500-evidence-tree-sha-provenance-mismatch) plus an unsynced draft. Blocks a clean migrate-hosted-tracker-db-to-todo-db-0-3-schema cutover: 'legacy-tracker-snapshot-export-for-restore-legacy' makes the tracker tables transferable, but the findings domain still has no path across.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "created_at": "2026-07-30T15:27:03Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "existing 'export --snapshot' output stays valid input for restore-legacy",
+        "item_id": "restore-legacy-drops-the-findings-domain"
+      },
+      {
+        "behavior": "the committed-export boundary: findings prose still never reaches Git (EXPORT_TABLE_ALLOWLIST stays findings-free)",
+        "item_id": "restore-legacy-drops-the-findings-domain"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "restore-legacy-drops-the-findings-domain",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "restore-legacy-drops-the-findings-domain",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_findings.py"
+      },
+      {
+        "item_id": "restore-legacy-drops-the-findings-domain",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/findings-domain.md"
+      },
+      {
+        "item_id": "restore-legacy-drops-the-findings-domain",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import json,subprocess,sys,tempfile,pathlib; p=pathlib.Path(tempfile.mkdtemp())/'s.json'; d=json.load(open(sys.argv[1])); d['unexpected_table']=[{'x':1}]; p.write_text(json.dumps(d)); r=subprocess.run(['todo-db','--db',sys.argv[2],'--project-id','benchbox','restore-legacy','--input',str(p),'--replace'],capture_output=True); sys.exit(0 if r.returncode!=0 else 1)\" \"$TODO_SNAPSHOT\" \"$TODO_SCRATCH_DB\"",
+        "description": "A snapshot carrying an unknown table is rejected, not silently ignored",
+        "expected": "exit 0",
+        "item_id": "restore-legacy-drops-the-findings-domain",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rqE 'findings (are|is) (deliberately )?(not )?(carried|migrated|dropped)' _project/specs/findings-domain.md",
+        "description": "Findings survive a round-trip, or their omission is a recorded decision",
+        "expected": "exit 0",
+        "item_id": "restore-legacy-drops-the-findings-domain",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "restore-legacy-drops-the-findings-domain",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "restore-legacy-drops-the-findings-domain",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "restore-legacy-drops-the-findings-domain",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide with the findings-domain owner",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "restore-legacy-drops-the-findings-domain",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make restore-legacy reject unknown tables so lossy snapshots cannot look successful",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "restore-legacy-drops-the-findings-domain",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement the chosen path for the findings data",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "context": "Use the canonical todo-db init-project/wrapper contract or an equivalent thin wrapper backed by a project-local uv lock. Remove absolute and sibling paths. Do not copy tracker source into either consumer.",
+  "description": "After BenchBox's package-only runtime is certified, migrate other consumers that currently depend on a sibling todo-db checkout or an absolute developer path. Apply the same locked-package contract to Oxbow and textcharts only after repository ownership, database identity, and clean-clone expectations are confirmed. This is a follow-up, not a prerequisite for the BenchBox cutover.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assume the non-git Oxbow/textcharts directories are safe to mutate",
+        "instead": "Inventory and request owner authorization before implementation",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "why": "Their ownership and recovery boundaries require explicit confirmation"
+      },
+      {
+        "dont": "Use /Users/joe/Developer/todo-db or ../todo-db as the release contract",
+        "instead": "Use a project-local locked package environment",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "why": "That is not portable to a fresh clone or cloud runner"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "needs_item": "certify-benchbox-package-only-todo-runtime-gated"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-13T23:55:37Z",
+      "created_at": "2026-08-10T20:46:22Z",
+      "worktree": "todo-db-standalone-extraction"
+    },
+    "preserves": [
+      {
+        "behavior": "Each consumer retains a distinct project-bound database",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated"
+      },
+      {
+        "behavior": "No secondary consumer receives a copied tracker implementation",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated"
+      },
+      {
+        "behavior": "No token or hosted DSN credential is committed",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated"
+      },
+      {
+        "behavior": "Work stops if repository ownership or writable scope is ambiguous",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "kind": "do_not_modify",
+        "path_glob": ".todo-db/**"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "kind": "do_not_modify",
+        "path_glob": "DONE/**"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "kind": "do_not_modify",
+        "path_glob": "TODO/**"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "kind": "do_not_modify",
+        "path_glob": "_project/DONE/**"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "kind": "do_not_modify",
+        "path_glob": "_project/TODO/**"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "kind": "only_modify",
+        "path_glob": ".gitignore"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.yaml"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "kind": "only_modify",
+        "path_glob": "todo.config.yaml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "tmp=$(mktemp -d) && gh repo clone joeharris76/Oxbow \"$tmp/Oxbow\" -- --quiet && gh repo clone joeharris76/textcharts \"$tmp/textcharts\" -- --quiet && for repo in \"$tmp/Oxbow\" \"$tmp/textcharts\"; do ! rg -n '/Users/joe/Developer/todo-db|\\.\\./todo-db' \"$repo/_project/scripts\" \"$repo/skill-sync.yaml\"; done",
+        "description": "Fresh Oxbow and textcharts clones contain no absolute or sibling todo-db runtime path",
+        "expected": "exit 0",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "last_result": "pass",
+        "last_run": "2026-08-13T23:55:22Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "tmp=$(mktemp -d) && gh repo clone joeharris76/Oxbow \"$tmp/Oxbow\" -- --quiet && gh repo clone joeharris76/textcharts \"$tmp/textcharts\" -- --quiet && for repo in \"$tmp/Oxbow\" \"$tmp/textcharts\"; do uv sync --project \"$repo/_project/scripts\" --locked && uv run --project \"$repo/_project/scripts\" --locked -- todo-db --version | grep -Fx 'todo-db 0.3.2' && test \"$(shasum -a 256 \"$repo/_project/scripts/vendor/todo_db-0.3.2-py3-none-any.whl\" | awk '{print $1}')\" = ddc8c56a8b9f11c550d8f3b81df568c6d111cc79c076cbc4bf7c03fd68a95fa4; done",
+        "description": "Both fresh clones resolve todo-db 0.3.2 from the locked verified wheel",
+        "expected": "exit 0",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "last_result": "pass",
+        "last_run": "2026-08-13T23:55:27Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "tmp=$(mktemp -d) && gh repo clone joeharris76/Oxbow \"$tmp/Oxbow\" -- --quiet && gh repo clone joeharris76/textcharts \"$tmp/textcharts\" -- --quiet && for repo in \"$tmp/Oxbow\" \"$tmp/textcharts\"; do uv run --project \"$repo/_project/scripts\" --locked -- python \"$repo/_project/scripts/verify_todo_runtime.py\"; done",
+        "description": "Consumer-specific clean-clone runtime proofs pass",
+        "expected": "exit 0",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "last_result": "pass",
+        "last_run": "2026-08-13T23:55:34Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Live GitHub inventory confirmed joeharris76/Oxbow and joeharris76/textcharts are unarchived main-branch repositories with ADMIN permission. Fresh clones at fcaa70279c5c8d004ff6227bc7fc8c11f276205a and b44f95cb37143e2ed902b68b9382c91407b27aab were used; the non-Git prototype directories were not mutation targets. Oxbow's root environment has unrelated local BenchBox/letterops sources, while textcharts' root is its distributable library environment, so isolated _project/scripts locks are the narrowest design. Scratch copies of the prototype databases migrated from schema 3 to 5 with identities oxbow/textcharts, preserving 24 items/32 events and 26 items/60 events respectively; original SHA-256 values remained a21c91f70fc3b156d605001f19ef57b4986d2fea181ded497d7ebdff744ae5fa and 43762a188b27a82e347f44d0c1df586e8fa92fb2f7b065f8e387d4b02552dcaf.",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "notes": null,
+        "started_at": "2026-08-13T23:36:00Z",
+        "started_branch": "fix/certify-todo-package-runtime-final",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-certify-todo-package-runtime-final",
+        "status": "done",
+        "summary": "Inventory Oxbow and textcharts ownership, manifests, target databases, and current wrapper paths",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Oxbow commit cd2bda83ba8084fe1221dce7ed8bc5b47e6deccc and textcharts commit 717f66d6ee5dccf8a5f58b382745c4a124ec8cd5 add isolated _project/scripts uv locks, the verified vendored todo-db 0.3.2 wheel (SHA-256 ddc8c56a8b9f11c550d8f3b81df568c6d111cc79c076cbc4bf7c03fd68a95fa4), thin fixed-identity wrappers, scratch verification, .todo-db ignore rules, and skill-sync CLI pointers. Qualified PRs: https://github.com/joeharris76/Oxbow/pull/7 and https://github.com/joeharris76/textcharts/pull/7. Root package environments and legacy YAML/Markdown rollback sources were not modified.",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "notes": null,
+        "started_at": "2026-08-13T23:42:33Z",
+        "started_branch": "fix/certify-todo-package-runtime-final",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-certify-todo-package-runtime-final",
+        "status": "done",
+        "summary": "Pin the released todo-db package and replace non-portable runtime resolution",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Exact fresh-clone verification rungs 3-5 passed after merged portability-proof follow-ups. Oxbow merged PRs https://github.com/joeharris76/Oxbow/pull/7 and https://github.com/joeharris76/Oxbow/pull/8; textcharts merged PRs https://github.com/joeharris76/textcharts/pull/7 and https://github.com/joeharris76/textcharts/pull/8. Both fresh main clones contain no absolute or sibling todo-db path, resolve todo-db 0.3.2 from the wheel with SHA-256 ddc8c56a8b9f11c550d8f3b81df568c6d111cc79c076cbc4bf7c03fd68a95fa4, and pass identity, v3-to-v5 migration, YAML mapping, non-holder release, audit, exact export/restore, credential-isolation, and nested-directory proofs. Hosted databases were not provisioned or mutated. textcharts' unrelated library coverage gate was already red at the pre-change main b44f95cb37143e2ed902b68b9382c91407b27aab (83.72% vs 85%) and remains a separate pre-existing gate.",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers-gated",
+        "notes": null,
+        "started_at": "2026-08-13T23:46:03Z",
+        "started_branch": "fix/certify-todo-package-runtime-final",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-certify-todo-package-runtime-final",
+        "status": "done",
+        "summary": "Run clean-clone wrapper, identity, lease-safety, and local/hosted backend checks",
+        "wid": "w2"
+      }
+    ]
+  }
+}

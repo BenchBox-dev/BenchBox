@@ -1,0 +1,78 @@
+{
+  "description": "Two UAT cell-accounting reporting defects surfaced by the UAT-hardening batch final validation (develop @ 89b256474). Neither breaks the release gate (the orchestrator + gate-summary path balances exactly) nor can hide a failure. (1) make uat-report REGENERATION silently drops pruned cells: tests/uat/_cli.py::_handle_report (~148-202) never reads compatibility_pruned.jsonl and never passes compatibility_pruned_count/early_stop_pruned_count/registry_pruned_count to the report writer; the cells_io.py sidecar (~96-116) omits prune counts. Exercised: an enumeration with candidate_count=6 (2 executed + 4 pruned) regenerates as candidates:2 total_defined:2 (4 cells vanish). (2) registry_pruned bucket always 0: orchestrator.py:489 passes the whole compatibility_pruned tuple as compatibility_pruned_count and never passes registry_pruned_count, so T11 (#1234) platform-include registry rows are mislabeled as compatibility_pruned in the TSV footer, gate summary (~623) and standalone JSON (_cli.py ~191); report.py ~234-240 states the two buckets must be disjoint.",
+  "legacy": {
+    "item_meta": {
+      "category": "Bug Fix",
+      "completed_at": "2026-07-21T22:23:41Z",
+      "completed_pr": 1257,
+      "created_at": "2026-07-19T21:46:19Z",
+      "worktree": "uat-hardening"
+    },
+    "scope_rules": [
+      {
+        "item_id": "uat-report-regen-prune-accounting",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/ -m fast -q",
+        "description": "regenerated report matches live and registry rows land in registry_pruned",
+        "expected": "pass",
+        "item_id": "uat-report-regen-prune-accounting",
+        "last_result": "pass",
+        "last_run": "2026-07-21T22:21:29Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-report-regen-prune-accounting",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-report-regen-prune-accounting",
+        "needs_wid": "w0",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Confirmed on develop@74eabb1b2: (1) accounting sidecar (cells_io.write_cells_jsonl) persists only skipped_unreachable_count + startup_failed_count, NOT compatibility/early_stop/registry prune counts, so make uat-report regen (_cli._handle_report) defaults them to 0 -> regenerated total_defined < live candidate_count. (2) live report + regen both pass ALL compatibility_pruned (incl status==pruned-registry rows) as compatibility_pruned_count with registry_pruned_count=0, mislabeling registry drops. Classifier: enumerate.CompatibilityPrunedCell.status==REGISTRY_PRUNE_STATUS.",
+        "item_id": "uat-report-regen-prune-accounting",
+        "notes": null,
+        "started_at": "2026-07-21T22:14:45Z",
+        "started_branch": "fix/uat-report-regen-prune-accounting",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Re-verify both defects reproduce on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "cells_io.write_cells_jsonl persists compatibility_pruned_count/early_stop_pruned_count/registry_pruned_count into the accounting sidecar; _handle_report reads them back (coerce_accounting_count) + passes to write_report, so a regenerated report's total_defined matches the live one. Test test_regen_report_reconstructs_prune_counts_from_sidecar: regen total_defined=8 (2 attempted + 2+1+3 prunes) vs 2 without the fix.",
+        "item_id": "uat-report-regen-prune-accounting",
+        "notes": null,
+        "started_at": "2026-07-21T22:21:12Z",
+        "started_branch": "fix/uat-report-regen-prune-accounting",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Persist prune counts durably and thread them through _handle_report so a regenerated report total_defined equals enumeration candidate_count; add a regen test",
+        "wid": "w1"
+      },
+      {
+        "evidence": "enumerate.is_registry_prune / count_pruned_by_kind split registry drops (status==pruned-registry) from compatibility-RULE drops; orchestrator (live report + write_cells_jsonl + _emit_abort_artifacts) passes the split so registry rows land in registry_pruned_count not compatibility_pruned_count. Tests: test_count_pruned_by_kind_splits_registry_from_compatibility + registry_pruned=3/compatibility_pruned=2 in the regen TSV footer.",
+        "item_id": "uat-report-regen-prune-accounting",
+        "notes": null,
+        "started_at": "2026-07-21T22:21:17Z",
+        "started_branch": "fix/uat-report-regen-prune-accounting",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Split enumeration pruned rows by kind and pass the registry subset as registry_pruned_count; add a bucket-label test",
+        "wid": "w2"
+      }
+    ]
+  }
+}

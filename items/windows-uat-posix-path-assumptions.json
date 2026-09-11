@@ -1,0 +1,80 @@
+{
+  "context": "Use pathlib component comparisons or as_posix only at assertion/probe boundaries. Preserve native production argv paths; repair test classification rather than forcing POSIX paths into Docker commands.",
+  "description": "Run 30434746317 shows ten Windows 3.10 failures across Docker lifecycle, disk-floor accounting, preflight display, and runner-log tests. Test helpers search native compose paths for '/clickhouse/' or '/postgresql/' and assertions require forward-slash substrings; on Windows they receive backslash paths, so stubs return the full compose filename, startup failures are not injected, and path assertions drift.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-30T18:46:33Z",
+        "from_item": "windows-uat-posix-path-assumptions",
+        "id": 669,
+        "reason": "This item's framing ('make UAT path probes separator-neutral') and its must-preserve rule ('lifecycle accounting semantics stay unchanged') are both wrong for two of the failures it counts: test_orchestrator.py::test_disk_floor_abort_carries_startup_failed_count and ::test_disk_floor_abort_threads_startup_failed_count_into_sidecar_and_partial_report fail 'assert 0 == 1' on startup_failed_count - a genuine lifecycle-accounting bug whose fix REQUIRES changing the accounting this item promises to preserve. Working them under this framing risks weakening a correct assertion. They are now tracked separately as uat-orchestrator-startup-failed-count-not-threaded. Also: PR #1352 already fixed the test_preflight_budget.py and test_runner.py members of this item's scope by deriving expectations from the same Path the code renders rather than hardcoding separators, so the remaining path work here is test_phases.py (4 docker teardown argv assertions) and test_docker_assets.py (1); the count of 10 in the title is stale.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Adversarial review disproved the lifecycle-defect claim: both assertions fail because the test fake searches /clickhouse/ in a Windows path. Replacement item windows-uat-native-compose-path-probes-v3 keeps accounting unchanged.",
+        "summary": "Two of the 10 failures are a lifecycle defect, not path probes - split to uat-orchestrator-startup-failed-count-not-threaded"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-07-29T13:04:52Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "production Docker argv keeps native paths and lifecycle accounting semantics stay unchanged",
+        "item_id": "windows-uat-posix-path-assumptions"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-uat-posix-path-assumptions",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_docker_assets.py"
+      },
+      {
+        "item_id": "windows-uat-posix-path-assumptions",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_orchestrator.py"
+      },
+      {
+        "item_id": "windows-uat-posix-path-assumptions",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      },
+      {
+        "item_id": "windows-uat-posix-path-assumptions",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_preflight_budget.py"
+      },
+      {
+        "item_id": "windows-uat-posix-path-assumptions",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_runner.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/uat/test_docker_assets.py tests/uat/test_orchestrator.py tests/uat/test_phases.py tests/uat/test_preflight_budget.py tests/uat/test_runner.py -q",
+        "description": "Focused UAT path and lifecycle regressions pass",
+        "expected": "exit 0",
+        "item_id": "windows-uat-posix-path-assumptions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-uat-posix-path-assumptions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace POSIX-only UAT path probes and assertions with separator-neutral comparisons",
+        "wid": "w1"
+      }
+    ]
+  }
+}

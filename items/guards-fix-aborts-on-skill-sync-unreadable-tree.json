@@ -1,0 +1,71 @@
+{
+  "context": "Reproduce in a fresh pool worktree. Decide whether the skill-sync step should fetch the pinned SHA before checkout, skip with a notice when the tree is unreadable (the target already has a no-op-with-notice path for a missing skill-sync CLI, so the idiom exists), or fail loudly but only after reporting which artifacts were regenerated.",
+  "description": "Observed 2026-07-30 in a fresh pool worktree: 'make guards-fix' regenerates the earlier artifacts fine (audit-raw, oracle-coverage-map, parity-fixtures, compat-docs, UAT LOC table) and then dies at its skill-sync step with 'Command failed: git checkout a48d0c02884f032b075f5968ab23e1261cf23dbc / fatal: unable to read tree' and exit 2. Because skill-sync is the LAST step (Makefile:810+) the earlier regens do survive, so the failure is recoverable - but the target exits non-zero, which means anyone using it to clear a drift guard sees a failure and cannot tell whether their artifact was regenerated. The referenced SHA is not readable in the worktree, suggesting a skill-sync mirror lock pointing at a commit that was never fetched (or was pruned) there.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "created_at": "2026-07-30T18:15:36Z",
+      "worktree": "ci-infrastructure"
+    },
+    "preserves": [
+      {
+        "behavior": "A genuine skill-sync drift is still surfaced, not silently swallowed",
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree"
+      },
+      {
+        "behavior": "guards-fix still regenerates every other drift-guard artifact",
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make guards-fix",
+        "description": "guards-fix completes in a fresh pool worktree",
+        "expected": "exit 0, or a clear skip notice naming the unreadable SHA",
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Diagnose why the pinned skill-sync tree SHA is unreadable in a fresh worktree",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "guards-fix-aborts-on-skill-sync-unreadable-tree",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make the step fetch, skip-with-notice, or fail after reporting regenerated artifacts",
+        "wid": "w2"
+      }
+    ]
+  }
+}

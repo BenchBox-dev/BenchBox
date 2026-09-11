@@ -1,0 +1,143 @@
+{
+  "description": "Documentation audit (2026-04-01) found several docs referencing deprecated\ncommands, stale module paths, or outdated information:\n\n1. docs/guides/dataframe-comparison.md - documents deprecated\n   compare-dataframes command. Has deprecation notice but entire file\n   still walks through old workflow.\n\n2. docs/reference/cli/tuning.md - still references create-sample-tuning\n   (hidden/deprecated in code). Should only document tuning init.\n\n3. docs/advanced/power-run-concurrent-queries.md - may reference an\n   outdated execution model. PowerRunExecutor actually exists at\n   benchbox.utils.execution_manager (line 148). Verify doc accuracy\n   against current API rather than assuming it's wrong.\n\n4. docs/performance/dataframe-benchmarks.md - verify module paths.\n   Note: benchbox.core.dataframe.profiling.DataFrameProfiler actually\n   EXISTS (line 439). Check each path individually rather than assuming\n   all are stale.\n\n5. docs/development/roadmap.md - platform count (28) is slightly stale;\n   codebase has 27 concrete adapters (not 40+ as previously claimed).\n   Verify exact count before updating. Phase 1 completion status not\n   updated.\n\n6. docs/development/adding-dataframe-platform.md - doesn't mention\n   ExpressionFamilyAdapter / PandasFamilyAdapter base classes. Code\n   examples use outdated query patterns.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-04-01T00:00:00Z",
+      "created_at": "2026-04-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "docs-fix-deprecated-references",
+        "kind": "only_modify",
+        "path_glob": "docs/advanced/power-run-concurrent-queries.md"
+      },
+      {
+        "item_id": "docs-fix-deprecated-references",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adding-dataframe-platform.md"
+      },
+      {
+        "item_id": "docs-fix-deprecated-references",
+        "kind": "only_modify",
+        "path_glob": "docs/development/roadmap.md"
+      },
+      {
+        "item_id": "docs-fix-deprecated-references",
+        "kind": "only_modify",
+        "path_glob": "docs/guides/dataframe-comparison.md"
+      },
+      {
+        "item_id": "docs-fix-deprecated-references",
+        "kind": "only_modify",
+        "path_glob": "docs/performance/dataframe-benchmarks.md"
+      },
+      {
+        "item_id": "docs-fix-deprecated-references",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/cli/tuning.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -rn 'compare-dataframes\\|create-sample-tuning\\|df-tuning' docs/ || echo 'PASS: no deprecated commands'",
+        "description": "No deprecated compare-dataframes or create-sample-tuning commands in docs",
+        "expected": "PASS: no deprecated commands",
+        "item_id": "docs-fix-deprecated-references",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -oP '\\d+(?=.*(?:platform|adapter))' docs/development/roadmap.md | head -3",
+        "description": "Roadmap platform count is accurate (27)",
+        "expected": "Should show 27 (not 28 or 40+)",
+        "item_id": "docs-fix-deprecated-references",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'ExpressionFamilyAdapter\\|PandasFamilyAdapter' docs/development/adding-dataframe-platform.md | xargs -I{} test {} -ge 2 && echo 'PASS' || echo 'FAIL: base classes missing'",
+        "description": "Adding-dataframe-platform.md mentions current base classes",
+        "expected": "PASS",
+        "item_id": "docs-fix-deprecated-references",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "docs-fix-deprecated-references",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rewrite or remove dataframe-comparison.md - compare-dataframes deprecated",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-fix-deprecated-references",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove create-sample-tuning references from tuning.md",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-fix-deprecated-references",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify and update power-run docs against current executor API",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-fix-deprecated-references",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify and update dataframe-benchmarks.md module paths",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-fix-deprecated-references",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update roadmap.md with current platform count and phase status",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-fix-deprecated-references",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update adding-dataframe-platform.md with current adapter base classes",
+        "wid": "w6"
+      }
+    ]
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "context": "Extend `_DML_LEADING_RE` to include REPLACE and UPSERT as leading verbs; add both\n(and lowercase/comment-prefixed variants) to the is_dml_query unit corpus.\n",
+  "description": "`is_dml_query` (benchbox/platforms/base/result_capture.py:196; leading-verb regex\n`_DML_LEADING_RE` at :82) guards EXPLAIN-ANALYZE plan capture against re-executing a\nwrite. It covers INSERT/UPDATE/DELETE/MERGE/COPY (incl. CTE-prefixed), CTAS,\nCREATE MATERIALIZED VIEW, and SELECT...INTO, but returns False for a bare\n`REPLACE INTO ...` (MySQL/SingleStore/Doris family) and a bare `UPSERT INTO ...`.\n\nNot currently exploitable: the three ANALYZE-capturing adapters (DuckDB, MotherDuck,\nPostgreSQL) do not emit those forms, the MySQL-family adapters use plain non-ANALYZE\nEXPLAIN, and no workload emits a bare REPLACE/UPSERT (the only occurrence is\n`INSERT OR REPLACE INTO`, caught via the leading INSERT). This is a latent gap: if a\nfuture ANALYZE-capturing engine or workload emits `REPLACE INTO`/`UPSERT INTO`, the\nstatement would be physically re-executed during capture, mutating data twice.\n\nAdd REPLACE and UPSERT to the leading-verb set so the guard is robust by construction.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-05T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All currently-caught write shapes stay caught.",
+        "item_id": "harden-is-dml-query-replace-upsert"
+      },
+      {
+        "behavior": "No read statement (plain SELECT, CREATE VIEW, plain CREATE TABLE, TRUNCATE) starts returning True.",
+        "item_id": "harden-is-dml-query-replace-upsert"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "harden-is-dml-query-replace-upsert",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "harden-is-dml-query-replace-upsert",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -k 'dml or plan_capture' -n 0 -q",
+        "description": "is_dml_query tests pass, including new REPLACE/UPSERT cases and unchanged read/DDL cases",
+        "expected": "passed",
+        "item_id": "harden-is-dml-query-replace-upsert",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "harden-is-dml-query-replace-upsert",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add REPLACE/UPSERT to _DML_LEADING_RE and extend the is_dml_query test corpus (incl. lowercase + comment-prefixed)",
+        "wid": "w1"
+      }
+    ]
+  }
+}

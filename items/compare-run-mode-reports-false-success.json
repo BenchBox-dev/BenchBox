@@ -1,0 +1,235 @@
+{
+  "context": "DECISION GATE w1: choose ONE of (a) route run mode through the same run-service path 'benchbox run' uses, so data generation, adapter config, and phase handling are shared; or (b) delete run mode entirely and make -p/--platform exit 2 with a message pointing at 'benchbox run' + file mode. Record the choice and the reason before writing code. Prefer (a) only if it reuses run_service rather than growing a second runner; choose (b) if (a) cannot be done without duplicating the runner.\n\nWhichever is chosen, correctness of the FAILURE path is mandatory and independent: a platform that raises must not be reported as 100% success, must not contribute to fastest/slowest or speedup, and the command must exit non-zero when any requested platform produced zero queries.",
+  "description": "VERIFIED on develop 2026-08-23. The invocation printed as the FIRST example in 'benchbox compare --help' does not work:\n\n  $ uv run -- benchbox compare -p duckdb -p sqlite --scale 0.01 --non-interactive\n  Failed to benchmark duckdb: 'benchmark'\n  Failed to benchmark sqlite: SQLite requires database path configuration.\n  Total Queries: 0 / Fastest: duckdb / Speedup: 1.00x\n  duckdb N/A N/A 100%   sqlite N/A N/A 100%\n  EXIT=0\n\nMechanism: benchbox/core/comparison/suite.py:190-224 (_benchmark_sql_platform) is a hardcoded TPC-H-only path. It never calls the real benchmark runner, never generates data, and for duckdb/sqlite/datafusion guesses a data directory 'benchmark_runs/tpch/sf<X>/data' that a new user does not have. duckdb dies with KeyError 'benchmark' from get_adapter() on an empty config; sqlite raises ConfigurationError at sqlite.py:209-211 before the directory check is even reached. Both exceptions are swallowed at suite.py:157-171, which appends a result that BYPASSES _build_platform_result, so the dataclass default success_rate=100.0 (benchbox/core/comparison/types.py:210) survives into the printed table.\n\nCustomer impact: a user comparing two engines is told the run succeeded at 100% with a 1.00x speedup when zero queries executed, and CI wrappers see exit 0. Reporting a fabricated success is worse than crashing.\n\nScope note: FILE mode ('benchbox compare a.json b.json') WORKS and is not in scope. Only run mode (-p/--platform) is broken. Independently confirmed by two adversarial reviewers on 2026-08-23.\n\nRESOLVED 2026-08-23 in PR #1836 (branch fix/compare-run-mode-false-success). make pr-preflight green: 28,018 passed, 0 failed. Awaiting review/merge.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add a second benchmark runner inside benchbox/core/comparison/",
+        "instead": "INSTEAD reuse the run-service path or delete run mode",
+        "item_id": "compare-run-mode-reports-false-success",
+        "why": "that is exactly how the current dead code path came to exist and it will drift from run_service the same way"
+      },
+      {
+        "dont": "Fix the symptom by hiding the summary table when query_count is 0",
+        "instead": "INSTEAD fix the exit code and the success_rate computation",
+        "item_id": "compare-run-mode-reports-false-success",
+        "why": "the command would still exit 0 and still claim to have compared engines"
+      },
+      {
+        "dont": "Mark this done because file mode works",
+        "instead": "INSTEAD verify the exact help-text example",
+        "item_id": "compare-run-mode-reports-false-success",
+        "why": "the broken invocation is the one the CLI prints as its own first example"
+      }
+    ],
+    "item_meta": {
+      "category": "cli",
+      "completed_at": "2026-08-23T23:39:25Z",
+      "completed_pr": 1836,
+      "created_at": "2026-08-23T13:06:48Z",
+      "worktree": "comparison-correctness"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing exit-code contract for file-mode regression gating in CI",
+        "item_id": "compare-run-mode-reports-false-success"
+      },
+      {
+        "behavior": "File mode (benchbox compare a.json b.json) keeps working unchanged, including --fail-on-regression and --include-plans",
+        "item_id": "compare-run-mode-reports-false-success"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "working single-platform run path that already handles datagen, adapter config and phases",
+        "decision": "reuse",
+        "item_id": "compare-run-mode-reports-false-success",
+        "path": "benchbox/core/run_service.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "kind": "do_not_modify",
+        "path_glob": "_project/"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/compare.py"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/comparison/"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/comparison/suite.py"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/comparison/types.py"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_compare_coverage.py"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_compare_run_mode_exit_contract.py"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/comparison/"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_comparison.py"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_unified_comparison_suite.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox compare -p duckdb -p sqlite --scale 0.01 --non-interactive; echo EXIT=$?",
+        "description": "The help text's own first example produces a real comparison or a non-zero exit",
+        "expected": "per-query table with Total Queries > 0, or EXIT != 0. Never Total Queries 0 with 100% and 1.00x",
+        "item_id": "compare-run-mode-reports-false-success",
+        "last_result": "pass",
+        "last_run": "2026-08-23T23:39:21Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox compare -p duckdb -p snowflake --scale 0.01 --non-interactive",
+        "description": "A failing platform is never reported as successful",
+        "expected": "snowflake reported as failed with 0% success; EXIT != 0",
+        "item_id": "compare-run-mode-reports-false-success",
+        "last_result": "pass",
+        "last_run": "2026-08-23T23:39:22Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox compare benchmark_runs/results/tpch_sf1_duckdb_sql_20260724_083841_f0d8a264.json benchmark_runs/results/tpch_sf1_datafusion_sql_20260724_083804_6f70346c.json; echo EXIT=$?",
+        "description": "File mode still works (no regression)",
+        "expected": "per-query comparison table, EXIT=0",
+        "item_id": "compare-run-mode-reports-false-success",
+        "last_result": "pass",
+        "last_run": "2026-08-23T23:39:23Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "compare-run-mode-reports-false-success",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Reproduced on develop f7e98858: compare -p duckdb -p sqlite --scale 0.01 printed Total Queries 0, Fastest duckdb, Speedup 1.00x, both platforms 100%, EXIT=0",
+        "item_id": "compare-run-mode-reports-false-success",
+        "notes": null,
+        "started_at": "2026-08-23T14:00:43Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Reproduce on a clean checkout and capture the exact stdout plus exit code as evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": "DECISION: option (a) - route through BenchmarkOrchestrator.execute_benchmark, the entry benchbox run uses. Chosen because it reuses the existing resolved-input path rather than growing a second runner; option (b) (delete run mode) rejected since the fix reuses existing code and keeps the documented feature. Constraint discovered during implementation: benchbox.core may not import benchbox.cli (import-linter 'utils < core < platforms < cli'), so the suite takes an injected platform_runner and the CLI supplies the wiring - same shape as execute_run(adapter_factory=...).",
+        "item_id": "compare-run-mode-reports-false-success",
+        "notes": null,
+        "started_at": "2026-08-23T14:00:46Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "DECISION GATE - choose (a) reuse run_service or (b) remove run mode; record the decision and reason in the item before any code change",
+        "wid": "w1"
+      },
+      {
+        "evidence": "success_rate default 100.0->0.0 in types.py; SQL failure path now builds through _build_platform_result; get_summary returns None fastest/slowest/speedup when nothing timed; ALL sentinel excluded from total_queries; CLI _exit_on_comparison_failure exits 1. Verified: duckdb+snowflake -> snowflake 0%, no ratio, EXIT=1",
+        "item_id": "compare-run-mode-reports-false-success",
+        "notes": null,
+        "started_at": "2026-08-23T14:00:49Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Fix the failure path",
+        "wid": "w2"
+      },
+      {
+        "evidence": "_benchmark_sql_platform delegates to the injected runner; superseded in-suite TPC-H runner and _setup_embedded_sql removed (106 lines). Verified: compare -p duckdb -p sqlite --scale 0.01 -> 22 queries each, geomean 1.82 vs 13.47ms, 7.40x, EXIT=0",
+        "item_id": "compare-run-mode-reports-false-success",
+        "notes": null,
+        "started_at": "2026-08-23T14:00:51Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement the chosen option from w1",
+        "wid": "w3"
+      },
+      {
+        "evidence": "tests/unit/cli/test_compare_run_mode_exit_contract.py (11 tests) pins the help-text example contract: failed platform never 100%, no fabricated ranking, ALL sentinel not counted, single survivor has no speedup, exit codes. Two tests that pinned the defect updated.",
+        "item_id": "compare-run-mode-reports-false-success",
+        "notes": null,
+        "started_at": "2026-08-23T14:00:54Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add a regression test that executes the exact example printed by 'benchbox compare --help' and asserts a real per-query table or a non-zero exit - never a 100%/1.00x table with zero queries",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Help text examples verified against shipped behaviour; the first --help example now runs. No doc text changes needed - the examples were correct, the code was not.",
+        "item_id": "compare-run-mode-reports-false-success",
+        "notes": null,
+        "started_at": "2026-08-23T14:00:57Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Reconcile the help text and docs with the shipped behaviour so no advertised example is broken",
+        "wid": "w5"
+      }
+    ]
+  }
+}

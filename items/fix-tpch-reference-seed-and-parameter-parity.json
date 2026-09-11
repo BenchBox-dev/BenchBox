@@ -1,0 +1,124 @@
+{
+  "context": "Start by determining the correct reference seed empirically:\n  1. Run `qgen` with various candidate seeds (1, 16843008, 17039360) at SF=1\n  2. Compare generated query parameters against TPCH_PARAMS values\n  3. Compare generated query output against answer files in benchbox/core/tpch/answers/\n\nThe seed that produces parameters matching TPCH_PARAMS AND matching answer\nfile row counts is the correct reference seed. Fix the constant accordingly.\n\nFor the default behavior, Option B (restore seed=1 default) is likely simpler\nand lower-risk: change adapter.py:3656 back to `run_config.get(\"seed\", 1)` and\nonly auto-select reference_seed when validation_mode==\"exact\". This preserves\nparity without touching DataFrame queries.\n\nLong-term, TPCH_PARAMS should be generated from qgen output for a given seed\nrather than hardcoded, but that can be a follow-up.\n",
+  "description": "The TPC-H reference seed constant has an incorrect octal-to-decimal mapping,\nand a recent seed default change (dbf159bd) broke SQL/DataFrame benchmark\nparity by making the two modes use different query parameters.\n\nTwo distinct bugs:\n\n1. TPCH_SF1_REFERENCE_SEED = 0o0101000000 evaluates to 17039360 in Python,\n   but the comment says \"16843008 decimal\". Either the octal literal or the\n   comment is wrong. Whichever is the actual reference seed, the value used\n   must match the answer files shipped for SF=1.0 validation.\n\n2. Commit dbf159bd changed `seed = run_config.get(\"seed\", 1)` to\n   `seed = run_config.get(\"seed\")` in adapter.py:3656 (TPC-H path).\n   When seed=None at SF=1.0, TPCHPowerTest auto-selects the reference seed\n   (17039360) instead of the previous default (1). The DataFrame queries in\n   dataframe_queries.py use hardcoded TPCH_PARAMS that were calibrated to\n   seed=1 parameters. The two modes now run different query workloads,\n   producing a spurious 3.3x performance gap and 4 validation failures\n   (Q11, Q16, Q18, Q20) in SQL mode.\n\nEvidence from today's benchmark runs:\n  - DF geometric mean: 18.1ms vs SQL geometric mean: 60.0ms (3.3x)\n  - Q18: DF returns 57 rows (correct), SQL returns 9 rows (wrong seed params)\n  - Q11: SQL returns non-deterministic row counts (1031, 888, 839 across iters)\n  - All 22 queries show DF faster, which was not the case before dbf159bd",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add seed parameter threading to DataFrame query functions",
+        "instead": "keep DataFrame params as a static dict derived from qgen output",
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "why": "that would require reimplementing qgen's parameter substitution in Python"
+      },
+      {
+        "dont": "change TPCH_PARAMS values without verifying against qgen output",
+        "instead": "regenerate from qgen instead",
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "why": "the parameters are interdependent and arbitrary changes will produce wrong row counts"
+      },
+      {
+        "dont": "remove the reference_seed concept entirely",
+        "instead": "keep it available but don't make it the default",
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "why": "exact validation against answer files requires a specific seed"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-06T00:00:00Z",
+      "created_at": "2026-02-06T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "DataFrame queries produce correct row counts matching TPC-H answer files at SF=1",
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity"
+      },
+      {
+        "behavior": "SQL queries with default seed produce identical row counts to DataFrame queries for all 22 TPC-H queries",
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity"
+      },
+      {
+        "behavior": "TPCHPowerTest.__init__() seed auto-selection logic for exact validation when user explicitly passes --validation=exact",
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity"
+      },
+      {
+        "behavior": "get_reference_seed() returns correct seed for SF=1.0 that matches answer files",
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/benchmark_mixin.py"
+      },
+      {
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/expression_family.py"
+      },
+      {
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/benchmark.py"
+      },
+      {
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/dataframe_queries.py"
+      },
+      {
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/power_test.py"
+      },
+      {
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_reference_seed.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED; print(TPCH_SF1_REFERENCE_SEED)\"",
+        "description": "Reference seed constant matches its comment",
+        "expected": "Value matches the decimal comment in the source code",
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'tpch' -v --timeout=60",
+        "description": "SQL and DataFrame modes produce matching row counts at SF=0.01",
+        "expected": "All TPC-H tests pass",
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v",
+        "description": "Existing platform tests still pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "fix-tpch-reference-seed-and-parameter-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

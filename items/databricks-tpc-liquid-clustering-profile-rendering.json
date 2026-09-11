@@ -1,0 +1,639 @@
+{
+  "context": "Treat Databricks Liquid Clustering as a strategy-aware physical rendering of\nthe existing logical TPC profile. First revalidate current Databricks docs and\nBenchBox execution order, then model rendering ids and mechanism semantics in\nthe profile validation layer. Add Liquid-specific templates or generated\nartifacts only after conflict validation is explicit. Finally, wire result\nmetadata and tests so comparisons cannot collapse Z-ORDER, Liquid, and\nfallback tuning into one misleading `tuned` bucket.\n\nPrefer small, reviewable layers:\n  1. strategy-aware mapping data model;\n  2. Databricks Liquid template/rendering artifacts;\n  3. config and adapter conflict validation;\n  4. lifecycle/operation metadata correctness;\n  5. docs and comparison semantics.\n",
+  "description": "Follow-up to generalize-tpc-tuning-base. The generalized TPC profile work\ncorrectly moved Databricks TPC-H/TPC-DS tuning columns into a reusable\nlogical profile, but review exposed a Databricks-specific blind spot that can\ncorrupt tuned-run comparisons: the current checked-in Databricks TPC examples\nstill render the logical profile through the legacy Z-ORDER path, while\nmodern Databricks guidance treats Liquid Clustering as the preferred table\nlayout for new Delta tables.\n\nThe goal is not to make Databricks special again. The goal is to separate\nthree concerns cleanly so the TPC tuning base stays reusable across platforms:\nlogical workload candidates, platform physical rendering strategy, and\nexecution/result metadata. Databricks must support at least Z-ORDER and\nLiquid Clustering as distinct renderings of the same logical TPC profile, and\nresult comparisons must expose which rendering was actually requested and\napplied.\n\nCurrent external evidence checked on 2026-05-26:\n- Databricks liquid clustering docs describe Liquid Clustering as a data\n  layout optimization that replaces table partitioning and ZORDER, supports\n  CREATE/ALTER TABLE CLUSTER BY, and supports CLUSTER BY AUTO for automatic\n  key selection.\n  Source: https://docs.databricks.com/gcp/en/delta/clustering\n- Databricks optimize-layout docs recommend Liquid Clustering instead of\n  partitions, ZORDER, or other layout approaches; OPTIMIZE groups data by\n  Liquid Clustering keys for clustered tables.\n  Source: https://docs.databricks.com/aws/en/delta/optimize\n- Databricks data-skipping docs state that ZORDER cannot be used with Liquid\n  Clustering and recommend Liquid Clustering for new tables.\n  Source: https://docs.databricks.com/gcp/en/delta/data-skipping\n\nCurrent BenchBox facts to revalidate before implementation:\n- `TuningType.LIQUID_CLUSTERING` and Databricks liquid configuration fields\n  already exist in `benchbox/core/tuning/interface.py`.\n- `DatabricksAdapter` can resolve `databricks_clustering_strategy` and emit\n  `ALTER TABLE ... CLUSTER BY (...)`, but the TPC profile capability mapping\n  currently reports Databricks logical locality as `z_order`.\n- The checked-in Databricks TPC YAMLs set `z_ordering_enabled: true` and keep\n  per-table `partitioning` fields, which is not a valid Liquid Clustering\n  rendering without a deliberate conversion rule.\n- Unified tuning application currently runs before data loading for fresh\n  native tables, while Databricks post-load layout operations and metadata\n  need to distinguish create-time `CLUSTER BY`, post-load `OPTIMIZE`, and\n  Z-ORDER statements.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add broad automatic template rewriting before validation and golden tests can prove every emitted field.",
+        "instead": "(not specified)",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "allow Liquid Clustering and Z-ORDER fields in the same effective config without a hard validation error or a documented explicit waiver.",
+        "instead": "(not specified)",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "claim cross-platform performance equivalence from logical profile coverage alone.",
+        "instead": "(not specified)",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "keep hardcoding Databricks profile mechanisms to `z_order`; the mapping must depend on the selected physical rendering.",
+        "instead": "(not specified)",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "report Databricks `distribution` as a real physical distribution key; Databricks distribution candidates are logical locality evidence.",
+        "instead": "(not specified)",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "silently rename or reinterpret existing Databricks TPC tuned YAMLs as Liquid Clustering; that would change historical comparison semantics.",
+        "instead": "(not specified)",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "databricks-tpc-liquid-clustering-profile-rendering",
+        "id": 139,
+        "reason": "Requires cloud credentials and explicit live-test approval.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Live Databricks warehouse validation for Liquid TPC is already covered by open item databricks-liquid-clustering-tuning-review-20260526.",
+        "summary": "Run live Databricks warehouse validation for Liquid TPC-H/TPC-DS"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "databricks-tpc-liquid-clustering-profile-rendering",
+        "id": 140,
+        "reason": "This TODO must keep the Databricks Liquid rendering gap focused while preserving generalized profile semantics.",
+        "resolution": "promoted",
+        "resolved_item": "generate-and-certify-bigquery-redshift-and-snowflake-tpc-tun",
+        "resolved_reason": null,
+        "summary": "Generate and certify BigQuery, Redshift, and Snowflake TPC tuned templates from the logical profile"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "databricks-tpc-liquid-clustering-profile-rendering",
+        "id": 141,
+        "reason": "Metadata must land first so the UI warning has a stable contract to consume.",
+        "resolution": "promoted",
+        "resolved_item": "build-a-comparison-ui-cohort-warning-for-cross-mechanism-tun",
+        "resolved_reason": null,
+        "summary": "Build a comparison-UI cohort warning for cross-mechanism tuned results"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_item": "generalize-tpc-tuning-base"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-26T00:00:00Z",
+      "created_at": "2026-05-26T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DuckDB tuned templates and mappings remain free of Databricks vocabulary such as Z-ORDER or Liquid Clustering.",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering"
+      },
+      {
+        "behavior": "Existing Databricks Z-ORDER tuned templates remain available for legacy strategy comparisons unless a migration is explicitly approved.",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering"
+      },
+      {
+        "behavior": "Liquid Clustering, Z-ORDER, and basic-constraints fallback are distinguishable in result metadata and comparison semantics.",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering"
+      },
+      {
+        "behavior": "New routine tests carry explicit `unit` and `fast` pytest markers.",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering"
+      },
+      {
+        "behavior": "No live Databricks/cloud tests run without explicit user approval.",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering"
+      },
+      {
+        "behavior": "No result metadata claims a tuning mechanism was applied unless BenchBox attempted and recorded that operation.",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering"
+      },
+      {
+        "behavior": "The logical TPC profile remains platform-neutral; Databricks is one renderer, not the source of truth.",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/physical-tuning/active/databricks-liquid-clustering-tuning-support.yaml: prior Databricks Liquid implementation TODO - supersede its broad completion claim with profile/rendering validation",
+        "decision": "supersede",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "path": "_project/DONE/physical-tuning/active/databricks-liquid-clustering-tuning-support.yaml"
+      },
+      {
+        "concept": "benchbox/cli/commands/run.py: current Databricks strategy and liquid-column platform-option normalization - extend conflict handling",
+        "decision": "extend",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "path": "benchbox/cli/commands/run.py"
+      },
+      {
+        "concept": "benchbox/cli/config.py: current Databricks sample tuning defaults - update only with an explicit legacy-vs-Liquid default decision",
+        "decision": "reuse",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "path": "benchbox/cli/config.py"
+      },
+      {
+        "concept": "benchbox/cli/dryrun.py: existing dry-run command rendering for sorted ingestion and platform options - keep preview truthful",
+        "decision": "reuse",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "path": "benchbox/cli/dryrun.py"
+      },
+      {
+        "concept": "benchbox/core/tuning/interface.py: existing Liquid Clustering config fields and TuningType - reuse and tighten validation",
+        "decision": "reuse",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "path": "benchbox/core/tuning/interface.py"
+      },
+      {
+        "concept": "benchbox/core/tuning/platform_capabilities.py: current logical-role to platform-mechanism mapping - make strategy-aware",
+        "decision": "reuse",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "path": "benchbox/core/tuning/platform_capabilities.py"
+      },
+      {
+        "concept": "benchbox/core/tuning/profile_validation.py: existing template/profile validation and metadata projection - extend with physical rendering ids",
+        "decision": "extend",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "path": "benchbox/core/tuning/profile_validation.py"
+      },
+      {
+        "concept": "benchbox/core/tuning/profiles/tpc.yaml: existing logical TPC tuning profile data - extend rather than replace",
+        "decision": "extend",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "path": "benchbox/core/tuning/profiles/tpc.yaml"
+      },
+      {
+        "concept": "benchbox/platforms/base/sorted_ingestion.py: existing strategy/capability matrix pattern - reuse for method capability semantics where applicable",
+        "decision": "reuse",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "path": "benchbox/platforms/base/sorted_ingestion.py"
+      },
+      {
+        "concept": "benchbox/platforms/databricks/adapter.py: existing Z-ORDER and Liquid Clustering operation hooks - make lifecycle and metadata behavior truthful",
+        "decision": "reuse",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "path": "benchbox/platforms/databricks/adapter.py"
+      },
+      {
+        "concept": "docs/usage/tpc-tuning-profiles.md: current logical profile comparison semantics - expand with Databricks strategy distinctions",
+        "decision": "reuse",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "path": "docs/usage/tpc-tuning-profiles.md"
+      },
+      {
+        "concept": "tests/unit/cli/test_run_command_branches.py and tests/unit/cli/test_cli_dryrun.py: current CLI override and dry-run coverage - extend for Liquid conflict validation",
+        "decision": "extend",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "path": "tests/unit/cli/test_run_command_branches.py"
+      },
+      {
+        "concept": "tests/unit/platforms/test_databricks_adapter.py and tests/unit/platforms/test_databricks_adapter_coverage.py: current Databricks strategy precedence coverage - update expected conflicts",
+        "decision": "reuse",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "path": "tests/unit/platforms/test_databricks_adapter.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/_binaries/"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "do_not_modify",
+        "path_glob": "docs/_build/"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/active/databricks-tpc-liquid-clustering-profile-rendering.yaml"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/databricks-tpc-liquid-clustering-profile-rendering.yaml"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/tuning_profile_check.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/config.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/dryrun.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/tuning.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dryrun.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/interface.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/platform_capabilities.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/profile_validation.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/profiles/tpc.yaml"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/workload_profiles.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/sorted_ingestion.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databricks/adapter.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/cli/run.md"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "docs/usage/cloud-sorted-ingestion.md"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "docs/usage/databricks-liquid-clustering.md"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "docs/usage/tpc-tuning-profiles.md"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "examples/tunings/README.md"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "examples/tunings/databricks/"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "examples/tunings/duckdb/"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_dryrun.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_databricks_tuning_examples.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_interactive_dry_run.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_platform_hooks.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_run_command_branches.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/generators/test_spark_family_ddl.py"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/DONE/main/active/databricks-tpc-liquid-clustering-profile-rendering.yaml",
+        "description": "New TODO validates against schema",
+        "expected": "Validation passed",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph remains valid after adding the dependency edge",
+        "expected": "passes",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/tuning_profile_check.py --benchmarks tpch,tpcds --platforms databricks,duckdb --strict",
+        "description": "TPC profile validation covers both legacy Z-ORDER and Databricks Liquid renderings",
+        "expected": "passes, with Databricks mechanisms reflecting the selected rendering",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/core/tuning/test_tpc_workload_profiles.py tests/unit/core/tuning/test_tpc_tuning_template_parity.py tests/unit/cli/test_databricks_tuning_examples.py -q",
+        "description": "Strategy-aware tuning profile unit tests pass",
+        "expected": "all tests pass",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/platforms -k 'databricks and (liquid or tuning or zorder)' -q",
+        "description": "Databricks tuning strategy unit tests pass",
+        "expected": "all relevant tests pass",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/cli/test_run_command_branches.py tests/unit/cli/test_cli_dryrun.py tests/unit/cli/test_interactive_dry_run.py -q",
+        "description": "CLI and dry-run strategy override tests pass",
+        "expected": "all tests pass",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/core/tuning/test_platform_optimization_config.py tests/unit/core/tuning/generators/test_spark_family_ddl.py -q",
+        "description": "Core tuning config and Spark-family DDL tests pass",
+        "expected": "all tests pass",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Final PR gate before publication when implementing this TODO",
+        "expected": "passes",
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "notes": "Re-open the three Databricks documentation sources in `description`\nand record a compact dated summary in docs or TODO completion notes:\n  - minimum Databricks Runtime/version constraints for manual Liquid\n    Clustering, automatic Liquid Clustering, and OPTIMIZE FULL;\n  - compatibility rules for Liquid Clustering with legacy partitioning\n    and ZORDER;\n  - recommended migration from Hive-style partitioning and ZORDER to\n    Liquid Clustering keys;\n  - current syntax for CREATE TABLE, ALTER TABLE, CLUSTER BY AUTO, and\n    post-load optimization.\n\nThis is a hard freshness gate. Do not proceed with implementation from\nthe cited 2026-05-26 evidence alone; if Databricks guidance changed,\nupdate the TODO completion notes or docs with the checked date, URLs,\nand the changed behavior before touching runtime code.\n\nRe-read the current branch code and summarize:\n  - how `platform_optimizations.databricks_clustering_strategy`,\n    `liquid_clustering_enabled`, and `liquid_clustering_columns` are\n    parsed and normalized;\n  - where schema creation, data loading, unified tuning application,\n    sorted ingestion, OPTIMIZE, and result metadata are ordered for\n    native Databricks runs;\n  - whether the current adapter has any path that would emit invalid\n    Liquid + ZORDER or Liquid + partitioning combinations.\n\nDo not commit raw stdout logs. If command output is useful, store the raw\ncapture under `/tmp` and commit only the durable summary.\n\nCompleted 2026-05-26. Current Databricks documentation still says Liquid\nClustering replaces table partitioning and ZORDER for Delta layout; Delta\nsupport is GA on Databricks Runtime 15.2 and above; automatic Liquid\nClustering uses `CLUSTER BY AUTO`, requires Unity Catalog managed Delta\ntables and Databricks Runtime 15.4 LTS or above for intelligent key\nselection; manual Liquid supports up to four clustering keys; `OPTIMIZE`\nclusters Liquid tables; and `OPTIMIZE FULL` is available in Databricks\nRuntime 16.0 and above to force reclustering. Data-skipping docs still\nstate that ZORDER cannot be combined with Liquid Clustering.\n\nBranch-code trace: unified Databricks tuning is validated before schema\ncreation. For fresh native runs BenchBox creates schema, applies unified\ntuning/table hooks before data load, then COPY INTO loads data and\npost-load Delta OPTIMIZE is attempted per table. The old adapter behavior\ncould let Liquid fields override ZORDER during strategy resolution and\nhide invalid mixed effective configs. This implementation changes that to\nhard validation, records requested/resolved strategy, and records applied\nor skipped layout operations for Liquid AUTO/manual, ZORDER, OPTIMIZE, and\nANALYZE paths.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate Databricks Liquid Clustering guidance and current BenchBox execution semantics",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "notes": "Extend the profile/capability model so Databricks mapping is strategy\naware instead of hardcoded to Z-ORDER.\n\nRequired concepts:\n  - logical profile: reusable TPC candidate source, currently `tpc-v1`;\n  - physical rendering: platform-specific representation of the logical\n    profile;\n  - Databricks rendering ids:\n      databricks_z_order\n      databricks_liquid_manual\n      databricks_liquid_auto\n  - physical mechanisms:\n      z_order\n      liquid_clustering\n      liquid_clustering_auto\n      partitioning\n      optimize\n      optimize_full\n  - unsupported/waived decisions with explicit reasons.\n\nThe mapping must answer:\n  - for Z-ORDER rendering, which logical roles map to partitioning,\n    clustering, distribution hints, and ZORDER operations;\n  - for manual Liquid rendering, which logical roles become clustering\n    keys, which legacy partition/ZORDER columns are folded into those\n    keys, and which candidates exceed Databricks key limits;\n  - for automatic Liquid rendering, how BenchBox reports logical intent\n    when Databricks chooses keys asynchronously from workload history;\n  - how distribution candidates should be represented when Databricks has\n    no user-managed physical distribution key.\n\nResolve the default-selection decision before w2 starts. Unless the\nimplementation records an explicit migration decision with tests, docs,\nand release-note guidance, preserve the current `--tuning tuned`\nDatabricks behavior as the legacy Z-ORDER rendering and expose Liquid\nthrough an explicit rendering/template/strategy path.\n\nDo not claim that Databricks Liquid, Databricks Z-ORDER, DuckDB sorting,\nBigQuery clustering, Redshift sort/dist keys, and Snowflake clustering are\nperformance-equivalent. Report logical coverage and physical mechanism\ndifferences separately.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define Databricks physical rendering variants for the logical TPC profile",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "notes": "Choose one of these implementation shapes and document the tradeoff:\n  - generated Liquid variants from the logical profile; or\n  - checked-in Databricks Liquid YAML variants, e.g.\n    `examples/tunings/databricks/tpch_liquid_tuned.yaml` and\n    `examples/tunings/databricks/tpcds_liquid_tuned.yaml`.\n\nMinimum requirements for Liquid variants:\n  - `z_ordering_enabled: false`;\n  - `liquid_clustering_enabled: true` or\n    `databricks_clustering_strategy: liquid_clustering`;\n  - no per-table legacy `partitioning` fields in Liquid-rendered Delta\n    templates; logical partition candidates must be converted into Liquid\n    clustering-key candidates or moved into a separate unsupported/waived\n    decision list with rationale;\n  - logical ZORDER candidates are explicitly converted into Liquid\n    clustering-key candidates or moved into a separate unsupported/waived\n    decision list with rationale;\n  - key-count limits are enforced or explicitly handled;\n  - template metadata records both `logical_tuning_profile_id` and\n    `physical_rendering_id`.\n\nPreserve existing Z-ORDER YAML behavior for users who intentionally want\nlegacy comparisons. Do not silently reinterpret existing\n`tpch_tuned.yaml` or `tpcds_tuned.yaml` as Liquid Clustering unless a\nmigration decision is made explicit in docs, tests, and release notes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add explicit Databricks Liquid TPC template/rendering artifacts without breaking Z-ORDER templates",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "notes": "Add validation that hard-fails invalid or misleading Databricks\neffective configurations. Do not allow waivers for runtime config\nconflicts that Databricks treats as mutually exclusive. At minimum,\nreject:\n  - `liquid_clustering_enabled: true` with `z_ordering_enabled: true`;\n  - Liquid rendering with non-empty `z_ordering_columns`;\n  - Liquid rendering with per-table partitioning on Delta tables where\n    legacy partitioning would conflict with Liquid Clustering;\n  - `databricks_clustering_strategy: none` with Liquid fields;\n  - generic `distribution` fields being reported as a real Databricks\n    physical distribution mechanism.\n\nWaivers are only acceptable for logical profile candidates that cannot be\nrepresented in a selected rendering, not for contradictory effective\nDatabricks configuration fields.\n\nAdd this validation in the lowest shared layer that can see the full\nunified tuning configuration, then add adapter-level guardrails where\nruntime table format or Databricks-specific constraints are only known by\nthe adapter. Error messages must name the conflicting fields and the\nmigration path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enforce Databricks layout conflict validation across config, template, and adapter paths",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "notes": "Trace and, if needed, adjust the native Databricks tuned lifecycle:\n  - schema creation: table format, create-time CLUSTER BY, legacy\n    partitioning, and table properties;\n  - data load: COPY INTO and sorted-ingestion hooks;\n  - post-load layout: ZORDER, ALTER TABLE CLUSTER BY, OPTIMIZE,\n    OPTIMIZE FULL where applicable, and ANALYZE;\n  - metadata capture: actual statements attempted and succeeded.\n\nThe implementation must prevent result metadata from saying a physical\nmechanism was applied when BenchBox only stored a config field or skipped\nthe operation. Capture skipped/failed layout operations separately from\nsuccessful operations so comparison tooling can treat them differently.\n\nThis work unit should include dry-run coverage where possible. Live\nDatabricks testing remains out of scope unless explicitly approved.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Correct Databricks tuning lifecycle so metadata matches operations actually applied",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "notes": "Extend result/tuning metadata so `tuned` comparisons can distinguish\nlogical profile coverage from physical rendering.\n\nRequired fields or equivalent payload:\n  - `logical_tuning_profile_id`\n  - `logical_tuning_profile_version`\n  - `physical_rendering_id`\n  - `platform_physical_tuning_mechanisms`\n  - `requested_databricks_clustering_strategy`\n  - `resolved_databricks_clustering_strategy`\n  - `applied_layout_operations`\n  - `skipped_layout_operations`\n  - `logical_profile_coverage`\n  - `unmapped_logical_candidates`\n  - `invalid_or_conflicting_tuning_fields`\n\nComparison semantics:\n  - same logical profile + different physical rendering is comparable\n    only as a cross-mechanism comparison, not as identical tuning;\n  - Z-ORDER vs Liquid Clustering should segment cohorts unless the user\n    explicitly asks to compare physical strategies;\n  - basic-constraints fallback remains a coverage gap, not a tuned\n    equivalent;\n  - automatic Liquid Clustering must be reported as automatic/adaptive,\n    not as proof that BenchBox selected a particular set of keys.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Expose strategy-aware tuning metadata for fair cross-platform comparisons",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "notes": "Add focused fast/unit coverage before broad gates.\n\nRequired tests:\n  - Databricks Liquid template validation passes for TPC-H and TPC-DS and\n    reports `liquid_clustering` or `liquid_clustering_auto`, not\n    `z_order`;\n  - Databricks Z-ORDER templates still pass and continue reporting\n    `z_order`;\n  - mixed Liquid + ZORDER config fails with a clear error;\n  - mixed Liquid + legacy partitioning fails with a clear error; logical\n    partition candidates may be waived only outside the effective\n    Liquid template/config, with rationale;\n  - profile validation detects when Databricks distribution candidates\n    are reported as real physical distribution keys;\n  - result metadata distinguishes requested strategy, resolved strategy,\n    and applied operations;\n  - DuckDB, BigQuery, Redshift, and Snowflake mapping tests still prove\n    the logical profile is platform-neutral and that physical mechanism\n    differences are surfaced rather than hidden.\n\nNew routine unit tests must include top-level:\n  `pytestmark = [pytest.mark.unit, pytest.mark.fast]`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests that fail on Liquid/Z-ORDER confusion and cross-platform parity regressions",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-tpc-liquid-clustering-profile-rendering",
+        "notes": "Update user-facing docs so a benchmark consumer can answer:\n  - whether a Databricks run used Z-ORDER, manual Liquid Clustering, or\n    automatic Liquid Clustering;\n  - how legacy TPC Z-ORDER/partition candidates map into Liquid keys;\n  - why Databricks distribution candidates are logical locality\n    candidates, not user-managed physical distribution keys;\n  - when Z-ORDER and Liquid runs should be compared as different physical\n    strategies rather than equivalent tuned runs;\n  - which Databricks Runtime or Unity Catalog assumptions apply.\n\nUpdate:\n  - `docs/usage/tpc-tuning-profiles.md`\n  - `docs/usage/cloud-sorted-ingestion.md`\n  - `examples/tunings/README.md`\n  - Databricks TPC YAML metadata or adjacent docs for both legacy Z-ORDER\n    and Liquid variants.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docs and examples with Databricks migration and comparison guidance",
+        "wid": "w7"
+      }
+    ]
+  }
+}

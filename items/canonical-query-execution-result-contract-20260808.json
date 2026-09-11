@@ -1,0 +1,290 @@
+{
+  "context": "Inventory at least four materially different producers plus serializer, loader, and comparison consumers. Define semantic fields and missing/null/zero behavior before implementation. Introduce compatibility constructors first, migrate boundaries in vertical slices, and use property-based round-trip tests. Unknown and conflicting fields require an explicit forward-compatibility/diagnostic policy. Do not flag-day rewrite adapters.",
+  "description": "The zero-row export and duration-unit comparison defects are instances of a broader parallel-representation problem: adapters, enhanced results, compact JSON, loaders, comparison code, and compatibility dictionaries independently interpret row counts, durations, status, digest, errors, and plan capture. Define one typed internal QueryExecution contract and explicit compatibility adapters so normalization occurs once at each boundary. Preserve the canonical v2 external artifact unless a separately reviewed version migration is proven necessary.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Introduce another generic dictionary or untyped metadata bag for correctness fields.",
+        "instead": "Use typed semantic fields and explicit extension handling.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "why": "That recreates the parallel-representation defect."
+      },
+      {
+        "dont": "Rewrite every platform adapter in one pull request.",
+        "instead": "Use compatibility constructors and representative vertical slices.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "why": "The blast radius would defeat parity review and rollback."
+      },
+      {
+        "dont": "Silently choose among conflicting aliases.",
+        "instead": "Apply documented precedence with a diagnostic or reject invalid combinations.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "why": "Conflicts indicate corrupt or ambiguous input."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "needs_item": "normalize-comparison-duration-units-20260808"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "needs_item": "preserve-zero-row-count-result-roundtrip-20260808"
+      }
+    ],
+    "item_meta": {
+      "category": "Results Architecture",
+      "completed_at": "2026-08-08T23:33:09Z",
+      "created_at": "2026-08-08T19:50:57Z",
+      "worktree": "result-architecture"
+    },
+    "preserves": [
+      {
+        "behavior": "Canonical v2 artifact keys, units, and valid round-trip behavior remain compatible.",
+        "item_id": "canonical-query-execution-result-contract-20260808"
+      },
+      {
+        "behavior": "Existing adapters may continue producing compatibility dictionaries during migration.",
+        "item_id": "canonical-query-execution-result-contract-20260808"
+      },
+      {
+        "behavior": "Missing, null, zero, false, and empty values remain distinguishable where domain semantics require it.",
+        "item_id": "canonical-query-execution-result-contract-20260808"
+      },
+      {
+        "behavior": "Platform SDK imports remain lazy.",
+        "item_id": "canonical-query-execution-result-contract-20260808"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing result schema models builders loaders and normalizers.",
+        "decision": "extend",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "path": "benchbox/core/results/"
+      },
+      {
+        "concept": "Completed consolidation of duplicated JSON normalization.",
+        "decision": "extend",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "path": "consolidate-result-normalization"
+      },
+      {
+        "concept": "Completed high-level BenchmarkResults unification.",
+        "decision": "extend",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "path": "unify-results-models-single-benchmarkresults"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/analysis/"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/base/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results -q",
+        "description": "All core result contract tests pass",
+        "expected": "Core result tests pass serially including property-based cases.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T23:32:21Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/analysis tests/unit/platforms/base/test_result_capture.py -q",
+        "description": "Analysis and base result-capture tests pass",
+        "expected": "Selected consumers pass against the canonical model.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T23:32:25Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ty check benchbox/core/results benchbox/core/analysis",
+        "description": "Migrated result modules satisfy type and lint checks",
+        "expected": "The migrated strict island reports no errors.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T23:32:27Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_result_parity.py -q",
+        "description": "Canonical model property tests reject representation drift",
+        "expected": "This command exits nonzero when zero null or duration conversion drift is reintroduced and exits zero for the canonical adapters.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T23:32:31Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_result_parity.py -q",
+        "description": "Representation-drift negative control",
+        "expected": "Exits 1 on an unfixed tree after reintroducing zero null or duration representation drift; exits 0 after restoring the canonical adapters.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T23:32:34Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventory documented in query_execution.py and enforced by AST drift test across 105 actual producer literals; schema loader comparison exporter database and base/platform consumers classified.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T23:31:30Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Inventory four or more result producers and every serializer loader comparison and reporting consumer with field and unit mappings.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Semantic contract documents canonical milliseconds rows status digest error plan identity iteration null zero empty and boundary-specific unknown-field policy.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T23:31:35Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Write the semantic contract for duration rows status digest errors plans identity iterations missing null zero and unknown fields.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Existing QueryExecution evolved as sole canonical model; QueryResultInput is fieldless compatibility constructor; explicit legacy and compact-v2 adapters validate aliases and types.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T23:31:41Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Define the typed QueryExecution model and explicit legacy-dictionary and compact-v2 adapters.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Schema export and loader use canonical adapters; byte-parity, loader key-shape, zero/null/missing, error and digest round-trip tests pass.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T23:31:46Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Migrate schema export and loader normalization behind compatibility constructors with byte-parity fixtures.",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Comparison, ResultBuilder, SQL failure, result capture and Spark-via-result-capture boundaries migrated without broad adapter rewrite; sub-ms precision preserved.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T23:31:52Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Migrate comparison and representative SQL dataframe and enhanced-result producers in reviewable slices.",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Bounded property matrix and conflict tests cover duration rows status identity iteration stream digest zero null false empty and unknowns; parent negative control failed 0.0 vs 0.9 then passed after restore.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T23:31:58Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add property-based round-trip and conflict-diagnostic tests for all semantic edge cases.",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Remaining compatibility exporters historical normalizer result database and TestDriversMixin inventoried with removal criteria in query_execution.py; AST drift gate forces future field classification.",
+        "item_id": "canonical-query-execution-result-contract-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T23:32:04Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Inventory remaining dictionary consumers and establish removal criteria for compatibility adapters.",
+        "wid": "w6"
+      }
+    ]
+  }
+}

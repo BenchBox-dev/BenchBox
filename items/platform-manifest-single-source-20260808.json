@@ -1,0 +1,290 @@
+{
+  "context": "Inventory every authoritative and derived platform surface before choosing ownership. Separate static metadata needed before imports from runtime adapter objects. Reuse the existing registry/decorator boundary, derive deterministic outputs only where they have durable consumers, and encode intentional surface differences as typed metadata rather than undocumented exceptions.",
+  "description": "Platform identity and support metadata is repeated across registry, aliases, CLI choices, documentation, and validation surfaces. Establish a single typed manifest or an explicitly generated static projection while preserving lazy SDK imports. The manifest, generated outputs, consistency tests, and required drift gate must land together so the new source of truth cannot immediately diverge.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add a manifest that duplicates an equally authoritative registry.",
+        "instead": "Declare one authority and make every other surface derived or validated.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "why": "Two sources of truth worsen the original drift problem."
+      },
+      {
+        "dont": "Instantiate adapters to obtain static metadata.",
+        "instead": "Store import-safe static facts separately from runtime objects.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "why": "That breaks lazy imports and increases discovery cost."
+      },
+      {
+        "dont": "Land generated outputs without the drift gate.",
+        "instead": "Land source generation and required validation atomically.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "why": "The outputs can become stale immediately."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "needs_item": "adapter-capability-protocols-20260808"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Registry and Governance",
+      "completed_at": "2026-08-09T00:45:20Z",
+      "created_at": "2026-08-08T19:52:03Z",
+      "worktree": "platform-governance"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing platform keys aliases and CLI spellings remain compatible unless separately deprecated.",
+        "item_id": "platform-manifest-single-source-20260808"
+      },
+      {
+        "behavior": "Generated outputs are deterministic and reviewed alongside their source.",
+        "item_id": "platform-manifest-single-source-20260808"
+      },
+      {
+        "behavior": "Optional platform SDKs are not imported during manifest or registry enumeration.",
+        "item_id": "platform-manifest-single-source-20260808"
+      },
+      {
+        "behavior": "PlatformAdapter plus @register_platform remains the runtime registration invariant.",
+        "item_id": "platform-manifest-single-source-20260808"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Current runtime registry and decorator boundary.",
+        "decision": "extend",
+        "item_id": "platform-manifest-single-source-20260808",
+        "path": "benchbox/core/platform_registry.py"
+      },
+      {
+        "concept": "Completed manifest-related adapter harmonization.",
+        "decision": "extend",
+        "item_id": "platform-manifest-single-source-20260808",
+        "path": "harmonize-bypass-adapters-with-manifest"
+      },
+      {
+        "concept": "Completed registry-owned benchmark metadata pattern and import-cost guard.",
+        "decision": "reuse",
+        "item_id": "platform-manifest-single-source-20260808",
+        "path": "registry-owned-benchmark-metadata-cleanup"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adding-new-platforms.md"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_platform_registry.py tests/unit/core/test_platform_registry_behavioral.py tests/unit/cli/test_run_command_options.py -q",
+        "description": "Registry and CLI parity tests pass",
+        "expected": "Registry and CLI surfaces agree.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T00:44:27Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make compat-docs-check",
+        "description": "Compatibility documentation drift gates pass",
+        "expected": "Documentation and compatibility outputs are current.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T00:44:35Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check .",
+        "description": "Full configured lint contract passes",
+        "expected": "Ruff reports all checks passed.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T00:44:37Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_platform_registry_behavioral.py -q",
+        "description": "Manifest drift test rejects a one-surface platform mutation",
+        "expected": "This command exits nonzero when a platform alias or registry entry is removed from only one surface and exits zero when derived surfaces agree.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T00:44:42Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_platform_registry_behavioral.py -q",
+        "description": "One-surface manifest drift negative control",
+        "expected": "Exits 1 on an unfixed tree after removing an alias or registration from only one surface; exits 0 after restoring parity.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T00:44:47Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "platform-manifest-single-source-20260808",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventoried 51 metadata keys, 47 lazy adapter rows, exact 24 CLI aliases, 4 registry aliases, 8 DataFrame factory rows, lazy exports, hooks, tuning/format/credential maps, docs and CI consumers across DuckDB/Pandas/ReadPrimitives/Databricks and all registered platforms.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T00:43:37Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Inventory all platform keys aliases CLI choices registry entries capability declarations docs and validation maps.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Declared benchbox/platforms/manifest.py sole static authority for canonical identity, scoped aliases/mode semantics, metadata/capabilities/support and ordered adapter coordinates; semantic operational maps remain independently owned and drift-validated; rejected decorator discovery and adapter instantiation.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T00:43:43Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Define authority ownership static-versus-runtime fields and generated-output policy with rejected alternatives.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Implemented stdlib-only frozen validated manifest with 51 records, typed alias scopes and implied modes, unique contiguous registration order, deep-frozen metadata, and deterministic projections without optional SDK imports.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T00:43:48Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Implement the typed manifest or static registry projection without importing optional SDKs.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Migrated core registry metadata/4 aliases/47 ordered lazy registrations, CLI 24 aliases and mode semantics, DataFrame factory consumer, scaffold guidance and generated 51-row onboarding inventory.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T00:43:53Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Migrate CLI aliases documentation and validation consumers in deterministic slices.",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Added duplicate key/alias/coordinate/order/capability validation, built-in registration invariants with third-party extension compatibility, exact projection/order tests, and semantic drift checks including DataFrame adapter and availability source symbols.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T00:43:59Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add duplicate-key alias registration capability and stale-output consistency checks.",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Added make platform-manifest/check, required PR guard aggregation and release lint wiring in same change; updated adding-platform workflow. Negative controls: removed CLI duck alias and typoed POLARS_AVAILABLE; both gates failed then passed after restoration.",
+        "item_id": "platform-manifest-single-source-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T00:44:04Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Wire the drift gate into required CI in the same change and update the add-platform workflow.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,167 @@
+{
+  "context": "Diff the live ruleset state (gh api) against the enforcement script's expectations, update the baseline to the documented post-retirement state only, confirm green via a dispatched run, and reconcile the stale activation TODO.",
+  "description": "2026-07-21 adversarial UAT review finding (P2, operational): release-canary.yml has been red for 4 consecutive scheduled runs (2026-07-17..20) on the `ruleset drift` job (step 'Fail if ruleset drift was detected'); the other canary jobs (pypi-latest installability, credential-free non-fast) are green. Probable cause: the 2026-07-18 retirement of the require_code_owner_review ruleset target (docs/operations/repo-admin-settings.md) was never reflected in _project/scripts/ruleset_review_enforcement.py's expectations.\n\nImpact: .github/workflows/validate-release-pr.yml:57-66 requires a green canary within RELEASE_CANARY_MAX_AGE_HOURS=48, so EVERY release PR is currently blocked regardless of UAT state. This is the single cheapest release unblocker.\n\nSecondary cleanup while in there: the tracker item [[release-canary-scheduled-activation]] rests on a stale premise (its 2026-07-04 evidence says the default branch is main and the canary is unregistered; the default branch has been develop since 2026-07-08, origin/main no longer exists, and the canary is registered and firing on schedule). Reconcile that item: its remaining live content is exactly this baseline refresh.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "mark the canary 'fixed' from a single green workflow_dispatch",
+        "instead": "confirm the next scheduled run is green too",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "why": "scheduled firing is the behavior that matters; dispatch runs can differ in permissions/context"
+      },
+      {
+        "dont": "silence, skip, or continue-on-error the drift job to force green",
+        "instead": "update the baseline to the documented, deliberate ruleset state",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "why": "the canary is the live detection layer for governance drift; a silenced canary is worse than a red one"
+      },
+      {
+        "dont": "widen the baseline beyond what repo-admin-settings.md records",
+        "instead": "any additional delta gets its own admin decision documented first",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "why": "undocumented widening hides real drift behind the legitimate fix"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-08-10T14:35:38Z",
+      "created_at": "2026-07-21T11:43:30Z",
+      "worktree": "release-tooling"
+    },
+    "preserves": [
+      {
+        "behavior": "The drift check keeps failing loudly on any UNdocumented ruleset change (no blanket allowlist).",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh"
+      },
+      {
+        "behavior": "pypi-latest-installability and credential-free-non-fast canary jobs unchanged.",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh"
+      },
+      {
+        "behavior": "validate-release-pr.yml's 48h green-canary freshness requirement unchanged.",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing drift enforcement - update expectations, not mechanism",
+        "decision": "extend",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "path": "_project/scripts/ruleset_review_enforcement.py"
+      },
+      {
+        "concept": "the documented 2026-07-18 ruleset retirement the baseline must match",
+        "decision": "reuse",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "path": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/release-canary.yml"
+      },
+      {
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/ruleset_review_enforcement.py"
+      },
+      {
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh run list --workflow=release-canary.yml --limit 2 --json conclusion,event",
+        "description": "Canary green post-fix",
+        "expected": "latest scheduled run conclusion=success; ruleset-drift job green",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "last_result": "pass",
+        "last_run": "2026-08-10T14:35:03Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests -k 'ruleset' -q",
+        "description": "Drift still detected when real",
+        "expected": "enforcement tests prove an undocumented ruleset delta still fails",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "last_result": "pass",
+        "last_run": "2026-08-10T14:35:35Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "2026-07-21: gh run 29821927272 ruleset-drift failed with HTTP 401 Unauthorized from RULESET_DRIFT_TOKEN; gh api full rulesets 15611785/19149459/15611787/18774756 and local uv run scripts/ruleset_drift_check.py --token gh-auth-token both confirm the live state matches docs and the retired develop review rule is already absent; no baseline code change is justified.",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "notes": null,
+        "started_at": "2026-07-21T12:03:57Z",
+        "started_branch": "fix/uat-remediation-release-canary-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Reproduce: read the failing canary run log; diff live rulesets (gh api GET) vs ruleset_review_enforcement.py expectations; identify the exact drift assertion(s) firing",
+        "wid": "w1"
+      },
+      {
+        "evidence": "No-op after revalidation: origin/develop already contains the documented 2026-07-18 retirement in scripts/ruleset_drift_check.py, _project/scripts/ruleset_review_enforcement.py, and repo-admin-settings.md; local full-ruleset check is green. Maintainer rotated RULESET_DRIFT_TOKEN on 2026-07-21, so w3 is now ready for explicit workflow_dispatch authorization.",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "notes": null,
+        "started_at": "2026-07-21T12:14:27Z",
+        "started_branch": "fix/uat-remediation-release-canary-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Update the baseline to match the documented 2026-07-18 ruleset retirement (docs/operations/repo-admin-settings.md) - nothing broader",
+        "wid": "w2"
+      },
+      {
+        "evidence": "GitHub Actions dispatch run 31343982578 succeeded with ruleset drift green; next scheduled run 31373659071 on 2026-08-10 succeeded with ruleset drift green at head bbd3666f9f0293e3a8814f8b5b1b4351a2ddac0e",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "notes": null,
+        "started_at": "2026-08-10T00:16:22Z",
+        "started_branch": "docs/credential-egress-closeout-v4",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-13",
+        "status": "done",
+        "summary": "Operator checkpoint: workflow_dispatch release-canary; confirm ruleset-drift job green; confirm next scheduled run green",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Dropped stale release-canary-scheduled-activation after current GitHub evidence proved its main/default-branch premise obsolete and both dispatched/scheduled canaries green.",
+        "item_id": "release-canary-ruleset-drift-baseline-refresh",
+        "notes": null,
+        "started_at": "2026-08-10T14:34:51Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Reconcile [[release-canary-scheduled-activation]]: default-branch premise is stale; fold its remaining live scope into this item or close it with evidence",
+        "wid": "w4"
+      }
+    ]
+  }
+}

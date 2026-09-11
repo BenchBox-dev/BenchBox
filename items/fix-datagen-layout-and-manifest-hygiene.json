@@ -1,0 +1,221 @@
+{
+  "context": "Implement in bounded phases with tests after each phase.\n\n1) Fix benchmark name normalization in benchbox/base.py so fallback strips\ntrailing 'Benchmark' and preserves special mappings.\n\n2) Add databases-path helper in benchbox/utils/path_utils.py and route DB\nartifact path creation in config/utils and adapters (DuckDB/SQLite/DataFusion)\nto benchmark_runs/databases, keeping datagen data paths unchanged.\n\n3) Add regeneration-time stale artifact pruning for table-level conflicts\n(single-file vs sharded/compressed variants) in TPC generators.\n\n4) Harden DataFrame cache conversion flow: restrict output to schema/source\ntable set for the benchmark run and prune leaf files not tracked in\n_manifest.json after successful writes.\n\n5) Fix Data Vault manifest entry path handling so recorded paths are valid and\nrelative/portable under output_dir.\n\n6) Add one-time migration utility to move existing DB artifacts out of datagen\nand optionally prune untracked stale files in dry-run/apply modes.\n",
+  "description": "benchmark_runs/datagen has drifted due to mixed responsibilities (SQL datagen,\nDataFrame cache, and database-engine artifacts) plus missing normalization and\ninsufficient cleanup paths.\n\nThis item implements a comprehensive fix that:\n  - normalizes benchmark IDs in BaseBenchmark naming paths\n  - moves SQL/DataFusion database artifacts to benchmark_runs/databases\n  - prevents stale-file coexistence during regeneration\n  - keeps DataFrame cache manifests and leaf directories in sync\n  - prevents cross-benchmark cache contamination (including OBT leakage)\n  - fixes malformed Data Vault manifest paths\n\nScope includes code changes, tests, and a one-time migration utility for\nexisting polluted workspaces.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "collapse SQL datagen and DataFrame cache manifest formats into one schema",
+        "instead": "preserve both and enforce local consistency",
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "why": "they serve different lifecycle contracts"
+      },
+      {
+        "dont": "delete all sidecar/tool files unconditionally after generation",
+        "instead": "prune only conflicts or explicit maintenance targets",
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "why": "some flows may depend on them for reuse/debug"
+      },
+      {
+        "dont": "perform broad recursive deletion based only on extension patterns",
+        "instead": "prune from manifest/table-aware allowlists",
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "why": "this risks data loss"
+      },
+      {
+        "dont": "rename existing database filenames or tuning suffixes",
+        "instead": "change only parent directory routing",
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "why": "downstream tooling expects current naming"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-02-13T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Current dual-manifest model remains intact: _datagen_manifest.json for SQL data and _manifest.json for DataFrame cache",
+        "item_id": "fix-datagen-layout-and-manifest-hygiene"
+      },
+      {
+        "behavior": "Existing benchmark run semantics for data generation and loading remain functional across supported platforms",
+        "item_id": "fix-datagen-layout-and-manifest-hygiene"
+      },
+      {
+        "behavior": "Existing database filename conventions (including tuning suffixes) remain unchanged",
+        "item_id": "fix-datagen-layout-and-manifest-hygiene"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/help.py"
+      },
+      {
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite remains green",
+        "expected": "all selected tests pass",
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/dataframe/test_data_loader.py tests/unit/platforms/test_duckdb.py tests/unit/platforms/test_datafusion.py tests/unit/core/tpcds -v --tb=short",
+        "description": "Updated modules pass targeted unit coverage",
+        "expected": "targeted tests pass, 0 failures",
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check .",
+        "description": "Ruff checks pass",
+        "expected": "no lint errors",
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/migrate_datagen_layout.py --dry-run",
+        "description": "Dry-run migration reports expected DB moves and stale candidates without writing",
+        "expected": "summary includes candidate database moves from datagen to databases",
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix BaseBenchmark benchmark-name normalization fallback and add regression tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add databases path helper and reroute DuckDB/SQLite/DataFusion + config DB artifact paths",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement table-aware stale artifact pruning for regeneration in TPC data generators",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Harden DataFrame cache conversion with schema/table filtering and leaf-manifest pruning",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix Data Vault manifest path normalization and add validation tests",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add one-time migration utility (dry-run/apply) for DB relocation and stale-file cleanup reporting",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-datagen-layout-and-manifest-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run verification suite, update indexes, and finalize TODO integration",
+        "wid": "w7"
+      }
+    ]
+  }
+}

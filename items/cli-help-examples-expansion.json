@@ -1,0 +1,10 @@
+{
+  "description": "Expand the CLI --help examples system with platform-specific and use-case\nspecific examples.\n\nCurrent state: 'benchbox run --help examples' provides categorized usage\nexamples. These could be expanded with:\n- Platform-specific examples (Snowflake, Databricks, etc.)\n- Use-case specific examples (comparison, tuning, data-only)\n- Error recovery examples\n\nThe goal is to make --help a complete reference that reduces need for\nexternal documentation.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation and User Experience",
+      "created_at": "2025-12-12T00:00:00Z",
+      "worktree": "docs-experience"
+    }
+  }
+}

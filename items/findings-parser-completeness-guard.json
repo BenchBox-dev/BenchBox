@@ -1,0 +1,139 @@
+{
+  "context": "Introduce the declarative mapping in todo_findings.py and drive the test from validate_blind_spot's own constants by import, never from a hand-copied literal list -- a copied list drifts exactly the way the two parsers already drifted. Include a negative test proving an undeclared field fails, so the guard is proven to fail closed rather than merely passing today.",
+  "description": "The root cause of the whole silent-loss class: validate_blind_spot.py accepts one field set (ALLOWED_FIELDS = 5 required + 8 optional) and _split_body parses EVERY '## ' section, but parse_draft (_project/scripts/todo_findings.py) reads a strictly narrower set -- 5 frontmatter keys plus evidence, and only 4 of the parsed sections. The two sets are never compared by any test, so a validator-accepted field silently vanishes and 'todo finding sync' still prints 'synced 1' with no error and no warning. Measured over the live corpus 2026-07-29: 65 of 65 files lose content this way.\n\nThe fix is a fail-closed contract, not a one-off patch: declare the parser's field and section homes machine-readably in todo_findings.py (for example FIELD_HOMES and SECTION_HOMES mappings), and test that every name in validate_blind_spot.ALLOWED_FIELDS and every known body heading has a declared home. Fields not yet given a real column carry an explicit, named pending set so the contract is still total -- adding a NEW validator field without a home fails the test immediately, and findings-schema-v4-lossless-legacy-fields empties the pending set rather than editing the assertion.\n\nThis is the guard that stops the class recurring; it is deliberately independent of the v4 migration so it can land first and make the v4 work verifiable.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assert against a hand-copied list of field names in the test",
+        "instead": "import validate_blind_spot and derive the expected set from its own constants at test time",
+        "item_id": "findings-parser-completeness-guard",
+        "why": "a duplicated literal drifts from validate_blind_spot.ALLOWED_FIELDS exactly the way parse_draft already drifted from it -- that drift is the defect being fixed"
+      },
+      {
+        "dont": "Mark the new test file 'fast'",
+        "instead": "give the module-level pytestmark 'unit' and 'medium', and confirm with uv run -- python _project/scripts/timing_policy_check.py",
+        "item_id": "findings-parser-completeness-guard",
+        "why": "the fast-lane cap in _project/config/fast_test_lane_policy.json has near-zero headroom on develop and CI's timing_policy_check --strict trips on any fast-lane addition"
+      },
+      {
+        "dont": "Silence the gap by adding the unmapped fields to an unnamed skip list or by loosening the assertion",
+        "instead": "name the pending set explicitly and require every entry to be justified, so v4 empties it and any new field still fails closed",
+        "item_id": "findings-parser-completeness-guard",
+        "why": "an unnamed exemption hides the very loss the guard exists to surface and makes the phase-5 parity gate unfalsifiable again"
+      }
+    ],
+    "item_meta": {
+      "category": "tracker",
+      "completed_at": "2026-07-29T17:02:46Z",
+      "completed_pr": 1341,
+      "created_at": "2026-07-29T16:39:14Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "parse_draft's current return shape and behaviour for the fields it already handles",
+        "item_id": "findings-parser-completeness-guard"
+      },
+      {
+        "behavior": "todo finding sync stays credential-free for create and candidates and unchanged for already-landed drafts",
+        "item_id": "findings-parser-completeness-guard"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-parser-completeness-guard",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-parser-completeness-guard",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/validate_blind_spot.py"
+      },
+      {
+        "item_id": "findings-parser-completeness-guard",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "findings-parser-completeness-guard",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_findings.py"
+      },
+      {
+        "item_id": "findings-parser-completeness-guard",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q",
+        "description": "findings script tests pass, including the new completeness guard",
+        "expected": "all pass",
+        "item_id": "findings-parser-completeness-guard",
+        "last_result": "pass",
+        "last_run": "2026-07-29T16:49:30Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/timing_policy_check.py --strict",
+        "description": "the fast-lane timing policy still holds after adding the test module",
+        "expected": "exit 0; the new module is unit+medium, not fast",
+        "item_id": "findings-parser-completeness-guard",
+        "last_result": "pass",
+        "last_run": "2026-07-29T16:50:04Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-parser-completeness-guard",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "findings-parser-completeness-guard",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added FRONTMATTER_HOMES (10 keys), FRONTMATTER_HOMES_PENDING_V4 (related_paths, suggested_sweep, todo_id) and SECTION_HOMES to _project/scripts/todo_findings.py, each naming its v4 target.",
+        "item_id": "findings-parser-completeness-guard",
+        "notes": null,
+        "started_at": "2026-07-29T16:49:05Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Declare the parser's frontmatter-field and body-section homes machine-readably in todo_findings.py, with an explicitly named pending set for fields that have no column yet",
+        "wid": "w1"
+      },
+      {
+        "evidence": "TestParserCompletenessGuard in tests/unit/scripts/test_todo_findings.py derives its expectation from vbs.ALLOWED_FIELDS and vbs.REQUIRED_BODY_HEADINGS by import, covering both directions (no accepted field undeclared, no declared field the validator rejects).",
+        "item_id": "findings-parser-completeness-guard",
+        "notes": null,
+        "started_at": "2026-07-29T16:49:17Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add the guard test driven by validate_blind_spot's own constants, covering both frontmatter fields and body sections",
+        "wid": "w2"
+      },
+      {
+        "evidence": "test_guard_fails_closed_on_a_new_validator_field monkeypatches an extra field into vbs.ALLOWED_FIELDS and asserts the completeness check surfaces it; plus TestUnmappedContentIsReported (6 cases) proves unmapped content is reported and a lossy draft is left unsynced. 1107 passed in tests/unit/scripts/.",
+        "item_id": "findings-parser-completeness-guard",
+        "notes": null,
+        "started_at": "2026-07-29T16:49:19Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add the negative case proving an undeclared field or section fails the guard, so it is shown to fail closed",
+        "wid": "w3"
+      }
+    ]
+  }
+}

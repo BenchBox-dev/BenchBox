@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: Medium\"\n- \"**Status**: Completed ✅\"\n- \"**Description**: Update Primitives and TPCHavoc benchmarks to reuse existing TPC-H databases when configuration matches, implementing the same validation checks that TPC-H uses\"\n- \"**Tasks**:\"\n- \"**Implementation Details**:\"\n- \"**Files Affected**: `benchbox/core/primitives/benchmark.py`, `benchbox/core/tpchavoc/benchmark.py`, `tests/unit/test_database_reuse_optimization.py`\"\n- \"**Impact**: Significantly reduces setup time for Primitives and TPCHavoc benchmarks when TPC-H database already exists with compatible configuration. Leverages existing TPC-H data generation work while maintaining validation integrity and configuration consistency.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

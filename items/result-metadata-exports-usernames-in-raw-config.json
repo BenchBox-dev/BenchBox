@@ -1,0 +1,92 @@
+{
+  "context": "Add username-shaped parts to _SECRET_KEY_PARTS, or introduce an explicit connection-identity key class if usernames should be recorded for some platforms and not others - decide which, because a username is identifying rather than strictly secret and some adapters may legitimately want it in provenance. Guard against over-redaction as #1346 did: a bare 'user' substring would also catch user_agent or num_users, so prefer bounded matching plus a non-credential guard test. Once shared redaction covers it, DuckLake's adapter-local _CREDENTIAL_CONFIG_KEYS scrub can be reduced or removed.",
+  "description": "is_secret_option_key() in benchbox/core/results/platform_options.py does not match user/username/pg_user/http_user/login/account, so any adapter carrying a username in platform_config exports it verbatim in platform_raw_config. Observed 2026-07-30 on a non-DuckLake adapter: PostgreSQLAdapter(username='alice-sentinel', password='hunter2-sentinel') produced normalized metadata containing username='alice-sentinel' while password was correctly '<redacted>'. Expected to affect every PG-family, Redshift, Snowflake and Trino-style adapter. PR #1364 fixed this for DuckLake ONLY, by scrubbing an explicit key set inside the adapter's own get_normalized_result_metadata override - a local patch on a repo-wide problem. Fourth instance of the same family in this effort (#1333 ATTACH error, #1345 MotherDuck traceback, #1346 *_key_id export, #1364 pg_user): key-NAME-based redaction keeps missing things because it only protects keys whose names happen to match. (Supersedes dropped result-metadata-exports-connection-usernames, which lacked a w0 unit.)",
+  "legacy": {
+    "item_meta": {
+      "category": "security",
+      "created_at": "2026-07-30T23:38:17Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Already-redacted keys (password/token/secret/key_id/...) keep their current behavior",
+        "item_id": "result-metadata-exports-usernames-in-raw-config"
+      },
+      {
+        "behavior": "Non-credential option keys still export their real values",
+        "item_id": "result-metadata-exports-usernames-in-raw-config"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "result-metadata-exports-usernames-in-raw-config",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/platform_options.py"
+      },
+      {
+        "item_id": "result-metadata-exports-usernames-in-raw-config",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_platform_options_capture.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_platform_options_capture.py -q",
+        "description": "A connection username is redacted in sanitized platform options",
+        "expected": "all pass; new case asserts REDACTED_VALUE for username/pg_user and real values for non-credential keys",
+        "item_id": "result-metadata-exports-usernames-in-raw-config",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "result-metadata-exports-usernames-in-raw-config",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "result-metadata-exports-usernames-in-raw-config",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "result-metadata-exports-usernames-in-raw-config",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-validate the leak still reproduces on a current develop checkout before changing anything",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "result-metadata-exports-usernames-in-raw-config",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide and implement how username-shaped keys are treated",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "result-metadata-exports-usernames-in-raw-config",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Tests for username redaction plus an over-redaction guard",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "context": "Follow existing override pattern. For QSA4, mechanically replace\nSUM(x) FILTER (WHERE cond) with sumIf(x, cond). For QTM1, wrap\norder_time in toDateTime() before passing to toHour().\n",
+  "description": "6 query failures on ClickHouse in coffeeshop benchmark:\n- QSA4 × 3: SUM(x) FILTER (WHERE cond) → ClickHouse needs sumIf(x, cond)\n- QTM1 × 3: EXTRACT(HOUR FROM order_time) where order_time is TIME type →\n  toHour() doesn't accept bare TIME values, needs toHour(toDateTime(order_time))\n\nPart of Pattern B (EXTRACT) and Pattern D (FILTER aggregate).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify base query files",
+        "instead": "create clickhouse_sql/ overrides instead",
+        "item_id": "clickhouse-coffeeshop-dialect-overrides",
+        "why": "other platforms depend on standard SQL FILTER/EXTRACT"
+      },
+      {
+        "dont": "use toHour() directly on TIME columns",
+        "instead": "wrap in toDateTime() first",
+        "item_id": "clickhouse-coffeeshop-dialect-overrides",
+        "why": "ClickHouse toHour() rejects bare TIME values"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-04-08T00:00:00Z",
+      "created_at": "2026-04-08T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Base coffeeshop QSA4/QTM1 queries unchanged - other platforms use standard FILTER and EXTRACT",
+        "item_id": "clickhouse-coffeeshop-dialect-overrides"
+      },
+      {
+        "behavior": "Override queries return identical column names and semantics",
+        "item_id": "clickhouse-coffeeshop-dialect-overrides"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'coffeeshop and clickhouse'",
+        "description": "ClickHouse coffeeshop overrides load with sumIf and toDateTime wrappers",
+        "expected": "Tests pass confirming sumIf/toDateTime overrides for QSA4/QTM1",
+        "item_id": "clickhouse-coffeeshop-dialect-overrides",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-coffeeshop-dialect-overrides",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "clickhouse-coffeeshop-dialect-overrides",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "clickhouse-coffeeshop-dialect-overrides",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create ClickHouse override for SA4 - actual issue is nested window aggregate SUM(SUM()) OVER (), replaced with CROSS JOIN subquery. TODO description was incorrect about FILTER clause.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-coffeeshop-dialect-overrides",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create ClickHouse override for TM1 using toHour(toDateTime(order_time)) for TIME-type column",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-coffeeshop-dialect-overrides",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests: load SA4/TM1 for ClickHouse and assert SQL avoids nested window aggregate and uses toDateTime() respectively",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,227 @@
+{
+  "description": "Update every doc that references the old two-repo model. Write a short\nrelease guide that captures the new flow in one page.\n\nCan run in parallel with Phase 6 (deletion). Both depend only on the\ndev locus migration, not on each other.\n\nThis phase lands as a normal PR on public from ~/Developer/benchbox-public.\nSquash-merge.\n\nPlan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 7).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add screenshots",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "why": "they rot quickly and the existing docs are text-only; ASCII tables and code blocks are sufficient."
+      },
+      {
+        "dont": "duplicate the Makefile release target into the release guide",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "why": "the Makefile is canonical; the guide should reference and explain, not paste-and-replicate."
+      },
+      {
+        "dont": "write a long history section",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "why": "the guide describes how to release TODAY; migration history belongs in MIGRATION-NOTES.md (if kept) or git history."
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-04-27T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All other docs (benchmarks, platforms, MCP server, getting-started) are unchanged. This phase only touches release-related docs and meta-files.",
+        "item_id": "single-repo-migration-phase-7-docs-cleanup"
+      },
+      {
+        "behavior": "docs/operations/results-phase-2-runbook.md (results publishing) is unchanged - it covers a different runbook.",
+        "item_id": "single-repo-migration-phase-7-docs-cleanup"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "kind": "only_modify",
+        "path_glob": "CONTRIBUTING.md"
+      },
+      {
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "kind": "only_modify",
+        "path_glob": "docs/development/development.md"
+      },
+      {
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "kind": "only_modify",
+        "path_glob": "docs/index.rst"
+      },
+      {
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/release-guide.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd docs && uv run -- python -m sphinx -W -b html . _build/html",
+        "description": "Docs build with no warnings",
+        "expected": "build succeeded",
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'private.*public.*remote' CLAUDE.md",
+        "description": "CLAUDE.md no longer references CRITICAL two-remote rule",
+        "expected": "0",
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f docs/operations/release-guide.md && wc -w docs/operations/release-guide.md",
+        "description": "Release guide exists and is non-trivial",
+        "expected": "between 200 and 800 words",
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "notes": "Phase 5 stripped the section as an interim step. Now write a\nproper replacement:\n  ## Git workflow\n  Single repo, single remote (origin -> joeharris76/BenchBox).\n  Working clone at ~/Developer/benchbox-public (or your local\n  equivalent — the previous private clone was retired in the\n  Option B migration).\n  Work on feature branches, open PRs against main, squash-merge.\n  Releases: make release VERSION=X.Y.Z, then tag-push to publish.\n  See docs/operations/release-guide.md for details.\nUpdate the Commands table to remove anything referencing the old\nrelease flow (automate_release.py etc. - those scripts are gone\nin Phase 6).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update CLAUDE.md - replace two-remote section with single-repo guidance",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "notes": "Strip the two-remote rule. Update the Release section to point\nto the new runbook. Keep dependency-bounds policy and other\nsections that are orthogonal to the migration.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update AGENTS.md - same treatment",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "notes": "Update line 193 area (\"Releases are handled by maintainers\") to:\n  \"External contributions land via PR against main. Releases are\n  cut by maintainers via the flow in\n  docs/operations/release-guide.md.\"\nAdd or extend a section explaining the squash-merge convention\n(each PR becomes one commit on main).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update CONTRIBUTING.md",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "notes": "Update GitHub URL in any badge or link to point at\njoeharris76/BenchBox (already correct after the rename, but\nverify all badges, install instructions, and \"view source\"\nlinks).\nCheck for \"private\" or \"internal\" in copy that no longer applies.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update README.md - URLs and any lingering private/public references",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "notes": "Short, scannable. Sections:\n  # Cutting a BenchBox release\n  ## The flow\n    1. make release VERSION=X.Y.Z (bumps version, drafts changelog,\n       opens PR)\n    2. Review the PR. Edit the changelog.\n    3. Squash-merge.\n    4. git tag vX.Y.Z && git push origin vX.Y.Z\n    5. release.yml builds and publishes to PyPI.\n  ## Recovering from common failures\n    - CI fails on main: fix on a branch, PR, merge.\n    - Wheel content is wrong: adjust pyproject.toml/MANIFEST.in\n      excludes, cut a patch release.\n    - PyPI publish fails: check trusted-publisher config, retry\n      with the next patch version.\n  ## Reference\n    - Source: Makefile (release target),\n      .github/workflows/release.yml,\n      scripts/generate_changelog_entry.py.\nStyle: myst markdown, frontmatter copyright header consistent\nwith sibling docs/operations/results-phase-2-runbook.md.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write docs/operations/release-guide.md (~300 words)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "notes": ".. toctree::\n   :maxdepth: 1\n   :caption: Contributing\n\n   contributing-results.md\n   operations/release-guide.md\n   operations/results-phase-2-runbook.md\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add the new guide to docs/index.rst toctree under Contributing",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "notes": "At line 99 area, the \"Release Preparation Workflow\" section is a\nstub. Replace its body with a single line:\n  See [the release guide](../operations/release-guide.md) for the\n  full maintainer workflow.\nKeep the heading so any inbound anchor links resolve.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace docs/development/development.md release-prep stub with a redirect",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-7-docs-cleanup",
+        "notes": "cd docs && uv run -- python -m sphinx -W -b html . _build/html\nMust complete with zero warnings. Open the rendered page and\nconfirm:\n  - Code blocks render with syntax highlighting\n  - Internal links resolve\n  - Toctree shows the new page in Contributing\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build docs locally with -W and verify the new page",
+        "wid": "w8"
+      }
+    ]
+  }
+}

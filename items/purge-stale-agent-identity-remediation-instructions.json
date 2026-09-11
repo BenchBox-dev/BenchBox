@@ -1,0 +1,125 @@
+{
+  "context": "Search, in this order: /Users/joe/.skill-sync/skills (canonical source), /Users/joe/.claude including CLAUDE.md and any settings or hook files, /Users/joe/.codex, this repo's _project/handoffs and docs, and .jsonl transcripts under /Users/joe/.claude/projects as a separate targeted pass. Classify every hit as (a) a durable reusable instruction that can be edited, (b) a one-off historical task instruction in a transcript, or (c) text originating from an external harness. Correct (a) to require the effective human identity and to forbid agent Co-Authored-By / *-Session trailers. For (b) and (c), do NOT fabricate a code fix: record that the source was task-local or external and state what would be needed to stop it. Regenerate any skill mirror only through `make skill-sync`; never hand-edit a mirror.",
+  "description": "A local agent session was observed executing `git config user.email noreply@anthropic.com && git config user.name Claude` inside /Users/joe/Developer/BenchBox.pool-09, which (see worktree-scoped-git-identity-at-claim) writes into the primary clone's shared config. The instruction came from task text, not from repo code: agent_instruction_audit.py only DETECTS the identity, and the only repo-side `git config user.*` writes are CI workflows setting benchbox-bot / github-actions[bot] in ephemeral CI checkouts. This item finds and corrects any DURABLE copy of that instruction so it stops being re-executed. Two search defects in the prior investigation must be corrected. First, the sweep excluded --glob '!*.jsonl' while the only confirmed evidence lived in a .jsonl transcript, so the search excluded its own evidence class. Second, it searched /Users/joe/.claude and /Users/joe/.codex but NOT /Users/joe/.skill-sync/skills, which is the canonical skill SOURCE and the single highest-value location: a copy there propagates into every generated mirror in every project. Scope note: the canonical skill source lives outside this repository, so that edit is an out-of-repo action recorded in the report, and only in-repo surfaces (handoffs, docs, AGENTS.md) are in this item's file scope.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Exclude .jsonl from the search because the files are large",
+        "instead": "Run transcripts as a separate targeted pass with a narrow pattern",
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "why": "The only confirmed evidence of the writer lives in a .jsonl transcript; excluding it hides the evidence class that produced the finding"
+      },
+      {
+        "dont": "Hand-edit a file under .claude/skills, .codex/skills, .gemini/skills or .antigravity/skills",
+        "instead": "Edit the canonical source under /Users/joe/.skill-sync/skills and run make skill-sync",
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "why": "They are generated mirrors; a hand edit is silently reverted by the next make skill-sync and breaks skill-sync-verify"
+      },
+      {
+        "dont": "Invent a local hook or fabricate a code fix when no durable writer is found",
+        "instead": "Report that the source was task-local or external, and record precisely what external change would stop it",
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "why": "The confirmed writer was an agent following task text; inventing a mechanism would encode a false root cause and leave the real supply untouched"
+      },
+      {
+        "dont": "Treat this cleanup as closing the recurrence",
+        "instead": "Rely on worktree-scoped-git-identity-at-claim for prevention and treat this item as reducing avoidable re-execution",
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "why": "The instruction text originates from an external agent harness that is still in service and will keep emitting it"
+      }
+    ],
+    "item_meta": {
+      "category": "repository-maintenance",
+      "created_at": "2026-08-04T01:28:49Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing handoff documents keep their historical record; corrections are additive or targeted, not a rewrite of history",
+        "item_id": "purge-stale-agent-identity-remediation-instructions"
+      },
+      {
+        "behavior": "Generated skill mirrors remain byte-identical to what make skill-sync produces from the canonical source",
+        "item_id": "purge-stale-agent-identity-remediation-instructions"
+      },
+      {
+        "behavior": "The documented escape hatches stay available: BENCHBOX_ALLOW_AGENT_GIT_IDENTITY and BENCHBOX_ALLOW_AGENT_COAUTHOR for a task that explicitly authorized that exact identity or trailer",
+        "item_id": "purge-stale-agent-identity-remediation-instructions"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "kind": "do_not_modify",
+        "path_glob": ".antigravity/skills/**"
+      },
+      {
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "kind": "do_not_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "kind": "do_not_modify",
+        "path_glob": ".codex/skills/**"
+      },
+      {
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "kind": "do_not_modify",
+        "path_glob": ".gemini/skills/**"
+      },
+      {
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "kind": "do_not_modify",
+        "path_glob": ".git/config"
+      },
+      {
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! rg -n -i 'git config[^\\n]*user\\.(name|email)[^\\n]*noreply@(anthropic|openai)' AGENTS.md CLAUDE.md docs/development .claude/skills",
+        "description": "Unfixed-tree gate: no LIVE instruction surface tells an agent to set a vendor noreply identity. Deliberately excludes _project/handoffs (historical records may quote the command as evidence) and the todo-db export (item prose is self-matching).",
+        "expected": "no live instruction surface directs an agent to set an agent/service identity",
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "out=$(make skill-sync-verify 2>&1) && ! printf '%s' \"$out\" | grep -q skipping",
+        "description": "Generated mirrors match their canonical source and lock, and verify actually ran rather than skipping",
+        "expected": "non-zero exit if skill-sync-verify fails OR if it prints a 'skipping' line, since a skip is not a pass",
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make agent-instructions-check",
+        "description": "The instruction audit still passes",
+        "expected": "agent-instructions PASS",
+        "item_id": "purge-stale-agent-identity-remediation-instructions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

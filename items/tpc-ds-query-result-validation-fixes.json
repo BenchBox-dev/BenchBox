@@ -1,0 +1,10 @@
+{
+  "description": "Successfully completed 3-phase fix for TPC-DS query result validation failures caused by variant conflation, seed misalignment, and inappropriate EXACT validation for parameterized queries. Changed default to SKIP validation with optional override mechanism for advanced users.",
+  "legacy": {
+    "item_meta": {
+      "category": "Benchmark Correctness and Validation",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

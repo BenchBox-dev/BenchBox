@@ -1,0 +1,410 @@
+{
+  "context": "Treat the curated subset as a product defect, not a catalog expansion\nchore. Start by proving the current registry/catalog mismatch. Then move\nthe inclusion source of truth into `scripts/generate_landing_quickstarts.py`\nusing `PlatformRegistry` metadata. Keep YAML as configuration for\nhuman-authored presentation/safety overrides only. The hardest part is\ndeployment classification: do not blindly accept the registry fallback that\ntreats missing deployment metadata as local if that would misclassify\nmanaged cloud/server platforms in the UI. Prefer improving registry\nmetadata when it is obviously incomplete, because other CLI/docs surfaces\nmay benefit from the same correction.\n",
+  "description": "The `/prompts/` landing prompt builder currently exposes a hand-curated\nstatic platform subset in `landing/prompts/catalog.yaml`. That subset was\nnot approved: platform filters should exclude non-applicable platforms by\ninterface and deployment, but every supported BenchBox platform must be\npromptable when it matches the selected filters.\n\nCurrent observed defect:\n  - Managed cloud + SQL compare mode only shows MotherDuck,\n    ClickHouse Cloud, and Snowflake.\n  - `landing/prompts/catalog.yaml` lists only 8 total platforms.\n  - The runtime platform registry reports 50 platform IDs, with 45\n    SQL-capable and 19 DataFrame-capable platforms when checked via\n    `PlatformRegistry.get_platform_capabilities()`.\n  - The registry currently includes at least one deployment capability\n    mode outside the prompt UI vocabulary (`remote` for Velox), and many\n    platforms rely on the registry's default-local fallback when no\n    deployment modes are defined. The implementation must audit and resolve\n    those cases rather than silently misclassifying them.\n\nThe fix should not replace one manually-curated list with a longer\nmanually-curated list. The prompt catalog must derive its platform list\nfrom the runtime registry at generation time, then use focused overrides\nonly for presentation and prompt-safety metadata that the registry cannot\nsupply.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add `landing/prompts/recipes.json` or a browser fetch of runtime registry data",
+        "instead": "(not specified)",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "why": "the decision record forbids a public unversioned JSON API."
+      },
+      {
+        "dont": "change root landing navigation, docs templates, BenchBox CLI behavior, or MCP tool names as part of this fix.",
+        "instead": "(not specified)",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hand-add the missing 42-ish platforms to `landing/prompts/catalog.yaml` as another complete static list",
+        "instead": "derive inclusion from PlatformRegistry instead.",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "why": "that recreates the unauthorized subset problem"
+      },
+      {
+        "dont": "mark every platform with missing deployment metadata as `local` without audit",
+        "instead": "fix metadata or add explicit prompt overrides.",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "why": "managed cloud and self-hosted platforms would appear under the wrong filter"
+      },
+      {
+        "dont": "remove interface/deployment filtering",
+        "instead": "(not specified)",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "why": "filters are correct, only the source platform universe is wrong."
+      },
+      {
+        "dont": "weaken managed-cloud safety validation to make generated entries pass",
+        "instead": "(not specified)",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "why": "all managed prompt paths must retain dependency/dry-run/no-secret guidance."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-all-supported-platforms",
+        "id": 432,
+        "reason": "All platforms must be promptable first; large-list ergonomics can follow if native selects become unwieldy.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Search/typeahead was deferred until native platform selects 'become unwieldy'. That UX trigger has not fired for the current ~20-platform native-select lists; condition unmet, no committed need.",
+        "summary": "Search/typeahead UI for long platform lists"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-all-supported-platforms",
+        "id": 433,
+        "reason": "This TODO must fix platform availability. Benchmark-specific compatibility filtering can be added separately unless registry `unsupported_benchmarks` makes it cheap and safe.",
+        "resolution": "promoted",
+        "resolved_item": "derive-benchmark-compatibility-per-platform",
+        "resolved_reason": null,
+        "summary": "Derive benchmark compatibility per platform"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "needs_item": "landing-prompts-generic-semantics-and-layout-fixes"
+      }
+    ],
+    "item_meta": {
+      "category": "Product and Documentation",
+      "created_at": "2026-05-14T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All supported runtime platforms with SQL or DataFrame capability are promptable after applicable filters are selected.",
+        "item_id": "landing-prompts-all-supported-platforms"
+      },
+      {
+        "behavior": "Default first-load state remains Generic + CLI + Test one platform + SQL + Local + duckdb + tpch + 0.01.",
+        "item_id": "landing-prompts-all-supported-platforms"
+      },
+      {
+        "behavior": "Dropdown platform ids use canonical PlatformRegistry ids; aliases do not create duplicate prompt options.",
+        "item_id": "landing-prompts-all-supported-platforms"
+      },
+      {
+        "behavior": "Filters still exclude non-applicable platforms by interface and deployment.",
+        "item_id": "landing-prompts-all-supported-platforms"
+      },
+      {
+        "behavior": "Managed-cloud safety guidance remains visible and conservative.",
+        "item_id": "landing-prompts-all-supported-platforms"
+      },
+      {
+        "behavior": "No new public CLI command, MCP prompt-rendering tool, browser fetch endpoint, or recipes.json file.",
+        "item_id": "landing-prompts-all-supported-platforms"
+      },
+      {
+        "behavior": "The prompt builder remains a static landing route backed by committed catalog.generated.js.",
+        "item_id": "landing-prompts-all-supported-platforms"
+      },
+      {
+        "behavior": "URL parameter names remain pinned: goal, agent, surface, interface, deployment, platform, platformA, platformB, benchmark, scale.",
+        "item_id": "landing-prompts-all-supported-platforms"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/decisions/landing-prompts-route.md — correct the product decision record instead of relying on chat context",
+        "decision": "reuse",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "path": "_project/decisions/landing-prompts-route.md"
+      },
+      {
+        "concept": "benchbox/core/platform_registry.py:PlatformRegistry.get_all_platform_metadata — reuse as the source of truth for supported platform ids",
+        "decision": "reuse",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "path": "benchbox/core/platform_registry.py:PlatformRegistry.get_all_platform_metadata"
+      },
+      {
+        "concept": "benchbox/core/platform_registry.py:PlatformRegistry.get_platform_capabilities — reuse for SQL/DataFrame and deployment capability derivation",
+        "decision": "reuse",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "path": "benchbox/core/platform_registry.py:PlatformRegistry.get_platform_capabilities"
+      },
+      {
+        "concept": "landing/prompts/catalog.yaml:managed safety_terms — preserve the current cloud-safety copy contract as overrides or generated safety text",
+        "decision": "reuse",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "path": "landing/prompts/catalog.yaml:managed"
+      },
+      {
+        "concept": "scripts/generate_landing_quickstarts.py:validate/render_js — extend the existing static catalog generator rather than adding a browser fetch or public API",
+        "decision": "extend",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "path": "scripts/generate_landing_quickstarts.py:validate/render_js"
+      },
+      {
+        "concept": "tests/unit/landing/test_landing_quickstarts.py — extend existing generator/catalog tests with registry-parity gates",
+        "decision": "extend",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "path": "tests/unit/landing/test_landing_quickstarts.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "kind": "do_not_modify",
+        "path_glob": "docs/_templates/page.html"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "kind": "do_not_modify",
+        "path_glob": "landing/index.html"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/landing-prompts-route.md"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.generated.js"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.yaml"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/prompts.js"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_landing_quickstarts.py"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/landing/test_landing_quickstarts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/generate_landing_quickstarts.py --check && uv run -- python -m pytest tests/unit/landing/ -q",
+        "description": "Registry parity and generated catalog checks pass",
+        "expected": "exit 0; landing tests pass including registry-parity checks",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python - <<'PY'\nimport json\nfrom pathlib import Path\nfrom benchbox.core.platform_registry import PlatformRegistry\ntext = Path('landing/prompts/catalog.generated.js').read_text()\npayload = text.split(' = ', 1)[1].rstrip(';\\n')\ncatalog = json.loads(payload)\nexpected = {pid for pid in PlatformRegistry.get_all_platform_metadata() if (lambda caps: caps.supports_sql or caps.supports_dataframe)(PlatformRegistry.get_platform_capabilities(pid))}\nactual = {p['id'] for p in catalog['platforms']}\nassert actual == expected, (sorted(expected - actual), sorted(actual - expected))\nprint(len(actual))\nPY",
+        "description": "Generated prompt catalog covers all registry-supported platforms",
+        "expected": "exit 0; printed count matches registry-supported platform count",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "node --check landing/prompts/prompts.js",
+        "description": "Prompt JS parses cleanly",
+        "expected": "exit 0",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -ni 'MVP platform subset|implicitly excluded|source of truth for platform inclusion' landing/prompts/catalog.yaml scripts/generate_landing_quickstarts.py",
+        "description": "No curated subset language remains in prompt catalog source",
+        "expected": "exit 0; no catalog/generator language permits a hand-curated inclusion subset",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test ! -e landing/prompts/recipes.json",
+        "description": "Forbidden public JSON catalog remains absent",
+        "expected": "exit 0",
+        "item_id": "landing-prompts-all-supported-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "landing-prompts-all-supported-platforms",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-all-supported-platforms",
+        "notes": "Re-run the current-state inventory before implementation and record a\ncompact summary in the PR body:\n\n    uv run -- python - <<'PY'\n    from collections import Counter\n    from benchbox.core.platform_registry import PlatformRegistry\n\n    metadata = PlatformRegistry.get_all_platform_metadata()\n    counts = Counter()\n    deployments = Counter()\n    for platform_id in sorted(metadata):\n        caps = PlatformRegistry.get_platform_capabilities(platform_id)\n        if caps.supports_sql:\n            counts[\"sql\"] += 1\n        if caps.supports_dataframe:\n            counts[\"dataframe\"] += 1\n        modes = {dep.mode for dep in caps.deployment_modes.values()} or {\"local\"}\n        for mode in modes:\n            deployments[mode] += 1\n    print(\"total\", len(metadata))\n    print(\"sql\", counts[\"sql\"])\n    print(\"dataframe\", counts[\"dataframe\"])\n    print(\"deployment_modes\", dict(sorted(deployments.items())))\n    PY\n\nAlso confirm the prompt catalog platform count before the change:\n\n    uv run -- python - <<'PY'\n    import yaml\n    from pathlib import Path\n    catalog = yaml.safe_load(Path(\"landing/prompts/catalog.yaml\").read_text())\n    print(len(catalog[\"platforms\"]))\n    print([p[\"id\"] for p in catalog[\"platforms\"]])\n    PY\n\nRaw stdout belongs in `/tmp` or the PR body summary, not committed as\na log transcript.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate current registry/catalog evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-all-supported-platforms",
+        "notes": "Update `_project/decisions/landing-prompts-route.md` to state that:\n  - `/prompts/` must expose every runtime-supported platform from\n    `PlatformRegistry.get_all_platform_metadata()` that supports SQL\n    or DataFrame execution.\n  - Filtering is allowed only by actual platform capability\n    (`supports_sql`, `supports_dataframe`, deployment mode, benchmark\n    compatibility), not by marketing curation.\n  - The route remains static: it may materialize registry data into\n    `landing/prompts/catalog.generated.js` at build/generation time,\n    but must not add a public JSON API or runtime endpoint.\n  - Hand-authored YAML may contain labels, ordering groups, safety\n    copy, or explicit metadata corrections, but must not be the source\n    of truth for platform inclusion.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace the curated-platform decision with an all-supported-platform contract",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-all-supported-platforms",
+        "notes": "The prompt UI filters by `interfaces[]` and `deployments[]`, so the\nsource metadata must be accurate. Inspect every platform returned by\n`PlatformRegistry.get_all_platform_metadata()` and classify:\n  - interface support from `PlatformRegistry.get_platform_capabilities()`\n    (`supports_sql`, `supports_dataframe`);\n  - deployment modes from `deployment_modes[*].mode`;\n  - fallback behavior for platforms with no deployment modes currently\n    defined (`supports_deployment_mode()` treats them as local).\n  - any deployment capability mode outside the current prompt UI\n    vocabulary (`local`, `self-hosted`, `managed`), especially\n    `remote`.\n\nProduce an implementation table in code/tests, not a one-off chat\ntable. If registry metadata is wrong for obvious cloud/server\nplatforms (for example Snowflake, BigQuery, Redshift, Databricks,\nAthena, Fabric, Synapse, Spark-provider platforms), either:\n  - fix the registry `capabilities.deployment_modes` so all consumers\n    benefit, or\n  - add a narrowly-scoped `platform_overrides` section in\n    `landing/prompts/catalog.yaml` with an explicit comment explaining\n    why the prompt route needs a correction before the registry is\n    fixed.\n\n`remote` must not leak into `catalog.generated.js` unless the UI gains\na fourth Deployment option. For this TODO, default to mapping `remote`\nto `self-hosted` only when the platform is user-managed/networked, and\ndocument that mapping in generator code/tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit deployment metadata before wiring filters to all platforms",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-all-supported-platforms",
+        "notes": "Refactor `scripts/generate_landing_quickstarts.py` so the generated\ncatalog's `platforms[]` is materialized from the runtime registry:\n  - source ids from `PlatformRegistry.get_all_platform_metadata()`;\n  - label from registry `display_name` unless a presentation override\n    exists;\n  - `interfaces` from `supports_sql` / `supports_dataframe`;\n  - `deployments` from deployment capability `mode` values, normalized\n    to the UI vocabulary `local`, `self-hosted`, `managed`;\n  - exclude only platforms with neither SQL nor DataFrame support.\n\nKeep `catalog.generated.js` as the static runtime payload. Do not\nfetch registry data in the browser, and do not introduce\n`landing/prompts/recipes.json`.\n\nThe generated prompt ids should use canonical PlatformRegistry ids, not\naliases from `PlatformRegistry.get_all_aliases()`. Aliases may remain\nvalid CLI input but should not duplicate dropdown entries.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Derive prompt platform entries from PlatformRegistry in the generator",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-all-supported-platforms",
+        "notes": "Change `landing/prompts/catalog.yaml` so hand-authored platform data\ncannot silently omit supported platforms. Recommended shape:\n\n    platform_overrides:\n      snowflake:\n        label: \"Snowflake\"\n        deployments: [managed]\n        safety_terms: ...\n\nThe generator should fail if `platforms:` is still used as a complete\nsource list, or should treat `platforms:` as generated/output-only and\nnot read it from YAML. Any override key must match a real registry\nplatform id.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Convert catalog.yaml platform data into overrides, not an inclusion list",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-all-supported-platforms",
+        "notes": "Managed deployments must keep the existing safety contract:\n  - dependency/status check before any live run;\n  - dry-run before live execution;\n  - no secrets pasted into chat.\n\nFor generated managed platform entries, either require explicit\n`safety_terms` in `platform_overrides` or synthesize conservative\ngeneric safety terms from deployment capability flags such as\n`requires_credentials`, `requires_network`, and `requires_cloud_storage`.\nAdd validator errors for managed entries that lack effective\ndependency/dry-run/no-secret guidance after overrides are applied.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Preserve cloud-safety behavior for every managed platform",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-all-supported-platforms",
+        "notes": "Regenerate `landing/prompts/catalog.generated.js`.\n\nExtend `tests/unit/landing/test_landing_quickstarts.py` with gates\nthat fail if the prompt catalog drifts from the runtime registry:\n  - generated platform ids equal every registry platform id with SQL\n    or DataFrame support;\n  - every generated platform has a non-empty label, at least one\n    interface, and at least one deployment;\n  - every generated deployment value is one of `local`,\n    `self-hosted`, or `managed`;\n  - any non-UI registry deployment mode such as `remote` has an\n    explicit generator mapping covered by test;\n  - SQL filter pool contains all SQL-capable registry platforms for\n    the selected deployment;\n  - DataFrame filter pool contains all DataFrame-capable registry\n    platforms for the selected deployment;\n  - managed platform entries have effective safety terms;\n  - no hand-curated subset comment remains.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate catalog.generated.js and update UI tests for full coverage",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-all-supported-platforms",
+        "notes": "Add the narrowest maintainable smoke test available in this codebase.\nIf no browser harness exists yet, add a static JS/DOM smoke similar to\nthe local review script that loads `catalog.generated.js` and\n`prompts.js`, selects:\n  - SQL + Managed cloud + Compare platforms;\n  - SQL + Self-hosted + Compare platforms;\n  - DataFrame + Local + Test one platform.\n\nAssert each dropdown includes all registry-derived applicable platform\nids and no inapplicable ids. This should be committed as a real test,\nnot left as a manual terminal transcript.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a focused browser/static smoke for platform dropdown coverage",
+        "wid": "w7"
+      }
+    ]
+  }
+}

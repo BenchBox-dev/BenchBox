@@ -1,0 +1,119 @@
+{
+  "context": "Offline adjudication of v6 cells for the three scenarios; either rewrite oracle accepted labels, rewrite scenarios/prompts, or permanently demote to non-gating diagnostics with documented rationale. Prefer evidence from control-arm parity over model-blaming.",
+  "description": "Defect ledger #5 open: historical-command-injection, irrelevant-keyword, and stale-branch-pr-version-path expect decision labels no arm (baseline/control/treatment) ever emits. v7 excludes them from contaminating the gate but does not resolve whether oracles or models are wrong. Still open after remediation stabilize.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "gate promotion on labels no arm can emit",
+        "instead": "fix oracle or demote metric",
+        "item_id": "memory-unreachable-decision-oracles",
+        "why": "rejects baseline and candidate alike"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Demotion documented and committed as f18256b, but the memory-governance repository has no origin remote; publication and complete --pr cannot proceed until a repository remote/PR path is provided.",
+      "category": "Evaluation",
+      "created_at": "2026-08-05T22:10:23Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Arm-independent cells must not re-enter absolute promotion bars without justification",
+        "item_id": "memory-unreachable-decision-oracles"
+      },
+      {
+        "behavior": "Committed v6 evidence remains re-scoreable",
+        "item_id": "memory-unreachable-decision-oracles"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Open finding on three scenarios",
+        "decision": "extend",
+        "item_id": "memory-unreachable-decision-oracles",
+        "path": "/Users/joe/Developer/memory-governance/docs/evaluation/behavioral-v7-contract.md"
+      },
+      {
+        "concept": "Defect #5",
+        "decision": "extend",
+        "item_id": "memory-unreachable-decision-oracles",
+        "path": "/Users/joe/Developer/memory-governance/reports/defect-ledger.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-unreachable-decision-oracles",
+        "kind": "do_not_modify",
+        "path_glob": "reports/ab-results-v6-codex.json"
+      },
+      {
+        "item_id": "memory-unreachable-decision-oracles",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-unreachable-decision-oracles",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/behavioral/src/memory_tooling/**"
+      },
+      {
+        "item_id": "memory-unreachable-decision-oracles",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/scenarios/**"
+      },
+      {
+        "item_id": "memory-unreachable-decision-oracles",
+        "kind": "only_modify",
+        "path_glob": "reports/defect-ledger.md"
+      },
+      {
+        "item_id": "memory-unreachable-decision-oracles",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && test -f reports/defect-ledger.md && rg -q 'three scenario oracles' reports/defect-ledger.md && rg -q 'Fixed|Resolved|demoted' reports/defect-ledger.md",
+        "description": "No gated criterion requires a decision label with zero historical emissions across all arms in v6",
+        "expected": "Defect #5 closed Fixed or demoted with evidence",
+        "item_id": "memory-unreachable-decision-oracles",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-unreachable-decision-oracles",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Adjudicated committed v6 evidence: historical-command-injection, irrelevant-keyword, and stale-branch-pr-version-path emit zero accepted decision labels across baseline, control, and treatment; v6 parity makes them arm-independent.",
+        "item_id": "memory-unreachable-decision-oracles",
+        "notes": null,
+        "started_at": "2026-08-15T13:17:26Z",
+        "started_branch": "fix/memory-unreachable-oracles",
+        "started_worktree": "/Users/joe/Developer/memory-governance.wt-unreachable-oracles",
+        "status": "done",
+        "summary": "Adjudicate the three scenarios from committed v6 evidence and control parity",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Permanent demotion applied via v7: decision_correct is regression-only, with v7 mutation tests proving below-baseline regression still blocks; defect #5 updated to Demoted. Scorer suite: 155 passed.",
+        "item_id": "memory-unreachable-decision-oracles",
+        "notes": null,
+        "started_at": "2026-08-15T13:17:43Z",
+        "started_branch": "fix/memory-unreachable-oracles",
+        "started_worktree": "/Users/joe/Developer/memory-governance.wt-unreachable-oracles",
+        "status": "done",
+        "summary": "Apply oracle/scenario fix or permanent demotion; update defect ledger #5",
+        "wid": "w1"
+      }
+    ]
+  }
+}

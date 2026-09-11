@@ -1,0 +1,170 @@
+{
+  "description": "The isolated post-measurement capture phase wired in by the CLI/orchestrator\ncutover (benchbox/platforms/base/execution.py:_capture_plans_post_measurement,\nlanded ~2026-06-15) calls run_plan_capture_phase() WITHOUT passing analyze_plans:\n\n    phase = run_plan_capture_phase(self, success_queries, connection=connection,\n                                   respect_sampling_filters=True)\n\nrun_plan_capture_phase defaults analyze_plans=False and overwrites\nself.analyze_plans for the duration of the phase. The net effect: for every\nphase-eligible adapter (DuckDB, MotherDuck, PostgreSQL, Redshift, SQLite,\nDataFusion) `--capture-plans` now produces STRUCTURAL-ONLY plans with no\nexecution statistics — even when the user left analyze_plans at its True\ndefault or explicitly passed --platform-option analyze_plans=true.\n\nTwo problems:\n  1. Silent regression. Before the cutover, `--capture-plans` on DuckDB/Postgres\n     captured EXPLAIN (ANALYZE) plans with actual per-operator timing and\n     cardinality. After it, eligible adapters silently lost that — the captured\n     plan is now an estimate. Docs (query-plan-analysis.md, recently corrected\n     in #793) again describe behavior the code no longer has.\n  2. It deletes the one knob that SHOULD exist. The intended contract is that\n     ANALYZE-vs-estimated is the only user-facing capture option. The phase\n     currently hard-codes estimated and ignores analyze_plans entirely, so the\n     knob is dead for exactly the adapters that go through the phase, while it\n     still works for the inline (non-eligible) adapters — an incoherent split.\n\nFix: the phase must thread the adapter's analyze_plans through to\nrun_plan_capture_phase(..., analyze_plans=self.analyze_plans). With analyze_plans\nTrue (default) the phase issues EXPLAIN (ANALYZE) post-measurement (full\nexecution detail, re-running each query once AFTER the timed loop so measurement\nis unaffected); with analyze_plans False it issues a static EXPLAIN (estimate,\nno re-execution). The shared is_dml_query write guard must still downgrade\nwrites to non-ANALYZE EXPLAIN so the post-measurement re-run does not mutate the\nloaded data a second time.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "keep the phase hard-coded to structural-only",
+        "instead": "pass analyze_plans through instead.",
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "why": "it silently drops ANALYZE timing and kills the one capture knob"
+      },
+      {
+        "dont": "re-run writes under ANALYZE in the phase",
+        "instead": "keep the is_dml_query downgrade.",
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "why": "it double-mutates the loaded data"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-06-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DML/write-DDL must not be re-executed by capture even when analyze_plans=True (is_dml_query guard stays in force).",
+        "item_id": "query-plan-capture-phase-respect-analyze"
+      },
+      {
+        "behavior": "Per-query execution_time_seconds and measured throughput/power metrics must remain free of capture cost (phase runs strictly after the timed loop).",
+        "item_id": "query-plan-capture-phase-respect-analyze"
+      },
+      {
+        "behavior": "analyze_plans=False must remain available for cheap estimate-only capture.",
+        "item_id": "query-plan-capture-phase-respect-analyze"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/plan_capture_phase.py — run_plan_capture_phase(analyze_plans=False default)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "path": "benchbox/core/plan_capture_phase.py"
+      },
+      {
+        "concept": "benchbox/platforms/base/execution.py — _capture_plans_post_measurement (drops analyze_plans)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "path": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "concept": "benchbox/platforms/base/result_capture.py — is_dml_query write guard (keeps DML on non-ANALYZE EXPLAIN)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "path": "benchbox/platforms/base/result_capture.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/plan_capture_phase.py"
+      },
+      {
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "kind": "only_modify",
+        "path_glob": "docs/features/query-plan-analysis.md"
+      },
+      {
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_plan_capture_phase.py -k analyze -v",
+        "description": "Phase honours analyze_plans on DuckDB (ANALYZE -> timing; estimate -> none)",
+        "expected": "analyze_plans=True yields per-operator timing; False yields none",
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_plan_capture_phase.py -k dml_single_execution -v",
+        "description": "DML executes once with analyze_plans=True in the phase",
+        "expected": "INSERT runs once; plan captured without ANALYZE re-execution",
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "notes": "In _capture_plans_post_measurement pass analyze_plans=self.analyze_plans to\nrun_plan_capture_phase. Confirm run_plan_capture_phase saves/restores the\nadapter's analyze_plans correctly (it already does for capture_plans).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Thread analyze_plans from the adapter into the post-measurement phase call",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "notes": "With analyze_plans=True, a write statement (INSERT/UPDATE/DELETE/MERGE/COPY,\nCTAS/CMV/SELECT INTO) must NOT be re-executed by the capture EXPLAIN. Assert\nthe adapter's get_query_plan emits a non-ANALYZE EXPLAIN for DML even when\nanalyze_plans=True, in the phase context.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify the is_dml_query guard still downgrades writes under ANALYZE in the phase",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "notes": "Integration test on DuckDB: capture_plans=True + analyze_plans=True via the\nphase yields a plan whose physical operator carries timing; analyze_plans=False\nyields no timing. Assert a DML query runs exactly once with analyze_plans=True.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tests: phase honours analyze_plans (ANALYZE plan vs estimate) on an eligible adapter",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-phase-respect-analyze",
+        "notes": "Update docs/features/query-plan-analysis.md: phase-eligible adapters capture\nANALYZE plans by default (post-measurement, ~1x extra cost), analyze_plans=false\ngives estimates. Note the capture re-run is outside the measured window.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-correct docs to match restored behavior",
+        "wid": "w4"
+      }
+    ]
+  }
+}

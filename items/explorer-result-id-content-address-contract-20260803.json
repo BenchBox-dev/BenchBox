@@ -1,0 +1,123 @@
+{
+  "context": "Record an explicit decision on whether result_id is a hash of raw evidence or of published bytes, then enforce that single contract in both the pipeline and the corpus migration so the two cannot diverge. Resolve this BEFORE the sanitization migration runs, because the answer determines whether ids churn.",
+  "description": "_project/scripts/explorer_pipeline/pipeline.py computes result_id from the raw bundle at line 541, then anonymizes at line 563 and writes the anonymized bundle under that raw-derived id at line 593. Public identity therefore depends on private metadata that is deliberately stripped before publication. Verified 2026-08-03 on develop 3af42e29b. This does not currently break download URLs, because the DuckDB row and the emitted filename use the same raw-derived id, so it is a latent contract defect rather than a live break. It matters because the corpus sanitization work will change raw bytes for 179 bundles: if ids hash raw bytes, every one of those ids changes and every reference must be migrated, whereas if ids hash public bytes they stay stable across sanitization. PR #1467 computes both old and new ids from raw and public content, which implies the intended contract, but the pipeline does not implement it.",
+  "legacy": {
+    "item_meta": {
+      "category": "Explorer identity contract",
+      "completed_at": "2026-08-04T03:06:38Z",
+      "completed_pr": 1505,
+      "created_at": "2026-08-03T23:46:54Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing published result URLs keep resolving, or a recorded old-to-new mapping migrates them",
+        "item_id": "explorer-result-id-content-address-contract-20260803"
+      },
+      {
+        "behavior": "The chosen contract is written down, not left implicit in code order",
+        "item_id": "explorer-result-id-content-address-contract-20260803"
+      },
+      {
+        "behavior": "The pipeline and the corpus migration derive ids the same way, with no second implementation",
+        "item_id": "explorer-result-id-content-address-contract-20260803"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-result-id-content-address-contract-20260803",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-result-id-content-address-contract-20260803",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "explorer-result-id-content-address-contract-20260803",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "explorer-result-id-content-address-contract-20260803",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-phase-2-runbook.md"
+      },
+      {
+        "item_id": "explorer-result-id-content-address-contract-20260803",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q -k result_id",
+        "description": "Pipeline and migration agree on the id derivation contract",
+        "expected": "Exits 1 on the unfixed tree, where the pipeline derives ids from raw bytes before anonymization and no test pins the contract, and exits 0 once one derivation is enforced in both places.",
+        "item_id": "explorer-result-id-content-address-contract-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q",
+        "description": "Explorer pipeline suite still passes",
+        "expected": "No regression in pipeline behaviour",
+        "item_id": "explorer-result-id-content-address-contract-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-result-id-content-address-contract-20260803",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-result-id-content-address-contract-20260803",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "DECIDED by Joe 2026-08-03: public-byte identity. Grounding: nothing is published - docs.yml's deploy job has never run on release, release carries zero result bundles, and runbook 1.3 states the explorer is not yet published from main - so the choice was free of migration cost. Rationale: a public content address must hash the bytes the public can actually fetch and verify; raw-byte IDs hash bytes nobody can see and expose a confirmable fingerprint of private content.",
+        "item_id": "explorer-result-id-content-address-contract-20260803",
+        "notes": null,
+        "started_at": "2026-08-04T03:04:56Z",
+        "started_branch": "fix/explorer-browser-required-gate-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Record the decision on raw-byte versus public-byte identity",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Already enforced on develop by #1467: pipeline.py derives result_id AFTER _public_bundle_data, from canonical_json_bytes(public_bundle), with an inline comment explaining the reproducibility requirement. Verified on origin/develop at d32a38ae90. Not re-implemented - concurrent-session race, credit to #1467.",
+        "item_id": "explorer-result-id-content-address-contract-20260803",
+        "notes": null,
+        "started_at": "2026-08-04T03:05:02Z",
+        "started_branch": "fix/explorer-browser-required-gate-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Enforce the chosen contract in the pipeline",
+        "wid": "w1"
+      },
+      {
+        "evidence": "_project/scripts/results_explorer_corpus_migrate.py derives new_result_id via the same BundleTransformer.result_id_from_bundle over public bytes (line 144), so pipeline and migration share one derivation with no second implementation. GAP: no test pins the contract - 'pytest tests/unit/scripts/explorer_pipeline -k result_id' collects only test_short_id_is_sha256_prefix_of_result_id and test_result_id_injected, neither of which would fail if the derivation reverted to raw bytes. Ladder rung 1 therefore does NOT hold; leaving a contract-pinning test as follow-up rather than claiming it.",
+        "item_id": "explorer-result-id-content-address-contract-20260803",
+        "notes": null,
+        "started_at": "2026-08-04T03:05:09Z",
+        "started_branch": "fix/explorer-browser-required-gate-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Align the corpus migration with the same derivation",
+        "wid": "w2"
+      }
+    ]
+  }
+}

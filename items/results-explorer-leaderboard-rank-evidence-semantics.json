@@ -1,0 +1,272 @@
+{
+  "context": "Treat missing/unranked/ranked as first-class display states. Add data\ninvariants, then update components and charts to consume the explicit state.\n",
+  "description": "The latest review found that leaderboard cells can say `No run` while still\nrendering trust/validation badges, and rank charts can show large all-dash\nmatrices for cohorts where rows are present but not rankable. This exposes a\ndeeper semantic bug: the UI conflates missing evidence, published-but-\nunranked evidence, and ranked evidence.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hide unranked submitted evidence entirely; users need to audit why it was excluded.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "infer missing state from `rank == null` alone.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "render a rank chart when no row has a rankable value.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "show trust or validation badges inside a `No run` cell.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "needs_item": "results-explorer-comparison-eligibility-contract-repair"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-11T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "results-explorer-followup-todo-review"
+    },
+    "preserves": [
+      {
+        "behavior": "Published but unranked runs remain discoverable for provenance.",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics"
+      },
+      {
+        "behavior": "Ranked cohorts keep existing rank ordering and metric display.",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics"
+      },
+      {
+        "behavior": "The same result/cohort state renders consistently across leaderboard, rank chart, and detail pages.",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics"
+      },
+      {
+        "behavior": "True missing runs stay visually lightweight and do not imply submission evidence.",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/scripts/results_explorer_snapshot_invariants.py should include contradictory cell-state checks.",
+        "decision": "reuse",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "path": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "concept": "results-explorer/src/components/MetaLeaderboard.tsx renders cross-benchmark cells and badge metadata.",
+        "decision": "reuse",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "path": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "concept": "results-explorer/src/components/RankTable.tsx and results-explorer/src/components/ChartPanel.tsx own benchmark rank-chart rendering.",
+        "decision": "reuse",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "path": "results-explorer/src/components/RankTable.tsx"
+      },
+      {
+        "concept": "results-explorer/src/lib/duckdbQueries.ts provides meta leaderboard and chart rows.",
+        "decision": "reuse",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "path": "results-explorer/src/lib/duckdbQueries.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-leaderboard-rank-evidence-semantics/"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RankTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayEligibility.ts"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/charts.smoke.test.tsx",
+        "description": "Leaderboard and rank component tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb",
+        "description": "Snapshot cell-state invariants pass",
+        "expected": "exit 0 and no `No run` cells have badge/link metadata",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"No run|Unranked|Excluded|rank chart|PASS|FAIL\" _project/verification-logs/results-explorer-leaderboard-rank-evidence-semantics/",
+        "description": "Browser evidence covers both missing and unranked states",
+        "expected": "logs include pass/fail evidence for leaderboard and rank chart states",
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "notes": "Query `meta_leaderboard`, `cohort_metadata`, `benchmark_rankings`, and any\nchart source tables on the checked git SHA and current snapshot. Capture\nSQL, snapshot path/checksum, row counts, and sample cells where:\n  - `rank IS NULL` and metric data exists;\n  - `rank IS NULL` and no metric data exists;\n  - `rank IS NOT NULL`;\n  - trust or validation badges exist with no rank.\nStore SQL and row counts in\n`_project/verification-logs/results-explorer-leaderboard-rank-evidence-semantics/w0.log`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture the current missing/unranked/ranked state matrix",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "notes": "Document exact UI states:\n  - Missing run: no metric, no result link, no trust badges, copy `No run`;\n  - Published but unranked: metric/result exists, no rank, copy\n    `Unranked` or `Excluded`, show reason and optional receipt link;\n  - Ranked: rank and metric displayed with eligibility badges.\nDecision gate: do not edit components until the contract is documented in\nimplementation notes and accepted by tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the display contract for missing, unranked, and ranked states",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "notes": "Update the meta leaderboard so `No run` cells never render trust or\nvalidation badges. If a result exists but is unranked, show explicit\n`Unranked` or `Excluded` state with the reason and a link to the result or\nreceipt only when that link is real.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update cross-benchmark leaderboard cells to honor the state contract",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "notes": "Rank charts should require rankable cells before rendering a rank matrix.\nIf every row is unranked/excluded, show an empty state with the dominant\nexclusion reasons and a link or affordance to inspect submitted evidence.\nIn mixed cohorts, separate or visually de-emphasize excluded rows so they\ndo not read as rankable competitors with missing data.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update rank charts to avoid authoritative all-dash matrices",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "notes": "Add tests that fail when:\n  - `No run` renders badges or links;\n  - an unranked result is labelled as missing;\n  - an all-unrankable rank chart renders a normal rank matrix;\n  - rank chart and leaderboard disagree about the same cell state.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add invariant and component tests for contradictory evidence states",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-leaderboard-rank-evidence-semantics",
+        "notes": "In the browser, check `/results/`, one benchmark rank tab with unranked\nrows, and one normal ranked benchmark. Capture screenshots or text logs.\nDecision gate: do not complete if any visible `No run` cell still contains\nprovenance badges or if any all-unrankable cohort appears as a normal rank\nleaderboard.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Browser-check leaderboard and rank chart semantics",
+        "wid": "w5"
+      }
+    ]
+  }
+}

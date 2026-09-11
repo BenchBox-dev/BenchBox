@@ -1,0 +1,136 @@
+{
+  "context": "This is primarily a design-and-decision TODO (w1) that may close most of itself. Only build\nthe corpus and the comparable-subset projection if cross-engine comparison is an actual goal.\nReuse recorded EXPLAIN fixtures from the family TODOs rather than requiring live engines.\n",
+  "description": "Operator-name harmonization was decided ad hoc in each parser with no shared conformance\ntarget. Examples that may or may not be intended:\n  - ClickHouse maps every wrapper `Expression` node to PROJECT (inflating PROJECT count)\n  - Spark maps Exchange/codegen wrappers to OTHER\n  - Presto maps `Output` to PROJECT\n  - ClickHouse/Spark insert many transform/exchange nodes other engines do not emit\n\nAs a result there is no answer to the question \"does the SAME logical query produce a\ncomparable harmonized DAG across engines?\" — and therefore no basis for cross-engine\nfingerprint or plan-shape comparison. This blocks one of the two plausible purposes of the\nfingerprint (cross-engine comparison); the other purpose (per-engine within-version\nregression detection) does not need it.\n\nThis TODO forces the decision and, if cross-engine comparison is in scope, builds the\nmissing artifact: a golden conformance corpus asserting invariants like \"TPC-H Q3 yields a\nDAG with exactly N JOINs and M base-table SCANs on every engine\", independent of the\nper-engine wrapper noise.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "force cross-engine equality on the raw fingerprint",
+        "instead": "compare a wrapper-stripped subset instead if comparison is needed.",
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "why": "engines legitimately differ in physical wrappers"
+      },
+      {
+        "dont": "keep harmonizing operator names per parser without a shared target",
+        "instead": "define the conformance corpus first.",
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "why": "divergent maps make cross-engine comparison meaningless"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-06-11T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "No parser's operator mapping changes without a conformance test justifying it.",
+        "item_id": "query-plan-capture-cross-engine-conformance"
+      },
+      {
+        "behavior": "The existing per-engine raw fingerprint must remain available unchanged for within-engine regression detection.",
+        "item_id": "query-plan-capture-cross-engine-conformance"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/query_plans/comparison.py — existing plan comparison entry point that would consume a conformance contract",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "path": "benchbox/core/query_plans/comparison.py"
+      },
+      {
+        "concept": "benchbox/core/query_plans/parsers/ — per-parser operator maps decided independently",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "path": "benchbox/core/query_plans/parsers/"
+      },
+      {
+        "concept": "benchbox/core/results/query_plan_models.py — LogicalOperatorType enum and get_structural_signature (the harmonization target)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "path": "benchbox/core/results/query_plan_models.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/comparison.py"
+      },
+      {
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/query_plan_models.py"
+      },
+      {
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/query_plans/"
+      },
+      {
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/query_plans/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/query_plans -k conformance -v",
+        "description": "Fingerprint purpose is documented and the corpus (if built) passes",
+        "expected": "Canonical queries meet the cross-engine DAG invariants, or the corpus is documented as out-of-scope",
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "notes": "Document the intended use in query_plan_models.py. This gates everything: if cross-engine\ncomparison is out of scope, close w2/w3 as not-needed and instead document that fingerprints\nare per-engine only. If in scope, proceed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide the fingerprint's purpose: per-engine regression vs cross-engine comparison (or both)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "notes": "For a small set of canonical queries (e.g. TPC-H Q1/Q3/Q5), record expected counts/shape of\nthe harmonized DAG (number of JOINs, base SCANs, AGGREGATEs) that every engine must satisfy.\nUse recorded EXPLAIN fixtures per engine. Assert each parser's DAG meets the invariants,\nignoring engine-specific wrapper operators (Exchange/codegen/Expression).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build a cross-engine conformance corpus of canonical queries with expected DAG invariants",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cross-engine-conformance",
+        "notes": "If cross-engine comparison is wanted, add a normalization that drops OTHER/exchange/codegen\nwrapper nodes before comparison, so the structural backbone (scans, joins, aggregates, sorts)\ncan be compared across engines. Keep it separate from the raw per-engine fingerprint.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a 'comparable subset' projection so wrapper noise does not break cross-engine equality",
+        "wid": "w3"
+      }
+    ]
+  }
+}

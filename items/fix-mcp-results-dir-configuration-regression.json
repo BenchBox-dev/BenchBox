@@ -1,0 +1,309 @@
+{
+  "context": "Introduce a core runtime-path resolver module that encapsulates precedence\nand normalization rules (explicit override > environment > default). Keep MCP\nargument parsing in MCP-specific CLI code, then pass resolved paths into MCP\nserver/tool registration (dependency injection) instead of module-level\nconstants.\n\nUpdate CLI internals to consume the same core resolver for default benchmark\nruns roots/results paths while preserving CLI command surface.\n\nValidate with targeted MCP + CLI regression tests and docs synchronization.\n",
+  "description": "MCP benchmark execution currently ignores runtime configuration for result\ndirectories. `benchbox-mcp --results-dir <path>` is not parsed, and MCP\nread/write tools default to hard-coded `benchmark_runs/results` paths.\n\nThis creates a behavioral regression against expected MCP configurability and\ncontradicts docs that describe `BENCHBOX_RESULTS_DIR` support.\n\nConstraints from review:\n- MCP and CLI remain separate interfaces (no CLI flag coupling).\n- Path-resolution logic must be centralized in core and reused by both MCP\n  internals and CLI internals.\n- MCP write path (benchmark export) and MCP read paths (results/analytics/\n  visualization/resources) must use the same resolved directory.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "couple MCP flags into benchbox run CLI",
+        "instead": "keep parsing isolated in MCP CLI entrypoint.",
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "why": "MCP and CLI are separate interfaces"
+      },
+      {
+        "dont": "duplicate env/path precedence logic across modules",
+        "instead": "centralize in core resolver and reuse.",
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "why": "drift will reintroduce inconsistency"
+      },
+      {
+        "dont": "keep module-level hard-coded DEFAULT_RESULTS_DIR in MCP tools",
+        "instead": "inject resolved roots at registration time.",
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "why": "write/read paths must stay in sync"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "fix-mcp-results-dir-configuration-regression",
+        "id": 71,
+        "reason": "Out of scope by design; MCP and CLI remain separate interfaces.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicit design decision: MCP and CLI remain separate interfaces; a --results-dir CLI flag was deliberately rejected, not deferred.",
+        "summary": "Add a CLI run flag named --results-dir"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-21T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Default behavior remains benchmark_runs/results when no override is provided.",
+        "item_id": "fix-mcp-results-dir-configuration-regression"
+      },
+      {
+        "behavior": "MCP benchmark responses preserve existing schema fields, including mcp_metadata.result_file.",
+        "item_id": "fix-mcp-results-dir-configuration-regression"
+      },
+      {
+        "behavior": "MCP tools continue to block path traversal outside the configured results root.",
+        "item_id": "fix-mcp-results-dir-configuration-regression"
+      },
+      {
+        "behavior": "benchbox run CLI behavior and interface remain unchanged (no new/repurposed --results-dir flag).",
+        "item_id": "fix-mcp-results-dir-configuration-regression"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/config.py"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "kind": "only_modify",
+        "path_glob": "docs/guides/mcp-integration.md"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_config_coverage.py"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_run_export_consistency.py"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "UV_CACHE_DIR=/tmp/uv-cache uv run benchbox-mcp --help",
+        "description": "MCP CLI advertises options and does not silently ignore args",
+        "expected": "Help output includes --results-dir and exits without starting server.",
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_mcp_main_module.py tests/unit/mcp/test_benchmark_tools.py tests/unit/mcp/test_mcp_results_and_analytics.py tests/unit/mcp/test_visualization_tools.py -q",
+        "description": "MCP unit tests for configured directories and result path parity pass",
+        "expected": "All selected tests pass.",
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_run_export_consistency.py tests/unit/cli/test_config_coverage.py -q",
+        "description": "CLI compatibility tests pass after core path resolver integration",
+        "expected": "All selected tests pass.",
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "needs_wid": "w7",
+        "wid": "w9"
+      },
+      {
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add core runtime path resolver for benchmark_runs/results/charts defaults",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor CLI internals to use core resolver without changing CLI interface",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add MCP-specific CLI arg parsing (--results-dir, --charts-dir, --log-level) and env fallback",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inject resolved directories into MCP server registration instead of module constants",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Route MCP benchmark export writes through configured results_dir",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align MCP traversal/safe-root checks with configured results_dir",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add/adjust unit tests for precedence, MCP write/read parity, and CLI compatibility",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update MCP docs to reflect actual configuration behavior and precedence",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-mcp-results-dir-configuration-regression",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run verification commands and close regression with evidence",
+        "wid": "w9"
+      }
+    ]
+  }
+}

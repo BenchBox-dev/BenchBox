@@ -1,0 +1,131 @@
+{
+  "context": "Preserve reusable generated source data under benchmark_runs/datagen/. Dask\ncleanup may remove only Dask-owned spill/runtime directories and loaded\ndatabase/output artifacts created for the current verification run; it must\nnot delete TPC-H source data because read, write, transaction, and related\nprimitives reuse that source corpus.\n\nPrefer Dask-owned adapter changes first. Use the existing\nDataFrameTuningConfiguration memory/spill fields where a user supplied tuning\nconfig exists, and add conservative local defaults only where untuned CLI\nDask currently has no resource envelope. Keep Dask optional: no base install\nimports should require Dask.\n",
+  "description": "Dask DataFrame produced repeated exit-137/resource-spike failures in the UAT\nsweep, including TPC-H, TPC-DS SF 0.1, read primitives SF 1.0, FlightData, and\nTPCHavoc. Dask ClickBench timed out at the 600-second cap. The behavior also\ncaused transient disk-space dips that recovered after subprocess exit.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "treat exit 137 as a generic benchmark failure",
+        "instead": "surface that classification explicitly.",
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "why": "it is an environment/resource signal"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Dask remains optional and does not affect base installs.",
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope"
+      },
+      {
+        "behavior": "Resource cleanup must not delete reusable generated benchmark source data.",
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/results-explorer-uat-defect-dask-resource-envelope.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/dask_df.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/pandas_family.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_dask_df_coverage.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_pandas_family_adapters.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox run --platform dask-df --benchmark tpch --scale 0.01 --phases load,power --non-interactive",
+        "description": "Dask local smoke either passes or reports a clear resource-envelope failure.",
+        "expected": "completed result or explicit resource-envelope diagnostic, not opaque exit 137",
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast tests remain green.",
+        "expected": "all selected tests pass",
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "notes": "W1 ownership research complete. UAT evidence lives in\n_project/handoffs/results-explorer-uat-retrospective-20260502.md, which\nrecords Dask exit-137/resource-spike failures for TPC-H, TPC-DS SF 0.1,\nread primitives SF 1.0, FlightData, and TPCHavoc, plus a Dask ClickBench\n600-second timeout.\n\nW2 should primarily own benchbox/platforms/dataframe/dask_df.py for local\ncluster defaults, memory/spill configuration, spill-directory cleanup, and\nDask-specific resource diagnostic text. CLI-facing Dask option defaults are\nregistered in benchbox/platforms/__init__.py. If Dask query compute\ndiagnostics cannot be routed through the adapter from the existing shared\npath, the only shared fallback file is\nbenchbox/platforms/dataframe/pandas_family.py.\n\nW3 should own tests/unit/platforms/dataframe/test_dask_df_coverage.py and,\nonly if CLI option default assertions change,\ntests/unit/platforms/dataframe/test_pandas_family_adapters.py.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Identify the Dask-owned runtime/config files before editing",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "notes": "Query-level reduction isolated the opaque exit-137 reproducer to TPC-H Q10\nin the Pandas-family implementation. Predicate pushdown and projection\nreduction did not prevent the parent-process kill, while the remaining 21\nTPC-H queries passed as a subset. W2 therefore owns a Dask adapter guard\nthat classifies TPC-H Q10 as a resource-envelope failure before executing\nthe known parent-killing graph.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define local resource limits, spill cleanup, and clearer exit-137 diagnostics",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-dask-resource-envelope",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add targeted coverage for Dask resource-limit reporting",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "description": "Cross-surface gates carry classified known_divergences (e.g. ClickBench Q18's\norder-less LIMIT, _H2ODB_KNOWN_DIVERGENCES). These entries are reported but do\nNOT fail the gate when they no longer reproduce. That asymmetry lets a stale\nexception linger: once a known divergence is silently resolved (by a loader fix,\na query change, or a comparator improvement), the baseline entry stays, and a\nFUTURE regression on that same cell would be masked as \"known\" instead of caught.\n\nAdd baseline hygiene: a known-divergence entry whose cell now matches must either\nfail the gate or force a baseline update (an --update-baseline discipline), so the\nexception list cannot drift ahead of reality. This mirrors the empty-baseline,\nfail-on-divergence discipline the TPC-Havoc gates already enforce, extended to the\n\"resolved exception\" direction.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "silently auto-prune resolved entries on a normal run",
+        "instead": "(not specified)",
+        "item_id": "cross-surface-known-divergence-baseline-hygiene",
+        "why": "default to FAIL so the removal is a reviewed change; auto-prune only behind an explicit --update-baseline."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-06-28T00:00:00Z",
+      "created_at": "2026-06-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A new unclassified divergence still fails the gate (no weakening of detection).",
+        "item_id": "cross-surface-known-divergence-baseline-hygiene"
+      },
+      {
+        "behavior": "Genuine, still-reproducing classified divergences (e.g. ClickBench Q18 order-less LIMIT) remain accepted.",
+        "item_id": "cross-surface-known-divergence-baseline-hygiene"
+      },
+      {
+        "behavior": "ResultValidator semantics unchanged; reuse, do not fork.",
+        "item_id": "cross-surface-known-divergence-baseline-hygiene"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': '_project/analysis/clickbench-cross-surface-divergences.md', 'note': 'Documents the single justified ClickBench Q18 baseline entry - the kind of entry that must be re-validated, not assumed permanent.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-known-divergence-baseline-hygiene",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/core/equivalence/cross_surface.py (known_divergences, GATES)', 'note': 'Where classified exceptions live; the gate already reports them - add the reverse check (resolved-but-still-listed).'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-known-divergence-baseline-hygiene",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/core/tpchavoc/equivalence.py (KNOWN_DIVERGENCES, empty-baseline fail-on-divergence)', 'note': 'The discipline to mirror: a baseline is for intentional differences only; reuse its pattern, do not fork the comparator.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-known-divergence-baseline-hygiene",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cross-surface-known-divergence-baseline-hygiene",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "cross-surface-known-divergence-baseline-hygiene",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/equivalence/"
+      },
+      {
+        "item_id": "cross-surface-known-divergence-baseline-hygiene",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpchavoc/"
+      },
+      {
+        "item_id": "cross-surface-known-divergence-baseline-hygiene",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/equivalence/test_cross_surface.py -q -k baseline",
+        "description": "Stale known-divergence entry is caught (unit)",
+        "expected": "a resolved-but-listed known_divergences entry fails the gate; a still-reproducing one is accepted; a new unclassified divergence fails",
+        "item_id": "cross-surface-known-divergence-baseline-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "add a fake resolved entry to a gate's known_divergences, run `make ssb-cross-surface-equivalence-report`",
+        "description": "Manual end-to-end check",
+        "expected": "gate FAILS naming the resolved entry; passes again once removed (or under --update-baseline)",
+        "item_id": "cross-surface-known-divergence-baseline-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cross-surface-known-divergence-baseline-hygiene",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cross-surface-known-divergence-baseline-hygiene",
+        "notes": "In the gate runner, after comparison, check each known_divergences entry: if\nthe cell it names now MATCHES (no divergence), that entry is stale. Default\nbehavior: FAIL the gate with a clear message naming the resolved entry and\ninstructing removal; provide an --update-baseline (or make target flag) to\ndrop resolved entries deterministically. Keep genuine, still-reproducing\nclassified divergences accepted exactly as today. Apply to every gate carrying\nknown_divergences.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Detect resolved-but-listed known divergences and fail (or require --update-baseline)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-known-divergence-baseline-hygiene",
+        "notes": "Add tests: (a) a known-divergence entry whose cell now matches fails the gate\n(or is removed under --update-baseline); (b) a still-reproducing classified\ndivergence is still accepted; (c) a NEW unclassified divergence still fails.\nReuse the planted-defect style of the existing gate tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test both directions: stale entry fails, live entry still accepted",
+        "wid": "w2"
+      }
+    ]
+  }
+}

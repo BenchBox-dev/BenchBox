@@ -1,0 +1,203 @@
+{
+  "context": "Reduce the excluded cell to a short muted label with the full reason on hover and in the accessible name. Preserve the DISTINCT reasons - trust policy versus insufficient query coverage are different facts and must not flatten to one string. Collapse unranked platforms only if D2 permits; if it does, the collapsed spanning row needs explicit handling in the role=grid focusPos coordinate model (MetaLeaderboard.tsx:83,339,378).",
+  "description": "Of 30 visible cells on the landing matrix, 8 read 'Excluded - Trust policy excludes this result from ranking' and 6 read 'No run'; 3 of 6 platforms carry no ranked figure at all. The exclusion LABEL is font-semibold in warning colour against plain numerals and the block runs four lines (MetaLeaderboard.tsx:561-567). The reason text itself is 10px - the defect is salience and block area, not type size.\n\nGated on rx-ux-00 D2 (ranked-scope default), which decides whether platforms with no ranked evidence may be collapsed by default.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a spanning collapsed row without updating focusPos handling",
+        "instead": "handle the coordinate model explicitly",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "why": "MetaLeaderboard implements 2D arrow-key navigation over row/col indices"
+      },
+      {
+        "dont": "collapse unranked platforms before D2 is recorded",
+        "instead": "wait for the gate",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "why": "published-unranked visibility is a stated product value"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "flatten trust-policy exclusion and insufficient-coverage into one label",
+        "instead": "keep both reasons distinct",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "why": "they tell the reader different things about what to do next"
+      },
+      {
+        "dont": "render an all-excluded ranking as a blank column",
+        "instead": "instead state that the ranking has no ranked evidence and why",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "why": "a blank column is indistinguishable from a loading or broken state"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "needs_item": "rx-ux-00-phase0-contract-decisions"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T18:10:34Z",
+      "completed_pr": 1819,
+      "created_at": "2026-08-22T14:49:18Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "The distinct exclusion reasons and their wording",
+        "item_id": "rx-ux-11-excluded-cell-quieting"
+      },
+      {
+        "behavior": "Trust is per-result. hosted-results-contract.md:687-698 forbids an aggregate trust badge on a mixed-trust set.",
+        "item_id": "rx-ux-11-excluded-cell-quieting"
+      },
+      {
+        "behavior": "role=grid arrow-key navigation over the matrix",
+        "item_id": "rx-ux-11-excluded-cell-quieting"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/**"
+      },
+      {
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayEligibility.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "last_result": "pass",
+        "last_run": "2026-08-22T18:10:22Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium e2e/capability/accessibility-regressions.spec.ts",
+        "description": "Accessibility regression suite passes",
+        "expected": "no new axe violations",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "last_result": "pass",
+        "last_run": "2026-08-22T18:10:25Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'leaderboard keyboard'",
+        "description": "Grid arrow-key navigation still traverses every focusable cell",
+        "expected": "arrow navigation reaches all cells including any collapsed row",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "last_result": "pass",
+        "last_run": "2026-08-22T18:10:28Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'all excluded ranking'",
+        "description": "All-excluded ranking renders an actionable state, not an empty shell",
+        "expected": "column with no ranked platform states why and what to do next",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "last_result": "pass",
+        "last_run": "2026-08-22T18:10:30Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "MetaLeaderboard renders short muted Excluded/Unranked labels with full per-result reason in title and aria-label; focused component suite passes 20/20.",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "notes": null,
+        "started_at": "2026-08-22T18:04:15Z",
+        "started_branch": "fix/rx-ux-11-excluded-cell-quieting",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-11-excluded-cell-quieting",
+        "status": "done",
+        "summary": "Reduce excluded cell to muted label plus hover/accessible reason",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Component coverage asserts trust-policy and insufficient-coverage reasons remain distinct in accessible labels and all-excluded guidance.",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "notes": null,
+        "started_at": "2026-08-22T18:04:20Z",
+        "started_branch": "fix/rx-ux-11-excluded-cell-quieting",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-11-excluded-cell-quieting",
+        "status": "done",
+        "summary": "Keep trust-policy and coverage reasons distinct",
+        "wid": "w2"
+      },
+      {
+        "evidence": "D2 ranked-scope default implemented by collapsing only published platforms with no ranked cells; expander sits outside role=grid and resets focus coordinates.",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "notes": null,
+        "started_at": "2026-08-22T18:04:25Z",
+        "started_branch": "fix/rx-ux-11-excluded-cell-quieting",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-11-excluded-cell-quieting",
+        "status": "done",
+        "summary": "If D2 allows, collapse unranked platforms with focusPos handling",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Chromium leaderboard keyboard scenario expands unranked platforms and verifies ArrowDown moves focus into the revealed row; passed.",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "notes": null,
+        "started_at": "2026-08-22T18:04:31Z",
+        "started_branch": "fix/rx-ux-11-excluded-cell-quieting",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-11-excluded-cell-quieting",
+        "status": "done",
+        "summary": "Keyboard test: grid navigation intact across any collapsed row",
+        "wid": "w4"
+      },
+      {
+        "evidence": "All-excluded cohort header states no ranked evidence, preserves distinct reasons, links to ranking details; Chromium all-excluded scenario passed.",
+        "item_id": "rx-ux-11-excluded-cell-quieting",
+        "notes": null,
+        "started_at": "2026-08-22T18:04:36Z",
+        "started_branch": "fix/rx-ux-11-excluded-cell-quieting",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-11-excluded-cell-quieting",
+        "status": "done",
+        "summary": "Define and implement the all-excluded ranking state",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Extend cost analysis to support multi-region pricing, spot instances,\ncommitted use discounts, and data transfer costs. Enable TCO comparisons\nand cost optimization recommendations.",
+  "legacy": {
+    "item_meta": {
+      "category": "Cost Intelligence",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "cost-intelligence-advanced"
+    }
+  }
+}

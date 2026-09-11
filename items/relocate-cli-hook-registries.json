@@ -1,0 +1,202 @@
+{
+  "context": "Do the physical move first as a no-logic-change relocation (w1), add the\ncompat shim immediately after (w2) so nothing breaks mid-migration, then\nupdate the real importers in core/ and platforms/ (w3) to point at the new\nlocation so the dependency graph is actually fixed - the shim alone does\nnot fix layering, only the updated importers do. Treat the public-contract\nquestion (w4) as a documentation/deprecation-window decision, not a design\nblocker for the move itself.\n",
+  "description": "Architecture review (Work Area E, structural remediation) found a layering\ninversion: nine `benchbox/core/*/benchmark.py` modules import\n`benchbox.cli.benchmark_hooks` at module level - e.g.\n`benchbox/core/nyctaxi/benchmark.py:643`,\n`benchbox/core/tpcdi/benchmark.py:2743`,\n`benchbox/core/datavault/benchmark.py:477` (confirmed 10 importing modules\ntotal: flightdata, tsbs_devops, tpcdi, nyctaxi, datavault, tpcds_obt,\nvector_search, joinorder_synthetic, joinorder, tpch_skew) - and\n`benchbox/platforms/__init__.py:593` imports `benchbox.cli.platform_hooks`,\nwhich itself imports `benchbox.core.platform_registry` and\n`benchbox.core.schemas` (`cli/platform_hooks.py:13-14`).\n\nBoth `benchbox/cli/benchmark_hooks.py` and `benchbox/cli/platform_hooks.py`\nare dependency-free (or near-dependency-free) pure registries - lightweight\nextension mechanisms letting benchmarks/platforms expose CLI option hooks\n(`--benchmark-option K=V`) without changing core CLI code. Despite the\nname/location, neither module actually depends on CLI parsing, click/argparse,\nor terminal I/O; they are data-holding registries that `core/` and\n`platforms/` should be able to depend on without reaching \"up\" into `cli/`.\nHaving `core -> cli` and `platforms -> cli` edges inverts the intended\n`utils < core < platforms < cli` layering that `import-layering-enforcement`\n(a separate TODO) will formalize.\n\nThis is a standalone structural fix, not a shrink-campaign item -\n`_project/goal-shrink-core-code.md` scopes god-class/architecture\ndecompositions out of the autonomous shrink loop.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change registry class names, method signatures, or hook registration order during the move",
+        "instead": "(not specified)",
+        "item_id": "relocate-cli-hook-registries",
+        "why": "this is a location fix, not a redesign."
+      },
+      {
+        "dont": "silently drop the cli.* shim without checking docs/reference/public-contracts.md first",
+        "instead": "(not specified)",
+        "item_id": "relocate-cli-hook-registries",
+        "why": "these may be documented as public import paths."
+      },
+      {
+        "dont": "update core/platforms importers to the new location without first adding the cli/ shim",
+        "instead": "(not specified)",
+        "item_id": "relocate-cli-hook-registries",
+        "why": "a partially migrated state would break external callers still using the old cli.* path during the same PR window."
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-03T00:00:00Z",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All 10 core benchmark modules and platforms/__init__.py continue to register their hooks at the same point in the import/registration sequence.",
+        "item_id": "relocate-cli-hook-registries"
+      },
+      {
+        "behavior": "CLI --benchmark-option and platform-option parsing behavior (PlatformHookRegistry, PlatformOptionSpec, parse_bool, BenchmarkOptionError) is byte-identical after the move.",
+        "item_id": "relocate-cli-hook-registries"
+      },
+      {
+        "behavior": "Existing imports of benchbox.cli.benchmark_hooks / benchbox.cli.platform_hooks from any external caller keep working via the shim for at least one release.",
+        "item_id": "relocate-cli-hook-registries"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/benchmark_hooks.py header comment ('Mirrors the platform_hooks.py pattern') - both registries already share a design pattern; relocate them together rather than one at a time to avoid a half-migrated state.",
+        "decision": "reuse",
+        "item_id": "relocate-cli-hook-registries",
+        "path": "benchbox/cli/benchmark_hooks.py"
+      },
+      {
+        "concept": "remove-or-integrate-legacy-cudf-platform-module.yaml - existing example of a relocation TODO in this same planning set that adds back-compat notes and a docs update step; follow its w0 (verify importers)/decide/update-docs shape.",
+        "decision": "reuse",
+        "item_id": "relocate-cli-hook-registries",
+        "path": "remove-or-integrate-legacy-cudf-platform-module.yaml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "relocate-cli-hook-registries",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/app.py"
+      },
+      {
+        "item_id": "relocate-cli-hook-registries",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/main.py"
+      },
+      {
+        "item_id": "relocate-cli-hook-registries",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/benchmark_hooks.py"
+      },
+      {
+        "item_id": "relocate-cli-hook-registries",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/platform_hooks.py"
+      },
+      {
+        "item_id": "relocate-cli-hook-registries",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "relocate-cli-hook-registries",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "relocate-cli-hook-registries",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/backward-compatibility.md"
+      },
+      {
+        "item_id": "relocate-cli-hook-registries",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k 'benchmark_hooks or platform_hooks or cli_options' --tb=short",
+        "description": "All benchmark and platform CLI option hooks still work after relocation",
+        "expected": "all hook-registry tests pass",
+        "item_id": "relocate-cli-hook-registries",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'from benchbox.cli.benchmark_hooks import BenchmarkOptionError; from benchbox.cli.platform_hooks import PlatformHookRegistry; print(\"ok\")'",
+        "description": "Old cli.* import paths still resolve via the shim",
+        "expected": "ok",
+        "item_id": "relocate-cli-hook-registries",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rn 'cli.benchmark_hooks\\|cli.platform_hooks\\|cli import benchmark_hooks\\|cli import platform_hooks' benchbox/core benchbox/platforms",
+        "description": "No remaining core/platforms module imports benchbox.cli.* for hooks",
+        "expected": "no matches (only benchbox/cli/*.py shim files reference the old names, if any)",
+        "item_id": "relocate-cli-hook-registries",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "relocate-cli-hook-registries",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "relocate-cli-hook-registries",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "relocate-cli-hook-registries",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "relocate-cli-hook-registries",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "relocate-cli-hook-registries",
+        "notes": "Used benchbox/core/hooks/ (not a top-level benchbox/hooks/) per the\ndefault in open_questions - platforms consuming a core-owned registry\nis consistent with utils < core < platforms < cli. Copied both files\nbyte-identical (verified with `diff`) into\nbenchbox/core/hooks/{benchmark_hooks,platform_hooks}.py plus a new\nbenchbox/core/hooks/__init__.py package docstring. All public names\n(BenchmarkOptionError, BenchmarkOptionSpec, BenchmarkHookRegistry,\nPlatformOptionError, PlatformOptionSpec, PlatformHookRegistry,\nparse_bool, parse_int, parse_int_list, parse_str_list,\nparse_enum_list, parse_datetime) preserved verbatim.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move benchmark_hooks.py and platform_hooks.py to benchbox/core/hooks/",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "relocate-cli-hook-registries",
+        "notes": "benchbox/cli/benchmark_hooks.py and benchbox/cli/platform_hooks.py are\nnow thin re-export shims from benchbox.core.hooks.* with explicit\n__all__ matching the original modules' __all__ (parse_bool stays\nimportable-but-not-in-__all__ for platform_hooks, matching prior\nbehavior). Checked docs/reference/public-contracts.md and\ndocs/reference/backward-compatibility.md - neither documented\nbenchbox.cli.benchmark_hooks/platform_hooks as public surface, so this\nis an internal-only courtesy shim, not a documented deprecation\nwindow. Added a row to backward-compatibility.md's Current Inventory\ntable noting the relocation and the shim's courtesy (non-guaranteed)\nstatus per w4.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add back-compat import shims in benchbox/cli/ for one release",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "relocate-cli-hook-registries",
+        "notes": "Updated all 10 core/*/benchmark.py importers (flightdata,\ntsbs_devops, tpcdi, nyctaxi, datavault, tpcds_obt, vector_search,\njoinorder_synthetic, joinorder, tpch_skew) plus 5 benchbox/platforms/*\nimporters (platforms/__init__.py:593, trino.py, presto.py,\nbase/config_utils.py, influxdb/__init__.py - a wider set than the\nreview's single named platforms/__init__.py:593 line, found via the\nfull-tree grep the TODO asked for) to import from\nbenchbox.core.hooks.benchmark_hooks / benchbox.core.hooks.platform_hooks\ndirectly. Left all other benchbox/cli/* internal callers\n(orchestrator.py, benchmarks.py, commands/run.py, help.py,\ndatabase.py, platform_defaults.py, main.py) importing the old\ncli.* path unchanged - out of this TODO's scope_limit (only\ncli/benchmark_hooks.py and cli/platform_hooks.py are modifiable\nwithin cli/) and harmless since cli->cli via the shim isn't a\nlayering violation. Verified with\n`grep -rn 'cli.benchmark_hooks\\|cli.platform_hooks\\|...' benchbox/core benchbox/platforms`\nreturning zero matches (after clearing __pycache__ and rewording the\nnew package's docstring so it doesn't itself match the grep pattern).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update all core/platforms importers to the new location",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "relocate-cli-hook-registries",
+        "notes": "Neither module is listed in docs/reference/public-contracts.md, so\ntreated as internal-only. Added a Current Inventory row to\ndocs/reference/backward-compatibility.md documenting the shim as an\ninternal courtesy (not a guaranteed compatibility window) rather than\nfollowing the public deprecation-window process.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Note the public-contract question and update docs if needed",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "context": "Migrate test imports first, delete the shim and alias, and prove no importer remains anywhere in the repository.",
+  "description": "From the 2026-08-09 adversarial review of PR #1644, deferred at merge without a tracker record. benchbox/core/analysis/comparison.py keeps _normalize_execution_time_ms (line 961) and a _DURATION_CONSISTENCY_TOLERANCE_MS alias solely so tests can import private shims; no production code calls either. The module docstring says the batch exists to eliminate parallel duration-normalization surfaces, and this shim is a third one. Migrate the tests to import query_execution_from_legacy_dict and DURATION_CONSISTENCY_TOLERANCE_MS from benchbox.core.results.query_execution, then delete the shim and alias.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Keep private cross-module shims alive for test convenience.",
+        "instead": "Import the canonical public helpers directly in tests.",
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "why": "They accumulate as parallel normalization surfaces the batch set out to eliminate."
+      },
+      {
+        "dont": "Move the tolerance constant into comparison to preserve the import path.",
+        "instead": "Delete the alias and import from the canonical module.",
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "why": "That would recreate a second authority for the same value."
+      }
+    ],
+    "item_meta": {
+      "category": "Comparison Correctness and Dead Code",
+      "created_at": "2026-08-11T12:40:16Z",
+      "worktree": "comparison-correctness"
+    },
+    "preserves": [
+      {
+        "behavior": "Comparison production behavior is byte-for-byte unchanged for all inputs.",
+        "item_id": "remove-comparison-duration-shim-20260811"
+      },
+      {
+        "behavior": "Test coverage of duration normalization semantics is retained against the canonical module.",
+        "item_id": "remove-comparison-duration-shim-20260811"
+      },
+      {
+        "behavior": "The canonical tolerance constant remains defined only in benchbox.core.results.query_execution.",
+        "item_id": "remove-comparison-duration-shim-20260811"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Canonical duration normalization and tolerance constant.",
+        "decision": "reuse",
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "path": "benchbox/core/results/query_execution.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/comparison.py"
+      },
+      {
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/analysis/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import benchbox.core.analysis.comparison as c; assert not hasattr(c, '_normalize_execution_time_ms')\"",
+        "description": "Shim is gone from comparison",
+        "expected": "Exits nonzero on the unfixed tree while the shim exists; exits 0 after removal.",
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/analysis/test_analysis_comparison.py tests/unit/core/test_comparison.py -q",
+        "description": "Comparison tests pass against canonical imports",
+        "expected": "All comparison tests pass importing from the canonical module.",
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/core/analysis/comparison.py tests/unit/core/analysis",
+        "description": "Touched paths satisfy Ruff",
+        "expected": "Ruff exits zero.",
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Migrate test imports to the canonical query_execution module",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-comparison-duration-shim-20260811",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Delete the shim and tolerance alias and prove no importer remains",
+        "wid": "w1"
+      }
+    ]
+  }
+}

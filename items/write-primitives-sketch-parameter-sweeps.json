@@ -1,0 +1,222 @@
+{
+  "context": "Pure operations.yaml work. For each new variant:\n  - Copy the default op's write_sql; change the parameter literal.\n  - Re-tune expected_value_min/max empirically against DuckDB\n    (RSE / accuracy is parameter-dependent).\n  - Re-tune storage-size bounds to match the new parameter value.\n  - Add a one-line description noting the parameter delta.\nAll non-DuckDB platform_overrides are `null` — sweeps are\nDuckDB-only by design.\n",
+  "description": "## Unblocked by `write-primitives-architecture-fixes` (2026-05-04)\n\nvalidation_query.platform_overrides shipped, so the per-cell validation\nblast-radius concern is gone. This TODO still depends on\n`write-primitives-sketch-clickhouse-and-storage-metrics` so the\nstorage-size validation methodology lands first — sweep variants reuse\nthe same `octet_length` bounds shape per parameter value.\n\nThe DuckDB community datasketches extension drift (recorded in\n`_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`)\nremains a parallel risk; smoke-test the exact installed extension build\nduring w1 before fanning out the sweep variants.\n\n## Original description\n\nThe merged sketch ops use one default parameter value per sketch\nfamily — Theta lg_k=12 (4096 entries), KLL k=200, Top-K\nlg_max_map_size=8 (256 entries). These defaults trade size,\naccuracy, and update speed in fixed proportions. Real users tune\nthese for their workload — bigger k = better accuracy + larger\nstorage + slower merge.\n\nThis TODO adds parameter-sweep variants of the existing sketch ops\nso the benchmark surfaces the sketch-tuning tradeoff directly:\nmeasure storage size, build latency, merge latency, and estimate\nerror across 3 parameter values per family.\n\nCaptured as a deferred item from the post-merge expansion review.\nLower priority because it's a tuning-analysis dimension rather than\na coverage gap — the existing default-parameter ops already\nvalidate the persist+merge claim; sweeps just refine the analysis.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add cloud-engine overrides for sweep variants",
+        "instead": "DuckDB-only sweep, cloud guidance in docs only.",
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "why": "each cloud has its own parameter mapping (Snowflake counters vs DataSketches lg_max_map_size, etc.) and 27 new overrides are out of proportion with the value"
+      },
+      {
+        "dont": "collapse sweep variants into a single parameterised op",
+        "instead": "separate ops per parameter value.",
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "why": "BenchBox treats each op as a discrete measurement unit and parameterising would require runtime parameter-injection plumbing"
+      },
+      {
+        "dont": "sweep with extreme values that wouldn't be used in production (e.g. lg_k=4 = 16 entries)",
+        "instead": "stick to DataSketches-recommended ranges.",
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "why": "the resulting estimates would be useless and the bounds would be impossible to set meaningfully"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "write-primitives-sketch-parameter-sweeps",
+        "id": 531,
+        "reason": "Each cloud engine has different parameter knobs and defaults; sweeping all 3 families × 3 values × 3 cloud engines = 27 new overrides per family. Out of proportion with the analytical value. DuckDB-only sweep is enough to demonstrate the tradeoff; cloud users tune at their end with vendor-specific knobs.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Cloud-engine parameter-sweep overrides for sketch tuning are covered by open item write-primitives-sketch-cloud-verification (cloud verification of platform_overrides).",
+        "summary": "Cloud-engine parameter-sweep overrides"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "needs_item": "write-primitives-architecture-fixes"
+      },
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "needs_item": "write-primitives-sketch-clickhouse-and-storage-metrics"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-04T00:00:00Z",
+      "created_at": "2026-05-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing sketch_query_theta_union_merge / _kll_quantiles_merge / _topk_combine ops execute identically — sweep variants are net-new ops with distinct IDs.",
+        "item_id": "write-primitives-sketch-parameter-sweeps"
+      },
+      {
+        "behavior": "Validation contracts on sweep variants use the same expected_value_min/max + expected_storage_min/max shape as the default ops.",
+        "item_id": "write-primitives-sketch-parameter-sweeps"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/"
+      },
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/schema.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/write-primitives-sketch-functions.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/write_primitives -q",
+        "description": "All write_primitives unit tests pass with new sweep variants",
+        "expected": "all tests pass",
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark write_primitives --scale 0.01 --queries sketch_query_theta_union_merge_lgk10,sketch_query_theta_union_merge_lgk14",
+        "description": "DuckDB end-to-end: theta lg_k sweep variants execute",
+        "expected": "2/2 pass; storage size at lg_k=10 < default < lg_k=14 as observed",
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark write_primitives --scale 0.01 --queries sketch_query_kll_quantiles_merge_k100,sketch_query_kll_quantiles_merge_k1000",
+        "description": "DuckDB end-to-end: KLL k sweep variants execute",
+        "expected": "2/2 pass; storage size at k=100 < default < k=1000",
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "notes": "Mirror the existing `sketch_query_theta_union_merge` with two\nnew ops: `sketch_query_theta_union_merge_lgk10` and `_lgk14`.\nEach builds with the corresponding lg_k parameter, persists,\nmerges, validates the distinct count is in tolerance bounds.\n\nThe bounds at lg_k=10 will be wider (higher RSE → more variance)\nand at lg_k=14 will be tighter — observe empirically and\ndocument inline.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 2 sketch_query_theta_union_merge variants at lg_k=10 and lg_k=14",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "notes": "Mirror `sketch_query_kll_quantiles_merge` with `_k100` and\n`_k1000` variants. Bounds reflect the relative accuracy: k=100\nmedian estimate may drift further from true; k=1000 should be\ntighter.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 2 sketch_query_kll_quantiles_merge variants at k=100 and k=1000",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "notes": "Mirror `sketch_query_topk_combine` with `_lgmm8` (current\ndefault; explicit variant for sweep symmetry) and `_lgmm10`.\nBoth should still report 7 frequent items deterministically\n(lineitem has 7 distinct shipmodes); the difference shows up in\nbuild/merge latency and storage size, not the estimate count.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 2 sketch_query_topk_combine variants at lg_max_map_size=8 and 10 (skip 6 — too small for TPC-H)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "notes": "Add a \"Parameter sweeps\" section to\n`docs/benchmarks/write-primitives-sketch-functions.md`:\n  - Why this dimension matters (the size / accuracy / latency\n    tradeoff is real and workload-dependent).\n  - Sweep parameter ranges per family with\n    DataSketches-recommended bounds.\n  - Observed numbers at SF=0.01 on DuckDB:\n    storage size, build latency, merge latency per parameter\n    value. Side-by-side bar charts (textcharts) optional.\n  - Cloud parameter mapping guidance: how to translate\n    DataSketches lg_k to Snowflake / Databricks equivalent\n    knobs (different defaults, different scales).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update cross-platform sketch docs with parameter-sweep methodology and observed numbers",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-parameter-sweeps",
+        "notes": "Terse user-facing bullet:\n\"write_primitives sketch: add parameter-sweep variants\n(sketch_query_*_merge_{lgk10,lgk14,k100,k1000,lgmm8,lgmm10})\nfor tuning analysis on DuckDB. Cloud parameter-knob mapping\nguidance in docs.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add changelog entry under unreleased",
+        "wid": "w5"
+      }
+    ]
+  }
+}

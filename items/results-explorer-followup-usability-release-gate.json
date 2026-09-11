@@ -1,0 +1,248 @@
+{
+  "context": "Use the per-item w0 logs as the release checklist instead of the original\nuncommitted row numbers. Prefer targeted automated checks first, then\nbrowser verification of actual user workflows. Capture evidence in\n_project/audits/ artifacts rather than relying on chat history. Map this\nTODO system's priority labels to the matrix as Critical→P0, High→P1,\nMedium-High→P2, Medium→P3, Low→P4 so legacy P-tier callers stay\ninterpretable.\n",
+  "description": "Run the evidence gate for the Results Explorer follow-up review after the\nimplementation TODOs land. The follow-up review was a 2026-05-08 chat-only\nartifact (not committed to _project/audits/); each implementation TODO\nrebinds its own slice of the review via its w0 work unit and writes a log\nunder _project/verification-logs/<id>/w0.log. This gate's matrix synthesizes\nthose logs into a single closure record so each defect has either a fix, a\ndocumented intentional behavior, or a follow-up blocker tracked.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "close defects because they were hard to reproduce without documenting the reproduction attempt.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "rerun broad suites repeatedly without inspecting targeted failures first.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "ship with pending Critical or High defects hidden as Medium polish.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "needs_item": "results-explorer-chart-panel-scope-and-labeling"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "needs_item": "results-explorer-compare-flow-entrypoints"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "needs_item": "results-explorer-navigation-and-pivot-controls"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "needs_item": "results-explorer-query-workbench-controls-and-facets"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "needs_item": "results-explorer-result-detail-metadata-density"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "needs_item": "results-explorer-run-identity-disambiguation"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "needs_item": "results-explorer-table-sticky-density-and-semantics"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No broad generated-data churn as part of the evidence gate.",
+        "item_id": "results-explorer-followup-usability-release-gate"
+      },
+      {
+        "behavior": "No claim of browser verification without route names and observed outcomes.",
+        "item_id": "results-explorer-followup-usability-release-gate"
+      },
+      {
+        "behavior": "No release approval unless Critical (P0) or High (P1) defects from the matrix are fixed or explicitly blocked.",
+        "item_id": "results-explorer-followup-usability-release-gate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "Production source code except to make a narrowly scoped verification-only test fixture adjustment."
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run",
+        "description": "Frontend unit test suite passes",
+        "expected": "all tests pass",
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate",
+        "description": "TODO validation passes",
+        "expected": "all TODO files valid",
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py reindex",
+        "description": "TODO indexes regenerate",
+        "expected": "indexes updated successfully",
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "notes": "Aggregate the seven dependency items' w0 evidence logs from\n_project/verification-logs/<id>/w0.log into a single closure matrix at\n_project/audits/results-explorer-followup-usability-release-2026-05-08.md.\nMap each rebound defect to the PR, file, test, and browser route that\nfixed it. Include unresolved defects only if they have a new TODO id,\npriority, and owner-ready description. Do not rely on the original\nuncommitted row numbering.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build the per-defect evidence matrix from per-item w0 logs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "notes": "Run targeted Results Explorer tests plus typecheck and build. Capture\nfailures with exact test names and keep logs outside the worktree if\noutput is long.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run automated Results Explorer verification gates",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "notes": "Translated into a Playwright capture spec at\n`results-explorer/e2e/captures/followup-usability-release.spec.ts`.\nThe spec exercises the eight primary surfaces touched by the\nfollow-up effort (Query Workbench facets disclosure, Query compare\ntray, Home cohort selector + compare CTA, Benchmark detail\nswitcher + sticky-top heatmap header, Platform detail switcher +\nfilter strip, Compare builder empty state, Compare normalized\nspeedup, Result Detail sparse metadata) and runs as a regression\ngate in CI.\n\nLocal run on develop tip + this PR's branch (chromium):\n8/8 specs pass — see commit message for the run summary. The\nspec is tagged `@followup-usability` so CI keeps it in the\nblocking suite for chromium and as an opt-in capture for\nfirefox/webkit later.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Browser-drive all primary Results Explorer routes",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "notes": "The Playwright spec above writes screenshots when invoked with\n`FOLLOWUP_USABILITY_CAPTURE=1`. The captures landed at\n`_project/audits/results-explorer-followup-usability-release-2026-05-08-screenshots/`\n(eight PNGs covering the routes listed under w3). The audit doc\nlinks to the directory and to the spec.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture before-release screenshots for repaired states",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-followup-usability-release-gate",
+        "notes": "Run TODO validation and reindexing after implementation TODO statuses\nare updated. Move completed implementation items only after their\nverification evidence is attached or referenced in work notes.\nPR #296 ran `todo_cli.py check-graph` on `61e267cec` (51 items, no\ncycles, no dangling references) and regenerated the DONE indexes.\nThe work unit stays `done` because the graph operations were\nactually executed; only the manual w3/w4 evidence was overstated.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate TODO graph, reindex, and close ready items",
+        "wid": "w5"
+      }
+    ]
+  }
+}

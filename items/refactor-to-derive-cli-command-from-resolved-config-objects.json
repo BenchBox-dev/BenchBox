@@ -1,0 +1,222 @@
+{
+  "description": "Expanded from the original resolved-config CLI-command deferral after the 2026-08-08 architecture review reproduced a systemic quick-restart replay defect. Quick restart restores raw selectors after derived state has already been resolved and refreshes only tuning_resolution; platform_key, phases, tuning flags and files, unified config, organization payload, dataframe tuning, resolved mode, seed, BenchmarkConfig, preview metadata, and execution context can therefore disagree. First characterize the full replay contract, then introduce typed RunRequest and immutable ResolvedRunPlan models with one resolver, migrate quick restart as the first vertical slice, and finally migrate interactive, direct CLI, dry-run, load-only, preview, and canonical-record paths. Decision cases: explicit current CLI input overrides saved preferences; saved configuration is resolved atomically; missing historical optional fields use documented compatibility defaults; missing or invalid current configuration fails closed and executes nothing; a missing saved seed must be surfaced as non-exact replay; environment discovery is captured once or explicitly revalidated. Guard rails: no per-field synchronization patch, no second mutable SimpleNamespace representation, no CLI flag rename, no preview/execution divergence, no removal of compatibility attributes until static and behavioral evidence shows no consumer, no broad run.py cleanup, preserve explicit dry-run phases and deterministic seeds, and measure setup/dispatch overhead before and after.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-08T22:50:31Z",
+      "created_at": "2026-07-19T12:33:29Z",
+      "worktree": "run-lifecycle"
+    },
+    "scope_rules": [
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_run_config_resolution_characterization.py tests/unit/cli/test_run_execution_path_parity.py tests/unit/cli/test_preferences_output.py tests/unit/cli/test_cli_data_load_modes.py -q",
+        "description": "Quick restart characterization and execution parity tests pass",
+        "expected": "All replay and execution parity tests pass serially.",
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "last_result": "pass",
+        "last_run": "2026-08-08T22:48:37Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/cli tests/unit/cli",
+        "description": "Touched CLI paths satisfy Ruff",
+        "expected": "Ruff exits zero.",
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "last_result": "pass",
+        "last_run": "2026-08-08T22:48:47Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTEST_ADDOPTS=\"-n 0\" uv run -- python -m pytest tests/unit/cli/test_run_command_branches.py tests/unit/cli/test_run_metadata_contract.py tests/unit/cli/test_cli_dryrun.py -q -k \"not test_dry_run_executor_initialization\"",
+        "description": "Run command branch and metadata tests pass with known host collision isolated",
+        "expected": "All selected run-path tests pass serially; the excluded test is independently known to fail only because /tmp/test is a pre-existing user-owned file.",
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "last_result": "pass",
+        "last_run": "2026-08-08T22:48:51Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Characterization and parity matrix covered quick-restart success/failure, selector precedence, tuning, phases, seed, compression, concurrency, environment rollback, and interactive flow.",
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "notes": null,
+        "started_at": "2026-08-08T22:46:11Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Characterize quick-restart raw and derived state across success failure platform phase tuning config and seed changes",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Decisions encoded in typed merge tests: explicit CLI wins, required missing selectors fail closed, assumed historical defaults are labeled non-exact, and derived execution state is recalculated.",
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "notes": null,
+        "started_at": "2026-08-08T22:46:52Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Record precedence compatibility failure and reproducibility decisions from the characterization matrix",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added frozen RunRequest and ResolvedRunPlan with intent, derived, and runtime-output boundaries documented in benchbox/cli/run_resolution.py.",
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "notes": null,
+        "started_at": "2026-08-08T22:46:57Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Define typed RunRequest and immutable ResolvedRunPlan boundaries and classify every field as intent derived state or runtime output",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Central resolver implemented; quick restart uses transactional merge and resolution with namespace and environment rollback and fail-closed errors.",
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "notes": null,
+        "started_at": "2026-08-08T22:47:02Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Implement one resolver and migrate quick restart to atomic all-or-nothing re-resolution",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Regression tests prove tuning, mode, phases, organization, dataframe tuning, seed, queries, compression, and concurrency refresh into plan, BenchmarkConfig, preview, execution, and metadata.",
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "notes": null,
+        "started_at": "2026-08-08T22:47:08Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Prove successful re-resolution refreshes all derived tuning platform phase organization mode seed BenchmarkConfig and execution-context fields",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Dry-run, direct, data/load-only, quick restart, and normal interactive paths now consume the canonical resolution/finalization boundary; focused parity suites passed.",
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "notes": null,
+        "started_at": "2026-08-08T22:47:14Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Migrate interactive direct CLI dry-run load-only and preview paths through the same resolver",
+        "wid": "w5"
+      },
+      {
+        "evidence": "One owned BenchmarkConfig builder and one ExecutionContext-from-plan builder serve non-wizard paths; normal wizard config is synchronized unconditionally from the finalized plan.",
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "notes": null,
+        "started_at": "2026-08-08T22:47:19Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Construct BenchmarkConfig and canonical metadata from the resolved plan at one owned boundary",
+        "wid": "w6"
+      },
+      {
+        "evidence": "Removed three duplicate BenchmarkConfig construction blocks and duplicate execution-context construction after consumer inventory; compatibility namespace retained where still consumed.",
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "notes": null,
+        "started_at": "2026-08-08T22:47:24Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Remove redundant mutable state only after consumer inventory and compatibility tests prove it unused",
+        "wid": "w7"
+      },
+      {
+        "evidence": "Rollback negative control failed when rollback was removed; final serial suites passed 64, 177 with one environment-only deselection, and 74 targeted tests; Ruff, format, scoped ty, diff, and duplicate delta passed.",
+        "item_id": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "notes": null,
+        "started_at": "2026-08-08T22:47:30Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Run the stale-state negative control and performance parity checks",
+        "wid": "w8"
+      }
+    ]
+  }
+}

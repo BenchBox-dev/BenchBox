@@ -1,0 +1,235 @@
+{
+  "context": "Gate-first for the actual pandas bump, not for every defensive code change.\nItems 3 and 4 are pre-flight guards and may land before w1/w2 if helpful,\nbut do not attempt the lock bump (w5) until both gates are resolved. Keep\nthe pre-flight changes minimal. The lock bump (w5) is the verification step,\nnot the starting point.\n\nFor the modin gate: watch modin's GitHub releases page and pyproject.toml\n`install_requires` for `pandas` upper bound removal. A `pandas<3` → `pandas>=3`\nchange in modin's metadata is the signal.\n\nFor the Python gate: the cleanest option is to raise the project minimum to\n3.11 in a separate, clearly-scoped commit before this item starts - that\navoids environment-marker complexity in pyproject.toml.\n",
+  "description": "pandas 3.0.2 is available on PyPI but cannot be safely bumped yet.\nA compatibility evaluation (2026-04-22) found two hard blockers that must\nclear before the actual lock bump begins, plus two targeted code fixes needed before\nthe lock bump lands.\n\n── HARD BLOCKERS (do not proceed until both are resolved) ──────────────────\n\n1. modin 0.37.1 requires `pandas<2.4,>=2.2`.\n   `uv lock --upgrade-package pandas` fails to resolve because modin's upper\n   bound (`<2.4`) and pandas 3.x are mutually exclusive. No modin release\n   beyond 0.37.1 exists as of 2026-04-22 that relaxes this cap. Modin is a\n   first-class BenchBox platform (benchbox/platforms/dataframe/modin_df.py,\n   extras modin / dataframe-pandas-family / all) - silently excluding it\n   from the resolved environment is not acceptable.\n   Watch: https://github.com/modin-project/modin/releases\n\n2. pandas 3.0 requires Python ≥ 3.11.\n   BenchBox declares `requires-python = \">=3.10,<3.15\"`. Bumping pandas\n   would silently break Python 3.10 users. Either (a) raise the project\n   minimum to 3.11 (requires a separate decision and full CI matrix change)\n   or (b) confirm that pandas can remain at 2.x for Python 3.10 via\n   environment markers - and verify uv resolves that correctly.\n\n── PRE-FLIGHT CODE FIXES (required before lock bump, no behaviour change) ──\n\n3. pandas_df.py:145-155 - `pd.options.mode.copy_on_write` assignment.\n   In pandas 3.0 this option is deprecated and a no-op. The current code\n   sets it unconditionally (guarded only by `pandas_version >= (2, 0)`).\n   Fix: add an upper guard `pandas_version < (3, 0)` so the assignment is\n   skipped on 3.x where CoW is always active.\n\n4. TPC-DI ingest datetime resolution.\n   pandas 3.0 defaults to microsecond resolution for datetime parsing\n   (vs. nanoseconds in 2.x). Any remaining code in `tpcdi/benchmark.py` that\n   reads or normalizes date/time values via pd.read_csv / pd.read_fwf /\n   pd.read_json / pd.to_datetime and then converts to int64 or compares\n   values numerically can produce 1000× different results under 3.x. Audit and add\n   explicit `dtype_backend`, `parse_dates=False`, or explicit resolution\n   normalization where the downstream code is resolution-sensitive. (CoW\n   in-place mutation audit was clean - no fixes needed there.)\n\n── EVALUATION SUMMARY ───────────────────────────────────────────────────────\n\nEvaluated 2026-04-22. pandas 3.x breaking changes cross-referenced against\nBenchBox codebase:\n- DataFrame.swapaxes / append / Index.format() - not used, no impact.\n- groupby/resample keyword changes - not used in DataFrame platform layer.\n- datetime-unit changes in read/normalize paths - affects the remaining\n  TPC-DI benchmark ingest path only (item 4).\n- CoW mandatory - in-place mutation audit clean; only item 3 needs a guard.\nEstimated effort once gates clear: 1-2 days.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assume the CoW audit applies to future TPC-DS query additions",
+        "instead": "(not specified)",
+        "item_id": "upgrade-pandas-to-3x",
+        "why": "new DataFrames created from slice operations (df[mask]) are copy-on-write in 3.x; always use .copy() on slice results before mutation"
+      },
+      {
+        "dont": "change datetime parsing behaviour as part of this item",
+        "instead": "(not specified)",
+        "item_id": "upgrade-pandas-to-3x",
+        "why": "read_csv format changes affect result correctness not just performance; audit and preserve existing semantics"
+      },
+      {
+        "dont": "run `uv lock --upgrade-package pandas` before w1 and w2 are done",
+        "instead": "(not specified)",
+        "item_id": "upgrade-pandas-to-3x",
+        "why": "the resolver will either fail (modin conflict) or silently install an environment that breaks 3.10 users"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "upgrade-pandas-to-3x",
+        "id": 38,
+        "reason": "Scope creep - 3.0 compat is the goal here; track 3.1+ removals in the next quarterly bounds review.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Reason explicitly routes pandas 3.1+ audit to the next quarterly dependency bounds review, tracked by open item review-dependency-upper-bounds-quarterly.",
+        "summary": "Audit pandas 3.1+ changes (DataFrame constructor string dtype inference, future removals)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "upgrade-pandas-to-3x",
+        "id": 39,
+        "reason": "Performance optimization, not a compatibility fix - belongs in a dedicated Modin platform improvement item once 3.x compat is confirmed.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Modin pandas-3.x optimization is explicitly gated on the pandas 3.x upgrade landing first; parent item upgrade-pandas-to-3x is still open/unmet.",
+        "summary": "Upgrade Modin to leverage pandas 3.x-native features (CoW-aware internals, future copy elision)"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "created_at": "2026-04-22T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Fast test suite baseline: currently 19 pre-existing failures - bump must not add new failures",
+        "item_id": "upgrade-pandas-to-3x"
+      },
+      {
+        "behavior": "Python 3.10 users either still supported (via marker) or explicitly told the minimum raised",
+        "item_id": "upgrade-pandas-to-3x"
+      },
+      {
+        "behavior": "TPC-DI date/time correctness - no silent 1000x resolution change in datetime → int conversions",
+        "item_id": "upgrade-pandas-to-3x"
+      },
+      {
+        "behavior": "modin platform fully functional after bump (benchbox run --platform modin-df --benchmark tpch works)",
+        "item_id": "upgrade-pandas-to-3x"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "upgrade-pandas-to-3x",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/benchmark.py"
+      },
+      {
+        "item_id": "upgrade-pandas-to-3x",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/pandas_df.py"
+      },
+      {
+        "item_id": "upgrade-pandas-to-3x",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "upgrade-pandas-to-3x",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpcdi/"
+      },
+      {
+        "item_id": "upgrade-pandas-to-3x",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/test_modin_df.py -n 0 -q",
+        "description": "modin platform still functional after pandas 3.x bump",
+        "expected": "All tests pass, 0 new failures",
+        "item_id": "upgrade-pandas-to-3x",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/test_pandas_df.py tests/unit/platforms/dataframe/test_pandas_family_adapters.py -n 0 -q",
+        "description": "pandas platform and family adapters fully green",
+        "expected": "All tests pass, 0 new failures",
+        "item_id": "upgrade-pandas-to-3x",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpcdi/ -n 0 -q",
+        "description": "TPC-DI datetime correctness",
+        "expected": "All tests pass, 0 new failures",
+        "item_id": "upgrade-pandas-to-3x",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Full fast smoke suite - no new failures beyond the 19 pre-existing baseline",
+        "expected": "Same 19 pre-existing failures; 0 new failures",
+        "item_id": "upgrade-pandas-to-3x",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "upgrade-pandas-to-3x",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "upgrade-pandas-to-3x",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "upgrade-pandas-to-3x",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "upgrade-pandas-to-3x",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "upgrade-pandas-to-3x",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "upgrade-pandas-to-3x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm modin ≥ X.Y ships with pandas ≥ 3.0 support - update pyproject.toml modin lower-bound and run `uv lock --upgrade-package modin pandas` to verify resolver accepts it",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "upgrade-pandas-to-3x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide Python 3.10 stance: either raise requires-python to '>=3.11' (separate PR) or add a pandas environment marker so 3.10 stays on 2.x; confirm uv resolves correctly in both cases before proceeding",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "upgrade-pandas-to-3x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add `pandas_version < (3, 0)` upper guard to the `pd.options.mode.copy_on_write` block in benchbox/platforms/dataframe/pandas_df.py:~145 (defensive pre-work; can land before the lock bump)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "upgrade-pandas-to-3x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Audit the remaining TPC-DI benchmark ingest path for resolution sensitivity; fix explicit dtype_backend / parse_dates / normalization where needed",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "upgrade-pandas-to-3x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run `uv lock --upgrade-package pandas`, run `uv run -- python -m pytest -m fast -q` and confirm only pre-existing failures appear (no new pandas-related failures)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "upgrade-pandas-to-3x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run targeted pandas/modin/dask/tpcdi suite: `uv run -- python -m pytest tests/unit/platforms/dataframe/ tests/unit/core/tpcdi/ -n 0 -q` - green or explain any new failures before committing",
+        "wid": "w6"
+      }
+    ]
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "context": "Add node_modules to the codespell --skip list (verify no other gitignored vendored trees are scanned the same way - check for .venv-style dirs already listed and any new ones).",
+  "description": "The codespell invocation at Makefile:942 passes a --skip list that omits node_modules. results-explorer/.gitignore ignores node_modules/, so any developer who has run the explorer's npm install has thousands of vendored files scanned, and codespell exits non-zero on their typos. That fails make spellcheck -> make ci-lint -> make pr-preflight. CI never installs those deps, so the gate is green in CI and red locally - the inverse of what a preflight is for, and it trains agents/humans to skip the gate. Observed while running preflight for #1333.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "completed_at": "2026-07-29T23:25:10Z",
+      "completed_pr": 1348,
+      "created_at": "2026-07-29T12:18:46Z",
+      "worktree": "ci-infrastructure"
+    },
+    "preserves": [
+      {
+        "behavior": "Real source-tree typos are still caught by spellcheck",
+        "item_id": "spellcheck-scans-gitignored-node-modules"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "spellcheck-scans-gitignored-node-modules",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make spellcheck",
+        "description": "spellcheck passes in a worktree that has results-explorer npm deps installed",
+        "expected": "exit 0 with node_modules present",
+        "item_id": "spellcheck-scans-gitignored-node-modules",
+        "last_result": "pass",
+        "last_run": "2026-07-29T23:24:01Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Makefile:942 codespell --skip gains node_modules; make spellcheck exit 0 in pool-09 WITH results-explorer/node_modules present (was exit 65). Must-preserve validated by injecting 'recieve' into tracked docs/README.md - still flagged, gate exit 2. Sweep: no other currently-present gitignored tree produces hits (.venv/.ruff_cache/.pytest_cache/.todo-db/egg-info/__pycache__ all clean); latent same-class risk is the gitignored agent skill mirrors (.codex/.gemini/.antigravity/skills) - NOT skipped because .claude/skills holds tracked content and a blanket skip would cut real coverage. Rejected a git-ls-files-driven invocation: passing explicit paths defeats the directory skips and re-exposes tracked vendored TPC-H binaries.",
+        "item_id": "spellcheck-scans-gitignored-node-modules",
+        "notes": null,
+        "started_at": "2026-07-29T23:21:21Z",
+        "started_branch": "fix/spellcheck-skip-node-modules",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Add node_modules to the codespell skip list and sweep for other vendored trees",
+        "wid": "w1"
+      }
+    ]
+  }
+}

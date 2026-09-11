@@ -1,0 +1,209 @@
+{
+  "context": "Treat this as a data-contract bug rather than a copy tweak. First prove which\nsource says the run exists and which source says it does not. Then make the\nrendered cell depend on one coherent availability decision.\n",
+  "description": "The 2026-05-09 post-completion review on develop dbac33ee1 found that the\nCross-Benchmark Leaderboard still renders a linked \"No run\" cell for TPC-H\nPolars SF 0.1, while the linked result detail page renders a valid Polars\nTPC-H SF 0.1 power score. The leaderboard and detail page therefore\ncontradict each other about the same result.\n\nThis item addresses review finding #4 recorded in\n_project/audits/results-explorer-post-completion-review-2026-05-09.md.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change generated result fixtures unless the read model cannot represent the truth.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hide the link without checking whether the run should contribute to the leaderboard.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "special-case Polars or TPC-H by display name.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "needs_item": "results-explorer-post-completion-compare-selection-recovery"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend UX",
+      "completed_at": "2026-05-10T00:00:00Z",
+      "created_at": "2026-05-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Meta-leaderboard modes Times, Ranks, and Speedup keep their existing semantics.",
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency"
+      },
+      {
+        "behavior": "Missing cohorts that truly have no published result still render as unavailable.",
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency"
+      },
+      {
+        "behavior": "Result detail links continue to point at canonical result ids.",
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-post-completion-leaderboard-data-consistency/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayLabels.ts"
+      },
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/MetaLeaderboard.a11y.test.tsx src/pages/__tests__/Home.test.tsx",
+        "description": "Meta-leaderboard tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual/browser: /results/ has no linked No run cells; TPC-H Polars SF 0.1 agrees with its detail page'",
+        "description": "Manual leaderboard consistency check passes",
+        "expected": "manual evidence captured in PR notes or verification log",
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "notes": "On current develop, open /results/ and capture every linked \"No run\"\ncell, its href, the linked detail page primary metric, and whether the\nleaderboard source row contains a score. Capture stdout to\n_project/verification-logs/results-explorer-post-completion-leaderboard-data-consistency/w0.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate the linked No run leaderboard contradiction",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "notes": "Inspect MetaLeaderboard, Home, result link helpers, and the snapshot read\nmodel to determine why a row can have a detail href but render \"No run\".\nRecord whether the bug is caused by a missing primary metric mapping,\nmismatched phase/scale key, stale aggregation, or an intentionally\nexcluded score.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Trace the meta-leaderboard score source and availability rules",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "notes": "If the run has a valid primary metric, render the value in the leaderboard\ncell and include it in ranking/scoring as appropriate. If the run is not\neligible for the cohort, render a non-linked unavailable state with a\ntruthful reason. Do not render a linked \"No run\" cell.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make leaderboard cells agree with detail-page run availability",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-leaderboard-data-consistency",
+        "notes": "Add tests that fail when a leaderboard cell is both linked to a result\ndetail page and labelled \"No run\". Include the TPC-H Polars SF 0.1 case\nor an equivalent fixture that exercises the same data path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression coverage for linked unavailable cells",
+        "wid": "w3"
+      }
+    ]
+  }
+}

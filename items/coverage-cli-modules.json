@@ -1,0 +1,220 @@
+{
+  "context": "Follow existing patterns in tests/unit/cli/. Most CLI modules can be tested\nby invoking Click commands with CliRunner or by testing individual functions\ndirectly. For compare commands, create small mock result files. For tuning.py,\ntest YAML config parsing and parameter resolution. For onboarding.py, mock\nuser input and filesystem operations.\n",
+  "description": "Several CLI modules are below 50% test coverage. These handle user-facing\ncommands, configuration, output formatting, and error handling.\n\nCurrent coverage breakdown:\n  - cli/commands/compare.py: 30.2% (623 missing)\n  - cli/commands/run.py: 49.8% (516 missing) - nearly there\n  - cli/commands/shell.py: 30.0% (301 missing)\n  - cli/commands/compare_plans.py: 11.6% (229 missing)\n  - cli/commands/compare_dataframes.py: 12.7% (200 missing)\n  - cli/tuning.py: 0.0% (397 missing)\n  - cli/config.py: 47.6% (267 missing) - nearly there\n  - cli/onboarding.py: 0.0% (192 missing)\n  - cli/output.py: 49.0% (177 missing) - nearly there\n  - cli/exceptions.py: 36.9% (178 missing)\n  - cli/preferences.py: 19.2% (126 missing)\n  - cli/composite_params.py: 46.4% (120 missing)\n  - cli/presentation/system.py: 16.7% (20 missing)\n  - cli/system.py: 43.3% (17 missing)\n\nThree modules (run.py, config.py, output.py) are very close to 50% and\nneed minimal effort. The zero-coverage modules (tuning.py, onboarding.py)\nneed foundational test suites.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "launch actual benchmark runs in CLI tests",
+        "instead": "mock the runner with unittest.mock.patch",
+        "item_id": "coverage-cli-modules",
+        "why": "benchmark runs take 30+ seconds and require platform credentials"
+      },
+      {
+        "dont": "test by parsing CLI stdout strings",
+        "instead": "test return values, exit codes, and side effects instead",
+        "item_id": "coverage-cli-modules",
+        "why": "stdout format changes would cause false failures"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-02-18T00:00:00Z",
+      "created_at": "2026-02-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing CLI tests continue to pass",
+        "item_id": "coverage-cli-modules"
+      },
+      {
+        "behavior": "CLI --help output remains unchanged",
+        "item_id": "coverage-cli-modules"
+      },
+      {
+        "behavior": "No changes to production code",
+        "item_id": "coverage-cli-modules"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "coverage-cli-modules",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "coverage-cli-modules",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/ -v --tb=short",
+        "description": "All CLI tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "coverage-cli-modules",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/commands/run.py (49.8% → 50%)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/commands/compare_plans.py (11.6% → 50%)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/commands/compare_dataframes.py (12.7% → 50%)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/exceptions.py (36.9% → 50%)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/preferences.py (19.2% → 50%)",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/presentation/system.py (16.7% → 50%)",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/config.py (47.6% → 50%)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/output.py (49.0% → 50%)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/composite_params.py (46.4% → 50%)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/system.py (43.3% → 50%)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/tuning.py (0% → 50%)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/onboarding.py (0% → 50%)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/commands/compare.py (30.2% → 50%)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-cli-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for cli/commands/shell.py (30.0% → 50%)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

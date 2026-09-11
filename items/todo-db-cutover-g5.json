@@ -1,0 +1,209 @@
+{
+  "description": "G5 of the DB-backed TODO tracker migration (_project/specs/todo-db-tracker.md,\n'Cutover plan'). DESTRUCTIVE / near-irreversible: freezes and deletes the legacy\nYAML system and cuts all routing + skills over to the DB tracker. G1-G4 and G6 are\ndone; the DB is live (import + G4 sweep applied + weekly export auto-merging).\n\nMAINTAINER-GATED: execute only on explicit authorization. Do w0 (final export\nsnapshot) FIRST as the rollback point. Land as ONE reviewable PR.\n\nRollback: before this lands, the YAML tree is untouched (discard the DB to abort).\nAfter: `todo export` output + git history reconstruct the YAML tree.\n\nSteps are the work units below (dependency-ordered).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete the 6 scripts without removing their CI/content-guard references in the same change",
+        "instead": "do w3 and w4 together",
+        "item_id": "todo-db-cutover-g5",
+        "why": "CI would break on missing todo_cli.py/validate_todo.py"
+      },
+      {
+        "dont": "delete the YAML trees or scripts before w0's final export snapshot is committed",
+        "instead": "complete w0 first and confirm the snapshot is on the branch",
+        "item_id": "todo-db-cutover-g5",
+        "why": "the snapshot is the only rollback point once the trees are gone"
+      }
+    ],
+    "item_meta": {
+      "completed_at": "2026-08-10T00:28:07Z",
+      "completed_pr": 1232,
+      "created_at": "2026-07-19T17:14:50Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "byte-stable `todo export` output format",
+        "item_id": "todo-db-cutover-g5"
+      },
+      {
+        "behavior": "git history of _project/TODO and _project/DONE (retained after deletion)",
+        "item_id": "todo-db-cutover-g5"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make skill-sync-verify",
+        "description": "skill-sync verifies after adopting todo-db",
+        "expected": "",
+        "item_id": "todo-db-cutover-g5",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "todo stats",
+        "description": "DB tracker reads still work post-cutover",
+        "expected": "",
+        "item_id": "todo-db-cutover-g5",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-db-cutover-g5",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-db-cutover-g5",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "todo-db-cutover-g5",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "todo-db-cutover-g5",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "todo-db-cutover-g5",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "todo-db-cutover-g5",
+        "needs_wid": "w0",
+        "wid": "w6"
+      },
+      {
+        "item_id": "todo-db-cutover-g5",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "todo-db-cutover-g5",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "todo-db-cutover-g5",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "todo-db-cutover-g5",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "todo-db-cutover-g5",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "todo-db-cutover-g5",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1232 (merged 2026-07-19, merge commit 6fde4cd3) contains the final cutover snapshot/rollback provenance; current origin/develop is 8fdd4336 and the legacy trees are absent while history remains in Git.",
+        "item_id": "todo-db-cutover-g5",
+        "notes": null,
+        "started_at": "2026-08-10T00:26:44Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Commit a final `todo export` snapshot as the rollback point; record the develop SHA in the PR/spec.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1232 merge commit 6fde4cd3 deleted _project/TODO and _project/DONE; current origin/develop has zero tracked paths under either tree, with history retained by the merged Git change.",
+        "item_id": "todo-db-cutover-g5",
+        "notes": null,
+        "started_at": "2026-08-10T00:27:09Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Delete _project/TODO/ (131 files) and _project/DONE/ (1240 files); git history retains them.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1232 merge commit 6fde4cd3 deleted TODO_SCHEMA.yaml, TODO_ENTRY_TEMPLATE.yaml, _indexes machinery, and legacy structure material; current origin/develop confirms those paths are absent.",
+        "item_id": "todo-db-cutover-g5",
+        "notes": null,
+        "started_at": "2026-08-10T00:27:15Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Delete TODO_SCHEMA.yaml, TODO_ENTRY_TEMPLATE.yaml, the _indexes/ machinery, and references/structure.md.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1232 merge commit 6fde4cd3 deleted the six retired YAML-tracker scripts and their tests; current origin/develop confirms all six script paths are absent.",
+        "item_id": "todo-db-cutover-g5",
+        "notes": null,
+        "started_at": "2026-08-10T00:27:22Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Delete the 6 retired scripts (validate_todo, generate_indexes, migrate_todos, migrate_todo_format, normalize_done_yaml, todo_cli) and their tests.",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #1232 merge commit 6fde4cd3 removed legacy content-guard/path-filter and todo_cli.py/validate_todo.py CI references; current origin/develop grep shows no such active references under .github, Makefile, or _project/scripts.",
+        "item_id": "todo-db-cutover-g5",
+        "notes": null,
+        "started_at": "2026-08-10T00:27:28Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Retire the path-filters.yml/content-guard _project/TODO|DONE checks and any CI refs to todo_cli.py/validate_todo.py.",
+        "wid": "w4"
+      },
+      {
+        "evidence": "PR #1232 merge commit 6fde4cd3 adopted the DB tracker and retired the legacy todo skill actions; current origin/develop contains skill-sync.yaml/lock and the DB-backed todo wrapper, and skill-sync verification passes.",
+        "item_id": "todo-db-cutover-g5",
+        "notes": null,
+        "started_at": "2026-08-10T00:27:34Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Adopt todo-db into skill-sync.yaml (remove from ignore); repoint/retire the legacy `todo` skill's cli/validate/tracker actions; shrink its SKILL.md.",
+        "wid": "w5"
+      },
+      {
+        "evidence": "PR #1232 merge commit 6fde4cd3 updated AGENTS.md and CLAUDE.md to the DB CLI policy; current origin/develop AGENTS.md states the shared DB is the only TODO record and _project/scripts/todo is the only write path.",
+        "item_id": "todo-db-cutover-g5",
+        "notes": null,
+        "started_at": "2026-08-10T00:27:41Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Update AGENTS.md 'Planning & TODOs' and CLAUDE.md pre-approved commands to the DB CLI (todo reads auto-allowed, writes per policy).",
+        "wid": "w6"
+      },
+      {
+        "evidence": "PR #1232 is merged into develop (2026-07-19, 6fde4cd3); current origin/develop has no legacy tracker trees/scripts,  passed, [OK] manifest: skill-sync.yaml found and valid\n[OK] lockfile: Lock file has 11 skill(s)\n[OK] source:canonical: Source type \"git\" is supported\n[OK] target:claude: .claude/skills exists\n[!!] target:codex: .codex/skills does not exist yet\n[!!] target:gemini: .gemini/skills does not exist yet\n[!!] target:antigravity: .antigravity/skills does not exist yet\n[OK] drift:claude: All tracked skills match lock file (1 ignored by target policy)\n[!!] materialization:claude: Local materialization incomplete: 1 missing skill(s), 0 modified file(s)\n[!!] drift:codex: Drift detected: 11 missing skill(s)\n[!!] materialization:codex: Local materialization incomplete: 11 missing skill(s), 0 modified file(s)\n[!!] drift:gemini: Drift detected: 11 missing skill(s)\n[!!] materialization:gemini: Local materialization incomplete: 11 missing skill(s), 0 modified file(s)\n[!!] drift:antigravity: Drift detected: 11 missing skill(s)\n[!!] materialization:antigravity: Local materialization incomplete: 11 missing skill(s), 0 modified file(s)\n[OK] tracked:claude: .claude/skills is tracked and visible to git\n[OK] portability: Install mode \"mirror\" is portable\n[OK] instruction:claude: Project CLAUDE.md found\n[OK] instruction:codex: Project AGENTS.md found\n[OK] instruction:gemini: Project GEMINI.md found\n[OK] instruction:copilot: Project AGENTS.md, CLAUDE.md, GEMINI.md found\n[OK] instruction:antigravity: Project ANTIGRAVITY.md found passed, and hosted  passed.",
+        "item_id": "todo-db-cutover-g5",
+        "notes": null,
+        "started_at": "2026-08-10T00:27:48Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Verify: skill-sync verify, CI green, `todo` reads/writes work post-cutover; open the single cutover PR.",
+        "wid": "w7"
+      }
+    ]
+  }
+}

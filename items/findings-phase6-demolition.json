@@ -1,0 +1,237 @@
+{
+  "context": "One PR, mechanical deletions, no logic changes. Verify the CI path-filter change doesn't orphan other classifier rules. CLAUDE.md/AGENTS.md edits follow docs-brevity style. After merge, run the export workflow manually once to confirm the committed snapshot is unchanged in shape.",
+  "description": "Single demolition PR after the phase-5 freeze cycle completes and all gates hold. Deletes the tracked _project/blind-spots/*.md records and retires every machinery surface the adversarial review's M6 inventoried: sweep_blind_spots.py + its tests, Makefile blind-spots-{list,report,sweep} targets (Makefile:2077-2085, .PHONY :1290, help :2397-2400), the .gitignore:169 un-ignore line for _project/blind-spots/, path-filters.yml safe-content (:10) and content-guard (:42) entries, and the CLAUDE.md pre-approved 'make blind-spots-*' commands + blind-spot capture-path bindings. KEEPS: validate_blind_spot.py (retargeted in phase 1 as the draft validator), the /blind-spot command (rewritten in phase 1), and README.md content relocated to docs/development/ as the findings-domain doc. Git HISTORY IS UNTOUCHED — the 61 commits and record contents remain readable in history per the phase-0 owner decision; rewriting history is a separate destructive action requiring separate authorization. HARD ENTRY GATES: (a) one full planning cycle elapsed since the freeze; (b) at least one finding was surfaced via the standard flow (ready/stats banner -> candidates) and triaged during that cycle — the requirement-2 proof; (c) phase-2 export pinning test and phase-3 non-claimability suite still green on develop.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Bundle history rewriting (filter-repo/BFG) into this PR",
+        "instead": "Tree deletion only; history question stays with the owner",
+        "item_id": "findings-phase6-demolition",
+        "why": "Destructive, separately-authorized decision per phase 0; also breaks every historical SHA reference"
+      },
+      {
+        "dont": "Delete before the freeze-cycle proof exists",
+        "instead": "Gate w1 blocks the PR",
+        "item_id": "findings-phase6-demolition",
+        "why": "The freeze cycle is the only evidence window proving the new flow actually surfaces findings (requirement 2); deleting early destroys the rollback path"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "findings-phase6-demolition",
+        "needs_item": "findings-phase4-surfacing"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "needs_item": "findings-phase5-migration"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Entry gates NOT met, verified 2026-07-30 against production rather than assumed. (1) The freeze began TODAY (README notice, PR #1359); the gate is a full planning cycle AFTER the freeze, and the freeze IS the rollback window -- demolishing now deletes the only fallback if a parity problem surfaces. (2) The '>=1 finding triaged through the new flow' precondition is NOT satisfied: production finding_events contains ONLY import=64, imported_triage_log=260, sync=1 -- ZERO triage/disposition/promote/link events. The 3 actionable / 29 actioned / 32 promoted dispositions are imported historical status mapped from Markdown 'status:' by STATUS_TO_DISPOSITION, not proof that the new triage flow works on production. An earlier note in this effort claimed this gate was 'arguably already satisfied'; that was wrong. (3) findings-evidence-tree-record-disposition should land first: that file is UNTRACKED, so phase 6's deletion of tracked _project/blind-spots/*.md would silently miss it. Unblock when a planning cycle has elapsed AND at least one finding has been triaged via 'todo finding triage' on production.",
+      "category": "cleanup",
+      "created_at": "2026-07-22T12:51:31Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "All other path-filters.yml classifier rules behave identically",
+        "item_id": "findings-phase6-demolition"
+      },
+      {
+        "behavior": "Git history: no rewrite, no force-push; record contents stay readable at historical SHAs",
+        "item_id": "findings-phase6-demolition"
+      },
+      {
+        "behavior": "validate_blind_spot.py and the rewritten /blind-spot command (phase-1 artifacts) untouched",
+        "item_id": "findings-phase6-demolition"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "blind-spots classified as safe-content/content-guard — entries removed with the tree",
+        "decision": "supersede",
+        "item_id": "findings-phase6-demolition",
+        "path": ".github/path-filters.yml:10,:42"
+      },
+      {
+        "concept": "blind-spots make targets — replaced by todo finding list/candidates",
+        "decision": "supersede",
+        "item_id": "findings-phase6-demolition",
+        "path": "Makefile:2077-2085"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-phase6-demolition",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_findings.py"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/validate_blind_spot.py"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "kind": "only_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "kind": "only_modify",
+        "path_glob": ".gitignore"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/**"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/sweep_blind_spots.py"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_blind_spot_tools.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make test-fast && make lint",
+        "description": "Full fast lane + lint green after deletions",
+        "expected": "exit 0",
+        "item_id": "findings-phase6-demolition",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git grep -l 'blind-spots' -- ':!docs/development/findings-domain.md' ':!_project/specs/findings-domain.md'",
+        "description": "No blind-spots references remain outside docs history notes",
+        "expected": "no matches (exit 1)",
+        "item_id": "findings-phase6-demolition",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Export snapshot shape unchanged post-merge",
+        "expected": "manual workflow run diff shows items-domain tables only; evidence on w5",
+        "item_id": "findings-phase6-demolition",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-phase6-demolition",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "findings-phase6-demolition",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "findings-phase6-demolition",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify entry gates: freeze cycle elapsed; >=1 finding triaged via new flow (finding_events evidence); pinning suites green",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "findings-phase6-demolition",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Relocate README content to docs/development/findings-domain.md; rewrite pointers",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "findings-phase6-demolition",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Delete tracked records + sweep script + sweep tests + Makefile targets + gitignore un-ignore + path-filters entries",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "findings-phase6-demolition",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "CLAUDE.md: drop make blind-spots-* + old bindings, point at drafts flow; AGENTS.md sweep refs",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "findings-phase6-demolition",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Post-merge: manual export run confirms snapshot shape; git log sweep confirms no findings content in new commits",
+        "wid": "w5"
+      }
+    ]
+  }
+}

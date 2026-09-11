@@ -1,0 +1,54 @@
+{
+  "context": "After the hosted tracker migrates to todo-db >=0.3, use standalone  to replace the rung with a shell sequence that resolves run_id first, resolves job_id from that run, asserts both are non-empty, then counts failures. Do not drop completed evidence or migrate the hosted DB as part of this item.",
+  "description": "windows-nightly-remaining-49-failures rung 1 nests  inside command substitution within xargs. The shell expands it before xargs, GitHub returns 404 for literal , the pipeline counts zero FAILED lines, and  passes. Observed directly on 2026-07-29 while the latest real Windows job still had 62 failures.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "windows-nightly-failure-count-verification-vacuous-xargs",
+        "needs_item": "migrate-hosted-tracker-db-to-todo-db-0-3-schema"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-07-29T13:09:48Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "the corrected rung fails on missing run/job/log data instead of interpreting it as zero failures",
+        "item_id": "windows-nightly-failure-count-verification-vacuous-xargs"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-nightly-failure-count-verification-vacuous-xargs",
+        "kind": "do_not_modify",
+        "path_glob": "**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "run_id=30434746317; test -n \"\"; job_id=; test -n \"\"; test \"0\" -gt 0",
+        "description": "Resolved run and job IDs produce a non-empty failed-test inventory",
+        "expected": "exit 0",
+        "item_id": "windows-nightly-failure-count-verification-vacuous-xargs",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-nightly-failure-count-verification-vacuous-xargs",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace the vacuous rung after hosted update support is available",
+        "wid": "w1"
+      }
+    ]
+  }
+}

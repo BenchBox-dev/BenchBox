@@ -1,0 +1,94 @@
+{
+  "context": "Reuse tests.utilities.posix_shell for the interpreter path, generate the minimum platform-specific launcher in the test fixture, and keep production executor version/age rejection unchanged.",
+  "description": "The action-loop test writes an extensionless bash-shebang executable named codex. Windows shutil.which uses PATHEXT and cannot resolve it. Create a portable launcher pair: retain the deterministic bash body and add a .cmd entrypoint discoverable as codex that invokes the verified test POSIX shell, with quoting that preserves --cd and prompt arguments.",
+  "legacy": {
+    "item_meta": {
+      "category": "Test portability",
+      "completed_at": "2026-08-01T15:29:42Z",
+      "completed_pr": 1406,
+      "created_at": "2026-08-01T14:06:31Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Production rejects missing and too-old Codex executors.",
+        "item_id": "windows-pr-followups-fake-codex-shim-v2"
+      },
+      {
+        "behavior": "The action order remains executor, commit, then reply.",
+        "item_id": "windows-pr-followups-fake-codex-shim-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-pr-followups-fake-codex-shim-v2",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/pr_review_followups.py"
+      },
+      {
+        "item_id": "windows-pr-followups-fake-codex-shim-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_pr_review_followups.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_pr_review_followups.py -q",
+        "description": "PR follow-up tests",
+        "expected": "fails on the unfixed Windows tree because codex is not found; exit 0 after repair",
+        "item_id": "windows-pr-followups-fake-codex-shim-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-pr-followups-fake-codex-shim-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-pr-followups-fake-codex-shim-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Direct fake launcher PATH/PATHEXT resolution and codex --version contract added; focused suite passes",
+        "item_id": "windows-pr-followups-fake-codex-shim-v2",
+        "notes": null,
+        "started_at": "2026-08-01T15:15:46Z",
+        "started_branch": "fix/windows-codex-shim",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Add a launcher fixture contract covering PATH/PATHEXT resolution",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Windows codex.cmd invokes verified Bash shim; POSIX executable fixture preserved",
+        "item_id": "windows-pr-followups-fake-codex-shim-v2",
+        "notes": null,
+        "started_at": "2026-08-01T15:17:07Z",
+        "started_branch": "fix/windows-codex-shim",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Generate a .cmd wrapper over the deterministic bash shim on Windows",
+        "wid": "w1"
+      },
+      {
+        "evidence": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_pr_review_followups.py -q: 34 passed",
+        "item_id": "windows-pr-followups-fake-codex-shim-v2",
+        "notes": null,
+        "started_at": "2026-08-01T15:17:13Z",
+        "started_branch": "fix/windows-codex-shim",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Run the full PR-followups script tests",
+        "wid": "w2"
+      }
+    ]
+  }
+}

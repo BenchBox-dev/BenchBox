@@ -1,0 +1,196 @@
+{
+  "description": "Several managed Spark adapters do not use SparkDataLoadMixin for data loading and\ntherefore are not covered by spark-mixin-open-table-format-loading.\n\nThis item covers the job/staging-based adapters whose loading is implemented through\nplatform-specific upload and remote table-registration flows:\n- emr-serverless\n- dataproc\n- dataproc-serverless\n- athena-spark\n\nThe goal is to make Delta/Iceberg/Hudi selectable and executable end-to-end for the\nadapters above, not merely to add capability-table entries.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "needs_item": "spark-mixin-open-table-format-loading"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-03-23T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Capability registration must remain conservative until verified end-to-end",
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading"
+      },
+      {
+        "behavior": "Existing parquet/native loading paths for all four adapters",
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/aws/athena_spark_adapter.py"
+      },
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/aws/emr_serverless_adapter.py"
+      },
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/format_capabilities.py"
+      },
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/gcp/dataproc_adapter.py"
+      },
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/gcp/dataproc_serverless_adapter.py"
+      },
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v -k 'emr or dataproc or athena_spark' --no-header -q",
+        "description": "Managed Spark adapter tests pass",
+        "expected": "All tests pass",
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base/test_format_capabilities.py -v --no-header -q",
+        "description": "Format capability tests pass after any re-registration",
+        "expected": "All tests pass",
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit each adapter's actual load path and supported remote table-registration mechanism",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Delta/Iceberg/Hudi loading or explicit per-format rejection for emr-serverless",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Delta/Iceberg/Hudi loading or explicit per-format rejection for dataproc and dataproc-serverless",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Delta/Iceberg loading or explicit per-format rejection for athena-spark",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-register only the adapters with verified end-to-end support in format_capabilities.py",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-spark-job-adapters-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add adapter-specific unit tests covering remote registration SQL/config generation",
+        "wid": "w6"
+      }
+    ]
+  }
+}

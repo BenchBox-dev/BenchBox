@@ -1,0 +1,232 @@
+{
+  "context": "Parse, deduplicate, resolve, and validate IDs as separate stages. Retain resolvable IDs, enumerate missing IDs without exposing internal errors, enforce the four-result limit before rendering, and canonicalize or explicitly reject the excess portion. Preserve hard comparison-safety blocks for benchmark, scale, phase, metric, and unsupported cohort mismatches.",
+  "description": "The comparison route currently treats one stale ID as fatal for every valid ID and silently truncates five or more requested IDs to four while leaving the original URL intact. Existing browser coverage protects the all-or-error behavior, so this is a deliberate contract change rather than an untested bug fix. Make partial recovery and cardinality limits visible, deterministic, and share-link safe.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "downgrade cohort-safety errors into warnings to keep more cards",
+        "instead": "recover existence errors first, then apply the existing hard cohort checks to the retained set",
+        "item_id": "results-explorer-compare-url-integrity",
+        "why": "partial ID recovery must not make invalid performance claims"
+      },
+      {
+        "dont": "replace slice(0, 4) with an unbounded result set",
+        "instead": "enforce the limit explicitly and communicate/canonicalize the decision",
+        "item_id": "results-explorer-compare-url-integrity",
+        "why": "the four-card layout and query budget are intentional product constraints"
+      },
+      {
+        "dont": "update only rendered state while leaving a misleading share URL",
+        "instead": "define and test deterministic URL canonicalization or an explicit rejection state",
+        "item_id": "results-explorer-compare-url-integrity",
+        "why": "refreshing or sharing would recreate a different state"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend Reliability",
+      "completed_at": "2026-08-02T13:44:16Z",
+      "completed_pr": 1478,
+      "created_at": "2026-08-02T04:27:41Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A copied post-recovery URL reproduces the same visible comparison state.",
+        "item_id": "results-explorer-compare-url-integrity"
+      },
+      {
+        "behavior": "Duplicate IDs do not consume the four-result budget or produce duplicate cards.",
+        "item_id": "results-explorer-compare-url-integrity"
+      },
+      {
+        "behavior": "No missing or excess ID is silently ignored; the user sees what was retained and why another entry was removed.",
+        "item_id": "results-explorer-compare-url-integrity"
+      },
+      {
+        "behavior": "The comparison order remains stable and follows the first occurrence in the shared URL.",
+        "item_id": "results-explorer-compare-url-integrity"
+      },
+      {
+        "behavior": "Unsafe cross-benchmark, cross-scale, cross-phase, or incompatible-metric comparisons remain hard-blocked.",
+        "item_id": "results-explorer-compare-url-integrity"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Rewrite the existing stale-ID assertion to protect partial recovery while retaining genuine hard blocks.",
+        "decision": "supersede",
+        "item_id": "results-explorer-compare-url-integrity",
+        "path": "results-explorer/e2e/failures/compare-hard-block.spec.ts"
+      },
+      {
+        "concept": "Keep cohort comparability decisions centralized after ID resolution.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-url-integrity",
+        "path": "results-explorer/src/lib/compareCohort.ts"
+      },
+      {
+        "concept": "Reuse URL-state helpers for deterministic deduplication and canonicalization.",
+        "decision": "extend",
+        "item_id": "results-explorer-compare-url-integrity",
+        "path": "results-explorer/src/lib/useUrlState.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/failures/compare-hard-block.spec.ts"
+      },
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/**"
+      },
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/compareCohort.test.ts"
+      },
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/useUrlState.test.ts"
+      },
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/compareCohort.ts"
+      },
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/useUrlState.ts"
+      },
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.a11y.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'from pathlib import Path; t=Path(\"results-explorer/src/pages/Compare.tsx\").read_text(); assert \".slice(0, 4)\" not in t'",
+        "description": "Comparison input is not silently sliced",
+        "expected": "Fails on the unfixed tree; exits 0 when the limit is handled through an explicit contract rather than silent slicing.",
+        "item_id": "results-explorer-compare-url-integrity",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:40:17Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/Compare.test.tsx src/pages/__tests__/Compare.a11y.test.tsx src/lib/__tests__/compareCohort.test.ts src/lib/__tests__/useUrlState.test.ts",
+        "description": "Comparison unit and accessibility contracts pass",
+        "expected": "Mixed valid/stale IDs recover, excess IDs are disclosed, URLs are deterministic, and unsafe cohorts remain blocked.",
+        "item_id": "results-explorer-compare-url-integrity",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:40:29Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --workers=1 e2e/failures/compare-hard-block.spec.ts",
+        "description": "Real comparison failure and route regressions pass",
+        "expected": "Browser tests prove partial recovery, limit messaging, reload parity, and retained hard comparison blocks.",
+        "item_id": "results-explorer-compare-url-integrity",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:42:54Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-compare-url-integrity",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Defined stable parsing/retention semantics in results-explorer/src/pages/Compare.tsx: trim and first-occurrence order, dedupe before the four-result cap, explicit overflow/duplicate notices, and canonical URL policy with one-result recovery preservation.",
+        "item_id": "results-explorer-compare-url-integrity",
+        "notes": "Cover empty, duplicate, missing, one through four valid, five-plus valid, mixed missing/excess, and cohort-incompatible sets. Choose whether excess IDs are rejected with a removal control or deterministically trimmed with a visible notice and canonical URL; no silent mode is allowed.",
+        "started_at": "2026-08-02T13:28:37Z",
+        "started_branch": "fix/results-explorer-compare-url-integrity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Specify comparison ID parsing, recovery, limit, and URL semantics",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Compare.tsx resolves each requested ID independently, loads each detail independently, recovers available details when other IDs are stale/unavailable, deduplicates aliases after resolution, and preserves existing single-ID error behavior when nothing is recoverable; focused Compare tests passed 59/59.",
+        "item_id": "results-explorer-compare-url-integrity",
+        "notes": "Load resolvable rows even when another ID is stale, show the unresolved identifiers in user-safe copy, retain valid cards, and provide controls to remove invalid entries or return to Results.",
+        "started_at": "2026-08-02T13:39:49Z",
+        "started_branch": "fix/results-explorer-compare-url-integrity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Separate ID resolution from cohort validation and render partial recovery",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Enforced MAX_COMPARE_SELECTIONS=4 after deduplication through planCompareIds; excess IDs are visibly reported, retained order is stable, URL canonicalization removes excess entries when at least two results remain, and one-result recovery keeps the original multi-ID URL for reload parity. Exact guard passed: uv run -- python -c '... assert \".slice(0, 4)\" not in Compare.tsx'.",
+        "item_id": "results-explorer-compare-url-integrity",
+        "notes": "Deduplicate first, enforce the limit, expose the outcome in an accessible status/alert, and synchronize the URL. Preserve card order and avoid extra data fetches for discarded entries when possible.",
+        "started_at": "2026-08-02T13:40:04Z",
+        "started_branch": "fix/results-explorer-compare-url-integrity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Enforce and communicate the four-result limit",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Updated Compare unit tests (stale partial recovery, duplicate/excess disclosure, alias deduplication), real Chromium failure coverage (partial recovery, reload parity, all-unavailable error, four-result limit, retained mixed-cohort claim suppression); tracker verification runs 1/2/3 all pass, with run 3 rerun after replacing a stale port-4319 server.",
+        "item_id": "results-explorer-compare-url-integrity",
+        "notes": "Update unit, accessibility, and real-browser coverage. Include reload/share round trips, keyboard removal controls, duplicate IDs, mixed valid/stale IDs, five IDs, and proof that genuine cohort mismatches still block claims.",
+        "started_at": "2026-08-02T13:40:10Z",
+        "started_branch": "fix/results-explorer-compare-url-integrity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Replace behavior-locking tests with the corrected contract",
+        "wid": "w3"
+      }
+    ]
+  }
+}

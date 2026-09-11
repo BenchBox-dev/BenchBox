@@ -1,0 +1,267 @@
+{
+  "context": "Make the smallest mechanical cleanup after characterization. Move `re` to\nmodule scope in result_plotter, extract the duplicated natural query sort key\ninto visualization utils, and prove call sites still sort the same examples.\n",
+  "description": "Independent verification confirmed two low-risk cleanup items in the\nvisualization subsystem:\n\n  - `benchbox/core/visualization/result_plotter.py` imports `re` inside\n    `_sort_results_by_version()` and `_natural_sort_key()`, while\n    `ascii_runtime.py` already imports `re` at module top.\n  - `result_plotter.py` and `ascii_runtime.py` both define an equivalent\n    natural query-ID sort key.\n\nThe original review overstated one detail: `statistics` is already imported\nat module top in `ascii_runtime.py`, so there is no per-call `statistics`\nimport to fix. This TODO keeps the cleanup narrow and intentionally separate\nfrom the registry/orchestration refactors.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "broaden tests into unrelated Results Explorer chart behavior.",
+        "instead": "(not specified)",
+        "item_id": "visualization-small-cleanups",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "change `normalize_query_id()` or query subset matching behavior.",
+        "instead": "(not specified)",
+        "item_id": "visualization-small-cleanups",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "combine this cleanup with registry or MCP orchestration refactors.",
+        "instead": "(not specified)",
+        "item_id": "visualization-small-cleanups",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hoist lazy textcharts renderer imports.",
+        "instead": "(not specified)",
+        "item_id": "visualization-small-cleanups",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "visualization-small-cleanups",
+        "id": 519,
+        "reason": "Only import placement and duplicated natural sort are in scope.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Rewriting all visualization utility helpers is an unscoped broad rewrite explicitly excluded from the parent's narrow import/dedup cleanup; no concrete driver.",
+        "summary": "Rewrite all visualization utility helpers"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "visualization-small-cleanups",
+        "id": 520,
+        "reason": "This TODO is about sort keys, not query subset normalization.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason clarifies this is entirely out of the parent item's scope (sort keys vs. query-ID normalization semantics), not a task for later.",
+        "summary": "Change query-ID normalization semantics"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "visualization-small-cleanups",
+        "id": 521,
+        "reason": "The lightweight visualization import boundary is intentional.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicitly an intentional design choice (lightweight visualization import boundary), not deferred work.",
+        "summary": "Hoist lazy textcharts renderer imports"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "visualization-small-cleanups",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality",
+      "completed_at": "2026-05-21T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Natural query ordering remains unchanged for existing ASCII charts.",
+        "item_id": "visualization-small-cleanups"
+      },
+      {
+        "behavior": "No chart renderer behavior changes except through identical shared sort helper use.",
+        "item_id": "visualization-small-cleanups"
+      },
+      {
+        "behavior": "ResultPlotter platform version sorting remains unchanged.",
+        "item_id": "visualization-small-cleanups"
+      },
+      {
+        "behavior": "Visualization package import remains lightweight.",
+        "item_id": "visualization-small-cleanups"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/visualization/__init__.py: lightweight import boundary - do not introduce eager renderer imports through utility extraction.",
+        "decision": "reuse",
+        "item_id": "visualization-small-cleanups",
+        "path": "benchbox/core/visualization/__init__.py"
+      },
+      {
+        "concept": "benchbox/core/visualization/ascii_runtime.py: current query matrix ordering - preserve chart output order.",
+        "decision": "reuse",
+        "item_id": "visualization-small-cleanups",
+        "path": "benchbox/core/visualization/ascii_runtime.py"
+      },
+      {
+        "concept": "benchbox/core/visualization/result_plotter.py: current version and query sort helpers - preserve behavior while removing duplication.",
+        "decision": "reuse",
+        "item_id": "visualization-small-cleanups",
+        "path": "benchbox/core/visualization/result_plotter.py"
+      },
+      {
+        "concept": "benchbox/core/visualization/utils.py: shared subtitle, slug, and power-run helpers - extend this rather than creating another utility module.",
+        "decision": "extend",
+        "item_id": "visualization-small-cleanups",
+        "path": "benchbox/core/visualization/utils.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "visualization-small-cleanups",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/visualize.py"
+      },
+      {
+        "item_id": "visualization-small-cleanups",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "visualization-small-cleanups",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "visualization-small-cleanups",
+        "kind": "do_not_modify",
+        "path_glob": "textcharts package source under .venv/"
+      },
+      {
+        "item_id": "visualization-small-cleanups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii_runtime.py"
+      },
+      {
+        "item_id": "visualization-small-cleanups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/result_plotter.py"
+      },
+      {
+        "item_id": "visualization-small-cleanups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/utils.py"
+      },
+      {
+        "item_id": "visualization-small-cleanups",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/ascii/test_ascii_charts.py"
+      },
+      {
+        "item_id": "visualization-small-cleanups",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/test_viz_utils.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/test_viz_utils.py tests/unit/visualization/ascii/test_ascii_charts.py -q",
+        "description": "Focused visualization utility and ASCII tests pass.",
+        "expected": "Visualization utility and ASCII chart tests pass.",
+        "item_id": "visualization-small-cleanups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"import re\" benchbox/core/visualization/result_plotter.py benchbox/core/visualization/ascii_runtime.py",
+        "description": "No local `re` imports remain in result_plotter methods.",
+        "expected": "result_plotter.py has only module-level import if needed; ascii_runtime.py retains module-level import.",
+        "item_id": "visualization-small-cleanups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph remains valid after implementation.",
+        "expected": "TODO validation and graph checks pass.",
+        "item_id": "visualization-small-cleanups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "visualization-small-cleanups",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "visualization-small-cleanups",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "visualization-small-cleanups",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "visualization-small-cleanups",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "visualization-small-cleanups",
+        "notes": "Re-run current-tree checks and record checked SHA plus a compact summary\nin the implementation PR body or TODO completion notes.\n\nRequired checks:\n  - `rg -n \"import re|def _natural_sort_key|statistics\" benchbox/core/visualization/result_plotter.py benchbox/core/visualization/ascii_runtime.py benchbox/core/visualization/utils.py`.\n  - Compare `ResultPlotter._natural_sort_key()` with\n    `ascii_runtime._natural_sort_key()` and list any divergence before\n    extracting.\n  - Identify tests covering version sorting and query-ID ordering.\n\nDecision gate: if the implementations have diverged by the time this\nTODO is implemented, write characterization tests for both behaviors\nbefore extracting a shared helper.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate local imports and duplicated natural-sort behavior before editing",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-small-cleanups",
+        "notes": "Move `import re` to module scope in\n`benchbox/core/visualization/result_plotter.py` and remove the two local\nimports. Do not hoist renderer submodule imports in `ascii_runtime.py`;\nthose are intentionally lazy so command registration stays lightweight.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Hoist `re` import in result_plotter without changing lazy renderer imports",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-small-cleanups",
+        "notes": "Move the shared natural query-ID sort key to\n`benchbox/core/visualization/utils.py`, for example\n`natural_query_sort_key(value: str) -> tuple[float, str]`.\n\nPreserve exact behavior:\n  - IDs with digits sort by numeric value;\n  - suffix/prefix text remains the tie-breaker;\n  - IDs without digits sort after numeric IDs;\n  - return type remains compatible with existing sort calls.\n\nUpdate `ascii_runtime.py` and `result_plotter.py` to import the helper.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract natural query-ID sorting to visualization utils",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-small-cleanups",
+        "notes": "Tests should cover:\n  - `Q1`, `Q2`, `Q10` natural ordering;\n  - bare numeric IDs if currently supported by callers;\n  - suffix cases such as `Q14a`;\n  - nonnumeric IDs sorting after numeric IDs;\n  - `ResultPlotter._sort_results_by_version()` still sorts platform\n    version labels as before.\n\nPrefer tests near existing visualization unit tests; avoid broad test\nrewrites.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add focused tests for shared natural sorting and version sorting",
+        "wid": "w3"
+      }
+    ]
+  }
+}

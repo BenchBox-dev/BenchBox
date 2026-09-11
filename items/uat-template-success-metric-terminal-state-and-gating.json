@@ -1,0 +1,194 @@
+{
+  "context": "Implement w1 first (schema), regression-test against the full TODO\ncorpus, then w2 (template additions), then w3 (retrofit if accepted).\nThe schema change is the only non-additive piece and so carries the\nregression risk; everything else is purely additive comment/example\nedits.\n",
+  "description": "Closes the remediation for blind-spot finding\n`2026-05-03-081922-uat-submit-success-metric-ambiguity` per the\napproved design document at\n`_project/specs/uat-methodology-blind-spot-remediation.md`.\n\nBundles three small edits that share a single PR surface:\n  1. Schema relaxation: `TODO_SCHEMA.yaml` `open_questions` items\n     become `oneOf [string, object]` (backwards-compatible — existing\n     string-form questions still validate).\n  2. Template additions: `_project/TODO_ENTRY_TEMPLATE.yaml` learns\n     three example snippets — terminal-state vocabulary in\n     `success_metrics`, validator-clean-rate metric, and\n     per-work-unit `coverage_checklist` block.\n  3. Optional retrofit: `external-contributor-submission-dry-run`\n     gets a one-line terminal-state addition to its `success_metrics`\n     (its `verification` block already names \"PR is merged\"\n     unambiguously, but the explicit success-metric line is the\n     remediation Finding 3 prescribes for in-flight UATs).\n\nSpec §2 Finding 3, §3 template/schema diff preview, §6 implementation\nTODO 2 contain the full rationale and the exact YAML to apply.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add `additionalProperties: false` to the new object form",
+        "instead": "leave additionalProperties at its default (true).",
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "why": "we explicitly want forward-compatibility for future fields like `resolved_with`"
+      },
+      {
+        "dont": "bundle in the coverage_checklist tooling change",
+        "instead": "that lives behind a separate (currently un-filed) TODO if a future UAT shows the convention drifting.",
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "why": "Finding 1 was approved as convention-only"
+      },
+      {
+        "dont": "enforce `gating: true` runtime semantics in todo_cli.py",
+        "instead": "this TODO is template + schema only.",
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "why": "the spec scopes that to a future TODO if reviewer attention proves insufficient"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-template-success-metric-terminal-state-and-gating",
+        "id": 297,
+        "reason": "Spec §2 Finding 3 scopes this to a future follow-up if reviewer attention proves insufficient. Premature tooling adds false-positive risk (defensible exceptions get blocked).",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly deferred until reviewer attention proves insufficient (spec Finding 3); no evidence that condition has been triggered.",
+        "summary": "`gating: true` runtime enforcement in todo_cli.py done"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-template-success-metric-terminal-state-and-gating",
+        "id": 298,
+        "reason": "Finding 1 was approved as convention-only per the W4 design. File separately if a future UAT shows the convention drifting.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Coverage-checklist tooling enforcement was explicitly approved as convention-only per the W4 design; file separately only if drift is observed, which hasn't happened.",
+        "summary": "Coverage checklist tooling enforcement"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-template-success-metric-terminal-state-and-gating",
+        "id": 299,
+        "reason": "Q4 in the design defaulted to wait. Promote per-TODO conventions into a subtemplate after the next two UATs prove their cost/benefit.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Subtemplate extraction explicitly deferred pending cost/benefit proof across the next two UATs; no evidence that evaluation happened.",
+        "summary": "_project/UAT_TEMPLATE.yaml subtemplate extraction"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All currently-tracked TODOs in `_project/TODO/` and `_project/DONE/` continue to validate without modification.",
+        "item_id": "uat-template-success-metric-terminal-state-and-gating"
+      },
+      {
+        "behavior": "Backwards compatibility: existing string-form `open_questions` entries continue to validate (the schema becomes oneOf string|object, not object-only).",
+        "item_id": "uat-template-success-metric-terminal-state-and-gating"
+      },
+      {
+        "behavior": "Template structure: comments stay terse; snippets remain copy-pastable.",
+        "item_id": "uat-template-success-metric-terminal-state-and-gating"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "kind": "do_not_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/external-contributor-submission-dry-run.yaml"
+      },
+      {
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO_ENTRY_TEMPLATE.yaml"
+      },
+      {
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO_SCHEMA.yaml"
+      },
+      {
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/tests/"
+      },
+      {
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/validate_todo.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cat > /tmp/uat_test_oq.yaml <<'EOF'\ntitle: \"Test\"\nworktree: main\npriority: Low\nstatus: \"Not Started\"\ndescription: \"Test that the schema relaxation works.\"\nopen_questions:\n- \"Legacy string\"\n- question: \"Object form\"\n  gating: true\n  affects: [\"w1\"]\nEOF\nuv run --project _project/scripts -- python _project/scripts/validate_todo.py /tmp/uat_test_oq.yaml\n",
+        "description": "Schema accepts object-form open_questions",
+        "expected": "✅ valid",
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all",
+        "description": "Existing TODOs still validate",
+        "expected": "all files valid",
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "notes": "Update `_project/TODO_SCHEMA.yaml` `open_questions` to:\n\n  open_questions:\n    type: array\n    description: \"Unresolved questions or uncertainties\"\n    items:\n      oneOf:\n        - type: string\n        - type: object\n          required: [question]\n          properties:\n            question: { type: string }\n            gating: { type: boolean }\n            affects: { type: array, items: { type: string } }\n            default: { type: string }\n            resolved_with: { type: string }\n\nVerify: `validate_todo.py` continues to pass on every existing TODO\nin `_project/TODO/` and `_project/DONE/`. Add a new fixture or unit\ntest that confirms the object form validates.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Schema relaxation: open_questions oneOf [string, object]",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "notes": "Update `_project/TODO_ENTRY_TEMPLATE.yaml` per the spec's §3\n\"Template diff preview\" exactly. Specifically:\n  - In the `work[]` example, add a commented `coverage_checklist:`\n    block scoped to \"OPTIONAL — for work units with cross-cutting\n    deliverables only\".\n  - In the `success_metrics` example, add commented examples for\n    the four-word terminal-state vocab and the validator-clean\n    rate (with a \"corpus-shaped UATs only\" guard).\n  - In the `open_questions` example, add a commented object-form\n    gating question after the existing string-form example.\nKeep template comments concise; readers should be able to copy\nsnippets without untangling dense prose.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Template additions: terminal-state vocab + validator-clean rate + coverage_checklist examples",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-template-success-metric-terminal-state-and-gating",
+        "notes": "Add to `_project/TODO/main/planning/external-contributor-submission-dry-run.yaml`:\n\n  success_metrics:\n  - \"Submission terminal state: merged-to-published-results (PR opened, CI green, merge complete)\"\n\nNo other edits to that file. The existing `verification` block\nalready implies this terminal state; the success_metric makes it\nexplicit. If the user prefers to skip the retrofit, drop this work\nunit; the rest of the TODO stands.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Optional retrofit of external-contributor-submission-dry-run",
+        "wid": "w3"
+      }
+    ]
+  }
+}

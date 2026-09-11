@@ -1,0 +1,312 @@
+{
+  "context": "Change the ANCHOR, not the directory name. In resolve_benchmark_runs_dir(), when the resolved root is still the bare DEFAULT_BENCHMARK_RUNS_ROOT sentinel, walk up from Path.cwd() for a '.git' entry (a directory in a clone, a FILE in a linked worktree — both must be accepted via .exists()) and return <worktree_root>.parent / 'benchmark_runs'. When cwd is not inside a work tree (installed package, arbitrary cwd) keep returning Path.cwd() / 'benchmark_runs' so published behaviour for non-repo users is byte-identical. Precedence --output > BENCHBOX_OUTPUT_DIR > default must be untouched: resolve_benchmark_runs_root() and the explicit/env branches keep their current semantics, and only the default branch changes. Guard against the degenerate case where the work tree root is the filesystem root (parent == self) by falling back to cwd. Then rewrite the ~13 tests that assert the literal cwd path so they assert against the resolved default root instead of a hardcoded shape, and add a positive regression test that the resolved default is never contained in a Git work tree.",
+  "description": "benchbox/core/runtime_paths.py::DEFAULT_BENCHMARK_RUNS_ROOT is the RELATIVE Path('benchmark_runs'), and benchbox/utils/path_utils.py::resolve_benchmark_runs_dir anchors that fallback to Path.cwd(). benchbox/cli/config.py::DirectoryManager.__init__ then eagerly mkdirs results/, datagen/ and databases/ under it. Consequence: any `uv run benchbox run` launched from a checkout with no BENCHBOX_OUTPUT_DIR set writes generated data, loaded databases and result JSONs INTO that checkout. Verified on 2026-07-24 @ 14b0271c1: the main clone held 1.9 GB of in-tree artifacts (datagen 1.0 G, databases 936 M, results 704 K) from a 2026-07-24 08:18-08:40 multi-platform session, while the intended shared root /Users/joe/Developer/benchmark_runs received nothing from that day. Direct probe from a scratch cwd returned `resolve_benchmark_runs_dir() = <cwd>/benchmark_runs`. The maintainer convention is `../benchmark_runs` — a SIBLING of the checkout — which works uniformly because every pool worktree (BenchBox.pool-NN, BenchBox.findings-pN) is itself a sibling of the main clone. Both existing guards miss the no-env case: tests/unit/core/test_benchmark_output_root_guard.py only forbids HARDCODED Path.cwd()/'benchmark_runs' in benchmark sources (it enforces routing through the very helper that is cwd-relative), and tests/uat/artifact_hygiene.py::configured_external_root is a no-op when BENCHBOX_OUTPUT_DIR is unset. .env.example:81 actively recommends the in-repo path (`BENCHBOX_OUTPUT_DIR=./benchmark_runs`).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Anchor the default under $HOME (e.g. ~/.benchbox/benchmark_runs)",
+        "instead": "Anchor to the enclosing work tree's parent, which yields exactly ../benchmark_runs for the main clone and every sibling pool worktree",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "why": "It orphans the existing 1.9 GB+ corpus at /Users/joe/Developer/benchmark_runs and abandons the established ../benchmark_runs sibling convention"
+      },
+      {
+        "dont": "Detect the work tree by shelling out to `git rev-parse --show-toplevel`",
+        "instead": "Walk cwd and its parents in pure Python for an existing '.git' entry, accepting both the directory and the linked-worktree file form",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "why": "Adds a subprocess to a hot path that runs during benchmark construction and fails when git is absent from the environment"
+      },
+      {
+        "dont": "Test the new behaviour by asserting a literal absolute path such as /Users/joe/Developer/benchmark_runs",
+        "instead": "Assert the relationship — the resolved root is not inside a Git work tree, and equals <worktree_root>.parent/'benchmark_runs' for a fixture repo",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "why": "That re-pins the tests to one machine's layout, the same brittleness that let the cwd default survive this long"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-24T18:59:22Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "A cwd that is NOT inside a Git work tree still resolves to Path.cwd()/'benchmark_runs', so installed-package users see no change",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree"
+      },
+      {
+        "behavior": "All pool worktrees and the main clone continue to resolve to the SAME shared root, preserving datagen reuse across checkouts",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree"
+      },
+      {
+        "behavior": "BENCHBOX_OUTPUT_DIR continues to be expanduser()'d and to accept both relative and absolute values",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree"
+      },
+      {
+        "behavior": "DirectoryManager still creates results/, datagen/ and databases/ under whatever root is resolved",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree"
+      },
+      {
+        "behavior": "Resolution precedence stays explicit --output > BENCHBOX_OUTPUT_DIR > default; neither the explicit nor the env branch changes behaviour",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree"
+      },
+      {
+        "behavior": "The directory name stays 'benchmark_runs' so the existing /Users/joe/Developer/benchmark_runs corpus and every BENCHBOX_OUTPUT_DIR-based UAT flow keep working",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Central explicit>env>default path resolver with documented precedence",
+        "decision": "extend",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "path": "benchbox/core/runtime_paths.py"
+      },
+      {
+        "concept": "resolve_benchmark_runs_dir absolutises the relative default for filesystem callers",
+        "decision": "extend",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "path": "benchbox/utils/path_utils.py"
+      },
+      {
+        "concept": "Report-only guard that cwd/benchmark_runs does not grow during an external-root run",
+        "decision": "extend",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "path": "tests/uat/artifact_hygiene.py"
+      },
+      {
+        "concept": "Static guard forbidding hardcoded cwd-local benchmark_runs defaults in benchmark sources",
+        "decision": "reuse",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "path": "tests/unit/core/test_benchmark_output_root_guard.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/utils/cloud_storage.py"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "only_modify",
+        "path_glob": ".env.example"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runtime_paths.py"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/path_utils.py"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/join-order.md"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "only_modify",
+        "path_glob": "tests/test_amplab.py"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "only_modify",
+        "path_glob": "tests/test_h2odb.py"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/artifact_hygiene.py"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_base_advanced.py"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/tpcdi/"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/test_path_utils.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/utils/test_path_utils.py -q",
+        "description": "Path utils unit tests pass, including the new work-tree discovery cases",
+        "expected": "exit 0",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/test_amplab.py tests/test_h2odb.py tests/unit/test_base_advanced.py tests/unit/core/test_config_utils.py tests/unit/core/test_benchmark_output_root_propagation.py tests/unit/core/dataframe/test_storage_location_parity.py tests/unit/mcp/test_benchmark_output_root_propagation.py tests/unit/tpcdi/test_config_simplified.py -q",
+        "description": "Every test that previously pinned the literal cwd default now passes against the resolved root",
+        "expected": "exit 0",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_benchmark_output_root_guard.py -q",
+        "description": "Existing static guard against hardcoded cwd defaults still passes",
+        "expected": "exit 0",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from pathlib import Path; from benchbox.utils.path_utils import resolve_benchmark_runs_dir; r=resolve_benchmark_runs_dir(); t=Path.cwd(); print(r); assert r==t.parent/'benchmark_runs', r; assert not str(r).startswith(str(t)+'/'), r\"",
+        "description": "From inside the worktree, the resolved default root is outside the work tree and equals ../benchmark_runs",
+        "expected": "prints the sibling benchmark_runs path, exit 0",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast lane stays green",
+        "expected": "exit 0",
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "notes": "Confirm three things: (1) resolve_benchmark_runs_dir() with no BENCHBOX_OUTPUT_DIR returns <cwd>/benchmark_runs; (2) DirectoryManager.__init__ eagerly mkdirs results/, datagen/ and databases/ under it; (3) .git is a directory in /Users/joe/Developer/BenchBox but a FILE in every linked pool worktree, and both must resolve to the same parent /Users/joe/Developer.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-validate on develop that the cwd-relative default still reproduces, and that the .git marker differs between the clone and linked worktrees",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "notes": "Must accept both marker shapes via .exists() — a directory in a normal clone, a file in a linked worktree. Unit-test against: a .git-as-dir fixture, a .git-as-file fixture, a nested subdirectory well below the root, and a tmpdir that is not a repo at all.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a work-tree discovery helper to benchbox/utils/path_utils.py that walks cwd and its parents for an existing .git entry, returning the containing directory or None",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "notes": "Include the degenerate guard for a work tree at the filesystem root (parent == self) by falling back to cwd. The explicit-argument and BENCHBOX_OUTPUT_DIR branches of resolve_benchmark_runs_root() must be left completely untouched.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Rewire resolve_benchmark_runs_dir() so the default branch returns <worktree_root>.parent/'benchmark_runs' inside a work tree and Path.cwd()/'benchmark_runs' outside one",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "notes": "Sites: tests/test_amplab.py:280, tests/test_h2odb.py:268, tests/unit/test_base_advanced.py:110 and :772, tests/unit/core/test_config_utils.py:230 and :240, tests/unit/core/test_benchmark_output_root_propagation.py:114, tests/unit/core/dataframe/test_storage_location_parity.py:57 and :80, tests/unit/mcp/test_benchmark_output_root_propagation.py:77, tests/unit/tpcdi/test_config_simplified.py:92.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Rewrite the ~13 tests that pin the literal Path.cwd()/'benchmark_runs' shape so they assert against the resolved default root instead",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "notes": "Run the containment assertion from a fixture repo with .git-as-dir and again from one with .git-as-file, so the linked-worktree shape is covered rather than assumed.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add regression tests that the resolved default root is never inside a Git work tree, and that an explicit BENCHBOX_OUTPUT_DIR still wins unchanged",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "anchor-default-benchmark-runs-root-outside-worktree",
+        "notes": "Docs to check: docs/operations/uat-framework.md (states the BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs UAT convention) and docs/benchmarks/join-order.md (describes datagen path resolution).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update .env.example:81 to stop recommending ./benchmark_runs, and reconcile any docs that contradict the new parent-anchored default",
+        "wid": "w5"
+      }
+    ]
+  }
+}

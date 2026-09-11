@@ -1,0 +1,11 @@
+{
+  "description": "Implement DataFrame versions of Transaction Primitives benchmark operations. This\nbenchmark tests database transaction semantics: COMMIT, ROLLBACK, savepoints,\nisolation levels, and multi-statement transactions.\n\nDataFrame platforms with table formats have ACID transaction support:\n\n**Delta Lake (Full ACID):**\n- Atomic writes with automatic commit\n- Optimistic concurrency control\n- Time travel (query historical versions)\n- VACUUM for garbage collection\n- Isolation: serializable snapshot isolation\n\n**Iceberg (Full ACID):**\n- Atomic table operations\n- Snapshot isolation\n- Time travel via snapshots\n- Schema evolution with transactions\n- Partition evolution\n\n**PySpark (Spark SQL):**\n- Transaction support via Delta Lake or Iceberg\n- Streaming transactions (structured streaming)\n- Batch transaction patterns\n\nPlatforms without transaction support (Polars, Pandas) should be skipped\nfor transaction-specific operations.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-31T00:00:00Z",
+      "created_at": "2026-01-25T00:00:00Z",
+      "worktree": "dataframe-benchmarks"
+    }
+  }
+}

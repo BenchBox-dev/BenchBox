@@ -1,0 +1,191 @@
+{
+  "context": "Follow docs/operations/mcp-production-readiness.md and docs/operations/mcp-remote-security.md as the runbooks. Revalidate the deployed revision and runbook assumptions first. Test staging before any public exposure. Capture a redacted revision-bound evidence document at docs/operations/mcp-production-readiness-evidence.md with timestamps, environment, owner, links or log references, pass or fail, and freshness expiry for every gate. Verify that the TLS and proxy edge preserves MCP POST, GET, SSE, authentication headers, and bounded timeouts; exercise backup and clean restore for the shared job, quota, and artifact stores; run multi-worker scaling, rollback to the prior digest, and incident diagnostics drills; configure OTLP and verify W3C propagation plus bounded redacted spans; then run pinned conformance, Inspector, protocol compatibility, multi-worker acceptance, observability, and cache checks against the deployed endpoint. If any gate fails or becomes stale, leave publication blocked and record the remediation as a follow-up.",
+  "description": "Complete the operator-controlled external deployment gate after local staging and adversarial review. Historical work rows w1-w5 preserve local Apple Container observations only; the 2026-08-13 review found that they did not satisfy their production contracts and must not be treated as accepted prerequisites. The current evidence document marks those observations unbound or partial and every production gate blocked. After PR #1716 merges, select the exact merged revision, build and publish it by immutable registry digest, deploy it to the approved external target, and replay every TLS/identity, shared-storage, scaling/rollback/incident, OTLP/W3C/redaction, multi-worker, DuckDB execution, protocol, tenancy, quota, durable-job, cancellation, artifact, and cache gate. Complete w6 only when one replayable redacted transcript binds all passing gates to the same revision, registry digest, readiness digest, timestamps, target, operator, and named production approver.",
+  "legacy": {
+    "item_meta": {
+      "blocked_reason": "Fail-closed after PR #1716 merged as 3ffa5ba0265e065805e28aab6f092682d3039f2a: no corrected immutable image has yet been built or exercised. Local post-merge replay is also waiting on /Users/joe/.benchbox/test.lock, whose recorded owner pid 53456 is gone; repository policy forbids deleting or bypassing the lock. Production still requires an approved external target/operator, immutable registry digest, TLS/identity edge, shared durable storage, HTTPS OTLP with W3C/redaction proof, the full deployed-endpoint matrix including DuckDB execution, one replayable bound transcript, and named approval before w6 or publication can complete.",
+      "category": "operations",
+      "created_at": "2026-08-02T01:26:47Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "Evidence contains no credentials, tokens, raw database URLs, unbounded request arguments, or result payloads",
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4"
+      },
+      {
+        "behavior": "Runtime semantics, auth and tenancy policy, durable job behavior, cache policy, and protocol compatibility remain unchanged",
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4"
+      },
+      {
+        "behavior": "The public or non-loopback endpoint remains fail-closed until current external evidence is complete, exact-revision and digest-bound, and approved",
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "kind": "do_not_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp*.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'import re; from pathlib import Path; text=Path(\"docs/operations/mcp-production-readiness-evidence.md\").read_text(); keys=(\"evidence_binding_status\",\"tls_edge\",\"backup_restore\",\"scaling_rollback_incident\",\"otlp\",\"multiworker\",\"public_acceptance\",\"publication_status\",\"production_gate_status\",\"deployment_revision\",\"immutable_registry_digest\",\"named_production_approver\"); values={}; [values.setdefault(key, []).append(value.strip()) for key, value in re.findall(r\"^([a-z_]+): (.+)$\", text, re.M) if key in keys]; assert all(len(values.get(key, [])) == 1 for key in keys); expected={\"evidence_binding_status\":\"COMPLETE\",\"tls_edge\":\"PASS\",\"backup_restore\":\"PASS\",\"scaling_rollback_incident\":\"PASS\",\"otlp\":\"PASS\",\"multiworker\":\"PASS\",\"public_acceptance\":\"PASS\",\"publication_status\":\"APPROVED\",\"production_gate_status\":\"APPROVED\"}; assert all(values[key][0] == value for key, value in expected.items()); assert re.fullmatch(r\"[0-9a-f]{40}\", values[\"deployment_revision\"][0]); assert re.fullmatch(r\"sha256:[0-9a-f]{64}\", values[\"immutable_registry_digest\"][0]); assert values[\"named_production_approver\"][0] not in {\"\",\"NOT_ASSIGNED\"}'",
+        "description": "Production evidence fields are unique and exactly approved",
+        "expected": "exits 1 on the current blocked local record; exits 0 only for unique exact production PASS and APPROVED fields with complete binding, full revision, immutable digest, and named approver",
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "last_result": "fail",
+        "last_run": "2026-08-16T22:11:41Z",
+        "seq": 8,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated origin/develop at 57d2a9b86ec913ddd1ca6223985a7cb8781aede2; required deployment revision 52a68a80ea8e9626d19476a856e04421e9764b0e is not present. Runbook policy remains current, but no approved deployment target, operator, immutable image digest, redacted configuration, or named publication approver is available in the authorized workspace.",
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "notes": null,
+        "started_at": "2026-08-02T13:27:33Z",
+        "started_branch": "test/freeze-bulk-path-coverage",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Revalidate that origin/develop contains the exact merged revision, that the runbooks and gate policy are current, and that the selected deployment target and evidence freshness window are still valid",
+        "wid": "w0"
+      },
+      {
+        "evidence": "docs/operations/mcp-production-readiness-evidence.md records the controlled staging target, operator, exact revision 96d1b040724c19d182792c99aaf3b960e5ad503e, local arm64 image digest, readiness digest, and redacted configuration scope.",
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "notes": null,
+        "started_at": "2026-08-13T15:40:50Z",
+        "started_branch": "docs/mcp-production-readiness-evidence-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-mcp-production-readiness-evidence-20260813",
+        "status": "done",
+        "summary": "Resolve the deployment target, operator, exact immutable image digest, and redacted configuration record",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Local Apple Container staging report: authenticated MCP traffic through the host TLS proxy at 127.0.0.1:18443 preserved MCP requests and selected both worker backends; invalid bearer token returned HTTP 401; docs/operations/mcp-production-readiness-evidence.md records tls_edge: PASS.",
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "notes": null,
+        "started_at": "2026-08-13T15:43:35Z",
+        "started_branch": "docs/mcp-production-readiness-evidence-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-mcp-production-readiness-evidence-20260813",
+        "status": "done",
+        "summary": "Deploy a staging candidate behind the approved TLS and proxy edge and prove MCP transport, authentication-header, timeout, and health-routing behavior",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Local native ext4 volume backup/clear/restore passed with marker local-apple-container-restore-ok; redacted backup SHA-256 3822a0a170ec1a89870a07c63027a7fa2cd0387dc3a5b20e550a67be062ad592; docs/operations/mcp-production-readiness-evidence.md records backup_restore: PASS.",
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "notes": null,
+        "started_at": "2026-08-13T15:43:53Z",
+        "started_branch": "docs/mcp-production-readiness-evidence-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-mcp-production-readiness-evidence-20260813",
+        "status": "done",
+        "summary": "Run shared job, quota, and artifact storage backup, clean restore, and durability checks with recovery evidence",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Two MCP worker processes shared the local state volume; cross-worker status lookup passed; rollback image 547be7d5d720d250d8b09a7512234163ed097a27 served 16 tools and current 96d1 recovered; docs/operations/mcp-production-readiness-evidence.md records scaling_rollback_incident: PASS.",
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "notes": null,
+        "started_at": "2026-08-13T15:44:11Z",
+        "started_branch": "docs/mcp-production-readiness-evidence-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-mcp-production-readiness-evidence-20260813",
+        "status": "done",
+        "summary": "Exercise multi-worker scale, rollback to the prior digest, and incident diagnostics or recovery drills with timestamps and outcomes",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Local OTLP receiver recorded 11 bounded application/x-protobuf /v1/traces requests from the pinned workers; no bearer values or raw payloads were recorded; docs/operations/mcp-production-readiness-evidence.md records otlp: PASS.",
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "notes": null,
+        "started_at": "2026-08-13T15:44:32Z",
+        "started_branch": "docs/mcp-production-readiness-evidence-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-mcp-production-readiness-evidence-20260813",
+        "status": "done",
+        "summary": "Configure OTLP export and verify W3C propagation plus bounded, redacted telemetry for representative requests",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-stateless-external-deployment-acceptance-v2-4",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Post-release only: replay production gates, publish a bound transcript, obtain named approval, and unblock shared-endpoint publication",
+        "wid": "w6"
+      }
+    ]
+  }
+}

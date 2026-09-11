@@ -1,0 +1,243 @@
+{
+  "context": "Start with the shared query catalog loader because read_primitives uses the\ngeneric query catalog path. Add result contract parsing in a backward-compatible\nway, then enforce the stricter contract only for read_primitives queries with\nvariants or high-risk nested/semi-structured outputs.\n\nUse the existing variant tests in tests/unit/core/read_primitives as the local\npattern. Keep the first implementation focused on read_primitives; do not\ngeneralize the policy to metadata_primitives or ai_primitives unless needed for\nshared loader compatibility.\n",
+  "description": "Previous review found that `read_primitives` platform variants can diverge enough\nto produce misleading cross-platform benchmark signals. Q75/json_aggregates exposed\nthe issue: matching column names and successful execution are not enough when the\nnested output shape or measured capability differs.\n\nApply the policy that every active platform variant must be meaningfully comparable\nto the base query. If a platform can only express a related-but-not-equivalent\noperation, skip that query on that platform rather than keeping it in cross-platform\nbenchmark scoring.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "broaden runtime parity tests to live cloud platforms in this item",
+        "instead": "keep runtime checks local/optional.",
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "why": "credentials and live_integration approvals are separate concerns"
+      },
+      {
+        "dont": "keep related-but-not-equivalent fallbacks as comparable variants",
+        "instead": "use semantics-preserving SQL or skip_on instead.",
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "why": "they produce misleading benchmark signals"
+      },
+      {
+        "dont": "rely only on column-name equality",
+        "instead": "validate declared result_contract metadata.",
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "why": "nested JSON/array/struct shape can diverge behind identical aliases"
+      },
+      {
+        "dont": "rewrite variants through SQLGlot",
+        "instead": "preserve the current bypass behavior.",
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "why": "existing platform variants are authored as final target SQL"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "ensure-read-primitives-variant-comparability",
+        "id": 153,
+        "reason": "The first implementation should fix benchmark correctness at the catalog/test layer; CLI/result-report integration can follow once the contract shape stabilizes.",
+        "resolution": "promoted",
+        "resolved_item": "expose-query-comparability-metadata-in-cli-output-and-persis",
+        "resolved_reason": null,
+        "summary": "Expose query comparability metadata in CLI output and persisted result artifacts"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "ensure-read-primitives-variant-comparability",
+        "id": 154,
+        "reason": "The first pass targets the highest-risk families. Follow-up coverage should include array_unnest (clickhouse, bigquery), array_agg_simple (clickhouse), struct_construction (clickhouse), list_transform (clickhouse), and the duckdb/clickhouse paths of map_construction so retained variants do not drift silently.",
+        "resolution": "promoted",
+        "resolved_item": "expand-runtime-parity-coverage-for-retained-read-primitives",
+        "resolved_reason": null,
+        "summary": "Expand runtime parity coverage for retained read_primitives variants not covered by the first local parity suite"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-04-29T00:00:00Z",
+      "created_at": "2026-04-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Catalog variants remain final target SQL and continue to bypass SQLGlot retranslation in ReadPrimitivesBenchmark.get_queries().",
+        "item_id": "ensure-read-primitives-variant-comparability"
+      },
+      {
+        "behavior": "Existing skip_on behavior continues to exclude unsupported queries without counting them as failures.",
+        "item_id": "ensure-read-primitives-variant-comparability"
+      },
+      {
+        "behavior": "Runnable but non-equivalent variants are skipped rather than retained as benchmark-comparable queries.",
+        "item_id": "ensure-read-primitives-variant-comparability"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/ai_primitives/catalog/queries.yaml"
+      },
+      {
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/metadata_primitives/catalog/queries.yaml"
+      },
+      {
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/read_primitives/test_catalog_loader.py tests/unit/core/read_primitives/test_query_manager_variants.py tests/unit/core/read_primitives/test_benchmark_variants.py -q",
+        "description": "Catalog loader and existing variant behavior still pass",
+        "expected": "all tests pass",
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/read_primitives/test_read_primitives_variant_contracts.py -q",
+        "description": "New static comparability contracts pass",
+        "expected": "all tests pass",
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/validation/test_read_primitives_variant_parity.py -q",
+        "description": "Focused runtime parity tests pass or skip cleanly for missing optional engines",
+        "expected": "tests pass; optional engines may skip when unavailable",
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph remains valid after this item is created",
+        "expected": "no cycles or dangling dependencies",
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add result_contract metadata support to the read_primitives catalog model and loader",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add static comparability linting for base/variant output columns, nested shape, row identity, and measured capability",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix or skip scalar and capability-divergent variants: fulltext, window_moving_frame, statistical_percentiles, timeseries_trend_analysis, and any_value",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix or skip semi-structured variants with nested-shape risk: JSON, arrays, structs, maps, and lambda/list operations",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add focused runtime parity tests for risky read_primitives families against DuckDB reference at SF=0.01",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "ensure-read-primitives-variant-comparability",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update read_primitives catalog docs and skip reference to require comparable variants or skip_on",
+        "wid": "w6"
+      }
+    ]
+  }
+}

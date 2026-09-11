@@ -1,0 +1,52 @@
+{
+  "context": "Joe's decision, three options. (a) Make skill-sync-skills public - branch protection becomes available at no cost, but the repo carries personal agent instructions, so review content first. (b) Upgrade the account to GitHub Pro. (c) Accept advisory-only and compensate: the drift becomes visible on main immediately after a bad merge, so a red main is the signal - optionally add the same check to the pre-commit/pre-push path in the canonical checkout so it fails locally before a push, which needs no plan change and is probably the best value. If (c), do (c)'s local hook rather than leaving it purely advisory.",
+  "description": "skill-sync-skills-lock-invariant-check shipped scripts/verify_lock.py and .github/workflows/verify-lock.yml (PR #13, merged). The workflow works and is green: it passed on the PR and on the push to main at 2026-07-29T12:30:37Z. But it cannot be made a REQUIRED status check, so the invariant is advisory - a PR that ships a stale lock still merges and nothing stops it, which is the exact outcome the item set out to prevent. The cause is the repository plan, not permissions: GET repos/joeharris76/skill-sync-skills/branches/main/protection returns 403 'Upgrade to GitHub Pro or make this repository public to enable this feature.' Branch protection is unavailable on a private repo on this plan, so no settings change or token scope will fix it.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-07-30T15:56:04Z",
+      "completed_pr": 15,
+      "created_at": "2026-07-29T23:39:26Z",
+      "worktree": "skill-sync-canonical"
+    },
+    "preserves": [
+      {
+        "behavior": "no personal content is made public without an explicit content review",
+        "item_id": "skill-sync-lock-gate-is-advisory-not-enforced"
+      },
+      {
+        "behavior": "verify_lock.py behaviour and the existing workflow stay working",
+        "item_id": "skill-sync-lock-gate-is-advisory-not-enforced"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "skill-sync-lock-gate-is-advisory-not-enforced",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.skill-sync/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test \"$(gh run list --repo joeharris76/skill-sync-skills --workflow 'Verify lock' --branch main --limit 1 --json conclusion --jq '.[0].conclusion')\" = success",
+        "description": "The lock gate still runs and passes on main",
+        "expected": "exit 0",
+        "item_id": "skill-sync-lock-gate-is-advisory-not-enforced",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/joeharris76/skill-sync-skills/branches/main/protection >/dev/null 2>&1 || grep -rq verify_lock /Users/joe/.skill-sync/.git/hooks/ /Users/joe/.skill-sync/.pre-commit-config.yaml 2>/dev/null",
+        "description": "Either branch protection is now reachable, or a local hook enforces the check",
+        "expected": "exit 0",
+        "item_id": "skill-sync-lock-gate-is-advisory-not-enforced",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

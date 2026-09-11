@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #727: Only DuckDB has summary.validation=passed locally across SF 0.01/0.1/1.0. Fresh DataFusion SF 0.01 failed missing write-ops tables; ClickHouse Local SF 0.01 failed schema NOT NULL on operation_id. SQLite/Spark/Polars local attempts remain partial. Needs two more validation-passed local platforms.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-09-04T20:20:58Z",
+      "worktree": "main"
+    }
+  }
+}

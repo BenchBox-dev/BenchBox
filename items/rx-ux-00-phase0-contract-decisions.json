@@ -1,0 +1,216 @@
+{
+  "context": "Record each decision with chosen option, rejected option, and one sentence of rationale in the work-unit evidence. Where a decision reverses a documented contract (D1, D4, possibly D2), update docs/operations/results-explorer-qa.md in the same change. Then unblock dependents.\n\nD1/D2 gate rx-ux-11. D3/D4/D5 gate rx-ux-12 and everything downstream.",
+  "description": "Decision gate for the Results Explorer usability remediation sequence (plan v4). Five contract decisions must be recorded before any Phase 3 item starts. Three adversarial review rounds (codex, agy, grok) rejected earlier plans partly because these were treated as implementation details rather than documented-contract reversals.\n\nD1 Default matrix mode. Recommendation: keep `times`, fix only the legend (rx-ux-04). Reversing the default changes what a shared link without `?mode=` renders.\n\nD2 Ranked-scope default. Recommendation: do not collapse unranked platforms by default; offer a URL-persisted `ranked only` toggle. Collapsing reverses a stated product value and complicates the role=grid coordinate model (MetaLeaderboard.tsx:83,339,378).\n\nD3 Picking vs compared state. Picking is four ephemeral useState Sets; compared is Compare's `?ids=` machine with async recovery. Recommendation: keep separate; give picking an in-memory owner; never URL-back it. URL-backing creates a global `?ids=` picking contract that cannot be retracted once copied into links.\n\nD4 Compare's future. Recommendation: keep Compare as the comparison renderer and move candidate picking to Query.\n\nD5 Corpus identity for stale-selection recovery. No snapshot-identity field exists today. Either always re-validate picked IDs against the live snapshot on load (no schema change), or add an identity field, which is a read-model v8 bump plus pipeline and build-contract changes. Recommendation: always re-validate.\n\nProduces decisions only. Must not change application code.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "start a Phase 3 item before D3, D4 and D5 are recorded",
+        "instead": "complete this gate first",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "why": "plan v3 designed a selection owner against a snapshot-identity field that does not exist"
+      },
+      {
+        "dont": "treat the default matrix mode as a styling choice",
+        "instead": "treat it as a documented-contract reversal with a QA doc update",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "why": "results-explorer-qa.md S2.2 pins `times` as default and `?mode=` as URL state"
+      },
+      {
+        "dont": "write application code in this item",
+        "instead": "record decisions and unblock dependents",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "why": "mixing code into a decision gate makes the decision unrevertible"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T15:35:38Z",
+      "created_at": "2026-08-22T14:48:34Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "/results/compare?ids=<one> pins that run and opens the builder (Compare.tsx:184+); ?ids=<a,b> renders a comparison. Both are live contracts (ResultDetail.tsx:266, e2e/routes/compare.spec.ts:58, compare-entrypoints.spec.ts:76).",
+        "item_id": "rx-ux-00-phase0-contract-decisions"
+      },
+      {
+        "behavior": "Read-model version 7 pin in _project/scripts/explorer_pipeline/contract.py and results-explorer/src/db.ts (EXPECTED_READ_MODEL_VERSION), guarded by db-remediation-pin.test.ts.",
+        "item_id": "rx-ux-00-phase0-contract-decisions"
+      },
+      {
+        "behavior": "Trust is per-result. hosted-results-contract.md:687-698 forbids an aggregate trust badge on a mixed-trust set.",
+        "item_id": "rx-ux-00-phase0-contract-decisions"
+      },
+      {
+        "behavior": "docs/operations/results-explorer-qa.md S2.2 pins three matrix modes with `times` as default and `?mode=` as URL state.",
+        "item_id": "rx-ux-00-phase0-contract-decisions"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git -C /Users/joe/Developer/BenchBox status --short results-explorer/src _project/scripts/explorer_pipeline",
+        "description": "No application source changed under this item",
+        "expected": "empty output",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "last_result": "pass",
+        "last_run": "2026-08-22T15:35:36Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'No aggregate or cohort-level badge is shown' docs/reference/hosted-results-contract.md",
+        "description": "D7 matches the hosted contract's trust rendering rule",
+        "expected": "line located under 'Trust label rendering rules'",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "last_result": "pass",
+        "last_run": "2026-08-22T15:35:37Z",
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n -A 4 'S2.2 MetaLeaderboard mode toggle' docs/operations/results-explorer-qa.md",
+        "description": "The S2.2 mode contract that D1 reverses still exists and is locatable for the downstream edit",
+        "expected": "section found, documenting times as the current default",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "last_result": "pass",
+        "last_run": "2026-08-22T15:35:37Z",
+        "seq": 9,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "D1 DECIDED: default the cross-benchmark matrix to speedup mode. Rejected: keep times. Rationale: one reading rule across the grid (1.00x is the ranking best, worse below it) removes the mixed-direction problem at its source. This REVERSES the documented default in docs/operations/results-explorer-qa.md S2.2, so that doc must change in the same PR and shared links without ?mode= will render speedup. Data verified sufficient: speedup_vs_best is populated for every ranking-eligible row (9/9 asc, 6/6 desc). Decided by repository owner, 2026-08-22.",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "notes": null,
+        "started_at": "2026-08-22T15:32:21Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record D1 default matrix mode with rationale",
+        "wid": "w1"
+      },
+      {
+        "evidence": "D2 DECIDED: collapse platforms with no ranked evidence by default, with a 'N more platforms have published results but nothing ranked - Show them' expander. Rejected: keep all visible with a ranked-only toggle; show everything with no toggle. Consequence: rx-ux-11 w3 is in scope, and the spanning collapsed row REQUIRES explicit focusPos handling in MetaLeaderboard's role=grid arrow-key model (MetaLeaderboard.tsx:83,339,378). Decided by repository owner, 2026-08-22.",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "notes": null,
+        "started_at": "2026-08-22T15:32:24Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record D2 ranked-scope default with rationale",
+        "wid": "w2"
+      },
+      {
+        "evidence": "D3 DECIDED: keep picking state and compared state separate. Picking gets one in-memory owner with tab lifetime, never URL-backed; Compare's ?ids= is untouched; buildCompareUrl is the seam. Rejected: a single global URL-backed ?ids= selection, because it cannot be retracted once shared and collides with route-specific query state. sessionStorage carries picking across the Pages 404 restore hop only. Decided by repository owner, 2026-08-22.",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "notes": null,
+        "started_at": "2026-08-22T15:32:26Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record D3 picking vs compared state model",
+        "wid": "w3"
+      },
+      {
+        "evidence": "D4 DECIDED: Compare stays the comparison renderer; candidate picking moves to the paged Query table. Rejected: retire Compare entirely; leave Compare as-is. rx-ux-19 retires only the candidate table, behind the ten-case parity gate, and ?ids= deep links including the single-ID pin keep working. Decided by repository owner, 2026-08-22.",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "notes": null,
+        "started_at": "2026-08-22T15:32:29Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record D4 Compare route future",
+        "wid": "w4"
+      },
+      {
+        "evidence": "D5 DECIDED: always re-validate picked IDs against the live snapshot on load, reusing Compare's async recovery. Rejected: add a snapshot-identity field, which would require a read-model v7->v8 bump plus pipeline, build-contract and browser-pin changes. Read-model stays at version 7. Cost: one async round trip per hydrate. Decided by repository owner, 2026-08-22.",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "notes": null,
+        "started_at": "2026-08-22T15:32:32Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record D5 corpus identity strategy",
+        "wid": "w5"
+      },
+      {
+        "evidence": "DISCHARGED BY DELEGATION, not by editing here. Two decisions reverse documented contracts and both need a code+doc change in one PR, which requires a linked worktree and is out of a decision gate's remit: (a) D1 reverses the S2.2 default from times to speedup - owned by rx-ux-23, whose w3 and its fourth verification assert the doc and the implemented default agree; (b) D2 reverses the ranked-scope default to collapse-by-default - owned by rx-ux-11. No documentation was edited under this gate; git status for the repo confirms no working-tree change. Recorded 2026-08-22.",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "notes": null,
+        "started_at": "2026-08-22T15:33:10Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Update results-explorer-qa.md for any contract-reversing decision",
+        "wid": "w6"
+      },
+      {
+        "evidence": "D6 DECIDED: adopt viewport-fit=cover. Rejected: leave the safe-area seam inert. Consequence: this is a global layout-viewport change affecting every route, so it is NOT folded into rx-ux-01 (which keeps its inert-seam scope and its do-not-modify rule on index.html). Adoption plus the full responsive re-check is owned by a separate item, rx-ux-24. Decided by repository owner, 2026-08-22.",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "notes": null,
+        "started_at": "2026-08-22T15:32:34Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record D6 whether to adopt viewport-fit=cover (global layout consequence) or leave the safe-area seam inert",
+        "wid": "w7"
+      },
+      {
+        "evidence": "D7 DECIDED: the selection tray names each selected run's trust individually; no aggregate trust badge or mixed-provenance summary. Rejected: a neutral mixed-provenance note (risks reading as the aggregate judgement the contract prohibits); saying nothing until the comparison view. Complies directly with hosted-results-contract.md:687-698. Decided by repository owner, 2026-08-22.",
+        "item_id": "rx-ux-00-phase0-contract-decisions",
+        "notes": null,
+        "started_at": "2026-08-22T15:32:37Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record D7 what the selection tray may state about a mixed-trust set, given hosted-results-contract.md forbids an aggregate trust badge",
+        "wid": "w8"
+      }
+    ]
+  }
+}

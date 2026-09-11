@@ -1,0 +1,228 @@
+{
+  "context": "Use a set-preserving seed that includes every accepted published-results path and any documented accepted legacy overlay. Promote by CAS on the protected publication branch. The deploy verifier proves exact artifact/database digests and visible corpus identity. On failure, automatically restore the last-known-good full-site deployment, freeze promotions, and retain the accepted merge as promotion_failed for repair.",
+  "description": "Enable independently triggered corpus promotions to update the live Results Explorer through the atomic Pages assembler. Preserve site, API docs, and Explorer app artifacts while changing only the corpus-derived artifact. Verify production read model, accepted-path union, live receipt, routes, range reads, and rollback. Only then declare published-results to live reconciliation operational.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Roll back the corpus by moving the source branch backward",
+        "instead": "roll forward the full site to a retained safe artifact above the takedown floor",
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "why": "that can resurrect withdrawn data and rewrite acceptance history"
+      },
+      {
+        "dont": "Target a historical expected bundle count",
+        "instead": "compare exact path sets and explicit dispositions",
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "why": "the accepted set can grow and may contain published-only history"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "needs_item": "independent-publication-a6-site-and-api-docs-lane"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "needs_item": "independent-publication-a7-explorer-application-lane"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "needs_item": "independent-publication-a8-published-results-gate-and-shadow-promotion"
+      }
+    ],
+    "item_meta": {
+      "category": "Publication Architecture",
+      "completed_at": "2026-09-04T17:29:40Z",
+      "completed_pr": 2018,
+      "created_at": "2026-08-31T20:38:03Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Corpus promotion changes no package, prose, API docs, or Explorer application artifact unless explicitly included in the manifest.",
+        "item_id": "independent-publication-a9-corpus-production-cutover"
+      },
+      {
+        "behavior": "Rollback never resurrects data below an authorized takedown floor.",
+        "item_id": "independent-publication-a9-corpus-production-cutover"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Preserve published-results as the accepted contribution authority",
+        "decision": "extend",
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "path": "results-data/README.md"
+      },
+      {
+        "concept": "Reuse transformation semantics in an attested zero-skip publisher bundle",
+        "decision": "extend",
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "path": "scripts/publish_results.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/*corpus*"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/*publication*"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "kind": "only_modify",
+        "path_glob": "publication/**"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run python scripts/publication/verify_lane_isolation.py --lane corpus",
+        "description": "Corpus-only canary changes only corpus and full-site deployment receipts",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/fetch_live_database.py --output /tmp/benchbox-live-results.duckdb && uv run python scripts/publication/check_corpus_bijection.py --accepted-ref origin/published-results --artifact /tmp/benchbox-live-results.duckdb",
+        "description": "Live read model matches the attested corpus digest and accepted path union",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run pytest tests/unit/workflows/test_corpus_cutover.py -q",
+        "description": "Rollback and forward repair preserve the takedown floor and restore a verified site",
+        "expected": "all tests pass",
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "set-preserving seed + union tooling merged; G1 union exported with per-object digests",
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create and review the set-preserving corpus seed and disposition ledger",
+        "wid": "w1"
+      },
+      {
+        "evidence": "gen1 preview canary served 199-result corpus with unchanged root content (run 33814942530)",
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run production corpus canary with unchanged package, site, and app artifacts",
+        "wid": "w2"
+      },
+      {
+        "evidence": "live digest verified: post-drill root canonical-equivalent to baseline; 138/138 release-accepted results live",
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify live database digest, accepted path union, routes, and representative old/new runs",
+        "wid": "w3"
+      },
+      {
+        "evidence": "corpus rollback drill: G3 PR 2037 + restore receipt",
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run corpus-specific rollback and forward-repair drill",
+        "wid": "w4"
+      },
+      {
+        "evidence": "independent promotion + scheduled reconciler green in CI (run 33888979555)",
+        "item_id": "independent-publication-a9-corpus-production-cutover",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enable normal independent corpus promotion and scheduled reconciliation",
+        "wid": "w5"
+      }
+    ]
+  }
+}

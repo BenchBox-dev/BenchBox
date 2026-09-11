@@ -1,0 +1,167 @@
+{
+  "context": "Reuse dev_loop_pr_metrics.py, event_fanout_v1, current GitHub pagination and its tests. Freeze cohort/time window and PR/head/base/run/attempt identifiers before aggregation; fetch bounded projected data and cache read-only evidence by immutable identity. Enumerate all synchronize heads and every attempt, then separately correlate speculative merge_group and post-merge runs. Generate report numbers and validation from the same data, not selected manual sums. This item changes measurement code only, not CI routing, queue settings or gate coverage.\n\nExtend this collector's existing validation machinery with --validate-lifecycle-baseline PATH --process-baseline PATH and --validate-refresh-audit PATH --baseline PATH. The first validates immutable identity completeness, all-head/run-attempt totals, explicit missingness and the preregistered process criteria. Include refresh observations keyed by PR/head/run/attempt with verdict/reason, or explicit missing-artifact status. The second reads a machine-readable JSON block embedded in the exact-refresh Markdown audit and recomputes its reason-code counts, denominator, missingness and timing-only share from that shared baseline; reject omitted/duplicate identities, changed windows, unknown denominators and conflated prior_check_not_success/prior_check_unbound. Unit tests include tampered totals, omitted superseded heads and changed thresholds. These are local report validators, not new CI gates or an additional sampler.",
+  "description": "Extend the original representative 28-day per-PR remeasurement, rather than create another metrics framework. The existing event_fanout_for_pr collector queries only the final merged head; it cannot establish total refresh/cancellation cost. Repair that coverage first, then produce the complete representative cohort and baseline for pr-process-low-drama-acceptance. Retain existing metric meanings and label new fields/version explicitly. Evidence: _project/scripts/dev_loop_pr_metrics.py:388-402; #2076/#2077 report corrections; session 01a07292. The 28-day historical sample may include incomplete/expired evidence, which must be quantified as missing rather than silently excluded.\n\nPREREGISTRATION OWNER: w0 also freezes _project/analysis/pr-process-acceptance-baseline.json BEFORE any dependent implementation begins. Record the source session, incident scenarios, metric definitions, historical cohort/window, exclusions and missing evidence, safety and efficiency thresholds, prospective strata and minimum 10-PR/7-day observation, registration timestamp and baseline commit. Register the 50% avoidable-action reduction target before observing implementation results. This is immediate historical/planning work, not a prerequisite seven-day prospective wait. Final acceptance only consumes and validates this frozen record. Any later criteria change is versioned and disclosed, never silently applied to a measured cohort.\n\nFEATURE-BATCH PREREGISTRATION: w0 must define delivery IDs, member counts/scopes, first work/commit/prepare/integration/PR-open/merge timestamps, feature-mode strata and comparison units before this new mode is implemented. Measure full feature-start-to-land lead time, agent/user effort, local and hosted validation across worker and integration branches, cancelled/abandoned work and backlog delivery throughput. Keep per-PR metrics for compatibility, but fewer PRs or a shorter post-open interval is not itself a saving. Compare equivalent delivered outcomes and change mix; apply the 50% avoidable-action target using the frozen comparable denominator, not a post-hoc per-PR denominator. Missing local history remains explicit. The existing 10-PR/7-day acceptance cohort includes feature batches without counting each member as a separate PR.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-09-10T12:22:58Z",
+      "created_at": "2026-07-23T19:18:33Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Missing evidence and censored observations remain explicit; changing the cohort requires a new snapshot.",
+        "item_id": "ci-baseline-representative-remeasure-sample"
+      },
+      {
+        "behavior": "No workflow skips, required-check changes, custom metrics framework or fabricated savings.",
+        "item_id": "ci-baseline-representative-remeasure-sample"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "measured overlap limits and absent per-step/node-ID evidence",
+        "decision": "reuse",
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "path": "_project/analysis/ci-waste-fast-lane-overlap-2026-08-31.md"
+      },
+      {
+        "concept": "existing event_fanout_v1 collector and report functions",
+        "decision": "extend",
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "path": "_project/scripts/dev_loop_pr_metrics.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/pr_refresh_certification.py"
+      },
+      {
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/ci-lifecycle-baseline.json"
+      },
+      {
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/ci-lifecycle-baseline.md"
+      },
+      {
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/pr-process-acceptance-baseline.json"
+      },
+      {
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/dev_loop_pr_metrics.py"
+      },
+      {
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/dev_loop_metrics/**"
+      },
+      {
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_dev_loop_pr_metrics.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_dev_loop_pr_metrics.py -q",
+        "description": "All-head and attempt accounting is complete and summaries reconcile",
+        "expected": "exit 0; fixtures include negative controls",
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "last_result": "pass",
+        "last_run": "2026-09-10T12:22:24Z",
+        "seq": 1,
+        "workspace_fingerprint": "abebeb35f02c57d7a5bad99e92f716a42e31d163d33665c4d7fe09bf9261804a"
+      },
+      {
+        "command": "uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-lifecycle-baseline _project/analysis/ci-lifecycle-baseline.json --process-baseline _project/analysis/pr-process-acceptance-baseline.json",
+        "description": "Historical baseline and preregistered acceptance criteria are internally consistent",
+        "expected": "exit 0 only with explicit all-head accounting, missingness and versioned criteria frozen before dependent implementation",
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "last_result": "pass",
+        "last_run": "2026-09-10T12:22:25Z",
+        "seq": 2,
+        "workspace_fingerprint": "abebeb35f02c57d7a5bad99e92f716a42e31d163d33665c4d7fe09bf9261804a"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Frozen preregistration delivered on develop by merged PR #2086 (commit cc9b66b9b, \"Freeze PR-process acceptance preregistration before batch implementation\"). _project/analysis/pr-process-acceptance-baseline.json holds pr_process_acceptance_v1 with frozen criteria_version, thresholds (avoidable_action_reduction), incident_scenarios, prospective_cohort strata/min_prs/min_days, batch-delivery preregistration and registration commit d2fa960e4. Content sha256 bound by the lifecycle report and validated by --validate-lifecycle-baseline (exit 0). Freeze precedes dependent implementation commits in the same PR.",
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Freeze the historical cohort, incident scenarios and acceptance thresholds before implementation",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Delivered on develop by #2086 (cc9b66b9b). dev_loop_pr_metrics.py:837 lifecycle_for_pr enumerates every synchronize head (pr_synchronize_heads / pulls commits) plus a branch-runs orphan pass; per-head runs+jobs+check-runs via event_fanout_metrics; run_attempt summed per head into totals.total_attempts; intra-push non-tip commits (pr_nontip_shas) classified separately; true tips with zero observable runs recorded as missing-artifact, never dropped. Speculative merge_group/post-merge runs excluded by querying per authored head_sha. Schema ci_lifecycle_baseline_v1; existing PrMetrics/summarize keys unchanged. Verified: pytest -n 0 tests/unit/scripts/test_dev_loop_pr_metrics.py -q -> 34 passed, fixtures include tampered-totals/omitted-head negative controls.",
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend the existing collector to all heads and attempts without double counting",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Delivered on develop by #2086 (cc9b66b9b). validate_lifecycle_baseline recomputes head/observed/missing/non-tip counts, total_attempts and runner-minute totals per PR from per_head data, reconciles the declared cohort (candidate_prs = collected + gaps), and binds the frozen process baseline by criteria_version + sha256 digest. validate_refresh_audit recomputes the refresh_audit_v1 block's reason_counts, denominator, missingness and timing_only_share from the shared lifecycle baseline; rejects omitted/duplicate identities, changed windows, unknown denominators, and conflated prior_check_not_success vs prior_check_unbound (codes sourced from scripts/pr_refresh_certification.py). _project/analysis/ci-lifecycle-baseline.md carries the reconciled per-PR table generated from ci-lifecycle-baseline.json. Verified: --validate-lifecycle-baseline ci-lifecycle-baseline.json --process-baseline pr-process-acceptance-baseline.json -> \"VALID\", exit 0.",
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Generate reconciled tables and validate baseline, preregistration and downstream refresh accounting",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Delivered on develop by #2086 (cc9b66b9b, \"Publish representative 28-day CI lifecycle baseline with refresh accounting\"). _project/analysis/ci-lifecycle-baseline.json + .md publish the full-cohort representative baseline: merged develop PRs 2026-08-11..2026-09-08, 349 in-window PRs with complete lifecycle + 1 explicit gap, 349 synchronize heads observed/missing split, 2346 attempts, 15053 completed / 2169 cancelled runner-minutes, 65 ancestry-only refresh pushes as the avoidable-action baseline (corrected 65 -> 284 on the full-cohort rebuild, same frozen window, disclosed in pr-process-acceptance-baseline.json note). The #2076/#2077 incomplete-report incidents are the missing-head accounting failure this collector repairs; missing evidence is quantified as missing-artifact, never silently excluded. Both item verifications pass on develop HEAD 3baf74ebc: pytest 34 passed; --validate-lifecycle-baseline exit 0.",
+        "item_id": "ci-baseline-representative-remeasure-sample",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replay the incomplete-report incidents and publish a representative baseline",
+        "wid": "w3"
+      }
+    ]
+  }
+}

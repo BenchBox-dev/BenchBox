@@ -1,0 +1,300 @@
+{
+  "context": "Move the remaining static facts into `BENCHMARK_METADATA`, then make CLI and\nMCP consume registry-owned data or neutral wording. Keep the runtime\ndata-source getter as a test oracle for now, but do not pay constructor cost\nduring ordinary imports.\n",
+  "description": "Independent verification at checked SHA e60986923 confirmed the registry is a\nreal single source of truth for benchmark listing/discovery, but found three\nremaining drift/cost pockets around metadata:\n\n1. `benchbox/cli/benchmarks.py` has local `_estimate_memory_usage()` and\n   `_estimate_execution_time()` dictionaries. The execution-time dictionary\n   duplicates registry `estimated_time_range`, and verification found one\n   actual drift: `coffeeshop` is `(2, 8)` locally but `(3, 12)` in the\n   registry. The original critic's missing-list details were partially stale:\n   current local memory/time dicts have 18 entries and miss\n   `ai_primitives`, `flightdata`, `tpchavoc`, `transaction_primitives`, and\n   `vector_search`; `datavault` and `tpcds_obt` are present in both local\n   dicts.\n\n2. `benchbox/core/benchmark_registry.py` populates `data_source` metadata at\n   import time by constructing exactly five probe benchmarks:\n   `read_primitives`, `write_primitives`, `transaction_primitives`,\n   `ai_primitives`, and `tpcds_obt`. Fresh-process verification measured\n   registry import at 0.841s on this machine with those five constructor\n   calls. The exact timing is environment-dependent, but the import-time\n   instantiation count is structural and actionable.\n\n3. `benchbox/mcp/tools/discovery.py` derives behavior from registry helpers\n   but its `get_benchmark_info()` docstring repeats a prose benchmark list\n   beginning `tpch, tpcds, ssb, clickbench...`, which can drift from the\n   registry-owned list.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "copy the CLI estimate dicts into a second registry-adjacent dict",
+        "instead": "(not specified)",
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "why": "metadata should live on each benchmark entry."
+      },
+      {
+        "dont": "instantiate benchmark classes at registry import time to compute static metadata.",
+        "instead": "(not specified)",
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "keep silent default estimates for missing registry metadata",
+        "instead": "(not specified)",
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "why": "that hides new benchmark drift."
+      },
+      {
+        "dont": "replace the MCP prose list with another hard-coded subset.",
+        "instead": "(not specified)",
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-05-22T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI benchmark selection remains registry-backed and keeps current user-facing estimate formatting.",
+        "item_id": "registry-owned-benchmark-metadata-cleanup"
+      },
+      {
+        "behavior": "Data-source relationships remain visible in benchmark metadata and agree with benchmark instance methods.",
+        "item_id": "registry-owned-benchmark-metadata-cleanup"
+      },
+      {
+        "behavior": "MCP runtime discovery continues to derive benchmark lists from the registry.",
+        "item_id": "registry-owned-benchmark-metadata-cleanup"
+      },
+      {
+        "behavior": "No benchmark classes are instantiated during registry import.",
+        "item_id": "registry-owned-benchmark-metadata-cleanup"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/benchmarks.py: _estimate_memory_usage and _estimate_execution_time - replace local dicts with registry lookups.",
+        "decision": "reuse",
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "path": "benchbox/cli/benchmarks.py"
+      },
+      {
+        "concept": "benchbox/core/benchmark_registry.py: BENCHMARK_METADATA and validation helpers - extend as the metadata source of truth.",
+        "decision": "extend",
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "path": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "concept": "benchbox/mcp/tools/discovery.py: runtime discovery imports registry helpers - preserve behavior while trimming hard-coded prose.",
+        "decision": "reuse",
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "path": "benchbox/mcp/tools/discovery.py"
+      },
+      {
+        "concept": "tests/unit/core/test_loader_registry_parity.py: registry key-set parity - extend to new metadata completeness checks.",
+        "decision": "extend",
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "path": "tests/unit/core/test_loader_registry_parity.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/benchmarks.py"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/discovery.py"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_no_cli_surface_drift.py"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_benchmark_manager_behavioral.py"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_benchmark_api_contract.py"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_loader_registry_parity.py"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_loader_registry_parity.py tests/unit/core/test_benchmark_api_contract.py -q",
+        "description": "Registry parity and metadata completeness tests pass.",
+        "expected": "All selected registry tests pass.",
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_benchmark_manager_behavioral.py tests/unit/cli/test_benchmark_selection.py -q",
+        "description": "CLI estimate behavior is covered by focused tests.",
+        "expected": "Focused CLI benchmark manager tests pass after adding estimate metadata coverage.",
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_discovery_tools.py -q",
+        "description": "MCP discovery tests pass after docstring wording changes.",
+        "expected": "MCP discovery tests pass.",
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite remains green after metadata changes.",
+        "expected": "Fast tests pass.",
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "notes": "Re-run compact read-only checks on the implementation branch:\n  - Parse CLI estimate dicts with `ast` and compare coverage/drift against\n    `BENCHMARK_METADATA`.\n  - Monkeypatch fresh-process `importlib.import_module` to count registry\n    data-source probe constructors.\n  - Grep MCP discovery docstrings for hard-coded benchmark-list prose.\nSummarize command, checked SHA, PASS/FAIL, counts, and drift rows in the\nPR; keep raw stdout in `/tmp`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate metadata drift, import-time probe count, and MCP docstring duplication",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "notes": "Add `base_memory_gb` and static `data_source` fields to\n`BENCHMARK_METADATA` for every benchmark. Preserve `estimated_time_range`\nas the execution-time source. Choose explicit values for currently\nmissing CLI entries instead of inheriting silent defaults. If uncertainty\nremains for a benchmark, document the estimate rationale in a concise\ncomment or TODO note rather than hiding it in CLI fallback behavior.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add registry metadata fields for base memory and static data source",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "notes": "Replace `_populate_benchmark_data_sources()` constructor probing with\nstatic metadata validation. Keep a test that instantiates the narrow set\nof data-source benchmarks and asserts their `get_data_source_benchmark()`\nmethod agrees with static metadata, but run that in tests rather than at\nmodule import.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove import-time data-source instantiation from the registry",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "notes": "Delete the CLI-local estimate dicts. `_estimate_execution_time()` should\nuse `estimated_time_range`; `_estimate_memory_usage()` should use\n`base_memory_gb`. Missing metadata should fail a registry validation test\ninstead of falling back silently. Preserve user-facing units and scale\nformula behavior unless separately justified.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Drive CLI memory and execution-time estimates from registry metadata",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "notes": "Replace the repeated prose list with wording such as \"any registered\nbenchmark ID; call `list_available('benchmarks')` to enumerate.\" Do not\nadd generated docstring machinery unless needed; the issue is the stale\nlist, not MCP runtime behavior.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Trim MCP benchmark docstring hints to registry-owned wording",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "registry-owned-benchmark-metadata-cleanup",
+        "notes": "Extend registry/contract tests so every benchmark has\n`estimated_time_range`, `base_memory_gb`, and `data_source`; CLI estimate\nhelpers read those fields; static `data_source` matches the runtime\ngetter for the known data-sharing benchmarks; and MCP docstring examples\ndo not repeat the registry list.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add metadata completeness and no-drift tests",
+        "wid": "w5"
+      }
+    ]
+  }
+}

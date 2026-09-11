@@ -1,0 +1,129 @@
+{
+  "context": "Remove --work from create and the work start/done verbs from the wrapper surface; add a schema migration or write-freeze for work tables; migrate any live in-flight units into item description prose.",
+  "description": "F2 of the 2026-08-05 adjudication. Work units are 39.5% of all item bytes (7,005 units) while start has fired on only 8.4% of items, and docs/development/task-management-design.md:30 assigns per-session task tracking to ephemeral Layer 3, not durable storage. Remove work from the authoring surface and stop persisting it; whether the migration drops the tables or merely stops writing them is a design decision for the implementer. Post-cutover: do not touch the schema while the restore-legacy cutover is in flight.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "drop-work-units-from-item-schema",
+        "needs_item": "todo-db-cutover-g5"
+      }
+    ],
+    "item_meta": {
+      "category": "tracker-simplification",
+      "created_at": "2026-08-05T18:35:19Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing work-unit history remains reconstructable from the event log and git export; no audit events are deleted",
+        "item_id": "drop-work-units-from-item-schema"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "drop-work-units-from-item-schema",
+        "kind": "do_not_modify",
+        "path_glob": "_project/todo-db-export/*"
+      },
+      {
+        "item_id": "drop-work-units-from-item-schema",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "drop-work-units-from-item-schema",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_shadow.py"
+      },
+      {
+        "item_id": "drop-work-units-from-item-schema",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_schema_migration_check.py"
+      },
+      {
+        "item_id": "drop-work-units-from-item-schema",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/todo-db-tracker.md"
+      },
+      {
+        "item_id": "drop-work-units-from-item-schema",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/*.py"
+      },
+      {
+        "item_id": "drop-work-units-from-item-schema",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/*.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! _project/scripts/todo create --help 2>&1 | grep -q -- '--work'",
+        "description": "create no longer offers --work",
+        "expected": "the authoring surface has no work-unit flag",
+        "item_id": "drop-work-units-from-item-schema",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python -c \"import json,sys; items=[json.loads(l) for l in open('_project/todo-db-export/items.jsonl')]; sys.exit(0 if all(not i.get('work') for i in items) else 1)\"",
+        "description": "Hot items carry no work payload",
+        "expected": "parses JSON keys per export-lint guidance; every hot item has an empty or absent work field",
+        "item_id": "drop-work-units-from-item-schema",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "drop-work-units-from-item-schema",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "drop-work-units-from-item-schema",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "drop-work-units-from-item-schema",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Remove --work and work start/done verbs from the wrapper surface",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-work-units-from-item-schema",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Schema migration or write-freeze for work tables",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-work-units-from-item-schema",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update tests and spec",
+        "wid": "w3"
+      }
+    ]
+  }
+}

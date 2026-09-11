@@ -1,0 +1,212 @@
+{
+  "context": "Pin the truncation and the missing-becomes-zero fabrication in regression tests against the throughput capture path, carry float milliseconds and None-for-missing through capture, then confirm comparison and export behavior with the fixed producer. The fix belongs in the producer; comparison filtering must not change.",
+  "description": "Residual defect from the 2026-08-09 adversarial review of PR #1644, verified on merged develop. benchbox/platforms/base/result_capture.py builds throughput query executions with execution_time_ms = int(float(query_result.get('execution_time_seconds', 0.0)) * 1000) (line 1556): every sub-millisecond successful query truncates to exactly 0 ms, and a missing duration is fabricated as 0.0 instead of None. PR #1644's comparison filter deliberately admits successful zero durations, so manufactured zeros skew comparison means and winner selection; a verified probe shows SUCCESS samples of 0 and 100.0 ms averaging 50.0. Preserve genuinely measured zeros but stop inventing them: carry float milliseconds without integer truncation and propagate None for missing durations. Export-side presentation rounding already exists in schema _round_duration_ms_for_export and must stay the only rounding authority.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Default a missing execution_time_seconds to 0.0.",
+        "instead": "Propagate None and let the canonical contract mark the duration missing.",
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "why": "That fabricates a perfect measurement from absent data."
+      },
+      {
+        "dont": "Re-add a magnitude filter in comparison to mask the truncation.",
+        "instead": "Fix the producer so zeros only appear when actually measured.",
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "why": "The quality batch made zero a valid measured duration; masking hides the producer fidelity loss."
+      },
+      {
+        "dont": "Round to integer milliseconds at capture time.",
+        "instead": "Carry float milliseconds and leave rounding to the export layer.",
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "why": "Sub-millisecond successes are common in read-primitives workloads."
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness and Result Integrity",
+      "completed_at": "2026-08-12T12:30:09Z",
+      "completed_pr": 1686,
+      "created_at": "2026-08-11T12:40:23Z",
+      "worktree": "result-integrity"
+    },
+    "preserves": [
+      {
+        "behavior": "Canonical v2 export rounding behavior in schema is unchanged.",
+        "item_id": "stop-manufactured-zero-durations-20260811"
+      },
+      {
+        "behavior": "Comparison continues to admit genuinely measured zero durations for successful queries.",
+        "item_id": "stop-manufactured-zero-durations-20260811"
+      },
+      {
+        "behavior": "Non-throughput capture paths keep their existing duration precision.",
+        "item_id": "stop-manufactured-zero-durations-20260811"
+      },
+      {
+        "behavior": "Throughput stream position semantics stay stream-local as established by PR #1644.",
+        "item_id": "stop-manufactured-zero-durations-20260811"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Export-side sub-millisecond rounding authority _round_duration_ms_for_export.",
+        "decision": "reuse",
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "path": "benchbox/core/results/schema.py"
+      },
+      {
+        "concept": "Completed duration-unit normalization this item extends to producer fidelity.",
+        "decision": "extend",
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "path": "normalize-comparison-duration-units-20260808"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/analysis/comparison.py"
+      },
+      {
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/analysis/"
+      },
+      {
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_base_adapter.py -q",
+        "description": "Sub-millisecond preservation regression is falsifiable on the unfixed tree",
+        "expected": "Exits nonzero on the unfixed tree once the w0 regression case pins sub-millisecond truncation and missing-duration fabrication; exits 0 after the repair.",
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/analysis/test_analysis_comparison.py -q",
+        "description": "Comparison behavior with the fixed producer",
+        "expected": "Comparison admits measured zeros and no longer averages manufactured zeros into winner selection.",
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results -q",
+        "description": "Core result contract tests pass",
+        "expected": "Export, loader, and contract behavior are unchanged.",
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/platforms/base/result_capture.py tests/unit/platforms tests/unit/core/analysis",
+        "description": "Touched paths satisfy Ruff",
+        "expected": "Ruff exits zero.",
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1686 tests/unit/platforms/test_base_adapter.py: parametrized 0.0009s, 0.0s, and missing-duration regression cases",
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "notes": null,
+        "started_at": "2026-08-12T12:29:16Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Pin the sub-millisecond truncation and missing-duration fabrication in failing regression tests on the throughput capture path",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1686 result_capture.py preserves float milliseconds and None for missing execution_time_seconds",
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "notes": null,
+        "started_at": "2026-08-12T12:29:28Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Carry float milliseconds and None-for-missing through throughput capture without touching comparison or export rounding",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1686 plus existing comparison tests: measured zero remains admitted; no comparison/schema changes",
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "notes": null,
+        "started_at": "2026-08-12T12:29:40Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add comparison-level coverage proving measured zeros stay admitted and manufactured zeros are gone",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Old truncating implementation negative control failed 2 regression cases; restored fix and reran platform/comparison/results tests green",
+        "item_id": "stop-manufactured-zero-durations-20260811",
+        "notes": null,
+        "started_at": "2026-08-12T12:29:58Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Restore the truncation as a negative control, prove the regression test fails, then restore the fix",
+        "wid": "w3"
+      }
+    ]
+  }
+}

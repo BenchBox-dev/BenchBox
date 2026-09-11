@@ -1,0 +1,216 @@
+{
+  "context": "Measure first (wheel size, import benchbox time, CI touchpoints). Update future-state/index.md and the two proposal READMEs so they share one status. Do not extract in this item.",
+  "description": "docs/design/future-state/index.md ranks 'Remove release tooling from wheel' and 'Isolate experimental subsystems' as High / Tier 1 Act now, citing 'evidence of need'. The proposal READMEs contain no wheel-size, import-time, CI-burden, or demand numbers. isolate-experimental-core-subsystems and remove-release-tooling-from-wheel are already done as namespace/config moves — the remaining question is further extraction (companion package, extra, MANIFEST prune).\n\nThis item must not leave two authorities. After measurements, either:\n1) confirm the High ranking and open a follow-up implementation item with numbers in the proposal, or\n2) supersede the index (lower the ranking or mark blocked-on-evidence) in the same PR as the measurement note.\n\nAn optional extra does not remove code from the wheel. psutil>=5.9.0 is already a core dependency; runner already degrades if monitoring import fails. Do not extra-gate monitoring without a measured install-size win.\n\nCompanion packages add versioning, CI, release, and dependency-skew cost. Require install-size, import-time, CI minutes, demand, and release-cost evidence before any extraction.\n\nDepends on arch-tier-commitment-decision so extraction is not sized against an uncommitted inventory.\n\nOut of scope: implementing the extraction; MCP production publication.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "gate monitoring behind an extra without measuring install size",
+        "instead": "record numbers first",
+        "item_id": "arch-future-state-index-reconciliation",
+        "why": "psutil is already core and the runner degrades today"
+      },
+      {
+        "dont": "implement extraction because the index says High",
+        "instead": "measure, then confirm or supersede",
+        "item_id": "arch-future-state-index-reconciliation",
+        "why": "the proposals have no measurements"
+      },
+      {
+        "dont": "leave the index at High while this item says undecided",
+        "instead": "one status in the index",
+        "item_id": "arch-future-state-index-reconciliation",
+        "why": "two authorities was the defect"
+      },
+      {
+        "dont": "treat an extra as wheel exclusion",
+        "instead": "measure both extra and exclude if extraction is confirmed",
+        "item_id": "arch-future-state-index-reconciliation",
+        "why": "code still ships unless MANIFEST/excludes change"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "arch-future-state-index-reconciliation",
+        "needs_item": "arch-tier-commitment-decision"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture",
+      "completed_at": "2026-08-14T02:47:37Z",
+      "completed_pr": 1730,
+      "created_at": "2026-08-14T01:19:11Z",
+      "worktree": "arch-simplification"
+    },
+    "preserves": [
+      {
+        "behavior": "Default-wheel contents do not change in this item",
+        "item_id": "arch-future-state-index-reconciliation"
+      },
+      {
+        "behavior": "Every future-state proposal has exactly one status after this item",
+        "item_id": "arch-future-state-index-reconciliation"
+      },
+      {
+        "behavior": "No companion package is created in this item",
+        "item_id": "arch-future-state-index-reconciliation"
+      },
+      {
+        "behavior": "psutil remains a core dependency unless a measured follow-up says otherwise",
+        "item_id": "arch-future-state-index-reconciliation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "monitoring extra proposal",
+        "decision": "extend",
+        "item_id": "arch-future-state-index-reconciliation",
+        "path": "docs/design/future-state/gate-monitoring-behind-optional-extra/README.md"
+      },
+      {
+        "concept": "ranked future-state proposals",
+        "decision": "extend",
+        "item_id": "arch-future-state-index-reconciliation",
+        "path": "docs/design/future-state/index.md"
+      },
+      {
+        "concept": "already-done namespace move",
+        "decision": "reuse",
+        "item_id": "arch-future-state-index-reconciliation",
+        "path": "isolate-experimental-core-subsystems"
+      },
+      {
+        "concept": "already-done claimed wheel exclusion",
+        "decision": "reuse",
+        "item_id": "arch-future-state-index-reconciliation",
+        "path": "remove-release-tooling-from-wheel"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "arch-future-state-index-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "MANIFEST.in"
+      },
+      {
+        "item_id": "arch-future-state-index-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "arch-future-state-index-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "arch-future-state-index-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "arch-future-state-index-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/contract-index.md"
+      },
+      {
+        "item_id": "arch-future-state-index-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/gate-monitoring-behind-optional-extra/README.md"
+      },
+      {
+        "item_id": "arch-future-state-index-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/index.md"
+      },
+      {
+        "item_id": "arch-future-state-index-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/isolate-experimental-core-subsystems/README.md"
+      },
+      {
+        "item_id": "arch-future-state-index-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/remove-release-tooling-from-wheel/README.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'High|Completed|Blocked|Superseded|Measured' docs/design/future-state/index.md docs/design/future-state/remove-release-tooling-from-wheel/README.md docs/design/future-state/isolate-experimental-core-subsystems/README.md",
+        "description": "Index and both High proposals agree on status",
+        "expected": "one consistent status per proposal",
+        "item_id": "arch-future-state-index-reconciliation",
+        "last_result": "pass",
+        "last_run": "2026-08-14T02:47:32Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --name-only -- benchbox pyproject.toml MANIFEST.in",
+        "description": "No benchbox/ or packaging files changed",
+        "expected": "empty",
+        "item_id": "arch-future-state-index-reconciliation",
+        "last_result": "pass",
+        "last_run": "2026-08-14T02:47:34Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "arch-future-state-index-reconciliation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "arch-future-state-index-reconciliation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated current origin/develop 723126bf3: the index still called release-tooling and experimental extraction High, proposal READMEs lacked measured baselines, and monitoring README incorrectly claimed default-wheel exclusion.",
+        "item_id": "arch-future-state-index-reconciliation",
+        "notes": null,
+        "started_at": "2026-08-14T02:40:55Z",
+        "started_branch": "docs/arch-future-state-index-reconciliation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-future-state-index-reconciliation",
+        "status": "done",
+        "summary": "Re-validate future-state index High rankings and proposal README emptiness on current origin/develop.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Measured with uv build --wheel: 10,219,657-byte wheel, 1,325 archive entries, 24 benchbox.experimental entries (307,255 uncompressed bytes), 5 benchbox.monitoring entries, zero release/maintainer/sync package-path entries, and warm import benchbox 0.298-0.409 seconds across five fresh processes; broad CI/release touchpoint search matched 18 files but did not measure CI minutes.",
+        "item_id": "arch-future-state-index-reconciliation",
+        "notes": null,
+        "started_at": "2026-08-14T02:41:35Z",
+        "started_branch": "docs/arch-future-state-index-reconciliation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-future-state-index-reconciliation",
+        "status": "done",
+        "summary": "Measure current wheel size, import time, and whether release/experimental still ship in the default wheel.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Recorded the wheel, import, package-inclusion, and evidence-limit measurements in the release-tooling, experimental-subsystems, and monitoring proposal READMEs; removed the unsupported evidence-of-need implication.",
+        "item_id": "arch-future-state-index-reconciliation",
+        "notes": null,
+        "started_at": "2026-08-14T02:41:41Z",
+        "started_branch": "docs/arch-future-state-index-reconciliation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-future-state-index-reconciliation",
+        "status": "done",
+        "summary": "Write the numbers into both proposal READMEs; remove the unbacked 'evidence of need' claim or cite the numbers.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Reconciled docs/design/future-state/index.md and contract-index.md to one status: release-tooling and experimental further extraction are Blocked on evidence; monitoring is Blocked on evidence and remains in the default wheel. Added _project/decisions/future-state-extraction-evidence-2026-08-13.md; no package or default-wheel files changed.",
+        "item_id": "arch-future-state-index-reconciliation",
+        "notes": null,
+        "started_at": "2026-08-14T02:41:46Z",
+        "started_branch": "docs/arch-future-state-index-reconciliation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-future-state-index-reconciliation",
+        "status": "done",
+        "summary": "Confirm High or supersede the index in the same PR so only one status remains.",
+        "wid": "w3"
+      }
+    ]
+  }
+}

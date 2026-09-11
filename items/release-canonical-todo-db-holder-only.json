@@ -1,0 +1,182 @@
+{
+  "context": "Extend the existing canonical package implementation and release workflow. Do not add BenchBox code, copy tracker logic into another repository, or inspect/modify credentials. Confirm the exact published version and artifact hash before downstream adoption.",
+  "description": "Release the canonical todo-db package containing the holder-only claim-release semantics required by BenchBox. Start from the existing fix/release-holder-only implementation and its tracker/CLI regression tests. Publish the next unused patch version after 0.3.0 as an immutable artifact; BenchBox must consume the released package, never a sibling checkout, mutable branch, or copied implementation. This is a prerequisite for the hosted schema migration and the embedded-runtime replacement.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Patch BenchBox's embedded release_item as the permanent solution",
+        "instead": "Fix and release the canonical todo-db package, then cut BenchBox over to it",
+        "item_id": "release-canonical-todo-db-holder-only",
+        "why": "That would preserve the duplicate implementation this batch is intended to remove"
+      },
+      {
+        "dont": "Read, copy, or commit database credentials",
+        "instead": "Use approved environment-provided authority only during authorized live gates",
+        "item_id": "release-canonical-todo-db-holder-only",
+        "why": "Credentials are runtime-only and must not enter source or tracker artifacts"
+      },
+      {
+        "dont": "Use a sibling checkout, mutable branch, or local path dependency for the production runtime",
+        "instead": "Pin the released package in BenchBox's uv project and lock",
+        "item_id": "release-canonical-todo-db-holder-only",
+        "why": "Fresh clones and CI would not reproduce the same tracker implementation"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-10T21:41:33Z",
+      "completed_pr": 5,
+      "created_at": "2026-08-10T20:42:05Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "non-holder release fails with exit 2 and preserves the holder claim",
+        "item_id": "release-canonical-todo-db-holder-only"
+      },
+      {
+        "behavior": "release artifacts are built and installed from an immutable published version",
+        "item_id": "release-canonical-todo-db-holder-only"
+      },
+      {
+        "behavior": "todo-db remains the sole owner of generic lifecycle, schema, backend, CLI, audit, export, and claim semantics",
+        "item_id": "release-canonical-todo-db-holder-only"
+      },
+      {
+        "behavior": "unclaimed release remains an idempotent no-op",
+        "item_id": "release-canonical-todo-db-holder-only"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "release-canonical-todo-db-holder-only",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "release-canonical-todo-db-holder-only",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "release-canonical-todo-db-holder-only",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/todo-db/.github/workflows/ci.yml"
+      },
+      {
+        "item_id": "release-canonical-todo-db-holder-only",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/todo-db/CHANGELOG.md"
+      },
+      {
+        "item_id": "release-canonical-todo-db-holder-only",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/todo-db/pyproject.toml"
+      },
+      {
+        "item_id": "release-canonical-todo-db-holder-only",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/todo-db/src/todo_db/tracker.py"
+      },
+      {
+        "item_id": "release-canonical-todo-db-holder-only",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/todo-db/tests/test_cli_tracker.py"
+      },
+      {
+        "item_id": "release-canonical-todo-db-holder-only",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/todo-db/tests/test_tracker.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run pytest tests/test_tracker.py tests/test_cli_tracker.py -q",
+        "description": "Canonical tracker and CLI release tests pass",
+        "expected": "exit 0",
+        "item_id": "release-canonical-todo-db-holder-only",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check .",
+        "description": "Canonical package lint passes",
+        "expected": "exit 0",
+        "item_id": "release-canonical-todo-db-holder-only",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run pytest -q",
+        "description": "Canonical full test suite passes",
+        "expected": "exit 0",
+        "item_id": "release-canonical-todo-db-holder-only",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run pytest tests/test_packaging_smoke.py -q && uv build",
+        "description": "Wheel and sdist build and isolated packaging smoke pass",
+        "expected": "exit 0",
+        "item_id": "release-canonical-todo-db-holder-only",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "release-canonical-todo-db-holder-only",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "release-canonical-todo-db-holder-only",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "In /Users/joe/Developer/todo-db.pool-canonical-release at 60769ed, inspected TodoTracker.release and both regressions; uv run pytest tests/test_tracker.py tests/test_cli_tracker.py -q passed 9 tests. Holder-only release, idempotent unclaimed release, stale-lease non-holder rejection, and CLI exit 2 are covered.",
+        "item_id": "release-canonical-todo-db-holder-only",
+        "notes": null,
+        "started_at": "2026-08-10T21:25:07Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Revalidate holder-only release behavior and the existing CLI exit-2 regression tests",
+        "wid": "w0"
+      },
+      {
+        "evidence": "In /Users/joe/Developer/todo-db.pool-canonical-release, uv run ruff check . passed; uv run pytest -q passed 101 tests; uv run pytest tests/test_packaging_smoke.py -q passed 1 test; uv build produced todo_db-0.3.0.tar.gz and todo_db-0.3.0-py3-none-any.whl.",
+        "item_id": "release-canonical-todo-db-holder-only",
+        "notes": null,
+        "started_at": "2026-08-10T21:29:50Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run package lint, full tests, packaging smoke, and wheel/sdist build gates",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Release gate cleared after PR #5 merged at 75cf990094dea33a151d99192ffc57df0dba7682. Rebuilt from that exact merged commit and published GitHub release v0.3.1 at https://github.com/joeharris76/todo-db/releases/tag/v0.3.1. Wheel SHA-256 785879ee2380fb1ff337a766b3d331e6e3337add001f8a91d4bd645e64332e0d; sdist SHA-256 a454808df0c10deb7393e83df1289bd26e88f9ee7ea78a4e15dc780a728c1cc9.",
+        "item_id": "release-canonical-todo-db-holder-only",
+        "notes": null,
+        "started_at": "2026-08-10T21:30:15Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Bump the next unused patch version, update CHANGELOG, publish the immutable artifact, and record version plus hash",
+        "wid": "w2"
+      }
+    ]
+  }
+}

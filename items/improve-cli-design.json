@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: High\"\n- \"**Status**: Completed ✅\"\n- \"**Description**: Remaining CLI issues focus on cleaning up platform-specific options, hardcoded database wiring, and brittle quiet-mode behavior after recent orchestration refactors.\"\n- \"**Context**: `benchbox run` still declares ClickHouse flags directly, database selection uses hardcoded branches, and quiet mode relies on ad-hoc console rebindings across modules.\"\n- \"**Tasks**:\"\n- \"**Files Affected**:\"\n- \"**Success Metrics**:\"\n- \"**Impact**: HIGH - Unlocks cleaner extension patterns and resolves long-standing CLI UX gaps\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (COMPLETED)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

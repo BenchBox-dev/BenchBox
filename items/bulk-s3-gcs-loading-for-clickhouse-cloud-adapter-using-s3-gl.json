@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #110 of bulk-shard-loading-clickhouse.\nDeferred: Bulk S3/GCS loading for ClickHouse Cloud adapter using s3() glob patterns\nReason deferred: Cloud adapter (_load_data_via_s3, _load_data_via_gcs) has its own per-file upload+insert loop that bypasses DataLoader and ClickHouseNativeHandler entirely. Bulk loading requires restructuring the upload pipeline (upload all first, then single INSERT with s3() glob) - a larger refactor tracked separately.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:33:48Z",
+      "worktree": "main"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Remove SQL mode support from the Polars platform adapter since Polars SQL is\nfundamentally incompatible with most BenchBox benchmarks. DataFrame execution\nwill be the only supported mode.\n\nAnalysis revealed that Polars SQL has critical limitations that prevent\nTPC-H, TPC-DS, and SSB benchmarks from running:\n\n1. **Implicit Joins Not Supported** - Polars requires explicit JOIN syntax;\n   comma-separated tables in FROM clause fail (affects 17/22 TPC-H queries)\n2. **EXISTS/NOT EXISTS Not Supported** - Correlated subqueries fail (Q4, Q21)\n3. **Scalar Subquery Comparisons** - Only `=` supported, not `>`, `<` (Q22)\n4. **Non-Equi Joins Not Supported** - LIKE in join conditions fails (Q13)\n5. **Date/String Comparison Issues** - Type coercion problems\n\nOnly ClickBench (single-table, no joins) could potentially work in SQL mode,\nbut maintaining a separate SQL code path for one benchmark is not justified.\n\nPolars is designed as a DataFrame library with SQL as a convenience layer.\nBenchBox should embrace this by using Polars's native DataFrame API, which\nhas no such limitations and provides better performance.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-01-14T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

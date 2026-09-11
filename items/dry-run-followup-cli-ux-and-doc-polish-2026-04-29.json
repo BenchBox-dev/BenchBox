@@ -1,0 +1,217 @@
+{
+  "description": "Seven smaller friction items surfaced by the 2026-04-29 Codex\nagent-proxy dry-run. Each work unit is independently verifiable and\nsmall; consolidated into one TODO to avoid TODO sprawl. None of these\nare blocking by themselves, but cumulatively they make the difference\nbetween a smooth and a frustrating first submission.\n\nSee `_project/handoffs/external-dry-run-retrospective-2026-04-29.md`\nfor the full report and Codex's verbatim feedback (Appendix A there).\n\nNote: the release-blocker hash-contract mismatch from the same\ndry-run is tracked separately as\n`dry-run-followup-validator-hash-contract-mismatch.yaml` (Critical).\nThis TODO is polish; that one is correctness.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "block on completing all 7 work units before landing any",
+        "instead": "(not specified)",
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "why": "each is independently shippable; ship as ready"
+      },
+      {
+        "dont": "bundle the validator hash mismatch fix into this TODO",
+        "instead": "(not specified)",
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "why": "that's release-blocker scope and tracked separately as `dry-run-followup-validator-hash-contract-mismatch`"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-01T00:00:00Z",
+      "created_at": "2026-04-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing user-facing behavior on the success path -- these are output / UX tweaks only, not flow changes",
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29"
+      },
+      {
+        "behavior": "Hard-failure red ❌ for actually-unrecoverable errors -- don't make every error look amber and dilute the signal",
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29"
+      },
+      {
+        "behavior": "The canonical `uv run -- python` examples in the validation block (those are unambiguous and contributor-tested)",
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "kind": "only_modify",
+        "path_glob": "README.md (w1: invocation consistency)"
+      },
+      {
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py (w4: drop Interactive header at line 706)"
+      },
+      {
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py (w2: print next commands)"
+      },
+      {
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/output.py (w3: downgrade red `Missing tables` at line 172)"
+      },
+      {
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/power_test.py (w7: reword stream_id warning at lines 172-176)"
+      },
+      {
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md (w1: invocation consistency)"
+      },
+      {
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/dataframe.md (w5: rename 'Platform Availability' at line 358)"
+      },
+      {
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "kind": "only_modify",
+        "path_glob": "docs/usage/ (w1: invocation consistency)"
+      },
+      {
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/ (regression tests for w2, w3, w4, w6)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -rEc '^[^#]*\\buv run benchbox\\b(?! --)' docs/contributing-results.md docs/usage/ README.md 2>/dev/null | awk -F: '{s+=$2}END{print s}'",
+        "description": "Doc invocation consistency: zero non-canonical `uv run benchbox` (without `--`) in contributor docs",
+        "expected": "0 (assuming `uv run -- benchbox` is the canonical form chosen in w1)",
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rm -rf /tmp/bb-test && uv run -- benchbox submit --last --output /tmp/bb-test 2>&1 | grep -c 'published-results'",
+        "description": "`benchbox submit` output mentions the PR target branch inline",
+        "expected": ">= 1",
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 2>&1 | grep -c 'Interactive Benchmark Runner'",
+        "description": "`benchbox run` non-interactive does not print the interactive header",
+        "expected": "0",
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 --force datagen 2>&1 | grep -E '\\[red\\][^[]*Missing tables|❌[^\\n]*Missing tables' | wc -l",
+        "description": "Missing-tables auto-recovery does not print in red",
+        "expected": "0",
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'timing only|per TPC-H spec' benchbox/core/tpch/power_test.py",
+        "description": "Stream-id warning explicitly mentions 'timing only' or 'per TPC-H spec'",
+        "expected": ">= 1",
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "notes": "DECISION: `uv run -- benchbox` is the canonical form for\ncontributor-facing submission docs. Bare `benchbox` remains\nacceptable in broad reference examples that explicitly assume an\ninstalled CLI.\n\nChanges:\n  - Normalized the active submission workflow in\n    `docs/contributing-results.md` to `uv run -- benchbox`.\n  - Updated the public-results contribution paragraph in\n    `README.md` to use `uv run -- benchbox submit`.\n\n`/code review W1`: no required issues. Scope stayed focused on\ncontributor-facing submission paths rather than rewriting every\nbroad README/reference example.\n\nVerification:\n  - `grep -rEc '^[^#]*\\buv run benchbox\\b(?! --)' docs/contributing-results.md docs/usage/ README.md 2>/dev/null | awk -F: '{s+=$2}END{print s}'`\n    reports no matches.\n  - `git diff --check` passed.\n\nCodex re-read steps to figure out which form to use. Pick one\ncanonical form for contributor-facing docs and normalize.\nRecommend `uv run -- benchbox` (matches the repo's uv-first\nconvention, matches the `uv run -- python` examples in the\nvalidation block). Bare `benchbox` only where the doc explicitly\nassumes a system install.\nFiles to scan: docs/contributing-results.md, docs/usage/,\nREADME.md, docs/development/.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit doc invocation consistency: pick canonical form between `benchbox`, `uv run benchbox`, `uv run -- benchbox`",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "notes": "Existing implementation already satisfies this work item:\n  - `_print_submission_summary()` prints the concrete `cp`\n    command for the bundle and manifest, the inventory command,\n    the validation command, the PR title, and the\n    `published-results` target branch.\n  - `tests/unit/cli/commands/test_submit.py` includes the pinned\n    W2 regression\n    `test_submit_prints_next_steps_with_pr_target_branch`.\n\n`/code review W2`: no required issues. The code path is covered\nby the focused submit unit suite, and no production-code patch was\nneeded for this slice.\n\nVerification:\n  - `uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -q`\n    passed: 28 passed.\n\nCodex's recommendation #2: after writing the bundle, print the\nexact next commands the contributor should run, with paths\nfilled in:\n  - cp <bundle_path> results-data/bundles/<bundle_filename>\n  - uv run -- python scripts/generate_corpus_inventory.py --write\n  - uv run -- python scripts/validate_submission.py results-data/bundles/<bundle_filename>\n  - PR title: `results: <benchmark> <platform> sf<scale>`\n  - PR target branch: `published-results`\nReduces re-read load and removes the \"where does this go?\"\nfriction. The information is already in the in-bundle\nCONTRIBUTING.md after PR #43; this surfaces it inline at submit\ntime so contributors don't have to switch contexts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make `benchbox submit` print the exact next commands",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "notes": "Existing production output already renders missing-table details\nas yellow/recoverable while preserving red output for hard\nfailures such as inaccessible tables.\n\nChange:\n  - Added\n    `test_missing_tables_validation_message_is_recoverable_amber`\n    in `tests/unit/cli/test_cli_output.py` to pin the amber\n    missing-table branch and the red inaccessible-table branch.\n\n`/code review W3`: no required issues. The test is scoped to the\nexact formatter behavior and does not weaken hard-failure red\noutput.\n\nVerification:\n  - `uv run -- python -m pytest tests/unit/cli/test_cli_output.py::TestConsoleResultFormatter::test_missing_tables_validation_message_is_recoverable_amber -q`\n    passed: 1 passed.\n\nCodex hit `❌ Missing tables...` printed in red, then the runner\nautomatically deleted+rebuilt the DuckDB file and the run\nsucceeded. The user-visible result was success, but the red ❌\nmade it look like a failure mid-run. Downgrade to amber/yellow\nwith a \"rebuilding...\" spinner; reserve red ❌ for actually\nunrecoverable errors.\n\nAudit findings (2026-04-29) — emit sites:\n  - `benchbox/cli/output.py:172` -- `[red]• Missing tables:[/red]`\n    (this is the most likely red ❌ Codex saw)\n  - `benchbox/platforms/base/result_capture.py:1372` -- already\n    uses `⚠️` (amber); not the offending site\n  - `benchbox/platforms/base/validation.py:174` -- adds error\n    to a result object; check if it propagates to the [red] path\n  - `benchbox/utils/data_validation.py:426` -- emit helper\n  - `benchbox/core/validation/engines.py:432` -- error append\n\nTrace the auto-recovery path: which caller catches the\nvalidation error, deletes+rebuilds the DuckDB file, and re-runs?\nDowngrade `cli/output.py:172` to amber/yellow IF the caller is\nrecoverable; keep red only for hard-fail paths.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Downgrade `benchbox run` recoverable Missing-tables from red ❌ to amber recovery message",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "notes": "Existing production code already gates the header on\n`sys.stdin.isatty()` and the absence of explicit platform +\nbenchmark args.\n\nChange:\n  - Added focused tests in\n    `tests/unit/cli/test_run_command_interactive_paths.py` for\n    suppressing the header with explicit run args and preserving\n    it for a prompted TTY run.\n\n`/code review W4`: no required issues. The regression tests\ncover the requested suppression without removing the true\ninteractive banner.\n\nVerification:\n  - `uv run -- python -m pytest tests/unit/cli/test_run_command_interactive_paths.py::test_interactive_header_suppressed_for_explicit_run_args tests/unit/cli/test_run_command_interactive_paths.py::test_interactive_header_shown_for_prompted_tty_run -q`\n    passed: 2 passed.\n\nCodex called this out: showing 'Interactive Benchmark Runner'\nwhen running with explicit flags (no interactive prompt) is\nmisleading. Suppress the header when stdin is not a TTY OR\nwhen explicit `--platform` / `--benchmark` args are provided.\n\nAudit findings (2026-04-29) — emit site:\n  - `benchbox/cli/commands/run.py:706` --\n    `Text(\"BenchBox Interactive Benchmark Runner\", style=\"bold blue\")`\nSingle-site fix; gate on `sys.stdin.isatty() and not (platform\nand benchmark)` or equivalent.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Drop 'Interactive Benchmark Runner' header in non-interactive `benchbox run`",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "notes": "Existing docs already use the CLI-matching `Available Databases`\nheading in `docs/platforms/dataframe.md`, and the other audited\ndocs also align with the CLI output.\n\nEvidence:\n  - `docs/platforms/dataframe.md:358` is `## Available Databases`.\n  - `benchbox/cli/system.py` and `benchbox/cli/database.py` print\n    or title the surface as `Available Databases`.\n  - `rg -n \"Platform Availability|Available Databases|Checking Platform Availability|benchbox profile\" ...`\n    found no remaining `Platform Availability` doc mismatch.\n\n`/code review W5`: no required issues. No docs patch was needed\nbeyond recording the resolved state.\n\nThe doc references a 'Platform Availability' surface; the actual\nCLI prints 'Available Databases'. Either add the doc-claimed\ntable to the CLI, or update docs to match what the CLI prints.\nLatter is cheaper.\n\nAudit findings (2026-04-29) — file pins:\n  - Doc: `docs/platforms/dataframe.md:358` (`## Checking Platform\n    Availability`) -- main mismatch surface\n  - Doc: `docs/usage/intelligent-guidance.md:49,83` -- already\n    uses 'Available Databases' (ASCII tree examples); aligned\n  - CLI: `benchbox/cli/system.py:42` -- prints\n    `[cyan]Available Databases:[/cyan]`\n  - CLI: `benchbox/cli/database.py:395,504` --\n    `Table(title=\"Available Databases\")`\nRecommended: rename the doc heading + body in\n`docs/platforms/dataframe.md:358` to 'Available Databases'\nand align the prose.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Sync `benchbox profile` docs ('Platform Availability' → actual 'Available Databases')",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "notes": "Existing implementation already routes dry-run and real submit\noutput through the shared `_print_submission_summary()` helper.\nDry-run only changes the header and the trailing\n`(dry run; no files written)` footer; the file list and next-step\ncommand shape are shared.\n\nExisting pinned test:\n  - `test_submit_dry_run_matches_real_run_shape` in\n    `tests/unit/cli/commands/test_submit.py`.\n\n`/code review W6`: no required issues. The shared helper avoids\ndrift between dry-run and real submit output, and the dry-run path\nstill asserts no files are written.\n\nVerification:\n  - `uv run -- python -m pytest tests/unit/cli/commands/test_submit.py::test_submit_dry_run_matches_real_run_shape -q`\n    passed: 1 passed.\n\nCodex noted the dry-run path output format and real output\nformat differ slightly. Make `--dry-run` print the same\nfile/manifest/contributing list shape as the real run, just\nwith a \"(dry run; no files written)\" footer. Today they're\nsimilar but the dry-run formatting is its own one-off.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align `benchbox submit --dry-run` output format with real submit output",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-cli-ux-and-doc-polish-2026-04-29",
+        "notes": "Existing warning text already includes the requested clarification:\nstream 0 is validated against the answer set, and streams > 0 are\nrun for timing only per TPC-H spec.\n\n`/code review W7`: no required issues. The behavior remains\nunchanged: auto-selected validation is disabled for nonzero\nstreams, while explicit validation modes are not silently altered\nby this wording-only path.\n\nVerification:\n  - `grep -cE 'timing only|per TPC-H spec' benchbox/core/tpch/power_test.py`\n    returned 2.\n\nCodex's run hit a warning that validation was disabled for\nstream_id != 0 and was unsure whether the result was actually\nfully validated.\n\nAudit findings (2026-04-29) — emit site:\n  - `benchbox/core/tpch/power_test.py:172-176`:\n      if stream_id != 0 and validation and validation_mode is None:\n          actual_validation_mode = \"disabled\"\n          self.logger.warning(\n              \"⚠️  TPC-H answer sets are only available for stream 0. \"\n              \"Disabling validation for stream_id != 0.\"\n          )\n\nThe warning IS correct (TPC-H answer sets only exist for stream 0),\nbut Codex's confusion shows the wording leaves room for \"did my\nresult get validated or not?\" doubt. Reword to explicitly state:\n\"Stream 0 was validated against the answer set; streams > 0 are\nrun for timing only (per TPC-H spec).\" Suppression is the wrong\ncall -- the warning protects users running multi-stream from\nclaiming false validation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Clarify the `stream_id != 0 validation disabled` TPC-H warning",
+        "wid": "w7"
+      }
+    ]
+  }
+}

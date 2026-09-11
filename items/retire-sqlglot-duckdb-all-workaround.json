@@ -1,0 +1,318 @@
+{
+  "context": "Bump the floor before deleting the code. The floor bump is the\ncontract that lets us assume the upstream fix is present; without it,\nusers on older sqlglot would silently regress. After the bump and\ndelete, the live DuckDB regression on TPC-H/TPC-DS/SSB is the\nload-bearing evidence the change is safe end-to-end. Documentation\nedits land in the same PR so the public artifacts (blog draft,\nupstream README) stay in sync with the code.\n",
+  "description": "The repro harness at `_project/sqlglot-upstream/repros/repro_all.py`\nconfirmed against `sqlglot==30.6.0` that SQLGlot's DuckDB generator now\npreserves `GROUP BY ALL` and `ORDER BY ALL` as bare keywords even when\n`identify=True` is set. This was previously a defect that BenchBox\nworked around with `_restore_group_order_by_all_keyword` and\n`_query_has_group_or_order_by_all` in `benchbox/utils/dialect_utils.py`,\ninvoked from two call sites:\n\n  1. `benchbox/utils/dialect_utils.translate_sql_query` (the central\n     wrapper).\n  2. `benchbox/platforms/base/dialect_translation.py` (a parallel\n     per-statement path that imports the same helpers).\n\nUpstream fix: https://github.com/tobymao/sqlglot/pull/3756 (issue\nhttps://github.com/tobymao/sqlglot/issues/3755). Verified by our\nharness on 30.6.0; the `[PASS]` line in the harness output confirms\nthe bare-keyword form is preserved.\n\nThis TODO retires the workaround safely. Safe retirement requires\nbumping our `sqlglot` floor in `pyproject.toml` to the first version\nthat includes #3756 - removing the code without that bump would silently\nbreak users on older `sqlglot` releases who still have the underlying\ndefect. Our current pin is `sqlglot>=20.0.0,<31.0.0`.\n\nTwo artifacts that currently document the workaround as load-bearing\nmust be updated in the same PR:\n\n  - `_blog/building-benchbox/drafts/11-what-we-built-on-top-of-sqlglot.md`\n    (post #11, currently in `drafts/`, not yet published). Section 2\n    \"Post-generation fixups\" lists `_restore_group_order_by_all_keyword`\n    in a three-row table. Update to remove that row, attribute the\n    retirement to upstream PR #3756, and reduce the post's \"three fixes\"\n    framing to two.\n  - `_project/sqlglot-upstream/README.md`. The verdict table and the\n    \"Follow-up TODOs\" section both reference this retirement.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a new public-path regression test in w4",
+        "instead": "(not specified)",
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "why": "the existing tests at test_dialect_utils.py:178,191 already cover GROUP/ORDER BY ALL through translate_sql_query; adding more would duplicate coverage."
+      },
+      {
+        "dont": "delete the workaround without bumping the sqlglot floor first",
+        "instead": "(not specified)",
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "why": "users on the current floor (>=20.0.0) may be on a sqlglot version pre-#3756 and would silently produce broken DuckDB SQL."
+      },
+      {
+        "dont": "skip the live DuckDB regression in w5",
+        "instead": "(not specified)",
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "why": "unit tests on translate_sql_query do not exercise the full per-platform call path through dialect_translation.py."
+      },
+      {
+        "dont": "skip w0 (re-validate the harness against the resolved sqlglot version)",
+        "instead": "(not specified)",
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "why": "the original PASS observation was recorded on 2026-05-04 against 30.6.0; if this TODO sits in planning/ for weeks, `uv lock` may resolve a different version and the safety predicate quietly drifts."
+      },
+      {
+        "dont": "touch the SQLite or Postgres post-fix branches",
+        "instead": "(not specified)",
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "why": "those are independently load-bearing per the repro harness FAIL results for items #2, #3 in the upstream prep."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "retire-sqlglot-duckdb-all-workaround",
+        "id": 486,
+        "reason": "Out of scope. Each post-fix should be retired against its own\nupstream-fix evidence. This TODO is scoped to the GROUP/ORDER BY\nALL workaround that the repro harness has already PASS-confirmed.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly rates this out of scope; vague future audit with no concrete trigger or evidence of a real problem yet.",
+        "summary": "Audit other DuckDB post-fix branches in dialect_utils.py for similar obsolescence"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "retire-sqlglot-duckdb-all-workaround",
+        "id": 487,
+        "reason": "Worth considering as a separate process improvement. Out of scope\nfor this cleanup.\n",
+        "resolution": "promoted",
+        "resolved_item": "auto-retirement-workflow-run-repros-on-every-sqlglot-upgrade",
+        "resolved_reason": null,
+        "summary": "Auto-retirement workflow (run repros on every sqlglot upgrade)"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality",
+      "completed_at": "2026-05-04T00:00:00Z",
+      "created_at": "2026-05-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All other dialect branches in translate_sql_query (e.g. SQLite EXTRACT/INTERVAL fixups) untouched.",
+        "item_id": "retire-sqlglot-duckdb-all-workaround"
+      },
+      {
+        "behavior": "DuckDB TPC-H, TPC-DS, and SSB validation results match pre-change baseline at SF 0.01.",
+        "item_id": "retire-sqlglot-duckdb-all-workaround"
+      },
+      {
+        "behavior": "Other helpers in dialect_utils.py (fix_postgres_date_arithmetic, _fix_sqlite_unsupported_syntax, normalize_dialect_for_sqlglot) untouched.",
+        "item_id": "retire-sqlglot-duckdb-all-workaround"
+      },
+      {
+        "behavior": "translate_sql_query public signature unchanged (callers must not need updates).",
+        "item_id": "retire-sqlglot-duckdb-all-workaround"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "kind": "do_not_modify",
+        "path_glob": "_project/sqlglot-upstream/issues/"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "kind": "do_not_modify",
+        "path_glob": "_project/sqlglot-upstream/repros/repro_all.py"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/datafusion_query_transformer.py"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/questdb_rewriter.py"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "kind": "only_modify",
+        "path_glob": "_blog/building-benchbox/drafts/11-what-we-built-on-top-of-sqlglot.md"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "kind": "only_modify",
+        "path_glob": "_project/sqlglot-upstream/README.md"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/dialect_translation.py"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/dialect_utils.py"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/sql_compat/test_translate_sql_delegation.py"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/test_dialect_utils.py"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --with sqlglot==30.6.0 python _project/sqlglot-upstream/repros/repro_all.py",
+        "description": "Repro harness still PASSes the DuckDB ALL case at the version pinned to the original PASS evidence (deterministic harness contract)",
+        "expected": "Item #1 reports [PASS]; items #2, #3, #5, #6 report [FAIL] (unchanged)",
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --with sqlglot python _project/sqlglot-upstream/repros/repro_all.py",
+        "description": "Repro harness PASSes item #1 at the sqlglot version uv resolves under the (post-w1) cap (w0 freshness check)",
+        "expected": "Item #1 reports [PASS] at the resolved version. If [FAIL], STOP and re-investigate before w1.",
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/utils/test_dialect_utils.py -v",
+        "description": "dialect_utils unit tests pass after pruning",
+        "expected": "all tests pass; no references to removed helpers",
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Full fast-test suite passes",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --platform duckdb --benchmark tpch --scale 0.01 --validation full && benchbox run --platform duckdb --benchmark tpcds --scale 0.01 --validation full && benchbox run --platform duckdb --benchmark ssb --scale 0.01 --validation full",
+        "description": "Live DuckDB regression on TPC-H, TPC-DS, SSB at SF 0.01 with --validation full",
+        "expected": "validation passes for every benchmark, results match pre-change baseline",
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "awk '/^## /{s=$0} s ~ /Post-generation fixups/' _blog/building-benchbox/drafts/11-what-we-built-on-top-of-sqlglot.md | grep -c '_restore_group_order_by_all_keyword'",
+        "description": "Blog post 11 'Post-generation fixups' table no longer lists the DuckDB ALL row",
+        "expected": "0 (a retrospective past-tense mention elsewhere in the post is fine; the assertion is scoped to the active fixups section)",
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -q 'Retire workaround in BenchBox' _project/sqlglot-upstream/README.md",
+        "description": "SQLGlot upstream README verdict no longer marks the workaround as un-retired",
+        "expected": "command exits 0 (the 'Retire workaround in BenchBox' status has been replaced by 'Retired in PR ...')",
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "notes": "The TODO's PASS evidence was recorded against `sqlglot==30.6.0` on\n2026-05-04. Before touching pyproject or code:\n  - Run `uv run --with sqlglot python _project/sqlglot-upstream/repros/repro_all.py`\n    (no version pin) so it resolves whatever the current cap allows.\n  - Confirm item #1 still PASSes; items #2/#3/#5/#6 still FAIL as\n    recorded.\nIf item #1 no longer PASSes (e.g., upstream regressed it after our\nobservation), STOP and re-investigate before proceeding. If a new\nsqlglot major (>=31.0.0) has shipped that the cap excludes, surface\nthat in the PR — it may need to be widened in the same change.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the repro harness against the resolved sqlglot version before any code change",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "notes": "Lookup: read sqlglot's CHANGELOG/release notes/git tags around the\nmerge of https://github.com/tobymao/sqlglot/pull/3756; record the\nfirst tagged release containing the fix in this TODO's \"Research\nfindings\" section, e.g. \"first fix release: sqlglot vX.Y.Z\n(YYYY-MM-DD)\".\n\nBump: update the `sqlglot` requirement in `pyproject.toml` from\n`>=20.0.0,<31.0.0` to `>=<min-with-3756>,<31.0.0`. Run `uv lock`\nto refresh `uv.lock`. Confirm the resolved version matches w0\n(no unintended downgrade or upgrade). Note in the PR body that\nthe floor bump is the safety predicate for w3.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Identify min sqlglot release containing PR #3756, bump floor, relock",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "notes": "CANCELLED 2026-05-04: implemented as 89eb06d9c, then reverted as\nab08064b2 within 2 minutes once the cross-dialect path was checked.\nThe repro harness only tested `read=\"duckdb\", write=\"duckdb\"`, but\nBenchBox's actual call goes through `read=\"postgres\", write=\"duckdb\"`\n(after netezza→postgres normalization in `dialect_utils.translate_sql_query`).\nOn `sqlglot==30.6.0` that cross-dialect path still emits\n`ORDER BY \"ALL\"`, so the helpers are still load-bearing. Verified\nwith a direct `sqlglot.transpile(..., read='postgres', write='duckdb',\nidentify=True)` probe.\n\nThe workaround stays. Retirement requires either a follow-up upstream\nfix that covers the cross-dialect path, or a deliberate decision to\ndrop Postgres/Netezza source SQL inputs to the DuckDB target.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove _restore_group_order_by_all_keyword and _query_has_group_or_order_by_all",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "notes": "CANCELLED 2026-05-04: depends on w3, which is cancelled. The private\nhelpers stay in place, so the test imports and direct-call assertions\nthat exercise them stay too — they remain a useful regression contract\nagainst accidental deletion.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prune direct private-helper test references; keep existing public-path regression tests",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "notes": "CANCELLED 2026-05-04: w3 was reverted, so there is no risky code\nchange for this gate to protect. The dialect_utils call path is\nunchanged on this branch except for the floor bump in w1 (which is\na constraint, not a runtime change).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Live regression: TPC-H/TPC-DS/SSB on DuckDB SF 0.01",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "retire-sqlglot-duckdb-all-workaround",
+        "notes": "DONE 2026-05-04 (re-scoped): instead of \"reflect retirement\", the\ndocumentation updates now reflect that the workaround stays and\ndocument the narrower remaining gap.\n\nBlog post 11 (commit 92c78e937): clarifies in section \"Post-generation\nfixups\" that PR #3756 fixed direct DuckDB only and that BenchBox's\nPostgres/Netezza→DuckDB path still produces quoted ALL. Adds a\nfootnote citing #3755/#3756 with the narrower scope. Updates the\n\"Test environment\" line to reflect the new floor and explicitly\nnotes the workaround stays.\n\nUpstream README (this commit): row #1 verdict updated from\n\"Retire workaround\" to \"Keep workaround\", explaining that the upstream\nfix only covers `read=duckdb`. The \"Follow-up TODOs\" bullet that\nasked us to retire the helper is replaced with a follow-up to extend\n`repros/repro_all.py` so the harness exercises the cross-dialect path\nBenchBox actually uses (the original mis-classification was a harness\ncoverage gap, not an upstream regression).\n  - Update the SQLGlot floor reference in the README if w2 changed it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update blog post 11 and SQLGlot upstream README to reflect retirement",
+        "wid": "w6"
+      }
+    ]
+  }
+}

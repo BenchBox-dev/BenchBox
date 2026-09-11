@@ -1,0 +1,251 @@
+{
+  "context": "Build the validator before touching anything else: w2 makes the\ncontract executable. Then w3 backfills the entire existing tree so\nCI starts green and the validator can enforce uniformly without a\ndate cutoff. w4 wires the capture flow for new audits, w5 enforces\nvia CI, w6 documents. Keep the validator narrow (no markdown\nlinting, no audit-content checks) so it stays trustworthy as a CI\ngate. Reuse the existing explorer-job path filter pattern in w5\nrather than authoring a new workflow from scratch — that pattern\nis already proven and keeps CI cost flat for non-audit PRs.\n",
+  "description": "Release-readiness reports under `_project/audits/` describe a tree. If\nthe tree the report describes is not the tree that ships, the verdict\nis structurally unreliable — even when every individual check passes.\nPR #269 demonstrated this: a release-readiness report and capture\ngenerated against the PR branch were squash-merged onto a develop tip\nthat included PR #268's literal-styled `Result summary` panel and\n`Compare guardrails` section, and the report still claimed READY.\nPR #271 (commit `274a4a11e`) closed the immediate token regression\nmanually, but the framework gap remains.\n\nThis TODO adds a durable, audit-agnostic gate so the same class of\nregression is caught at PR time across every structured audit, not\nonly retheme work:\n\n1. Every `_project/audits/*.md` audit landing after the cutoff date\n   must include a `develop_sha:` frontmatter field naming the develop\n   SHA the report describes.\n2. The capture flow that authors release-final reports\n   (`results-explorer/e2e/captures/release-final.spec.ts` and any\n   sibling `*-final.spec.ts` drivers) records the develop SHA at\n   run-start so the human author copies it into the audit\n   frontmatter.\n3. A small validator (`_project/scripts/audit_sha_check.py`) and a\n   `make audit-sha-check FILE=…` target verify the field is present,\n   resolves to a SHA reachable from `origin/develop`, and is not too\n   far behind the merge target's tip.\n4. A path-aware CI hook on `_project/audits/**` and\n   `results-explorer/e2e/captures/**` runs the validator on every PR\n   and refuses to merge a release-readiness audit whose recorded SHA\n   is missing or stale relative to the merge target.\n\nComplements (does not replace)\n`results-explorer-token-scan-ci-gate.yaml`: that gate prevents the\nliteral-color regression class from shipping; this gate makes every\nrelease-readiness audit's tree-claim auditable so future cross-PR\nraces on any surface (security, performance, docs migration) are\ncaught at the audit-author step rather than after merge.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "backfill develop_sha by hand",
+        "instead": "drive the backfill from `_project/scripts/audit_sha_backfill.py` so the derivation is auditable and idempotent.",
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "why": "per-file judgment calls about which commit to use will drift over time"
+      },
+      {
+        "dont": "extend the validator to lint audit content (markdown, headings, sections)",
+        "instead": "content-quality checks belong in a separate audit-review TODO.",
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "why": "the validator must stay narrow to remain trustworthy as a CI gate"
+      },
+      {
+        "dont": "land the validator before the backfill",
+        "instead": "sequence is w2 (validator) → w3 (backfill) → w5 (CI gate) in the same PR series, with w3's output landing before w5 enables enforcement.",
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "why": "CI would fail on the existing tree from day one"
+      },
+      {
+        "dont": "make the gate run on every CI build",
+        "instead": "use a path filter on `_project/audits/**` and `results-explorer/e2e/captures/**` so non-audit PRs see no overhead.",
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "why": "most PRs do not touch audits"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "needs_item": "results-explorer-token-scan-ci-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "Quality",
+      "completed_at": "2026-05-08T00:00:00Z",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Backfill must be idempotent — re-running the helper on already-stamped audits is a no-op.",
+        "item_id": "audit-develop-sha-stamping-and-ci-gate"
+      },
+      {
+        "behavior": "CI required-result aggregator path-filter behavior.",
+        "item_id": "audit-develop-sha-stamping-and-ci-gate"
+      },
+      {
+        "behavior": "Existing _project/audits/*.md content — backfill only adds the `develop_sha:` frontmatter field; body text and other frontmatter fields stay byte-identical.",
+        "item_id": "audit-develop-sha-stamping-and-ci-gate"
+      },
+      {
+        "behavior": "Existing pre-commit hooks and the `make lint` umbrella target.",
+        "item_id": "audit-develop-sha-stamping-and-ci-gate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-05-07-211858-release-readiness-against-pre-merge-tree.md"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/captures/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "bash -lc 'set -e; tmp=$(mktemp _project/audits/_gate_test_XXXXX.md); printf -- \"---\\nid: gate-test\\ndate: 2026-05-08\\n---\\n# Stub\\n\" > \"$tmp\"; trap \"rm -f $tmp\" EXIT; ! make audit-sha-check FILE=\"$tmp\"'",
+        "description": "Validator fails on an audit missing develop_sha",
+        "expected": "non-zero exit (validator caught the missing field)",
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "bash -lc 'set -e; sha=$(git rev-parse origin/develop); tmp=$(mktemp _project/audits/_gate_test_XXXXX.md); printf -- \"---\\nid: gate-test\\ndate: 2026-05-08\\ndevelop_sha: $sha\\n---\\n# Stub\\n\" > \"$tmp\"; trap \"rm -f $tmp\" EXIT; make audit-sha-check FILE=\"$tmp\"'",
+        "description": "Validator passes on an audit with a real develop_sha",
+        "expected": "exit 0",
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: open a no-op docs PR and confirm audit-sha-check job is skipped via path filter'",
+        "description": "CI gate runs only on PRs touching _project/audits/** or captures",
+        "expected": "Job is reported as skipped on the PR checks tab",
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "notes": "Specify in `docs/operations/results-explorer-qa.md` (smallest\ndoc-change footprint; broaden later when other audit owners\nadopt):\n  - Required field name: `develop_sha:` (full 40-char SHA).\n  - Required on every audit under `_project/audits/*.md` —\n    historical audits are backfilled in w3 so the validator can\n    enforce the requirement uniformly without grandfathering.\n  - Allowed staleness: configurable via CLI flag, default 0 (any\n    ancestor of `origin/develop` is acceptable; reviewers may\n    require `--require-current` for top-of-tree audits).\n  - Backfill rule (consumed by w3): for each existing audit,\n    derive the SHA from the introducing commit via `git log\n    --diff-filter=A --reverse --format=%H -- <audit-file> | head\n    -1`, then use that commit's parent on develop. Document this\n    rule so future agents can re-derive it deterministically.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the develop_sha frontmatter contract",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "notes": "New file: `_project/scripts/audit_sha_check.py`.\nBehavior:\n  - Parse the audit's YAML frontmatter; require `develop_sha:`\n    unconditionally (no date cutoff after backfill in w3 lands).\n  - Run `git merge-base --is-ancestor <develop_sha> origin/develop`\n    and exit non-zero if the SHA is not reachable.\n  - With `--require-current N`, also require that the SHA is\n    within N commits of `origin/develop` tip.\nAdd `make audit-sha-check FILE=<path>` that wraps the script\nunder the existing `audit-*` target convention, and add the\ntarget to the pre-approved-commands allowlist in CLAUDE.md so\nagents can invoke it without prompts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement audit_sha_check.py validator + Makefile target",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "notes": "For each `_project/audits/*.md`:\n  sha=$(git log --diff-filter=A --reverse --format=%H -- \"$f\" | head -1)\n  # Verify the introducing commit is reachable from origin/develop;\n  # if not (e.g., authored on a feature branch and squashed), fall\n  # back to the squash-merge commit that landed it on develop.\n  # If still unreachable, fall back to `git rev-parse $sha^` (the\n  # parent before the audit was added) and document the deviation\n  # inline as a frontmatter comment.\nAdd a bulk-backfill helper script (`_project/scripts/audit_sha_backfill.py`)\nso the operation is repeatable and reviewers can audit the\nderivation per file. The script must:\n  - Not modify audits whose `develop_sha:` is already present.\n  - Print the derivation source per file (\"introducing commit\",\n    \"merge commit\", \"parent fallback\") to stdout so reviewers\n    can spot edge cases.\n  - Be idempotent: running it twice changes nothing.\nRun the backfill, eyeball the per-file derivation log, and land\nthe backfilled audits in the same PR as the validator so CI\nstarts green on the existing tree.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Backfill develop_sha into every existing _project/audits/*.md",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "notes": "Modify `results-explorer/e2e/captures/release-final.spec.ts` (and\nany sibling `*-final.spec.ts` drivers) to:\n  - Run `git fetch --no-tags origin develop` and `git rev-parse\n    origin/develop` at spec setup.\n  - Inject the resulting SHA into the screenshot manifest under a\n    new `develop_sha:` key.\n  - Print a copy-paste-ready frontmatter snippet to stdout at\n    spec teardown so the audit author drops it into the report.\nOut of scope: rewriting the capture spec's screenshot logic.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire the develop SHA into the release-final capture flow",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "notes": "Reuse the explorer test job's path filter pattern. New CI step:\n  - Triggers on PRs touching `_project/audits/**` or\n    `results-explorer/e2e/captures/**`.\n  - Runs `make audit-sha-check FILE=<changed-audit>` for every\n    modified audit file (loop over `git diff --name-only`).\n  - Refuses the PR if any audit fails the validator.\nJob must remain a no-op for PRs that don't touch the path filter.\nPre-merge sanity check: with the backfill from w3 landed, run the\nvalidator across the entire `_project/audits/` tree from a fresh\nclone and confirm exit 0 before declaring CI green.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add path-aware CI hook on _project/audits/** and capture specs",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "audit-develop-sha-stamping-and-ci-gate",
+        "notes": "Update `docs/operations/results-explorer-qa.md` with:\n  - The `develop_sha:` field requirement (uniform — no cutoff).\n  - The `make audit-sha-check` invocation.\n  - The backfill derivation rule from w1 so future sweeps can\n    repeat it on any newly-orphaned audits.\n  - A note that the contract applies to every report under\n    `_project/audits/`, not only retheme audits.\nAppend a `commits:` reference back to this TODO from the source\nblind-spot file via a new triage-log entry once the gate ships.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the contract and link from the source blind-spot",
+        "wid": "w6"
+      }
+    ]
+  }
+}

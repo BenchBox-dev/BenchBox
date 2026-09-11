@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #301 of adopt-apple-container-ci-parity.\nDeferred: Reproduce postgres-integration (needs a live Postgres) inside container\nReason deferred: Needs a database service, which is the Docker Compose problem tracked in migrate-test-docker-stacks-to-mocker. postgres-integration is also a non-blocking sample, not the hard gate.\n",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:23Z",
+      "worktree": "main"
+    }
+  }
+}

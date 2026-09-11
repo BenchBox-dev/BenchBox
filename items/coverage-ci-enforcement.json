@@ -1,0 +1,194 @@
+{
+  "context": "Write a standalone Python script (no external dependencies beyond stdlib)\nthat uses xml.etree.ElementTree to parse coverage.xml. Group files by\ntheir first two path components (e.g., benchbox/cli, benchbox/core/tpch).\nPrint a table of packages with coverage, highlight failures, exit 1 if\nany package is below threshold. Make threshold configurable via CLI arg.\n",
+  "description": "Once all modules reach ≥50% coverage (via the companion TODO items),\nadd CI enforcement to prevent regressions below the floor.\n\nCurrent CI uses --cov-fail-under=50 which checks OVERALL coverage only.\nThis allows individual modules to drop to 0% as long as the aggregate\nstays above 50%. A per-module check would catch this.\n\nOptions:\n  1. Use coverage.py's [report] fail_under per-package (limited granularity)\n  2. Add a custom script that parses coverage.xml and fails on any module <50%\n  3. Use diff-cover to enforce coverage on changed files only\n\nRecommend option 2: a lightweight Python script in scripts/ that parses\ncoverage.xml, groups by top-level package, and fails if any package is\nbelow threshold.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add external dependencies to the coverage script",
+        "instead": "use only stdlib (xml.etree, pathlib, argparse)",
+        "item_id": "coverage-ci-enforcement",
+        "why": "it runs in CI where install time matters"
+      },
+      {
+        "dont": "make the script fail on missing coverage.xml",
+        "instead": "exit 0 with a warning if the file is absent",
+        "item_id": "coverage-ci-enforcement",
+        "why": "not all CI runs generate it"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "coverage-ci-enforcement",
+        "needs_item": "coverage-cli-modules"
+      },
+      {
+        "item_id": "coverage-ci-enforcement",
+        "needs_item": "coverage-core-benchmarks"
+      },
+      {
+        "item_id": "coverage-ci-enforcement",
+        "needs_item": "coverage-core-tpcdi"
+      },
+      {
+        "item_id": "coverage-ci-enforcement",
+        "needs_item": "coverage-core-utilities"
+      },
+      {
+        "item_id": "coverage-ci-enforcement",
+        "needs_item": "coverage-platforms"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-02-18T00:00:00Z",
+      "created_at": "2026-02-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing passing CI jobs remain passing with no increase in runtime >20%",
+        "item_id": "coverage-ci-enforcement"
+      },
+      {
+        "behavior": "ci-test Makefile target continues to run pytest with existing flags and pass",
+        "item_id": "coverage-ci-enforcement"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "coverage-ci-enforcement",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/check_module_coverage.py --coverage-xml coverage.xml --threshold 50 --exclude-module benchbox/data --exclude-module benchbox/examples",
+        "description": "Script correctly identifies modules below threshold",
+        "expected": "table of per-module coverage with pass/fail indicators",
+        "item_id": "coverage-ci-enforcement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/check_module_coverage.py --coverage-xml coverage.xml --threshold 99 --exclude-module benchbox/data --exclude-module benchbox/examples; echo $?",
+        "description": "Script exits non-zero when modules fail",
+        "expected": "exit code 1 (since no module is at 99%)",
+        "item_id": "coverage-ci-enforcement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "coverage-ci-enforcement",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "coverage-ci-enforcement",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "coverage-ci-enforcement",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "coverage-ci-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write scripts/check_module_coverage.py that parses coverage.xml",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-ci-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Parse coverage.xml, group by benchbox/* top-level package",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-ci-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Report per-package coverage with pass/fail against 50% threshold",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-ci-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Exit non-zero if any package fails",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-ci-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for the coverage check script itself",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-ci-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add check_module_coverage.py to Makefile as coverage-check target",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-ci-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add to ci-test target in Makefile after pytest coverage run",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-ci-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update GitHub Actions workflow to run the check",
+        "wid": "w8"
+      }
+    ]
+  }
+}

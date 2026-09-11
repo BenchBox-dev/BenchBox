@@ -1,0 +1,43 @@
+{
+  "description": "Following the complexity-check evaluation of the top-20 functions at CC=14,\nfive functions were classified as \"required complexity\" - their branching is\ninherent to the problem domain and cannot be meaningfully reduced without\nadding indirection that hurts readability.\n\nThese should be added to pyproject.toml [tool.benchbox.complexity] exclude_functions\nwith rationale comments, matching the existing pattern established in previous batches.\n\nFunctions to exclude:\n1. benchbox/cli/commands/show_plan.py:show_plan (CC=14)\n   - Error handling (4 except branches) + 3-way format dispatch; irreducible for a CLI command\n2. benchbox/cli/commands/tuning_group.py:_display_config_settings_table (CC=14)\n   - Guard count proportional to number of config fields; no reducible structure\n3. benchbox/core/query_plans/parsers/base.py:_harmonize_operator_type (CC=14)\n   - 12-way keyword→enum mapping; branching count equals enum member count\n4. benchbox/core/concurrency/analyzer.py:analyze_contention (CC=14)\n   - Mutually-exclusive classification decision tree; genuinely a classifier\n5. benchbox/core/metadata_primitives/complexity.py:__post_init__ (CC=14)\n   - N independent field validation guards; inherent to dataclass validation",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-21T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "scope_rules": [
+      {
+        "item_id": "complexity-ignore-required-w15",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make complexity-check",
+        "description": "Complexity check still passes after adding exclusions",
+        "expected": "PASSED: all functions within complexity limit",
+        "item_id": "complexity-ignore-required-w15",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "complexity-ignore-required-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 5 exclude_functions entries to pyproject.toml with rationale comments",
+        "wid": "w1"
+      }
+    ]
+  }
+}

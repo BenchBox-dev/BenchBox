@@ -1,0 +1,136 @@
+{
+  "context": "1. Redefine should-be-armed so intentional holds are not stranded (arm evidence: ready_for_review timeline, prior auto_merge that dropped, pr-ready marker/label, or similar).\n2. Rewrite remediation to make pr-ready / READY=1 / draft→ready only.\n3. Coordinate with auto-merge-explicit-hold-is-not-durable so --apply never re-arms an explicit hold.\n4. Unit tests: intentional hold vs true stranding fixtures.",
+  "description": "After the auto-merge hold (#1567 Makefile + PR #1592 workflow arms only on ready_for_review / make pr-ready), a green non-draft non-soundness PR with auto-merge OFF is the normal intentional state while work continues — not a stranding.\n\n`_project/scripts/green_unmerged_sweep.py` still defines stranded as roughly: non-draft ∧ required green ∧ auto-merge off ∧ not soundness ∧ age > threshold. That matches every intentional hold after CI goes green. Nightly green_unmerged_sweep.py --apply (and any re-arm path) then fights the hold: false-positive digests and, if --apply arms, re-introduces the partial-stack race the hold exists to prevent.\n\nRemediation must not claim synchronize re-enables (post-#1592 it only disables for soundness).\n\nReplaces dropped stub green-unmerged-sweep-false-positives-after-auto-merge-hold (promote from deferral #697). Sibling: auto-merge-explicit-hold-is-not-durable. Origin: CI/merge integrity batch residual audit 2026-08-05.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "needs_item": "auto-merge-workflow-defeats-the-makefile-hold-20260805"
+      }
+    ],
+    "item_meta": {
+      "category": "ci-integrity",
+      "completed_at": "2026-08-06T01:00:57Z",
+      "completed_pr": 1624,
+      "created_at": "2026-08-05T23:38:43Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Soundness-path PRs must never be auto-armed by the sweep",
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805"
+      },
+      {
+        "behavior": "True stranding (armed then dropped) must still surface",
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/fixtures/green_unmerged_fixture.json"
+      },
+      {
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/green_unmerged_sweep.py"
+      },
+      {
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q -k green_unmerged",
+        "description": "Intentional-hold and true-stranding fixtures are distinguished",
+        "expected": null,
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Criteria: stranded requires prior arm intent from timeline (ready_for_review|auto_squash_enabled|auto_merge_enabled|auto_merge_disabled). Intentional holds never arm and are excluded. Fixtures 2001/2007=hold, 2008/2009/2010=true strand.",
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T00:49:28Z",
+        "started_branch": "fix/green-unmerged-intentional-hold",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Define intentional-hold vs stranded classifier criteria and fixtures",
+        "wid": "w0"
+      },
+      {
+        "evidence": "is_stranded requires had_arm_intent; fetch_pr_timeline_events; remediation text make pr-ready/READY=1/draft→ready only (no synchronize re-arm claim). ClassifiedPR.had_arm_intent field added.",
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T00:53:05Z",
+        "started_branch": "fix/green-unmerged-intentional-hold",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Implement classifier + remediation text rewrite",
+        "wid": "w1"
+      },
+      {
+        "evidence": "--apply still only upserts digest from stranded set; never enables auto-merge. Intentional holds excluded from hits so cannot appear in digest. nightly.yml comment updated to document arm-intent gate.",
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T00:53:12Z",
+        "started_branch": "fix/green-unmerged-intentional-hold",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Coordinate with durable-hold paths (nightly --apply)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Unit tests distinguish hold vs strand; self-test 10 PRs 3 stranded; pr-triage.md documents classifier + remediation. BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest tests/unit/scripts/test_green_unmerged_sweep.py -q -n0 → 38 passed; --self-test PASSED.",
+        "item_id": "green-unmerged-sweep-intentional-hold-false-positives-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T00:53:19Z",
+        "started_branch": "fix/green-unmerged-intentional-hold",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Unit tests + ops doc update",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "description": "Follow-up to qpc-03 / #987. That change hardened the numeric-literal grammar\nfor normalized plan fingerprints and added a ``#`` boundary exclusion so DuckDB\nordinal column references (``#0``/``#1``) stay structural instead of masking to\nan indistinguishable placeholder - but the exclusion was applied to only ONE of\ntwo divergent regexes. ``_normalize_literal_text`` (aggregation/group/sort\nexpressions) excluded ``#``; ``_mask_literals`` (join/filter/projection\nexpressions) did not. Result: two plans referencing GENUINELY DIFFERENT\npositional columns collapsed to the same normalized fingerprint on the\nfilter/join/projection surface - a false \"plan unchanged\" - while the\nagg/group/sort surface reported them correctly.\n\nReproduced on the real signature path before the fix:\n  proj #0,#1 -> Project|proj:#<NUM>,#<NUM>\n  proj #0,#2 -> Project|proj:#<NUM>,#<NUM>   COLLIDE: True\n  group #0,#1 vs #0,#2                        COLLIDE: False (already correct)\n\nSince ``--normalize-plan-literals`` is API-only / unshipped, this was not live,\nbut it would have produced false negatives on real DuckDB plans that use\npositional projection/filter references. Found during sign-off review of the\nfive query-plan-capture remediation PRs.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "keep two separately-compiled numeric patterns",
+        "instead": "(not specified)",
+        "item_id": "qpc-12-fingerprint-ordinal-protection-all-surfaces",
+        "why": "a single source of truth prevents the boundary set from drifting again."
+      }
+    ],
+    "item_meta": {
+      "category": "Bug Fix / Correctness",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-06T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "Default (literal-sensitive) fingerprint unchanged",
+        "item_id": "qpc-12-fingerprint-ordinal-protection-all-surfaces"
+      },
+      {
+        "behavior": "Identifiers with trailing digits (l_orderkey1, t1) and signed/hex/underscore/scientific literals behave as before",
+        "item_id": "qpc-12-fingerprint-ordinal-protection-all-surfaces"
+      },
+      {
+        "behavior": "Literal normalization still collapses genuine value differences (x>5 vs x>99 share a normalized fingerprint)",
+        "item_id": "qpc-12-fingerprint-ordinal-protection-all-surfaces"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "#987 (qpc-03) - added # exclusion to _NUMERIC_LITERAL_RE only",
+        "decision": "reuse",
+        "item_id": "qpc-12-fingerprint-ordinal-protection-all-surfaces",
+        "path": "#987"
+      },
+      {
+        "concept": "benchbox/core/results/query_plan_models.py:_mask_literals / _normalize_literal_text - the two divergent maskers",
+        "decision": "reuse",
+        "item_id": "qpc-12-fingerprint-ordinal-protection-all-surfaces",
+        "path": "benchbox/core/results/query_plan_models.py:_mask_literals"
+      },
+      {
+        "concept": "tests/unit/core/query_plans/test_fingerprint_normalization.py:test_ordinal_column_references_survive_normalization_in_group_by - the sibling test for the already-protected surface",
+        "decision": "reuse",
+        "item_id": "qpc-12-fingerprint-ordinal-protection-all-surfaces",
+        "path": "tests/unit/core/query_plans/test_fingerprint_normalization.py:test_ordinal_column_references_survive_normalization_in_group_by"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-12-fingerprint-ordinal-protection-all-surfaces",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/query_plan_models.py"
+      },
+      {
+        "item_id": "qpc-12-fingerprint-ordinal-protection-all-surfaces",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/query_plans/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/query_plans/ tests/unit/query_plans/ tests/unit/core/results/test_query_plan_models.py -q -n 0",
+        "description": "Fingerprint normalization + plan model suites pass, incl. the new projection/filter ordinal regression",
+        "expected": "all pass",
+        "item_id": "qpc-12-fingerprint-ordinal-protection-all-surfaces",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-12-fingerprint-ordinal-protection-all-surfaces",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-12-fingerprint-ordinal-protection-all-surfaces",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consolidate to one canonical #-protected _NUMERIC_LITERAL_RE shared by both maskers; delete the divergent un-protected pattern",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-12-fingerprint-ordinal-protection-all-surfaces",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a regression test asserting projection/filter ordinals #0,#1 vs #0,#2 do not collapse, while literal thresholds still normalize",
+        "wid": "w2"
+      }
+    ]
+  }
+}

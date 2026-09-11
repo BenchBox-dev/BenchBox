@@ -1,0 +1,70 @@
+{
+  "context": "Options, cheapest first: (a) add a .gitattributes merge driver for the generated block so git resolves it by rerunning the generator instead of raising a textual conflict; (b) move the generated table into its own included file so conflicts are confined to a file nobody hand-edits; (c) drop the committed numbers and have CI compute them on demand, keeping only the prose. Do NOT resolve occurrences by hand-picking a side -- that is how wrong numbers land.",
+  "description": "_project/specs/uat-framework.md carries a generated per-module Actual column and a UAT-LOC-SUMMARY block produced by _project/scripts/uat_loc_table.py and CI-checked with --check. Any PR that changes a UAT module's line count must regenerate that block, so two concurrent UAT PRs always collide there even when their code changes are disjoint. Observed 2026-08-05: make pr-open warned that #1628 textually conflicts with both #1626 (fix/lakesail-velox-compose-env-fallback) and #1618 (fix/uat-compose-project-name-budget) in exactly this file, and recovering #1628 hit the same conflict twice -- once cherry-picking onto develop and again rebasing after #1616 merged. Each occurrence is individually cheap (checkout --theirs, rerun the generator) but it is unavoidable, scales with concurrent UAT work, and the naive resolution -- hand-picking a side -- silently commits wrong numbers that only --check catches later.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "created_at": "2026-08-06T01:22:38Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "CI still fails when the committed table drifts from the tree (uat_loc_table.py --check stays authoritative).",
+        "item_id": "uat-loc-table-guarantees-pairwise-pr-conflicts-20260805"
+      },
+      {
+        "behavior": "The spec keeps a human-readable per-module LOC breakdown in some form.",
+        "item_id": "uat-loc-table-guarantees-pairwise-pr-conflicts-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-loc-table-guarantees-pairwise-pr-conflicts-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "uat-loc-table-guarantees-pairwise-pr-conflicts-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/"
+      },
+      {
+        "item_id": "uat-loc-table-guarantees-pairwise-pr-conflicts-20260805",
+        "kind": "only_modify",
+        "path_glob": ".gitattributes"
+      },
+      {
+        "item_id": "uat-loc-table-guarantees-pairwise-pr-conflicts-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/uat_loc_table.py"
+      },
+      {
+        "item_id": "uat-loc-table-guarantees-pairwise-pr-conflicts-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/uat_loc_table.py --check",
+        "description": "The generated table still matches the tree",
+        "expected": "exit 0 on a clean tree; this guard must keep holding after any restructuring",
+        "item_id": "uat-loc-table-guarantees-pairwise-pr-conflicts-20260805",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git check-attr -a -- _project/specs/uat-framework.md | grep -q merge",
+        "description": "Git knows how to merge the generated region without a hand resolution",
+        "expected": "a merge attribute is declared for the spec (only applies if option (a) is chosen; amend this rung if (b) or (c) is taken instead)",
+        "item_id": "uat-loc-table-guarantees-pairwise-pr-conflicts-20260805",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

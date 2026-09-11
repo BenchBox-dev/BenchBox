@@ -1,0 +1,210 @@
+{
+  "context": "Emit every role a spec actually needs, sourced from the read model the build already produces rather than recomputed in JavaScript, then replace every literal and add a gate so the class cannot come back. Role identity matters - the funded/community fixture is not interchangeable with the canonical one, so the contract must name roles, not just platforms.",
+  "description": "PR #1545 derived three of the fixture identifiers the browser specs use and left the rest as literals, so the Chromium suite is still red with 8 failures. Every hardcoded id in the suite is stale against the current build: the datafusion, tuned-duckdb, community-funded-duckdb and aws long ids, plus three short ids. compare.spec.ts is the clearest case - LONG_DUCKDB was replaced with fixtureIds.detailId while LONG_DATAFUSION on the next line stayed a literal, with fixtureIds.datafusionId already present and unused in the emitted JSON. The emitted contract exposes 2 roles while the specs reference about 6, and its allResultIds and shortIdLength fields have no reader. writeFixtureIds also reimplements the pipeline's _build_short_ids in JavaScript and assumes its input set matches the pipeline's all_result_ids, which replaces one drift class with another rather than removing it. Nothing prevents the next spec from hardcoding an id again.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci-defect",
+      "completed_at": "2026-08-05T00:15:18Z",
+      "completed_pr": 1545,
+      "created_at": "2026-08-04T23:42:32Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A green rung is not evidence the suite passes - w5 requires an observed CI run, not a local assumption",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role"
+      },
+      {
+        "behavior": "Fixture ids stay derived from the build that produced them; no spec regains a literal",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role"
+      },
+      {
+        "behavior": "Specs keep asserting role-specific corpus facts - the funded/community fixture is not interchangeable with the canonical one",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role"
+      },
+      {
+        "behavior": "The generator keeps never touching results-data/ or results-explorer/public/data/",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/**"
+      },
+      {
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/browser-ci.md"
+      },
+      {
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package.json"
+      },
+      {
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/**"
+      },
+      {
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -rqE '\"tpch-[a-z0-9-]+-sf[0-9.]+-[0-9]{8}-[0-9a-f]{8}\"' results-explorer/e2e",
+        "description": "no spec hardcodes a long content-addressed result id",
+        "expected": "Fails on the unfixed tree today (measured exit 1) - 7 stale literals remain across 9 spec files",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -rqE 'const [A-Z_]+ = \"[0-9a-f]{8}\"' results-explorer/e2e",
+        "description": "no spec hardcodes a short id",
+        "expected": "Fails on the unfixed tree today (measured exit 1) - 0820b170, 0f0add9f and 009ee9fd remain",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_e2e_specs_have_no_hardcoded_ids.py -q",
+        "description": "the anti-regression gate exists and passes",
+        "expected": "Fails on the unfixed tree today (measured non-zero - the gate does not exist)",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium",
+        "description": "the Chromium browser suite is green",
+        "expected": "Fails on the unfixed tree today - 8 spec failures observed on PR #1545 CI run 30933934042",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "fixture-ids.json now carries one entry per role, keyed by run.id, which is authored in the source bundles and the generator's own VARIANTS rather than content-addressed. 11 roles emitted (duckdb, duckdbTuned, duckdbCommunity, duckdbSf01, datafusion, datafusionPartial, awsCloud, containerLocal, gcpServerless, polars, starSchema), each with long and short ids. The generator now throws when a generated bundle has no role, when two claim one role, or when a declared role is missing from the build, so adding or renaming a fixture breaks the generator loudly instead of drifting the specs silently. Filename prefix could not do this: three fixtures share tpch-duckdb-sf0.01- and funding-disclosure.spec.ts depends on the community one specifically.",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "notes": null,
+        "started_at": "2026-08-05T00:02:51Z",
+        "started_branch": "fix/e2e-derive-fixture-ids",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Enumerate every fixture role the specs reference and emit each one from the generator",
+        "wid": "w0"
+      },
+      {
+        "evidence": "writeFixtureIds reads the pipeline's own short_ids table out of the built results.duckdb via a one-line uv subprocess, and the JS sha256 reimplementation plus its createHash import are deleted. The previous revision recomputed _build_short_ids from a comment describing it, with nothing enforcing agreement and an unstated assumption that bundle filenames matched the pipeline's all_result_ids; that traded one drift class for another. Emitted short ids now match the read model by construction. The generator raises if the read model has no short_id for an emitted result.",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "notes": null,
+        "started_at": "2026-08-05T00:13:24Z",
+        "started_branch": "fix/e2e-derive-fixture-ids",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Source short ids from the built read model instead of recomputing the algorithm in JavaScript",
+        "wid": "w1"
+      },
+      {
+        "evidence": "All 14 remaining hardcoded ids replaced across 10 spec files: a6bb8a70 (datafusion, 3 sites), a5eff54e (tuned, 2), b92a4ffb (community/funded), e73da6ce (aws, 2), 0820b170 (sf0.1 short, 3), 0f0add9f (star-schema short, 2), 009ee9fd (tuned short, 2). Four of those were missed by the ladder's own greps - two DUCKDB_SF01_ID assignments, a TPCH_SF01_SHORT, and an object property shortId: '009ee9fd' - because 'const NAME =' does not match an object literal; found by a shape grep over all string literals, which is what w3 turns into a gate. result-detail-failures.spec.ts also needed the fixtureIds import added; tsc did not catch it because tsconfig does not cover e2e/, only the Playwright run did.",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "notes": null,
+        "started_at": "2026-08-05T00:13:30Z",
+        "started_branch": "fix/e2e-derive-fixture-ids",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Replace every remaining hardcoded long and short id in the specs",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added tests/unit/scripts/test_e2e_specs_have_no_hardcoded_ids.py: shape-based detectors over every e2e TypeScript source, excluding *-output/ capture artifacts and comments. Proven non-vacuous both ways - clean tree 15 passed; planting a long and a short literal in compare.spec.ts fails both detectors, restored after. The short-id detector is deliberately not quote-anchored because the literal that survived the first fix was interpolated into a template string. It rejects CSS colours, longer words, and dated audit filenames (a real false positive from pr246-final-evidence.spec.ts) by requiring at least one digit and one a-f letter; the accepted blind spot is an all-digit short id, about 2.3 percent of sha256 prefixes, documented in the module.",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "notes": null,
+        "started_at": "2026-08-05T00:13:57Z",
+        "started_branch": "fix/e2e-derive-fixture-ids",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Add a gate that fails when any spec hardcodes a content-addressed identifier",
+        "wid": "w3"
+      },
+      {
+        "evidence": "allResultIds and shortIdLength are gone. Both were emitted by the previous revision and read by nothing (grep over results-explorer/e2e returns no use outside support/fixtures.ts). The payload is now exactly two maps, ids and shortIds, keyed by role. shortIdLength in particular only existed as a byproduct of the JS algorithm reimplementation removed in w1.",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "notes": null,
+        "started_at": "2026-08-05T00:13:35Z",
+        "started_branch": "fix/e2e-derive-fixture-ids",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Drop allResultIds and shortIdLength or give them a reader",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Ran the suite rather than assuming it: npx playwright test --project=chromium --workers=2 gives 119 passed, 10 skipped, 0 failed in 2.5m, against the previous run's 8 failures on PR #1545 CI run 30933934042. This is a local observed run on installed node_modules and a real build, not an inference - the earlier PR body admitted Playwright could not be run and shipped a claim CI then disproved. It also caught a defect the ladder and tsc both missed: result-detail-failures.spec.ts used fixtureIds without importing it, and tsconfig does not cover e2e/. Also green: npm run typecheck exit 0, vitest 862 passed across 70 files, fixture determinism verifier OK. CI on the pushed branch remains the authority for the runner environment.",
+        "item_id": "explorer-fixture-ids-cover-every-spec-role",
+        "notes": null,
+        "started_at": "2026-08-05T00:14:03Z",
+        "started_branch": "fix/e2e-derive-fixture-ids",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Confirm the Chromium suite is green in CI rather than assumed green",
+        "wid": "w5"
+      }
+    ]
+  }
+}

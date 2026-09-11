@@ -1,0 +1,215 @@
+{
+  "context": "Validate only allowed result bundle, metadata, and manifest paths. Reject executable, symlink, workflow, package, and unexpected files. A tiny CODEOWNED pull_request_target dispatcher may inspect immutable event metadata only, never check out or import PR content. After merge, the protected controller consumes the GitHub merge SHA and independently recomputes all hashes.",
+  "description": "Replace deny-list corpus PR validation with a hard data-path allowlist and trusted validator execution. Contributor PR contents are read-only data. Validation and publication code must come from a separate immutable trusted checkout or attested bundle, never from the PR tree.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Expand the deny-list of executable paths",
+        "instead": "allow only explicitly supported data paths and types",
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "why": "deny-lists miss new execution surfaces"
+      },
+      {
+        "dont": "Use pull_request_target to check out the contributor head",
+        "instead": "inspect event metadata and dispatch a trusted controller with the merge SHA",
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "why": "that grants untrusted content a privileged execution context"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "needs_item": "independent-publication-a1-authority-and-threat-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Publication Architecture",
+      "completed_at": "2026-09-01T18:39:00Z",
+      "completed_pr": 1997,
+      "created_at": "2026-08-31T20:37:06Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No untrusted PR code, action, import, hook, or executable is run with elevated credentials.",
+        "item_id": "independent-publication-a2-corpus-trust-isolation"
+      },
+      {
+        "behavior": "Valid data-only community submissions continue to receive deterministic feedback.",
+        "item_id": "independent-publication-a2-corpus-trust-isolation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Harden the existing validation entry point with an allowlist",
+        "decision": "extend",
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "path": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "concept": "Reuse submission semantics while changing the trust boundary",
+        "decision": "extend",
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "path": "scripts/validate_submission.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/*corpus*"
+      },
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      },
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run pytest tests/unit/scripts/test_validate_submission.py tests/unit/workflows/test_corpus_trust_boundary.py -q",
+        "description": "Adversarial PR trees cannot execute code and unexpected paths are rejected",
+        "expected": "all tests pass",
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "last_result": "pass",
+        "last_run": "2026-09-01T18:38:58Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/validator_parity.py --check",
+        "description": "Trusted validator produces identical acceptance results in PR and post-merge modes",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "last_result": "pass",
+        "last_run": "2026-09-01T18:38:59Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "feat(publication): A2 w1 allowlist in 5d49cf341 via PR #1997",
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "notes": null,
+        "started_at": "2026-09-01T18:36:33Z",
+        "started_branch": "feat/publication-a2-corpus-trust",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a2-corpus-trust",
+        "status": "done",
+        "summary": "Define a positive corpus path and file-type allowlist",
+        "wid": "w1"
+      },
+      {
+        "evidence": "feat(publication): A2 w2 in ec80106cc/3bc0acbf0 via PR #1997 (trusted checkout, parity, allowlist)",
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "notes": null,
+        "started_at": "2026-09-01T18:36:41Z",
+        "started_branch": "feat/publication-a2-corpus-trust",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a2-corpus-trust",
+        "status": "done",
+        "summary": "Build a trusted validator bundle and immutable invocation path",
+        "wid": "w2"
+      },
+      {
+        "evidence": "feat(publication): A2 w3 in ec80106cc/3bc0acbf0 via PR #1997 (trusted checkout, parity, allowlist)",
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "notes": null,
+        "started_at": "2026-09-01T18:36:46Z",
+        "started_branch": "feat/publication-a2-corpus-trust",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a2-corpus-trust",
+        "status": "done",
+        "summary": "Make PR validation read contributor contents without executing or importing them",
+        "wid": "w3"
+      },
+      {
+        "evidence": "feat(publication): A2 w4 in ec80106cc/3bc0acbf0 via PR #1997 (trusted checkout, parity, allowlist)",
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "notes": null,
+        "started_at": "2026-09-01T18:36:51Z",
+        "started_branch": "feat/publication-a2-corpus-trust",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a2-corpus-trust",
+        "status": "done",
+        "summary": "Add merge-SHA revalidation and independent digest computation",
+        "wid": "w4"
+      },
+      {
+        "evidence": "feat(publication): A2 w5 adversarial fixtures in 54068b847 via PR #1997",
+        "item_id": "independent-publication-a2-corpus-trust-isolation",
+        "notes": null,
+        "started_at": "2026-09-01T18:36:56Z",
+        "started_branch": "feat/publication-a2-corpus-trust",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a2-corpus-trust",
+        "status": "done",
+        "summary": "Add adversarial fixtures for workflows, symlinks, imports, package files, and path escapes",
+        "wid": "w5"
+      }
+    ]
+  }
+}

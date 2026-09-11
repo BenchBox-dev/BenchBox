@@ -1,0 +1,10 @@
+{
+  "description": "Implement a PySpark DataFrame adapter for BenchBox, enabling TPC-H benchmark execution\nusing PySpark's DataFrame API. PySpark belongs to the Expression family (like Polars),\nusing lazy evaluation and expression-based column operations.\n\nCurrent State:\n- BenchBox has existing Spark SQL adapter (benchbox/platforms/spark.py) for SQL mode\n- Expression family base class exists (ExpressionFamilyAdapter)\n- Polars adapter serves as reference implementation for Expression family\n- TPC-H queries have dual implementations (pandas_impl, expression_impl)\n\nValue Proposition:\n- Enables DataFrame vs SQL comparison for Spark platform\n- Supports distributed execution (local + cluster modes)\n- Bridges to existing Spark infrastructure users may have\n- Completes the Expression family platform coverage",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Enhancement",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

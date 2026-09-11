@@ -1,0 +1,252 @@
+{
+  "context": "Start by making chart intent explicit in registry metadata, then update\nChartPanel navigation. Treat log scale and speedup as distinct encodings:\nlog scale for magnitude across orders of magnitude, speedup when the user is\nasking relative winner/loser questions. Test chart math separately from Preact\nrendering so scale regressions are easy to catch.\n",
+  "description": "Fix visualization choices that currently reduce trust or legibility in the\nResults Explorer. Database benchmark latency often spans orders of magnitude,\nso linear bar charts can compress meaningful differences and cause labels to\noverlap. Chart navigation also exposes too many tiny chart chips without an\nanalytical hierarchy. The goal is to make charts answer clear questions:\noverview, per-query behavior, distribution, cost, trend, and rank.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "mix cohorts in trend charts",
+        "instead": "split by cohort.",
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "why": "benchmark/scale geomeans are not one metric"
+      },
+      {
+        "dont": "present every chart as an equal chip",
+        "instead": "group charts by question.",
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "why": "users need analytical hierarchy"
+      },
+      {
+        "dont": "rely on color alone in heatmaps",
+        "instead": "keep visible values and accessible names.",
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "why": "color perception and print/screenshot contexts vary"
+      },
+      {
+        "dont": "use linear latency bars when one slow outlier collapses the rest of the field",
+        "instead": "use log scale or speedup encoding with clear labels.",
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "why": "users cannot compare fast platforms"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "needs_item": "explorer-critical-results-ux-defects"
+      }
+    ],
+    "item_meta": {
+      "category": "Data Visualization",
+      "completed_at": "2026-05-02T00:00:00Z",
+      "created_at": "2026-05-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Benchmark ranking order continues to come from pipeline-emitted primary_metric/primary_order, not frontend guesses.",
+        "item_id": "explorer-chart-correctness-and-navigation"
+      },
+      {
+        "behavior": "Chart registry remains the single source for chart availability and chart metadata.",
+        "item_id": "explorer-chart-correctness-and-navigation"
+      },
+      {
+        "behavior": "Charts remain readable when only one platform/result is present.",
+        "item_id": "explorer-chart-correctness-and-navigation"
+      },
+      {
+        "behavior": "Heatmaps remain keyboard navigable and retain existing role/grid accessibility behavior.",
+        "item_id": "explorer-chart-correctness-and-navigation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartMath.ts"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartRegistry.ts"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/queryLabels.ts"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Frontend typecheck and chart tests pass.",
+        "expected": "All chart registry, chart math, heatmap, and ChartPanel tests pass.",
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Production build succeeds.",
+        "expected": "Vite build completes without chart-related warnings or errors.",
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "notes": "In `results-explorer/src/lib/chartRegistry.ts` and ChartPanel, replace the\nflat 10+ chip list with grouped tabs or segmented controls:\n  - Overview\n  - Per-query\n  - Distribution\n  - Cost\n  - Trend\n  - Rank\nEach group should show at most the relevant chart controls for the current\npage/data shape.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit chart registry and group charts by analytical question",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "notes": "Update PowerBar/ChartPanel latency views so linear bars do not compress\nfaster engines against a slow outlier. Use log scale for latency magnitude\nor speedup-vs-best where comparison is the point. Axis labels must disclose\nlog scale when used.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Use log-scale or ratio-based encoding for latency bars where values span orders of magnitude",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "notes": "The audited SSB Performance Bar showed labels crowding near the origin.\nImplement collision-aware label placement: outside labels when space is\ninsufficient, minimum label gutter, and tooltip fallback for narrow bars.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix label overlap in SSB/star_schema performance bar charts",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "notes": "Carry forward the critical defect fix: trend charts must not mix\nbenchmark/scale/phase cohorts. Render cohort-specific small multiples or\nrequire a selected cohort before showing the time series.\n\nAlready satisfied by `explorer-critical-results-ux-defects` w3/w6 on the\ncurrent base: `buildTrendCohorts` groups by benchmark, scale factor,\nphase, and primary metric, and `PlatformIndex.test.tsx` asserts TPC-H and\nSSB trend points do not cross cohort sections.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Split platform trend charts by cohort or metric",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "notes": "Query IDs should sort Q1, Q2, ..., Q10 rather than lexicographic 1, 10,\n11, ..., 2. Labels should preserve benchmark-specific prefixes where\npresent (`Q1`, `q01`, `query_001`) rather than bare ambiguous numerals.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add natural query sorting and explicit query labels in heatmaps and tables",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "notes": "MetaLeaderboard and QueryHeatmap should have text/value labels sufficient\nfor interpretation without relying only on color. Add or preserve\ncolor-blind-safe sequential palettes and reduced-color rendering where\nsupported by CSS/media queries.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add high-contrast and reduced-color paths for heatmaps",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-chart-correctness-and-navigation",
+        "notes": "Extend chartMath and component tests for log-scale mapping, label\ncollision behavior, cohort-split trend data, natural query sort, and\nheatmap accessible names/values.\n\nExisting W2-W6 commits cover log-scale chart math, ChartPanel log-scale\nrendering, collision-aware value label placement, cohort-split trend\nrendering, natural query sort, and MetaLeaderboard heatmap values. W7\ncloses the remaining exact accessible-name assertion for QueryHeatmap.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add chart math and rendering tests for scale, sorting, and labels",
+        "wid": "w7"
+      }
+    ]
+  }
+}

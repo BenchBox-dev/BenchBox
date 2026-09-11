@@ -1,0 +1,413 @@
+{
+  "context": "Work in phases, each independently testable and committable:\n\nPhase 1 (w1-w2): Extract shared infrastructure for the primitives fork. These are the\nhighest-value targets with byte-for-byte identical code. Create new shared modules,\nupdate imports, verify with existing tests.\n\nPhase 2 (w3-w5): Consolidate benchmark base class methods and query infrastructure.\nThese are lower-risk refactors touching well-tested code paths.\n\nPhase 3 (w6-w8): Minor utility extraction, ignore-list configuration, and threshold\nadjustment. This is the cleanup phase.\n\nFor each consolidation:\n1. Read both/all copies side-by-side to confirm true equivalence\n2. Create the shared module with the canonical implementation\n3. Update all call sites to use the shared version\n4. Run targeted tests for affected modules\n5. Run make duplicate-check-verbose to confirm line count drop\n6. Commit\n",
+  "description": "The `make duplicate-check-verbose` tool reports 440 duplicate function groups totalling\n~17,595 duplicated lines (threshold: 20,000). After careful analysis of the top 30 groups,\n13 groups are genuine parallel implementations that should be consolidated, while 17 are\nintended boilerplate (interface implementations, structural patterns, or facade delegations)\nthat should be marked for ignore.\n\nThis work reduces the duplicated-line count by an estimated 2,500-3,000 lines through\ntargeted consolidation of the highest-value groups, while configuring the duplicate checker\nto suppress known-intentional patterns so future regressions are caught at a lower threshold.\n\nKey consolidation targets (by estimated line savings):\n- transaction_primitives/write_primitives generator fork (~530 lines)\n- catalog loaders (transaction/write/metadata/read primitives) (~310 lines)\n- benchmark base class (generate_data, load_data_to_database) (~210 lines)\n- query manager base class (get_query, _load_queries pattern) (~140 lines)\n- DataFrame query registry list_*_queries functions (~120 lines)\n- platform adapter apply_constraint_configuration / apply_unified_tuning (~360 lines via ignore)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change public API signatures during consolidation",
+        "instead": "only change internal implementations",
+        "item_id": "consolidate-duplicate-code",
+        "why": "downstream code and tests depend on them"
+      },
+      {
+        "dont": "consolidate code that only looks structurally similar",
+        "instead": "always read the actual implementations to confirm true duplication",
+        "item_id": "consolidate-duplicate-code",
+        "why": "AST hashing ignores identifiers"
+      },
+      {
+        "dont": "consolidate platform adapter interface methods (from_config, apply_constraint_configuration)",
+        "instead": "(not specified)",
+        "item_id": "consolidate-duplicate-code",
+        "why": "these are intended per-platform implementations even when structurally identical"
+      },
+      {
+        "dont": "create deep inheritance hierarchies",
+        "instead": "use mixins or standalone utility functions instead",
+        "item_id": "consolidate-duplicate-code",
+        "why": "the adapter hierarchy is already 3 levels deep"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "consolidate-duplicate-code",
+        "id": 65,
+        "reason": "The two benchmarks share generators and catalogs but have distinct query sets and validation logic. Full unification requires deeper analysis of behavioral differences.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: transaction_primitives + write_primitives already share generators/catalogs (consolidate-duplicate-code done); full module unification of two benchmarks with intentionally distinct query sets/validation is speculative, unscoped, and the note itself hedges it needs 'deeper analysis'.",
+        "summary": "Full transaction_primitives/write_primitives module unification"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "consolidate-duplicate-code",
+        "id": 66,
+        "reason": "These are similar (~79 lines each) but have platform-specific error handling and cursor semantics. Consolidation requires careful testing against live platforms.",
+        "resolution": "promoted",
+        "resolved_item": "consolidate-firebolt-presto-trino-execute-query-implementati",
+        "resolved_reason": null,
+        "summary": "Consolidate Firebolt/Presto/Trino execute_query implementations"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "consolidate-duplicate-code",
+        "id": 67,
+        "reason": "Protocol methods in protocols.py have structural duplication but serve as the interface contract. Changing them risks breaking the protocol hierarchy.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: protocols.py DataFrame protocol methods are the interface contract; structural similarity across Protocol declarations is by-design. consolidate-duplicate-code (DONE) correctly excluded them. Consolidation is inappropriate, not deferred work.",
+        "summary": "Unify DataFrame protocol abstract method definitions"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-02-20T00:00:00Z",
+      "created_at": "2026-02-20T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "All benchmark tests pass (uv run -- python -m pytest tests/unit/ -v --timeout=120)",
+        "item_id": "consolidate-duplicate-code"
+      },
+      {
+        "behavior": "All existing platform adapter tests pass (uv run -- python -m pytest tests/unit/platforms/ -v)",
+        "item_id": "consolidate-duplicate-code"
+      },
+      {
+        "behavior": "Catalog loader tests pass (uv run -- python -m pytest tests/ -k 'catalog or loader' -v)",
+        "item_id": "consolidate-duplicate-code"
+      },
+      {
+        "behavior": "DataFrame query registry tests pass (uv run -- python -m pytest tests/ -k 'registry or dataframe_quer' -v)",
+        "item_id": "consolidate-duplicate-code"
+      },
+      {
+        "behavior": "DuckDB TPC-H smoke test passes (benchbox run --platform duckdb --benchmark tpch --scale 0.01)",
+        "item_id": "consolidate-duplicate-code"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/context.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/protocols.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/*/dataframe_queries/registry.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/amplab/benchmark.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/amplab/queries.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_mixins.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/clickbench/benchmark.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/query_registry.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/h2odb/benchmark.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/metadata_primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/primitives/"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_manager.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/benchmark.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/ssb/benchmark.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/ssb/queries.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/queries.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/query_analytics.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/query_etl.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/query_validation.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transaction_primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transaction_primitives/generator.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/utils/tuning.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/generator.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "scripts/check_duplicate_code.py"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/ -v --timeout=120",
+        "description": "All unit tests pass after each work unit",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "consolidate-duplicate-code",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make duplicate-check-verbose 2>&1 | tail -1",
+        "description": "Duplicate line count reduced below 15500",
+        "expected": "PASS: duplicated lines within threshold (value below 15500)",
+        "item_id": "consolidate-duplicate-code",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Smoke test passes",
+        "expected": "all fast-marked tests pass",
+        "item_id": "consolidate-duplicate-code",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "consolidate-duplicate-code",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "consolidate-duplicate-code",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "consolidate-duplicate-code",
+        "notes": "Create benchbox/core/primitives/generator_base.py with shared methods from\ntransaction_primitives/generator.py and write_primitives/generator.py.\nBoth generators inherit from this base. Methods to extract:\n- _generate_special_test_files (~159 lines, byte-for-byte identical)\n- generate_bulk_load_files (~107 lines, byte-for-byte identical)\nEstimated savings: ~530 duplicated lines.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create shared primitives generator base class consolidating _generate_special_test_files and generate_bulk_load_files from transaction_primitives and write_primitives generators",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-duplicate-code",
+        "notes": "Create benchbox/core/primitives/catalog/loader.py with generic\nload_operations_catalog() and load_query_catalog() functions.\nThe 4 existing loaders become thin wrappers passing their error class and package.\nUnify identical dataclass definitions (ValidationQuery, WriteOperation,\nMetadataQuery, PrimitiveQuery) where field structures match.\nEstimated savings: ~310 duplicated lines.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create shared catalog loader for transaction/write/metadata/read primitives catalog YAML parsing",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-duplicate-code",
+        "notes": "Create a DataGenerationMixin in benchbox/core/benchmark_mixins.py (standalone,\nnot modifying the existing base class hierarchy):\n- generate_data(): 5 copies differ only in TABLES reference.\n  Mixin provides the method; each benchmark defines _get_table_schema() -> dict.\n- load_data_to_database(): 3 copies (clickbench, read_primitives, ssb).\n  Parameterize the schema dict and provide as mixin method.\nEach benchmark class adds the mixin to its bases and implements _get_table_schema().\nEstimated savings: ~210 duplicated lines.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract common benchmark mixin with generate_data() and load_data_to_database()",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-duplicate-code",
+        "notes": "Create benchbox/core/query_manager.py (or add to existing base) with:\n- get_query(query_id, params) template method\n- Abstract _generate_default_params(query_id)\nSubclass in SSB, AMPLab, TPC-DI sub-managers (4 copies eliminated).\nEstimated savings: ~140 duplicated lines.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create ParameterizedQueryManager base class with shared get_query() method",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-duplicate-code",
+        "notes": "The filtering logic in list_*_queries (family/category filter over get_all_queries)\nis duplicated 9 times across dataframe_queries/registry.py files.\nMove this logic to QueryRegistry.list_queries(family, category) method.\nEach registry file's list_*_queries becomes a one-liner delegation.\nEstimated savings: ~120 duplicated lines.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add list_queries() method to QueryRegistry class, simplify 9 registry wrapper functions",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-duplicate-code",
+        "notes": "Create a small utility in benchbox/core/utils/tuning.py:\n  def extract_constraint_flags(tuning_config) -> tuple[bool, bool]\nUsed by 5 benchmark get_create_tables_sql implementations.\nMinor savings (~50 lines) but reduces a common pattern to one line.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract tuning config unpacking utility for get_create_tables_sql methods",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-duplicate-code",
+        "notes": "After consolidation work is complete, update pyproject.toml\n[tool.benchbox.duplicates] section or the check_duplicate_code.py script\nto suppress known-intentional patterns:\n- Platform adapter interface methods (from_config, apply_constraint_configuration,\n  apply_unified_tuning, supports_tuning_type)\n- DataFrame adapter cast_date/cast_string implementations\n- Facade/delegation one-liners\n- Structural patterns (_load_queries, _generate_default_params)\nLower the threshold from 20,000 to catch future regressions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure duplicate checker ignore patterns for intended boilerplate groups",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-duplicate-code",
+        "notes": "Run: uv run -- python -m pytest -x -v\nRun: make duplicate-check-verbose\nVerify duplicated lines dropped by ~2,500-3,000 from baseline 17,595.\nUpdate threshold in pyproject.toml to new level + 10% buffer.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full test suite, update duplicate threshold, verify line count reduction",
+        "wid": "w8"
+      }
+    ]
+  }
+}

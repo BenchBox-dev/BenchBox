@@ -1,0 +1,83 @@
+{
+  "context": "First establish scope: reproduce on Linux by driving the disk-floor abort with a prior startup failure. If it reproduces, this is a plain cross-platform defect in the abort path and the Windows nightly was just the messenger. Thread startup_failed_count through the abort path into both the sidecar and the partial report; do not adjust the tests, which assert the correct contract. If it does NOT reproduce on Linux, find what makes the Windows ordering differ before changing anything.",
+  "description": "Two Windows nightly failures are a genuine lifecycle-accounting bug, NOT the path-separator family they currently sit inside: tests/uat/test_orchestrator.py::test_disk_floor_abort_carries_startup_failed_count and ::test_disk_floor_abort_threads_startup_failed_count_into_sidecar_and_partial_report both fail 'assert 0 == 1' - the disk-floor abort path reports startup_failed_count as 0 when one platform already failed to start, so the count is dropped on the way into the sidecar and the partial report. Confirmed present in Nightly run 30542333194 job 'test (windows-latest, 3.10)' and still failing at run 30555936402 after the path and encoding families were fixed. Filed separately from windows-uat-posix-path-assumptions for two reasons: (1) that item frames the work as 'make UAT path probes separator-neutral', which is the wrong remedy here and invites weakening a correct assertion; (2) its must-preserve rule literally says 'lifecycle accounting semantics stay unchanged', which would block the fix this defect needs. Not yet established whether the defect is Windows-only or merely surfaced there - determining that is part of the work.",
+  "legacy": {
+    "item_meta": {
+      "category": "uat-hardening",
+      "created_at": "2026-07-30T18:46:14Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The two orchestrator assertions stay exactly as written - they encode the correct contract and must not be loosened",
+        "item_id": "uat-orchestrator-startup-failed-count-not-threaded"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-orchestrator-startup-failed-count-not-threaded",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/uat/test_orchestrator.py -q",
+        "description": "disk-floor abort preserves the startup-failed count",
+        "expected": "exit 0",
+        "item_id": "uat-orchestrator-startup-failed-count-not-threaded",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-orchestrator-startup-failed-count-not-threaded",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-orchestrator-startup-failed-count-not-threaded",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-orchestrator-startup-failed-count-not-threaded",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reproduce the dropped startup_failed_count on Linux and decide whether the defect is cross-platform or Windows-only",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-orchestrator-startup-failed-count-not-threaded",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Thread startup_failed_count through the disk-floor abort into the sidecar and partial report",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-orchestrator-startup-failed-count-not-threaded",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm both orchestrator tests pass unmodified on Linux and in the Windows nightly",
+        "wid": "w2"
+      }
+    ]
+  }
+}

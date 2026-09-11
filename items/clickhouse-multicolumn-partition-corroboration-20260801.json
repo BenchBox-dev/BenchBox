@@ -1,0 +1,157 @@
+{
+  "context": "Normalize one level of outer plain parentheses in normalize_columns (mirror the existing tuple( handling: strip a single balanced outer '(...)' wrapper before splitting), with an explicit collision review in the PR description: confirm the change cannot make two DIFFERENT key expressions compare equal (the comma-split tokenization is applied identically to both sides, and the probe f(a),b vs f(a,b) still tokenizes differently). Add live chDB coverage for the multi-column shape end-to-end (ledger record -> introspect -> corroborate -> corroborated=True). Document the expression-canonicalization limitation in the receipts design note and pin toYYYYMM verbatim survival with a live assertion.",
+  "description": "From the 2026-07-31 adversarial review, proven against live chDB.\n\nDefect (R2, fail-closed but silent and generator-reachable): for CREATE TABLE ... PARTITION BY (a, b), system.tables.partition_key comes back as the string '(a, b)' - WITH parentheses. normalize_columns (benchbox/core/tuning/introspection.py:284-305) strips '[...]' and 'tuple(...)' wrappers but not plain parens, so the expected ('a','b') mismatches the observed ('(a','b)') forever: a multi-column-partition tuned run can NEVER reach applied_verified, with no error anywhere. The shipped generator emits exactly this shape for two partitioning columns (benchbox/core/tuning/generators/clickhouse.py:211 joins 'a, b'; clickhouse/workload.py:154 renders 'PARTITION BY (a, b)'). The existing live tests (tests/integration/test_clickhouse_applied_ledger_live.py) only cover single-expression partitions, which is why this survived - it is exactly the invisible fail-closed class that file's docstring warns about.\n\nRelated, same family (document, do not over-fix): ClickHouse canonicalizes expression sugar in the catalog - ORDER BY (toStartOfInterval(t, INTERVAL 1 DAY)) is stored as toStartOfInterval(t, toIntervalDay(1)) -> permanent mismatch for any sugar form. toYYYYMM survives verbatim (verified live), so the shipped generator is safe today; the limitation must be documented and pinned by a live test so a future generator change cannot silently regress into never-verifying.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not attempt to canonicalize ClickHouse expression sugar (INTERVAL 1 DAY -> toIntervalDay(1)) in BenchBox",
+        "instead": "document the limitation as known fail-closed behavior and pin it with a live test",
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "why": "reimplementing ClickHouse's expression canonicalizer is unbounded and version-dependent"
+      },
+      {
+        "dont": "Do not fix by making the ClickHouse introspector rewrite catalog strings platform-specifically",
+        "instead": "fix normalize_columns once, cover with unit vectors from all three shipped introspectors",
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "why": "the same normalize_columns is the shared comparison contract for every platform; a platform-side rewrite hides the shared-contract gap"
+      },
+      {
+        "dont": "Do not strip ALL parentheses from catalog or intent text",
+        "instead": "strip exactly one balanced OUTER wrapper, then keep the existing tokenizer",
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "why": "that would collapse different expressions (f(a),b vs f(a,b)) into equal tuples and could mint a false corroboration - the one direction this system must never fail"
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness",
+      "completed_at": "2026-08-01T14:55:24Z",
+      "completed_pr": 1401,
+      "created_at": "2026-08-01T12:29:04Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Fail-closed direction on any ambiguity: when in doubt, mismatch/unverifiable, never corroborated.",
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801"
+      },
+      {
+        "behavior": "Matching stays order-sensitive exact tuple comparison - no substring or set-equality loosening.",
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801"
+      },
+      {
+        "behavior": "No screen-scraping of SHOW CREATE TABLE; system.tables structured columns remain the only ClickHouse catalog source.",
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801"
+      },
+      {
+        "behavior": "Single-expression partition keys (toYYYYMM(col)) keep corroborating verbatim (pinned by existing live tests).",
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/clickhouse/introspection.py"
+      },
+      {
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/introspection.py"
+      },
+      {
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/development/tuning-introspection-receipts.md"
+      },
+      {
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_clickhouse_applied_ledger_live.py"
+      },
+      {
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.tuning.applied_ledger import PHASE_DDL, AppliedTuningLedger; from benchbox.core.tuning.introspection import corroborate; from benchbox.platforms.clickhouse.client import ClickHouseLocalClient; from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospector; c=ClickHouseLocalClient(); c.execute('DROP TABLE IF EXISTS zz_mc'); ddl='CREATE TABLE zz_mc (a Int32, b Int32, c Int32) ENGINE=MergeTree PARTITION BY (a, b) ORDER BY (c)'; c.execute(ddl); led=AppliedTuningLedger(); led.record(ddl, PHASE_DDL, table='zz_mc'); r=corroborate(led, ClickHouseTuningIntrospector().introspect(c, led)); assert r.corroborated, [e.to_dict() for e in r.entries]\"",
+        "description": "Multi-column partition corroborates against live chDB (post-fix probe)",
+        "expected": "exit 0: both sort_key and partition_key intents corroborated against the real catalog",
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T14:48:14Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.tuning.introspection import normalize_columns as n; assert n('f(a), b') != n('f(a, b)'); assert n('(a, b)') == n('a, b') == n('tuple(a, b)')\"",
+        "description": "No false-equality collisions introduced by paren stripping",
+        "expected": "exit 0: wrapper forms unify; distinct expressions stay distinct",
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T14:48:16Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning tests/integration/test_clickhouse_applied_ledger_live.py -q",
+        "description": "Tuning unit + live suites green",
+        "expected": "all pass",
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T14:48:24Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added unit wrapper/collision/expression vectors and a live chDB multi-column receipt regression. Exact pre-fix live and collision probes both exited 1: catalog (a, b) normalized to ((a, b)) tokens while intent normalized to (a, b). Pytest was initially waiting on the legitimate shared lock, so the tracker ladder direct probes established red without bypassing it.",
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "notes": "Add a live chDB regression test: multi-column PARTITION BY (a, b) recorded ledger must corroborate (fails today with MISMATCH expected ('a','b') vs observed ('(a','b)')); add unit vectors for normalize_columns covering '(a, b)', 'tuple(a, b)', '[a, b]', bare 'a, b', and single expressions.",
+        "started_at": "2026-08-01T14:37:36Z",
+        "started_branch": "fix/clickhouse-multicolumn-partition-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Live chDB regression: multi-column PARTITION BY (a, b) must corroborate (fails today); unit vectors for '(a, b)', 'tuple(a, b)', '[a, b]', bare and single-expression forms",
+        "wid": "w1"
+      },
+      {
+        "evidence": "normalize_columns now removes exactly one balanced plain outer parenthesis wrapper before the existing tokenizer. Both exact post-fix live chDB and false-equality collision probes exit 0; malformed/unbalanced and nested wrapper tests remain fail-closed.",
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "notes": "normalize_columns: strip one balanced outer plain-paren wrapper (guarding against stripping a function call like 'f(a, b)' where the wrapper IS the argument list - only strip when the parens enclose the entire string and removing them leaves balanced text), with collision-analysis notes in the PR.",
+        "started_at": "2026-08-01T14:42:17Z",
+        "started_branch": "fix/clickhouse-multicolumn-partition-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "normalize_columns: strip one balanced outer plain-paren wrapper without collapsing function-call forms; collision analysis in the PR",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Live chDB pins verbatim toYYYYMM corroboration and observed toStartOfInterval(ts, INTERVAL 1 DAY) -> toIntervalDay(1) catalog rewriting as mismatch; receipts design note documents one-wrapper normalization, exact order-sensitive matching, and expression canonicalization remaining fail-closed.",
+        "item_id": "clickhouse-multicolumn-partition-corroboration-20260801",
+        "notes": "Live-pin the expression-canonicalization limitation: assert toYYYYMM(col) corroborates verbatim and that a sugar form (toStartOfInterval + INTERVAL) honestly mismatches; document both in the receipts design note as known fail-closed shapes.",
+        "started_at": "2026-08-01T14:43:13Z",
+        "started_branch": "fix/clickhouse-multicolumn-partition-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Live-pin expression canonicalization: toYYYYMM corroborates verbatim, sugar forms honestly mismatch; document both",
+        "wid": "w3"
+      }
+    ]
+  }
+}

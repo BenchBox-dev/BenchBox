@@ -1,0 +1,267 @@
+{
+  "context": "Code changes are small and independent (w1-w4); the checklist (w5) is\nthe deliverable that ties them together and must be written against a\nmentally-fresh machine: every command copy-pasteable, every prerequisite\nstated with its failure symptom (\"if you skip this you will see X\").\nHouse style: dense and terse per the docs-brevity feedback memory.\n",
+  "description": "Bus-factor findings from the review (develop @ fc31f3604): a competent\nsecond operator on a fresh machine cannot run the release-gate sweep\nfrom the docs alone. Ordered by how badly each strands them:\n\n1. VENV PROVISIONING GAP: cells run `uv run --no-sync`\n   (matrix.py:353-363); PLATFORM_UV_EXTRA covers only clickhouse-local,\n   clickhouse-server, lakesail, singlestore, influxdb (matrix.py:36-43).\n   The default dev dependency-group ([dependency-groups] dev,\n   pyproject.toml:425+) covers most drivers but NOT modin[ray] and NOT\n   databend-driver -- both appear only under\n   [project.optional-dependencies] extras (modin at :149 in the all-style\n   extra and :241 in the modin extra; databend-driver at :207-209), which\n   a plain `uv sync` does not install -- and modin-df is in\n   release-gate stage 1, databend in stage 3. A second operator gets\n   ModuleNotFoundError cells recorded as FAILED, breaching the 1.0\n   clean-rate floor with no doc pointing at the cause. Fix in code:\n   extend PLATFORM_UV_EXTRA for modin and databend (the mechanism\n   exists); document the provisioning contract (which extras each\n   release-gate stage needs) in uat-local-provisioning.md.\n\n2. OUTPUT-ROOT CONTRACT CONTRADICTION: uat-framework.md:391-392 and\n   AGENTS.md:121 say to set BENCHBOX_OUTPUT_DIR for sweeps, but sweeps\n   read the root ONLY from YAML output.* templates (execute.py:766-771,\n   config.py:53-56 defaults); the env var affects only bare uat-cell\n   defaults (runner.py:326-342) and uat_bring_up. Fix in code (preferred\n   over doc-only): when the YAML uses the DEFAULT templates, honor\n   BENCHBOX_OUTPUT_DIR as the base root; explicit YAML templates always\n   win. Then the docs become true.\n\n3. PHANTOM BENCHBOX_SEED: uat-framework.md:393 tells operators to record\n   BENCHBOX_SEED; nothing reads it (grep verified: only the doc and a\n   YAML comment). Remove from docs, or wire it through if seeds are\n   meant to be controllable -- removing is correct: execute.official/\n   seed is the real mechanism (config.py:47-49).\n\n4. UNDOCUMENTED PHYSICAL PREREQS: Docker VM memory (velox's 11.7 GB\n   ceiling lives in a code comment, matrix.py:29-34), doris\n   vm.max_map_count (documented only outside UAT docs), first-run\n   multi-GB image pulls/builds silently eating docker_start_timeout_s\n   300 (LakeSail admits it in release-gate-02:55 comment), node +\n   Playwright browser install for explorer smoke. Add a \"fresh machine\n   checklist\" section to uat-local-provisioning.md; add a pre-pull/\n   pre-build helper (make uat-prepull PLATFORM=... wrapping compose pull\n   --ignore-buildable + compose build) so first-run timeouts stop\n   presenting as skipped-unreachable mysteries.\n\n5. ENGINE REQUIREMENT: after uat-container-engine-routing, document the\n   resolved-engine contract (mocker on macOS, docker elsewhere,\n   BENCHBOX_CONTAINER_CLI override) in uat-local-provisioning.md.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add bash blocks to CLAUDE.md/AGENTS.md that repeat uat-local-provisioning.md content (docs-brevity house rule).",
+        "instead": "(not specified)",
+        "item_id": "uat-operator-provisioning",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "solve the provisioning gap with docs alone when PLATFORM_UV_EXTRA exists",
+        "instead": "(not specified)",
+        "item_id": "uat-operator-provisioning",
+        "why": "code first, docs describe the code."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-operator-provisioning",
+        "id": 44,
+        "reason": "Code is not Linux-blocked but evidence/budgets are all macOS; an actual Linux sweep is an operational campaign, not a code/docs change. The checklist notes Linux as untested territory.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Parent item uat-operator-provisioning is itself still open and is the natural owner of the Linux release-gate validation campaign.",
+        "summary": "Linux release-gate validation run"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-operator-provisioning",
+        "id": 45,
+        "reason": "uat-docker-cleanup APPLY=1 already covers reclamation; a dedicated target is ergonomic sugar.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Ergonomic-sugar sub-detail of its own parent item, which is still open (planning) and covers this scope; existing uat-docker-cleanup APPLY=1 already suffices. (tracked by uat-operator-provisioning)",
+        "summary": "make uat-bring-down counterpart to uat-bring-up"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-operator-provisioning",
+        "needs_item": "uat-container-engine-routing"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "needs_item": "uat-resume-retirement-artifact-durability"
+      }
+    ],
+    "item_meta": {
+      "category": "Operations / Documentation",
+      "completed_at": "2026-07-19T23:50:44Z",
+      "completed_pr": 1229,
+      "created_at": "2026-07-11T00:00:00Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "Explicit YAML output templates always win over BENCHBOX_OUTPUT_DIR (no silent root switching for configured sweeps).",
+        "item_id": "uat-operator-provisioning"
+      },
+      {
+        "behavior": "PLATFORM_UV_EXTRA stays the single extra-injection point (README.md:60-67 declares matrix.py the source of truth).",
+        "item_id": "uat-operator-provisioning"
+      },
+      {
+        "behavior": "uv run --no-sync invocation pattern (sync-per-cell would add minutes per cell).",
+        "item_id": "uat-operator-provisioning"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Makefile uat-bring-up (2182) -- the make-target shape for uat-prepull; same UAT_BRING_UP_KNOWN_PLATFORMS validation guard. Reuse pattern.",
+        "decision": "reuse",
+        "item_id": "uat-operator-provisioning",
+        "path": "Makefile"
+      },
+      {
+        "concept": "pyproject.toml extras 'modin' (:241) and 'databend' (:207) -- the extras to reference.",
+        "decision": "reuse",
+        "item_id": "uat-operator-provisioning",
+        "path": "pyproject.toml"
+      },
+      {
+        "concept": "tests/uat/matrix.py:36-43 PLATFORM_UV_EXTRA -- existing extra-injection mechanism; the fix is two new entries, not a new mechanism. Extend.",
+        "decision": "extend",
+        "item_id": "uat-operator-provisioning",
+        "path": "tests/uat/matrix.py:36-43"
+      },
+      {
+        "concept": "tests/uat/phases/execute.py:758-771 -- template expansion where the env-var default-base honoring lands. Extend.",
+        "decision": "extend",
+        "item_id": "uat-operator-provisioning",
+        "path": "tests/uat/phases/execute.py:758-771"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-operator-provisioning",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-local-provisioning.md"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "kind": "only_modify",
+        "path_glob": "scripts/uat-bring-up/uat_bring_up.py"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/config.py"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/docker_assets.py"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/matrix.py"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_config.py"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_docker_assets.py"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_matrix.py"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_matrix.py tests/uat/test_config.py tests/uat/test_phases.py -q",
+        "description": "Extras coverage test + output-root contract tests",
+        "expected": "pass, including release-gate-platform import coverage and env-var/template precedence tests",
+        "item_id": "uat-operator-provisioning",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make uat-prepull PLATFORM=postgresql DRY_RUN=1",
+        "description": "Prepull target smoke (dry-run)",
+        "expected": "prints the pull/build plan without executing",
+        "item_id": "uat-operator-provisioning",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-operator-provisioning",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "uat-operator-provisioning",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1229: modin+databend added to PLATFORM_UV_EXTRA; release-gate import-probe coverage test",
+        "item_id": "uat-operator-provisioning",
+        "notes": null,
+        "started_at": "2026-07-19T23:48:40Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add modin and databend to PLATFORM_UV_EXTRA; fast import-probe test that every release-gate platform resolves in the dev group or has a PLATFORM_UV_EXTRA entry",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1229: BENCHBOX_OUTPUT_DIR honored for default templates only (provenance-gated via OutputConfig.explicitly_set); precedence tests both directions",
+        "item_id": "uat-operator-provisioning",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:07Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Honor BENCHBOX_OUTPUT_DIR as base when YAML output templates are defaults (explicit templates win); tests for both directions; align uat-framework.md/AGENTS.md wording",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1229: removed phantom BENCHBOX_SEED from uat-framework.md",
+        "item_id": "uat-operator-provisioning",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:10Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Remove BENCHBOX_SEED from docs (execute.seed is the real mechanism); sweep docs for other phantom env vars (grep os.environ/os.getenv across tests/uat vs doc claims)",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #1229: make uat-prepull (resolved container engine, DRY_RUN) + docs",
+        "item_id": "uat-operator-provisioning",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:12Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "make uat-prepull PLATFORM=... (compose pull + build via the resolved engine, project-scoped); document in uat-local-provisioning.md",
+        "wid": "w4"
+      },
+      {
+        "evidence": "PR #1229: fresh-machine checklist in docs/operations/uat-local-provisioning.md",
+        "item_id": "uat-operator-provisioning",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:14Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Fresh-machine checklist in uat-local-provisioning.md: extras per stage, engine install, VM memory, doris max_map_count, node+Playwright, prepull, first-run datagen/network costs",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #109 of bulk-shard-loading-clickhouse.\nDeferred: Bulk loading for PostgreSQL COPY FROM PROGRAM or COPY FROM STDIN multi-file\nReason deferred: PostgreSQL COPY is fundamentally single-file per statement; would require UNION ALL construction or a PL/pgSQL wrapper - different scope",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:33:46Z",
+      "worktree": "main"
+    }
+  }
+}

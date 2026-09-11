@@ -1,0 +1,81 @@
+{
+  "context": "1. Create or add to `benchbox/core/sql_utils.py` (or find an existing\n   utilities module for SQL string manipulation)\n2. Extract the canonical 4-copy version as `normalize_table_name_in_sql(sql)`\n3. Handle the Redshift variant by parameterizing the regex pattern or having\n   Redshift call the shared version with a flag\n4. Replace all 5 platform copies with imports from the shared module\n",
+  "description": "Group 25 from the duplicate-check report identifies 5 copies of\n`_normalize_table_name_in_sql` across platform adapters:\n- firebolt.py:1072\n- presto.py:956\n- redshift.py:1612\n- spark.py:722\n- trino.py:956\n\nFour of five copies are byte-for-byte identical (same two re.sub patterns\nwith identical regex and lambda replacements). Redshift has a minor variant\n(missing the IF NOT EXISTS group in its CREATE TABLE pattern).\n\nThis is a pure utility function with no platform-specific behavior - it just\nlowercases table names in SQL statements. It belongs in a shared module.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-21T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Redshift-specific variant still handles its CREATE TABLE pattern correctly",
+        "item_id": "dedup-sql-utilities"
+      },
+      {
+        "behavior": "SQL table name normalization produces identical output for all platforms",
+        "item_id": "dedup-sql-utilities"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v",
+        "description": "Platform adapter tests pass",
+        "expected": "all tests pass",
+        "item_id": "dedup-sql-utilities",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dedup-sql-utilities",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dedup-sql-utilities",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dedup-sql-utilities",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract normalize_table_name_in_sql to benchbox/core/sql_utils.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-sql-utilities",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace 5 platform copies with imports from shared module",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-sql-utilities",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run platform tests to verify no regressions",
+        "wid": "w3"
+      }
+    ]
+  }
+}

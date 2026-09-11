@@ -1,0 +1,109 @@
+{
+  "context": "Joe decision recorded as short ADR or operations section; update docs/evaluation.md, docs/operations/memory-rollout.md, docs/manual/rollout.md to match. No code gate change without the written decision.",
+  "description": "Remediation plan judgment call: keep behavioral matrix as install prerequisite vs move it to format-change-only gate, with install gated by deterministic chain (strict audit, freshness, retrieval, ledger, backup, canary, swap, monitoring). Install docs still list behavioral gate as step 1. Not measurement — risk appetite.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change install docs without a recorded decision",
+        "instead": "ADR or signed ops note first",
+        "item_id": "memory-behavioral-gate-install-policy",
+        "why": "policy drift between agents"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Batch blocker: work order requires Joe's recorded policy choice before documentation changes; agent must not invent policy.",
+      "category": "Policy",
+      "created_at": "2026-08-05T22:10:36Z",
+      "worktree": "memory-governance"
+    },
+    "preserves": [
+      {
+        "behavior": "Deterministic audit chain remains mandatory before live swap regardless of policy choice",
+        "item_id": "memory-behavioral-gate-install-policy"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Install steps listing behavioral gate",
+        "decision": "extend",
+        "item_id": "memory-behavioral-gate-install-policy",
+        "path": "/Users/joe/Developer/memory-governance/docs/manual/rollout.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-behavioral-gate-install-policy",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/src/memory_tooling/score.py"
+      },
+      {
+        "item_id": "memory-behavioral-gate-install-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/decisions/**"
+      },
+      {
+        "item_id": "memory-behavioral-gate-install-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation.md"
+      },
+      {
+        "item_id": "memory-behavioral-gate-install-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/manual/evaluate.md"
+      },
+      {
+        "item_id": "memory-behavioral-gate-install-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/manual/rollout.md"
+      },
+      {
+        "item_id": "memory-behavioral-gate-install-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/memory-rollout.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && rg -n 'behavioral gate|promotion eligible' docs/manual/rollout.md docs/operations/memory-rollout.md docs/evaluation.md | head -20; test -f docs/manual/rollout.md",
+        "description": "Rollout and evaluation docs agree on gate placement",
+        "expected": "Consistent policy text after decision",
+        "item_id": "memory-behavioral-gate-install-policy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-behavioral-gate-install-policy",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "memory-behavioral-gate-install-policy",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Joe chooses install-time vs format-change-only behavioral gate",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-behavioral-gate-install-policy",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update evaluation and rollout docs to the chosen policy",
+        "wid": "w1"
+      }
+    ]
+  }
+}

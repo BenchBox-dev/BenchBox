@@ -1,0 +1,167 @@
+{
+  "context": "Fix the driver formulas (TPC-H and TPC-DS), make the calculator the single source of truth (driver delegates or a test asserts equality), add a magnitude regression test, and sweep exported-schema consumers for double-count assumptions. Small, surgical; blocks any throughput evidence publication.",
+  "description": "2026-07-21 adversarial UAT review finding (P1): benchbox/core/throughput/runner.py:374 computes throughput_at_size = (num_streams * 3600 * SF) / total_time, omitting the x22 queries-per-stream factor required by TPC-H spec 5.4.2.2 ((S x 22 x 3600 x SF) / Ts); the comment above documents the wrong formula as intended. The repo's own TPCMetricsCalculator.calculate_throughput_at_size (benchbox/core/results/metrics.py:64-95) implements the spec correctly and disagrees with the driver by exactly 22x. TPC-DS twin defect at benchbox/core/tpcds/benchmark/runner.py:1428 (x99).\n\nThe DRIVER value is what ships: result_capture.py:1574 -> ThroughputTestPhase -> adapter.py:893 -> schema.py:1420-1421 exports summary.tpc_metrics.throughput_at_size; QphH derived at adapter.py:896-897 is ~sqrt(22) = 4.7x low. Meanwhile benchbox metrics (cli/commands/metrics.py:178) recomputes via the correct calculator, so CLI output contradicts the exported JSON for the same run. Never caught because the only production check is throughput_at_size > 0 (tests/uat/throughput.py:259-263).\n\nHistorical exported results understate the metric; handle by documentation (CHANGELOG correction note), never by retro-editing published bundles.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change TPCMetricsCalculator to match the driver",
+        "instead": "fix the driver and keep one source of truth",
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "why": "the calculator implements the spec formula; the driver is the wrong side of the 22x disagreement"
+      },
+      {
+        "dont": "leave the UAT-side check at throughput_at_size > 0",
+        "instead": "assert driver == calculator in tests and add a plausibility band in validate_throughput_result",
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "why": "a 22x magnitude error sailed through it"
+      },
+      {
+        "dont": "retro-edit or rescale historical exported results/bundles",
+        "instead": "document the correction and which result versions are affected",
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "why": "changelog policy forbids retrospective edits; published bundles are records"
+      }
+    ],
+    "item_meta": {
+      "category": "Bug Fixes",
+      "completed_at": "2026-07-21T13:09:11Z",
+      "completed_pr": 1242,
+      "created_at": "2026-07-21T11:43:14Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "Per-query timing rows and power-phase metrics untouched.",
+        "item_id": "tpch-tpcds-throughput-at-size-formula"
+      },
+      {
+        "behavior": "TTT measurement window semantics (first-stream-start to last-stream-end over completed streams) unchanged.",
+        "item_id": "tpch-tpcds-throughput-at-size-formula"
+      },
+      {
+        "behavior": "benchbox metrics CLI output remains spec-correct (it already is).",
+        "item_id": "tpch-tpcds-throughput-at-size-formula"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "TPCMetricsCalculator.calculate_throughput_at_size - the spec-correct formula",
+        "decision": "reuse",
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "path": "benchbox/core/results/metrics.py:64-95"
+      },
+      {
+        "concept": "validate_throughput_result metric check - the seam for a plausibility band",
+        "decision": "extend",
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "path": "tests/uat/throughput.py:259-263"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/metrics.py"
+      },
+      {
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/throughput/"
+      },
+      {
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/benchmark/runner.py"
+      },
+      {
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/"
+      },
+      {
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'throughput and (metric or at_size or formula)' -q",
+        "description": "Formula parity regression",
+        "expected": "driver == TPCMetricsCalculator; synthetic S=3 SF=1 TTT=3600 yields 66.0",
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "last_result": "pass",
+        "last_run": "2026-07-21T13:00:42Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml",
+        "description": "Nightly lane green with corrected metric",
+        "expected": "sweep passes; exported throughput_at_size reflects the x22 correction and the assert step still validates streams",
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "last_result": "pass",
+        "last_run": "2026-07-21T13:00:48Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Both throughput drivers now pass actual executed-query totals to TPCMetricsCalculator; formula-focused unit selection passes 12 tests.",
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "notes": null,
+        "started_at": "2026-07-21T12:43:46Z",
+        "started_branch": "codex/uat-throughput-at-size-formula-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.isolated-throughput-formula-20260721",
+        "status": "done",
+        "summary": "Fix driver formulas: throughput/runner.py:374 (x22 via queries-per-stream, not hardcoded) and tpcds/benchmark/runner.py:1428 (x99); derive the factor from the actual per-stream query count",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Canonical calculator parity is pinned at S=3, SF=1, TTT=3600 => 66.0; legacy TPC-DS runner also asserts parity. Formula selection passes 11 tests.",
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "notes": null,
+        "started_at": "2026-07-21T12:43:59Z",
+        "started_branch": "codex/uat-throughput-at-size-formula-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.isolated-throughput-formula-20260721",
+        "status": "done",
+        "summary": "Single source of truth: delegate to TPCMetricsCalculator or assert driver == calculator in a regression test (S=3, SF=1, TTT=3600 -> 66.0, not 3.0)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Consumer sweep found pass-through only in result_capture/schema and geometric mean only in adapter (no compensating multiplier). Nightly DuckDB TPCH SF1 lane passed 1/1; exported 66 queries over 815ms produced 291533.74 and UAT plausibility=ok. CHANGELOG documents non-retroactive correction.",
+        "item_id": "tpch-tpcds-throughput-at-size-formula",
+        "notes": null,
+        "started_at": "2026-07-21T12:44:02Z",
+        "started_branch": "codex/uat-throughput-at-size-formula-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.isolated-throughput-formula-20260721",
+        "status": "done",
+        "summary": "Sweep consumers (result_capture.py:1574, adapter.py:893-897, schema.py:1420) for compensating double-counts; add a plausibility band to the UAT throughput validator; CHANGELOG correction entry",
+        "wid": "w3"
+      }
+    ]
+  }
+}

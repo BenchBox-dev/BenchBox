@@ -1,0 +1,188 @@
+{
+  "description": "OBSOLETED on 2026-04-26: superseded by the single-repo migration plan\n(_project/TODO/main/planning/single-repo-migration-phase-*.yaml). The\nrelease guide is still produced, but as part of the single-repo\nmigration's Phase 7 (docs cleanup), describing a much simpler flow\n(Makefile + GitHub Actions release workflow). The original version\nof this TODO described the guide for the old two-repo orchestration,\nwhich no longer exists post-migration.\n\nOriginal deps removed (the two depended-on TODOs were also obsoleted\nthe same day).\n\nOriginal description below preserved for historical context.\n\n---\n\nRelease knowledge today is fragmented across:\n- `scripts/automate_release.py` docstring (developer-facing, not skimmable)\n- `AGENTS.md` (mixed agent guidance)\n- `docs/development/development.md:99` (a stub: \"Release Preparation Workflow\")\n- `CONTRIBUTING.md:193` (\"Releases are handled by maintainers\" - points\n  nowhere)\n\nA maintainer cutting their first BenchBox release has nowhere coherent to\nlook. The new guide is the canonical entrypoint: skimmable, ~1500 words,\nlinks to source for detail.\n\nWhy this depends on the other two items: the doc references the new\n`is_public_path` predicate (in the glossary) and the new `Step 3.5`\ndivergence preflight + `--allow-public-divergence` flag (in the failure\nrecovery section). Writing it before those land would produce stale docs.\n\nFormat and location confirmed by the existing precedent: `docs/operations/`\nalready houses `results-phase-2-runbook.md` (a sibling maintainer runbook),\nmyst-parser markdown is the project default.\n\nPlan file: /Users/joe/.claude/plans/make-a-detailed-and-dynamic-bentley.md\n(Phase C).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a \"history\" or \"previous release process\" section",
+        "instead": "(not specified)",
+        "item_id": "add-maintainer-release-guide",
+        "why": "it is dead weight; the guide describes how to release TODAY, full stop."
+      },
+      {
+        "dont": "duplicate content from automate_release.py's docstring into the guide",
+        "instead": "(not specified)",
+        "item_id": "add-maintainer-release-guide",
+        "why": "the docstring is for developers reading the source; the guide is for maintainers running the tool; they need different framings. Link to source, summarise behaviour, do not paste."
+      },
+      {
+        "dont": "include screenshots or animated GIFs",
+        "instead": "(not specified)",
+        "item_id": "add-maintainer-release-guide",
+        "why": "the existing docs are text-only and screenshots rot fast; ASCII tables and code blocks are sufficient and maintainable."
+      },
+      {
+        "dont": "make the guide a complete reference of every flag",
+        "instead": "(not specified)",
+        "item_id": "add-maintainer-release-guide",
+        "why": "that is what `--help` is for; the guide is the runbook (\"here is what to do\"), not the man page."
+      },
+      {
+        "dont": "write the guide before the dependent items land",
+        "instead": "(not specified)",
+        "item_id": "add-maintainer-release-guide",
+        "why": "it references the new is_public_path predicate and the new --allow-public-divergence flag; writing first means rewriting twice."
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-04-26T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing anchor `#release-preparation-workflow` in docs/development/development.md continues to resolve (heading kept, body replaced with redirect).",
+        "item_id": "add-maintainer-release-guide"
+      },
+      {
+        "behavior": "The `AGENTS.md` content is unchanged. The release guide may LINK to it (e.g., for dependency bounds policy) but does not duplicate its content.",
+        "item_id": "add-maintainer-release-guide"
+      },
+      {
+        "behavior": "The existing `docs/operations/results-phase-2-runbook.md` continues to resolve in the toctree. The new entry is added BEFORE it, not in place of it.",
+        "item_id": "add-maintainer-release-guide"
+      },
+      {
+        "behavior": "The line at `CONTRIBUTING.md:193` (\"Releases are handled by maintainers\") remains - optionally extend to add a link to the new guide, but do not remove the existing copy.",
+        "item_id": "add-maintainer-release-guide"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "add-maintainer-release-guide",
+        "kind": "only_modify",
+        "path_glob": "docs/development/development.md"
+      },
+      {
+        "item_id": "add-maintainer-release-guide",
+        "kind": "only_modify",
+        "path_glob": "docs/index.rst"
+      },
+      {
+        "item_id": "add-maintainer-release-guide",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/release-guide.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd docs && uv run -- python -m sphinx -W -b html . _build/html",
+        "description": "Docs build with no warnings",
+        "expected": "build succeeded",
+        "item_id": "add-maintainer-release-guide",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f docs/operations/release-guide.md && wc -w docs/operations/release-guide.md",
+        "description": "New page exists and is non-trivial",
+        "expected": "word count between 1000 and 3000",
+        "item_id": "add-maintainer-release-guide",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'operations/release-guide' docs/index.rst",
+        "description": "Toctree includes the new page",
+        "expected": "1",
+        "item_id": "add-maintainer-release-guide",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -A2 'Release Preparation Workflow' docs/development/development.md | grep -c 'release-guide'",
+        "description": "development.md no longer has a release-prep stub, only a redirect",
+        "expected": "1",
+        "item_id": "add-maintainer-release-guide",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "add-maintainer-release-guide",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "add-maintainer-release-guide",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "add-maintainer-release-guide",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "add-maintainer-release-guide",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "add-maintainer-release-guide",
+        "notes": "Create `docs/operations/release-guide.md`. Structure:\n\n  # Cutting a BenchBox release\n\n  ## Overview\n  One short diagram: private -> curated public tree -> squash -> tag ->\n  wheel -> archive. Plain text or simple ASCII, not a graphics file.\n\n  ## Before you start\n  - On private main, clean, fetched.\n  - ../BenchBox-public clone exists, on main, clean, fetched.\n  - PyPI token configured.\n  - The two-remote rule (CLAUDE.md): push to `private`, never `public`\n    without intent.\n\n  ## The one command\n  ```bash\n  uv run python scripts/automate_release.py --version 0.2.2 -y --push\n  ```\n  What each phase does, with one-liner descriptions and source pointers\n  (e.g., \"Phase 4 builds the curated public tree - see\n  benchbox/release/workflow.py::prepare_public_release\").\n\n  ## What automation handles vs what you handle\n  Two-column table.\n  Automation: version bump, changelog, CI, content checks, size guard,\n  public divergence preflight, squash, tag, build, archive.\n  You: write user-facing changelog blurb, decide patch vs minor,\n  communicate the release.\n\n  ## Recovering from common failures\n  - CI check fails -> fix on private, re-run.\n  - Size check fails -> identify file, add to HOLD_BACK_PATHS or shrink.\n  - Content validation fails (em-dash etc.) -> fix in source, re-run.\n  - **Public divergence preflight fails** -> run `benchbox-sync pull\n    --revspec <last-tag>..HEAD`, commit on private, re-run. Use\n    `--allow-public-divergence` ONLY if you intentionally want to\n    overwrite those commits.\n\n  ## When to use benchbox-sync (and when not to)\n  Table:\n  | Subcommand | Use when |\n  | status | Sanity check before release. |\n  | pull | An external PR landed on public; bring it back to private. |\n  | push | Almost never - prefer cutting a patch release. |\n\n  ## Glossary\n  - Squash anchor - previous v* tag, where the next release squashes from.\n  - Normalized timestamp - most-recent-whole-hour UTC.\n  - Source fingerprint - hash of the curated tree.\n  - Curated tree - the subset decided by `is_public_path` (single-source\n    predicate in benchbox/release/workflow.py).\n\n  ## Reference\n  - Source: `scripts/automate_release.py`, `benchbox/release/workflow.py`,\n    `benchbox/release/sync.py`.\n  - Related: AGENTS.md (dependency bounds), CONTRIBUTING.md.\n\nStyle: myst-parser markdown (.md). Triple-backtick fences with language\nhints. H2 sentence case. Frontmatter copyright header consistent with\nother docs/operations/*.md files - check\n`docs/operations/results-phase-2-runbook.md` and copy the header style.\nLength target: ~1500 words. If it grows past 2500, split.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Draft docs/operations/release-guide.md with the canonical structure",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "add-maintainer-release-guide",
+        "notes": "Edit `docs/index.rst`. In the Contributing section (currently around\nline 68-71), add the new entry. Final shape:\n\n  .. toctree::\n     :maxdepth: 1\n     :caption: Contributing\n\n     contributing-results.md\n     operations/release-guide.md\n     operations/results-phase-2-runbook.md\n\nOrder: release guide BEFORE results runbook (releases are the more\ncommon operation; runbooks for one-off corpus operations come after).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wire toctree entry in docs/index.rst under Contributing",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "add-maintainer-release-guide",
+        "notes": "At `docs/development/development.md:99`, the existing \"Release\nPreparation Workflow\" section is a stub. Replace its body with a single\nline:\n  See [the release guide](../operations/release-guide.md) for the full\n  maintainer workflow.\nKeep the heading so any existing inbound anchor links still resolve.\nDo not duplicate content from the new guide here.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace the development.md release stub with a one-line redirect",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "add-maintainer-release-guide",
+        "notes": "Run:\n  cd docs && uv run -- python -m sphinx -W -b html . _build/html\nMust complete with zero warnings. The `-W` flag converts warnings to\nerrors, so any unresolved cross-reference, broken toctree entry, or\nmyst parse error fails the build.\nThen open `docs/_build/html/operations/release-guide.html` in a\nbrowser and visually confirm:\n  - Code blocks render with syntax highlighting\n  - Internal links resolve (especially the dev-doc redirect from w3)\n  - The toctree shows the new page in the Contributing section\nSpot-check on a phone or narrow window for the table layout\n(the \"automation vs you\" two-column table is the most likely to wrap\nawkwardly).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Build docs locally with -W and verify the new page renders",
+        "wid": "w4"
+      }
+    ]
+  }
+}

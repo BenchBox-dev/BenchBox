@@ -1,0 +1,182 @@
+{
+  "context": "Follow the exact pattern used for DuckDB in move-duckdb-to-optional-extras:\n\n1. Remove from [project.dependencies] (lines 41-43)\n2. Add new stanza in [project.optional-dependencies]:\n     # clickhouse-connect: moved out of core - see move-remaining-platform-drivers-to-optional-extras\n     clickhouse-connect = [\"clickhouse-connect>=0.10.0\"]\n   (polars and postgresql extras already exist; just confirm they're present)\n3. Add polars>=X, clickhouse-connect>=X, psycopg2-binary>=X to [project.optional-dependencies].all\n4. Add each to [dependency-groups].dev with a comment:\n     \"polars>=1.36.1\",  # polars: moved out of core deps; must be explicit here for dev environment\n     \"clickhouse-connect>=0.10.0\",  # clickhouse-connect: moved out of core deps; must be explicit here for dev environment\n     \"psycopg2-binary>=2.9.11\",  # psycopg2-binary: moved out of core deps; must be explicit here for dev environment\n\nNote: uv.lock is gitignored - do not attempt to commit it. Just verify `uv lock` resolves\nsuccessfully after the changes.\n",
+  "description": "Three platform drivers are currently in [project.dependencies] (pyproject.toml lines 41-43),\nmeaning uv installs them for every BenchBox user - even those who never run polars,\nClickHouse, or PostgreSQL benchmarks:\n\n  \"polars>=1.36.1\",          # line 41 - ~20 MB, no reason to force on all users\n  \"clickhouse-connect>=0.10.0\",  # line 42 - cloud-only driver, not needed locally\n  \"psycopg2-binary>=2.9.11\",     # line 43 - PostgreSQL driver, irrelevant for DuckDB users\n\nMore importantly, pinning them in core means uv enforces those exact lower-bound\nversions on every uv run - a user who manually installs polars==1.20.0 for comparison\ntesting will have it silently reverted to >=1.36.1.\n\nThis was the same problem we fixed for DuckDB (see move-duckdb-to-optional-extras).\nThe fix is the same: move each package out of core and into a named optional extra.\n\nCurrent extras state (pyproject.toml):\n  - polars: optional extra \"polars\" already exists at line 222 with \"polars>=1.35.2\"\n  - postgresql: optional extra \"postgresql\" already exists at line 159 with \"psycopg2-binary>=2.9.0\"\n  - clickhouse-connect: NO clickhouse-connect optional extra exists (only \"clickhouse\" extra\n    at line ~161 uses clickhouse-driver, a different package for a different ClickHouse adapter)\n\nWork required:\n  1. Remove the three packages from [project.dependencies]\n  2. Add a new \"clickhouse-connect\" optional extra (analogous to the \"duckdb\" extra)\n  3. Add all three to [project.optional-dependencies].all\n  4. Add all three to [dependency-groups].dev (so contributors still get them)\n  5. Update README.md installation instructions for each affected platform",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify the existing 'clickhouse' extra (clickhouse-driver)",
+        "instead": "only add the new 'clickhouse-connect' extra",
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "why": "that is a separate driver for the clickhouse (non-cloud) adapter"
+      },
+      {
+        "dont": "remove polars or psycopg2-binary from their existing optional extra entries",
+        "instead": "only remove them from [project.dependencies]",
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "why": "those already exist and are correct"
+      },
+      {
+        "dont": "set a higher minimum version in the new extras than what was previously in core",
+        "instead": "use the same or lower floor",
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "why": "that would be more restrictive, not less"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-23T00:00:00Z",
+      "created_at": "2026-02-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DuckDB optional extra added in the previous TODO is not modified",
+        "item_id": "move-remaining-platform-drivers-to-optional-extras"
+      },
+      {
+        "behavior": "Existing 'clickhouse' extra (clickhouse-driver) is NOT changed - it is a different driver for a different adapter",
+        "item_id": "move-remaining-platform-drivers-to-optional-extras"
+      },
+      {
+        "behavior": "Existing 'postgresql' optional extra remains unchanged in its own entry",
+        "item_id": "move-remaining-platform-drivers-to-optional-extras"
+      },
+      {
+        "behavior": "benchbox[all] extra continues to include all three packages",
+        "item_id": "move-remaining-platform-drivers-to-optional-extras"
+      },
+      {
+        "behavior": "uv sync --group dev still installs polars, clickhouse-connect, and psycopg2-binary for contributors",
+        "item_id": "move-remaining-platform-drivers-to-optional-extras"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "python -c \"import tomllib; d=tomllib.load(open('pyproject.toml','rb')); deps=d['project']['dependencies']; print('polars in core:', any('polars' in x for x in deps)); print('clickhouse-connect in core:', any('clickhouse-connect' in x for x in deps)); print('psycopg2-binary in core:', any('psycopg2-binary' in x for x in deps))\"",
+        "description": "polars, clickhouse-connect, psycopg2-binary are no longer in [project.dependencies]",
+        "expected": "polars in core: False, clickhouse-connect in core: False, psycopg2-binary in core: False",
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv lock",
+        "description": "uv lock resolves without errors after the changes",
+        "expected": "Lock file updated (or already up to date), no resolution errors",
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast unit tests still pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit pyproject.toml lines 39-120: confirm version floors for polars, clickhouse-connect, psycopg2-binary in core and in existing extras; record decisions as comments above new stanzas",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove the three packages from [project.dependencies]; add new 'clickhouse-connect' optional extra; add all three to [project.optional-dependencies].all",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add polars, clickhouse-connect, psycopg2-binary to [dependency-groups].dev with explanatory comments; run uv lock to verify no resolution errors",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update README.md install tables: add [polars], [clickhouse-connect], [postgresql] extras to quick-start and platform install sections; follow the same pattern used for [duckdb]",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "move-remaining-platform-drivers-to-optional-extras",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run smoke tests to verify a fresh install without extras doesn't import-error on DuckDB benchmark, and a polars run still works when the polars extra is present",
+        "wid": "w5"
+      }
+    ]
+  }
+}

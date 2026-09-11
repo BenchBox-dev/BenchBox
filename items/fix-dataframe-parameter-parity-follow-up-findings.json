@@ -1,0 +1,521 @@
+{
+  "context": "Implement in smallest safe increments:\n\n1) Fix runner lifecycle first. Introduce strict setup/teardown structure using\n   `try/finally` so overrides cannot leak on exceptions or early return paths.\n2) Add stream-aware setup path for TPC-DS where overrides are derived per stream\n   context used by current query batch. Reuse extractor cache by `(seed, sf, stream_id)`.\n3) Expand extractor coverage using expected-key-gated pattern extraction and\n   query-driven prioritization. Do not attempt full SQL parsing.\n4) Add targeted tests for each failure mode and parity behavior before broader test runs.\n",
+  "description": "Follow-up work is required after adversarial review of the DataFrame parameter\nsubstitution parity implementation (commit e6d83095). Three concrete issues were\nidentified:\n\n1. Override lifecycle bug (P1): module-level parameter overrides can leak across\n   runs because setup happens before query discovery and cleanup is not guaranteed\n   for early returns or unexpected exceptions.\n2. Stream parity gap (P1): TPC-DS override extraction currently ignores stream_id,\n   but DataFrame execution iterates stream IDs across warmup/measurement iterations.\n   This breaks SQL/DataFrame substitution parity for stream-varying runs.\n3. Extractor coverage gap (P2): TPC-DS extraction supports only a narrow set of\n   parameter families, leaving many query parameters stuck on static defaults.\n   This prevents robust parity claims for broad TPC-DS coverage.\n\nThis TODO closes all three issues with minimal surface-area change, explicit\nguardrails, and verification targeted at correctness, parity, and regression safety.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "clear overrides only on success paths",
+        "instead": "enforce cleanup in `finally`",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "why": "runner exceptions and early returns are common enough to leak global state"
+      },
+      {
+        "dont": "introduce a full SQL parser for extraction",
+        "instead": "extend targeted regex/pattern logic instead",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "why": "query templates are known and pattern extraction is sufficient and faster"
+      },
+      {
+        "dont": "move override state into DataFrameContext or query function signatures",
+        "instead": "keep injection through existing parameter accessors",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "why": "this would fan out changes across all adapters and query registrations"
+      },
+      {
+        "dont": "silently claim full parity coverage if unsupported parameter keys remain",
+        "instead": "explicitly track and document supported/uncovered key sets",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "why": "this creates false confidence"
+      },
+      {
+        "dont": "treat one extracted TPC-DS override map as valid for all streams",
+        "instead": "derive/apply by current stream context",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "why": "stream_id influences dsqgen substitution choices"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-02-06T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "If qgen/dsqgen extraction fails, behavior remains graceful fallback to static defaults with warning logs",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings"
+      },
+      {
+        "behavior": "No API/signature changes to `DataFrameContext` protocol or query registration callables",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings"
+      },
+      {
+        "behavior": "Runner continues emitting warmup and measurement results with existing iteration/stream metadata fields",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings"
+      },
+      {
+        "behavior": "TPC permutation ordering logic is untouched (TPCHStreams and TPCDSPermutationGenerator remain authoritative)",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings"
+      },
+      {
+        "behavior": "TPC-H behavior remains unchanged except for cleanup hardening where shared runner flow is touched",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings"
+      },
+      {
+        "behavior": "When no seed is provided, DataFrame queries continue using static defaults exactly as before",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/context.py"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/query.py"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/c_tools.py"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/queries.py"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/dataframe_queries/parameters.py"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/parameter_extractor.py"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_parameter_parity.py"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_runner_lifecycle.py"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpcds/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run _project/scripts/validate_todo.py _project/TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml",
+        "description": "TODO schema validation passes for this new item",
+        "expected": "Validation successful",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_runner_lifecycle.py tests/unit/core/test_parameter_parity.py -k 'override or cleanup or lifecycle' -v",
+        "description": "Runner lifecycle tests prove override cleanup on failure and no-query paths",
+        "expected": "All selected tests pass and include failure-path cleanup assertions",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpcds/test_parameter_extractor_coverage.py -v",
+        "description": "TPC-DS extractor tests cover newly supported parameter families and fallback behavior",
+        "expected": "All extractor coverage tests pass",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast smoke suite remains green after parity follow-up changes",
+        "expected": "Fast marker tests pass with no regressions",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m benchbox run --platform datafusion --benchmark tpcds --scale 0.01 --mode dataframe --phases power --queries Q1 --seed 42 --non-interactive",
+        "description": "Seeded stream-aware TPC-DS DataFrame smoke run completes",
+        "expected": "Run completes successfully and logs stream-specific execution metadata",
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w11",
+        "wid": "w13"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w15",
+        "wid": "w16"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w15",
+        "wid": "w17"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w15",
+        "wid": "w18"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w19",
+        "wid": "w20"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w19",
+        "wid": "w21"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wrap DataFrame query execution override setup/teardown in a guaranteed cleanup path",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Preserve TPC-H behavior (no stream argument) and avoid unnecessary duplicate extraction for identical seed/SF/stream triples",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add stream-parity tests that prove different stream IDs can yield different effective parameters",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Mock extractor responses per stream and assert query execution uses stream-specific overrides",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression test that SQL/DataFrame parameter source inputs align for stream-aware runs",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory TPCDS_DEFAULT_PARAMS keys and rank uncovered keys by query impact and parity risk",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement extraction for high-impact uncovered parameter families",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add robust regex/pattern handlers for missing keys used by critical parity queries (for example `hours`, category/city/state-set style filters)",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Keep extraction generic and keyed by expected defaults to avoid injecting irrelevant fields",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document intentionally unsupported keys and fallback rationale for non-critical cases",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for new extraction families and fallback behavior",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor `_execute_dataframe_queries()` to clear overrides in `finally` regardless of exceptions",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Include positive extraction cases and malformed SQL/fallback cases",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add coverage assertion that supported parameter-key set grows and is tracked",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run focused parity tests and existing DataFrame fast/unit suites",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate TODO scope with targeted benchmark smoke runs for seeded stream-aware TPC-DS",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture before/after parity evidence in commit message or TODO notes",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Ensure early exits (including no-query paths) also clear overrides before return",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Preserve current behavior when seed is None (no overrides set)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests that explicitly fail inside execution and verify overrides are always cleared",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add one TPC-H test and one TPC-DS test for failure-path cleanup",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add no-queries path test to prove cleanup is still executed",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Thread stream ID into TPC-DS override extraction for each execution stream",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-dataframe-parameter-parity-follow-up-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update runner override setup flow so TPC-DS extraction receives current stream context instead of a single global extraction",
+        "wid": "w9"
+      }
+    ]
+  }
+}

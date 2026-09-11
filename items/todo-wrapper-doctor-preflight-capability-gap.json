@@ -1,0 +1,102 @@
+{
+  "context": "Add a read-only 'doctor' to the project wrapper reporting the four things bootstrap.md names: backend/config, identity, database reachability, and auth, plus an advisory turso-CLI check. Run it before connect/freeze so it can diagnose an unreachable or frozen backend. Reserve exit 4 for auth failures (including the real 'JWT error: InvalidToken' shape) and exit 2 for everything else, so batch can distinguish halt-worthy auth from a plain outage. Never print the DSN or the token.",
+  "description": "The todo-db batch workflow requires a side-effect-free 'doctor' preflight before the first claim, and HALTS on its exit 4 so a dead token cannot desynchronize the tracker from the work. No reachable CLI implements it. Confirmed by enumeration on both surfaces, not a lookup failure: '_project/scripts/todo --help' advertises no 'doctor' (nor 'batch'), and no standalone todo-db exists on this machine at all ('todo-db' and 'todo' absent from PATH, nothing in ~/.local/bin, no pipx entry, todo_db module not importable). So sessions record the mandated gate as 'skipped', quietly turning a required preflight into an optional one. bootstrap.md documents doctor as a todo-db >= 0.3 command, but it is NOT in the skill's standalone_only_commands (only 'update' is), and this wrapper already owns the sibling 'init', so implementing it here is within the boundary. Supersedes the dropped todo-batch-mandates-a-doctor-preflight-that-does-not-exist.",
+  "legacy": {
+    "item_meta": {
+      "category": "framework-gap",
+      "completed_at": "2026-08-01T17:17:19Z",
+      "completed_pr": 1418,
+      "created_at": "2026-08-01T13:33:36Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Neither the hosted DSN nor the auth token is ever printed, matching _report_backend",
+        "item_id": "todo-wrapper-doctor-preflight-capability-gap"
+      },
+      {
+        "behavior": "No change to the standalone-only command boundary: 'update' stays standalone-only and is not added to the wrapper",
+        "item_id": "todo-wrapper-doctor-preflight-capability-gap"
+      },
+      {
+        "behavior": "doctor performs no tracker write and emits no audit event",
+        "item_id": "todo-wrapper-doctor-preflight-capability-gap"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-wrapper-doctor-preflight-capability-gap",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "todo-wrapper-doctor-preflight-capability-gap",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_doctor.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo doctor --help >/dev/null 2>&1",
+        "description": "the wrapper exposes the mandated preflight",
+        "expected": "exit 0 once implemented; argparse exits 2 on an unfixed tree where the subcommand does not exist",
+        "item_id": "todo-wrapper-doctor-preflight-capability-gap",
+        "last_result": "pass",
+        "last_run": "2026-08-01T17:12:48Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_doctor.py -q -n 0",
+        "description": "doctor guards pass, including auth-vs-outage exit classification and no-leak",
+        "expected": "exit 0 once implemented; on an unfixed tree collection fails because DOCTOR_EXIT_AUTH does not exist",
+        "item_id": "todo-wrapper-doctor-preflight-capability-gap",
+        "last_result": "pass",
+        "last_run": "2026-08-01T17:12:54Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo doctor >/dev/null 2>&1",
+        "description": "a healthy hosted backend reports OK end to end",
+        "expected": "exit 0 once implemented; nonzero on an unfixed tree",
+        "item_id": "todo-wrapper-doctor-preflight-capability-gap",
+        "last_result": "pass",
+        "last_run": "2026-08-01T17:12:58Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-wrapper-doctor-preflight-capability-gap",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Decided doctor belongs on this wrapper: bootstrap.md documents it as a todo-db >= 0.3 command, but it is NOT in the skill's standalone_only_commands (only 'update' is), and this wrapper already owns the sibling 'init', so rule 4 is not engaged. Implemented run_doctor() with the four checks bootstrap.md names (backend/config, identity, reachability, auth) plus an advisory turso-CLI check, dispatched from a new _preconnect_command() BEFORE connect/freeze so it can diagnose an unreachable, unmigrated or frozen backend. Dogfooded as the batch preflight for this very batch: 'OK reachable read 1802 item(s), schema v4'.",
+        "item_id": "todo-wrapper-doctor-preflight-capability-gap",
+        "notes": null,
+        "started_at": "2026-08-01T17:14:56Z",
+        "started_branch": "feat/todo-wrapper-doctor-preflight",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Implement doctor on the wrapper with the four checks and the exit-4 auth contract",
+        "wid": "w1"
+      },
+      {
+        "evidence": "10 guards in tests/unit/scripts/test_todo_db_doctor.py. Exercising the branches against the live hosted DB caught three real defects in my own first cut, all fixed and pinned: (1) a rejected token returned exit 2, not 4 -- the transport says 'JWT error: InvalidToken' with no space, so an 'invalid token' marker missed it and a batch would have kept running against a dead token instead of halting; (2) the AUTH remediation printed ABOVE the check table when redirected (stdout block-buffered vs unbuffered stderr); (3) _redacted scrubs the token but NOT the DSN, so a transport error quoting the URL leaked it, violating the module's own _report_backend invariant. Verified exit codes: no token 4, bad token 4, plain outage 2, healthy 0. Read-only proven by table+event-count snapshot equality. Full tests/unit/scripts suite 1297 passed, ruff clean, lint-imports/lint-markers/timing-policy green.",
+        "item_id": "todo-wrapper-doctor-preflight-capability-gap",
+        "notes": null,
+        "started_at": "2026-08-01T17:15:03Z",
+        "started_branch": "feat/todo-wrapper-doctor-preflight",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Pin auth-vs-outage classification, read-only behaviour, and DSN/token non-leakage",
+        "wid": "w2"
+      }
+    ]
+  }
+}

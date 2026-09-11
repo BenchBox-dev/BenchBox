@@ -1,0 +1,396 @@
+{
+  "context": "Land repository compatibility before admin activation wherever GitHub permits. Add merge_group checks_requested support to every required workflow and adapt event-dependent classifiers to merge-group SHAs. Rehearse on a non-develop rule or controlled test repository if necessary. Operator then transfers ownership, verifies all transfer-sensitive surfaces, enables the queue with squash, and monitors canaries. Rollback may disable the queue, but repository transfer and Pages side effects are not assumed instantly reversible.",
+  "description": "Dropped. SHADOW_ONLY still governs. Repository transfer to BenchBox-dev is owned by github-org-transfer-00 through 04 (and 00b), not this item. Do not treat that transfer as NATIVE_MERGE_QUEUE authorization. If a later decision selects NATIVE_MERGE_QUEUE after the org transfer, reopen this item for merge_group + queue enablement only; do not re-transfer the repository.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assume old owner URLs and Pages redirect identically",
+        "instead": "verify every external and publication surface",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "why": "GitHub documents transfer exceptions including Pages"
+      },
+      {
+        "dont": "Delete post-merge safety because queue CI is green",
+        "instead": "retain the existing post-merge defense",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "why": "they validate different commits and hosted event delivery can fail"
+      },
+      {
+        "dont": "Run reduced fast-refresh and merge queue policies together",
+        "instead": "keep 07a blocked or dropped",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "why": "two integration policies obscure authority and failure semantics"
+      },
+      {
+        "dont": "Transfer or enable the queue before repository compatibility lands",
+        "instead": "land, rehearse, then perform protected operator actions",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "why": "required merge_group checks may never report"
+      },
+      {
+        "dont": "Use pull_request-only event fields on merge_group",
+        "instead": "add explicit merge_group data flow and tests",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "why": "the event schema and SHA/ref differ"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "needs_item": "strict-base-refresh-06-activation-decision-and-selected-path-handoff"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Blocked until strict-base-refresh-06-activation-decision-and-selected-path-handoff selects NATIVE_MERGE_QUEUE, an operator approves transfer, and the item is explicitly unblocked.",
+      "category": "Dev Loop",
+      "created_at": "2026-08-14T12:16:16Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Every current required context reports on merge_group before queue activation",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration"
+      },
+      {
+        "behavior": "No bypass actors and strict current integration validation remain",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration"
+      },
+      {
+        "behavior": "Soundness-path maintainer review and hold labels remain effective",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration"
+      },
+      {
+        "behavior": "Squash is the only merge method for queued develop PRs",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration"
+      },
+      {
+        "behavior": "develop-post-merge remains active as a distinct defense",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "hold and soundness auto-merge revocation",
+        "decision": "supersede",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "path": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "concept": "trusted ruleset-drift context",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "path": ".github/workflows/develop-ruleset-drift.yml"
+      },
+      {
+        "concept": "required full Develop PR integration aggregate",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "path": ".github/workflows/pr.yml"
+      },
+      {
+        "concept": "required browser aggregate",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "path": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "concept": "pr-ready, pr-refresh, and PR publication operator flow",
+        "decision": "supersede",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "path": "Makefile"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "do_not_modify",
+        "path_glob": ".github/integration-domains.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "do_not_modify",
+        "path_glob": "A custom merge-steward workflow or GitHub App"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "do_not_modify",
+        "path_glob": "Reduced fast-refresh skip conditions from strict-base-refresh-07a"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "do_not_modify",
+        "path_glob": "Release and published-results branch policies unless explicitly required by transfer"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-ruleset-drift.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/required_lane.py"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "only_modify",
+        "path_glob": "docs/development/pr-base-branch-policy.md"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "only_modify",
+        "path_glob": "scripts/path_filter_decision.py"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'merge_group:|checks_requested' .github/workflows/pr.yml .github/workflows/results-explorer-browser.yml .github/workflows/develop-ruleset-drift.yml",
+        "description": "All required workflows expose merge_group checks_requested",
+        "expected": "Each required workflow has an explicit merge_group trigger",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q -k 'merge_group or merge_queue or ruleset or browser or required_result'",
+        "description": "Workflow tests cover pull_request and merge_group schemas",
+        "expected": "all selected tests pass",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'merge_group|checks_requested|queued|removed|incompatible|squash|rollback|run URL' _project/decisions/strict-base-refresh-activation-*.md docs/operations/repo-admin-settings.md",
+        "description": "Canary evidence proves successful and failing merge-group behavior",
+        "expected": "Durable positive and negative canary evidence is recorded",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo show strict-base-refresh-07a-reduced-fast-refresh-rollout --json | jq -e '.blocked_reason != null or .state == \"dropped\"'",
+        "description": "07a is not actionable during native queue deployment",
+        "expected": "exit 0",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo lint strict-base-refresh-07b-native-merge-queue-migration",
+        "description": "This TODO passes tracker quality lint",
+        "expected": "0 findings",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/$(gh repo view --json nameWithOwner --jq .nameWithOwner)/rulesets/$(gh api repos/$(gh repo view --json nameWithOwner --jq .nameWithOwner)/rulesets --jq '.[] | select(.name==\"develop-squash-only\") | .id') --jq '{bypass:[.bypass_actors[]?.actor_type],rules:[.rules[].type],checks:[.rules[]|select(.type==\"required_status_checks\")|.parameters.required_status_checks[].context]}'",
+        "description": "Live post-transfer ruleset has merge queue, squash, required contexts, and no bypass",
+        "expected": "merge queue rule present, bypass empty, every required context present",
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "notes": "Stop while blocked, if assessment is DEFER or NO_GO, or if any secret/app/Pages owner is unresolved.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate NATIVE_MERGE_QUEUE selection, operator approval, organization target, and transfer inventory",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "notes": "Handle merge_group event fields explicitly; do not reference pull_request-only fields without a guarded alternative.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add merge_group checks_requested support for ci-required-result, browser gate, and ruleset-drift",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "notes": "Queue-tier must provide every required context. Use full combined-tree validation unless the activation record explicitly approves another proven policy.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Adapt path classification and full integration CI to the merge-group SHA while preserving current PR checks",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "notes": "No PR may bypass soundness-path human review or be enqueued before its current required pre-queue checks pass.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Adapt pr-ready, auto-merge revocation, soundness controls, Codex review flow, and operator docs for enqueue semantics",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "notes": "Negative controls: missing context, red group, base advance, grouped incompatible PRs, auto-merge hold, fork, and timeout.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Rehearse merge_group contexts, failure removal, ordering, batching, squash output, and rollback before develop activation",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "notes": "Protected operator action. Record before/after inventory without secret values. Stop and roll back queue activation on any unresolved surface.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Execute operator-approved repository transfer and verify URLs, Pages, CNAME, secrets, variables, apps, webhooks, packages, environments, and permissions",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "notes": "Protected operator action. Start with low build concurrency and one-PR groups; expand only after evidence.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Enable merge queue on develop with squash, no bypass, required contexts, conservative grouping, and bounded timeout",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "notes": "Include two queued PRs with an intentional incompatible pair that must be removed or fail before merge.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run canary PRs, prove no open branch refresh is needed, and validate full merge-group integration results",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "strict-base-refresh-07b-native-merge-queue-migration",
+        "notes": "Document non-reversible transfer/Pages considerations separately from queue disablement.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update runbooks, perform queue-disable rollback drill, and complete independent post-deployment review",
+        "wid": "w8"
+      }
+    ]
+  }
+}

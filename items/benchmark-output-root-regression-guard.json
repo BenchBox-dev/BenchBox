@@ -1,0 +1,239 @@
+{
+  "context": "Build the guard on top of the registry so it auto-covers new benchmarks. Reuse\nthe helper functions already in the propagation test for resolving nested\ngenerators. Prefer xfail with an explicit reason over skipping for the known\ntpcds/tpcdi override gap, so the tracker shows the residual work.\n",
+  "description": "PR #759 fixed the lifecycle-ordering bug where generator-backed benchmarks\nignored BENCHBOX_OUTPUT_DIR and wrote datagen output under a worktree-local\nbenchmark_runs/. The fix made BaseBenchmark's default datagen root env-aware\nand added an opt-in GeneratorOutputDirMixin that propagates a resolved root to\nnested generators. The accompanying tests\n(tests/unit/core/test_benchmark_output_root_propagation.py,\ntests/unit/mcp/test_benchmark_output_root_propagation.py) only assert a\nhand-picked subset of benchmark families.\n\nThe footgun is structural: a new generator-backed benchmark that builds its\ngenerator in __init__ and forgets the mixin (or hardcodes\nPath.cwd()/\"benchmark_runs\") silently reintroduces the original bug, and no\ntest or lint catches it. A one-off manual probe across all 24 registered\nbenchmarks confirmed the contract currently holds, but that evidence is not\ndurable.\n\nConvert that probe into a registry-driven regression guard so the contract is\nenforced for every current and future benchmark, and add a cheap static guard\nthat fails when a benchmark constructor hardcodes a cwd-local benchmark_runs\ndefault instead of the shared resolver.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assert only benchmark.output_dir",
+        "instead": "assert the nested generator/downloader paths too.",
+        "item_id": "benchmark-output-root-regression-guard",
+        "why": "the original bug lived in nested generators"
+      },
+      {
+        "dont": "hand-list benchmark ids",
+        "instead": "enumerate via get_all_benchmarks() instead.",
+        "item_id": "benchmark-output-root-regression-guard",
+        "why": "the point is to auto-cover future benchmarks"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-output-root-regression-guard",
+        "id": 353,
+        "reason": "Cleanup of existing on-disk artifacts belongs to benchmark-runs-duplicate-artifact-cleanup, not this regression-guard item.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Cleanup of orphaned non-canonical datagen dirs is explicitly assigned to benchmark-runs-duplicate-artifact-cleanup, which is open.",
+        "summary": "Clean up orphaned non-canonical datagen dirs (e.g. nyctaxi_1.0) left by direct library users before PR #759 canonicalized the names"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-output-root-regression-guard",
+        "id": 354,
+        "reason": "That filesystem-at-runtime assertion is owned by benchmark-runs-local-artifact-guardrails; this item is the unit-test + static-source counterpart (construction contract and hardcoded-default lint).",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Runtime guardrail explicitly owned by benchmark-runs-local-artifact-guardrails, which is already DONE (_project/DONE/main/planning/); no open work remains here.",
+        "summary": "Runtime/UAT guardrail that fails a run when worktree-local benchmark_runs writes appear despite an external output root"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "benchmark-output-root-regression-guard",
+        "needs_item": "benchmark-runs-output-root-propagation"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-06-11T00:00:00Z",
+      "created_at": "2026-06-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The existing per-family assertions in test_benchmark_output_root_propagation.py keep passing (extend, do not delete).",
+        "item_id": "benchmark-output-root-regression-guard"
+      },
+      {
+        "behavior": "tests remain in the fast lane and write nothing under the active worktree.",
+        "item_id": "benchmark-output-root-regression-guard"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/planning/benchmark-runs-local-artifact-guardrails.yaml — align with the runtime guardrail effort; this item is the test/lint counterpart",
+        "decision": "reuse",
+        "item_id": "benchmark-output-root-regression-guard",
+        "path": "_project/TODO/main/planning/benchmark-runs-local-artifact-guardrails.yaml"
+      },
+      {
+        "concept": "benchbox/base.py:GeneratorOutputDirMixin (OUTPUT_DIR_GENERATOR_ATTRS) — reuse to discover the nested-generator attributes to assert against",
+        "decision": "reuse",
+        "item_id": "benchmark-output-root-regression-guard",
+        "path": "benchbox/base.py:GeneratorOutputDirMixin"
+      },
+      {
+        "concept": "benchbox/core/benchmark_registry.py:get_all_benchmarks / get_public_benchmark_class — reuse to enumerate every benchmark under test",
+        "decision": "reuse",
+        "item_id": "benchmark-output-root-regression-guard",
+        "path": "benchbox/core/benchmark_registry.py:get_all_benchmarks"
+      },
+      {
+        "concept": "benchbox/utils/path_utils.py:get_benchmark_runs_datagen_path / resolve_benchmark_runs_dir — reuse as the canonical env-aware root for assertions",
+        "decision": "reuse",
+        "item_id": "benchmark-output-root-regression-guard",
+        "path": "benchbox/utils/path_utils.py:get_benchmark_runs_datagen_path"
+      },
+      {
+        "concept": "tests/unit/core/test_benchmark_output_root_propagation.py — extend the per-family assertions into a registry-parametrized form rather than adding a parallel test file",
+        "decision": "extend",
+        "item_id": "benchmark-output-root-regression-guard",
+        "path": "tests/unit/core/test_benchmark_output_root_propagation.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchmark-output-root-regression-guard",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "benchmark-output-root-regression-guard",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "benchmark-output-root-regression-guard",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/lint.yml"
+      },
+      {
+        "item_id": "benchmark-output-root-regression-guard",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "benchmark-output-root-regression-guard",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      },
+      {
+        "item_id": "benchmark-output-root-regression-guard",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_benchmark_output_root_propagation.py tests/unit/mcp/test_benchmark_output_root_propagation.py -q",
+        "description": "New registry-wide propagation tests pass",
+        "expected": "all tests pass; every registered benchmark is parametrized",
+        "item_id": "benchmark-output-root-regression-guard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_benchmark_output_root_guard.py -q",
+        "description": "Static guard fails on a deliberately hardcoded cwd default",
+        "expected": "guard passes on current tree and fails when a benchmark hardcodes Path.cwd()/benchmark_runs",
+        "item_id": "benchmark-output-root-regression-guard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite still passes",
+        "expected": "no new failures attributable to this change",
+        "item_id": "benchmark-output-root-regression-guard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchmark-output-root-regression-guard",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchmark-output-root-regression-guard",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-output-root-regression-guard",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchmark-output-root-regression-guard",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchmark-output-root-regression-guard",
+        "notes": "Construct each id from get_all_benchmarks() with BENCHBOX_OUTPUT_DIR set to\na tmp path and assert output_dir plus any OUTPUT_DIR_GENERATOR_ATTRS\ngenerator resolves under it. Capture stdout to /tmp/output-root-guard-w0.log\n(do not commit) and record the pass count and any exceptions in the PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate that every registered benchmark currently honors the env output root",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-output-root-regression-guard",
+        "notes": "Parametrize over get_all_benchmarks(). For each, construct via the public\nclass (mirroring the MCP/library entry point) with BENCHBOX_OUTPUT_DIR set;\nassert output_dir and each present nested generator/downloader resolve under\nthe root and that Path.cwd() is not a parent. Resolve nested generators via\n_impl when the public wrapper delegates.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a registry-parametrized test asserting env-root honoring at construction for all benchmarks",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-output-root-regression-guard",
+        "notes": "For benchmarks that build a generator in __init__, assign a fresh explicit\nroot after construction and assert the nested generator follows. Mark the\nknown non-mixin benchmarks (tpcds, tpcdi) xfail and reference\nbenchmark-output-root-explicit-override-propagation so the gap is tracked,\nnot hidden.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a test asserting post-construction output_dir reassignment propagates to nested generators",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-output-root-regression-guard",
+        "notes": "A unit test (or ruff/grep-based check wired into ci-lint) that scans\nregistered benchmark class source files for Path.cwd()/\"benchmark_runs\"\ndefaults and fails with guidance to use get_benchmark_runs_datagen_path\ninstead. Allow a documented exception list only for intentional non-datagen\npaths.\n\nScan target must cover ALL registered benchmark sources, not only files named\nbenchmark.py. For example, TPCDSBenchmark lives in\nbenchbox/core/tpcds/benchmark/runner.py, not benchmark.py. Derive scan\ntargets from the registered class __module__ paths (via get_all_benchmarks())\nrather than a glob like benchbox/core/**/benchmark.py so future benchmarks\nadded in non-standard file names are automatically covered.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a static guard that fails on hardcoded cwd-local benchmark_runs defaults in constructors",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-output-root-regression-guard",
+        "notes": "Assert that a CloudStagingPath/DatabricksPath assigned as the output root\npropagates to the nested generator without being re-wrapped or losing cloud\nsemantics. Use a mocked/staging path so no live cloud access is required.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend coverage to a cloud/dbfs output root through at least one generator-backed benchmark",
+        "wid": "w4"
+      }
+    ]
+  }
+}

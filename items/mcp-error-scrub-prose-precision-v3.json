@@ -1,0 +1,146 @@
+{
+  "context": "Add table-driven behavior cases through scrub_secret_material, covering benign phrases, connector assignments, quoted assignments, and mixed messages. Define the contract in terms of returned text, not regex shape. Sequence after the vocabulary item because both touch benchbox/mcp/errors.py and tests/unit/mcp/test_errors.py; re-drive both gates before implementation to detect a concurrent fix. The corrected rungs drive make_execution_error and inspect the returned structured response, while unit tests may still exercise the helper for focused cases.",
+  "description": "Reduce false-positive MCP error scrubbing that currently mangles benign prose such as secret sauce, token refresh, and password reset. This is a separate precision concern from the remaining assignment vocabulary item. The scrubber must continue removing actual secret-bearing assignment/prose forms while preserving human-readable diagnostics when no value is exposed. This is the corrected successor of mcp-error-scrub-prose-precision-v1; its stored rung was repaired during adversarial plan review. This successor repairs the stale dependency edge found during adversarial graph review.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not assert only that output differs or contains asterisks.",
+        "instead": "Assert exact preservation for benign phrases and exact sentinel absence for secret cases.",
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "why": "A mangled message could satisfy a weak assertion while hiding useful diagnostics."
+      },
+      {
+        "dont": "Do not solve false positives by removing all secret-related scrubbing.",
+        "instead": "Narrow the behavior using paired secret and benign prose cases.",
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "why": "That would reintroduce the concrete credential-egress defect."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "needs_item": "mcp-error-scrub-secret-vocabulary-v2"
+      }
+    ],
+    "item_meta": {
+      "category": "security",
+      "created_at": "2026-08-02T20:32:28Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Actual secret-bearing assignment/prose forms remain scrubbed.",
+        "item_id": "mcp-error-scrub-prose-precision-v3"
+      },
+      {
+        "behavior": "Punctuation, exception context, and benign diagnostic wording remain readable.",
+        "item_id": "mcp-error-scrub-prose-precision-v3"
+      },
+      {
+        "behavior": "The existing formatter and inline egress-reviewed marker contract.",
+        "item_id": "mcp-error-scrub-prose-precision-v3"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/tools/analytics.py"
+      },
+      {
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/errors.py"
+      },
+      {
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_errors.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --all-extras -- python -c 'from benchbox.mcp.errors import make_execution_error; samples=[\"secret sauce is the default\",\"token refresh required\",\"password reset required\"]; assert all(make_execution_error(x)[\"message\"]==x for x in samples)'",
+        "description": "Unfixed-tree gate: benign diagnostic phrases must remain byte-identical after scrubbing; current develop replaces secret-related prose.",
+        "expected": "FAIL on unfixed develop: benign MCP prose is mangled; exits 1 before the precision fix and 0 after it.",
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --all-extras -- python -c 'from benchbox.mcp.errors import make_execution_error; assert \"REAL_SECRET\" not in make_execution_error(\"password=REAL_SECRET\")[\"message\"]; assert make_execution_error(\"password field is missing\")[\"message\"]==\"password field is missing\"'",
+        "description": "Regression guard: a real assignment remains scrubbed while a non-secret password diagnostic is preserved.",
+        "expected": "PASS on current develop and after the change: secret removal remains active without broad prose damage.",
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-drive benign prose and secret-bearing mixed-message cases after the vocabulary item.",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Adjust scrub behavior to distinguish prose from credential values.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-error-scrub-prose-precision-v3",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add exact preservation assertions and run MCP regression checks.",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,336 @@
+{
+  "context": "Start with the base lifecycle contract, not QuestDB. Add a narrow opt-in hook\nwhose default preserves existing skip_database_management behavior. Use the\ncurrent expected-table and existing-table helper patterns where they fit, but\nkeep adapter-specific readiness checks local: QuestDB needs a non-empty-table\nprobe, while InfluxDB can use its existing metadata-listing API. After the\nhook is covered by base tests, migrate QuestDB and InfluxDB one adapter at a\ntime and keep each adapter's existing unit tests green before broadening the\nverification command.\n",
+  "description": "QuestDB's handle_existing_database() override validates that all expected\nbenchmark tables exist and contain data before marking the database as reused.\nInfluxDB has a separate override that logs a warning when force_recreate=True\nbut does not validate benchmark table presence. Both overrides work around a\nbase class limitation: when skip_database_management=True, the base class\nimmediately returns with database_was_reused=True without table validation.\n\nRefactor the base class (benchbox/platforms/base/connection_lifecycle.py)\nto provide an opt-in check_benchmark_tables_exist() hook that managed-database\nadapters can implement without duplicating connection and set-comparison\nlogic. The hook result must cover adapter-specific data-readiness semantics,\nnot just metadata presence, so QuestDB's existing non-empty table guard is not\nlost.\n\nMigration plan:\n- Base lifecycle: keep legacy skip_database_management behavior for adapters\n  that do not implement the hook; only opted-in adapters should trigger\n  validation work in the skip path.\n- QuestDB: replace the full override body with a call to the base hook while\n  preserving dry-run, force-recreate, missing-benchmark, missing-table, and\n  empty-table outcomes.\n- InfluxDB: keep its custom force_recreate warning; add a hook call for table\n  validation (the two concerns are independent and both should be preserved)\n- Future managed-database adapters get correct reuse detection automatically\n  by implementing the hook rather than reimplementing the pattern from scratch.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add live cloud or Docker requirements to prove this refactor",
+        "instead": "keep live tests out unless explicitly requested.",
+        "item_id": "generalize-database-table-reuse-detection",
+        "why": "the behavior can be covered with unit-level adapter mocks"
+      },
+      {
+        "dont": "duplicate expected-table resolution with ad hoc benchmark.tables-only logic",
+        "instead": "reuse the existing expected-table helper order or document any adapter-specific exception.",
+        "item_id": "generalize-database-table-reuse-detection",
+        "why": "generated-data keys can be incomplete or late-populated"
+      },
+      {
+        "dont": "make skip_database_management=True globally trigger full DatabaseValidator work",
+        "instead": "require explicit adapter opt-in instead.",
+        "item_id": "generalize-database-table-reuse-detection",
+        "why": "several managed/live adapters rely on the current fast skip path"
+      },
+      {
+        "dont": "reduce QuestDB readiness to table-name presence",
+        "instead": "preserve the LIMIT 1 non-empty check.",
+        "item_id": "generalize-database-table-reuse-detection",
+        "why": "prior partial runs can leave empty tables that must not be reused"
+      },
+      {
+        "dont": "remove InfluxDB's force_recreate warning while adding validation",
+        "instead": "keep both branches tested.",
+        "item_id": "generalize-database-table-reuse-detection",
+        "why": "recreation support and table-readiness validation are independent concerns"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture & Refactoring",
+      "completed_at": "2026-05-26T00:00:00Z",
+      "created_at": "2026-04-14T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Adapters with skip_database_management=True and no hook implementation still set database_was_reused=True without opening validation connections.",
+        "item_id": "generalize-database-table-reuse-detection"
+      },
+      {
+        "behavior": "ConnectionLifecycleMixin.handle_existing_database() still returns early in dry_run mode before any database existence or table-readiness checks.",
+        "item_id": "generalize-database-table-reuse-detection"
+      },
+      {
+        "behavior": "Existing CLI/orchestrator paths that bind adapter.benchmark_instance for validation remain compatible.",
+        "item_id": "generalize-database-table-reuse-detection"
+      },
+      {
+        "behavior": "InfluxDBSetupMixin.handle_existing_database() still logs the current force_recreate warning.",
+        "item_id": "generalize-database-table-reuse-detection"
+      },
+      {
+        "behavior": "QuestDBAdapter force_recreate=True sets database_was_reused=False without connecting to QuestDB.",
+        "item_id": "generalize-database-table-reuse-detection"
+      },
+      {
+        "behavior": "QuestDBAdapter marks database_was_reused=True only when all expected tables exist and each expected table has at least one row.",
+        "item_id": "generalize-database-table-reuse-detection"
+      },
+      {
+        "behavior": "QuestDBAdapter treats missing benchmark metadata, empty expected-table lists, missing expected tables, and empty expected tables as fresh database states.",
+        "item_id": "generalize-database-table-reuse-detection"
+      },
+      {
+        "behavior": "The base hook default is a no-op/no-opinion result, such as None, so old adapters keep the current database_was_reused=True skip behavior.",
+        "item_id": "generalize-database-table-reuse-detection"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/base/connection_lifecycle.py:ConnectionLifecycleMixin.handle_existing_database - extend skip_database_management handling with an opt-in hook",
+        "decision": "extend",
+        "item_id": "generalize-database-table-reuse-detection",
+        "path": "benchbox/platforms/base/connection_lifecycle.py:ConnectionLifecycleMixin.handle_existing_database"
+      },
+      {
+        "concept": "benchbox/platforms/base/phase_tracking.py:_get_existing_tables - reuse or override the existing metadata-query convention for adapter table listing",
+        "decision": "reuse",
+        "item_id": "generalize-database-table-reuse-detection",
+        "path": "benchbox/platforms/base/phase_tracking.py:_get_existing_tables"
+      },
+      {
+        "concept": "benchbox/platforms/base/phase_tracking.py:_get_expected_tables - reuse expected-table resolution order instead of inventing a second benchmark-table parser",
+        "decision": "reuse",
+        "item_id": "generalize-database-table-reuse-detection",
+        "path": "benchbox/platforms/base/phase_tracking.py:_get_expected_tables"
+      },
+      {
+        "concept": "benchbox/platforms/base/validation.py:SchemaValidator - reuse the expected-vs-existing set-comparison semantics where practical, but do not invoke full database compatibility validation in the managed skip path by default",
+        "decision": "reuse",
+        "item_id": "generalize-database-table-reuse-detection",
+        "path": "benchbox/platforms/base/validation.py:SchemaValidator"
+      },
+      {
+        "concept": "benchbox/platforms/influxdb/adapter.py:get_tables/table_exists - extend this InfluxDB metadata path for hook implementation instead of duplicating metadata SQL in setup.py",
+        "decision": "extend",
+        "item_id": "generalize-database-table-reuse-detection",
+        "path": "benchbox/platforms/influxdb/adapter.py:get_tables/table_exists"
+      },
+      {
+        "concept": "benchbox/platforms/questdb.py:QuestDBAdapter.handle_existing_database - supersede the duplicated lifecycle override while preserving non-empty table checks",
+        "decision": "supersede",
+        "item_id": "generalize-database-table-reuse-detection",
+        "path": "benchbox/platforms/questdb.py:QuestDBAdapter.handle_existing_database"
+      },
+      {
+        "concept": "tests/unit/platforms/test_base_adapter_database_management.py and tests/unit/platforms/test_questdb_coverage.py - extend existing lifecycle and QuestDB regression coverage",
+        "decision": "extend",
+        "item_id": "generalize-database-table-reuse-detection",
+        "path": "tests/unit/platforms/test_base_adapter_database_management.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "kind": "do_not_modify",
+        "path_glob": "tests/integration/platforms/"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/generalize-database-table-reuse-detection.yaml"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/connection_lifecycle.py"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/phase_tracking.py"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/influxdb/adapter.py"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/influxdb/setup.py"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/questdb.py"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/influxdb/test_setup_mixin.py"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_base_adapter_database_management.py"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_questdb_adapter.py"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_questdb_coverage.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_base_adapter_database_management.py tests/unit/platforms/test_questdb_adapter.py tests/unit/platforms/test_questdb_coverage.py tests/unit/platforms/influxdb/test_setup_mixin.py -q",
+        "description": "Base, QuestDB, and InfluxDB focused unit coverage passes",
+        "expected": "all selected tests pass with 0 failures",
+        "item_id": "generalize-database-table-reuse-detection",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_platform_validation.py -q",
+        "description": "Validation helper expectations still pass",
+        "expected": "all selected tests pass with 0 failures",
+        "item_id": "generalize-database-table-reuse-detection",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/platforms/base/connection_lifecycle.py benchbox/platforms/questdb.py benchbox/platforms/influxdb/adapter.py benchbox/platforms/influxdb/setup.py tests/unit/platforms/test_base_adapter_database_management.py tests/unit/platforms/test_questdb_adapter.py tests/unit/platforms/test_questdb_coverage.py tests/unit/platforms/influxdb/test_setup_mixin.py",
+        "description": "Edited Python files satisfy Ruff",
+        "expected": "All checks passed!",
+        "item_id": "generalize-database-table-reuse-detection",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/todo_cli.py validate _project/TODO/main/planning/generalize-database-table-reuse-detection.yaml",
+        "description": "TODO remains valid after implementation notes and completion updates",
+        "expected": "TODO validates successfully",
+        "item_id": "generalize-database-table-reuse-detection",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "generalize-database-table-reuse-detection",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "generalize-database-table-reuse-detection",
+        "notes": "Run focused current-state checks and record the compact replayable summary\nin the implementation PR body or TODO completion note: checked SHA, whether\nthe original dbc84af27 reference is resolvable, and the current locations\nof the base skip path, QuestDB table/non-empty guard, InfluxDB warning, and\nother skip_database_management users. Raw stdout belongs in /tmp, CI\nartifacts, or BENCHBOX_OUTPUT_DIR, not committed verification logs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate current lifecycle and adapter evidence before editing code",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-database-table-reuse-detection",
+        "notes": "Introduce check_benchmark_tables_exist() or an equivalently narrow hook in\nConnectionLifecycleMixin and call it from the\nskip_database_management=True branch. The default implementation should\nreturn None (unknown/no opinion) or an equivalent not-implemented sentinel\nso existing adapters that do not opt in still set database_was_reused=True\nwithout opening validation connections.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add an opt-in managed-database table-readiness hook to the base lifecycle",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-database-table-reuse-detection",
+        "notes": "Preserve the current QuestDB outcomes: dry-run exits without a connection,\nforce_recreate sets database_was_reused=False, missing benchmark/table\nmetadata is treated as fresh, missing expected tables are treated as fresh,\nand expected tables that exist but are empty are treated as fresh. The\nreplacement should use the base-class flow plus a QuestDB\ncheck_benchmark_tables_exist() implementation, not a second\nhandle_existing_database() rewrite.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate QuestDB to the shared hook without weakening reuse safety",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-database-table-reuse-detection",
+        "notes": "Keep InfluxDBSetupMixin.handle_existing_database() warning behavior for\nforce_recreate=True and add table-readiness validation through the shared\nhook. Reuse the existing get_tables()/table_exists() metadata path or add a\nnarrow _get_existing_tables() adapter method instead of issuing duplicate\nmetadata SQL in setup code. Do not collapse the force_recreate warning into\nthe hook; recreation support and table-readiness validation stay separate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate InfluxDB while preserving its force_recreate warning",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-database-table-reuse-detection",
+        "notes": "Cover the base default hook path for non-opted-in adapters, the opted-in\nfalse/true paths, QuestDB's non-empty table guard, and InfluxDB's preserved\nforce_recreate warning plus table-validation branch. Assert the hook is\ncalled where expected and cover present, missing, and partial table sets\nwithout requiring a live QuestDB or InfluxDB server.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add focused tests for default behavior, QuestDB, and InfluxDB",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-database-table-reuse-detection",
+        "notes": "Run the TODO verification commands, then compare changed paths against\nscope_limit.only_modify before completing the item.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run targeted verification and confirm scope stayed within the allowlist",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #141 of databricks-tpc-liquid-clustering-profile-rendering.\nDeferred: Build a comparison-UI cohort warning for cross-mechanism tuned results\nReason deferred: Metadata must land first so the UI warning has a stable contract to consume.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:07Z",
+      "worktree": "main"
+    }
+  }
+}

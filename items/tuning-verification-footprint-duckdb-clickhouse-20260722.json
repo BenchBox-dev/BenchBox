@@ -1,0 +1,11 @@
+{
+  "description": "DuckDB CTAS sorted-ingestion drops the pre-load CREATE INDEX so a full tuned run stays applied_unverified; record a corroboratable sort footprint (CTAS ORDER BY, or post-load index). ClickHouse key DDL runs at CREATE TABLE (outside the ledger) so it never mints applied_verified; fold it in. From tuning-introspection-receipts-20260716.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-23T12:28:30Z",
+      "completed_pr": 1275,
+      "created_at": "2026-07-22T21:07:25Z",
+      "worktree": "main"
+    }
+  }
+}

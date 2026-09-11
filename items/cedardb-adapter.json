@@ -1,0 +1,292 @@
+{
+  "description": "Add support for CedarDB (formerly Umbra), a high-performance RDBMS that handles both\nOLAP and OLTP workloads with PostgreSQL wire protocol compatibility.\n\nCedarDB is notable for:\n- Blazingly fast analytical and transactional query execution\n- Full PostgreSQL SQL dialect and wire protocol compatibility\n- Strong ACID guarantees with MVCC\n- Works with existing PostgreSQL tools (psql, DBeaver, DataGrip)\n- Python connectivity via psycopg2/psycopg3 (PostgreSQL drivers)\n\nReference: https://cedardb.com/docs/",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate PostgreSQL adapter logic",
+        "instead": "subclass PostgreSQLAdapter (from benchbox.platforms.postgresql import PostgreSQLAdapter) as done in timescaledb.py, pg_mooncake.py, pg_duckdb.py",
+        "item_id": "cedardb-adapter",
+        "why": "CedarDB uses PG wire protocol"
+      },
+      {
+        "dont": "hardcode PostgreSQL default port 5432",
+        "instead": "make port configurable with a CedarDB-appropriate default",
+        "item_id": "cedardb-adapter",
+        "why": "CedarDB may use a different port"
+      },
+      {
+        "dont": "modify existing adapter files",
+        "instead": "create a new cedardb.py file",
+        "item_id": "cedardb-adapter",
+        "why": "CedarDB is additive"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-04-07T00:00:00Z",
+      "created_at": "2026-01-26T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "cedardb-adapter"
+      },
+      {
+        "behavior": "PlatformRegistry.get_adapter_class() resolves all existing platforms - CedarDB registration in __init__.py must not break the eager-load block pattern (see timescaledb/pg_duckdb/pg_mooncake sections in __init__.py)",
+        "item_id": "cedardb-adapter"
+      },
+      {
+        "behavior": "PostgreSQLAdapter.__init__(), connect(), execute_query(), _load_data() behavior unchanged - CedarDB overrides only, no parent edits",
+        "item_id": "cedardb-adapter"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cedardb-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/postgresql.py"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/timescaledb.py"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/platforms/cedardb.md"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/cedardb.py"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/credentials/cedardb.py"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_cedardb.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.cedardb import CedarDBAdapter; print('import OK')\"",
+        "description": "New adapter imports correctly",
+        "expected": "import OK",
+        "item_id": "cedardb-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_cedardb.py -v --tb=short",
+        "description": "Unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "cedardb-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "Existing platform tests unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "cedardb-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.platform_registry import PlatformRegistry; assert 'cedardb' in PlatformRegistry.get_available_platforms(), 'not registered'; print('registered OK')\"",
+        "description": "CedarDB registered in PlatformRegistry",
+        "expected": "registered OK",
+        "item_id": "cedardb-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cedardb-adapter",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "cedardb-adapter",
+        "needs_wid": "w4",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cedardb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document CedarDB-specific SQL extensions and limitations",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cedardb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Identify bulk loading capabilities and COPY support",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "cedardb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research tuning parameters and configuration options",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "cedardb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create CedarDBAdapter subclass with connection defaults and register in __init__.py eager-load block (follow timescaledb.py)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "cedardb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add bulk loading support (COPY or custom) based on w2 research findings",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "cedardb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement platform-specific tuning configuration based on w3 research findings",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "cedardb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests: connection config construction, bulk load path, tuning config, dialect properties, get_platform_info() (follow test_pg_mooncake_adapter.py pattern with monkeypatched psycopg2)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "cedardb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run TPC-H/TPC-DS validation at SF 0.01 and SF 1",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "cedardb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create platform documentation and spec page (_project/specs/platforms/cedardb.md)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

@@ -1,0 +1,250 @@
+{
+  "context": "Use a w0 reproduction against the current factory and registry, choose the smallest contract-preserving correction, align schema/validation/factory/docs, and prove local, remote, and rejected Docker behavior. Treat Docker packaging as deployment infrastructure unless an explicit endpoint, lifecycle, and trust contract is approved.",
+  "description": "Adversarial review found that the MCP schema accepts deployment=\\\"docker\\\", while the Velox registry and adapter implement only local and remote. The adapter treats every non-local value as remote and therefore turns docker into an implicit remote endpoint instead of a Docker deployment. Revalidate the current registry, adapter, CLI, and docs contract, then make the MCP choice fail closed or implement a separately specified Docker mode without changing the meaning of local/remote.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not add a Docker branch without a documented lifecycle, endpoint, isolation, and cleanup contract",
+        "instead": "Treat Docker as packaging infrastructure unless a separate contract is approved",
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "why": "A partial Docker mode would create ambiguous ownership and security behavior"
+      },
+      {
+        "dont": "Do not leave any non-local string implicitly mapped to remote",
+        "instead": "Enumerate supported values and reject unknown values before factory construction",
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "why": "Unknown deployment values can redirect execution to an unintended endpoint"
+      },
+      {
+        "dont": "Do not prove this only with schema serialization",
+        "instead": "Assert the adapter deployment and endpoint selected by the factory",
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "why": "Serialization can pass while the factory selects the wrong deployment"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "needs_item": "mcp-v2-platform-option-contract-matrix-v3"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-04T12:18:12Z",
+      "completed_pr": 1520,
+      "created_at": "2026-08-02T20:24:32Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing local and remote Velox semantics and endpoint validation remain explicit.",
+        "item_id": "mcp-v2-velox-deployment-choice-v3"
+      },
+      {
+        "behavior": "MCP cannot create, discover, or contact an arbitrary Docker or remote endpoint from an option value.",
+        "item_id": "mcp-v2-velox-deployment-choice-v3"
+      },
+      {
+        "behavior": "No live Velox service, Docker daemon, or user credential is used by validation tests.",
+        "item_id": "mcp-v2-velox-deployment-choice-v3"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "deployment allowlist accepts docker",
+        "decision": "supersede",
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "path": "benchbox/mcp/schemas.py"
+      },
+      {
+        "concept": "authoritative Velox deployment choices are local and remote",
+        "decision": "extend",
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "path": "benchbox/platforms/registry.py"
+      },
+      {
+        "concept": "adapter maps non-local deployment to remote",
+        "decision": "extend",
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "path": "benchbox/platforms/velox.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/security.py"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "do_not_modify",
+        "path_glob": "deploy/**"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "do_not_modify",
+        "path_glob": "docker/**"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "do_not_modify",
+        "path_glob": "docs/operations/mcp-production-readiness.md"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/registry.py"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/velox.py"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/**"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms tests/unit/mcp/test_schemas.py -q",
+        "description": "The unfixed deployment regression is demonstrated before correction",
+        "expected": "exits 1 on the unfixed tree when docker is asserted not to become remote; exits 0 after the fail-closed contract is implemented",
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:15:31Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp tests/integration/mcp -q",
+        "description": "Factory and durable paths preserve the corrected deployment contract",
+        "expected": "exits 1 on the unfixed tree if replay or normalization reintroduces docker-to-remote routing; exits 0 after focused coverage passes",
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:15:43Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/mcp benchbox/platforms/velox.py tests/unit/mcp tests/unit/platforms tests/integration/mcp",
+        "description": "Scoped Velox and MCP checks are clean",
+        "expected": "exits 1 on the unfixed tree if the contract patch has lint defects; exits 0 after scoped checks pass",
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:15:46Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Schema half already closed by PR #1486, which changed velox deployment choices from ('local','docker') to ('local','remote'); validate_platform_options('velox',{'deployment':'docker'}) already raises. NOT re-implemented. Remaining defect confirmed at velox.py:116-123: self.deployment = config.get('deployment') or config.get('deployment_mode') or 'local', then EVERY subsequent branch is a bare 'if self.deployment == \"local\": ... else: <remote>'. So any unknown string ('docker', a typo, a future value) silently routes to the Spark-Connect remote path with endpoint defaulting to sc://localhost:50051. Authoritative supported set is local/remote per the module docstring (velox.py:21) and the two-mode design note (velox.py:82). Docker is packaging infrastructure (docker/ + deploy/ trees, both do_not_modify) with no lifecycle, endpoint, isolation, or cleanup contract, so it stays rejected rather than partially implemented.",
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "notes": null,
+        "started_at": "2026-08-04T12:10:53Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Reproduce the docker-to-remote misrouting and confirm the authoritative supported deployment set.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "w1: SUPPORTED_VELOX_DEPLOYMENTS=frozenset({'local','remote'}) + VeloxAdapter._validate_deployment() called from __init__ before the endpoint/caching branches; unknown values now raise ValueError instead of falling through to the Spark-Connect remote path. Docker rejected with a message pointing at the real workflow (deployment='local' inside the container) rather than partially implemented -- no Docker lifecycle/endpoint/isolation/cleanup contract exists and docker/ + deploy/ are do_not_modify. w2: tests/unit/platforms/test_velox_adapter.py TestDeploymentContractIsEnumerated (docker rejected, rejection message names packaging infrastructure, 6 unknown values incl. a raw sc:// endpoint rejected, 4 accepted/normalized, adapter-vs-MCP-allowlist parity) plus constructor tests for BOTH spellings (deployment and deployment_mode alias) and a test that local/remote still select their own endpoints and caching flags. w3: docs/reference/mcp.md records the enumerated contract and why docker is rejected. Ladder rung1 8235 passed, rung2 684 passed, rung3 ruff clean. Negative control: reverting only velox.py fails 15. No live Velox service, Docker daemon, or credential is used.",
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "notes": null,
+        "started_at": "2026-08-04T12:17:01Z",
+        "started_branch": "test/freeze-bulk-path-coverage",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Correct the allowlist and factory mapping, or document and implement an explicitly approved Docker mode",
+        "wid": "w1"
+      },
+      {
+        "evidence": "w1: SUPPORTED_VELOX_DEPLOYMENTS=frozenset({'local','remote'}) + VeloxAdapter._validate_deployment() called from __init__ before the endpoint/caching branches; unknown values now raise ValueError instead of falling through to the Spark-Connect remote path. Docker rejected with a message pointing at the real workflow (deployment='local' inside the container) rather than partially implemented -- no Docker lifecycle/endpoint/isolation/cleanup contract exists and docker/ + deploy/ are do_not_modify. w2: tests/unit/platforms/test_velox_adapter.py TestDeploymentContractIsEnumerated (docker rejected, rejection message names packaging infrastructure, 6 unknown values incl. a raw sc:// endpoint rejected, 4 accepted/normalized, adapter-vs-MCP-allowlist parity) plus constructor tests for BOTH spellings (deployment and deployment_mode alias) and a test that local/remote still select their own endpoints and caching flags. w3: docs/reference/mcp.md records the enumerated contract and why docker is rejected. Ladder rung1 8235 passed, rung2 684 passed, rung3 ruff clean. Negative control: reverting only velox.py fails 15. No live Velox service, Docker daemon, or credential is used.",
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "notes": null,
+        "started_at": "2026-08-04T12:17:09Z",
+        "started_branch": "test/freeze-bulk-path-coverage",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add local, remote, rejected-docker, unknown-value, alias, and durable replay tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": "w1: SUPPORTED_VELOX_DEPLOYMENTS=frozenset({'local','remote'}) + VeloxAdapter._validate_deployment() called from __init__ before the endpoint/caching branches; unknown values now raise ValueError instead of falling through to the Spark-Connect remote path. Docker rejected with a message pointing at the real workflow (deployment='local' inside the container) rather than partially implemented -- no Docker lifecycle/endpoint/isolation/cleanup contract exists and docker/ + deploy/ are do_not_modify. w2: tests/unit/platforms/test_velox_adapter.py TestDeploymentContractIsEnumerated (docker rejected, rejection message names packaging infrastructure, 6 unknown values incl. a raw sc:// endpoint rejected, 4 accepted/normalized, adapter-vs-MCP-allowlist parity) plus constructor tests for BOTH spellings (deployment and deployment_mode alias) and a test that local/remote still select their own endpoints and caching flags. w3: docs/reference/mcp.md records the enumerated contract and why docker is rejected. Ladder rung1 8235 passed, rung2 684 passed, rung3 ruff clean. Negative control: reverting only velox.py fails 15. No live Velox service, Docker daemon, or credential is used.",
+        "item_id": "mcp-v2-velox-deployment-choice-v3",
+        "notes": null,
+        "started_at": "2026-08-04T12:17:17Z",
+        "started_branch": "docs/bulk-transfer-pk-assessment",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run focused checks and reconcile reference documentation and contract matrix",
+        "wid": "w3"
+      }
+    ]
+  }
+}

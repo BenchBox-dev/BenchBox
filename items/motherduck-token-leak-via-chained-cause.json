@@ -1,0 +1,78 @@
+{
+  "context": "Mirror the DuckLake fix: suppress the chained cause when self.token is set (raise ... from None), keeping the redacted message as the sole carrier of the diagnosis; keep the chain for token-free runs so ordinary connection failures stay debuggable.",
+  "description": "benchbox/platforms/motherduck.py:223-228 redacts the message with _redact_motherduck_token() but still raises 'from e'. The original driver exception carries the unredacted motherduck_token, and Python prints it in the 'direct cause' section of any traceback, so the redaction is undone wherever a traceback is logged (CI output, crash reports). Same defect class as the DuckLake postgres password leak fixed in #1333, which suppresses the cause whenever the adapter holds secret material and keeps the chain otherwise.",
+  "legacy": {
+    "item_meta": {
+      "category": "security",
+      "completed_at": "2026-07-29T23:14:15Z",
+      "completed_pr": 1345,
+      "created_at": "2026-07-29T12:18:09Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "The existing _redact_motherduck_token() message redaction stays intact",
+        "item_id": "motherduck-token-leak-via-chained-cause"
+      },
+      {
+        "behavior": "Token-free connection failures keep their chained cause and full driver text",
+        "item_id": "motherduck-token-leak-via-chained-cause"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "motherduck-token-leak-via-chained-cause",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/motherduck.py"
+      },
+      {
+        "item_id": "motherduck-token-leak-via-chained-cause",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_motherduck_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_motherduck_adapter.py -q",
+        "description": "Regression test: a failed MotherDuck connection exposes the token neither in the message nor in __cause__",
+        "expected": "all pass; reverting the fix flips the new test to red",
+        "item_id": "motherduck-token-leak-via-chained-cause",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "motherduck-token-leak-via-chained-cause",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "benchbox/platforms/motherduck.py create_connection(): 'from e' -> 'from None' so the chained cause cannot re-print the unredacted token; comment records why it is unconditional (__init__ guarantees a token)",
+        "item_id": "motherduck-token-leak-via-chained-cause",
+        "notes": null,
+        "started_at": "2026-07-29T23:09:21Z",
+        "started_branch": "fix/motherduck-token-chained-cause",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Suppress the chained cause when a token is held, mirroring DuckLake's holds_secret_material gate",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/platforms/test_motherduck.py: test_create_connection_does_not_leak_token_through_chained_cause (asserts __cause__ is None, __suppress_context__ True, and no token in the RENDERED traceback); 48 passed; mutation check - restoring 'from e' fails exactly that one test. NOTE: test placed in the existing test_motherduck.py beside the sibling redaction test, NOT the test_motherduck_adapter.py named in this item's scope/ladder (that file does not exist; the glob was a promotion-time guess)",
+        "item_id": "motherduck-token-leak-via-chained-cause",
+        "notes": null,
+        "started_at": "2026-07-29T23:10:37Z",
+        "started_branch": "fix/motherduck-token-chained-cause",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Regression test asserting the sentinel token appears in neither str(exc) nor exc.__cause__",
+        "wid": "w2"
+      }
+    ]
+  }
+}

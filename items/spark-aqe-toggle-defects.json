@@ -1,0 +1,223 @@
+{
+  "description": "The Spark adapter cannot actually run with Adaptive Query Execution (AQE)\ndisabled through the standard pipeline, which blocks the AQE on/off comparison\nplanned in the Spark AQE blog post (see\n_blog/platform-deep-dives/outlines/spark-adaptive-query-execution.md and\nresearch file entries B2/B4 in\n_blog/platform-deep-dives/research/spark-aqe-verification-2026-07-04.md,\nverified at commit 5fe58367). Three related defects:\n\n  1. CLI flag is enable-only: `--adaptive-enabled` was declared\n     `action=\"store_true\", default=True` (benchbox/platforms/spark.py:300),\n     so passing the flag sets True and omitting it defaults to True. No CLI\n     spelling produces False.\n  2. Session-build disable was a no-op on modern Spark: _get_spark_conf only\n     set the three AQE keys when adaptive_enabled was True and omitted them\n     otherwise (spark.py:439-443). Spark enables AQE by default since 3.2.0,\n     so omission left AQE on even with adaptive_enabled=False.\n  3. Run-time force-re-enable: configure_for_benchmark unconditionally set\n     spark.sql.adaptive.enabled (and the coalesce/skewJoin keys) to \"true\"\n     for benchmark types olap/analytics/tpch/tpcds/joinorder\n     (spark.py:653-669, called from\n     benchbox/platforms/base/adapter.py:493-494 before query execution),\n     clobbering both adaptive_enabled=False and any spark_config override.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "drop the AQE keys from _get_spark_conf when disabled",
+        "instead": "set 'false' explicitly.",
+        "item_id": "spark-aqe-toggle-defects",
+        "why": "Spark 3.2.0+ defaults AQE on, so omission silently leaves it enabled"
+      },
+      {
+        "dont": "fix by adding a separate --disable-adaptive flag",
+        "instead": "use BooleanOptionalAction like the LakeSail adapter.",
+        "item_id": "spark-aqe-toggle-defects",
+        "why": "two flags for one boolean drift apart"
+      },
+      {
+        "dont": "remove the configure_for_benchmark AQE block entirely",
+        "instead": "make it honor adaptive_enabled and spark_config instead.",
+        "item_id": "spark-aqe-toggle-defects",
+        "why": "plain sessions still benefit from the explicit OLAP settings"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "spark-aqe-toggle-defects",
+        "id": 488,
+        "reason": "Different adapters and config surfaces; needs its own pass with per-adapter verification rather than riding along here. Review found the AQE key literals duplicated across spark.py, lakesail.py, velox.py, and pyspark/session.py; consider hoisting _SPARK_AQE_KEYS (and the resolve-then-apply pattern) into _spark_helpers.py as part of that port.",
+        "resolution": "promoted",
+        "resolved_item": "port-the-same-fixes-to-the-sibling-spark-family-adapters-lak",
+        "resolved_reason": null,
+        "summary": "Port the same fixes to the sibling Spark-family adapters: lakesail.py (has defect 2 at ~292-295 and defect 3 at ~531-533; its CLI flag is already BooleanOptionalAction so --no-adaptive-enabled currently parses but is silently ineffective at run time) and velox.py (defect 2 at ~266-269), then audit the cloud Spark adapters (CloudSparkConfigMixin, Databricks, EMR/Glue/Dataproc/Synapse/Fabric)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "spark-aqe-toggle-defects",
+        "id": 489,
+        "reason": "The outline is redrafted during the drafting TODO anyway; the research file entry is a dated evidence log pinned to commit 5fe58367 and stays as written.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly states the outline gets redrafted anyway during the drafting TODO and the dated evidence log 'stays as written'; no action needed.",
+        "summary": "Update the blog outline section 5 wording once this fix merges (the outline describes the defects in the present tense)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Default behavior is unchanged: AQE stays enabled by default (adaptive_enabled defaults True; the three keys are set to 'true').",
+        "item_id": "spark-aqe-toggle-defects"
+      },
+      {
+        "behavior": "LakeSail adapter behavior untouched.",
+        "item_id": "spark-aqe-toggle-defects"
+      },
+      {
+        "behavior": "configure_for_benchmark continues to set spark.sql.cbo.enabled and spark.sql.cbo.joinReorder.enabled for OLAP benchmark types.",
+        "item_id": "spark-aqe-toggle-defects"
+      },
+      {
+        "behavior": "spark_config precedence: an explicit user key wins over adapter-computed values at session build AND at configure_for_benchmark time.",
+        "item_id": "spark-aqe-toggle-defects"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/lakesail.py:207-212 - the same --adaptive-enabled flag already uses argparse.BooleanOptionalAction (--adaptive-enabled / --no-adaptive-enabled) with default=True; reuse this pattern for the Spark adapter.",
+        "decision": "reuse",
+        "item_id": "spark-aqe-toggle-defects",
+        "path": "benchbox/platforms/lakesail.py:207-212"
+      },
+      {
+        "concept": "benchbox/platforms/spark.py:_get_spark_conf - spark_config merges last (conf.update(self.spark_config)) so explicit user keys win at session build; the fix extends the same precedence to run time.",
+        "decision": "reuse",
+        "item_id": "spark-aqe-toggle-defects",
+        "path": "benchbox/platforms/spark.py:_get_spark_conf"
+      },
+      {
+        "concept": "tests/unit/platforms/test_lakesail_adapter.py:test_add_cli_arguments_supports_disabling_adaptive - the CLI regression test shape to mirror.",
+        "decision": "reuse",
+        "item_id": "spark-aqe-toggle-defects",
+        "path": "tests/unit/platforms/test_lakesail_adapter.py:test_add_cli_arguments_supports_disabling_adaptive"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "spark-aqe-toggle-defects",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "spark-aqe-toggle-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/spark.py"
+      },
+      {
+        "item_id": "spark-aqe-toggle-defects",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_spark_adapter.py"
+      },
+      {
+        "item_id": "spark-aqe-toggle-defects",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_spark_coverage.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_spark_adapter.py tests/unit/platforms/test_spark_coverage.py -q",
+        "description": "Spark adapter unit tests pass, including the new AQE toggle regressions",
+        "expected": "all pass except the pre-existing test_spark_in_platform_list isolation flake (fails identically on a clean tree; passes when run alone)",
+        "item_id": "spark-aqe-toggle-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_spark_adapter.py -k disabling_adaptive -q",
+        "description": "--no-adaptive-enabled parses to False through a real ArgumentParser",
+        "expected": "1 passed",
+        "item_id": "spark-aqe-toggle-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "spark-aqe-toggle-defects",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "spark-aqe-toggle-defects",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "spark-aqe-toggle-defects",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "spark-aqe-toggle-defects",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "spark-aqe-toggle-defects",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "spark-aqe-toggle-defects",
+        "needs_wid": "w1",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "spark-aqe-toggle-defects",
+        "notes": "RESOLVED: benchbox/platforms/spark.py now declares the flag with\naction=argparse.BooleanOptionalAction, default=True, matching the\nLakeSail adapter. --no-adaptive-enabled parses to False; the default\nand the positive spelling stay True, so existing invocations are\nunchanged.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Switch --adaptive-enabled to argparse.BooleanOptionalAction",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "spark-aqe-toggle-defects",
+        "notes": "RESOLVED: _get_spark_conf sets the three AQE keys (module constant\n_SPARK_AQE_KEYS) to \"true\" or \"false\" per adaptive_enabled, instead of\nomitting them when disabled. Omission does not disable AQE on Spark\n3.2.0+ where the upstream default is on. spark_config still merges\nlast, so explicit user overrides continue to win at session build.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set AQE keys explicitly in both directions in _get_spark_conf",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "spark-aqe-toggle-defects",
+        "notes": "RESOLVED: for OLAP benchmark types, configure_for_benchmark now sets\neach AQE key to spark_config.get(key, computed) where computed follows\nadaptive_enabled. An explicit spark_config entry is no longer clobbered\nat run time, and adaptive_enabled=False now survives the full\nbenchbox run pipeline. The CBO settings are unchanged.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make configure_for_benchmark honor adaptive_enabled and spark_config",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "spark-aqe-toggle-defects",
+        "notes": "RESOLVED: tests/unit/platforms/test_spark_adapter.py gains a real-parser\nCLI test (default/enabled/disabled spellings);\ntests/unit/platforms/test_spark_coverage.py updates test_aqe_disabled to\nassert explicit \"false\" keys (the old assertion encoded defect 2) and\nadds configure_for_benchmark tests for adaptive_enabled=False and for a\nspark_config override surviving run time.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regression tests for all three defects",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "spark-aqe-toggle-defects",
+        "notes": "RESOLVED (found by Codex review on the PR): the argparse flag lives on a\nsecondary entry point (PlatformRegistry.add_platform_arguments); the\nprimary `benchbox run` CLI parses --platform-option pairs against\nPlatformHookRegistry's option-spec table, which had no spark rows at\nall, so even --platform-option adaptive_enabled=false was rejected.\nAdded the spark|adaptive_enabled spec row (parse_bool, default 'true',\nmirroring the velox row) in benchbox/platforms/__init__.py; the\nregistered spark config builder already maps the field through to\nSparkAdapter.from_config. Regression test in\ntests/unit/cli/test_platform_hooks.py asserts the default and that\nadaptive_enabled=false parses to Python False.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register adaptive_enabled as a benchbox run platform option for spark",
+        "wid": "w5"
+      }
+    ]
+  }
+}

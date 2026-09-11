@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #575 of standardize-clickhouse-deployment-mode-contract.\nDeferred: Remove the legacy `mode` alias and `embedded` synonym entirely after one deprecation window\nReason deferred: Current callers and old config files may still depend on these spellings; this TODO should normalize reads and canonicalize writes first",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:59Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

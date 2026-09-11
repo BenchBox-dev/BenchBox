@@ -1,0 +1,299 @@
+{
+  "context": "Use git-filter-repo with a name-callback to target only commits where\nauthor name == b\"user.email\", leaving all other authors untouched.\nWork in strict order: backup → rewrite → verify → re-add remotes → push.\nNever push until w4 (verification) passes completely.\nHandle the remote-only seed-corpus-infra branch last, via cherry-pick.\n",
+  "description": "On 2026-01-28, a local git config entry `user.name=user.email` was written\nto .git/config, setting the commit author name to the literal string \"user.email\"\ninstead of \"Joe Harris\". This was discovered and fixed on 2026-04-14 (the config\nentry has been removed). However, all commits between 80e17e9 (2026-01-28 09:21)\nand 2cfdcfd (2026-04-14 20:16) were made with the bad author name - a total of\n2,286 commits on main and 1,850 commits on published-results (overlapping with main).\n\ngit-filter-repo is available at /Users/joe/.local/bin/git-filter-repo and will\nbe used to rewrite the author name across all affected commits.\n\nRefs affected:\n- main: 2,286 commits with author \"user.email\" (first: 80e17e9, last: 2cfdcfd)\n- published-results: 1,850 commits affected (shares history with main)\n- Tags v0.1.0-v0.2.0: point to correct-author commits, but their SHAs shift\n  during rewrite - tags must be force-pushed after rewrite\n- private/claude/seed-corpus-infra: 3 remote-only commits on top of old main;\n  these are NOT rewritten by filter-repo and must be cherry-picked onto new main\n- claude/condescending-mcnulty: local branch, 0 commits ahead of main - safe to\n  reset to new main HEAD after rewrite\n- public remote: READ-ONLY by repo policy - must NEVER receive a push\n\nfilter-repo behavior to account for:\n- Rewrites ALL commits reachable from any local ref (both branches, all tags)\n- Strips all remote-tracking refs after rewrite (safety mechanism) - remotes\n  must be re-added manually before any push\n- Does NOT have a safe --dry-run mode for name callbacks\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "proceed past w4 if any verification check fails",
+        "instead": "(not specified)",
+        "item_id": "fix-git-author-history-rewrite",
+        "why": "push only after confirming the rewrite is correct"
+      },
+      {
+        "dont": "push the backup/* tags to any remote",
+        "instead": "(not specified)",
+        "item_id": "fix-git-author-history-rewrite",
+        "why": "they're local safety refs only and contain the old 'user.email' commits"
+      },
+      {
+        "dont": "run `git push` or `git push public` without specifying `private` as the remote",
+        "instead": "(not specified)",
+        "item_id": "fix-git-author-history-rewrite",
+        "why": "this would push to the public repo, leaking private history"
+      },
+      {
+        "dont": "skip w2 (backup tags)",
+        "instead": "(not specified)",
+        "item_id": "fix-git-author-history-rewrite",
+        "why": "filter-repo is irreversible without a backup ref; restoring from backup/pre-author-fix/* is the only recovery path"
+      },
+      {
+        "dont": "try to run filter-repo twice",
+        "instead": "(not specified)",
+        "item_id": "fix-git-author-history-rewrite",
+        "why": "the second run would find nothing to fix and produce a clean-run, but may corrupt the backup tags"
+      },
+      {
+        "dont": "use `git push --force-with-lease` here",
+        "instead": "(not specified)",
+        "item_id": "fix-git-author-history-rewrite",
+        "why": "the lease check will always fail since the remote has old SHAs; plain `--force` is correct and intentional"
+      }
+    ],
+    "item_meta": {
+      "category": "Repository Maintenance",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Total commit count must be unchanged after rewrite",
+        "item_id": "fix-git-author-history-rewrite"
+      },
+      {
+        "behavior": "private/claude/seed-corpus-infra: 3 unique commits must be recoverable and pushed with correct authorship",
+        "item_id": "fix-git-author-history-rewrite"
+      },
+      {
+        "behavior": "public remote: must never receive a push at any point during this process",
+        "item_id": "fix-git-author-history-rewrite"
+      },
+      {
+        "behavior": "published-results branch: must be rewritten and force-pushed to private with correct authorship",
+        "item_id": "fix-git-author-history-rewrite"
+      },
+      {
+        "behavior": "version tags v0.1.0-v0.2.0: must survive the rewrite and be accessible on private remote",
+        "item_id": "fix-git-author-history-rewrite"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "kind": "only_modify",
+        "path_glob": "git commit objects (author metadata only)"
+      },
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "kind": "only_modify",
+        "path_glob": "git refs (branch and tag pointers after rewrite)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git log --all --format='%an' | sort -u | grep -c 'user\\.email'",
+        "description": "No 'user.email' author commits remain anywhere in the repo",
+        "expected": "0",
+        "item_id": "fix-git-author-history-rewrite",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git tag | grep '^v' | sort",
+        "description": "All version tags still exist",
+        "expected": "v0.1.0\nv0.1.1\nv0.1.2\nv0.1.3\nv0.1.4\nv0.1.5\nv0.2.0",
+        "item_id": "fix-git-author-history-rewrite",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git log private/main --format='%an' | sort -u",
+        "description": "private/main has correct authorship",
+        "expected": "Joe Harris",
+        "item_id": "fix-git-author-history-rewrite",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git log private/published-results --format='%an' | sort -u",
+        "description": "private/published-results has correct authorship",
+        "expected": "Joe Harris",
+        "item_id": "fix-git-author-history-rewrite",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "needs_wid": "w6",
+        "wid": "w10"
+      },
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "fix-git-author-history-rewrite",
+        "needs_wid": "w3",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-git-author-history-rewrite",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Pre-flight: snapshot current state of all refs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-git-author-history-rewrite",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Delete local backup tags after validation",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-git-author-history-rewrite",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Create backup tags before running filter-repo",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-git-author-history-rewrite",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run git-filter-repo to rewrite author name",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-git-author-history-rewrite",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify rewrite correctness before touching any remote",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-git-author-history-rewrite",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-add remotes (filter-repo strips them)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-git-author-history-rewrite",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Force-push main and published-results to private remote",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-git-author-history-rewrite",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Force-push version tags to private remote",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-git-author-history-rewrite",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Recover private/claude/seed-corpus-infra branch",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-git-author-history-rewrite",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reset local claude/condescending-mcnulty to new main",
+        "wid": "w9"
+      }
+    ]
+  }
+}

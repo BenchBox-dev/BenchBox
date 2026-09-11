@@ -1,0 +1,164 @@
+{
+  "context": "Static disclosure - no new data fetching required. All the displayed\nfields come from the detail result object already loaded by ResultDetail.\nThe panel is a simple definition list rendered from props.\n\nCollapsed by default with a clear \"How this was measured ↓\" label.\nThe label should be visible on first load so the panel is discoverable.\n",
+  "description": "Post-launch audit (2026-04-14) found that a visitor to a result detail\npage cannot determine:\n  - What the \"Duration\" number means (sum? mean? median?)\n  - Whether tuning was applied (currently just a boolean)\n  - Whether warmup queries are included in the timing\n  - What execution mode was used (SQL vs DataFrame)\n  - What hardware the result was produced on beyond OS/arch/CPU count\n\nThis matters because BenchBox's differentiator over ClickBench is\n\"rich per-query detail - execution plans, tuning configurations,\nvalidation status\". If a visitor can't interpret the numbers, that\nclaim is hollow. The absence of methodology disclosure also makes it\nimpossible to assess whether two results are meaningfully comparable.\n\nThis TODO adds a \"How this was measured\" disclosure section to the\nResultDetail page that surfaces the aggregation method, execution mode,\ntuning state, test type, and key environment parameters.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add interactive filtering or controls to the disclosure panel",
+        "instead": "action controls belong elsewhere",
+        "item_id": "explorer-add-methodology-disclosure",
+        "why": "this is read-only provenance"
+      },
+      {
+        "dont": "expand the panel by default",
+        "instead": "disclosure is for the methodologically curious",
+        "item_id": "explorer-add-methodology-disclosure",
+        "why": "most visitors just want the numbers"
+      },
+      {
+        "dont": "omit the metric definition",
+        "instead": "always include the definition",
+        "item_id": "explorer-add-methodology-disclosure",
+        "why": "'Geomean query time' is not obvious to a first-time visitor"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-add-methodology-disclosure",
+        "needs_item": "explorer-extend-manifest-and-pipeline"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-15T00:00:00Z",
+      "created_at": "2026-04-14T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Collapsed by default - visitors who don't care are not burdened",
+        "item_id": "explorer-add-methodology-disclosure"
+      },
+      {
+        "behavior": "Existing ResultDetail layout above the disclosure panel - disclosure is additive",
+        "item_id": "explorer-add-methodology-disclosure"
+      },
+      {
+        "behavior": "Graceful rendering for bundles that lack execution_mode / tuning_mode (null-safe)",
+        "item_id": "explorer-add-methodology-disclosure"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-add-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MethodologyDisclosure.tsx (new)"
+      },
+      {
+        "item_id": "explorer-add-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-add-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'MethodologyDisclosure' results-explorer/src/pages/ResultDetail.tsx",
+        "description": "MethodologyDisclosure component renders in ResultDetail",
+        "expected": "imported and used",
+        "item_id": "explorer-add-methodology-disclosure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "TypeScript compiles cleanly",
+        "expected": "(no errors)",
+        "item_id": "explorer-add-methodology-disclosure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'execution_mode.*null\\|null.*execution_mode\\|??' results-explorer/src/components/MethodologyDisclosure.tsx",
+        "description": "Component renders for null execution_mode (old bundle compatibility)",
+        "expected": "null-safe access present",
+        "item_id": "explorer-add-methodology-disclosure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-add-methodology-disclosure",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-add-methodology-disclosure",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-add-methodology-disclosure",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-add-methodology-disclosure",
+        "notes": "Metric definition copy: \"Primary metric is geometric mean of per-query\nexecution times (measurement runs only). Wall-clock total is shown\nseparately. Lower geomean = faster.\"\n\nTest type: \"Power test (single-stream sequential)\" or \"Throughput test\n(N concurrent streams)\".\n\nQuery scope: \"Full benchmark (22 queries)\" or \"Query subset: Q1, Q6, Q17\".\n\nEnvironment: already surfaced (OS/arch/CPU/memory/Python). Add\nexecution_mode and tuning_mode here too.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design the disclosure panel content: list each disclosed item (metric definition, execution mode, tuning mode, test type, query scope, environment summary) and write the copy for each.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-add-methodology-disclosure",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement MethodologyDisclosure component in results-explorer/src/components/. Collapsible panel, collapsed by default. Accepts detail result props; renders the disclosed items as a definition list.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-add-methodology-disclosure",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate MethodologyDisclosure into ResultDetail.tsx below the query timing table. Ensure it renders for all bundles including those predating the extended manifest (graceful null handling).",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-add-methodology-disclosure",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add comparability summary row to Compare.tsx header: execution_mode + tuning_mode + test_type per result. Surfaces differences without navigating to detail pages.",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "context": "Decide soft warn vs hard refuse for community-facing publish/export paths. If hard refuse, gate only community/public export not private local dumps; document operator setup; tests for empty vs configured salt. Do not bake a secret salt into the repo.",
+  "description": "ADR retained-field salt decision (2026-08-05, #1585) keeps empty OSS default and documents residual confirmation oracle on endpoint/database_name/submission_path. Operators who publish community submissions are recommended to set a deployment-private machine_id_salt before first public export, but there is no hard gate. Residual: silent empty-salt community publishes remain possible.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "require-operator-salt-for-community-publish",
+        "needs_item": "retained-published-pseudonym-salt-decision"
+      }
+    ],
+    "item_meta": {
+      "category": "privacy",
+      "completed_at": "2026-08-06T00:05:22Z",
+      "completed_pr": 1612,
+      "created_at": "2026-08-05T22:22:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No repository-baked default salt",
+        "item_id": "require-operator-salt-for-community-publish"
+      },
+      {
+        "behavior": "Private/local export without salt still possible unless explicitly gated",
+        "item_id": "require-operator-salt-for-community-publish"
+      },
+      {
+        "behavior": "Publication fixed point for already-public-shaped tokens",
+        "item_id": "require-operator-salt-for-community-publish"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "require-operator-salt-for-community-publish",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/**"
+      },
+      {
+        "item_id": "require-operator-salt-for-community-publish",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/**"
+      },
+      {
+        "item_id": "require-operator-salt-for-community-publish",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "require-operator-salt-for-community-publish",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -q 'residual confirmation oracle' docs/development/adr/adr-published-identifier-field-set.md",
+        "description": "ADR residual policy still recorded",
+        "expected": null,
+        "item_id": "require-operator-salt-for-community-publish",
+        "last_result": "pass",
+        "last_run": "2026-08-06T00:01:27Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "require-operator-salt-for-community-publish",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "require-operator-salt-for-community-publish",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Decision: hard refuse on benchbox submit when BENCHBOX_MACHINE_ID_SALT empty; private export unrestricted",
+        "item_id": "require-operator-salt-for-community-publish",
+        "notes": null,
+        "started_at": "2026-08-06T00:01:03Z",
+        "started_branch": "fix/require-operator-salt-community-publish",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Decide warn-only vs hard refuse for community public export without salt",
+        "wid": "w0"
+      },
+      {
+        "evidence": "require_public_pseudonym_salt + submit gate",
+        "item_id": "require-operator-salt-for-community-publish",
+        "notes": null,
+        "started_at": "2026-08-06T00:01:12Z",
+        "started_branch": "fix/require-operator-salt-community-publish",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Implement chosen gate on export/submit public path",
+        "wid": "w1"
+      },
+      {
+        "evidence": "ADR + result-formats + unit tests 47 passed",
+        "item_id": "require-operator-salt-for-community-publish",
+        "notes": null,
+        "started_at": "2026-08-06T00:01:19Z",
+        "started_branch": "fix/require-operator-salt-community-publish",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Docs + tests for empty vs configured salt",
+        "wid": "w2"
+      }
+    ]
+  }
+}

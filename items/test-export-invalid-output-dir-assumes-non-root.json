@@ -1,0 +1,67 @@
+{
+  "context": "Make the uncreatable-path condition privilege-independent rather than skipping. Options in preference order: point the test at a path that cannot be created regardless of privilege (e.g. a child of an existing regular file, which yields NotADirectoryError/FileNotFoundError for root too); or if that cannot express the intended failure, add a skipif on os.geteuid() == 0 with a recorded reason alongside the existing win32 guard. Prefer the first - it keeps the assertion running everywhere.",
+  "description": "tests/unit/cli/test_cli_output.py::TestResultExporterErrorHandling::test_export_with_invalid_output_dir expects ResultExporter(output_dir=Path('/invalid/path/that/cannot/be/created')) to raise FileNotFoundError. Running as root - the default in many CI images and dev containers, including the one this was found in - that path IS creatable, so nothing raises and the test fails with 'DID NOT RAISE FileNotFoundError'. Pre-existing and unrelated to any current branch: verified by stashing an in-flight change and re-running, with identical failure. The test already carries skipif(sys.platform == 'win32', reason='Path handling differs on Windows'), so it has a precedent for guarding on environment; it just does not account for privilege. Low priority because it does not affect the hosted Linux runners, but it makes the unit suite unrunnable-clean in a root container and costs a diagnosis cycle each time someone hits it.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci-failure-reduction",
+      "created_at": "2026-07-30T18:47:19Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The test still proves ResultExporter surfaces an error for an uncreatable output directory",
+        "item_id": "test-export-invalid-output-dir-assumes-non-root"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "test-export-invalid-output-dir-assumes-non-root",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_output.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 'tests/unit/cli/test_cli_output.py",
+        "description": "the exporter error-path test behaves the same as root and non-root",
+        "expected": "TestResultExporterErrorHandling' -q",
+        "item_id": "test-export-invalid-output-dir-assumes-non-root",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "test-export-invalid-output-dir-assumes-non-root",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "test-export-invalid-output-dir-assumes-non-root",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm the failure reproduces as root and passes as non-root on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "test-export-invalid-output-dir-assumes-non-root",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Rewrite the fixture path so creation fails regardless of privilege, or guard on euid with a recorded reason",
+        "wid": "w1"
+      }
+    ]
+  }
+}

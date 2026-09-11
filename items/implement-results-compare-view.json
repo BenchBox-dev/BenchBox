@@ -1,0 +1,174 @@
+{
+  "context": "Load detail JSONs for each compared result, merge on query ID, and render\na table + chart. Use DuckDB-WASM for the merge query if convenient, or\ndo it in TypeScript for simpler results. Keep the comparison honest -\nhard-block incompatible cohorts (different benchmark or scale factor), and\nwarn about non-blocking configuration differences without hiding them.\n",
+  "description": "Build the dynamic comparison tool at `/results/compare?ids=id1,id2[,id3]`.\n**This is the primary Phase 1 deliverable** - the feature that validates the\ncore hypothesis (\"people want to browse and compare public benchmark results\")\nand differentiates the explorer from a file listing.\n\nThe compare view is a dynamic tool: visitors pick a benchmark, scale factor,\nand platforms, then see a side-by-side query-level timing breakdown. It is the\nfeature that makes users come back and share links.\n\nComparison requires strict cohort validation: results must share the same\nbenchmark and scale factor to be compared. Incompatible comparisons (different\nbenchmark or different scale factor) must be hard-blocked with a clear error,\nnot merely warned. This prevents misleading cross-context comparisons from\never reaching the user.\n\nNote: this TODO does NOT depend on the result detail page. Compare and detail\nare independent siblings, both depending only on the scaffold.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "allow comparing results from different benchmarks or different scale factors",
+        "instead": "hard-block with an error, do not render the comparison",
+        "item_id": "implement-results-compare-view",
+        "why": "cross-context comparison is meaningless and misleading"
+      },
+      {
+        "dont": "compute a single 'score' that hides per-query variation",
+        "instead": "show query-level detail prominently",
+        "item_id": "implement-results-compare-view",
+        "why": "aggregate scores obscure important per-query behavior"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "implement-results-compare-view",
+        "needs_item": "build-static-pipeline-bundles-to-read-model"
+      },
+      {
+        "item_id": "implement-results-compare-view",
+        "needs_item": "scaffold-results-explorer-frontend"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-03T00:00:00Z",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cohort validation must hard-block incompatible comparisons (different benchmark or scale factor) - never render them with a warning",
+        "item_id": "implement-results-compare-view"
+      },
+      {
+        "behavior": "Compare URLs must be stable and shareable - query params, not session state",
+        "item_id": "implement-results-compare-view"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "implement-results-compare-view",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "implement-results-compare-view",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Vite build succeeds with compare view included",
+        "expected": "Build completes with exit code 0",
+        "item_id": "implement-results-compare-view",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && test -f dist/compare/index.html || test -f dist/404.html",
+        "description": "Compare route fallback page exists in build output",
+        "expected": "At least one fallback for client-side compare routing exists",
+        "item_id": "implement-results-compare-view",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run build",
+        "description": "Compare view component tests pass (cohort validation, data merge, rendering)",
+        "expected": "Typecheck and build both pass",
+        "item_id": "implement-results-compare-view",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "implement-results-compare-view",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "implement-results-compare-view",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "implement-results-compare-view",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "implement-results-compare-view",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "implement-results-compare-view",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "implement-results-compare-view",
+        "notes": "When the compare view loads with `?ids=id1,id2`:\n1. Fetch detail JSON for each result ID\n2. Validate cohort compatibility (strict - block incompatible, don't warn):\n   - Same benchmark: required (hard-block if mismatched - show error, refuse to render)\n   - Same scale factor: required (hard-block if mismatched - show error, refuse to render)\n   - Same query set: warn if different (e.g., subset vs full) but allow comparison\n   - Different platform/config: expected and fine\n3. Build a merged query-level dataset: for each query ID, collect timings\n   from all compared results\n4. Handle missing queries gracefully (show \"N/A\" if a result doesn't have\n   a particular query)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement cohort validation and comparison data loading",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-results-compare-view",
+        "notes": "Show a summary comparing the selected results:\n- Side-by-side cards: platform, config, date, total duration for each\n- Speedup indicator: \"Result A is X.Xx faster/slower than Result B\" (based\n  on total duration or geometric mean of query times)\n- Cohort info: benchmark, scale factor, query count\n- Warnings if non-blocking configurations differ (query subset, tuning mode)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the comparison summary header",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-results-compare-view",
+        "notes": "Sortable table with one row per query:\n| Query | Result A (ms) | Result B (ms) | Diff | Speedup |\n|-------|--------------|--------------|------|---------|\n| Q1    | 45.2         | 38.1         | -7.1 | 1.19x   |\n| Q2    | 12.1         | 15.3         | +3.2 | 0.79x   |\n\nColor-code: green for faster, red for slower, neutral for within 5%.\nSupport sorting by any column. Highlight queries with >2x difference.\n\nFor 3+ results, extend the table with additional columns. Keep it readable\nup to 4 results; beyond that, suggest using DuckDB-WASM for custom analysis.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the query-level comparison table",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-results-compare-view",
+        "notes": "Grouped bar chart showing query times for each compared result:\n- X-axis: query IDs (Q1, Q2, ..., Q22)\n- Y-axis: execution time (ms)\n- One bar color per result\n- Hover/click shows exact timing\n\nUse lightweight SVG rendering (no charting library needed for grouped bars).\nIf the chart gets complex, consider a small library like uPlot or Chart.css.\n\nAlso show a summary chart: total duration or geometric mean comparison.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the query-level comparison chart",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-results-compare-view",
+        "notes": "- Compare URLs are shareable: `/results/compare?ids=id1,id2`\n- \"Add to comparison\" button on detail pages and browse pages\n- Comparison selection persists in session storage (not lost on navigation)\n- \"Clear comparison\" action\n- Maximum 4 results in one comparison (warn if user tries to add more)\n- Deep link from browse pages: checkbox select → \"Compare Selected\" button\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement compare URL sharing and result selection UX",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,216 @@
+{
+  "context": "Publish per-worktree Git configuration inside the serialized creation transaction and roll back only the exact resources created by that invocation on failure. Keep mutable task, run, claim, liveness, and evaluation state in Bossmode. Provide a non-destructive manual owner-release record for non-controller workflows.",
+  "description": "Extend worktree-create so every new worktree carries immutable provenance: lifecycle ID, creation time, branch, base ref and OID, initial head, and optional controller kind and stable IDs. Legacy and foreign worktrees remain unknown. Do not create a second task or lease registry in BenchBox or infer abandonment from missing controller state.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Copy Bossmode task, claim, and evaluation state into Git config",
+        "instead": "Store stable binding IDs and query the controller",
+        "item_id": "worktree-maintenance-local-metadata",
+        "why": "Duplicated mutable state drifts"
+      },
+      {
+        "dont": "Leave half-created worktrees after metadata failure",
+        "instead": "Use exact creation rollback",
+        "item_id": "worktree-maintenance-local-metadata",
+        "why": "Missing provenance recreates the ownership gap"
+      },
+      {
+        "dont": "Let preflight claim an unknown worktree",
+        "instead": "Refresh only a binding proven to belong to the caller",
+        "item_id": "worktree-maintenance-local-metadata",
+        "why": "Preflight is not adoption"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "worktree-maintenance-local-metadata",
+        "needs_item": "worktree-maintenance-readonly-audit"
+      }
+    ],
+    "item_meta": {
+      "category": "Repository Maintenance",
+      "completed_at": "2026-09-10T23:06:58Z",
+      "completed_pr": 2065,
+      "created_at": "2026-08-26T01:49:10Z",
+      "worktree": "worktree-maintenance"
+    },
+    "preserves": [
+      {
+        "behavior": "Controller mutable lifecycle state is not duplicated locally.",
+        "item_id": "worktree-maintenance-local-metadata"
+      },
+      {
+        "behavior": "Existing path, branch, and remote collision checks remain fail closed.",
+        "item_id": "worktree-maintenance-local-metadata"
+      },
+      {
+        "behavior": "Legacy, foreign, and missing metadata stay owner unknown.",
+        "item_id": "worktree-maintenance-local-metadata"
+      },
+      {
+        "behavior": "Rollback touches only resources created by the failing invocation.",
+        "item_id": "worktree-maintenance-local-metadata"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "primary clone refusal",
+        "decision": "reuse",
+        "item_id": "worktree-maintenance-local-metadata",
+        "path": "scripts/agent_write_preflight.sh"
+      },
+      {
+        "concept": "worktree-specific Git configuration",
+        "decision": "extend",
+        "item_id": "worktree-maintenance-local-metadata",
+        "path": "scripts/set_worktree_identity.sh"
+      },
+      {
+        "concept": "serialized creation and exact rollback",
+        "decision": "extend",
+        "item_id": "worktree-maintenance-local-metadata",
+        "path": "scripts/worktree_lifecycle.sh"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "worktree-maintenance-local-metadata",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "worktree-maintenance-local-metadata",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/integration/worktree/test_worktree_release_dirty_guard.py tests/integration/worktree/test_worktree_lifecycle_metadata.py tests/unit/test_agent_write_preflight.py -q",
+        "description": "Metadata lifecycle tests",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-local-metadata",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make makefile-inventory-check",
+        "description": "Make inventory",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-local-metadata",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "if git diff --unified=0 origin/develop...HEAD -- scripts make | rg -n '^\\+.*(worktree prune|git gc|worktree unlock)'; then exit 1; fi",
+        "description": "No broad cleanup",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-local-metadata",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "worktree-maintenance-local-metadata",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "worktree-maintenance-local-metadata",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "worktree-maintenance-local-metadata",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "worktree-maintenance-local-metadata",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "worktree-maintenance-local-metadata",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Defined immutable local fields (lifecycle_id, created_at, branch, base_ref, base_oid, initial_head) in scripts/worktree_lifecycle_metadata.py stored in per-worktree git config under benchbox.worktree.*. Kept mutable controller state strictly separated (controller_kind, controller_id stored as stable bindings only; no tasks, leases, claims or runs duplicated locally). Zero deletion authority enforced (deletion_authorized=False). Provenance states classified: managed, legacy, foreign, malformed.",
+        "item_id": "worktree-maintenance-local-metadata",
+        "notes": null,
+        "started_at": "2026-09-06T14:41:49Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Define immutable local fields and separate them from controller-owned mutable state",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Published per-worktree configuration in scripts/worktree_lifecycle.sh during serialized creation using $py_runner scripts/worktree_lifecycle_metadata.py init with immutable provenance fields and controller bindings. On failure, exact rollback cleans up created worktree and branch via on_creation_exit trap.",
+        "item_id": "worktree-maintenance-local-metadata",
+        "notes": null,
+        "started_at": "2026-09-06T14:42:49Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Publish metadata during serialized creation with exact rollback on failure",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Implemented read_metadata and audit_metadata in scripts/worktree_lifecycle_metadata.py with full provenance classification: managed, legacy (unconfigured worktree within repository), foreign (metadata pointing outside repository or to another worktree), and malformed (invalid git config, corrupted timestamps or UUIDs).",
+        "item_id": "worktree-maintenance-local-metadata",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Expose metadata to audit with explicit legacy, foreign, and malformed states",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Implemented release_metadata in scripts/worktree_lifecycle_metadata.py, worktree_lifecycle.sh release, and make worktree-release WORKTREE_PATH=<path>. It logs manual-released-at and manual-released-by in per-worktree config for caller-owned worktrees, refuses release on controller-bound worktrees, and never deletes files or branches.",
+        "item_id": "worktree-maintenance-local-metadata",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a non-destructive manual owner-release operation for caller-owned non-controller worktrees",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Added comprehensive suite in tests/integration/worktree/test_worktree_lifecycle_metadata.py covering immutable provenance publishing, controller binding, worktree isolation without cross-leakage, caller-owned manual release, controller-bound release refusal, legacy/foreign/malformed classifications, and exact creation rollback on metadata failure (9 passed in 5.07s; 47 worktree tests passed).",
+        "item_id": "worktree-maintenance-local-metadata",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test concurrency, isolation, rollback, unknown owners, foreign metadata, malformed fields, and controller mismatch",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Confirmed that WorktreeLifecycleMetadata sets deletion_authorized=False unconditionally, and verified with rg that zero deletion actions, worktree prune, git gc, or worktree unlock commands exist in scripts/worktree_lifecycle_metadata.py. Removal remains strictly gated by make worktree-remove.",
+        "item_id": "worktree-maintenance-local-metadata",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decision gate: confirm no local metadata field alone authorizes deletion",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "context": "Decide the policy first, then enforce it mechanically. Either (a) declare stacked PRs unsupported and add a cheap always-on guard workflow, triggered without a branch filter, that fails any PR whose base is not develop/release/published-results - making the unsupported case loud instead of silent; or (b) widen the pull_request branch filters so intermediate bases are validated too, accepting the extra runner cost. Option (a) is likely correct given develop is the only integration branch. Whichever is chosen, also distinguish 'no checks because base is unsupported' from 'no checks because the PR is conflicting' in whatever surfaces PR status, since the two need different remediation.",
+  "description": "Every PR workflow filters on branches: [develop] (pr.yml, lint.yml via release, auto-merge-on-open.yml, extension-smoke.yml, gitignore-lint.yml, results-explorer-browser.yml, docs.yml). A pull request whose BASE is any other branch therefore triggers no workflow at all: gh pr checks reports 'no checks reported'. That includes ci-required-result, the single check develop's ruleset requires. Observed 2026-08-04 on PRs #1513, #1514, #1515 and #1520, which were stacked on other claude/* branches and ran nothing. Two consequences: (1) stacked-PR workflows are structurally unsupported - the pattern silently produces unvalidated PRs rather than failing loudly; (2) a PR merged into an intermediate branch is never independently validated, and its content can later reach develop inside a parent PR's diff. A PR targeting develop that is CONFLICTING also reports no checks, because GitHub cannot build a merge commit - so 'no checks reported' has two distinct causes that currently look identical.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-05T22:58:54Z",
+      "completed_pr": 1596,
+      "created_at": "2026-08-04T12:35:44Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No workflow gains permissions beyond what it has today",
+        "item_id": "pr-workflows-skip-non-develop-base-branches"
+      },
+      {
+        "behavior": "PRs targeting develop keep their current check set and required-check contract",
+        "item_id": "pr-workflows-skip-non-develop-base-branches"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pr-workflows-skip-non-develop-base-branches",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "pr-workflows-skip-non-develop-base-branches",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "pr-workflows-skip-non-develop-base-branches",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "pr-workflows-skip-non-develop-base-branches",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import pathlib, yaml; hits = [p.name for p in pathlib.Path('.github/workflows').glob('*.yml') if 'pull_request' in (yaml.safe_load(p.read_text()) or {}).get(True, {}) and not (yaml.safe_load(p.read_text())[True]['pull_request'] or {}).get('branches')]; assert hits, 'every pull_request workflow is still branch-filtered, so a non-develop base still runs nothing'\"",
+        "description": "A guard job exists that is not itself gated on a develop base",
+        "expected": "exits 1 on the unfixed tree where all pull_request workflows are branch-filtered; exits 0 once an unfiltered guard exists",
+        "item_id": "pr-workflows-skip-non-develop-base-branches",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rqi 'stacked' AGENTS.md docs/development",
+        "description": "The policy is written down where agents will read it",
+        "expected": "exits 1 while the stacked-PR policy is undocumented; exits 0 once the decision is recorded",
+        "item_id": "pr-workflows-skip-non-develop-base-branches",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

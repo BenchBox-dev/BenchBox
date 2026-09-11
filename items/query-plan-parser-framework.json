@@ -1,0 +1,11 @@
+{
+  "description": "Implement platform-specific EXPLAIN output parsers that convert native query \nplans into harmonized QueryPlanDAG structure. Includes base parser interface\nand 9 platform-specific implementations.\n\n**Parsing Strategy**:\n- Each platform provides EXPLAIN in different format (text trees, JSON, XML)\n- Parse native format → intermediate representation → QueryPlanDAG\n- Graceful degradation on parse failures (warn, continue without plan)",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2025-11-23T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-parsers"
+    }
+  }
+}

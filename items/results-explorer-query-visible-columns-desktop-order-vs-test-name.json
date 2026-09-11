@@ -1,0 +1,142 @@
+{
+  "description": "PR #276 (`fix(explorer): tighten Query workbench desktop intro to keep\nresults panel above the fold`) closed the failing `responsive.spec.ts`\ndesktop assertion by trimming 12px of vertical space above the grid at\nlg+ widths only. That fix passes the numeric `expectTopWithin(...,\nmaxY=900)` check (panel.top is now 897), but it leaves two related soft\nissues that the PR #276 review surfaced and explicitly deferred:\n\n1) **Layout/test-name semantic mismatch.** The test is titled\n   \"query workbench renders summary, active filters, and rows\n   **before deep controls** at desktop\", but the `query-visible-columns`\n   element (locate by `data-testid=\"query-visible-columns\"` in\n   `results-explorer/src/pages/Query.tsx`) keeps the `lg:order-1`\n   class, so at desktop the column-toggle UI still renders **above**\n   the summary and rows. The numeric assertion passes but the test\n   name promises ordering the layout does not deliver. This is the\n   durable concern and survives any future visible-columns\n   restructure.\n\n2) **Brittle 3px desktop budget (state-dependent).** Immediately\n   after PR #276 landed, panel.top = 897 against `maxY = 900` at\n   desktop — any future change adding a border, a font-metrics tick,\n   or a half-line wrap on the intro paragraph would retrip the\n   assertion. The block comment above `VIEWPORTS` in\n   `results-explorer/e2e/responsive.spec.ts` (added by PR #278\n   alongside this TODO) documents the brittleness. **Important\n   state-dependence:** PR #277 (concurrent, may land before this\n   TODO is actioned) restructures `query-visible-columns` from a\n   div into a default-collapsed `<details>`/`<summary>` affordance,\n   which collapses the visible-columns block from ≈494px to ≈54px\n   by default at lg:order-1. Once PR #277 is in develop, the live\n   panel.top drops to ≈457 and the brittleness rationale evaporates;\n   only the semantic mismatch (1) remains. Re-measure with the live\n   DOM probe before deciding which resolution to pick. (Numbers in\n   this block corrected post-PR-291 against the captured w0.log to\n   match the observed measurement at the time; the original draft\n   estimated 30px / 445 from a smaller probe.)\n\nResolving (1) structurally also resolves (2) regardless of PR #277's\nmerge state: if `query-visible-columns` drops `lg:order-1` (or moves\nto `lg:order-5` so the right-column flex order at desktop becomes\nsummary → panel → details → visible-columns), panel.top falls into\nthe low hundreds and the desktop budget stops being a recurring\nconcern.\n\nTwo reasonable resolutions:\n  a) **Restructure the layout to match the test name.** Drop\n     `lg:order-1` from `query-visible-columns` so the section's flex\n     order at desktop is summary → panel → details → visible-columns,\n     matching the test's \"rows before deep controls\" promise. UX\n     change: the column-toggle UI moves from the top of the right\n     column to the bottom at desktop. Mobile/tablet ordering is\n     already this way (visible-columns at the bottom via `order-5`).\n  b) **Rename the test and document the lg-order intent.** Keep the\n     `lg:order-1` placement (PR #120's design intent of putting\n     column configuration above the table at desktop) and rename the\n     test to something like \"renders summary, results panel, and\n     deep controls within the desktop viewport budget\" so the title\n     matches what the assertions actually check.\n\nResolution (a) is preferable because it removes a documented\ninconsistency and gives the desktop budget durable headroom; (b) is\nacceptable if PR #120's design intent is still load-bearing.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete the desktop-budget comment block on `VIEWPORTS` in `responsive.spec.ts` (added by PR #278) without resolving this TODO; under resolution (a) the comment must be UPDATED to reflect the new headroom, not silently dropped.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "relax `maxY` at mobile/tablet",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "why": "only desktop is at issue."
+      },
+      {
+        "dont": "silently `test.skip` the failing assertion if a future regression retripps the desktop budget.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend / Test Infrastructure",
+      "completed_at": "2026-05-09T00:00:00Z",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All `data-testid`s on `query-visible-columns`, `query-results-panel`, `query-result-summary`, and `query-mobile-filter-drawer` — downstream tests rely on them.",
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name"
+      },
+      {
+        "behavior": "Mobile/tablet ordering: results panel above visible-columns (the existing `order-3` < `order-5` invariant).",
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name"
+      },
+      {
+        "behavior": "`maxY=1200` budgets at mobile/tablet.",
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/responsive.spec.ts (test title + comment if resolving (b); update the `VIEWPORTS` budget comment under (a) to reflect the new headroom)"
+      },
+      {
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx (one to two lines around the `query-visible-columns` and intro container if resolving (a); else untouched)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'responsive|layout|a11y|mobile' --workers=1",
+        "description": "Responsive grep stays green end-to-end",
+        "expected": "exit 0; 24+ passed, 0 failed",
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium e2e/responsive.spec.ts --grep 'query workbench renders summary' --workers=1",
+        "description": "If resolution (a): panel.top has ≥100px headroom at desktop",
+        "expected": "exit 0 across mobile/tablet/desktop/wide; w3 DOM probe captured to verification log shows panel.top ≤ 500 at desktop AND wide",
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "notes": "The cited numbers in `description` (897 post-PR-276,\n≈445 post-PR-277, ≈399 under resolution (a)) were measured on\n2026-05-08 against the then-develop tip. Before w1 makes the\ndecision, re-run a DOM probe at desktop and wide widths to\nconfirm the live numbers and update w1's notes.\n\nSteps:\n  1. Build the explorer:\n     `cd results-explorer && npm run test:e2e:fixtures && npm run build`\n  2. Drop a temporary probe spec at\n     `results-explorer/e2e/_probe-query-layout.spec.ts` that\n     reads the bounding rects of `query-result-summary`,\n     `query-results-panel`, and `query-visible-columns` at\n     viewports 1280×900 and 1600×900 (the existing\n     `responsive.spec.ts` `setViewport` helper is reusable).\n  3. Run:\n     `cd results-explorer && npx playwright test --project=chromium e2e/_probe-query-layout.spec.ts --workers=1 --reporter=list 2>&1 | tee ../_project/verification-logs/results-explorer-query-visible-columns-desktop-order-vs-test-name/w0.log`\n  4. Update w1's notes with the observed\n     `query-results-panel.top` at 1280 and 1600 widths.\n  5. Delete the probe spec before commit (it is scaffolding,\n     not a regression test).\n\nThe captured `w0.log` is the source of truth; the `description`\nsection is illustrative only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-measure live panel.top against develop tip and capture probe output",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "notes": "Read PR #120's PR description and the visible-columns design\nrationale. If PR #120's intent (configure-columns-first at\ndesktop) is still load-bearing, choose (b); otherwise (a).\n\nFallback if PR #120's description does not articulate intent\n(terse merge-commit, missing rationale, etc.): default to\nresolution (a) — the test title is the more recent and more\nassertive contract — and note the absence in this work-unit's\nnotes so future reviewers see the decision trail.\n\nRecord the chosen resolution as `metadata.chosen_resolution: a|b`\non this TODO before starting w2 so w2's checklist is\nunambiguous.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide between layout restructure (a) or test rename (b)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "notes": "For resolution (a) — three discrete commits, in order:\n\n  w2.a — drop or relax `lg:order-1` on the element with\n         `data-testid=\"query-visible-columns\"` in `Query.tsx`\n         (replace with `lg:order-5` to match its DOM order;\n         keeps mobile/tablet `order-5` intact). Run the\n         responsive grep to confirm panel.top dropped.\n\n  w2.b — revert PR #276's `mb-6 lg:mb-3` page-intro tighten\n         in `Query.tsx` back to bare `mb-6` since the budget\n         is now generous and the lg-only tighten was a\n         targeted patch for the now-resolved 3px headroom.\n\n  w2.c — update the `VIEWPORTS` block comment in\n         `responsive.spec.ts` so it reflects the post-fix\n         headroom rather than the historical 3px brittleness;\n         keep the closed-TODO pointer for traceability.\n\nFor resolution (b) — single commit:\n\n  w2.b' — rename the test\n          \"query workbench renders summary, active filters, and\n          rows before deep controls at ${viewport.name}\" in\n          `responsive.spec.ts` to a title that matches the\n          actual lg-order (suggested: \"query workbench keeps\n          summary, deep controls, and rows within the desktop\n          viewport budget at ${viewport.name}\"); add a one-line\n          comment near `query-visible-columns` in `Query.tsx`\n          documenting the lg-order intent and pointing to\n          PR #120.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the chosen change (one commit per sub-step under resolution (a) so each is independently revertible)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-query-visible-columns-desktop-order-vs-test-name",
+        "notes": "`cd results-explorer && npx playwright test --project=chromium --grep 'responsive|layout|a11y|mobile' --workers=1`.\nCapture to\n`_project/verification-logs/results-explorer-query-visible-columns-desktop-order-vs-test-name/responsive-grep.log`.\nFor resolution (a), also include a DOM probe confirming\npanel.top dropped meaningfully (target: ≤500 at 1280/1440/1600).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-run responsive grep end-to-end and capture verification",
+        "wid": "w3"
+      }
+    ]
+  }
+}

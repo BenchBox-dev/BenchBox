@@ -1,0 +1,276 @@
+{
+  "context": "For display name research (w1): Use official vendor documentation pages, not marketing\npages. Accept only names used in the product's own UI or official docs.\n\nFor naming convention (w2): Adopt a two-part rule:\n  [VendorFull] [ProductLine] [Qualifier]\n  e.g., \"Amazon Athena\", \"Amazon Athena for Apache Spark\", \"Google Cloud Dataproc\",\n  \"Microsoft Fabric Warehouse\", \"Microsoft Fabric Spark\"\n\nFor key renaming (w3): Add `\"fabric_dw\": \"fabric-dw\"` alias in PLATFORM_ALIASES in\n`benchbox/cli/platform.py`. Register adapter under new canonical key in\n`platform_registry.py`. Keep old key working via alias to avoid breakage.\n\nFor display name updates (w4): Only change `display_name` string values in\n`_build_platform_metadata()`. Do not rename dict keys yet (handled in w3).\n",
+  "description": "Platform names shown in the CLI and registry are inconsistent in three ways:\n  1. **Vendor prefix style** - \"AWS Athena\" (not official) vs \"Amazon Athena\" (official);\n     \"GCP Dataproc\" (abbrev) vs \"Google Cloud Dataproc\" (official)\n  2. **Key format** - `fabric_dw` uses underscores while all other Fabric platforms\n     use hyphens (`fabric-spark`, `fabric-lakehouse`)\n  3. **Verbosity vs. density** - \"Microsoft Fabric Lakehouse SQL Endpoint\" is unwieldy;\n     \"Databricks\" is ambiguous between SQL and DataFrame variants\n\n## Specific Issues\n\n### Microsoft Fabric (`fabric_dw`, `fabric-spark`, `fabric-lakehouse`)\n- `fabric_dw` CLI key uses underscore → should be `fabric-dw` (hyphen-consistent)\n- Display name \"Fabric Warehouse\" omits \"Microsoft\" brand prefix\n- Display name \"Microsoft Fabric Lakehouse SQL Endpoint\" is too verbose\n- Official Microsoft names: \"Microsoft Fabric Warehouse\", \"Microsoft Fabric Lakehouse\",\n  \"Microsoft Fabric Spark\" (Spark compute within Fabric, not a separate product name)\n\n### Amazon Athena (`athena`, `athena-spark`)\n- `athena` display name is \"AWS Athena\" - official brand is \"Amazon Athena\"\n- `athena-spark` correctly uses \"Amazon Athena for Apache Spark\"\n- Inconsistency between siblings: one uses \"AWS\", one uses \"Amazon\"\n\n### Google Cloud Dataproc (`dataproc`, `dataproc-serverless`)\n- Display names use \"GCP Dataproc\" / \"GCP Dataproc Serverless\"\n- Official brand is \"Google Cloud Dataproc\" (not \"GCP\")\n- \"GCP\" abbreviation is informal; Google's own docs use \"Google Cloud\"\n\n### Databricks (`databricks`, `databricks-df`)\n- `databricks` display name is just \"Databricks\" - unclear it is the SQL mode\n- `databricks-df` correctly says \"Databricks DataFrame\"\n- Sibling disambiguation: consider \"Databricks SQL\" vs \"Databricks DataFrame\"\n\n### Azure Synapse (`synapse`, `synapse-spark`)\n- `synapse` display name is \"Azure Synapse\" - official name is \"Azure Synapse Analytics\"\n- `synapse-spark` display name is \"Azure Synapse Spark\" - same prefix issue\n- Both should use \"Azure Synapse Analytics\" and \"Azure Synapse Analytics Spark\"\n\n### AWS Glue (`glue`) - Verify\n- \"AWS Glue\" is the correct official name (not \"Amazon Glue\") ✓\n- No change needed if confirmed\n\n### Databricks SQL naming - Research required\n- `databricks` being renamed to \"Databricks SQL\" is unverified; Databricks does not\n  officially brand the connector as \"Databricks SQL\" - the product is just \"Databricks\"\n- Disambiguation approach needs research before committing; treat as deferred until w1\n\n## Desired End State\nA consistent naming convention applied to all platform display names:\n- Full official vendor brand prefix: \"Amazon\", \"Google Cloud\", \"Microsoft\" (not abbreviations)\n- Dense but unambiguous names: prefer shorter forms when unambiguous in context\n- All Fabric CLI keys use hyphen format (`fabric-dw`, `fabric-spark`, `fabric-lakehouse`)\n- SQL vs DataFrame variants are clearly differentiated in display names",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "batch all display_name changes into one commit",
+        "instead": "commit per vendor family",
+        "item_id": "harmonize-platform-display-names",
+        "why": "individual vendor changes are easier to review and revert separately"
+      },
+      {
+        "dont": "rename `fabric_dw` dict key in platform_registry.py without adding a backward-compat alias",
+        "instead": "add alias first, rename second",
+        "item_id": "harmonize-platform-display-names",
+        "why": "existing saved benchmark results use the old key"
+      },
+      {
+        "dont": "shorten official product names beyond their abbreviated form",
+        "instead": "always include enough context",
+        "item_id": "harmonize-platform-display-names",
+        "why": "'Athena' alone is ambiguous across AWS services"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-22T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing benchmark result files keyed with `fabric_dw` can still be loaded by get_results/analyze_results",
+        "item_id": "harmonize-platform-display-names"
+      },
+      {
+        "behavior": "Platform listing output remains parseable by the same column widths/layout",
+        "item_id": "harmonize-platform-display-names"
+      },
+      {
+        "behavior": "Platform registry `get_platform_info('fabric_dw')` still returns a valid record",
+        "item_id": "harmonize-platform-display-names"
+      },
+      {
+        "behavior": "`fabric_dw` still resolves via alias to `fabric-dw` so existing user scripts are not broken",
+        "item_id": "harmonize-platform-display-names"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "harmonize-platform-display-names",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/platform.py"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "kind": "only_modify",
+        "path_glob": "examples/"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_platform_registry.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.cli.platform import normalize_platform_name; assert normalize_platform_name('fabric_dw') == 'fabric-dw', f'expected fabric-dw, got {normalize_platform_name(\\\"fabric_dw\\\")}'\"",
+        "description": "fabric_dw alias resolves correctly after key rename",
+        "expected": "No assertion error",
+        "item_id": "harmonize-platform-display-names",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.platform_registry import PlatformRegistry; r = PlatformRegistry(); bad = [k for k,v in r.list_platforms().items() if not v.display_name]; assert not bad, f'Empty display_name: {bad}'\"",
+        "description": "All platform display_names are non-empty strings",
+        "expected": "No assertion error",
+        "item_id": "harmonize-platform-display-names",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_platform_registry.py -q",
+        "description": "Platform registry unit tests pass",
+        "expected": "All tests pass with 0 failures",
+        "item_id": "harmonize-platform-display-names",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Smoke test: fast test suite passes with no regressions",
+        "expected": "All fast tests pass",
+        "item_id": "harmonize-platform-display-names",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "harmonize-platform-display-names",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "harmonize-platform-display-names",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "harmonize-platform-display-names",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research and document official product names for all affected platforms",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-platform-display-names",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define naming convention rules and apply to candidate display names",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-platform-display-names",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename `fabric_dw` CLI key to `fabric-dw`; add backward-compatible alias",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-platform-display-names",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update all display_name fields in platform_registry.py per convention",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-platform-display-names",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update PLATFORM_ALIASES to cover any renamed CLI keys",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-platform-display-names",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docs, examples, and any hardcoded references to renamed keys",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-platform-display-names",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add/update tests: assert fabric-dw as primary key resolves, old fabric_dw alias works, all display_names non-empty",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-platform-display-names",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Full regression: run unit + fast tests; confirm no regressions in platform listing or result loading",
+        "wid": "w8"
+      }
+    ]
+  }
+}

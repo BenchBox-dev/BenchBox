@@ -1,0 +1,177 @@
+{
+  "context": "Small doc-only PRs. The review-protocol skill mirror lives in ~/.skill-sync (shared source; .claude/skills is gitignored) — amend the canonical docs/development/review-protocol.md in-repo and sync the SHARED skill mirror via the skill-sync workflow so the PR carries skill-sync.lock only. Spec amendment is one paragraph scoping the rejection plus a pointer to the findings-domain spec. Owner sign-off on the history stance is recorded in the findings-domain spec's Assumptions section.",
+  "description": "Gate phase for the findings-domain project (blind-spot findings out of Git, integrated with planning). Two governing documents must be amended BEFORE any capture or schema work, per the 2026-07-22 adversarial review: (1) the tracker spec's 'No offline write queue' rejection (_project/specs/todo-db-tracker.md:69-71, reiterated :556-557) must be narrowed to work-state writes so append-only finding DRAFT FILES are permitted — today the rejection is unscoped and the findings design would silently contradict a standing ADR; (2) review-protocol §4 'Capture is local-only' (docs/development/review-protocol.md:109-126) must name the gitignored draft file as the SOLE write a review-shaped session may perform for findings — direct hosted-DB writes during review are forbidden because hosted writes are immediately cross-session-visible with no PR cycle (spec :54-55), which is the 'landing changes' that §1:31-35 reserves for a separately authorized turn. Also records the owner decision that 'out of Git' means current-tree-only (66 tracked records, 61 commits of history stay; rewriting history is a separate destructive decision), and lands the findings-domain spec itself at _project/specs/findings-domain.md.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Edit .claude/skills/SHARED/review-protocol/SKILL.md directly in the repo tree",
+        "instead": "Author in ~/.skill-sync and sync; the PR carries skill-sync.lock",
+        "item_id": "findings-phase0-governance",
+        "why": ".claude/skills is gitignored; the shared source lives in ~/.skill-sync and drifts if edited in place"
+      },
+      {
+        "dont": "Silently contradict the spec's write-queue rejection by shipping capture code first",
+        "instead": "Amend the spec in this phase, cite the adversarial review, then build in later phases",
+        "item_id": "findings-phase0-governance",
+        "why": "It is a standing, twice-stated design decision; contradicting it without amendment re-opens settled debates and hides the ADR trail"
+      }
+    ],
+    "item_meta": {
+      "category": "governance",
+      "completed_at": "2026-07-22T22:29:13Z",
+      "completed_pr": 1271,
+      "created_at": "2026-07-22T12:50:35Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "Defect gate (§2) wording unchanged — defects still never enter any findings surface",
+        "item_id": "findings-phase0-governance"
+      },
+      {
+        "behavior": "Review-protocol §1 authorization boundary: reviews produce findings; landing anything requires a separate authorized turn",
+        "item_id": "findings-phase0-governance"
+      },
+      {
+        "behavior": "Work-state writes still fail loudly when offline — the write-queue rejection stays in force for items/work_units/claims",
+        "item_id": "findings-phase0-governance"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Explicit rejection of an offline write queue — narrowly: permit append-only finding drafts, keep rejection for work-state",
+        "decision": "supersede",
+        "item_id": "findings-phase0-governance",
+        "path": "_project/specs/todo-db-tracker.md:69-71"
+      },
+      {
+        "concept": "Local-only capture contract — name draft files as the sole in-review finding write",
+        "decision": "extend",
+        "item_id": "findings-phase0-governance",
+        "path": "docs/development/review-protocol.md:109-126"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-phase0-governance",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "findings-phase0-governance",
+        "kind": "do_not_modify",
+        "path_glob": "_project/blind-spots/**"
+      },
+      {
+        "item_id": "findings-phase0-governance",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-phase0-governance",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/findings-domain.md"
+      },
+      {
+        "item_id": "findings-phase0-governance",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/todo-db-tracker.md"
+      },
+      {
+        "item_id": "findings-phase0-governance",
+        "kind": "only_modify",
+        "path_glob": "docs/development/review-protocol.md"
+      },
+      {
+        "item_id": "findings-phase0-governance",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/specs/findings-domain.md && grep -q 'finding draft' _project/specs/todo-db-tracker.md && grep -qi 'draft' docs/development/review-protocol.md",
+        "description": "Both amendments merged to develop; spec file present",
+        "expected": "exit 0",
+        "item_id": "findings-phase0-governance",
+        "last_result": "pass",
+        "last_run": "2026-07-22T21:59:03Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make lint",
+        "description": "Docs lint passes",
+        "expected": "exit 0",
+        "item_id": "findings-phase0-governance",
+        "last_result": "pass",
+        "last_run": "2026-07-22T21:59:10Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-phase0-governance",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "findings-phase0-governance",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "findings-phase0-governance",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Amended _project/specs/todo-db-tracker.md: 'No offline write queue' design principle narrowed to work-state (items/work-units/claims/deferrals) and hosted-mode reiteration (:556-557); permits append-only finding draft files per 2026-07-22 adversarial review. grep 'finding draft' passes.",
+        "item_id": "findings-phase0-governance",
+        "notes": null,
+        "started_at": "2026-07-22T21:58:15Z",
+        "started_branch": "claude/findings-domain-batch-wvbod8",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Amend todo-db-tracker.md:69-71 + :556-557: scope write-queue rejection to work-state; permit append-only finding draft files with rationale",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Amended docs/development/review-protocol.md §4 naming ~/.benchbox/finding-drafts/ draft file as sole in-review finding write, forbidding direct hosted-DB writes (= landing); mirrored into TRACKED .claude/skills/SHARED/review-protocol/SKILL.md (skill-sync CLI absent in cloud; mirror is tracked per recon #2, not gitignored) and updated skill-sync.lock SKILL.md sha256/size to match (verified consistent).",
+        "item_id": "findings-phase0-governance",
+        "notes": null,
+        "started_at": "2026-07-22T21:58:20Z",
+        "started_branch": "claude/findings-domain-batch-wvbod8",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Amend review-protocol §4 + SHARED skill mirror via skill-sync: draft-file capture is the only in-review finding write; sync is a separate landing step",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Recorded owner history stance in _project/specs/findings-domain.md Assumptions: 'out of Git' = current-tree-only (tracked records deleted phase6; 61 commits of history stay readable); history rewrite = separate owner-authorized destructive action, out of scope.",
+        "item_id": "findings-phase0-governance",
+        "notes": null,
+        "started_at": "2026-07-22T21:58:24Z",
+        "started_branch": "claude/findings-domain-batch-wvbod8",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Record 'out of Git = current tree only; history rewrite = separate owner-authorized destructive action' in findings-domain spec Assumptions",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Wrote _project/specs/findings-domain.md master spec: problem/goals(R2/R4/R5), governance amendments, capture (phase1), schema v2->3 (phase3), CLI, surfacing banner (phase4), export boundary (phase2), migration parity + dangling-todo_id policy (phase5), demolition (phase6), assumptions/owner history stance, metrics, roadmap, non-goals. Reconstructed from the 7 work orders; verify seq1 (files+grep) and seq2 (make lint EXIT=0, 'All checks passed!') pass.",
+        "item_id": "findings-phase0-governance",
+        "notes": null,
+        "started_at": "2026-07-22T21:58:37Z",
+        "started_branch": "claude/findings-domain-batch-wvbod8",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Land _project/specs/findings-domain.md (capture, deferral-shaped schema, CLI, export boundary, migration parity, demolition, metrics)",
+        "wid": "w4"
+      }
+    ]
+  }
+}

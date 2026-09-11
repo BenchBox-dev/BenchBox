@@ -1,0 +1,169 @@
+{
+  "description": "All three plan CLI coverage suites monkeypatch load_result_file with\nSimpleNamespace fakes that DEFINE .phases (test_show_plan_coverage.py:34-35,\ntest_compare_plans_coverage.py:85, test_plan_history_coverage.py) — the\nsuite stayed green while every real invocation crashed. The keystone\nno-mock integration test lands with qpc-01; this item is the sweep: keep\nfast fakes for flag/option coverage but derive their shape from the real\nclasses so attribute drift fails, and add the missing contract tests the\nreview identified (export->load->export byte equality lives in qpc-02;\nadapter->parser contracts live in qpc-06).\n\nFinding: F8.1 (sweep portion).\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "convert everything to slow integration tests",
+        "instead": "(not specified)",
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "why": "one real-path test per CLI plus spec'd fakes is the target."
+      },
+      {
+        "dont": "hand fakes attributes the production class lacks",
+        "instead": "(not specified)",
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "why": "that is the exact mechanism that masked the .phases crash."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "needs_item": "qpc-01-plan-rehydration-and-phases-view"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-07T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing coverage of CLI flags/options",
+        "item_id": "qpc-11-plan-cli-test-democking"
+      },
+      {
+        "behavior": "Test suite runtime stays in the fast lane (no benchmark execution; tmp-file bundles only)",
+        "item_id": "qpc-11-plan-cli-test-democking"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/runner/dataframe_runner.py:66,98 — repo precedent for rejecting synthetic MagicMock attributes",
+        "decision": "reuse",
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "path": "benchbox/core/runner/dataframe_runner.py:66,98"
+      },
+      {
+        "concept": "tests/unit/cli/commands/test_compare_plans_coverage.py, test_plan_history_coverage.py",
+        "decision": "reuse",
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "path": "tests/unit/cli/commands/test_compare_plans_coverage.py"
+      },
+      {
+        "concept": "tests/unit/cli/commands/test_show_plan_coverage.py:8-51 — the masking pattern",
+        "decision": "reuse",
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "path": "tests/unit/cli/commands/test_show_plan_coverage.py:8-51"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands/test_show_plan_coverage.py tests/unit/cli/commands/test_compare_plans_coverage.py tests/unit/cli/commands/test_plan_history_coverage.py -q",
+        "description": "CLI suites pass against real loader output",
+        "expected": "all pass",
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "manual: temporarily rename query_results locally, run the suites, restore",
+        "description": "Shape-drift canary: renaming a BenchmarkResults field used by CLIs breaks a test",
+        "expected": "at least one test fails",
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "notes": "The SimpleNamespace .phases fakes were already gone (suites use real make_benchmark_results). Added one real-path test per CLI with NO load_result_file/PlanHistory monkeypatch: show-plan and compare-plans drive real on-disk bundles (build_result_payload + build_plans_payload) through the real loader; plan-history drives a real PlanHistory over real on-disk history JSON.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: replace SimpleNamespace result fakes with real BenchmarkResults or spec-constrained mocks; add one real-loader test per CLI.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "notes": "Added tests/unit/cli/commands/test_plan_cli_no_mock_guardrail.py: for each plan CLI suite that stubs its data-load boundary (load_result_file / PlanHistory) it requires a `def test_..real..` companion. Verified it goes red when the real-path test is removed.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: guardrail preventing load_result_file monkeypatching without a sibling real-file test.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "notes": "Manual canary confirmed: renaming query_results in iter_query_results turns the new real-loader show-plan/compare-plans tests red; the guardrail goes red when its real-path companion is removed.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Review: adversarial code review (did any test lose coverage in the swap; fake-shape drift actually fails now — mutate a field name and confirm red).",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix: address review findings; re-run verification.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-11-plan-cli-test-democking",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Submit PR referencing qpc-11.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

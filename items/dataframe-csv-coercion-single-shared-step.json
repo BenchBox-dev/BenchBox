@@ -1,0 +1,126 @@
+{
+  "description": "Follow-up to dataframe-csv-empty-string-null-uniform (#904) and its coverage\nfollow-up dataframe-csv-empty-string-parity-coverage (#936). #904 landed the\nempty-string-vs-null CSV coercion PER ADAPTER rather than as the single shared\nstep the original YAML specified. It is functionally equivalent today, but it\nmeans each DataFrame adapter carries its own copy of the contract — each is an\nindependent risk surface that can drift.\n\nConsolidate the coercion into one shared step in the common DataFrame CSV load\npath so the empty-string/null contract has a single source of truth. This is now\na safe refactor because #936 pins the contract across every installed adapter\n(datafusion/pyspark/pandas/polars/dask, plus the SQL<->DataFrame parity case), so\nthe parity tests are the behavior-preservation net.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change any adapter's empty-string/null outcome while consolidating",
+        "instead": "(not specified)",
+        "item_id": "dataframe-csv-coercion-single-shared-step",
+        "why": "this is a structural move only."
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-07-22T20:38:00Z",
+      "completed_pr": 1265,
+      "created_at": "2026-07-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Behavior-preserving refactor: no adapter's observable CSV-loading semantics change.",
+        "item_id": "dataframe-csv-coercion-single-shared-step"
+      },
+      {
+        "behavior": "The empty-string vs null CSV contract is unchanged for every adapter — proven by the #936 parity tests staying green.",
+        "item_id": "dataframe-csv-coercion-single-shared-step"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': 'benchbox/platforms/dataframe/benchmark_mixin.py (DataFrame CSV load path)', 'note': 'The common load path where the single shared coercion step should live.'}",
+        "decision": "reuse",
+        "item_id": "dataframe-csv-coercion-single-shared-step",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/platforms/dataframe/polars_df.py (missing_utf8_is_empty_string) and the sibling per-adapter coercion sites', 'note': 'The per-adapter coercion this item consolidates; enumerate every site before extracting.'}",
+        "decision": "reuse",
+        "item_id": "dataframe-csv-coercion-single-shared-step",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'tests/integration/test_dataframe_csv_empty_string_null_semantics.py (#936)', 'note': 'The cross-adapter parity net that must stay byte-identical-green through the refactor.'}",
+        "decision": "reuse",
+        "item_id": "dataframe-csv-coercion-single-shared-step",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dataframe-csv-coercion-single-shared-step",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/"
+      },
+      {
+        "item_id": "dataframe-csv-coercion-single-shared-step",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/"
+      },
+      {
+        "item_id": "dataframe-csv-coercion-single-shared-step",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_dataframe_csv_empty_string_null_semantics.py -q",
+        "description": "Cross-adapter parity holds through the refactor",
+        "expected": "all per-adapter + cross-surface parity cells pass unchanged; coercion now lives in one shared step",
+        "item_id": "dataframe-csv-coercion-single-shared-step",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dataframe-csv-coercion-single-shared-step",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dataframe-csv-coercion-single-shared-step",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Enumerated every per-adapter empty-string/null CSV coercion site in benchbox/platforms/dataframe/*.py: (1) pandas_df.py read_csv ~L383-386 vectorized df[cols]=df[cols].fillna(''); (2) cudf_df.py read_csv ~L255-262 per-column loop fillna(''); (3) dask_df.py read_csv ~L450-458 identical loop; (4) modin_df.py read_csv ~L313-320 identical loop; (5) datafusion_df.py read_csv ~L574-584 df.with_column(name, coalesce(col(name), lit(''))); (6) pyspark_df.py read_csv ~L479-482 df.fillna('', subset=present); (7) polars_df.py read_csv ~L295 passes missing_utf8_is_empty_string=null_marker is None as a native scan_csv kwarg (global per-file boolean, not a per-column restore -- structurally different mechanism, left as-is). Common load path confirmed: pandas_family.py::_load_csv_files/load_table (pandas/cudf/dask/modin) and expression_family.py::_load_csv_files/load_table (polars/datafusion/pyspark) both delegate dialect resolution to shared_loading.py already (resolve_dataframe_csv_dialect, declared_string_columns); benchmark_mixin.py has no concrete CSV coercion logic (abstract mixin only) -- confirms the STALE-REFERENCE WARNING. Premise NOT satisfied: coercion is duplicated 6 ways today, not a single shared step.",
+        "item_id": "dataframe-csv-coercion-single-shared-step",
+        "notes": "Enumerate where each adapter implements the empty-field -> \"\" vs null rule\n(null_marker semantics). Record file:line for each.\n",
+        "started_at": "2026-07-22T20:23:37Z",
+        "started_branch": "chore/dataframe-csv-coercion-shared-step",
+        "started_worktree": "/home/user/bb-wt/dataframe-csv",
+        "status": "done",
+        "summary": "Map every per-adapter empty-string/null CSV coercion site",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added two shared functions to benchbox/platforms/dataframe/shared_loading.py: resolve_empty_string_restore_columns(string_columns, null_marker, available_columns) -- the single shared guard+membership decision (null_marker is None and string present in the loaded frame) reused by ALL 6 post-hoc-coercion adapters; and coerce_empty_string_columns(df, string_columns, null_marker) -- the single shared restore action for the 4 pandas-compatible adapters (fillna('') via per-column loop, proven safe across pandas/cudf/dask/modin). pandas_df.py/cudf_df.py/dask_df.py/modin_df.py now call coerce_empty_string_columns instead of each carrying its own copy of the loop (pandas previously used a vectorized df[cols]=... variant; now uses the same per-column loop as the other three -- same final values, no behavior change). datafusion_df.py and pyspark_df.py now call resolve_empty_string_restore_columns for the shared guard/membership step but keep their own backend-specific restore action (DataFusion: with_column+coalesce; PySpark: native fillna(subset=)) since their DataFrame APIs are not fillna-compatible with the pandas-like adapters -- unifying those into the same action would require an abstraction layer, out of scope for a structural-move-only refactor. polars_df.py is unchanged: it applies the same null_marker-is-None decision natively via a single scan_csv boolean flag (missing_utf8_is_empty_string) over all UTF-8 columns, not a per-declared-string-column post-read restore, so there was no duplicated post-hoc coercion code to extract there; added a doc comment cross-referencing the shared decision for continuity.",
+        "item_id": "dataframe-csv-coercion-single-shared-step",
+        "notes": "Move the contract into a single shared step each adapter defers to; remove the\nper-adapter special-casing. Behavior-preserving move only.\n",
+        "started_at": "2026-07-22T20:24:04Z",
+        "started_branch": "chore/dataframe-csv-coercion-shared-step",
+        "started_worktree": "/home/user/bb-wt/dataframe-csv",
+        "status": "done",
+        "summary": "Extract the coercion to one shared step in the common DataFrame CSV load path",
+        "wid": "w2"
+      },
+      {
+        "evidence": "uv run -- python -m pytest tests/integration/test_dataframe_csv_empty_string_null_semantics.py -q => 2 failed, 14 passed, 4 skipped -- byte-identical to the pre-refactor baseline (verified via git stash comparison). The 2 pyspark failures are a pre-existing environment issue (Java version detection: 'Unable to determine Java version. PySpark SQL mode requires Java 17 or 21.'), reproduced identically on the unmodified tree via git stash, confirming it predates and is unrelated to this refactor. modin/cudf skip because those packages are not installed in this environment (also pre-existing). All installed-adapter cells (datafusion, pandas, polars, dask) plus the SQL<->DataFrame cross-surface parity cases (datafusion/pandas/polars x null_marker in [None, '']) pass unchanged. Also ran the full tests/unit/platforms/dataframe/ suite (1039 passed, 66 skipped, all skips Java-related) and tests/integration/test_dataframe_adapter_smoke.py (10 failed/8 passed, same pre-existing pyspark Java failures reproduced identically on baseline via git stash) -- no new failures introduced anywhere.",
+        "item_id": "dataframe-csv-coercion-single-shared-step",
+        "notes": "The #936 parametrized parity tests (per-adapter + SQL<->DataFrame CSV-path)\nmust stay green unchanged; add a test asserting no per-adapter coercion path\nremains if useful.\n",
+        "started_at": "2026-07-22T20:27:30Z",
+        "started_branch": "chore/dataframe-csv-coercion-shared-step",
+        "started_worktree": "/home/user/bb-wt/dataframe-csv",
+        "status": "done",
+        "summary": "Confirm byte-identical behavior via the #936 parity tests",
+        "wid": "w3"
+      }
+    ]
+  }
+}

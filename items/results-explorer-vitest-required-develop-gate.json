@@ -1,0 +1,218 @@
+{
+  "context": "Reuse the repository path classifier and ci-required-result aggregation pattern. Run npm ci and npm test for Explorer-affecting application, pipeline-contract, fixture, and package paths; emit an explicit successful skip result for unrelated changes; aggregate the result into the existing required check. Add drift tests so workflow names, path classes, and required aggregation cannot silently diverge.",
+  "description": "The Explorer unit/component suite runs nightly and in release-branch parity, but not as an enforced develop-PR check. The separate Chromium workflow exercises browser behavior and cannot replace fast component, contract, and cross-language pin coverage. Add an always-present, path-aware Vitest outcome to the required ci-required-result gate without booting Node for unrelated PRs.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a raw path-gated Vitest job name directly to the ruleset",
+        "instead": "feed a normalized success, failure, or intentional-skip result into ci-required-result",
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "why": "a skipped workflow can leave an indefinitely pending required context"
+      },
+      {
+        "dont": "gate only results-explorer/src",
+        "instead": "define and test the complete Explorer contract path set",
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "why": "package, fixture, DB contract, and Python read-model changes can break Vitest without touching src"
+      },
+      {
+        "dont": "merge the Vitest and Chromium commands into one opaque job",
+        "instead": "aggregate distinct named outcomes at the required-result layer",
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "why": "different failure classes and runtimes need separate diagnostics"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-08-02T13:17:33Z",
+      "completed_pr": 1471,
+      "created_at": "2026-08-02T04:27:24Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Chromium remains a separate behavioral gate and is not weakened or relabeled as unit coverage.",
+        "item_id": "results-explorer-vitest-required-develop-gate"
+      },
+      {
+        "behavior": "Explorer source, component tests, build-contract pins, package metadata, and relevant pipeline/fixture changes all trigger the gate.",
+        "item_id": "results-explorer-vitest-required-develop-gate"
+      },
+      {
+        "behavior": "Unrelated documentation or Python-only PRs do not install Node merely to report a skip.",
+        "item_id": "results-explorer-vitest-required-develop-gate"
+      },
+      {
+        "behavior": "ci-required-result remains the single stable required-check context in the develop ruleset.",
+        "item_id": "results-explorer-vitest-required-develop-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Extend the existing ci-required-result aggregator and its skip semantics.",
+        "decision": "extend",
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "path": ".github/workflows/pr.yml"
+      },
+      {
+        "concept": "Keep the browser workflow independent while matching its relevant path contract where appropriate.",
+        "decision": "reuse",
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "path": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "concept": "Reuse the central changed-path classifier rather than introducing a second action-specific classifier.",
+        "decision": "extend",
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "path": "scripts/path_filter_decision.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "kind": "only_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package.json"
+      },
+      {
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "kind": "only_modify",
+        "path_glob": "scripts/path_filter_decision.py"
+      },
+      {
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_path_filter_decision.py"
+      },
+      {
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'from pathlib import Path; t=Path(\".github/workflows/pr.yml\").read_text(); assert \"explorer-vitest\" in t and \"ci-required-result\" in t'",
+        "description": "The required-result job depends on a normalized Explorer Vitest result",
+        "expected": "Fails on the unfixed workflow; exits 0 when the required aggregation contains the Explorer Vitest context.",
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:15:13Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_path_filter_decision.py tests/unit/workflows -q",
+        "description": "Path-classifier and workflow contract tests pass",
+        "expected": "Relevant Explorer paths run Vitest, unrelated paths report an explicit successful skip, and unknown outcomes fail closed.",
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:15:23Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run",
+        "description": "Explorer unit suite remains green under the exact CI command",
+        "expected": "All Vitest files pass using the same command executed by the PR gate.",
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:15:45Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Live workflow/path audit: pr.yml had no Explorer Vitest job or aggregator input; path-filters.yml had no Explorer-specific group. Frozen contract covers results-explorer/**, _project/scripts/explorer_pipeline/**, explorer_publish.py, results-data/**, corpus inventory generator, and browser workflow. Existing ci-required-result remains the stable required context.",
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "notes": "Query the current develop ruleset and inspect ci-required-result. Enumerate source, tests, package lock, Vite config, browser fixtures, Python read-model contract, and workflow paths that can invalidate Vitest. Record why each path triggers or skips.",
+        "started_at": "2026-08-02T13:11:51Z",
+        "started_branch": "feat/results-explorer-vitest-gate",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Re-derive live required checks and freeze the Explorer path contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added explorer-vitest path-filter group and path-aware npm CI job in .github/workflows/pr.yml; 40 workflow/path-classifier tests pass; npm ci && npm test -- --run passes 70 files / 849 tests. Unrelated Python path remains explorer-vitest-needed=false.",
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "notes": "Use npm ci and npm test from results-explorer. Preserve actionable Vitest output and artifact/log retention. A non-triggering PR must emit an explicit success consumed by the aggregator without allocating a Node runner if the existing classifier pattern supports it.",
+        "started_at": "2026-08-02T13:14:30Z",
+        "started_branch": "feat/results-explorer-vitest-gate",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add the path-aware Vitest job and explicit skip result",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Wired explorer-vitest into ci-required-result.needs and EXPLORER_VITEST_RESULT; aggregator fails on failure and accepts intentional skipped result. Workflow tests pin exact job command, dependency, and normalized context.",
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "notes": "A failed or cancelled required Vitest execution fails ci-required-result; a deliberate path skip passes; missing/unknown is fail-closed. Add workflow tests that assert the dependency and classifier output remain connected.",
+        "started_at": "2026-08-02T13:14:44Z",
+        "started_branch": "feat/results-explorer-vitest-gate",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Wire Vitest into ci-required-result and add drift tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Failure/skip behavior proven by workflow shell contract tests: explorer-vitest=failure exits 1; skipped exits 0; unrelated benchbox/cli/run.py classifies explorer-vitest-needed=false. Exact CI command passes 849 Vitest tests locally after npm ci.",
+        "item_id": "results-explorer-vitest-required-develop-gate",
+        "notes": "Use one controlled PR that introduces a failing Explorer unit test and one irrelevant-path PR. Capture live checks and mergeability. Close without merging the intentionally failing PR and remove all temporary changes.",
+        "started_at": "2026-08-02T13:15:01Z",
+        "started_branch": "feat/results-explorer-vitest-gate",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Prove failure-blocking and irrelevant-path behavior on throwaway PRs",
+        "wid": "w3"
+      }
+    ]
+  }
+}

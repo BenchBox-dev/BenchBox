@@ -1,0 +1,201 @@
+{
+  "context": "Collect a bounded recent window of develop merges and Develop PR required-gate durations from GitHub Actions. Re-query live required contexts. Count shadow_eligible versus full_required on recent synchronize events. Write an audit or decision under _project/ that states whether gate duration is a material fraction of interarrival, what open-time currency (01) cannot fix, and which one of keep-SHADOW_ONLY / consider-07a / consider-07b is justified. Queueing cost of multi-PR refresh must be priced.",
+  "description": "Produce a measurement-backed record of whether a serialized strict-base repo can converge. Compare required-gate wall-clock (ci-required-result, especially medium-test) to develop merge interarrival and to live refresh-shadow eligible yield. This item may recommend keeping SHADOW_ONLY, or may recommend that an operator later reopen 07a or 07b. It must not itself unblock 07a/07b, change skip conditions, or mutate GitHub settings.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Recommend updating every open PR on each develop merge",
+        "instead": "price that cost explicitly if any updater is considered",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "why": "refresh storm is already documented as self-defeating"
+      },
+      {
+        "dont": "Treat open-time currency as sufficient if gate duration approaches interarrival",
+        "instead": "report both open-stale residual and in-flight interarrival residual separately",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "why": "refreshing at open still loses to a merge that lands during the next full gate"
+      },
+      {
+        "dont": "Unblock 07a or 07b from this item",
+        "instead": "write a recommendation and leave a later activation TODO to consume it",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "why": "06 is still the activation authority; this item only produces evidence"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "needs_item": "behind-pr-occurrence-00-policy"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-17T01:13:34Z",
+      "completed_pr": 1756,
+      "created_at": "2026-08-17T00:38:29Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "07a and 07b remain blocked unless a later activation item, not this one, unblocks them",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement"
+      },
+      {
+        "behavior": "No required check is skipped from this measurement",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "observational exact-refresh classifier",
+        "decision": "reuse",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "path": ".github/workflows/develop-refresh-shadow.yml"
+      },
+      {
+        "concept": "historical refresh replay and shadow_eligible yield",
+        "decision": "extend",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "path": "_project/audits/strict-base-refresh-replay-2026-08-14.md"
+      },
+      {
+        "concept": "whole-event latency and medium-test as merge-unblock wall",
+        "decision": "extend",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "path": "_project/decisions/strict-base-refresh-ci-profile-2026-08-14.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/pr_refresh_certification.py"
+      },
+      {
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "kind": "do_not_modify",
+        "path_glob": "strict-base-refresh-07a skip conditions"
+      },
+      {
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "kind": "do_not_modify",
+        "path_glob": "strict-base-refresh-07b merge-queue enablement"
+      },
+      {
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/behind-pr-occurrence-*.md"
+      },
+      {
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/behind-pr-occurrence-throughput-*.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'sample|interarrival|shadow_eligible|SHADOW_ONLY|07a|07b' _project/audits/behind-pr-occurrence-*.md _project/decisions/behind-pr-occurrence-throughput-*.md",
+        "description": "Measurement record states sample, gate duration, interarrival, and a single recommendation",
+        "expected": "measurement concepts present",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "last_result": "pass",
+        "last_run": "2026-08-17T01:13:28Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo show strict-base-refresh-07a-reduced-fast-refresh-rollout --json | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get(\"blocked_reason\")'",
+        "description": "07a remains blocked after this item exists",
+        "expected": "exit 0",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "last_result": "pass",
+        "last_run": "2026-08-17T01:13:32Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Live ruleset 15611785 strict=true; 07a/07b blocked; 10/10 recent shadow runs full_required",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "notes": null,
+        "started_at": "2026-08-17T01:05:26Z",
+        "started_branch": "docs/behind-pr-occurrence-02-throughput",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-behind-pr-02",
+        "status": "done",
+        "summary": "Revalidate live required contexts, shadow workflow, and 07a/07b blocked state",
+        "wid": "w0"
+      },
+      {
+        "evidence": "_project/audits/behind-pr-occurrence-throughput-2026-08-16.md interarrival n=32 p50=31.3min; 50% gaps <31min",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "notes": null,
+        "started_at": "2026-08-17T01:07:10Z",
+        "started_branch": "docs/behind-pr-occurrence-02-throughput",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-behind-pr-02",
+        "status": "done",
+        "summary": "Measure required-gate wall-clock and develop merge interarrival on a stated sample",
+        "wid": "w1"
+      },
+      {
+        "evidence": "10 newest shadow artifacts: 0 shadow_eligible, 10 full_required",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "notes": null,
+        "started_at": "2026-08-17T01:07:16Z",
+        "started_branch": "docs/behind-pr-occurrence-02-throughput",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-behind-pr-02",
+        "status": "done",
+        "summary": "Count live shadow_eligible yield and record fail-closed reasons",
+        "wid": "w2"
+      },
+      {
+        "evidence": "_project/decisions/behind-pr-occurrence-throughput-2026-08-16.md keep SHADOW_ONLY",
+        "item_id": "behind-pr-occurrence-02-throughput-measurement",
+        "notes": null,
+        "started_at": "2026-08-17T01:08:15Z",
+        "started_branch": "docs/behind-pr-occurrence-02-throughput",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-behind-pr-02",
+        "status": "done",
+        "summary": "Write the measurement record with a single recommendation and residual risk",
+        "wid": "w3"
+      }
+    ]
+  }
+}

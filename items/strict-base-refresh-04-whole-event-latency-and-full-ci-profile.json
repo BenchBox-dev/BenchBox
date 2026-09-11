@@ -1,0 +1,272 @@
+{
+  "context": "Extend _project/scripts/dev_loop_pr_metrics.py rather than create a parallel metrics stack. Add deterministic tests and a decision report. This TODO may identify follow-up optimization TODOs, but it must not remove tests, change required contexts, or activate refresh skipping.",
+  "description": "Make the decision cost function accurate and identify independent full-CI speedups. Extend dev-loop metrics to distinguish time until all required contexts succeed, time until auto-merge can proceed, time until every synchronize-triggered workflow completes, and runner-minutes by workflow/job. Profile code-test, medium-test, correctness-gate, plan-capture, lint, Documentation, browser, and ruleset-drift setup versus execution. Propose only evidence-backed optimizations that preserve test coverage and required semantics.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assume Documentation blocks merging",
+        "instead": "measure it separately as whole-event fan-out",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "why": "it is not a required context"
+      },
+      {
+        "dont": "Create a second CI metrics implementation",
+        "instead": "extend dev_loop_pr_metrics.py",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "why": "parallel definitions drift"
+      },
+      {
+        "dont": "Optimize only runner-minutes",
+        "instead": "lead with required-gate and merge-unblock wall time",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "why": "the user-visible problem is merge latency"
+      },
+      {
+        "dont": "Remove slow tests from required CI in a profiling TODO",
+        "instead": "create a separately reviewed follow-up",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "why": "measurement is not authorization to weaken safety"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "needs_item": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-14T13:43:56Z",
+      "completed_pr": 1734,
+      "created_at": "2026-08-14T12:13:29Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Cancelled and incomplete runs are not counted as fully consumed completed-run minutes",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile"
+      },
+      {
+        "behavior": "Current metric consumers remain compatible or receive an explicitly versioned schema",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile"
+      },
+      {
+        "behavior": "Public standard-runner dollar cost is reported as zero while latency and concurrency remain measurable",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile"
+      },
+      {
+        "behavior": "Test coverage and required contexts are not changed by this profiling item",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing dev-loop PR and CI metrics",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "path": "_project/scripts/dev_loop_pr_metrics.py"
+      },
+      {
+        "concept": "CI duration budgets and censoring caveats",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "path": "docs/operations/fast-lane-budget.md"
+      },
+      {
+        "concept": "deterministic metrics contract tests",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "path": "tests/unit/scripts/test_dev_loop_pr_metrics.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/strict-base-refresh-ci-profile-*.md"
+      },
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/dev_loop_pr_metrics.py"
+      },
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/fast-lane-budget.md"
+      },
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_dev_loop_pr_metrics.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_dev_loop_pr_metrics.py -q",
+        "description": "Metrics unit suite passes",
+        "expected": "all tests pass",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "last_result": "pass",
+        "last_run": "2026-08-14T13:43:45Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'merge-unblock|required-gate|all-workflow|queue|cancel|runner-minute|setup|execution' _project/decisions/strict-base-refresh-ci-profile-*.md",
+        "description": "Report separates required and whole-event latency",
+        "expected": "All required dimensions are present",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "last_result": "pass",
+        "last_run": "2026-08-14T13:43:47Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/dev_loop_pr_metrics.py --help",
+        "description": "Existing metrics command remains runnable",
+        "expected": "exit 0 and documented options",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "last_result": "pass",
+        "last_run": "2026-08-14T13:43:49Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo lint strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "description": "This TODO passes tracker quality lint",
+        "expected": "0 findings",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "last_result": "pass",
+        "last_run": "2026-08-14T13:43:53Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "event_fanout_v1 defines required-gate, merge-unblock, all-workflow, queue-delay, runner-minutes, cancel bucket, setup/execution",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "notes": "Document event correlation and how reruns, cancelled attempts, overlapping workflows, and missing jobs are handled.",
+        "started_at": "2026-08-14T13:36:18Z",
+        "started_branch": "fix/strict-base-refresh-04-ci-profile",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-04",
+        "status": "done",
+        "summary": "Define merge-unblock, required-gate, all-workflow, runner-minute, cancellation, and queue-delay metrics",
+        "wid": "w0"
+      },
+      {
+        "evidence": "extended dev_loop_pr_metrics.py; existing summarize keys unchanged; --event-fanout is versioned",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "notes": "Use run and job APIs; keep current output compatibility or add a versioned section.",
+        "started_at": "2026-08-14T13:38:56Z",
+        "started_branch": "fix/strict-base-refresh-04-ci-profile",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-04",
+        "status": "done",
+        "summary": "Extend dev-loop metrics to correlate all synchronize workflows and compute per-job setup and execution durations",
+        "wid": "w1"
+      },
+      {
+        "evidence": "11 unit tests including reruns, missing/renamed contexts, cancellations, multi-workflow span",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "notes": "Pin the difference between merge-unblock latency and last-workflow completion.",
+        "started_at": "2026-08-14T13:39:10Z",
+        "started_branch": "fix/strict-base-refresh-04-ci-profile",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-04",
+        "status": "done",
+        "summary": "Add deterministic tests for multiple workflows, reruns, cancellations, missing checks, and required-context changes",
+        "wid": "w2"
+      },
+      {
+        "evidence": "profiled #1717/#1718/#1719 refreshes: merge-unblock 27-31m is medium-test",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "notes": "Report medians and tails separately for code, content, and explorer-relevant cohorts.",
+        "started_at": "2026-08-14T13:39:21Z",
+        "started_branch": "fix/strict-base-refresh-04-ci-profile",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-04",
+        "status": "done",
+        "summary": "Profile recent initial runs and exact refreshes and identify the top latency and resource contributors",
+        "wid": "w3"
+      },
+      {
+        "evidence": "follow-ups named; no test deletion or required-context change",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "notes": "Prefer caching, setup reuse, deterministic sharding, and test performance fixes; do not delete or silently demote coverage.",
+        "started_at": "2026-08-14T13:39:32Z",
+        "started_branch": "fix/strict-base-refresh-04-ci-profile",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-04",
+        "status": "done",
+        "summary": "Evaluate safe full-CI optimizations and create separate follow-ups only for independently validated changes",
+        "wid": "w4"
+      },
+      {
+        "evidence": "_project/decisions/strict-base-refresh-ci-profile-2026-08-14.md",
+        "item_id": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile",
+        "notes": "State whether refresh-specific machinery still has material latency value after general CI improvements.",
+        "started_at": "2026-08-14T13:39:43Z",
+        "started_branch": "fix/strict-base-refresh-04-ci-profile",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-04",
+        "status": "done",
+        "summary": "Publish the critical-path report for the final activation gate",
+        "wid": "w5"
+      }
+    ]
+  }
+}

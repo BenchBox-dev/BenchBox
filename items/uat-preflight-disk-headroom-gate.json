@@ -1,0 +1,174 @@
+{
+  "context": "Extend preflight_budget.py to expose both the steady and peak estimate per\nscale, and a helper that compares peak against shutil.disk_usage on each\nconfigured root. Wire it into the preflight phase before the existing\nfree_space_min_gib check; emit the per-root table either way. Largest scale\n= max(scale) across the config matrix.\n",
+  "description": "The native SQL sweep (uat_complete_native_20260528_20260528) aborted\nmid-execute when /tmp fell below the 4.0 GiB floor:\nresume.json abort_reason = \"free space 3.6 GiB < cutoff 4.0 GiB at /tmp\".\nuat_lifecycle.log shows free space drifting down (18.63 -> 11.01 -> 7.36\n-> 4.86 GiB) across platforms with docker_cleanup_status=not-run until the\nfloor tripped. The existing preflight.free_space_min_gib cutoff is a single\nstatic floor; it does not relate available headroom to the workload the\nconfig actually demands, and it watches a limited set of paths.\n\nMake preflight (a) report free space at every relevant root and (b) gate\nthe sweep against the largest configured scale's expected peak from the\ndisk-budget table, so a sweep does not start only to abort halfway.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make the gate a hard non-overridable block",
+        "instead": "keep an explicit override and surface unknowns.",
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "why": "budget table coverage is incomplete (unknown cells exist)"
+      },
+      {
+        "dont": "only watch the output root",
+        "instead": "report every root the run writes to.",
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "why": "the 2026-05-28 abort was on /tmp"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Unknown disk-budget cells are still reported, not treated as zero.",
+        "item_id": "uat-preflight-disk-headroom-gate"
+      },
+      {
+        "behavior": "free_space_min_gib remains a valid explicit override; the new gate must be overridable for operators who know the run fits.",
+        "item_id": "uat-preflight-disk-headroom-gate"
+      },
+      {
+        "behavior": "preserve_datagen:false stays rejected by the config validator.",
+        "item_id": "uat-preflight-disk-headroom-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "tests/uat/phases/* free_space_min_gib cutoff (docs/operations/uat-framework.md 'Disk-budget estimate and resume manifests') — reuse the cutoff mechanism, add per-root reporting",
+        "decision": "reuse",
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "path": "tests/uat/phases/*"
+      },
+      {
+        "concept": "tests/uat/preflight_budget.py — existing disk-budget estimate from tests/uat/data/disk_budget_table.tsv; extend it from advisory-only into a gate input",
+        "decision": "extend",
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "path": "tests/uat/preflight_budget.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/_cli.py"
+      },
+      {
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/data/disk_budget_table.tsv"
+      },
+      {
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/orchestrator.py"
+      },
+      {
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/preflight.py"
+      },
+      {
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/preflight_budget.py"
+      },
+      {
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_cli_dispatch.py"
+      },
+      {
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_orchestrator.py"
+      },
+      {
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_preflight.py"
+      },
+      {
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_preflight_budget.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_preflight.py tests/uat/test_preflight_budget.py -q",
+        "description": "Preflight budget + disk tests pass",
+        "expected": "all pass",
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_preflight_budget.py -k 'gate or headroom' -q",
+        "description": "A configured matrix whose peak exceeds free space fails preflight with an actionable message",
+        "expected": "gate test asserts non-zero preflight + message naming the short root",
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "notes": "One compact table line per root, printed before workload cells run.\nThe native abort was on /tmp specifically while the output root still\nhad headroom, so per-root visibility is the point.\nImplemented in preflight result output for CLI preflight, CLI execute,\nand orchestrated sweeps.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Emit a preflight free-space report for /tmp, output root, benchmark data root, and (managed mode) Docker data root",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "notes": "Use preflight_budget.py's peak estimate. If estimated peak for the\nlargest configured scale exceeds free headroom on any required root,\nfail preflight with an actionable message (free space, shrink matrix,\nor override). Keep unknown-cell handling explicit (count + warn), per\nthe existing advisory contract; do not silently pass unknowns.\nImplemented with largest-scale peak gating, per-root shortfall messages,\nunknown-cell warnings, and a zero cutoff override.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Relate the disk-budget peak estimate to the largest configured scale and gate on it",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-preflight-disk-headroom-gate",
+        "notes": "Documented the disk-budget line, per-root report, largest-scale headroom\ngate, unknown-cell warning behavior, and `preflight.free_space_min_gib: 0`\noverride.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the disk gate and override in docs/operations/uat-framework.md",
+        "wid": "w3"
+      }
+    ]
+  }
+}

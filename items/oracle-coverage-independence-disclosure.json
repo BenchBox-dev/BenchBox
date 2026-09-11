@@ -1,0 +1,106 @@
+{
+  "description": "The cross-surface gates are honestly documented per-benchmark, but the campaign\nheadline (\"N benchmarks gated\") hides that the gates are not equally strong\noracles. For DSL-generated benchmarks (SSB, ~40/43 ClickBench), both DataFrame\nbackends are generated from ONE spec, so the only independent signal is\nSQL-vs-spec - a weaker check than SQL-vs-independent-handwritten-DataFrame (e.g.\nCoffeeShop's hand-written impls). A reader who sees \"guarded\" may infer an\nindependent cross-check that, for several gates, does not exist.\n\nRelatedly, the oracle coverage map already reports \"guarded\" on REGISTRATION, with\nan Enforced column distinguishing enforced (CI-blocking) vs staged; surface the\nindependence dimension in the same table so \"guarded\" cannot be misread as\n\"independently verified\".",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-06-28T00:00:00Z",
+      "created_at": "2026-06-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Per-benchmark reference-independence docstrings remain; this surfaces them, not removes them.",
+        "item_id": "oracle-coverage-independence-disclosure"
+      },
+      {
+        "behavior": "The existing coverage-map drift guard (--check) stays green after regeneration.",
+        "item_id": "oracle-coverage-independence-disclosure"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': '_project/analysis/oracle-coverage-map.json', 'note': 'The generated artifact whose schema gains the independence field; regenerate and commit after the change.'}",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-independence-disclosure",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': '_project/scripts/generate_oracle_coverage_map.py:340', 'note': \"The Enforced column / table generation - add an independence-strength column here, derived from each gate's surface provenance.\"}",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-independence-disclosure",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/core/equivalence/cross_surface.py:11', 'note': 'Module docstring already states reference-independence caveats per benchmark - lift that into structured per-gate metadata the map can render.'}",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-independence-disclosure",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "oracle-coverage-independence-disclosure",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      },
+      {
+        "item_id": "oracle-coverage-independence-disclosure",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/generate_oracle_coverage_map.py"
+      },
+      {
+        "item_id": "oracle-coverage-independence-disclosure",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/equivalence/"
+      },
+      {
+        "item_id": "oracle-coverage-independence-disclosure",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make oracle-coverage-map && make oracle-coverage-map-check",
+        "description": "Coverage map shows independence strength and drift guard passes",
+        "expected": "map includes an independence-strength column per gate; --check passes",
+        "item_id": "oracle-coverage-independence-disclosure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "oracle-coverage-independence-disclosure",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "oracle-coverage-independence-disclosure",
+        "notes": "Add a per-gate independence rating (e.g. strong = SQL vs independent\nhand-written DataFrame; weak = SQL vs shared DSL spec) with a one-line\nrationale, derived from each gate's surface provenance. Render it as a column\nin generate_oracle_coverage_map.py output alongside the existing Enforced\ncolumn, and regenerate _project/analysis/oracle-coverage-map.json. Keep the\ndrift-guard (--check) green after regeneration.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Classify each gate's independence strength and render it in the coverage map",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "oracle-coverage-independence-disclosure",
+        "notes": "Update tests/unit/test_oracle_coverage_map.py (and the map's narrative, if any)\nso the independence column is covered by the drift guard. Do not weaken the\nexisting reference-independence disclosures in the gate docstrings - this\nstructures and surfaces them, it does not replace them.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update the --check test and any narrative docs to include the new column",
+        "wid": "w2"
+      }
+    ]
+  }
+}

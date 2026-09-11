@@ -1,0 +1,11 @@
+{
+  "description": "Multiple modules implement nearly identical logic for extracting data from\nbenchmark result JSON files, with duplicated schema version detection and\nfield mapping. This creates maintenance burden and risk of inconsistent\nbehavior when the schema evolves.\n\nDiscovered during fix for empty chart generation (ResultPlotter._normalize_dict\nwas using v1.x schema paths while actual output uses v2.x schema).\n\nThe fix added v2.x support to result_plotter.py, but now there are 5+ places\nwith similar extraction logic that should be consolidated.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-28T00:00:00Z",
+      "created_at": "2026-01-28T00:00:00Z",
+      "worktree": "core-functionality"
+    }
+  }
+}

@@ -1,0 +1,161 @@
+{
+  "context": "Treat this as connector compatibility hardening, not a broad Trino adapter\nrefactor. First prove whether Trino still rejects PRIMARY KEY metadata in the\nrelevant connector modes. Only then mirror the narrow Presto helper ordering.\n",
+  "description": "The JoinOrder Presto DDL remediation added `strip_primary_keys()` to\n`PrestoAdapter._optimize_table_definition()` after Presto rejected benchmark\nCREATE TABLE statements that carried PRIMARY KEY metadata. Trino has a\nparallel `_optimize_table_definition()` path and currently does not call the\nshared helper. If Trino becomes a canonical JoinOrder target, the same DDL\nfailure shape may recur.\n\nThis is not release-blocking for the JoinOrder remediation batch because the\nreviewed target was Presto, not Trino. Keep it as a scoped follow-up unless a\nTrino JoinOrder UAT failure makes it urgent.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "factor Presto and Trino DDL optimization into a new shared abstraction unless multiple non-PK rewrites also converge",
+        "instead": "(not specified)",
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "run live Trino/cloud tests without explicit approval",
+        "instead": "(not specified)",
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use broad regex rewrites in the adapter when `strip_primary_keys()` already handles nested parentheses",
+        "instead": "(not specified)",
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Compatibility",
+      "created_at": "2026-05-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not change the canonical JoinOrder schema, query set, row counts, or reference cardinalities",
+        "item_id": "joinorder-trino-primary-key-ddl"
+      },
+      {
+        "behavior": "Do not remove FOREIGN KEY metadata unless a Trino-specific failure proves it is necessary",
+        "item_id": "joinorder-trino-primary-key-ddl"
+      },
+      {
+        "behavior": "Keep SDK imports lazy and do not require a live Trino server for unit coverage",
+        "item_id": "joinorder-trino-primary-key-ddl"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/base/ddl_helpers.py: shared balanced-parenthesis `strip_primary_keys()` helper",
+        "decision": "reuse",
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "path": "benchbox/platforms/base/ddl_helpers.py"
+      },
+      {
+        "concept": "benchbox/platforms/presto.py: Presto strips PRIMARY KEY metadata before connector-specific rewrites",
+        "decision": "reuse",
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "path": "benchbox/platforms/presto.py"
+      },
+      {
+        "concept": "tests/unit/platforms/test_presto_adapter.py: focused adapter optimizer coverage without a live server",
+        "decision": "reuse",
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "path": "tests/unit/platforms/test_presto_adapter.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/planning/joinorder-trino-primary-key-ddl.yaml"
+      },
+      {
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/trino.py"
+      },
+      {
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_trino_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_trino_adapter.py -q",
+        "description": "Trino DDL optimizer unit coverage passes",
+        "expected": "passes",
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base/test_ddl_helpers.py -q",
+        "description": "Shared DDL helper regression coverage still passes",
+        "expected": "passes",
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/DONE/main/planning/joinorder-trino-primary-key-ddl.yaml",
+        "description": "TODO graph remains valid",
+        "expected": "passes",
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "notes": "Re-check Trino memory and Hive/Iceberg connector CREATE TABLE behavior\nwith a minimal statement containing both inline and table-level PRIMARY\nKEY metadata. If current Trino accepts the metadata, document that and\nclose this as no-op.\n\n2026-05-26 evidence: Trino 481 CREATE TABLE syntax documents column\ntype/default/null/comment/properties and table WITH properties, not inline\nor table-level PRIMARY KEY constraints. Memory, Hive, and Iceberg connector\ndocs document CREATE TABLE support and connector properties, with no\nPRIMARY KEY acceptance path. No live Trino run was used.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm Trino connector behavior for PRIMARY KEY metadata",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "notes": "If Trino rejects PRIMARY KEY metadata, import `strip_primary_keys` from\n`benchbox.platforms.base.ddl_helpers` and call it before memory/Hive\nconnector-specific rewrites, mirroring the Presto order.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the shared primary-key stripping helper if Trino rejects the metadata",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-trino-primary-key-ddl",
+        "notes": "Cover inline `id INTEGER PRIMARY KEY` and table-level\n`PRIMARY KEY (id, coalesce(other_id, 0))` inputs. Keep the test focused\non Trino DDL optimization and avoid requiring a live Trino server.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add focused Trino optimizer regression coverage",
+        "wid": "w3"
+      }
+    ]
+  }
+}

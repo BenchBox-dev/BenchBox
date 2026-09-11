@@ -1,0 +1,60 @@
+{
+  "context": "Coerce at the boundary where the value enters the adapter, not at the point of use, so every consumer of self.thread_limit sees a real int: in __init__, `int()` the value and raise a clear ValueError naming the option when it is not integral. For the two string settings, prefer DuckDB's parameterised SET where the version in use supports it; where it does not, validate against the same bounded memory-size pattern MCP already applies (benchbox/mcp/schemas.py MEMORY_LIMIT_PATTERN) before interpolating, rather than escaping quotes. Add a test that a non-integral thread_limit is rejected at construction and never reaches conn.execute -- assert on a connection spy, because asserting only on the raised error would pass even if the statement had already been sent.",
+  "description": "benchbox/platforms/duckdb.py:667 reads `self.thread_limit = config.get(\"thread_limit\")` with no type coercion, and :800 applies it as `conn.execute(f\"SET threads TO {self.thread_limit}\")` -- raw interpolation of a config-supplied value into SQL.\n\nThis is a consequence of my own change. Before #1514, DuckDBAdapter.from_config omitted `thread_limit` from its pass-through key list, so the only way to reach :800 was to call the constructor directly. Adding `thread_limit` to that list (which is what made MCP's duckdb.threads actually apply) also connected the unified-config and config-file paths to the interpolation.\n\nNot an MCP escalation: MCP_PLATFORM_OPTION_ALLOWLIST bounds duckdb.threads to an int in 1..256 and _prepare_adapter_platform_options renames it, so nothing string-shaped survives that boundary. The exposure is the non-MCP path -- a benchmark config or profile YAML carrying `thread_limit: \"4; ATTACH 'x' AS y\"` is interpolated verbatim. Config files are comparatively trusted, hence medium rather than high, but the surface was widened without being noticed at review time and should not stay that way.\n\nNote :790 `SET memory_limit = '{self.memory_limit}'` and :795 max_temp_directory_size have the same shape and were already live before #1514; fix them in the same pass rather than leaving a half-hardened file. See [duckdb-from-config-drops-constructor-read-keys], which covers the adjacent question of which other constructor-read keys from_config still drops.\n\nIdentified 2026-08-04 during the adversarial review of the mcp-v2-platform-options batch.",
+  "legacy": {
+    "item_meta": {
+      "category": "security",
+      "created_at": "2026-08-04T23:26:12Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "An absent thread_limit still means 'do not emit SET threads at all', not 'emit a default'",
+        "item_id": "duckdb-thread-limit-raw-sql-interpolation"
+      },
+      {
+        "behavior": "MCP duckdb.threads keeps reaching the effective DuckDB `SET threads` statement -- the TestMCPThreadsReachTheEffectiveSetting coverage added by #1514 must still pass",
+        "item_id": "duckdb-thread-limit-raw-sql-interpolation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "duckdb-thread-limit-raw-sql-interpolation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "duckdb-thread-limit-raw-sql-interpolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "duckdb-thread-limit-raw-sql-interpolation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_duckdb_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/platforms/test_duckdb_adapter.py -q -n 0",
+        "description": "A non-integral thread_limit never reaches conn.execute",
+        "expected": "exits 0 with a new case proving construction fails and the connection spy recorded no SET statement",
+        "item_id": "duckdb-thread-limit-raw-sql-interpolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/platforms/test_duckdb_adapter.py -q -n 0 -k MCPThreadsReachTheEffectiveSetting",
+        "description": "The MCP path still applies the requested thread count end to end",
+        "expected": "exits 0",
+        "item_id": "duckdb-thread-limit-raw-sql-interpolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

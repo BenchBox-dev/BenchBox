@@ -1,0 +1,152 @@
+{
+  "context": "Extend the embedded tracker lint with a narrow detector for verification commands combining grep/rg with _project/todo-db-export. Report why substring matching is self-referential and direct authors to parse JSON keys or table membership. Add positive and negative unit tests, including a structured jq command that remains valid.",
+  "description": "Finding 2026-07-30-184634-verification-rung-greps-match-item-prose documents repeated false verification results caused by grep or rg over _project/todo-db-export: the committed export includes item prose that names the same schema identifiers the rung is trying to prove absent. Add a lint diagnostic and author guidance requiring structured JSON inspection for export assertions.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Ban every grep command in every verification rung",
+        "instead": "Target the self-referential committed export path",
+        "item_id": "verification-export-grep-self-match-guard",
+        "why": "grep is a valid exit-status assertion for ordinary files"
+      },
+      {
+        "dont": "Silently rewrite stored verification commands",
+        "instead": "Emit an actionable lint finding",
+        "item_id": "verification-export-grep-self-match-guard",
+        "why": "That destroys authored intent and auditability"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-01T21:14:09Z",
+      "completed_pr": 1443,
+      "created_at": "2026-08-01T20:20:37Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Ordinary grep or rg commands outside _project/todo-db-export remain accepted",
+        "item_id": "verification-export-grep-self-match-guard"
+      },
+      {
+        "behavior": "Structured jq or Python assertions over exported JSON remain accepted",
+        "item_id": "verification-export-grep-self-match-guard"
+      },
+      {
+        "behavior": "Verification commands remain graded only by exit status",
+        "item_id": "verification-export-grep-self-match-guard"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "verification-command lint and author help",
+        "decision": "extend",
+        "item_id": "verification-export-grep-self-match-guard",
+        "path": "_project/scripts/todo_db.py"
+      },
+      {
+        "concept": "tracker lint regression coverage",
+        "decision": "extend",
+        "item_id": "verification-export-grep-self-match-guard",
+        "path": "tests/unit/scripts/test_todo_db_v2.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "verification-export-grep-self-match-guard",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "verification-export-grep-self-match-guard",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_v2.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -k 'export and grep' -q",
+        "description": "Focused export self-match lint regressions",
+        "expected": "passes after the guard and fails on the unfixed tree because substring-grep rungs are not diagnosed",
+        "item_id": "verification-export-grep-self-match-guard",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:31:25Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q",
+        "description": "Complete embedded tracker unit module",
+        "expected": "passes after the change and exposes any regression in existing lint behavior",
+        "item_id": "verification-export-grep-self-match-guard",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:31:37Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "verification-export-grep-self-match-guard",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "verification-export-grep-self-match-guard",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "verification-export-grep-self-match-guard",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Hosted verification rows confirm the repeated class: findings-phase2-export-boundary and findings-schema-v4-lossless-legacy-fields use substring scans over _project/todo-db-export, whose items.jsonl prose contains the same identifiers.",
+        "item_id": "verification-export-grep-self-match-guard",
+        "notes": null,
+        "started_at": "2026-08-01T20:26:19Z",
+        "started_branch": "fix/finish-three-workflow-ci-handoff",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-finish-ci-handoff",
+        "status": "done",
+        "summary": "Revalidate the two historical self-matching rung examples",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added targeted _EXPORT_SUBSTRING_SCAN_RE detection to lint_item plus create --verify guidance; it flags direct grep/rg scans of _project/todo-db-export and directs authors to structured JSON checks.",
+        "item_id": "verification-export-grep-self-match-guard",
+        "notes": null,
+        "started_at": "2026-08-01T20:26:24Z",
+        "started_branch": "fix/finish-three-workflow-ci-handoff",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-finish-ci-handoff",
+        "status": "done",
+        "summary": "Add export substring-grep lint detection and author guidance",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added parameterized grep/rg regression tests and a structured jq negative control. The focused test initially failed until negated grep/rg syntax was handled, proving the regression coverage is non-vacuous; final focused run passed 3 tests.",
+        "item_id": "verification-export-grep-self-match-guard",
+        "notes": null,
+        "started_at": "2026-08-01T20:28:03Z",
+        "started_branch": "fix/finish-three-workflow-ci-handoff",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-finish-ci-handoff",
+        "status": "done",
+        "summary": "Add regression tests for grep, rg, and structured JSON commands",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Recorded rungs passed with PYTEST_ADDOPTS=-n 0 while another worktree held the shared pytest lock: 3 focused and 86 full-module tests passed; Ruff check and format check passed; scope check reports exactly the two allowed files.",
+        "item_id": "verification-export-grep-self-match-guard",
+        "notes": null,
+        "started_at": "2026-08-01T20:28:09Z",
+        "started_branch": "fix/finish-three-workflow-ci-handoff",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-finish-ci-handoff",
+        "status": "done",
+        "summary": "Run focused tracker tests, lint, and scope verification",
+        "wid": "w3"
+      }
+    ]
+  }
+}

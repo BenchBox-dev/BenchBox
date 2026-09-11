@@ -1,0 +1,10 @@
+{
+  "description": "Improve parser robustness and resilience against format changes across platform\nversions. Add fallback mechanisms, version-specific parser selection, and\nmulti-format support to handle EXPLAIN output variations gracefully.\n\n**Problems Addressed**:\n- DuckDB parser depends on Unicode box-drawing characters (fragile)\n- No fallback when text parsing fails\n- No version-specific parser selection\n- Format changes break parsing with cryptic errors",
+  "legacy": {
+    "item_meta": {
+      "category": "Reliability",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-remediation"
+    }
+  }
+}

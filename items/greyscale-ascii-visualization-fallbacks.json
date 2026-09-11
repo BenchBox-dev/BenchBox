@@ -1,0 +1,275 @@
+{
+  "context": "Follow the heatmap's existing pattern (base.py:64-66) which already differentiates\nseries without color using intensity characters. Extend this approach to all charts:\n\n1. Define fill-pattern and marker palettes in base.py alongside DEFAULT_PALETTE\n2. Add a method like `get_series_fill(index)` and `get_series_marker(index)` to\n   TerminalColors or ASCIIChartOptions that returns the fill/marker character\n   when color_mode is NONE, or the standard █/■ when color is available\n3. Update each chart's render() to call these methods instead of hardcoding █/■\n4. The colorize() method can remain unchanged - the differentiation happens at\n   the character level, not the ANSI level\n\nThis keeps the change minimal: chart classes swap one character lookup, and all\nthe palette/fallback logic lives in base.py.\n",
+  "description": "When color is disabled - either via CLI `--no-color`, the `NO_COLOR` env var,\nor the MCP path (which hardcodes `use_color=False`) - ASCII chart output becomes\nunreadable because all visual differentiation between data series is lost.\n\nThe root cause is that `TerminalColors.colorize()` returns plain undecorated text\nwhen `color_mode == ColorMode.NONE`, but the chart renderers rely entirely on color\nto distinguish between series (bars, legend markers, comparison pairs, etc.).\n\nThe heatmap is the one exception - it already falls back to intensity characters\n(`░▒▓█`) when color is unavailable (base.py:64-66). All other chart types need\nequivalent structural differentiation.\n\n**Current behavior (broken):**\n- CLI `--no-color`: all bars use identical `█` fill, legends have same `■` marker,\n  comparison charts show indistinguishable series\n- MCP `generate_chart`: hardcodes `use_color=False` (visualization.py:470),\n  producing same unreadable output\n\n**Desired behavior:**\n- No-color output uses different fill characters per series (e.g., `█`, `▓`, `▒`, `░`)\n- Legend markers differentiate series with unique symbols (e.g., `■`, `◆`, `▲`, `●`)\n- Comparison bars show series-identifying prefixes or patterns\n- Text labels and structural layout compensate for absent color\n- MCP output is always readable without relying on ANSI rendering",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a new ColorMode.GREYSCALE enum for this work",
+        "instead": "keep ColorMode as-is and differentiate via fill characters",
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "why": "the no-color path should use structural patterns not ANSI dim/bold"
+      },
+      {
+        "dont": "enable color output in the MCP path",
+        "instead": "use structural character differentiation instead",
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "why": "MCP consumers (LLMs, chat UIs) cannot render ANSI codes"
+      },
+      {
+        "dont": "modify the colorize() method signature",
+        "instead": "add new helper methods alongside it instead",
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "why": "all 15 chart classes call it"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "greyscale-ascii-visualization-fallbacks",
+        "id": 317,
+        "reason": "A GREYSCALE color mode using ANSI dim/bold/underline (supported on most terminals\neven without color) could provide a middle tier between full color and no formatting.\nDeferring because the structural-pattern approach covers the primary use cases\n(MCP and --no-color). Can revisit if users want a dim/bold tier.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Greyscale ColorMode explicitly deferred pending user demand for a dim/bold tier; no evidence that demand has materialized.",
+        "summary": "Add intermediate 'greyscale' ColorMode that uses dim/bold ANSI"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "greyscale-ascii-visualization-fallbacks",
+        "id": 318,
+        "reason": "An alternative approach would be rendering charts as HTML/SVG for richer MCP output.\nDeferring because ASCII output is the established format and the structural fixes\nsolve the immediate readability problem.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Speculative HTML/SVG alternative; the immediate ASCII readability problem was already fixed. BenchBox deliberately committed to ASCII/textcharts (blog 'why we deleted plotly', 'extracting textcharts'). No concrete need.",
+        "summary": "HTML/SVG chart output format for MCP"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-17T00:00:00Z",
+      "created_at": "2026-02-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ASCIIChartOptions API is backwards compatible - no new required parameters",
+        "item_id": "greyscale-ascii-visualization-fallbacks"
+      },
+      {
+        "behavior": "All colored output (use_color=True) renders identically to current behavior",
+        "item_id": "greyscale-ascii-visualization-fallbacks"
+      },
+      {
+        "behavior": "CLI --no-color and --no-unicode flags continue to work independently",
+        "item_id": "greyscale-ascii-visualization-fallbacks"
+      },
+      {
+        "behavior": "Heatmap intensity character fallback (base.py:64-66) continues to work",
+        "item_id": "greyscale-ascii-visualization-fallbacks"
+      },
+      {
+        "behavior": "MCP generate_chart tool signature and response format unchanged",
+        "item_id": "greyscale-ascii-visualization-fallbacks"
+      },
+      {
+        "behavior": "detect_terminal_capabilities() auto-detection logic unchanged",
+        "item_id": "greyscale-ascii-visualization-fallbacks"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/visualize.py"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/ascii/__init__.py"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/ascii/exporters.py"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/post_run_summary.py"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/tools/visualization.py"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ -v",
+        "description": "Existing visualization tests pass unchanged",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/test_nocolor_rendering.py -v",
+        "description": "No-color bar chart output has distinct fill characters per series",
+        "expected": "All tests pass, verifying series differentiation",
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.visualization.ascii.base import FILL_PATTERNS, SERIES_MARKERS; assert len(set(FILL_PATTERNS)) >= 8, f'only {len(set(FILL_PATTERNS))} unique fills'; assert len(set(SERIES_MARKERS)) >= 8, f'only {len(set(SERIES_MARKERS))} unique markers'; print('PASS: 8+ unique fill patterns and series markers')\"",
+        "description": "Fill pattern palette has at least 8 distinct entries matching color palette size",
+        "expected": "PASS: 8+ unique fill patterns and series markers",
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "notes": "Add to base.py alongside existing palettes:\n- FILL_PATTERNS: tuple of fill character sets per series (e.g., \"█\", \"▓\", \"▒\", \"░\", \"▚\", \"▞\", \"╳\", \"·\")\n- SERIES_MARKERS: tuple of legend marker characters (e.g., \"■\", \"◆\", \"▲\", \"●\", \"◇\", \"▽\", \"○\", \"□\")\n- ASCII fallbacks for both (e.g., \"#\", \"=\", \"-\", \".\", \"x\", \"+\", \"o\", \"*\")\nAdd a helper method to TerminalColors or ASCIIChartOptions to return the\nappropriate fill/marker for a given series index.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add fill-pattern palette and series-marker palette to base.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "notes": "In bar_chart.py, when colors.color_mode == NONE, use per-series fill characters\nfrom FILL_PATTERNS instead of uniform █. Legend should use SERIES_MARKERS.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update ASCIIBarChart to use fill patterns when color is off",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "notes": "In comparison_bar.py, baseline vs comparison bars need distinct fill patterns.\nThe improvement/regression text markers should use structural symbols (↑/↓)\ninstead of relying on green/red colorize() calls.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update ASCIIComparisonBar to use distinct patterns per series",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "notes": "Apply fill-pattern and series-marker fallbacks to the most complex charts\n(highest colorize() call count, multiple render modes):\n- histogram.py (11 calls - two render modes: single-platform and multi-platform,\n  each with bars + legends + outlier markers)\n- summary_box.py (7 calls - multiple styled sections)\n- diverging_bar.py (4 calls - positive/negative differentiation)\n- box_plot.py (4 calls - whisker/box/median coloring)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update high-complexity chart types for no-color readability",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "notes": "Apply fill-pattern and series-marker fallbacks to the simpler chart classes\n(mechanical changes, 2-4 colorize calls each):\n- normalized_speedup.py (4 calls - reference line + series)\n- stacked_bar.py (3 calls - multi-segment fills)\n- percentile_ladder.py (3 calls - band colors + segmented bars)\n- scatter_plot.py (3 calls - point markers per series)\n- sparkline_table.py (2 calls - inline sparkline coloring)\n- line_chart.py (2 calls - line character per series)\n- cdf_chart.py (2 calls - curve character per series)\n- rank_table.py (2 calls - rank highlight coloring)\n- Heatmap already has fallbacks - verify they're sufficient, no changes expected\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update remaining chart types for no-color readability",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "notes": "Add parametrized tests that render each chart type with use_color=False and verify:\n- Output contains no ANSI escape codes\n- Multiple series produce visually distinct output (different fill characters)\n- Legend entries have unique markers\n- Output is not empty and structurally complete\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for no-color rendering across chart types",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "greyscale-ascii-visualization-fallbacks",
+        "notes": "End-to-end validation:\n- Run `benchbox visualize --no-color --template head_to_head` with real result files\n- Run MCP generate_chart with template and verify content field is readable\n- Compare colored vs no-color output to ensure same data is conveyed\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify MCP and CLI --no-color produce readable output end-to-end",
+        "wid": "w7"
+      }
+    ]
+  }
+}

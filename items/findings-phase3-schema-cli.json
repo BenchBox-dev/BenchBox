@@ -1,0 +1,338 @@
+{
+  "context": "CLI: todo finding create|list|show|candidates|dismiss|triage|link|promote|sync. create prints the review-protocol §2 defect-gate question and requires --gate class-not-instance attestation; refuses finding_kind bug-class without --fixed-by <ref> (mechanizes §2:63-73: bug-class requires an already-landed fix). create writes the DRAFT FILE only, never the DB — capture and landing are always two steps (protocol compliance). sync walks ~/.benchbox/finding-drafts/, validates via the phase-1 validator, inserts-if-absent by filename-stem id; same-id/different-content is a LOUD ERROR, never a merge; synced drafts renamed *.synced, pruned after 30 days; without write creds degrades to a clear 'N drafts pending' message. candidates orders by disposition then age (the proven sweep order, sweep_blind_spots.py:206-211); --rank urgency is opt-in and only meaningful after triage populates the fields. triage sets disposition/urgency/breadth/confidence/reconsider_after; actionable and dismissed require --reason. promote validates payload work units + verifications, then ONE _write_txn: create_from_payload -> finding_links(kind=promoted-to) insert -> disposition flip via conditional UPDATE WHERE disposition IN (open,actionable) (double-promote guard). Many-to-one and one-to-many via repeated link calls.",
+  "description": "The findings domain lands in the shared tracker DB as a sibling module (_project/scripts/todo_findings.py imported by todo_db.py — keeps the 2,781-line monolith from growing; todo_db.py is NOT CODEOWNERS/soundness-gated, so the real risk is the manual-only hosted acceptance, which is a gate of this phase). Schema migration SCHEMA_VERSION 2->3, additive: findings (id=filename-stem regex-enforced, date, finding_kind, review_context, observed_sha, verbatim body columns title/finding_text/why_matters/next_steps, disposition CHECK IN (open,actionable,actioned,dismissed,promoted) DEFAULT open, disposition_reason with CHECK required for actionable/dismissed, nullable urgency/breadth/confidence/reconsider_after, created_at, imported_from); finding_evidence (path, pattern, line_start/line_end optional, note); finding_links (kind CHECK IN (promoted-to,informs,resolved-by,related-finding,duplicate-of,supersedes), exactly-one-target CHECK across target_item/target_finding); finding_events (log_event conventions, separate table — do NOT loosen events.item_id FK to items). Findings are non-claimable STRUCTURALLY: no query in ready_items, claim_item, lint, stats open-counts, deps, or batch touches these tables — pinned by a dedicated test suite. Entity shape and promote mechanics deliberately mirror deferrals (open->promoted|dismissed, reason-required dismiss, conditional-UPDATE single-txn promote per promote_deferral todo_db.py:1339-1391).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Auto-merge draft conflicts or last-write-wins on sync",
+        "instead": "Loud error naming both versions; human resolves",
+        "item_id": "findings-phase3-schema-cli",
+        "why": "Silent data loss in an audit-trail domain"
+      },
+      {
+        "dont": "Default candidates ordering by urgency/confidence",
+        "instead": "Disposition then age by default; --rank urgency opt-in post-triage",
+        "item_id": "findings-phase3-schema-cli",
+        "why": "Capture-time fields are optional and often absent; ranking fabricated or missing values launders guesses into a deterministic-looking order"
+      },
+      {
+        "dont": "Grow todo_db.py with the findings implementation inline",
+        "instead": "Sibling module todo_findings.py; todo_db.py only wires parsers/dispatch",
+        "item_id": "findings-phase3-schema-cli",
+        "why": "2,781-line single file; hosted write paths are only manually acceptance-tested — blast radius review demands separation"
+      },
+      {
+        "dont": "Store findings as rows in items (blocked, zero-unit, or otherwise)",
+        "instead": "Separate tables; non-claimability by structural absence, pinned by tests",
+        "item_id": "findings-phase3-schema-cli",
+        "why": "claim_item never checks blocked_reason (todo_db.py:1194) so any items encoding is claimable; completion gates are vacuous with zero units"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "needs_item": "findings-phase0-governance"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "needs_item": "findings-phase2-export-boundary"
+      }
+    ],
+    "item_meta": {
+      "category": "tracker",
+      "completed_at": "2026-07-23T19:35:45Z",
+      "completed_pr": 1273,
+      "created_at": "2026-07-22T12:50:59Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "DSN redaction (_redacted) on every new error path; tokens never echoed",
+        "item_id": "findings-phase3-schema-cli"
+      },
+      {
+        "behavior": "Deferrals subsystem untouched (findings mirror it, not replace it)",
+        "item_id": "findings-phase3-schema-cli"
+      },
+      {
+        "behavior": "Draft capture continues to work with zero credentials (sync is the only credentialed step)",
+        "item_id": "findings-phase3-schema-cli"
+      },
+      {
+        "behavior": "events.item_id FK to items stays strict — finding events go to finding_events",
+        "item_id": "findings-phase3-schema-cli"
+      },
+      {
+        "behavior": "ready_items/claim_item/lint/stats/deps/batch semantics for items — byte-identical SQL for ready and claim",
+        "item_id": "findings-phase3-schema-cli"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "promote_deferral: conditional-UPDATE single-txn promotion of a non-claimable entity into a planning item — finding promote reuses the exact pattern wrapping create_from_payload",
+        "decision": "extend",
+        "item_id": "findings-phase3-schema-cli",
+        "path": "_project/scripts/todo_db.py:1339-1391"
+      },
+      {
+        "concept": "deferrals: open->promoted|dismissed lifecycle, reason-required dismiss — findings are free-standing deferrals with evidence + links",
+        "decision": "extend",
+        "item_id": "findings-phase3-schema-cli",
+        "path": "_project/scripts/todo_db.py:166-176 + _project/specs/todo-db-tracker.md:171-182"
+      },
+      {
+        "concept": "events table + log_event — same conventions, separate finding_events table",
+        "decision": "extend",
+        "item_id": "findings-phase3-schema-cli",
+        "path": "_project/scripts/todo_db.py:178-185,959-969"
+      },
+      {
+        "concept": "fail-closed mutation classifier — classify every finding subcommand explicitly",
+        "decision": "extend",
+        "item_id": "findings-phase3-schema-cli",
+        "path": "_project/scripts/todo_db.py:843-853"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "kind": "do_not_modify",
+        "path_glob": "_project/blind-spots/**"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_findings.py"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/validate_blind_spot.py"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/findings-domain.md"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts -k 'finding and (claim or ready or lint or stats)' -q",
+        "description": "Non-claimability pinning suite green",
+        "expected": "all passed",
+        "item_id": "findings-phase3-schema-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts -k 'finding_sync' -q",
+        "description": "Sync idempotency + conflict tests green",
+        "expected": "all passed",
+        "item_id": "findings-phase3-schema-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts -k 'finding_promote' -q",
+        "description": "Promote rollback leaves no orphan on payload failure",
+        "expected": "all passed",
+        "item_id": "findings-phase3-schema-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-fast",
+        "description": "Full fast lane green",
+        "expected": "exit 0",
+        "item_id": "findings-phase3-schema-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Hosted acceptance evidence recorded (manual gate)",
+        "expected": "w8 evidence lists each write path exercised against benchbox-todo",
+        "item_id": "findings-phase3-schema-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "findings-phase3-schema-cli",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "v3 DDL in todo_findings.FINDINGS_SCHEMA_SQL, composed into todo_db.SCHEMA_SQL (fresh bootstrap) + MIGRATIONS[3] (v2->v3 upgrade) from ONE source (no drift). migrate_backend (hosted) + migrate_db (local) both apply it. Tests: test_todo_db_v2 v1->current asserts findings tables present; test_todo_db_hosted migrate_backend applied==[2,3].",
+        "item_id": "findings-phase3-schema-cli",
+        "notes": null,
+        "started_at": "2026-07-23T00:26:26Z",
+        "started_branch": "feat/findings-phase3-schema-cli",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Migration v3 DDL: findings, finding_evidence, finding_links, finding_events with CHECKs; migrate_backend covers hosted + local",
+        "wid": "w1"
+      },
+      {
+        "evidence": "todo_findings.py sibling module: get_finding/insert_finding row helpers, _set_disposition (legal-transition + terminal guards), log_finding_event -> finding_events (separate from items events, so review prose never reaches the committed export). DSN redaction preserved (TodoError messages carry no token; sqlite3.Error redacted at main() boundary). Cycle-safe via sys.modules alias. 27 tests in test_todo_findings.py.",
+        "item_id": "findings-phase3-schema-cli",
+        "notes": null,
+        "started_at": "2026-07-23T00:58:02Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "todo_findings.py sibling module: row helpers, disposition transitions, event logging per log_event conventions, DSN redaction",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Wired finding create|list|show|candidates|dismiss|triage|link (+sync/promote) subparsers; _dispatch routes 'finding' by name (no module-top todo_findings ref). Classifier: _command_mutates_tracker + _command_is_read_only special-case finding subcommands — create/candidates offline (zero-cred, handled before backend resolution); list/show read-only; sync/dismiss/triage/link/promote mutate.",
+        "item_id": "findings-phase3-schema-cli",
+        "notes": null,
+        "started_at": "2026-07-23T00:58:07Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Wire finding create|list|show|candidates|dismiss|triage|link subcommands; classify reads vs mutations in the fail-closed classifier",
+        "wid": "w3"
+      },
+      {
+        "evidence": "finding create: prints review-protocol §2 gate, requires --gate class-not-instance, bug-class requires --fixed-by, writes the draft file ONLY (never DB), then validates via the phase-1 validator. Tests: test_finding_create_requires_gate_attestation, _bug_class_requires_fixed_by, _writes_valid_draft_only, _collision_suffix.",
+        "item_id": "findings-phase3-schema-cli",
+        "notes": null,
+        "started_at": "2026-07-23T00:58:13Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Gate attestation: create prints §2 gate, requires --gate class-not-instance; bug-class needs --fixed-by; create writes draft only",
+        "wid": "w4"
+      },
+      {
+        "evidence": "finding sync: insert-if-absent by filename-stem id; same-id/different-content is a loud TodoError naming the id (never merged); success renames draft->*.md.synced; 30-day prune of old .synced; cred-less count_unsynced_drafts (local glob). Tests: test_finding_sync_inserts_absent/_is_idempotent/_conflict_is_loud_never_merged/_prunes_old_synced_drafts/_zero_credential_candidate_count.",
+        "item_id": "findings-phase3-schema-cli",
+        "notes": null,
+        "started_at": "2026-07-23T00:58:19Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "finding sync: insert-if-absent by filename stem, loud content conflict, *.synced rename + 30-day prune, cred-less 'N drafts pending'",
+        "wid": "w5"
+      },
+      {
+        "evidence": "finding promote: create_item(_in_txn=True) + finding_links(promoted-to) + disposition->promoted in ONE _write_txn (mirrors promote_deferral). Rollback proven: promoting to a duplicate item id fails and leaves disposition=open, zero links, only the original insert event. Tests: test_finding_promote_creates_item_links_and_flips/_rolls_back_on_duplicate_item/_rejects_terminal.",
+        "item_id": "findings-phase3-schema-cli",
+        "notes": null,
+        "started_at": "2026-07-23T00:58:24Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "finding promote: payload validation + single _write_txn (create_from_payload + link + conditional disposition flip); rollback test",
+        "wid": "w6"
+      },
+      {
+        "evidence": "Non-claimability pinning suite: findings absent from ready_items, not claimable as items (claim raises), ignored by lint --all's item query, excluded from stats (byte-identical counts), absent from items table; ready_items/claim_item source references only items tables. 6 tests match -k 'finding and (claim or ready or lint or stats)'. Plus hosted-delegation finding write/dismiss test in test_todo_db_hosted.",
+        "item_id": "findings-phase3-schema-cli",
+        "notes": null,
+        "started_at": "2026-07-23T00:58:30Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Non-claimability pinning suite: findings invisible to ready/claim/lint --all/stats open counts/deps/batch; ready+claim SQL unchanged",
+        "wid": "w7"
+      },
+      {
+        "evidence": "Hosted acceptance complete. (1) Rehearsal on scratch Turso DB benchbox-todo-p3-rehearsal: seeded v2 + 2 items, ran v3 CLI migrate -> applied [3], schema_version=3, 4 findings tables created, 2 items preserved. Exercised every hosted write path against real libsql: finding create(draft)->sync(insert)->list->triage(judgment + open->actionable w/reason)->link(informs->item)->promote(atomic item+link+disposition->promoted). All succeeded. (2) PRODUCTION: migrated benchbox-todo v2->v3 (applied [3]); verified on primary: schema_version=3, finding_tables=4 (findings/finding_evidence/finding_links/finding_events), items=1553 + events=3136 preserved (additive, no data loss), phase3 item still readable. PR #1273 merged (61cea7d66).",
+        "item_id": "findings-phase3-schema-cli",
+        "notes": null,
+        "started_at": "2026-07-23T19:25:00Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Manual hosted acceptance vs benchbox-todo: every new write path exercised; evidence recorded on this unit",
+        "wid": "w8"
+      }
+    ]
+  }
+}

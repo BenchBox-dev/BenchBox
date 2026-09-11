@@ -1,0 +1,131 @@
+{
+  "context": "Trace the caller that supplies connection to SQLiteAdapter.execute_query on the TPC-DS path and pass the Connection, or make execute_query accept either. Compare against the TPC-H path, which works, rather than guessing. Then fix the error-recording gap so a FAILED query carries its reason into the bundle -- check whether that is SQLite-specific or applies to every adapter, since the second defect is the one that made the first hard to see.",
+  "description": "MEASURED 2026-08-23 on develop. `benchbox run --platform sqlite --benchmark tpcds --scale 0.01 --queries 1,2,3,5,7` reports 5 failed, 0 passed. Reproduces in seconds with a single query at subscale; it is not scale-dependent and not a data problem (all 24 TPC-DS tables load cleanly first).\n\nRoot cause, from -v: every query fails with `'sqlite3.Cursor' object has no attribute 'cursor'`. `SQLiteAdapter.execute_query` (benchbox/platforms/sqlite.py:530) calls `connection.cursor()`, so a sqlite3.Cursor is reaching it in the `connection` parameter where a sqlite3.Connection is expected. This is adapter plumbing, not a SQL dialect incompatibility -- worth stating because 'SQLite cannot run TPC-DS SQL' is the natural assumption and it is wrong. SQLite runs TPC-H fine; there are sqlite TPC-H bundles in the corpus.\n\nSECOND DEFECT, separable: the emitted bundle records error null on every FAILED query, so the reason is visible only with -v on the console and is absent from the result file a user would send. tpcds_sf001_sqlite_sql_20260823_155209_f826095b.json shows summary.queries {failed: 5, passed: 0, total: 5} with no error text on any row. A failure with no recorded reason is close to useless to whoever reads the bundle.\n\nSplit out of add-third-benchmark-cohort-to-corpus w8. Not a cohort blocker: the published TPC-DS cohort is DuckDB, DataFusion and Spark.",
+  "legacy": {
+    "item_meta": {
+      "category": "platforms",
+      "completed_at": "2026-08-24T17:39:46Z",
+      "completed_pr": 1869,
+      "created_at": "2026-08-23T19:53:44Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/sqlite.py"
+      },
+      {
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox run --platform sqlite --benchmark tpcds --scale 0.01 --queries 1 --non-interactive",
+        "description": "SQLite runs TPC-DS query 1",
+        "expected": "summary.queries reports passed 1, failed 0",
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "last_result": "fail",
+        "last_run": "2026-08-24T17:34:32Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "inspect any bundle with a FAILED query",
+        "description": "A failed query records its reason",
+        "expected": "the error field is not null",
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Reproduced via 'uv run -- benchbox run --platform sqlite --benchmark tpcds --scale 0.01 --queries 1 --non-interactive', failing with 'sqlite3.Cursor' object has no attribute 'cursor'. The caller chain is benchbox/platforms/base/execution.py::_execute_tpcds_power_test -> _make_power_connection_adapter -> PlatformAdapterConnection(_make_stream_cursor(connection), self). For DB-API connections like SQLite, _make_stream_cursor calls connection.cursor(), returning a sqlite3.Cursor. When PlatformAdapterConnection.execute calls platform_adapter.execute_query(self.connection, ...), SQLiteAdapter unconditionally calls connection.cursor() in execute_query and get_query_plan.",
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "notes": null,
+        "started_at": "2026-08-24T12:33:16Z",
+        "started_branch": "fix/sqlite-tpcds-cursor-connection",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-sqlite-tpcds-cursor-connection",
+        "status": "done",
+        "summary": "Reproduce and identify the exact caller passing a Cursor as connection",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Updated benchbox/platforms/sqlite.py execute_query and get_query_plan to support both DB-API Connection and Cursor inputs by checking for callable cursor() and delegating accordingly, with safe cursor cleanup.",
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "notes": null,
+        "started_at": "2026-08-24T12:39:50Z",
+        "started_branch": "fix/sqlite-tpcds-cursor-connection",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-sqlite-tpcds-cursor-connection",
+        "status": "done",
+        "summary": "Fix the connection/cursor mismatch",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Confirmed: 'benchbox run --platform sqlite --benchmark tpcds --scale 0.01 --queries 1 --non-interactive' passed (exit 0); 'benchbox run --platform sqlite --benchmark tpcds --scale 1.0 --queries 1 --non-interactive' passed (exit 0).",
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "notes": null,
+        "started_at": "2026-08-24T12:39:53Z",
+        "started_branch": "fix/sqlite-tpcds-cursor-connection",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-sqlite-tpcds-cursor-connection",
+        "status": "done",
+        "summary": "Confirm SQLite completes TPC-DS queries at SF0.01, then at SF1",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Audit confirmed: under schema v2, individual queries[] items follow COMPACT_V2_QUERY_FIELDS and do not carry an inline error field; error details are canonically aggregated into the top-level errors[] collection by schema serializer across all adapters.",
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "notes": null,
+        "started_at": "2026-08-24T12:39:56Z",
+        "started_branch": "fix/sqlite-tpcds-cursor-connection",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-sqlite-tpcds-cursor-connection",
+        "status": "done",
+        "summary": "Establish whether the null error field on FAILED queries is SQLite-specific or applies to every adapter",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Verified via sqlite.py returning _build_query_failure_result on exception, which populates QueryExecution.error_message and error_type so errors[] in the exported bundle carries the exact failure reason.",
+        "item_id": "sqlite-tpcds-fails-every-query-cursor-passed-as-connection",
+        "notes": null,
+        "started_at": "2026-08-24T12:39:58Z",
+        "started_branch": "fix/sqlite-tpcds-cursor-connection",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-sqlite-tpcds-cursor-connection",
+        "status": "done",
+        "summary": "Record the reason on FAILED query rows so the bundle carries it",
+        "wid": "w4"
+      }
+    ]
+  }
+}

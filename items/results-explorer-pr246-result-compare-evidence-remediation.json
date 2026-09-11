@@ -1,0 +1,333 @@
+{
+  "context": "First decide the reading order, then adjust components. Avoid changing\ncomparability logic while fixing presentation unless a test proves the logic\nis wrong. Use shared chart and status primitives where available. Verify with\nboth same-cohort and mixed-scale compare cases from PR #246.\n",
+  "description": "PR #246 found that Result Detail and Compare are auditable but not yet sharp\nenough for decision-making. Result Detail overweights the Run Receipt before\nthe primary metric/action, Compare overweights the Comparability Receipt\nbefore the decision/chart read, mobile Result Detail charts clip, and the\nsame-cohort Compare speedup chart wastes large plot space for equal values.\n\nThis TODO turns those screenshots into a concrete implementation plan for\nsingle-result interpretation and multi-result comparison. The goal is not to\ndemote reproducibility; it is to make reproducibility, metric interpretation,\ncomparability, baseline choice, and chart evidence work in the right order.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bury reproducibility so far down the page that a result no longer feels auditable.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "claim or imply a winner when comparability logic suppresses winner claims.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "default to a sparse chart when a two-result equal-value state is clearer.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "introduce a user-selectable primary metric toggle unless the benchmark-derived metric contract is intentionally reopened.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use chart labels that overflow the SVG or require horizontal page scroll.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "needs_item": "results-explorer-retheme-theme-system-foundation"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Benchmark-derived primary metric semantics.",
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation"
+      },
+      {
+        "behavior": "Comparability receipt logic and winner-claim suppression behavior.",
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation"
+      },
+      {
+        "behavior": "Compare route `?ids=` share URL contract and compact ID canonicalization.",
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation"
+      },
+      {
+        "behavior": "Result Detail route `/results/r/{result_id}`.",
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation"
+      },
+      {
+        "behavior": "Run Receipt reproducibility details, download links, and provenance metadata.",
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/*Chart*.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ComparabilityReceipt.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CompareSummary.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryDiffTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RunReceipt.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Compare.test.tsx src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx src/components/__tests__/QueryDiffTable.test.tsx",
+        "description": "Result Detail and Compare tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- src/components/__tests__/charts.smoke.test.tsx src/components/__tests__/ChartPanel.test.tsx",
+        "description": "Chart smoke tests pass",
+        "expected": "chart tests pass",
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: recapture Result Detail and Compare at 390, 768, 1280, 1600 plus mixed-scale Compare and compare against PR #246 screenshots'",
+        "description": "Manual PR #246 detail/compare recapture is clean",
+        "expected": "manual evidence shows VH-3, VH-4, DQ-3, DQ-4, and DQ-8 resolved or explicitly deferred",
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "notes": "For Result Detail, define the first read as:\n  - benchmark/workload;\n  - platform;\n  - scale and phase;\n  - primary metric and unit;\n  - trust and validation;\n  - run date;\n  - primary actions such as compare, download, copy/reproduce.\n\nFor Compare, define the first read as:\n  - whether the results are comparable;\n  - winner/suppression state;\n  - baseline;\n  - headline ratio/delta;\n  - query wins/losses/same counts;\n  - chart/table path for details.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Map the first-viewport decision hierarchy for Result Detail and Compare",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "notes": "Replace inline receipt metrics with a compact summary module or metric\ncards. Keep Run Receipt visible enough to support auditability, but do\nnot let receipt/environment metadata consume the whole first analytical\nviewport. Group `Compare this result`, download, and reproducibility\nactions consistently near the top summary.\n\nAcceptance evidence:\n- recaptured 390px and 1280px detail screenshots show primary metrics and\n  at least one primary action before detailed receipt sections dominate;\n- trust/validation/source labels are visible but subordinate to the\n  primary metric.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Redesign Result Detail top summary and receipt placement",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "notes": "Compare must lead with a compact comparability status and decision\nsummary. Move baseline controls close to ratio/delta interpretation. Keep\nwarning counts and specific differences visible, but collapse or compact\nmatched receipt details so the first viewport does not read as a receipt\ninventory before showing the comparison outcome.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Redesign Compare top summary, comparability receipt, and baseline control",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "notes": "The `result-detail-duckdb-390.png` evidence shows the chart extending past\nthe mobile card. Constrain SVG/chart width to its container, recompute\nmargins at narrow widths, and keep labels legible without horizontal page\noverflow. Add coverage that would fail if the SVG exceeds the card or if\nright-side labels are clipped.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix Result Detail chart clipping and responsive chart bounds",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "notes": "The `compare-duckdb-aws-1280.png` evidence shows equal or near-equal\n`1.00x` values collapsing into a sparse vertical stack with huge empty\nplot area. Use a dynamic domain, a clearer two-result default chart, or a\ncompact \"no meaningful difference\" state. Keep baseline axis/legend text\nvisible and do not rely on color alone.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix Compare speedup chart domain, whitespace, and equal-value state",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "notes": "The mixed-scale evidence correctly shows `Scale factor differs` and\n`Claims suppressed`, but the query diff remains visible below. Repeat or\npin suppression context near query-level values and charts whenever severe\nbenchmark/scale/platform mismatches suppress winner claims.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Keep comparability suppression attached to tables and charts",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "notes": "Tests should cover:\n  - first-viewport summary labels for detail and compare;\n  - primary metric unit/direction labels;\n  - baseline selector accessible name and state;\n  - comparability warning/suppression labels;\n  - chart container not overflowing at 390px and 768px where feasible;\n  - equal-value compare chart/state with no misleading whitespace.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add focused Result Detail and Compare regression tests",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-result-compare-evidence-remediation",
+        "notes": "Capture Result Detail and Compare at 390px, 768px, 1280px, and 1600px,\nplus the mixed-scale Compare guardrail. Store after evidence under\n`_project/audits/` and compare directly with the PR #246 filenames listed\nin this TODO.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Recapture Result Detail and Compare PR #246 evidence",
+        "wid": "w8"
+      }
+    ]
+  }
+}

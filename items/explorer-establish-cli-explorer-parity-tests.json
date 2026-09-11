@@ -1,0 +1,297 @@
+{
+  "context": "Build foundation-first: extract pure helpers (w1) before generating\nfixtures (w2), because the fixture generator must mirror the exact\nsignatures the helpers expose.\n\nReuse the project's existing Python visualization functions where they\nexist as pure helpers - `core/visualization/ascii/heatmap.py` and\nsiblings delegate to `textcharts`, but the pre-textcharts color/sort\nmath may live in `result_plotter.py`. If a Python equivalent does not\nexist, ADD it (in Python) rather than picking a TS-only number, so\nparity is bidirectional.\n\nFixture format mirrors the textcharts test pattern (if any) so future\ncontributors recognize the convention. Keep fixtures small and readable\n- explicit `id` on each case is mandatory so failures are debuggable.\n",
+  "description": "The 2026-04-15 visualization review identified that the Python CLI\n(`benchbox/core/visualization/`) and the Preact explorer\n(`results-explorer/src/components/`) reimplement the same\nvisualization math in two languages with **zero shared computation\nand zero contract tests**.\n\nConcrete drift surfaces today:\n  - Heatmap color: `colorForCell` (QueryHeatmap.tsx:39-45) duplicates\n    `textcharts.heatmap` log10-ratio→hue logic.\n  - Per-baseline speedup: `NormalizedSpeedupChart.tsx:57` duplicates\n    `textcharts.normalized_speedup` (`baseline / this`).\n  - Diverging delta: `DivergingBarChart.tsx:49` duplicates the\n    `textcharts.diverging_bar` `(this - baseline) / baseline * 100`\n    formula, plus an independent magnitude sort at line 63-67.\n  - Per-query \"fastest\" highlight: Compare.tsx:388-411 inlines its own\n    ranking that has no CLI counterpart and disagrees with Compare's\n    summary-card definition (see explorer-unify-visualization-foundations\n    for the dual-definition bug).\n\nThe user requirement is explicit: **\"there should be only ONE place\nwhere visualization values are composed, when that is not possible\nwe must have test infrastructure that ENSURES the parallel\nimplementations match.\"** This item builds that test infrastructure.\nCentralizing computation server-side is tracked separately\n(explorer-emit-comparison-artifact-from-pipeline).\n\nStrategy: Python emits canonical fixtures (input data + expected\noutput values) for every chart-type computation. Vitest loads the\nfixtures and asserts that the explorer's pure helper functions produce\nbyte-identical numbers (within float tolerance). Any future drift\nfails CI, regardless of which side changes.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "commit auto-regenerated fixtures without inspecting the diff",
+        "instead": "`make parity-check` must be run separately to detect diffs",
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "why": "the fixture IS the contract and silent regeneration hides drift"
+      },
+      {
+        "dont": "generate fixtures from the TS side",
+        "instead": "Python (the canonical compute layer) emits, TS verifies",
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "why": "that makes Python the follower, not the source of truth"
+      },
+      {
+        "dont": "inline the math back into components after extraction",
+        "instead": "components import helpers, no exceptions",
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "why": "that defeats the test contract"
+      },
+      {
+        "dont": "skip cases for missing-data inputs (null/None)",
+        "instead": "every helper must have at least one null-input case",
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "why": "that is exactly where Python and JS often disagree (NaN vs null)"
+      },
+      {
+        "dont": "use `toEqual` for floats in the parity suite",
+        "instead": "use `Math.abs(a - b) < 1e-9` with explicit tolerance",
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "why": "IEEE-754 noise differs between Python and JS"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-establish-cli-explorer-parity-tests",
+        "id": 168,
+        "reason": "Overkill for trivial math (log10, ratios, medians). Cost in build\ncomplexity and runtime size is not justified when fixture-pinned\ncontracts achieve the same correctness guarantee.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Rejected in its own reason as overkill for trivial math; fixture-pinned contracts already provide the correctness guarantee.",
+        "summary": "WASM-compile the Python compute layer and call it from the browser"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-establish-cli-explorer-parity-tests",
+        "id": 169,
+        "reason": "Tracked separately in `add-hypothesis-property-tests.yaml`. Should\nbuild on this fixture infrastructure once it is established.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Explicitly tracked separately in add-hypothesis-property-tests.yaml, which is open (planning).",
+        "summary": "Property-based parity tests via Hypothesis + fast-check"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-04-15T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing 36-test Vitest suite continues to pass alongside the new parity suite",
+        "item_id": "explorer-establish-cli-explorer-parity-tests"
+      },
+      {
+        "behavior": "Existing `colorForCell` / `lightnessForCell` exported signatures from QueryHeatmap.tsx - these are imported elsewhere and tested",
+        "item_id": "explorer-establish-cli-explorer-parity-tests"
+      },
+      {
+        "behavior": "Existing chart visual output - extracting helpers must not change pixel-level rendering for the same input data",
+        "item_id": "explorer-establish-cli-explorer-parity-tests"
+      },
+      {
+        "behavior": "Vitest setup at `results-explorer/src/test/setup.ts` - append, do not replace",
+        "item_id": "explorer-establish-cli-explorer-parity-tests"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/**"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/ascii/**"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/result_plotter.py"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/ci.yml"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "only_modify",
+        "path_glob": "docs/visualization-parity.md"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/parity/**"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/DivergingBarChart.tsx"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartMath.ts"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/parity/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -E 'export (function|const) (colorForCell|lightnessForCell|speedupRatio|deltaPct|sortByMagnitudeDesc|perQuerySpeedup|geomeanMs)' results-explorer/src/lib/chartMath.ts",
+        "description": "Pure helper module exists and re-exports the documented functions",
+        "expected": "all 7 named exports present",
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python tests/parity/generate_visualization_fixtures.py --out tests/parity/fixtures && ls tests/parity/fixtures/*.json",
+        "description": "Fixture generator runs and produces one file per chart computation",
+        "expected": "at least 7 .json files matching the 7 helpers in w1",
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- chartMath.parity",
+        "description": "Vitest parity suite runs all fixture cases and passes",
+        "expected": "parity suite present, all cases pass",
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make parity-check",
+        "description": "Make target detects fixture drift",
+        "expected": "exit 0 when fixtures match, exit non-zero with diff when they don't",
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- QueryHeatmap",
+        "description": "Existing QueryHeatmap unit tests still pass (refactored to use fixtures)",
+        "expected": "all QueryHeatmap tests pass; no hardcoded color numbers remain in the test file",
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test",
+        "description": "Full Vitest suite still passes (36 + new parity tests)",
+        "expected": "all tests pass",
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "notes": "Move the math out of the SVG components into pure functions:\n  - `colorForCell`, `lightnessForCell` (already pure, re-export from QueryHeatmap)\n  - `speedupRatio(baselineMs, thisMs)` from NormalizedSpeedupChart.tsx:57\n  - `deltaPct(thisMs, baselineMs)` from DivergingBarChart.tsx:49\n  - `sortByMagnitudeDesc(entries)` from DivergingBarChart.tsx:63-67\n  - `perQuerySpeedup(timings)` (slowest/fastest) from Compare.tsx:388-393\n  - `geomeanMs(samples)` (median-based reduction matching transformer)\nComponents import these helpers; no behavior change. Each helper\nreturns plain numbers - no SVG, no DOM - so Vitest can call them\ndirectly from a fixture loop.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit and extract pure computation functions out of every explorer chart component into testable helpers in `results-explorer/src/lib/chartMath.ts`",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "notes": "Pytest-runnable script (or a regular pytest test using\n`--generate-fixtures` flag) that produces files at\n`tests/parity/fixtures/{chart_name}.json` with shape:\n\n  {\n    \"chart\": \"heatmap_color\",\n    \"version\": 1,\n    \"cases\": [\n      {\"id\": \"fastest_in_col\", \"input\": {\"ms\": 100, \"minInCol\": 100},\n       \"expected\": {\"hue\": 120}},\n      {\"id\": \"ten_x_slower\",   \"input\": {\"ms\": 1000, \"minInCol\": 100},\n       \"expected\": {\"hue\": 0}},\n      ...\n    ]\n  }\n\nOne fixture file per chart computation listed in w1. Cases must\ninclude: identity (ratio=1), boundary (ratio=10 clamp), missing\ndata (None/null), and at least one realistic mid-range value.\n\nFixtures are CHECKED INTO GIT - they are the contract. Regenerating\nthem must be a deliberate act (changes the contract) and require\nthe Vitest suite to accept the new numbers via re-run.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build Python fixture generator at `tests/parity/generate_visualization_fixtures.py` that emits JSON fixtures per chart computation",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "notes": "Pattern: read each `tests/parity/fixtures/*.json` (relative path\ncomputed in vitest config), iterate `cases`, call the corresponding\nTS helper from `chartMath.ts`, assert\n`Math.abs(result - expected) < 1e-9` for floats and strict equality\nfor ints/strings.\n\nUse `describe.each` or generator pattern so each case appears as\nits own test name (debuggable on failure). On a fixture mismatch,\nthe failure message must show: chart name, case id, input, expected\nvs actual, and the suspected source of drift (Python file vs TS file).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Vitest parity suite at `results-explorer/src/__tests__/parity/chartMath.parity.test.ts` that loads each fixture and asserts equivalence",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "notes": "- `make parity-fixtures` regenerates fixtures via the Python script\n- `make parity-check` runs Python generation into a tmpdir, diffs\n  against the checked-in fixtures, fails if they differ\n- GitHub Actions: run `make parity-check` AND `cd results-explorer\n  && npm test` on every PR\n- Document the workflow in `docs/contributing-to-explorer.md`\n  (or new `docs/visualization-parity.md`): \"If you change a chart\n  computation, regenerate fixtures with `make parity-fixtures` -\n  this changes the contract; reviewers must approve the diff.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire fixture generation into a Make target / CI gate so divergence is detected automatically",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-establish-cli-explorer-parity-tests",
+        "notes": "The current `QueryHeatmap.test.tsx` tests `colorForCell` against\nhardcoded TS expectations only. Replace those assertions with the\nfixture-driven path so QueryHeatmap is the proof-of-concept for\nthe new infrastructure. Delete the duplicated hardcoded numbers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Backfill parity for the existing `colorForCell` and `lightnessForCell` tests so they share the fixture suite",
+        "wid": "w5"
+      }
+    ]
+  }
+}

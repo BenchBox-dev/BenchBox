@@ -1,0 +1,250 @@
+{
+  "context": "Treat Result Detail as a detail/receipt surface, not a dense leaderboard\nsurface. Preserve compact shared formatting where it improves scanning, but\nexpose exact power-score evidence where users inspect a single result.\n",
+  "description": "The follow-up remediation release gate caught a post-merge regression in the\nfull Results Explorer frontend suite. `ResultDetail.test.tsx` now fails after\nthe shared metric-formatting rollout because the canonical result summary no\nlonger exposes exact power-score precision, and the median/raw duration table\ncontract no longer matches the rendered labels.\n\nThis is a release-blocking evidence issue, not just stale tests: Result\nDetail is the route where users inspect an individual benchmark receipt, so\ncompact leaderboard/table formatting must not erase exact score evidence or\nmake raw timing units ambiguous.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add source changes outside Result Detail, shared formatter helpers, or focused tests unless reproduction proves the issue is shared.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "globally revert `fmtScore` to exact formatting.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "silence the failing tests without deciding the detail-route contract.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "needs_item": "results-explorer-metric-formatting-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "results-explorer-followup-todo-review"
+    },
+    "preserves": [
+      {
+        "behavior": "Leaderboard, benchmark, platform, query, and compare surfaces must keep compact large power-score formatting.",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression"
+      },
+      {
+        "behavior": "Raw sort/comparison values must remain numeric and unrounded.",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression"
+      },
+      {
+        "behavior": "Result Detail must preserve exact score evidence for receipt-level inspection.",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression"
+      },
+      {
+        "behavior": "Timing headers must match the rendered timing unit contract.",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/verification-logs/results-explorer-followup-remediation-release-gate/w2-frontend-tests.log captures the release-gate failure.",
+        "decision": "reuse",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "path": "_project/verification-logs/results-explorer-followup-remediation-release-gate/w2-frontend-tests.log"
+      },
+      {
+        "concept": "results-explorer/src/lib/metricFormatters.ts centralizes compact/exact power score and dynamic latency formatting.",
+        "decision": "reuse",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "path": "results-explorer/src/lib/metricFormatters.ts"
+      },
+      {
+        "concept": "results-explorer/src/pages/ResultDetail.tsx owns the result summary, median display-timing table, and expanded raw query table.",
+        "decision": "reuse",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "path": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "concept": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx contains the failing median-first and exact score precision contract tests.",
+        "decision": "reuse",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "path": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-result-detail-metric-formatting-regression.yaml"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-result-detail-metric-formatting-regression/"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/utils.test.ts"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/metricFormatters.test.ts"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/metricFormatters.ts"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/utils.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/ResultDetail.test.tsx",
+        "description": "Result Detail formatter regression tests pass",
+        "expected": "ResultDetail tests pass",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run",
+        "description": "Full Results Explorer frontend suite passes",
+        "expected": "all frontend tests pass",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run build",
+        "description": "Typecheck and build pass",
+        "expected": "both commands exit 0",
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "notes": "Rerun `cd results-explorer && npm test -- --run src/pages/__tests__/ResultDetail.test.tsx`\non the checked post-metric-formatting tree. Capture the failure output in\n`_project/verification-logs/results-explorer-result-detail-metric-formatting-regression/w0.log`.\nClassify which failures are true product-contract defects versus tests that\nshould be updated to the shared metric-formatting contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce and classify the Result Detail formatter failures",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "notes": "Result Detail should expose exact power-score precision in the canonical\nresult summary or an equally explicit detail-only affordance. Do not revert\ncompact score formatting on leaderboards, benchmark/platform tables, or\ncompare cards.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Restore exact result-summary score evidence without reintroducing noisy dense-table decimals",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "notes": "The default median table and expanded raw-query table must have headers that\nagree with their values. If values use dynamic `ms`/`s` formatting, use\nsemantic headers such as `Median latency` and `Duration`; if raw table\nvalues are guaranteed milliseconds, keep explicit `(ms)` copy.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align median/raw duration labels with the displayed timing units",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "notes": "Update or add Result Detail tests so they fail on missing exact score\nevidence, stale unit labels, or a regression back to noisy dense-table\ndecimals.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update focused tests for exact precision and unit-label behavior",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-result-detail-metric-formatting-regression",
+        "notes": "Rerun:\n  - `cd results-explorer && npm test -- --run src/pages/__tests__/ResultDetail.test.tsx`;\n  - `cd results-explorer && npm test -- --run`;\n  - `cd results-explorer && npm run typecheck`;\n  - `cd results-explorer && npm run build`.\nCapture logs under\n`_project/verification-logs/results-explorer-result-detail-metric-formatting-regression/`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rerun release-gate automated checks affected by the fix",
+        "wid": "w4"
+      }
+    ]
+  }
+}

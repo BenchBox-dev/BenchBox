@@ -1,0 +1,10 @@
+{
+  "description": "\"Introduced a dedicated `benchbox.platforms.base` package with separate modules for adapter orchestration, dataclasses, and utilities, refreshed developer documentation, and added focused unit tests for the new components.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

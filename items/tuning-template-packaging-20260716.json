@@ -1,0 +1,121 @@
+{
+  "description": "Deferred from tuning-docs-env-contract-fixes-20260712 (review finding N8):\ntemplate auto-discovery is cwd-relative, so installed-package users silently\nhit the tuned-fallback path unless BENCHBOX_TUNING_PATH is set. Ship the\nexamples/tunings templates as package resources and add a discovery tier\n(env path > cwd examples > packaged resources) so `--tuning tuned` works\noutside a repo checkout. Update the precedence doc written by #1178.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing precedence for env path and cwd discovery (packaged tier is LAST)",
+        "item_id": "tuning-template-packaging-20260716"
+      },
+      {
+        "behavior": "Provenance records the packaged-template ref distinctly",
+        "item_id": "tuning-template-packaging-20260716"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/tuning/profiles/tpc.yaml: existing in-package YAML resource loaded at runtime - reuse loading pattern",
+        "decision": "reuse",
+        "item_id": "tuning-template-packaging-20260716",
+        "path": "benchbox/core/tuning/profiles/tpc.yaml"
+      },
+      {
+        "concept": "pyproject.toml existing package-data/include configuration - extend",
+        "decision": "extend",
+        "item_id": "tuning-template-packaging-20260716",
+        "path": "pyproject.toml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-template-packaging-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "tuning-template-packaging-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/tuning_resolver.py"
+      },
+      {
+        "item_id": "tuning-template-packaging-20260716",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/cli/tuning.md"
+      },
+      {
+        "item_id": "tuning-template-packaging-20260716",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "tuning-template-packaging-20260716",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_tuning_resolution.py -q",
+        "description": "Simulated installed-env discovery test green",
+        "expected": "All passing incl. packaged-tier tests",
+        "item_id": "tuning-template-packaging-20260716",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-template-packaging-20260716",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-template-packaging-20260716",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-template-packaging-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Package templates as resources (pyproject data files or importlib.resources layout)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-template-packaging-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add packaged-resource tier to get_tuning_template_paths + tuning list; update docs/reference/cli/tuning.md precedence table",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-template-packaging-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tests: discovery works from a temp cwd with no repo checkout (simulated installed env)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

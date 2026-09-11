@@ -1,0 +1,20 @@
+{
+  "description": "Implement comprehensive DDL generation for Amazon Redshift with support for\nits unique physical tuning capabilities.\n\n## Redshift Physical Tuning Features\n\n### Distribution Styles (DISTSTYLE)\n- **ALL**: Entire table copied to every node (small dimension tables)\n- **KEY**: Rows distributed by hash of DISTKEY column (fact tables)\n- **EVEN**: Round-robin distribution (default, no join colocation)\n- **AUTO**: Redshift chooses based on data size\n\n### Distribution Key (DISTKEY)\n- Single column for hash distribution\n- Critical for join performance (colocate related rows)\n- Should match JOIN columns between fact and dimension tables\n\n### Sort Keys (SORTKEY)\n- **COMPOUND**: Columns sorted in order specified (default)\n  - Best for queries with range conditions on leading column\n  - Best for ORDER BY matching the sort key\n- **INTERLEAVED**: Equal weight to each column\n  - Best for queries filtering on any subset of columns\n  - Higher load/vacuum overhead\n- Up to 400 columns in sort key\n\n### Column Encoding (ENCODE)\n- Per-column compression algorithm\n- Options: RAW, AZ64, BYTEDICT, DELTA, DELTA32K, LZO, MOSTLY8/16/32,\n  RUNLENGTH, TEXT255, TEXT32K, ZSTD\n- AUTO encoding recommended for most cases\n\n## Current Gap\n\nRedshift adapter (`benchbox/platforms/redshift.py`) has:\n- `generate_tuning_clause()` method (line ~1936)\n- Reads partitioning/sorting columns from tuning config\n- BUT: Only logs tuning info, doesn't generate DISTSTYLE/SORTKEY DDL",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pt-03-redshift-ddl",
+        "needs_item": "pt-01-ddl-generator-protocol"
+      },
+      {
+        "item_id": "pt-03-redshift-ddl",
+        "needs_item": "pt-02-tuning-config-enhancements"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-01-03T00:00:00Z",
+      "worktree": "physical-tuning"
+    }
+  }
+}

@@ -1,0 +1,451 @@
+{
+  "description": "Integrate StarRocks as a supported BenchBox platform. StarRocks is an open-source\nMPP columnar OLAP database (Linux Foundation project) with strong performance\ncharacteristics and growing enterprise adoption (11K+ GitHub stars, used by\nAirbnb, Alibaba, Coinbase, Pinterest, Tencent).\n\nTechnical fit analysis confirms:\n- SQLGlot has official 'starrocks' dialect support (verified working)\n- MySQL protocol connectivity via PyMySQL (port 9030)\n- Full TPC-H (22 queries) and TPC-DS (99 queries) compatibility\n- Competitive performance vs ClickHouse, Trino, Druid in benchmarks\n- Multiple data loading options (Stream Load HTTP API, INSERT+FILES())\n\nStrategic value:\n- Fills gap in modern MPP OLAP coverage alongside ClickHouse\n- Enables independent TPC-H/TPC-DS verification (vs vendor-published results)\n- Native data lake support (Iceberg, Hudi, Delta Lake) enables lakehouse benchmarks\n- Growing market adoption makes this relevant for users\n\nReference: Comprehensive analysis completed in conversation on 2026-01-07.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create a shared DorisStarRocksBase class",
+        "instead": "implement independently",
+        "item_id": "starrocks-olap-platform",
+        "why": "the projects have diverged and coupling creates fragile inheritance"
+      },
+      {
+        "dont": "modify existing adapter files",
+        "instead": "create a new starrocks.py file",
+        "item_id": "starrocks-olap-platform",
+        "why": "StarRocks is additive"
+      },
+      {
+        "dont": "use port 8030 for Stream Load",
+        "instead": "verify port in StarRocks documentation",
+        "item_id": "starrocks-olap-platform",
+        "why": "StarRocks routes Stream Load to BE on port 8040, unlike Doris which routes to FE on port 8030"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "starrocks-olap-platform",
+        "id": 599,
+        "reason": "Requires running StarRocks FE+BE cluster - not available in local dev",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: The 'no local FE+BE cluster' blocker is resolved: StarRocks now runs in the UAT Docker matrix (tests/uat/matrix.py:56, docker_assets.py:164) with tpch, and live/smoke tests exist. E2E TPC-H/DS validation is subsumed by the Docker UAT release-gate (open uat-certification items).",
+        "summary": "End-to-end TPC-H/TPC-DS validation on live StarRocks cluster (w13-w14)"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-16T00:00:00Z",
+      "created_at": "2026-01-07T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "starrocks-olap-platform"
+      },
+      {
+        "behavior": "ClickHouse adapter's PyMySQL usage unaffected by StarRocks's PyMySQL dependency",
+        "item_id": "starrocks-olap-platform"
+      },
+      {
+        "behavior": "Platform registry autodiscovery continues working for all existing platforms",
+        "item_id": "starrocks-olap-platform"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "starrocks-olap-platform",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/doris.py"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/platform-expansion/planning/starrocks-olap-platform.yaml"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/credentials/starrocks.py"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/starrocks.py"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/starrocks.md"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "kind": "only_modify",
+        "path_glob": "examples/getting_started/sql/starrocks_tpch.py"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/test_starrocks_smoke.py"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_starrocks_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.starrocks import StarRocksAdapter; print('import OK')\"",
+        "description": "New adapter imports correctly",
+        "expected": "import OK",
+        "item_id": "starrocks-olap-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_starrocks_adapter.py -v --tb=short",
+        "description": "Unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "starrocks-olap-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "Existing platform tests unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "starrocks-olap-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/platforms/test_starrocks_smoke.py -v --tb=short -m integration",
+        "description": "Integration smoke test for StarRocks platform",
+        "expected": "smoke test passes for StarRocks connection, schema, load, and query execution",
+        "item_id": "starrocks-olap-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform starrocks --benchmark tpch --scale 0.01 --non-interactive --phases power",
+        "description": "TPC-H SF=0.01 end-to-end run succeeds on StarRocks",
+        "expected": "run completes with successful query execution and valid row counts",
+        "item_id": "starrocks-olap-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform starrocks --benchmark tpcds --scale 1 --non-interactive --phases power",
+        "description": "TPC-DS SF=1 end-to-end run succeeds on StarRocks",
+        "expected": "run completes all selected TPC-DS queries without platform-specific failures",
+        "item_id": "starrocks-olap-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w2",
+        "wid": "w11"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w4",
+        "wid": "w11"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w6",
+        "wid": "w12"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w12",
+        "wid": "w13"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w12",
+        "wid": "w14"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w11",
+        "wid": "w15"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w15",
+        "wid": "w16"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "starrocks-olap-platform",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement adapter skeleton and dialect wiring in benchbox/platforms/starrocks.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add TPC-DS tuning defaults for StarRocks profile",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create unit test suite for adapter connection, SQL generation, and Stream Load formatting",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create integration smoke coverage (local cluster harness + adapter smoke tests)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run and validate TPC-H SF=0.01 end-to-end on StarRocks",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run and validate TPC-DS SF=1 end-to-end on StarRocks",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Publish documentation (platform guide, Stream Load details, deployment options)",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add getting-started example script for StarRocks TPC-H run",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement connection and query execution paths (PyMySQL + timing/row validation)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement StarRocks schema creation (table models, distribution, partitioning)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Stream Load via BE HTTP endpoint on port 8040 with robust error handling",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement chunked Stream Load and load status validation for large files",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register platform in registry and package metadata (platform_registry, __init__, pyproject extras)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement cache-control and validation hooks (disable query cache + verify)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement platform optimization hooks (bitmap/bloom indexes and ANALYZE support)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add StarRocks tuning profile with benchmark-specific defaults (TPC-H)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

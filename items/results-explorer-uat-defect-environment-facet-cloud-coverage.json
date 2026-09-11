@@ -1,0 +1,139 @@
+{
+  "description": "W6 validated environment facet rendering/filtering mechanics, but the local\nvalidator-clean corpus had 205 `deployment_class=local` rows and\n`unknown`-only cloud provider, cloud region, and instance/warehouse facets.\nThat means the Results Explorer still lacks UAT coverage for true cloud,\ncontainer, embedded, region, and compute-shape differentiation.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fake public cloud results as maintainer-curated benchmark records",
+        "instead": "use fixture-only rows or clearly labeled submissions.",
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "why": "that corrupts corpus trust"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No live cloud run is started without explicit approval and cost awareness.",
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage"
+      },
+      {
+        "behavior": "Trust labels distinguish synthetic fixtures, community submissions, and maintainer runs.",
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/corpus-inventory.json"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/active/results-explorer-uat-defect-environment-facet-cloud-coverage.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/results-explorer-uat-defect-environment-facet-cloud-coverage.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/query.spec.ts"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/generate-browser-fixtures.mjs"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/verify-browser-fixtures.mjs"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures",
+        "description": "Generated browser fixture snapshot contains non-unknown environment facet values.",
+        "expected": "fixture verification passes and reports cloud/provider/region/shape coverage",
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm exec -- playwright test --project=chromium --workers=1 e2e/routes/query.spec.ts",
+        "description": "Browser smoke validates environment facet filtering without npm dev server.",
+        "expected": "Query/environment facet browser coverage passes",
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "notes": "W1 baseline evidence:\n- `benchbox explorer build --data-dir results-data --output /tmp/benchbox-explorer-facet-w1` currently produces 12\n  rows with `deployment_class=local` only, and `cloud_provider`, `cloud_region`, `instance_or_warehouse`, and\n  `storage_format` all NULL.\n- `cd results-explorer && npm run test:e2e:fixtures` currently produces seven browser-fixture rows with\n  `deployment_class=local` only, cloud/provider/region/shape all NULL, and storage limited to `duckdb_native` and\n  `parquet`.\n\nMinimal safe corpus for W2 is fixture-only, not public `results-data`: add deterministic variants in\n`results-explorer/scripts/generate-browser-fixtures.mjs` so generated browser fixtures include:\n- one cloud AWS row with `deployment_class=cloud`, `cloud_provider=aws`, `cloud_region=us-east-1`,\n  `instance_or_warehouse=m6i.large`, and `storage_format=parquet`;\n- one managed/serverless row with a second provider/region/shape, such as `cloud_provider=gcp`,\n  `cloud_region=us-central1`, and `instance_or_warehouse=serverless-slots-4`;\n- one provisioned-local/container-source row carrying `platform_runtime.runtime_type=docker_container`, while\n  preserving the current flattened `deployment_class=local` contract until the snapshot exposes a dedicated runtime\n  facet.\n\nThese rows must remain synthetic browser-test fixtures. If a sidecar is needed to exercise trust labeling, use a\nfixture-local `submission-manifest.json` and synthetic contributor text; do not add fake cloud rows to\n`results-data/bundles/` as maintainer-curated records.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the minimal cloud/provisioned-local corpus needed for environment facet UAT",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Generate or stage safe fixture rows covering cloud/container/runtime facets",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-environment-facet-cloud-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run terminating Explorer browser smoke against the facet-coverage corpus",
+        "wid": "w3"
+      }
+    ]
+  }
+}

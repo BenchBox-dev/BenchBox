@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #391 of df-support-transaction-primitives.\nDeferred: Iceberg table format support testing\nReason deferred: Iceberg support depends on PySpark + Iceberg catalog setup. Defer until Delta Lake path is validated.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:05Z",
+      "worktree": "main"
+    }
+  }
+}

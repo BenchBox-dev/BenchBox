@@ -1,0 +1,454 @@
+{
+  "context": "Work by failure cluster and add regression tests before broad sweeps. Prefer\nthe existing SQL compatibility registry and Spark helper paths over adding\nLakeSail-only special cases. Treat load failures as hard correctness issues\nonce their root cause is known, because later validation errors often hide the\noriginal load defect.\n",
+  "description": "The 2026-05-12 enabled-platform UAT run proved the LakeSail adapter can\ncomplete several benchmarks: `validator_rollup.tsv` is clean for TPC-H, SSB,\nH2O DB, AMPLab, and JoinOrder. The same run failed 17 LakeSail cells across\nbenchmark-specific SQL, DDL, data loading, and capability gaps.\n\nRepresentative artifact evidence from\n`/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/cells.jsonl`:\nTPC-DS hit Spark/LakeSail division-by-zero; TPC-DS OBT rejected quoted alias or\ninterval syntax around `order count`; metadata primitives rejected `KEY` in\nDDL; vector search rejected `FLOAT[128]`; read primitives rejected\n`APPROX_TOP_K`; TPC-DI and write/transaction primitives missed expected\nstaging or mixed-case tables; ClickBench hit non-nullable column load issues;\nCoffeeShop rejected colon-prefixed SQL/data syntax; TPCHavoc and TPCH skew\ntried to read generated CSV compatibility paths as directories.\n\nFix all benchmark combinations that can run on current LakeSail. Only add a\ncompatibility exclusion after a targeted repro proves the current platform\nlacks the required feature and the rule includes explicit source evidence.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add broad string replacements that only match the captured failing query text",
+        "instead": "(not specified)",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "modify generated raw UAT artifacts under `benchmark_runs/` or commit result bundles",
+        "instead": "(not specified)",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "skip the 17 failing LakeSail benchmarks just because the 2026-05-12 run failed them",
+        "instead": "(not specified)",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "weaken validators to make LakeSail appear clean",
+        "instead": "(not specified)",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "lakesail-benchmark-sql-compatibility-remediation",
+        "id": 608,
+        "reason": "This TODO targets correctness and compatibility first; performance tuning comes after all possible benchmarks run.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: LakeSail perf tuning explicitly deferred until 'all possible benchmarks run'; that condition isn't confirmed met, and no open item tracks it yet.",
+        "summary": "Optimize LakeSail performance for large scale rungs"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "needs_item": "uat-matrix-compatibility-policy"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "uat-enabled-platforms-remediation"
+    },
+    "preserves": [
+      {
+        "behavior": "Benchmark exclusions require explicit compatibility rules with evidence, not ad hoc conditionals",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation"
+      },
+      {
+        "behavior": "Existing clean LakeSail benchmarks remain clean: TPC-H, SSB, H2O DB, AMPLab, and JoinOrder",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation"
+      },
+      {
+        "behavior": "Query rewrites preserve benchmark semantics and validator expectations; do not change canonical benchmark SQL globally to fit one platform",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation"
+      },
+      {
+        "behavior": "Spark helper changes must not regress Spark, Databricks, or other Spark-family adapters",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/_spark_helpers.py:209-251 -- `optimize_spark_table_definition()` currently strips constraints and appends USING but does not cover all observed DDL constructs",
+        "decision": "reuse",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "path": "benchbox/platforms/_spark_helpers.py:209-251"
+      },
+      {
+        "concept": "benchbox/platforms/_spark_helpers.py:373-450 -- Spark schema creation loop used by LakeSail",
+        "decision": "reuse",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "path": "benchbox/platforms/_spark_helpers.py:373-450"
+      },
+      {
+        "concept": "benchbox/platforms/base/spark_execution_mixin.py:205-372 -- Spark/LakeSail load path and CSV compatibility temporary-path handling",
+        "decision": "reuse",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "path": "benchbox/platforms/base/spark_execution_mixin.py:205-372"
+      },
+      {
+        "concept": "benchbox/platforms/base/spark_execution_mixin.py:440-524 -- query failure path for Spark-family adapters",
+        "decision": "reuse",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "path": "benchbox/platforms/base/spark_execution_mixin.py:440-524"
+      },
+      {
+        "concept": "benchbox/platforms/lakesail.py:508-540 -- LakeSail schema creation path calls Spark DDL helpers with `source_dialect='duckdb'`",
+        "decision": "reuse",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "path": "benchbox/platforms/lakesail.py:508-540"
+      },
+      {
+        "concept": "docs/compat/capability-matrix.md:128-132 -- current LakeSail compatibility rules cover only DDL optimize",
+        "decision": "reuse",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "path": "docs/compat/capability-matrix.md:128-132"
+      },
+      {
+        "concept": "docs/compat/skip-reference.md -- compatibility skip/block documentation pattern",
+        "decision": "reuse",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "path": "docs/compat/skip-reference.md"
+      },
+      {
+        "concept": "docs/platforms/lakesail.md:42-51 -- LakeSail Docker data-path mirroring requirements",
+        "decision": "reuse",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "path": "docs/platforms/lakesail.md:42-51"
+      },
+      {
+        "concept": "tests/unit/platforms/test_lakesail_adapter.py:221-235 -- current minimal LakeSail DDL helper coverage",
+        "decision": "reuse",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "path": "tests/unit/platforms/test_lakesail_adapter.py:221-235"
+      },
+      {
+        "concept": "tests/unit/platforms/test_lakesail_coverage.py:721-752 -- current minimal LakeSail USING-clause coverage",
+        "decision": "reuse",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "path": "tests/unit/platforms/test_lakesail_coverage.py:721-752"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/pg_duckdb.py"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/pg_mooncake.py"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/timescaledb.py"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/ai_primitives/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/clickbench/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/coffeeshop/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/datavault/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/metadata_primitives/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/primitives/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds_obt/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch_skew/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpchavoc/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transaction_primitives/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tsbs_devops/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/vector_search/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/_spark_helpers.py"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/spark_execution_mixin.py"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/lakesail.py"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "docs/compat/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/lakesail.md"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/sql_compat/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/sql_compat/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_lakesail_adapter.py tests/unit/platforms/test_lakesail_coverage.py -q",
+        "description": "LakeSail platform unit coverage passes",
+        "expected": "passes with added cases for every DDL/query/load helper change",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_spark_adapter.py tests/unit/platforms/test_spark_helpers.py tests/unit/platforms/test_spark_csv_dialect_resolver.py -q",
+        "description": "Spark-family regression coverage passes",
+        "expected": "passes with Spark-family helper coverage intact",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-sweep CONFIG=tests/uat/configs/uat-lakesail-failing-benchmarks.yaml",
+        "description": "Previously failing LakeSail benchmarks run in managed UAT",
+        "expected": "Every non-compatibility-blocked LakeSail benchmark produces a result bundle and validator rollup is clean where validators exist",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/sql_compat tests/unit/sql_compat -m fast -q && uv run -- python _project/scripts/reference_usage_audit.py --summary",
+        "description": "SQL compatibility docs reflect any explicit LakeSail exclusions",
+        "expected": "passes with documented LakeSail compatibility rules for any blocked benchmarks",
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "notes": "Re-run a targeted LakeSail UAT subset or parse current artifacts on the\nimplementation branch. Produce a compact failure matrix with benchmark,\nphase, first error, and likely fix owner. Do not commit raw cells/logs.\n\nCompleted on 2026-05-13 from\n`/Users/joe/Developer/benchmark_runs/logs/uat_lakesail_failing_benchmarks_20260513`.\nThe focused rerun ended with 12 executed LakeSail cells passing and 4\ncompatibility-pruned cells (`ai_primitives`, `metadata_primitives`,\n`transaction_primitives`, `write_primitives`).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate and cluster current LakeSail failures",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "notes": "Add focused DDL rewrite coverage for metadata primitives, TSBS devops,\nNYCTaxi, FlightData, DataVault, and Vector Search. Cover actual benchmark\nCREATE TABLE statements through the same helper path LakeSail uses, not\nsynthetic one-line DDL only.\n\nCompleted through Spark/LakeSail DDL and load fixes covering CSV directory\nwrapping, mixed-case TPC-DI table loads, ClickBench nullability, vector\nARRAY DDL, CoffeeShop/TPC-DI time handling, and no-data metadata load flow.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Harden LakeSail DDL normalization for benchmark schemas",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "notes": "Address TPC-DS division-by-zero semantics, TPC-DS OBT alias/interval\nsyntax, read primitive `APPROX_TOP_K`, and any other query-time failure\nproven by w0. Prefer dialect-aware rewrites with validator-backed\nsemantics. If a function has no current LakeSail equivalent, create an\nexplicit compatibility rule rather than a hidden skip.\n\nCompleted with TPC-DS Q90 denominator protection, TPC-DS OBT Spark\ntranslation, CoffeeShop Spark variants, vector_search query-source skips,\nread_primitives execution-filter documentation, TPC-Havoc variant skips,\nand TPC-DI query skips for the 26 stable Sail query gaps.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Repair or gate LakeSail query syntax/function gaps",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "notes": "Investigate and fix TPC-DI mixed-case table load gaps, write and\ntransaction primitive staging tables, ClickBench nullable column loading,\nCoffeeShop colon/dialect parsing, and TPCHavoc/TPCH skew CSV\ncompatibility path handling. Keep fixes in shared Spark/LakeSail loading\nhelpers only when Spark semantics also require them.\n\nCompleted. The final focused UAT rerun passed `clickbench`,\n`coffeeshop`, `flightdata`, `nyctaxi`, `tpcdi`, `tpcds`, `tpcds_obt`,\n`tpch_skew`, `tpchavoc`, `tsbs_devops`, `vector_search`, and\n`read_primitives`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix LakeSail data loading and generated-source path handling",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "notes": "AI primitives currently fail before schema creation because the benchmark\nlacks a `get_create_tables_sql` path for SQL adapters. Vector search\ncurrently fails at `FLOAT[128]` DDL. Implement SQL-compatible execution if\ncurrent LakeSail supports the required semantics; otherwise add explicit,\ndocumented compatibility exclusions.\n\nCompleted. `ai_primitives` is benchmark-gated for LakeSail as an LLM/API\nworkload without a SQL schema contract. `vector_search` schema/load now\nworks; its six vector-distance queries are explicitly skipped for\nLakeSail because Sail rejects both DuckDB vector functions and Spark\nlambda fallback expressions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve AI primitives and vector search support posture",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-benchmark-sql-compatibility-remediation",
+        "notes": "Run focused unit tests for every rewrite/load fix, then a managed LakeSail\nUAT subset containing each previously failing benchmark at the smallest\nmeaningful scale. Finish with validator rollup checks for every benchmark\nthat produces a result bundle.\n\nCompleted. Verification:\n- `uv run -- python -m pytest tests/unit/platforms/test_lakesail_adapter.py tests/unit/platforms/test_lakesail_coverage.py -q` -> 110 passed.\n- `uv run -- python -m pytest tests/unit/platforms/test_spark_adapter.py tests/unit/platforms/test_spark_helpers.py tests/unit/platforms/test_spark_csv_dialect_resolver.py tests/unit/platforms/base/test_spark_execution_mixin.py -q` -> 165 passed.\n- `uv run -- python -m pytest tests/unit/core/sql_compat tests/unit/sql_compat -m fast -q` -> 325 passed.\n- `uv run -- python _project/scripts/reference_usage_audit.py --summary` -> parse errors 0.\n- `BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs make uat-sweep CONFIG=tests/uat/configs/uat-lakesail-failing-benchmarks.yaml` -> execute/report 0; 12 passed, 4 compatibility-pruned, 0 failed, 0 timed out.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run LakeSail regression suite and validator-backed UAT subset",
+        "wid": "w5"
+      }
+    ]
+  }
+}

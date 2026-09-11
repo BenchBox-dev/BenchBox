@@ -1,0 +1,62 @@
+{
+  "context": "Resolve alongside one-engine-mcp-adoption-not-actually-done rather than independently. If MCP adopts the service and genuinely uses RunRequest/RunPlan as the item's anti-pattern intends ('express differences as RunRequest inputs'), keep them and replace the dataclass-semantics tests with the cross-surface equivalence tests that rung 2 requires. If adoption is re-scoped away from these types, delete them and their test class.",
+  "description": "The shared run service is consumed directly by CLI and MCP through execute_run and resolved helper inputs. SilentVerbosity remains an active MCP consumer. Repository-wide import analysis found no production consumer for the separate core RunRequest or RunPlan dataclasses, while the CLI owns a distinct active request model. Remove the unused core value types, their module exports, and dataclass-only tests; preserve every execution and resolution signature. This cleanup is independent of external deployment acceptance and the final publication gate.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "one-engine-run-request-plan-unused-scaffolding",
+        "needs_item": "one-engine-mcp-adoption-not-actually-done"
+      }
+    ],
+    "item_meta": {
+      "category": "cleanup",
+      "completed_at": "2026-08-13T22:46:44Z",
+      "completed_pr": 1717,
+      "created_at": "2026-08-11T12:57:08Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "execute_run, resolve_run_config, resolve_lifecycle_phases, resolve_validation_options, resolve_execution_mode and stamp_requested_phases all keep their current signatures; only the unused value types are in scope.",
+        "item_id": "one-engine-run-request-plan-unused-scaffolding"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-run-request-plan-unused-scaffolding",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/run_service.py"
+      },
+      {
+        "item_id": "one-engine-run-request-plan-unused-scaffolding",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_run_service.py -q",
+        "description": "No exported type is unreferenced outside its own test",
+        "expected": "Suite passes after the types are either consumed or removed.",
+        "item_id": "one-engine-run-request-plan-unused-scaffolding",
+        "last_result": "pass",
+        "last_run": "2026-08-13T22:46:41Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Removed core run_service.RunRequest and RunPlan plus their dataclass-only tests and module exports. Added a regression assertion that the core service does not expose a second unused request/plan model. rg confirms only the separate active CLI RunRequest remains. uv run -- ruff check and uv run -- ty check passed; related core/CLI/MCP suite: 746 passed; stored verification seq 1: 28 passed.",
+        "item_id": "one-engine-run-request-plan-unused-scaffolding",
+        "notes": null,
+        "started_at": "2026-08-13T22:39:02Z",
+        "started_branch": "chore/run-service-unused-types-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-run-service-unused-types-20260813",
+        "status": "done",
+        "summary": "Remove unused core RunRequest and RunPlan types and their dataclass-only tests",
+        "wid": "w0"
+      }
+    ]
+  }
+}

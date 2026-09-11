@@ -1,0 +1,156 @@
+{
+  "description": "The canonical model (query-plan-capture-canonical-isolation) makes plan capture a\nsingle isolated post-measurement phase for all EXPLAIN-based engines. A small set\nof engines do not fit that model cleanly: their execution plan and statistics are\nobtainable ONLY as a side effect of running the actual workload query, not from a\nstandalone EXPLAIN on a separate connection.\n\nVerified classification (2026-06-15):\n  - BigQuery: GENUINE EXCEPTION. get_query_plan uses a dry-run that returns only a\n    cost/bytes estimate (a dict, not a parseable plan), while the real execution\n    plan/stage timing live on the executed QueryJob (job.query_plan, slot_ms,\n    bytes_billed). An isolated EXPLAIN/dry-run re-run yields only the estimate, and\n    a real re-run costs bytes (money) and duplicates the measured query. BigQuery is\n    ALSO not currently wired for capture at all (no parser, dict return type).\n  - Spark / Databricks: NOT exceptions — EXPLAIN EXTENDED is a standalone static\n    plan, fully isolatable with no loss. They belong in the phase (handled by the\n    canonical-isolation TODO), not here.\n  - Snowflake / other cloud SaaS: assess against the same test — EXPLAIN-able and\n    isolatable, or plan-as-job-side-effect?\n\nThis TODO decides and documents the policy for the genuine side-effect class and\nwires it consistently. Options to weigh per engine:\n  A) Estimated-only in the phase: run the engine's dry-run/EXPLAIN in the isolated\n     phase, accept that no actual-execution detail is captured (analyze_plans is a\n     no-op for these engines), document the limitation.\n  B) Harvest from the measured job: capture the plan from the already-executed\n     job/profile during/after its own execution (the one inline exception),\n     explicitly carved out and documented as NOT going through the isolated phase.\nThe decision must keep \"no second paid execution\" for BigQuery and must not\nreintroduce a general inline path for EXPLAIN-based engines.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "force BigQuery through a standalone EXPLAIN re-run",
+        "instead": "harvest from the executed job or accept estimate-only per the decision.",
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "why": "dry-run loses actual stats and a real re-run costs money"
+      },
+      {
+        "dont": "use the BigQuery exception to justify keeping inline capture for EXPLAIN engines",
+        "instead": "the exception is narrow and explicit.",
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "why": "they are fully isolatable"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "needs_item": "query-plan-capture-canonical-isolation"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-06-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "EXPLAIN-based engines keep exactly one (isolated) capture path.",
+        "item_id": "query-plan-capture-sideeffect-engine-policy"
+      },
+      {
+        "behavior": "No second billed BigQuery query execution is introduced for capture.",
+        "item_id": "query-plan-capture-sideeffect-engine-policy"
+      },
+      {
+        "behavior": "Spark/Databricks remain on the isolated phase (not classified here).",
+        "item_id": "query-plan-capture-sideeffect-engine-policy"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/base/spark_execution_mixin.py / databricks/adapter.py — EXPLAIN EXTENDED (isolatable)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "path": "benchbox/platforms/base/spark_execution_mixin.py"
+      },
+      {
+        "concept": "benchbox/platforms/bigquery.py:1714 get_query_plan (dry-run estimate, dict) and :1506 job_stats (actual)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "path": "benchbox/platforms/bigquery.py:1714"
+      },
+      {
+        "concept": "query-plan-capture-cloud-live-snowflake-bigquery — live CI for these engines",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "path": "query-plan-capture-cloud-live-snowflake-bigquery"
+      },
+      {
+        "concept": "query-plan-capture-cloud-saas — parser + wiring work for Snowflake/BigQuery/Synapse/Firebolt/Fabric/Lakesail",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "path": "query-plan-capture-cloud-saas"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/"
+      },
+      {
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/features/query-plan-analysis.md"
+      },
+      {
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -k bigquery -q",
+        "description": "BigQuery capture path documented and does not issue a second billed query",
+        "expected": "BigQuery capture follows the documented side-effect policy",
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "notes": "For Snowflake, BigQuery, Azure Synapse, Firebolt, Fabric Warehouse, Lakesail:\ndetermine whether a standalone EXPLAIN reproduces the plan (=> phase, like the\nEXPLAIN engines) or whether the plan/stats are only on the executed job (=>\nside-effect exception). Record the classification.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Classify each cloud SaaS engine as isolatable-EXPLAIN vs side-effect-only",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "notes": "Pick option A or B per side-effect engine. Constraints: no second paid BigQuery\nexecution; analyze_plans semantics defined (likely a no-op for these); the\nEXPLAIN-engine path stays inline-free.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide the side-effect policy (estimated-in-phase vs harvest-from-job) and document it",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-sideeffect-engine-policy",
+        "notes": "Implement capture for BigQuery per the decision, coordinating with\nquery-plan-capture-cloud-saas (parser + wiring). Ensure it does not depend on\nor reintroduce the removed EXPLAIN-engine inline path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wire the chosen policy for BigQuery (and any other side-effect engine)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,208 @@
+{
+  "description": "Build the replacement release tooling that supersedes automate_release.py.\nThe new flow has three pieces:\n\n1. Makefile release target: bumps version, generates changelog, opens a\n   release PR. Maintainer reviews, edits changelog, squash-merges.\n2. GitHub Actions release workflow: triggered by tag push, runs final\n   CI, builds wheel and sdist, publishes to PyPI via trusted publisher.\n3. Standalone changelog generator extracted from automate_release.py,\n   keeping the Claude-summarisation fallback.\n\nautomate_release.py and the rest of the old machinery still exist during\nthis phase as a fallback. They are deleted in Phase 6.\n\nUnder Option B, these artefacts are added on private (current dev locus)\nand land on public via the Phase 4 final sync. The Makefile target uses\n`origin` from the start; when invoked from the public clone post-Phase 5,\norigin is the canonical repo. Do NOT invoke `make release` from the\nprivate clone — its `origin` remote does not exist (private has `private`\nand `public` remotes today).\n\nPlan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 3).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bake secrets or tokens into release.yml",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "why": "trusted publisher uses OIDC and needs no static tokens; if you find yourself reaching for a PYPI_API_TOKEN, you are doing it wrong."
+      },
+      {
+        "dont": "publish to real PyPI from a sandbox/test workflow run",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "why": "PyPI rejects re-uploads of the same version; a botched test burns the version number forever."
+      },
+      {
+        "dont": "skip the SOURCE_DATE_EPOCH computation",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "why": "reproducible builds were the one piece of the old apparatus worth keeping (D7); computing it from the tag commit preserves that property cheaply."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "needs_item": "single-repo-migration-phase-1-wheel-hygiene"
+      },
+      {
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "needs_item": "single-repo-migration-phase-2-continuous-ci"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-04-27T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The PyPI trusted-publisher configuration remains unchanged - the new workflow uses the same publisher as the old one would have.",
+        "item_id": "single-repo-migration-phase-3-new-release-flow"
+      },
+      {
+        "behavior": "automate_release.py and friends still work end-to-end during this phase. The new flow runs alongside, not in place of, the old one.",
+        "item_id": "single-repo-migration-phase-3-new-release-flow"
+      },
+      {
+        "behavior": "update_version.py is reused as-is, not duplicated.",
+        "item_id": "single-repo-migration-phase-3-new-release-flow"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "kind": "only_modify",
+        "path_glob": ".github/RELEASE_PR_TEMPLATE.md"
+      },
+      {
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_changelog_entry.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run python scripts/generate_changelog_entry.py --help",
+        "description": "scripts/generate_changelog_entry.py exists and is importable as a CLI",
+        "expected": "exit 0, usage line printed",
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make -n release VERSION=0.0.0 2>&1 | head -1",
+        "description": "Makefile has a release target",
+        "expected": "shows the bump command",
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -A2 'on:' .github/workflows/release.yml | grep -E 'tags:|v\\*'",
+        "description": ".github/workflows/release.yml exists and triggers on tag push",
+        "expected": "tags: ['v*']",
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh pr list --head 'sandbox-release-flow' --json title --jq '.[0].title'",
+        "description": "Sandbox dry-run produces a release PR",
+        "expected": "Release v0.0.0-test (or similar)",
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "notes": "Lift functions automate_release.py:_build_raw_changelog,\n_summarize_changelog_with_claude, and generate_changelog_entry\n(lines 156-414) into a standalone script with its own argparse.\nArgs: --version, --release-date, --since-tag (optional, defaults\nto most recent v* tag), --output (default CHANGELOG.md).\nKeep the Claude CLI summarisation fallback exactly as-is. Reuse\nupdate_version.py for version bumping (do not duplicate).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract scripts/generate_changelog_entry.py from automate_release.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "notes": "Append to Makefile:\n  release:\n      @test -n \"$(VERSION)\" || (echo \"Usage: make release VERSION=X.Y.Z\" && exit 1)\n      uv run python scripts/update_version.py --version $(VERSION)\n      uv run python scripts/generate_changelog_entry.py --version $(VERSION)\n      git checkout -b release/v$(VERSION)\n      git add CHANGELOG.md benchbox/__init__.py pyproject.toml docs/ landing/ benchbox/_metadata.py 2>/dev/null || true\n      git commit -m \"Release v$(VERSION)\"\n      git push origin release/v$(VERSION)\n      gh pr create --title \"Release v$(VERSION)\" --body-file .github/RELEASE_PR_TEMPLATE.md\nNote: under Option B, `origin` is the canonical remote in the public\nclone (~/Developer/benchbox-public). The Makefile is intended to run\nfrom there post-Phase 5. Add a comment in the Makefile explaining\nthis so it is not invoked accidentally from the private clone before\ndev-locus migration.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Makefile release target",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "notes": "Short template with a checklist:\n  ## Release vX.Y.Z\n  - [ ] Reviewed the auto-generated changelog\n  - [ ] Edited any unclear bullets\n  - [ ] Confirmed version bump in benchbox/__init__.py, pyproject.toml,\n        docs/index.rst landing pages\n  After merge: git tag vX.Y.Z && git push origin vX.Y.Z. The\n  release.yml workflow handles the rest.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add .github/RELEASE_PR_TEMPLATE.md",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "notes": "Triggers: push tags v*.\nJobs:\n  - checkout with fetch-depth 0 (need history for SOURCE_DATE_EPOCH)\n  - setup uv (astral-sh/setup-uv@v3)\n  - compute SOURCE_DATE_EPOCH from the tag's commit timestamp:\n    echo \"SOURCE_DATE_EPOCH=$(git log -1 --format=%ct ${GITHUB_REF_NAME})\" >> $GITHUB_ENV\n  - run final pytest -m fast as a sanity check\n  - uv run python -m build\n  - verify the wheel: pip install dist/*.whl in a fresh venv,\n    assert benchbox.__version__ == GITHUB_REF_NAME without v prefix\n  - publish via pypa/gh-action-pypi-publish@release/v1\n    (trusted publisher already configured per CHANGELOG)\nPermissions: id-token: write (PyPI), contents: read.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add .github/workflows/release.yml triggered by v* tag push",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-3-new-release-flow",
+        "notes": "Optional. Under Option B, the new flow gets exercised on real public\nmain in Phase 4; most issues will surface there. Skip this work unit\nif you would rather catch issues during the actual v0.3.0 cut and\niterate.\nIf running:\n  git checkout -b sandbox-release-flow\n  make release VERSION=0.0.0-test\n  Review the resulting PR. Close without merging. No PyPI publish\n  because no tag was pushed.\nNote: requires a public clone with origin set, since the Makefile\npushes to origin. From private clone this will fail.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "(Optional) Dry-run with v0.0.0-test on a sandbox branch",
+        "wid": "w5"
+      }
+    ]
+  }
+}

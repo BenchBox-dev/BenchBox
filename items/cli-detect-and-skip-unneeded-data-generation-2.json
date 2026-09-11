@@ -1,0 +1,10 @@
+{
+  "description": "- Implemented manifest-based detection to skip redundant data generation without scanning or decompressing data files.\n- \"Generators (TPC-DS and TPC-H) now write `_datagen_manifest.json` containing per-table file entries with `path`, `size_bytes`, and `row_count`, plus global metadata (benchmark, scale, compression, parallel, timestamp).\"\n- \"Orchestrator preflight validates the manifest strictly: confirms benchmark/scale, verifies each listed file exists and its `size_bytes` matches. When valid, it reuses data and constructs `benchmark.tables` mapping directly from the manifest.\"\n- \"Added CLI flags `--no-regenerate` and `--force-regenerate` to control regeneration.\"\n- Added unit tests for orchestrator flag behavior and manifest creation/consumption.\n- \"Impact: Deterministic, fast detection for reuse (local and cloud), improved UX and run predictability.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

@@ -1,0 +1,215 @@
+{
+  "context": "Work in format_capabilities.py first (pure data registration, no logic changes).\nReference existing DELTA_CAPABILITY pattern for new capabilities.\nUse EXTENSION support level for formats that need extra packages (deltalake, pyiceberg, hudi).\nUse NATIVE for formats built into the platform (Databricks delta, Quanton iceberg).\n",
+  "description": "BenchBox supports 34+ platform adapters and 5 open table formats (parquet, delta,\niceberg, vortex, ducklake) plus Hudi via Spark-based platforms. Several platforms are\nknown to support table formats that BenchBox does not yet register in format_capabilities.py.\nThis TODO tracks closing every verified gap.\n\n## Current State (as of 2026-03-05)\n\n### format_capabilities.py Registry\n| Format   | Registered Platforms                                                    |\n|----------|-------------------------------------------------------------------------|\n| parquet  | duckdb, datafusion, clickhouse, databricks, snowflake, bigquery,        |\n|          | redshift, postgresql, sqlite                                            |\n| delta    | databricks (NATIVE), duckdb (EXTENSION), datafusion (EXTENSION)         |\n| iceberg  | duckdb (EXPERIMENTAL), datafusion (EXTENSION)                           |\n| vortex   | duckdb (EXTENSION), datafusion (EXPERIMENTAL)                           |\n| ducklake | duckdb (NATIVE)                                                         |\n\nNote: ORC and Hive are NOT open table formats that BenchBox manages. ORC is a storage\nformat (like Parquet) used internally by Spark/Hive - BenchBox doesn't generate ORC data.\nHive is a metastore/catalog layer, not a table format - Presto/Trino use \"hive\" as a\ncatalog connector type, not as a `--table-format` value.\n\n### Verified Gaps\n\n**Gap 1: Hudi format missing from CAPABILITIES_REGISTRY**\n- PySpark SQL / cloud_spark base: Hudi via hudi-spark-bundle (SparkTableFormat.HUDI)\n- Quanton/OneHouse: Hudi is primary format (explicit --table-format hudi support)\n- LakeSail: Hudi support\n- hudi_maintenance.py exists with full ACID ops via PySpark\n- NOTE: Databricks adapter does NOT have Hudi loading code (only PySpark path)\n\n**Gap 2: Spark-based platforms missing from CAPABILITIES_REGISTRY**\n- spark: not in PLATFORM_FORMAT_PREFERENCES (supports delta, iceberg, parquet via code)\n- pyspark-sql: not in PLATFORM_FORMAT_PREFERENCES\n- AWS EMR Serverless: supports delta, iceberg via Spark (cloud_spark base)\n- GCP Dataproc/Serverless: supports delta, iceberg via Spark (cloud_spark base)\n- Azure Synapse Spark: supports delta via Spark (cloud_spark base)\n\n**Gap 3: Presto/Trino missing from CAPABILITIES_REGISTRY**\n- Presto: supports iceberg, delta catalogs (explicit --table-format choices)\n- Trino: supports iceberg, delta, hive catalogs (explicit --table-format choices)\n- Neither appears in CAPABILITIES_REGISTRY or PLATFORM_FORMAT_PREFERENCES\n\n**Gap 4: Cloud lakehouse platforms missing**\n- Fabric Lakehouse: delta native (not registered)\n- Fabric Spark: delta + parquet (not registered)\n- Quanton: iceberg, hudi, delta (not registered, but adapter has full support)\n- LakeSail: iceberg, hudi, delta (not registered)\n\n**Gap 5: Snowflake Iceberg and Delta not registered**\n- Snowflake supports Iceberg Tables (managed + unmanaged) since 2024\n- Snowflake supports Delta Lake via external tables (TABLE_FORMAT=DELTA) and Delta Direct\n- No code in snowflake.py adapter for Iceberg or Delta yet (adapter gap too)\n\n**Gap 6: ClickHouse Delta/Iceberg not registered**\n- ClickHouse can read Delta Lake and Iceberg via table functions\n- No code in clickhouse.py adapter for these formats yet (adapter gap too)\n\n**Gap 7: Redshift Delta/Iceberg not registered**\n- Redshift Spectrum supports read-only queries on Delta Lake tables (since 2020, via manifest)\n- Redshift has limited Iceberg preview support\n- No code in redshift adapter for Delta or Iceberg loading yet (adapter gap too)\n\n**Gap 8: BigQuery Delta not registered**\n- BigQuery has native Delta Lake support via BigLake (since mid-2024)\n- BigQuery also supports Iceberg via BigLake external tables\n- No code in bigquery.py adapter for Delta or Iceberg loading yet (adapter gap too)\n\n### Confirmed Non-Gaps (investigated and rejected)\n- Databricks Hudi: Databricks platform supports Hudi via Spark runtime, but the BenchBox\n  Databricks SQL adapter has zero Hudi code. Only PySpark-based adapters have Hudi support.\n  (Tracked as deferred item d6.)\n- ORC: Storage format, not an open table format BenchBox manages.\n- Hive: Catalog/metastore layer, not a table format.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add loading code for formats without live platform access to test",
+        "instead": "instead mark those as needing integration testing in the work unit",
+        "item_id": "open-table-format-gap-analysis",
+        "why": "untested loading paths will give false confidence"
+      },
+      {
+        "dont": "confuse storage formats (ORC) or catalog layers (Hive) with open table formats",
+        "instead": "instead keep scope to formats BenchBox actually generates and loads",
+        "item_id": "open-table-format-gap-analysis",
+        "why": "BenchBox's --table-format flag manages table formats like Delta/Iceberg that datagen produces"
+      },
+      {
+        "dont": "register a format for a platform that cannot actually use it",
+        "instead": "instead only register formats with confirmed platform support",
+        "item_id": "open-table-format-gap-analysis",
+        "why": "the fail-fast check in runner.py will allow the run to proceed and then fail at load time"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "open-table-format-gap-analysis",
+        "id": 217,
+        "reason": "MotherDuck inherits DuckDB capabilities but cloud constraints may limit some formats",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: MotherDuck table-format capability investigation is a minor credential-gated MotherDuck cloud-capability follow-up; the open motherduck-cloud-features item is the natural umbrella for MotherDuck cloud feature completion.",
+        "summary": "Investigate MotherDuck table format support"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "open-table-format-gap-analysis",
+        "id": 218,
+        "reason": "pg_duckdb supports delta/iceberg via DuckDB extensions but not registered",
+        "resolution": "promoted",
+        "resolved_item": "investigate-pg-duckdb-table-format-registration",
+        "resolved_reason": null,
+        "summary": "Investigate pg_duckdb table format registration"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "open-table-format-gap-analysis",
+        "id": 219,
+        "reason": "Athena v3 supports Iceberg natively but adapter may not handle it",
+        "resolution": "promoted",
+        "resolved_item": "investigate-aws-athena-non-spark-iceberg-support",
+        "resolved_reason": null,
+        "summary": "Investigate AWS Athena (non-Spark) Iceberg support"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "open-table-format-gap-analysis",
+        "id": 220,
+        "reason": "BigQuery supports BigLake Iceberg tables but adapter has no Iceberg code",
+        "resolution": "promoted",
+        "resolved_item": "investigate-bigquery-biglake-iceberg-support",
+        "resolved_reason": null,
+        "summary": "Investigate BigQuery BigLake Iceberg support"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "open-table-format-gap-analysis",
+        "id": 221,
+        "reason": "Redshift has limited Iceberg preview support but unclear if production-ready",
+        "resolution": "promoted",
+        "resolved_item": "investigate-redshift-iceberg-preview-support",
+        "resolved_reason": null,
+        "summary": "Investigate Redshift Iceberg preview support"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "open-table-format-gap-analysis",
+        "id": 222,
+        "reason": "Databricks platform supports Hudi but the BenchBox SQL adapter has no Hudi code",
+        "resolution": "promoted",
+        "resolved_item": "add-databricks-hudi-support-to-benchbox-databricks-sql-adapt",
+        "resolved_reason": null,
+        "summary": "Add Databricks Hudi support to BenchBox Databricks SQL adapter"
+      }
+    ],
+    "item_meta": {
+      "category": "Feature",
+      "completed_at": "2026-03-05T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "work_needs": [
+      {
+        "item_id": "open-table-format-gap-analysis",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "open-table-format-gap-analysis",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "open-table-format-gap-analysis",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "open-table-format-gap-analysis",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "open-table-format-gap-analysis",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "open-table-format-gap-analysis",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "open-table-format-gap-analysis",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "open-table-format-gap-analysis",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "open-table-format-gap-analysis",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add HUDI_CAPABILITY to registry",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "open-table-format-gap-analysis",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Spark-based platforms to format preferences and capabilities",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "open-table-format-gap-analysis",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Presto and Trino to format capabilities",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "open-table-format-gap-analysis",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register cloud lakehouse platforms",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "open-table-format-gap-analysis",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register Snowflake, ClickHouse, Redshift, and BigQuery format gaps",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "open-table-format-gap-analysis",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update format_capabilities tests for all new registrations",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "open-table-format-gap-analysis",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify each platform adapter's loading code handles registered formats",
+        "wid": "w7"
+      }
+    ]
+  }
+}

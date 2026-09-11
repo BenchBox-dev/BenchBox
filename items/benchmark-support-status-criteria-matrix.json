@@ -1,0 +1,289 @@
+{
+  "context": "Start from the current public contract taxonomy, then add benchmark-specific\nevidence dimensions. Use the registry to enumerate benchmark IDs and statuses.\nCross-check docs and result-integrity spec coverage, then write a compact\nmatrix that explains current status values without becoming a second runtime\ncatalog. Add a drift check only after choosing a matrix format that can be\nparsed reliably.\n",
+  "description": "PR #502 added registry-owned `support_status` for every benchmark, but the\nfirst assignment is still a product decision encoded as metadata rather than\nan auditable criteria matrix. The current counts are test-protected, but the\nrepository does not yet explain why each benchmark is stable, beta,\nexperimental, repo_only, deprecated, or document_only.\n\nBuild a benchmark support-status criteria matrix that makes future promotions\nand demotions reviewable. The matrix should evaluate each benchmark against\nconcrete product criteria: user docs coverage, result-integrity spec coverage,\ndataset/source contract, validation coverage, public discovery behavior,\nDataFrame coverage where claimed, known unsupported platform gaps, and\nmaintenance commitment. The matrix should not duplicate the registry as a\nsecond source of truth; it should document the rationale and acceptance\nthresholds for changing the registry-owned status field.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change DataFrame capability flags as part of criteria documentation",
+        "instead": "file follow-up TODOs for capability gaps.",
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "why": "capability and support status are separate contracts"
+      },
+      {
+        "dont": "duplicate the entire BENCHMARK_METADATA table in docs",
+        "instead": "document only status rationale and evidence pointers.",
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "why": "that creates a second catalog"
+      },
+      {
+        "dont": "mark a benchmark stable only because it imports or runs at smoke scale",
+        "instead": "require evidence rows.",
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "why": "stable implies docs, validation, and maintenance commitment"
+      },
+      {
+        "dont": "use benchmark category as status rationale",
+        "instead": "record criteria evidence instead.",
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "why": "category is workload taxonomy, not product support"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-support-status-criteria-matrix",
+        "id": 358,
+        "reason": "It is the only beta whose sole integrity-dimension gap is a missing result-integrity spec; adding one (plus a DataFrame routing decision) is the concrete blocker recorded in docs/benchmarks/support-status.md.",
+        "resolution": "promoted",
+        "resolved_item": "promote-vector-search-beta-stable-once-it-has-a-benchmarkspe",
+        "resolved_reason": null,
+        "summary": "Promote vector_search beta -> stable once it has a BenchmarkSpec"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-support-status-criteria-matrix",
+        "id": 359,
+        "reason": "Their status is partly coupled to the benchbox.core.base_benchmark.BaseBenchmark migration; revisit when that base is gone.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Verified benchbox/core/base_benchmark.py still exists; deprecated base has not been removed, so the reassessment trigger has not occurred.",
+        "summary": "Reassess tpcds_obt and datavault experimental status after the deprecated core base is removed"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-support-status-criteria-matrix",
+        "id": 360,
+        "reason": "External-dataset betas are gated on a pinned source contract, not on query coverage.",
+        "resolution": "promoted",
+        "resolved_item": "pin-reproducible-external-source-contracts-for-nyctaxi-and-f",
+        "resolved_reason": null,
+        "summary": "Pin reproducible external-source contracts for nyctaxi and flightdata before any stable promotion"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "needs_item": "benchmark-support-status-and-discovery-policy"
+      }
+    ],
+    "item_meta": {
+      "category": "Benchmark Architecture",
+      "completed_at": "2026-05-25T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Benchmark surface visibility remains independent of support_status.",
+        "item_id": "benchmark-support-status-criteria-matrix"
+      },
+      {
+        "behavior": "Current public benchmark discovery count remains unchanged unless a separate surface decision changes it.",
+        "item_id": "benchmark-support-status-criteria-matrix"
+      },
+      {
+        "behavior": "Runtime support_status values remain registry-owned in benchbox/core/benchmark_registry.py.",
+        "item_id": "benchmark-support-status-criteria-matrix"
+      },
+      {
+        "behavior": "supports_dataframe remains a capability flag, not a proxy for support status.",
+        "item_id": "benchmark-support-status-criteria-matrix"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/benchmark_registry.py: BENCHMARK_METADATA support_status values - reuse as runtime source of truth.",
+        "decision": "reuse",
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "path": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "concept": "docs/development/result-integrity-validation.md: integrity spec coverage list - use as one evidence dimension, not as the whole support decision.",
+        "decision": "reuse",
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "path": "docs/development/result-integrity-validation.md"
+      },
+      {
+        "concept": "docs/platforms/support-status.md: platform support-status rationale style - reuse the explanatory pattern, but adapt criteria to benchmark-specific evidence.",
+        "decision": "reuse",
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "path": "docs/platforms/support-status.md"
+      },
+      {
+        "concept": "docs/reference/public-contracts.md: support taxonomy and count policy - extend criteria language rather than creating new status terms.",
+        "decision": "extend",
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "path": "docs/reference/public-contracts.md"
+      },
+      {
+        "concept": "tests/unit/core/test_benchmark_api_contract.py: benchmark count and support-status drift tests - extend for matrix row coverage.",
+        "decision": "extend",
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "path": "tests/unit/core/test_benchmark_api_contract.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/"
+      },
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "kind": "only_modify",
+        "path_glob": "docs/development/result-integrity-validation.md"
+      },
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_benchmark_api_contract.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_benchmark_api_contract.py -q",
+        "description": "Benchmark registry support-status contract remains green.",
+        "expected": "All benchmark API contract tests pass.",
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make docs-validate",
+        "description": "Docs validate after adding the criteria matrix.",
+        "expected": "Documentation validation passes.",
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph and schema remain valid if follow-up TODOs are added.",
+        "expected": "TODO validation and graph checks pass.",
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "notes": "Capture the checked SHA, current status counts, benchmark IDs, public IDs,\nand result-integrity spec coverage in the TODO or implementation PR body.\nDo not rely on the PR #502 review text alone; the criteria matrix must be\nbased on the current tree at implementation time.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-read the benchmark registry, public contract map, benchmark docs, and result-integrity spec list before proposing criteria",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "notes": "Write criteria for stable, beta, experimental, repo_only, deprecated, and\ndocument_only. Include benchmark-specific dimensions that platform status\ndid not need: official-vs-development scale factors, generated-vs-external\ndatasets, canonical query coverage, result validation availability, docs\ndepth, and whether DataFrame support is claimed for that benchmark.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define status-specific acceptance criteria for benchmark families",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "notes": "Produce one row per benchmark with the current registry status, rationale,\nevidence pointers, and any promotion/demotion blockers. The matrix may live\nin a developer/reference doc, but the runtime status remains in\n`benchbox/core/benchmark_registry.py`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Score every registry benchmark against the criteria and record status rationale",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "notes": "Add a focused test that fails when a benchmark status is added, removed, or\nchanged without a corresponding criteria-matrix row or explicit rationale\nupdate. Prefer a simple parseable markdown table or YAML/JSON summary if\nthe existing docs test patterns can check it cleanly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests or docs checks that keep the matrix synchronized with registry status values",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-criteria-matrix",
+        "notes": "If the matrix shows that a beta benchmark is close to stable or that an\nexperimental benchmark has unclear criteria, record follow-up TODOs or\ndeferred entries with exact blockers. Do not change support_status values\nin this TODO unless the criteria evidence makes the change unambiguous.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Record concrete promotion candidates and blockers as deferred work, not as silent comments",
+        "wid": "w4"
+      }
+    ]
+  }
+}

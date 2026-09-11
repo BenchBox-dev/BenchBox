@@ -1,0 +1,122 @@
+{
+  "context": "Add value-level URI userinfo handling at the shared platform option sanitizer after exact-key classification, then drive database_path, endpoint, nested, list, and tuple values through internal and public result metadata boundaries.",
+  "description": "The structural option sanitizer classifies values by key. A driven SQLite adapter carried a credential-bearing PostgreSQL URI in its non-secret database_path key, and sanitize_platform_options preserved URI_PASSWORD through extracted platform.config and public metadata. Scrub embedded credential userinfo in string option values while preserving ordinary non-credential URLs, paths, and tuning values.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2",
+        "needs_item": "platform-options-redact-credential-aliases-v2"
+      }
+    ],
+    "item_meta": {
+      "category": "Security",
+      "created_at": "2026-08-02T13:15:45Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "non-secret filesystem paths and tuning values",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2"
+      },
+      {
+        "behavior": "ordinary URLs without credential userinfo",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2"
+      },
+      {
+        "behavior": "the existing explicit-key redaction policy",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/platform_options.py"
+      },
+      {
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_platform_options_capture.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "PYTHONPATH=. uv run --all-extras -- python -c 'import json; from benchbox.core.results.platform_options import sanitize_platform_options; out=sanitize_platform_options({\"database_path\":\"postgresql://user:URI_PASSWORD@db.example/db\",\"output_location\":\"https://user:URI_TOKEN@example.com/export\",\"threads\":4}); text=json.dumps(out); assert \"URI_PASSWORD\" not in text and \"URI_TOKEN\" not in text'",
+        "description": "credential material embedded in a non-secret option value is absent after sanitization",
+        "expected": "expected: exits 1 on an unfixed tree because URI userinfo survives; exits 0 after value-level URI scrubbing",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run --all-extras -- python -c 'from benchbox.core.results.platform_options import sanitize_platform_options; out=sanitize_platform_options({\"url\":\"https://public.example/export\",\"path\":\"/tmp/data\",\"sort_key\":\"o_orderkey\"}); assert out=={\"url\":\"https://public.example/export\",\"path\":\"/tmp/data\",\"sort_key\":\"o_orderkey\"}'",
+        "description": "ordinary URL and option-value behavior remains green",
+        "expected": "expected: passes before and after as a regression guard",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run --all-extras -- pytest tests/unit/core/results/test_platform_options_capture.py -q",
+        "description": "platform option tests pass",
+        "expected": "expected: passes before and after as a regression guard",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-drive credential-bearing URI values through all structural option boundaries",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Scrub URI userinfo values without redacting ordinary public URLs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run platform option and result export regressions",
+        "wid": "w2"
+      }
+    ]
+  }
+}

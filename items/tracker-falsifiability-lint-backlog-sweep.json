@@ -1,0 +1,81 @@
+{
+  "context": "Decide policy before touching items: exempt more categories, grandfather items created before the lint landed, or sweep. Only then act. Do not mass drop+recreate items that have dependents.",
+  "description": "The rung-falsifiability lint landed via todo-lint-rung-falsifiability-and-scope-completeness-2 (done). It is correct and valuable, but it was applied to a tracker that already held hundreds of items authored before the rule existed. Measured 2026-08-01: 'todo lint --all' reports 525 finding(s) across 277 item(s), of which 125 are specifically 'no falsifiability: every rung's expected text reads as passing on the unfixed tree'. No open item covers that backlog, so the lint reports a large standing failure that nobody owns and that therefore trains readers to ignore it. Verification ladders are create-time-only, so each fix is a drop+recreate that cascades through any dependents - which makes a blind sweep expensive and risky. Confirmed adjacent examples: findings-import-surfaces-undocumented trips it; cutover-record-corrections-and-quiescence-probe tripped it and was repaired by drop+recreate as -v2 (zero dependents, so cheap). The 'flake' category is already exempt, which suggests category-based exemption is the cheaper lever than mass recreation.",
+  "legacy": {
+    "item_meta": {
+      "category": "tracker",
+      "completed_at": "2026-08-13T14:07:53Z",
+      "completed_pr": 1536,
+      "created_at": "2026-08-04T12:16:07Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "no item with dependents is dropped as part of a lint sweep without its dep edges being re-created",
+        "item_id": "tracker-falsifiability-lint-backlog-sweep"
+      },
+      {
+        "behavior": "the falsifiability rule itself stays enforced for newly created items",
+        "item_id": "tracker-falsifiability-lint-backlog-sweep"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tracker-falsifiability-lint-backlog-sweep",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "tracker-falsifiability-lint-backlog-sweep",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_freeze.py -q -n 0 -k \"grandfather or falsifiab\" && printf \"grandfathering tests passed\\\\n\"",
+        "description": "Grandfathering policy and negative controls",
+        "expected": "grandfathering tests passed",
+        "item_id": "tracker-falsifiability-lint-backlog-sweep",
+        "last_result": "pass",
+        "last_run": "2026-08-13T14:07:42Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_verification_lint.py -q -k post_rule_advisory",
+        "description": "Post-rule items still receive the falsifiability advisory",
+        "expected": "focused advisory regression passes",
+        "item_id": "tracker-falsifiability-lint-backlog-sweep",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1536 chose grandfathering by the UTC rule epoch. Category exemptions were rejected because legacy categories are free text across 57 values; mass recreation was rejected because terminal IDs and dependencies make it unsafe.",
+        "item_id": "tracker-falsifiability-lint-backlog-sweep",
+        "notes": null,
+        "started_at": "2026-08-13T14:06:55Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Decide the policy - category exemption, grandfathering by creation date, or per-item recreation",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1536 commit 04df44c5f reports pre-rule ladders as countable grandfathered notes, keeps post-rule no-falsifiability advisories, supports an off switch for backlog audits, and includes UTC-boundary regression tests.",
+        "item_id": "tracker-falsifiability-lint-backlog-sweep",
+        "notes": null,
+        "started_at": "2026-08-13T14:07:09Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Apply the chosen policy and drive the falsifiability finding count to zero",
+        "wid": "w2"
+      }
+    ]
+  }
+}

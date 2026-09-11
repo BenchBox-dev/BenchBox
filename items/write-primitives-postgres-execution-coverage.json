@@ -1,0 +1,185 @@
+{
+  "context": "Reuse the DuckDB SCD2 fixture shape (seed 50 customers, run each op, assert\nclose/insert counts + seed restoration). Parameterize the connection over a\ncontainer-backed psycopg fixture, skipping when unavailable. Add the UAT cell\nvia the existing enumeration config. Keep runtime notes (container CLI,\nsimple-protocol) in the test so the next maintainer does not re-derive them.\n",
+  "description": "SCD2 adversarial audit finding C (prior review's Postgres gate item, now\nclosed empirically). The three SCD2 ops are correctly NOT in the Postgres\nper-operation skip list (postgres_write_primitives.py:15-25), but \"not\nskipped\" was never \"verified passing\" - no test, no CI workflow, and no UAT\ncell executes write_primitives on PostgreSQL at all.\n\nDuring the audit I stood up PostgreSQL 16.14 (Apple container runtime) and ran\nthe full SCD2 surface via scratchpad/pg_scd2.py: the DDL, BOTH _get_population_\nsql bodies (the 3-statement stage population runs in a single execute() -\npsycopg3 falls to the simple query protocol when there are no params and TEXT\nformat, per Cursor._execute_send), all three ops' multi-statement write_sql,\nall 10 validation queries, and all three cleanup_sql bodies ran GREEN. The\ndimension came back byte-identical to the pristine seed (0 rows deviating);\ndim/stage row_hash agree 20/20 for the 'unchanged' group. Cross-engine\nfingerprint formatting (|| concat + CAST AS VARCHAR) was byte-identical between\nDuckDB and Postgres for c_acctbal, c_acctbal+100, -999.99, and integer-valued\ndecimals.\n\nSo the SQL is genuinely portable; the gap is purely coverage. This TODO turns\nthe one-off manual verification into a durable test + UAT cell.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hard-require a live PostgreSQL for the default/fast test run",
+        "instead": "skip when the container/DSN is absent.",
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "why": "most local runs have none"
+      },
+      {
+        "dont": "modify operation/population SQL to 'help' Postgres",
+        "instead": "coverage only.",
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "why": "it already passes verbatim"
+      },
+      {
+        "dont": "use the docker CLI on this host",
+        "instead": "use the Apple `container` runtime or a CI service container.",
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "why": "it hangs (mocker shim)"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-11T00:00:00Z",
+      "created_at": "2026-07-10T00:00:00Z",
+      "worktree": "scd2-audit-followup"
+    },
+    "preserves": [
+      {
+        "behavior": "No change to operation SQL or population SQL - this TODO is coverage only.",
+        "item_id": "write-primitives-postgres-execution-coverage"
+      },
+      {
+        "behavior": "The DuckDB SCD2 integration tests are unchanged and still green.",
+        "item_id": "write-primitives-postgres-execution-coverage"
+      },
+      {
+        "behavior": "The new postgres test SKIPS cleanly (not fails) when no PostgreSQL container is available, so local fast-test runs are unaffected.",
+        "item_id": "write-primitives-postgres-execution-coverage"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/base/psycopg2_mixin.py:39 execute_query - psycopg connection path",
+        "decision": "reuse",
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "path": "benchbox/platforms/base/psycopg2_mixin.py:39"
+      },
+      {
+        "concept": "benchbox/platforms/postgresql.py PostgreSQLAdapter / PsycopgConnectionMixin - the adapter under test",
+        "decision": "reuse",
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "path": "benchbox/platforms/postgresql.py"
+      },
+      {
+        "concept": "scratchpad/pg_scd2.py (audit) - the manual verification to convert into a fixture",
+        "decision": "reuse",
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "path": "scratchpad/pg_scd2.py"
+      },
+      {
+        "concept": "tests/integration/test_write_primitives_duckdb.py:983 TestWritePrimitivesSCD2DuckDB - mirror this fixture for postgres",
+        "decision": "reuse",
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "path": "tests/integration/test_write_primitives_duckdb.py:983"
+      },
+      {
+        "concept": "tests/uat/test_phases.py:165-199 UAT benchmark/platform enumeration - add a postgresql x write_primitives cell",
+        "decision": "reuse",
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "path": "tests/uat/test_phases.py:165-199"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/integration"
+      },
+      {
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/uat"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration -n 0 -q -k scd2_postgres",
+        "description": "New postgres SCD2 test passes when a PG container is present, skips otherwise.",
+        "expected": "passes with PG available; skipped (not failed) without",
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -k scd2 -n 0 -q",
+        "description": "DuckDB SCD2 tests unchanged and green.",
+        "expected": "all pass",
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "notes": "Audit result to reproduce: setup DDL + both population bodies + 3 ops + 10\nvalidations + 3 cleanups all green; final dim identical to pristine seed.\nCapture stdout to /tmp; summarize PG version, per-op pass/fail, and the\ndeviation count here and in the PR body. Container runtime: Apple\n`container` (docker shim hangs on this host - see MEMORY mocker gotchas).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the audit evidence: re-run the SCD2 surface on a fresh PostgreSQL 16 container and confirm 0 rows deviating from seed.",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a postgres SCD2 integration test mirroring TestWritePrimitivesSCD2DuckDB, gated on a container fixture (skip if no PG available).",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a postgresql x write_primitives UAT cell so the surface is enumerated and executed in the matrix.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-postgres-execution-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document in the test that psycopg3's simple query protocol (no params + TEXT format) is what lets the multi-statement write_sql run in one execute().",
+        "wid": "w3"
+      }
+    ]
+  }
+}

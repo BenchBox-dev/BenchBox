@@ -1,0 +1,126 @@
+{
+  "context": "Pick a scheme that survives '::' inside the command - a distinct separator, an escape, or accepting the structured --from JSON payload as the supported path for such rungs - and keep every existing 2-field and 3-field spec parsing exactly as it does now. Then repair the one mangled rung in the database, and add a lint finding for a stored command that does not lex, so the next occurrence is caught rather than discovered by hand.",
+  "description": "_parse_verify_flag (todo_db.py) does fields = spec.split('::') with no maxsplit, then takes fields[0..2] as description, command, expected. pytest node IDs use the same '::' token, so the most natural targeted rung - a file plus class plus test - is shredded: everything after the first '::' inside the command moves into expected and the rest is dropped entirely. It is silent, with no error at create time and no lint finding afterwards, so the ladder looks well-formed while carrying a command that cannot run. Live victim on the tracker today: item test-export-invalid-output-dir-assumes-non-root seq 1 stored command 'uv run -- python -m pytest -n 0 (quote)tests/unit/cli/test_cli_output.py' with expected 'TestResultExporterErrorHandling(quote) -q' - truncated mid-quote, so it does not even lex. A shlex scan of every stored rung finds that one case of this defect; three other non-lexing rungs are prose written into the command field, a different problem. Note maxsplit alone does not fix it: with a 3-field spec the command still ends at its own first '::'. Needs a separator or escaping decision.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-10T00:10:34Z",
+      "completed_pr": 1667,
+      "created_at": "2026-07-31T13:47:33Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing specs of the form description plus command, and description plus command plus expected, parse exactly as they do today",
+        "item_id": "verify-flag-separator-collides-with-pytest-node-ids"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "verify-flag-separator-collides-with-pytest-node-ids",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "verify-flag-separator-collides-with-pytest-node-ids",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db.py -q -k verify_flag",
+        "description": "The parser unit tests pass",
+        "expected": "parse round-trip cases green",
+        "item_id": "verify-flag-separator-collides-with-pytest-node-ids",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:00:42Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db.py -q -k lex",
+        "description": "Lint rejects a stored verification command that cannot lex",
+        "expected": "the new lint guard passes",
+        "item_id": "verify-flag-separator-collides-with-pytest-node-ids",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:00:49Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db.py::TestVerifyFlagParsing::test_verify_flag_alternate_separator_preserves_pytest_node_id -q",
+        "description": "A rung whose command carries a pytest node id round-trips with the command intact",
+        "expected": "the node id stays in the command field",
+        "item_id": "verify-flag-separator-collides-with-pytest-node-ids",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:00:55Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "verify-flag-separator-collides-with-pytest-node-ids",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "verify-flag-separator-collides-with-pytest-node-ids",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "verify-flag-separator-collides-with-pytest-node-ids",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Current hosted snapshot /tmp/benchbox-verify-flag-snapshot.json contains 27 verification commands with pytest/shell :: tokens; test-export-invalid-output-dir-assumes-non-root has the known mangled command/expected split. Current parser reproduces the collision; self-test confirms the new ||| form preserves the node id.",
+        "item_id": "verify-flag-separator-collides-with-pytest-node-ids",
+        "notes": null,
+        "started_at": "2026-08-09T23:58:22Z",
+        "started_branch": "fix/batch-verify-flag-separator-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Re-validate the mangling on current develop and re-count affected stored rungs",
+        "wid": "w0"
+      },
+      {
+        "evidence": "_project/scripts/todo_db.py now accepts legacy :: specs unchanged and a distinct ||| separator for pytest node IDs; test_todo_db.py::TestVerifyFlagParsing covers both forms.",
+        "item_id": "verify-flag-separator-collides-with-pytest-node-ids",
+        "notes": null,
+        "started_at": "2026-08-10T00:01:07Z",
+        "started_branch": "fix/batch-verify-flag-separator-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Fix the parse, preserving existing 2-field and 3-field behavior",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Hosted rung seq 1 was replaced through audited todo update with the focused TestVerifyFlagParsing node-id regression; todo verify seq 4 pass.",
+        "item_id": "verify-flag-separator-collides-with-pytest-node-ids",
+        "notes": null,
+        "started_at": "2026-08-10T00:01:13Z",
+        "started_branch": "fix/batch-verify-flag-separator-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Repair the mangled rung on test-export-invalid-output-dir-assumes-non-root",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added test_lex_rejects_mangled_pytest_node_id_command; todo verify seq 3 pass and exact -k lex selector runs 1 test.",
+        "item_id": "verify-flag-separator-collides-with-pytest-node-ids",
+        "notes": null,
+        "started_at": "2026-08-10T00:01:19Z",
+        "started_branch": "fix/batch-verify-flag-separator-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Lint flags a verification command that does not lex",
+        "wid": "w3"
+      }
+    ]
+  }
+}

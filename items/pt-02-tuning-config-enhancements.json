@@ -1,0 +1,16 @@
+{
+  "description": "Extend the existing `TuningColumn` and related classes to support advanced\nphysical tuning options that different platforms require.\n\n## Current Limitations\n\nThe current `TuningColumn` class only captures:\n- `name`: Column name\n- `type`: SQL data type\n- `order`: Position in tuning configuration\n\nThis is insufficient for:\n- **Sort order**: ASC vs DESC per column\n- **Nulls handling**: NULLS FIRST vs NULLS LAST\n- **Compression**: Per-column encoding (Redshift ENCODE)\n- **Partition granularity**: DAILY, MONTHLY, YEARLY for date columns\n- **Sort key style**: COMPOUND vs INTERLEAVED (Redshift)\n- **Bucket count**: Number of buckets for hash partitioning\n\n## Backward Compatibility\n\nAll enhancements must be backward compatible with existing YAML configs.\nNew fields should have sensible defaults that preserve current behavior.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pt-02-tuning-config-enhancements",
+        "needs_item": "pt-01-ddl-generator-protocol"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-03T00:00:00Z",
+      "worktree": "physical-tuning"
+    }
+  }
+}

@@ -1,0 +1,331 @@
+{
+  "context": "Add hints as YAML data, pin the shape in the validator, render in\nthe JS builder. The reason hints are strings (not structured\n{flag,value}) is that the renderer only concatenates — structure\nwould force the renderer to know the difference between port,\npassword, endpoint, etc., which doesn't change output.\n\nFor the TPC-DS rule, prefer benchmark-level metadata over a\nprompt-side hardcoded list because future benchmarks may share the\nbundled-dsdgen constraint (e.g., TPC-DS variants).\n\nVerify each seeded port/flag against the actual adapter before\ncommitting. If an adapter has moved away from a documented default,\nfix the hint in this PR.\n",
+  "description": "Sampled CLI sessions show two recurring footguns the /prompts/ page\ndoes not surface:\n\n(a) Many local self-hosted platforms need `--platform-option` flags\n    that aren't obvious from CLI help — SingleStore port/password,\n    QuestDB http_port (REST), Doris/StarRocks dual SQL+HTTP ports,\n    Velox Spark Connect endpoint, ClickHouse deployment-mode\n    suffix (`clickhouse:local` vs `clickhouse-cloud`). Real\n    sessions: 5285c89f (singlestore), e47108b5 / 2fd35b2d (questdb),\n    eed8fe29 / b43e249e (doris), 9978f3bd / a970ce74 (starrocks),\n    fceaed01 (velox).\n\n(b) TPC-DS at scale factor below 1.0 requires the bundled patched\n    dsdgen at `_binaries/tpc-ds/<platform>/dsdgen` (per CLAUDE.md\n    \"TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox\").\n    The current prompt happily emits `-b tpcds -s 0.1` with no\n    warning.\n\nBoth are self-contained YAML-data + validator + JS-builder changes.\nNo core touch. No new UI controls.\n\nDecision gates:\n- D0 (before w1): re-validate the sampled session evidence and\n  adapter defaults, then commit a compact summary before relying on\n  the session-ID claims in this TODO.\n- D1 (before w1): hint shape — list of strings vs structured\n  `{flag, value, scope}`. Default: platform-scoped list of strings\n  in the override entry, because the JS builder just concatenates\n  them into a sub-bullet group; structure adds cost without rendering\n  value.\n- D2 (before w3): TPC-DS warning is informational or blocking?\n  Default: informational (the bundled dsdgen IS present in the\n  repo at _binaries/, so the warning serves as an agent-context\n  cue, not a stop step).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add platform_option_hints for platforms whose required options are obvious from --help (DuckDB, Polars). Hints are for non-obvious defaults only",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "why": "additive noise hurts UX."
+      },
+      {
+        "dont": "copy hint port numbers from this TODO blindly; verify against benchbox/platforms/<id>.py current defaults.",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "generalize requires_bundled_dsdgen_below to other benchmarks without a documented constraint. Keep the whitelist tpcds-only in this phase.",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "render hints as a single flat 'Notes:' blob; per-platform sub-bullets preserve compare-mode clarity (each platform's hints scoped to that platform's section).",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use the override system to hide platforms or change their interface/deployment filter membership",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "why": "that's already pinned by test_platform_override_cannot_control_filter_membership (line 131)."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase3-platform-footgun-hints",
+        "id": 455,
+        "reason": "Out of scope for the prompt surface; tracked as a separate CI initiative if/when platform-option drift becomes recurrent.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly deferred 'if/when platform-option drift becomes recurrent'; no evidence recurrence threshold was hit; not tracked as a CI initiative.",
+        "summary": "End-to-end smoke matrix that verifies hinted ports actually connect"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase3-platform-footgun-hints",
+        "id": 456,
+        "reason": "Adapters don't currently expose a structured option-defaults surface; manual maintenance is cheaper than building one for a 5-platform set.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Explicitly rejected: manual hint maintenance judged cheaper than building a structured adapter-docstring surface for a 5-platform set.",
+        "summary": "Auto-generate hints from adapter docstrings"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase3-platform-footgun-hints",
+        "id": 457,
+        "reason": "Tracked in prompts-landing-phase5-mcp-parity.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: prompts-landing-phase5-mcp-parity.yaml is already in _project/DONE — MCP parity for hints/dsdgen warning is complete.",
+        "summary": "MCP parity for hints + dsdgen warning"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "needs_item": "prompts-landing-phase1-cli-hygiene"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing PLATFORM_OVERRIDE_KEYS members (safety_terms, install_command, etc.).",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints"
+      },
+      {
+        "behavior": "Phase 1 step ordering — hints render between install and dependency-check; dsdgen warning renders before dry-run.",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints"
+      },
+      {
+        "behavior": "Validator pins for platforms_are_derived (line 433) — overrides remain decoration, not inclusion.",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints"
+      },
+      {
+        "behavior": "tests/unit/landing/test_platform_overrides_apply_without_controlling_inclusion (line 95) — the override pattern remains additive.",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "CLAUDE.md TPC-DS rule — surface that constraint into the prompt rather than relying on the user to know it",
+        "decision": "reuse",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "path": "CLAUDE.md"
+      },
+      {
+        "concept": "_binaries/tpc-ds/<platform>/dsdgen — the actual bundled binary the warning will reference",
+        "decision": "reuse",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "path": "_binaries/tpc-ds/<platform>/dsdgen"
+      },
+      {
+        "concept": "benchbox/platforms/{singlestore,questdb,doris,starrocks,velox}.py — source of truth for the platform-option defaults that must be rechecked before seeding hints",
+        "decision": "reuse",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "path": "benchbox/platforms/{singlestore,questdb,doris,starrocks,velox}.py"
+      },
+      {
+        "concept": "landing/prompts/catalog.yaml:47 platform_overrides — currently empty; this TODO is its first real consumer",
+        "decision": "reuse",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "path": "landing/prompts/catalog.yaml:47"
+      },
+      {
+        "concept": "landing/prompts/catalog.yaml:51-63 benchmarks[] — extend with optional requires_bundled_dsdgen_below",
+        "decision": "extend",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "path": "landing/prompts/catalog.yaml:51-63"
+      },
+      {
+        "concept": "scripts/generate_landing_quickstarts.py:39-47 PLATFORM_OVERRIDE_KEYS — extend with platform_option_hints; mirror the existing safety_terms whitelist pattern",
+        "decision": "extend",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "path": "scripts/generate_landing_quickstarts.py:39-47"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/index.html"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/prompts-landing-phase3-platform-footgun-evidence.md"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.generated.js"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.yaml"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/prompts.js"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_landing_quickstarts.py"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/landing/test_landing_quickstarts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/generate_landing_quickstarts.py --validate-only",
+        "description": "Validator passes against new shape",
+        "expected": "validate-only: OK",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make prompts-landing-check",
+        "description": "Make check green",
+        "expected": "check: OK",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/landing/ -v",
+        "description": "Landing tests pass",
+        "expected": "0 failures",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -nE 'port|http_port|endpoint' benchbox/platforms/singlestore.py benchbox/platforms/questdb.py benchbox/platforms/doris.py benchbox/platforms/starrocks.py benchbox/platforms/velox.py 2>/dev/null | head -80",
+        "description": "Each seeded platform's hinted port matches the platform adapter's documented default",
+        "expected": "manual review; ports match catalog.yaml hints OR a comment in this TODO records the discrepancy",
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "notes": "Re-run the evidence search behind the local-session claims and\nthe adapter-default checks before changing catalog.yaml:\n  - command(s) used to inspect sampled ~/.claude JSONL sessions\n  - command(s) used to inspect each adapter default\n  - checked repo SHA and current date\n  - count of sampled sessions and which platforms each supports\n  - confirmed platform-option keys/default values\n  - confirmed bundled dsdgen paths under _binaries/tpc-ds/\nCommit the compact summary to\n`_project/analysis/prompts-landing-phase3-platform-footgun-evidence.md`.\nRaw JSONL/stdout stays in /tmp or another ignored local path. If the\nsession logs are unavailable, record that fact and remove or soften\nthe session-ID-specific evidence claims before continuing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate session evidence, adapter defaults, and dsdgen binary evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "notes": "In scripts/generate_landing_quickstarts.py:\n- Add 'platform_option_hints' to PLATFORM_OVERRIDE_KEYS (line 39).\n- In _validate_platform_overrides, require each entry to be a\n  list of non-empty strings, each containing the substring\n  '--platform-option' (so hints can't drift into being generic\n  prose).\n- In _apply_platform_override, copy the list onto the entry.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend PLATFORM_OVERRIDE_KEYS with platform_option_hints; validate shape",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "notes": "In landing/prompts/catalog.yaml platform_overrides:\n  singlestore:\n    platform_option_hints:\n      - \"--platform-option port=13306  # local Docker default\"\n      - \"--platform-option password=<value>  # local Docker\"\n  questdb:\n    platform_option_hints:\n      - \"--platform-option http_port=9000  # REST endpoint, distinct from SQL port 8812\"\n  doris:\n    platform_option_hints:\n      - \"--platform-option port=9030\"\n      - \"--platform-option http_port=8030\"\n  starrocks:\n    platform_option_hints:\n      - \"--platform-option port=9030\"\n      - \"--platform-option http_port=8030\"\n  velox:\n    platform_option_hints:\n      - \"--platform-option deployment=remote\"\n      - \"--platform-option endpoint=sc://host:50051  # Spark Connect\"\nNote: clickhouse local-vs-cloud is a selection/labeling footgun,\nbut it is handled by the existing\ndeployment-mode suffix in the platform ID, NOT a platform-option\nhint. Do not add a clickhouse entry.\n\nVerify each port/flag against the platform adapter docstrings\nbefore committing; do NOT copy from this TODO blindly — defaults\nmay have changed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Seed platform_overrides with the five platform-option footgun platforms",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "notes": "catalog.yaml benchmarks[] — add to the tpcds entry:\n  requires_bundled_dsdgen_below: \"1.0\"\nIn validate():\n- Allow this key only on tpcds.\n- Value must be a string parseable as float in scales[].\n- Reject for every other benchmark, including tpch.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add requires_bundled_dsdgen_below to TPC-DS benchmark entry + validator",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "notes": "In prompts.js buildAgentPrompt:\n(a) After the install step, if\n    platformEntry.platform_option_hints OR\n    platformBEntry.platform_option_hints is non-empty,\n    emit a \"Likely required platform options for {label}:\"\n    bullet list. Show ONE list per selected platform.\n(b) Before the dry-run step, if benchmarkEntry has\n    requires_bundled_dsdgen_below AND\n    parseFloat(state.scale) < parseFloat(that),\n    emit a warning step pointing at _binaries/tpc-ds/.\nBoth rules are gated and emit nothing for the default DuckDB+\nTPC-H+0.01 case.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Render hints + dsdgen warning in buildAgentPrompt",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase3-platform-footgun-hints",
+        "notes": "tests/unit/landing/test_landing_quickstarts.py:\n- test_platform_option_hints_must_contain_flag_substring\n- test_platform_option_hints_only_applied_to_promptable_platforms\n- test_requires_bundled_dsdgen_below_validated_only_for_tpcds\n  (strictly tpcds-only; tpch must be rejected)\n- test_tpcds_sub_scale_emits_dsdgen_warning_in_payload (via\n  extending the dropdown-smoke matrix at line 368)\n- test_tpch_sub_scale_does_not_emit_dsdgen_warning\nRegenerate + run prompts-landing-check and the landing suite.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tests + regenerate",
+        "wid": "w5"
+      }
+    ]
+  }
+}

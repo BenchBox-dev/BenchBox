@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #259 of results-explorer-uat-multi-scale-corpus-sweep.\nDeferred: Throughput phase coverage\nReason deferred: This sweep runs `--phases load,power` only. Throughput adds a multiplicative wall-clock cost that the 10-minute cap cannot absorb at SF>=0.1. Consider after the load/power UAT lands and the explorer's throughput rendering is ready to be tested.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:14Z",
+      "worktree": "main"
+    }
+  }
+}

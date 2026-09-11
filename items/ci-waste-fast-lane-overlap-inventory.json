@@ -1,0 +1,169 @@
+{
+  "context": "Read the selector and retained Actions evidence for each lane. Record collected-selection fingerprints and attributable runner-minutes where durably available; otherwise record explicit nulls and classify overlap as unknown. Do not change markers or workflows.",
+  "description": "Third item in the CI-waste sequence. Measure how much CI time is the identical fast-marker selection repeated across pull_request, merge_group, develop-post-merge, and nightly, including nightly OS/Python cells.\n\nClassify identical selection, platform/version repetition, and unique work by runner-minute using the remesure snapshot. The predicted hit is nightly's multi-cell identical fast suite versus PR and post-merge make ci-test.\n\nThis item produces an inventory. It does not skip, shard, or demote any lane.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "confuse collected parametrized case count with novelty",
+        "instead": "fingerprint selection and weight by minutes",
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "why": "28k is collect count, not unique properties"
+      },
+      {
+        "dont": "treat overlap as authorization to skip a required lane",
+        "instead": "report identical vs unique runner-minutes only",
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "why": "skip/split is a later decision gate after this inventory"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "needs_item": "ci-waste-dev-loop-remeasure"
+      }
+    ],
+    "item_meta": {
+      "category": "CI",
+      "completed_at": "2026-09-01T00:00:41Z",
+      "completed_pr": 1988,
+      "created_at": "2026-08-27T23:11:41Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Fast-lane count ceiling and delta guard remain",
+        "item_id": "ci-waste-fast-lane-overlap-inventory"
+      },
+      {
+        "behavior": "No marker demotion or workflow skip in this item",
+        "item_id": "ci-waste-fast-lane-overlap-inventory"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "OS/Python matrix of the same fast marker",
+        "decision": "reuse",
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "path": ".github/workflows/nightly.yml"
+      },
+      {
+        "concept": "fast-lane count regime",
+        "decision": "reuse",
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "path": "docs/operations/fast-lane-budget.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "kind": "do_not_modify",
+        "path_glob": "pytest.ini"
+      },
+      {
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "for term in pull_request merge_group post-merge nightly; do rg -q \"$term\" _project/analysis/ci-waste-fast-lane-overlap*.md || exit 1; done",
+        "description": "inventory names every required CI surface",
+        "expected": "all four surfaces named",
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "last_result": "pass",
+        "last_run": "2026-09-01T00:00:39Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -z \"$(git diff --name-only origin/develop -- .github/workflows Makefile pytest.ini tests)\" && test -z \"$(git ls-files --others --exclude-standard -- .github/workflows Makefile pytest.ini tests)\"",
+        "description": "no tracked or untracked test or workflow files changed",
+        "expected": "empty",
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "last_result": "pass",
+        "last_run": "2026-09-01T00:00:39Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Pinned source inspection at bd888c28a: Makefile ci-test, pr.yml test, develop-post-merge fast-test, and nightly matrix all select fast and not (slow or stress or resource_heavy or live_integration); hashes recorded in the inventory.",
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "notes": null,
+        "started_at": "2026-08-31T19:12:10Z",
+        "started_branch": "docs/ci-waste-fast-lane-overlap-inventory",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-fast-lane-overlap-inventory",
+        "status": "done",
+        "summary": "Re-read the fast-marker expressions in Makefile ci-test, pr.yml code-test, develop-post-merge fast-test, and nightly test job matrix",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Live Actions evidence verified for 10 cells across runs 33407603525, 33409803494, 33395527790, 33398409495, and 33389517555; counts and step timestamps match. Node-ID hashes were unavailable, so no exact identity is claimed.",
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "notes": null,
+        "started_at": "2026-08-31T19:29:57Z",
+        "started_branch": "docs/ci-waste-fast-lane-overlap-inventory",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-fast-lane-overlap-inventory",
+        "status": "done",
+        "summary": "Fingerprint collected fast-lane selection per lane and OS/Python cell; classify identical vs unique work",
+        "wid": "w1"
+      },
+      {
+        "evidence": "_project/analysis/ci-waste-fast-lane-overlap-2026-08-31.md records PR median 98.73 runner-min, merge_group 83.07 runner-min, observed post-merge/nightly step durations, evidence limits, and no skip/split/demotion recommendation.",
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "notes": null,
+        "started_at": "2026-08-31T19:30:02Z",
+        "started_branch": "docs/ci-waste-fast-lane-overlap-inventory",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-fast-lane-overlap-inventory",
+        "status": "done",
+        "summary": "Weight the overlap by runner-minutes from the remeasure snapshot and write the inventory; do not recommend a skip in this item",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Durable manifest and live replay prove retained Actions data lacks collected node IDs and attributable fast-step runner-minutes. Report records nulls, classifies overlap unknown, and authorizes no skip/split/demotion.",
+        "item_id": "ci-waste-fast-lane-overlap-inventory",
+        "notes": null,
+        "started_at": "2026-08-31T19:44:38Z",
+        "started_branch": "docs/ci-waste-fast-lane-overlap-inventory",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-fast-lane-overlap-inventory",
+        "status": "done",
+        "summary": "Reconcile unrecoverable historical fingerprint and runner-minute gaps with explicit null evidence and an inconclusive no-change outcome",
+        "wid": "w3"
+      }
+    ]
+  }
+}

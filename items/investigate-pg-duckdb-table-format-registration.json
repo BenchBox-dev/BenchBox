@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #218 of open-table-format-gap-analysis.\nDeferred: Investigate pg_duckdb table format registration\nReason deferred: pg_duckdb supports delta/iceberg via DuckDB extensions but not registered",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:42Z",
+      "worktree": "main"
+    }
+  }
+}

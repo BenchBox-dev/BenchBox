@@ -1,0 +1,102 @@
+{
+  "description": "Documentation audit (2026-04-01) found that the two foundational design docs\nare severely outdated:\n\n1. `docs/design/architecture.md` describes a non-existent `.run()` method\n   and Template Method pattern. The actual execution model is lifecycle-based\n   via `ExecutionPhases` and `BenchmarkResults` models. Missing entirely:\n   `DataFrameContext`, `ExpressionFamilyAdapter`, `PandasFamilyAdapter`\n   classes and the whole DataFrame execution path.\n\n2. `docs/design/structure.md` completely omits `benchbox/core/` (30+\n   subsystems) and `benchbox/platforms/` (40+ database adapters). A user\n   reading this doc cannot understand the actual project organization.\n\nThese are the docs developers read FIRST when trying to understand the\ncodebase. Getting them wrong cascades into confusion everywhere.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-04-01T00:00:00Z",
+      "created_at": "2026-04-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "docs-rewrite-architecture-and-structure",
+        "kind": "only_modify",
+        "path_glob": "docs/design/architecture.md"
+      },
+      {
+        "item_id": "docs-rewrite-architecture-and-structure",
+        "kind": "only_modify",
+        "path_glob": "docs/design/structure.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'Template Method\\|\\.run()' docs/design/architecture.md || echo 'PASS: no stale pattern refs'",
+        "description": "No references to non-existent .run() Template Method pattern",
+        "expected": "PASS: no stale pattern refs",
+        "item_id": "docs-rewrite-architecture-and-structure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "for d in core platforms benchmarks cli; do grep -q \"benchbox/$d\" docs/design/structure.md && echo \"PASS: $d\" || echo \"FAIL: $d missing\"; done",
+        "description": "Key subsystems mentioned in structure.md",
+        "expected": "PASS for all four directories",
+        "item_id": "docs-rewrite-architecture-and-structure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'ExpressionFamilyAdapter\\|PandasFamilyAdapter' docs/design/architecture.md | xargs -I{} test {} -ge 2 && echo 'PASS: adapter families documented' || echo 'FAIL: adapter families missing'",
+        "description": "DataFrame adapter families documented in architecture.md",
+        "expected": "PASS: adapter families documented",
+        "item_id": "docs-rewrite-architecture-and-structure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "docs-rewrite-architecture-and-structure",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "docs-rewrite-architecture-and-structure",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "docs-rewrite-architecture-and-structure",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Map current execution model, key classes, and data flow",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-rewrite-architecture-and-structure",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rewrite architecture.md with current execution model",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-rewrite-architecture-and-structure",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rewrite structure.md with complete directory map",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "context": "Heuristic lint checks, not execution: e.g. a rung whose expected-text declares gating ('exits 1 on an unfixed tree') gets structural scrutiny; a source file in only_modify whose conventional test file exists on disk but is not in scope is a finding. Keep false-positive cost low: warn-level findings, and items whose work legitimately touches no tests stay createable.",
+  "description": "Successor of todo-lint-rung-falsifiability-and-scope-completeness (dropped 2026-07-31: its rung 2, `pytest tests/unit/scripts/test_todo_db_v2.py -q -k lint`, already passes on the unfixed tree - 6 existing lint tests pass - so it verified nothing about the coverage it claimed; a non-gating rung on the item that is about non-gating rungs). Premise (re-validated 2026-07-31): `todo lint` returns 0 findings on every currently open item, yet audit found gating defects in five of them: rungs green on the unfixed tree, prose-placeholder rungs, and only_modify sets omitting the test file the item's own work units promise. lint should (a) flag rungs whose EXPECTED text claims failure on the unfixed tree but whose semantics cannot gate (heuristics; running arbitrary rung commands at lint time is out of scope), and (b) flag only_modify sets that name a source file with an existing test file while omitting that test file. Depends on todo-lint-unrunnable-verification-commands-2: the falsifiability signal is vacuously satisfiable by a broken (unrunnable) rung, so brokenness rejection must land first.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "needs_item": "todo-lint-unrunnable-verification-commands-2"
+      }
+    ],
+    "item_meta": {
+      "category": "tooling",
+      "completed_at": "2026-08-01T00:48:45Z",
+      "completed_pr": 1385,
+      "created_at": "2026-07-31T23:33:56Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing lint findings keep firing unchanged",
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2"
+      },
+      {
+        "behavior": "Items whose work legitimately touches no tests are not made un-createable",
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_v2.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q -k 'falsifiability or scope_completeness'",
+        "description": "the new checks have dedicated tests",
+        "expected": "exits 5 on the unfixed tree (no tests collected = coverage absent, verified 2026-07-31); all pass once w3 lands. Test names must contain 'falsifiability' / 'scope_completeness'.",
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q -k lint",
+        "description": "existing lint suite still green",
+        "expected": "all pass before and after - regression guard, not a gate",
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_verification_lint.py -q -k falsifiability",
+        "description": "Current semantic lint rejects non-falsifiable verification commands",
+        "expected": "focused falsifiability tests pass",
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated pre-fix: lint returned 0 findings for a pass-only ladder and for only_modify omitting an existing test file (both reproduced in unit fixtures)",
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "notes": null,
+        "started_at": "2026-08-01T00:14:30Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-lint-falsifiability",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Re-validate that lint still returns 0 findings for a non-gating rung and an incomplete scope",
+        "wid": "w0"
+      },
+      {
+        "evidence": "_has_falsifiable_rung: at least one runnable rung must declare unfixed-tree failure in expected text; flake/validation categories exempt; per-database opt-in (lint.require_falsifiable_rung, ON in the shared DB). Hosted backlog: 137 genuine findings, my audited item set stays at 0",
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "notes": null,
+        "started_at": "2026-08-01T00:14:33Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-lint-falsifiability",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Flag a verification rung that cannot gate (structure/expected-text heuristics)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "_missing_scope_test_files: conventional family tests/unit/<subpath>/test_<stem>*.py; flags only when members EXIST and none is scope-covered; opt-in via lint.require_scope_test_files (ON in shared DB)",
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "notes": null,
+        "started_at": "2026-08-01T00:14:35Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-lint-falsifiability",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Warn when only_modify names a source file but omits its existing test file",
+        "wid": "w2"
+      },
+      {
+        "evidence": "TestLintFalsifiabilityAndScopeCompleteness: pass-only flagged, gating accepted, BROKEN RUNG DOES NOT VACUOUSLY SATISFY (placeholder rung with gating language still flagged), flake exempt, omitted-test flagged, covering-glob ok, no-existing-test ok; 177 passed across todo_db suites",
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness-2",
+        "notes": null,
+        "started_at": "2026-08-01T00:14:38Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-lint-falsifiability",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Tests for both checks, including that a broken/unrunnable rung does not vacuously satisfy w1",
+        "wid": "w3"
+      }
+    ]
+  }
+}

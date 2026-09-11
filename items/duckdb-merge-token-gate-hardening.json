@@ -1,0 +1,221 @@
+{
+  "context": "Harden the single gate function, then reconcile its metadata and registry.\nPrefer a small comment/literal stripper + regex over a full SQL parser\n(no parser dependency on this hot path). For the registry, pick one source of\ntruth: the runtime already reads the dicts directly, so either wire the\nregistry to the same derivation or drop the register loop entirely - do not\nleave two mechanisms that can diverge. Apply the same decision symmetrically\nto the postgres rule.\n",
+  "description": "SCD2 adversarial audit findings N6 and N7.\n\nN6 - benchbox/sql_compat/rules/execution_filter/duckdb_write_primitives.py:\n40-42 tests \"MERGE INTO\" in write_sql.upper(). Verified (scratchpad repro3.py)\nfalse positives and false negatives, both real against DuckDB 1.3.2:\n  - false positive: token only in a comment ('-- ... MERGE INTO ...') -> gate\n    skips an op DuckDB would run fine.\n  - false positive: token only in a string literal ('MERGE INTO staging')\n    -> same.\n  - false negatives: 'MERGE  INTO' (two spaces), 'MERGE\\nINTO', and MERGE\n    reached via a CTE -> gate does NOT skip, and DuckDB 1.3.2 raises\n    ParserException on all three (confirmed).\nNo live instance today (all 21 catalog ops with the token use the exact\nsingle-space form), so this is a regression trap for the next MERGE op added:\nit would run and hard-error instead of skipping cleanly. The gate also reads\noperation.write_sql (benchmark.py:422) and runs BEFORE platform_overrides\nresolution (benchmark.py:428-432), so it does not see the effective SQL.\n\nN7 - the gate's own metadata is wrong and its REGISTRY is write-only:\n  - duckdb_write_primitives.py:10-19 says \"20 legacy MERGE INTO ops\"; the\n    actual count of catalog ops whose write_sql contains MERGE INTO is 21 (the\n    20 merge-category ops + bulk_load_upsert_mode).\n  - :27 says DUCKDB_WRITE_PRIMITIVES_OPERATION_SKIPS holds \"gaps that cannot be\n    detected from the write_sql token\", but its only entry\n    (bulk_load_upsert_mode) IS token-detectable (verified), so that entry and\n    the operation_id lookup at :43-45 are dead code.\n  - the REGISTRY.register loop at :49-66 registers 1 duckdb execution-filter\n    rule while the runtime skips 21. Nothing resolves Phase.EXECUTION_FILTER:\n    benchmark.py:42-45 imports the dicts directly, so the registry is\n    decorative today - but a future consumer (coverage matrix, compat report)\n    would get a wrong DuckDB answer. postgres_write_primitives.py:97-114 has\n    the same write-only-registry shape.\n  - tests/integration/test_write_primitives_duckdb.py:515 repeats the\n    \"112 - 20 failing MERGE INTO\" arithmetic.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "leave both a decorative registry and direct dict imports",
+        "instead": "collapse to one source of truth.",
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "why": "they can silently disagree (1 vs 21)"
+      },
+      {
+        "dont": "pull in a SQL parser for the gate",
+        "instead": "use a targeted comment/literal-stripped regex.",
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "why": "it is on the per-op resolution path"
+      },
+      {
+        "dont": "widen the gate to the whole merge category",
+        "instead": "gate on the MERGE INTO token only.",
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "why": "portable SCD2 ops are merge-category and must keep running on DuckDB"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "needs_item": "write-primitives-sql-override-skip-order"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-11T00:00:00Z",
+      "created_at": "2026-07-10T00:00:00Z",
+      "worktree": "scd2-audit-followup"
+    },
+    "preserves": [
+      {
+        "behavior": "All 21 genuine MERGE INTO ops continue to skip cleanly on DuckDB.",
+        "item_id": "duckdb-merge-token-gate-hardening"
+      },
+      {
+        "behavior": "All 3 portable SCD2 ops (UPDATE+INSERT) continue to RUN on DuckDB (not skipped).",
+        "item_id": "duckdb-merge-token-gate-hardening"
+      },
+      {
+        "behavior": "bulk_load_upsert_mode still skips on DuckDB (whether via token or an explicit rule).",
+        "item_id": "duckdb-merge-token-gate-hardening"
+      },
+      {
+        "behavior": "postgres_write_primitives skip behavior is unchanged for the SCD2 and merge ops.",
+        "item_id": "duckdb-merge-token-gate-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/write_primitives/benchmark.py:421-424 the token-gate call site (before platform_overrides resolution)",
+        "decision": "reuse",
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "path": "benchbox/core/write_primitives/benchmark.py:421-424"
+      },
+      {
+        "concept": "benchbox/sql_compat/context.py:17 Phase.EXECUTION_FILTER - resolved by nothing today",
+        "decision": "reuse",
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "path": "benchbox/sql_compat/context.py:17"
+      },
+      {
+        "concept": "benchbox/sql_compat/rules/execution_filter/duckdb_write_primitives.py:33-46 the token gate function - harden",
+        "decision": "reuse",
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "path": "benchbox/sql_compat/rules/execution_filter/duckdb_write_primitives.py:33-46"
+      },
+      {
+        "concept": "benchbox/sql_compat/rules/execution_filter/duckdb_write_primitives.py:49-66 write-only REGISTRY.register loop - decide populate vs delete",
+        "decision": "reuse",
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "path": "benchbox/sql_compat/rules/execution_filter/duckdb_write_primitives.py:49-66"
+      },
+      {
+        "concept": "benchbox/sql_compat/rules/execution_filter/postgres_write_primitives.py:97-114 same write-only-registry shape - reconcile consistently",
+        "decision": "reuse",
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "path": "benchbox/sql_compat/rules/execution_filter/postgres_write_primitives.py:97-114"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/rules/execution_filter/duckdb_write_primitives.py"
+      },
+      {
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/rules/execution_filter/postgres_write_primitives.py"
+      },
+      {
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_write_primitives_duckdb.py"
+      },
+      {
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/sql_compat"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -k scd2 -n 0 -q",
+        "description": "SCD2 ops still run (not skipped) on DuckDB; all MERGE INTO ops still skip.",
+        "expected": "all pass",
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/sql_compat -n 0 -q -k merge_token_gate",
+        "description": "New gate unit test covers comment/literal false positives and whitespace/CTE false negatives.",
+        "expected": "new test passes",
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "notes": "Strip line comments (--...), block comments (/*...*/), and single-quoted\nstring literals before matching, then apply re.search(r'\\bMERGE\\s+INTO\\b').\nCover the exact cases in scratchpad repro3.py ATTACK 6.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace substring test with a whitespace-tolerant regex over comment- and string-literal-stripped SQL (MERGE\\s+INTO).",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "notes": "Requires moving the gate call after override resolution in\nbenchmark.py:428-432, or passing the resolved SQL into the gate. Keep the\nchange minimal and covered by a test with a duckdb override. This edits the\nSAME _get_effective_write_sql control flow as\nwrite-primitives-sql-override-skip-order; land AFTER that TODO (see\ndeps.needs) and rebase on its reordering to avoid a benchmark.py conflict.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Evaluate the gate against the effective SQL (after platform_overrides), not operation.write_sql, so an override that swaps MERGE in/out is gated correctly.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix stale comments: :10-19 '20' -> 21 (incl bulk_load_upsert_mode); remove/justify the dead OPERATION_SKIPS entry + :43-45 lookup.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "notes": "Pick ONE source of truth. The runtime reads the dicts directly, so either\nwire the registry to the same derivation or drop the register loop entirely\nin both duckdb_write_primitives.py and postgres_write_primitives.py.\nDocument the choice so no future consumer re-diverges (1 rule vs 21 skips).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reconcile the write-only REGISTRY: populate token-derived skips or delete the decorative register loop (duckdb + postgres).",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-merge-token-gate-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Correct the arithmetic comment at tests/integration/test_write_primitives_duckdb.py:515.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

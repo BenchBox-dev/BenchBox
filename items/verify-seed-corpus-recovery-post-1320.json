@@ -1,0 +1,60 @@
+{
+  "description": "PR #1320 fixed seed-corpus.yml failing to start on every push (12+ consecutive startup failures with empty job lists). No develop-triggered run has executed since the fix merged; the only post-fix failures are from stale feature branches carrying the old workflow file. Confirm the next corpus-relevant develop push produces a green seed-corpus run; if it fails again, escalate with the run log. Discovered 2026-07-28 during agent-instruction remediation close-out.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-29T11:45:50Z",
+        "from_item": "verify-seed-corpus-recovery-post-1320",
+        "id": 656,
+        "reason": "Rung 1 is broken twice over. (a) Malformed: 'gh run list --jq -e EXPR' is invalid gh syntax - -e is consumed as the jq expression and gh exits with usage help, so the rung fails regardless of CI state. (b) Unsatisfiable: seed-corpus.yml is workflow_dispatch-only. The pre-fix red runs were phantom startup failures GitHub recorded when validating the file on push; once the file became valid those stopped, so no automatic develop run will ever exist again and 'latest develop run == success' can never be true. Recovery was instead proven by controlled comparison: push b466c4d7 (19:07:49Z) produced seed-corpus failure 19:07:46Z, whereas the 5 develop pushes at/after the fix 23f6e89a (23:23:33Z) produced zero seed-corpus runs. A correct rung asserts the ABSENCE of startup failures since the fix, or checks a manually dispatched run.",
+        "resolution": "promoted",
+        "resolved_item": "dispatch-seed-corpus-to-prove-it-runs-green",
+        "resolved_reason": null,
+        "summary": "Replace the unsatisfiable seed-corpus recovery rung"
+      }
+    ],
+    "item_meta": {
+      "completed_at": "2026-07-29T11:47:07Z",
+      "created_at": "2026-07-29T11:40:26Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No workflow changes unless the run fails again",
+        "item_id": "verify-seed-corpus-recovery-post-1320"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "verify-seed-corpus-recovery-post-1320",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/seed-corpus.yml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "sh -c 'gh run list --repo joeharris76/BenchBox --workflow seed-corpus.yml --branch develop --limit 1 --json conclusion --jq -e \".[0].conclusion == \\\"success\\\"\" >/dev/null'",
+        "description": "latest develop seed-corpus run succeeded",
+        "expected": "first post-fix develop run is green",
+        "item_id": "verify-seed-corpus-recovery-post-1320",
+        "last_result": "fail",
+        "last_run": "2026-07-29T11:45:02Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Controlled comparison of push events either side of the fix. Pre-fix: every seed-corpus run is event=push, conclusion=failure, jobs=[] (phantom startup failure); 12/12 sampled, one-to-one with pushes - e.g. develop push b466c4d7 at 2026-07-28T19:07:49Z produced seed-corpus run 30390584901 at 19:07:46Z with zero jobs. Fix 23f6e89a (PR #1320) merged 2026-07-28T23:23:30Z. Post-fix: 5 pushes to develop (23f6e89a 23:23:33Z, 30dcc8a6 23:34:21Z, ba5b8c42 23:45:04Z, 2d134cd3 00:36:30Z, 06484de9 00:50:53Z, all confirmed via push-triggered 'Develop post-merge' runs) produced ZERO seed-corpus runs; last seed-corpus run of any kind remains 2026-07-28T23:11:46Z, before the fix. Zero runs is the correct state for a workflow_dispatch-only workflow. No workflow change made - the item's must-preserve forbids changes unless the run failed again, and it did not.",
+        "item_id": "verify-seed-corpus-recovery-post-1320",
+        "notes": null,
+        "started_at": "2026-07-29T11:45:00Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Check the first develop-triggered seed-corpus run after 2026-07-29; record run id and conclusion",
+        "wid": "w1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,267 @@
+{
+  "context": "Add scripts/pr_refresh_replay.py and deterministic fixtures. Use GitHub run/check metadata and Git objects as read-only inputs, store a bounded durable report under _project/audits, and separate observed facts from estimates. Report Develop PR and whole-event runner-minutes, required-gate wall time, all-workflow wall time, eligibility hit rate, fallback reasons, and full-only failures. Absence of failures is evidence, not proof.",
+  "description": "Build a reproducible historical replay and adversarial evidence set for the shadow classifier. Cover every explicit branch refresh since strict activation, a longer pre-activation synchronize window where evidence is available, all full-CI failures on refresh-like heads, and synthetic negative controls. Measure whether the proposed shadow eligibility decision would have hidden a lint, fast-test, medium-test, correctness, plan-capture, browser, ruleset-drift, or other synchronize-workflow failure. This TODO cannot activate skipping.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Commit unbounded GitHub payloads",
+        "instead": "normalize minimal deterministic fixtures",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "why": "they may contain unstable or sensitive data"
+      },
+      {
+        "dont": "Discard classifier fallbacks from the denominator",
+        "instead": "publish hit rate and every fallback reason",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "why": "a classifier that always returns full has no value"
+      },
+      {
+        "dont": "Report pr.yml savings as total synchronize savings",
+        "instead": "report both scoped and all-event measures",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "why": "Documentation and other workflows also run"
+      },
+      {
+        "dont": "Treat ten green shadow runs as skip-safety proof",
+        "instead": "replay actual full-lane failures and targeted semantic counterexamples",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "why": "shadow parity does not exercise failures in skipped lanes"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "needs_item": "strict-base-refresh-02-shadow-certification-workflows"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-14T18:07:45Z",
+      "completed_pr": 1739,
+      "created_at": "2026-08-14T12:13:16Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "No sample-size threshold alone authorizes activation",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls"
+      },
+      {
+        "behavior": "Raw tokens, full API payloads, and contributor-controlled text are not committed",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls"
+      },
+      {
+        "behavior": "Replay is read-only against GitHub and does not rerun, cancel, or alter hosted workflows",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls"
+      },
+      {
+        "behavior": "Required-gate latency and all-workflow resource usage are reported separately",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "GitHub PR and run measurement conventions",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "path": "_project/scripts/dev_loop_pr_metrics.py"
+      },
+      {
+        "concept": "missing-run and post-merge evidence caveats",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "path": "docs/operations/develop-post-merge-gaps.md"
+      },
+      {
+        "concept": "typed eligibility and reason codes",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "path": "scripts/pr_refresh_certification.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/strict-base-refresh-replay-*.md"
+      },
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "kind": "only_modify",
+        "path_glob": "scripts/pr_refresh_replay.py"
+      },
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/ci/pr-refresh-replay/**"
+      },
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_pr_refresh_replay.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_pr_refresh_replay.py -q",
+        "description": "Replay unit and fixture suite passes",
+        "expected": "all tests pass",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "last_result": "pass",
+        "last_run": "2026-08-14T18:07:33Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'eligible|fallback|full-only|semantic|required-gate|all-workflow|runner-minute|cancelled|confidence|limitation' _project/audits/strict-base-refresh-replay-*.md",
+        "description": "Replay report includes required coverage and separate metrics",
+        "expected": "All evidence sections are present",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "last_result": "pass",
+        "last_run": "2026-08-14T18:07:35Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/pr_refresh_replay.py --fixtures tests/fixtures/ci/pr-refresh-replay --check-completeness",
+        "description": "Every recorded refresh has a decision and full-lane outcome record",
+        "expected": "exit 0 with zero unclassified records",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "last_result": "pass",
+        "last_run": "2026-08-14T18:07:37Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo lint strict-base-refresh-03-historical-replay-and-negative-controls",
+        "description": "This TODO passes tracker quality lint",
+        "expected": "0 findings",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "last_result": "pass",
+        "last_run": "2026-08-14T18:07:42Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "replay fixtures + audit 2026-08-14; pytest and --check-completeness green",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "notes": "Include Documentation, Results Explorer, ruleset drift, auto-merge revocation, and any path-filtered workflows, not only pr.yml.",
+        "started_at": "2026-08-14T18:03:57Z",
+        "started_branch": "fix/strict-base-refresh-03-replay",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-03",
+        "status": "done",
+        "summary": "Inventory refresh and synchronize runs, required-context changes, and all workflows sharing the event over the chosen window",
+        "wid": "w0"
+      },
+      {
+        "evidence": "replay fixtures + audit 2026-08-14; pytest and --check-completeness green",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "notes": "Cache only redacted fixture data committed for tests; live API dumps and tokens must not enter Git.",
+        "started_at": "2026-08-14T18:05:58Z",
+        "started_branch": "fix/strict-base-refresh-03-replay",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-03",
+        "status": "done",
+        "summary": "Implement deterministic replay ingestion and normalization for PR heads, bases, run attempts, jobs, conclusions, and timings",
+        "wid": "w1"
+      },
+      {
+        "evidence": "replay fixtures + audit 2026-08-14; pytest and --check-completeness green",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "notes": "A fast-eligible refresh with a failed lane that would be waived is a blocking counterexample until understood.",
+        "started_at": "2026-08-14T18:06:04Z",
+        "started_branch": "fix/strict-base-refresh-03-replay",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-03",
+        "status": "done",
+        "summary": "Replay every eligible-looking refresh against actual full-lane outcomes and identify full-only failures",
+        "wid": "w2"
+      },
+      {
+        "evidence": "replay fixtures + audit 2026-08-14; pytest and --check-completeness green",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "notes": "Include a runtime cross-module incompatibility that lint does not catch; it must remain an explicit residual risk or force full CI.",
+        "started_at": "2026-08-14T18:06:10Z",
+        "started_branch": "fix/strict-base-refresh-03-replay",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-03",
+        "status": "done",
+        "summary": "Add semantic, metadata, merge-driver, chained-refresh, fork, race, self-change, and malformed-evidence negative controls",
+        "wid": "w3"
+      },
+      {
+        "evidence": "replay fixtures + audit 2026-08-14; pytest and --check-completeness green",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "notes": "Separate merge-unblock latency from non-required workflow completion. Label cancelled-run sums and incomplete history.",
+        "started_at": "2026-08-14T18:06:15Z",
+        "started_branch": "fix/strict-base-refresh-03-replay",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-03",
+        "status": "done",
+        "summary": "Calculate eligibility yield, reason distribution, latency, runner-minutes, and confidence limits for both pr.yml and whole-event fan-out",
+        "wid": "w4"
+      },
+      {
+        "evidence": "replay fixtures + audit 2026-08-14; pytest and --check-completeness green",
+        "item_id": "strict-base-refresh-03-historical-replay-and-negative-controls",
+        "notes": "The report must list every counterexample, missing-data class, and unsupported claim; zero observed failures must not be called proof.",
+        "started_at": "2026-08-14T18:06:22Z",
+        "started_branch": "fix/strict-base-refresh-03-replay",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-03",
+        "status": "done",
+        "summary": "Publish the replay report and run adversarial review against the activation criteria",
+        "wid": "w5"
+      }
+    ]
+  }
+}

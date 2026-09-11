@@ -1,0 +1,402 @@
+{
+  "context": "Build the work in vertical slices following SHARED/slicing-framework.md:\n  Slice 1 (w1+w2):  schema + types — verify CREATE TABLE works per engine\n  Slice 2 (w3):     validation contract extension — verify loader accepts new shape\n  Slice 3 (w4):     8 ops added — verify each runs end-to-end on duckdb\n  Slice 4 (w5+w6):  empirical tolerances + tests — verify ★ headline\n                    tests catch synthetic regressions\n  Slice 5 (w7+w8+w9): docs + blind-spot promotion + changelog\n\nFor per-engine SQL divergence use existing platform_overrides pattern\n(operations.yaml is full of these). Don't introduce a new variant\nmechanism. Match the verbosity of existing ops — terse `description:`\nfield, multi-statement `write_sql:` blocks where useful.\n\nFor the BINARY column type, prefer extending the existing dialect-\ntranslation pipeline over adding a one-off sketch-column path —\nBINARY is generally useful and other future workflows will benefit.\n\nThe three ★ headline tests are the ones that validate the \"merge in\nmilliseconds\" claim. Their validation contracts must be comparison-\nready: same query semantics as the corresponding read_primitives exact\nquery (aggregation_distinct, statistical_percentiles), so users can\ncross-reference latency numbers.\n",
+  "description": "Adds a new `sketch` category to `write_primitives` that exercises the\n*persistence and merge* half of the modern approximate-analytics story:\nbuilding Apache DataSketches sketches in one query, persisting them as\na binary column, then merging and re-querying them in a later query.\n\nThis is the differentiated capability that vendors (Databricks, Snowflake\nvia DATASKETCHES_*, BigQuery via KLL_QUANTILES.* / HLL_COUNT.*, Spark)\ncompete on — \"store sketches as columns, merge across time/partition,\nrequery in milliseconds\". The DataSketches binary format is genuinely\ncross-engine portable across Databricks / Snowflake / BigQuery / Spark\n(all built on the DataSketches C++/Java/WASM core), so this is a real\ncross-vendor benchmark, not a Databricks-only test.\n\nThis TODO is the *resolution* of the framework gap captured in the\nblind-spot finding 2026-05-02-084332: `read_primitives` cannot test\ncross-query sketch persistence because it runs queries in isolation;\n`write_primitives` already has the structural primitives (write phase,\nvalidation read phase, staging-table schema, platform_overrides) needed\nto test the persist/merge/requery loop end-to-end.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add ClickHouse-native (-State/-Merge) variants in the first pass",
+        "instead": "explicitly deferred.",
+        "item_id": "write-primitives-sketch-persistence-category",
+        "why": "they use a different binary format and would dilute focus from the cross-engine DataSketches portability claim"
+      },
+      {
+        "dont": "advertise this benchmark as testing approximation accuracy",
+        "instead": "call this out in the docs.",
+        "item_id": "write-primitives-sketch-persistence-category",
+        "why": "it tests latency under approximate semantics, not error magnitude"
+      },
+      {
+        "dont": "chase exact-value validation on approximate sketch reads",
+        "instead": "use the new tolerance-based expected_value_min/max.",
+        "item_id": "write-primitives-sketch-persistence-category",
+        "why": "sketches are non-deterministic across engines and runs"
+      },
+      {
+        "dont": "expand the blind-spot finding to other vendor announcement types in this TODO",
+        "instead": "captured as the third deferred item.",
+        "item_id": "write-primitives-sketch-persistence-category",
+        "why": "that scope creep belongs in a separate process/review-skill update"
+      },
+      {
+        "dont": "make sketch ops depend on each other across operations.yaml entries",
+        "instead": "keep each op fully self-contained (create table, populate sketches, query, drop).",
+        "item_id": "write-primitives-sketch-persistence-category",
+        "why": "the benchmark runner treats each op as independent and idempotent"
+      },
+      {
+        "dont": "mix sketch columns into existing staging tables (INSERT_OPS_*, etc.)",
+        "instead": "add dedicated SKETCH_OPS_* tables.",
+        "item_id": "write-primitives-sketch-persistence-category",
+        "why": "that risks regressing the 113 existing ops via type-system surprises"
+      },
+      {
+        "dont": "promote the blind-spot to `actioned` (closed)",
+        "instead": "promote to `merged-to-todo` linked to this slug.",
+        "item_id": "write-primitives-sketch-persistence-category",
+        "why": "the framework gap is partially mitigated, not eliminated; future evaluations of similar persistence-flavored announcements (vector indexes, materialized aggregates) still need the same execution-model-fit check"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "write-primitives-sketch-persistence-category",
+        "id": 561,
+        "reason": "ClickHouse uses its own serialization (uniqState / quantileTDigestState / topKState) that is not binary-compatible with DataSketches. Adding ClickHouse-native variants is valuable but is a scope expansion that should land as a follow-up TODO once the DataSketches-portable core works.",
+        "resolution": "promoted",
+        "resolved_item": "clickhouse-native-sketch-variants-using-state-merge-combinat",
+        "resolved_reason": null,
+        "summary": "ClickHouse-native sketch variants using -State / -Merge combinators"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "write-primitives-sketch-persistence-category",
+        "id": 562,
+        "reason": "Genuinely interesting but requires two-engine orchestration that BenchBox doesn't have today. Out of scope for first cut.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Cross-engine sketch portability testing requires two-engine orchestration infrastructure BenchBox doesn't have; explicitly out of scope for first cut.",
+        "summary": "Cross-engine sketch portability test (write on engine A, query on engine B)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "write-primitives-sketch-persistence-category",
+        "id": 563,
+        "reason": "Databricks-native + Snowflake DataSketches UDAFs only. Same portability calculus as the read_primitives Tuple deferral.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Tuple sketch ops are Databricks/Snowflake-UDAF-only; the deferral's own 'same portability calculus' reasoning argues against adding vendor-locked, low-portability ops with no cross-platform benchmark value or committed demand. sketch category deliberately covers theta/hll/kll/topk/cpc/req only.",
+        "summary": "Tuple sketch ops (distinct + metric)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "write-primitives-sketch-persistence-category",
+        "id": 564,
+        "reason": "Captured as the third bullet in the blind-spot finding's suggested next steps. This is a process/review-skill update, not a benchmark code change. Should be raised as a separate TODO if pursued.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicitly framed as optional future work to be raised as a separate TODO only if pursued; no commitment made, not currently tracked.",
+        "summary": "Audit other vendor announcements for the same single-query-vs-persistent-artifact mismatch"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "needs_item": "read-primitives-approximate-aggregate-queries"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-05-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All 113 existing write_primitives operations execute identically — no behavior changes to insert/update/delete/bulk_load/merge/ddl/transaction categories.",
+        "item_id": "write-primitives-sketch-persistence-category"
+      },
+      {
+        "behavior": "Catalog loader continues to accept all existing validation_query shapes (expected_rows, expected_rows_min/max, column counts).",
+        "item_id": "write-primitives-sketch-persistence-category"
+      },
+      {
+        "behavior": "Existing STAGING_TABLES exports (INSERT_OPS_*, UPDATE_OPS_*, DELETE_OPS_*, MERGE_OPS_*) remain unchanged in shape.",
+        "item_id": "write-primitives-sketch-persistence-category"
+      },
+      {
+        "behavior": "Existing platform_overrides skip patterns (DataFusion DML skips, Starrocks skips) continue to work.",
+        "item_id": "write-primitives-sketch-persistence-category"
+      },
+      {
+        "behavior": "Per-op cleanup_sql still runs after each op — sketch ops MUST clean up their persistent tables to keep the benchmark idempotent.",
+        "item_id": "write-primitives-sketch-persistence-category"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/dataframe_operations.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/generator.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/operations.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-05-02-084332-read-primitives-cant-test-sketch-persistence.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/README.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/schema.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/write-primitives-sketch-functions.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/write_primitives/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/write_primitives -q",
+        "description": "All write_primitives unit tests pass with new ops + validation contract",
+        "expected": "all tests pass, including new sketch op coverage",
+        "item_id": "write-primitives-sketch-persistence-category",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/write_primitives/test_catalog_loader.py -q",
+        "description": "Catalog loader rejects malformed expected_value_min/max",
+        "expected": "loader-validation tests pass; bad min/max combos surfaced as schema errors",
+        "item_id": "write-primitives-sketch-persistence-category",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --help-topic benchmarks | grep -i sketch",
+        "description": "Help-topic surfaces the new sketch-functions docs",
+        "expected": "output references write-primitives-sketch-functions.md or equivalent guidance",
+        "item_id": "write-primitives-sketch-persistence-category",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark write_primitives --scale 0.01 --queries sketch_query_theta_union_merge,sketch_query_kll_quantiles_merge,sketch_query_topk_combine",
+        "description": "DuckDB executes the three headline sketch merge operations",
+        "expected": "all three explicit operations complete within configured tolerances",
+        "item_id": "write-primitives-sketch-persistence-category",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/write_primitives/test_doc_yaml_consistency.py tests/unit/core/write_primitives/test_catalog_loader.py -q",
+        "description": "Promoted sketch finding remains represented by current tests and documentation",
+        "expected": "focused catalog and documentation tests pass",
+        "item_id": "write-primitives-sketch-persistence-category",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "write-primitives-sketch-persistence-category",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-persistence-category",
+        "notes": "`benchbox/core/write_primitives/schema.py` does not currently use\nBINARY/VARBINARY columns. Add type-mapping support in the DDL\ntranslation layer:\n  - Databricks: `BINARY`\n  - Snowflake: `BINARY`\n  - BigQuery: `BYTES`\n  - DuckDB: `BLOB` (where datasketches extension loaded)\n  - Redshift: `HLLSKETCH` for HLL family only; skip elsewhere\nUse the existing platform-override pattern. Verify the translation\ncovers CREATE TABLE and INSERT...SELECT.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add BINARY column type and per-engine type aliasing in dialect translation",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-persistence-category",
+        "notes": "Two new staging tables, dedicated to sketch ops to avoid mixing\nsketch columns into existing staging tables:\n  - `sketch_ops_daily_users` (activity_date DATE, region VARCHAR(25),\n    user_sketch BINARY, rev_sketch BINARY)\n  - `sketch_ops_topk` (shard_id INTEGER, topk_sketch BINARY)\nWire into TABLES export and `get_all_staging_tables_sql`. Update\nthe data generator if any seed data is required (likely none —\nsketches are populated by the benchmark INSERT...SELECT itself).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add SKETCH_OPS_* staging tables in schema.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-persistence-category",
+        "notes": "Today validation queries assert `expected_rows`,\n`expected_rows_min/max`, or column counts. Sketch read queries\nreturn approximate scalar estimates that need tolerance-based\nvalidation. Add `expected_value_min` / `expected_value_max` fields\nto the validation_query schema in\n`benchbox/core/write_primitives/catalog/loader.py`. Keep semantics\nnarrow: a single numeric value from the first row's first column\nmust fall in [min, max]. Don't silently accept the field on\nops that have no corresponding scalar; validate at load time.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend validation contract with expected_value_min/max for approximate scalars",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-persistence-category",
+        "notes": "In `benchbox/core/write_primitives/catalog/operations.yaml` add\n`category: sketch` with these ops:\n  - sketch_ddl_create_persistent_table  (DDL with BINARY columns)\n  - sketch_insert_theta_per_partition   (theta_sketch_agg, GROUP BY date)\n  - sketch_insert_kll_per_partition     (kll_sketch_agg over l_extendedprice)\n  - sketch_insert_topk_per_shard        (approx_top_k_accumulate)\n  - sketch_query_theta_union_merge      ★ HEADLINE TEST — theta_union_agg + estimate vs aggregation_distinct\n  - sketch_query_kll_quantiles_merge    ★ HEADLINE TEST — kll merge + get_quantile vs statistical_percentiles\n  - sketch_query_topk_combine           ★ HEADLINE TEST — approx_top_k_combine + estimate\n  - sketch_drop_persistent_table        (cleanup)\nEach op declares platform_overrides for Databricks/Snowflake/\nBigQuery first-class, with `null` skips for ClickHouse / DataFusion /\nRedshift (except HLL-only Redshift cover if w1 added it). Use\ntolerance-based expected_value_min/max for the ★ headline tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 8 sketch operations to operations.yaml",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-persistence-category",
+        "notes": "Run the new sketch ops on duckdb (with extension if loaded), and\nwhere credentials available on databricks / snowflake / bigquery.\nFor each ★ headline test, observe the cross-run distribution of the\napproximate scalar at SF=0.01 and SF=0.1, then set\nexpected_value_min/max wide enough to never false-fail but tight\nenough to catch a real regression (e.g., a sketch becoming a no-op).\nDocument chosen tolerances in inline YAML comments referencing the\nobservation runs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Empirically tune validation tolerances against real engines",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-persistence-category",
+        "notes": "`uv run -- python -m pytest tests/unit/write_primitives -q -m fast`\nmust pass. Catalog loader must accept the new validation kind and\nreject malformed expected_value_min/max combinations. New BINARY\ncolumn type translates correctly per engine. Verify cleanup_sql\nDROP works on every supported engine.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run write_primitives unit tests and operation contract checks",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-persistence-category",
+        "notes": "Capture the cross-platform sketch-storage table in user-facing docs:\n  - Add `docs/benchmarks/write-primitives-sketch-functions.md` with:\n    * Sketch family × engine support matrix (Theta / KLL / Top-K /\n      Tuple rows × Databricks / Snowflake / BigQuery / DuckDB /\n      ClickHouse / Redshift / DataFusion columns)\n    * Per-engine column-type mapping (BINARY / BYTES / HLLSKETCH /\n      BLOB / AggregateFunction)\n    * DataSketches binary portability statement (which 4 engines\n      share format)\n    * Explicit \"headline test\" callouts on the three ★ ops so users\n      know which numbers to compare to read_primitives baselines\n    * Why ClickHouse and Redshift have narrower coverage (separate\n      algorithmic models, not engine deficiency)\n  - Add the same table to the `write_primitives/README.md` under a\n    new \"Sketch persistence operations\" section.\n  - Reference it from `benchbox run --help-topic benchmarks`.\n  - Cross-link to the companion `read_primitives` approximate-\n    functions doc.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write cross-platform sketch documentation in benchmark help-topic and README",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-persistence-category",
+        "notes": "Run:\n`uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py triage 2026-05-02-084332-read-primitives-cant-test-sketch-persistence --action promote --todo-id write-primitives-sketch-persistence-category`\nThis sets the blind-spot status to merged-to-todo and links it to\nthis TODO. Note the read_primitives companion TODO is also a\ncontributing resolver (it scopes out persistence on the read side);\nreference it in the triage log entry that gets appended to the\nblind-spot file.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Promote blind-spot finding 2026-05-02-084332 to merged-to-todo",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-persistence-category",
+        "notes": "Terse user-facing bullet:\n\"write_primitives: add `sketch` category exercising DataSketches\nTheta / KLL / Top-K persist + merge + requery on Databricks,\nSnowflake, BigQuery.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add changelog entry under unreleased",
+        "wid": "w9"
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "description": "The current CLI handling of `--tuning` argument uses implicit logic that can confuse users.\nWhen users specify `--tuning tuned`, the system silently attempts to load a template from\n`examples/tunings/{platform}/{benchmark}_tuned.yaml`. If not found, it falls back to basic\nconstraints without warning. Users have no visibility into which tuning file was loaded\nor what settings are being applied.\n\nKey issues identified:\n1. Silent template loading - users don't know what template is used\n2. Implicit fallback chain - silent fallback to basic config if template missing\n3. No discovery mechanism - users must manually find tuning files\n4. Path resolution ambiguity - custom paths resolved from cwd only\n5. Error messaging - invalid path treated same as invalid keyword\n6. \"auto\" mode unclear - documentation doesn't explain how it differs from \"tuned\"\n\nThis TODO addresses making tuning file resolution explicit and transparent so users\nalways know exactly what tuning configuration is being applied and where it came from.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-16T00:00:00Z",
+      "created_at": "2026-01-16T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

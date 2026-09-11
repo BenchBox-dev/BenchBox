@@ -1,0 +1,144 @@
+{
+  "context": "Use `benchbox run` directly to generate all seed results. The seed workflow is\na consumer of the existing CLI, not a new code path. Focus on depth per\nbenchmark (≥3 platforms at the same scale factor per benchmark) to ensure the\ndynamic comparison tool has meaningful content at launch.\n",
+  "description": "The Phase 1 results explorer needs a curated seed corpus of real benchmark\nresults to be useful at launch. This TODO covers defining which benchmarks,\nplatforms, and scale factors to include, building a reproducible CI workflow\nthat generates the results, and committing the canonical schema-v2 bundles\nto a data directory that the static build pipeline can consume.\n\n**Corpus strategy: depth over breadth.** The primary deliverable is a dynamic\ncomparison tool, so the corpus must have sufficient depth per benchmark - many\nplatforms at the same scale factor - rather than just hitting a raw bundle\ncount. The target is: each included benchmark has ≥3 comparable platforms at\nthe same scale factor, across most supported benchmarks and platforms at\nlimited scale factors.\n\nCoverage matrix: TPC-H (SF 0.01, 0.1, 1), TPC-DS (SF 1), and SSB (SF 0.01,\n0.1) across DuckDB, DataFusion, ClickHouse, and Polars, plus additional\nplatforms as available. Each bundle must include companion files (plans,\ntuning) where supported.\n\nThe corpus should be regenerable from CI so it stays fresh as BenchBox and\nplatforms evolve. Results are committed under `results-data/` at the repo\nroot. A dedicated data repo is explicitly deferred until repo size or corpus\nchurn makes extraction worthwhile.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "commit large bundles (>10MB each) directly to the main repo",
+        "instead": "use a data repo, LFS, or CI-generated artifacts if bundles are large",
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "why": "git history bloats permanently"
+      },
+      {
+        "dont": "generate the corpus manually and commit ad hoc",
+        "instead": "build a CI workflow from the start",
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "why": "the corpus must be reproducible and refreshable"
+      },
+      {
+        "dont": "include only synthetic or trivially small results",
+        "instead": "run actual benchmarks at SF 0.01+ with full query sets",
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "why": "the explorer must show realistic platform behavior"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "needs_item": "define-results-platform-product-and-launch-strategy"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing benchbox run and export workflows must not be modified - seed generation uses them as-is",
+        "item_id": "generate-seed-corpus-for-results-explorer"
+      },
+      {
+        "behavior": "Schema-v2 bundle format is the canonical artifact - no custom export shapes",
+        "item_id": "generate-seed-corpus-for-results-explorer"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "kind": "only_modify",
+        "path_glob": "results-data/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import json, pathlib, collections; bundles = list(pathlib.Path('results-data/bundles').glob('*.json')); print(f'{len(bundles)} bundles found'); cohorts = collections.defaultdict(set); [cohorts[(json.load(open(b))['metadata']['benchmark'], str(json.load(open(b))['metadata'].get('scale_factor','')))].add(json.load(open(b))['metadata']['platform']) for b in bundles]; [print(f'  {k}: {len(v)} platforms') for k,v in sorted(cohorts.items())]; assert all(len(v) >= 3 for v in cohorts.values()), f'Some cohorts have <3 platforms: {dict((k,len(v)) for k,v in cohorts.items() if len(v)<3)}'\"",
+        "description": "All seed bundles pass schema validation and depth-per-benchmark criterion",
+        "expected": "All bundles found; every benchmark×scale cohort has ≥3 platforms",
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "notes": "Decide:\n- Which benchmark×platform×scale combinations to include (prioritize depth:\n  ≥3 platforms per benchmark×scale, across most supported benchmarks)\n- Exact directory layout under `results-data/bundles/`\n- Naming convention for bundles (e.g., `tpch-duckdb-sf0.01-{date}.json`)\n- Whether to capture query plans for all runs (recommended: yes for DuckDB/DataFusion)\nMinimum coverage matrix:\n| Benchmark | Platforms | Scale Factors |\n|-----------|-----------|---------------|\n| TPC-H | DuckDB, DataFusion, Polars, ClickHouse | 0.01, 0.1, 1.0 |\n| TPC-DS | DuckDB, DataFusion, Polars, ClickHouse | 1.0 |\n| SSB | DuckDB, DataFusion, Polars, ClickHouse | 0.01, 0.1 |\nThis establishes a 24-run floor with ≥4 platforms per benchmark×scale\ncohort, satisfying the depth criterion. Additional runs (cloud platforms,\nextra curated cohorts) are welcome but not required to meet launch criteria.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define seed corpus spec: benchmarks, platforms, scale factors, and storage location",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "notes": "Create `.github/workflows/seed-corpus.yml` (or extend an existing workflow)\nthat runs the specified benchmark matrix using `benchbox run`. Each run should:\n- Export canonical schema-v2 bundles with companion files\n- Use `--capture-plans` where supported\n- Use `--validation full` for correctness verification\n- Output bundles to a consistent directory structure\nThe workflow should be manually triggerable (`workflow_dispatch`) and\noptionally scheduled (weekly/monthly) for corpus freshness.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build a GitHub Actions workflow that generates seed corpus bundles",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "notes": "Execute the workflow, verify all bundles pass schema validation, and commit\nthe initial corpus. Verify that each bundle has valid metadata, query timings,\nand companion files. Document any platforms that failed or were skipped and why.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run initial seed corpus generation and commit bundles",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "generate-seed-corpus-for-results-explorer",
+        "notes": "Create a simple `corpus-inventory.json` that lists all bundles with their\nbenchmark, platform, scale factor, date, and file paths. Add a validation\nscript that checks all listed bundles exist, pass schema validation, and\nhave consistent metadata. This manifest is consumed by the static build\npipeline (separate TODO).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a corpus inventory manifest and validation script",
+        "wid": "w4"
+      }
+    ]
+  }
+}

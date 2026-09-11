@@ -1,0 +1,71 @@
+{
+  "context": "In the lint pass, reject a verification command that cannot be a shell command - starts with '<', contains an unbalanced angle-bracket placeholder, or fails a shell parse (bash -n). A shell-parse check is the most general and needs no heuristics. Consider whether items whose verification is inherently manual should instead be required to use a self-asserting proxy (e.g. grep for a recorded artifact), which is what the guidance already asks for.",
+  "description": "A verification ladder command can be a prose placeholder and nothing notices until someone runs it. ducklake-beta-scale-runs-four-modes shipped with rung 1 as '<record the four run ids and correctness-gate outcomes on this item>'; 'todo verify --run 1' died with '/bin/sh: syntax error near unexpected token newline'. Because complete_item() does not gate on verification results, the item still completed with an unrunnable ladder. Sibling of todo-lint-unresolvable-scope-and-ladder-paths, which covers commands naming files that do NOT exist; this is the distinct case of a command that is not a command at all.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "created_at": "2026-07-30T23:37:17Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing lint findings keep firing unchanged",
+        "item_id": "todo-lint-unrunnable-verification-commands"
+      },
+      {
+        "behavior": "Legitimate multi-line or piped verification commands still pass",
+        "item_id": "todo-lint-unrunnable-verification-commands"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-lint-unrunnable-verification-commands",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/todo_db.py lint ducklake-beta-scale-runs-four-modes | grep -qi 'record the four run ids'",
+        "description": "lint reports a placeholder verification command",
+        "expected": "the known-bad placeholder rung is reported",
+        "item_id": "todo-lint-unrunnable-verification-commands",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-lint-unrunnable-verification-commands",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "todo-lint-unrunnable-verification-commands",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reject verification commands that fail a shell parse or are prose placeholders",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-lint-unrunnable-verification-commands",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Tests for a runnable command, a placeholder, and a piped/multi-line command",
+        "wid": "w2"
+      }
+    ]
+  }
+}

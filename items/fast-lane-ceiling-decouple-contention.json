@@ -1,0 +1,245 @@
+{
+  "context": "Land phases 1-2 first (small, immediately kills textual conflicts), then 3-4. Keep the absolute ceiling enforced until the delta guard has run green for a week. Wall-clock budget (WS1.4) is deliberately deferred until 4 weeks of ci-failure-baseline-dev-loop-metrics data exist.",
+  "description": "WS1 of _project/planning/ci-failure-reduction-plan.md. fast_test_lane_policy.json is the 2nd most-touched file in the repo (10 PRs since 2026-06-20; 8 ceiling bumps in the week of 07-16..07-22; ~30 documented bumps in _ceiling_note including two multi-PR 'composed byte-identical bump' episodes). Root causes: (a) bumps use minimal headroom (+5..+33) so the next test-adding PR retrips; (b) the justification log is one JSON string so any two bumps conflict textually; (c) the check is absolute, not base-relative, so two independently-green PRs compose over the ceiling after both merge (strict checks are off).\n\nPhased fix: (1) move _ceiling_note to an append-only _project/config/fast_lane_ceiling_log.md with merge=union in .gitattributes; (2) bump quantum +500 with resulting headroom >= 250, plus a WARNING from timing_policy_check.py when headroom < 100 so the bump lands before the violation; (3) persist develop's fast-lane collected count from develop-post-merge (it already runs ci-lint and prints the count) and enforce a base-relative delta (start: +150) in the PR lint lane, demoting the absolute ceiling to a post-merge/nightly backstop; (4) auto-ratchet: scheduled job opens a mechanical chore PR bumping +500 with a generated log entry when headroom < 100. End state: feature PRs never edit the policy file.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Bump with minimal working headroom (+5..+33) ever again",
+        "instead": "+500 quantum, resulting headroom >= 250, warning fires at < 100",
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "why": "Guarantees the next test-adding PR retrips the ceiling - this caused ~30 bumps since April"
+      },
+      {
+        "dont": "Delete the absolute ceiling when the delta guard lands",
+        "instead": "Keep the auto-ratcheted absolute backstop post-merge/nightly",
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "why": "Delta-only allows slow unbounded lane growth (+149 per PR forever)"
+      },
+      {
+        "dont": "Hand-compose byte-identical policy bumps across queued PRs",
+        "instead": "Delta guard + auto-ratchet make feature-PR bumps unnecessary",
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "why": "That is manual merge-queue management; it cost two multi-PR choreography episodes in July"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "needs_item": "ci-failure-baseline-dev-loop-metrics"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "created_at": "2026-07-23T12:29:08Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "An absolute lane-size backstop remains enforced somewhere (post-merge/nightly) at every phase - never delta-only",
+        "item_id": "fast-lane-ceiling-decouple-contention"
+      },
+      {
+        "behavior": "develop-post-merge safety net stays active (see dev-loop-step-6-queue-decision-gate must-preserve)",
+        "item_id": "fast-lane-ceiling-decouple-contention"
+      },
+      {
+        "behavior": "forbidden_marker_expressions and forbidden_path_substrings enforcement in timing_policy_check.py is unchanged",
+        "item_id": "fast-lane-ceiling-decouple-contention"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/**"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/**"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "kind": "only_modify",
+        "path_glob": ".gitattributes"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "kind": "only_modify",
+        "path_glob": "_project/config/**"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/timing_policy_check.py"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/timing_policy_check.py --strict",
+        "description": "Policy check passes strict on the reworked layout",
+        "expected": "exit 0",
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f _project/config/fast_lane_ceiling_log.md && grep -c 'fast_lane_ceiling_log.md merge=union' .gitattributes",
+        "description": "Ceiling log exists and merges by union",
+        "expected": "1",
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git log --since='2 weeks ago' --oneline -- _project/config/fast_test_lane_policy.json | grep -vc 'chore(fast-lane)'",
+        "description": "No feature PR touches the policy JSON over a 2-week window post-land",
+        "expected": "0",
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Split _ceiling_note into _project/config/fast_lane_ceiling_log.md (append-only, dated entries) + .gitattributes merge=union; JSON keeps only the number",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Encode bump policy in timing_policy_check.py: WARNING when headroom < 100; document +500 quantum / >=250 headroom convention in the log header",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Persist develop fast-lane collected count from develop-post-merge (Actions cache or repo variable) for PR-lane consumption",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Base-relative delta guard in the PR lint lane (fail when pr_count - develop_count > 150; absolute ceiling becomes warn-only in PR lane, enforced post-merge/nightly)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Auto-ratchet: scheduled job opens a mechanical chore PR (+500, generated log entry) when headroom < 100",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fast-lane-ceiling-decouple-contention",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "DECISION GATE (needs 4 weeks of baseline metrics): wall-clock lane budget in the PR test job; demote count checks to advisory if adopted",
+        "wid": "w6"
+      }
+    ]
+  }
+}

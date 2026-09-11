@@ -1,0 +1,88 @@
+{
+  "context": "Thread has_header from the benchmark's csv_has_header attribute (resolved next to the existing csv_delimiter) through _convert_table_files into convert_csv_to_parquet, and set ReadOptions(skip_rows=1) when a header is declared AND explicit column names are supplied. Gate the pass-through on format_type == 'csv' so .tbl stays headerless regardless of the attribute. Bump DATAFRAME_CACHE_VERSION so stale caches built from the broken path are not reused.",
+  "description": "FormatConverter.convert_csv_to_parquet passes the schema's column names to pyarrow.csv.ReadOptions(column_names=...). That REPLACES the header names but does NOT skip the header LINE, so a headered CSV is parsed with its own header as the first data row. With declared numeric/date column types the conversion then FAILS ('CSV conversion error to int64: invalid value day_of_week'), and _convert_table_files logs 'Failed to convert <table>, using source file' and falls back to the RAW CSV -- an untyped read where date columns stay strings. Every downstream date filter then matches nothing, so the DataFrame surface silently returns zero rows instead of erroring. Headerless TPC .tbl is unaffected (it has no header), which is why this survived: every gated benchmark so far is .tbl or headerless. Found by wiring a FlightData cross-surface gate, whose CSVs carry headers -- all 20 queries x 2 backends diverged. The benchmark already declares csv_has_header=True; the converter simply never received it.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-01T20:38:12Z",
+      "completed_pr": 1441,
+      "created_at": "2026-08-01T20:33:19Z",
+      "worktree": "dataframe-benchmarks"
+    },
+    "preserves": [
+      {
+        "behavior": "Declared column types still apply; the fix must not reintroduce PyArrow type inference",
+        "item_id": "dataframe-loader-ingests-csv-header-as-data"
+      },
+      {
+        "behavior": "Headerless sources (TPC .tbl, headerless CSV) keep every row -- no off-by-one from skipping a line that is not a header",
+        "item_id": "dataframe-loader-ingests-csv-header-as-data"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dataframe-loader-ingests-csv-header-as-data",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/data_loader.py"
+      },
+      {
+        "item_id": "dataframe-loader-ingests-csv-header-as-data",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/dataframe/test_data_loader_behavioral.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/dataframe/test_data_loader_behavioral.py -k HeaderedCsv -q -n 0",
+        "description": "a headered CSV converts with declared types and does not count its header as a row",
+        "expected": "exit 0 once fixed; on an unfixed tree conversion returns FAILED and the assertions fail",
+        "item_id": "dataframe-loader-ingests-csv-header-as-data",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:33:48Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/dataframe/ -q -n 0",
+        "description": "the full DataFrame loader suite is unregressed",
+        "expected": "exit 0; a header-skip that mis-fires on headerless .tbl would drop a row and fail here",
+        "item_id": "dataframe-loader-ingests-csv-header-as-data",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:34:07Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dataframe-loader-ingests-csv-header-as-data",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Threaded has_header from the benchmark's csv_has_header attribute (resolved beside the existing csv_delimiter) through _convert_table_files into convert_csv_to_parquet, setting ReadOptions(skip_rows=1) only when a header is declared AND explicit column names are supplied. Pass-through gated on format_type == 'csv' so .tbl stays headerless regardless of the attribute. DATAFRAME_CACHE_VERSION v4 -> v5 so caches built from the broken path are not reused.",
+        "item_id": "dataframe-loader-ingests-csv-header-as-data",
+        "notes": null,
+        "started_at": "2026-08-01T20:34:33Z",
+        "started_branch": "feat/flightdata-cross-surface-gate",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Thread has_header into the converter and skip the header line; bump the cache version",
+        "wid": "w1"
+      },
+      {
+        "evidence": "3 tests in TestHeaderedCsvConversion. Mutation-proved: reverting ONLY the skip_rows line fails test_headered_csv_converts_with_typed_columns and test_header_row_is_not_ingested_as_data (conversion returns FAILED with 'CSV conversion error to int64: invalid value id'), while test_headerless_source_is_unchanged still passes -- confirming the guard is header-specific and does not touch .tbl. Empirically end to end: before the fix the FlightData cross-surface probe logged 'Conversion failed ... invalid value day_of_week' and 'Failed to convert flights, using source file'; after the fix both disappear.",
+        "item_id": "dataframe-loader-ingests-csv-header-as-data",
+        "notes": null,
+        "started_at": "2026-08-01T20:34:47Z",
+        "started_branch": "feat/flightdata-cross-surface-gate",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Pin headered-CSV typing, header-not-ingested, and headerless-unchanged",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "description": "Starting gate for the single-repo migration (Option B). Eight decisions\nmust be made and recorded before Phase 0 begins. Some decisions can be\nrevisited based on Phase 0 audit findings (notably D2a: filter-merge vs\nworking-tree-only for _project/**, which depends on whether gitleaks finds\nanything in _project/**'s history).\n\nThis is a no-code item. Output: a one-page decisions doc committed to the\nrepo so future-you and any collaborators can see why each choice was made.\n\nPlan file: /Users/joe/.claude/plans/single-repo-migration.md\n\nDecisions to make:\n\n- D1: Which GitHub repo URL becomes canonical?\n  Recommended: existing joeharris76/BenchBox (current public) stays\n  canonical. Archive joeharris76/benchbox-private after dev locus\n  migrates. No rename, no visibility flip — avoids the only\n  irreversible step.\n\n- D2: Bulk private commit history — preserve or leave behind?\n  Recommended: leave behind. Bring working-tree contents only via one\n  final curated sync. No concrete archaeological value identified for\n  ~year of solo private commits; removes audit burden on every\n  wip/hack/temp commit message.\n\n- D2a: TODO/DONE history specifically?\n  Recommended: preserve via git filter-repo --path _project/ then merge\n  with --allow-unrelated-histories. _project/ contents are decision\n  rationale with long-term value. Reconfirm after Phase 0 audit findings.\n\n- D3: Where do _project/TODO and _project/DONE live?\n  Recommended: on main, excluded from wheel.\n\n- D4: Where do _blog/drafts/ live?\n  Recommended: on main, excluded from wheel; or in a wip/ branch that\n  never merges. Working-tree only (no history preserved).\n\n- D5: Merge strategy on main?\n  Recommended: squash-merge only — with one explicit exception: the\n  Phase 4 _project/** filter-merge PR uses a regular merge commit\n  (squashing would defeat the history-preservation purpose).\n\n- D6: Continuous CI surface?\n  Recommended: every push to main, every PR.\n\n- D7: Reproducibility apparatus?\n  Recommended: keep SOURCE_DATE_EPOCH from tag commit; drop the rest of\n  the timestamp normalization machinery.\n\n- D8: /Users/joe/Developer/BenchBox (private clone) disposition after Phase 5?\n  Recommended: rename to BenchBox.retired-YYYYMMDD/ to prevent shell\n  muscle-memory mistakes; delete after 60-day soak. Future development\n  happens in ~/Developer/benchbox-public (optionally renamed/symlinked\n  to /Users/joe/Developer/BenchBox if you want the canonical path back).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "defer the decisions doc until after Phase 0",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-decisions-gate",
+        "why": "then there is no gate; the audit happens with implicit assumptions instead of explicit choices."
+      },
+      {
+        "dont": "skip D1 reconfirmation",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-decisions-gate",
+        "why": "Option B (current public stays canonical) is the load-bearing assumption of the entire plan; if this decision flips back to Option A (rename + flip), the plan and 10 other TODOs need rewriting."
+      },
+      {
+        "dont": "skip D2a (TODO/DONE history)",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-decisions-gate",
+        "why": "it determines whether Phase 4 includes a filter-merge step or whether _project/** is just working-tree synced. The mechanics differ substantially."
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-04-27T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The plan file remains the source of truth for the migration; the decisions doc only records the per-decision answers.",
+        "item_id": "single-repo-migration-decisions-gate"
+      },
+      {
+        "behavior": "This item is a gate, not a refactor. Nothing changes in the codebase except the new decisions doc.",
+        "item_id": "single-repo-migration-decisions-gate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "single-repo-migration-decisions-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/single-repo-migration.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/decisions/single-repo-migration.md && grep -c '^| D[1-8]' _project/decisions/single-repo-migration.md",
+        "description": "Decisions doc exists and lists all of D1-D8 with explicit choices",
+        "expected": "8",
+        "item_id": "single-repo-migration-decisions-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "single-repo-migration-decisions-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "single-repo-migration-decisions-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-decisions-gate",
+        "notes": "The plan covers each decision with the recommendation and trade-off.\nSpend time on D2/D2a (history strategy) and D4 (drafts location) as\nthey have the highest variance in possible answers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Read /Users/joe/.claude/plans/single-repo-migration.md fully and the rationale tables",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-decisions-gate",
+        "notes": "Format: one paragraph context, then a table with columns\n(ID, Decision, Choice, Reason). Keep under one page.\nFor each D1-D8: record the choice and a short reason. If you\ndeviated from the recommendation, write down why.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write the decisions doc at _project/decisions/single-repo-migration.md",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-decisions-gate",
+        "notes": "Lands on private via the curated flow (since dev locus is still on\nprivate at this point). It will arrive on public as part of the\nPhase 4 _project/** filter-merge.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Commit decisions doc on a feature branch, open PR, self-review, merge",
+        "wid": "w3"
+      }
+    ]
+  }
+}

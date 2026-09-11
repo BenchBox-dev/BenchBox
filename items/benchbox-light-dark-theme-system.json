@@ -1,0 +1,553 @@
+{
+  "context": "Treat theming as a shared product contract, not a Results-only retheme.\nFirst inventory current assumptions, then define semantic tokens and theme\npersistence, then migrate each surface to the shared tokens. Move chart and\nSVG colors behind a theme-aware API before claiming dark-mode support. Finish\nby strengthening token gates and visual/a11y coverage so future PRs cannot\nregress one theme while testing the other.\n",
+  "description": "BenchBox currently has incompatible theme models across public surfaces.\nLanding is effectively dark-only through `landing/style.css`; docs/blog use\nFuro's light/dark support but force the custom BenchBox nav to stay dark;\nResults Explorer uses a custom token system and has tests that intentionally\npin a mixed dark-shell/light-data workspace. Users should be able to choose\nlight or dark theme consistently across landing, docs/blog, and Results\nExplorer, with the choice persisted and respected by every page.\n\nThis phase supersedes the previous Results Explorer decision that hard-coded\n\"dark BenchBox shell + light analytical data panels\" as the theme contract.\nThat visual treatment can remain the light-theme default if it still works,\nbut the product contract must become a real two-theme system: light and dark\ntokens for shell, data panels, controls, tables, charts, badges, focus rings,\nempty/error/loading states, code blocks, and sticky/scrollable surfaces.\n\nThis TODO depends on the shared header phase so the theme toggle and header\ntokens are implemented once instead of being patched separately into three\nheaders.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a toggle that only changes the header or page background",
+        "instead": "(not specified)",
+        "item_id": "benchbox-light-dark-theme-system",
+        "why": "charts, tables, badges, and controls must also switch."
+      },
+      {
+        "dont": "hard-code SVG axis/grid/text colors in chart components after this work",
+        "instead": "(not specified)",
+        "item_id": "benchbox-light-dark-theme-system",
+        "why": "those are exactly where dark mode breaks."
+      },
+      {
+        "dont": "keep the old mixed dark-shell/light-data contract as the only Results Explorer theme",
+        "instead": "(not specified)",
+        "item_id": "benchbox-light-dark-theme-system",
+        "why": "users need an actual dark and light choice."
+      },
+      {
+        "dont": "leave docs/blog with both Furo and BenchBox theme controls showing contradictory state.",
+        "instead": "(not specified)",
+        "item_id": "benchbox-light-dark-theme-system",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "rely only on unit tests for a visual theme change",
+        "instead": "(not specified)",
+        "item_id": "benchbox-light-dark-theme-system",
+        "why": "contrast, flash, chart legibility, and responsive behavior require browser verification."
+      },
+      {
+        "dont": "solve dark mode by reducing information density or hiding table/chart details.",
+        "instead": "(not specified)",
+        "item_id": "benchbox-light-dark-theme-system",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchbox-light-dark-theme-system",
+        "id": 344,
+        "reason": "Not required for the product contract; light/dark plus reduced/high-contrast states are sufficient for this phase.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicit product-scope decision: light/dark plus reduced/high-contrast states deemed sufficient; custom palettes not required for this phase.",
+        "summary": "User-customizable color palettes beyond light/dark"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchbox-light-dark-theme-system",
+        "id": 345,
+        "reason": "Useful later, but current need is a durable implementation and regression gates.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Vague 'public design-system documentation site' idea with no scope; theming item itself is already done.",
+        "summary": "A public design-system documentation site"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchbox-light-dark-theme-system",
+        "id": 346,
+        "reason": "Docs already rely on Furo; integrate with its theme mechanics instead of creating a new docs frontend.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Rejected alternative (full Furo replacement); the decision made was to integrate with Furo instead. Not deferred work.",
+        "summary": "Replacing Furo entirely"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_item": "benchbox-site-header-unification"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-14T00:00:00Z",
+      "created_at": "2026-05-13T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Charts, heatmaps, badges, and status states remain distinguishable in both themes and in reduced/high-contrast modes.",
+        "item_id": "benchbox-light-dark-theme-system"
+      },
+      {
+        "behavior": "Docs/blog Furo functionality remains intact.",
+        "item_id": "benchbox-light-dark-theme-system"
+      },
+      {
+        "behavior": "Header remains identical across surfaces in both light and dark themes.",
+        "item_id": "benchbox-light-dark-theme-system"
+      },
+      {
+        "behavior": "No Results data/query semantics, compare cohort rules, or result-link behavior changes as part of theming.",
+        "item_id": "benchbox-light-dark-theme-system"
+      },
+      {
+        "behavior": "Results Explorer dense analytical tables remain scannable and information-dense in both themes.",
+        "item_id": "benchbox-light-dark-theme-system"
+      },
+      {
+        "behavior": "System preference is respected for first-time visitors unless the user chooses an explicit theme.",
+        "item_id": "benchbox-light-dark-theme-system"
+      },
+      {
+        "behavior": "Theme choice persists across reloads and navigation.",
+        "item_id": "benchbox-light-dark-theme-system"
+      },
+      {
+        "behavior": "Users can choose light or dark theme and the choice applies consistently across landing, docs/blog, and Results Explorer.",
+        "item_id": "benchbox-light-dark-theme-system"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/planning/results-explorer-retheme-theme-system-foundation.yaml:1 — prior Results-only retheme foundation to supersede",
+        "decision": "supersede",
+        "item_id": "benchbox-light-dark-theme-system",
+        "path": "_project/DONE/main/planning/results-explorer-retheme-theme-system-foundation.yaml:1"
+      },
+      {
+        "concept": "_project/DONE/results-explorer-contract-followup/planning/results-explorer-home-theme-and-responsive-density-contract.yaml:1 — prior mixed-theme contract to replace with a real theme choice",
+        "decision": "reuse",
+        "item_id": "benchbox-light-dark-theme-system",
+        "path": "_project/DONE/results-explorer-contract-followup/planning/results-explorer-home-theme-and-responsive-density-contract.yaml:1"
+      },
+      {
+        "concept": "_project/analysis/results-explorer-theme-inventory-2026-05-07.md:106 — prior dark-shell/light-data decision that this TODO must supersede",
+        "decision": "supersede",
+        "item_id": "benchbox-light-dark-theme-system",
+        "path": "_project/analysis/results-explorer-theme-inventory-2026-05-07.md:106"
+      },
+      {
+        "concept": "benchbox-site-header-unification — dependency that establishes the shared global header before adding a theme toggle",
+        "decision": "reuse",
+        "item_id": "benchbox-light-dark-theme-system",
+        "path": "benchbox-site-header-unification"
+      },
+      {
+        "concept": "docs/_static/custom.css:53 — current forced-dark BenchBox nav override that must be removed or superseded",
+        "decision": "reuse",
+        "item_id": "benchbox-light-dark-theme-system",
+        "path": "docs/_static/custom.css:53"
+      },
+      {
+        "concept": "docs/conf.py:169 — Furo theme configuration and existing light/dark variable hooks",
+        "decision": "reuse",
+        "item_id": "benchbox-light-dark-theme-system",
+        "path": "docs/conf.py:169"
+      },
+      {
+        "concept": "docs/operations/results-explorer-token-scan.md:1 — existing Results token gate and documented arbitrary-value/SVG gaps",
+        "decision": "reuse",
+        "item_id": "benchbox-light-dark-theme-system",
+        "path": "docs/operations/results-explorer-token-scan.md:1"
+      },
+      {
+        "concept": "landing/script.js:133 — current JS-injected mobile nav styles that must become theme-aware",
+        "decision": "reuse",
+        "item_id": "benchbox-light-dark-theme-system",
+        "path": "landing/script.js:133"
+      },
+      {
+        "concept": "landing/style.css:3 — current dark-only landing CSS variables",
+        "decision": "reuse",
+        "item_id": "benchbox-light-dark-theme-system",
+        "path": "landing/style.css:3"
+      },
+      {
+        "concept": "results-explorer/src/index.css:6 — current Results Explorer `--bb-*` token definitions and mixed surface contract",
+        "decision": "reuse",
+        "item_id": "benchbox-light-dark-theme-system",
+        "path": "results-explorer/src/index.css:6"
+      },
+      {
+        "concept": "results-explorer/src/lib/chartTheme.ts:1 — current chart color source, currently fixed hex values",
+        "decision": "reuse",
+        "item_id": "benchbox-light-dark-theme-system",
+        "path": "results-explorer/src/lib/chartTheme.ts:1"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/results-explorer-contract-followup/planning/results-explorer-home-theme-and-responsive-density-contract.yaml"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/scan_explorer_tokens.py"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "docs/_static/"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "docs/_templates/"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "docs/conf.py"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-token-scan.md"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package-lock.json"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package.json"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_scan_explorer_tokens.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/analysis/benchbox-theme-contract.md && rg -n 'landing|docs|blog|Results|light|dark|data-theme|localStorage|chart' _project/analysis/benchbox-theme-contract.md",
+        "description": "Shared theme contract is documented and references all public surfaces",
+        "expected": "contract exists and covers shell, static pages, docs/blog, Results, persistence, and charts",
+        "item_id": "benchbox-light-dark-theme-system",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test",
+        "description": "Results Explorer unit and component tests pass",
+        "expected": "all Vitest tests pass",
+        "item_id": "benchbox-light-dark-theme-system",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Results Explorer builds",
+        "expected": "Vite build succeeds",
+        "item_id": "benchbox-light-dark-theme-system",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- sphinx-build -b html docs docs/_build/html",
+        "description": "Docs build succeeds with synchronized theme assets",
+        "expected": "Sphinx build succeeds",
+        "item_id": "benchbox-light-dark-theme-system",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make lint-explorer-tokens && make lint-site-theme-tokens",
+        "description": "Token/literal gates pass",
+        "expected": "Results and site-wide theme token scans pass with only documented allowlisted palette definitions; if the implementation intentionally replaces these targets, update this verification command in the same PR",
+        "item_id": "benchbox-light-dark-theme-system",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "Run the light/dark browser verification added by this TODO across landing, docs/blog, and Results routes at desktop and mobile widths",
+        "description": "Cross-surface light/dark browser verification passes",
+        "expected": "theme toggle, persistence, contrast, charts, tables, and header parity pass in both themes",
+        "item_id": "benchbox-light-dark-theme-system",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w3",
+        "wid": "w9"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w4",
+        "wid": "w9"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w7",
+        "wid": "w9"
+      },
+      {
+        "item_id": "benchbox-light-dark-theme-system",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchbox-light-dark-theme-system",
+        "notes": "Produce a compact inventory covering:\n- landing `--bg-*`, `--text-*`, `--accent-*`, hard-coded colors, gradients,\n  badges, code blocks, and mobile menu JS-injected styles;\n- docs/blog Furo `light_css_variables`, `dark_css_variables`, custom CSS,\n  nav overrides, code blocks, tables, admonitions, tags, and blog widgets;\n- Results Explorer `--bb-*` tokens, `data-surface` usage, direct\n  arbitrary-value classes, raw SVG/chart hex colors, badge tones,\n  skeleton colors, sticky table colors, high/reduced-color modes, and\n  tests pinning mixed-theme behavior.\n\nDecision gate: do not start retheming until the inventory identifies\nwhich tokens are site-wide, which are Results-data-specific, and which\nare docs/Furo adapter variables.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory theme assumptions and hard-coded colors across public surfaces",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-light-dark-theme-system",
+        "notes": "Define:\n- theme values: `light`, `dark`, and optional `system`;\n- where the selected value is stored (`localStorage` key and fallback);\n- how early the theme is applied to avoid flash of wrong theme;\n- whether the toggle lives in the shared global header or in a menu;\n- accessible label, keyboard behavior, and announced state;\n- interaction with Furo's existing theme controls on docs/blog;\n- default behavior for first-time visitors using `prefers-color-scheme`.\n\nDecision gate: choose whether BenchBox controls Furo's theme directly or\nmaps a BenchBox site preference onto Furo's supported `data-theme`\ncontract. Do not ship two unsynchronized theme toggles on docs/blog.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the site-wide theme contract, persistence, and toggle behavior",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-light-dark-theme-system",
+        "notes": "Define token names and values for both light and dark modes:\n- global shell: header, footer, nav, CTA, active state;\n- app/page background;\n- data panel, muted panel, elevated panel, sticky cell/header;\n- primary/muted/subtle/inverse text;\n- border, strong border, divider, shadow/elevation;\n- focus-visible rings on light and dark surfaces;\n- status tones: info, success, warning, danger, neutral;\n- trust/validation/tuning/computed/visibility badges;\n- code block and inline code;\n- chart axis, grid, label, annotation, tooltip, categorical palette,\n  sequential palette, diverging palette, faster/slower fills, missing\n  state, and reduced/high-contrast variants.\n\nThe token contract must make dark mode a first-class mode for dense\nanalytical tables and charts, not a dark shell around light islands.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create shared semantic tokens for both themes",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-light-dark-theme-system",
+        "notes": "Update landing and shared header assets so theme selection is applied\nbefore first paint as much as static deployment allows. The landing page\nmust support light and dark for:\n- header and mobile menu;\n- hero and background treatment;\n- cards, badges, links, code blocks, copy buttons, and footer;\n- responsive states and hover/focus states.\n\nAvoid duplicating logic in every page. Keep the implementation compatible\nwith static hosting and no frontend build step for `landing/`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement shared theme initialization and toggle on static public pages",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-light-dark-theme-system",
+        "notes": "Update `docs/conf.py`, `docs/_templates/page.html`, and\n`docs/_static/custom.css` so docs/blog use the same visible theme choice\nas the rest of BenchBox. Remove the custom nav forced-dark overrides and\nalign Furo `light_css_variables` and `dark_css_variables` with the shared\nBenchBox tokens.\n\nEnsure Furo search, sidebars, API pages, tables, code blocks, admonitions,\ntags, blog archives, and blog sidebars remain readable in both themes.\nIf Furo's native toggle cannot be synchronized cleanly, document the\ndecision and hide/replace one control so users do not see conflicting\ntheme state.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate the shared theme contract with docs/blog and Furo",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-light-dark-theme-system",
+        "notes": "Replace the old mixed-theme contract with theme-aware tokens in\n`results-explorer/src/index.css` and Results components. Cover:\n- `body`, app shell, global header, secondary Results nav, footer;\n- Home hero/filter bands and leaderboard surfaces;\n- Benchmark and platform detail controls, filter panels, compare bars,\n  sticky headers, sticky columns, and large tables;\n- Compare builder, decision summary, guardrails, receipts, query diff,\n  result cards, and warning callouts;\n- Query Workbench facets, visible columns, exports, result table,\n  Advanced SQL, starter queries, and SQL result table;\n- loading, empty, error, warning, disabled, selected, hover, focus, and\n  reduced-color states.\n\nRemove tests that assert the old hard-coded mixed dark/light background\nvalues and replace them with tests that verify both themes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retheme Results Explorer app shell, pages, forms, panels, tables, and states",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-light-dark-theme-system",
+        "notes": "Refactor chart color access so components do not embed light-theme hex\nvalues for axes, grid lines, labels, annotations, legends, missing states,\nor fills. Cover at least:\n- `ChartPanel.tsx`;\n- `CDFChart.tsx`;\n- `CostScatter.tsx`;\n- `DistributionBox.tsx`;\n- `DivergingBarChart.tsx`;\n- `NormalizedSpeedupChart.tsx`;\n- `PercentileLadder.tsx`;\n- `PowerBar.tsx`;\n- `QueryHistogram.tsx`;\n- `QueryTimingChart.tsx`;\n- `StackedPhase.tsx`;\n- `TimeSeries.tsx`;\n- `results-explorer/src/lib/chartTheme.ts`.\n\nUse a theme-aware chart theme API or CSS-variable reads with SSR/test\nfallbacks. Keep platform categorical colors stable enough that users can\ncompare charts across tabs, but adjust axis/grid/text colors by theme.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make Results Explorer charts and SVGs theme-aware",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-light-dark-theme-system",
+        "notes": "Update the Results Explorer token scan and documentation so it catches\ntheme bypasses that are currently known gaps:\n- arbitrary-value Tailwind classes such as `text-[#374151]`;\n- inline SVG `fill=\\\"#...\\\"` and `stroke=\\\"#...\\\"` literals outside the\n  approved chart theme source;\n- raw `rgb()`/`rgba()` colors in public surfaces;\n- landing/docs header literal colors that should be tokenized.\n\nKeep a narrow allowlist for intentional palette definitions and document\neach allowlist reason. The gate should prevent new spot fixes from\nsilently making one theme correct and the other broken.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Upgrade token/literal gates to protect both themes",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-light-dark-theme-system",
+        "notes": "Update or supersede artifacts that currently encode the old Results-only\nmixed theme contract, including:\n- `_project/analysis/results-explorer-theme-inventory-2026-05-07.md`;\n- `_project/analysis/results-explorer-retheme-audit-remediation-plan-2026-05-07.md`;\n- `_project/DONE/results-explorer-contract-followup/planning/results-explorer-home-theme-and-responsive-density-contract.yaml`;\n- `results-explorer/e2e/routes/home.spec.ts`;\n- any release-gate reports or operations docs that describe dark shell\n  plus light analytical panels as the final product contract.\n\nDo not rewrite history in DONE items. Add clear supersession notes where\nappropriate, and ensure active tests assert the new user-selectable\nlight/dark contract instead of treating mixed surfaces as mandatory.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retire stale mixed-theme documentation, tests, and release evidence",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-light-dark-theme-system",
+        "notes": "Add or extend browser checks for both light and dark themes at desktop\nand mobile widths across:\n- landing `/`;\n- docs `/docs/`;\n- blog `/blog/` if locally buildable;\n- Results `/results/`;\n- Results benchmark detail;\n- Results platform detail;\n- Results compare builder and completed compare;\n- Results query workbench.\n\nVerify:\n- theme toggle changes visible colors on every surface;\n- persisted choice survives reload and route changes;\n- first paint does not visibly flash the opposite theme beyond the\n  accepted technical limit;\n- WCAG contrast passes for text, controls, badges, heatmaps, chart axes,\n  disabled controls, selected rows, and warning/error states;\n- no chart or table becomes unreadable in either theme;\n- header remains identical across surfaces in both themes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add cross-surface visual, accessibility, and persistence verification",
+        "wid": "w9"
+      }
+    ]
+  }
+}

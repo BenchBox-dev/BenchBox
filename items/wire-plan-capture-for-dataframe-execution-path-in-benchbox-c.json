@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #595 of query-plan-capture-spark-databricks.\nDeferred: Wire plan capture for DataFrame execution path in benchbox/core/dataframe/profiling.py\nReason deferred: The DataFrame profiling system is a parallel architecture to the SQL execution path. Merging the two systems is a larger refactor that should be a separate TODO. This TODO covers only execute_query() SQL path.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:37:09Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

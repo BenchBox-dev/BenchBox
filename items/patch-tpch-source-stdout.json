@@ -1,0 +1,10 @@
+{
+  "description": "Apply patches to TPC-H dbgen source code to enable reliable stdout data generation\nusing the -z flag, matching the tpch-kit reference implementation.\n\nThe BenchBox TPC-H source (June 2021) lacks stdout output capability that was added\nto tpch-kit (March 2025). This prevents streaming data generation workflows that\nare critical for compression pipelines and efficient data loading.\n\nKey differences identified between BenchBox and tpch-kit:\n- Missing `zstdout` global variable declaration in dss.h\n- Missing stdout conditional in print_prep() function in print.c\n- Missing -z command-line flag handling in driver.c\n- Money formatting bug in print.c (int vs long format specifier)",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-15T00:00:00Z",
+      "worktree": "tpch-stdout-fix"
+    }
+  }
+}

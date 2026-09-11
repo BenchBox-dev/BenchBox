@@ -1,0 +1,155 @@
+{
+  "context": "Two independent halves; the first is the prerequisite for the second being meaningful.\n\n1. Surface run age where results are validated and where the read model is built. run_date already exists; add an explicit recency/staleness report in results-data/validate_corpus.py (and keep it stdlib-only) and, if a pipeline field is required, derive it from run_date without changing ranking eligibility. Do not edit results-explorer UI. Do not bump the Explorer read-model contract if that would force a frontend change.\n\n2. Once age is visible in validators/pipeline, evaluate the existing seed-corpus.yml monthly schedule as the refresh path. Do not retarget the restore item's seed-lane matrix here.\n\nDo not add an automatic age-based withdrawal. Deleting evidence on a timer is not the same as labelling it, and the 2026-08-28 cut showed how much cohort coverage a bulk removal costs.",
+  "description": "GAP identified 2026-08-28 while investigating why pre-August results were still in the Results Explorer corpus.\n\nNothing in the pipeline has an age, freshness, or retention concept. Verified by reading _project/scripts/explorer_pipeline/*.py, results-data/validate_corpus.py, and docs/development/benchbox-results-platform-strategy.md: no cutoff, no max-age, no staleness field, no age surfaced in the read model or UI.\n\nThe consequence, measured before the 2026-08-28 trust cut: 130 of 138 bundles predated 2026-08-23, and 111 of those came from a single 2026-05-02 UAT sweep. The corpus was ~80% one four-month-old afternoon. A visitor saw a DuckDB 1.4.3 number with no signal that it was months and several releases stale.\n\nBundles had only ever been removed for soundness reasons (2026-07-16 tuned drop, 2026-08-24 zero-query withdrawal), never for age, and no gate or report would ever have raised it. It was found by reading timestamps by hand.\n\nNot the same problem as the trust cut itself, which was a one-off decision. This item is about the missing signal that let it go unnoticed, and would let it recur.\n\nREVALIDATED 2026-09-04. run_date already exists on explorer_pipeline ManifestEntry/DetailResult and results.duckdb; ranking_exclusion_reason does not use age. results-data/validate_corpus.py still reports only cohort depth. Recency work stays in explorer_pipeline and validators, not the Explorer app. Do not edit results-explorer UI. Do not add automatic age-based withdrawal. Age must not become a ranking exclusion without an explicit recorded decision (default: no).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Edit results-explorer UI or bump the Explorer read-model contract solely to display age",
+        "instead": "INSTEAD report recency from validate_corpus.py and existing run_date in explorer_pipeline",
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "why": "this topic's path claim keeps recency in pipeline/validators; Explorer UI is owned elsewhere"
+      },
+      {
+        "dont": "Fail the corpus depth gate or exclude ranking because a bundle is old",
+        "instead": "INSTEAD label age and leave ranking eligibility unchanged unless an explicit decision says otherwise",
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "why": "the honest default is show age and let the reader judge; the 2026-08-28 cut showed bulk removal cost"
+      }
+    ],
+    "item_meta": {
+      "category": "results",
+      "completed_at": "2026-09-10T23:07:07Z",
+      "completed_pr": 2051,
+      "created_at": "2026-08-29T12:11:08Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Ranking eligibility rules in _project/scripts/explorer_pipeline/models.py::ranking_exclusion_reason -- age must not silently become an exclusion reason without an explicit decision",
+        "item_id": "corpus-has-no-recency-or-staleness-signal"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "kind": "only_modify",
+        "path_glob": "results-data/validate_corpus.py"
+      },
+      {
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_corpus_cohort_depth.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb",
+        "description": "Explorer snapshot invariants still pass",
+        "expected": "passes",
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python results-data/validate_corpus.py",
+        "description": "(no description)",
+        "expected": "pass, and print a recency/staleness report derived from bundle run dates; age must not fail the depth gate",
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -q tests/unit/scripts/test_corpus_cohort_depth.py tests/unit/scripts/explorer_pipeline/test_ranking.py tests/unit/scripts/explorer_pipeline/test_read_model_contract.py",
+        "description": "(no description)",
+        "expected": "passed",
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Confirmed no re-plumbing needed. ManifestEntry.run_date (models.py:155) and DetailResult.run_date (models.py:393) are required VARCHAR fields. transformer.to_manifest_entry/to_detail_result set run_date = run.timestamp[:10] (transformer.py:1389-1416). duckdb_builder persists run_date on results and platform_agg tables (duckdb_builder.py:207,420,626). Bundles carry run.timestamp (sampled 199 primary bundles). ranking_exclusion_reason (models.py:509-532) has no age/staleness reason; select_canonical_row uses run_date only as newest-wins tiebreak among eligible rows, not as exclusion.",
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm run_date reaches the read model and is queryable from results.duckdb",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added stdlib-only recency report to results-data/validate_corpus.py: cohort_recency/format_recency_report from run.timestamp; per-cohort and overall oldest/newest age_days. main() prints the report; exit code still depth-only. Added run_age_days(run_date) in explorer_pipeline/models.py (no DuckDB column, no EXPLORER_READ_MODEL_VERSION bump). Extended test_corpus_cohort_depth.py. Live: uv run -- python results-data/validate_corpus.py exit 0; overall oldest=2026-08-23 (12d) newest=2026-09-01 (3d) across 199 bundles. pytest 83 passed (cohort depth + ranking + read_model_contract).",
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Surface recency in explorer_pipeline and validate_corpus.py from run_date; no Explorer UI",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Explicit decision recorded: age does NOT affect ranking eligibility. Comment on ranking_exclusion_reason documents intentional absence of age/staleness from the reason set; default remains no. validate_corpus recency banner states the same. test_ranking_exclusion_reason_has_no_age_or_staleness_reason proves an old rankable row stays eligible and returned reason literals contain no age/stale tokens.",
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide explicitly whether age ever affects ranking eligibility; default is no",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Evaluated .github/workflows/seed-corpus.yml without editing it. Refresh path already exists: on.schedule cron '0 7 1 * *' (monthly, 07:00 UTC on the 1st) plus workflow_dispatch. Comment in-file: 'Monthly publication sweep... so published-results does not stall until someone remembers to click.' Matrix covers TPC-H/TPC-DS and other lanes across platforms. Conclusion: monthly seed-corpus schedule is the appropriate refresh path for keeping corpus ages bounded; no automatic age-based withdrawal added (bulk removal costs cohort coverage, as shown by the 2026-08-28 cut). Recency report makes unnoticed stall visible between monthly runs.",
+        "item_id": "corpus-has-no-recency-or-staleness-signal",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Evaluate existing monthly seed-corpus.yml refresh; no age-based withdrawal",
+        "wid": "w3"
+      }
+    ]
+  }
+}

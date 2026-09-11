@@ -1,0 +1,236 @@
+{
+  "context": "Rehearse the whole migration on a scratch Turso DB seeded at v3 (this worked well for the v3 cut), using a DEDICATED TODO_DB_REPLICA per database -- reusing the default replica across two DBs silently mixes snapshots (stale reads, failed writes). Verify tables and row counts, exercise every findings write path, then destroy the scratch DB. Only after the parity and drill evidence is reviewed does the coordinated production migration run, and that step needs explicit human authorization.",
+  "description": "Implement the SCHEMA_VERSION 3 -> 4 migration that gives every validator-accepted legacy field and every '## ' body section a field-level home, so the phase-5 parity gate can promise field-level preservation. Measured exposure over the live 65-file corpus (2026-07-29): today's parse_draft silently drops related_paths (65 files, 170 path entries), suggested_sweep (65 files, 11,559 chars), todo_id (36 files, 19 unique targets, NO column exists), and 8 unknown '## ' sections totalling 5,779 chars -- including seven 'Why the review missed it' meta-analysis sections, which are the L2 lesson the corpus exists for. sync reports 'synced 1' with no error or warning. This item is why findings-phase5-migration is blocked: phase 5 pushes all 65 files through this parser and phase 6 then deletes the tracked originals.\n\nShape decided by the owner 2026-07-29: explicit columns plus a sections table. ALTER TABLE findings ADD COLUMN related_paths TEXT (JSON array); ADD COLUMN suggested_sweep TEXT; CREATE TABLE finding_sections (id, finding_id REFERENCES findings ON DELETE CASCADE, position, heading, text) for any '## ' section outside the four known headings -- the sections table subsumes the whole problem class rather than enumerating today's four stray headings.\n\ntodo_id link mapping (pre-flight run 2026-07-29 against the live tracker): ZERO dangling targets -- all 19 unique todo_id values resolve to live items, so the spec's dangling-link policy (target_item NULL plus a note) covers a case that does not occur; keep the counter in the parity report but expect zero. The 36 files split by status: 32 are 'merged-to-todo' + todo_id and map to kind 'promoted-to' (consistent with disposition 'promoted'); 4 are 'actioned' + todo_id and must map to kind 'resolved-by', because a 'promoted-to' edge on an 'actioned' finding both misstates the history and breaks the promote invariant that 'promoted-to' implies disposition 'promoted'. Both kinds are already in the baked-in CHECK, so no finding_links table rebuild is needed.\n\nComposed with findings-link-fk-delete-safety-20260724 by owner decision 2026-07-29: both changes require SCHEMA_VERSION 3 -> 4, and production must migrate ONCE. The FK delete-safety change (finding_links.target_item is a real FK, so a hosted --replace reload can fail or leave stale links) lands in this same migration and PR. The project todo wrapper has no 'update' subcommand (standalone-only), so that item's scope could not be folded into it in place; it is completed alongside this one against the same landed migration.\n\nOperational coupling: the CLI refuses to run against a DB whose schema_version is below the CLI's SCHEMA_VERSION and migrations never auto-apply, so the moment v4 code is on develop every collaborator's CLI is inert against the live v3 DB until someone runs 'todo migrate'. Land the code and run the hosted migrate together.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add the new columns or finding_sections to EXPORT_TABLE_ALLOWLIST or TRANSFER_TABLES",
+        "instead": "leave them absent so the phase-2 pinning test keeps failing closed on any finding% table by construction",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "why": "findings hold review prose that is deliberately not version-controlled; the export boundary is the whole point of phase 2"
+      },
+      {
+        "dont": "Apply the 3 -> 4 migration against the production hosted tracker before rehearsing it on a scratch or restored snapshot",
+        "instead": "rehearse on a scratch DB with a dedicated TODO_DB_REPLICA, verify tables and row counts, exercise every write path, then land the code and run the hosted todo migrate together under explicit authorization",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "why": "a bad column or FK migration on the shared tracker (~1,650 real records) is hard to reverse, and because the CLI refuses to run below its SCHEMA_VERSION every collaborator's CLI goes inert the moment the code lands"
+      },
+      {
+        "dont": "Introduce a new finding_links.kind value for the legacy todo_id edges",
+        "instead": "reuse the existing kinds -- 'promoted-to' for the 32 merged-to-todo findings and 'resolved-by' for the 4 actioned findings that carry a todo_id",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "why": "kind carries a baked-in CHECK constraint, so a new value forces a finding_links table rebuild inside the migration"
+      },
+      {
+        "dont": "Issue raw DELETE statements or row-by-row bulk writes against the hosted DB",
+        "instead": "use the CLI and the Hrana bulk transfer path",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "why": "the tracker classifier blocks raw DELETEs, and per-row writes cost roughly 0.15 s/statement against the primary"
+      },
+      {
+        "dont": "Squeeze related_paths or suggested_sweep into a free-text row or a shared finding_evidence row",
+        "instead": "use the explicit related_paths and suggested_sweep columns and the finding_sections table",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "why": "the phase-5 parity gate promises field-level preservation, which free text cannot satisfy, and an undiscriminated evidence row cannot be told apart from a genuine evidence entry on the way back out"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "needs_item": "findings-schema-legacy-frontmatter-mapping-20260724"
+      }
+    ],
+    "item_meta": {
+      "category": "tracker",
+      "completed_at": "2026-07-30T00:30:42Z",
+      "completed_pr": 1347,
+      "created_at": "2026-07-29T16:39:51Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "Every existing v3 findings / finding_evidence / finding_links / finding_events row survives the 3 -> 4 migration unchanged",
+        "item_id": "findings-schema-v4-lossless-legacy-fields"
+      },
+      {
+        "behavior": "Every optional frontmatter key and every '## ' body section in the legacy corpus round-trips losslessly",
+        "item_id": "findings-schema-v4-lossless-legacy-fields"
+      },
+      {
+        "behavior": "Existing promoted and linked findings keep their links intact after the FK change",
+        "item_id": "findings-schema-v4-lossless-legacy-fields"
+      },
+      {
+        "behavior": "No findings table, and none of the new columns, ever reaches _project/todo-db-export/ -- the phase-2 export allowlist stays closed by construction",
+        "item_id": "findings-schema-v4-lossless-legacy-fields"
+      },
+      {
+        "behavior": "The documented restore + audit verify drill still passes after the change",
+        "item_id": "findings-schema-v4-lossless-legacy-fields"
+      },
+      {
+        "behavior": "todo finding show --json output stays a superset of what it emits today",
+        "item_id": "findings-schema-v4-lossless-legacy-fields"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_findings.py"
+      },
+      {
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/findings-domain.md"
+      },
+      {
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q",
+        "description": "tracker script tests pass",
+        "expected": "all pass",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "last_result": "pass",
+        "last_run": "2026-07-30T00:30:39Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -q 'related_paths|suggested_sweep|finding_sections|finding_evidence' _project/todo-db-export/",
+        "description": "no findings column or table name leaks into the committed export snapshot",
+        "expected": "no match; the export allowlist stays items-domain only",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_todo_db_standalone_compat_real.py -q -k real_locked_wrapper_preserves_package_export_bytes",
+        "description": "Locked wrapper preserves the package lossless export byte-for-byte",
+        "expected": "focused real-wrapper test passes",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Reproduced both modes on a seeded local v3 DB (promote -> finding_links.target_item -> items). FK ON: the --replace DELETE loop over reversed(TRANSFER_TABLES) aborts with 'FOREIGN KEY constraint failed'. FK OFF (SQLite/libSQL server default): DELETE succeeds leaving 1 stale link and a finding still claiming disposition='promoted' against an unresolvable target. Prototyped the fixes: ON DELETE SET NULL nulls target_item even when the reload REINSERTS the item, destroying promote provenance on every reload -- rejected. DEFERRABLE INITIALLY DEFERRED lets delete+reinsert commit with provenance intact and still refuses a genuine dangler at COMMIT -- chosen.",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "notes": null,
+        "started_at": "2026-07-29T23:06:14Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Rehearse on a scratch v3 DB with a dedicated TODO_DB_REPLICA: seed representative findings, evidence, and promoted links, then capture the current --replace reload failure and stale-link behaviour",
+        "wid": "w1"
+      },
+      {
+        "evidence": "MIGRATIONS[4] adds related_paths + suggested_sweep columns, finding_sections (UNIQUE(finding_id,position), ON DELETE CASCADE, indexed), and rebuilds finding_links with target_item DEFERRABLE INITIALLY DEFERRED. v3 delta frozen as FINDINGS_SCHEMA_V3_SQL so a v2 DB still climbs to exactly v3. Pinned by TestV4MigrationEquivalence: migrated-v3 schema == fresh-v4 schema, rows/links/evidence preserved, reload keeps the link, genuine dangler still refused at COMMIT. 1127 passed.",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "notes": null,
+        "started_at": "2026-07-29T23:11:15Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Implement the 3 -> 4 migration: related_paths and suggested_sweep columns, the finding_sections table, and finding_links delete-safety, as one MIGRATIONS[4] delta shared with SCHEMA_SQL",
+        "wid": "w2"
+      },
+      {
+        "evidence": "parse_draft/insert_finding/get_finding/show --json/_print_finding now handle related_paths (JSON array, order preserved; absent stays NULL), suggested_sweep, extra '## ' sections (verbatim, document order, finding_sections rows) and legacy todo_id -> finding_links with kind by status (promoted-to for promoted, resolved-by for actioned). Unresolvable target keeps its id in the note and is reported. FRONTMATTER_HOMES_PENDING_V4 now empty; guard asserts FRONTMATTER_HOMES == vbs.ALLOWED_FIELDS. 1133 passed.",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "notes": null,
+        "started_at": "2026-07-29T23:18:58Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Teach parse_draft, insert_finding, get_finding, show --json and _print_finding the new columns and sections, including the status-driven promoted-to / resolved-by split for legacy todo_id",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Export boundary still closed at v4: no finding% table in TRANSFER_TABLES or EXPORT_TABLE_ALLOWLIST; finding_sections absent from both; 19 export tests pass incl. the phase-2 pinning test and its finding_evidence fail-closed sentinel. Intent-check over _project/todo-db-export/: 0 rows carry findings-domain JSON keys. NOTE: this item's rung 2 (rg for column/table names) is mis-specified the same way phase-2's rung 3 was -- it matches item PROSE in items.jsonl/index.md, not findings data. The structural gate is the pinning test.",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "notes": null,
+        "started_at": "2026-07-29T23:19:01Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm the export boundary stays closed: the new columns and finding_sections are absent from EXPORT_TABLE_ALLOWLIST and the phase-2 pinning test still fails closed",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Lossless round-trip over the real 65-record corpus at v4 with items seeded from a live snapshot: 65 synced, 0 conflicts, 0 unmapped, 0 round-trip failures across every accepted frontmatter key (incl. related_paths order) and every extra section (byte-verbatim); 8 finding_sections rows; links 32 promoted-to + 4 resolved-by; 0 dangling, 0 stale. Reload drill: DELETE+reinsert over reversed(TRANSFER_TABLES) with foreign_keys ON now commits with the promote link intact (regression test), and a genuine dangler is still refused at COMMIT. 9 restore/transfer tests pass.",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "notes": null,
+        "started_at": "2026-07-29T23:19:04Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add the lossless round-trip check over the full legacy corpus and re-run the restore + audit verify drill on the snapshot, confirming no stale links",
+        "wid": "w5"
+      },
+      {
+        "evidence": "PR #1347 merged to develop 2026-07-29T23:43:40Z (SCHEMA_VERSION=4), then the hosted migration ran against the production benchbox-todo primary: 'applied migration(s) to v4'. Verified post-migration: schema_version=4; ALL baseline counts identical (items=1674, events=4154, work_units=6387, deferrals=664, findings=1, finding_evidence=3, finding_links=0, finding_events=1); findings.related_paths + findings.suggested_sweep present; finding_links rebuilt with 'target_item TEXT REFERENCES items(id) DEFERRABLE INITIALLY DEFERRED'; finding_sections table created (0 rows). CLI works end-to-end against prod again (todo ready returns items). The pre-existing finding retains its 3 evidence rows.",
+        "item_id": "findings-schema-v4-lossless-legacy-fields",
+        "notes": null,
+        "started_at": "2026-07-30T00:30:08Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Land the code and run the coordinated hosted todo migrate together -- REQUIRES EXPLICIT HUMAN AUTHORIZATION per the production-safety gate",
+        "wid": "w6"
+      }
+    ]
+  }
+}

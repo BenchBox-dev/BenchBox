@@ -1,0 +1,245 @@
+{
+  "context": "Keep the inventory's sidecar-presence inference for internal vs community, and\nlayer the vendor signal on top exactly as the item-3 gate resolves it (e.g.\nbundle under results-data/bundles/vendor/ -> vendor-supplied). Read funding\nfrom the bundle's provenance.funding first, then the manifest, defaulting to\n'unspecified'. For the DDL, funding is a plain column; is_ranking_eligible is\nalready a precomputed boolean, so the only change is which visibility states\nmap to true — encode that from provenance.py's mapping so the DDL, inventory,\nand pipeline agree. Because the pipeline that POPULATES the DB is gitignored,\nthis item changes the SCHEMA + tests + inventory only and hands the populate\nlogic + read_model_version bump to item 5.\n",
+  "description": "Integrate the two new signals into the explorer's ingest layer so they reach\nthe browser. Two in-repo surfaces change: (1) scripts/generate_corpus_inventory.py,\nwhich today derives trust_label from submission-manifest-sidecar presence\n(_bundle_trust_label, :41-52) and emits per-bundle metadata + a\nby_trust_label summary; (2) docs/development/browser-duckdb-schema.sql, the\nfrozen read-model DDL that already defines trust_label, visibility, and\nis_ranking_eligible on the `results` table and carries trust_label into\nbenchmark_rankings and cohort_metadata.\n\nThis item teaches the inventory to recognize the maintainer-controlled vendor\nsignal (from item 3) and the funding value (from item 2's provenance block /\nitem 3's manifest), adds a `funding` column to the read-model DDL and the\nranking/cohort projections, and sets is_ranking_eligible = true for\nvendor-supplied per decision D2. It records the required read_model_version\nbump as a hand-off obligation for item 5 (the pipeline that writes the DB is\nnot in this checkout).\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bump read_model_version in the DDL comment without the matching pipeline change",
+        "instead": "(not specified)",
+        "item_id": "corpus-inventory-and-read-model",
+        "why": "record it as an item-5 obligation to avoid a half-applied version."
+      },
+      {
+        "dont": "make funding NULLable in the read model",
+        "instead": "(not specified)",
+        "item_id": "corpus-inventory-and-read-model",
+        "why": "default 'unspecified' keeps the badge/chip logic total."
+      },
+      {
+        "dont": "put the vendor/funding derivation logic in a DuckDB view (violates the bare-column G-11 rule)",
+        "instead": "(not specified)",
+        "item_id": "corpus-inventory-and-read-model",
+        "why": "it belongs in the pipeline/Python."
+      },
+      {
+        "dont": "re-derive label->visibility here; import the mapping from provenance.py.",
+        "instead": "(not specified)",
+        "item_id": "corpus-inventory-and-read-model",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "needs_item": "bundle-schema-and-run-cli"
+      },
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "needs_item": "provenance-vocabulary-and-labels"
+      },
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "needs_item": "submit-manifest-and-validator"
+      }
+    ],
+    "item_meta": {
+      "category": "Feature",
+      "completed_at": "2026-08-10T00:01:38Z",
+      "completed_pr": 1021,
+      "created_at": "2026-07-06T00:00:00Z",
+      "worktree": "results-labels-funding"
+    },
+    "preserves": [
+      {
+        "behavior": "Bundles with no provenance/funding default to funding='unspecified' and today's trust_label derivation is unchanged for internal/community.",
+        "item_id": "corpus-inventory-and-read-model"
+      },
+      {
+        "behavior": "DuckDB views keep projecting only bare columns (no arithmetic/CASE/window in views); all derivation stays in the pipeline (Python).",
+        "item_id": "corpus-inventory-and-read-model"
+      },
+      {
+        "behavior": "corpus-inventory schema_version is bumped if the entry shape changes (currently '2.2').",
+        "item_id": "corpus-inventory-and-read-model"
+      },
+      {
+        "behavior": "corpus-inventory.json remains deterministic (sorted, timestamp-normalized in --check).",
+        "item_id": "corpus-inventory-and-read-model"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/scripts/explorer_pipeline/models.py:73-97 RANKING_ELIGIBLE_VISIBILITIES + RANKING_ELIGIBLE_TRUST_LABELS — supersede (hardcoded sets OMIT public-vendor-reported/vendor-supplied; reconcile with provenance.py so vendor rows rank per D2). Found by item-1 code review.",
+        "decision": "supersede",
+        "item_id": "corpus-inventory-and-read-model",
+        "path": "_project/scripts/explorer_pipeline/models.py:73-97"
+      },
+      {
+        "concept": "benchbox/core/results/provenance.py (item 1) — reference (mapping + funding enum, imported not duplicated)",
+        "decision": "reuse",
+        "item_id": "corpus-inventory-and-read-model",
+        "path": "benchbox/core/results/provenance.py"
+      },
+      {
+        "concept": "docs/development/browser-duckdb-schema.sql results table (trust_label/visibility/is_ranking_eligible) + benchmark_rankings + cohort_metadata — extend (add funding column; wire vendor visibility into ranking eligibility)",
+        "decision": "extend",
+        "item_id": "corpus-inventory-and-read-model",
+        "path": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "concept": "scripts/generate_corpus_inventory.py:41-52 _bundle_trust_label + :63-140 extract_metadata/generate_inventory — extend (add vendor detection, funding extraction, by_funding summary)",
+        "decision": "extend",
+        "item_id": "corpus-inventory-and-read-model",
+        "path": "scripts/generate_corpus_inventory.py:41-52"
+      },
+      {
+        "concept": "tests/unit/core/explorer_pipeline/test_pipeline.py:279-465 trust-label sidecar override tests — extend (add vendor + funding cases)",
+        "decision": "extend",
+        "item_id": "corpus-inventory-and-read-model",
+        "path": "tests/unit/core/explorer_pipeline/test_pipeline.py:279-465"
+      },
+      {
+        "concept": "tests/unit/core/explorer_pipeline/test_read_model_contract.py + tests/unit/cli/test_explorer_build_contract.py — extend (read_model_version + column set)",
+        "decision": "extend",
+        "item_id": "corpus-inventory-and-read-model",
+        "path": "tests/unit/core/explorer_pipeline/test_read_model_contract.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/ (not in checkout; item 5)"
+      },
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/ (not in checkout; item 5)"
+      },
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "kind": "only_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-data/corpus-inventory.json (regenerated)"
+      },
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_corpus_inventory.py"
+      },
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/explorer/"
+      },
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/ (corpus inventory tests)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/generate_corpus_inventory.py --write && uv run -- python -c \"import json; inv=json.load(open('results-data/corpus-inventory.json')); assert 'by_funding' in inv['summary']; assert all('funding' in b for b in inv['bundles'])\"",
+        "description": "Inventory includes funding + by_funding and vendor labels",
+        "expected": "no assertion error",
+        "item_id": "corpus-inventory-and-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/generate_corpus_inventory.py --check",
+        "description": "Inventory --check is stable after --write",
+        "expected": "OK: corpus-inventory.json is up-to-date",
+        "item_id": "corpus-inventory-and-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ tests/unit/explorer/ -q",
+        "description": "Read-model + explorer pipeline contract tests pass with the new column",
+        "expected": "all pass (or documented xfails pending item 5 pipeline change)",
+        "item_id": "corpus-inventory-and-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import duckdb; con=duckdb.connect(); con.execute(open('docs/development/browser-duckdb-schema.sql').read())\"",
+        "description": "DDL parses",
+        "expected": "no error",
+        "item_id": "corpus-inventory-and-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "corpus-inventory-and-read-model",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "corpus-inventory-and-read-model",
+        "notes": "Resolve via item-1 mapping + item-3 vendor signal (not just community-vs-default); extract funding from the bundle provenance block/manifest; add funding to each entry and a by_funding counter to the summary; retire the local COMMUNITY/DEFAULT literals.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "In generate_corpus_inventory.py, resolve trust_label via the item-1 mapping and the item-3 vendor signal, and extract funding from the bundle. Import constants from provenance.py.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "corpus-inventory-and-read-model",
+        "notes": "Propagate into benchmark_rankings and cohort_metadata; ensure the vendor visibility state is treated as ranking-eligible in the is_ranking_eligible derivation (computed in Python per the G-11 views-are-bare-columns rule).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `funding VARCHAR NOT NULL` to the `results` table in browser-duckdb-schema.sql and propagate it where trust_label travels.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "corpus-inventory-and-read-model",
+        "notes": "Record the required read_model_version bump as an explicit obligation passed to item 5.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update the read-model contract tests + corpus-inventory tests for the new column/summary and the vendor/funding cases.",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,247 @@
+{
+  "context": "Keep the Makefile flow, but make its preconditions explicit and testable.\nUse one-shot `gh` inspection rather than long local polling. Treat missing\nrequired contexts as a contract failure that blocks local finalization.\n",
+  "description": "`make release-finalize` currently squash-merges the release PR, immediately\nfast-forwards local `main`, creates tag `vX.Y.Z`, and pushes the tag. That\nmeans push-to-main workflow jobs, including the integration job that runs on\n`main` pushes, cannot complete before the tag fires `.github/workflows/release.yml`.\n\nAfter `release-required-main-pr-test-contract` creates a pre-merge required\nrelease context, `release-finalize` must be hardened so operators cannot\nmistake post-merge/push-to-main checks for pre-publish evidence. This TODO\nowns the final release-command sequencing and operator messaging.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a local sleep/poll loop that waits for push-to-main integration after merge",
+        "instead": "(not specified)",
+        "item_id": "release-finalize-pretag-ci-wait",
+        "why": "publication safety must happen before merge."
+      },
+      {
+        "dont": "bypass `gh pr merge` errors with `|| true`",
+        "instead": "(not specified)",
+        "item_id": "release-finalize-pretag-ci-wait",
+        "why": "failed merge must stop tag creation."
+      },
+      {
+        "dont": "claim `release.yml` is a correctness gate",
+        "instead": "(not specified)",
+        "item_id": "release-finalize-pretag-ci-wait",
+        "why": "it is the tag publish pipeline."
+      },
+      {
+        "dont": "create test tags or temporary release branches in automated tests.",
+        "instead": "(not specified)",
+        "item_id": "release-finalize-pretag-ci-wait",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "release-finalize-pretag-ci-wait",
+        "id": 464,
+        "reason": "Polling can make local command behavior ambiguous; initial hardening should fail fast and let GitHub Actions be the source of pending state.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicit design decision to fail-fast over polling for release-PR checks; not a pending task.",
+        "summary": "Auto-watch pending release PR checks inside `release-finalize`"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "needs_item": "release-required-main-pr-test-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "created_at": "2026-05-25T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No command in tests actually pushes tags, merges PRs, or publishes packages.",
+        "item_id": "release-finalize-pretag-ci-wait"
+      },
+      {
+        "behavior": "`release-finalize` still creates and pushes the public version tag only after the release PR has merged.",
+        "item_id": "release-finalize-pretag-ci-wait"
+      },
+      {
+        "behavior": "`release-finalize` still refuses to proceed when no open `vX.Y.Z -> main` PR exists.",
+        "item_id": "release-finalize-pretag-ci-wait"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/RELEASE_PR_TEMPLATE.md:After CI green checklist — reuse as human release checkpoint",
+        "decision": "reuse",
+        "item_id": "release-finalize-pretag-ci-wait",
+        "path": ".github/RELEASE_PR_TEMPLATE.md:After"
+      },
+      {
+        "concept": "Makefile:release-finalize — extend existing two-command release flow instead of replacing it with a separate script",
+        "decision": "extend",
+        "item_id": "release-finalize-pretag-ci-wait",
+        "path": "Makefile:release-finalize"
+      },
+      {
+        "concept": "docs/operations/release-guide.md:release flow — update operator-facing release sequencing",
+        "decision": "reuse",
+        "item_id": "release-finalize-pretag-ci-wait",
+        "path": "docs/operations/release-guide.md:release"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "kind": "only_modify",
+        "path_glob": ".github/RELEASE_PR_TEMPLATE.md"
+      },
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/release-finalize-pretag-ci-wait.yaml"
+      },
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/release-guide.md"
+      },
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_release_infrastructure.py -q",
+        "description": "Release-finalize command-shape tests pass",
+        "expected": "all tests pass",
+        "item_id": "release-finalize-pretag-ci-wait",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "for path in docs/operations/release-guide.md .github/RELEASE_PR_TEMPLATE.md; do grep -q \"release-required-result\" \"$path\" || exit 1; done && grep -q \"post-merge\" docs/operations/release-guide.md\n",
+        "description": "Release docs name pre-merge required context and post-merge caveat",
+        "expected": "release-required-result is present in both release docs surfaces and post-merge caveat is present in release-guide",
+        "item_id": "release-finalize-pretag-ci-wait",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/release-finalize-pretag-ci-wait.yaml\n",
+        "description": "TODO graph remains valid",
+        "expected": "exit 0",
+        "item_id": "release-finalize-pretag-ci-wait",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "release-finalize-pretag-ci-wait",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "release-finalize-pretag-ci-wait",
+        "notes": "Capture raw output under `/tmp/release-finalize-pretag-w0/` and commit\nonly a compact summary in PR body or TODO notes.\n\nRequired commands:\n  - `sed -n '817,830p' Makefile`\n  - `gh pr view --help | sed -n '1,120p'` if `gh` is available\n  - `gh pr checks --help | sed -n '1,160p'` if `gh` is available\n\nDecision gate:\n  - If `release-finalize` has already been changed to wait for\n    release-required checks before tagging, update this TODO with the\n    commit and convert remaining work into tests/docs only.\n\nImplementation evidence:\n  - Captured raw w0 output under `/tmp/release-finalize-pretag-w0/`.\n  - Baseline `Makefile` target found the `vX.Y.Z -> main` PR, printed a\n    generic CI-green message, squash-merged, then immediately fetched,\n    checked out `main`, tagged, and pushed.\n  - `gh pr checks --help` supports `--required`, `--json`, `--jq`, and\n    returns exit code 8 for pending checks; the implemented guard treats\n    exit 8 as inspectable pending state rather than success.\n  - Decision: require exactly `release-required-result` in the required\n    check set before `gh pr merge --squash`, and fail closed for missing,\n    pending, failed, canceled, skipped, duplicate, or unexpected states.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate current release-finalize sequencing and available required-check APIs",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-finalize-pretag-ci-wait",
+        "notes": "Before `gh pr merge --squash`, verify the release PR has the expected\nrelease-required status context and that it is successful.\n\nAcceptable implementation:\n  - Query `gh pr view` / `gh pr checks` once.\n  - Fail with a clear message if `release-required-result` is missing,\n    pending, skipped unexpectedly, or failed.\n  - Do not poll inside `release-finalize`; pending is a terminal local\n    state that tells the operator to wait in GitHub Actions.\n\nDecision gate:\n  - Do not merge if the stable required context is absent. Absence means\n    the ruleset/workflow contract is broken, not that release can proceed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a non-polling precondition check that release PR required contexts are green before merge",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-finalize-pretag-ci-wait",
+        "notes": "Update release docs and command output to say explicitly:\n  - push-to-main jobs are post-merge signals,\n  - release publication depends on the release PR required result, not on\n    jobs that start after `main` advances,\n  - if post-merge `main` checks fail after a tag, recovery is a patch\n    release or incident process, not pretending the release was blocked.\n\nDecision gate:\n  - Do not add a wait for push-to-main integration after merge and before\n    tagging as the primary safety mechanism. The correct safety mechanism\n    is pre-merge `release-required-result`; waiting after merge still\n    leaves an awkward merged-but-untagged release state.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prevent tag push from depending on post-merge push-to-main checks",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-finalize-pretag-ci-wait",
+        "notes": "Add fast tests that parse `Makefile` and release docs to prove:\n  - `release-finalize` checks for `release-required-result` before merge,\n  - command output no longer implies generic \"CI green\" without naming the\n    required release context,\n  - docs distinguish pre-merge required checks from post-merge push checks.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Makefile/release-guide tests for finalize preconditions and messaging",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-finalize-pretag-ci-wait",
+        "notes": "Use a mocked shell/script test where possible; do not create tags or merge\nreal PRs during unit verification.\n\nRequired failure modes:\n  - required context missing,\n  - required context pending,\n  - required context failed,\n  - no release PR found,\n  - successful path reaches the existing tag commands only after the\n    precondition passes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run an explicit dry-run or mocked-shell verification of release-finalize failure modes",
+        "wid": "w4"
+      }
+    ]
+  }
+}

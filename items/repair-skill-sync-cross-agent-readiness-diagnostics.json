@@ -1,0 +1,183 @@
+{
+  "context": "Fix this in the skill-sync implementation using BenchBox as a regression fixture. Define each readiness dimension explicitly, honor ignore semantics consistently, detect instruction-only consumers accurately, preserve machine-readable output where possible, and document aggregate exit behavior.",
+  "description": "The audit found contradictory skill-sync signals in BenchBox: verify passes the tracked Claude snapshot while status and doctor report every Codex, Gemini, and Antigravity skill missing; an intentionally ignored Claude blog skill is also reported missing; and Copilot is reported unconfigured even though repository instructions support AGENTS.md. The CLI must distinguish tracked snapshot integrity, local materialization readiness, and whole-project cross-agent readiness so a green command cannot be over-interpreted.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Auto-sync missing targets from status or doctor",
+        "instead": "Report precise remediation commands",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "why": "A diagnostic command must not mutate agent configuration"
+      },
+      {
+        "dont": "Make verify imply that every configured local target exists",
+        "instead": "Expose and name the dimensions separately",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "why": "Tracked snapshot integrity and local readiness are different claims"
+      }
+    ],
+    "item_meta": {
+      "category": "Agent infrastructure",
+      "completed_at": "2026-07-27T16:04:05Z",
+      "completed_pr": 6,
+      "created_at": "2026-07-27T15:47:11Z",
+      "worktree": "skill-sync"
+    },
+    "preserves": [
+      {
+        "behavior": "JSON output remains machine-readable and backward-compatible, or introduces an explicit schema version",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics"
+      },
+      {
+        "behavior": "status and doctor remain read-only and never materialize absent targets",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics"
+      },
+      {
+        "behavior": "verify continues to prove tracked target bytes against the lock and configuration",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Tracked Claude snapshot verification",
+        "decision": "extend",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "path": "/Users/joe/Developer/BenchBox/Makefile"
+      },
+      {
+        "concept": "Configured target and ignore semantics",
+        "decision": "reuse",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "path": "/Users/joe/Developer/BenchBox/skill-sync.yaml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/skill-sync/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/skill-sync && npm run test:run",
+        "description": "skill-sync test suite passes",
+        "expected": "exit 0",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "last_result": "pass",
+        "last_run": "2026-07-27T16:03:54Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/skill-sync && npm run check && npm run lint",
+        "description": "Type, formatting, and lint checks pass",
+        "expected": "exit 0",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "last_result": "pass",
+        "last_run": "2026-07-27T16:03:58Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/BenchBox && node /Users/joe/Developer/skill-sync/dist/cli/index.js status --json | jq -e \".targets and .instructions\" >/dev/null",
+        "description": "BenchBox JSON diagnostics expose explicit target and instruction state",
+        "expected": "exit 0",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "last_result": "pass",
+        "last_run": "2026-07-27T16:04:01Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Captured before-state in /tmp: verify clean for tracked Claude, status 1/19/19/19 missing, doctor warnings, and Copilot configured=false. Implemented in /Users/joe/Developer/skill-sync.agent-readiness on fix/cross-agent-readiness.",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "notes": null,
+        "started_at": "2026-07-27T15:55:13Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Capture reproducible BenchBox status, doctor, and verify outputs and specify the intended readiness dimensions",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Policy-aware readiness reports Claude blog as state=ignored, materializationState=missing, summary missing=0 ignored=1; regression tests pass.",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "notes": null,
+        "started_at": "2026-07-27T15:59:19Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Make ignored skills distinct from missing skills in status and doctor",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added schemaVersion 2 additive readiness dimensions for tracked snapshots, local materialization, and instructions in status and doctor; verify behavior unchanged.",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "notes": null,
+        "started_at": "2026-07-27T15:59:26Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Separate tracked snapshot integrity from configured-target materialization and define aggregate exit behavior",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added AGENTS.md/CLAUDE.md/GEMINI.md Copilot discovery; BenchBox now reports Copilot instructionConfigured=true with targetConfigured=false.",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "notes": null,
+        "started_at": "2026-07-27T15:59:35Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Recognize AGENTS.md as the supported Copilot instruction surface without inventing a generated mirror",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Added focused and integration regressions plus CLI/usage docs; final delegated gate: 38 files, 389 tests, typecheck and lint all pass; BenchBox built-CLI assertions pass.",
+        "item_id": "repair-skill-sync-cross-agent-readiness-diagnostics",
+        "notes": null,
+        "started_at": "2026-07-27T15:59:43Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add unit and integration fixtures plus CLI documentation for the corrected semantics",
+        "wid": "w4"
+      }
+    ]
+  }
+}

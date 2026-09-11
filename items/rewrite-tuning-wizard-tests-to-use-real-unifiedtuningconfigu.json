@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #237 of remediate-coverage-theater.\nDeferred: Rewrite tuning wizard tests to use real UnifiedTuningConfiguration objects\nReason deferred: Lower priority - tuning wizard is user-facing but not on critical path",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:01Z",
+      "worktree": "main"
+    }
+  }
+}

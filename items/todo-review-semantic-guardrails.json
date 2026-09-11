@@ -1,0 +1,206 @@
+{
+  "context": "Separate deterministic checks from reviewer judgement. Add conservative\ntooling where the pattern is structurally detectable, and update review\nguidance where semantic context is required.\n",
+  "description": "Follow-up from the PR 719 TODO review L2 audit. The review found defects that\nschema validation did not catch:\n\n- mutually exclusive work units encoded as normal pending work, even though the\n  TODO lifecycle has no skipped/waived work status;\n- verification commands whose shell semantics can produce ambiguous output;\n- missing `prior_art` on TODOs that add new modules, file locations, or\n  conventions;\n- evidence wording that uses one label for different domains, such as local\n  Docker host port vs adapter service/container port.\n\nThese are review-framework blind spots. Capture them as reusable TODO-review\nguardrails so future TODO reviews fail the pattern directly instead of relying\non reviewer memory.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a broad skipped status just to paper over mutually exclusive work units.",
+        "instead": "(not specified)",
+        "item_id": "todo-review-semantic-guardrails",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "edit generated skill mirrors directly; update the canonical source if skill guidance changes.",
+        "instead": "(not specified)",
+        "item_id": "todo-review-semantic-guardrails",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make fragile keyword checks fail large classes of valid TODOs without a clear escape hatch.",
+        "instead": "(not specified)",
+        "item_id": "todo-review-semantic-guardrails",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "todo-review-semantic-guardrails",
+        "id": 34,
+        "reason": "That would alter TODO lifecycle semantics; this item should first enforce the current model.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Introduce a skipped/waived work status"
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Tooling",
+      "created_at": "2026-05-31T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing valid TODOs with normal decision work remain valid.",
+        "item_id": "todo-review-semantic-guardrails"
+      },
+      {
+        "behavior": "The current work-unit completion model is not changed unless separately chartered.",
+        "item_id": "todo-review-semantic-guardrails"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "/Users/joe/.skill-sync/skills/todo/SKILL.md review action — update reviewer guidance through the canonical skill source, not generated mirrors",
+        "decision": "reuse",
+        "item_id": "todo-review-semantic-guardrails",
+        "path": "/Users/joe/.skill-sync/skills/todo/SKILL.md"
+      },
+      {
+        "concept": "_project/TODO/main/planning/uat-certification-rerun-ordering-and-gate.yaml — reuse as a positive example with prior_art and concrete verification",
+        "decision": "reuse",
+        "item_id": "todo-review-semantic-guardrails",
+        "path": "_project/TODO/main/planning/uat-certification-rerun-ordering-and-gate.yaml"
+      },
+      {
+        "concept": "_project/TODO_SCHEMA.yaml — reuse existing work/status schema; do not add a skipped status casually",
+        "decision": "reuse",
+        "item_id": "todo-review-semantic-guardrails",
+        "path": "_project/TODO_SCHEMA.yaml"
+      },
+      {
+        "concept": "_project/scripts/validate_todo.py — extend for machine-checkable semantic TODO rules when reliable",
+        "decision": "extend",
+        "item_id": "todo-review-semantic-guardrails",
+        "path": "_project/scripts/validate_todo.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-review-semantic-guardrails",
+        "kind": "do_not_modify",
+        "path_glob": ".agents/skills/ or .codex/skills/ generated mirrors directly"
+      },
+      {
+        "item_id": "todo-review-semantic-guardrails",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/ runtime code"
+      },
+      {
+        "item_id": "todo-review-semantic-guardrails",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/ runtime behavior"
+      },
+      {
+        "item_id": "todo-review-semantic-guardrails",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.skill-sync/skills/todo/SKILL.md for canonical review guidance, followed by make skill-sync"
+      },
+      {
+        "item_id": "todo-review-semantic-guardrails",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/ or _project/DONE/ test fixtures if needed"
+      },
+      {
+        "item_id": "todo-review-semantic-guardrails",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO_SCHEMA.yaml"
+      },
+      {
+        "item_id": "todo-review-semantic-guardrails",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/validate_todo.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -k 'todo and semantic_guardrail' -q",
+        "description": "TODO semantic guardrail tests pass",
+        "expected": "0 failures",
+        "item_id": "todo-review-semantic-guardrails",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all",
+        "description": "TODO graph and schema validation remain clean",
+        "expected": "graph validation passed and all TODO/DONE files valid",
+        "item_id": "todo-review-semantic-guardrails",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-review-semantic-guardrails",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-review-semantic-guardrails",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "todo-review-semantic-guardrails",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "todo-review-semantic-guardrails",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "todo-review-semantic-guardrails",
+        "notes": "Inspect validate_todo.py, TODO_SCHEMA.yaml, todo_cli.py completion logic,\nand the todo skill review guidance. Record which guardrails can be\nmachine-checked and which belong in reviewer guidance.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-validate the PR 719 review gaps against current TODO tooling",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-review-semantic-guardrails",
+        "notes": "Candidate checks: pending work notes that use branch-selection language\nwithout a single completion path; verification commands with known\nambiguous shell constructs; TODOs adding new modules, env vars, file\nlocations, or conventions without prior_art. Prefer conservative warnings\nwhen false positives are likely.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add the machine-checkable guardrails",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-review-semantic-guardrails",
+        "notes": "Add review guidance for same-label/different-domain evidence claims,\nespecially infrastructure facts like host port vs service port where the\ncorrect fix is explicit modeling rather than forcing one value.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update TODO-review guidance for judgement-based guardrails",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-review-semantic-guardrails",
+        "notes": "Add focused tests or fixture TODOs covering conditional work units, missing\nprior_art, ambiguous verification commands, and the allowed replacement\npattern: one required implementation work unit plus deferred unchosen path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add regression fixtures/tests for the new guardrails",
+        "wid": "w3"
+      }
+    ]
+  }
+}

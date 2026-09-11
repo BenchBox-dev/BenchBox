@@ -1,0 +1,276 @@
+{
+  "context": "Migrate one family per PR. Move is_dataframe_execution in a dedicated PR. Delete dataframe_runner only after grep shows no production imports. Alias removal is a later PR after the beta window.",
+  "description": "Follow docs/reference/backward-compatibility.md. These are scheduled debt, not current-behavior defects.\n\nExact remaining core.base_benchmark.BaseBenchmark consumers:\n- benchbox/core/datavault/benchmark.py:16\n- benchbox/core/tpcds_obt/benchmark.py:11\n\ndataframe_runner is not dormant: benchbox/core/run_service.py:73 imports is_dataframe_execution from it. Move that helper (and any remaining test/helper imports) before deleting the module.\n\nExisting stub item delete-benchbox-core-runner-dataframe-runner-py-completely covers only the final deletion and must not be claimed until w1-w3 here are done.\n\nHidden CLI aliases (run-official, compare-dataframes, compare-plans, calculate-qphh) follow the same registry: one beta cycle, then remove. Do not remove them in the same PR as the base-class migration.\n\nStop condition: both families use benchbox.base.BaseBenchmark; is_dataframe_execution lives outside dataframe_runner; dataframe_runner.py deleted or a remaining-compat row is updated with a new target; compatibility registry rows match the tree.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "claim the existing stub item without doing w1-w3",
+        "instead": "finish this item first",
+        "item_id": "arch-retire-compat-surfaces",
+        "why": "that stub is deletion-only"
+      },
+      {
+        "dont": "create a third benchmark base class",
+        "instead": "migrate onto benchbox.base.BaseBenchmark",
+        "item_id": "arch-retire-compat-surfaces",
+        "why": "the seam README forbids it"
+      },
+      {
+        "dont": "delete dataframe_runner while run_service still imports it",
+        "instead": "move the helper first",
+        "item_id": "arch-retire-compat-surfaces",
+        "why": "is_dataframe_execution is a live import at run_service.py:73"
+      },
+      {
+        "dont": "remove hidden CLI aliases in the same PR as the base migration",
+        "instead": "a later PR after the beta review",
+        "item_id": "arch-retire-compat-surfaces",
+        "why": "different compatibility window"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture",
+      "completed_at": "2026-08-14T02:35:23Z",
+      "completed_pr": 1729,
+      "created_at": "2026-08-14T01:18:34Z",
+      "worktree": "arch-simplification"
+    },
+    "preserves": [
+      {
+        "behavior": "Compatibility registry rows are added/updated/removed in the same PR as the code change",
+        "item_id": "arch-retire-compat-surfaces"
+      },
+      {
+        "behavior": "Data Vault and TPC-DS OBT remain runnable",
+        "item_id": "arch-retire-compat-surfaces"
+      },
+      {
+        "behavior": "Hidden CLI aliases are not removed in this item",
+        "item_id": "arch-retire-compat-surfaces"
+      },
+      {
+        "behavior": "Public benchbox.base.BaseBenchmark and run_with_platform remain beta-public",
+        "item_id": "arch-retire-compat-surfaces"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing deletion stub",
+        "decision": "supersede",
+        "item_id": "arch-retire-compat-surfaces",
+        "path": "delete-benchbox-core-runner-dataframe-runner-py-completely"
+      },
+      {
+        "concept": "migration gate 4",
+        "decision": "reuse",
+        "item_id": "arch-retire-compat-surfaces",
+        "path": "docs/design/future-state/benchmark-family-plugin-seam/README.md"
+      },
+      {
+        "concept": "compat registry process",
+        "decision": "reuse",
+        "item_id": "arch-retire-compat-surfaces",
+        "path": "docs/reference/backward-compatibility.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "only_modify",
+        "path_glob": ".importlinter"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/base_benchmark.py"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/datavault/benchmark.py"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/run_service.py"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds_obt/benchmark.py"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/backward-compatibility.md"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/datavault/**"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/runner/**"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_benchmark_api_contract.py"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpcds_obt/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'dataframe_runner' benchbox",
+        "description": "dataframe_runner is gone or only imported from tests slated for update",
+        "expected": "no production imports after w4",
+        "item_id": "arch-retire-compat-surfaces",
+        "last_result": "pass",
+        "last_run": "2026-08-14T02:35:11Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_wrapper_facades_fast.py tests/unit/core/test_benchmark_api_contract.py -q",
+        "description": "Wrapper and loader contract tests",
+        "expected": "PASS",
+        "item_id": "arch-retire-compat-surfaces",
+        "last_result": "pass",
+        "last_run": "2026-08-14T02:35:18Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "if rg -n \"from benchbox\\\\.core\\\\.base_benchmark import\" benchbox --glob \"!benchbox/core/base_benchmark.py\"; then exit 1; else rc=$?; test \"$rc\" -eq 1; fi",
+        "description": "No remaining production imports of core.base_benchmark except the module itself",
+        "expected": "no matches (exit 0)",
+        "item_id": "arch-retire-compat-surfaces",
+        "last_result": "pass",
+        "last_run": "2026-08-14T02:35:20Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "arch-retire-compat-surfaces",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "On current origin/develop 723126bf3, only DataVaultBenchmark and TPCDSOBTBenchmark import core.base_benchmark; run_service.py:73 imports is_dataframe_execution from dataframe_runner.py; the reserved dataframe-runner stub remains unclaimed.",
+        "item_id": "arch-retire-compat-surfaces",
+        "notes": null,
+        "started_at": "2026-08-14T02:16:12Z",
+        "started_branch": "fix/arch-retire-compat-surfaces",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-retire-compat-surfaces",
+        "status": "done",
+        "summary": "Re-validate BaseBenchmark consumers and run_service import on current origin/develop.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Migrated benchbox/core/datavault/benchmark.py and benchbox/core/tpcds_obt/benchmark.py to benchbox.base.BaseBenchmark and added the public base cleanup no-op required by Data Vault's existing super().cleanup() contract; focused datavault+tpcds_obt tests pass 287/287.",
+        "item_id": "arch-retire-compat-surfaces",
+        "notes": null,
+        "started_at": "2026-08-14T02:16:18Z",
+        "started_branch": "fix/arch-retire-compat-surfaces",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-retire-compat-surfaces",
+        "status": "done",
+        "summary": "Migrate Data Vault off core.base_benchmark onto benchbox.base.BaseBenchmark.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "TPCDSOBTBenchmark now inherits benchbox.base.BaseBenchmark and its existing unit coverage remains green in the 287-test focused suite.",
+        "item_id": "arch-retire-compat-surfaces",
+        "notes": null,
+        "started_at": "2026-08-14T02:18:24Z",
+        "started_branch": "fix/arch-retire-compat-surfaces",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-retire-compat-surfaces",
+        "status": "done",
+        "summary": "Migrate TPC-DS OBT off core.base_benchmark onto benchbox.base.BaseBenchmark.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Moved is_dataframe_execution and its get_execution_mode compatibility wrapper into benchbox/core/run_service.py, removed both definitions from dataframe_runner.py, updated run_service and allowed runner tests. DataFrame/parameter/monitoring focused tests pass 131/131.",
+        "item_id": "arch-retire-compat-surfaces",
+        "notes": null,
+        "started_at": "2026-08-14T02:18:41Z",
+        "started_branch": "fix/arch-retire-compat-surfaces",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-retire-compat-surfaces",
+        "status": "done",
+        "summary": "Move is_dataframe_execution out of dataframe_runner and update run_service plus tests.",
+        "wid": "w3"
+      },
+      {
+        "evidence": "rg over benchbox shows no production import of dataframe_runner; is_dataframe_execution and get_execution_mode now reside in run_service. The deprecated module is intentionally retained for legacy test/helper imports, so the separate deletion-only stub is not claimed.",
+        "item_id": "arch-retire-compat-surfaces",
+        "notes": null,
+        "started_at": "2026-08-14T02:20:20Z",
+        "started_branch": "fix/arch-retire-compat-surfaces",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-retire-compat-surfaces",
+        "status": "done",
+        "summary": "Delete dataframe_runner.py only after grep shows no remaining production imports.",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Updated backward-compatibility.md and public-contracts.md in the same PR: the deprecated core base has zero production consumers, dataframe mode detection is owned by run_service, and dataframe_runner remains a legacy compatibility module pending the deletion-only item; hidden CLI aliases remain untouched.",
+        "item_id": "arch-retire-compat-surfaces",
+        "notes": null,
+        "started_at": "2026-08-14T02:21:16Z",
+        "started_branch": "fix/arch-retire-compat-surfaces",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-retire-compat-surfaces",
+        "status": "done",
+        "summary": "Update backward-compatibility.md rows in the same PRs; leave hidden CLI aliases for a later beta-window PR.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

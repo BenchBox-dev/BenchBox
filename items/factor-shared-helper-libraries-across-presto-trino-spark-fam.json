@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #114 of centralize-ddl-translation-phase.\nDeferred: Factor shared helper libraries across Presto/Trino/Spark-family DDL optimizers after parity is established\nReason deferred: First move ownership centrally; de-duplication is a separate cleanup pass",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:33:52Z",
+      "worktree": "main"
+    }
+  }
+}

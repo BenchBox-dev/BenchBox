@@ -1,0 +1,215 @@
+{
+  "description": "`results-data/corpus-inventory.json` is currently maintained by hand. It\nenumerates every bundle in the seed corpus with metadata (benchmark,\nplatform, scale, trust label, hash). Once Phase 2 community PRs start\nlanding, hand-maintenance will drift: contributors will forget to update\nthe inventory, maintainers will forget to nudge them, and the explorer\nstatic-build pipeline will silently see a stale view of the corpus.\n\nThis item replaces the hand-maintained file with a generated one. The\ngenerator scans `results-data/bundles/` recursively, extracts metadata\nfrom each bundle's schema-v2 header (and sidecar manifest where present),\nand writes a deterministic, sorted `corpus-inventory.json`. A pre-commit\nhook and a CI step prevent drift.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "auto-regenerate during the pipeline build",
+        "instead": "(not specified)",
+        "item_id": "automate-corpus-inventory-generation",
+        "why": "PRs need to fail loudly with \"run the script\" guidance, not silently regenerate and hide drift."
+      },
+      {
+        "dont": "include `generated_at` in `--check` mode",
+        "instead": "(not specified)",
+        "item_id": "automate-corpus-inventory-generation",
+        "why": "timestamp drift would defeat the purpose; the deterministic comparison must be byte-stable."
+      },
+      {
+        "dont": "parse the submission-manifest.json contents for trust resolution",
+        "instead": "(not specified)",
+        "item_id": "automate-corpus-inventory-generation",
+        "why": "the established contract (PR"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "automate-corpus-inventory-generation",
+        "needs_item": "implement-pr-based-result-submission-workflow"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-12T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing fields/shape consumed by any downstream tool referencing `corpus-inventory.json`. Audit consumers in w5 before changing the shape.",
+        "item_id": "automate-corpus-inventory-generation"
+      },
+      {
+        "behavior": "Existing pipeline at `benchbox/core/explorer_pipeline/` - it builds its own manifest; the inventory is a separate, lighter index.",
+        "item_id": "automate-corpus-inventory-generation"
+      },
+      {
+        "behavior": "The schema-v2 bundle format and the trust-label sidecar contract - generator reads, never mutates.",
+        "item_id": "automate-corpus-inventory-generation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "automate-corpus-inventory-generation",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "item_id": "automate-corpus-inventory-generation",
+        "kind": "only_modify",
+        "path_glob": ".pre-commit-config.yaml"
+      },
+      {
+        "item_id": "automate-corpus-inventory-generation",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "automate-corpus-inventory-generation",
+        "kind": "only_modify",
+        "path_glob": "results-data/corpus-inventory.json"
+      },
+      {
+        "item_id": "automate-corpus-inventory-generation",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_corpus_inventory.py"
+      },
+      {
+        "item_id": "automate-corpus-inventory-generation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_generate_corpus_inventory.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/generate_corpus_inventory.py --write && uv run -- python scripts/generate_corpus_inventory.py --check",
+        "description": "Generator runs cleanly against current corpus, --check passes after --write",
+        "expected": "exit 0 from both runs",
+        "item_id": "automate-corpus-inventory-generation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_generate_corpus_inventory.py -q",
+        "description": "Unit tests pass",
+        "expected": "all tests pass",
+        "item_id": "automate-corpus-inventory-generation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/generate_corpus_inventory.py --write && cp results-data/corpus-inventory.json /tmp/inv1.json && uv run -- python scripts/generate_corpus_inventory.py --write && diff /tmp/inv1.json results-data/corpus-inventory.json",
+        "description": "Generated file is byte-identical when run twice (deterministic)",
+        "expected": "no diff (modulo generated_at if not stripped)",
+        "item_id": "automate-corpus-inventory-generation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "automate-corpus-inventory-generation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "automate-corpus-inventory-generation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "automate-corpus-inventory-generation",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "automate-corpus-inventory-generation",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "automate-corpus-inventory-generation",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "automate-corpus-inventory-generation",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "automate-corpus-inventory-generation",
+        "notes": "Inputs: scan `results-data/bundles/` for `*.json` (excluding sidecar\nfiles matching `submission-manifest.json` and any `.plans.json` /\n`.tuning.json` companions).\n\nFor each bundle:\n  - Parse schema-v2 header: benchmark, platform, scale_factor,\n    timestamp, query_count, query_set\n  - Detect sibling `submission-manifest.json` → trust_label =\n    community-submission, else default maintainer-run\n  - Compute SHA256 of the bundle file\n  - Capture relative path\n\nOutput: `results-data/corpus-inventory.json` with\n  - `generated_at` (UTC ISO timestamp, omit if --check)\n  - `bundles[]` sorted by (benchmark, platform, scale_factor, timestamp)\n  - `cohorts` summary: per-(benchmark, scale) lists of platforms\n  - `summary`: total_bundles, by_benchmark, by_platform, by_trust_label\n\nFlags:\n  - `--check` → exit 1 if generated content differs from on-disk file\n    (no write, deterministic - no `generated_at`)\n  - `--write` → overwrite `corpus-inventory.json`\nDefault: `--write`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write `scripts/generate_corpus_inventory.py`",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "automate-corpus-inventory-generation",
+        "notes": "`tests/unit/scripts/test_generate_corpus_inventory.py`:\n  - Empty bundles dir → empty inventory with consistent shape\n  - Single bundle without sidecar → maintainer-run trust label\n  - Single bundle with sidecar → community-submission\n  - Multiple bundles → sorted deterministically\n  - Cohort summary: 3 platforms at same (benchmark, scale) groups\n    correctly\n  - Hash matches sha256 of bundle file\n  - `--check` returns 0 on match, 1 on drift, prints diff\n  - Companion files (.plans.json, .tuning.json) excluded from bundle\n    enumeration\n  - Malformed bundle JSON → fail with clear message naming the file\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for the generator",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "automate-corpus-inventory-generation",
+        "notes": "Update `.github/workflows/validate-submission.yml` to add a step after\nbundle validation:\n  `uv run python scripts/generate_corpus_inventory.py --check`\nA failing check posts a PR comment instructing the contributor to run\n`uv run python scripts/generate_corpus_inventory.py --write` locally\nand amend the PR. Keep the message friendly - most contributors will\nnot have read the contributor guide before this point.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire the generator into validate-submission CI workflow",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "automate-corpus-inventory-generation",
+        "notes": "Add to `.pre-commit-config.yaml` (or create one if absent):\n  - id: corpus-inventory\n    name: corpus-inventory drift check\n    entry: uv run python scripts/generate_corpus_inventory.py --check\n    files: ^results-data/bundles/\n    language: system\n    pass_filenames: false\nDocument hook installation in `docs/contributing-results.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add pre-commit hook entry for the generator",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "automate-corpus-inventory-generation",
+        "notes": "1. Run `--write` against the current corpus.\n2. Diff against the existing hand-maintained file. Any diff is suspect:\n   investigate whether the hand-maintained file is right (then fix the\n   generator) or the generator is right (then commit the regenerated\n   file with a chore commit).\n3. The pipeline at `benchbox/core/explorer_pipeline/` already derives\n   its own manifest, so confirm no consumer depends on the\n   hand-curated shape.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate corpus-inventory.json and reconcile differences",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "automate-corpus-inventory-generation",
+        "notes": "Update `docs/contributing-results.md`:\n  - Replace any \"edit corpus-inventory.json\" instruction with\n    \"run `uv run python scripts/generate_corpus_inventory.py --write`\".\n  - Note that CI will reject PRs whose inventory drifts.\nAdd a one-liner to the Phase 2 ops runbook (TODO\n`write-results-platform-phase-2-operations-runbook`) referencing the\nsame.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the generator in contributor guide and ops runbook",
+        "wid": "w6"
+      }
+    ]
+  }
+}

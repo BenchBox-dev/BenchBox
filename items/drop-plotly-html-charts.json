@@ -1,0 +1,251 @@
+{
+  "context": "Work outside-in: start by deleting the leaf Plotly files (charts.py, styles.py, dependencies.py)\nthat nothing else imports, then strip Plotly code from the shared files (result_plotter.py,\nexporters.py, visualization.py) that have both Plotly and ASCII paths. After removal, unify the\ndata models by promoting ASCII models as canonical and refactoring ResultPlotter to produce them\ndirectly. Finally simplify the MCP/CLI interface by removing format branching.\n\nKey files to reference for understanding the current dual-path architecture:\n- exporters.py:render_ascii_chart() - shows the conversion between Plotly and ASCII models\n- mcp/tools/visualization.py - shows the format branching (HTML vs ASCII)\n- charts.py - the Plotly chart classes that will be deleted entirely\n",
+  "description": "Remove Plotly and the entire HTML chart rendering pipeline from BenchBox. The ASCII charting\nsystem (2,255 lines, 6 chart types, zero dependencies) is the actively-used visualization\npath for CLI, MCP, and CI. The Plotly/HTML path (~1,750 lines source + ~1,260 lines tests)\ngenerates static .html files that nobody opens - there is no browser integration, no HTTP\nserver, no CI usage, and no documented user workflow that depends on HTML output.\n\nRemoving Plotly eliminates:\n- Two parallel rendering pipelines with incompatible data models\n- ~2,300 lines of source + test code (37% reduction in visualization module)\n- 46 MB optional dependency weight (plotly 43 MB + narwhals 3.3 MB)\n- The dual data model problem (BarDatum vs BarData, etc.) that forces every new chart type\n  to be implemented twice\n- Three test files that use pytest.importorskip(\"plotly\") and may skip silently\n\nThis clears the path for the ASCII charting enhancement (enhance-ascii-charting.yaml) by\nestablishing a single canonical data model and removing the need for conversion layers.\n\nDecision rationale: Evaluated in depth - HTML charts are the default format but disconnected\nfrom real usage. MCP returns file paths for HTML (useless to LLMs) vs inline content for ASCII\n(immediately useful). CLI generates files users must manually locate and open. No blog workflow\nreferences chart generation. The feature is vestigial.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "break the MCP tool registration",
+        "instead": "(not specified)",
+        "item_id": "drop-plotly-html-charts",
+        "why": "generate_chart must still work; just remove the HTML branch and simplify the response model"
+      },
+      {
+        "dont": "delete exporters.py entirely",
+        "instead": "(not specified)",
+        "item_id": "drop-plotly-html-charts",
+        "why": "export_ascii() and render_ascii_chart() serve the ASCII path; only remove export_figure() and Plotly imports"
+      },
+      {
+        "dont": "delete result_plotter.py entirely",
+        "instead": "(not specified)",
+        "item_id": "drop-plotly-html-charts",
+        "why": "it contains the data loading and normalization logic (from_sources, NormalizedResult) that ASCII charts depend on"
+      },
+      {
+        "dont": "leave 'plotly' in pyproject.toml extras",
+        "instead": "(not specified)",
+        "item_id": "drop-plotly-html-charts",
+        "why": "orphaned optional deps confuse users and bloat installs"
+      },
+      {
+        "dont": "remove the chart template system (templates.py)",
+        "instead": "(not specified)",
+        "item_id": "drop-plotly-html-charts",
+        "why": "templates are format-agnostic and drive which charts to generate, not how to render them"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-06T00:00:00Z",
+      "created_at": "2026-02-06T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "ASCIIChartBase interface and render() -> str contract must not change",
+        "item_id": "drop-plotly-html-charts"
+      },
+      {
+        "behavior": "All 6 ASCII chart types (bar, histogram, heatmap, box, line, scatter) must remain fully functional",
+        "item_id": "drop-plotly-html-charts"
+      },
+      {
+        "behavior": "CLI benchbox visualize command must continue to work (ASCII output)",
+        "item_id": "drop-plotly-html-charts"
+      },
+      {
+        "behavior": "Chart templates (default, flagship, head_to_head, trends, cost_optimization) must work with ASCII",
+        "item_id": "drop-plotly-html-charts"
+      },
+      {
+        "behavior": "MCP generate_chart tool must continue to work (ASCII format)",
+        "item_id": "drop-plotly-html-charts"
+      },
+      {
+        "behavior": "MCP suggest_charts tool must continue to work (format-agnostic logic)",
+        "item_id": "drop-plotly-html-charts"
+      },
+      {
+        "behavior": "NormalizedResult and NormalizedQuery dataclasses must be preserved (shared data loading)",
+        "item_id": "drop-plotly-html-charts"
+      },
+      {
+        "behavior": "ResultPlotter.from_sources() must continue loading and normalizing result JSON files",
+        "item_id": "drop-plotly-html-charts"
+      },
+      {
+        "behavior": "tests/unit/visualization/ascii/test_ascii_charts.py (934 lines) must pass unchanged",
+        "item_id": "drop-plotly-html-charts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/ascii/"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "do_not_modify",
+        "path_glob": "tests/unit/visualization/ascii/"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/visualize.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/comparison/plotter.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/benchmark_suite.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/__init__.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/charts.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/dependencies.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/exporters.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/result_plotter.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/styles.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/templates.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/visualization.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "docs/visualization/chart-generation-guide.md"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/visualization/test_visualization_export.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_visualization_tools.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/test_charts.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/test_result_plotter.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/test_styles.py"
+      },
+      {
+        "item_id": "drop-plotly-html-charts",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/test_visualize_cli.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ascii/ -v",
+        "description": "All ASCII chart tests pass unchanged",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "drop-plotly-html-charts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_visualization_tools.py -v",
+        "description": "MCP visualization tool tests pass",
+        "expected": "all tests pass (some removed, remaining pass)",
+        "item_id": "drop-plotly-html-charts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -r 'import plotly\\|from plotly\\|require_plotly' benchbox/ --include='*.py'",
+        "description": "No references to plotly remain in source code",
+        "expected": "no output (zero matches)",
+        "item_id": "drop-plotly-html-charts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'plotly' pyproject.toml",
+        "description": "plotly is not in any pyproject.toml dependency group",
+        "expected": "0",
+        "item_id": "drop-plotly-html-charts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -x -q",
+        "description": "Full test suite passes",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "drop-plotly-html-charts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox/core/visualization/",
+        "description": "Lint and type check clean",
+        "expected": "no lint errors",
+        "item_id": "drop-plotly-html-charts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

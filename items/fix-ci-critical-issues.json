@@ -1,0 +1,11 @@
+{
+  "description": "Multiple CI workflows are failing due to broken configurations, missing files,\nand duplicate workflows. This task addresses all critical issues to achieve\ngreen CI builds on GitHub.\n\nIssues identified in code review:\n1. tpch-c-compatible-tests.yml references non-existent scripts\n2. python-publish.yml duplicates release.yml functionality\n3. docs.yml has failing linkcheck job\n4. test.yml has duplicate docs job\n5. Test matrix is overly broad (13 configurations)",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-01-18T00:00:00Z",
+      "created_at": "2026-01-18T00:00:00Z",
+      "worktree": "ci-infrastructure"
+    }
+  }
+}

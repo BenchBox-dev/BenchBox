@@ -1,0 +1,309 @@
+{
+  "context": "Spend w0 confirming whether a new field is needed; if existing\nregistry data is sufficient, the change becomes purely landing-side.\nIf a new field is required, treat it as a one-line capability\naddition with a conservative default ('free'), seeded for eight\nknown platforms. Resist the temptation to model cost more richly —\nthe prompt only needs a binary \"ask first\" gate; the enum exists\nsolely to distinguish 'paid_credits' (Snowflake/BQ) from\n'paid_compute' (managed Postgres on AWS) for future copy variants,\nnot because today's prompt needs to differentiate them.\n\nSmoke step intentionally calls real benchbox at SF=0.01 — that is\nwhat catches credential/driver/port issues. A dry-run-only smoke\nwould not.\n",
+  "description": "Paid managed platforms (motherduck, clickhouse-cloud, snowflake,\nredshift, bigquery, databricks, athena, firebolt:cloud) charge real\nmoney for compute/credits at non-trivial scale. The current /prompts/\noutput instructs an agent to \"run live\" at the chosen scale with no\nsmoke step and no explicit cost acknowledgment. For an agent invoked\nby a user who copy-pasted a SF=10 Snowflake prompt, this is a\nmeaningful blast-radius gap.\n\nThis TODO surfaces a cost classification from PlatformRegistry into\nthe browser catalog and uses it (in combination with scale) to\ninject two new conditional steps into the rendered prompt:\n\n1. SMOKE — when target scale != \"0.01\" AND\n   (platform is paid OR deployment is \"managed\"/\"self-hosted\"),\n   prepend a SF=0.01 dry-run-or-real smoke step before the target-\n   scale dry-run. Catches plumbing failures cheaply.\n2. COST ACKNOWLEDGMENT — when any selected platform is paid AND\n   parseFloat(scale) >= 0.1, inject an explicit \"ask the user to\n   confirm credit/compute spend\" step before the live run.\n\nDecision gates:\n- D1 (before w1): cost_class enum (`free | paid_credits | paid_compute`)\n  vs boolean `is_paid`. RECOMMEND enum: MotherDuck has a free tier so a\n  boolean over-asserts. Confirm with owner.\n- D2 (before w1): does PlatformRegistry already expose anything\n  cost-adjacent (e.g., `requires_credentials`, `cloud` category)?\n  If yes, derive cost_class rather than annotating each platform\n  by hand. Inspect first; only add a new field if no derivable\n  proxy exists with >=95% accuracy.\n- D3 (before w3): smoke step calls real benchbox at SF=0.01 vs uses\n  --dry-run only. Default: real run at SF=0.01 — that's the value of\n  smoke (catches actual driver/load issues). Document this in the\n  rendered prompt so the user knows we're spending ~free compute.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a 'free tier' yes/no field",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "why": "same information as cost_class with a less expressive default."
+      },
+      {
+        "dont": "bypass w0",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "why": "adding a new capability field when an existing one suffices creates maintenance debt across docs, MCP, and tests."
+      },
+      {
+        "dont": "introduce a UI checkbox to opt out of smoke",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "why": "keep the rule selection-derived; advanced users can edit the copied prompt."
+      },
+      {
+        "dont": "key the cost-ack gate on 'managed' deployment alone",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "why": "self-hosted Snowflake-on-AWS exists; self-hosted Postgres does not need a cost-ack. The right gate is cost_class + scale."
+      },
+      {
+        "dont": "model cost as a numeric price",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "why": "registry has no source of truth for credit/compute pricing; a tag is sufficient."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase2-cost-aware-gating",
+        "id": 453,
+        "reason": "Out of scope; the prompt only needs a binary gate. Revisit if a billing surface becomes part of /prompts/.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly out of scope unless /prompts/ grows a billing surface; no evidence that condition has occurred.",
+        "summary": "Cost-class richer modeling (per-query estimate, credit/$ conversion)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase2-cost-aware-gating",
+        "id": 454,
+        "reason": "Tracked in prompts-landing-phase5-mcp-parity.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Verified DONE: prompts-landing-phase5-mcp-parity.yaml exists with status Completed -- MCP parity for cost-ack was already delivered.",
+        "summary": "MCP parity for cost-ack"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "needs_item": "prompts-landing-phase1-cli-hygiene"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Default DuckDB+TPC-H+0.01+local prompt remains short (Phase 1 success metric).",
+        "item_id": "prompts-landing-phase2-cost-aware-gating"
+      },
+      {
+        "behavior": "MCP surface — out of scope for this phase; MCP parity tracked in Phase 5.",
+        "item_id": "prompts-landing-phase2-cost-aware-gating"
+      },
+      {
+        "behavior": "Phase 1 step ordering (announce, tee, summary, force-datagen footer) — new steps slot in BEFORE live run, AFTER dry-run.",
+        "item_id": "prompts-landing-phase2-cost-aware-gating"
+      },
+      {
+        "behavior": "PlatformRegistry public API — cost_class is additive with a 'free' default; no method signature changes.",
+        "item_id": "prompts-landing-phase2-cost-aware-gating"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/platform_registry.py PlatformRegistry.get_platform_capabilities — extend the capabilities surface with a single cost_class field",
+        "decision": "extend",
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "path": "benchbox/core/platform_registry.py"
+      },
+      {
+        "concept": "landing/prompts/prompts.js:186-200 deployment + interface conditional rendering — pattern to mirror for cost gating",
+        "decision": "reuse",
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "path": "landing/prompts/prompts.js:186-200"
+      },
+      {
+        "concept": "scripts/generate_landing_quickstarts.py:222-252 _derive_platform_entries — already surfaces multiple capability-derived fields; extend the same pattern",
+        "decision": "extend",
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "path": "scripts/generate_landing_quickstarts.py:222-252"
+      },
+      {
+        "concept": "scripts/generate_landing_quickstarts.py:39-47 PLATFORM_OVERRIDE_KEYS — add cost_class as an override-eligible key for edge cases (free tiers, BYO-cluster)",
+        "decision": "reuse",
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "path": "scripts/generate_landing_quickstarts.py:39-47"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/index.html"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.generated.js"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.yaml"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/prompts.js"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_landing_quickstarts.py"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_platform_registry.py"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/landing/test_landing_quickstarts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/generate_landing_quickstarts.py --validate-only",
+        "description": "Validator passes",
+        "expected": "validate-only: OK",
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make prompts-landing-check",
+        "description": "Make check target green",
+        "expected": "check: OK",
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/landing/ tests/unit/core/ -v",
+        "description": "Landing + core platform tests pass",
+        "expected": "all tests pass",
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-fast",
+        "description": "Fast suite green",
+        "expected": "0 failures",
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "notes": "Grep PlatformRegistry capabilities and metadata for any\npre-existing field that can serve as cost proxy\n(e.g., `category == 'cloud'`, `requires_credentials`,\n`deployment_modes[*].requires_network`). Capture findings to\n/tmp/prompts-phase2-w0.log and summarise in this TODO before w1:\n  - command run\n  - existing fields reviewed\n  - decision: derive vs new field\nIf a derivable proxy exists with >=95% accuracy across the\n8 named paid platforms, SKIP w1 and adapt the plan to use the\nproxy. Otherwise proceed with w1.\n\nCompleted 2026-05-16:\n  command: rg -n \"class PlatformCapabilities|PlatformCapabilities\\(|requires_credentials|deployment_modes|category|cloud|cost|credit|billing|motherduck|clickhouse-cloud|snowflake|redshift|bigquery|databricks|athena|firebolt\" benchbox/core/platform_registry.py tests/unit/core tests/unit/platforms > /tmp/prompts-phase2-w0.log\n  reviewed: category, supports, deployment_modes.requires_credentials,\n    deployment_modes.requires_network, notes/description pricing text,\n    and existing cost modules/tests.\n  decision: add cost_class. Cloud/category and credential/network\n    fields identify deployment risk but are over-broad for paid/free\n    semantics and cannot distinguish paid_credits from paid_compute.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate registry surface before adding a new capability field",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "notes": "Add `cost_class: Literal['free','paid_credits','paid_compute'] = 'free'`\nto the capabilities dataclass. Seed the eight known paid-managed\nplatforms; leave everything else default 'free'. Keep change\nminimal — one field, default 'free', no method-signature impact.\nAdd a single unit test in tests/unit/core/ that asserts each of\nthe eight expected paid platforms reports the expected class.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add cost_class to PlatformCapabilities (or equivalent) in PlatformRegistry",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "notes": "In _derive_platform_entries (scripts/generate_landing_quickstarts.py:222-252),\ncopy cost_class into the per-platform browser entry. Extend\nPLATFORM_OVERRIDE_KEYS (line 39) and STRING_PLATFORM_OVERRIDE_KEYS\n(line 48) to allow cost_class override (a free-tier user may want\nto mark motherduck as 'free' in their personal fork). Extend\n_validate_platform_overrides to constrain to the enum.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Surface cost_class into the browser catalog via the generator",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "notes": "In prompts.js buildAgentPrompt (post Phase 1 ordering):\n- Determine `isPaid = (platformEntry.cost_class || 'free') !== 'free'\n            || (platformBEntry && platformBEntry.cost_class !== 'free')`.\n- Determine `needsSmoke = state.scale !== '0.01'\n            && (isPaid || state.deployment !== 'local')`.\n- If needsSmoke: insert SMOKE step before the target dry-run\n  rendering an identical command but with --scale 0.01 and an\n  explicit \"abort if smoke fails\" instruction.\n- If isPaid && parseFloat(state.scale) >= 0.1: insert\n  COST ACKNOWLEDGMENT step before the live-run step.\nTest via the dropdown-smoke pattern at line 368, not snapshots.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add smoke + cost-acknowledgment steps to buildAgentPrompt",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "notes": "tests/unit/landing/test_landing_quickstarts.py additions:\n- test_known_paid_platforms_carry_cost_class\n- test_cost_class_override_constrained_to_enum\n- test_browser_payload_emits_cost_class_for_managed_platforms\n- extend dropdown-smoke test to verify SMOKE/COST step labels\n  appear in the right scale x deployment x platform combos\n  (and DON'T appear in DuckDB+0.01+local).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add validator pins + unit tests for the cost-class surface",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase2-cost-aware-gating",
+        "notes": "uv run -- python scripts/generate_landing_quickstarts.py --write\nmake prompts-landing-check\nuv run -- python -m pytest tests/unit/landing/ tests/unit/core/ -v\nManually verify two prompt renderings — DuckDB+0.01 (must remain\nsmoke-free, cost-ack-free) and Snowflake+TPC-H+1.0 (must show\nboth). Paste both into the PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate + verify",
+        "wid": "w5"
+      }
+    ]
+  }
+}

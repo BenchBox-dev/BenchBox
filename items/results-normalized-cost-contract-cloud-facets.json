@@ -1,0 +1,488 @@
+{
+  "context": "Start with the data contract, because UI cost work is not trustworthy until\nnormalized provenance is present. Reuse the existing cost package and pricing\nversion constants. In the explorer, prefer new fields and label every cost\nchart with model version and scope. Treat missing cost as a status, not as\nnull-only UI absence.\n",
+  "description": "Make cost usable for ranking, filtering, and trust. Product direction is that\ncost must be normalized by BenchBox and not supplied directly by submitters.\nCloud region, instance/warehouse shape, storage, and pricing model facets must\nbe captured in benchmark results and filterable in the explorer.\n\nCurrent UI evidence shows an inconsistent cost story: Query Workbench can\nreport \"Has cost yes(...)\" when `cost_usd` is present, while benchmark chart\ncopy can still say no cost data is available; local/self-hosted rows may\nappear as `0` even though the comparison needs to distinguish \"normalized\nzero cloud compute cost\" from \"no normalized cost model available.\"",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "accept submitter-supplied total cost as leaderboard cost",
+        "instead": "compute normalized cost from resource metadata and BenchBox pricing tables.",
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "why": "vendors can manipulate it"
+      },
+      {
+        "dont": "change cost rankings without visible methodology copy",
+        "instead": "show model version and scope near every cost metric.",
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "why": "cost is high-stakes for vendor comparison"
+      },
+      {
+        "dont": "collapse zero local compute cost and missing cloud cost into the same value",
+        "instead": "use explicit cost_status.",
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "why": "users will misread price/performance"
+      },
+      {
+        "dont": "hardcode regional prices in the frontend",
+        "instead": "surface only emitted model fields.",
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "why": "pricing provenance belongs in `benchbox.core.cost`"
+      }
+    ],
+    "item_meta": {
+      "category": "Result Integrity",
+      "completed_at": "2026-05-01T00:00:00Z",
+      "created_at": "2026-05-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing `cost_usd` consumers keep working through the read-only alias defined in w2 (alias is `None` outside `compute_only` normalized cost). Decision is locked in w2 before downstream wiring begins.",
+        "item_id": "results-normalized-cost-contract-cloud-facets"
+      },
+      {
+        "behavior": "Existing result bundles without normalized cost continue to load with explicit unavailable status.",
+        "item_id": "results-normalized-cost-contract-cloud-facets"
+      },
+      {
+        "behavior": "Local/self-hosted platforms are not shown as cloud-cost comparable unless the cost scope explains what is included.",
+        "item_id": "results-normalized-cost-contract-cloud-facets"
+      },
+      {
+        "behavior": "Visible metrics parity remains Python-canonical; TypeScript must not become the cost reference implementation.",
+        "item_id": "results-normalized-cost-contract-cloud-facets"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "_project/planning/visible_metrics.yaml"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/cost/calculator.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/cost/integration.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/cost/models.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/models.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/transformer.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/ssb_sf01_datafusion_sql_20260404_191827_7512d99e.json"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/ssb_sf01_duckdb_sql_20260404_191819_68f79876.json"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/ssb_sf01_sqlite_sql_20260404_191855_123c586c.json"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/star_schema_sf001_datafusion_20260403_093817_adf0920e.json"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/star_schema_sf001_duckdb_20260403_093809_d4ec318a.json"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/star_schema_sf001_sqlite_20260403_093902_c4f99a62.json"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/tpch_sf001_datafusion_20260403_093731_c235e698.json"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/tpch_sf001_duckdb_20260403_093653_9c0925d1.json"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/tpch_sf001_polars_20260403_093741_e744512d.json"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/tpch_sf01_datafusion_sql_20260404_191814_890f931e.json"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/tpch_sf01_duckdb_sql_20260404_191803_a4f37225.json"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/tpch_sf01_polars_df_20260404_191727_mcp_b897c572.json"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-data/corpus-inventory.json"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/duckdbMetricParity.test.ts"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CostScatter.tsx"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/SparklineTable.tsx"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/charts.smoke.test.tsx"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/queryFilters.test.ts"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/starterQueries.test.ts"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartRegistry.ts"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/queryFilters.ts"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/starterQueries.ts"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Query.test.tsx"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/types.ts"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/published_results_validator.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/cost/test_calculator.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/cost/test_integration.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_duckdb_builder.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_transformer.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_visible_metrics_registry.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_query_plan_serialization.py"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_validate_submission.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/cost tests/unit/core/explorer_pipeline -q",
+        "description": "Python cost and explorer pipeline tests pass.",
+        "expected": "All cost and explorer pipeline tests pass, including normalized cost contract coverage.",
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Frontend typecheck and tests pass with normalized cost fields.",
+        "expected": "TypeScript and Vitest pass with new cost facets and cost-status states.",
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline/test_visible_metrics_registry.py -q",
+        "description": "Visible metric registry remains valid.",
+        "expected": "Visible metrics registry test passes for all added cost/deployment fields.",
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "needs_wid": "w4",
+        "wid": "w9"
+      },
+      {
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "notes": "In `benchbox/core/cost/models.py`, add a `NormalizedCost` data class with\nthe canonical fields:\n  - `normalized_cost_usd: Decimal`\n  - `cost_model_version: str` (e.g. `\"2026.05.0\"`)\n  - `cost_model_source: str` (e.g. `\"benchbox.core.cost.pricing\"`)\n  - `cost_scope: Literal[\"compute_only\", \"compute_plus_storage\"]`\n  - `cost_status: Literal[\"normalized\", \"not_applicable_local\", \"unavailable\"]`\n  - `billing_unit: str`\n  - `pricing_region: str`\nAdd a `DeploymentMetadata` block with `cloud_provider`, `cloud_region`,\n`instance_type`, `warehouse_size`, `node_count`, `cluster_size`,\n`storage_format`, `storage_tier`. Add\n`tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py`\nwith fixtures covering all three cost statuses. No transformer/DuckDB\nwiring in this unit.\nOwned files for this work unit:\n  - benchbox/core/cost/models.py\n  - tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define normalized cost data classes and Python contract test fixture",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "notes": "Locks the open decision in `must_preserve`. RECOMMENDED resolution:\nretain `cost_usd` as a read-only deprecated alias populated from\n`normalized_cost_usd` when `cost_status == \"normalized\"` and `cost_scope\n== \"compute_only\"`, and `None` otherwise. Document the decision in the\n`NormalizedCost` docstring and in\n`test_normalized_cost_contract.py::test_cost_usd_alias_behavior`. If the\nuser prefers a hard break instead, replace this work unit with a\nmigration of every `cost_usd` consumer in the same PR.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document cost_usd compatibility decision (alias vs hard migrate)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "notes": "Touch `benchbox/core/explorer_pipeline/models.py` and `transformer.py`.\nThe transformer must emit either a populated `NormalizedCost` block or\nan explicit `cost_status=\"unavailable\"` row; no implicit nulls or\npartially-populated cost objects. Extend pipeline tests to cover all\nthree cost statuses.\nOwned files for this work unit:\n  - benchbox/core/explorer_pipeline/models.py\n  - benchbox/core/explorer_pipeline/transformer.py\n  - tests/unit/core/explorer_pipeline/test_transformer.py\n  - tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire normalized cost through bundle reader and explorer pipeline transformer",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "notes": "Touch `benchbox/core/explorer_pipeline/duckdb_builder.py` and\n`_project/planning/visible_metrics.yaml`. Add parity tests so every\nvisible cost/deployment field is either a raw bundle copy or a\ndocumented derived value with a canonical Python reference. Update\n`test_visible_metrics_registry.py` accordingly.\nOwned files for this work unit:\n  - benchbox/core/explorer_pipeline/duckdb_builder.py\n  - _project/planning/visible_metrics.yaml\n  - tests/unit/core/explorer_pipeline/test_duckdb_builder.py\n  - tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py\n  - tests/unit/core/explorer_pipeline/test_visible_metrics_registry.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire normalized cost through DuckDB builder and visible metrics registry",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "notes": "Reuse `benchbox/core/cost/models.py`, `calculator.py`, and `pricing.py`.\nCost should be computed from measured usage/resource configuration plus\nBenchBox pricing tables, not from arbitrary submitter-supplied totals.\nAdd validation errors or warnings when a cloud run lacks the provider,\nregion, warehouse/instance, or billing-unit metadata required to normalize.\nOwned files for this work unit:\n  - benchbox/core/cost/calculator.py\n  - benchbox/core/cost/integration.py\n  - benchbox/core/results/schema.py\n  - tests/unit/core/cost/test_calculator.py\n  - tests/unit/core/cost/test_integration.py\n  - tests/unit/core/results/test_query_plan_serialization.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate normalized cost with existing benchbox.core.cost calculators",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "notes": "Add filters for cloud provider, region, instance/warehouse shape, storage\nformat, cost status, and cost model version. Query Workbench should expose\nthese columns in schema/column picker and starter queries. Cost filters\nshould distinguish `normalized`, `not_applicable_local`, and `unavailable`.\nOwned files for this work unit:\n  - results-explorer/src/types.ts\n  - results-explorer/src/lib/duckdbQueries.ts\n  - results-explorer/src/lib/queryFilters.ts\n  - results-explorer/src/lib/starterQueries.ts\n  - results-explorer/src/pages/Query.tsx\n  - results-explorer/src/lib/__tests__/queryFilters.test.ts\n  - results-explorer/src/lib/__tests__/starterQueries.test.ts\n  - results-explorer/src/pages/__tests__/Query.test.tsx\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add cloud/deployment facets to explorer filters and Query Workbench",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "notes": "Update `CostScatter`, benchmark pages, compare pages, and home leaderboard\nmetrics so any cost chart labels axes as normalized USD with scope and\nmodel version. When no normalized cost exists, empty-state copy should\nsay which metadata is missing, not just \"No cost data available.\"\nOwned files for this work unit:\n  - results-explorer/src/types.ts\n  - results-explorer/src/lib/duckdbQueries.ts\n  - results-explorer/src/lib/chartRegistry.ts\n  - results-explorer/src/components/CostScatter.tsx\n  - results-explorer/src/components/SparklineTable.tsx\n  - results-explorer/src/pages/Home.tsx\n  - results-explorer/src/lib/__tests__/duckdbQueries.test.ts\n  - results-explorer/src/__tests__/duckdbMetricParity.test.ts\n  - results-explorer/src/components/__tests__/ChartPanel.test.tsx\n  - results-explorer/src/components/__tests__/charts.smoke.test.tsx\n  - results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx\n  - results-explorer/src/pages/__tests__/Home.test.tsx\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update cost visualizations to use normalized cost and disclose model version",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "notes": "Public submissions should provide resource/deployment metadata; BenchBox\ncomputes normalized cost. Add validator tests using fixtures that attempt\nto submit `cost.total_usd` directly without normalized-cost provenance.\nOwned files for this work unit:\n  - scripts/validate_submission.py\n  - tests/fixtures/published_results_validator.py\n  - tests/unit/scripts/test_validate_submission.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add submission validation that rejects user-supplied public leaderboard cost totals",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-normalized-cost-contract-cloud-facets",
+        "notes": "Existing rows should not silently appear as comparable normalized cost if\nthe metadata is missing. Backfill local rows as `not_applicable_local`\nwhere valid, and cloud rows as `unavailable` until enough metadata exists.\nOwned files for this work unit:\n  - results-data/bundles/ssb_sf01_datafusion_sql_20260404_191827_7512d99e.json\n  - results-data/bundles/ssb_sf01_duckdb_sql_20260404_191819_68f79876.json\n  - results-data/bundles/ssb_sf01_sqlite_sql_20260404_191855_123c586c.json\n  - results-data/bundles/star_schema_sf001_datafusion_20260403_093817_adf0920e.json\n  - results-data/bundles/star_schema_sf001_duckdb_20260403_093809_d4ec318a.json\n  - results-data/bundles/star_schema_sf001_sqlite_20260403_093902_c4f99a62.json\n  - results-data/bundles/tpch_sf001_datafusion_20260403_093731_c235e698.json\n  - results-data/bundles/tpch_sf001_duckdb_20260403_093653_9c0925d1.json\n  - results-data/bundles/tpch_sf001_polars_20260403_093741_e744512d.json\n  - results-data/bundles/tpch_sf01_datafusion_sql_20260404_191814_890f931e.json\n  - results-data/bundles/tpch_sf01_duckdb_sql_20260404_191803_a4f37225.json\n  - results-data/bundles/tpch_sf01_polars_df_20260404_191727_mcp_b897c572.json\n  - results-data/corpus-inventory.json\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Backfill or explicitly mark existing public fixtures by cost status",
+        "wid": "w9"
+      }
+    ]
+  }
+}

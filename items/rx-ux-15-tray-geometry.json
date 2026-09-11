@@ -1,0 +1,196 @@
+{
+  "context": "Desktop: fixed to the viewport bottom, reusing the shared component from rx-ux-01. Mobile: a collapsible fixed bar - compact by default showing count and primary action, expanding on tap - NOT a sticky child of a scroll container. Clearance is measured for both collapsed and expanded heights. Dismissal collapses without clearing the selection.",
+  "description": "Geometry slice for the shared selection tray, separate from its accessibility behaviour (rx-ux-16) and from print (rx-ux-20).\n\nConstraint established by review: the app uses document scrolling (Layout.tsx:19) and the named table containers are HORIZONTAL scrollers (e.g. QueryHeatmap.tsx:613). A tray placed inside overflow-x-auto gets the wrong containing block and tracks horizontal offset. A sticky element placed after route content will not be visible until the reader reaches it.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Rebuild tray placement or clearance measurement from scratch",
+        "instead": "INSTEAD extend the existing component and spec",
+        "item_id": "rx-ux-15-tray-geometry",
+        "why": "#1810 already landed a shared CompareTray whose spacer height is measured with a ResizeObserver and asserted in e2e"
+      },
+      {
+        "dont": "clear the selection when the tray is dismissed",
+        "instead": "collapse it",
+        "item_id": "rx-ux-15-tray-geometry",
+        "why": "dismissal is a display preference, not an intent to discard work"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-15-tray-geometry",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "place the tray inside a table's overflow-x-auto container",
+        "instead": "keep it fixed with its own containing block",
+        "item_id": "rx-ux-15-tray-geometry",
+        "why": "it would track horizontal scroll offset and disappear sideways"
+      },
+      {
+        "dont": "use one fixed clearance value",
+        "instead": "measure collapsed and expanded heights",
+        "item_id": "rx-ux-15-tray-geometry",
+        "why": "an expanded tray is taller and would re-cover the last row"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rx-ux-15-tray-geometry",
+        "needs_item": "rx-ux-01-overlay-clearance-and-print-suppression"
+      },
+      {
+        "item_id": "rx-ux-15-tray-geometry",
+        "needs_item": "rx-ux-14-picking-state-owner"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-25T01:48:11Z",
+      "completed_pr": 1888,
+      "created_at": "2026-08-22T14:49:36Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing tray behaviour on Benchmark and Platform pages until rx-ux-18 migrates them",
+        "item_id": "rx-ux-15-tray-geometry"
+      },
+      {
+        "behavior": "rx-ux-01's inset token and clearance mechanism",
+        "item_id": "rx-ux-15-tray-geometry"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "clearance and print-suppression assertions at 390px and desktop",
+        "decision": "extend",
+        "item_id": "rx-ux-15-tray-geometry",
+        "path": "results-explorer/e2e/routes/compare-tray.spec.ts"
+      },
+      {
+        "concept": "shared tray with ResizeObserver-measured spacer, landed by #1810",
+        "decision": "extend",
+        "item_id": "rx-ux-15-tray-geometry",
+        "path": "results-explorer/src/components/CompareTray.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-15-tray-geometry",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/index.html"
+      },
+      {
+        "item_id": "rx-ux-15-tray-geometry",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-15-tray-geometry",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/**"
+      },
+      {
+        "item_id": "rx-ux-15-tray-geometry",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium",
+        "description": "Chromium browser suite passes against a fresh build",
+        "expected": "fixtures verified, build succeeds, chromium suite green",
+        "item_id": "rx-ux-15-tray-geometry",
+        "last_result": "fail",
+        "last_run": "2026-08-25T01:48:04Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'tray geometry'",
+        "description": "Tray stays visible and clear of the last row at both widths and both states",
+        "expected": "no intersection with the last row at 390x844 and 1440x1000, collapsed and expanded",
+        "item_id": "rx-ux-15-tray-geometry",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'tray horizontal'",
+        "description": "Tray does not move with horizontal table scrolling",
+        "expected": "tray position is stable while a wide table scrolls sideways",
+        "item_id": "rx-ux-15-tray-geometry",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-15-tray-geometry",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-15-tray-geometry",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-15-tray-geometry",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "CLOSED BY #1810 - shared CompareTray with fixed desktop placement live at BenchmarkIndex.tsx:809 and PlatformIndex.tsx:851; verified in this PR",
+        "item_id": "rx-ux-15-tray-geometry",
+        "notes": null,
+        "started_at": "2026-08-25T00:46:34Z",
+        "started_branch": "feat/rx-ux-15-tray-geometry",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-15-tray-geometry",
+        "status": "done",
+        "summary": "CLOSED BY #1810 - shared CompareTray with fixed desktop placement is live at BenchmarkIndex.tsx:809 and PlatformIndex.tsx:851",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Implemented mobile collapsible fixed bar: collapsed by default (count + primary action), tap expands, dismissal collapses without clearing; ResizeObserver measures collapsed+expanded; 8 tray geometry tests pass",
+        "item_id": "rx-ux-15-tray-geometry",
+        "notes": null,
+        "started_at": "2026-08-25T00:46:50Z",
+        "started_branch": "feat/rx-ux-15-tray-geometry",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-15-tray-geometry",
+        "status": "done",
+        "summary": "Mobile collapsible fixed bar with compact default",
+        "wid": "w2"
+      },
+      {
+        "evidence": "MOSTLY CLOSED BY #1810 - clearance measured via ResizeObserver into spacer and asserted at 390px and desktop for collapsed+expanded; verified by tray-geometry.spec clearance tests",
+        "item_id": "rx-ux-15-tray-geometry",
+        "notes": null,
+        "started_at": "2026-08-25T00:47:00Z",
+        "started_branch": "feat/rx-ux-15-tray-geometry",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-15-tray-geometry",
+        "status": "done",
+        "summary": "MOSTLY CLOSED BY #1810 - clearance measured via ResizeObserver into the spacer and asserted at 390px and desktop; only the collapsed state remains once w2 exists",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Added dark theme, forced-colors, and 200%-zoom proof: dark theme at 390+1440, forced colors at 390, 200% zoom at 640; all pass in tray-geometry.spec.ts",
+        "item_id": "rx-ux-15-tray-geometry",
+        "notes": null,
+        "started_at": "2026-08-25T00:47:05Z",
+        "started_branch": "feat/rx-ux-15-tray-geometry",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-15-tray-geometry",
+        "status": "done",
+        "summary": "Add the missing capture axes - dark theme, forced colors and 200 percent zoom - since 390px is already covered",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #479 of result-schema-policy-and-explorer-input-gate.\nDeferred: Rewrite explorer transformer to use typed models throughout\nReason deferred: Valuable but larger than the immediate input-gate risk.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:22Z",
+      "worktree": "main"
+    }
+  }
+}

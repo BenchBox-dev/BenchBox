@@ -1,0 +1,250 @@
+{
+  "context": "Use the existing migration and replacement TODOs as prerequisites. Test from a clean environment with no sibling todo-db checkout and no globally installed CLI. Require package version/lock agreement, wrapper behavior, command parity, rollback evidence, and structural no-duplication checks.",
+  "description": "Final certification gate after the hosted schema migration, embedded-runtime replacement, package release, and portable shadow tooling. Prove that a clean BenchBox checkout invokes exactly one locked todo-db package, that the wrapper has no legacy fallback, that CI cannot silently bypass the package, and that the duplicate implementation is deleted or restricted to explicitly bounded migration tooling. This is the release gate for claiming canonical runtime ownership.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Delete the legacy implementation before the canonical package, migration, and canary gates pass",
+        "instead": "Keep legacy code outside the default path for a bounded retention window, then remove it in a separate cleanup step",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "why": "That would remove the only rollback path before the new runtime is proven"
+      },
+      {
+        "dont": "Switch between legacy and canonical databases automatically on command failure",
+        "instead": "Require an explicit human rollback decision and a versioned snapshot",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "why": "Automatic fallback creates split-brain tracker state"
+      },
+      {
+        "dont": "Treat skill-sync verify as proof of runtime behavior",
+        "instead": "Run wrapper-level package, migration, audit, and lease-safety gates",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "why": "It proves snapshot/lock integrity only"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "needs_item": "make-todo-db-shadow-cutover-portable-gated"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "needs_item": "migrate-hosted-tracker-db-to-todo-db-0-3-schema"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "needs_item": "release-canonical-todo-db-holder-only"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "needs_item": "replace-embedded-todo-cli-with-todo-db-0-3"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-13T23:35:16Z",
+      "completed_pr": 1720,
+      "created_at": "2026-08-10T20:46:12Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No automatic legacy fallback between databases",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated"
+      },
+      {
+        "behavior": "No claim of lease-safety parity until the actual BenchBox wrapper passes the canonical non-holder release test",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated"
+      },
+      {
+        "behavior": "No generated skill snapshot is committed as a substitute for runtime verification",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated"
+      },
+      {
+        "behavior": "Rollback is explicit and documented before the first canonical write",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated"
+      },
+      {
+        "behavior": "The old database and final pre-cutover snapshot remain retained for the approved rollback window",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "kind": "do_not_modify",
+        "path_glob": ".todo-db/**"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "kind": "do_not_modify",
+        "path_glob": "_project/DONE/**"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "kind": "do_not_modify",
+        "path_glob": "_project/TODO/**"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "kind": "only_modify",
+        "path_glob": ".github/**"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/**"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv sync --project _project/scripts --locked && uv run --project _project/scripts -- todo-db --version",
+        "description": "BenchBox scripts dependency is lock-resolved and package version is available",
+        "expected": "exit 0",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "last_result": "pass",
+        "last_run": "2026-08-13T23:34:33Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_standalone_compat.py tests/integration/test_todo_db_standalone_compat_real.py -q",
+        "description": "Wrapper integration tests pass against the package runtime",
+        "expected": "exit 0",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "last_result": "pass",
+        "last_run": "2026-08-13T23:35:01Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n 'todo_db\\.py|BENCHBOX_TODO_DB_STANDALONE' _project/scripts/todo",
+        "description": "Default wrapper contains no embedded implementation or automatic standalone flag fallback",
+        "expected": "exit 0",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "last_result": "pass",
+        "last_run": "2026-08-13T23:35:03Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n '/Users/joe/Developer/todo-db|\\.\\./todo-db' _project/scripts/todo _project/scripts/todo_db_standalone_compat.py .github Makefile",
+        "description": "No production wrapper references the developer-machine standalone checkout",
+        "expected": "exit 0",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "last_result": "pass",
+        "last_run": "2026-08-13T23:35:05Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_db_export_workflow.py tests/integration/test_todo_db_standalone_compat_real.py -q",
+        "description": "Wrapper rejects package-only destructive recovery commands and preserves exact package export bytes",
+        "expected": "exit 0",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "last_result": "pass",
+        "last_run": "2026-08-13T23:35:11Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh run view 31754155860 --repo joeharris76/BenchBox --json conclusion,headSha --jq 'select(.conclusion == \"success\" and .headSha == \"f15179af300257918498b241a241b71b62954276\")'",
+        "description": "Post-cutover package-only export workflow succeeded on the remediation merge",
+        "expected": "exit 0",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "last_result": "pass",
+        "last_run": "2026-08-13T23:35:13Z",
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Fresh clone /tmp/benchbox-todo-cert.foxdoR/repo at develop b0902f8a7. PATH was constrained to a temporary bin containing only uv plus system binaries; command -v todo-db failed before project sync. uv sync --project _project/scripts --locked installed vendored todo-db 0.3.2; uv run reported todo-db 0.3.2. From tests/integration, ../../_project/scripts/todo initialized and read stats from an explicit fresh local SQLite DB successfully.",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "notes": null,
+        "started_at": "2026-08-13T21:17:40Z",
+        "started_branch": "fix/certify-todo-package-runtime",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-certify-todo-package-runtime",
+        "status": "done",
+        "summary": "Run clean-clone package resolution, version/lock agreement, and wrapper-from-nested-directory checks",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Fresh develop clone with constrained PATH passed the real wrapper boundary suite: 63 passed, no skips. Structural scans found no todo_db.py, todo_findings.py, BENCHBOX_TODO_DB_STANDALONE, absolute /Users/joe/Developer/todo-db path, or ../todo-db path in the wrapper, adapter, .github, or Makefile. CI export workflow invokes the locked package-only wrapper.",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "notes": null,
+        "started_at": "2026-08-13T21:18:32Z",
+        "started_branch": "fix/certify-todo-package-runtime",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-certify-todo-package-runtime",
+        "status": "done",
+        "summary": "Prove the default wrapper and CI path cannot invoke the embedded tracker or silently fall back",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Actual package-backed wrapper negative control: Alice claimed a disposable item, Bob release returned exit 2 and claim remained Alice, then Alice released successfully. Hosted audit verified sha256-chain-v2 at 8,865 events/head 8016294f. Wrapper exported 2,178 items to /tmp/benchbox-todo-cert.foxdoR/roundtrip-fixed.MDpjbv; locked todo-db 0.3.2 restored into a new local DB, reverified the identical audit head, and re-exported byte-identically (SHA-256 54e06f655e2cc0277fd9365a422ddc1b921c0d018ab7187a919f850079cd128a).",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "notes": null,
+        "started_at": "2026-08-13T21:23:11Z",
+        "started_branch": "fix/certify-todo-package-runtime",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-certify-todo-package-runtime",
+        "status": "done",
+        "summary": "Run post-cutover canary, audit, export, and rollback-artifact verification",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Canonical todo-db v0.3.2 remains published from merged source with the BenchBox-vendored wheel SHA-256 ddc8c56a8b9f11c550d8f3b81df568c6d111cc79c076cbc4bf7c03fd68a95fa4. todo_db.py and todo_findings.py are absent; production scans found no embedded runtime, feature flag, absolute checkout, or sibling checkout reference. The previous local replica/todo.sqlite assets remain untouched under the protected primary .todo-db area, while the workflow retains run/attempt-versioned lossless artifacts for 90 days and versioned item-domain snapshots in Git.",
+        "item_id": "certify-benchbox-package-only-todo-runtime-gated",
+        "notes": null,
+        "started_at": "2026-08-13T21:25:56Z",
+        "started_branch": "fix/certify-todo-package-runtime",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-certify-todo-package-runtime",
+        "status": "done",
+        "summary": "Record final release evidence and remove or archive remaining legacy runtime references",
+        "wid": "w3"
+      }
+    ]
+  }
+}

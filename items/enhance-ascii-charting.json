@@ -1,0 +1,143 @@
+{
+  "context": "Follow existing inheritance pattern: new classes inherit from ASCIIChartBase in ascii/ module.\nUse existing BLOCK_CHARS, INTENSITY_CHARS, BOX_CHARS from base.py - do not duplicate.\nFollow factory function pattern (from_*_data) for data conversion.\nMirror _render_single_ascii_chart() dispatch pattern in visualization.py for new types.\nReference existing bar_chart.py for 1/8 block precision rendering technique.\nReference existing histogram.py for auto-chunking pattern if comparison charts have many queries.\n",
+  "description": "Enhance the existing ASCII charting module (benchbox/core/visualization/ascii/) with new chart\ntypes and improved comparison visualizations. The current implementation has 6 chart types across\n~2,255 lines and is well-architected with terminal capability detection, ANSI color support, and\nUnicode fallbacks.\n\nKey enhancements needed:\n1. Paired comparison bar chart - side-by-side bars (e.g., SQL vs DataFrame) with inline percentage\n   change annotations, regression/improvement color coding, and scale notes\n2. Diverging bar chart - centered-zero horizontal bars showing regression/improvement distribution,\n   sorted by magnitude, with overflow arrows for outliers\n3. Summary box - bordered panel with key aggregate metrics (geo mean, total time, improved/stable/\n   regressed counts, worst/best queries)\n4. Inline percentage annotations - \"+23%\", \"-57%\", \"← !\" markers alongside bars\n5. Intelligent truncation - handle outliers (e.g., Q21 +726%) by truncating bars with indicators\n   rather than compressing the entire scale\n\nLibrary evaluation conclusion: Keep custom implementation. Evaluated 10+ terminal charting libraries\n(plotext, plotext-plus, termgraph, plotille, uniplot, rich, textual, asciichartpy, drawille,\nbashplotlib). None can replace the existing module without significant adaptation. Key reasons:\n- BenchBox needs render() -> str pattern; most libraries print to stdout\n- Benchmark-specific features (Pareto frontiers, best/worst markers, grouped multi-platform bars,\n  auto-chunking) don't exist in any library\n- Sub-character bar precision (1/8 Unicode blocks) exceeds all library implementations\n- 4-tier terminal color degradation (truecolor -> 256 -> 16 -> none) with NO_COLOR support is\n  more robust than any library\n- Zero dependency advantage is significant\nClosest competitor was plotext-plus (7/10 fit) but still needs wrappers for string output,\nbenchmark annotations, and regression highlighting. Full evaluation documented in this item.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "adopt an external charting library",
+        "instead": "(not specified)",
+        "item_id": "enhance-ascii-charting",
+        "why": "the render()->str pattern, benchmark-specific features, and sub-character precision cannot be replicated; custom implementation evaluated as superior to all 10+ candidates"
+      },
+      {
+        "dont": "compress the entire bar scale for outliers",
+        "instead": "(not specified)",
+        "item_id": "enhance-ascii-charting",
+        "why": "it makes most bars unreadably small; truncate outlier bars instead with overflow indicators"
+      },
+      {
+        "dont": "hardcode terminal width",
+        "instead": "(not specified)",
+        "item_id": "enhance-ascii-charting",
+        "why": "base.py already handles terminal detection; use self.width from ASCIIChartBase"
+      },
+      {
+        "dont": "print to stdout",
+        "instead": "(not specified)",
+        "item_id": "enhance-ascii-charting",
+        "why": "all ASCII charts must return strings for MCP tool responses and CLI piping"
+      },
+      {
+        "dont": "skip Unicode fallback",
+        "instead": "(not specified)",
+        "item_id": "enhance-ascii-charting",
+        "why": "ASCII_BLOCK_CHARS and ASCII_BOX_CHARS exist for terminals without Unicode support"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-06T00:00:00Z",
+      "created_at": "2026-02-06T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "4-tier color degradation chain (truecolor -> 256 -> 16 -> none) must work for new chart types",
+        "item_id": "enhance-ascii-charting"
+      },
+      {
+        "behavior": "ASCIIChartBase interface and render() -> str contract must not change",
+        "item_id": "enhance-ascii-charting"
+      },
+      {
+        "behavior": "ASCIIChartOptions(use_color=False) must produce clean output without ANSI codes for new charts",
+        "item_id": "enhance-ascii-charting"
+      },
+      {
+        "behavior": "Existing 6 ASCII chart types (bar, histogram, heatmap, box, line, scatter) must remain fully functional",
+        "item_id": "enhance-ascii-charting"
+      },
+      {
+        "behavior": "Factory functions from_bar_data(), from_query_latency_data(), etc. must remain backward-compatible",
+        "item_id": "enhance-ascii-charting"
+      },
+      {
+        "behavior": "MCP generate_chart tool must continue to work for existing chart_type values",
+        "item_id": "enhance-ascii-charting"
+      },
+      {
+        "behavior": "Unicode -> ASCII fallback must work for all new chart types",
+        "item_id": "enhance-ascii-charting"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "enhance-ascii-charting",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/*.py"
+      },
+      {
+        "item_id": "enhance-ascii-charting",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/__init__.py"
+      },
+      {
+        "item_id": "enhance-ascii-charting",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/exporters.py"
+      },
+      {
+        "item_id": "enhance-ascii-charting",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/visualization.py"
+      },
+      {
+        "item_id": "enhance-ascii-charting",
+        "kind": "only_modify",
+        "path_glob": "tests/test_ascii_charts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'ascii' -q",
+        "description": "All existing and new ASCII chart tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "enhance-ascii-charting",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'visualization' -q",
+        "description": "No regressions in visualization tests",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "enhance-ascii-charting",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox/core/visualization/ascii/",
+        "description": "No lint errors in new or modified files",
+        "expected": "All checks passed or no output (clean)",
+        "item_id": "enhance-ascii-charting",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.visualization.ascii import ASCIIComparisonBar, ASCIIDivergingBar, ASCIISummaryBox; print('imports ok')\"",
+        "description": "New classes are properly exported from ascii module",
+        "expected": "imports ok",
+        "item_id": "enhance-ascii-charting",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

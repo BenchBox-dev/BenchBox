@@ -1,0 +1,124 @@
+{
+  "context": "Add KIND_CLUSTER_KEY plus an ALTER TABLE ... CLUSTER BY (cols) rule (and CLUSTER BY on CREATE TABLE) to the shared classifier, treating RESUME RECLUSTER as maintenance like OPTIMIZE. Add SnowflakeTuningIntrospector reading INFORMATION_SCHEMA.TABLES.CLUSTERING_KEY, bounded to the ledger's tables, normalizing the catalog form defensively (Snowflake may report LINEAR(a, b) or (a, b)).",
+  "description": "Snowflake DOES apply real tuning (ALTER TABLE ... CLUSTER BY, plus RESUME RECLUSTER) and those statements ARE already captured — apply_standard_unified_tuning wraps the connection in a recording_connection(PHASE_DDL) and RecordingConnection.cursor() proxies execute, so snowflake.py needs no ledger references of its own. The defect is downstream: the shared classifier has no rule for ALTER TABLE ... CLUSTER BY, so every clustering statement classifies as 'unverifiable', which BLOCKS the upgrade. Verified at develop: a ledger holding ALTER TABLE LINEITEM CLUSTER BY (...) plus RESUME RECLUSTER yields two unverifiable entries and corroborated=False. Consequence: a tuned Snowflake run can never reach applied_verified, and its receipt reads 'no corroboration rule for this statement' rather than naming the clustering key. Snowflake also has no get_tuning_introspector, so there is nothing to corroborate against even once classification works. INFORMATION_SCHEMA.TABLES.CLUSTERING_KEY is the catalog source; snowflake.py already reads it to decide whether to re-cluster.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-30T23:40:48Z",
+        "from_item": "snowflake-cluster-key-corroboration-20260730",
+        "id": 673,
+        "reason": "w3 needs live Snowflake credentials; AGENTS.md requires explicit approval for live cloud tests and none was given. parse_clustering_key accepts both documented forms defensively, but the guess is unverified — and it fails CLOSED (runs silently never verify), so it must not be assumed correct.",
+        "resolution": "promoted",
+        "resolved_item": "snowflake-clustering-key-live-verification-20260730",
+        "resolved_reason": null,
+        "summary": "Confirm against a live Snowflake which text INFORMATION_SCHEMA.TABLES.CLUSTERING_KEY actually returns (LINEAR(A, B) vs (A, B)) and that a clustered table reaches applied_verified"
+      }
+    ],
+    "item_meta": {
+      "category": "soundness",
+      "completed_at": "2026-07-30T23:42:38Z",
+      "completed_pr": 1371,
+      "created_at": "2026-07-30T23:33:58Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "An unrecognized clustering statement must keep BLOCKING the upgrade, never be silently dropped",
+        "item_id": "snowflake-cluster-key-corroboration-20260730"
+      },
+      {
+        "behavior": "Non-Snowflake platforms' classification and applied_ledger_hash inputs are unchanged",
+        "item_id": "snowflake-cluster-key-corroboration-20260730"
+      },
+      {
+        "behavior": "applied_verified stays earned: only ever record LESS, never over-certify",
+        "item_id": "snowflake-cluster-key-corroboration-20260730"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning/test_introspection.py tests/unit/platforms -q -k 'introspection or snowflake'",
+        "description": "Classifier and introspector unit tests",
+        "expected": "pass",
+        "item_id": "snowflake-cluster-key-corroboration-20260730",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Live Snowflake: a clustered table reaches applied_verified and an unclustered one does not",
+        "expected": null,
+        "item_id": "snowflake-cluster-key-corroboration-20260730",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "snowflake-cluster-key-corroboration-20260730",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "snowflake-cluster-key-corroboration-20260730",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "snowflake-cluster-key-corroboration-20260730",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added KIND_CLUSTER_KEY and rules for ALTER TABLE ... CLUSTER BY (cols) and CLUSTER BY on CREATE TABLE; ALTER TABLE ... [RESUME|SUSPEND] RECLUSTER classifies as maintenance (non-blocking, same class as OPTIMIZE) — the bare RECLUSTER form is emitted by snowflake.py:1597 and would otherwise have blocked. Fail-closed preserved: a visible-but-unparsable CLUSTER BY and any other ALTER TABLE still return UNVERIFIABLE. 8 of the new tests fail with the ALTER TABLE branch removed",
+        "item_id": "snowflake-cluster-key-corroboration-20260730",
+        "notes": null,
+        "started_at": "2026-07-30T23:40:41Z",
+        "started_branch": "feat/snowflake-cluster-key-corroboration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Classify ALTER TABLE ... CLUSTER BY as a cluster_key intent; RESUME RECLUSTER as maintenance",
+        "wid": "w0"
+      },
+      {
+        "evidence": "New benchbox/platforms/snowflake_introspection.py: SnowflakeTuningIntrospector reads INFORMATION_SCHEMA.TABLES.CLUSTERING_KEY, bounded (LIMIT 1000, scoped to schema and to ledger_tables), non-fatal (returns error state), closes its cursor, and works with both cursor-style and execute-style connections. Wired via SnowflakeAdapter.get_tuning_introspector",
+        "item_id": "snowflake-cluster-key-corroboration-20260730",
+        "notes": null,
+        "started_at": "2026-07-30T23:40:44Z",
+        "started_branch": "feat/snowflake-cluster-key-corroboration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "SnowflakeTuningIntrospector reads CLUSTERING_KEY, bounded and non-fatal",
+        "wid": "w1"
+      },
+      {
+        "evidence": "17 tests in tests/unit/platforms/test_snowflake_introspection.py + 7 classifier tests: corroborated / mismatch / absent (NULL CLUSTERING_KEY) / degraded-introspection / key-order-significant, plus parse_clustering_key accepting LINEAR(A,B), (A,B) and bare A,B. Full fast lane 26121 passed; ruff and ty clean",
+        "item_id": "snowflake-cluster-key-corroboration-20260730",
+        "notes": null,
+        "started_at": "2026-07-30T23:40:46Z",
+        "started_branch": "feat/snowflake-cluster-key-corroboration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Corroboration end-to-end on a fake catalog, incl. the mismatch and absent cases",
+        "wid": "w2"
+      },
+      {
+        "evidence": "NOT PERFORMED — split out, not verified. Live Snowflake needs cloud credentials and AGENTS.md requires explicit approval for live cloud tests; none was given. Tracked with its own ladder as snowflake-clustering-key-live-verification-20260730 (promoted from deferral #673). Open risk carried there: parse_clustering_key accepts LINEAR(A,B), (A,B) and a bare list defensively, but which form Snowflake actually returns is UNCONFIRMED, and a wrong guess fails CLOSED — clustered runs would silently never verify",
+        "item_id": "snowflake-cluster-key-corroboration-20260730",
+        "notes": null,
+        "started_at": "2026-07-30T23:42:35Z",
+        "started_branch": "feat/snowflake-cluster-key-corroboration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Live-Snowflake confirmation of the real CLUSTERING_KEY text (LINEAR(...) vs (...))",
+        "wid": "w3"
+      }
+    ]
+  }
+}

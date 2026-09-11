@@ -1,0 +1,139 @@
+{
+  "description": "21 platform adapters each have a _build_<platform>_config function that performs\nthe same 4-step operation: (1) instantiate CredentialManager, (2) merge\noptions/saved_creds/explicit_options/overrides, (3) extract fields into a dict,\n(4) return DatabaseConfig(**config_dict).\n\nbenchbox/platforms/base/config_utils.py already contains build_platform_config()\nimplementing this exact pattern, but only 3 of 21 platforms use it\n(velox.py:761, lakesail.py:811, azure_synapse.py:1300).\n\nThe credential merge order bug (commit d41c56980) required patching 18 separate\nfiles because each had its own inline copy. If the builders used the shared helper,\nthe same fix would have been one edit.\n\nPlatforms are divided into four groups based on consolidation difficulty:\n\n  Group A (5 platforms) - clean drop-in, no complications:\n    databend, clickhouse_cloud, spark, snowflake, databricks\n\n  Group B (4 platforms) - minor audit needed before consolidating:\n    trino, presto, starburst (conditional schema key), firebolt (deployment_mode sourcing)\n\n  Group C (3 platforms) - need base_options parameter added to helper:\n    pg_duckdb, pg_mooncake, timescaledb (pre-seed merged_options with {\"schema\": \"public\"})\n\n  Group D (6 platforms) - investigation gate required before any code:\n    singlestore, doris, starrocks (os.environ fallbacks + int() coercions)\n    athena (dual-source region: region or aws_region)\n    bigquery (multi-step staging_root derivation from default_output_location)\n    redshift (admin_database=\"dev\" hardcoded default, conditional database handling)\n\nGroups C and D must complete investigation work units before any consolidation\nis attempted. The investigation may conclude that some Group D platforms should\nstay inline - that outcome is acceptable if properly documented.",
+  "legacy": {
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-22T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "work_needs": [
+      {
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "needs_wid": "w7",
+        "wid": "w9"
+      },
+      {
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "notes": "Three specific questions to answer before w4 can proceed:\n\nQ1: trino/presto/starburst conditional schema\n  Current code: `if \"schema\" in overrides and overrides[\"schema\"]: config_dict[\"schema\"] = ...`\n  build_platform_config would emit schema=None when not set.\n  Action: grep each adapter's __init__ and from_config() for schema access patterns.\n    - config.get(\"schema\") → safe (None is handled)\n    - config[\"schema\"] → NOT safe (KeyError if key absent, or TypeError if None used as schema)\n  Read: benchbox/platforms/trino.py TrinoPlatform.from_config()\n        benchbox/platforms/presto.py PrestoPlatform.from_config()\n        benchbox/platforms/starburst.py StarburstPlatform.from_config()\n  If all three use config.get(\"schema\"), include \"schema\" in platform_fields (emitting None is safe).\n  If any uses config[\"schema\"], exclude \"schema\" from platform_fields and note it in w4.\n\nQ2: databricks missing benchmark/scale_factor/tuning_config\n  build_platform_config always adds these three fields (from overrides).\n  Current _build_databricks_config omits them - they'd be added as None.\n  Action: Check DatabaseConfig Pydantic model for Optional annotations on these fields.\n  Read: benchbox/core/schemas.py DatabaseConfig definition.\n  If Optional, adding them as None is safe → databricks can go in Group A (w3).\n  If required/non-Optional, databricks needs special handling in w4.\n\nQ3: firebolt deployment_mode sourcing\n  Current: \"deployment_mode\": overrides.get(\"deployment_mode\") or options.get(\"deployment_mode\")\n  With helper: merged_options.get(\"deployment_mode\") - since overrides is merged last, this\n  should be equivalent. Verify by tracing: if deployment_mode is in overrides, it appears in\n  merged_options (overrides.update last). If it's only in options, it also appears in merged_options.\n  Confirm there's no case where options.get() would find it but merged_options.get() wouldn't.\n\nRecord findings as annotations in w4 notes before marking w1 done.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit Group B adapters - confirm conditional-schema and missing benchmark fields are safe to normalize",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "notes": "File: benchbox/platforms/base/config_utils.py\n\nChange: Add `base_options: dict[str, Any] | None = None` as last parameter before options.\nChange: Replace `merged_options: dict[str, Any] = {}` with `merged_options: dict[str, Any] = dict(base_options or {})`\n\nThat's the only code change needed. All existing callers pass no base_options - behavior unchanged.\n\nTest: tests/unit/core/test_platform_config_utils.py (already exists - add a test case)\nTest case: call build_platform_config with base_options={\"schema\": \"public\"} and empty\ncredentials → confirm schema=\"public\" appears in result.options. Then call with\nsaved_creds={\"schema\": \"custom\"} → confirm saved_creds win over base_options (priority invariant).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend build_platform_config with base_options parameter",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "notes": "Five platforms where every config_dict entry is a plain merged_options.get(field).\nNOTE: clickhouse_cloud, snowflake, databricks all have the credential merge order bug\n(saved_creds updated before options). Consolidation to build_platform_config fixes this\nas a side-effect - each commit message should note the merge-order fix.\n\nFor each platform, the swap is:\n1. Remove: CredentialManager import, cred_manager, saved_creds, explicit_options, merged_options,\n   name, driver_package, config_dict, and return DatabaseConfig(**config_dict) lines\n2. Add: from benchbox.platforms.base.config_utils import build_platform_config (local import)\n3. Add: return build_platform_config(platform_type=..., credential_key=..., ...)\n\nPlatform details:\n  databend:       credential_key=\"databend\",       driver=\"databend-driver\",   display=\"Databend\"\n                  fields: host, port, username, password, database, dsn, warehouse, ssl, disable_result_cache\n  clickhouse_cloud: credential_key=\"clickhouse-cloud\", driver=\"clickhouse-connect\", display=\"ClickHouse Cloud\"\n                  fields: host, password, username, database, oauth_token, s3_staging_url, s3_region,\n                          gcs_staging_url, max_memory_usage, max_execution_time, disable_result_cache, compression\n  spark:          credential_key=\"spark\",           driver=\"pyspark\",           display=\"Apache Spark\"\n                  fields: master, app_name, deploy_mode, driver_memory, executor_memory, executor_cores,\n                          num_executors, shuffle_partitions, broadcast_threshold, adaptive_enabled,\n                          table_format, enable_hive, spark_config, java_home, staging_root\n  snowflake:      credential_key=\"snowflake\",       driver=\"snowflake-connector-python\", display=\"Snowflake\"\n                  fields: account, warehouse, schema, username, password, role, authenticator,\n                          private_key_path, private_key_passphrase\n  databricks:     credential_key=\"databricks\",      driver=\"databricks-sql-connector\", display=\"Databricks\"\n                  fields: server_hostname, http_path, access_token, catalog, schema,\n                          uc_catalog, uc_schema, uc_volume, staging_root\n\nCommit per platform (5 commits), or group if they're truly trivial after first one succeeds.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consolidate Group A - databend, clickhouse_cloud, spark, snowflake, databricks",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "notes": "w1 FINDINGS:\n  Q1 (schema): ALL SAFE. trino/presto/starburst from_config() all use\n    `if \"schema\" in config and config[\"schema\"]:` - handles None correctly.\n    Include \"schema\" in platform_fields for all three.\n  Q2 (databricks benchmark fields): DatabaseConfig uses extra=\"allow\" - benchmark,\n    scale_factor, tuning_config are extra fields with no validators. Safe as None.\n    Databricks promoted to Group A (w3).\n  Q3 (firebolt deployment_mode): Equivalent. Include in platform_fields.\n\ntrino:     credential_key=\"trino\", default_display_name=\"Trino\", default_driver_package=\"trino\"\n           fields: host, port, catalog, username, password, http_scheme, verify_ssl, ssl_cert_path,\n                   session_properties, query_timeout, timezone, table_format, staging_root, schema\npresto:    credential_key=\"presto\", default_display_name=\"Presto\", default_driver_package=\"presto-python-client\"\n           fields: host, port, catalog, username, password, http_scheme, verify_ssl, ssl_cert_path,\n                   session_properties, query_timeout, table_format, staging_root, schema\nstarburst: credential_key=\"starburst\", default_display_name=\"Starburst\", default_driver_package=\"trino\"\n           fields: host, port, catalog, username, password, role, http_scheme, verify_ssl,\n                   ssl_cert_path, session_properties, query_timeout, timezone, table_format, staging_root, schema\nfirebolt:  credential_key=\"firebolt\", default_display_name=\"Firebolt\", default_driver_package=\"firebolt-sdk\"\n           fields: url, client_id, client_secret, account_name, engine_name, api_endpoint,\n                   deployment_mode, s3_staging_url, s3_region\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consolidate Group B - trino, presto, starburst, firebolt (after w1 audit)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "notes": "These platforms pre-seed merged_options with {\"schema\": \"public\"} and use .get(field, default)\nthroughout the builder. The investigation goal is confirming that build_platform_config with\nbase_options={\"schema\": \"public\"} is sufficient - no data is lost.\n\nKey finding already established (read from pg_duckdb.py:130-154):\n- pg_duckdb from_config() applies defaults for host=\"localhost\", port=5432, username=\"postgres\",\n  sslmode=\"prefer\", work_mem=\"256MB\", maintenance_work_mem=\"512MB\", etc.\n- pg_duckdb registry (benchbox/platforms/__init__.py:914) registers host=\"localhost\",\n  port=\"5432\", username=\"postgres\" as option defaults - so options already contains them.\n- The builder's .get(field, default) is the middle (redundant) layer of a triple-layer default:\n  registry default → builder .get(default) → from_config .get(default)\n\nAction for each platform:\n1. Identify which .get(field, default) entries in the builder have NO corresponding registry\n   option spec default (those are truly load-bearing).\n2. For any load-bearing defaults not in the registry: decide whether to add them to the registry\n   (preferred) or keep the inline builder for that platform (fallback).\n3. Confirm schema is the only field needing base_options (since it may not have a registry default).\n\nRead:\n  benchbox/platforms/pg_duckdb.py: _build_pg_duckdb_config + from_config()\n  benchbox/platforms/pg_mooncake.py: same\n  benchbox/platforms/timescaledb.py: same\n  benchbox/platforms/__init__.py: option spec registrations for pg-duckdb, pg-mooncake, timescaledb\n\nw5 FINDINGS:\n  - schema is already registered with default=\"public\" on all three platforms. base_options={\"schema\": \"public\"}\n    is still useful in w6 to preserve merged_options[\"schema\"] when the builder is called directly with empty options,\n    but it is not the only load-bearing default.\n  - All three platforms have additional top-level builder defaults that are not yet registered:\n    admin_database, sslmode, work_mem, maintenance_work_mem, effective_cache_size,\n    max_parallel_workers_per_gather.\n  - pg_duckdb also has a load-bearing compare_native=False builder default; this should be registered so the helper\n    can keep emitting False instead of None.\n  - pg_mooncake storage_mode and timescaledb chunk/compression fields are already covered by registry defaults.\n\nExpected outcome: all three platforms consolidate cleanly with base_options={\"schema\": \"public\"}.\nAction: register the missing Group C defaults first as a registry-only change, then proceed with w6.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Investigate Group C (pg_duckdb, pg_mooncake, timescaledb) - triple-layer defaults and base_options sufficiency",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "notes": "After w5 confirms readiness and w2 adds base_options support.\n\nEach platform swaps to:\n  return build_platform_config(\n      platform_type=\"pg-duckdb\",  # or pg-mooncake / timescaledb\n      credential_key=\"pg-duckdb\",\n      default_display_name=\"pg_duckdb\",\n      default_driver_package=\"psycopg\",\n      base_options={\"schema\": \"public\"},\n      platform_fields=[...],\n      options=options,\n      overrides=overrides,\n      info=info,\n  )\n\nw6 FINDINGS:\n  - base_options had to seed all direct-call builder defaults, not just schema. The shared helper receives\n    already-defaulted registry values in the normal CLI path, but unit tests also call the builders directly\n    with options={}, so host/port/username and each platform's non-None fallback fields must be pre-seeded.\n  - pg_duckdb base_options: host, port, username, schema, admin_database, sslmode, work_mem,\n    maintenance_work_mem, effective_cache_size, max_parallel_workers_per_gather, force_execution,\n    postgres_scan_threads, compare_native.\n  - pg_mooncake base_options: host, port, username, schema, admin_database, sslmode, work_mem,\n    maintenance_work_mem, effective_cache_size, max_parallel_workers_per_gather, storage_mode.\n  - timescaledb base_options: host, port, username, schema, admin_database, sslmode, work_mem,\n    maintenance_work_mem, effective_cache_size, max_parallel_workers_per_gather, chunk_interval,\n    compression_enabled, compression_after.\n  - Verification: `uv run ruff check ...` passed on the touched files; focused Group C adapter+hook tests passed;\n    `uv run -- python -m pytest -m fast -q -n 0` completed with 21020 passed, 1 skipped, 2105 deselected.\n\nplatform_fields for pg_duckdb: host, port, username, password, database, admin_database,\n  sslmode, work_mem, maintenance_work_mem, effective_cache_size, max_parallel_workers_per_gather,\n  force_execution, postgres_scan_threads, compare_native, duckdb_db_path\n(The redundant .get(field, default) in the builder are removed; from_config() still handles defaults.)\n\nRun fast tests after each platform. The test at\ntests/unit/platforms/test_pg_duckdb_adapter.py (or equivalent) must continue to pass.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consolidate Group C (pg_duckdb, pg_mooncake, timescaledb) using base_options",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "notes": "These builders use os.environ.get() and int() coercions for field defaults:\n  singlestore: SINGLESTORE_HOST, SINGLESTORE_PORT, SINGLESTORE_USER, SINGLESTORE_PASSWORD\n  doris:       DORIS_HOST, DORIS_PORT (int), DORIS_HTTP_PORT (int), DORIS_BE_HTTP_PORT (int),\n               DORIS_USER/DORIS_USERNAME, DORIS_PASSWORD, DORIS_DATABASE\n  starrocks:   STARROCKS_HOST, STARROCKS_PORT (int), STARROCKS_USER, STARROCKS_PASSWORD,\n               STARROCKS_DATABASE, STARROCKS_HTTP_PORT (int)\n\nInvestigation questions:\n1. Are these platforms' PlatformOptionSpec defaults currently hardcoded strings\n   (e.g., default=\"localhost\") or do they already read from env vars?\n   Read: benchbox/platforms/__init__.py option spec registrations for singlestore, doris, starrocks\n2. Could PlatformOptionSpec.default be changed to a callable or env-var-aware value?\n   Or could the default= argument read os.environ at registration time?\n   Read: benchbox/cli/platform_hooks.py PlatformOptionSpec definition\n3. Are there existing unit tests that mock the env vars and assert specific values?\n   These tests constrain how safe the migration is.\n4. The int() coercions in doris/starrocks (e.g., int(merged_options.get(\"port\") or \"9030\")):\n   are these needed because the registry/options dict stores port as a string?\n   If so, this is a type-coercion concern separate from the env-var question.\n\nDecision framework:\n- If env-var fallbacks CAN move to registry defaults cleanly: add to w9 as consolidation candidates\n- If env-var fallbacks require PlatformOptionSpec changes that affect other platforms: too risky, leave inline\n- If int() coercions are needed because of string→int type conversion: note in w9 as a blocker\n  (build_platform_config would return string where adapter expects int - a silent type bug)\n\nw7 FINDINGS:\n  - PlatformOptionSpec.default is a static value. PlatformHookRegistry.get_default_options() returns that raw value\n    unchanged; there is no callable/env-aware default hook today.\n  - Reading os.environ at registration time would only snapshot the environment once, but the existing tests patch env vars\n    around builder/direct-construction calls after import. That means moving env fallbacks into today's registry mechanism\n    would break current behavior and tests.\n  - Existing tests explicitly lock in env-var resolution:\n    singlestore -> tests/unit/platforms/test_singlestore_adapter.py\n    doris       -> tests/unit/platforms/test_doris_adapter.py\n    starrocks   -> tests/unit/platforms/test_starrocks_adapter.py\n  - int() coercions are load-bearing:\n    singlestore coerces port\n    doris coerces port/http_port/be_http_port\n    starrocks coerces port/http_port\n\nVerdicts:\n  - singlestore: Can consolidate: NO. Reason: builder-level env fallback and port coercion are runtime behaviors, not static defaults.\n  - doris: Can consolidate: NO. Reason: env fallback plus multi-port int coercion are load-bearing and covered by tests.\n  - starrocks: Can consolidate: NO. Reason: env fallback plus int coercion for FE/HTTP ports are load-bearing and covered by tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Investigate Group D env-var platforms (singlestore, doris, starrocks) - can env-var fallbacks move to registered defaults?",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "notes": "ATHENA - dual-source region\n  Current: \"region\": merged_options.get(\"region\") or merged_options.get(\"aws_region\")\n  Options:\n    (a) Pre-process before calling helper:\n        if not options.get(\"region\") and options.get(\"aws_region\"):\n            options = {**options, \"region\": options[\"aws_region\"]}\n        return build_platform_config(..., platform_fields=[\"region\", ...])\n    (b) Normalize in registry: register aws_region as an alias for region at registration time\n    (c) Leave inline\n  Evaluate: does the dual-source appear only in _build_athena_config, or does AthenaAdapter\n  also access aws_region directly from config? Read athena.py AthenaAdapter.__init__ / from_config.\n  If the adapter only uses config.get(\"region\"), option (a) is safe.\n\nBIGQUERY - multi-step staging_root derivation\n  Current: ~15 lines of logic resolving staging_root from overrides, then default_output_location\n  in merged_options, then parsing with get_cloud_path_info() to extract storage_bucket/storage_prefix.\n  Options:\n    (a) Extract as _resolve_bigquery_staging(merged_options, overrides) → (staging_root, bucket, prefix)\n        Then call build_platform_config with staging_root/storage_bucket/storage_prefix\n        injected into options before the call.\n    (b) Leave inline - the logic is load-bearing and extracting it doesn't reduce complexity\n  Evaluate: is there test coverage for the staging_root fallback logic in test_bigquery_adapter.py?\n  If yes, extraction is safe (tests catch regressions). If no coverage, document as higher risk.\n\nREDSHIFT - admin_database default + conditional database\n  Current: \"admin_database\": merged_options.get(\"admin_database\", \"dev\")\n  Options:\n    (a) Register \"dev\" as the registry default for admin_database option spec - then options\n        will contain it and merged_options.get(\"admin_database\") returns \"dev\" without the fallback\n    (b) Leave inline\n  Also check: build_platform_config already handles \"if database in overrides\" the same way\n  as the inline code - verify they're truly equivalent.\n  Read: benchbox/platforms/__init__.py for redshift option spec registration.\n\nw8 FINDINGS:\n  - athena: AthenaAdapter.__init__ already treats region and aws_region as aliases (`config.get(\"region\") or config.get(\"aws_region\")`).\n    The builder's only unique logic is emitting top-level region from either source.\n  - bigquery: staging_root/default_output_location parsing is covered by targeted builder tests in both\n    tests/unit/platforms/test_bigquery_adapter.py and tests/unit/platforms/test_bigquery_adapter_coverage.py.\n    The logic can be preserved as a post-processing step over the merged options emitted by the shared helper.\n  - redshift: the builder is otherwise a plain field projection. The only special cases are\n    admin_database defaulting to \"dev\" and the existing \"database only when explicitly overridden\" rule.\n    build_platform_config already matches the conditional database behavior, so only admin_database needs additive seeding.\n\nVerdicts:\n  - athena: Consolidation path: (a). Risk: low. Action: use build_platform_config for the plain fields, then set config.region from config.options[\"region\"] or config.options[\"aws_region\"].\n  - bigquery: Consolidation path: (a). Risk: medium. Action: keep the staging resolver logic, but run it after build_platform_config using config.options as the merged source of truth.\n  - redshift: Consolidation path: (a). Risk: low. Action: consolidate to build_platform_config with base_options={\"admin_database\": \"dev\"}.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Investigate Group D complex platforms (athena, bigquery, redshift) - can unique logic be pre-processed?",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-platform-config-builders-to-shared-helper",
+        "notes": "Investigation-driven implementation plan:\n  singlestore: stay inline; add explanatory comment citing env-var fallback + int coercion\n  doris:       stay inline; add explanatory comment citing env-var fallback + multi-port int coercion\n  starrocks:   stay inline; add explanatory comment citing env-var fallback + int coercion\n  athena:      consolidate via build_platform_config, then normalize config.region from config.options[\"region\"] or [\"aws_region\"]\n  bigquery:    consolidate via build_platform_config, then resolve staging_root/storage_bucket/storage_prefix from config.options\n  redshift:    consolidate via build_platform_config with base_options={\"admin_database\": \"dev\"}\n\nFor every platform that stays inline after investigation, add this comment at the top\nof the function body (immediately after the docstring):\n  # Intentionally inline - not using build_platform_config because: <reason from w7/w8>\n  # See _project/DONE/main/.../consolidate-platform-config-builders-to-shared-helper.yaml\n\nThis prevents future contributors from \"cleaning up\" these builders in a way that\naccidentally re-introduces credential merge order bugs or silent type coercion errors.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Group D consolidation for platforms that cleared investigation gates (w7 + w8)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

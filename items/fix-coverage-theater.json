@@ -1,0 +1,135 @@
+{
+  "description": "Audit found ~30-35% of \"coverage wave\" tests inflate metrics without validating behavior.\n16 `assert True` instances always pass. 315 `assert hasattr` checks verify attributes exist\nbut never call them. 81 trivial `.columns` assertions exercise code without checking output.\nImport-only tests get coverage credit for importing modules. Mock dispatch tests verify\nmocks were called, not that behavior is correct.\n\nThis must be fixed BEFORE adding new coverage - otherwise the 80% target is built on\na foundation of tests that protect nothing. Net statement gain is ~0, but test suite\nintegrity improves dramatically.\n\nCurrent coverage: 66.4% (79,444 / 115,498 statements).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add `# pragma: no cover` to bypass coverage on code that should be tested",
+        "instead": "(not specified)",
+        "item_id": "fix-coverage-theater",
+        "why": "this TODO is about fixing test quality, not hiding gaps"
+      },
+      {
+        "dont": "just delete failing tests",
+        "instead": "fix the assertion to test real behavior",
+        "item_id": "fix-coverage-theater",
+        "why": "the goal is to make tests meaningful, not to remove them"
+      },
+      {
+        "dont": "replace `assert True` with `assert result is not None`",
+        "instead": "assert on specific values, types, or state",
+        "item_id": "fix-coverage-theater",
+        "why": "that's still trivial"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "fix-coverage-theater",
+        "id": 182,
+        "reason": "Completed in 8b13958f7 (refactor(tests): rename coverage_wave_remaining files to describe content).",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Deferral note itself records completion in commit 8b13958f7; already done.",
+        "summary": "Rename files with 'coverage' in the name to describe what they test"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "fix-coverage-theater",
+        "id": 183,
+        "reason": "mutmut or cosmic-ray can find tests that pass regardless of code changes. Useful as a second pass after fixing known theater, but expensive to run.",
+        "resolution": "promoted",
+        "resolved_item": "add-mutation-testing-to-detect-tests-that-never-fail",
+        "resolved_reason": null,
+        "summary": "Add mutation testing to detect tests that never fail"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-03-23T00:00:00Z",
+      "created_at": "2026-03-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing test markers (fast, unit, etc.) must be preserved",
+        "item_id": "fix-coverage-theater"
+      },
+      {
+        "behavior": "Coverage percentage must not drop below 66.2% - baseline updated from 66.4% after bc77a1adf excluded low-ROI bulk DF query sets from scope",
+        "item_id": "fix-coverage-theater"
+      },
+      {
+        "behavior": "Total test count must not decrease (currently 14,215 collected) - upgrade tests, don't delete them",
+        "item_id": "fix-coverage-theater"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-coverage-theater",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Kill all `assert True` statements (16 instances)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-coverage-theater",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Upgrade hasattr-only checks to behavioral assertions (priority 20 of 315)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-coverage-theater",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Deepen mock dispatch tests in 4 coverage files (12 instances)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-coverage-theater",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix trivial `.columns` assertions in dataframe query tests (81 tests)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-coverage-theater",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Convert import-only tests to behavioral tests",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-coverage-theater",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Triage `assert ... is not None` sole-assertion tests (cap at top 20)",
+        "wid": "w6"
+      }
+    ]
+  }
+}

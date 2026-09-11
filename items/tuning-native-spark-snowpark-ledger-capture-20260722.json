@@ -1,0 +1,23 @@
+{
+  "description": "Native spark.py/lakesail.py apply AQE/CBO via connection.conf.set(); snowpark_connect.py via self._session.sql() - both bypass the RecordingConnection's wrapped execute()/cursor().execute(), so the applied ledger stays empty and overall_status derives 'noop' for tuned native-Spark/Snowpark runs (under-reports; never a false 'applied'). Extend capture to conf.set + session.sql. From tuning-applied-ledger-and-validation-status-20260712 review.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-23T12:35:20Z",
+        "from_item": "tuning-native-spark-snowpark-ledger-capture-20260722",
+        "id": 642,
+        "reason": "Native Spark (SparkLikeAdapterMixin.apply_platform_optimizations spark.conf.set, covering spark.py + lakesail.py) is implemented in this PR. The Snowpark portion is deferred: the current snowpark_connect.py applies NO tuning-derived self._session.sql(...) statement — apply_platform_optimizations (SparkTuningMixin) returns [] and configure_for_benchmark issues only ALTER SESSION SET USE_CACHED_RESULT (benchmarking hygiene applied to ALL runs, not tuning). Recording that would falsely report baseline runs as applied_unverified. Needs maintainer input on where Snowpark should apply tuning-derived session settings before honest ledger capture can be added.",
+        "resolution": "promoted",
+        "resolved_item": "tuning-snowpark-session-ledger-capture-20260723",
+        "resolved_reason": null,
+        "summary": "Snowpark applied-ledger session-tuning capture"
+      }
+    ],
+    "item_meta": {
+      "completed_at": "2026-07-23T12:37:01Z",
+      "completed_pr": 1276,
+      "created_at": "2026-07-22T12:17:59Z",
+      "worktree": "main"
+    }
+  }
+}

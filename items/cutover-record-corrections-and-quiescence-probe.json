@@ -1,0 +1,79 @@
+{
+  "context": "Replace the probe first (it is the cheap half and unblocks quiescence verification), then decide the must-preserve cascade with Joe. Do not drop the migration item without an explicit ruling.",
+  "description": "Two create-time-only defects in the tracked record of the 0.3 cutover, both confirmed by execution on 2026-08-01. (1) migrate-hosted-tracker-db-to-todo-db-0-3-schema still carries the must-preserve 'the hosted DB is never restored with --replace while another actor holds a live claim'. That precondition is SUPERSEDED - a claim check is not a gate, because create/defer/promote/block/drop and config writes take no claim at all (root@vm emitted 21 unclaimed create/drop events in under 4 minutes on 2026-08-01). The block reason says so; the must-preserve row still says the wrong thing, and must-preserve is create-time-only. That item has 5 dependents whose dep edges are also create-time-only, so drop+recreate cascades into re-creating all five - do NOT drop it casually; either accept the cascade deliberately or land update-scope-rules in the todo-db project first. (2) Rung 1 of tracker-cutover-needs-a-write-freeze-not-a-claim-check shells out to 'todo stats --json', which does not exist; the command exits 2, both reads capture empty stdout, and '' == '' passes the rung UNCONDITIONALLY. Executed verbatim against production on 2026-08-01 it exited 0 ('no writer is active') while the event count moved 4534 to 4538 during the very 60s window it was measuring. stats['events'] (added by #1377) makes a correct probe writable. Decisions and runbook are recorded in _project/decisions/todo-db-cutover-write-freeze-2026-08-01.md (D2: SCHEMA_VERSION stays 4, the freeze stays advisory; D3: freeze + verified quiescence, neither alone).",
+  "legacy": {
+    "item_meta": {
+      "category": "tracker",
+      "created_at": "2026-08-01T12:44:34Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "a quiescence probe must fail, not pass, when it cannot read the event fingerprint",
+        "item_id": "cutover-record-corrections-and-quiescence-probe"
+      },
+      {
+        "behavior": "the migration item's 5 dependent edges survive any correction to its must-preserve",
+        "item_id": "cutover-record-corrections-and-quiescence-probe"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cutover-record-corrections-and-quiescence-probe",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "cutover-record-corrections-and-quiescence-probe",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! uv run -- python -c \"import subprocess,sys,json; json.loads(subprocess.run(['_project/scripts/todo','stats','--nonexistent-flag'],capture_output=True,text=True,check=True).stdout)\"",
+        "description": "The replacement probe fails when the fingerprint is unreadable",
+        "expected": "exit 0 (the inner command must fail, so the negation succeeds)",
+        "item_id": "cutover-record-corrections-and-quiescence-probe",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q",
+        "description": "Tracker suites stay green",
+        "expected": "exit 0",
+        "item_id": "cutover-record-corrections-and-quiescence-probe",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cutover-record-corrections-and-quiescence-probe",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace the vacuous rung with a fingerprint probe that fails closed on unreadable output",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cutover-record-corrections-and-quiescence-probe",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Get an explicit ruling on the must-preserve cascade (accept 5-dependent recreate, or land update-scope-rules first)",
+        "wid": "w2"
+      }
+    ]
+  }
+}

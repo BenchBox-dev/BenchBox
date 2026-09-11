@@ -1,0 +1,199 @@
+{
+  "context": "Collect live evidence into the decision closeout. Include dig of apex A/AAAA, www CNAME, both challenge TXT records, gh api pages cname and protected_domain_state, and curl of https://benchbox.dev/ and https://www.benchbox.dev/. Org verification must already have completed in 02 w5; this item proves it stuck. G7b remains the next release-branch docs.yml deploy.",
+  "description": "Gate G7 and G7b. After pin-update merges, prove redirects, answers/JoinOrder downloads, scheduled workflows, Codecov, ruleset-drift, and Pages domain cutover: apex and www 200, www CNAME BenchBox-dev.github.io (or still GitHub Pages), org Pages protected_domain_state verified for benchbox.dev, user challenge TXT may then be removed. G7b is still the next push to release for publish-path. Do not enable merge queue.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Enable merge queue because the repo is now org-owned",
+        "instead": "Leave SHADOW_ONLY and 07b dropped",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "why": "Availability is not authorization"
+      },
+      {
+        "dont": "Leave benchbox.dev verified only on the user account after the repo is in the org",
+        "instead": "INSTEAD Confirm org protected_domain_state verified and drop the user challenge only after that",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "why": "user verification would then forbid org repos from publishing to that domain"
+      },
+      {
+        "dont": "Treat G7 serving-only Pages as G7b publish-path proof",
+        "instead": "Record G7b as the next release-branch docs.yml deploy",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "why": "deploy job is push to release only"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "needs_item": "github-org-transfer-03-pin-update"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-22T14:59:06Z",
+      "created_at": "2026-08-21T02:12:08Z",
+      "worktree": "github-org-transfer"
+    },
+    "preserves": [
+      {
+        "behavior": "G7b is a later release-branch deploy, not a same-day requirement for closing G7 serving checks",
+        "item_id": "github-org-transfer-04-canary-closeout"
+      },
+      {
+        "behavior": "Merge queue remains disabled",
+        "item_id": "github-org-transfer-04-canary-closeout"
+      },
+      {
+        "behavior": "Old owner/name is not recreated",
+        "item_id": "github-org-transfer-04-canary-closeout"
+      },
+      {
+        "behavior": "strict-base-refresh-07b remains dropped",
+        "item_id": "github-org-transfer-04-canary-closeout"
+      },
+      {
+        "behavior": "www.benchbox.dev CNAME is BenchBox-dev.github.io or proven still serving via GitHub Pages",
+        "item_id": "github-org-transfer-04-canary-closeout"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "success criteria and G7/G7b split",
+        "decision": "extend",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "path": "_project/decisions/github-org-transfer-benchbox-dev-2026-08-21.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub merge queue and develop ruleset bypass actors"
+      },
+      {
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/github-org-transfer-benchbox-dev-2026-08-21.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh api repos/BenchBox-dev/BenchBox --jq .owner.login",
+        "description": "Owner is BenchBox-dev",
+        "expected": "BenchBox-dev",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "last_result": "pass",
+        "last_run": "2026-08-22T14:58:59Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "curl -fsSI https://github.com/joeharris76/BenchBox/releases/download/answers-v1/checksums.sha256 | head -n 15",
+        "description": "Answers release URL still fetches via redirect",
+        "expected": "HTTP 200 or 302",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "last_result": "pass",
+        "last_run": "2026-08-22T14:59:00Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/BenchBox-dev/BenchBox/actions/workflows --jq '[.workflows[] | select(.path|test(\"\\\\.yml$\")) | {path,state}]'",
+        "description": "Scheduled workflows are registered",
+        "expected": "no disabled_inactivity on scheduled workflows",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "last_result": "pass",
+        "last_run": "2026-08-22T14:59:01Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/BenchBox-dev/BenchBox/pages --jq '{cname,protected_domain_state,https_enforced}'",
+        "description": "Org Pages domain is verified for benchbox.dev",
+        "expected": "cname=benchbox.dev protected_domain_state=verified https_enforced=true",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "last_result": "pass",
+        "last_run": "2026-08-22T14:59:02Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "dig www.benchbox.dev +short",
+        "description": "www.benchbox.dev CNAME targets the org",
+        "expected": "BenchBox-dev.github.io or GitHub Pages with HTTP 200",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "last_result": "pass",
+        "last_run": "2026-08-22T14:59:02Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "curl -fsSI https://benchbox.dev/ && curl -fsSI https://www.benchbox.dev/",
+        "description": "Apex and www still serve",
+        "expected": "HTTP 200 both",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "last_result": "pass",
+        "last_run": "2026-08-22T14:59:03Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'Execution and closeout' _project/decisions/github-org-transfer-benchbox-dev-2026-08-21.md",
+        "description": "Decision record documents closeout including local remotes and GitHub Apps",
+        "expected": "match",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "last_result": "pass",
+        "last_run": "2026-08-22T14:59:04Z",
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "G7 evidence collected: apex HTTP 200, www HTTP 301->200, redirects green, all 30 workflows active",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "notes": null,
+        "started_at": "2026-08-22T14:56:41Z",
+        "started_branch": "docs/github-org-transfer-04-canary-closeout",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-github-org-transfer-04",
+        "status": "done",
+        "summary": "Collect G7 evidence including Pages domain lock (org verified, apex/www 200, www CNAME)",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Closed transfer decision record with G0-G7 execution summary, merge queue remaining disabled, and G7b recorded",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "notes": null,
+        "started_at": "2026-08-22T14:57:41Z",
+        "started_branch": "docs/github-org-transfer-04-canary-closeout",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-github-org-transfer-04",
+        "status": "done",
+        "summary": "Close the decision record; keep 07b dropped and queue off; note local remotes and GitHub Apps",
+        "wid": "w1"
+      },
+      {
+        "evidence": "G7b recorded as separate tracker item github-org-transfer-05-pages-publish-path for next release cut",
+        "item_id": "github-org-transfer-04-canary-closeout",
+        "notes": null,
+        "started_at": "2026-08-22T14:56:47Z",
+        "started_branch": "docs/github-org-transfer-04-canary-closeout",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-github-org-transfer-04",
+        "status": "done",
+        "summary": "Record G7b as github-org-transfer-05-pages-publish-path; do not close publish-path from a serving-only 200",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "description": "WS6 of _project/planning/ci-failure-reduction-plan.md. Check-run sampling on 2026-07-23 shows WebKit (@smoke, non-blocking) failed on BOTH recent explorer-touching PRs (#1270, #1264, both 2026-07-22) while Firefox @smoke and Chromium full-suite passed both times - deterministic WebKit-specific breakage, not a flake. Note stabilize-webkit-browser-smoke-flake-under-parallel-workers is DONE, so this is likely a regression or a new breakage. Non-blocking-but-always-red is the worst state: it trains everyone to ignore red, and each failure uploads a ~160MB playwright-report artifact.\n\nTimebox one diagnosis session. Then either (a) fix the root cause, or (b) move the WebKit job to nightly.yml with an auto-filed issue on failure and remove it from the PR lane until supported. Either way, trim failure-artifact size/retention (traces on first retry only, retention-days: 3). Also correct the PR-triage guidance that says 'Firefox/WebKit flake - ignore': Firefox is green; WebKit is known-broken and should reference this item. Related: graduate-browser-smoke-to-blocking-gates (graduation needs 10 consecutive greens - impossible until this lands).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Leave the job non-blocking-and-red as steady state",
+        "instead": "Fix it or move it out of the PR lane with an auto-filed tracking issue",
+        "item_id": "webkit-smoke-fix-or-demote",
+        "why": "Expected-red normalizes ignoring CI and buries real failures"
+      },
+      {
+        "dont": "Mark the failing specs skip-on-webkit wholesale without diagnosis",
+        "instead": "Diagnose first; targeted skips only with linked issue and rationale",
+        "item_id": "webkit-smoke-fix-or-demote",
+        "why": "Silently shrinks smoke coverage and fakes a graduation-ready green streak"
+      }
+    ],
+    "item_meta": {
+      "category": "Results Explorer",
+      "created_at": "2026-07-23T12:29:32Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Chromium full-suite blocking behavior is unaffected",
+        "item_id": "webkit-smoke-fix-or-demote"
+      },
+      {
+        "behavior": "If a src/ change turns out to be required for the fix, stop and re-scope this item first (scope deliberately excludes src/)",
+        "item_id": "webkit-smoke-fix-or-demote"
+      },
+      {
+        "behavior": "graduate-browser-smoke-to-blocking-gates remains the graduation path once green; its 10-consecutive-green criterion is unchanged",
+        "item_id": "webkit-smoke-fix-or-demote"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "webkit-smoke-fix-or-demote",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "webkit-smoke-fix-or-demote",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "webkit-smoke-fix-or-demote",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "webkit-smoke-fix-or-demote",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "webkit-smoke-fix-or-demote",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "webkit-smoke-fix-or-demote",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "webkit-smoke-fix-or-demote",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/playwright.config.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'webkit' .github/workflows/results-explorer-browser.yml .github/workflows/nightly.yml",
+        "description": "PR lane has zero expected-red checks: WebKit job either green on 3 consecutive explorer PRs or absent from PR-triggered workflow",
+        "expected": "webkit job green in PR lane, or present only in nightly.yml",
+        "item_id": "webkit-smoke-fix-or-demote",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'retention-days' .github/workflows/results-explorer-browser.yml",
+        "description": "Failure artifact policy trimmed",
+        "expected": "retention-days: 3 on failure-report uploads",
+        "item_id": "webkit-smoke-fix-or-demote",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "webkit-smoke-fix-or-demote",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "webkit-smoke-fix-or-demote",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "webkit-smoke-fix-or-demote",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "webkit-smoke-fix-or-demote",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Diagnose the deterministic WebKit @smoke failures on #1270/#1264 (compare against the stabilize-webkit... fix; identify regression point)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "webkit-smoke-fix-or-demote",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Fix root cause OR demote to nightly.yml with auto-filed issue on failure; remove from PR lane if demoted",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "webkit-smoke-fix-or-demote",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Trim failure artifacts (trace-on-first-retry, retention-days 3) for all three browser jobs",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "webkit-smoke-fix-or-demote",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update triage guidance: Firefox is green; WebKit status tracked here (docs/operations)",
+        "wid": "w4"
+      }
+    ]
+  }
+}

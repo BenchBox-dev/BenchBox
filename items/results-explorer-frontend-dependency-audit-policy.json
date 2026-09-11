@@ -1,0 +1,211 @@
+{
+  "context": "Re-run the lockfile audit, trace each advisory to direct/transitive and runtime/build/test reachability, inspect upstream fixes, and prefer lockfile-compatible updates. Add CI enforcement at an agreed severity with a machine-readable exception file containing advisory, rationale, owner, expiry, and removal condition. Fail closed on new or expired high/critical advisories while avoiding blind npm audit fix upgrades.",
+  "description": "The release review found npm audit reporting four advisories, three high and one low, in the Vite/PostCSS and transitive test/build dependency graph. No vulnerable code path in the shipped browser bundle or exploit was reproduced. Establish a proportionate policy that distinguishes runtime, build-time, and test-only exposure, fixes safe updates, and records narrowly scoped expiring exceptions instead of leaving audit output unmanaged.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "allow an unbounded advisory ID or package-name wildcard",
+        "instead": "pin exceptions to exact advisory/range with expiry",
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "why": "it would suppress future unrelated vulnerabilities"
+      },
+      {
+        "dont": "classify every devDependency advisory as harmless",
+        "instead": "document actual reachability and CI/build threat model per advisory",
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "why": "build and test tooling executes trusted project inputs and can affect produced artifacts"
+      },
+      {
+        "dont": "run npm audit fix --force and accept the generated diff",
+        "instead": "apply the narrowest supported upgrade and verify build, tests, e2e, and bundle output",
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "why": "unreviewed major upgrades can break the build or alter shipped behavior"
+      }
+    ],
+    "item_meta": {
+      "category": "Supply Chain",
+      "completed_at": "2026-08-02T14:23:05Z",
+      "completed_pr": 1484,
+      "created_at": "2026-08-02T04:28:21Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A new critical or high advisory cannot hide behind an unrelated existing exception.",
+        "item_id": "results-explorer-frontend-dependency-audit-policy"
+      },
+      {
+        "behavior": "Application runtime behavior and production bundle size remain unchanged unless a reviewed dependency fix requires otherwise.",
+        "item_id": "results-explorer-frontend-dependency-audit-policy"
+      },
+      {
+        "behavior": "Every exception names an owner, exact advisory/package range, expiry date, exposure analysis, and removal trigger.",
+        "item_id": "results-explorer-frontend-dependency-audit-policy"
+      },
+      {
+        "behavior": "Major upgrades are evaluated explicitly and never accepted through npm audit fix --force.",
+        "item_id": "results-explorer-frontend-dependency-audit-policy"
+      },
+      {
+        "behavior": "The npm lockfile remains deterministic under npm ci.",
+        "item_id": "results-explorer-frontend-dependency-audit-policy"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Mirror the repository's existing dependency-audit aggregation and fail-closed result handling.",
+        "decision": "extend",
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "path": ".github/workflows/pr.yml"
+      },
+      {
+        "concept": "Run the frontend audit in an existing Node-capable lane rather than provisioning a separate duplicate environment.",
+        "decision": "extend",
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "path": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "concept": "Treat the committed lockfile as the audited dependency graph.",
+        "decision": "reuse",
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "path": "results-explorer/package-lock.json"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/browser-ci.md"
+      },
+      {
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package-lock.json"
+      },
+      {
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package.json"
+      },
+      {
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm audit --audit-level=high",
+        "description": "No unexcepted high-severity frontend advisory remains",
+        "expected": "Fails on the unfixed lockfile; exits 0 after fixes or narrowly validated policy handling leaves no unexcepted high advisory.",
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "last_result": "pass",
+        "last_run": "2026-08-02T14:21:35Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm ci && npm test -- --run && npm run typecheck && npm run build",
+        "description": "Clean install, test, typecheck, and build pass",
+        "expected": "The audited lockfile installs deterministically and all frontend checks pass.",
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "last_result": "pass",
+        "last_run": "2026-08-02T14:22:18Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q",
+        "description": "Frontend workflow policy tests pass",
+        "expected": "New/expired high advisories fail the gate and scoped live exceptions behave as documented.",
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "last_result": "pass",
+        "last_run": "2026-08-02T14:22:32Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Before-change npm audit --audit-level=high identified direct high advisories in postcss and vite plus a transitive undici high advisory through Playwright; one low @babel/core advisory remains below the blocking threshold and is intentionally visible, not excepted.",
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "notes": "Capture package, advisory, severity, direct/transitive chain, fixed version, runtime/build/test reachability, exploit preconditions, and whether the package contributes bytes to dist. Compare npm audit with upstream advisories before choosing severity or exception.",
+        "started_at": "2026-08-02T14:15:34Z",
+        "started_branch": "chore/results-explorer-dependency-audit",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Reproduce and classify every current npm advisory",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Patched postcss to 8.5.25, vite to 6.4.3, and Playwright to 1.62.1; constrained transitive undici to ^7.28.0. npm ci, 851 Vitest tests, typecheck, and production build pass; generated JS bundle size is unchanged within measurement noise.",
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "notes": "Prefer patch/minor lockfile-compatible upgrades; isolate any major upgrade. Run npm ci, unit tests, typecheck, build, Chromium, Firefox, and WebKit smoke, and compare bundle composition/size for unexpected runtime additions.",
+        "started_at": "2026-08-02T14:20:51Z",
+        "started_branch": "chore/results-explorer-dependency-audit",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Apply safe dependency updates and verify the production artifact",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added npm run audit:high to the blocking Chromium browser lane and nightly parity lane, documented the non-force-upgrade/visible-low policy, and added workflow regression tests covering both gates. Full tests/unit/workflows suite passes (112 tests).",
+        "item_id": "results-explorer-frontend-dependency-audit-policy",
+        "notes": "If an advisory cannot yet be fixed, add an exact machine-readable exception with expiry and owner. CI fails on new high/critical findings or expired exceptions, reports low/moderate findings, and produces actionable package chains.",
+        "started_at": "2026-08-02T14:21:14Z",
+        "started_branch": "chore/results-explorer-dependency-audit",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add an expiring audit policy and CI enforcement",
+        "wid": "w2"
+      }
+    ]
+  }
+}

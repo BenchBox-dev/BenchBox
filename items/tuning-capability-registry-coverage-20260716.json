@@ -1,0 +1,97 @@
+{
+  "description": "The capability registry introduced by the renderer consolidation (#1180)\ncovers the 9 legacy compat platforms plus starrocks/doris; platforms with\nregistered DDL generators but no registry entries (trino, presto, athena,\nfirebolt, azure_synapse, timescaledb, pg_duckdb, pg_mooncake, questdb, ...)\nlive as documented allowlist gaps in the capability-source drift test.\nAdd registry entries derived from each platform's real generator +\nadapter behavior, shrinking the drift-test allowlists to empty as coverage\nlands. Where a generator exists but the adapter never consumes it, record\nrendered_via honestly (dry-run-only today) and note the renderer-migration\nfollow-up per platform.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "tuning-capability-registry-coverage-20260716",
+        "needs_item": "tuning-renderer-consolidation-and-baseline-policy-20260712"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Drift test stays fail-on-new-drift throughout",
+        "item_id": "tuning-capability-registry-coverage-20260716"
+      },
+      {
+        "behavior": "Registry entries record REAL behavior (no aspirational ddl claims for adapter paths that do not consume generators yet)",
+        "item_id": "tuning-capability-registry-coverage-20260716"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-capability-registry-coverage-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/**"
+      },
+      {
+        "item_id": "tuning-capability-registry-coverage-20260716",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning -q -k 'drift or registry'",
+        "description": "Drift suite green with shrunken allowlists",
+        "expected": "All passing; allowlists reduced per commit body",
+        "item_id": "tuning-capability-registry-coverage-20260716",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-capability-registry-coverage-20260716",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tuning-capability-registry-coverage-20260716",
+        "needs_wid": "w0",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-capability-registry-coverage-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Start gate: PR #1180 merged; enumerate the drift-test allowlist entries as the coverage worklist",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-capability-registry-coverage-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Registry entries for the Trino family (trino/presto/athena) + firebolt + synapse + timescaledb, verified against generators and adapters",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-capability-registry-coverage-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Registry entries for the pg extensions (pg_duckdb/pg_mooncake) + questdb; shrink allowlists; strictify tests where emptied",
+        "wid": "w2"
+      }
+    ]
+  }
+}

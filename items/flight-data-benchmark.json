@@ -1,0 +1,400 @@
+{
+  "description": "Implement a flight data benchmark using the US Bureau of Transportation Statistics\n(BTS) On-Time Performance dataset. This benchmark provides realistic time-series\nanalytics on commercial aviation data spanning decades, enabling performance\ntesting of temporal aggregations, route analysis, and delay pattern detection.\n\nThe BTS dataset is excellent for benchmarking because:\n- Real operational data from US commercial airlines (1987-present)\n- Multi-dimensional analysis: temporal, geographic, carrier, aircraft\n- Predictable scale factors based on historical coverage\n- Rich analytical patterns: delays, cancellations, routes, seasonal trends\n- Well-documented schema with stable data quality\n\nUse cases covered:\n- On-time performance analysis\n- Delay cause attribution\n- Route and airport performance rankings\n- Seasonal and temporal patterns\n- Carrier comparisons\n\ncontext_sections:\n- name: Data Sources\n  summary: |\n    **Primary Source: BTS TranStats**\n    - URL: https://www.transtats.bts.gov/ontime/\n    - Format: CSV (customizable download)\n    - Coverage: January 1987 - present (monthly updates)\n    - Cost: Free (public data)\n\n    **Alternative Sources:**\n    | Source | Coverage | Format | Access |\n    |--------|----------|--------|--------|\n    | BTS TranStats | 1987-present | CSV | Direct download |\n    | Kaggle | 2018-2024 | CSV/Parquet | Download |\n    | AWS Open Data | Historical | Parquet | S3 access |\n    | OpenSky Network | Global, real-time | JSON/Parquet | API (academic) |\n\n    **Recommended for BenchBox:**\n    - BTS TranStats for authoritative US data\n    - Pre-converted Parquet for faster loading\n    - Kaggle datasets for quick prototyping\n\n- name: Schema Structure\n  summary: |\n    **Core Fields (simplified from full BTS schema):**\n\n    | Field | Type | Description |\n    |-------|------|-------------|\n    | Year, Month, DayofMonth | INT | Date components |\n    | DayOfWeek | INT | 1=Monday, 7=Sunday |\n    | FlightDate | DATE | Full flight date |\n    | Reporting_Airline | STRING | Carrier code |\n    | Flight_Number_Reporting_Airline | INT | Flight number |\n    | Origin, Dest | STRING | Airport codes |\n    | CRSDepTime, CRSArrTime | INT | Scheduled times (HHMM) |\n    | DepTime, ArrTime | INT | Actual times (HHMM) |\n    | DepDelay, ArrDelay | FLOAT | Minutes delayed |\n    | Cancelled | INT | 0/1 flag |\n    | CancellationCode | STRING | A=Carrier, B=Weather, C=NAS, D=Security |\n    | Diverted | INT | 0/1 flag |\n    | Distance | FLOAT | Miles |\n\n    **Delay Attribution Fields:**\n    - CarrierDelay, WeatherDelay, NASDelay, SecurityDelay, LateAircraftDelay\n\n    **Dimension Tables:**\n    - Airlines (carrier code -> name mapping)\n    - Airports (code -> name, city, state, coordinates)\n\n- name: Data Volumes\n  summary: |\n    **Annual Flight Volumes (approximate):**\n    | Period | Flights/Year | Notes |\n    |--------|--------------|-------|\n    | 2019 | 7.4 million | Pre-pandemic peak |\n    | 2020 | 4.7 million | COVID impact |\n    | 2021 | 5.4 million | Recovery |\n    | 2022-2024 | 6-7 million | Near pre-pandemic |\n\n    **Historical Totals:**\n    - 1987-2024: ~200+ million flights\n    - Single year: ~50-100 MB (compressed)\n    - Full historical: ~5-10 GB (compressed)\n\n- name: Query Workload Categories\n  summary: |\n    **On-Time Performance (5+ queries):**\n    - On-time arrival rate by carrier\n    - Delay distribution by airport\n    - Average delay by time of day\n    - Best/worst performing routes\n    - Improvement trends over time\n\n    **Delay Analysis (4+ queries):**\n    - Delay cause breakdown\n    - Cascading delay patterns (LateAircraftDelay)\n    - Weather vs carrier-controlled delays\n    - Recovery time analysis\n\n    **Route Analytics (4+ queries):**\n    - Busiest routes by flight count\n    - Route reliability rankings\n    - Distance vs delay correlation\n    - Hub connectivity patterns\n\n    **Temporal Patterns (4+ queries):**\n    - Day-of-week patterns\n    - Seasonal variations\n    - Holiday impact analysis\n    - Time-of-day congestion\n\n    **Carrier Comparisons (3+ queries):**\n    - Carrier ranking by on-time %\n    - Cancellation rates by carrier\n    - Market share by route\n\n- name: Scale Factor Design\n  summary: |\n    **TPC-aligned scale factors (SF=1 ≈ 1GB raw data):**\n\n    Full dataset: ~200M flights (1987-present), ~15-20 GB raw.\n    Per flight: ~75-100 bytes. Scale factors use time-based subsetting.\n\n    | Scale | Period | Flights | Size (Raw) | Use Case |\n    |-------|--------|---------|------------|----------|\n    | 0.01 | ~1 week | ~140K | ~10 MB | CI/testing |\n    | 0.1 | ~2 months | ~1.2M | ~100 MB | Development |\n    | 1.0 | ~1.5 years | ~10M | ~1 GB | Standard |\n    | 10.0 | ~15 years | ~100M | ~10 GB | Large scale |\n    | 100.0 | Full (37y) | ~200M | ~15-20 GB | Maximum |\n\n    **Scaling Strategy:**\n    - Time-based (contiguous years) for trend analysis\n    - Recent years preferred for relevance\n    - Maintain referential integrity with dimension tables\n    - Note: Full dataset (~200M flights) is smaller than SF=100 convention",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "download real flight data in unit tests",
+        "instead": "use synthetic test fixtures",
+        "item_id": "flight-data-benchmark",
+        "why": "files are large and BTS rate-limits"
+      },
+      {
+        "dont": "embed full airport/airline datasets inline in code",
+        "instead": "use downloadable CSV files with version pinning",
+        "item_id": "flight-data-benchmark",
+        "why": "reference data changes over time"
+      },
+      {
+        "dont": "hardcode BTS download URLs",
+        "instead": "use configuration-driven URL templates",
+        "item_id": "flight-data-benchmark",
+        "why": "BTS periodically changes endpoints"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "flight-data-benchmark",
+        "id": 58,
+        "reason": "Not needed for initial DuckDB-only implementation; add when expanding to other platforms",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Platform-specific SQL variants deferred until expansion beyond DuckDB; no evidence this benchmark has expanded to other platforms.",
+        "summary": "Add platform-specific SQL variants"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "flight-data-benchmark",
+        "id": 59,
+        "reason": "Documentation can follow once the benchmark is functional and API is stable",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: docs/benchmarks/flightdata.md already exists — benchmark usage documentation is already written.",
+        "summary": "Document benchmark usage"
+      }
+    ],
+    "item_meta": {
+      "category": "Benchmark Development",
+      "completed_at": "2026-04-04T00:00:00Z",
+      "created_at": "2026-01-12T00:00:00Z",
+      "worktree": "benchmark-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "BaseBenchmark contract unchanged",
+        "item_id": "flight-data-benchmark"
+      },
+      {
+        "behavior": "Existing NYC Taxi benchmark interface unchanged",
+        "item_id": "flight-data-benchmark"
+      },
+      {
+        "behavior": "Platform registry backward compatible",
+        "item_id": "flight-data-benchmark"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "flight-data-benchmark",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/nyctaxi/"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/__init__.py"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_flightdata_duckdb.py"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/flightdata/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.flightdata import FlightDataBenchmark; print('OK')\"",
+        "description": "Flight data benchmark module imports",
+        "expected": "OK",
+        "item_id": "flight-data-benchmark",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/flightdata/ -v --tb=short",
+        "description": "Unit tests pass",
+        "expected": "all tests pass",
+        "item_id": "flight-data-benchmark",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w3",
+        "wid": "w10"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w3",
+        "wid": "w11"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w3",
+        "wid": "w12"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w3",
+        "wid": "w13"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w7",
+        "wid": "w13"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w10",
+        "wid": "w16"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w11",
+        "wid": "w16"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w12",
+        "wid": "w16"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w13",
+        "wid": "w16"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w8",
+        "wid": "w16"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w9",
+        "wid": "w16"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "flight-data-benchmark",
+        "needs_wid": "w3",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": "Decision: BTS TranStats as primary source (authoritative, no account required).\nURL template: https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_{year}_{month}.zip\nFormat: ZIP containing CSV. Synthetic fallback for SF < 0.1 and CI/testing.\nScale factors map to time periods (SF=1 ≈ 17 months ≈ 10M flights ≈ 1GB).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Evaluate data sources and write acquisition ADR",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement route analytics queries (4 queries)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement temporal pattern queries (4 queries)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement carrier comparison queries (3 queries)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement FlightDataBenchmark class",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register benchmark with CLI",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create unit and integration tests",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create flightdata module structure",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement schema definitions",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create airport and airline reference data",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement CSV/Parquet downloader",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement scale factor subsetting",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement platform data loading",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement on-time performance queries (5 queries)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "flight-data-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement delay analysis queries (4 queries)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

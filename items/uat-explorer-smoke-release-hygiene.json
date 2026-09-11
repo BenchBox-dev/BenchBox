@@ -1,0 +1,191 @@
+{
+  "context": "Guard the heavy path on file presence; always run a cheap corpus contract.\nDelegate npm/Playwright to the Results Explorer's own entrypoint so UAT calls\nit rather than reimplementing it. Make docs.yml dormancy intentional.\n",
+  "description": "Outcome of a 4-round adversarial architecture review of the UAT layer. This\nis the critic's single highest-priority item: the ONLY live, verifiable\ndefect (as opposed to a wording/charter dispute).\n\ntests/uat/phases/explorer_smoke.py is present on origin/main and shells out to\n`_project/scripts/explorer_publish.py build` and results-explorer/ scripts —\nbut BOTH _project/scripts/explorer_publish.py AND results-explorer/ are ABSENT\nfrom origin/main (verified). So main carries a release-gate phase that is\nstructurally incapable of passing on a clean main checkout: it is dead /\nfalse-gating.\n\nThe phase also re-issues npm ci / npm run build / playwright\n(explorer_smoke.py:222-226), duplicating the Results Explorer's own CI\n(.github/workflows/results-explorer-browser.yml).\n\nIMPORTANT framing: explorer smoke IS chartered by the spec\n(_project/specs/uat-framework.md:38,102,128,297-299,418,445). This is a\nrelease-HYGIENE problem, not a charter problem. Do not delete the capability;\nmake it safe when the explorer is absent and stop owning browser mechanics.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete explorer smoke",
+        "instead": "(not specified)",
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "why": "it is chartered; make it presence-aware"
+      },
+      {
+        "dont": "hard-fail when the explorer is absent",
+        "instead": "(not specified)",
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "why": "skip-with-reason so main stays green"
+      },
+      {
+        "dont": "keep npm ci/build/playwright inside tests/uat",
+        "instead": "(not specified)",
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "why": "hand off to Results Explorer"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-explorer-smoke-release-hygiene",
+        "id": 506,
+        "reason": "Hard-gating requires the explorer + publish pipeline to be present on the release branch (see [[uat-charter-visibility-on-main]]).",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Condition (explorer+publish pipeline present on release branch) not yet met; remediate-explorer-deploy-path-reconciliation (open) confirms explorer is still stripped from release curation.",
+        "summary": "Re-enable full explorer smoke as a hard release gate once the explorer ships to the target branch"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-31T00:00:00Z",
+      "created_at": "2026-05-31T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Packaged-bundle corpus contract is still validated on every run (minimal check)",
+        "item_id": "uat-explorer-smoke-release-hygiene"
+      },
+      {
+        "behavior": "When the explorer IS present, the full build + Playwright smoke still runs and gates as before",
+        "item_id": "uat-explorer-smoke-release-hygiene"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/results-explorer-browser.yml — reuse as the browser-test owner; UAT should not copy its npm/Playwright mechanics",
+        "decision": "reuse",
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "path": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "concept": "results-explorer/scripts/serve-browser-tests.mjs — reuse/extend only if a thin delegated entrypoint is needed when the explorer is present",
+        "decision": "extend",
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "path": "results-explorer/scripts/serve-browser-tests.mjs"
+      },
+      {
+        "concept": "tests/uat/phases/explorer_smoke.py — preserve the UAT phase wrapper but reduce it to corpus contract + delegation",
+        "decision": "reuse",
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "path": "tests/uat/phases/explorer_smoke.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/matrix.py"
+      },
+      {
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/runner.py"
+      },
+      {
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml (dormant-step documentation/guarding only)"
+      },
+      {
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/ (entrypoint UAT calls — only if delegation requires a thin command)"
+      },
+      {
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/ (guard/contract helpers)"
+      },
+      {
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/explorer_smoke.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -k 'explorer_smoke and (skip or guard)' -q",
+        "description": "Clean main checkout runs UAT without false-gating on absent explorer files",
+        "expected": "phase skips-with-reason when explorer files absent; no hard failure",
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -k explorer_corpus_contract -q",
+        "description": "Minimal corpus-contract check runs regardless of explorer presence",
+        "expected": "corpus contract validated; passes/fails on bundle shape, not Node availability",
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "needs_wid": "w0",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "notes": "Verify on origin/main: tests/uat/phases/explorer_smoke.py present;\n_project/scripts/explorer_publish.py absent; results-explorer/ absent.\nConfirm the phase invokes explorer_publish.py build + the explorer browser\nscripts. Record a compact summary (paths, present/absent, invoking lines).\nRE-VALIDATED 2026-05-31 (origin/main fetched fresh):\n  - git ls-tree origin/main tests/uat/phases/explorer_smoke.py -> PRESENT (blob 55a3954)\n  - git ls-tree origin/main _project/scripts/explorer_publish.py -> ABSENT (empty)\n  - git ls-tree origin/main results-explorer/ -> ABSENT (empty)\n  - explorer_smoke.py:29 EXPLORER_BUILD_ARGV shells _project/scripts/explorer_publish.py build\n  - explorer_smoke.py:222-226 issued npm ci / npm run build / npx playwright directly\nConfirms the false-gate is live; on develop both assets exist (phase passes there).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the false-gate: confirm explorer files absent on origin/main while the phase ships there",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "notes": "Always run a cheap, no-Node corpus-contract check on packaged bundles\n(shape/manifest/terminal-state). Run the full explorer_publish.py build +\nPlaywright ONLY when _project/scripts/explorer_publish.py AND\nresults-explorer/ exist on the target branch; otherwise skip-with-reason\n(structured skip, NOT a hard failure).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a branch-presence guard with a minimal always-on corpus-contract check",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "notes": "UAT hands off a bundles directory and calls a Results Explorer command\nrather than owning npm ci / build / playwright. Removes the duplicate of\nresults-explorer-browser.yml mechanics from explorer_smoke.py:222-226.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move npm/build/Playwright ownership to the Results Explorer entrypoint",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-explorer-smoke-release-hygiene",
+        "notes": ".github/workflows/docs.yml on main carries explorer build+deploy steps\nguarded by hashFiles('results-explorer/package.json') (false on main) and\nreferences the absent explorer_publish.py. Either document-as-dormant with\na clear comment, or guard cleanly so the dormancy is intentional and\nreadable rather than accidental dead code.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve docs.yml dormant explorer deploy steps on main",
+        "wid": "w3"
+      }
+    ]
+  }
+}

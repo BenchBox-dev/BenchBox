@@ -1,0 +1,153 @@
+{
+  "context": "Add `import` to the spec's CLI list with a one-line description of the bulk path and its refuse-by-default target guard; add a `finding import` row to the skill source's action table and regenerate mirrors with `make skill-sync`; document TODO_DB_FINDING_DRAFTS_DIR where the drafts directory is already described. Match the dense terse house style -- no bash blocks restating content that already exists.",
+  "description": "Three surfaces shipped during the findings-domain v4/phase-5 work are documented nowhere an agent or operator would look:\n\n1. `_project/specs/findings-domain.md` CLI section still reads `todo finding create | list | show | candidates | dismiss | triage | link | promote | sync` -- `import` is missing. Zero occurrences of 'finding import' in the spec, which is the master design doc.\n2. `.claude/skills/todo-db/SKILL.md`'s action table routes only `finding candidates` / `finding triage` / `finding sync` / `finding promote`. `import` is unroutable, and that skill is HOW agents discover tracker actions -- its own rule 4 says to report a capability gap and stop when an action is not advertised, so an agent asked to import the corpus would correctly conclude the capability does not exist.\n3. `TODO_DB_FINDING_DRAFTS_DIR` appears in no doc at all (not AGENTS.md, not the spec, not the skills, not docs/). Its entire purpose is that an operator pins it at the standalone cutover so BenchBox and standalone todo-db agree on the drafts directory. Undocumented, nobody will pin it, and the silent-divergence failure the bridge was built to prevent recurs -- `sync` reporting 'synced 0' while a real draft sits stranded.\n\nThe skill is a GENERATED mirror: source lives at /Users/joe/.skill-sync/skills and mirrors are produced by `make skill-sync`. Never hand-edit `.claude/skills/`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Document the bulk import without its target guard",
+        "instead": "state that --confirm-target <db-name> is required and that the command refuses by default",
+        "item_id": "findings-import-surfaces-undocumented",
+        "why": "`--bulk` writes to the shared production tracker; documenting the happy path alone invites an unconfirmed run"
+      },
+      {
+        "dont": "Hand-edit .claude/skills/todo-db/SKILL.md",
+        "instead": "edit the source under /Users/joe/.skill-sync/skills and run `make skill-sync`",
+        "item_id": "findings-import-surfaces-undocumented",
+        "why": "it is a generated mirror; a hand edit is overwritten by the next `make skill-sync` and drifts from the tracked snapshot the skill-sync-verify CI gate checks"
+      }
+    ],
+    "item_meta": {
+      "category": "documentation",
+      "completed_at": "2026-08-10T16:00:48Z",
+      "completed_pr": 1682,
+      "created_at": "2026-07-30T18:55:02Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "Generated skill mirrors stay generated: any skill text change happens in the skill-sync source and is regenerated",
+        "item_id": "findings-import-surfaces-undocumented"
+      },
+      {
+        "behavior": "The dense terse house style of AGENTS.md and the spec -- no bash blocks repeating existing content",
+        "item_id": "findings-import-surfaces-undocumented"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-import-surfaces-undocumented",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "findings-import-surfaces-undocumented",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "findings-import-surfaces-undocumented",
+        "kind": "only_modify",
+        "path_glob": ".codex/skills/**"
+      },
+      {
+        "item_id": "findings-import-surfaces-undocumented",
+        "kind": "only_modify",
+        "path_glob": ".gemini/skills/**"
+      },
+      {
+        "item_id": "findings-import-surfaces-undocumented",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "findings-import-surfaces-undocumented",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/findings-domain.md"
+      },
+      {
+        "item_id": "findings-import-surfaces-undocumented",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      },
+      {
+        "item_id": "findings-import-surfaces-undocumented",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "findings-import-surfaces-undocumented",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.lock"
+      },
+      {
+        "item_id": "findings-import-surfaces-undocumented",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.yaml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -q 'finding import' _project/specs/findings-domain.md",
+        "description": "the spec documents the import subcommand",
+        "expected": "exit 0",
+        "item_id": "findings-import-surfaces-undocumented",
+        "last_result": "pass",
+        "last_run": "2026-08-10T16:00:46Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rq 'TODO_DB_FINDING_DRAFTS_DIR' _project/specs/findings-domain.md AGENTS.md docs/",
+        "description": "the drafts-dir env var is documented somewhere an operator will find it",
+        "expected": "exit 0",
+        "item_id": "findings-import-surfaces-undocumented",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-import-surfaces-undocumented",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Spec CLI section now lists import alongside the other nine subcommands and documents 'todo finding import' (--corpus/--dry-run/--report), that it never touches the corpus files unlike sync's .synced rename, its idempotency and imported_from provenance, triage-log-line-per-event, and 'import --bulk' with its refuse-by-default --confirm-target guard plus the local-backend/token/replica refusals.",
+        "item_id": "findings-import-surfaces-undocumented",
+        "notes": null,
+        "started_at": "2026-07-30T19:22:21Z",
+        "started_branch": "docs/findings-import-surfaces",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add `import` (and its --bulk / --confirm-target guard) to the spec's CLI section",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added a 'Drafts directory binding' paragraph to the spec: every findings surface resolves through TODO_DB_FINDING_DRAFTS_DIR falling back to ~/.benchbox/finding-drafts/; names the standalone's differing default (~/.todo-db/finding-drafts/<project-id>/); states the divergence is SILENT (sync reports synced 0, banner counts zero, draft stranded); says to pin at cutover; notes an exported-but-empty value is ignored rather than resolving to cwd.",
+        "item_id": "findings-import-surfaces-undocumented",
+        "notes": null,
+        "started_at": "2026-07-30T19:22:27Z",
+        "started_branch": "docs/findings-import-surfaces",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Document TODO_DB_FINDING_DRAFTS_DIR where the drafts directory is already described, including why it is pinned at cutover",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Merged canonical skill-sync-skills PR #28 at 3e337743078a1c766842a9ff0be9bfab100ea535; updated skill-sync.yaml pin, regenerated tracked mirrors and skill-sync.lock, and make skill-sync-check passed.",
+        "item_id": "findings-import-surfaces-undocumented",
+        "notes": null,
+        "started_at": "2026-08-09T18:10:57Z",
+        "started_branch": "docs/findings-import-surfaces-v2",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-13",
+        "status": "done",
+        "summary": "Add a `finding import` row to the skill-sync SOURCE action table and regenerate mirrors with make skill-sync",
+        "wid": "w3"
+      }
+    ]
+  }
+}

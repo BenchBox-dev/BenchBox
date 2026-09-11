@@ -1,0 +1,534 @@
+{
+  "description": "After fixing critical CI issues and achieving green builds, re-enable the\ncomprehensive quality checks that were temporarily disabled or made non-blocking.\n\nThese checks provide value but should not block initial release:\n- linkcheck: Validates external links in documentation\n- security audit: Checks dependencies for known vulnerabilities\n- docstring coverage: Ensures public APIs are documented\n- spellcheck: Catches typos in documentation\n- example validation: Ensures documented examples work\n\nThis task properly configures these checks so they provide value without\ncausing spurious failures.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make linkcheck blocking on first attempt",
+        "instead": "add it as warning first, then promote to blocking after 2 weeks of clean runs",
+        "item_id": "reenable-comprehensive-ci",
+        "why": "external URLs are flaky"
+      },
+      {
+        "dont": "re-enable all checks simultaneously",
+        "instead": "re-enable one at a time with monitoring",
+        "item_id": "reenable-comprehensive-ci",
+        "why": "a single failure blocks all PRs"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-02-24T00:00:00Z",
+      "created_at": "2026-01-18T00:00:00Z",
+      "worktree": "ci-infrastructure"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing passing CI jobs (lint, test-fast, docs-build) remain passing",
+        "item_id": "reenable-comprehensive-ci"
+      },
+      {
+        "behavior": "No increase in CI runtime >20%",
+        "item_id": "reenable-comprehensive-ci"
+      },
+      {
+        "behavior": "make ci-test continues to work",
+        "item_id": "reenable-comprehensive-ci"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "kind": "do_not_modify",
+        "path_glob": "_binaries/**"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/**"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "kind": "do_not_modify",
+        "path_glob": "tests/live/**"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "kind": "only_modify",
+        "path_glob": ".safety-policy.yml"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "kind": "only_modify",
+        "path_glob": "docs/conf.py"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "kind": "only_modify",
+        "path_glob": "docs/linkcheck_ignore.txt"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "kind": "only_modify",
+        "path_glob": "scripts/check_example_syntax.py"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_example_references.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make ci-lint && make ci-test",
+        "description": "Existing CI checks still pass",
+        "expected": "all checks pass",
+        "item_id": "reenable-comprehensive-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make docs-linkcheck",
+        "description": "Documentation link checking is stable with configured ignores",
+        "expected": "linkcheck completes with only expected/allowlisted external failures",
+        "item_id": "reenable-comprehensive-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make security-audit",
+        "description": "Security audit is configured and passing",
+        "expected": "security audit completes with no untriaged blockers",
+        "item_id": "reenable-comprehensive-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make docstring-coverage",
+        "description": "Docstring coverage threshold is enforced at target level",
+        "expected": "interrogate passes at configured fail-under threshold",
+        "item_id": "reenable-comprehensive-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make docs-validate",
+        "description": "Example reference and syntax validation passes",
+        "expected": "example reference and syntax checks pass",
+        "item_id": "reenable-comprehensive-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w12",
+        "wid": "w11"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w5",
+        "wid": "w11"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w9",
+        "wid": "w12"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w13",
+        "wid": "w15"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w14",
+        "wid": "w15"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w16",
+        "wid": "w15"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w13",
+        "wid": "w16"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w11",
+        "wid": "w17"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w15",
+        "wid": "w17"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w18",
+        "wid": "w19"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w20",
+        "wid": "w21"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w17",
+        "wid": "w22"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w19",
+        "wid": "w22"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w21",
+        "wid": "w22"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w6",
+        "wid": "w5"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "reenable-comprehensive-ci",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create linkcheck ignore list for known-flaky URLs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create security ignore list for false positives",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-enable security job as blocking",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `make security-audit` for local testing",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Review current coverage threshold (64%)",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add docstrings to undocumented public APIs",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update threshold to achievable level",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure interrogate ignore patterns for internal modules",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-enable docstring-coverage as blocking",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test validate_example_references.py locally",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix any broken example references",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add docs/linkcheck_ignore.txt with external URLs to skip",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test check_example_syntax.py locally",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix any syntax errors in examples",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-enable example-validation as blocking",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure sphinx linkcheck_ignore in conf.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix or remove genuinely broken links",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-enable linkcheck as blocking (or keep as warning)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `make docs-linkcheck` for local testing",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Evaluate security scanning options",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "safety vs pip-audit vs GitHub Dependabot",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "reenable-comprehensive-ci",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose tool that minimizes false positives",
+        "wid": "w9"
+      }
+    ]
+  }
+}

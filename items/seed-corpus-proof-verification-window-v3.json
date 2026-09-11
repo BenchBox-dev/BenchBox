@@ -1,0 +1,109 @@
+{
+  "context": "Treat historical failures as evidence, not as a permanent veto. Verify that the latest workflow_dispatch is successful, that its head contains the PR #1349 merge, and that both SSB DataFusion matrix jobs succeeded. Then drop the malformed v2 and original active proof items as superseded and complete this replacement without code changes.",
+  "description": "The original Seed Corpus proof item is held open by an immutable historical assertion that can never recover after run 30455422794 failed. Run 30574449328 later completed successfully after PR #1349 merged. Replace the point-in-time window with a latest-dispatch criterion, inspect the selected DataFusion and bundle-location jobs, and preserve both the failed and successful run links.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Require that no historical failure exists after a fixed timestamp",
+        "instead": "Evaluate the latest relevant post-fix dispatch and its selected jobs",
+        "item_id": "seed-corpus-proof-verification-window-v3",
+        "why": "A repaired workflow can never satisfy that monotonic historical assertion"
+      }
+    ],
+    "item_meta": {
+      "category": "verification",
+      "created_at": "2026-08-01T20:20:31Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Run 30455422794 remains recorded as the failure that exposed both root causes",
+        "item_id": "seed-corpus-proof-verification-window-v3"
+      },
+      {
+        "behavior": "Run 30574449328 remains the post-fix success proof",
+        "item_id": "seed-corpus-proof-verification-window-v3"
+      },
+      {
+        "behavior": "The workflow stays dispatch-only; no schedule is added without separate authorization",
+        "item_id": "seed-corpus-proof-verification-window-v3"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "seed-corpus-proof-verification-window-v3",
+        "kind": "do_not_modify",
+        "path_glob": "**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh run list --repo joeharris76/BenchBox --workflow seed-corpus.yml --event workflow_dispatch --limit 1 --json conclusion --jq '.[0].conclusion' | grep -qx success",
+        "description": "Latest Seed Corpus dispatch is successful",
+        "expected": "passes now and fails when the latest relevant dispatch is unsuccessful",
+        "item_id": "seed-corpus-proof-verification-window-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test \"$(gh run view 30574449328 --repo joeharris76/BenchBox --json jobs --jq '[.jobs[]|select((.name==\"ssb / datafusion / sf0.01\" or .name==\"ssb / datafusion / sf0.1\") and .conclusion==\"success\")]|length')\" -eq 2",
+        "description": "Successful dispatch contains both SSB DataFusion cells",
+        "expected": "passes for the repaired run and fails if either formerly broken DataFusion cell is absent or unsuccessful",
+        "item_id": "seed-corpus-proof-verification-window-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "seed-corpus-proof-verification-window-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "seed-corpus-proof-verification-window-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "seed-corpus-proof-verification-window-v3",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate the latest Seed Corpus dispatch and PR #1349 ancestry",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "seed-corpus-proof-verification-window-v3",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Inspect SSB DataFusion and bundle-location job conclusions",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "seed-corpus-proof-verification-window-v3",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Preserve failed and successful run evidence and reconcile superseded items",
+        "wid": "w2"
+      }
+    ]
+  }
+}

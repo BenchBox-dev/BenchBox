@@ -1,0 +1,119 @@
+{
+  "context": "Per site, decide whether the field is the SAME statistic as the core one or a deliberately different one. Same -> migrate onto percentile_ms/sample_stdev_ms and disclose the numeric delta, exactly as PR #1551 did. Different -> rename the field so two definitions never share a name, and document why. result_capture.py is the one that matters most because it reaches published result bundles; its stdev is population where core's is sample, which is a definitional difference, not a rounding one. Widen the verification grep beyond mcp+cli so the rung stops certifying a claim it does not check.",
+  "description": "Phase 1 adversarial review (2026-08-04) of merged PRs #1548-#1551 found one-engine-unify-statistics incomplete, and its rung 1 overclaiming: the grep covers only benchbox/mcp and benchbox/cli while its expected text asserts 'Statistics helpers exist only in benchbox/core'. Three implementations survive. (1) benchbox/platforms/base/result_capture.py::_build_latency_stats and _build_numeric_stats compute p90/p95/p99 by linear interpolation and stdev via statistics.pstdev (POPULATION, not sample), and this path feeds result bundles -- so one bundle can carry two definitions of the same field name. Measured on the 22 TPC-H fixture timings: core p95 200.0ms vs result_capture p95 199.0ms; core sample stdev 76.74 vs capture population stdev 74.97. (2) benchbox/core/vector_search/metrics.py::_percentile, linear interpolation. (3) benchbox/experimental/load_testing/analyzer.py::_percentile, floor-index. All three were out of scope for one-engine-unify-statistics (do_not_modify benchbox/platforms/; only_modify covered benchbox/core/results/ only).",
+  "legacy": {
+    "item_meta": {
+      "category": "Results",
+      "completed_at": "2026-08-09T15:03:00Z",
+      "completed_pr": 1649,
+      "created_at": "2026-08-04T21:08:16Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "Published result bundle field NAMES are unchanged; any field whose definition changes is listed with its numeric delta.",
+        "item_id": "one-engine-unify-remaining-statistics"
+      },
+      {
+        "behavior": "benchbox.core.results.metrics stays the canonical implementation; no new percentile definition is introduced.",
+        "item_id": "one-engine-unify-remaining-statistics"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-unify-remaining-statistics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "one-engine-unify-remaining-statistics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/vector_search/"
+      },
+      {
+        "item_id": "one-engine-unify-remaining-statistics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/experimental/load_testing/"
+      },
+      {
+        "item_id": "one-engine-unify-remaining-statistics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "one-engine-unify-remaining-statistics",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -rn 'def _percentile\\|def _std_dev' benchbox/platforms benchbox/core/vector_search benchbox/experimental",
+        "description": "No percentile or stddev helper survives outside benchbox/core/results",
+        "expected": "Exits 1 on the unfixed tree (three definitions exist today); exits 0 only once each is migrated or renamed.",
+        "item_id": "one-engine-unify-remaining-statistics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'latency and (stats or percentile)' -q",
+        "description": "Latency stats agree with the core definition",
+        "expected": "Result-capture latency percentiles match percentile_ms and its stdev matches sample_stdev_ms, or the differing fields are renamed and tested as such.",
+        "item_id": "one-engine-unify-remaining-statistics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-unify-remaining-statistics",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-unify-remaining-statistics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1649 merged 71034c0761: unified 3 percentile/stdev impls to core/results/metrics, grep rungs green, fast suite pass",
+        "item_id": "one-engine-unify-remaining-statistics",
+        "notes": null,
+        "started_at": "2026-08-09T15:02:44Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-verify the three sites at HEAD and characterize each against the core definition",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1649 merged 71034c0761: unified 3 percentile/stdev impls to core/results/metrics, grep rungs green, fast suite pass",
+        "item_id": "one-engine-unify-remaining-statistics",
+        "notes": null,
+        "started_at": "2026-08-09T15:02:50Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Decide same-vs-different per field; migrate or rename with deltas disclosed",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1649 merged 71034c0761: unified 3 percentile/stdev impls to core/results/metrics, grep rungs green, fast suite pass",
+        "item_id": "one-engine-unify-remaining-statistics",
+        "notes": null,
+        "started_at": "2026-08-09T15:02:55Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Widen the unify-statistics grep rung so it covers every package",
+        "wid": "w2"
+      }
+    ]
+  }
+}

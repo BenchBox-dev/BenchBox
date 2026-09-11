@@ -1,0 +1,133 @@
+{
+  "description": "green_unmerged_sweep.py (PR #1633) and soundness_drain_report.py (PR #1635) now each carry an identical private copy of the develop required-lane classifier: REQUIRED_CHECK_NAMES, latest_check_run(), is_check_run_success(), is_required_lane_green(). They were fixed in separate PRs because #1633 was still in flight when #1635 was written, and editing it would have meant a conflict or a stacked PR (zero CI in this repo).\n\nExtract one helper module alongside the existing precedent: both scripts already do sys.path.insert(SCRIPT_DIR) then 'from auto_merge_soundness_paths import any_soundness_path'. A sibling module (e.g. _project/scripts/develop_required_checks.py) exporting the constant and the four predicates fits that pattern exactly.\n\nNote the two are NOT byte-identical in behaviour: soundness_drain_report.py additionally needs required_lane_green_at() for its park-time anchor, which the sweep has no use for. Extract the shared core; leave park-time anchoring with the drain report unless the sweep grows a need for it.\n\nBoth scripts currently pin their constant to the required-context block in docs/operations/repo-admin-settings.md via their own unit test, so they agree transitively today; the extraction replaces that transitive agreement with a structural one. Keep exactly one runbook-parsing pin after the merge rather than deleting both.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "needs_item": "soundness-drain-all-ruleset-required-checks-20260806"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-09T12:49:41Z",
+      "completed_pr": 1646,
+      "created_at": "2026-08-06T14:37:26Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Neither observer script gains the ability to enable auto-merge; both stay observation-only",
+        "item_id": "converge-required-lane-classifier-helper-20260806"
+      },
+      {
+        "behavior": "Required-lane green stays fail-closed on a missing run in both scripts",
+        "item_id": "converge-required-lane-classifier-helper-20260806"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! rg -q '^REQUIRED_CHECK_NAMES' _project/scripts/green_unmerged_sweep.py _project/scripts/soundness_drain_report.py",
+        "description": "Neither script defines its own REQUIRED_CHECK_NAMES",
+        "expected": "exit 0",
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "last_result": "pass",
+        "last_run": "2026-08-09T12:48:40Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/green_unmerged_sweep.py --self-test && uv run -- python _project/scripts/soundness_drain_report.py --self-test",
+        "description": "Both self-tests still pass",
+        "expected": "exit 0",
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "last_result": "pass",
+        "last_run": "2026-08-09T12:48:43Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q -n 0",
+        "description": "Scripts unit tests pass",
+        "expected": "exit 0",
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "last_result": "pass",
+        "last_run": "2026-08-09T12:49:34Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1646 80881bd7: extracted _project/scripts/required_lane.py, repointed both observers, datetime-aware ordering",
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "notes": null,
+        "started_at": "2026-08-09T12:41:53Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Extract shared helper module and repoint both scripts",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1646: helper _project/scripts/required_lane.py is single source, both scripts import it; tests keep per-script behaviour pin but classifier logic collapsed - verified by rg + self-test + 93 tests",
+        "item_id": "converge-required-lane-classifier-helper-20260806",
+        "notes": null,
+        "started_at": "2026-08-09T12:43:53Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Collapse the duplicated unit-test coverage to one runbook pin plus per-script behaviour",
+        "wid": "w1"
+      }
+    ]
+  }
+}

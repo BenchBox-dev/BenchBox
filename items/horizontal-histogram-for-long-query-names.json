@@ -1,0 +1,124 @@
+{
+  "context": "1. In generate_post_run_summary(), after building the query_display_ids,\n   compute the median query ID length.\n2. If median length > 6, build an ASCIIBarChart (horizontal) instead of\n   ASCIIQueryHistogram (vertical). ASCIIBarChart already supports labels\n   up to 30 chars and has its own truncation logic.\n3. ASCIIBarChart uses BarData(label, value, ...) instead of HistogramBar.\n   Map the query data into the appropriate dataclass.\n4. For high query counts (>40), consider showing only the top/bottom N\n   queries in horizontal mode since vertical space is limited.\n\nKey files:\n  - benchbox/core/visualization/post_run_summary.py (chart selection logic)\n  - benchbox/core/visualization/ascii/bar_chart.py (ASCIIBarChart, BarData)\n  - benchbox/core/visualization/ascii/histogram.py (ASCIIQueryHistogram - read only)\n",
+  "description": "The post-run query latency histogram uses vertical bars (ASCIIQueryHistogram)\nwhich puts query IDs on the x-axis. For benchmarks with short numeric IDs\n(TPC-H: Q1-Q22, TPC-DS: Q1-Q99) this works well. But for Primitives\nbenchmarks and others with long descriptive query names (e.g.,\n\"Qaggregation_groupby_large\", \"Qshuffle_inner_join_one_to_many_string\"),\nthe labels get truncated to 2-3 characters (\"Qa\", \"Qo\", \"Qsh\"), making the\nchart unreadable.\n\nA horizontal bar chart (ASCIIBarChart already exists in bar_chart.py) would\nput query names on the y-axis with up to 30 characters of label space,\nmaking long names legible. The post-run summary should automatically choose\nthe appropriate chart type based on query name length.\n\nDecision heuristic: if the median query ID length exceeds a threshold\n(e.g., 6 characters), use horizontal bars. Otherwise use vertical histogram.\n\nAffected benchmarks (long query names):\n  - read_primitives (124 queries, names like \"aggregation_groupby_large\")\n  - transaction_primitives\n  - metadata_primitives\n  - joinorder (names like \"1a\", \"2b\" - short, so vertical is fine)\n  - h2odb (names like \"groupby_q1\" - borderline)\n\nUnaffected benchmarks (short numeric IDs):\n  - tpch (Q1-Q22), tpcds (Q1-Q99), ssb (Q1-Q13), clickbench (Q1-Q43)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify ASCIIQueryHistogram or ASCIIBarChart internals",
+        "instead": "add the selection logic in generate_post_run_summary() only",
+        "item_id": "horizontal-histogram-for-long-query-names",
+        "why": "these are shared rendering components used elsewhere"
+      },
+      {
+        "dont": "use query count as the sole heuristic",
+        "instead": "use query name length as the primary signal",
+        "item_id": "horizontal-histogram-for-long-query-names",
+        "why": "TPC-DS has 99 queries with short names"
+      }
+    ],
+    "item_meta": {
+      "category": "Visualization",
+      "completed_at": "2026-02-10T00:00:00Z",
+      "created_at": "2026-02-10T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ASCIIBarChart and ASCIIQueryHistogram classes are not modified",
+        "item_id": "horizontal-histogram-for-long-query-names"
+      },
+      {
+        "behavior": "All existing post-run summary tests continue to pass",
+        "item_id": "horizontal-histogram-for-long-query-names"
+      },
+      {
+        "behavior": "Existing vertical histogram rendering for TPC-H/TPC-DS/SSB/ClickBench is unchanged",
+        "item_id": "horizontal-histogram-for-long-query-names"
+      },
+      {
+        "behavior": "generate_post_run_summary() return type (PostRunSummary) is unchanged",
+        "item_id": "horizontal-histogram-for-long-query-names"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "horizontal-histogram-for-long-query-names",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "horizontal-histogram-for-long-query-names",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/ascii/bar_chart.py"
+      },
+      {
+        "item_id": "horizontal-histogram-for-long-query-names",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/ascii/histogram.py"
+      },
+      {
+        "item_id": "horizontal-histogram-for-long-query-names",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/post_run_summary.py"
+      },
+      {
+        "item_id": "horizontal-histogram-for-long-query-names",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/visualization/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/visualization/test_post_run_summary.py -v --tb=short",
+        "description": "Existing post-run summary tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "horizontal-histogram-for-long-query-names",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/visualization/ -k 'horizontal or long_query' -v --tb=short",
+        "description": "New tests for horizontal bar chart selection",
+        "expected": "new tests pass showing horizontal chart for long query names",
+        "item_id": "horizontal-histogram-for-long-query-names",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "horizontal-histogram-for-long-query-names",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "horizontal-histogram-for-long-query-names",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add chart type selection logic in generate_post_run_summary() based on median query name length",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "horizontal-histogram-for-long-query-names",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for horizontal bar chart selection with long and short query names",
+        "wid": "w2"
+      }
+    ]
+  }
+}

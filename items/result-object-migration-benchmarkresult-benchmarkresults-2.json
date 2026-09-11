@@ -1,0 +1,10 @@
+{
+  "description": "\"Removed the legacy `benchbox.core.config.BenchmarkResult` class, rewired CLI execution/error paths and the data-only pipeline to produce `BenchmarkResults`, and updated schema/exporter utilities, documentation, and tests to expect the canonical model exclusively.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (Should-Fix Before Release)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "result-object-migration"
+    }
+  }
+}

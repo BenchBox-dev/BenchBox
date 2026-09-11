@@ -1,0 +1,251 @@
+{
+  "context": "Treat this as a verification and bookkeeping gate, not an implementation\ntrack. Use the dependent TODOs for fixes, then run one complete acceptance\npass and update TODO/DONE state only when evidence supports completion.\n",
+  "description": "After the 2026-05-09 post-completion Results Explorer review, the remaining\nissues span compare selection, leaderboard consistency, chart behavior,\ncompare summary semantics, and result receipt copy. This gate verifies that\nall post-completion TODOs are actually complete on the same develop SHA and\nthat no stale TODO state is left behind.\n\nThis item covers the final release acceptance pass for review findings #1\nthrough #13 recorded in\n_project/audits/results-explorer-post-completion-review-2026-05-09.md.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "leave completed post-completion TODOs in _project/TODO.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-release-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "mark the gate approved based only on unit tests.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-release-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "rewrite unrelated historical Results Explorer TODOs during this gate.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-release-gate",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "needs_item": "results-explorer-post-completion-chart-tabs-and-disambiguation"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "needs_item": "results-explorer-post-completion-compare-selection-recovery"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "needs_item": "results-explorer-post-completion-compare-summary-semantics"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "needs_item": "results-explorer-post-completion-leaderboard-data-consistency"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "needs_item": "results-explorer-post-completion-result-receipt-cost-copy"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-10T00:00:00Z",
+      "created_at": "2026-05-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A failing P0 or P1 browser finding blocks approval.",
+        "item_id": "results-explorer-post-completion-release-gate"
+      },
+      {
+        "behavior": "Existing unrelated TODO and DONE items are not modified.",
+        "item_id": "results-explorer-post-completion-release-gate"
+      },
+      {
+        "behavior": "Release gate audit must reflect the actual checked develop SHA.",
+        "item_id": "results-explorer-post-completion-release-gate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/planning/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-post-completion-chart-tabs-and-disambiguation.yaml"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-post-completion-compare-selection-recovery.yaml"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-post-completion-compare-summary-semantics.yaml"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-post-completion-leaderboard-data-consistency.yaml"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-post-completion-release-gate.yaml"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-post-completion-result-receipt-cost-copy.yaml"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/results-explorer-post-completion-release-gate-*.md"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-post-completion-release-gate/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run",
+        "description": "Full Results Explorer test suite passes",
+        "expected": "all tests pass",
+        "item_id": "results-explorer-post-completion-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-post-completion-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-post-completion-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate",
+        "description": "TODO graph and indexes validate",
+        "expected": "graph and schema checks pass",
+        "item_id": "results-explorer-post-completion-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-post-completion-release-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-release-gate",
+        "notes": "Use the TODO CLI to show each dependent item. Verify every work unit is\ndone, every blocker is resolved, and each dependent item either lives in\nDONE or has status Completed with a pending move. Capture the TODO state\nto _project/verification-logs/results-explorer-post-completion-release-gate/w0.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm all dependent TODO work units are completed",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-release-gate",
+        "notes": "Run the full Results Explorer checks from a clean current develop tree:\nnpm test -- --run, npm run typecheck, and npm run build. Capture command\nstatus and failure tails if any to the release-gate verification log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the full Results Explorer automated verification ladder",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-release-gate",
+        "notes": "Restart the Vite dev server and exercise /results/, /results/tpch/,\n/results/query, /results/compare, /results/p/polars/, and\n/results/r/tpch-polars-sf0.1-20260502-0093bb7a. Verify that each\nformerly failing finding has a concrete pass/fail observation, including\ncompare entrypoints, linked No run cells, chart tab activation, duplicate\nchart scope, run-label disambiguation, same-platform compare copy, query\ndenominator copy, duplicate SSB options, guardrail text, and cost enum\nleakage.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run browser acceptance across all formerly failing routes",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-release-gate",
+        "notes": "Write _project/audits/results-explorer-post-completion-release-gate-<gate-date>.md\nwhere <gate-date> is the YYYY-MM-DD on which this gate actually runs (not\nthe originating-review date). Include the develop SHA at gate time, the\noriginating review SHA dbac33ee1, commands run, browser routes checked, a\ndefect-by-defect pass/fail table for findings #1-#13, and any residual\nrisks. Do not mark the audit APPROVED if any P0/P1 defect still\nreproduces.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write a compact release-gate audit artifact",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-release-gate",
+        "notes": "When the audit passes, use the TODO complete workflow to mark each\npost-completion item Completed, move it to _project/DONE, regenerate\nindexes, and verify no completed item remains in _project/TODO. Do not\nleave status Not Started on items whose PRs have landed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move completed post-completion TODOs to DONE and reindex",
+        "wid": "w4"
+      }
+    ]
+  }
+}

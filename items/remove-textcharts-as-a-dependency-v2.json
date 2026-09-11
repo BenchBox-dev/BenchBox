@@ -1,0 +1,183 @@
+{
+  "context": "Inventory every runtime and test import, compatibility shim, package extra, lockfile entry, generated dependency artifact, and public chart contract that depends on textcharts. Measure the supported replacement or vendoring option against rendering output, import compatibility, package size, and MCP/CLI behavior. Choose a staged migration with an explicit deprecation window if removal is viable; otherwise document retention and the separate external-MCP boundary. Update dependency metadata atomically and prove no accidental external textcharts MCP registration is introduced.",
+  "description": "Successor of remove-textcharts-as-a-dependency, promoted from deferral #517 of visualization-mcp-surface-and-help-contract. BenchBox core visualization compatibility shims currently import textcharts, while MCP exposes result-aware chart tools and does not register or proxy the external textcharts MCP server. Decide whether textcharts remains a supported runtime dependency, is replaced or vendored, or is removed in a staged migration; do not remove the dependency while those shims and public rendering contracts still require it.",
+  "legacy": {
+    "item_meta": {
+      "category": "dependencies",
+      "completed_at": "2026-08-02T13:26:35Z",
+      "completed_pr": 1474,
+      "created_at": "2026-08-02T01:29:40Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "Dependency audit artifacts and lockfile remain generated and internally consistent",
+        "item_id": "remove-textcharts-as-a-dependency-v2"
+      },
+      {
+        "behavior": "Existing ASCII renderer output, semantic chart IDs, compatibility imports, and MCP result-aware tool contracts remain supported",
+        "item_id": "remove-textcharts-as-a-dependency-v2"
+      },
+      {
+        "behavior": "External textcharts MCP tools remain separate and are never silently registered by BenchBox",
+        "item_id": "remove-textcharts-as-a-dependency-v2"
+      },
+      {
+        "behavior": "No dependency removal lands without package-install and runtime import evidence",
+        "item_id": "remove-textcharts-as-a-dependency-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "kind": "do_not_modify",
+        "path_glob": "textcharts/**"
+      },
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/**"
+      },
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/**"
+      },
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/development/dependency-*.md"
+      },
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp*.md"
+      },
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/**"
+      },
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/visualization/**"
+      },
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      },
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -q \"textcharts|retention|replacement|vendoring|deprecation\" docs/development/adr docs/reference/mcp.md",
+        "description": "The dependency decision and migration boundary are recorded",
+        "expected": "exits 1 on an unfixed tree; exits 0 once the decision is explicit",
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:26:01Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/visualization tests/unit/mcp/test_visualization_tools.py tests/integration/mcp/test_transport_contract_parity.py -q",
+        "description": "Renderer and MCP visualization regression suites pass",
+        "expected": "exits 1 on an unfixed tree if rendering or MCP contracts drift; exits 0 once the regression suites pass",
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:26:09Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv lock --check && uv run -- python _project/scripts/dependency_audit/parse_deps.py --check",
+        "description": "Dependency metadata and generated audit checks pass",
+        "expected": "exits 1 on an unfixed tree if dependency metadata or generated artifacts drift; exits 0 once both checks pass",
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:26:12Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated 20 production import sites in the generated inventory, direct pyproject and uv.lock declarations, 0 dependency-audit violations, installed textcharts 0.1.2, legacy shim identity, MCP semantic chart tools, and existing ASCII compatibility boundaries.",
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "notes": null,
+        "started_at": "2026-08-02T13:23:50Z",
+        "started_branch": "feat/mcp-textcharts-retention-v2",
+        "started_worktree": "/private/tmp/benchbox-mcp-textcharts-retention.mWJdZ4",
+        "status": "done",
+        "summary": "Revalidate all textcharts runtime imports, compatibility shims, dependency declarations, generated audit rows, lock entries, and MCP/CLI public contracts",
+        "wid": "w0"
+      },
+      {
+        "evidence": "ADR follow-up compares replacement, vendoring, and shim deprecation; retention is selected because supported shims and monitoring import textcharts directly and removal would break normal installs.",
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "notes": null,
+        "started_at": "2026-08-02T13:25:35Z",
+        "started_branch": "feat/mcp-textcharts-retention-v2",
+        "started_worktree": "/private/tmp/benchbox-mcp-textcharts-retention.mWJdZ4",
+        "status": "done",
+        "summary": "Compare replacement, vendoring, and retention options for rendering fidelity, import compatibility, package size, and support ownership; record the decision and migration/deprecation window",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Implemented retention hardening atomically in ADR and dependency inventory; pyproject.toml and uv.lock remain unchanged and internally consistent.",
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "notes": null,
+        "started_at": "2026-08-02T13:25:41Z",
+        "started_branch": "feat/mcp-textcharts-retention-v2",
+        "started_worktree": "/private/tmp/benchbox-mcp-textcharts-retention.mWJdZ4",
+        "status": "done",
+        "summary": "Implement the approved dependency migration or retention hardening atomically across source, metadata, lockfile, and generated audit artifacts",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added package-install/runtime shim regression checks; renderer, MCP parity, lock, generated audit, and dependency audit suites pass.",
+        "item_id": "remove-textcharts-as-a-dependency-v2",
+        "notes": null,
+        "started_at": "2026-08-02T13:25:47Z",
+        "started_branch": "feat/mcp-textcharts-retention-v2",
+        "started_worktree": "/private/tmp/benchbox-mcp-textcharts-retention.mWJdZ4",
+        "status": "done",
+        "summary": "Add renderer, import, package-install, MCP visualization, dependency-audit, and public-contract regression checks",
+        "wid": "w3"
+      }
+    ]
+  }
+}

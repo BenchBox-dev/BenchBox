@@ -1,0 +1,178 @@
+{
+  "description": "Build on merged PR #2071 and completed auto-revert-code-under-test-attribution; do not duplicate the dotted-JUnit parser fix. #2068 and #2073 demonstrate that successful failure detection can still propose an unrelated revert. Extend scripts/post_merge_signature.py and existing develop-post-merge incident/advisory flow. Explicitly supersede the current no-extractable-path=>revert default only for unproven attribution: unknown must retain red CI and an owned incident, not be treated as safe or be automatically reverted.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Treat a snapshot, a queued review, a skipped hook or an unbound passing check as completion",
+        "instead": "Bind actual evidence to the relevant PR/head/input and retain an explicit owned next action",
+        "item_id": "post-merge-attribution-recovery",
+        "why": "The observed session repeatedly lost asynchronous work or overstated evidence"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "needs_item": "publication-ledger-reproducible-inputs"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-09-08T02:40:37Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "KEEP_IDLE and SHADOW_ONLY remain in force for skip/shard/demotion/reduced-refresh proposals; this plan does not activate them.",
+        "item_id": "post-merge-attribution-recovery"
+      },
+      {
+        "behavior": "Keep GitHub native merge queue as the only merger; no privileged steward, bypass actor, direct protected-branch push, or new bot credential.",
+        "item_id": "post-merge-attribution-recovery"
+      },
+      {
+        "behavior": "Preserve required PR, merge_group, and post-merge coverage, soundness maintainer review, explicit user authority, and durable hold labels.",
+        "item_id": "post-merge-attribution-recovery"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "post-merge-attribution-recovery",
+        "path": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "post-merge-attribution-recovery",
+        "path": "scripts/post_merge_signature.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "kind": "do_not_modify",
+        "path_glob": ".agents/skills/**"
+      },
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "kind": "do_not_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/post-merge-attribution-policy.md"
+      },
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "kind": "only_modify",
+        "path_glob": "scripts/post_merge_signature.py"
+      },
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_post_merge_signature.py"
+      },
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_develop_post_merge_metrics.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/test_post_merge_signature.py tests/unit/workflows/test_develop_post_merge_metrics.py -q",
+        "description": "Post-merge attribution and incident recovery preserve true failures",
+        "expected": "exit 0; behavioral negative controls fail on the prior implementation",
+        "item_id": "post-merge-attribution-recovery",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "post-merge-attribution-recovery",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "post-merge-attribution-recovery",
+        "notes": "Verify #2071 is integrated, retain its real incident-format parser tests, and record the policy change from unknown attribution proposing a revert to unknown attribution requiring diagnosis with red CI/incident owner. Preserve proven same-subsystem regressions and signature deduplication.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Retain the merged parser fix and explicitly revise unknown-attribution policy",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "post-merge-attribution-recovery",
+        "notes": "Capture immutable failing commit/PR, test/job identifiers, relevant source-input identities, predecessor evidence and ownership match in one existing incident artifact. Distinguish code regression, external-ref drift, environment/transient failure, stale run and unknown. Never infer causal ownership from temporal adjacency alone.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Capture immutable incident inputs and distinguish failure ownership classes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "post-merge-attribution-recovery",
+        "notes": "Only propose an automatic revert when attribution evidence supports the changed subsystem; otherwise create/update the existing idempotent advisory/incident with next action and owner. Inspect current target state and proposed revert diff before retrying or closing; newer green unrelated runs cannot certify the exact failed input.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Propose reverts only with supported attribution while keeping unknown failures red and owned",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "post-merge-attribution-recovery",
+        "notes": "Replay actual #2068 BigQuery dotted-JUnit and #2073 ledger-ref incidents plus genuine owned regressions, unmappable job failures, missing evidence, reruns and a revert that introduces another failure. Verify no wrong revert for the incident fixtures, no suppressed real regression, and no duplicate incidents.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replay both bad reverts and genuine regressions without duplicate incidents",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,215 @@
+{
+  "context": "Split build and deploy jobs. PR validation is read-only. Only the protected publication push or trusted dispatch may enter the github-pages environment and obtain Pages write/OIDC permissions. Post-deploy verification probes receipts, digests, routes, range reads, docs, Explorer, and corpus identity. Failure automatically rolls forward to the retained known-good artifact, verifies recovery, freezes promotion, and opens an incident.",
+  "description": "Deploy a byte-equivalent or intentionally no-op assembled artifact through the new protected path while the old release deploy remains available. Verify production, then perform and verify a rollback drill to the retained last-known-good successful deployment. Do not release the promotion lock until verification or rollback finishes.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Disable the old deploy before a production no-op and rollback drill",
+        "instead": "retain it until both gates pass",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "why": "there would be no proven recovery path"
+      },
+      {
+        "dont": "Release the promotion lock after upload but before verification",
+        "instead": "hold the lock through verify or verified rollback",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "why": "a failed deployment can race with later promotions"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "needs_item": "independent-publication-a4-hermetic-build-and-shadow-assembly"
+      }
+    ],
+    "item_meta": {
+      "category": "Publication Architecture",
+      "completed_at": "2026-09-04T17:14:22Z",
+      "completed_pr": 2031,
+      "created_at": "2026-08-31T20:37:30Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Rollback uses a retained successful deployment artifact and receipt, never an arbitrary manifest SHA.",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback"
+      },
+      {
+        "behavior": "The old production deploy remains recoverable until the new path and rollback are both proven.",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Reuse one atomic Pages deployment while replacing release-only triggering",
+        "decision": "extend",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "path": ".github/workflows/docs.yml"
+      },
+      {
+        "concept": "Reuse operational rollback evidence and incident conventions",
+        "decision": "extend",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "path": "docs/operations/release-guide.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/*publication*"
+      },
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "kind": "only_modify",
+        "path_glob": "publication/**"
+      },
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run python scripts/publication/verify_live.py --require-receipt --expect-noop",
+        "description": "No-op deploy creates a live receipt whose artifact and observed digest match",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "last_result": "fail",
+        "last_run": "2026-09-01T23:02:11Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run pytest tests/unit/workflows/test_publication_rollback.py -q",
+        "description": "Forced verifier failure automatically restores and verifies the retained known-good deployment",
+        "expected": "all tests pass",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/check_workflow_permissions.py",
+        "description": "Only deploy job holds Pages write and OIDC permissions",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #2010",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "notes": null,
+        "started_at": "2026-09-01T23:01:43Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Create least-privilege deploy job and restricted github-pages environment",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #2010",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "notes": null,
+        "started_at": "2026-09-01T23:01:46Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Deploy a no-op assembled artifact and verify live identity",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #2010",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "notes": null,
+        "started_at": "2026-09-01T23:01:49Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Execute automatic rollback drill to the last successful deployment receipt",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #2010",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "notes": null,
+        "started_at": "2026-09-01T23:01:52Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Verify rollback, promotion freeze, incident receipt, and lock retention",
+        "wid": "w4"
+      },
+      {
+        "evidence": "PR #2010",
+        "item_id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "notes": null,
+        "started_at": "2026-09-01T23:01:56Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Approve removal of the old release deploy only after drill evidence",
+        "wid": "w5"
+      }
+    ]
+  }
+}

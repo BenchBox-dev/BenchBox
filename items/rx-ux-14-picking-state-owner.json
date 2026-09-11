@@ -1,0 +1,233 @@
+{
+  "context": "Add one in-memory owner (context or signal) for picking state. It survives client-side navigation between entry points and dies with the tab. It never writes ?ids=. sessionStorage carries it across the Pages 404 -> /results/ restore hop only, reusing main.tsx's existing key convention. On load, picked IDs are revalidated through compareRecovery per D5. The seam to compared state is the existing buildCompareUrl. This item is ADDITIVE: existing per-page selection keeps working until rx-ux-18 migrates each route.",
+  "description": "Picking state and compared state are different contracts and must not share a query parameter.\n\nPicking: runs a reader has ticked mid-task. Today four ephemeral useState Sets (BenchmarkIndex, PlatformIndex, Query, Compare's builder). Lifetime is the visit. Deliberately NOT shareable.\n\nCompared: the set a comparison renders, carried by /results/compare?ids=. Lifetime is the link. Already shareable and already relied upon.\n\nMerging them - as an earlier revision proposed by URL-backing selection - would make picking shareable and put a global ?ids= into copied links that cannot later be retracted.\n\nGated on rx-ux-00 D3 (model), D4 (Compare's future) and D5 (revalidation strategy).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "URL-back picking state to make it survive navigation",
+        "instead": "INSTEAD keep the in-memory owner D3 chose",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "why": "D3 in rx-ux-00 recorded that a global ids picking contract cannot be retracted once copied into links"
+      },
+      {
+        "dont": "assume a snapshot-identity field exists",
+        "instead": "follow D5 - always revalidate, or land the v8 bump first",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "why": "no snapshot identity exists in read-model version 7"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "remove any existing page selection in this item",
+        "instead": "keep it additive until rx-ux-18",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "why": "additive migration is what makes each route revertible"
+      },
+      {
+        "dont": "rewrite Compare's ?ids= from the picking owner",
+        "instead": "promote to a comparison through buildCompareUrl",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "why": "Compare's URL canonicalisation has its own recovery rules that must stay authoritative"
+      },
+      {
+        "dont": "serialise picking state into the URL",
+        "instead": "keep it in memory with a sessionStorage hop for Pages restore only",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "why": "a global ?ids= picking contract cannot be retracted once copied into links"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rx-ux-14-picking-state-owner",
+        "needs_item": "rx-ux-00-phase0-contract-decisions"
+      },
+      {
+        "item_id": "rx-ux-14-picking-state-owner",
+        "needs_item": "rx-ux-12-extract-compare-recovery"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-24T23:16:52Z",
+      "completed_pr": 1885,
+      "created_at": "2026-08-22T14:49:31Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "/results/compare?ids=<one> pins that run and opens the builder (Compare.tsx:184+); ?ids=<a,b> renders a comparison. Both are live contracts (ResultDetail.tsx:266, e2e/routes/compare.spec.ts:58, compare-entrypoints.spec.ts:76).",
+        "item_id": "rx-ux-14-picking-state-owner"
+      },
+      {
+        "behavior": "Compare's ?ids= URL machine is untouched by this item",
+        "item_id": "rx-ux-14-picking-state-owner"
+      },
+      {
+        "behavior": "Compare's recovery rule that a multi-selection URL stays multi after a one-result recovery, so it does not collapse into the single-result builder (Compare.tsx:331-350).",
+        "item_id": "rx-ux-14-picking-state-owner"
+      },
+      {
+        "behavior": "MAX_COMPARE_SELECTIONS as the single cap constant",
+        "item_id": "rx-ux-14-picking-state-owner"
+      },
+      {
+        "behavior": "main.tsx sessionStorage redirect key convention (main.tsx:5-20)",
+        "item_id": "rx-ux-14-picking-state-owner"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Map-backed selection surviving paging and search, a partial D3 implementation scoped to one route",
+        "decision": "extend",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "path": "results-explorer/src/pages/Query.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-14-picking-state-owner",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "item_id": "rx-ux-14-picking-state-owner",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "rx-ux-14-picking-state-owner",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/App.tsx"
+      },
+      {
+        "item_id": "rx-ux-14-picking-state-owner",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/**"
+      },
+      {
+        "item_id": "rx-ux-14-picking-state-owner",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/pickingState.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "last_result": "pass",
+        "last_run": "2026-08-24T23:16:30Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build && npx playwright test --project=chromium e2e/routes/compare.spec.ts e2e/routes/compare-entrypoints.spec.ts",
+        "description": "Compare deep links still work unchanged",
+        "expected": "all pass",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "last_result": "pass",
+        "last_run": "2026-08-24T23:16:46Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/lib/__tests__/pickingState.test.tsx -t 'restores only results that still resolve'",
+        "description": "Stale picked IDs degrade without inflating the resolved count",
+        "expected": "pass; only currently published IDs count as picked and absence remains distinct from load failure",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "last_result": "pass",
+        "last_run": "2026-08-24T23:16:48Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -z \"$(rg -n 'ids=' results-explorer/src/lib/pickingState.ts || true)\"",
+        "description": "Picking state emits no URL parameter",
+        "expected": "exit 0",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "last_result": "pass",
+        "last_run": "2026-08-24T23:16:49Z",
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/lib/__tests__/pickingState.test.tsx -t 'falls back to memory'",
+        "description": "Denied sessionStorage access preserves in-memory fallback",
+        "expected": "pass without throwing SecurityError",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "last_result": "pass",
+        "last_run": "2026-08-24T23:18:40Z",
+        "seq": 8,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-14-picking-state-owner",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-14-picking-state-owner",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-14-picking-state-owner",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PickingStateProvider in App owns capped in-memory IDs and exposes pick/remove/toggle/replace/clear plus compare URL promotion; focused unit coverage passes.",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "notes": null,
+        "started_at": "2026-08-24T19:07:59Z",
+        "started_branch": "feat/rx-ux-14-picking-state-owner",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-14-picking-state-owner",
+        "status": "done",
+        "summary": "Add in-memory picking owner with cross-route persistence",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Pagehide snapshot is consumed only when the existing benchbox.results.redirect Pages fallback marker is present; normal reload and reopened-tab tests discard it.",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "notes": null,
+        "started_at": "2026-08-24T19:19:14Z",
+        "started_branch": "feat/rx-ux-14-picking-state-owner",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-14-picking-state-owner",
+        "status": "done",
+        "summary": "sessionStorage hop for the Pages 404 restore path only",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Pages-restored picks run through recoverCompareResults with short-ID resolution, membership confirmation, and detail loading; only recovered canonical IDs count.",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "notes": null,
+        "started_at": "2026-08-24T19:19:20Z",
+        "started_branch": "feat/rx-ux-14-picking-state-owner",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-14-picking-state-owner",
+        "status": "done",
+        "summary": "Revalidate picked ids via compareRecovery per D5",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Five pickingState tests cover cross-route provider persistence, compare promotion, fallback-only restore, tab-close/reload discard, canonical recovery, stale absence, and load failure distinction.",
+        "item_id": "rx-ux-14-picking-state-owner",
+        "notes": null,
+        "started_at": "2026-08-24T19:19:25Z",
+        "started_branch": "feat/rx-ux-14-picking-state-owner",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-14-picking-state-owner",
+        "status": "done",
+        "summary": "Tests: navigation persistence, tab-close discard, stale-id degradation",
+        "wid": "w4"
+      }
+    ]
+  }
+}

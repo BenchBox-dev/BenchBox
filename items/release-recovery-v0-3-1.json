@@ -1,0 +1,278 @@
+{
+  "context": "Treat v0.3.1 as a small recovery release, not a broad product event. The\nimplementation surface should be the normal release-cut/release-finalize\nflow plus the TODO bookkeeping that records the recovery evidence.\n",
+  "description": "The public `v0.3.0` tag, GitHub release, and PyPI files are immutable and\nalready published. The release workflow run for that tag published the\nartifacts, then failed every install-smoke job because a clean install of\n`benchbox==0.3.0` could not import `benchbox` without `pandas`.\n\nThis TODO owns the explicit recovery path that PRs #659/#661/#662 recorded\nonly as blocker prose: cut the next monotonic release, `v0.3.1`, after\nconfirming the post-`v0.3.0` release-gate fixes are present on `develop`.\nCompletion of this TODO provides the evidence needed to close Phase 4's\nrelease verification work and then make an explicit Phase 8 decision.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "let Phase 8 proceed merely because a recovery PR exists",
+        "instead": "(not specified)",
+        "item_id": "release-recovery-v0-3-1",
+        "why": "the dependency is completion evidence, not intent."
+      },
+      {
+        "dont": "mark Phase 4 complete before the recovery release has passed clean install/import",
+        "instead": "(not specified)",
+        "item_id": "release-recovery-v0-3-1",
+        "why": "the original release verification failed after publish."
+      },
+      {
+        "dont": "re-run `v0.3.0-rc.1`",
+        "instead": "(not specified)",
+        "item_id": "release-recovery-v0-3-1",
+        "why": "the pre-GA validation window is gone and the GA version already exists."
+      },
+      {
+        "dont": "re-upload `0.3.0`",
+        "instead": "(not specified)",
+        "item_id": "release-recovery-v0-3-1",
+        "why": "PyPI rejects replacement files and the public artifact history must remain immutable."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "needs_item": "drop-pandas-from-core-dependencies"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "needs_item": "release-finalize-pretag-ci-wait"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "needs_item": "single-repo-migration-phase-6-delete-obsolete-tooling"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "needs_item": "single-repo-migration-phase-7-docs-cleanup"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "created_at": "2026-05-25T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not bypass Phase 8 dependency semantics. Phase 8 remains blocked until Phase 4 is explicitly closed or Phase 8 is explicitly retired as satisfied by this recovery release.",
+        "item_id": "release-recovery-v0-3-1"
+      },
+      {
+        "behavior": "Do not re-tag, force-push, delete, or re-upload `v0.3.0` / `0.3.0`; PyPI artifacts and public tags are immutable release history.",
+        "item_id": "release-recovery-v0-3-1"
+      },
+      {
+        "behavior": "Do not treat a failed `0.3.0` install smoke as repaired until a later monotonic version has passed clean install/import from PyPI.",
+        "item_id": "release-recovery-v0-3-1"
+      },
+      {
+        "behavior": "Do not weaken the release-required context or publish path to get v0.3.1 out.",
+        "item_id": "release-recovery-v0-3-1"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/release-recovery-v0-3-1.yaml"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/single-repo-migration.md"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "kind": "only_modify",
+        "path_glob": "benchbox/__init__.py"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "kind": "only_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh run list --repo joeharris76/BenchBox --workflow=release.yml --branch v0.3.1 --limit 1 --json conclusion --jq '.[0].conclusion'",
+        "description": "Recovery release workflow succeeded",
+        "expected": "success",
+        "item_id": "release-recovery-v0-3-1",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --isolated --with pip -- python -m pip index versions benchbox | grep -c '0.3.1'",
+        "description": "PyPI lists the monotonic recovery version",
+        "expected": "at least 1",
+        "item_id": "release-recovery-v0-3-1",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --isolated --no-project --with 'benchbox==0.3.1' -- python -c 'import benchbox; print(benchbox.__version__)'",
+        "description": "Clean install/import from PyPI succeeds",
+        "expected": "0.3.1",
+        "item_id": "release-recovery-v0-3-1",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run _project/scripts/todo_cli.py check-graph && uv run _project/scripts/validate_todo.py --all",
+        "description": "TODO graph remains valid after migration bookkeeping",
+        "expected": "exit 0",
+        "item_id": "release-recovery-v0-3-1",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "release-recovery-v0-3-1",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "release-recovery-v0-3-1",
+        "notes": "Capture only compact evidence in the PR body or TODO notes. Required\nchecks:\n  - `git ls-remote --tags origin 'refs/tags/v0.3.0*'`\n  - `gh release view v0.3.0 --repo joeharris76/BenchBox`\n  - `gh run view 26160520298 --repo joeharris76/BenchBox --json conclusion,jobs`\n  - `uv run --isolated --no-project --with 'benchbox==0.3.0' -- python -c 'import benchbox'`\n  - `uv run --isolated --with pip -- python -m pip index versions benchbox`\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate the live v0.3.0 failure and current PyPI version state",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-recovery-v0-3-1",
+        "notes": "Confirm at minimum:\n  - base runtime dependencies include the `pandas` dependency needed by\n    the import path that broke `v0.3.0`;\n  - release finalization waits for the stable required release context\n    before tagging;\n  - local `make pr-preflight` is green on the recovery branch before any\n    release side effects.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm the recovery fixes are present on develop before cutting v0.3.1",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-recovery-v0-3-1",
+        "notes": "This is a real public release. Do not proceed without explicit maintainer\napproval after w1/w2 evidence is available.\n\nCommand:\n  make release-cut VERSION=0.3.1\n\nExpected result: a `v0.3.1 -> main` release PR with curated release-tree\nchanges, version bumps, and changelog updates.\n\nOutcome (2026-07-09): maintainer approval granted; cut from\n`develop@99db4caf3`; release PR #1072 opened. Two mechanical snags:\n  - a stale local `v0.3.1` branch + worktree from prior aborted cuts\n    (#711/#712/#1029/#1043) blocked `git checkout -b v0.3.1` and had to be\n    removed first;\n  - `scripts/generate_changelog_entry.py` shells out to a nested `claude`\n    CLI (`CLAUDE_TIMEOUT_SECONDS = 120`) which stalls when release-cut is\n    driven from inside a Claude Code session. Worked around with a\n    fail-fast `claude` shim on PATH so it fell back to the raw changelog,\n    which was then hand-curated before the commit was pushed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Get explicit maintainer approval and run release-cut VERSION=0.3.1",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-recovery-v0-3-1",
+        "notes": "Confirm the release PR diff is only the expected release curation,\nversion, changelog, docs, and landing marker changes. Confirm\n`release-required-result` is the required context and succeeds before\nfinalization. Do not use post-merge push-to-main checks as pre-publish\nevidence.\n\nOutcome (2026-07-09): PR #1072 verified — release tree carries\n`__version__ = \"0.3.1\"`, the hand-curated `[0.3.1]` CHANGELOG section, zero\ndev-only paths, and the rebuilt Linux dbgen binaries. Required contexts\n`validate-base` and `release-required-result` both green before finalize.\n\nTwo release-infrastructure gaps surfaced here (both fixed, see w7):\n  - a clean cut from `develop` CONFLICTS with `main`: the two diverge by\n    design (the 2026-04-27 amendment removed the develop-rebase), so\n    GitHub could not compute a merge ref and no CI ran at all. Needs\n    `git merge -s ours --allow-unrelated-histories origin/main` on the\n    release branch (\"align release histories\") -- tree-preserving, and\n    what every prior aborted cut had done by hand. `release-cut` did not\n    do this at the time; it was folded into the target by PR #1089.\n  - `validate-base` bootstrap restored `ruleset_review_enforcement.py`\n    from develop but not its sibling import `auto_merge_soundness_paths`,\n    so the ruleset-drift step died with ModuleNotFoundError. Prior cuts\n    never reached that step (they failed earlier on the non-fast suite),\n    which is why it stayed latent.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Review the v0.3.1 release PR and required release context",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-recovery-v0-3-1",
+        "notes": "Command:\n  make release-finalize VERSION=0.3.1\n\nExpected result: release PR squash-merged to `main`, tag `v0.3.1` pushed,\nand release.yml triggered for the immutable `v0.3.1` artifact.\n\nOutcome (2026-07-09): PR #1072 squash-merged to `main` as the single\ncommit `7550c423d` (\"Release v0.3.1 (#1072)\"); tag `v0.3.1` points at it;\n`release.yml` run 29055922350 triggered and concluded success.\n\nSnag: `release-finalize`'s `git push origin v$(VERSION)` fails with\n\"src refspec v0.3.1 matches more than one\" because a `v0.3.1` branch and a\n`v0.3.1` tag both exist at that point. Pushed explicitly with\n`git push origin refs/tags/v0.3.1`. Also, `release-finalize` (and the\nrelease-branch push) trip the local pre-commit pre-push hook, since\ncuration removes `.pre-commit-config.yaml` from the release tree; run with\n`PRE_COMMIT_ALLOW_NO_CONFIG=1` (do NOT disable hooks wholesale).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run release-finalize VERSION=0.3.1 after required checks pass",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-recovery-v0-3-1",
+        "notes": "Required checks:\n  - release.yml for tag `v0.3.1` concludes success;\n  - PyPI lists `benchbox 0.3.1`;\n  - clean isolated install/import succeeds:\n    `uv run --isolated --no-project --with 'benchbox==0.3.1' -- python -c 'import benchbox; print(benchbox.__version__)'`;\n  - wheel contents remain clean of maintainer scaffolding.\n\nOutcome (2026-07-09): all four pass.\n  - `release.yml` run 29055922350 concluded `success` (verify-tag-on-main,\n    dependency-bounds, build, publish, github-release, and\n    test-installation on ubuntu/macos/windows x 3.10/3.12/3.13).\n  - `pip index versions benchbox` lists `0.3.1` as the available/latest\n    version, ahead of the broken `0.3.0`.\n  - Clean isolated import prints `0.3.1`; the install resolves 29 packages\n    and pandas is NOT among them, so the exact `ModuleNotFoundError: No\n    module named 'pandas'` that broke `v0.3.0` is repaired.\n  - `pip show -f benchbox` yields zero hits for `_project`,\n    `automate_release`, `benchbox/release/`, `.claude`, `AGENTS.md`,\n    `CLAUDE.md`, `_blog`, `results-explorer`, or `skill-sync`.\n\nThe emergency override variables were never set: `validate-base` takes the\ntrusted-base bootstrap path while `main` lacks\n`scripts/release_readiness_check.py`, and that path never consults\n`RELEASE_READINESS_OVERRIDE_SHA/REASON`. The circular\n`pypi-latest-installability` canary failure therefore never gated this\nrelease. Nothing to remove.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify v0.3.1 publishes and clean install/import passes",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-recovery-v0-3-1",
+        "notes": "After v0.3.1 is verified, update Phase 4 w8 with the recovery-release\nevidence and move Phase 4 to DONE if the maintainer accepts the monotonic\nrecovery as terminal for the failed v0.3.0 installability gate.\n\nThen make an explicit Phase 8 decision: either retire Phase 8 as\nsatisfied by the v0.3.1 recovery release, or keep Phase 8 as a separate\nlater post-migration release. Do not let that decision remain implicit.\n\nOutcome (2026-07-09), maintainer-approved:\n  - Phase 4 w8 recorded the recovery evidence and Phase 4 moved to\n    `Completed`. The monotonic v0.3.1 release is accepted as terminal for\n    the failed v0.3.0 installability gate; immutable `0.3.0` was never\n    re-tagged or re-uploaded.\n  - Phase 8 is RETIRED as satisfied by this recovery release. Rationale:\n    `_project/decisions/single-repo-migration.md` already scopes Phase 8 as\n    \"exercises the full flow end-to-end on `v0.3.1`\", and v0.3.1 did\n    exactly that -- cut from `develop` with `release-cut`, curated,\n    squash-merged to `main`, tagged, and published via `release.yml`, with\n    the old `automate_release.py` long gone. A second post-migration\n    release would re-run an already-passed exercise.\n  - The two release-infrastructure gaps this release exposed (the\n    `-s ours` history alignment that `release-cut` did not perform, and\n    the missing `auto_merge_soundness_paths` restore in the `validate-base`\n    bootstrap) are recorded in the decision-doc amendment. The bootstrap\n    restore is fixed and regression-tested in this PR; the alignment merge\n    was folded into `release-cut` afterwards by PR #1089.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Close migration bookkeeping from the recovery evidence",
+        "wid": "w7"
+      }
+    ]
+  }
+}

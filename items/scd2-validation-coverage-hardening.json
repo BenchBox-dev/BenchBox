@@ -1,0 +1,242 @@
+{
+  "context": "Edit only the validation_queries blocks of the three SCD2 ops in\noperations.yaml. For N2 reuse the positive anti-join shape already present in\nbasic/new_keys_only. For N3 use the existing but unused expected_value_min/max\nmode in _check_validation_query, bounding the delta against the seed so it\nstays scale-independent. For N5 copy the effective_ts scoping from\nno_change's own no_rows_closed_by_batch. For N11 tighten the predicate to the\nbatch stamp. Land after the gating TODO so failures are observable.\n",
+  "description": "SCD2 adversarial audit findings N2, N3, N5, N11. The three SCD2 ops in\nbenchbox/core/write_primitives/catalog/operations.yaml ship validations that a\nbroken or no-op implementation can pass:\n\nN2 - merge_scd_type2_no_change has NO positive assertion. Its three checks\n(at_most_one_current_per_business_key, no_rows_closed_by_batch,\nno_new_versions_inserted) are all zero-row \"offending\" queries. Reproduced\n(scratchpad repro3.py): delete all 20 'unchanged' keys from the dimension, run\nnothing -> validation_passed=True. This directly falsifies the premise in the\nCompleted TODO _project/DONE/write-primitives-scd2-followup/\nscd2-validation-soundness-hardening.yaml, which states \"each op already\nbackstops the existence side with a positive companion check\" - true for\nbasic and new_keys_only, false for no_change.\n\nN3 - no cardinality bounds. Reproduced: inject 50 junk current rows for unseen\nkeys, or run basic against an already-merged dimension doing nothing -> all\nchecks pass. No SCD2 validation uses the expected_rows_min/max or\nexpected_value_min/max modes that _check_validation_query already supports\n(benchmark.py:145-151).\n\nN5 - merge_scd_type2_new_keys_only's no_rows_closed asserts globally\n(WHERE is_current = false, expected 0), only pristine-seed-safe. Reproduced:\nbasic write (no cleanup) then new_keys_only -> no_rows_closed FAILs at 20 rows\nthough new_keys_only behaved perfectly. Its sibling no_rows_closed_by_batch\nscopes by effective_ts; this one should too.\n\nN11 - every_changed_key_closed_with_stamp checks\nvalid_to < DATE '9999-12-31' (any closed row) instead of\nvalid_to = s.effective_ts (this batch's stamp).\n\nDepends on write-primitives-validation-result-gating: until a failing\nvalidation fails the run, these additions are unobservable.\n\nExplicitly NOT in scope: changing no_change's UPDATE/INSERT SQL. Verified\n(scratchpad repro2.py 5a) it is a live, correct defensive path (row_hash wins\nover the change_type label), not dead code. Timings the blog cites are\nunaffected: validations are excluded from the reported write duration.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hardcode SF-specific counts",
+        "instead": "bound the delta against the seed count.",
+        "item_id": "scd2-validation-coverage-hardening",
+        "why": "the ops run at any scale"
+      },
+      {
+        "dont": "rely on run ordering for correctness",
+        "instead": "scope each check to its own batch.",
+        "item_id": "scd2-validation-coverage-hardening",
+        "why": "the audit showed unscoped checks (N5) only pass against a pristine seed"
+      },
+      {
+        "dont": "touch no_change's write_sql",
+        "instead": "only add/adjust validation_queries.",
+        "item_id": "scd2-validation-coverage-hardening",
+        "why": "its change_type-vs-row_hash UPDATE is a verified correct live path"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "scd2-validation-coverage-hardening",
+        "needs_item": "write-primitives-validation-result-gating"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-11T00:00:00Z",
+      "created_at": "2026-07-10T00:00:00Z",
+      "worktree": "scd2-audit-followup"
+    },
+    "preserves": [
+      {
+        "behavior": "Ops remain scale-independent: no absolute, SF-specific magic numbers beyond the existing small range bounds.",
+        "item_id": "scd2-validation-coverage-hardening"
+      },
+      {
+        "behavior": "Reported write durations (blog SF0.01/SF0.1 numbers) are unaffected - only validation_queries change.",
+        "item_id": "scd2-validation-coverage-hardening"
+      },
+      {
+        "behavior": "The happy-path SCD2 run stays green on DuckDB and PostgreSQL (0 rows deviating from the pristine seed).",
+        "item_id": "scd2-validation-coverage-hardening"
+      },
+      {
+        "behavior": "no_change's UPDATE/INSERT SQL is unchanged - it is a verified live defensive path, not dead code.",
+        "item_id": "scd2-validation-coverage-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/write-primitives-scd2-followup/scd2-validation-soundness-hardening.yaml - the Completed TODO whose central premise N2 falsifies",
+        "decision": "reuse",
+        "item_id": "scd2-validation-coverage-hardening",
+        "path": "_project/DONE/write-primitives-scd2-followup/scd2-validation-soundness-hardening.yaml"
+      },
+      {
+        "concept": "benchbox/core/write_primitives/benchmark.py:133-151 _check_validation_query (expected_rows / expected_rows_min-max / expected_value_min-max modes) - reuse the unused range modes",
+        "decision": "reuse",
+        "item_id": "scd2-validation-coverage-hardening",
+        "path": "benchbox/core/write_primitives/benchmark.py:133-151"
+      },
+      {
+        "concept": "benchbox/core/write_primitives/catalog/operations.yaml:105-107 the three SCD2 ops and their validation_queries",
+        "decision": "reuse",
+        "item_id": "scd2-validation-coverage-hardening",
+        "path": "benchbox/core/write_primitives/catalog/operations.yaml:105-107"
+      },
+      {
+        "concept": "operations.yaml merge_scd_type2_basic every_changed_key_has_current_staged_version - reuse this positive anti-join shape for N2",
+        "decision": "reuse",
+        "item_id": "scd2-validation-coverage-hardening",
+        "path": "operations.yaml"
+      },
+      {
+        "concept": "operations.yaml merge_scd_type2_no_change no_rows_closed_by_batch - reuse its effective_ts scoping pattern for N5",
+        "decision": "reuse",
+        "item_id": "scd2-validation-coverage-hardening",
+        "path": "operations.yaml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "scd2-validation-coverage-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "scd2-validation-coverage-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "scd2-validation-coverage-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_write_primitives_duckdb.py"
+      },
+      {
+        "item_id": "scd2-validation-coverage-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/benchmarks/test_write_primitives_core.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py tests/integration/test_write_primitives_duckdb.py -k scd2 -n 0 -q",
+        "description": "SCD2 unit + DuckDB integration green (single-threaded).",
+        "expected": "all pass, including the new broken-state regression tests",
+        "item_id": "scd2-validation-coverage-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -n 0 -q -k no_change_noop",
+        "description": "no-op no_change against a dimension missing its 'unchanged' keys now FAILS validation.",
+        "expected": "new test passes (validation correctly fails for the no-op)",
+        "item_id": "scd2-validation-coverage-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "scd2-validation-coverage-hardening",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "scd2-validation-coverage-hardening",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "scd2-validation-coverage-hardening",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "scd2-validation-coverage-hardening",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "scd2-validation-coverage-hardening",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "scd2-validation-coverage-hardening",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "scd2-validation-coverage-hardening",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "scd2-validation-coverage-hardening",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "scd2-validation-coverage-hardening",
+        "notes": "scratchpad repro3.py classified each validation positive/negative:\nbasic has 3 positive companions, new_keys_only has 1, no_change has 0.\nReopen scd2-validation-soundness-hardening's premise in the PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-confirm per-op which SCD2 ops lack a positive existence check; record that no_change has none.",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-validation-coverage-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "N2: add every_unchanged_key_has_current_version_with_matching_hash to no_change (anti-join stage->dim on is_current AND row_hash = s.row_hash, expected 0).",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-validation-coverage-hardening",
+        "notes": "Use a scale-independent form: bound the DELTA against the seed count rather\nthan an absolute SF-specific number, or assert the exact post-op total via a\nsubquery. Must stay scale-independent (the ops run at any SF).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "N3: add dimension-cardinality bounds per op via expected_value_min/max (SELECT COUNT(*)): basic=seed+40, no_change=seed, new_keys_only=seed+20.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-validation-coverage-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "N5: scope new_keys_only.no_rows_closed to the batch (valid_to IN (SELECT effective_ts ... WHERE change_type='new')).",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-validation-coverage-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "N11: change every_changed_key_closed_with_stamp to test d.valid_to = s.effective_ts instead of < DATE '9999-12-31'.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-validation-coverage-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tests: each reproduced broken state now fails validation (zero-current keys; 50 junk current rows; no-op no_change against a dimension missing its keys).",
+        "wid": "w5"
+      }
+    ]
+  }
+}

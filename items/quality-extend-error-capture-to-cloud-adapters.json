@@ -1,0 +1,163 @@
+{
+  "context": "Mirror the ClickHouse pattern from the just-completed\nclickhouse-error-message-capture TODO. For each except site:\n  1. Replace bare `except Exception` with the most specific exception class\n     the underlying SDK raises (boto3, firebolt-sdk, pynvml, etc.).\n  2. Always write str(exception) to the result's error field before re-raising\n     or returning a failure result.\n  3. Add a structured log line (logger.warning) so failures are visible in\n     both the result JSON and the run log.\nAdd one unit test per file that injects a synthetic exception via mock and\nasserts the error message round-trips to the result.\n\nFor the experimental GPU modules, keep tests hermetic: use monkeypatch/fakes\nso CI does not require CUDA, NVML, or a real GPU.\n",
+  "description": "Quality plan Phase 1c. The just-completed clickhouse-error-message-capture\nTODO (Pattern G from the SF1 failure analysis) ensures str(exception) lands\nin the result error field. The audit found 10 bare `except Exception:` sites\nthat swallow error messages the same way:\n  - benchbox/platforms/redshift.py (3)\n  - benchbox/platforms/firebolt.py (1)\n  - benchbox/experimental/gpu/metrics.py (3)\n  - benchbox/experimental/gpu/capabilities.py (1)\n  - benchbox/experimental/concurrency/pool_tester.py (2)\n\nThese distort benchmark results when failures occur silently. Apply the same\nerror-capture pattern uniformly.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add new exception classes",
+        "instead": "reuse what's there",
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "why": "the existing core/errors hierarchy is sufficient"
+      },
+      {
+        "dont": "change retry semantics",
+        "instead": "only touch error capture",
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "why": "that's a separate concern with its own risks"
+      },
+      {
+        "dont": "require a real GPU in unit tests",
+        "instead": "mock the failure paths instead",
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "why": "CI won't provide one"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "needs_item": "clickhouse-error-message-capture"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-12T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing retry/backoff logic in redshift.py untouched",
+        "item_id": "quality-extend-error-capture-to-cloud-adapters"
+      },
+      {
+        "behavior": "Experimental adapters' opt-in behavior (off by default) unchanged",
+        "item_id": "quality-extend-error-capture-to-cloud-adapters"
+      },
+      {
+        "behavior": "Successful query path unchanged on each adapter",
+        "item_id": "quality-extend-error-capture-to-cloud-adapters"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -q",
+        "description": "All platform tests pass",
+        "expected": "all tests pass",
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_redshift_error_capture.py tests/unit/platforms/test_firebolt_error_capture.py tests/unit/core/concurrency/test_pool_tester.py tests/unit/experimental/gpu/ -v",
+        "description": "New platform, concurrency, and GPU error-capture tests pass",
+        "expected": "all tests pass",
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit redshift.py three bare-except sites; convert to typed exceptions + str(exception) in result.error_message",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply same pattern to firebolt.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply same pattern to experimental/gpu/metrics.py and capabilities.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply same pattern to experimental/concurrency/pool_tester.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-extend-error-capture-to-cloud-adapters",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests per adapter asserting error messages reach result objects (mirror the ClickHouse test added in clickhouse-error-message-capture)",
+        "wid": "w5"
+      }
+    ]
+  }
+}

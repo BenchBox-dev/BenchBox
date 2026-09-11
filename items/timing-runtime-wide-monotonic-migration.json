@@ -1,0 +1,344 @@
+{
+  "context": "Execute subsystem migration in batches:\n1) platform adapters query/load/create-schema elapsed timers,\n2) base benchmark runtime (`benchbox/base.py`) and core validation runtime\n   (`benchbox/core/validation/data.py`),\n3) core benchmark runtime modules (including TPC-DI and multiregion).\n\nUse `benchbox/utils/clock.py` wrappers for all elapsed and timeout logic.\nAvoid mixing direct `perf_counter` and raw `time.time` calls in migrated paths.\n",
+  "description": "Complete runtime-wide migration from wall-clock elapsed arithmetic to\ncentralized monotonic timing helpers introduced in the timing foundation.\n\nThis includes remaining benchmark runtime paths in platforms/core where\nelapsed durations, retries, and timeout windows still use `time.time()`.\nWall-clock timestamps are retained only where event-time semantics are\nrequired (audit timestamps, metadata timestamps, user-facing timeline fields).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change public result field semantics while migrating clocks",
+        "instead": "preserve existing units/contracts",
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "why": "this phase is methodology-only"
+      },
+      {
+        "dont": "convert every datetime.now usage blindly",
+        "instead": "migrate only elapsed/timeout arithmetic",
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "why": "many are event timestamps not elapsed timers"
+      },
+      {
+        "dont": "perform giant unreviewable refactor in one commit",
+        "instead": "migrate by subsystem with focused test coverage",
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "why": "timing changes are cross-cutting"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_item": "timing-query-contract-unification"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "created_at": "2026-02-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Benchmark output metrics remain numerically consistent within expected tolerance",
+        "item_id": "timing-runtime-wide-monotonic-migration"
+      },
+      {
+        "behavior": "Event timestamp fields remain wall-clock UTC values",
+        "item_id": "timing-runtime-wide-monotonic-migration"
+      },
+      {
+        "behavior": "Platform adapter behavior and SQL execution semantics do not change",
+        "item_id": "timing-runtime-wide-monotonic-migration"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/multiregion/orchestrator.py"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/benchmark.py"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/etl/batch.py"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/etl/transformations.py"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/validation/data.py"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_runner_lifecycle.py"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_validation_data.py"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_base_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -k 'adapter or timing or load_data' -q",
+        "description": "Platform unit tests pass for touched adapters",
+        "expected": "Selected tests pass",
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/ -k 'runner or timing or benchmark' -q",
+        "description": "Core runtime tests pass for touched benchmark modules",
+        "expected": "Selected tests pass",
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_validation_data.py -q",
+        "description": "Core validation timing tests pass for migrated validation paths",
+        "expected": "Selected tests pass",
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w2",
+        "wid": "w9"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w3",
+        "wid": "w9"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w4",
+        "wid": "w9"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w7",
+        "wid": "w9"
+      },
+      {
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory remaining runtime elapsed and timeout call sites after phase-2 changes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run targeted platform/core suites and document timing parity outcomes",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate platform base adapter elapsed/timeout logic to centralized monotonic helpers",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate platform base data-loading elapsed/timeout logic to centralized monotonic helpers",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate core runner lifecycle elapsed/timeout logic to centralized monotonic helpers",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate benchbox/base.py benchmark duration arithmetic to centralized monotonic helpers",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate core validation elapsed logic in benchbox/core/validation/data.py to centralized monotonic helpers",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate TPC-DI benchmark and ETL elapsed/timeout hotspots to centralized monotonic helpers",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate multiregion orchestrator elapsed timing to centralized monotonic helpers",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-runtime-wide-monotonic-migration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression tests for timeout behavior under wall-clock perturbation scenarios",
+        "wid": "w9"
+      }
+    ]
+  }
+}

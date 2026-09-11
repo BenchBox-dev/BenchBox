@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: High\"\n- \"**Status**: Completed ✅\"\n- \"**Description**: Finished moving validation orchestration into the core runtime, exposing a reusable `ValidationService` while keeping the CLI as a presentation layer.\"\n- \"**Context**: Validation hooks were split between CLI and core, limiting programmatic use and forcing adapters to manage their own engines.\"\n- \"**Tasks**:\"\n- \"**Files Affected**:\"\n- \"**Success Metrics**:\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (COMPLETED)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

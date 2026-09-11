@@ -1,0 +1,371 @@
+{
+  "context": "Treat `get_platform_skip_queries(platform_name)` as a SQL-visible hook. Only\nput entries there when the skip is valid for SQL execution as well as any\nother execution mode. Introduce a separate DataFrame-specific platform hook\nfor DataFrame-only workarounds and update `BenchmarkExecutionMixin` to call\nthat hook.\n\nIn `dataframe_queries.py`, keep skip lists aligned to actual support:\nfamily-wide lists should only contain true all-expression-family gaps, Polars\nshould own Map dtype gaps, DataFusion should own DataFusion DataFrame API gaps,\nand PySpark should own the list higher-order gaps unless PySpark-native\nimplementations are added with tests.\n\nPrefer narrow tests that assert the dispatch contract directly. The SQL\nregression was missed because commit 4a2b00043 added DataFrame mixin tests but\nno SQL adapter test around the shared hook.\n",
+  "description": "A review of commits 7c61f2ac9 and 4a2b00043 found that read-primitives query\nskip dispatch now conflates SQL platform skips with DataFrame platform skips.\nThe immediate correctness bug is that DataFusion SQL loses valid catalog\nvariants because a DataFrame-only skip list was moved into the generic\n`get_platform_skip_queries(platform_name)` hook, which is also consumed by the\nSQL adapter.\n\nThe concrete regression:\n- `ReadPrimitivesBenchmark.get_platform_skip_queries(\"DataFusion\")` returns\n  `get_skip_for_datafusion()`.\n- `get_skip_for_datafusion()` is documented as DataFusion DataFrame mode only\n  and contains `list_filter`, `list_transform`, `list_reduce`, and\n  `array_distinct`.\n- `PlatformAdapter._filter_queries()` applies `get_platform_skip_queries()` in\n  the SQL path after DataFusion dialect query selection.\n- The SQL catalog has DataFusion variants for those four query IDs, so the\n  generic platform skip removes working SQL coverage.\n\nA manual proof on the reviewed tree showed DataFusion SQL query selection\nincludes all four query IDs, then the SQL adapter platform skip removes them:\n  dialect_queries {'list_transform': True, 'list_filter': True, 'list_reduce': True, 'array_distinct': True}\n  after_platform_filter {'list_transform': False, 'list_filter': False, 'list_reduce': False, 'array_distinct': False}\n  count_delta 150 146\n\nTwo related skip-taxonomy issues should be fixed in the same narrow pass:\n- `SKIP_FOR_EXPRESSION_FAMILY` currently contains map queries even though the\n  stated reason is Polars' lack of native Map dtype; the shared expression\n  helper has PySpark and DataFusion branches for `map_from_entries()`, so the\n  family-wide bucket suppresses PySpark/DataFusion DataFrame coverage.\n- PySpark DataFrame appears to need explicit handling for `list_filter` and\n  `list_transform` because those expression implementations call\n  `ctx.element()`, and only Polars overrides `element()`. DataFusion is covered\n  by the DataFrame-specific skip list; PySpark currently is not.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "broaden skips to whole categories like `lambda` or `map`",
+        "instead": "skip only the concrete unsupported query IDs",
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "why": "the benchmark needs per-query capability accounting"
+      },
+      {
+        "dont": "fix the DataFusion SQL regression by special-casing DataFusion inside `PlatformAdapter._filter_queries()`",
+        "instead": "split the hook by execution mode instead",
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "why": "the ambiguous hook would still leak future DataFrame-only skips into SQL"
+      },
+      {
+        "dont": "implement PySpark `element()` by returning a placeholder or Polars-like object",
+        "instead": "either skip those queries or implement native Spark expressions with behavioral tests",
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "why": "Spark list transform/filter semantics must be real expressions"
+      },
+      {
+        "dont": "keep Polars-only map blockers under `SKIP_FOR_EXPRESSION_FAMILY`",
+        "instead": "use a Polars-specific DataFrame skip bucket",
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "why": "that suppresses PySpark/DataFusion DataFrame coverage"
+      },
+      {
+        "dont": "move the four DataFusion DataFrame skips into read-primitives catalog `skip_on`",
+        "instead": "keep DataFrame-only skips in DataFrame dispatch",
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "why": "the SQL catalog has working DataFusion variants"
+      }
+    ],
+    "item_meta": {
+      "category": "Bug Fix",
+      "created_at": "2026-04-10T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DataFusion DataFrame mode still skips `list_filter`, `list_transform`, `list_reduce`, and `array_distinct` until those DataFrame implementations are supported",
+        "item_id": "fix-read-primitives-query-skip-dispatch"
+      },
+      {
+        "behavior": "DataFusion SQL read-primitives keeps the catalog variants for `array_distinct`, `list_transform`, `list_filter`, and `list_reduce`",
+        "item_id": "fix-read-primitives-query-skip-dispatch"
+      },
+      {
+        "behavior": "Polars DataFrame mode still skips `map_construction`, `map_access`, and `map_keys_values` because Polars has no native Map dtype",
+        "item_id": "fix-read-primitives-query-skip-dispatch"
+      },
+      {
+        "behavior": "PySpark and DataFusion DataFrame modes do not inherit Polars-only map skips via `SKIP_FOR_EXPRESSION_FAMILY`",
+        "item_id": "fix-read-primitives-query-skip-dispatch"
+      },
+      {
+        "behavior": "Skip ID matching remains case-insensitive and whitespace-tolerant in both SQL and DataFrame adapters",
+        "item_id": "fix-read-primitives-query-skip-dispatch"
+      },
+      {
+        "behavior": "`ReadPrimitivesBenchmark.get_platform_skip_queries('LakeSail')` continues to skip `empty_build_join` for SQL mode",
+        "item_id": "fix-read-primitives-query-skip-dispatch"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/catalog/queries.yaml"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpchavoc/dataframe_queries/"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/datafusion_df.py"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/polars_df.py"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/pyspark_df.py"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/unified_frame.py"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "do_not_modify",
+        "path_glob": "preview/"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/benchmark.py"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/dataframe_queries.py"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/benchmark_mixin.py"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/read_primitives/test_query_manager_variants.py"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/read_primitives/test_read_primitives_dataframe.py"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/base/test_adapter_query_skips.py"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_benchmark_mixin.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/test_benchmark_mixin.py tests/unit/core/read_primitives/test_query_manager_variants.py -q",
+        "description": "Existing DataFrame mixin and read-primitives variant tests still pass",
+        "expected": "all tests pass",
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base/test_adapter_query_skips.py -q",
+        "description": "SQL adapter regression test proves DataFusion SQL keeps catalog variants while LakeSail SQL skip remains active",
+        "expected": "all tests pass; DataFusion SQL keeps list_filter, list_transform, list_reduce, and array_distinct",
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/read_primitives/test_read_primitives_dataframe.py tests/unit/platforms/dataframe/test_benchmark_mixin.py -q -k 'skip or platform'",
+        "description": "Read-primitives DataFrame skip-list tests verify Polars/DataFusion/PySpark platform-specific buckets",
+        "expected": "all selected tests pass",
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from types import SimpleNamespace; from benchbox.core.read_primitives.benchmark import ReadPrimitivesBenchmark; from benchbox.platforms.base.adapter import PlatformAdapter; b=ReadPrimitivesBenchmark(); qs=b.get_queries(dialect='datafusion'); ids=['list_transform','list_filter','list_reduce','array_distinct']; filtered=PlatformAdapter._filter_queries(SimpleNamespace(platform_name='DataFusion'), qs, b, 'read_primitives', {}); print({i: i in filtered for i in ids}); print(len(qs), len(filtered))\"",
+        "description": "Manual DataFusion SQL proof no longer shows the four-query drop after platform filtering",
+        "expected": "all four IDs print True after filtering, and the filtered count does not drop by those four queries",
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base/test_adapter_query_skips.py tests/unit/platforms/dataframe/test_benchmark_mixin.py tests/unit/core/read_primitives/test_query_manager_variants.py tests/unit/core/read_primitives/test_read_primitives_dataframe.py -q",
+        "description": "Targeted affected suite passes",
+        "expected": "all tests pass",
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w7",
+        "wid": "w9"
+      },
+      {
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "notes": "Keep `get_platform_skip_queries(platform_name)` for skips that are valid\nfor SQL execution too, such as the LakeSail `empty_build_join` skip. Add a\nDataFrame-mode hook such as `get_dataframe_platform_skip_queries(platform_name)`\nfor DataFrame-only platform workarounds.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Split SQL platform skips from DataFrame platform skips in the read-primitives benchmark API",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "notes": "`get_platform_skip_queries(\"DataFusion\")` must no longer return\n`list_filter`, `list_transform`, `list_reduce`, or `array_distinct` for\nSQL mode. DataFusion DataFrame mode should still skip those four IDs via\nthe new DataFrame-specific platform hook until the underlying DataFrame\nimplementations are supported.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move DataFusion DataFrame skips out of the generic SQL-visible platform hook",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "notes": "`SKIP_FOR_EXPRESSION_FAMILY` should only contain queries unsupported by\nall expression-family adapters. Move `map_construction`, `map_access`, and\n`map_keys_values` to a Polars DataFrame platform skip list because the\nstated blocker is Polars' lack of native Map dtype, while PySpark and\nDataFusion have platform branches in `ExpressionFamilyContext.map_from_entries()`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make expression-family skips truly family-wide and move Polars map skips to a platform-specific bucket",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "notes": "The narrow fix is to add `list_filter` and `list_transform` to a PySpark\nDataFrame platform skip list because those implementations call\n`ctx.element()` and PySpark does not override the default raising method.\nIf implementing PySpark-native transform/filter instead, do it only with\nfocused tests against Spark expression semantics; do not fake `element()`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add explicit PySpark DataFrame handling for list_filter and list_transform",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "notes": "`_collect_skip_query_ids()` should keep the existing DataFrame-wide and\nexpression-family hooks, then union in platform skips from the new\nDataFrame-only hook. It should not call `get_platform_skip_queries()` for\nmode-specific DataFrame skip lists.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update the DataFrame benchmark mixin to consume the DataFrame-specific platform skip hook",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "notes": "Preserve the case-insensitive normalization added in 4a2b00043, but make\nit defensive like the DataFrame mixin by normalizing with\n`str(value).strip().lower()`. Do not use this as a workaround for the\nDataFusion SQL regression; the mode split is still required.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Harden SQL adapter skip normalization without changing its SQL-only platform skip semantics",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "notes": "Add a focused test that builds `ReadPrimitivesBenchmark().get_queries(dialect=\"datafusion\")`\nand then passes those queries through `PlatformAdapter._filter_queries()`\nwith `platform_name=\"DataFusion\"`. Assert `list_filter`, `list_transform`,\n`list_reduce`, and `array_distinct` survive filtering. Also assert the\nLakeSail SQL skip remains effective for `empty_build_join`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add SQL adapter regression tests proving DataFusion SQL keeps the four catalog-variant queries",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "notes": "Extend the DataFrame mixin tests beyond synthetic fixtures by using\n`ReadPrimitivesBenchmark`. Assert DataFusion DataFrame skips the four\nDataFusion-only IDs, Polars skips the three map IDs, PySpark skips\n`list_filter`/`list_transform`, and PySpark/DataFusion do not inherit the\nPolars map skips through an expression-family bucket.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add real-benchmark DataFrame skip-dispatch tests for DataFusion, Polars, and PySpark",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-read-primitives-query-skip-dispatch",
+        "notes": "Rerun the existing passing tests plus the new SQL/DataFrame regression\ntests. Include the manual DataFusion SQL proof command in the implementation\nnotes or PR description so reviewers can see that `count_delta` no longer\ndrops from 150 to 146.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run targeted query-skip verification and document the expected pass/fail boundaries",
+        "wid": "w9"
+      }
+    ]
+  }
+}

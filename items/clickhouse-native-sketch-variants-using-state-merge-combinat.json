@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #561 of write-primitives-sketch-persistence-category.\nDeferred: ClickHouse-native sketch variants using -State / -Merge combinators\nReason deferred: ClickHouse uses its own serialization (uniqState / quantileTDigestState / topKState) that is not binary-compatible with DataSketches. Adding ClickHouse-native variants is valuable but is a scope expansion that should land as a follow-up TODO once the DataSketches-portable core works.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:54Z",
+      "worktree": "main"
+    }
+  }
+}

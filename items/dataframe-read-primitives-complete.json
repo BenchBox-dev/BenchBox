@@ -1,0 +1,10 @@
+{
+  "description": "Complete the DataFrame implementation for ALL 136 Read Primitives queries.\n\nCurrent state: 102 queries implemented, 34 remaining\nTarget: 133 queries with implementations (only 3 correlated-subquery queries are truly SQL-only)\n\nThis is a CORRECTION to the previous incomplete implementation that incorrectly\nmarked 49 queries as \"skipped\" or \"expression-family-only\" when they should have\nbeen implemented.\n\nKEY INSIGHT: Spark DataFrames are DECLARATIVE, not imperative. They build a logical\nplan that goes through Catalyst optimizer - the same optimizations apply as SQL.\nTherefore, 10 of the 13 \"optimizer\" queries CAN be tested via DataFrames by writing\nthem in \"naive\" form and letting Catalyst optimize.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-25T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

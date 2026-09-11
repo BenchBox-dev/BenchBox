@@ -1,0 +1,104 @@
+{
+  "description": "The Results Explorer UAT sweep found cells that were recorded as passed even\nthough the run log reported query-level failures. Examples include\n`spark_tpchavoc_0.1_20260502_205516.log:5910`, which reported 203 passed and\n17 failed queries, and `pandas-df_read_primitives_1.0_20260502_211633.log:145`,\nwhich reported completion with failures.\n\nA cell should not be eligible for publication or leaderboard display as a\nclean pass when any query in the requested phase failed.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "silently drop failed query rows",
+        "instead": "preserve diagnostics while changing pass/fail eligibility.",
+        "item_id": "results-explorer-uat-defect-partial-success-exit-contract",
+        "why": "users need failure evidence"
+      },
+      {
+        "dont": "widen this into benchmark-specific fixes",
+        "instead": "fix the shared result/status path.",
+        "item_id": "results-explorer-uat-defect-partial-success-exit-contract",
+        "why": "the bug is the status contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Fully successful runs still export and submit as clean passed results.",
+        "item_id": "results-explorer-uat-defect-partial-success-exit-contract"
+      },
+      {
+        "behavior": "Query-level failure diagnostics remain visible in logs and result artifacts.",
+        "item_id": "results-explorer-uat-defect-partial-success-exit-contract"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k 'partial and query and failure' -q",
+        "description": "Targeted regression test proves query-level failures do not publish as clean passes.",
+        "expected": "selected tests pass",
+        "item_id": "results-explorer-uat-defect-partial-success-exit-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite remains green.",
+        "expected": "all selected tests pass",
+        "item_id": "results-explorer-uat-defect-partial-success-exit-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-partial-success-exit-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-partial-success-exit-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-partial-success-exit-contract",
+        "notes": "W1 trace result (2026-05-03):\n  - Core result construction is already detecting mixed query outcomes.\n    `benchbox/core/results/builder.py:597` upgrades the result\n    `validation_status` from `PASSED` to `PARTIAL` when measurement\n    query failures are present; `tests/unit/core/results/test_builder.py:168`\n    already covers this.\n  - Schema-v2 export preserves the failure evidence. `benchbox/core/results/schema.py:272`\n    recomputes measurement query totals from serialized query rows,\n    `benchbox/core/results/schema.py:385` emits query error entries,\n    and `summary.queries.failed` is included in the public bundle.\n  - The pass/fail leak is downstream. `benchbox/cli/commands/run.py:1489`\n    treats every status except `FAILED`/`INTERRUPTED` as a successful\n    command, exports `PARTIAL` bundles, prints a green completion at\n    `benchbox/cli/commands/run.py:1508`, and can still call\n    `publish_bundle()` for those bundles at `benchbox/cli/commands/run.py:1514`.\n  - `benchbox submit` loads the reconstructed query counts at\n    `benchbox/cli/commands/submit.py:519` but only applies the existing\n    TPC-DS compliance guard at `benchbox/cli/commands/submit.py:546`;\n    it does not reject `failed_queries > 0`.\n  - `benchbox publish`/`publish_bundle` similarly only guard unofficial\n    compliance classes (`benchbox/cli/commands/publish.py:96` and\n    `benchbox/cli/commands/publish.py:341`), so direct publication can\n    still accept partial bundles.\n  - Explorer ranking eligibility ignores status. `ManifestEntry` has\n    `validation_status` but no failed-query count\n    (`benchbox/core/explorer_pipeline/models.py:87`), and\n    `is_ranking_eligible()` at `benchbox/core/explorer_pipeline/models.py:181`\n    checks only trust label and visibility. The transformer extracts\n    validation status at `benchbox/core/explorer_pipeline/transformer.py:189`\n    but does not force failed-query bundles out of rankings.\n\nW2 owned implementation files:\n  - `benchbox/core/results/status.py` (new shared status/eligibility policy)\n  - `benchbox/cli/commands/run.py`\n  - `benchbox/cli/commands/submit.py`\n  - `benchbox/cli/commands/publish.py`\n  - `benchbox/core/explorer_pipeline/models.py`\n  - `benchbox/core/explorer_pipeline/transformer.py`\n\nW3 owned test files:\n  - `tests/unit/cli/test_run_command_branches.py`\n  - `tests/unit/cli/commands/test_submit.py`\n  - `tests/unit/cli/commands/test_publish.py`\n  - `tests/unit/core/explorer_pipeline/test_read_model_contract.py`\n  - `tests/unit/core/explorer_pipeline/test_transformer.py`\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Trace the run-result status contract and list exact owned files",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-partial-success-exit-contract",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make partial query failures explicit and non-clean-pass",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-partial-success-exit-contract",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression coverage for mixed pass/fail query outcomes",
+        "wid": "w3"
+      }
+    ]
+  }
+}

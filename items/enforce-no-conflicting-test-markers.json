@@ -1,0 +1,501 @@
+{
+  "context": "Work units are sequenced: extend the existing pytest_collection_modifyitems hook\nin warning mode first (w1), placing conflict detection BEFORE the deselection\nslice so all 43 violations are visible regardless of -m filter. CI stays green\nwhile violations are fixed (w2-w13 can run in any order or in parallel - one\nfile per commit). Promote to error mode (w14) only after all violations are\ngone, confirmed by pytest --collect-only returning zero marker-conflict warnings.\nFinally add the make target (w15) to give pre-commit a fast entry point.\n",
+  "description": "43 tests across 12 files currently carry mutually exclusive marker combinations\nthat undermine the fast/medium/slow speed-lane semantics and cause selection\nambiguity for both humans and automation.\n\nDiscovered violations (as of 2026-04-01):\n  fast + slow        : 13 tests in 5 files\n  medium + slow      : 26 tests in 6 files\n  fast + resource_heavy: 4 tests in 1 file\n\nConflict rules to enforce:\n  Speed-lane mutual exclusion: a test may carry at most one of {fast, medium, slow}\n  Exclusion-set incompatibility: fast is incompatible with {slow, stress, resource_heavy, live_integration}\n\nThe fix has two parts:\n1. Conflict detection merged into the existing pytest_collection_modifyitems hook in\n   tests/conftest.py, running BEFORE the deselection slice so all collected items\n   (including those about to be deselected by -m filters) are inspected. Starts in\n   warning mode, promoted to error mode once all violations are remediated.\n2. Remediation of all 43 existing violations - each test gets a single correct\n   speed marker based on what it actually does.\n\nThis makes the pytest_collection_modifyitems exclusion hook (added in\nd84c897a8) a belt-and-suspenders safety net rather than the primary guard.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a second pytest_collection_modifyitems function to conftest.py",
+        "instead": "(not specified)",
+        "item_id": "enforce-no-conflicting-test-markers",
+        "why": "Python silently overrides the first; extend the existing hook body instead"
+      },
+      {
+        "dont": "add new markers to tests without first checking for speed-lane conflicts",
+        "instead": "(not specified)",
+        "item_id": "enforce-no-conflicting-test-markers",
+        "why": "the hook catches it at collection time but a failing CI run wastes 10+ minutes before you see the error; check locally with --collect-only first"
+      },
+      {
+        "dont": "change test logic while fixing markers",
+        "instead": "(not specified)",
+        "item_id": "enforce-no-conflicting-test-markers",
+        "why": "this is a metadata-only cleanup and any logic change risks introducing regressions that get blamed on the marker fix, making it harder to revert cleanly"
+      },
+      {
+        "dont": "pipe the lint-markers pytest invocation into tail or any filter",
+        "instead": "(not specified)",
+        "item_id": "enforce-no-conflicting-test-markers",
+        "why": "the exit code must come from pytest directly, otherwise CI wiring silently passes on failure"
+      },
+      {
+        "dont": "resolve conflicts by removing resource_heavy or live_integration from tests that genuinely need those markers",
+        "instead": "(not specified)",
+        "item_id": "enforce-no-conflicting-test-markers",
+        "why": "those exist to route tests to the right runner; remove the speed-lane marker instead"
+      },
+      {
+        "dont": "use BENCHBOX_SKIP_MARKER_CHECK=1 in CI",
+        "instead": "(not specified)",
+        "item_id": "enforce-no-conflicting-test-markers",
+        "why": "it defeats the entire purpose"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-04-01T00:00:00Z",
+      "created_at": "2026-04-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "BENCHBOX_SKIP_MARKER_CHECK=1 suppresses validation errors after w14 promotion (escape hatch preserved); during w1-w13 migration, BENCHBOX_ENFORCE_MARKER_CHECK=1 opts into early error mode",
+        "item_id": "enforce-no-conflicting-test-markers"
+      },
+      {
+        "behavior": "No test logic changes - only marker annotations modified",
+        "item_id": "enforce-no-conflicting-test-markers"
+      },
+      {
+        "behavior": "make test-fast and uv run -- python -m pytest -m fast -q collect identical node ID sets (not just equal counts) - enforced by existing collection hook in d84c897a8",
+        "item_id": "enforce-no-conflicting-test-markers"
+      },
+      {
+        "behavior": "make test-slow, make test-stress, make test-all still collect their expected sets - hook must not block explicit marker opt-in",
+        "item_id": "enforce-no-conflicting-test-markers"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/lint.yml"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "tests/conftest.py (validation hook)"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/core/data_organization/test_presorted_generation.py"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_nyctaxi_duckdb.py"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_phase4_validation_integration.py"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_tpch_skew_duckdb.py"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_tsbs_devops_duckdb.py"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "tests/test_tpcdi.py"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "tests/test_tpcds_direct.py"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/benchmarks/test_write_primitives_generator.py"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/monitoring/test_profiler.py"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_databricks_liquid_clustering.py"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_tpcdi_phase1.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest --collect-only -q --override-ini=\"addopts=-p _benchbox_pytest_xdist_safety --strict-markers --strict-config -p no:cov\" -m \"fast and slow\" -p no:warnings 2>&1 | tail -3",
+        "description": "No fast+slow conflicts after w2-w6",
+        "expected": "no tests collected",
+        "item_id": "enforce-no-conflicting-test-markers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest --collect-only -q --override-ini=\"addopts=-p _benchbox_pytest_xdist_safety --strict-markers --strict-config -p no:cov\" -m \"medium and slow\" -p no:warnings 2>&1 | tail -3",
+        "description": "No medium+slow conflicts after w7-w12",
+        "expected": "no tests collected",
+        "item_id": "enforce-no-conflicting-test-markers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest --collect-only -q --override-ini=\"addopts=-p _benchbox_pytest_xdist_safety --strict-markers --strict-config -p no:cov\" -m \"fast and resource_heavy\" -p no:warnings 2>&1 | tail -3",
+        "description": "No fast+resource_heavy conflicts after w13",
+        "expected": "no tests collected",
+        "item_id": "enforce-no-conflicting-test-markers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest --collect-only -q -p no:warnings 2>&1 | grep -c 'Marker conflict'",
+        "description": "After w14: zero marker-conflict warnings in clean collect-only",
+        "expected": "0",
+        "item_id": "enforce-no-conflicting-test-markers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "diff <(uv run -- python -m pytest -m fast --collect-only -q --override-ini=\"addopts=-p _benchbox_pytest_xdist_safety --strict-markers --strict-config -p no:cov\" -p no:warnings 2>&1 | grep '::' | sort) <(make test-fast ARGS='--collect-only -q -p no:warnings' 2>&1 | grep '::' | sort)",
+        "description": "make test-fast node ID set is identical before and after marker remediation",
+        "expected": "empty diff (no output)",
+        "item_id": "enforce-no-conflicting-test-markers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make lint-markers",
+        "description": "make lint-markers exits 0",
+        "expected": "exit code 0",
+        "item_id": "enforce-no-conflicting-test-markers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w1",
+        "wid": "w10"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w1",
+        "wid": "w11"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w1",
+        "wid": "w12"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w1",
+        "wid": "w13"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w10",
+        "wid": "w14"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w11",
+        "wid": "w14"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w12",
+        "wid": "w14"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w2",
+        "wid": "w14"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w3",
+        "wid": "w14"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w4",
+        "wid": "w14"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w5",
+        "wid": "w14"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w6",
+        "wid": "w14"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w7",
+        "wid": "w14"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w8",
+        "wid": "w14"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w9",
+        "wid": "w14"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w14",
+        "wid": "w15"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "enforce-no-conflicting-test-markers",
+        "needs_wid": "w1",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Merge conflict validation into pytest_collection_modifyitems (warning mode)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix medium+slow: test_tpcdi.py (2 tests)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix medium+slow: test_release_infrastructure.py (1 test)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix medium+slow: test_tpcdi_phase1.py (1 test)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix fast+resource_heavy: test_presorted_generation.py (4 tests)",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Promote validation hook from warning to error mode",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add make lint-markers target for pre-commit and CI",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix fast+slow: test_nyctaxi_duckdb.py (3 tests)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix fast+slow: test_tsbs_devops_duckdb.py (5 tests)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix fast+slow: test_tpcds_direct.py (1 test)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix fast+slow: test_profiler.py (3 tests)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix fast+slow: test_databricks_liquid_clustering.py (1 test)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix medium+slow: test_write_primitives_generator.py (18 tests)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix medium+slow: test_tpch_skew_duckdb.py (4 tests)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-no-conflicting-test-markers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix medium+slow: test_phase4_validation_integration.py (2 tests)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

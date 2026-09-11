@@ -1,0 +1,11 @@
+{
+  "description": "Plan DataFrame support for TPC-DS-OBT with explicit OBT-specific adaptation.\n\nTPC-DS-OBT query set and schema differ materially from normalized TPC-DS.\nExisting TPC-DS DataFrame implementations are not directly reusable without\ndenormalized-schema-specific rewriting.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-07T00:00:00Z",
+      "created_at": "2026-02-07T00:00:00Z",
+      "worktree": "dataframe-benchmarks"
+    }
+  }
+}

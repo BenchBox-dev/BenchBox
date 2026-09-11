@@ -1,0 +1,115 @@
+{
+  "context": "Restore the pre-#1467 originals (git checkout 37370ce5e4^ -- results-data/) and apply exactly ONE public pass with _project/scripts/results_explorer_corpus_migrate.py --write, which post-#1512 no longer carries _preserve_public_hashes and so applies a single clean pass. File sets are identical between the two revisions apart from #1467's own audit manifest, so nothing is resurrected or dropped. Verify: zero find_public_path_leaks over the whole corpus, idempotent for 207/207, and fresh-submission == curated for ALL fields rather than machine_id alone. Every result_id changes; that is still free because nothing is published yet (origin/release carries zero bundles and published-results records no result_id). Sequence this BEFORE the published-results mirror so the public branch is mirrored once, at the final values.",
+  "description": "Corrects an overstated claim in PR #1512 (merged, 3b45633e2c). That PR asserted the corpus needed no re-derivation because its stored values were 'already exactly one pass from raw'. That was verified on machine_id ONLY and generalised. Measuring the WHOLE payload on 2026-08-04: a fresh submission and the curated bundle are identical for 0 of 207 bundles and differ for 207, across environment.platform_runtime.engine_host (195), platform.config + execution.driver_runtime_python_executable (146 each), platform.config.working_dir (138), platform.raw_config.working_dir (133), database_path (42/37), database (25/25) and others. MECHANISM, confirmed on amplab_sf001_datafusion_df_20260502_223331_f228f907: the exporter already anonymizes at capture time, so the raw pre-#1467 bundle carried engine_host as host_51e3fb6b450f - ALREADY a 12-hex pseudonym - and #1467 hashed it a SECOND time into the curated corpus as host_7e5bc04be41b. machine_id was 16-hex (not pseudonym-shaped), so it was hashed exactly once, which is the only reason the original spot-check agreed. CONSEQUENCE: the cross-corpus grouping bug #1512 set out to fix is fixed for machine_id and still present for every host_/path_/database_ field - the same physical machine still yields different pseudonyms between the curated corpus and a fresh submission. Idempotence itself IS fixed and is not in question (207/207 stable, 0 leaks). NOTE the corpus is 207 primary bundles, not the 203 quoted in #1512 - that figure came from a flat glob that missed 4 nested bundles under results-data/bundles/ssb/**; the corpus privacy gate uses rglob and did cover them. ALSO note this is the same re-derivation that salt rotation would require (see the Salt rotation section added to docs/reference/result-formats.md in PR #1528).",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-04T13:20:31Z",
+        "from_item": "rederive-corpus-to-single-pass",
+        "id": 688,
+        "reason": "Ran the full setup successfully - branch off develop, restored the pre-#1467 originals (399 files), removed the stale audit manifest - but 'results_explorer_corpus_migrate.py --write' was denied by the Claude Code auto mode classifier. The read-only dry run of the SAME script is permitted and passes (reports 207/207 bundles unchanged against today's corpus), so the gate is specifically on the mutating --write flag, not the script. Declined to reimplement the rewrite in raw Python, which would have bypassed the intent of that gate. Worktree was restored immediately and verified: 400 corpus files, 0 leaks, audit manifest present, nothing staged. To unblock, either add a Bash permission rule for that command or run it directly: git checkout 37370ce5e4^ -- results-data/ && rm results-data/bundles/path-privacy-migration.manifest.json && uv run -- python _project/scripts/results_explorer_corpus_migrate.py --write",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Migrate --write is not code-gated; dry-run on current tip shows 0 changed bundles (207/207 unchanged). Prior deferral was agent-environment permission confusion.",
+        "summary": "Re-derivation blocked: the migration tool's --write is gated by the local permission classifier"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rederive-corpus-to-single-pass",
+        "needs_item": "published-results-corpus-leak-and-mirror-gap"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-06T00:08:33Z",
+      "completed_pr": 1613,
+      "created_at": "2026-08-04T13:09:37Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Idempotence from #1512 holds after re-derivation",
+        "item_id": "rederive-corpus-to-single-pass"
+      },
+      {
+        "behavior": "Semantic benchmark fields stay byte-identical - the migration tool already asserts this via _semantic_signature",
+        "item_id": "rederive-corpus-to-single-pass"
+      },
+      {
+        "behavior": "Zero private-path leaks over the whole corpus",
+        "item_id": "rederive-corpus-to-single-pass"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rederive-corpus-to-single-pass",
+        "kind": "only_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "rederive-corpus-to-single-pass",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/**"
+      },
+      {
+        "item_id": "rederive-corpus-to-single-pass",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_corpus_privacy_invariant.py -q",
+        "description": "corpus is idempotent and leak-free after re-derivation",
+        "expected": "Both the leak scan and the fixed-point gate stay green",
+        "item_id": "rederive-corpus-to-single-pass",
+        "last_result": "pass",
+        "last_run": "2026-08-06T00:07:56Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_corpus_privacy_invariant.py -q -k rederiv",
+        "description": "fresh equals curated across every field",
+        "expected": "Write the test in w1 so this rung becomes runnable; it must fail on today's corpus where 207/207 bundles differ",
+        "item_id": "rederive-corpus-to-single-pass",
+        "last_result": "pass",
+        "last_run": "2026-08-06T00:08:04Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rederive-corpus-to-single-pass",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "migrate dry-run: changed_bundles=0/207; fixed_point_drift=0; post-#1578 corpus already single public pass under current AnonymizationManager",
+        "item_id": "rederive-corpus-to-single-pass",
+        "notes": null,
+        "started_at": "2026-08-06T00:06:52Z",
+        "started_branch": "fix/prune-empty-client-host-corpus",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Re-derive all 207 bundles, companions and manifests from the pre-#1467 originals with one pass",
+        "wid": "w0"
+      },
+      {
+        "evidence": "test_rederiv_fresh_public_pass_equals_curated_for_all_fields passes; migrate dry-run 0/207 changes",
+        "item_id": "rederive-corpus-to-single-pass",
+        "notes": null,
+        "started_at": "2026-08-06T00:07:41Z",
+        "started_branch": "fix/prune-empty-client-host-corpus",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Pin fresh-submission == curated across ALL fields, not just machine_id",
+        "wid": "w1"
+      }
+    ]
+  }
+}

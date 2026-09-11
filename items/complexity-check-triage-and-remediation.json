@@ -1,0 +1,429 @@
+{
+  "context": "Use an evidence-first workflow:\n1) Build a complete classification matrix for every flagged function.\n2) Apply ignore entries only for truly irreducible complexity with explicit rationale.\n3) Refactor accidental complexity in subsystem batches with focused tests.\n4) Re-run complexity and regression tests after each batch.\n5) Keep threshold policy (`max_complexity = 20`) intact unless a separate policy change is approved.\n\nPreferred refactor strategy is extraction into private helpers with clear contracts and\nreduced branch nesting, not broad architectural rewrites.\n",
+  "description": "`make complexity-check` currently fails with significant complexity debt that mixes\nintentional orchestration logic and accidental branching complexity.\n\nBaseline captured on 2026-02-20:\n- Total functions scanned: 4906\n- Warnings (score >= 15): 106\n- Failures (score > 20): 70\n- Highest offenders: `_extract_common_params` (76), `build_result_payload` (63),\n  `render_ascii_chart_from_results` (51), multiple `load_data` methods in cloud\n  adapters, and runner/dataframe orchestration methods.\n\nThis TODO delivers a complete decision record for every flagged function (simplify vs\nintentional ignore), implements refactors for accidental complexity, and applies narrow\nignore entries only where complexity is demonstrably irreducible and justified.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add module-wide or directory-wide complexity excludes",
+        "instead": "add only function-level excludes with rationale.",
+        "item_id": "complexity-check-triage-and-remediation",
+        "why": "this hides future regressions"
+      },
+      {
+        "dont": "collapse platform-specific error handling into generic paths",
+        "instead": "share scaffolding only.",
+        "item_id": "complexity-check-triage-and-remediation",
+        "why": "adapters have distinct semantics"
+      },
+      {
+        "dont": "lower global complexity thresholds to make checks pass",
+        "instead": "reduce code complexity or justify narrow ignores.",
+        "item_id": "complexity-check-triage-and-remediation",
+        "why": "this weakens enforcement"
+      },
+      {
+        "dont": "mix behavior changes with complexity-only refactors",
+        "instead": "keep functional behavior stable and test-backed.",
+        "item_id": "complexity-check-triage-and-remediation",
+        "why": "this obscures regressions"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "complexity-check-triage-and-remediation",
+        "id": 63,
+        "reason": "Out of scope for this complexity remediation item; requires separate architecture proposal.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Vague 'deep redesign' with no scope; explicitly requires a separate architecture proposal that does not exist.",
+        "summary": "Deep redesign of benchmark lifecycle architecture beyond targeted extraction"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "complexity-check-triage-and-remediation",
+        "id": 64,
+        "reason": "Requires credentials/environments and should be handled in dedicated live-test follow-up if unit/integration mocks are insufficient.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Vague trigger ('if mocks insufficient'); no concrete live-test gap identified, no open item covers general adapter-refactor live validation.",
+        "summary": "Live cloud integration validation for every adapter refactor"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-02-20T00:00:00Z",
+      "created_at": "2026-02-20T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI output contracts for compare/export/visualization commands remain stable.",
+        "item_id": "complexity-check-triage-and-remediation"
+      },
+      {
+        "behavior": "Complexity check continues to detect real regressions (no broad suppressions).",
+        "item_id": "complexity-check-triage-and-remediation"
+      },
+      {
+        "behavior": "DataFrame benchmark execution parity between pandas-family and expression-family adapters.",
+        "item_id": "complexity-check-triage-and-remediation"
+      },
+      {
+        "behavior": "Platform `load_data` semantics, supported file types, and option handling remain backward compatible.",
+        "item_id": "complexity-check-triage-and-remediation"
+      },
+      {
+        "behavior": "`benchbox run` lifecycle behavior and phase ordering remain unchanged.",
+        "item_id": "complexity-check-triage-and-remediation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "kind": "do_not_modify",
+        "path_glob": ".github/ or CI/CD configuration"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**/public API signatures or CLI command interfaces"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml (dependency specifications)"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "tests/fixtures/ or test fixture data"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/quality/complexity/"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/**/*.py"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml (complexity config section only)"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "kind": "only_modify",
+        "path_glob": "quality/complexity/classification-matrix.yaml"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "kind": "only_modify",
+        "path_glob": "scripts/check_complexity.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/check_complexity.py --no-fail --top 200",
+        "description": "Complexity baseline and classification inventory are complete and consistent",
+        "expected": "Report completes successfully and all functions above warning threshold are represented in the classification matrix.",
+        "item_id": "complexity-check-triage-and-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make complexity-check",
+        "description": "Primary complexity gate passes after remediation and approved ignores",
+        "expected": "PASS with zero functions above max complexity threshold.",
+        "item_id": "complexity-check-triage-and-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q -n 0",
+        "description": "Fast regression suite remains green",
+        "expected": "All fast tests pass with 0 failures.",
+        "item_id": "complexity-check-triage-and-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core tests/unit/platforms tests/unit/cli -q -n 0",
+        "description": "Touched subsystem tests remain green",
+        "expected": "Targeted unit suites pass for modified modules.",
+        "item_id": "complexity-check-triage-and-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w6",
+        "wid": "w10"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w6",
+        "wid": "w11"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w10",
+        "wid": "w12"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w8",
+        "wid": "w12"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w9",
+        "wid": "w12"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w12",
+        "wid": "w13"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w7",
+        "wid": "w13"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "complexity-check-triage-and-remediation",
+        "needs_wid": "w6",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Persist current output from `scripts/check_complexity.py --no-fail --top 200` under\n`_project/quality/complexity/` and seed the canonical machine-readable inventory at\n`quality/complexity/classification-matrix.yaml` with all functions at score >= 15,\nincluding score, file, function, and module family.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture baseline complexity artifacts and seed function inventory",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Normalize shared load flow into scoped helpers/mixins for adapters with parallel logic\n(Redshift/BigQuery/Databricks/Trino/Presto/Athena/Snowflake) without changing platform-specific semantics.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor accidental complexity batch C: platform adapter load_data families",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Decompose large lifecycle/result-shaping functions into deterministic units with clear\ncontracts and easier test coverage.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor accidental complexity batch D: core runner, result schema, and TPC-DS paths",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Validated touched areas with focused suites:\n- `tests/unit/platforms/test_{bigquery,presto,trino,athena,snowflake}_adapter.py`\n- `tests/integration/test_tpch_maintenance_test.py`\n- `tests/unit/core/tpcds_obt/test_tpcds_obt_queries.py`\n- `tests/unit/cli/test_quiet_mode.py`\n- `tests/unit/platforms/test_platform_driver_runtime_contract.py`\nCombined targeted run result: 250 passed, 19 deselected.\nFull `-m fast` run currently reports one order-dependent failure in\n`test_dataframe_adapter_contract_rejects_isolated_runtime_without_binding_support`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run targeted tests for each refactor batch and fix regressions",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Ensure intentional complexity is narrowly allowlisted and accidental complexity\nreductions remove all remaining failures above max threshold.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-run complexity checks and confirm pass/fail posture with updated ignores",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Before (2026-02-20 baseline): 4906 scanned, 106 warnings, 70 failures.\nAfter remediation: 5048 scanned, 109 warnings, 0 failures.\nNet change: failures reduced by 70; complexity gate now passes.\nUpdated complexity artifact: `_project/quality/complexity/latest-report.txt`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document before/after metrics, update TODO status, and regenerate indexes",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Create explicit criteria for `simplify_now`, `ignore_with_rationale`, and\n`defer_with_owner`, including examples and disqualifiers for broad ignores.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define triage rubric for intended vs accidental complexity",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Review each failing function in `benchbox/core/` (runner, result shaping, lifecycle)\nand record: decision category, concrete rationale, proposed refactor strategy or exact\nignore key (`file:function`), and required regression tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Classify failing functions in core runner, result schema, and TPC-DS paths (>20)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Review each failing function in `benchbox/platforms/` and dataframe-related modules.\nRecord same evidence as w3. Includes cloud adapter `load_data` families and\ndataframe runner/mixin hotspots.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Classify failing functions in platform adapters and dataframe orchestration (>20)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Review remaining failing functions in `benchbox/cli/`, chart rendering, comparison\noutput, and any other modules. Record same evidence as w3.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Classify failing functions in CLI, visualization, and remaining modules (>20)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Classify all warning-band functions and assign priority buckets:\nimmediate, near-term, monitor-only. May span multiple sessions if count exceeds ~40;\nbatch by module family if needed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Classify warning-band functions (15-20) and prioritize remediation queue",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Update `[tool.benchbox.complexity].exclude_functions` in `pyproject.toml` only for\napproved `ignore_with_rationale` cases. No module-wide excludes. Every entry must map\nto the classification matrix and include a re-review note.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Finalize ignore candidates and add narrow exclusions with rationale linkage",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Split high-complexity render/format functions into smaller pure helpers while\npreserving output formatting and user-facing behavior.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor accidental complexity batch A: visualization and CLI formatting paths",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-check-triage-and-remediation",
+        "notes": "Reduce branching in dataframe benchmark mixins and unified frame hotspots by extracting\nmode-specific helpers and consolidating repeated decision logic.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor accidental complexity batch B: dataframe orchestration hotspots",
+        "wid": "w9"
+      }
+    ]
+  }
+}

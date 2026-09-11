@@ -1,0 +1,212 @@
+{
+  "context": "Treat trust, moderation, and observability as first-class platform features.\nThe hosted explorer can be static-first, but the write path still needs the\nsame operational rigor as any public ingestion service.\n",
+  "description": "A hosted benchmark-results platform is not credible if anyone can spam it,\nexfiltrate private metadata, or silently corrupt public read models. Before\nBenchBox opens self-service submissions broadly, it needs threat modeling,\nquotas, moderation controls, observability, backups, and explicit incident\nprocedures.\n\nThis item covers the operational and governance controls that make the hosted\nplatform safe to run in public.\n\n**Phase assignment:** Phase 3 only. Phase 1 (static, maintainer-curated) and\nPhase 2 (PR-based, GitHub-mediated) have no hosted services to secure or\noperate. This work is only relevant if/when a hosted API is built.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "launch self-service public submissions without quotas and rate limits",
+        "instead": "define throttling and eligibility rules first",
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "why": "abuse cost will be immediate"
+      },
+      {
+        "dont": "rely on UI badges alone for trust and visibility enforcement",
+        "instead": "enforce policy at the service boundary",
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "why": "storage and API mistakes can leak data"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "needs_item": "define-hosted-results-contract-and-governance-model"
+      },
+      {
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "needs_item": "design-results-ingest-storage-and-derived-read-model"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-27T00:00:00Z",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Explorer rebuilds and moderation actions remain auditable after the fact",
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls"
+      },
+      {
+        "behavior": "Public and unlisted result visibility rules stay enforceable at the storage and API layers, not only in UI hints",
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -c 'Spoofing\\|Tampering\\|Repudiation\\|Information\\|Denial\\|Elevation' docs/reference/threat-model.md",
+        "description": "Threat model document committed with STRIDE coverage (run after w2)",
+        "expected": ">= 6",
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'integrity\\|breach\\|abuse' docs/operations/results-phase-3-runbook.md",
+        "description": "Incident runbook committed and covers all three required incident classes (run after w8)",
+        "expected": ">= 3",
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "notes": "List what must be protected: raw bundles, durable metadata, public read\nmodels, API keys, actor identity records. Map external interfaces (submission\nAPI, explorer, admin CLI). Output: one-page asset inventory used as input\nto w2.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enumerate assets and attack surface: protected assets, external interfaces, trust boundaries",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "notes": "Apply STRIDE (Spoofing, Tampering, Repudiation, Information Disclosure,\nDenial of Service, Elevation of Privilege) to each layer in w1. Output:\nthreat-model.md with per-threat likelihood × impact scores and proposed\nmitigations.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write STRIDE threat analysis for the submission, storage, and explorer layers",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "notes": "Sort threats by risk score. For each top-10 mitigation, either assign to\nan existing design TODO (auth, quota, moderation) or add it as an\nacceptance criterion to the Phase 3 launch gate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prioritize top 10 mitigations and assign to design items or Phase 3 acceptance criteria",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "notes": "Choose between API keys vs OAuth. Define token scopes (submit-only vs full\nread access). Set session and refresh lifetime policy. Outputs feed into\nintegrate-benchbox-cli-submit-and-service-auth.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define auth model: eligibility gates, token type, scopes, and session lifetime",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "notes": "Set per-actor burst budget, daily submission cap, and total storage quota.\nDefine what happens when a limit is hit (reject vs queue vs alert). Include\na grace period for first-time submitters.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define rate limiting and quota model: per-actor submission limits and storage caps",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "notes": "How does a new actor become trusted? Who can trigger takedowns and under\nwhat conditions? What fields does the audit log capture? Output: moderation\nrunbook with explicit escalation paths.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define moderation workflow: trust promotion, content takedown, and audit log schema",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "notes": "Set observable, testable SLO targets. Example targets: submission ACK <5s\np99, explorer p99 <500ms, backup RPO <24h, RTO <4h. These feed alerting\nthresholds and incident severity definitions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define platform SLOs: ingestion latency p99, explorer availability, backup RPO/RTO",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "operate-results-platform-security-observability-and-abuse-controls",
+        "notes": "Define who is alerted, what actions are taken, and what public\ncommunications are required for each incident class. Runbook must be\nexecutable without the original author present.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write incident response runbook for result integrity incidents, data breaches, and abuse",
+        "wid": "w8"
+      }
+    ]
+  }
+}

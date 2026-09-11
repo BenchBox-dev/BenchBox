@@ -1,0 +1,182 @@
+{
+  "context": "Work units are independent (different files) and can land in any order or\nas separate small PRs. For w1, prefer strengthening the existing test\n(assert the __getitem__ call args) over a full fake-Row rewrite unless the\nfake is trivial to build - the goal is \"not tautological,\" not \"fully\nintegration-real.\" For w2, read each test's surrounding setup/mocks to\ninfer the intended positive outcome rather than guessing; if a test's\nintended outcome is genuinely ambiguous from the code, treat that\nambiguity itself as a finding worth a one-line comment. For w3, the\nbuilder/runner trace above is definitive - no further investigation\nneeded. For w4, mirror the existing module-level guard pattern already\nused at the top of the same file (lines 21-29) rather than inventing a\nnew pattern.\n",
+  "description": "Test-strategy review of the write_primitives and dataframe-runner unit\nsuites found several places where tests assert shapes/mocks rather than\nvalues, so they cannot catch real regressions:\n\n1. `tests/unit/core/write_primitives/test_pyspark_sketch_factories.py`\n   mocks the whole PySpark API (`fake_pyspark_functions` fixture,\n   `MagicMock()` spark session) and mostly asserts call shapes (e.g.\n   lines ~92-96, ~106, ~146-147). The one apparent \"value\" assertion,\n   `TestPysparkHllMergeExtract.test_extractor_reads_state_and_chains_union_then_estimate`\n   (line ~117-130), configures `row.__getitem__.return_value = 14836.5`\n   and then asserts `result == 14836.5` — the assertion is tautological\n   because the value only ever flows out of the same mock it was injected\n   into; the extractor's real logic (indexing into the Row by a specific\n   column key) is never verified.\n\n2. `tests/unit/core/write_primitives/test_benchmark_execution.py` has 7\n   tests (lines 206, 360, 374, 390, 404, 418, 591) that end on\n   `mock_conn.execute.assert_not_called()` with no accompanying positive\n   assertion about the resulting state (e.g. what error/skip/no-op result\n   was actually produced). \"Execute was never called\" alone doesn't\n   verify the surrounding code behaved correctly — a test that returns\n   early for the wrong reason still passes.\n\n3. `tests/unit/core/runner/test_dataframe_runner.py:484`\n   (`test_standard_phase_does_not_raise`) asserts\n   `result.validation_status in (\"PASSED\", \"FAILED\")`. This is an\n   either-outcome assertion: both possible values pass, so a regression\n   that flips the actual outcome is invisible. Tracing the runner\n   (`benchbox/core/runner/dataframe_runner.py`): the result builder\n   defaults `_validation_status` to `\"PASSED\"`\n   (`benchbox/core/results/builder.py:261`) and only overwrites it to\n   `\"FAILED\"` in the runner's `except` branch (dataframe_runner.py:298-303)\n   or to `\"PARTIAL\"` when failed queries exist and status was still\n   `\"PASSED\"` (builder.py:598-600). Since this test runs with\n   `DataFramePhases(load=False, execute=False)` and a mocked adapter that\n   raises nothing, the only reachable outcome is `\"PASSED\"` — the\n   assertion should be pinned to that. (Note: the review that seeded this\n   TODO cited \"lines ~464,486\" for this pattern; only line 484 actually\n   contains it — line 464 is an unrelated `NotImplementedError` test and\n   line 486 (`test_power_phase_does_not_raise`) only checks\n   `isinstance(result, BenchmarkResults)`, not `validation_status`.)\n\n4. `tests/unit/benchmarks/test_write_primitives_dataframe.py` has 12\n   in-body `try: from ... import X / except ImportError: pytest.skip(...)`\n   sites (e.g. lines ~566, 586, 610, 622, 639, 691, 758, 809, 862, 928,\n   950, 972), all guarding imports from\n   `benchbox.platforms.dataframe.pyspark_maintenance`. PySpark is a core\n   (non-optional) dependency of this project\n   (`pyspark>=3.5.0` in `pyproject.toml`'s main `dependencies` list, not\n   an extra), so it is installed in CI. These in-body skips mean that if\n   a future change breaks the import of the module under test (e.g. a\n   typo, a moved symbol, a real ImportError from a genuinely broken\n   dependency chain), the tests silently skip instead of failing — CI\n   stays green.\n\nNone of these are found-then-forgotten: they're passing tests today that\nwould keep passing through the regressions they're nominally guarding\nagainst.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "convert test_benchmark_execution.py's assert_not_called() tests into full integration tests with a real connection",
+        "instead": "keep them mock-based, just add a positive assertion on the mocked result/state.",
+        "item_id": "write-primitives-test-value-assertions",
+        "why": "that's out of scope and would require live DB fixtures"
+      },
+      {
+        "dont": "delete the mock-based call-shape assertions in test_pyspark_sketch_factories.py",
+        "instead": "only fix the tautological value assertion(s), leave the rest.",
+        "item_id": "write-primitives-test-value-assertions",
+        "why": "they correctly verify chaining/argument behavior for a fully-mocked PySpark API"
+      },
+      {
+        "dont": "move the module-level importorskip for test_write_primitives_dataframe.py into conftest.py",
+        "instead": "keep the guard local to this file.",
+        "item_id": "write-primitives-test-value-assertions",
+        "why": "other test files in the same directory import unrelated platforms and would be needlessly skipped"
+      },
+      {
+        "dont": "weaken test_dataframe_runner.py:484 further (e.g. to `is not None`)",
+        "instead": "assert the literal expected string.",
+        "item_id": "write-primitives-test-value-assertions",
+        "why": "the whole point is pinning the actually-reachable value"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-04T00:00:00Z",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All 7 test_benchmark_execution.py assert_not_called() calls remain in place - only add assertions, don't remove existing ones.",
+        "item_id": "write-primitives-test-value-assertions"
+      },
+      {
+        "behavior": "No change to production code in benchbox/core/write_primitives/, benchbox/core/runner/, or benchbox/platforms/dataframe/ - this is a test-only TODO.",
+        "item_id": "write-primitives-test-value-assertions"
+      },
+      {
+        "behavior": "Tests still skip cleanly (not error) on developer machines without PySpark installed, via the module-level importorskip/import-guard, not per-test try/except.",
+        "item_id": "write-primitives-test-value-assertions"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-test-value-assertions",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/builder.py"
+      },
+      {
+        "item_id": "write-primitives-test-value-assertions",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "write-primitives-test-value-assertions",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/"
+      },
+      {
+        "item_id": "write-primitives-test-value-assertions",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/pyspark_maintenance.py"
+      },
+      {
+        "item_id": "write-primitives-test-value-assertions",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/benchmarks/test_write_primitives_dataframe.py"
+      },
+      {
+        "item_id": "write-primitives-test-value-assertions",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/runner/test_dataframe_runner.py"
+      },
+      {
+        "item_id": "write-primitives-test-value-assertions",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/write_primitives/test_benchmark_execution.py"
+      },
+      {
+        "item_id": "write-primitives-test-value-assertions",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/write_primitives/test_pyspark_sketch_factories.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/write_primitives/test_pyspark_sketch_factories.py -v",
+        "description": "PySpark sketch factory tests still pass after de-tautologizing the value assertion",
+        "expected": "All tests pass",
+        "item_id": "write-primitives-test-value-assertions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/write_primitives/test_benchmark_execution.py -v",
+        "description": "Benchmark execution tests still pass with added positive assertions",
+        "expected": "All tests pass",
+        "item_id": "write-primitives-test-value-assertions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/runner/test_dataframe_runner.py -v -k 'standard_phase_does_not_raise'",
+        "description": "DataFrame runner test passes with the pinned validation_status",
+        "expected": "Test passes with validation_status == PASSED",
+        "item_id": "write-primitives-test-value-assertions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_dataframe.py -v -k PySpark",
+        "description": "Write-primitives dataframe tests still pass and no longer skip on PySpark import (since PySpark is installed)",
+        "expected": "Tests pass (not skipped) since pyspark is a core dependency and is installed",
+        "item_id": "write-primitives-test-value-assertions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-test-value-assertions",
+        "notes": "In `TestPysparkHllMergeExtract.test_extractor_reads_state_and_chains_union_then_estimate`\n(~line 113-130), the assertion `assert result == 14836.5` merely\nechoes `row.__getitem__.return_value` set two lines earlier — replace\nor strengthen it so the test verifies the extractor's actual logic:\n  - Assert `row.__getitem__.call_args == call(0)` (or whichever key/\n    index the extractor is documented to read) so the test would fail\n    if the extractor started reading the wrong column/index.\n  - Where the full-mock architecture makes a fully \"real\" value\n    assertion infeasible (no real PySpark Row available in this unit\n    test), use a small hand-built fake Row class (e.g. a\n    `dict`-backed object implementing `__getitem__`) instead of\n    `MagicMock`, so `result` is produced by genuine dict lookup logic\n    in the extractor rather than being an injected mock return value.\nApply the same \"real/fake-backed value, not injected-mock-echo\"\npattern to any other value-bearing assertions in this file that\nexhibit the same tautology (skim the KLL and top-K merge-extract\ntests for the same `row.__getitem__.return_value = X; assert result\n== X` shape).\nLeave the call-shape assertions (e.g. `assert_called_once_with(...)`)\nas-is where they already verify real behavior (arguments, chaining).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "test_pyspark_sketch_factories.py: fix the tautological HLL-merge-extract value assertion",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-test-value-assertions",
+        "notes": "For each of the 7 tests ending on `mock_conn.execute.assert_not_called()`\n(lines 206, 360, 374, 390, 404, 418, 591), read the surrounding test to\ndetermine what SHOULD have happened instead of executing SQL (e.g. an\nearly-return value, a raised/logged error, a specific `OperationResult`\nstate, a skip reason). Add an assertion on that positive outcome so the\ntest fails if the code takes the \"don't execute\" path for the wrong\nreason. Do not weaken or remove the `assert_not_called()` calls\nthemselves — they stay as a necessary (not sufficient) condition.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "test_benchmark_execution.py: add positive assertions alongside the 7 execute.assert_not_called() sites",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-test-value-assertions",
+        "notes": "Replace `assert result.validation_status in (\"PASSED\", \"FAILED\")`\nwith `assert result.validation_status == \"PASSED\"` — per\n`benchbox/core/results/builder.py:261,598-600` and\n`benchbox/core/runner/dataframe_runner.py:298-303`, a mocked adapter\nthat raises nothing with `DataFramePhases(load=False, execute=False)`\ncan only reach `\"PASSED\"` (default, never overwritten to `\"FAILED\"`\nsince the except branch never runs, and never demoted to `\"PARTIAL\"`\nsince there are no query results at all). Scan the rest of the file\nfor the same `in (\"PASSED\", \"FAILED\")` or similar either-outcome\nshape (only one other match was found during triage, at the same\nline - re-check after w3 lands in case new copies appear from a\nmerge).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "test_dataframe_runner.py:484: pin validation_status to PASSED for this fixture",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-test-value-assertions",
+        "notes": "Replace the 12 in-body `try/except ImportError: pytest.skip(...)`\nsites (~lines 566, 586, 610, 622, 639, 691, 758, 809, 862, 928, 950,\n972) that guard imports from\n`benchbox.platforms.dataframe.pyspark_maintenance` with a single\nmodule-level `pyspark = pytest.importorskip(\"pyspark\")`-style guard\n(or, since the failure mode is specifically the BenchBox wrapper\nmodule rather than the `pyspark` package itself, guard on\n`benchbox.platforms.dataframe.pyspark_maintenance` directly) placed\nonce near the top of the file, alongside the existing module-level\n`except ImportError` block at lines 21/29. This preserves \"skip\ncleanly on machines without PySpark installed\" for local dev while\nensuring a genuine breakage of the module under test (which PySpark\nIS installed to exercise in CI - see `pyproject.toml`'s core\n`dependencies` list) fails the suite instead of silently skipping.\nKeep the two existing legitimate module-level import guards (lines\n21, 29) - only remove the in-body per-test duplicates.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "test_write_primitives_dataframe.py: replace in-body ImportError skips with module-level importorskip",
+        "wid": "w4"
+      }
+    ]
+  }
+}

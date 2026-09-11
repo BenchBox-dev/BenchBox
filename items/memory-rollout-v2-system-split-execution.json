@@ -1,0 +1,425 @@
+{
+  "context": "Reuse memory_tooling.rollout exact-target validation, redacted hash manifests, operation-bound tokens, fail-closed canary blockers, and isolated restore tests. First implement all missing behavior against temporary fixtures and produce a complete source-to-candidate disposition ledger. Then require one promotion-eligible system packet and explicit Joe authorization naming exact targets, settings, candidate hashes, backup destination, canary window, abort thresholds, and rollback owner. Create and verify a backup, run staged loader-compatible canaries, obtain a separate canary acceptance, perform one atomic reversible swap, and stop before any cleanup until Joe approves every deletion-ledger entry. Monitor for the agreed window and obtain final acceptance or restore the verified backup.",
+  "description": "Successor to memory-canary-rollout-monitoring-and-cleanup, whose scope excludes the memory_tooling and evaluation code required by its own verification commands. Extend the existing dry-run-only rollout planner into fully tested fixture-mode backup, canary, atomic-swap, rollback, strict audit, approved-ledger cleanup, and monitoring workflows. Live execution remains per-system and separately human-gated: promotion eligibility does not authorize backup, canary, live mutation, cleanup, or final acceptance. Codex and Claude use separate packets, manifests, approvals, canaries, swaps, cleanup ledgers, and monitoring outcomes.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete anything not present in an approved exact ledger",
+        "instead": "dry-run each entry with its replacement or retention rationale and verify afterward",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "why": "broad cleanup can destroy evidence, credentials, or unrelated application state"
+      },
+      {
+        "dont": "incrementally edit live memory files",
+        "instead": "stage a complete candidate and use one reversible atomic swap or config pointer",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "why": "partial writes can leave indexes, records, topics, and settings inconsistent"
+      },
+      {
+        "dont": "share approvals or manifests between Codex and Claude",
+        "instead": "run independent system packets and human gates",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "why": "their stores, loaders, candidates, and observed treatment effects differ"
+      },
+      {
+        "dont": "treat a promotion-eligible score as live-mutation authority",
+        "instead": "require an exact per-system live-mutation-boundary approval",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "why": "evaluation acceptance and operational risk acceptance are different human decisions"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-05T22:13:13Z",
+        "from_item": "memory-rollout-v2-system-split-execution",
+        "id": 693,
+        "reason": "w8 final acceptance is a human gate; tracked as its own critical item without circular needs-edge on this parent.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "User discontinued the entire memory-governance workstream; this deferred follow-up is cancelled with the parent and requires no further decision.",
+        "summary": "Final window disposition tracked as memory-claude-window-final-disposition (parent w8)"
+      },
+      {
+        "created_at": "2026-08-05T22:13:15Z",
+        "from_item": "memory-rollout-v2-system-split-execution",
+        "id": 694,
+        "reason": "No deletions approved yet; formal none/approve-list decision after window close.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "User discontinued the entire memory-governance workstream; this deferred follow-up is cancelled with the parent and requires no further decision.",
+        "summary": "Deletion ledger disposition tracked as memory-claude-deletion-ledger-decision (parent w7)"
+      },
+      {
+        "created_at": "2026-08-05T22:13:17Z",
+        "from_item": "memory-rollout-v2-system-split-execution",
+        "id": 695,
+        "reason": "live-mutation-authorization.md still DRAFT UNSIGNED after swap.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "User discontinued the entire memory-governance workstream; this deferred follow-up is cancelled with the parent and requires no further decision.",
+        "summary": "Auth doc close-out tracked as memory-claude-auth-doc-finalization"
+      },
+      {
+        "created_at": "2026-08-05T22:13:19Z",
+        "from_item": "memory-rollout-v2-system-split-execution",
+        "id": 696,
+        "reason": "Defect #10; option A accepted operationally without option C recalibration.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "User discontinued the entire memory-governance workstream; this deferred follow-up is cancelled with the parent and requires no further decision.",
+        "summary": "Monitor MEMORY.md index false-positive tracked as memory-monitor-index-update-classification"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "needs_item": "memory-rollout-tooling-prerequisites"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Batch blocker: w7/w8 and four open deferrals require separate Joe approvals and final acceptance; work order forbids live mutation without exact current authorization.",
+      "category": "Operations",
+      "created_at": "2026-07-29T12:18:27Z",
+      "worktree": "memory-rollout"
+    },
+    "preserves": [
+      {
+        "behavior": "Codex and Claude rollout identity, approval, backup, canary, swap, cleanup, monitoring, and acceptance are independent",
+        "item_id": "memory-rollout-v2-system-split-execution"
+      },
+      {
+        "behavior": "Dry-run and isolated fixture behavior remain the default; live apply fails closed without exact current authorization",
+        "item_id": "memory-rollout-v2-system-split-execution"
+      },
+      {
+        "behavior": "Every live target is exact and every operation token binds operation, target, and reviewed manifest",
+        "item_id": "memory-rollout-v2-system-split-execution"
+      },
+      {
+        "behavior": "Source sessions, transcripts, histories, credentials, and ambiguous paths are never cleanup targets",
+        "item_id": "memory-rollout-v2-system-split-execution"
+      },
+      {
+        "behavior": "The current no-promote state blocks every live operation until a named system has a passing packet and explicit Joe approval",
+        "item_id": "memory-rollout-v2-system-split-execution"
+      },
+      {
+        "behavior": "The last verified backup remains byte-recoverable until final acceptance and approved retention expiry",
+        "item_id": "memory-rollout-v2-system-split-execution"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Human gate and cleanup safety contract",
+        "decision": "extend",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "path": "/Users/joe/Developer/memory-governance/docs/operations/memory-rollout.md"
+      },
+      {
+        "concept": "Exact-target dry-run plans, safe manifests, approval tokens, and canary blockers",
+        "decision": "extend",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "path": "/Users/joe/Developer/memory-governance/memory_tooling/src/memory_tooling/rollout.py"
+      },
+      {
+        "concept": "Fail-closed target, privacy, restore, token, symlink, and canary mutations",
+        "decision": "extend",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "path": "/Users/joe/Developer/memory-governance/memory_tooling/tests/test_rollout.py"
+      },
+      {
+        "concept": "Ordered Phase 4 and Phase 5 gates",
+        "decision": "reuse",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "path": "/Users/joe/Developer/memory-governance/reports/final-completion-plan.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/history.jsonl"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/sessions/**"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/archived_sessions/**"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/sessions/**"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "do_not_modify",
+        "path_glob": "/tmp/memory-behavioral-v3-raw/**"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/isolation-v3*.json"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v3/**"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/rollout/**"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/src/memory_tooling/audit.py"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/src/memory_tooling/rollout.py"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/tests/test_audit.py"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/tests/test_rollout.py"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "kind": "only_modify",
+        "path_glob": "reports/rollout/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling -- python -m pytest memory_tooling/tests/test_rollout.py memory_tooling/tests/test_audit.py -q",
+        "description": "Rollout and audit mutation suites pass",
+        "expected": "Broad targets, unresolved symlinks, unsafe manifests, stale hashes, wrong tokens, unsafe canaries, partial swaps, and unapproved deletes fail closed",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling -- python -m memory_tooling.rollout self-test-safety && uv run --project memory_tooling -- python -m memory_tooling.rollout self-test-restore",
+        "description": "Safety and isolated restore self-tests pass",
+        "expected": "Unsafe targets are rejected and temporary restored content is hash-identical",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling -- python -m memory_tooling.rollout verify-ledger --ledger reports/rollout/disposition-ledger.json --require-complete --reject-unapproved-delete",
+        "description": "Per-system disposition ledger is complete and contains no implicitly approved deletion",
+        "expected": "Every immutable-baseline file and semantic record has exactly one reviewed disposition; delete remains separately approved per entry",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling -- python -m memory_tooling.rollout self-test-lifecycle",
+        "description": "Backup, canary, atomic-swap, rollback, and monitoring fixture drills pass before live authorization",
+        "expected": "A temporary full lifecycle completes, injected failures restore hash-identical backups, and no home target changes",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && test -n \"$MEMORY_SYSTEM\" && test -f \"reports/rollout/$MEMORY_SYSTEM/final-acceptance.md\" && rg -q '^Live-mutation authorization:' \"reports/rollout/$MEMORY_SYSTEM/final-acceptance.md\" && rg -q '^Backup acceptance:' \"reports/rollout/$MEMORY_SYSTEM/final-acceptance.md\" && rg -q '^Canary acceptance:' \"reports/rollout/$MEMORY_SYSTEM/final-acceptance.md\" && rg -q '^Deletion-ledger decision:' \"reports/rollout/$MEMORY_SYSTEM/final-acceptance.md\" && rg -q '^Final acceptance:' \"reports/rollout/$MEMORY_SYSTEM/final-acceptance.md\"",
+        "description": "Named-system rollout report records every independent human gate and final state",
+        "expected": "The report names exact hashes and records accepted or rolled-back outcome for one system without inferring approval for the other",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "0069f66: rollout.py gains ledger_errors/build_ledger/build_record_ledger, atomic_swap + rollback (two-rename window, restores on any mismatch), monitoring_report, verify-ledger/build-ledger/self-test-lifecycle CLI. self-test-safety, self-test-restore, self-test-lifecycle all pass. 61 mutation tests: unapproved delete, unnamed approver, incomplete coverage, unknown disposition, missing rationale, duplicate path, unverifiable staged tree, double swap without accept, broad live target, hash-identical rollback. Fixed 2 self-inflicted defects the drill caught (home fingerprint scoped to */memory not all of ~/.claude/projects; ledger keyed on content hash not filename).",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "notes": null,
+        "started_at": "2026-08-04T13:11:52Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Implement and mutation-test fixture-only backup verification, loader-compatible canary staging, atomic swap, rollback, strict audit, deletion-ledger validation, and monitoring reports",
+        "wid": "w0"
+      },
+      {
+        "evidence": "0069f66: reports/rollout/claude/disposition-ledger.json (41 entries, 38 rewrite, 3 delete, 0 approved) + ledger-review.md. verify-ledger --require-complete exits 0; --reject-unapproved-delete exits 1 with LEDGER-007 x3, as designed. Finding: live store went 50->52 records in ~20min, so generate/review/approve/install is not a viable sequence; freshness must be re-asserted inside the swap window. No delete approved.",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "notes": null,
+        "started_at": "2026-08-04T13:11:55Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Generate and review a complete per-system source-to-candidate disposition ledger; leave every delete entry unapproved",
+        "wid": "w1"
+      },
+      {
+        "evidence": "c41979f: reports/rollout/claude/live-mutation-authorization.md — DRAFT, UNSIGNED. All contents filled in: 5 exact targets with measured tree hashes, settings explicitly out of scope, backup destination (~/.local/state/memory-governance/backups/, deliberately not /tmp), 48h canary window, 6 abort thresholds derived from the frozen v6 criteria, rollback owner, and the section-6 double freshness re-assertion. Signature block left blank; NO live file modified. Awaiting Joe's signature — the only part of this unit that is genuinely his.",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "notes": null,
+        "started_at": "2026-08-04T13:28:35Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "For one named promotion-eligible system, record Joe's exact live-mutation-boundary authorization, targets, hashes, settings, backup destination, canary window, abort thresholds, and rollback owner",
+        "wid": "w2"
+      },
+      {
+        "evidence": "b3d83d9: 6 trees backed up (codex 129 files + 5 claude project trees, 1.5MB) to ~/.local/state/memory-governance/backups/claude-20260804-1, each independently restore-drilled hash-identical. reports/rollout/claude/backup-20260804.json. Backup creation is non-mutating and needed no w2 signature. Joe's separate backup ACCEPTANCE still pending.",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "notes": null,
+        "started_at": "2026-08-04T15:01:33Z",
+        "started_branch": "fix/git-identity-cloud-rca-maiixe-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Create the content-safe backup and pass an isolated hash-identical restore drill; obtain separate Joe backup acceptance",
+        "wid": "w3"
+      },
+      {
+        "evidence": "b3d83d9: canary staged at ~/.local/state/memory-governance/canary/claude-20260804, outside live memory, live fingerprint unchanged. strict exit 0; snapshot 4cbf5909 == live, 52 == 52 records. reports/rollout/claude/canary-evidence.md: PRIV-001 pass, 0/52 automatic_current_context, 0/52 unscoped, 52/52 retrieval_terms, 42.4% smaller than live, tool_calls 1.00 in all v6 arms. Ledger rebuilt in-window: 0 proposed deletes, both gates exit 0 (vs 3 for a 20-min-stale candidate).",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "notes": null,
+        "started_at": "2026-08-04T15:01:36Z",
+        "started_branch": "fix/git-identity-cloud-rca-maiixe-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Stage loader-compatible canaries without replacing live memory and collect retrieval, authority, privacy, isolation, payload, and tool-amplification evidence",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Joe accepted the canary and authorized the install via explicit session directives (Proceed / Approved), then ran the swap command himself after the harness classifier declined agent execution. Canary evidence: reports/rollout/claude/canary-evidence.md; in-window regeneration to 53 records, snapshot f63642b8.",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "notes": null,
+        "started_at": "2026-08-04T23:16:41Z",
+        "started_branch": "fix/git-identity-cloud-rca-maiixe-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Record Joe's separate canary acceptance or rollback decision",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Swap executed 2026-08-04T23:07 by Joe running swap_driver.py: 5 atomic swaps (previous trees parked as memory.previous), 1 new todo-db install, freshness re-asserted in-window (f63642b8, 53==53), fresh 6-tree restore-drilled backup (claude-20260804-2) taken first, zero ledger deletions. All 6 installed + 5 parked trees independently re-verified hash-identical. Report: reports/rollout/claude/swap-report-20260804.json. Monitoring window 2026-08-04T23:13Z to 2026-08-06T23:13Z; w8 final acceptance is Joe's at window close.",
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "notes": null,
+        "started_at": "2026-08-04T23:16:46Z",
+        "started_branch": "fix/git-identity-cloud-rca-maiixe-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Perform one authorized atomic swap for the named system, verify loader and content identity immediately, and roll back on any mismatch",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "After separate per-entry Joe approval, dry-run and apply only the exact deletion or sanitization ledger and verify retained evidence",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-rollout-v2-system-split-execution",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Monitor for the agreed window and obtain Joe's final acceptance or restore the verified backup; repeat for the other system only under new approvals",
+        "wid": "w8"
+      }
+    ]
+  }
+}

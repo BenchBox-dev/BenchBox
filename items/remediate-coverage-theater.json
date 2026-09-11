@@ -1,0 +1,182 @@
+{
+  "description": "An audit of the test suite (14,765 tests, 68% coverage) found systematic\ncoverage theater - tests that inflate metrics without catching bugs.  The root\ncause is per-file coverage enforcement (via `test_check_per_file_coverage.py`\nand `test_check_module_coverage.py`) which incentivised an agent to produce 92\ncoverage-specific test files (`*coverage*.py`, `*wave_remaining*.py`) whose\ntests mock everything and assert only that mocks behave as configured.\n\nKey findings:\n- 79 files named `*coverage*.py` + 13 `*wave_remaining*.py` (92 total)\n- ~933 tests from these files, mostly mock-verify-mock tautologies\n- 1,366 `isinstance()` assertions across 295 files (many trivial)\n- Pattern: mock class -> call method -> assert mock returned what you told it to\n- Pattern: instantiate dataclass -> assert attributes equal constructor args\n- Pattern: 300-line fake framework (test_unified_frame_coverage.py) that\n  diverges from real API silently\n- Estimated meaningful coverage: 30-40% (vs reported 68%)\n\nThis TODO remediates in phases: first remove perverse incentives, then triage\nthe 92 files, then write replacement tests for critical paths.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add isinstance/is-not-None assertions as replacements",
+        "instead": "assert on computed values and behavior instead",
+        "item_id": "remediate-coverage-theater",
+        "why": "these are precisely the hollow assertions being removed"
+      },
+      {
+        "dont": "keep hollow tests 'just in case'",
+        "instead": "delete and replace with real tests",
+        "item_id": "remediate-coverage-theater",
+        "why": "false confidence from passing hollow tests is worse than no test at all"
+      },
+      {
+        "dont": "set per-file coverage thresholds",
+        "instead": "use a single suite-wide threshold",
+        "item_id": "remediate-coverage-theater",
+        "why": "this recreates the perverse incentive that caused the theater"
+      },
+      {
+        "dont": "write replacement tests that mock the database connection",
+        "instead": "use real in-memory connections instead",
+        "item_id": "remediate-coverage-theater",
+        "why": "mock connections are the root cause of the current theater"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "remediate-coverage-theater",
+        "id": 236,
+        "reason": "Lower priority - CLI setup is less critical than platform execution paths",
+        "resolution": "promoted",
+        "resolved_item": "rewrite-cli-setup-tests-to-use-real-config-files-instead-of",
+        "resolved_reason": null,
+        "summary": "Rewrite CLI setup tests to use real config files instead of 54 patches"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "remediate-coverage-theater",
+        "id": 237,
+        "reason": "Lower priority - tuning wizard is user-facing but not on critical path",
+        "resolution": "promoted",
+        "resolved_item": "rewrite-tuning-wizard-tests-to-use-real-unifiedtuningconfigu",
+        "resolved_reason": null,
+        "summary": "Rewrite tuning wizard tests to use real UnifiedTuningConfiguration objects"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "remediate-coverage-theater",
+        "id": 238,
+        "reason": "Requires TPC binary availability - harder to test in CI",
+        "resolution": "promoted",
+        "resolved_item": "rewrite-generator-tests-to-use-real-tpc-binary-integration-l",
+        "resolved_reason": null,
+        "summary": "Rewrite generator tests to use real TPC binary (integration-level)"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-03-05T00:00:00Z",
+      "created_at": "2026-03-05T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All e2e tests (tests/e2e/) must continue to pass unchanged",
+        "item_id": "remediate-coverage-theater"
+      },
+      {
+        "behavior": "All existing integration tests (tests/integration/) must continue to pass unchanged",
+        "item_id": "remediate-coverage-theater"
+      },
+      {
+        "behavior": "Coverage number may drop - this is expected and correct",
+        "item_id": "remediate-coverage-theater"
+      },
+      {
+        "behavior": "tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py must be kept (has real Polars execution)",
+        "item_id": "remediate-coverage-theater"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remediate-coverage-theater",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "remediate-coverage-theater",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "remediate-coverage-theater",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "remediate-coverage-theater",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "remediate-coverage-theater",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remediate-coverage-theater",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove per-file coverage enforcement and replace with suite-wide threshold",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-coverage-theater",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Triage the 92 coverage/wave_remaining test files into delete/keep/rewrite buckets",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-coverage-theater",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete files triaged as DELETE and verify suite still passes",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-coverage-theater",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write behavior-verifying tests for platform adapters (DuckDB, SQLite, DataFusion)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-coverage-theater",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write file-based credential tests to replace mock CredentialManager tests",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-coverage-theater",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add mutation testing for critical modules to measure test effectiveness",
+        "wid": "w6"
+      }
+    ]
+  }
+}

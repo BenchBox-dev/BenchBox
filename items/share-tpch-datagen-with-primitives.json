@@ -1,0 +1,10 @@
+{
+  "description": "\"Fixed critical issues where Primitives benchmark was creating duplicate TPC-H data in primitives_sf* directories and corrupting shared TPC-H manifests. Implemented data sharing infrastructure allowing Primitives to automatically use TPC-H data from tpch_sf* directories. Added comprehensive documentation and 12 new tests covering data sharing, manifest isolation, and CLI orchestrator behavior.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (Should-Fix Before Release)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

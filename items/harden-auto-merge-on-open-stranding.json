@@ -1,0 +1,150 @@
+{
+  "description": "Source: results-explorer/publication remediation re-review (2026-07-06).\n\nSymptom (confirmed, not hypothesised): three separate fixes were committed on\nfeature branches and their PRs treated as landed, yet the fix content never\nreached merged `origin/develop` and had to be re-landed:\n  - §2.7 submission self-green guard — re-landed via #986.\n  - §2.16 QA-plan reusability (stranded commit cf394466) — re-landed via #996.\n  - §2.22 explorer-test relocation (stranded commits 4865a2f2 + 33687637) —\n    re-landed via #997.\nThe common factor is the `auto-merge-on-open.yml` flow, which auto-enables\nsquash auto-merge the moment a PR opens. The re-review found each fix ABSENT\nfrom develop despite the originating session believing it merged. The exact\nmechanism was never established — this item is diagnose-first, guard-second.\n\nRisk if left alone: silent recurrence. A future PR can be reported \"merged\"\nwhile a subset of its intended changes is orphaned, so a closed/DONE item is\nnot actually live — the most dangerous class of drift because nothing flags it.\n\nNOTE: `.github/workflows/auto-merge-on-open.yml` is CODEOWNERS-gated\n(@joeharris76). Any workflow change in w1 waits for Code Owner review — do not\nexpect squash auto-merge on this item's own PR for that path.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "disable auto-merge-on-open to 'fix' this",
+        "instead": "(not specified)",
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "why": "the flow is high-value; add detection, not a process regression."
+      },
+      {
+        "dont": "guess the mechanism and build a guard for it",
+        "instead": "(not specified)",
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "why": "4 distinct causes are plausible; w0's forensic verdict gates w1."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-06T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "CODEOWNERS review on soundness/self-protection workflow paths.",
+        "item_id": "harden-auto-merge-on-open-stranding"
+      },
+      {
+        "behavior": "The one-PR-per-fix squash-auto-merge dev flow (do not disable auto-merge wholesale to fix a detection gap).",
+        "item_id": "harden-auto-merge-on-open-stranding"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/auto-merge-on-open.yml — the flow under investigation; the guard in w1 extends or gates this (CODEOWNERS-protected).",
+        "decision": "reuse",
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "path": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "concept": ".github/workflows/develop-post-merge.yml — existing post-merge hook; the natural home for a merged-tree-vs-PR-head assertion (w1 option a).",
+        "decision": "reuse",
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "path": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "concept": "PRs #986 / #996 / #997 — the three re-landings; their diffs are the ground truth for what was stranded (w0 forensic input).",
+        "decision": "reuse",
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "path": "PRs"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/orphaned-commit-detector.yml"
+      },
+      {
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      },
+      {
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/analysis/auto-merge-stranding-forensic.md && grep -cE '#986|#996|#997' _project/analysis/auto-merge-stranding-forensic.md",
+        "description": "w0: a committed forensic file records a per-case merged-vs-head verdict for all 3 stranded fixes",
+        "expected": ">= 3 (the file exists with a verdict block per case; absent until w0 is done, so this fails-closed before then)",
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git grep -lE 'stranded|orphan|merged.*head|head.*merged' -- .github/workflows/ _project/scripts/ tests/ 2>/dev/null",
+        "description": "w1: a guard/detector plus a test exists for the confirmed mechanism",
+        "expected": "at least one guard/detector implementation + test (once w1 lands)",
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "notes": "For each of §2.7 (#986), §2.16 (#996, stranded cf394466), §2.22 (#997,\nstranded 4865a2f2/33687637), reconstruct from git + GitHub history: the\noriginal PR number, the SHA auto-merge actually merged, the branch's head\nSHA at merge time, and whether the fix commit predated or postdated the\nmerged snapshot. Test the concrete hypotheses:\n  (a) auto-merge merged a base/snapshot that predated the fix commit\n      (commits pushed after auto-merge was enabled but merged from an\n      earlier point);\n  (b) the PR was closed (not merged) with the branch's commits abandoned;\n  (c) a rebase/force-push or a superseding PR dropped the commit;\n  (d) the squash captured only a subset of the branch's commits.\nWrite a compact committed summary to\n`_project/analysis/auto-merge-stranding-forensic.md` — one block per case\n(§2.7/#986, §2.16/#996, §2.22/#997) with: original PR#, the SHA auto-merge\nmerged, the branch head SHA at merge, and the verdict (which hypothesis).\nRaw logs go to an ignored local path, not a committed transcript.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Forensically reconstruct why each of the 3 stranded fixes did not reach develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "harden-auto-merge-on-open-stranding",
+        "notes": "Design AFTER w0 identifies the mechanism. Candidate mechanisms (pick per\nroot cause, do not implement all):\n  - a `develop-post-merge.yml` assertion that the merged commit's tree\n    actually contains the merged PR head's diff (fail loudly on mismatch);\n  - an `auto-merge-on-open.yml` guard that only enables auto-merge when the\n    PR head is the branch tip AND refuses if the base is stale;\n  - a scheduled \"orphaned fix-commit\" detector that flags closed PR branches\n    whose unique commits never appear on develop.\nKeep it minimal and targeted at the confirmed cause; add a test.\n\nDEFERRED 2026-07-06 (w0 landed via the forensic PR without w1): w0's\nverdict (_project/analysis/auto-merge-stranding-forensic.md) rules OUT\nthe first two candidate mechanisms above — in all 3 confirmed cases there\nwas no open PR at merge time for the stranded commit to race against, so\nneither a merged-tree-vs-PR-head assertion in develop-post-merge.yml nor\na stale-base guard in auto-merge-on-open.yml would have caught any of\nthem. Only the third candidate (a scheduled orphaned-fix-commit detector\nthat diffs each closed-PR branch's current tip against develop) matches\nthe confirmed mechanism. That detector needs a NEW scheduled workflow\nfile, which this item's scope_limit.only_modify does not currently list\n(it names only the two existing workflow files) — widening scope and\npicking a concrete cadence/permissions design is a judgment call left for\na human decision before implementing, per the orchestrator's instruction\nto prefer a clean w0 PR over a speculative guard. w1 stays pending.\n\nDONE 2026-07-06: implemented the scheduled orphaned-fix-commit detector (the\nonly candidate matching w0's verdict). SCOPE WIDENED (approved this turn) to\nadd ONE new workflow file — a fresh `.github/workflows/orphaned-commit-detector.yml`,\nwhich is NOT CODEOWNERS-gated (CODEOWNERS covers only auto-merge-on-open.yml\nand release.yml), so no code-owner review is required and it can auto-merge.\nDeliverables:\n  - _project/scripts/detect_orphaned_commits.py: for every branch whose PR\n    merged, flags commits in `<merged-PR-head>..origin/<branch>` not on\n    develop (squash-proof — compares against the API-reported pre-squash\n    head, never patch-ids). Pure logic split out for unit testing.\n  - _project/analysis/known-stranded-commits.txt: allowlist of the 4\n    historical resolved orphans (43c4f689/cf394466/4865a2f2/33687637) so the\n    detector fails only on NEW occurrences.\n  - .github/workflows/orphaned-commit-detector.yml: weekly + dispatch +\n    on-change; fetches all branches and runs the detector with a read-only\n    pull-requests token.\n  - tests/unit/workflows/test_detect_orphaned_commits.py: 12 tests pinning\n    allowlist parsing + new-vs-acknowledged classification.\nVerified locally: with the governance branch's merged head, the detector\nreturns exactly the two §2.22 orphans, which the allowlist then suppresses.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a guard/detector so a stranded fix cannot merge-then-vanish silently",
+        "wid": "w1"
+      }
+    ]
+  }
+}

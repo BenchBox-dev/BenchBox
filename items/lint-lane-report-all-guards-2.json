@@ -1,0 +1,179 @@
+{
+  "description": "WS4 of _project/planning/ci-failure-reduction-plan.md. The pr.yml lint job runs ~15 independent guards sequentially and stops at the first failure, so a PR with multiple guard misses pays one full CI cycle (plus a triage wake) per discovery: fix ruff, push, discover timing-policy, push, discover compat-docs... Restructure so every independent guard runs with continue-on-error: true (locally: accumulate exit codes), then one aggregator step fails the job if any guard failed and writes a consolidated pass/fail table to GITHUB_STEP_SUMMARY. Guards stay individually visible in the UI; the round-trip count for multi-guard misses drops to 1. Mirror the same accumulate-then-fail structure in the ci-lint make target.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Let the aggregator read step outcomes by hand-listing step ids",
+        "instead": "Derive the guard set programmatically (steps context iteration or a naming convention checked by the parity test)",
+        "item_id": "lint-lane-report-all-guards-2",
+        "why": "New guards would silently escape aggregation"
+      },
+      {
+        "dont": "Merge all guards into one opaque mega-script step",
+        "instead": "Keep one step per guard with continue-on-error + a final aggregator",
+        "item_id": "lint-lane-report-all-guards-2",
+        "why": "Loses per-guard visibility and step-level timing in the Actions UI"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "lint-lane-report-all-guards-2",
+        "needs_item": "ci-lint-parity-pin-2"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-07-24T01:32:38Z",
+      "completed_pr": 1295,
+      "created_at": "2026-07-23T13:51:13Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Each guard's individual pass/fail remains visible per-step in the Actions UI",
+        "item_id": "lint-lane-report-all-guards-2"
+      },
+      {
+        "behavior": "The lint job remains a required (blocking) member of ci-required-result - aggregation must not soften the gate",
+        "item_id": "lint-lane-report-all-guards-2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "lint-lane-report-all-guards-2",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "lint-lane-report-all-guards-2",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "lint-lane-report-all-guards-2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "lint-lane-report-all-guards-2",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "lint-lane-report-all-guards-2",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "lint-lane-report-all-guards-2",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "lint-lane-report-all-guards-2",
+        "kind": "only_modify",
+        "path_glob": "tests/system/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/system/test_ci_lint_parity.py -q",
+        "description": "Parity test still passes after restructure",
+        "expected": "passed",
+        "item_id": "lint-lane-report-all-guards-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -q 'lint-guard-summary' .github/workflows/pr.yml",
+        "description": "Aggregator step exists in the lint job",
+        "expected": "exit 0 (fails today; passes once the aggregator lands)",
+        "item_id": "lint-lane-report-all-guards-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "MANUAL: on a scratch branch, inject two trivial guard breaks (e.g. a ruff violation + a stale dependency inventory), run make ci-lint, confirm BOTH are reported in one run and exit is nonzero",
+        "expected": null,
+        "item_id": "lint-lane-report-all-guards-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "lint-lane-report-all-guards-2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "lint-lane-report-all-guards-2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "lint-lane-report-all-guards-2",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "lint-lane-report-all-guards-2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "re-validated on develop 7c273416 pre-change: code-lint job had 15 sequential guard steps, none with continue-on-error, fail-fast confirmed (base pr.yml read during restructure); guard count matches the item's ~15 claim",
+        "item_id": "lint-lane-report-all-guards-2",
+        "notes": null,
+        "started_at": "2026-07-24T01:26:49Z",
+        "started_branch": "chore/lint-lane-report-all",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-reportall",
+        "status": "done",
+        "summary": "Re-validate evidence: recount the pr.yml lint job's independent guard steps and confirm the job is still fail-fast sequential on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "pr.yml code-lint: 15 guard steps get id guard-<slug> + continue-on-error:true (setup steps untouched); lint-guard-summary aggregator (if always, jq over toJSON(steps) via env var, filters guard- prefix on OUTCOME, GITHUB_STEP_SUMMARY table, exit 1 on any failure); no hand-listed ids; commands/names byte-identical",
+        "item_id": "lint-lane-report-all-guards-2",
+        "notes": "Name the aggregator step 'lint-guard-summary' (grep marker for verification seq2). Steps context cannot iterate outcomes generically - use a naming convention (all guard steps share an id prefix) and have the parity pin test assert every guard step carries the prefix, so new guards cannot silently escape aggregation.",
+        "started_at": "2026-07-24T01:26:53Z",
+        "started_branch": "chore/lint-lane-report-all",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-reportall",
+        "status": "done",
+        "summary": "Restructure pr.yml lint job: per-guard continue-on-error + aggregator step with GITHUB_STEP_SUMMARY table",
+        "wid": "w1"
+      },
+      {
+        "evidence": "ci-lint recipe: single set +e shell, per-guard rc accumulation, consolidated FAILED-guards line, nonzero iff any failed, output streams live; guard commands byte-identical modulo trailing continuation",
+        "item_id": "lint-lane-report-all-guards-2",
+        "notes": null,
+        "started_at": "2026-07-24T01:26:58Z",
+        "started_branch": "chore/lint-lane-report-all",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-reportall",
+        "status": "done",
+        "summary": "Mirror accumulate-then-fail in the ci-lint make recipe (report all failing guards, exit nonzero once)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "parity test extended to 4 tests (medium): naming-convention + aggregator-exists assertions; normalizer strips trailing continuations; 4 passed. Two-failure proof: scratch ruff F401 + codespell hit -> single run reported both (FAILED guards: ruff-check spellcheck, exit=2); reverted; clean run exit 0",
+        "item_id": "lint-lane-report-all-guards-2",
+        "notes": null,
+        "started_at": "2026-07-24T01:27:02Z",
+        "started_branch": "chore/lint-lane-report-all",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-reportall",
+        "status": "done",
+        "summary": "Update/verify the ci-lint parity pin test against the restructured job",
+        "wid": "w3"
+      }
+    ]
+  }
+}

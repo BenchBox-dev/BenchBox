@@ -1,0 +1,237 @@
+{
+  "context": "Define route ownership explicitly: internal /results routes use SPA navigation; /docs and other site-owned routes force native navigation; known legacy platform spellings canonicalize once; unknown IDs/slugs render a stable error with actionable recovery. Exercise real clicks and direct HTTP routes against both the browser-test server and a Pages-shaped root 404 artifact.",
+  "description": "Real-browser review reproduced two flywheel documentation CTAs being intercepted by preact-router and rendered as Explorer 404s. It also confirmed weak recovery for an invalid result ID and a phantom platform option for underscore-form slugs. The workflow-generated Pages fallback itself worked, and unknown-benchmark title handling was correct. Consolidate the real routing defects while adding regression coverage for the claims that were refuted.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "canonicalize every underscore to a hyphen globally",
+        "instead": "use the platform registry or an explicit alias map at the platform-route boundary",
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "why": "benchmark/result identifiers may legitimately contain underscores"
+      },
+      {
+        "dont": "fix the CTA test by dispatching synthetic click or popstate events",
+        "instead": "use Playwright locator.click and assert the loaded document content and network request",
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "why": "the defect depends on the router's real global click delegation"
+      },
+      {
+        "dont": "replace actionable route errors with silent redirects",
+        "instead": "canonicalize known aliases and show recovery controls for genuinely unknown IDs",
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "why": "stale shared links need a clear explanation and recovery path"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend Reliability",
+      "completed_at": "2026-08-02T13:25:26Z",
+      "completed_pr": 1473,
+      "created_at": "2026-08-02T04:27:32Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Canonical internal /results links remain client-side and retain base-path behavior.",
+        "item_id": "results-explorer-route-navigation-recovery-hardening"
+      },
+      {
+        "behavior": "Canonical platform IDs in data and URLs are not rewritten merely for display.",
+        "item_id": "results-explorer-route-navigation-recovery-hardening"
+      },
+      {
+        "behavior": "No redirect loop, history duplication, or phantom switcher option is introduced.",
+        "item_id": "results-explorer-route-navigation-recovery-hardening"
+      },
+      {
+        "behavior": "The global header's already-correct absolute documentation links remain correct.",
+        "item_id": "results-explorer-route-navigation-recovery-hardening"
+      },
+      {
+        "behavior": "Unknown benchmark routes keep the non-leaking Not found document title and Back to Results recovery.",
+        "item_id": "results-explorer-route-navigation-recovery-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Extend the existing direct-route matrix with real-click and Pages-shaped assertions.",
+        "decision": "extend",
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "path": "results-explorer/e2e/routes/direct-route.spec.ts"
+      },
+      {
+        "concept": "Reuse the canonical absolute documentation destinations already used by the header.",
+        "decision": "reuse",
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "path": "results-explorer/src/config/headerContract.ts"
+      },
+      {
+        "concept": "Reuse the established not-found title and recovery presentation rather than inventing route-specific error chrome.",
+        "decision": "reuse",
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "path": "results-explorer/src/pages/NotFound.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/failures/**"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/**"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/serve-browser-tests.mjs"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/**"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/NotFound.tsx"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'from pathlib import Path; t=Path(\"results-explorer/src/pages/Home.tsx\").read_text(); block=t.split(\"const FLYWHEEL_STEPS\",1)[1]; assert \"data-native\" in block or \"https://benchbox.dev/docs/\" in block'",
+        "description": "Flywheel docs links are explicitly native or absolute",
+        "expected": "Fails on the unfixed tree; exits 0 when the flywheel documentation links bypass SPA routing.",
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/Home.test.tsx src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/NotFound.test.tsx",
+        "description": "Focused route and component regressions pass",
+        "expected": "Unit tests cover native docs links, canonical platform aliases, invalid-result recovery, and stable unknown-route titles.",
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --workers=1 e2e/routes/direct-route.spec.ts",
+        "description": "Real-click and direct-route browser tests pass",
+        "expected": "Both flywheel clicks load docs, canonical routes render, unknown routes recover, and the Pages-shaped fallback serves the SPA.",
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Frozen scope from live source: external docs CTAs are only in Home FLYWHEEL_STEPS; preact-router handles same-origin links, while Layout header already uses absolute docs links. PlatformIndex currently derives switcher options from raw data and route; NotFound already has title and Back to Results. Existing direct-route and focused unit specs identified for real regression coverage.",
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "notes": "Document internal SPA routes, site-native routes, registered platform slugs, accepted legacy aliases, and unknown-route outcomes. Verify behavior at /results/, /results/p/<slug>/, /results/r/<id>, and /docs under a non-root base.",
+        "started_at": "2026-08-02T13:18:30Z",
+        "started_branch": "fix/results-explorer-route-recovery",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Freeze route ownership, canonical aliases, and recovery behavior",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Home Flywheel docs links now carry data-native=true so preact-router bypasses interception; Home focused test passes 27/27 and asserts native only on docs links.",
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "notes": "Reuse canonical header destinations or add the router's native-navigation marker. Unit tests assert markup; browser tests must click both CTAs and prove the docs document loads rather than merely checking the URL.",
+        "started_at": "2026-08-02T13:18:36Z",
+        "started_branch": "fix/results-explorer-route-recovery",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Make flywheel documentation CTAs perform native navigation",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PlatformIndex has an explicit clickhouse_local -> clickhouse-local alias map, replaces the URL with route(..., true), and derives switcher options from canonical data IDs; ResultDetail invalid/stale IDs now render Breadcrumb + Back to Results recovery. Typecheck and focused Platform/ResultDetail/NotFound tests pass (46 tests).",
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "notes": "Map clickhouse_local to the registered clickhouse-local route without injecting an option, and provide Back to Results plus Browse/Query recovery for a missing result. Preserve an explicit error for unknown non-alias slugs.",
+        "started_at": "2026-08-02T13:21:05Z",
+        "started_branch": "fix/results-explorer-route-recovery",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Canonicalize known platform aliases and improve invalid-result recovery",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Built generated fixture corpus and ran Playwright Chromium direct-route matrix against an isolated Pages-shaped server (E2E_FIXTURE_DIR + port 4323): 5/5 passed, including real locator.click docs CTA navigation, canonical platform routes, direct benchmark/query/compare routes, and warning copy.",
+        "item_id": "results-explorer-route-navigation-recovery-hardening",
+        "notes": "Assemble the root 404 artifact exactly as deployment does and run real direct requests/clicks. Assert title, H1, final URL, network target, history behavior, no console error, and no raw-slug title leak.",
+        "started_at": "2026-08-02T13:21:43Z",
+        "started_branch": "fix/results-explorer-route-recovery",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Run the direct-route matrix against a Pages-shaped server",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,326 @@
+{
+  "context": "Build an executable production-readiness matrix rather than a documentation-only checklist. Exercise the official MCP conformance suite plus mcp-explorer smoke coverage for modern and chosen legacy modes. Run protocol calls across two workers with a shared job/quota backend. Add SDK OpenTelemetry spans and W3C propagation with bounded, redacted attributes. Define explicit cache-control policy per endpoint/data class and prove private data cannot enter shared caches. Keep json_response disabled unless progress/notification requirements are resolved. Publish remote deployment documentation only after every required gate is automated or carries named external evidence.",
+  "description": "Complete the move from localhost-capable Streamable HTTP to an operable shared service. The gate must prove MCP 2026-07-28 conformance, alternating-worker behavior, authentication and tenant isolation, workload limits, durable jobs, and safe telemetry. It must also define cacheability by data class: stable discovery metadata may use shared long-lived caching, while recent results and system-profile data remain private or short-lived. Replace reliance on the currently unused process-global metrics collector with SDK/OpenTelemetry and W3C trace propagation where appropriate.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "publish remote endpoint instructions before the gate is satisfied",
+        "instead": "keep localhost docs until current acceptance evidence exists",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "why": "documentation would encourage unsafe exposure"
+      },
+      {
+        "dont": "share-cache recent results or system profiles",
+        "instead": "use private/no-store or explicitly bounded per-principal caching",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "why": "those responses can be tenant-specific or sensitive"
+      },
+      {
+        "dont": "treat a green unit suite as MCP conformance or production certification",
+        "instead": "require the executable multi-layer acceptance matrix",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "why": "protocol, proxy, worker, security, and durability failures occur above the unit boundary"
+      },
+      {
+        "dont": "use the process-global MCP metrics collector as cross-worker truth",
+        "instead": "export SDK/OpenTelemetry signals to shared observability infrastructure",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "why": "it resets on restart and fragments by worker"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "needs_item": "mcp-durable-benchmark-job-handles"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "needs_item": "mcp-http-auth-tenancy-admission-controls"
+      }
+    ],
+    "item_meta": {
+      "category": "operations",
+      "created_at": "2026-08-01T15:44:58Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "A pending or failed gate cannot be described as production-ready or publicly deployed",
+        "item_id": "mcp-stateless-production-readiness-gate"
+      },
+      {
+        "behavior": "Progress notifications and future streaming remain possible unless a separate decision approves JSON-only responses",
+        "item_id": "mcp-stateless-production-readiness-gate"
+      },
+      {
+        "behavior": "Sensitive result, system-profile, identity, and authorization data never enters a shared cache",
+        "item_id": "mcp-stateless-production-readiness-gate"
+      },
+      {
+        "behavior": "Telemetry contains no credentials, raw database URLs, unbounded tool arguments, or result payloads",
+        "item_id": "mcp-stateless-production-readiness-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "currently unused process-global MCP metrics collector",
+        "decision": "supersede",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "path": "benchbox/mcp/observability.py"
+      },
+      {
+        "concept": "compact Python SDK 2 Streamable HTTP integration example",
+        "decision": "reuse",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "path": "https://github.com/datasette/datasette-mcp"
+      },
+      {
+        "concept": "modern and legacy MCP smoke exploration",
+        "decision": "reuse",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "path": "https://github.com/simonw/mcp-explorer"
+      },
+      {
+        "concept": "existing focused MCP regression suite",
+        "decision": "extend",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "path": "tests/unit/mcp"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/benchmarks/**"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp*.md"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp*.md"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "kind": "only_modify",
+        "path_glob": "scripts/verify_mcp_conformance.py"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/**"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/verify_mcp_conformance.py --protocol-version 2026-07-28",
+        "description": "Official MCP 2026-07-28 conformance passes",
+        "expected": "the pinned official conformance suite reports all required server checks passing",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_protocol_compatibility.py -q",
+        "description": "Modern and supported legacy smoke scenarios pass",
+        "expected": "modern sessionless and explicitly supported legacy scenarios pass",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_multiworker_acceptance.py -q",
+        "description": "Alternating-worker production acceptance passes",
+        "expected": "auth, tenancy, quotas, durable jobs, cancellation, and artifacts work across two workers",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_observability_and_cache.py -q",
+        "description": "Telemetry and cache policy tests detect no secret or cross-tenant leakage",
+        "expected": "trace attributes are bounded/redacted and private data never enters shared caches",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp tests/integration/mcp -q",
+        "description": "Focused MCP suites remain green",
+        "expected": "all MCP unit and integration tests pass",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/mcp tests/unit/mcp tests/integration/mcp scripts/verify_mcp_conformance.py && uv run -- ty check",
+        "description": "Repository static checks pass",
+        "expected": "Ruff and ty exit successfully",
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Define the production acceptance matrix, supported protocol versions, legacy policy, and evidence owners",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add SDK OpenTelemetry and W3C trace propagation with redacted bounded attributes",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Classify discovery, prompt, tool, result, and system-profile responses by cacheability and implement cache controls",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Pin the upstream conformance and mcp-explorer revisions, then automate MCP 2026-07-28 modern/legacy smoke tests",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run alternating-worker acceptance for auth, tenancy, quotas, durable jobs, cancellation, and artifact access",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document TLS proxying, secure configuration, storage/queue dependencies, scaling, rollback, and incident diagnostics",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-stateless-production-readiness-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Block shared-endpoint publication until every automated and external acceptance gate has current evidence",
+        "wid": "w7"
+      }
+    ]
+  }
+}

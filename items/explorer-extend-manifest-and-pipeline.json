@@ -1,0 +1,251 @@
+{
+  "context": "Source-map first (w1): walk the bundle schema and write down exactly which\nbundle key maps to which manifest field. Avoids guessing during implementation.\n\nCompute geomean_ms at transform time, not in the browser. The browser DuckDB\ncan do it in a query, but pre-computing it means it's available in the JSON\nmanifest and in sort/filter without DuckDB being loaded.\n\ntuning_hash: short SHA256 prefix of the serialized tuning config dict (or\ntuning mode string if no detail is available). Purpose is grouping, not\ncryptographic identity - 8 hex chars is enough.\n\ntest_type: infer from which phases are present in the bundle. If\nphases.power_test is populated → \"power\"; if phases.throughput_test → \"throughput\";\nif both → \"power\" (primary). If neither, leave null.\n",
+  "description": "Post-launch audit (2026-04-14) found that the Phase 1 pipeline transformer\nemits only 11 manifest fields from a bundle that contains 13 blocks and\n50+ fields. This silently drops execution_mode, tuning_mode, platform_version,\ntest_type, validation_status, cost_usd, and the per-query run_type/iter/stream\nfields needed for warmup vs measurement distinction.\n\nThe DuckDB `results` table has 11 columns; all other fidelity TODOs\n(methodology disclosure, tuning visibility, comparability warnings, charts)\ndepend on these fields reaching the manifest and DuckDB schema first.\n\nTarget manifest additions (all sourced from existing bundle fields):\n  - geomean_ms          - exp(mean(ln(query_ms))) across measurement queries\n  - execution_mode      - \"sql\" | \"dataframe\" from config.mode\n  - tuning_mode         - \"tuned\" | \"notuning\" | \"auto\" from config.tuning_mode\n  - tuning_hash         - stable short hash of tuning config for grouping\n  - platform_version    - platform.version (distinct from driver_version)\n  - test_type           - \"power\" | \"throughput\" from phases\n  - validation_status   - summary.validation.status\n  - cost_usd            - cost.total_usd (null if absent)\n\nTarget query record additions:\n  - run_type            - \"warmup\" | \"measurement\" per query timing entry\n  - iter, stream        - iteration and stream IDs",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add UI changes in this TODO",
+        "instead": "UI consumption comes in follow-up TODOs",
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "why": "this is a pipeline/data-model change only"
+      },
+      {
+        "dont": "change the tuning_hash algorithm without updating all callers",
+        "instead": "stability matters more than hash quality",
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "why": "it is used for grouping across results"
+      },
+      {
+        "dont": "error on missing fields",
+        "instead": "null-safe extraction throughout",
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "why": "older bundles predate many fields"
+      },
+      {
+        "dont": "recompute geomean_ms in every browser query",
+        "instead": "add it to the manifest at build time",
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "why": "it should be precomputed"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-14T00:00:00Z",
+      "created_at": "2026-04-14T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing DuckDB column names - extend schema with new columns only",
+        "item_id": "explorer-extend-manifest-and-pipeline"
+      },
+      {
+        "behavior": "Existing manifest field names and types - add fields, never rename or remove",
+        "item_id": "explorer-extend-manifest-and-pipeline"
+      },
+      {
+        "behavior": "Explorer pages render correctly for bundles that have no tuning config, no cost data, or no run_type on queries",
+        "item_id": "explorer-extend-manifest-and-pipeline"
+      },
+      {
+        "behavior": "Null-safety for older bundles that predate any new field - missing → null, not error",
+        "item_id": "explorer-extend-manifest-and-pipeline"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/schema.py (bundle schema is read-only here)"
+      },
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/components/ (no UI changes in this TODO)"
+      },
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/ (no UI changes in this TODO)"
+      },
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/types.ts"
+      },
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ -q",
+        "description": "All pipeline unit tests pass",
+        "expected": "all tests pass",
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python -c \"import json; m=json.load(open('results-explorer/public/data/manifest.json')); r=m['results'][0]; assert 'geomean_ms' in r and 'execution_mode' in r and 'tuning_mode' in r, r.keys()\"",
+        "description": "Regenerated manifest contains new fields for existing bundles",
+        "expected": "(no assertion error)",
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import duckdb; con=duckdb.connect('results-explorer/public/data/results.duckdb'); print([c[0] for c in con.execute('PRAGMA table_info(results)').fetchall()])\"",
+        "description": "DuckDB results table has new columns",
+        "expected": "list includes geomean_ms, execution_mode, tuning_mode, validation_status",
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite unaffected",
+        "expected": "all tests pass",
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Audit transformer.py and models.py: map each target field to its bundle source path; document any fields that require computation (geomean_ms, tuning_hash) vs direct extraction.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add geomean_ms computation to transformer.py: exp(mean(ln(ms))) over measurement-only queries (run_type=measurement or all if run_type absent). Add to ManifestResult and DetailResult models.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add execution_mode, tuning_mode, tuning_hash, platform_version, test_type, validation_status, cost_usd to ManifestResult and DetailResult. Null-safe for older bundles.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add run_type, iter, stream to QueryTiming in detail JSON. Update transformer.py query extraction loop.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Extend DuckDB schema in duckdb_builder.py: add all new manifest columns to the results table; add run_type, iter, stream columns to queries table. Regenerate for existing corpus and verify.",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update TypeScript types.ts in results-explorer to match extended ManifestResult and DetailResult shapes. No UI changes - just type alignment.",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-extend-manifest-and-pipeline",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-run full pipeline over existing corpus; confirm no regressions in existing explorer pages; confirm new fields appear in manifest and DuckDB.",
+        "wid": "w7"
+      }
+    ]
+  }
+}

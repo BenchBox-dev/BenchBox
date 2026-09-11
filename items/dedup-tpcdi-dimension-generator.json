@@ -1,0 +1,95 @@
+{
+  "context": "Extract a `_generate_table(self, conn, table_name, num_records, insert_sql)`\nhelper that handles: progress logging, timing via mono_time/elapsed_seconds,\nconn.execute(insert_sql), stats dict updates (records_generated, tables_generated,\ngeneration_times, sql_operations), completion logging.\n\nThe helper should accept an optional `num_records` parameter. When provided,\nit is used for stats and logging. When None, the helper extracts the count\nfrom the query result (as generate_time_dimension currently does).\n\nEach of the 6 generator methods reduces to: compute count (if known),\nbuild SQL string, call self._generate_table(conn, \"TableName\", count, sql).\n",
+  "description": "Group 4 from the duplicate-check report identifies 6 methods with identical\nscaffolding in benchbox/core/tpcdi/generator/sql.py:\n- generate_time_dimension (line ~225)\n- generate_company_dimension (line 263)\n- generate_security_dimension (line 315)\n- generate_customer_dimension (line 359)\n- generate_account_dimension (line 427)\n- generate_trade_facts (line 467)\n\nAll 6 share the same pattern: progress log → mono_time() → conn.execute(sql)\n→ elapsed_seconds → stats update (4 keys) → completion log → return count.\nOnly the SQL INSERT body and record count computation differ.\n\nNote: generate_time_dimension extracts its record count from the query result\nrather than pre-computing it. generate_account_dimension derives its count\nfrom a formula (num_customers * 1.5) rather than base_X * scale_factor.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assume record count is always a pre-computed variable",
+        "instead": "the helper must accept an optional count and fall back to result extraction",
+        "item_id": "dedup-tpcdi-dimension-generator",
+        "why": "generate_time_dimension extracts it from the query result"
+      },
+      {
+        "dont": "hardcode count formula as base_X * scale_factor",
+        "instead": "each caller computes its own count before invoking the helper",
+        "item_id": "dedup-tpcdi-dimension-generator",
+        "why": "generate_account_dimension uses num_customers * 1.5"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-21T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Progress logging messages include table name and record count",
+        "item_id": "dedup-tpcdi-dimension-generator"
+      },
+      {
+        "behavior": "generate_time_dimension returns count extracted from query result, not pre-computed",
+        "item_id": "dedup-tpcdi-dimension-generator"
+      },
+      {
+        "behavior": "generation_stats dict populated identically after each dimension generation",
+        "item_id": "dedup-tpcdi-dimension-generator"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dedup-tpcdi-dimension-generator",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/generator/sql.py"
+      },
+      {
+        "item_id": "dedup-tpcdi-dimension-generator",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k tpcdi",
+        "description": "TPC-DI tests pass",
+        "expected": "all tests pass",
+        "item_id": "dedup-tpcdi-dimension-generator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dedup-tpcdi-dimension-generator",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dedup-tpcdi-dimension-generator",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _generate_table helper and refactor all 6 generator methods to use it",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-tpcdi-dimension-generator",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run TPC-DI tests to verify no regressions",
+        "wid": "w2"
+      }
+    ]
+  }
+}

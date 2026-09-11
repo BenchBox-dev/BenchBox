@@ -1,0 +1,76 @@
+{
+  "context": "Split the tuple into directory prefixes (trailing slash, matched with startswith) and exact files (matched with ==). Keep one public predicate. Extend the parametrized auto-mergeable list with the .bak/.example shapes so the distinction is pinned, and keep the 1:1 CODEOWNERS test passing.",
+  "description": "Codex P2 on PR #1529 (merged). is_soundness_path() passes the whole SOUNDNESS_PREFIXES tuple to str.startswith(), so entries documented and tested as EXACT FILES also match anything sharing that prefix: benchbox/core/results/anonymization.py.bak and benchbox/core/results/anonymization_specs.yaml.example are treated as review-required, while the corresponding CODEOWNERS patterns are exact and do not match them. That silently breaks the 1:1 gate/CODEOWNERS contract asserted by test_codeowners_matches_soundness_prefixes_1to1 and needlessly withholds auto-merge. Pre-existing for the other exact-file entries too (result_capture.py, resolver.py, decision.py, _registration.py, and the two workflow files); #1529 added two more instances rather than introducing the flaw. Note the existing test pins that result_capture_helpers.py does NOT match, which holds only because that name diverges before the extension - it does not cover the .bak/.example shape.",
+  "legacy": {
+    "item_meta": {
+      "category": "governance",
+      "created_at": "2026-08-04T17:16:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The 1:1 mirror with .github/CODEOWNERS",
+        "item_id": "soundness-path-prefix-not-exact-file"
+      },
+      {
+        "behavior": "The classifier stays self-protecting",
+        "item_id": "soundness-path-prefix-not-exact-file"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "soundness-path-prefix-not-exact-file",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/auto_merge_soundness_paths.py"
+      },
+      {
+        "item_id": "soundness-path-prefix-not-exact-file",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_auto_merge_soundness_paths.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py -q",
+        "description": "sibling files are not gated",
+        "expected": "Extend the auto-mergeable parametrization in w1",
+        "item_id": "soundness-path-prefix-not-exact-file",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "soundness-path-prefix-not-exact-file",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "soundness-path-prefix-not-exact-file",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Separate exact-file matching from directory-prefix matching",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "soundness-path-prefix-not-exact-file",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Pin the .bak/.example shapes as auto-mergeable",
+        "wid": "w1"
+      }
+    ]
+  }
+}

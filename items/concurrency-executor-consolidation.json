@@ -1,0 +1,167 @@
+{
+  "description": "There are three overlapping concurrent-stream executors plus a dead stub. This\nfragmentation is a maintenance and correctness hazard: fixes to one path (the\nproduction one) do not reach the others, and it is not obvious which is live.\n\n- LIVE: benchbox/core/throughput/runner.py:StreamRunner — the real executor\n  used by the CLI/adapter throughput path.\n- EFFECTIVELY DEAD: benchbox/utils/execution_manager.py:ConcurrentQueryExecutor\n  (+ PowerRunExecutor) — config-driven, reachable only through the stubbed\n  run_concurrent_streams paths below.\n- UNUSED EXTERNALLY: benchbox/core/tpc_patterns.py:StreamExecutor — a full\n  concurrent framework instantiated only inside its own module; external\n  consumers import only generate_official_benchmark_audit_trail from it.\n- NON-EXECUTING STUB: benchbox/core/tpch/streams.py:TPCHStreamRunner.run_stream\n  (~lines 431-454) counts `-- Query` comment lines and marks every query\n  successful WITHOUT executing SQL. Any path through\n  run_concurrent_streams (tpch/streams.py, and the parallel\n  tpcds/benchmark/runner.py:988-1011 path) measures nothing real. A test or\n  caller that reaches this reports fake success.\n\nFix: make StreamRunner the single throughput executor; delete or clearly\nquarantine the dead/unused executors; and either remove the non-executing\nstub or make it raise NotImplementedError so it cannot silently report fake\nsuccess.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete code that a passing test depends on without first proving the test is asserting fake success (the stub case).",
+        "instead": "(not specified)",
+        "item_id": "concurrency-executor-consolidation",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-09T00:00:00Z",
+      "created_at": "2026-07-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The production StreamRunner throughput path behavior.",
+        "item_id": "concurrency-executor-consolidation"
+      },
+      {
+        "behavior": "generate_official_benchmark_audit_trail (the one thing external code imports from tpc_patterns).",
+        "item_id": "concurrency-executor-consolidation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/unknown/planning/tpc-h-stream-processing-implementation.yaml — the completed item that originally filled these stubs; context for why they exist.",
+        "decision": "reuse",
+        "item_id": "concurrency-executor-consolidation",
+        "path": "_project/DONE/unknown/planning/tpc-h-stream-processing-implementation.yaml"
+      },
+      {
+        "concept": "benchbox/core/throughput/runner.py:StreamRunner — the canonical executor to standardize on.",
+        "decision": "reuse",
+        "item_id": "concurrency-executor-consolidation",
+        "path": "benchbox/core/throughput/runner.py:StreamRunner"
+      },
+      {
+        "concept": "benchbox/core/tpc_patterns.py:StreamExecutor — unused framework to retire or fold in.",
+        "decision": "reuse",
+        "item_id": "concurrency-executor-consolidation",
+        "path": "benchbox/core/tpc_patterns.py:StreamExecutor"
+      },
+      {
+        "concept": "benchbox/utils/execution_manager.py:ConcurrentQueryExecutor — legacy path to retire.",
+        "decision": "reuse",
+        "item_id": "concurrency-executor-consolidation",
+        "path": "benchbox/utils/execution_manager.py:ConcurrentQueryExecutor"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "concurrency-executor-consolidation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpc_patterns.py"
+      },
+      {
+        "item_id": "concurrency-executor-consolidation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/benchmark/runner.py"
+      },
+      {
+        "item_id": "concurrency-executor-consolidation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/streams.py"
+      },
+      {
+        "item_id": "concurrency-executor-consolidation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/execution_manager.py"
+      },
+      {
+        "item_id": "concurrency-executor-consolidation",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "concurrency-executor-consolidation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'stream' -v",
+        "description": "No production/test path reaches a non-executing stream stub",
+        "expected": "stream tests pass against real or explicitly-not-implemented paths",
+        "item_id": "concurrency-executor-consolidation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "concurrency-executor-consolidation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "concurrency-executor-consolidation",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "concurrency-executor-consolidation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "concurrency-executor-consolidation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "concurrency-executor-consolidation",
+        "notes": "grep + call-graph; captured to /tmp/concurrency-consolidation-w0.log. StreamRunner is the only live executor; ConcurrentQueryExecutor/PowerRunExecutor and the tpc_patterns.py framework have zero production callers; TPCHStreamRunner.run_stream and TPCDSBenchmark.run_streams/_execute_single_stream are non-executing comment-counting stubs reachable only from tests.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Map every caller of each executor and the stub; confirm which are truly reachable in production/tests",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "concurrency-executor-consolidation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Neutralize the non-executing run_stream stub (raise NotImplementedError or route to real execution)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "concurrency-executor-consolidation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retire ConcurrentQueryExecutor / PowerRunExecutor and StreamExecutor, or fold their unique value into StreamRunner",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "concurrency-executor-consolidation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update tests/docs that reference retired paths",
+        "wid": "w3"
+      }
+    ]
+  }
+}

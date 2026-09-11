@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #370 of dataframe-test-coverage.\nDeferred: ClickBench dataframe queries (446 stmts, 30.5%)\nReason deferred: ClickBench uses a single wide table with specific data patterns. Testing requires the ClickBench dataset or representative fixtures. Lower priority - push after main targets are hit.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:52Z",
+      "worktree": "main"
+    }
+  }
+}

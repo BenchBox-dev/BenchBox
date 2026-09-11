@@ -1,0 +1,153 @@
+{
+  "context": "Two-line removal in pyproject.toml. Verify by building the docs.\n",
+  "description": "Two Sphinx-related deps are declared but inert:\n\n- `sphinx-rtd-theme>=3.1.0` (`pyproject.toml` line 487) - `docs/conf.py`\n  sets `html_theme = \"furo\"`. The rtd theme is never loaded. Not\n  referenced anywhere in repo source.\n- `sphinx-copybutton>=0.5.2` (`pyproject.toml` line 491) - `docs/conf.py`\n  extensions list does **not** include `\"sphinx_copybutton\"`. The\n  package is installed but Sphinx will not activate it.\n\nTwo valid resolutions for each:\n  A. Drop the declaration (removes installed-but-unused weight).\n  B. Wire it up in `docs/conf.py` if the feature is actually wanted.\n\nRecommendation: drop both. If a future contributor wants copy buttons\non code blocks, they can re-add the dep + extensions entry as a single\nreviewable change.\n\nSource for this finding: `docs/development/dependency-inventory.md` (F5\nand F6), produced by `audit-imported-dependencies-for-elimination`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "touch `docs/conf.py` extensions list",
+        "instead": "file a separate TODO if copy buttons are wanted later",
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "why": "the goal is removal, not feature work"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "clean-up-unused-sphinx-dev-deps",
+        "id": 115,
+        "reason": "Out of scope for this cleanup. If wanted, file a separate TODO for the docs feature add.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: sphinx-copybutton wiring explicitly framed as optional/out-of-scope ('if wanted, file separately'); no signal it's wanted.",
+        "summary": "Wire up sphinx-copybutton if copy buttons are desired"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-15T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Docs build (`make docs` or equivalent) succeeds after the change",
+        "item_id": "clean-up-unused-sphinx-dev-deps"
+      },
+      {
+        "behavior": "Existing `extensions` list in `docs/conf.py` is unchanged (no addition or removal)",
+        "item_id": "clean-up-unused-sphinx-dev-deps"
+      },
+      {
+        "behavior": "`docs/conf.py` continues to use `html_theme = 'furo'`",
+        "item_id": "clean-up-unused-sphinx-dev-deps"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "kind": "do_not_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import pathlib; t = pathlib.Path('pyproject.toml').read_text(); assert 'sphinx-rtd-theme' not in t, 'sphinx-rtd-theme still present'; assert 'sphinx-copybutton' not in t, 'sphinx-copybutton still present'; print('OK: both removed')\"",
+        "description": "Both deps absent from pyproject",
+        "expected": "OK: both removed",
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import importlib; m = importlib.import_module('sphinx'); print('sphinx importable:', m.__version__)\"",
+        "description": "Docs build still succeeds (replace with project docs target)",
+        "expected": "sphinx importable: <version>",
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm sphinx-rtd-theme is not referenced in docs/, examples/, or any conf.py: `grep -rn 'sphinx_rtd_theme\\|rtd_theme' docs examples`.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm sphinx-copybutton is not in `docs/conf.py:extensions`: read the file and verify.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove both lines from `[dependency-groups] dev` in pyproject.toml. Refresh uv.lock with `uv lock`.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "clean-up-unused-sphinx-dev-deps",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build docs locally to confirm no regression: `make docs` (or the project's docs build target).",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "description": "Consolidates 6 deferred benchmark implementations from\nimplement-dataframe-benchmarks (completed 2026-02-18) and 3 DataFusion-specific\ngaps from fix-read-primitives-datafusion-df (completed 2026-02-12).\n\nThese benchmarks were descoped because they don't map cleanly to the DataFrame\nread-query model. Each needs dedicated architecture work before implementation.\n\nDataFrame benchmark deferrals:\n- TPC-DI (38 ops): ETL pipeline with mutation-heavy SCD Type 2 operations\n- Write Primitives (109 ops): INSERT/UPDATE/DELETE/DDL - needs write-operation adapter layer\n- TPC-DS-OBT (89 queries): Fully denormalized table doesn't map to TPC-DS DataFrame schema\n- TPC-Havoc (220 queries): Tests SQL optimizer syntax rewriting - meaningless for DataFrames\n- JoinOrder (113 queries): Tests SQL optimizer join ordering - DataFrames handle joins programmatically\n- Read Primitives (136 queries): Catalog-driven architecture with DB-specific features\n\nDataFusion v50 gaps:\n- string_to_array returning actual list expressions (not split_part proxy)\n- array_sum / list.sum() (no built-in; needs unnest+aggregate workaround)\n- array_distinct Arrow type normalization (returns Dictionary instead of Utf8)",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "deferred-dataframe-benchmark-implementations",
+        "id": 374,
+        "reason": "These benchmarks test SQL optimizer behavior (syntax rewriting, join ordering) which is meaningless for DataFrame execution. Likely never applicable to DataFrame mode.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Reason states DataFrame execution bypasses SQL parsing entirely, so this is 'likely never applicable'; self-obsoleting.",
+        "summary": "TPC-Havoc and JoinOrder DataFrame implementations"
+      }
+    ],
+    "item_meta": {
+      "category": "Benchmark Expansion",
+      "completed_at": "2026-02-18T00:00:00Z",
+      "created_at": "2026-02-18T00:00:00Z",
+      "worktree": "main"
+    },
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "deferred-dataframe-benchmark-implementations",
+        "notes": "Completed 2026-02-07 via dataframe-tpcds-obt-adaptation +\nimplement-tpcds-obt-dataframe-queries (DONE/dataframe-benchmarks/active/).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Evaluate TPC-DS-OBT feasibility - design denormalization step for DataFrame loading pipeline",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "deferred-dataframe-benchmark-implementations",
+        "notes": "Completed 2026-02-07 via dataframe-write-primitives-model +\nintegrate-write-primitives-dataframe-mode + dataframe-write-primitives\n(DONE/dataframe-benchmarks/active/ and DONE/dataframe-expansion/active/).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design write-operation adapter layer for DataFrame platforms (INSERT/UPDATE/DELETE semantics)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "deferred-dataframe-benchmark-implementations",
+        "notes": "Completed via dataframe-read-primitives-architecture +\nintegrate-read-primitives-dataframe-mode + dataframe-read-primitives-complete\n(DONE/dataframe-benchmarks/active/ and DONE/dataframe-expansion/).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Evaluate Read Primitives DataFrame approach - catalog-driven query generation with different architecture",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "deferred-dataframe-benchmark-implementations",
+        "notes": "Resolved 2026-02-12 via fix-read-primitives-datafusion-df\n(DONE/dataframe-benchmarks/active/). string_to_array and array_distinct fixed;\narray_sum confirmed genuinely unsupported in DataFusion v50 - skipped with xfail.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Monitor DataFusion releases for string_to_array, array_sum, array_distinct fixes - update adapter when resolved",
+        "wid": "w4"
+      }
+    ]
+  }
+}

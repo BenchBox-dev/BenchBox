@@ -1,0 +1,232 @@
+{
+  "context": "Model result_source and funding as plain string enums (tuples + frozenset)\nplus a dict-backed mapping, mirroring status.py's lightweight style rather\nthan introducing Enum classes the rest of the result layer does not use.\nExpose the mapping as data so item 4's DuckDB DDL and item 5's frontend can be\nderived from the same table rather than re-deriving label->visibility in three\nplaces. Keep helpers total: unknown/empty source -> 'internal'; unknown/empty\nfunding -> 'unspecified' (never raise in the producer path; strict rejection\nis the validator's job in item 3).\n",
+  "description": "Establish a single source of truth for two provenance concepts before any\nproducer, submit, inventory, or read-model code references them. Today the\ntrust-label vocabulary is split and partial: VALID_LABELS lives in\nbenchbox/core/publishing/bundle_publisher.py:26\n(\"maintainer-run\", \"community-submission\", \"ci\", \"local\",\n\"unofficial-research\") but the explorer only ever distinguishes two labels,\ninferred from submission-manifest-sidecar presence\n(scripts/generate_corpus_inventory.py:41 _bundle_trust_label). There is no\n\"vendor-supplied\" tier and no funding concept anywhere.\n\nThis item introduces one module that defines: the result_source enum and its\nsource -> trust_label -> visibility -> ranking-eligibility mapping, and the\nfunding enum, with normalize/validate helpers. It adds \"vendor-supplied\" to\nVALID_LABELS and updates the governance contract of record. No behavior\nchanges for existing bundles yet (nothing emits the new fields until the\nbundle/run item lands); this item is the vocabulary + docs foundation every\nlater item imports.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bump read_model_version in this item",
+        "instead": "(not specified)",
+        "item_id": "provenance-vocabulary-and-labels",
+        "why": "no read-model column changes here (that is item 4)."
+      },
+      {
+        "dont": "introduce Enum classes if tuples/frozensets match the surrounding result-layer style.",
+        "instead": "(not specified)",
+        "item_id": "provenance-vocabulary-and-labels",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "redefine label/funding string literals in generate_corpus_inventory.py, submit.py, or the DDL",
+        "instead": "(not specified)",
+        "item_id": "provenance-vocabulary-and-labels",
+        "why": "import from the one module."
+      },
+      {
+        "dont": "wire vendor-supplied into inference-by-sidecar",
+        "instead": "(not specified)",
+        "item_id": "provenance-vocabulary-and-labels",
+        "why": "vendor is maintainer-applied (item 3 gate G-VENDOR-SIGNAL), never inferred here."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-29T11:48:31Z",
+        "from_item": "provenance-vocabulary-and-labels",
+        "id": 657,
+        "reason": "Verified on origin/develop 2026-07-29: provenance.py, bundle_publisher.py, hosted-results-contract.md and generate_corpus_inventory.py all carry the vendor-supplied vocabulary, but contributing-results.md has zero occurrences. Docs-only residual; the vocabulary itself is landed and consistent, so it does not hold the item open.",
+        "resolution": "promoted",
+        "resolved_item": "contributing-results-vendor-supplied-label-docs",
+        "resolved_reason": null,
+        "summary": "docs/contributing-results.md never got the vendor-supplied label section that w3 claims to have added"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture",
+      "completed_at": "2026-07-29T11:48:58Z",
+      "completed_pr": 1021,
+      "created_at": "2026-07-06T00:00:00Z",
+      "worktree": "results-labels-funding"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing VALID_LABELS entries (ci, local, unofficial-research) keep working; publish --label default stays 'maintainer-run'.",
+        "item_id": "provenance-vocabulary-and-labels"
+      },
+      {
+        "behavior": "The new module imports nothing from benchbox.cli or benchbox.platforms (no import cycle).",
+        "item_id": "provenance-vocabulary-and-labels"
+      },
+      {
+        "behavior": "hosted-results-contract.md remains internally consistent: every label has a visibility state and a ranking-eligibility rule.",
+        "item_id": "provenance-vocabulary-and-labels"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/publishing/bundle_publisher.py:26 VALID_LABELS — extend (add 'vendor-supplied'; keep ci/local/unofficial-research untouched)",
+        "decision": "extend",
+        "item_id": "provenance-vocabulary-and-labels",
+        "path": "benchbox/core/publishing/bundle_publisher.py:26"
+      },
+      {
+        "concept": "benchbox/core/results/status.py — reference (existing small result-vocabulary module; mirror its style/placement)",
+        "decision": "reuse",
+        "item_id": "provenance-vocabulary-and-labels",
+        "path": "benchbox/core/results/status.py"
+      },
+      {
+        "concept": "docs/reference/hosted-results-contract.md:181-233 Trust Labels / visibility / ranking eligibility — extend (this doc is the contract of record; the new module must match it exactly)",
+        "decision": "extend",
+        "item_id": "provenance-vocabulary-and-labels",
+        "path": "docs/reference/hosted-results-contract.md:181-233"
+      },
+      {
+        "concept": "scripts/generate_corpus_inventory.py:21-22 COMMUNITY_TRUST_LABEL/DEFAULT_TRUST_LABEL — reference (these constants must be re-sourced from the new module in item 4, not redefined)",
+        "decision": "reuse",
+        "item_id": "provenance-vocabulary-and-labels",
+        "path": "scripts/generate_corpus_inventory.py:21-22"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "kind": "do_not_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/generate_corpus_inventory.py"
+      },
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/publishing/bundle_publisher.py"
+      },
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/provenance.py (new)"
+      },
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "kind": "only_modify",
+        "path_glob": "docs/development/benchbox-results-platform-strategy.md"
+      },
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/hosted-results-contract.md"
+      },
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_provenance.py (new)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'import benchbox.core.results.provenance'",
+        "description": "New module imports cleanly with only core deps (no import cycle)",
+        "expected": "no ImportError",
+        "item_id": "provenance-vocabulary-and-labels",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_provenance.py -q",
+        "description": "Vocabulary + mapping tests pass (asserts vendor-supplied in VALID_LABELS + contract alignment)",
+        "expected": "all pass",
+        "item_id": "provenance-vocabulary-and-labels",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make docs-check || true",
+        "description": "Contract doc still parses / links check (repo doc lint)",
+        "expected": "no new failures attributable to this change",
+        "item_id": "provenance-vocabulary-and-labels",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "provenance-vocabulary-and-labels",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "provenance-vocabulary-and-labels",
+        "notes": "Helpers: normalize_funding()/is_valid_funding()/trust_label_for_source()/ visibility_for_label(). Pure data + functions, no I/O, no CLI/platform imports (avoid cycles, same rule as models.py).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add benchbox/core/results/provenance.py: RESULT_SOURCE, the source->trust_label->visibility->ranking_eligible mapping, FUNDING_SOURCES, and normalize/validate/lookup helper functions.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "provenance-vocabulary-and-labels",
+        "notes": "Re-source community/default label constants from the new module where trivially safe. Do NOT change publish default (stays 'maintainer-run').",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'vendor-supplied' to VALID_LABELS in bundle_publisher.py and re-source the community/default label constants from the new module.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "provenance-vocabulary-and-labels",
+        "notes": "Add the vendor-supplied label row, the public-vendor-reported visibility state, ranking-eligibility change, and a Funding disclosure subsection listing the enum. Add CHANGELOG entry.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update the governance contract of record (hosted-results-contract.md), contributing-results.md, and the strategy doc for the new vocabulary.",
+        "wid": "w3"
+      }
+    ]
+  }
+}

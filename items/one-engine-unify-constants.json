@@ -1,0 +1,202 @@
+{
+  "context": "Small mechanical PR after the ADR lands (ledger semantics needed for the data_only ruling). For each constant: define in core, import at every current literal site, add a parity test asserting the CLI click.Choice values, MCP schema enum values, and the core constant are equal (modulo the ledgered data_only decision). MCP phases validation rejects unknown phases with a validation error listing VALID_PHASES.",
+  "description": "Untested constant drift found in review: run modes are {sql,dataframe} in CLI (benchbox/cli/commands/run.py:2941 click.Choice) but {sql,dataframe,data_only} in MCP (benchbox/mcp/schemas.py:736 MODE_CHOICES); the 7-item valid-phases list is duplicated twice inside CLI (run.py:840 and benchbox/cli/benchmarks.py:922) and absent from MCP validation entirely; export formats {json,csv,html} are literal in cli/commands/export.py:25 and duplicated twice with different lengths inside mcp/tools/results.py:91,99. Create canonical core constants (e.g. core/constants.py or core/schemas.py): RUN_MODES, VALID_PHASES, EXPORT_FORMATS. Both surfaces consume them; MCP gains phase validation against VALID_PHASES; the data_only asymmetry is resolved deliberately -- either exposed on both surfaces or entered in the tiered omission ledger (governance from one-engine-adr-scoped-surfaces). Replicate the chart-registry parity-test pattern (tests/unit/visualization/test_chart_type_registry.py) for each constant set.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "resolve the data_only asymmetry by quietly removing it from MCP",
+        "instead": "make the deliberate ruling under the three-tier ledger and implement that",
+        "item_id": "one-engine-unify-constants",
+        "why": "MCP callers use data_only today; removal is a breaking surface change needing governance"
+      },
+      {
+        "dont": "write parity tests that grep source files for literals",
+        "instead": "import both surfaces' live enum/choice objects and compare sets",
+        "item_id": "one-engine-unify-constants",
+        "why": "behavior-driving assertions survive refactors; source greps rot"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "one-engine-unify-constants",
+        "needs_item": "one-engine-adr-scoped-surfaces"
+      }
+    ],
+    "item_meta": {
+      "category": "core",
+      "completed_at": "2026-08-04T20:47:12Z",
+      "completed_pr": 1555,
+      "created_at": "2026-08-04T17:14:36Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing accepted values keep working on both surfaces; this item may only ADD validation (MCP phases) or reconcile enums, never silently drop an accepted value.",
+        "item_id": "one-engine-unify-constants"
+      },
+      {
+        "behavior": "MCP docs param tables stay schema-derived (docs drift tests keep passing).",
+        "item_id": "one-engine-unify-constants"
+      },
+      {
+        "behavior": "data_only aliasing in MCP (datagen/generate -> data_only at benchmark.py:129-162) keeps accepting the aliases it accepts today.",
+        "item_id": "one-engine-unify-constants"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing core constants module imported by cli/execution_pipeline.py",
+        "decision": "extend",
+        "item_id": "one-engine-unify-constants",
+        "path": "benchbox/core/constants.py"
+      },
+      {
+        "concept": "The proven cross-surface constant parity test pattern",
+        "decision": "reuse",
+        "item_id": "one-engine-unify-constants",
+        "path": "tests/unit/visualization/test_chart_type_registry.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-unify-constants",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/security.py"
+      },
+      {
+        "item_id": "one-engine-unify-constants",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "one-engine-unify-constants",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "one-engine-unify-constants",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/benchmarks.py"
+      },
+      {
+        "item_id": "one-engine-unify-constants",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/export.py"
+      },
+      {
+        "item_id": "one-engine-unify-constants",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "one-engine-unify-constants",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "one-engine-unify-constants",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "one-engine-unify-constants",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "one-engine-unify-constants",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/"
+      },
+      {
+        "item_id": "one-engine-unify-constants",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "one-engine-unify-constants",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'constant and parity or (mode and parity) or (phase and parity)' -q",
+        "description": "Mode/phase/format parity tests exist and pass",
+        "expected": "CLI choices, MCP enums, and core constants are asserted equal.",
+        "item_id": "one-engine-unify-constants",
+        "last_result": "pass",
+        "last_run": "2026-08-04T20:05:18Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -k 'phase and (invalid or unknown or reject)' -q",
+        "description": "MCP rejects unknown phases",
+        "expected": "run_benchmark with a bogus phase returns a validation error listing valid phases.",
+        "item_id": "one-engine-unify-constants",
+        "last_result": "pass",
+        "last_run": "2026-08-04T20:05:28Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test \"$(grep -rl 'throughput.*maintenance' benchbox/cli/commands/run.py benchbox/cli/benchmarks.py | wc -l)\" -le 1 || ! grep -q 'VALID_PHASES = ' benchbox/cli/benchmarks.py",
+        "description": "No duplicated phase list remains in CLI",
+        "expected": "The 7-phase list is defined once, in core.",
+        "item_id": "one-engine-unify-constants",
+        "last_result": "pass",
+        "last_run": "2026-08-04T20:05:31Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-unify-constants",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-unify-constants",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Enumerated every literal: --mode Choice (run.py:2941) vs MODE_CHOICES (schemas.py:734); the 7-phase list at run.py:840 and benchmarks.py:922; export formats at export.py:25 and results.py:91,99 (two different lengths). Traced data_only through _derive_execution_type -> ExecutionPipeline._execute_data_only, establishing it is an execution type, not a run mode.",
+        "item_id": "one-engine-unify-constants",
+        "notes": null,
+        "started_at": "2026-08-04T20:46:49Z",
+        "started_branch": "refactor/one-engine-residual-dedup",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Re-verify the drift sites at HEAD; enumerate every literal occurrence of modes/phases/formats",
+        "wid": "w0"
+      },
+      {
+        "evidence": "core/constants.py gains RUN_MODES, VALID_PHASES, QUERY_PHASES, EXECUTION_TYPES, EXPORT_FORMATS, MCP_RESULT_FORMATS, MCP_MODE_CHOICES, MCP_DATA_ONLY_ALIASES; all sites migrated. validate_phases added and wired into BOTH MCP admission paths (run_benchmark and start_benchmark, the latter needing a scope amendment).",
+        "item_id": "one-engine-unify-constants",
+        "notes": null,
+        "started_at": "2026-08-04T20:46:52Z",
+        "started_branch": "refactor/one-engine-residual-dedup",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Core constants + migrate all sites + MCP phase validation",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Parity tests read live Click Choice objects and MCP enums, not source greps. data_only ruled an execution type rather than a run mode, with the reasoning and the inverse-ledger observation documented in docs/reference/mcp.md. No accepted value dropped. PR #1555.",
+        "item_id": "one-engine-unify-constants",
+        "notes": null,
+        "started_at": "2026-08-04T20:46:55Z",
+        "started_branch": "refactor/one-engine-residual-dedup",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Parity tests per constant set; data_only ruling implemented per ledger",
+        "wid": "w2"
+      }
+    ]
+  }
+}

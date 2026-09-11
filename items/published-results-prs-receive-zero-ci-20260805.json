@@ -1,0 +1,98 @@
+{
+  "context": "The guard has to live where the PR lands, or the check has to be reported by something that is not a workflow in the head tree. Prefer carrying the minimal workflow set onto published-results over weakening the drift check, so that the mirror PR is verified rather than merely unblocked.",
+  "description": "PR #1542 (the results mirror into published-results) has an empty statusCheckRollup - zero checks, not zero failures. Cause: published-results carries exactly one workflow file, .github/workflows/validate-submission.yml, and GitHub resolves pull_request workflow files from the head+base merge. The head branch auto/results-mirror-355cc445 is cut from published-results, so no other workflow exists in that tree to run. PR #1563 added pr-base-guard.yml with no branch or path filter to stop a PR receiving zero CI, but it cannot fire here: a guard only runs where its file exists, and it exists on develop, not on published-results. So the develop-base hole is closed and the published-results-base hole is not. This is load-bearing right now - Corpus Drift Check on develop is failing because published-results is 400 paths behind, and the PR that closes that gap is the one flying blind.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-05T18:27:24Z",
+      "completed_pr": 1573,
+      "created_at": "2026-08-05T14:48:58Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "pr-base-guard.yml keeps its unfiltered trigger, which is what makes it unable to become a never-reporting required check",
+        "item_id": "published-results-prs-receive-zero-ci-20260805"
+      },
+      {
+        "behavior": "published-results stays a corpus branch - do not import the full develop CI matrix onto it",
+        "item_id": "published-results-prs-receive-zero-ci-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "published-results-prs-receive-zero-ci-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "published-results-prs-receive-zero-ci-20260805",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "published-results-prs-receive-zero-ci-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "published-results-prs-receive-zero-ci-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q -k published_results_base",
+        "description": "A PR based on published-results reports at least one check",
+        "expected": "Fails on the unfixed tree, where nothing asserts that published-results carries a reporting workflow",
+        "item_id": "published-results-prs-receive-zero-ci-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-05T18:27:16Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows/test_stacked_pr_base_guard.py -q",
+        "description": "The develop-base guard is unchanged",
+        "expected": "No regression in the guard landed by #1563",
+        "item_id": "published-results-prs-receive-zero-ci-20260805",
+        "last_result": "fail",
+        "last_run": "2026-08-05T18:27:21Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "published-results-prs-receive-zero-ci-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "CORRECTION to this item's filed premise, established before any implementation began. I filed it claiming the sparse workflow set on published-results was why #1542 has zero checks. That is wrong. validate-submission.yml DOES live on published-results, DOES trigger on pull_request into it, and its 'paths: results-data/bundles/**' filter matches all 100 of #1542's changed files. It should have run.\n\nREAL CAUSE: #1542's author is app/github-actions. sync-results-data-to-published.yml:195 opens it with secrets.GITHUB_TOKEN, and GitHub never starts pull_request-triggered workflow runs for GITHUB_TOKEN events - documented recursion prevention, unreachable by any trigger filter. validate-submission.yml's own comment near line 56 already records that this mirror PR is opened with GITHUB_TOKEN; nobody had joined that to 'so this workflow never runs on it'.\n\nThe sparse-workflow cause is still real but is a SEPARATE, narrower gap: pr-base-guard.yml cannot fire on a published-results-based PR because its file is not there.\n\nW0 CLASSIFICATION - what is meaningful for a corpus-only branch. published-results carries results-data/, benchbox/validation/bundle.py, scripts/validate_submission.py, scripts/generate_corpus_inventory.py and docs; nothing else. adr-published-results-slim-corpus-branch.md already rejected routing corpus contributions through develop's CI for this reason.\n- MEANINGFUL: bundle schema/hash/privacy validation, and corpus-inventory freshness - exactly the two gates validate-submission.yml runs for a human submission PR.\n- STRUCTURALLY INAPPLICABLE: ruff/ty/pytest matrix, packaging, browser and E2E lanes, docs build - none of the code they check exists on that branch.\n\nAlso confirmed by direct query, and it bounds what the fix can claim: no ruleset targets published-results. The repo's four rulesets target develop, release, v* branches and tags. So no check on that branch can be REQUIRED today; the draft state plus maintainer review is the actual enforcement.",
+        "item_id": "published-results-prs-receive-zero-ci-20260805",
+        "notes": null,
+        "started_at": "2026-08-05T15:13:59Z",
+        "started_branch": "fix/privacy-rejection-aborts-build-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Establish which checks are meaningful for a corpus-only branch and which are structurally inapplicable",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Implemented in afb08886f2 (Sonnet subagent) + 4e5cab89eb (my review fixes). PR #1573.\n\nFIX: the sync workflow validates the exact content it is about to propose - validate_submission.py plus generate_corpus_inventory.py --check, the same two gates validate-submission.yml would apply - and posts the verdict as a 'corpus-mirror/validate-bundles' commit status on the mirror branch head. A commit status is a Statuses-API write, not a workflow trigger, so it is unaffected by the GITHUB_TOKEN recursion rule and needs NO new credential; only a 'statuses: write' grant on the token the workflow already holds. A PAT or GitHub App was considered and rejected as introducing a credential the repo does not have.\n\nSEQUENCING SOLVED: the fix lives entirely on develop. Storing published-results' workflow set on develop and having the sync workflow carry it over is not merely undesirable, it is not executable - GITHUB_TOKEN cannot push changes under .github/workflows/ regardless of the permissions block, which adr-published-results-slim-corpus-branch.md already documents for validate-submission.yml edits. So no develop-side test can assert published-results' content without going red until a human acts.\n\nREVIEW FINDING - AVAILABILITY REGRESSION, fixed. The status and PR-opening steps sit after the new setup and validate steps, and GitHub skips every later step once one fails. A flaky setup-uv, or any error the validate step's 'set -uo pipefail' capture does not convert into a reported state, would have skipped BOTH: no status AND no mirror PR. That is strictly worse than the blind PR being fixed, because before these steps existed the PR was always created, and develop's Corpus Drift Check depends on that PR existing to be actionable. Both steps now run under always(); an absent verdict posts as 'error' rather than defaulting; the failure gate is '!= success' rather than '== failure' so a run that could not determine the verdict is not green. An absent verdict must never default to success - a green check on content nothing examined is worse than an empty rollup because it stops anyone looking.\n\nNOT FIXED, documented as manual maintainer debt in docs/operations/results-phase-2-runbook.md rather than left silent: pr-base-guard.yml still cannot run on a published-results-based PR.\n\nLIMITS RECORDED so a green badge is not over-read: the status is ADVISORY (no ruleset targets published-results), and it is SELF-ATTESTED by the run that built the content, so it catches bad content but not a later manual push to the mirror branch. A --force-with-lease push from another run re-posts against the new SHA, so a stale green cannot ride on new bytes.\n\nFALSIFICATION, two disjoint neuters: (1) rubber-stamping the validate step to STATE=success without invoking either validator, name/id/outputs unchanged - fails test_..._status_reflects_real_validation with 'validate step never invokes scripts/validate_submission.py'; (2) reverting the always() guards, the error default and the failure gate - fails exactly the 3 new availability tests while the other 6 pass.\n\nSUITES: tests/unit/workflows 153 passed; test_stacked_pr_base_guard.py 5 passed; pr-base-guard.yml untouched and still unfiltered. check-scope OK, 3 files.\n\nUNVERIFIED FROM HERE: no live GitHub run exercised the Statuses API call, so that the posted status renders in statusCheckRollup is asserted from documented API semantics and static structure, not integration-tested. The first mirror run after this lands is the confirming observation.",
+        "item_id": "published-results-prs-receive-zero-ci-20260805",
+        "notes": null,
+        "started_at": "2026-08-05T18:27:09Z",
+        "started_branch": "fix/published-results-zero-ci-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/agent-a31a154e703a2eca1",
+        "status": "done",
+        "summary": "Make a PR into published-results report at least one real check, and cover the zero-check condition with a test",
+        "wid": "w1"
+      }
+    ]
+  }
+}

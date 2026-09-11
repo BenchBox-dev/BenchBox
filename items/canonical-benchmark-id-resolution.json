@@ -1,0 +1,300 @@
+{
+  "context": "Treat runtime benchmark identity as a registry contract, not a string\nformatting convenience. First pin current mismatches with tests, then replace\nthe heuristic and adjust validation to fail early for unknown IDs. Keep\noutput path tests nuanced: canonical identity must match the registry, while\ndata-source output locations may deliberately refer to the source benchmark.\n",
+  "description": "Independent verification at checked SHA e60986923 confirmed the critic's\nhighest-risk finding directionally, with one important correction: the public\n`benchbox.base.BaseBenchmark._get_benchmark_name()` heuristic mismatches 8\nregistry IDs, not 9. `tpcds_obt` does not use `_get_benchmark_name()` because\nit still inherits the deprecated core base; it has a related name heuristic\nrisk through `benchbox.core.base_benchmark.BaseBenchmark.name`, but its\nconstructor explicitly writes to `benchmark_runs/datagen/tpcds_obt_sf1`.\n\nConfirmed mismatches for public-base core classes:\n  read_primitives -> readprimitives\n  write_primitives -> writeprimitives\n  metadata_primitives -> metadataprimitives\n  ai_primitives -> aiprimitives\n  transaction_primitives -> transactionprimitives\n  joinorder_synthetic -> joinordersynthetic\n  tpch_skew -> tpchskew\n  vector_search -> vectorsearch\n\nRuntime leakage was confirmed through logger names for all 8 mismatches, and\nthrough default output paths for direct callers of classes such as\n`TPCHSkewBenchmark` and `VectorSearchBenchmark`. Some data-sharing benchmarks\nintentionally override their output directory to the canonical TPC-H datagen\npath after base initialization, so output-path impact is not uniform. The\nrunner path is likely shielded when it passes explicit `benchmark_name` and\noutput directories, but this still needs end-to-end confirmation before code\nchanges.\n\nIndependent verification also confirmed `validate_scale_factor(\"unknown_bench\",\n999)` returns silently in `benchbox/core/benchmark_registry.py` before the\nloader eventually fails elsewhere. This is actionably related: benchmark ID\nvalidity and canonical identity should fail early and consistently.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "expand the `special_mappings` dict",
+        "instead": "(not specified)",
+        "item_id": "canonical-benchmark-id-resolution",
+        "why": "that keeps the heuristic alive and recreates registry drift."
+      },
+      {
+        "dont": "infer canonical IDs by lowercasing class names",
+        "instead": "(not specified)",
+        "item_id": "canonical-benchmark-id-resolution",
+        "why": "underscores and acronym boundaries are part of the registry contract."
+      },
+      {
+        "dont": "launch long-running benchmark runs to verify identity",
+        "instead": "(not specified)",
+        "item_id": "canonical-benchmark-id-resolution",
+        "why": "targeted instantiation, dry-run, and contract tests are sufficient."
+      },
+      {
+        "dont": "treat source-data output directories as identity",
+        "instead": "(not specified)",
+        "item_id": "canonical-benchmark-id-resolution",
+        "why": "primitives may reuse TPC-H data while still being separate benchmarks."
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-05-22T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Data-sharing benchmarks that intentionally reuse TPC-H datagen paths keep that output behavior unless a separate product decision changes it.",
+        "item_id": "canonical-benchmark-id-resolution"
+      },
+      {
+        "behavior": "No live/cloud benchmark execution is required for this fix.",
+        "item_id": "canonical-benchmark-id-resolution"
+      },
+      {
+        "behavior": "Scale-factor validation for known benchmarks keeps existing error types for unsupported scales.",
+        "item_id": "canonical-benchmark-id-resolution"
+      },
+      {
+        "behavior": "The registry remains the single source of truth for benchmark IDs; do not add an untested parallel dict.",
+        "item_id": "canonical-benchmark-id-resolution"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/benchmark_registry.py: BENCHMARK_CLASS_NAMES and CORE_BENCHMARK_CLASS_NAMES - reuse as the class-to-ID source of truth.",
+        "decision": "reuse",
+        "item_id": "canonical-benchmark-id-resolution",
+        "path": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "concept": "benchbox/utils/path_utils.py: get_benchmark_runs_datagen_path - preserve intentional data-source output directory conventions.",
+        "decision": "reuse",
+        "item_id": "canonical-benchmark-id-resolution",
+        "path": "benchbox/utils/path_utils.py"
+      },
+      {
+        "concept": "tests/unit/core/test_benchmark_api_contract.py: public contract invariants - reuse for unknown-ID and canonical-ID contract coverage.",
+        "decision": "reuse",
+        "item_id": "canonical-benchmark-id-resolution",
+        "path": "tests/unit/core/test_benchmark_api_contract.py"
+      },
+      {
+        "concept": "tests/unit/core/test_loader_registry_parity.py: registry/loader parity checks - extend to runtime identity parity.",
+        "decision": "extend",
+        "item_id": "canonical-benchmark-id-resolution",
+        "path": "tests/unit/core/test_loader_registry_parity.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "do_not_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/base_benchmark.py"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_loader.py"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/datavault/benchmark.py"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "only_modify",
+        "path_glob": "tests/test_base.py"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_benchmark_api_contract.py"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_loader_registry_parity.py"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_scale_factor_validation.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_loader_registry_parity.py tests/unit/core/test_benchmark_api_contract.py tests/test_base.py -q",
+        "description": "Runtime identity parity is pinned for all loader benchmarks.",
+        "expected": "All selected parity and base tests pass.",
+        "item_id": "canonical-benchmark-id-resolution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_benchmark_api_contract.py -q",
+        "description": "Unknown benchmark scale validation fails early and clearly.",
+        "expected": "Unknown benchmark ID and scale-factor contract tests pass.",
+        "item_id": "canonical-benchmark-id-resolution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite remains green after registry/base changes.",
+        "expected": "Fast tests pass.",
+        "item_id": "canonical-benchmark-id-resolution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "canonical-benchmark-id-resolution",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "canonical-benchmark-id-resolution",
+        "notes": "Re-run a read-only harness that imports registry IDs, resolves every\nloader class, instantiates with `get_benchmark_default_scale()`, and\nrecords `(registry_id, class, runtime_id, output_dir, logger_name)` for\nany mismatch. Commit only a compact markdown or TODO note if durable\nevidence is needed; keep raw stdout in `/tmp`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-run and preserve a compact identity verification summary on the current branch",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "canonical-benchmark-id-resolution",
+        "notes": "Prefer a registry-derived reverse map from\n`CORE_BENCHMARK_CLASS_NAMES`/`BENCHMARK_CLASS_NAMES` before adding a new\nclass attribute. If a class attribute is chosen, add a registry parity\ntest that fails when it diverges. Account for wrappers, core classes,\nsubclasses such as `TPCHSkewBenchmark`, and data-sharing benchmarks whose\noutput directory intentionally points at the source benchmark.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design the canonical benchmark-id source for runtime instances",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "canonical-benchmark-id-resolution",
+        "notes": "Change `benchbox/base.py` so runtime identity, logger names, validation\nfallbacks, and default direct-call output paths use the canonical registry\nID. Do not hard-code another special-case mapping inside the base class.\nPreserve intentional data-source output overrides for primitives that\nreuse TPC-H data.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace `_get_benchmark_name()` heuristic with registry-backed canonical resolution",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "canonical-benchmark-id-resolution",
+        "notes": "Extend the existing parity/contract tests so every loader benchmark that\nexposes runtime identity is checked against its registry ID. Include\nexplicit assertions for `tpch_skew`, `vector_search`,\n`joinorder_synthetic`, and the primitives. Separate assertions for\nintentional data-source output directories from assertions for canonical\nbenchmark identity.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add all-benchmark parity tests for runtime identity, logger names, and direct default paths",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "canonical-benchmark-id-resolution",
+        "notes": "Update `validate_scale_factor()` or its caller contract so an unknown\nbenchmark ID raises a clear `ValueError`/`KeyError` before class loading.\nAdd tests for unknown ID, invalid scale for a known ID, and valid default\nscale for all registered benchmarks. Preserve existing\n`ScaleFactorNotSupportedError` behavior for unsupported known scales.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make scale validation reject unknown benchmark IDs at the earliest registry boundary",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "canonical-benchmark-id-resolution",
+        "notes": "Read and, where practical, exercise the lifecycle runner path that passes\nexplicit `benchmark_name` and output directories. Confirm `benchmark_id`\nin validation metadata, manifests, and run artifacts remains canonical.\nIf a lightweight dry-run is sufficient, use it; do not launch live/cloud\nworkloads.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm orchestrated runner paths are not regressed",
+        "wid": "w5"
+      }
+    ]
+  }
+}

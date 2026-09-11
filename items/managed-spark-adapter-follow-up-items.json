@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #76 of spark-mixin-open-table-format-loading.\nDeferred: Managed Spark adapter follow-up items\nReason deferred: Athena Spark, Dataproc-family, Synapse Spark, and Fabric Spark require separate non-mixin TODOs",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:33:27Z",
+      "worktree": "main"
+    }
+  }
+}

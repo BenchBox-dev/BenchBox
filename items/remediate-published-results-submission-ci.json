@@ -1,0 +1,243 @@
+{
+  "description": "Source: _project/audits/results-explorer-publication-adversarial-review.md\n(develop_sha fddedf26), findings §2.6 (Required), §2.8 (Required, verify\nfirst), §2.7 (Advisory), §2.15 (Required).\n\n§2.6 — Contributor PRs target `published-results`, so the workflow that runs\nis the ON-BRANCH copy of validate-submission.yml, which has drifted behind\ndevelop: `git show origin/published-results:.github/workflows/validate-submission.yml\n| grep -c CHANGED_MANIFESTS` → 0 vs 3 on develop. The develop fix that closed\nthe manifest-only-PR hash bypass is absent exactly where untrusted PRs land,\nand the sync workflow's allowlist (sync-results-data-to-published.yml:21-30)\ndoes not include .github/workflows/**, so nothing detects/mirrors the drift.\n\n§2.8 — validate-submission.yml uses plain `pull_request` with\n`pull-requests: write` (:3-12); for fork PRs GitHub caps GITHUB_TOKEN\nread-only, so the always()-gated \"Post PR comment\" step (:97-132) should 403\nand turn even a passing validation red for external contributors. VERIFY\nagainst a real historical fork-PR run before implementing (a repo setting\ncould change this).\n\n§2.7 — The trigger path filter (results-data/bundles/**) matches any-of, and\nvalidator scripts run from the PR merge commit, so a PR touching a bundle plus\nscripts/validate_submission.py or benchbox/validation/bundle.py runs its own\ndoctored validator and self-greens the check (no privilege escalation; token\nis read-only for forks, but check-spoofing).\n\n§2.15 — adr-published-results-slim-corpus-branch.md claims validators are\n\"stdlib-only … no benchbox.* imports\" (:100-103) and excludes benchbox/ from\nthe allowlist (:84-86), but scripts/validate_submission.py:23 imports\nbenchbox.validation.bundle, the sync workflow mirrors\nbenchbox/validation/bundle.py, and that file is present on published-results\n(landed via mirror PR #555). The ADR's own maintenance trigger fired and was\nnever actioned; it also cites a TODO path now under _project/DONE/.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "run fork-PR code with pull_request_target checked out at the PR head",
+        "instead": "check out the base's validator only.",
+        "item_id": "remediate-published-results-submission-ci",
+        "why": "that executes untrusted code with a writable token"
+      },
+      {
+        "dont": "verbatim-mirror develop's validate-submission.yml onto the branch",
+        "instead": "use an explicit, documented update mechanism.",
+        "item_id": "remediate-published-results-submission-ci",
+        "why": "the copies intentionally differ in the --no-project invocation"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Read-only token posture for fork-supplied code (no elevation).",
+        "item_id": "remediate-published-results-submission-ci"
+      },
+      {
+        "behavior": "The slim, corpus-only shape of published-results (no pyproject.toml/uv.lock added).",
+        "item_id": "remediate-published-results-submission-ci"
+      },
+      {
+        "behavior": "The uv run --no-project invocation contract on published-results.",
+        "item_id": "remediate-published-results-submission-ci"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/sync-results-data-to-published.yml — extend its allowlist for w1 option (b).",
+        "decision": "extend",
+        "item_id": "remediate-published-results-submission-ci",
+        "path": ".github/workflows/sync-results-data-to-published.yml"
+      },
+      {
+        "concept": ".github/workflows/validate-main-pr.yml — reuse its trusted-policy checkout pattern for w1 option (a).",
+        "decision": "reuse",
+        "item_id": "remediate-published-results-submission-ci",
+        "path": ".github/workflows/validate-main-pr.yml"
+      },
+      {
+        "concept": "docs/development/adr/adr-published-results-slim-corpus-branch.md:maintenance-protocol — the ADR itself prescribes the update in w4.",
+        "decision": "reuse",
+        "item_id": "remediate-published-results-submission-ci",
+        "path": "docs/development/adr/adr-published-results-slim-corpus-branch.md:maintenance-protocol"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remediate-published-results-submission-ci",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "remediate-published-results-submission-ci",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "remediate-published-results-submission-ci",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/sync-results-data-to-published.yml"
+      },
+      {
+        "item_id": "remediate-published-results-submission-ci",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "item_id": "remediate-published-results-submission-ci",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/adr-published-results-slim-corpus-branch.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -c CHANGED_MANIFESTS .github/workflows/validate-submission.yml",
+        "description": "The checked-out (develop-side) validate-submission.yml covers manifest-only PRs -- run this on the PR that implements w1, BEFORE it merges",
+        "expected": ">= 1",
+        "item_id": "remediate-published-results-submission-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'validate-submission.yml' .github/workflows/sync-results-data-to-published.yml",
+        "description": "The sync workflow's allowlist will carry the fixed workflow file to published-results on the next mirror PR (if w1 chose option b)",
+        "expected": "present in the trigger paths, so a develop push after this PR opens/updates a mirror PR carrying the fix",
+        "item_id": "remediate-published-results-submission-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git show origin/published-results:.github/workflows/validate-submission.yml | grep -c CHANGED_MANIFESTS",
+        "description": "POST-MERGE ONLY (w5): published-results validate-submission covers manifest-only PRs, once the mirror PR has been reviewed and merged",
+        "expected": ">= 1 -- run this ONLY after w5's mirror-PR merge, not as a gate on this TODO's own develop-side PR (the branch cannot reflect the fix until that separate merge happens)",
+        "item_id": "remediate-published-results-submission-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -nE 'pull_request_target|base\\.sha|base\\.ref|actions/checkout' .github/workflows/validate-submission.yml",
+        "description": "Validation runs from a trusted ref (closes the self-green vector), or errors on validator edits",
+        "expected": "validator runs from the base ref (not the PR head), OR a step fails the job when the PR modifies scripts/validate_submission.py / benchbox/validation/bundle.py",
+        "item_id": "remediate-published-results-submission-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'benchbox/validation/bundle.py' docs/development/adr/adr-published-results-slim-corpus-branch.md",
+        "description": "ADR allowlist includes the vendored validator",
+        "expected": "listed in the allowlist; stdlib-only claim corrected",
+        "item_id": "remediate-published-results-submission-ci",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remediate-published-results-submission-ci",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "remediate-published-results-submission-ci",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "remediate-published-results-submission-ci",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "remediate-published-results-submission-ci",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "remediate-published-results-submission-ci",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "remediate-published-results-submission-ci",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "remediate-published-results-submission-ci",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remediate-published-results-submission-ci",
+        "notes": "Gate: §2.8 remediation only proceeds if a historical fork PR to\npublished-results actually 403s on the comment step (check Actions\nhistory). Re-confirm §2.6 drift:\n`git show origin/published-results:.github/workflows/validate-submission.yml`\nlacks the CHANGED_MANIFESTS block. Capture to /tmp and summarize.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify §2.8 against a real fork-PR run and re-confirm §2.6 branch drift",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-published-results-submission-ci",
+        "notes": "Options (decide in review): (a) run validation from a trusted branch via\npull_request_target checking out the base's validator, so the up-to-date\nworkflow always runs and self-green (§2.7) is closed at once; or (b) add\n.github/workflows/validate-submission.yml to the slim-branch allowlist +\na documented mirror mechanism. Whichever is chosen, the manifest-only\nbypass must be closed on published-results.\n\nPropagation note: `sync-results-data-to-published.yml` opens a DRAFT PR\nagainst `published-results` on a develop push -- it never auto-merges\n(maintainers flip it ready by hand). So merging THIS TODO's PR into\ndevelop does not, by itself, make `origin/published-results` reflect\nthe fix; a maintainer must still review and merge the resulting mirror\nPR. Do not treat \"merged into develop\" as \"live on published-results\".\n\n2026-07-06 CLARIFICATION (review-followup-sweep): the chosen\nimplementation was NEITHER pure option (a) nor (b) -- the workflow\nstayed `pull_request` (not `pull_request_target`) and instead added an\nexplicit self-green guard step that fails any submission PR touching\nthe validator/workflow files (closes w3 separately). The vendored\n*scripts* (`validate_submission.py`, `bundle.py`,\n`generate_corpus_inventory.py`) DO auto-mirror via the sync workflow's\nexisting allowlist. `.github/workflows/validate-submission.yml` itself\ndoes NOT and never will auto-mirror -- `GITHUB_TOKEN` cannot push\n`.github/workflows/**` changes regardless of `permissions:`, a\nhard-coded GitHub restriction, not a config gap. This is now documented\nas a permanent manual-resync requirement in\n`docs/development/adr/adr-published-results-slim-corpus-branch.md`\n(\"The workflow file itself is NOT auto-mirrored\"). \"Done\" here means\nthe decided mechanism landed and is durably documented, not that the\nworkflow-file sync gap was automated away -- it cannot be.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Establish a maintained update path for the on-branch validate-submission.yml and restore the manifest-only guard",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-published-results-submission-ci",
+        "notes": "If §2.8 confirmed: move commenting to a workflow_run/pull_request_target\ncompanion running with the base token, or skip commenting gracefully when\nthe token is read-only. Do not weaken the read-only posture for fork code.\n\n2026-07-06 DONE: develop PR #1000 (merged) adds the workflow_run companion\n(validate-submission-comment.yml) + artifact upload + continue-on-error on\nthe inline post; published-results mirror #1001 (merged) carries the\nartifact-upload + continue-on-error half. NOTE (documented, not blocking):\nthe companion only fires from the DEFAULT branch, so it stays inert until\nthe develop default-switch (#993) lands; and the repo has 0 forks, so §2.8\ncould not be verified against a real fork-PR run — built to the documented\nGitHub mechanism. The continue-on-error change already removes the red-X\nharm on published-results now.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix fork-PR comment posting so a passing validation never shows red for external contributors",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-published-results-submission-ci",
+        "notes": "Run validation from a trusted ref, OR fail the job when the PR modifies\nvalidator files, OR narrow the trigger so validator edits route to\ndevelop only. May be subsumed by w1 option (a).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Neutralize the self-green vector (§2.7)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-published-results-submission-ci",
+        "notes": "Add benchbox/validation/bundle.py to the allowlist; correct the\n\"stdlib-only / no benchbox.*\" statement to describe the shared\nimplementation + importlib fallback; fix the DONE TODO path reference.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update adr-published-results-slim-corpus-branch.md to match reality",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-published-results-submission-ci",
+        "notes": "This TODO's develop-side PR only prepares the fix; it does not put it on\npublished-results by itself. After it merges to develop,\nsync-results-data-to-published.yml opens (or updates) a draft PR against\npublished-results -- review and merge that PR, then re-run the\npublished-results-branch verification command below against the\nnow-current branch.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Post-merge: merge the resulting mirror PR into published-results and confirm the branch is live",
+        "wid": "w5"
+      }
+    ]
+  }
+}

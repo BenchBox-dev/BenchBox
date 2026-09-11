@@ -1,0 +1,130 @@
+{
+  "context": "Extend the existing dev-loop-metrics script rather than adding a new tool; use gh/GitHub API run history keyed by head branch; snapshot to _project/analysis/ci-failure-baseline-<date>.md with the exact query commands recorded for reproducibility.",
+  "description": "WS9 of _project/planning/ci-failure-reduction-plan.md (branch claude/ci-failures-merge-blockers-sitg7a). Because every dev PR lands via squash auto-merge once green, head-SHA check runs are green by construction; the real failure cost is fix-forward pushes, guard-file conflicts, and post-merge develop breaks. Before landing WS1-WS4 we need a baseline so a 2-week review can arbitrate outcomes (especially whether the merge-queue trial tracked by dev-loop-step-6-queue-decision-gate is justified).\n\nExtend `make dev-loop-metrics` to compute, per merged develop PR over a trailing window: (a) pushes-after-open (fix-forward count, via commits on the head branch after PR open); (b) open-to-merge wall time; (c) whether _project/config/fast_test_lane_policy.json was touched; (d) first-pass required-lane green rate, derived from Actions run history per head branch (NOT head-SHA check runs, which are always green). Capture a dated baseline snapshot under _project/analysis/.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Derive first-pass green rate from head-SHA check runs",
+        "instead": "Use Actions workflow-run history per head branch across all pushes",
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "why": "Auto-merge guarantees heads are green, so that measure reads 100% and hides every fix-forward round trip"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "created_at": "2026-07-23T12:29:01Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing dev-loop-metrics output fields and their meanings (additive change only)",
+        "item_id": "ci-failure-baseline-dev-loop-metrics"
+      },
+      {
+        "behavior": "No new required CI check is introduced by this item",
+        "item_id": "ci-failure-baseline-dev-loop-metrics"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/**"
+      },
+      {
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make dev-loop-metrics",
+        "description": "dev-loop-metrics runs clean with the new fields",
+        "expected": "exit 0, new per-PR fields present in output",
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "ls _project/analysis/ | grep -c ci-failure-baseline",
+        "description": "Baseline snapshot committed",
+        "expected": ">= 1",
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Extend dev-loop-metrics with the four per-PR measures (fix-forward pushes, open-to-merge time, policy-file touch, first-pass green rate)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Capture and commit the dated baseline snapshot for the trailing 4 weeks",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ci-failure-baseline-dev-loop-metrics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document the 2-week re-measure cadence and decision hooks (WS1-WS4 effectiveness, merge-queue justification) in the snapshot header",
+        "wid": "w3"
+      }
+    ]
+  }
+}

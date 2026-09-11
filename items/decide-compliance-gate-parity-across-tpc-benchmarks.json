@@ -1,0 +1,92 @@
+{
+  "context": "Decide the intended contract: either extend compliance classification to TPC-H and TPC-DI so published results carry a comparable methodology guarantee, or record explicitly why TPC-DS alone is gated and document that TPC-H results are unqualified. Do not extend the gate without deciding what happens to the 22 existing TPC-H bundles already in the public corpus, which were minted with no compliance field.",
+  "description": "Observed 2026-08-18 while fixing the TPC-DS compliance wiring. TPC-DS classifies every run (benchbox/core/tpcds/compliance.py) and benchbox submit refuses unofficial_nonstandard and unofficial_subscale results. TPC-H and TPC-DI have no equivalent: grep for compliance_class across benchbox/core/tpch/ and benchbox/core/tpcdi/ returns nothing, and TPC-H bundles carry no compliance_class field at all. Confirmed empirically: tpch_sf10_duckdb_sql_20260817_210939_80e1274f and tpch_sf100_duckdb_sql_20260817_214011_d40cb760 both pass benchbox submit without ever being run with --official. The consequence is that a casually configured TPC-H run publishes to the corpus with exactly the same standing as a rigorous one, while an equally rigorous TPC-DS run is refused unless it was invoked with --official. Whichever way this is resolved, the current asymmetry means the corpus mixes results whose methodology guarantees differ without any field distinguishing them - which matters most for TPC-H, the benchmark the corpus has most of.",
+  "legacy": {
+    "item_meta": {
+      "category": "core",
+      "created_at": "2026-08-18T21:33:16Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "decide-compliance-gate-parity-across-tpc-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/"
+      },
+      {
+        "item_id": "decide-compliance-gate-parity-across-tpc-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "decide-compliance-gate-parity-across-tpc-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/"
+      },
+      {
+        "item_id": "decide-compliance-gate-parity-across-tpc-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'compliance' docs/reference/public-contracts.md",
+        "description": "Contract is explicit",
+        "expected": "states which benchmarks are gated and why",
+        "item_id": "decide-compliance-gate-parity-across-tpc-benchmarks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "decide-compliance-gate-parity-across-tpc-benchmarks",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "decide-compliance-gate-parity-across-tpc-benchmarks",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "decide-compliance-gate-parity-across-tpc-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "decide-compliance-gate-parity-across-tpc-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide gate-everything versus document-the-asymmetry, including the fate of existing corpus bundles",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "decide-compliance-gate-parity-across-tpc-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement the decision and record it where a future reader will find it",
+        "wid": "w2"
+      }
+    ]
+  }
+}

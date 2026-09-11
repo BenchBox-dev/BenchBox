@@ -1,0 +1,237 @@
+{
+  "description": "Four companion-file defects:\n1. build_plans_payload checks is_dataclass BEFORE hasattr(to_dict)\n   (schema.py:1074-1083), so QueryPlanDAG always serializes via asdict —\n   bypassing the depth-guarded to_dict, leaking the internal\n   fingerprint_integrity field (reproduced), and drifting from the designed\n   serialization.\n2. plans_by_query[query_id] = plan_entry is last-writer-wins: with multiple\n   iterations/streams only one plan per query survives, silently — plan\n   flapping across iterations is unobservable from a bundle.\n3. The companion bypasses anonymization: raw_explain_output is exported\n   verbatim even when anonymize=True (exporter.py:224 vs 253) — absolute\n   paths/usernames leak from \"anonymized\" bundles.\n4. _load_companion_file path arithmetic breaks on filenames with extra dots\n   (sf0.1) and the fallback str.replace(\".json\", ...) hits the first\n   occurrence anywhere in the path.\n\nFindings: F1.5, F1.6, F1.7.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "anonymize by mutating the in-memory result object",
+        "instead": "(not specified)",
+        "item_id": "qpc-07-plans-companion-hardening",
+        "why": "anonymize the payload copy only (mirror the main-file pattern)."
+      },
+      {
+        "dont": "silently drop plans for repeated query ids",
+        "instead": "(not specified)",
+        "item_id": "qpc-07-plans-companion-hardening",
+        "why": "either retain or count what was dropped."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "qpc-07-plans-companion-hardening",
+        "needs_item": "qpc-01-plan-rehydration-and-phases-view"
+      }
+    ],
+    "item_meta": {
+      "category": "Data Integrity / Privacy",
+      "completed_at": "2026-07-07T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing single-plan companions still load (backward-compatible reader)",
+        "item_id": "qpc-07-plans-companion-hardening"
+      },
+      {
+        "behavior": "canonical_json_text byte-stability",
+        "item_id": "qpc-07-plans-companion-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/results/anonymization.py AnonymizationManager",
+        "decision": "reuse",
+        "item_id": "qpc-07-plans-companion-hardening",
+        "path": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "concept": "benchbox/core/results/exporter.py:218-267 _export_json_v2 / _write_companion_files",
+        "decision": "reuse",
+        "item_id": "qpc-07-plans-companion-hardening",
+        "path": "benchbox/core/results/exporter.py:218-267"
+      },
+      {
+        "concept": "benchbox/core/results/loader.py:165-179 _load_companion_file",
+        "decision": "reuse",
+        "item_id": "qpc-07-plans-companion-hardening",
+        "path": "benchbox/core/results/loader.py:165-179"
+      },
+      {
+        "concept": "benchbox/core/results/schema.py:1043-1104 build_plans_payload",
+        "decision": "reuse",
+        "item_id": "qpc-07-plans-companion-hardening",
+        "path": "benchbox/core/results/schema.py:1043-1104"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-07-plans-companion-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "qpc-07-plans-companion-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "qpc-07-plans-companion-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/loader.py"
+      },
+      {
+        "item_id": "qpc-07-plans-companion-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "qpc-07-plans-companion-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_query_plan_serialization.py -q",
+        "description": "No internal fields leak; to_dict branch used",
+        "expected": "all pass, including fingerprint_integrity-absent assertion",
+        "item_id": "qpc-07-plans-companion-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_query_plan_serialization.py -q -k iteration",
+        "description": "Multi-iteration plans retained",
+        "expected": "all pass",
+        "item_id": "qpc-07-plans-companion-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results -q -k anonym",
+        "description": "Anonymized export contains no absolute paths in companion",
+        "expected": "all pass",
+        "item_id": "qpc-07-plans-companion-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-07-plans-companion-hardening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "qpc-07-plans-companion-hardening",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "qpc-07-plans-companion-hardening",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "qpc-07-plans-companion-hardening",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "qpc-07-plans-companion-hardening",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "qpc-07-plans-companion-hardening",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-07-plans-companion-hardening",
+        "notes": "_build_plan_entry now checks hasattr(to_dict) before is_dataclass, so QueryPlanDAG.to_dict() (depth-guarded, omits fingerprint_integrity) is used instead of asdict(). Added a test asserting the companion plan dict equals plan.to_dict() and excludes fingerprint_integrity.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: reorder serialization branches (to_dict first, asdict fallback); assert fingerprint_integrity is absent from exported payloads.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-07-plans-companion-hardening",
+        "notes": "SKIPPED (already satisfied): #976/#979 already key .plans.json by \"{query_id}#{stream_id}[:{test_type}]\" so multi-stream/cross-phase plans are never last-writer-wins collapsed. Verified there is no separate per-iteration capture axis to retain: capture_query_plan's docstring states iteration/stream sampling was retired -- the canonical model captures each distinct query exactly once in the isolated post-measurement phase, so a query_id+stream_id pair never produces more than one plan record. The YAML's `-k iteration` verification predates that retirement and has no corresponding scenario to test; the existing multi-stream/cross-phase tests are the applicable coverage.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: retain plans per (query_id, iteration, stream) in the companion instead of last-writer-wins; loader accepts both shapes.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-07-plans-companion-hardening",
+        "notes": "_write_companion_files now strips raw_explain_output (set to None) from a deep-copied plans payload when anonymize=True, mirroring the anonymize-a-copy pattern (does not mutate the in-memory result). Chose omission over partial regex/path scrubbing since raw_explain_output is opaque per-platform free text no existing AnonymizationManager helper is designed to safely scrub. Added anonymized/non-anonymized exporter tests.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: anonymize the plans payload when anonymize=True (paths/hostnames in raw_explain_output and operator properties).",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-07-plans-companion-hardening",
+        "notes": "Replaced the double with_suffix()/global str.replace with an exact basename swap; added a regression test with a result_sf0.1.json-style filename asserting the plans companion resolves to result_sf0.1.plans.json (not the corrupted result_sf0.plans.json).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: fix companion path arithmetic — exact basename suffix replacement (name[:-len('.json')] + suffix); regression test with sf0.1 style filenames.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-07-plans-companion-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Review: adversarial code review (companion schema-version handling on load, anonymization completeness).",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-07-plans-companion-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix: address review findings; re-run verification.",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-07-plans-companion-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Submit PR referencing qpc-07.",
+        "wid": "w7"
+      }
+    ]
+  }
+}

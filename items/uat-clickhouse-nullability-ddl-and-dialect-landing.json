@@ -1,0 +1,268 @@
+{
+  "context": "Treat 5f266e76f as prior art to supersede, not to merge. Decide the wrapping mechanism first (structured DDL via the existing ClickHouseDDLGenerator.generate_column_list vs corrected regex post-processing), implement key-aware wrapping, fix the generator manifest AND resolver, then prove with unit tests plus the three live cells (vector_search, datavault, tpcds).",
+  "description": "2026-07-21 adversarial UAT review finding (P0): the remediation that made ClickHouse vector_search and datavault SF=0.01 pass live exists ONLY as unmerged local commit 5f266e76f on branch fix/uat-clickhouse-loader-nullability-dialect (no remote, no PR). origin/develop@9f69c53c6 still loses all nullability: _optimize_table_definition (benchbox/platforms/clickhouse/workload.py:70-154) never adds Nullable(...), so bare DuckDB types from schema_primitives.py:52-56 reach ClickHouse as NOT NULL while the value converter correctly emits None (data_loading.py:2148-2203) -> live failures 'NoneType has no attribute year/tzinfo' (TPC-DS date/DataVault load_end_dts) and integer None rejection.\n\nThe stranded commit is NOT mergeable as-is; four defects found by review:\n1. Wraps Nullable onto tuning-key columns: 9 tuned TPC-DS tables (STORE_SALES SS_SOLD_DATE_SK partition + SS_CUSTOMER_SK/SS_STORE_SK/SS_PROMO_SK sorting, STORE_RETURNS, CATALOG_SALES, CATALOG_RETURNS, WEB_SALES, WEB_RETURNS, DATE_DIM, ITEM, CUSTOMER per tpcds_tuned.yaml) get Nullable columns in MergeTree ORDER BY/PARTITION BY; allow_nullable_key appears nowhere in benchbox/ -> schema-creation crash replaces the load crash.\n2. Greedy regex \\([^;\\n]*\\) corrupts compact single-line DDL when a paren-typed nullable column is not last (b Nullable(DECIMAL(10,2), c VARCHAR(5))); its own test only covers last position.\n3. Nullable(X) NOT NULL can be emitted if get_schema() nullability disagrees with rendered DDL (strip runs before wrap).\n4. A nullable FLOAT[N] would become Nullable(Array(...)), which ClickHouse rejects (latent).\n\nSame review, dialect side (P1, fully live on develop): resolve_csv_dialect's manifest branch is all-or-nothing (data_loading.py:189-197) -- partial metadata (vector_search writes only csv_has_header, generator.py:206) falls back to comma for .csv, discarding the benchmark's _csv_delimiter='|' (benchmark.py:94-95) -> embedding fields split on commas. 15+ platforms share the resolver. Correct fix is BOTH generator-side (self-describing manifest) and resolver-side (field-by-field fallback per the documented a->b->c precedence). 5f266e76f only fixes the resolver.\n\nAlso falsify/close during live verification: chdb/clickhouse-local file() path may silently coerce empty nullable fields to 0/epoch/'' via input_format_csv_empty_as_default (data_loading.py:2041-2059) -- corruption, not crash.\n\nThis item is the remaining implementation chunk of [[uat-clickhouse-server-loader-type-coverage]]; that umbrella's live TPC-DS closure is checkpoint w6/v4 here.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fabricate default values for genuinely nullable fields anywhere in the load path",
+        "instead": "preserve None end-to-end and make the DDL accept it",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "why": "silent corruption is worse than the current loud failure; None-preservation is tested behavior"
+      },
+      {
+        "dont": "fix only the resolver and leave the vector_search manifest partial",
+        "instead": "fix generator-side metadata AND the resolver fallback",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "why": "the data artifact should be self-describing; every downstream consumer of the manifest inherits the ambiguity otherwise"
+      },
+      {
+        "dont": "merge or cherry-pick 5f266e76f as-is",
+        "instead": "rework it; treat the branch as superseded prior art",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "why": "the commit corrupts compact DDL (greedy paren regex), breaks tuned TPC-DS, and its tests only cover last-position paren types"
+      },
+      {
+        "dont": "wrap Nullable onto ORDER BY/PARTITION BY/PRIMARY KEY columns without an explicit allow_nullable_key decision",
+        "instead": "exclude resolved key columns from wrapping, or set allow_nullable_key=1 deliberately with recorded rationale",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "why": "ClickHouse rejects Nullable key columns; tuned TPC-DS has 9 tables with nullable columns in tuning keys, so blind wrapping turns a load-time crash into a schema-creation crash"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-07-21T11:45:23Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "All 99 existing tests in test_clickhouse_adapter.py + test_csv_dialect.py stay green.",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing"
+      },
+      {
+        "behavior": "Non-nullable columns keep bare types + NOT NULL semantics; tuned and baseline ClickHouse DDL for them is byte-identical to today.",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing"
+      },
+      {
+        "behavior": "The converter's None-preservation contract (test_clickhouse_adapter.py:637-653): no fabricated 0/epoch/'' defaults anywhere.",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing"
+      },
+      {
+        "behavior": "Tuned TPC-DS CREATE TABLE succeeds for all 24 tables (the 9 key-affected tables are the regression surface).",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing"
+      },
+      {
+        "behavior": "clickhouse-local keeps the faster file() load path; the client-insert path stays gated to server deployment mode.",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "ClickHouseDDLGenerator.generate_column_list already renders Nullable(type) from structured ColumnDefinitions",
+        "decision": "extend",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "path": "benchbox/core/tuning/generators/clickhouse.py:299-323"
+      },
+      {
+        "concept": "_optimize_table_definition existing DDL rewrite pipeline (Nullable-NOT-NULL strip, FLOAT[N]->Array, ENGINE/ORDER BY append)",
+        "decision": "extend",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "path": "benchbox/platforms/clickhouse/workload.py:70-154"
+      },
+      {
+        "concept": "regex post-processing wrap + resolver field-by-field fallback + 59 lines of tests",
+        "decision": "supersede",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "path": "local branch fix/uat-clickhouse-loader-nullability-dialect @ 5f266e76f"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/clickbench/"
+      },
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/"
+      },
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/"
+      },
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tsbs_devops/"
+      },
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/vector_search/"
+      },
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_manifest_driven_loading.py"
+      },
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/test_csv_dialect.py -q",
+        "description": "Unit suites green incl. new key-exclusion and compact-DDL cases",
+        "expected": "all pass; includes Nullable-wrap-excluded-on-key-columns and mid-list DECIMAL(10,2) tests",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms -k 'clickhouse and tuned' -q",
+        "description": "Tuned TPC-DS DDL creates all tables",
+        "expected": "all 9 previously key-affected tables produce DDL ClickHouse accepts",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make uat-cell PLATFORM=clickhouse-server BENCHMARK=vector_search SCALE=0.01 && make uat-cell PLATFORM=clickhouse-server BENCHMARK=datavault SCALE=0.01",
+        "description": "Live cells on merged code",
+        "expected": "both cells pass; no NULL/type/dialect load errors",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpcds SCALE=0.01",
+        "description": "TPC-DS live closure (previously CPU-capped at 20min, never proven)",
+        "expected": "cell reaches a verdict with no load errors; if a runtime cap is hit again, record it and split a perf TODO instead of claiming closure",
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "notes": "Structured path is preferred if reachable from the workload mixin without breaking the ADR-3 single-renderer contract.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide wrapping mechanism: extend structured DDL (tuning/generators/clickhouse.py generate_column_list already emits Nullable) vs corrected regex post-processing; record decision + rationale in the PR",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Key-aware Nullable wrapping: never wrap columns present in resolved ORDER BY/PARTITION BY/PRIMARY KEY, or set allow_nullable_key=1 deliberately with recorded rationale; cover all 9 tuned TPC-DS tables",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Fix compact-DDL handling (greedy paren regex) with a mid-list DECIMAL(10,2) regression test; guard the Nullable(X) NOT NULL invariant (raise or strip, never emit)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "notes": "generator.py:206 is the write site. Other partial writers found by review: tsbs_devops:181, nyctaxi:301 (omit delimiter, accidentally safe), clickbench:397, joinorder_synthetic:732 (omit csv_has_header, default happens to be right).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "vector_search generator: add csv_delimiter '|' to manifest metadata; audit other partial-metadata writers and complete their dialect metadata",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Land resolver field-by-field fallback in resolve_csv_dialect matching the documented a->b->c precedence; preserve explicit-None csv_null_marker semantics (key-membership, not dict.get)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-nullability-ddl-and-dialect-landing",
+        "notes": "The chdb/clickhouse-local half falsifies the input_format_csv_empty_as_default silent-coercion hypothesis (data_loading.py:2041-2059): empty CSV fields into previously-non-Nullable columns must load as NULL post-fix, not 0/epoch/''.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Live checkpoint: clickhouse-server vector_search + datavault SF=0.01 cells pass on MERGED code; chdb/local empty-nullable-field load preserves NULL",
+        "wid": "w6"
+      }
+    ]
+  }
+}

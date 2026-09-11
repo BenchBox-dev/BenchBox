@@ -1,0 +1,262 @@
+{
+  "context": "1. G11 -- apply_table_tunings:\n   Extract `_apply_table_tunings_base(adapter, table_tuning, connection,\n   platform_name)` into a shared module (e.g., benchbox/platforms/base/tuning_utils.py\n   or as a mixin). The function handles the 97% common logic; platforms pass\n   their name for log messages. ImportError handling can use a try/except\n   with platform-specific fallback via a parameter or override.\n\n2. G12 -- Azure config builders:\n   Extract `_build_azure_compatible_config(host, port, database, ...)` into\n   a shared utility (e.g., benchbox/platforms/azure/config_utils.py).\n   Both LakeSail and Azure Synapse call the shared builder and apply\n   platform-specific overrides after.\n\n3. G16 -- Presto/Trino create_schema:\n   Add `create_schema(connection, catalog, schema_name, platform_name)` to\n   the existing benchbox/platforms/presto_trino_utils.py module from wave-2.\n   Both platforms delegate to this shared function.\n\n4. G18+G28 -- Azure Spark execution:\n   Extract `_execute_statement(session, code, ...)` and\n   `_wait_for_statement(session, statement_id, ...)` into\n   benchbox/platforms/azure/spark_execution_utils.py. Both Fabric and\n   Synapse Spark adapters import and call the shared implementations.\n\n5. G23 -- get_query_plan:\n   Extract `get_sql_query_plan(connection, query)` into\n   benchbox/platforms/base/sql_execution.py (which already has the\n   wave-2 execute_sql_query utility, or create a new plan_utils module).\n   All 5 platforms delegate to this utility.\n\n6. G24 -- Cloud URL parsing:\n   Extract `parse_cloud_url(url)` returning (bucket, path) into\n   benchbox/utils/cloud_urls.py or similar. Both ClickHouse Cloud and\n   Firebolt import and use the shared parser. Consider handling s3://,\n   gs://, and az:// patterns in one function.\n\n7. G26 -- Table name extraction:\n   Extract `extract_table_name(sql_statement)` into\n   benchbox/platforms/base/sql_utils.py. All 6 identical platforms\n   (firebolt, lakesail, presto, redshift, spark, trino) delegate to\n   this shared utility. The 4 divergent platforms (azure_synapse, athena,\n   fabric_warehouse, questdb) retain their platform-specific implementations\n   due to different regex patterns for bracket-quoting, EXTERNAL TABLE\n   support, schema-qualified names, and quote-handling respectively.\n",
+  "description": "Wave-3 duplicate-check triage (2026-03-12, post wave-2) identifies 7\nconsolidation-worthy groups in the SQL platform adapter layer. These are\nparallel implementations across platform adapters that can share a base\nimplementation via utilities, mixins, or extraction to existing shared modules.\n\nTargets (report rank -> dup lines):\n\nG11 (48 dup lines): apply_table_tunings in firebolt.py:1227, lakesail.py:604,\n    presto.py:1051. 3 copies with 97% identical logic: check has_any_tuning() ->\n    get partitioning columns -> sort by order -> log. Only ImportError handling\n    and log messages differ across platforms.\n\nG12 (47 dup lines): _build_lakesail_config and _build_synapse_config in\n    azure_synapse.py:1341 and lakesail.py:686. Identical Azure-compatible\n    config builder pattern. Both construct connection configs from the same\n    parameter set with platform-specific defaults.\n\nG16 (46 dup lines): create_schema in presto.py:635 and trino.py:647.\n    Byte-for-byte identical schema creation logic. Textbook extension of\n    the existing presto_trino_utils.py from wave-2 (which already holds\n    the shared _validate_catalog_exists utility).\n\nG18+G28 (88 dup lines combined): _execute_statement in\n    fabric_spark_adapter.py:419 and synapse_spark_adapter.py:402, plus\n    _wait_for_statement in fabric_spark_adapter.py:465 and\n    synapse_spark_adapter.py:448. Two pairs of identical methods in the\n    Azure Spark adapter family. Both adapters use the same Livy-based\n    statement execution and polling pattern.\n\nG23 (44 dup lines): get_query_plan across 5 platforms: athena.py:1193,\n    azure_synapse.py:1200, firebolt.py:1124, presto.py:958, trino.py:956.\n    Verbatim identical: cursor -> EXPLAIN query -> fetchall -> join rows.\n    No platform-specific differences whatsoever.\n\nG24 (44 dup lines): _parse_gcs_url and _parse_s3_url in\n    clickhouse_cloud.py:880/:904 and firebolt.py:999. Cloud storage URL\n    parsing utilities duplicated across platforms. These extract bucket\n    and path from gs:// and s3:// URLs using the same regex/split logic.\n\nG26 (44 dup lines): _extract_table_name across 6 platforms:\n    firebolt.py:1063, lakesail.py:504, presto.py:913, redshift.py:1692,\n    spark.py:539, trino.py:913. Identical SQL table name extraction from\n    CREATE TABLE with shared regex pattern (IF NOT EXISTS variant) and\n    try/except/pass structure. 4 additional platforms (azure_synapse:1102,\n    athena:1176, fabric_warehouse:1223, questdb:437) have platform-specific\n    regex variants (bracket-quoting, EXTERNAL TABLE, schema-qualified names,\n    quote-handling) and are excluded from this consolidation.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create a deep inheritance hierarchy for platform adapters",
+        "instead": "use standalone utility functions or thin mixins",
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "why": "platform adapters are frequently added/modified by contributors unfamiliar with the class hierarchy; utility functions are easier to discover and compose than deep class chains"
+      },
+      {
+        "dont": "merge Fabric and Synapse Spark adapters",
+        "instead": "extract only _execute_statement and _wait_for_statement",
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "why": "Fabric has workspace-scoped Lakehouse/Warehouse semantics that Synapse lacks; only the Livy execution layer is shared"
+      },
+      {
+        "dont": "merge Presto and Trino into a single adapter class",
+        "instead": "only share specific utilities via presto_trino_utils.py",
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "why": "they diverge on features (Trino adds fault-tolerant execution, Presto has different auth) and a merged class would accumulate platform-specific branches"
+      },
+      {
+        "dont": "over-generalize the tuning utility",
+        "instead": "only consolidate the specific 3 platforms (firebolt, lakesail, presto) that are 97% identical",
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "why": "other platforms (BigQuery, Snowflake, DuckDB) use radically different tuning mechanisms (clustering, micro-partitions, pragmas) and a universal abstraction would be leaky"
+      },
+      {
+        "dont": "use *args/**kwargs for the config builder",
+        "instead": "keep explicit parameters matching the current signatures",
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "why": "explicit parameters preserve type safety and IDE navigability across the 2 consuming adapters"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "needs_item": "dedup-wave3-ignore-rules"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-03-23T00:00:00Z",
+      "created_at": "2026-03-12T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Azure Spark statement execution and polling semantics unchanged",
+        "item_id": "dedup-wave3-sql-platform-adapters"
+      },
+      {
+        "behavior": "Azure config builders produce identical connection parameters",
+        "item_id": "dedup-wave3-sql-platform-adapters"
+      },
+      {
+        "behavior": "Cloud URL parsing returns identical (bucket, path) tuples",
+        "item_id": "dedup-wave3-sql-platform-adapters"
+      },
+      {
+        "behavior": "_extract_table_name returns identical table name strings from DDL",
+        "item_id": "dedup-wave3-sql-platform-adapters"
+      },
+      {
+        "behavior": "apply_table_tunings behavior identical per platform (including ImportError handling)",
+        "item_id": "dedup-wave3-sql-platform-adapters"
+      },
+      {
+        "behavior": "create_schema DDL output byte-for-byte identical for Presto and Trino",
+        "item_id": "dedup-wave3-sql-platform-adapters"
+      },
+      {
+        "behavior": "get_query_plan output format identical (newline-joined plan rows)",
+        "item_id": "dedup-wave3-sql-platform-adapters"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/"
+      },
+      {
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'firebolt or presto or trino or athena or azure or clickhouse or redshift or spark or lakesail'",
+        "description": "Platform adapter tests pass",
+        "expected": "exit code 0, no failures",
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make duplicate-check-verbose 2>&1 | grep -c 'apply_table_tunings\\|_build_lakesail_config\\|_wait_for_statement\\|_extract_table_name'",
+        "description": "Duplicate check shows reduction for targeted groups",
+        "expected": "0",
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "notes": "97% identical across platforms. Only ImportError handling differs.\nUse a platform_name parameter for log messages.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _apply_table_tunings_base into shared module, refactor firebolt/lakesail/presto",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "notes": "Both build connection configs from the same parameters.\nKeep platform-specific defaults as post-build overrides.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _build_azure_compatible_config utility, refactor lakesail and azure_synapse",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "notes": "Extends the existing wave-2 shared module.\nByte-for-byte identical logic.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add create_schema to presto_trino_utils.py, refactor both platforms",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "notes": "Two functions, both identical between Fabric and Synapse adapters.\nBoth use the same Livy session API.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract Azure Spark _execute_statement and _wait_for_statement into spark_execution_utils.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "notes": "Verbatim identical across athena, azure_synapse, firebolt, presto, trino.\nStandard EXPLAIN -> fetchall -> join pattern.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract get_sql_query_plan utility, refactor 5 platform adapters",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "notes": "URL parsing for s3:// and gs:// schemes.\nConsider a unified parser supporting both.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract parse_cloud_url utility, refactor clickhouse_cloud and firebolt",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "notes": "Same SQL parsing logic across firebolt, lakesail, presto, redshift, spark, trino.\nAll 6 use identical regex (IF NOT EXISTS variant) and try/except/pass structure.\n4 divergent platforms (azure_synapse, athena, fabric_warehouse, questdb) have\nplatform-specific regex and are excluded - different enough to not consolidate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract extract_table_name utility, refactor 6 platform adapters",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run platform-specific tests: pytest -k 'firebolt or lakesail or presto or trino or azure or spark or athena or clickhouse or redshift'",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-sql-platform-adapters",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full test suite to verify no regressions: make test-all",
+        "wid": "w9"
+      }
+    ]
+  }
+}

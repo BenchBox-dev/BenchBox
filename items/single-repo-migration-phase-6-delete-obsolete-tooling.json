@@ -1,0 +1,281 @@
+{
+  "description": "After the dev locus migration and v0.3.0 release on the new flow, delete\nthe now-obsolete machinery:\n  - 6 release scripts in scripts/\n  - benchbox/release/sync.py, workflow.py, content_validation.py\n  - HOLD_BACK_PATHS, ALLOWED_ROOT_FILES, _SOURCES_INCLUDE_PATHS,\n    transforms, etc. - all of it\n  - test files that covered held-back code or release machinery\n\nNet effect: thousands of lines deleted. The repo gets simpler; future\ncontributors have less surface area to learn.\n\nThis phase lands as a normal PR on public from ~/Developer/benchbox-public\n(the new dev locus). Squash-merge.\n\nPlan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 6).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete tests/unit/test_xdist_safety.py without checking",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "why": "it tested xdist behaviour that may still apply to the ambient CI in Phase 2; review before removing."
+      },
+      {
+        "dont": "delete update_version.py",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "why": "the new release flow depends on it; check it has no transitive imports of the deleted modules first (w6)."
+      },
+      {
+        "dont": "keep \"just in case\" wrappers around deleted scripts",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "why": "they accumulate; if you need any of these scripts back, pull them from git history."
+      },
+      {
+        "dont": "skip the test-suite run in w7",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "why": "deleting modules silently breaks importers; tests are the cheapest way to find them."
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-04-27T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The actual benchbox package functionality (CLI, MCP, platforms, benchmarks) is unchanged. Only the release-machinery is removed.",
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling"
+      },
+      {
+        "behavior": "benchbox/release/__init__.py may be retained as an empty stub if the package import structure relies on it; otherwise delete the whole directory.",
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling"
+      },
+      {
+        "behavior": "generate_changelog_entry.py from Phase 3 is retained - the Makefile release target uses it.",
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling"
+      },
+      {
+        "behavior": "update_version.py is retained - the Makefile release target uses it.",
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/release/"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "kind": "only_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/release/"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_*.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "ls scripts/ | grep -E 'automate_release|prepare_release|finalize_release|verify_release|build_release|sync_repos' | wc -l",
+        "description": "scripts/ no longer contains release machinery",
+        "expected": "0",
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "ls benchbox/release/ 2>/dev/null | grep -E 'sync\\.py|workflow\\.py|content_validation\\.py' | wc -l",
+        "description": "benchbox/release/ no longer contains sync or workflow modules",
+        "expected": "0",
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast",
+        "description": "Full test suite passes",
+        "expected": "all green",
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -l 'benchbox\\.release\\.(sync|workflow|content_validation)' --type py | wc -l",
+        "description": "No remaining references to deleted modules",
+        "expected": "0",
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "notes": "rg -l 'benchbox\\.release\\.(sync|workflow|content_validation)' --type py\nrg -l 'automate_release|prepare_release|finalize_release|verify_release|build_release|sync_repos|benchbox-sync' --type py --type md --type yaml\nMake a list. Each hit is either a deletion or an edit (to remove\nthe reference).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory consumers of the modules being deleted",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "notes": "git rm scripts/automate_release.py\ngit rm scripts/prepare_release.py\ngit rm scripts/finalize_release.py\ngit rm scripts/verify_release.py\ngit rm scripts/build_release.py\ngit rm scripts/sync_repos.py\nCheck .github/workflows/ for any workflow that calls these scripts\n(results-explorer-browser.yml? others?). Update or delete as needed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete the 6 release scripts and the .github/workflows entries that reference them",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "notes": "git rm benchbox/release/sync.py\ngit rm benchbox/release/workflow.py\nCheck benchbox/release/__init__.py - delete release-specific exports.\nFor content_validation.py: if you want em-dash checks, move them\ninto a pre-commit hook or CI step, then delete the module. If you\ndo not, just delete.\ngit rm benchbox/release/content_validation.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete benchbox/release/sync.py, workflow.py, content_validation.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "notes": "git rm -r tests/unit/release/\ngit rm tests/unit/test_release_scripts.py\ngit rm tests/unit/test_release_size_check.py\ngit rm tests/unit/test_release_exclusion_invariants.py\ngit rm tests/unit/test_release_fingerprint.py\ngit rm tests/unit/test_release_timestamps.py\ngit rm tests/unit/test_release_sync.py\nCheck tests/unit/test_xdist_safety.py - was it held back? If yes,\neither keep (now public) or delete with the rest.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete test files for the now-gone code",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "notes": "Search pyproject.toml for benchbox-sync, benchbox.release, and any\nother references to deleted code. Remove [project.scripts]\nbenchbox-sync entry if present. Trim hatch/setuptools excludes\nthat pointed at now-deleted paths (e.g., benchbox/release/**\nis moot if benchbox/release/ no longer exists).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update pyproject.toml to remove benchbox-sync entry point and excludes pointing at deleted paths",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "notes": "update_version.py is kept (used by Makefile release target).\nAudit its imports - it should not depend on workflow.py or sync.py.\nIf it does (per automate_release.py:34-41 it uses\nDOCUMENTATION_PATHS, update_landing_page_version, etc.), keep\nthose self-contained inside update_version.py.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Trim or delete update_version.py imports",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "notes": "uv run -- python -m pytest -m fast\nuv run ruff check .\nuv run ruff format --check .\nuv run ty check\nExpect import errors in remaining files that referenced the\ndeleted modules. Each error is either a stale import to delete\nor a function call to remove.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the full test suite and lint, fix import errors and reference cleanups",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-6-delete-obsolete-tooling",
+        "notes": "These three were superseded by this migration:\n  - unify-public-path-curation-predicate\n  - integrate-public-divergence-preflight-into-automate-release\n  - add-maintainer-release-guide\nThey were already moved to DONE during the same session that\ncreated this TODO. Verify their location and delete the planning\nfiles if any leftover.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retire the three obsolete TODOs created earlier today",
+        "wid": "w8"
+      }
+    ]
+  }
+}

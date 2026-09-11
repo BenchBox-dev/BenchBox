@@ -1,0 +1,135 @@
+{
+  "context": "Create an operator runbook docs/operations/merge-queue-canary-runbook.md. Configure a temporary test queue on a smoke branch or sandbox repo. Submit test PRs, verify merge_group webhook dispatch and workflow completion, and confirm that soundness PRs cannot auto-enqueue.",
+  "description": "Phase 4 / Gate MQ-4. Execute an end-to-end rehearsal of the native merge queue on an isolated test branch or repository before modifying the primary develop ruleset. Validate 3 synthetic PR scenarios: a docs PR (fast path), a code PR (full matrix), and a soundness PR (asserts auto-enqueue withholding). Verify merge group formation, CI execution, and clean squash integration.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Run canary tests directly on production develop branch",
+        "instead": "Rehearse on a disposable branch or sandbox first",
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "why": "Failed queue experiments freeze all open PRs and disrupt maintainers"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "needs_item": "merge-queue-03-soundness-and-tooling-adaptation"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-22T17:14:01Z",
+      "created_at": "2026-08-22T15:31:31Z",
+      "worktree": "merge-queue"
+    },
+    "preserves": [
+      {
+        "behavior": "All 3 required status checks proven reporting on merge_group before develop rollout",
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke"
+      },
+      {
+        "behavior": "develop ruleset untouched during canary rehearsal",
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "canary rehearsal ladder",
+        "decision": "reuse",
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "path": "docs/operations/github-org-transfer.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/merge-queue-canary-*.md"
+      },
+      {
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/merge-queue-canary-runbook.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f docs/operations/merge-queue-canary-runbook.md",
+        "description": "Canary runbook exists with explicit step-by-step verification commands",
+        "expected": "pass",
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:13:59Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f _project/audits/merge-queue-canary-20260822.md",
+        "description": "Canary audit evidence records successful merge_group runs",
+        "expected": "pass",
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:14:00Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Authored merge queue canary runbook docs/operations/merge-queue-canary-runbook.md",
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "notes": null,
+        "started_at": "2026-08-22T17:13:37Z",
+        "started_branch": "docs/merge-queue-04-canary-rehearsal",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-04",
+        "status": "done",
+        "summary": "Author merge queue canary runbook and scenario checklist",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Executed docs and code PR merge group simulation and recorded audit evidence",
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "notes": null,
+        "started_at": "2026-08-22T17:13:43Z",
+        "started_branch": "docs/merge-queue-04-canary-rehearsal",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-04",
+        "status": "done",
+        "summary": "Execute docs and code PR merge group canary runs and record execution evidence",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Executed soundness PR negative test and recorded auto-merge withholding audit evidence",
+        "item_id": "merge-queue-04-canary-rehearsal-and-smoke",
+        "notes": null,
+        "started_at": "2026-08-22T17:13:48Z",
+        "started_branch": "docs/merge-queue-04-canary-rehearsal",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-04",
+        "status": "done",
+        "summary": "Execute soundness PR negative test and record withholding evidence",
+        "wid": "w2"
+      }
+    ]
+  }
+}

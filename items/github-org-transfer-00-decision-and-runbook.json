@@ -1,0 +1,172 @@
+{
+  "context": "Write _project/decisions/github-org-transfer-benchbox-dev-2026-08-21.md citing strict-base-refresh-policy, merge-queue assessment, SHADOW_ONLY activation, and the Claude/Agy review disposition. Extend docs/operations/repo-admin-settings.md transfer section (or a linked docs/operations/github-org-transfer.md that the admin runbook indexes) with org domain verification, Pages serving vs publish, environment JSON including github-pages release-only branch policy, tag ruleset bypass User:57046, OIDC/PyPI dual publisher, secret authentication not name-presence, PAT/org policy, Actions allowed_actions, Codecov, scheduled-workflow liveness, never recreate joeharris76/BenchBox, never change JoinOrder manifest URL or answers default URL, never add develop bypass actors.",
+  "description": "Land the operator-binding decision record that authorizes transferring joeharris76/BenchBox to org BenchBox-dev without enabling merge queue, and expand the GitHub admin runbook so a transfer can be rebuilt from captured JSON rather than incomplete prose. This is Phase 1A / gate G1 docs only. Do not transfer the repository, change hosted settings, retarget public URLs, or enable a merge queue.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add develop-squash-only bypass actors to relieve CODEOWNERS self-approval",
+        "instead": "Preserve bypass_actors none and keep soundness-path pin-updates out of this program",
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "why": "Bypass would weaken the documented soundness gate"
+      },
+      {
+        "dont": "Instruct changing joinorder data_manifest.toml url or _DEFAULT_ANSWERS_BASE_URL",
+        "instead": "Rely on GitHub release redirects and never recreate the old owner/name",
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "why": "manifest identity hash includes url; published wheels hardcode the answers URL"
+      },
+      {
+        "dont": "Select or enable native merge queue, merge_group, or reduced refresh as part of this item",
+        "instead": "Cite SHADOW_ONLY and leave strict-base-refresh-07b dropped",
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "why": "Transfer availability is not queue authorization"
+      },
+      {
+        "dont": "Treat curl https://benchbox.dev/ as proof that Pages publish works",
+        "instead": "Document serving-only vs publish-path (release-branch deploy) and G7b",
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "why": "docs.yml deploys only on push to release"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-21T02:18:49Z",
+      "completed_pr": 1798,
+      "created_at": "2026-08-21T02:11:36Z",
+      "worktree": "github-org-transfer"
+    },
+    "preserves": [
+      {
+        "behavior": "CODEOWNERS stays @joeharris76",
+        "item_id": "github-org-transfer-00-decision-and-runbook"
+      },
+      {
+        "behavior": "No GitHub ownership or settings mutation in this TODO",
+        "item_id": "github-org-transfer-00-decision-and-runbook"
+      },
+      {
+        "behavior": "PyPI project name benchbox and domain benchbox.dev are unchanged",
+        "item_id": "github-org-transfer-00-decision-and-runbook"
+      },
+      {
+        "behavior": "SHADOW_ONLY remains the refresh policy",
+        "item_id": "github-org-transfer-00-decision-and-runbook"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "SHADOW_ONLY selected; 07b blocked",
+        "decision": "reuse",
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "path": "_project/decisions/strict-base-refresh-activation-2026-08-14.md"
+      },
+      {
+        "concept": "transfer-sensitive inventory and DEFER on queue",
+        "decision": "extend",
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "path": "_project/decisions/strict-base-refresh-merge-queue-2026-08-14.md"
+      },
+      {
+        "concept": "live admin runbook and incomplete transfer restore steps",
+        "decision": "extend",
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "path": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings, ownership, rulesets, secrets, environments, Pages"
+      },
+      {
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/github-org-transfer-benchbox-dev-2026-08-21.md"
+      },
+      {
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/github-org-transfer.md"
+      },
+      {
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'BenchBox-dev|SHADOW_ONLY|manifest_hash|_DEFAULT_ANSWERS_BASE_URL|bypass_actors|G7b|admin:org' _project/decisions/github-org-transfer-benchbox-dev-2026-08-21.md",
+        "description": "Decision record names destination, queue-off, JoinOrder/answers URL freeze, no develop bypass, and G0-G7b gates",
+        "expected": "those tokens present",
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "last_result": "pass",
+        "last_run": "2026-08-21T02:18:46Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'protected_domain|serving-only|deployment-branch|never recreate|RULESET_DRIFT_TOKEN' docs/operations/repo-admin-settings.md docs/operations/github-org-transfer.md",
+        "description": "Runbook covers Pages serving vs publish, org domain verification, environment JSON, and never recreate old owner/name",
+        "expected": "transfer restore surfaces present",
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "last_result": "pass",
+        "last_run": "2026-08-21T02:18:47Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --name-only origin/develop...HEAD -- .github/workflows",
+        "description": "This TODO does not change workflows",
+        "expected": "no output",
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "last_result": "pass",
+        "last_run": "2026-08-21T02:18:47Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "decision record landed with gates G0-G7b, SHADOW_ONLY, manifest_hash freeze",
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "notes": null,
+        "started_at": "2026-08-21T02:13:38Z",
+        "started_branch": "docs/github-org-transfer-00-decision-runbook",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-docs-github-org-transfer-00",
+        "status": "done",
+        "summary": "Write the BenchBox-dev transfer decision record with gates, non-goals, and review disposition",
+        "wid": "w0"
+      },
+      {
+        "evidence": "docs/operations/github-org-transfer.md plus repo-admin-settings transfer section",
+        "item_id": "github-org-transfer-00-decision-and-runbook",
+        "notes": null,
+        "started_at": "2026-08-21T02:14:58Z",
+        "started_branch": "docs/github-org-transfer-00-decision-runbook",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-docs-github-org-transfer-00",
+        "status": "done",
+        "summary": "Expand the admin transfer restore runbook with post-review surfaces",
+        "wid": "w1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "context": "AGENTS.md is the front door for contributors and AI agents. It should\nlink out to depth, not contain it. Each new section: 2-5 sentences + a\nlink to the deep-dive in /docs/development/.\n\nFor tests/README.md, treat it as onboarding doc for \"I want to write a\nnew test in BenchBox\" - explain the marker system, the lock, the macOS\nquirk, and where to put fast vs slow tests.\n",
+  "description": "Quality plan Phase 4f/4g. AGENTS.md is referenced as the canonical contributor\n& agent guide but is only 98 lines - too thin to actually be canonical.\nPromote frequently-needed patterns from /docs/development/ into AGENTS.md\nso contributors and AI agents have one source of truth.\n\nSeparately, tests/conftest.py:52-209 implements a sophisticated file-based\ninter-process test lock with a macOS-specific workaround at lines 109-122.\nThis is undocumented, fragile, and surprises new contributors. Add a\ntests/README.md explaining what the lock does, why it exists, and when\nthe macOS branch fires.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "document the macOS conftest branch by paraphrasing the code",
+        "instead": "quote the exact lines (109-122) and explain why",
+        "item_id": "quality-expand-agents-md-and-document-test-lock",
+        "why": "rewrites rot"
+      },
+      {
+        "dont": "duplicate content from /docs/development/ into AGENTS.md",
+        "instead": "summarize in 2-5 sentences and link",
+        "item_id": "quality-expand-agents-md-and-document-test-lock",
+        "why": "the two will drift out of sync"
+      },
+      {
+        "dont": "let AGENTS.md exceed 300 lines",
+        "instead": "move depth to /docs/development/",
+        "item_id": "quality-expand-agents-md-and-document-test-lock",
+        "why": "it stops being a quick reference"
+      }
+    ],
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "completed_at": "2026-04-12T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "AGENTS.md remains a quick reference, not a 1000-line tome - target ≤ 300 lines",
+        "item_id": "quality-expand-agents-md-and-document-test-lock"
+      },
+      {
+        "behavior": "Existing /docs/development/ structure unchanged",
+        "item_id": "quality-expand-agents-md-and-document-test-lock"
+      },
+      {
+        "behavior": "Test runtime/behavior unchanged (this is doc-only)",
+        "item_id": "quality-expand-agents-md-and-document-test-lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --with markdownlint-cli2 markdownlint-cli2 AGENTS.md tests/README.md",
+        "description": "AGENTS.md is well-formed markdown",
+        "expected": "no errors",
+        "item_id": "quality-expand-agents-md-and-document-test-lock",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --with linkchecker linkchecker AGENTS.md tests/README.md",
+        "description": "Local cross-links resolve without requiring external network access",
+        "expected": "no broken links",
+        "item_id": "quality-expand-agents-md-and-document-test-lock",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-expand-agents-md-and-document-test-lock",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quality-expand-agents-md-and-document-test-lock",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-expand-agents-md-and-document-test-lock",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Expand AGENTS.md with 5 sections (+80-120 lines, ≤300 total, ~2h): timing policy, result validation, adapter authoring pointer, dep upper-bounds reference, test markers cheat sheet",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-expand-agents-md-and-document-test-lock",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write tests/README.md (~100-150 lines) covering: (a) marker taxonomy, (b) the inter-process lock contract, (c) the macOS conftest branch, (d) how to add a new test category (~2 hours)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-expand-agents-md-and-document-test-lock",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cross-link AGENTS.md ↔ tests/README.md ↔ docs/development/ so the entry points are obvious (~30 min)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "context": "The pipeline currently loads each bundle exactly once into memory to\nbuild manifest + details. Extend that same pass: maintain a dict\nkeyed by (benchmark, scale_factor, phase) that accumulates platform\nrows as each bundle is processed. At the end of the pass, emit one\nBenchmarkSummary per key.\n\nDo not refactor the pipeline architecture for this change. Add the\naccumulator and the emission step. Nothing else.\n\nFor phase handling: schema-v2 bundles already carry a `test_type`\n(\"power\" or \"throughput\"). Use that field to route each platform row\ninto the right accumulator bucket. Bundles without an explicit\ntest_type default to \"power\" (matches current CLI behavior).\n",
+  "description": "The strategy review (2026-04-15) identified that the explorer's current\ndata model - manifest.json (aggregate only) + details/{id}.json (one file\nper result) - cannot support a ClickBench-style Platform × Query matrix\nleaderboard without N parallel detail fetches assembled client-side. That\napproach is slow, fragile, and silently breaks when platforms run\nheterogeneous query subsets.\n\nThis TODO introduces a third derived artifact shape emitted by the\nexplorer pipeline:\n\n    results-explorer/public/data/benchmarks/{benchmark}_sf{sf}_{phase}.json\n\nOne file per (benchmark, scale_factor, phase) tuple, containing the full\ncross-platform query matrix pre-computed from already-loaded bundles (no\nextra I/O - the pipeline already has everything in memory during its\nsingle pass).\n\nKey schema decisions driven by the adversarial review:\n\n1. Key includes **phase** (not just benchmark/scale). The proposal that\n   keyed on (benchmark, scale) alone silently collapses power vs\n   throughput vs maintenance phases. Making phase part of the filename\n   makes the scope of each matrix explicit and URL-addressable.\n\n2. Tuning_mode is a per-platform-row field, not an artifact-level filter.\n   Two DuckDB rows with different tuning modes occupy different matrix\n   rows; the UI labels them as such.\n\n3. Each row carries `power_score` (for TPC-H/TPC-DS), `geomean_ms`, and\n   `cost_usd` so the UI can choose ranking metric per benchmark family\n   without a second fetch.\n\n4. Sparse matrices: platforms that ran a subset of queries produce\n   `null` in the missing cells, never crash the build.\n\n5. Artifacts are gzipped on write (`*.json.gz`). TPC-DS SF100 with 30\n   platforms × 99 queries × throughput streams can reach 200-500KB raw;\n   gzip cuts that ~5×. Loader handles both for local dev convenience.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "collapse tuning modes into a single row per platform",
+        "instead": "each (platform, tuning_mode) gets its own row",
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "why": "tuned vs notuning is a comparability-breaking dimension"
+      },
+      {
+        "dont": "default missing power_score to 0",
+        "instead": "use null and document the fallback (display_geomean_ms)",
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "why": "that would sort broken results to the top"
+      },
+      {
+        "dont": "fan out into additional bundle loads",
+        "instead": "use in-memory accumulation only",
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "why": "the pipeline is already O(N) bundles"
+      },
+      {
+        "dont": "key the artifact on (benchmark, scale) alone",
+        "instead": "include phase in the key",
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "why": "it silently mixes power and throughput phases"
+      },
+      {
+        "dont": "populate timings cells from the first raw QueryTiming row",
+        "instead": "use display_ms from QueryDisplayTiming (median of passing runs)",
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "why": "the first row is the cold-cache outlier"
+      },
+      {
+        "dont": "use geomean_ms (raw all-sample) for display ranking",
+        "instead": "use display_geomean_ms from the read-model contract reduction",
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "why": "it averages cold-cache and throughput-stream rows"
+      },
+      {
+        "dont": "use platform string directly as the matrix row key",
+        "instead": "use platform_id from the read-model contract",
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "why": "it may include trust suffixes producing spurious duplicate rows"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "needs_item": "explorer-fix-read-model-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-15T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing details/{id}.json per-result pages - detail page consumers must continue to work",
+        "item_id": "explorer-emit-benchmark-summary-artifact"
+      },
+      {
+        "behavior": "Existing manifest.json schema - new artifact is additive; do not remove or reshape manifest fields",
+        "item_id": "explorer-emit-benchmark-summary-artifact"
+      },
+      {
+        "behavior": "ExplorerPipeline.run() remains a single pass over bundles - no extra bundle loads introduced",
+        "item_id": "explorer-emit-benchmark-summary-artifact"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/explorer.py"
+      },
+      {
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer/exporter.py"
+      },
+      {
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer/models.py"
+      },
+      {
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer/pipeline.py"
+      },
+      {
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/public/data/benchmarks/**"
+      },
+      {
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer/test_benchmark_summary.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m benchbox.cli explorer build --dry-run 2>&1 | grep -c 'benchmarks/.*_sf.*_.*\\.json'",
+        "description": "Pipeline emits a summary artifact per (benchmark, scale, phase) tuple",
+        "expected": "non-zero integer matching unique (benchmark, scale, phase) count",
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer/test_benchmark_summary.py -v",
+        "description": "Unit tests pass",
+        "expected": "all tests pass",
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'import gzip, json; d = json.loads(gzip.open(\"results-explorer/public/data/benchmarks/tpch_sf0.01_power.json.gz\").read()); assert \"platforms\" in d and \"query_ids\" in d'",
+        "description": "Generated artifact round-trips through gzip + JSON",
+        "expected": "no assertion failure",
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "notes": "BenchmarkSummary fields: benchmark, scale_factor, phase, query_ids\n(ordered), platforms (list of PlatformRow), cell_reduction (string\ndocumenting the reduction policy, e.g.\n\"median_successful_measurement_ms\"), ranking (from\nRANKING_METRIC_BY_FAMILY, set by explorer-align-ranking-metric-with-tpc-standards).\n\nPlatformRow fields:\n  result_id, platform_id (canonical), platform (raw display name),\n  platform_version, tuning_mode, tuning_hash, execution_mode,\n  trust_label, run_date, is_ranking_eligible (bool),\n  power_score (nullable), display_geomean_ms (from read-model contract\n  display reduction - NOT raw geomean_ms), sample_geomean_ms (raw,\n  for audit), cost_usd (nullable),\n  timings (dict query_id → display_ms from QueryDisplayTiming, null\n  per missing cell - NOT the first raw duration_ms row).\n\nThe distinction between display_geomean_ms and sample_geomean_ms is\ncritical: the matrix cells MUST use display_ms values (median of\npassing runs per logical query), not raw per-sample rows. See\nexplorer-fix-read-model-contract for the reduction definition.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define BenchmarkSummary + PlatformRow Pydantic models in benchbox/core/explorer/models.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "notes": "Zero additional disk I/O - accumulate from detail results already\nloaded in the single-pass scan. Phase values: \"power\" and\n\"throughput\" in Phase 1. Use the same sf_str formatting as existing\nmanifest paths.\n\nCanonical-row selection: for each (platform_id, benchmark, scale,\nphase) group, call `select_canonical_row()` from the read-model\ncontract to pick the default ranked row. Non-canonical variants\n(different tuning modes, trust tiers) are included as additional\nPlatformRows marked `is_ranking_eligible: false`. This lets the\nmatrix default view show one row per platform while the \"All\nvariants\" filter reveals the full set.\n\nSort canonical rows first by `is_ranking_eligible` descending, then\nby primary ranking metric (power_score or display_geomean_ms).\nNon-eligible rows follow in the same metric order.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend ExplorerPipeline.run() to emit benchmarks/{b}_sf{sf}_{phase}.json.gz per (benchmark, scale, phase) tuple",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "notes": "Cases: (a) normal multi-platform; (b) sparse query subset\n(platform missing Q17 → null cell); (c) mixed tuning modes produce\ndistinct rows; (d) phase separation (power and throughput produce\nseparate files); (e) gzip output is valid and round-trips.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write unit tests in tests/unit/core/explorer/test_benchmark_summary.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-emit-benchmark-summary-artifact",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate artifacts (uv run benchbox explorer build) and commit refreshed data/ tree",
+        "wid": "w4"
+      }
+    ]
+  }
+}

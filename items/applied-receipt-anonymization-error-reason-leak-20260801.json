@@ -1,0 +1,188 @@
+{
+  "context": "Two layers. Downstream: _sanitize_applied_receipt pops receipt['error'] (replace with error_redacted:true) and redacts entries[].reason unless it matches a known code-authored template. Upstream (the durable fix): stop interpolating raw exception text and parsed table identifiers into reason - carry a stable code-token reason (e.g. 'introspection_degraded', 'absent_in_catalog') plus a detail field that is already on the drop list. Extend the same policy to dropped[] (scrub or enforce the convention with a lint/test). Add the missing test coverage: the existing test (tests/unit/core/results/test_applied_ledger_export.py:109-159) never exercises a receipt.",
+  "description": "From the 2026-07-31 adversarial review (leak demonstrated by executing the real scrub code).\n\nLeak 1: IntrospectionReceipt.to_payload() emits a top-level 'error' (benchbox/core/tuning/introspection.py:211-212), and every degraded entry gets reason=f'introspection degraded: {state_error}' (introspection.py:531) where state_error embeds the raw driver exception from the platform introspectors (clickhouse/introspection.py:78, duckdb_introspection.py:61, snowflake_introspection.py:99) - connection strings, hostnames, usernames, cert paths. _sanitize_applied_receipt (benchbox/core/results/exporter.py:478-503) pops statement/diff/evidence/table/name/columns but never receipt['error'], and deliberately retains 'reason' (docstring wrongly classifies reason as structural). After ResultExporter(anonymize=True) the 'anonymized' companion still contains the full raw driver string in applied_receipt.receipt.error and entries[].reason - next to statement_redacted:true.\n\nLeak 2: ABSENT verdicts set reason=f'no {intent.kind} on {intent.table} found in catalog' (introspection.py:553); intent.table is captured by [^\\s(]+ regexes so it carries fully-qualified catalog.schema.table - the exact identifier class the exporter pops from the sibling 'table' field.\n\nPropagation: the explorer pipeline ingests the receipt verbatim (_project/scripts/explorer_pipeline/transformer.py:303-332), RunReceipt.tsx:371 renders reason, and publish/submit copy companions byte-for-byte (benchbox/validation/bundle.py COMPANION_SUFFIXES, cli/commands/submit.py:665-667), so export-time scrubbing is the only gate. Contradicts the design note's own claim at docs/development/tuning-introspection-receipts.md:136-137 ('Anonymized exports scrub the receipt's free-text / identifier fields exactly like the ledger statements').\n\nAdjacent smell (fix here too): dropped[].intent/reason are retained wholesale on an unenforced 'code-authored strings' convention (exporter.py:424-426); today's call sites are safe (duckdb.py:1360-1376) but nothing stops a future adapter passing exception text into record_dropped.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not fix by dropping the receipt entirely from anonymized exports",
+        "instead": "scrub the free-text fields and keep the structured verdicts",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "why": "the receipt is the corroboration evidence and the whole point of the feature"
+      },
+      {
+        "dont": "Do not regex-redact hostnames/paths out of the raw error string",
+        "instead": "replace free text with code tokens and *_redacted markers, keeping raw detail only in fields already dropped",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "why": "denylist scrubbing of arbitrary driver text is unwinnable; the exporter's model is field-drop, not content-filtering"
+      },
+      {
+        "dont": "Do not weaken the existing statement/table/evidence drops while refactoring",
+        "instead": "extend the drop list; never shrink it",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "why": "they are the currently-working half of the policy, pinned by tests"
+      }
+    ],
+    "item_meta": {
+      "category": "Security and Privacy",
+      "completed_at": "2026-08-01T15:05:54Z",
+      "completed_pr": 1404,
+      "created_at": "2026-08-01T12:28:56Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Non-anonymized exports keep full statement/error/reason text - the honest local record must not lose diagnostics.",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801"
+      },
+      {
+        "behavior": "Receipt structure stays backward-compatible for the explorer's verbatim ingestion (additive markers only, no renamed fields).",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801"
+      },
+      {
+        "behavior": "The upgrade gate's fail-closed behavior on degraded introspection is unchanged; only the TEXT carried in the receipt changes.",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801"
+      },
+      {
+        "behavior": "Verdicts, summary counts, and the corroborated flag are untouched by scrubbing - anonymization must never change trust semantics.",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/result_capture.py"
+      },
+      {
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/applied_ledger.py"
+      },
+      {
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/introspection.py"
+      },
+      {
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/development/tuning-introspection-receipts.md"
+      },
+      {
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/**"
+      },
+      {
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_applied_ledger_export.py -q",
+        "description": "Anonymized companion carries no raw introspection error text (post-fix probe)",
+        "expected": "receipt-bearing anonymization tests pass, including hostname/qualified-table negative assertions",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T14:11:55Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -nE \"reason=f.*(state_error|intent\\.table)\" benchbox/core/tuning/introspection.py",
+        "description": "Grep guard: no f-string interpolation of state_error or intent.table into receipt reasons",
+        "expected": "exit 0: reasons are code tokens; raw detail lives only in droppable fields",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T14:11:57Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite green",
+        "expected": "no regressions",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T14:13:38Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added hostile receipt.error, degraded/ABSENT reason, and dropped intent/reason regression in test_applied_ledger_export.py; focused test failed before implementation with secret.internal and private identifiers present.",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "notes": "Add failing tests: anonymized export of a companion whose receipt carries error='...host secret.internal...' and entries with degraded/ABSENT reasons must contain neither the hostname nor the fully-qualified table anywhere in the serialized output; include a dropped[] entry carrying hostile text.",
+        "started_at": "2026-08-01T14:04:26Z",
+        "started_branch": "fix/applied-receipt-anonymization-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Add failing tests: anonymized companion must not contain hostnames from receipt.error, degraded/ABSENT reasons, or hostile dropped[] text",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Exporter now removes receipt.error/reasons/details with additive markers and replaces top-level or nested dropped entries with count-preserving redaction markers; focused anonymization tests pass.",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "notes": "Exporter: _sanitize_applied_receipt pops receipt['error'] (add error_redacted marker) and redacts/tokenizes entries[].reason; apply the same policy to dropped[] entries; update the exporter docstring that misclassifies reason as structural.",
+        "started_at": "2026-08-01T14:06:35Z",
+        "started_branch": "fix/applied-receipt-anonymization-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Exporter: pop receipt.error (error_redacted marker), redact/tokenize entries[].reason, scrub dropped[]; fix docstring misclassifying reason as structural",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Receipt reasons are code-authored templates; degraded raw driver text moved to additive detail and ABSENT table identity remains only in the structural table field; grep guard and focused tests pass.",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "notes": "Upstream reason hygiene: introspection.py builds reasons from code-constant templates; raw exception text moves to a droppable detail field and intent.table is no longer interpolated into ABSENT reasons (or is carried only in the already-dropped table field).",
+        "started_at": "2026-08-01T14:06:38Z",
+        "started_branch": "fix/applied-receipt-anonymization-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Upstream reason hygiene: code-constant reason tokens; raw exception text and intent.table move to droppable fields",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Documented exact receipt/dropped scrub fields and markers, non-anonymized diagnostic retention, and explorer verbatim ingestion as the reason export anonymization is the sole publication gate.",
+        "item_id": "applied-receipt-anonymization-error-reason-leak-20260801",
+        "notes": "Verify the design-note claim at tuning-introspection-receipts.md:136-137 is true after the fix and extend it to name the exact scrubbed fields; note the explorer renders receipt text verbatim so export-time scrubbing is the only gate.",
+        "started_at": "2026-08-01T14:08:34Z",
+        "started_branch": "fix/applied-receipt-anonymization-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Docs: make the receipts.md:136-137 scrub claim true and explicit; note the explorer renders receipt text verbatim",
+        "wid": "w4"
+      }
+    ]
+  }
+}

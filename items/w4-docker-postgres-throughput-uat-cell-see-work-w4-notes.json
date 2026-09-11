@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #497 of throughput-uat-and-ci-coverage.\nDeferred: w4 (Docker Postgres throughput UAT cell) -- see work[].w4 notes.\n\nReason deferred: Time/scope: a materially larger lift than w1-w3, deserves its own pass.\n",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:35Z",
+      "worktree": "main"
+    }
+  }
+}

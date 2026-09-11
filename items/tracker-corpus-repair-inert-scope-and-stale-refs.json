@@ -1,0 +1,111 @@
+{
+  "context": "Sweep `todo lint --all` for the inert-deny and deleted-from-the-tree findings. For each flagged item: if unclaimed and clearly this-repo work, drop with 'Successor: <new-id>' and re-create with corrected scope/ladder (runner.py -> benchbox/core/runner/, result_capture.py -> result_factory.py or the intended target, annotations moved from path_glob into the description, todo_cli.py/validate_todo.py replaced with todo_db.py equivalents). Leave items actively claimed by other sessions with a deferral note instead.",
+  "description": "The 2026-08-01 lint hardening (PRs #1387, #1431) made 21 standing corpus defects visible on open items: do_not_modify rules that cannot match any real path (6 items deny benchbox/core/runner.py which is shadowed by the runner/ package; 3 items created 2026-08-01 deny benchbox/core/results/result_capture.py which never existed - near-miss result_factory.py 0.76; an annotated-glob cluster e.g. 'scripts/generate_corpus_inventory.py (item 4, done)') and stale references to files deleted in the G5 cutover (#1232): _project/scripts/todo_cli.py in 6 items, validate_todo.py in 5. Lint flags them; the items themselves still carry the broken rules, and each deny that matches nothing protects nothing TODAY. Scope and ladders are create-time-only, so every repair is a drop with a successor-naming reason plus a corrected re-create - coordinate per item owner; several belong to other sessions' planning stock.",
+  "legacy": {
+    "item_meta": {
+      "category": "Tracker integrity",
+      "created_at": "2026-08-01T20:21:27Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Every drop names its successor per drop semantics",
+        "item_id": "tracker-corpus-repair-inert-scope-and-stale-refs"
+      },
+      {
+        "behavior": "Items claimed by live sessions are deferred, not dropped from under them",
+        "item_id": "tracker-corpus-repair-inert-scope-and-stale-refs"
+      },
+      {
+        "behavior": "Tracker-state-only work: no repository files change (deny scope pins this)",
+        "item_id": "tracker-corpus-repair-inert-scope-and-stale-refs"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tracker-corpus-repair-inert-scope-and-stale-refs",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "tracker-corpus-repair-inert-scope-and-stale-refs",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "tracker-corpus-repair-inert-scope-and-stale-refs",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! (_project/scripts/todo lint --all | grep -qE \"do_not_modify .*(annotation|package directory|suspiciously close)|deleted from the tree\")",
+        "description": "no open item carries an inert deny rule or a deleted-file reference",
+        "expected": "exits 1 on the unfixed backlog (verified 2026-08-01, hosted backend: 21 matching findings); exits 0 once every flagged item is repaired or explicitly deferred with the finding gone. Needs the hosted tracker env.",
+        "item_id": "tracker-corpus-repair-inert-scope-and-stale-refs",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q -k 'inert_deny or deny_rule or deleted_path or stale_reference'",
+        "description": "the lint checks that power this sweep still pass their own suites",
+        "expected": "all pass before and after - regression guard, not a gate",
+        "item_id": "tracker-corpus-repair-inert-scope-and-stale-refs",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tracker-corpus-repair-inert-scope-and-stale-refs",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tracker-corpus-repair-inert-scope-and-stale-refs",
+        "needs_wid": "w0",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tracker-corpus-repair-inert-scope-and-stale-refs",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-run the lint sweep and enumerate current offenders with owners",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tracker-corpus-repair-inert-scope-and-stale-refs",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Drop and re-create the unclaimed offenders with corrected scope and ladders, naming successors",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tracker-corpus-repair-inert-scope-and-stale-refs",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record deferral notes on offenders owned by live sessions",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,230 @@
+{
+  "context": "Investigation-first TODO: w0/w1 are mandatory before any code. The\nscope_limit below is deliberately broad for the INVESTIGATION only; w1\nmust pin the actual seam (expected: the validation module producing\nsummary.validation, possibly tpch/throughput_test.py where seed\nprovenance is known) and w2+ must stay within the pinned files. Keep the\nchange scoped to validation policy; do not touch execution. This is\ncomparator/validation-adjacent code -- check .github/CODEOWNERS: if the\ntouched paths are soundness-critical, the PR waits for Code Owner review\ninstead of auto-merge (call it out in the PR body).\n",
+  "description": "DECISION (user, 2026-07-11): fix this as part of the UAT hardening effort.\nIt is the single defect that neutralizes the nightly throughput UAT gate.\n\nThe defect (documented in .github/workflows/nightly.yml:580-595 and\ntests/uat/throughput.py:116-129, verified on develop @ fc31f3604):\nTPC-H throughput mode derives per-stream/per-position query parameters as\n`seed + stream_id * 1000 + position`\n(benchbox/core/tpch/throughput_test.py), so queries 11/16/18/20 -- TPC-H's\nparameter-sensitive, answer-set-boundary queries -- never land on the\nreference-seed exact-match validation path after the first query of\nstream 0. They then fail BenchBox's LOOSE (+-50%) row-count check on\nevery stream. Reproduced upstream with a custom seed, a different custom\nseed, and no seed at all; confirmed independent of concurrency (same 4\nqueries fail in single-stream POWER mode with a non-reference seed).\n\nConsequence: every throughput cell is permanently red, which forced\n`continue-on-error: true` on the nightly sweep (nightly.yml:596) and\nreduced the CI signal to a single stream-count assertion. Restoring the\ngate (nightly-throughput-gate-restoration) depends on this fix.\n\nPrior-art policy to mirror: the bounded correctness gate ALREADY excludes\nQ11/Q16/Q18/Q20 \"for answer-set boundary sensitivity\"\n(docs/operations/release-guide.md:33-35); the fix brings the loose\nvalidation path in line with that established policy instead of inventing\na new one. Expected shape: when a query's substitution parameters differ\nfrom the reference seed AND the query is in the documented\nparameter-sensitive set, row-count validation records\n\"not validated (parameter-sensitive, non-reference params)\" instead of a\nfailure; validation status for the run treats these as neither pass nor\nfail (mirroring how the correctness gate's exclusion works). Value: a\nclean throughput run becomes achievable and Throughput@Size is computed,\nun-neutralizing validate_throughput_metric.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "exclude the 4 queries unconditionally",
+        "instead": "(not specified)",
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "why": "reference-seed runs must keep validating them."
+      },
+      {
+        "dont": "special-case inside tests/uat",
+        "instead": "(not specified)",
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "why": "the fix belongs in benchbox core so every consumer (CLI runs, UAT, nightly) benefits."
+      },
+      {
+        "dont": "widen the loose tolerance band to make the queries pass",
+        "instead": "(not specified)",
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "why": "that weakens validation for every query."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "tpch-throughput-seed-validation-fix",
+        "id": 616,
+        "reason": "Requires per-parameter answer-set computation; the exclusion mirrors the established correctness-gate policy and unblocks the gate now. Track as a future strengthening.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Exact match: open item tpch-throughput-parameter-aware-rowcounts already tracks parameter-aware Q11/16/18/20 row counts.",
+        "summary": "Parameter-aware expected row counts for Q11/16/18/20 (deriving expectations per seed instead of excluding)"
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness / Data Integrity",
+      "completed_at": "2026-07-11T00:00:00Z",
+      "created_at": "2026-07-11T00:00:00Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "Per-stream seed derivation formula unchanged (it is TPC-compliant stream permutation behavior).",
+        "item_id": "tpch-throughput-seed-validation-fix"
+      },
+      {
+        "behavior": "Reference-seed runs keep EXACT-match validation for all queries including Q11/16/18/20 -- the exclusion applies only to non-reference parameters.",
+        "item_id": "tpch-throughput-seed-validation-fix"
+      },
+      {
+        "behavior": "TPC-H/TPC-DS throughput success-gate defaults (0.99/0.70) from PR #1106 unchanged.",
+        "item_id": "tpch-throughput-seed-validation-fix"
+      },
+      {
+        "behavior": "The correctness gate (make test-correctness-gate) behavior and its exclusion list are untouched.",
+        "item_id": "tpch-throughput-seed-validation-fix"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/expected_results/ -- where reference-seed expectations live; check whether a parameter-sensitive query-set constant already exists there before defining one (if it exists, import it; do not duplicate).",
+        "decision": "reuse",
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "path": "benchbox/core/expected_results/"
+      },
+      {
+        "concept": "benchbox/core/tpch/throughput_test.py -- per-stream seed derivation (the mechanism stays; only validation policy changes).",
+        "decision": "reuse",
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "path": "benchbox/core/tpch/throughput_test.py"
+      },
+      {
+        "concept": "docs/operations/release-guide.md:33-35 + make test-correctness-gate -- the existing Q11/16/18/20 exclusion policy and its rationale. Reuse the policy and the query set constant.",
+        "decision": "reuse",
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "path": "docs/operations/release-guide.md:33-35"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/expected_results/"
+      },
+      {
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/validation/"
+      },
+      {
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "kind": "only_modify",
+        "path_glob": "benchbox/validation/"
+      },
+      {
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "kind": "only_modify",
+        "path_glob": "docs/development/throughput-result-alignment.md"
+      },
+      {
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/throughput.py"
+      },
+      {
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/ tests/integration/test_tpch_throughput_test.py tests/integration/test_throughput_corrections.py -q",
+        "description": "Non-reference-seed run validates clean with recorded exclusions; wrong-count regression still fails",
+        "expected": "pass including new exclusion tests",
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml",
+        "description": "Throughput UAT cell goes green locally",
+        "expected": "exit 0, matrix summary shows the cell passed",
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "notes": "PREMISE CORRECTION: SF 0.01 does NOT reproduce -- expected-results\nproviders only support scale_factor==1.0\n(benchbox/core/expected_results/tpch_results.py get_tpch_expected_results\nreturns None for SF!=1.0), so at SF 0.01 every query except scale-\nindependent Q1 gets ValidationMode.SKIP and the run reports\nsummary.validation=\"passed\" with 66/66 regardless of seed. Re-ran at\nSF=1.0 (still cheap, ~4s generate+load) which does carry answer files.\n\nCommand: uv run -- benchbox run --platform duckdb --benchmark tpch\n--scale 1 --seed 12345 --phases generate,load,power --output\n/tmp/tpch-seed-repro-sf1 --non-interactive\nHEAD SHA: 295b645447773a0a8c6ab94a92a91f014be68540\nResult JSON: benchmark_runs/results/tpch_sf1_duckdb_sql_20260711_081042_1a47cb2c.json\n\nFailure lines (stream=0, run_type=warmup, from the exported queries[]\narray -- the CLI's own summary/console output does NOT surface these;\nsee w1 notes for why):\n  {\"id\": \"20\", \"run_type\": \"warmup\", \"status\": \"FAILED\", \"stream\": 0}\n  {\"id\": \"18\", \"run_type\": \"warmup\", \"status\": \"FAILED\", \"stream\": 0}\n  {\"id\": \"16\", \"run_type\": \"warmup\", \"status\": \"FAILED\", \"stream\": 0}\n  {\"id\": \"11\", \"run_type\": \"warmup\", \"status\": \"FAILED\", \"stream\": 0}\n\nAlso ran the THROUGHPUT phase (2 streams, default base_seed=42, SF=1,\nreusing the same generated data): 8 FAILED queries = exactly {11,16,18,20}\nx 2 streams (both stream 0 and stream 1), confirming the TODO's \"fails\non every stream\" framing. CLI surfaced this one as \"PARTIAL\" /\n\"8 failed queries\" (throughput DOES propagate failures to the run\nverdict, unlike power's warmup-only failure which is silently\nswallowed -- see w1 notes point 4).\n\nPremise otherwise CONFIRMED: proceeding to w1/w2.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the defect at HEAD: non-reference-seed TPC-H power run on DuckDB confirms Q11/16/18/20 fail loose validation; record command, SHA, and failure lines in notes",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "notes": "Seam, precisely:\n1. benchbox/core/validation/query_validation.py QueryValidator.\n   validate_query_result() is the single dispatch point for row-count\n   validation (EXACT/RANGE/LOOSE/SKIP) -- called from ~20 platform\n   adapter execute_query() implementations (benchbox/platforms/*, out\n   of scope_limit) plus benchbox/core/benchmark_mixins.py (also out of\n   scope_limit, core/ but not core/validation|tpch|expected_results|\n   results/). None of those call sites are touched by this fix.\n2. benchbox/core/expected_results/registry.py\n   ExpectedResultsRegistry.get_expected_result() decides EXACT vs SKIP\n   purely from stream_id (>0 => SKIP, \"no answer files for streams>0\")\n   -- it has NO visibility into which seed produced the current query's\n   parameters.\n3. benchbox/core/expected_results/tpch_results.py\n   get_tpch_expected_results() registers EVERY TPC-H query with\n   ValidationMode.EXACT unconditionally (never LOOSE) -- so the LOOSE\n   mode described in that file's own module docstring (\"BenchBox\n   automatically switches to LOOSE validation\" for custom seeds) is\n   DEAD in practice.\n4. benchbox/core/tpch/power_test.py TPCHPowerTest.__init__ computes an\n   `actual_validation_mode` string (\"exact\"/\"loose\"/\"disabled\") from\n   comparing the seed to get_reference_seed(scale_factor) (lines\n   ~140-195), stores it on TPCHPowerTestConfig.validation_mode -- but\n   grep confirms `.validation_mode` is read ONLY when building\n   to_dict() metadata; it is NEVER consulted to change how\n   validate_query_result() is called. The \"auto-switch to loose\"\n   plumbing is entirely vestigial. Root cause is NOT \"wrong tolerance\n   chosen\" -- it's \"no seed-awareness reaches the validator at all\".\n5. Confirms exact match to TODO's \"queries 11/16/18/20 ... never land\n   on the reference-seed exact-match path\" framing: registry.py only\n   ever exact-validates stream_id in (None, 0); power_test.py's own\n   warmup/measurement iteration renumbering\n   (benchbox/core/tpch/platform_power.py current_stream_id = i for\n   warmup, warm_up_iterations+i for measurement) means only the\n   WARMUP run is ever tagged stream_id=0 and reaches EXACT validation\n   at all -- and platform_power.py's warmup loop (lines ~104-129)\n   never checks power_test_result.success, so those failures are\n   silently absorbed and never surface in the CLI's printed\n   success/PASSED verdict (only the measurement runs, tagged stream 1-3\n   and therefore already SKIPped, are checked). This means today,\n   POWER mode's Q11/16/18/20 failures are invisible unless you inspect\n   the exported JSON's queries[] array directly -- worth flagging as a\n   separate follow-up (spawned as a background task, not fixed here;\n   out of this TODO's scope which is validation-policy-only).\n6. SEPARATE BUG FOUND (not fixed here, see below): throughput_test.py\n   _execute_stream()'s `connection.set_query_context(query_id)` call\n   (line ~475) omits `stream_id=stream_id` -- so EVERY throughput\n   stream is treated as stream_id=None -> \"stream 0\" by the registry,\n   meaning ALL streams (not just stream 0) attempt EXACT validation.\n   This is WHY w0's throughput repro found stream 1 also failing\n   Q11/16/18/20, not just stream 0. Chose NOT to fix this omission in\n   this TODO: the parameter-sensitive exclusion (w2) resolves it\n   completely regardless, because the exclusion check does not depend\n   on stream_id or the registry's skip logic -- it is computed\n   independently from the actual per-query seed\n   (base_seed + stream_id*1000 + position) vs the reference seed.\n   Leaving the stream_id omission in place does not reintroduce any\n   failure for THIS defect (confirmed: the other 18 \"answer-stable\"\n   queries already tolerate stream>0's different derived parameters\n   without EXACT mismatches in the w0 throughput repro -- 8/44 failed,\n   all and only {11,16,18,20} x 2 streams). Flagged as a spawn_task\n   follow-up per review-protocol instead of silently leaving it\n   undocumented.\n7. No existing PARAMETER_SENSITIVE/BOUNDARY_SENSITIVE Python constant\n   in benchbox/core/expected_results/ (confirmed via grep) -- the only\n   prior art is Makefile's CORRECTNESS_GATE_QUERY_IDS (the INCLUDED 18,\n   inverse of the excluded 4), consumed only by\n   tests/integration/test_local_platform_benchmark_matrix.py via the\n   BENCHBOX_CORRECTNESS_GATE_QUERY_IDS env var -- test-only plumbing,\n   not importable production code. Defining a new constant, not\n   duplicating.\n\nPINNED FILE LIST for w2 (narrowed from the full scope_limit):\n  - benchbox/core/expected_results/tpch_results.py (new constant)\n  - benchbox/core/validation/query_validation.py (context channel +\n    exclusion check)\n  - benchbox/core/tpch/power_test.py (compute + set/clear context)\n  - benchbox/core/tpch/throughput_test.py (compute + set/clear context)\nDesign constraint driving the context-channel approach (rather than a\nnew function parameter threaded through validate_query_result's\ncallers): threading an explicit \"is_reference_seed\" argument would\nrequire editing every platform adapter's execute_query() signature\n(~20 files under benchbox/platforms/, all outside scope_limit) plus\nbenchbox/core/benchmark_mixins.py (also outside scope_limit). Instead,\nbenchbox/core/tpch/{power_test,throughput_test}.py set a thread-local\n\"is this query using the reference seed's parameters\" flag immediately\nbefore calling connection.execute() (the same call site that already\ncalls set_query_context() via hasattr-duck-typing, so no platform code\nneeds to know this channel exists), and\nbenchbox/core/validation/query_validation.py reads it. Defaults to\nNone (unset) for every caller that never sets it (TPC-DS, DataFrame\nvalidation, any other QueryValidator user) -- preserves their exact\npre-existing behavior untouched, satisfying must_preserve.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Locate the loose validation path and reference-seed exact-match branch; record the pinned file list in work notes -- w2 must stay within that narrowed set, not the full scope_limit",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "notes": "Implemented exactly the four pinned files from w1, no others:\n  - benchbox/core/expected_results/tpch_results.py: added\n    PARAMETER_SENSITIVE_QUERY_IDS = frozenset({\"11\",\"16\",\"18\",\"20\"})\n    (no prior Python constant existed -- confirmed by w1 grep -- so\n    this is new, not a duplicate of the Makefile's env-var list).\n  - benchbox/core/validation/query_validation.py: added a\n    threading.local()-backed context\n    (set_reference_seed_context/get_reference_seed_context/\n    clear_reference_seed_context) plus\n    get_parameter_sensitive_query_ids(benchmark_type) (dict keyed by\n    benchmark, tpch -> the new constant, everything else -> empty\n    frozenset). validate_query_result() checks, BEFORE the registry\n    lookup: if get_reference_seed_context() is False and the\n    normalized query_id is parameter-sensitive for this benchmark,\n    return ValidationResult(is_valid=True,\n    validation_mode=ValidationMode.SKIP, warning_message=\"Query 'N'\n    not validated (parameter-sensitive, non-reference params).\") --\n    the exact phrase from the TODO description, so it is greppable in\n    the per-query row_count_validation.warning field\n    (_build_query_result_with_validation in\n    benchbox/platforms/base/result_capture.py already maps SKIP ->\n    status SKIPPED without touching overall query status; unchanged).\n  - benchbox/core/tpch/power_test.py: TPCHPowerTest.__init__ stashes\n    self.reference_seed; run()'s per-query loop calls\n    set_reference_seed_context(stream_seed is None or stream_seed ==\n    self.reference_seed) immediately before connection.execute(), and\n    clear_reference_seed_context() in the existing finally block\n    (fires on both success and exception paths).\n  - benchbox/core/tpch/throughput_test.py: _execute_stream() resolves\n    reference_seed = get_reference_seed(config.scale_factor) once,\n    then per query computes stream_seed = seed + stream_id*1000 +\n    position (same formula _resolve_query_text() already uses to\n    generate the SQL -- re-read, not re-derived, so\n    must_preserve's \"seed derivation formula unchanged\" holds) and\n    calls set_reference_seed_context(stream_seed == reference_seed) /\n    clear_reference_seed_context() around connection.execute().\nDeliberately did NOT touch throughput_test.py's\nconnection.set_query_context(query_id) call (missing stream_id= --\nsee w1 note 6): the exclusion above resolves the reproduced defect on\nevery stream regardless of that separate, pre-existing omission.\nFlagged as a spawn_task follow-up, not folded into this change.\nruff, ty, and lint-imports (utils < core < platforms < cli) all clean\non the four touched files; no platforms/*.py file was modified.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the parameter-sensitive exclusion: one shared query-set constant, applied only when params differ from the reference seed; per-query detail records the exclusion reason",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "notes": "Added regression coverage at two levels (no new test files -- all\nadditions to existing files that already carry pytestmark, so\nlint-markers stays clean):\n  - tests/unit/core/expected_results/test_validation_engine.py\n    (new TestParameterSensitiveExclusion class, 12 cases): constant\n    value, get_parameter_sensitive_query_ids() per-benchmark scoping,\n    context set/get/clear round-trip, each of Q11/16/18/20 excluded\n    when context=False (asserts the exact warning-message phrase),\n    each still EXACT-fails when context=True (must_preserve) and when\n    context is left unset/None (default -- proves callers that never\n    touch this context, e.g. TPC-DS, are unaffected), a non-boundary\n    query (Q1) still fails on a wrong count even with context=False\n    (anti_pattern guard against unconditional exclusion), and TPC-DS\n    explicitly unaffected by a non-reference context.\n  - tests/integration/test_tpch_power_test.py (new\n    TestPowerTestReferenceSeedContext class, 6 cases): verifies\n    TPCHPowerTest.run() calls set_reference_seed_context with the\n    correct bool for qgen-defaults / reference-seed / custom-seed\n    runs, verifies clear_reference_seed_context fires every query, and\n    two REAL-stack end-to-end cases routed through the actual\n    PlatformAdapterConnection + DuckDBAdapter + QueryValidator (only\n    the innermost raw DB cursor mocked, forced to return a row count\n    that would fail any real SF=1 EXACT comparison): a custom-seed run\n    reports Q11/16/18/20 as SUCCESS (not FAILED) -- the literal w0\n    repro, now fixed; a reference-seed run still reports Q11 as FAILED\n    (must_preserve).\n  - tests/integration/test_tpch_throughput_test.py (new\n    TestThroughputReferenceSeedContext class, 5 cases): verifies\n    per-position context is True ONLY for stream 0 position 0 with the\n    reference seed (every other position necessarily diverges, given\n    the seed+stream_id*1000+position formula), False for the default\n    base_seed=42 and for any seed at a non-SF=1.0 scale factor (no\n    pinned reference exists below SF=1.0), context cleared every\n    query, and a REAL-stack end-to-end case across TWO streams (0 and\n    1) confirming Q11/16/18/20 are absent from BOTH streams' failed-\n    query sets with the default base_seed -- this is the literal w0\n    throughput repro (8 failures = {11,16,18,20} x 2 streams), now 0\n    boundary-query failures on either stream. (The other 18\n    non-boundary queries are expected to fail in this specific test\n    because the mock forces every query's row count to 999 regardless\n    of query id -- that is correct EXACT-mode behavior and is not\n    this test's concern; it only asserts on the boundary set.)\nAll new + pre-existing tests pass:\n  - tests/unit/core/ (9993 passed, 12 skipped, 0 failed)\n  - tests/integration/test_tpch_power_test.py -m \"integration and slow\" (12 passed)\n  - tests/integration/test_tpch_throughput_test.py -m \"integration and slow\" (16 passed)\n  - tests/integration/test_throughput_corrections.py (included in the\n    tests/unit/core/ run above via the combined verification command;\n    separately reconfirmed, all passing)\nOne incidental finding during verification: a pre-existing local-only\ntest, tests/unit/core/results/test_integrity_validator.py::\nTestIntegrityValidatorReferenceFiles, opportunistically scans\nbenchmark_runs/results/*_sf1_duckdb_*_2026*.json (gitignored, dev-\nmachine-local, no CI equivalent) for the LATEST matching file by\nmtime and asserts it doesn't fail integrity checks. My own w0 repro\nruns left deliberately-broken result files there, which the test\npicked up and failed on (not a regression -- cleaned up the repro\nartifacts; benchmark_runs/ is gitignored so nothing to commit).\nruff clean on all three touched test files; lint-imports clean;\nlint-markers clean (no new test files, no new markers needed).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify end-to-end: non-reference-seed run reports clean-with-exclusions; wrong row count on a non-excluded query still fails; summary.validation keeps submit classification honest",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpch-throughput-seed-validation-fix",
+        "notes": "Command: make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml\n(SF=1, streams=3, seed=20260709 -- a non-reference seed -- via\nrun-official --streams 3, phases_arg=\"load,throughput\",\nvalidator_clean_rate_floor=1.0). Log:\n/tmp/tpch-seed-uat-sweep.log. Ran at commit b833c878a (this TODO's\nimplementation commit); source_dirty=false.\n\nResult: phase_exit_codes preflight=0 execute=0 validate=0 report=0.\nmatrix_summary.tsv: status=passed terminal_state=passed\nsubmit_terminal_state=submittable validator_status=clean.\nvalidator_rollup.tsv: error_count=0 warning_count=0\nvalidator_clean_rate=100.0%.\nResult JSON (benchmark_runs/results/tpch_sf1_duckdb_sql_20260711_083610_03c8ab80.json)\nsummary: queries.failed=0, queries.passed=66 (22 queries x 3 streams),\nvalidation=\"passed\", tpc_metrics.throughput_at_size=265178.57 (>0).\nQ11/16/18/20 status=SUCCESS on all 3 streams (0,1,2) -- the literal w0\ndefect, now clean end-to-end through the real UAT harness at the\nconfig that previously required continue-on-error in nightly.yml.\n\nProcess note (unrelated to this fix, flagging for the orchestrator):\nthis worktree's local `develop` ref was stale (merge-base fc31f3604,\nwell behind the actual develop tip at session start), so `git diff\n--name-only develop...HEAD` returned many files from already-merged\nupstream PRs. Used `git diff --name-only 295b64544..HEAD` (295b64544\n= this session's recorded starting HEAD SHA, see w0) instead, which\ncorrectly isolates this TODO's own 8 touched files.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the nightly throughput config locally via make uat-sweep and confirm the cell passes clean with Throughput@Size > 0",
+        "wid": "w4"
+      }
+    ]
+  }
+}

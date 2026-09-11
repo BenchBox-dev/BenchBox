@@ -1,0 +1,10 @@
+{
+  "description": "Implement maintenance operations (INSERT/UPDATE/DELETE equivalents) for DataFrame\nplatforms, enabling full TPC-H and TPC-DS compliance in DataFrame mode.\n\nCurrently, `get_maintenance_operations_sql()` only supports SQL mode. When users\nrun `--platform polars-df --benchmark tpch --phases maintenance`, no error is raised\nand the maintenance phase silently does nothing useful.\n\nDataFrame platforms like Spark (Delta Lake, Iceberg), Polars, and others support\nwrite operations that can implement TPC maintenance semantics:\n- Delta Lake: MERGE, UPDATE, DELETE operations\n- Iceberg: Row-level deletes, upserts\n- Polars: write_parquet() with append/overwrite modes\n- Parquet files: Partition-based updates\n\nThis work involves:\n1. Adding validation to error when maintenance+dataframe is attempted (short-term fix)\n2. Designing a unified maintenance abstraction that works for both SQL and DataFrame\n3. Implementing platform-specific maintenance operations",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-25T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

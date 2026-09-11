@@ -1,0 +1,70 @@
+{
+  "description": "Surfaced during the funding-chip work: PR #1091's \"Chromium (full suite,\nblocking)\" job concluded `failure` at 12:24, and the PR squash-auto-merged at\n12:29 anyway, landing a red browser suite on develop. The job name advertises\n\"blocking\" but it is not wired into the required merge gate.\n\nEvidence (read-only, captured 2026-07-10):\n  - The develop ruleset `develop-squash-only` (id 15611785) has exactly ONE\n    required status check: `ci-required-result`\n    (`gh api repos/joeharris76/BenchBox/rulesets/15611785`).\n  - `ci-required-result` (.github/workflows/pr.yml:949) aggregates only:\n    ci-paths, content-guard, code-lint, code-test, correctness-gate,\n    plan-capture-gate, medium-test, explorer-tokens, audit-sha, package-smoke,\n    dependency-audit, parity-check.\n  - The browser jobs — \"Chromium (full suite, blocking)\", WebKit @smoke,\n    Firefox @smoke — live in a SEPARATE workflow\n    (.github/workflows/results-explorer-browser.yml) and are NOT in that\n    aggregate's `needs:` list. So `ci-required-result` can be green while\n    Chromium is red, and auto-merge proceeds.\n\nScope note: WebKit and Firefox @smoke are INTENTIONALLY advisory today\n(`continue-on-error: true`), tracked separately by\ngraduate-browser-smoke-to-blocking-gates. This item is specifically about the\nChromium FULL suite, which is named \"blocking\" and is meant to gate merges but\ndoes not. Shared root cause with auto-merge-review-gate-admin-enforcement (the\ndevelop ruleset is under-configured), but a distinct remediation: that item\ntargets require_code_owner_review for soundness paths and deliberately\nexcludes status-check wiring; this item targets the required status-check set.\n\nCaveat to design around: the browser workflow is path-gated, so it does not\nrun on every PR. Whatever wiring is chosen must make a code-only PR that does\nnot touch explorer paths still able to merge (the aggregate must treat a\ncorrectly-skipped Chromium job as pass, not pending/fail) — mirror the\nexisting `ci-required-result` skip-handling for path-gated jobs rather than\nhard-requiring the raw job in the ruleset.\n",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "chromium-blocking-suite-not-in-required-checks",
+        "id": 12,
+        "reason": "Requires a repo admin (gh api PUT on the ruleset); an agent PR cannot change branch protection. Only needed if w1 chooses option (b) over the aggregate-job approach.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Sub-step of the parent item's own still-open scope; already tracked there, only needed if that item's w1 picks option (b). (tracked by chromium-blocking-suite-not-in-required-checks)",
+        "summary": "If wiring via the ruleset (option b): apply the develop ruleset required_status_checks change to include the Chromium gate."
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-08-05T14:51:22Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "work_needs": [
+      {
+        "item_id": "chromium-blocking-suite-not-in-required-checks",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "chromium-blocking-suite-not-in-required-checks",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Gap confirmed live 2026-08-03: gh api repos/joeharris76/BenchBox/rulesets/15611785 returns required checks ['ci-required-result'] only, so the job named 'Chromium (full suite, blocking)' gates nothing. Wiring point DECIDED: aggregate job, not a direct required-checks entry on the Chromium job. Requiring the Chromium job directly would deadlock the repo - the workflow is path-filtered and GitHub holds a PR unmergeable forever on a required check that never reports, so every PR touching nothing under results-explorer/ would block permanently. Verified empirically: the gate does not appear among PR #1501's 22 checks.",
+        "item_id": "chromium-blocking-suite-not-in-required-checks",
+        "notes": "Re-read the develop ruleset required_status_checks and ci-required-result's\nneeds list. Decide between: (a) add the Chromium full-suite job to\nci-required-result's needs + aggregation with correct skip-as-pass\nhandling (keeps one roll-up check in the ruleset — preferred, matches the\nexisting pattern); or (b) add the Chromium context directly to the ruleset\nrequired_status_checks (admin action, and must handle path-skip). Record\nthe choice and why in the PR body.\n",
+        "started_at": "2026-08-04T11:33:29Z",
+        "started_branch": "fix/explorer-result-id-public-byte-contract-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Confirm the gap live and decide the wiring point (aggregate job vs ruleset required-checks)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1503 (merged) added the develop push trigger and 6 contract tests. PR #1504 (open) adds the 'Results Explorer browser gate' umbrella job: drops the pull_request paths filter so the workflow always starts, moves the allowlist into an explorer-changes job, gates the three browser jobs on it, and runs the gate with if: always() - passing when Chromium succeeded or nothing relevant changed, failing closed when change detection broke or Chromium was skipped while explorer files changed. Firefox and WebKit are deliberately absent from its needs so they are not promoted as a side effect. Admin runbook and ruleset drift expectations updated in the same PR.",
+        "item_id": "chromium-blocking-suite-not-in-required-checks",
+        "notes": "If (a): extend .github/workflows/pr.yml ci-required-result to consume the\nChromium full-suite result across workflows (workflow_run or a reusable\njob), treating 'skipped' (path-gated off) as pass and 'failure' as fail.\nIf (b): the ruleset PUT is a deferred admin action (see deferred).\n",
+        "started_at": "2026-08-04T11:33:34Z",
+        "started_branch": "fix/explorer-result-id-public-byte-contract-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Implement the chosen wiring so a red Chromium full suite blocks merge",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Verified end-to-end on 2026-08-05 against live state, not a declared baseline.\n\nLIVE RULESET: 'gh api repos/joeharris76/BenchBox/rulesets/15611785' reports required_status_checks contexts ['ci-required-result', 'Results Explorer browser gate']. The flip is applied.\n\nLIVE DRIFT CHECK: Release Canary run 30997653699 on develop, job 'ruleset drift', conclusion success, completed 2026-08-05T10:30:50Z - after the flip. That job runs scripts/ruleset_drift_check.py against the real GitHub API and fails the workflow on drift, so it is the rung that actually observes live state.\n\nCORRECTION to this item's earlier blocked note: it credited tests/unit/test_ruleset_drift.py with going green on apply. That test compares synthetic ruleset payloads against the contexts declared in docs/operations/repo-admin-settings.md and never calls the API, so it exercises the comparison logic and would have passed whether or not the flip happened. It remains meaningful - it pins that the runbook declares both contexts and that a missing context IS reported as drift - but it is not the live check. It passes: 6 tests.\n\nTHE CONTEXT ACTUALLY REPORTS: merged PR #1567's rollup shows 'Results Explorer browser gate: SUCCESS'. This was the real hazard of the flip - a required context that never reports blocks every PR forever - and it is disproved on a real PR that merged after the flip.\n\nNOT VERIFIED HERE: PRs based on published-results still receive zero checks, so the gate does not cover them. Logged separately as published-results-prs-receive-zero-ci-20260805 rather than left implicit in this item.",
+        "item_id": "chromium-blocking-suite-not-in-required-checks",
+        "notes": "Add a drift check (model on the existing pr.yml gh-api ruleset/aggregate\ndrift steps) that fails if the Chromium full suite ever falls out of the\nrequired set. Verify with a throwaway PR that forces a Chromium failure and\nconfirm it cannot merge, and that a non-explorer code-only PR still can.\n",
+        "started_at": "2026-08-05T14:51:12Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Regression/drift guard + verify end-to-end",
+        "wid": "w3"
+      }
+    ]
+  }
+}

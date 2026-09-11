@@ -1,0 +1,180 @@
+{
+  "context": "Fix each defect independently and prove it with a test, not a convention. Give each project a distinct distribution or import name (or add a root pytest config that maps the four suites), make pilot scoring read the predeclared pilot set and refuse to overwrite a report whose run set differs, parameterize the generation constants so any committed generation can be re-audited by flag, and narrow the transcript tripwire to sessions the runner itself could have created (nonce, model pin, or session id correlation) rather than any new file.",
+  "description": "Four defects confirmed by direct reproduction on 2026-07-29 against main at f801885. One, four projects (memory_tooling, memory_tooling/claude, memory_tooling/codex, evaluation_runs/behavioral) all expose the same top-level package name memory_tooling, so a repo-root pytest fails with 7 collection errors and each suite only runs under its own --project root; a reviewer running the obvious command sees red on green code. Two, the v5 item rung 3 re-runs score --pilot --enforce-pilot-thresholds, which after the full fill rescores 180 runs into the committed 45-run pilot report, overwrites it, and prints false blockers; recovery needed git checkout. Three, audit.py and score.py hardcode results-vN, isolation-vN, preflight-vN, and the schema_version check, so v3 and v4 evidence cannot be re-audited or re-scored without a historical checkout, weakening the immutability claim the packets rely on. Four, the runner treats ANY new file matching ~/.claude/projects/*/*.jsonl as an isolation failure, so an unrelated concurrent human session fails the run; this fired on the v3 144-run matrix and needed manual re-attestation.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "completed_at": "2026-08-04T01:23:44Z",
+      "created_at": "2026-08-03T23:41:13Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Committed v3, v4, and v5 results, isolation manifests, and scored reports stay byte-identical",
+        "item_id": "memory-governance-harness-defects"
+      },
+      {
+        "behavior": "Live Codex and Claude memory and settings remain byte-unchanged",
+        "item_id": "memory-governance-harness-defects"
+      },
+      {
+        "behavior": "No fix weakens an existing gate threshold or safety check",
+        "item_id": "memory-governance-harness-defects"
+      },
+      {
+        "behavior": "The tripwire still fails a run that genuinely leaks an evaluation session transcript",
+        "item_id": "memory-governance-harness-defects"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-governance-harness-defects",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-governance-harness-defects",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-governance-harness-defects",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-governance-harness-defects",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-governance-harness-defects",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v3/**"
+      },
+      {
+        "item_id": "memory-governance-harness-defects",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v4/**"
+      },
+      {
+        "item_id": "memory-governance-harness-defects",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v5/**"
+      },
+      {
+        "item_id": "memory-governance-harness-defects",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-governance-harness-defects",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-governance-harness-defects",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/**"
+      },
+      {
+        "item_id": "memory-governance-harness-defects",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-governance-harness-defects",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest --collect-only -q",
+        "description": "One repo-root command collects and runs every suite",
+        "expected": "Collection succeeds with zero import errors across all four projects",
+        "item_id": "memory-governance-harness-defects",
+        "last_result": "fail",
+        "last_run": "2026-08-04T01:23:12Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q -k pilot",
+        "description": "Pilot scoring refuses to overwrite a report whose run set differs",
+        "expected": "A regression test proves the committed pilot report survives a post-fill invocation",
+        "item_id": "memory-governance-harness-defects",
+        "last_result": "pass",
+        "last_run": "2026-08-04T01:23:15Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m memory_tooling.audit --check-evaluation-isolation --generation v3",
+        "description": "A prior generation can be re-audited from current main",
+        "expected": "V3 evidence re-audits clean without checking out an older commit",
+        "item_id": "memory-governance-harness-defects",
+        "last_result": "fail",
+        "last_run": "2026-08-04T01:23:17Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q -k transcript",
+        "description": "Unrelated concurrent transcripts do not fail isolation",
+        "expected": "Tests prove an unrelated new transcript passes while a leaked evaluation transcript still fails",
+        "item_id": "memory-governance-harness-defects",
+        "last_result": "pass",
+        "last_run": "2026-08-04T01:23:20Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "evaluation_runs/run-all-tests.sh runs all four suites, each under its own project, in one invocation: 42+11+13+63=129 tests green, exit 0, and every suite runs even if an earlier one fails. Renaming packages to allow a single-interpreter root pytest was rejected because python -m memory_tooling.* invocations are pinned in create-time-only rungs of other items (phase-4 rollout, v5 gate). NOTE rung 1 as authored (root pytest --collect-only) cannot pass: making root collection coherent needs a root-level pytest.ini or conftest.py, and this item's only_modify covers docs/evaluation, evaluation_runs, memory_tooling, tests, reports - no repo-root file. Same rung-vs-scope class as the finding filed on the durability item",
+        "item_id": "memory-governance-harness-defects",
+        "notes": null,
+        "started_at": "2026-08-04T01:14:56Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Give the four projects non-colliding import paths or a root pytest configuration so one repo-root command runs every suite green",
+        "wid": "w0"
+      },
+      {
+        "evidence": "commit b406bdf. Two independent fixes: --pilot now selects the predeclared codex pilot subset so the gate reproduces its verdict after the fill instead of rescoring all 180; and _refuse_clobber rejects writing a report over one covering a different run set (clear message, exit 2, --force override). Proven end to end: the exact invocation that destroyed the committed pilot report now exits 2 with 'summarizes 45 run(s) and this invocation covers 0' and diff confirms the committed report is byte-unchanged. 4 regression tests added (-k 'pilot or clobber' = 6 passed)",
+        "item_id": "memory-governance-harness-defects",
+        "notes": null,
+        "started_at": "2026-08-04T01:16:32Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Make pilot scoring read the predeclared pilot set and fail closed instead of overwriting a committed report with a different run set",
+        "wid": "w1"
+      },
+      {
+        "evidence": "commit 5fbf5e6. audit.py exposes results_dir(generation)/isolation_name(generation)/DEFAULT_GENERATION and both audit and score take --generation. Proven: audit --generation v3|v4|v5 each runs from current main against the right evidence set (v3 output names claude-* runs that exist only in v3). Scoring an older generation correctly refuses because prompts/oracles/response schema are generation-specific, now as a clean message + exit 2 instead of a traceback. Rung 3 (audit --generation v3) passes - it reports the genuine evidence loss rather than a tooling failure. 2 tests added",
+        "item_id": "memory-governance-harness-defects",
+        "notes": null,
+        "started_at": "2026-08-04T01:18:54Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Parameterize the generation constants so v3, v4, and v5 evidence can each be re-audited and re-scored from current main",
+        "wid": "w2"
+      },
+      {
+        "evidence": "commit 2f04f0a. _transcript_is_evaluation_owned attributes a new transcript by the two properties an eval session pins - cwd = governance repo AND model = claude-opus-4-6 - so the real 2026-07-29 false positive (session 84cff73e, cwd BenchBox, model claude-opus-5) no longer fails a run. Manifest now separates new_session_transcripts from leaked_session_transcripts and only the latter drives unchanged/exit. Fails safe: matching both still fails, and an unreadable transcript is treated as a leak. 4 tests, all matched by the rung's -k transcript selector",
+        "item_id": "memory-governance-harness-defects",
+        "notes": null,
+        "started_at": "2026-08-04T01:20:48Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Narrow the transcript tripwire to evaluation-owned sessions so an unrelated concurrent session cannot fail an otherwise isolated run",
+        "wid": "w3"
+      }
+    ]
+  }
+}

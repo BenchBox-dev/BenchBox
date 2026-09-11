@@ -1,0 +1,709 @@
+{
+  "context": "This TODO is foundation + offline data prep. Most of the work\nhappens outside the running BenchBox process: a build pipeline\nthat runs once, produces an archive, stages a draft Release.\n\nSequence the work to minimize rework:\n  1. w0 (re-validate cited evidence) — gates the rest\n  2. Design doc first (w1) — anchors all subsequent decisions\n  3. In parallel: data-fetch module (w2), registry+enforcement (w3),\n     and conversion pipeline (w4→w7)\n  4. Pipeline gates (w8, w9) added before reference cardinalities\n     (w10→w12) so we never compute reference values on broken data\n  5. Archive packaging (w13) and tiny fixture regen (w14) precede\n     Release staging (w15, w16)\n\nFor the build pipeline (w4-w14), use Docker-Postgres for\nreproducibility. Document the exact image tag in\n`data_manifest.toml`. The pipeline script must be idempotent and\nre-runnable — if Joe needs to rebuild from a clean source 6 months\nfrom now, the same script + same upstream pg_dump must produce a\nbyte-identical archive (modulo timestamps in the manifest).\n\nReusable infrastructure: design every module in `benchbox/core/data_fetch/`\nto be benchmark-agnostic. The cutover TODO will instantiate it for\njoinorder. Future TODOs will instantiate for ClickBench, etc.\n",
+  "description": "Step 1 of the dual-track JOB strategy responding to GitHub issue #289\n(https://github.com/joeharris76/BenchBox/issues/289). Splits into two\nTODOs: this one (foundation + archive build) and\n`joinorder-canonical-cutover` (code wiring + queries + docs + ship).\n\nIssue #289 documents that BenchBox's `joinorder` benchmark generates\nuniformly-random synthetic data, which destroys the cardinality-skew\nsignal JOB was designed to expose (Leis et al. PVLDB 2015). A probe\nby an external reviewer confirmed 10/13 embedded queries return zero\nrows on synthetic data because columns like `movie_companies.note`\nand `cast_info.note` are always NULL, while queries filter on\nspecific note values like `'co-production'`, `'(USA)'`, `'voice'`.\n\nThis TODO produces the artifacts that the cutover TODO consumes:\n  1. Reusable data-fetch / scale-factor / dataset-versioning infrastructure\n     designed for reuse by future real-data benchmarks (ClickBench, etc.).\n  2. A bit-reproducible Parquet archive of the May 2013 IMDb snapshot\n     used by the JOB paper, sourced from Harvard Dataverse pg_dump\n     (doi:10.7910/DVN/2QYZBT), with full provenance and validation.\n  3. Reference cardinalities for all 113 canonical JOB queries,\n     computed via PostgreSQL on the converted data — the oracle for\n     the \"do queries actually work\" validator.\n  4. A DRAFT GitHub Release staging the archive at tag\n     `data/joinorder-imdb-2013-v1`. Promoted to published only by\n     the cutover TODO, after the code path is verified end-to-end.\n\nCutover TODO is gated on this one: the manifest, the archive URL,\nand the reusable module skeletons are all consumed downstream.\n\nDecisions locked in (from planning):\n  - Source: Harvard Dataverse pg_dump (institutional stability + DOI).\n  - Hosting: GitHub Releases.\n  - License posture: ship `DATA-LICENSE.md` per benchmark with IMDb\n    attribution + Boncz-style scope clause + takedown commitment.\n    No click-through (matches JOB ecosystem precedent).\n  - Tiny canonical fixture (~1MB): checked into repo for unit tests;\n    regenerated deterministically from full canonical via the build\n    pipeline.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add joinorder-specific exception classes",
+        "instead": "exceptions live in benchbox/core/data_fetch/errors.py and are benchmark-agnostic",
+        "item_id": "joinorder-canonical-foundation",
+        "why": "the data_fetch infrastructure is meant for reuse"
+      },
+      {
+        "dont": "commit the full canonical Parquet archive to git",
+        "instead": "only the tiny fixture (~1MB) is checked in; the full archive lives only on the GitHub Release",
+        "item_id": "joinorder-canonical-foundation",
+        "why": "it is ~1.5 GB and slows every clone"
+      },
+      {
+        "dont": "compute reference cardinalities by re-running the queries on the BenchBox-converted Parquet via DuckDB",
+        "instead": "use Postgres on the restored pg_dump as the oracle, then validate that DuckDB on the converted Parquet matches",
+        "item_id": "joinorder-canonical-foundation",
+        "why": "that loses the independent-oracle property"
+      },
+      {
+        "dont": "hard-code joinorder-specific logic in benchbox/core/data_fetch/",
+        "instead": "keep the module benchmark-agnostic; joinorder-specific config goes in benchbox/core/joinorder/data_manifest.toml",
+        "item_id": "joinorder-canonical-foundation",
+        "why": "the whole point is reuse for ClickBench / future real-data benchmarks"
+      },
+      {
+        "dont": "publish the GitHub Release as non-draft in this TODO",
+        "instead": "staging stays draft until cutover TODO's UAT smoke test passes",
+        "item_id": "joinorder-canonical-foundation",
+        "why": "the live URL is consumed by code that doesn't exist yet"
+      },
+      {
+        "dont": "skip the encoding round-trip gate",
+        "instead": "fail loud at build time",
+        "item_id": "joinorder-canonical-foundation",
+        "why": "silent NFC/NFD normalization in the Parquet writer will break predicate matching on accented names without producing any error message"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-canonical-foundation",
+        "id": 198,
+        "reason": "Cutover TODO (joinorder-canonical-cutover). This TODO produces the artifacts; cutover consumes them.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: _project/DONE/main/planning/joinorder-canonical-cutover.yaml is already DONE — the cutover this deferral names has happened.",
+        "summary": "Wire joinorder benchmark to canonical data path"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-canonical-foundation",
+        "id": 199,
+        "reason": "Cutover TODO. Reference cardinalities for all 113 are computed here, but checked-in to the joinorder package only after the rename to keep the rename atomic.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Verified benchbox/core/joinorder/queries.py now contains all 113 JOB queries; the cutover add-missing-queries work is already done.",
+        "summary": "Add the 100 missing SQL queries to benchbox/core/joinorder/queries.py"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-canonical-foundation",
+        "id": 200,
+        "reason": "Cutover TODO. Rename only after `joinorder_synthetic` exists in the registry.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: joinorder-canonical-cutover (DONE) description confirms bundles were re-tagged joinorder_sf1_*->joinorder_synthetic_sf1_* in that same PR.",
+        "summary": "Bundle migration (re-tag joinorder_sf1_* → joinorder_synthetic_sf1_*)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-canonical-foundation",
+        "id": 201,
+        "reason": "Cutover TODO's final phase, after end-to-end UAT smoke.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: joinorder-canonical-cutover.yaml (Completed 2026-05-11) work item w5 already promotes the draft GitHub Release to published -- action done.",
+        "summary": "Promote draft GitHub Release to published"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-canonical-foundation",
+        "id": 202,
+        "reason": "Step 2 (Track 2). This is the foundation for measuring statistics maintenance interplay; deferred to track2 groundwork TODO.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Implemented: track2-joinorder-stats-phase.yaml (Completed, PR #980); StatisticsGatheringPhase in results/models.py:131, supports_statistics_phase:true in benchmark_registry.yaml. track2-scaling-strategy now depends on it as satisfied.",
+        "summary": "Statistics-as-phase support in the benchmark phase model"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-11T00:00:00Z",
+      "created_at": "2026-05-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All current generator-based benchmark code paths in benchbox/core/joinorder/ remain untouched in this TODO — rename happens in the cutover TODO",
+        "item_id": "joinorder-canonical-foundation"
+      },
+      {
+        "behavior": "Existing benchmark_registry.py entries for non-joinorder benchmarks default to surface=public — no behavior change for them",
+        "item_id": "joinorder-canonical-foundation"
+      },
+      {
+        "behavior": "Existing benchmarks (tpch, tpcds, etc.) continue to accept their declared scale_factor ranges — the new validate_scale_factor() must read each benchmark's scale_options from the registry, not hard-code joinorder",
+        "item_id": "joinorder-canonical-foundation"
+      },
+      {
+        "behavior": "data_fetch module is fully testable without network access — all tests use mocked HTTP",
+        "item_id": "joinorder-canonical-foundation"
+      },
+      {
+        "behavior": "result-publisher continues to publish all current public bundles (no joinorder bundles touched in this TODO; that's the cutover TODO)",
+        "item_id": "joinorder-canonical-foundation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/joinorder/build-inputs/queries/*.sql sourcing from gregrahn/join-order-benchmark — reuse: same upstream that CWI mirror, CedarDB, and MIT learnedsystems all draw from; pin commit SHA in build manifest",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-foundation",
+        "path": "_project/joinorder/build-inputs/queries/*.sql"
+      },
+      {
+        "concept": "_project/scripts/pyproject.toml — reuse: established pattern for offline-pipeline dependencies in their own uv project, isolated from the main package",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-foundation",
+        "path": "_project/scripts/pyproject.toml"
+      },
+      {
+        "concept": "benchbox/cli/config.py:get_datagen_path (line 954) — reuse: per-benchmark/per-scale datagen directory; data_fetch downloads into the same path so air-gapped users hit the existing convention",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-foundation",
+        "path": "benchbox/cli/config.py:get_datagen_path"
+      },
+      {
+        "concept": "benchbox/core/benchmark_registry.py (line 264 joinorder entry; categories at line 31) — extend: add new optional `surface: public|internal` field and `data_manifest` field; existing entries default surface=public so behavior is unchanged",
+        "decision": "extend",
+        "item_id": "joinorder-canonical-foundation",
+        "path": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "concept": "benchbox/core/errors.py — extend: add ScaleFactorNotSupportedError to the existing exception hierarchy",
+        "decision": "extend",
+        "item_id": "joinorder-canonical-foundation",
+        "path": "benchbox/core/errors.py"
+      },
+      {
+        "concept": "benchbox/core/nyctaxi/downloader.py — extend: nyctaxi uses .exists()-skip for presence check; data_fetch generalizes that to manifest-driven sha256 verification (nyctaxi itself stays unchanged in Step 1; potential follow-up to back-port the gate)",
+        "decision": "extend",
+        "item_id": "joinorder-canonical-foundation",
+        "path": "benchbox/core/nyctaxi/downloader.py"
+      },
+      {
+        "concept": "benchbox/core/runner/runner.py — extend: add a single `validate_scale_factor()` call before generator/load; reuses the registry's existing scale_options list (joinorder already declares scale_options=[1.0])",
+        "decision": "extend",
+        "item_id": "joinorder-canonical-foundation",
+        "path": "benchbox/core/runner/runner.py"
+      },
+      {
+        "concept": "benchbox/utils/path_utils.py:resolve_benchmark_runs_dir (line 31) — reuse: the data_fetch manager resolves output_dir via this helper, no new env var or location policy",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-foundation",
+        "path": "benchbox/utils/path_utils.py:resolve_benchmark_runs_dir"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "do_not_modify",
+        "path_glob": "README.md, CHANGELOG.md (cutover TODO)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/benchmark.py (cutover TODO)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/dataframe_queries.py (cutover TODO)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/generator.py (rename happens in cutover TODO)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/queries.py (cutover TODO)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "do_not_modify",
+        "path_glob": "docs/benchmarks/join-order.md (cutover TODO)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/ (cutover TODO does the rename)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "_project/design/data-fetch-infra-reuse-guide.md (new — design doc consumed by Track-2 groundwork TODO)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "_project/design/joinorder-step1-foundations.md (new)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "_project/joinorder/build-inputs/queries/*.sql (new — 113 queries from gregrahn)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "_project/joinorder/cardinality-cross-check.md (new — Leis 2015 cross-check report)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "_project/joinorder/reference_cardinalities.json (new)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "_project/joinorder/release-notes.md (new)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "_project/joinorder/tiny_reference_cardinalities.json (new)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/build_joinorder_data.py (new — main offline build pipeline used by w4-w14)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/pyproject.toml (add deps if needed)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/w0_validate_empty_queries.py (new — w0 evidence re-validation helper; replays the issue #289 empty-query probe against the current generator)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/joinorder-canonical-foundation/w0.log (new — re-validation log)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py (ensure CLI construction path also reaches scale validation)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/orchestrator.py (ensure programmatic/CLI orchestration path also reaches scale validation)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py (add `surface` field + scale validation hook)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/data_fetch/ (new module)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/errors.py (add ScaleFactorNotSupportedError if not present)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/data_manifest.toml (new)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/ (call reusable scale validation before generation/load)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/path_utils.py (only if the datagen verification helper extends existing path utilities)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/joinorder_canonical_tiny/ (new — 21 tiny Parquets)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/data_fetch/ (new)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_registry_surface_field.py (new)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_scale_factor_validation.py (new)"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_build_joinorder_data.py (new — build-pipeline unit coverage)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/design/joinorder-step1-foundations.md && grep -cE '^## (Scale-factor|Data-fetch|Dataset versioning|Registry surface)' _project/design/joinorder-step1-foundations.md\n",
+        "description": "Foundation design doc exists with all four sections",
+        "expected": ">= 4",
+        "item_id": "joinorder-canonical-foundation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'from benchbox.core.data_fetch import fetch_data' && uv run -- python -m pytest tests/unit/core/data_fetch/ -q\n",
+        "description": "data_fetch module skeleton imports cleanly and tests pass",
+        "expected": "no import error, all tests pass",
+        "item_id": "joinorder-canonical-foundation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_scale_factor_validation.py::test_joinorder_rejects_non_unit_scale -q\n",
+        "description": "scale_factor validation rejects sf!=1 for joinorder",
+        "expected": "1 passed",
+        "item_id": "joinorder-canonical-foundation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "tar -tf joinorder-imdb-2013-v1.tar.zst | sort | grep -cE '\\.parquet$|^data_manifest\\.toml$|^DATA-LICENSE\\.md$|^checksums\\.txt$|^reference_cardinalities\\.json$'\n",
+        "description": "Build pipeline produces archive with all 21 Parquets + manifest + checksums + reference cardinalities",
+        "expected": ">= 25 (21 parquets + 4 metadata files)",
+        "item_id": "joinorder-canonical-foundation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'def (test_)?encoding_round_trip|encoding[_ ]round[_ ]trip' _project/scripts/build_joinorder_data.py",
+        "description": "Encoding round-trip gate is enforced",
+        "expected": ">= 1",
+        "item_id": "joinorder-canonical-foundation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'import json; d = json.load(open(\"_project/joinorder/reference_cardinalities.json\")); print(len(d[\"queries\"]))'\n",
+        "description": "Reference cardinalities cover all 113 queries",
+        "expected": "113",
+        "item_id": "joinorder-canonical-foundation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh release view data/joinorder-imdb-2013-v1 --json isDraft,assets --jq '{draft: .isDraft, asset_count: (.assets | length)}'\n",
+        "description": "DRAFT GitHub Release exists with archive asset",
+        "expected": "{\"draft\": true, \"asset_count\": 2}",
+        "item_id": "joinorder-canonical-foundation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test \"$(ls tests/fixtures/joinorder_canonical_tiny/*.parquet | wc -l | tr -d ' ')\" = \"21\" && uv run -- python _project/scripts/build_joinorder_data.py verify-tiny-fixture --fixture tests/fixtures/joinorder_canonical_tiny --queries _project/joinorder/build-inputs/queries --cardinalities _project/joinorder/tiny_reference_cardinalities.json\n",
+        "description": "Tiny fixture is checked in and preserves canonical predicate oracle",
+        "expected": "21 Parquets present and all 113 tiny-fixture query cardinalities validated",
+        "item_id": "joinorder-canonical-foundation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f benchbox/core/joinorder/data_manifest.toml && grep -cE '^url|^sha256|^version|^dataset_version|^manifest_hash|^data_archive_hash' benchbox/core/joinorder/data_manifest.toml\n",
+        "description": "data_manifest.toml is wired up for joinorder",
+        "expected": ">= 6",
+        "item_id": "joinorder-canonical-foundation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w9",
+        "wid": "w11"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w12",
+        "wid": "w13"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w7",
+        "wid": "w13"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w8",
+        "wid": "w13"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w9",
+        "wid": "w13"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w13",
+        "wid": "w15"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w15",
+        "wid": "w16"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "joinorder-canonical-foundation",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "Pins the upstream evidence cited in this TODO's description.\nThe \"10/13 embedded queries return zero rows on synthetic data\"\nfinding came from an external reviewer probe; before relying on\nit as motivation, re-run it locally to ensure the underlying\ndefect hasn't been partially patched in the interim.\n\nProcedure:\n  1. Generate joinorder synthetic data at sf=0.01 via the\n     existing generator (faster than sf=1, same defect signature)\n  2. Load the generated tables into DuckDB\n  3. For each of the 13 currently embedded JOB queries\n     (benchbox/core/joinorder/queries.py), rewrite as\n     SELECT COUNT(*) FROM (<query>) sub\n  4. Execute all 13; record counts\n  5. Assert: at least 8/13 return 0 rows (matches the issue\n     #289 review's 10/13 finding within sampling tolerance)\n\nCapture stdout to:\n  _project/verification-logs/joinorder-canonical-foundation/w0.log\n\nA reviewer landing this PR weeks later can replay the log and\nverify the motivation hasn't shifted (e.g., someone partially\nfixed the generator without updating this TODO). If the empty-\nquery rate has dropped below 8/13, STOP and re-survey before\nproceeding — the issue's framing may need adjustment.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the 10/13 empty-query claim against current generator",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "Output: `_project/design/joinorder-step1-foundations.md`\nSections:\n  1. Scale-factor enforcement gate\n     - Survey current scale_factor plumbing in benchbox/core/,\n       benchbox/core/runner/, and benchbox/cli/ (find every\n       path that can construct or run a benchmark)\n     - Pattern: `validate_scale_factor(benchmark, sf, registry)`\n       raises `ScaleFactorNotSupportedError` when sf not in\n       registry[benchmark].scale_options\n     - Reusable across benchmarks (TPC-DS has scale constraints too)\n  2. Data-fetch infrastructure (`benchbox/core/data_fetch/`)\n     - Per-benchmark `data_manifest.toml` schema (URL, sha256,\n       file layout, version, license file)\n     - Reuse BenchBox's existing datagen path convention:\n       `resolve_benchmark_runs_dir()` +\n       `get_datagen_path(benchmark, sf)`\n     - Add manifest-driven SHA256 verification on top of\n       nyctaxi-style `.exists()` presence checks\n     - No new env vars and no new CLI flags; air-gapped users\n       pre-populate the datagen directory and hit the same\n       checksum gate\n     - Failure modes documented: ChecksumMismatchError,\n       ManifestValidationError, DataFetchError\n  3. Dataset versioning in result bundles\n     - Separate identity fields:\n       * `dataset_version`: logical immutable dataset id, e.g.\n         `joinorder-imdb-2013-v1`; null for generated benchmarks\n       * `manifest_hash`: sha256 of data_manifest.toml\n       * `data_archive_hash`: sha256 of the packaged archive, or\n         aggregate sha256 over per-table file hashes when no\n         archive is present\n     - Surfaced at data layer only — explorer requires zero UI changes\n  4. Registry `surface` field\n     - \"public\" | \"internal\" — internal hidden from explorer\n     - joinorder_synthetic uses \"internal\" (per Joe: must not be\n       visible)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write design doc: reusable foundations (scale-factor gate, data-fetch infra, dataset-versioning, registry surface field)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "Source: gregrahn/join-order-benchmark canonical 113 queries\n(1a-33c). Pin the gregrahn commit SHA used (record in build\nmanifest provenance) so the import is reproducible.\n\nOutput: `_project/joinorder/build-inputs/queries/{1a,...,33c}.sql`\nOne file per query, exact text from upstream (no rewrites).\n\nNOT committed to benchbox/core/joinorder/queries.py — that\nis the cutover TODO's responsibility. Build-inputs directory\nis the staging area used only by the offline pipeline.\n\nSanity check: each .sql file is parseable by\n`sqlglot.parse_one(text, read=\"postgres\")` without error.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Import 113 canonical JOB queries from gregrahn into a build-input directory",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "For each of 113 queries, run against the restored Postgres\non canonical converted data and capture:\n  - row_count (integer)\n  - first_row_sha256 (sha256 of the canonical-ordered first row;\n    query rewritten as `SELECT ... FROM (<query>) ORDER BY 1,2,...`\n    for deterministic ordering)\n  - postgres_version\n  - query_id (canonical \"1a\", \"33c\" etc.)\n\nOutput: `_project/joinorder/reference_cardinalities.json`\n(committed to repo). Schema:\n  {\n    \"postgres_version\": \"16.2\",\n    \"dataset_version\": \"joinorder-imdb-2013-v1\",\n    \"manifest_hash\": \"<sha256(data_manifest.toml)>\",\n    \"data_archive_hash\": \"<aggregate-data-sha256>\",\n    \"gregrahn_commit\": \"<sha>\",\n    \"queries\": {\n      \"1a\": {\"row_count\": ..., \"first_row_sha256\": \"...\"},\n      ...\n    }\n  }\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Compute reference cardinalities via PostgreSQL oracle",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "First verify whether Leis et al. 2015 or companion JOB materials\npublish usable result cardinalities for any of the 113 queries.\nThe papers primarily publish optimizer/cardinality-estimation\nerror distributions, not a complete answer-set oracle, so this\nwork unit must not assume a table of reference row counts exists.\nCross-check our computed cardinalities only for values that are\nactually published or otherwise traceable to a stable upstream\nartifact.\n\nOutput: `_project/joinorder/cardinality-cross-check.md`\nLists each query for which a published/traceable count exists,\nreports our computed count and PASS / DRIFT verdict. If no\nsuitable published counts exist, the report must say so plainly\nand explain that the authoritative oracle for BenchBox is the\nPostgres run captured in w11. Drift > ±2% on any traceable count\nrequires investigation before proceeding.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cross-check reference cardinalities against Leis 2015 published values",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "Tarball: `joinorder-imdb-2013-v1.tar.zst`\nContents:\n  - 21 *.parquet files\n  - data_manifest.toml (with all provenance fields)\n  - DATA-LICENSE.md (template content, finalized in cutover TODO)\n  - checksums.txt (sha256 per Parquet)\n  - reference_cardinalities.json\n\nTarball-level sha256 written separately as\n`joinorder-imdb-2013-v1.tar.zst.sha256`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Package full archive tarball with manifest + license + checksums + cardinalities",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "Re-run the conversion pipeline with sampling: pick ~50 rows\nper table from the canonical Parquets, biased to ensure each\nnon-known-zero canonical query predicate has ≥1 satisfying row in the tiny\nsample. Sampling strategy:\n  - For tables with predicate-targeted columns, sample rows\n    where those columns have known query-matching values\n  - For pure FK tables (cast_info, movie_companies, etc.),\n    sample rows that bridge the predicate-satisfying rows\n    via FK relationships\n  - Verify referential integrity after sampling\n\nOutput: 21 tiny Parquet files checked into\n`tests/fixtures/joinorder_canonical_tiny/`, plus a tiny\nmanifest with dataset_version distinct from full canonical\n(so unit tests can reference both), plus\n`_project/joinorder/tiny_reference_cardinalities.json` with the\nsame schema as full `reference_cardinalities.json`.\n\nVerification before commit: load tiny fixture into DuckDB,\nrun all 113 queries from w10, assert every non-known-zero query\nhas ≥1 underlying row, and assert the five known-zero canonical\nqueries preserve 0 underlying rows.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate tiny canonical fixture (~1MB) and check into repo",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "`gh release create data/joinorder-imdb-2013-v1 \\\n  --draft \\\n  --title \"JoinOrder canonical IMDb 2013 dataset (v1)\" \\\n  --notes-file _project/joinorder/release-notes.md \\\n  joinorder-imdb-2013-v1.tar.zst \\\n  joinorder-imdb-2013-v1.tar.zst.sha256`\n\nRelease stays DRAFT until cutover TODO's UAT smoke test\nverifies the live-download path end-to-end. Promotion to\npublished is done in the cutover TODO's final phase.\n\nRelease notes (`_project/joinorder/release-notes.md`) include:\n  - Provenance (Harvard Dataverse DOI, May 2013 IMDb snapshot)\n  - IMDb attribution string verbatim\n  - Boncz-style scope clause\n  - BenchBox redistribution disclaimer + takedown contact\n  - Per-table row counts and sha256s\n  - Tarball-level sha256\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Stage as DRAFT GitHub Release on tag `data/joinorder-imdb-2013-v1`",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "File: `benchbox/core/joinorder/data_manifest.toml`\nFields populated from w8 manifest output. URL points at the\nDRAFT Release asset (which is fetchable via the API even while\ndraft, with a token). The cutover TODO's UAT step verifies\nthe URL resolves end-to-end.\n\nAdd `joinorder-canonical-foundation` checkpoint to commit\nmessage body so the cutover TODO can grep for it later.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `data_manifest.toml` for joinorder pointing at the staged Release URL",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "Module structure (minimum viable, fully tested):\n  benchbox/core/data_fetch/__init__.py    # public API: fetch_data()\n  benchbox/core/data_fetch/manifest.py    # parse data_manifest.toml\n  benchbox/core/data_fetch/manager.py     # orchestrate path, fetch, validate\n  benchbox/core/data_fetch/downloader.py  # HTTP GET + progress + resume + retry\n  benchbox/core/data_fetch/errors.py      # exception hierarchy\n\nTests (mocked HTTP):\n  tests/unit/core/data_fetch/test_manifest.py\n  tests/unit/core/data_fetch/test_manager.py\n  tests/unit/core/data_fetch/test_downloader.py\n\nSkeleton is benchmark-agnostic; no joinorder-specific code in\nthis module. Joinorder wiring happens in the cutover TODO.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build reusable data-fetch module skeleton in benchbox/core/data_fetch/",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "Two reusable changes in benchbox/core/benchmark_registry.py:\n  - Add `surface: \"public\" | \"internal\"` field; default \"public\"\n  - Add `validate_scale_factor()` helper used by the runner\n    before generator/load-path\n\nAlso wire the runner to call validate_scale_factor() before any\ndata-generating step. The runner location should be discovered\nduring w1.\n\nTests:\n  tests/unit/core/test_scale_factor_validation.py\n    - Parametrized: joinorder is sf=1-only; tpch/tpcds accept\n      their declared ranges; arbitrary sf rejected for joinorder\n  tests/unit/core/test_registry_surface_field.py\n    - \"public\" benchmarks visible via the result-publisher path\n    - \"internal\" benchmarks hidden from the same path\n    - Existing benchmarks all default to \"public\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `surface` field to benchmark registry schema and reusable scale-factor enforcement",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "Script foundation: `_project/scripts/build_joinorder_data.py`\n\nThis work unit produces a runnable pipeline skeleton that:\n  1. Downloads the Harvard Dataverse pg_dump\n     (doi:10.7910/DVN/2QYZBT); records upstream sha256 to\n     a build manifest\n  2. Spins up an ephemeral Postgres container via docker\n     (image tag pinned in script)\n  3. Restores the pg_dump into the container\n  4. Validates restore: every expected table is present,\n     row counts within ±1% of Leis 2015 Table 3 reference\n  5. Tears down container on exit\n\nOutput: working pipeline that produces a restored Postgres,\nvalidated for completeness, with provenance recorded.\nSubsequent work units (w5-w7) extract data from this\nrestored state.\n\nDependencies isolated in `_project/scripts/pyproject.toml`\n(already established pattern in this repo).\n\nCompleted 2026-05-11:\n  - Added `download-pgdump`, `restore-postgres`, and `w4`\n    subcommands.\n  - Dataverse metadata is resolved from the Harvard API and\n    constrained to the single `imdb_pg11` pg_dump file.\n  - Downloads use checksum validation, SHA256 provenance, and\n    curl retry/resume when available so a truncated transfer\n    cannot overwrite a valid cached artifact.\n  - `postgres:16.2` is pinned for restore; the container is\n    ephemeral by default and was torn down after validation.\n  - Live verification passed:\n    `~/Developer/benchmark_runs/joinorder/logs/w4-20260511T025034Z.log`\n  - Build manifest:\n    `~/Developer/benchmark_runs/joinorder/build/joinorder-imdb-2013-v1/build_manifest.json`\n  - Upstream pg_dump SHA256:\n    `1390a764ee76d03d80fd6743ec7a6e5f22493411967582e4f1ecc2e282c1a59c`\n  - Restore validation: 21/21 expected tables, 74,190,187 total\n    rows, no missing tables, no row-count failures.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pipeline scaffolding: ephemeral Postgres container + pg_dump download/restore",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "For each of 21 IMDb tables in the restored Postgres:\n  COPY <table> TO '/tmp/<table>.csv' WITH (\n    FORMAT csv,\n    ENCODING 'UTF8',\n    HEADER true,\n    QUOTE '\"',\n    ESCAPE '\"',\n    FORCE_QUOTE *\n  )\n\nNo NFC/NFD normalization in the extract step. Verify via\nsampling: extract a row containing accented characters\n(e.g., from `name` table) and assert byte-for-byte match\nagainst Postgres SELECT output.\n\nOutput: 21 CSV files with provenance (per-file sha256\ncaptured for the manifest).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Per-table CSV extract from restored Postgres with UTF-8 fidelity",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "For each of 21 CSVs, convert to Parquet via DuckDB:\n  COPY (SELECT * FROM read_csv_auto('<file>.csv'))\n    TO '<file>.parquet' (\n      FORMAT 'parquet',\n      COMPRESSION 'zstd',\n      ROW_GROUP_SIZE 100000\n    )\n\nSchema preservation: `read_csv_auto` infers types; verify\nagainst the Postgres source schema (pg_dump metadata).\nMismatches must be caught: explicit type casting per table\nif necessary. Document any forced types in the manifest.\n\nOutput: 21 Parquet files + per-file sha256 captured for the\nmanifest.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "CSV → Parquet conversion via DuckDB with zstd compression",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "Assemble `data_manifest.toml` with:\n  - dataset_version: logical immutable id, e.g.\n    `joinorder-imdb-2013-v1`\n  - script git SHA (from `git rev-parse HEAD` at build time)\n  - DuckDB version (from `duckdb.__version__`)\n  - Postgres image tag (pinned in w4)\n  - source DOI, retrieval timestamp (ISO-8601 UTC),\n    upstream pg_dump sha256\n  - per-table block: file path, row count, sha256, schema\n    (column name → Postgres type)\n  - data_archive_hash: aggregate sha256 over all per-file\n    hashes in deterministic table order\n  - manifest_hash: sha256 of the final data_manifest.toml\n    contents after all fields are populated\n\nThe manifest is the gate document: any byte-difference in\nthe conversion downstream changes data_archive_hash and then\nmanifest_hash. dataset_version is a human-stable release id;\nif the archive bytes change, either keep the same logical\ndataset_version with a new manifest_hash for a metadata-only\ncorrection, or intentionally bump dataset_version for a data\nchange. The design doc from w1 must state this policy.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Provenance manifest assembly with full reproducibility metadata",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "After Parquet conversion, the pipeline MUST assert encoding\nfidelity. Sample the following classes of rows:\n  - non-ASCII names from `name`, `aka_name` (e.g., accented chars,\n    ideographic chars in actor names)\n  - non-ASCII titles from `title`, `aka_title`\n  - punctuation-heavy notes from `cast_info.note`,\n    `movie_companies.note`\n\nRound-trip test:\n  Parquet → DuckDB scan → compare typed values against the\n  Postgres source rows for sampled primary keys, and compare\n  UTF-8 byte sequences for string/text columns before any\n  normalization. Do not require whole-row CSV serializer output\n  to be byte-identical; CSV quoting, ordering, and NULL\n  representation can legitimately differ across tools.\n\nPipeline aborts (non-zero exit) if any sampled value or string\nbyte sequence differs.\nThis catches silent NFC/NFD normalization or encoding drift in\nthe DuckDB writer. Sample size: 100 rows per table from the\ncanonical-tricky set above.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Encoding round-trip gate (build-time pipeline assertion)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-foundation",
+        "notes": "The defect that makes synthetic JOB worthless is that\n`movie_companies.note` and `cast_info.note` are always NULL,\nso queries filtering on those values match nothing. The\npipeline MUST assert the canonical source/query pair has the\nexpected predicate-domain shape.\n\nFor each of the 113 canonical JOB queries:\n  - Compute underlying joined predicate cardinality via Postgres\n    by replacing the aggregate SELECT list with COUNT(*).\n  - Assert known-zero canonical queries `2c`, `5a`, `5b`, `10b`,\n    and `32a` have exactly 0 underlying rows. These are also zero\n    on the original CWI JOB archive, so they are part of the\n    canonical oracle rather than Dataverse restore corruption.\n  - Assert every other canonical query has >=1 underlying joined\n    row.\n  - Preserve aggregate-result semantics separately: the known-zero\n    queries are MIN aggregate queries without GROUP BY, so SQL\n    returns one row with NULL aggregate values even though the\n    underlying join is empty.\n\nExact null-count assertions against the restored canonical source:\n  - movie_companies.note: 1,271,989 NULL / 2,609,129 rows\n  - cast_info.note: 22,007,252 NULL / 36,244,344 rows\n  - title.episode_of_id: 985,048 NULL / 2,528,312 rows\n\nPipeline aborts if any non-known-zero query becomes empty, any\nknown-zero query becomes nonzero, or any exact null count drifts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Canonical predicate-domain validation gate (known-zero preserving)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

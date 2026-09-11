@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #496 of throughput-stream-count-wiring-defect.\nDeferred: Add a --streams/--concurrency CLI option to `benchbox run` itself\n(benchbox/cli/commands/run.py) so BenchmarkConfig.concurrency is\nreachable from the canonical (non-deprecated) `run` command, not just\nthe deprecated `run-official` shim. Confirmed there is currently NO way\nto set concurrency>1 through `run`'s direct-execution path\n(benchbox/cli/commands/run.py `_run_direct`) at all -- every\n`BenchmarkConfig(...)` construction in that file omits `concurrency=`,\nso it always takes the schema default of 1. docs/usage/faq.md already\ndocuments `benchbox run --platform duckdb --benchmark tpch --scale 1\n--phases throughput --streams 4` as valid usage (see the sibling\nconcurrency-docs-alignment TODO's \"do not document it as working until\nit does\" caveat) -- that example remains non-functional until this\nfollow-up lands, since run.py was out of this TODO's scope_limit.\n\nReason deferred: run.py is not in this TODO's scope_limit.only_modify\n(benchbox/platforms/base/execution.py,\nbenchbox/cli/commands/run_official.py, tests/integration/ only).\nAdding a real CLI option there is a small, low-risk one-line-per-call\nchange (a new click.option + concurrency=... in the three\nBenchmarkConfig(...) constructions in _run_dry_run/_run_direct/the\ninteractive flow) but is out of scope for this fix and needs its own\nreviewed change.\n",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:34Z",
+      "worktree": "main"
+    }
+  }
+}

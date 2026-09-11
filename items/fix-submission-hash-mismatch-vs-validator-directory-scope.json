@@ -1,0 +1,161 @@
+{
+  "description": "Surfaced 2026-04-27 by the\n`verify-ci-validation-workflow-end-to-end` end-to-end test (PRs #27,\n#28, #29 against `published-results`).\n\nThe two halves of the Phase 2 submission flow disagree on what\n\"bundle\" the manifest hash covers:\n\n- `benchbox/cli/commands/submit.py:_compute_bundle_hash` hashes\n  `output_path/bundle/` — the isolated package directory containing\n  only the new submission's files. Manifest written with this hash.\n- `scripts/validate_submission.py:_validate_manifest_hash` hashes\n  `bundle_path.parent`, where `bundle_path` is the changed bundle\n  file under `results-data/bundles/`. That parent already contains\n  every other bundle in the corpus.\n\nSo the submitter hashes one file; the validator hashes ~13. They\ncan never match.\n\nEvidence: even an unmodified `benchbox submit --last` package fails\nthe validator with a hash mismatch on PR. See\n`_project/handoffs/ci-validation-evidence-2026-04-27.md`.\n\n**Impact**: every Phase 2 community PR submission fails CI today\nregardless of content. Phase 2 is not actually shippable in its\ncurrent form.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "'fix' this by hashing the entire results-data/bundles/ directory in the submitter",
+        "instead": "make the contract per-bundle.",
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "why": "that requires the submitter to clone the full corpus and stay synced"
+      },
+      {
+        "dont": "bury the contract in a code comment",
+        "instead": "write it down in an ADR or in scripts/validate_submission.py's docstring.",
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "why": "the next agent will repeat the same divergence"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-27T00:00:00Z",
+      "created_at": "2026-04-27T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing schema-v2 bundle format. The fix is a contract change in the manifest, not the bundle.",
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope"
+      },
+      {
+        "behavior": "Phase 2 PR-based submission flow remains the only supported submit path until Phase 3 stands up.",
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope"
+      },
+      {
+        "behavior": "Validator continues to reject obvious tampering (the hash-mismatch and schema-invalid cases captured 2026-04-27 must still fail post-fix).",
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/"
+      },
+      {
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_submission_validation.py"
+      },
+      {
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_submit.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_submission_validation.py -q",
+        "description": "Round-trip integration test passes",
+        "expected": "All tests pass",
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "see w4 evidence file",
+        "description": "Re-run E2E test against published-results: happy path is green",
+        "expected": "PASSED status on a new test PR",
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "notes": "Two paths:\n\nA. **Per-file hash** (recommended): the manifest's `bundle_hash`\n   is the SHA-256 of the bundle's primary JSON file (and\n   optional companions, as separate fields). The validator\n   recomputes per-file and compares. This matches the\n   architecture-design doc's content-addressed storage scheme\n   (each bundle is a single content hash regardless of corpus\n   co-location).\n\nB. **Directory hash** (status quo on validator side): the\n   manifest's `bundle_hash` is over a directory, but the\n   submitter must compute that hash with the *same set of files*\n   as the validator. This forces the submitter to know the\n   corpus state — a bad coupling.\n\nPick A. Document the decision in an ADR fragment under\n`docs/development/adr/` if it warrants one (probably yes — this\nis a contract change).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide which side defines the contract: per-file hash or directory hash",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "notes": "Update `benchbox/cli/commands/submit.py:_compute_bundle_hash`\nand `scripts/validate_submission.py:_validate_manifest_hash` so\nthey compute the same value for the same logical input.\n\nFor path A (recommended), the manifest gains a per-file hash\nmap:\n\n    {\n      \"bundle_hash\":  \"<sha256 of primary bundle file>\",\n      \"companion_hashes\": {\n        \"<filename>.plans.json\":  \"<sha256>\",\n        \"<filename>.tuning.json\": \"<sha256>\"\n      }\n    }\n\nValidator iterates the map; mismatches cite the offending file\nand the offending hash side (manifest vs computed).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update both implementations to match the chosen contract",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "notes": "A round-trip test: package via the submit command, copy bundle\n+ manifest into a fixture mimicking results-data/bundles/ with\n*other* bundles already present, run the validator. Must pass.\n\nA hand-corrupt test: same flow but flip a byte; validator must\nfail with a clear message.\n\nBoth tests live under `tests/integration/test_submission_validation.py`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests covering the contract on both sides",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-submission-hash-mismatch-vs-validator-directory-scope",
+        "notes": "Open one new test PR against `published-results` with a\nmaintainer-run small bundle. Confirm: workflow accepts on the\nhappy path, the corpus-inventory check runs and either passes or\ngives a clear \"out of date\" message, the PR-comment is updated\nidempotently after a no-op recommit. Append the new evidence to\n`_project/handoffs/ci-validation-evidence-*.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-run the verify-ci-validation end-to-end test once the fix lands",
+        "wid": "w4"
+      }
+    ]
+  }
+}

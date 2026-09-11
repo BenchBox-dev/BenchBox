@@ -1,0 +1,10 @@
+{
+  "description": "Currently only 8 platforms and 6 benchmarks have dedicated sphinx-tags.\nThe remaining 19 platforms and 12 benchmarks use category tags only\n(sql-platform, dataframe-platform, cloud-platform, custom-benchmark),\nwhich means users cannot filter documentation by specific platform or benchmark.\n\nThis task adds dedicated tags to all documented platforms and benchmarks\nso users can find all pages related to a specific technology.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2026-01-12T00:00:00Z",
+      "worktree": "docs-experience"
+    }
+  }
+}

@@ -1,0 +1,187 @@
+{
+  "description": "Follow-up from the qpc-05 (#1032) review. qpc-05 fixed the SHARED helper\nbenchbox/platforms/base/sql_execution.py::get_query_plan_from_cursor to return\nNone (not an error string) on EXPLAIN failure, and updated its two delegators\n(azure_synapse, firebolt). But four adapters have their OWN inline\nget_query_plan implementations that still `return f\"Could not get query plan:\n{e}\"` as the plan text — so a failed EXPLAIN is handed to a parser as if it\nwere plan output, or displayed as a plan:\n  - benchbox/platforms/velox.py:520\n  - benchbox/platforms/_spark_helpers.py:132\n  - benchbox/platforms/athena.py:1319\n  - benchbox/platforms/presto_trino_adapter_base.py:649\n(redshift.py / snowflake.py log at DEBUG — a separate lower-priority smell.)\n\nCRITICAL COUPLING: several parsers deliberately sniff the\n\"Could not get query plan\" prefix as a sentinel — doris, singlestore, spark,\ndatabend, questdb. Any cleanup of the inline returners MUST update those\nparsers in lockstep (remove the prefix-sniffing branch, handle None instead),\nor captured-failure detection regresses on those engines.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "encode errors in the data channel; return None and log.",
+        "instead": "(not specified)",
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "remove an inline error-string return without also updating every parser that sniffs its prefix",
+        "instead": "(not specified)",
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "why": "grep 'Could not get query plan' first."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "needs_item": "qpc-05-silent-failure-surfacing"
+      }
+    ],
+    "item_meta": {
+      "category": "Error Handling / Consistency",
+      "created_at": "2026-07-07T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "Display path stays best-effort (failure never aborts query execution)",
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep"
+      },
+      {
+        "behavior": "No engine's capture-failure accounting regresses when the sentinel string is removed",
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep"
+      },
+      {
+        "behavior": "strict_plan_capture still raises on capture failure",
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/base/sql_execution.py::get_query_plan_from_cursor — the fixed shared helper (qpc-05, returns None + WARNING)",
+        "decision": "reuse",
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "path": "benchbox/platforms/base/sql_execution.py::get_query_plan_from_cursor"
+      },
+      {
+        "concept": "benchbox/platforms/{velox.py:520, athena.py:1319, presto_trino_adapter_base.py:649}, benchbox/platforms/_spark_helpers.py:132 — inline error-string returners",
+        "decision": "reuse",
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "path": "benchbox/platforms/{velox.py:520"
+      },
+      {
+        "concept": "parsers doris/singlestore/spark/databend/questdb — sniff the 'Could not get query plan' prefix",
+        "decision": "reuse",
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "path": "parsers"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/"
+      },
+      {
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/_spark_helpers.py"
+      },
+      {
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/athena.py"
+      },
+      {
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/presto_trino_adapter_base.py"
+      },
+      {
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/velox.py"
+      },
+      {
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms -q -k 'plan and (velox or spark or athena or presto or trino)'",
+        "description": "Inline impls return None on failure; sniffing parsers handle None",
+        "expected": "all pass, including new None-return tests",
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make the four inline get_query_plan impls return None + log WARNING on EXPLAIN failure, matching the shared helper.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update the prefix-sniffing parsers (doris/singlestore/spark/databend/questdb) to handle None instead of the sentinel string; add a test per changed impl.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Review: adversarial code review (no engine loses capture-failure detection; display path still best-effort).",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Fix review findings; re-run verification.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-13-explain-error-string-inline-impls-sweep",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Submit PR referencing qpc-13.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

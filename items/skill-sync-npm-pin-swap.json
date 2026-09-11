@@ -1,0 +1,54 @@
+{
+  "description": "The cloud/CI integrity gate that verifies the tracked skill snapshot runs\nskill-sync via a github-sha pin because the tool is not published to npm:\n\n  .github/workflows/pr.yml (skill-sync tracked snapshot verify step):\n    run: npx -y github:joeharris76/skill-sync#d3c9c45 verify --project .\n\nThe github pin is reproducible and tokenless, so this is acceptable as an\ninterim. Costs vs an npm dependency: a full repo clone on every CI run, no\nsemver, and reliance on GitHub availability.\n\nWhen skill-sync is published to npm, replace the single call site with:\n\n    run: npx -y skill-sync@<ver> verify --project .\n\nUpdate the adjacent comment, and optionally repoint the Makefile default\n`SKILL_SYNC ?= /Users/joe/Developer/skill-sync/dist/cli/index.js` to the\nnpm-installed binary so local `make skill-sync` / `make skill-sync-verify`\nuse the published tool too. The Makefile and `.pre-commit-config.yaml`\nalready resolve skill-sync via the override-able `SKILL_SYNC` path, so the\nonly hard-coded github pin is the one CI line above.\n",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "skill-sync-npm-pin-swap",
+        "id": 32,
+        "reason": "Lives in the separate joeharris76/skill-sync repo and is a deliberate decision (the tool may stay github-only). This TODO is the consumer-side swap; it unblocks only once that publish happens.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Publishing skill-sync to npm lives in a separate external repo and is a maintainer decision; fits the human-action-required queue.",
+        "summary": "Publish skill-sync to npm"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "imported from YAML status: Blocked",
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-06-29T00:00:00Z",
+      "worktree": "chore-skill-sync-npm-pin-swap"
+    },
+    "work_needs": [
+      {
+        "item_id": "skill-sync-npm-pin-swap",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "skill-sync-npm-pin-swap",
+        "notes": "Single call site. Update the adjacent explanatory comment too.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace github-sha pin with npx -y skill-sync@<ver> in pr.yml verify step",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "skill-sync-npm-pin-swap",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Optionally repoint Makefile SKILL_SYNC default at the npm binary",
+        "wid": "w2"
+      }
+    ]
+  }
+}

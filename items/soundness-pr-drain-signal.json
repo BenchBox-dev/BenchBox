@@ -1,0 +1,140 @@
+{
+  "description": "WS7 of _project/planning/ci-failure-reduction-plan.md. Soundness-path PRs correctly withhold auto-merge (CODEOWNERS mirror in _project/scripts/auto_merge_soundness_paths.py), but they then park silently and grow conflicts while parked - #1116 and #1142 sat for days awaiting the owner, and both needed conflict resolution during the wait. The withholding gate itself is correct and untouchable; the fix is making the queue drain observable.\n\nAdd a small scheduled job that lists open PRs which are (a) green on required checks, (b) auto-merge withheld or otherwise awaiting the owner, (c) idle > 24h - and emits one daily 'ready for your review: N PRs' signal (issue comment, notification, or morning-brief hook) plus an `awaiting-owner` label for at-a-glance triage. Target: median park time < 1 day, which also shrinks conflict churn on exactly the PRs that can least afford re-review.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Ping per-PR or per-event",
+        "instead": "One daily digest, silent when the queue is empty",
+        "item_id": "soundness-pr-drain-signal",
+        "why": "Notification fatigue defeats the signal within a week"
+      },
+      {
+        "dont": "Use pull_request_target or a long-lived PAT for the scheduled job",
+        "instead": "Scheduled (cron) trigger with default GITHUB_TOKEN, minimal permissions block",
+        "item_id": "soundness-pr-drain-signal",
+        "why": "Write-token automation on a public repo is an exfiltration risk (see dev-loop-step-6 anti-patterns)"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "created_at": "2026-07-23T12:29:46Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "No auto-merge, no auto-approve, no nudge that mutates PR state beyond the label",
+        "item_id": "soundness-pr-drain-signal"
+      },
+      {
+        "behavior": "The soundness withholding gate itself is untouched - this item only observes and reports",
+        "item_id": "soundness-pr-drain-signal"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "soundness-pr-drain-signal",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "soundness-pr-drain-signal",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "soundness-pr-drain-signal",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/auto_merge_soundness_paths.py"
+      },
+      {
+        "item_id": "soundness-pr-drain-signal",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/soundness-drain.yml"
+      },
+      {
+        "item_id": "soundness-pr-drain-signal",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "soundness-pr-drain-signal",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "soundness-pr-drain-signal",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/soundness_drain_report.py --dry-run",
+        "description": "Dry-run lists the expected PR set",
+        "expected": "lists green+withheld+idle PRs, exit 0",
+        "item_id": "soundness-pr-drain-signal",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -A3 'permissions:' .github/workflows/soundness-drain.yml",
+        "description": "Workflow has minimal permissions",
+        "expected": "issues/pull-requests write only; contents read",
+        "item_id": "soundness-pr-drain-signal",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "soundness-pr-drain-signal",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "soundness-pr-drain-signal",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "soundness-pr-drain-signal",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Scheduled workflow/script: find green, owner-gated, idle>24h open PRs; apply awaiting-owner label; emit one daily summary",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "soundness-pr-drain-signal",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wire the signal to the owner's preferred channel (issue, notification, or morning-brief) - confirm choice in PR",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "soundness-pr-drain-signal",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record park-time metric in dev-loop-metrics for the WS9 review",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "description": "Adversarial review finding (2026-07-02, joinorder Track-2 review) -- a design\nreconciliation the project must make before Track-2 scaling is coded. Three\nlinked, unresolved concerns:\n\n1. Two un-reconciled Track-2 directions. The decision doc recommends the\n   `replicated_imdb` baseline -- scale UP via offset replication\n   (_project/decisions/joinorder-scale-stress-decision-2026-06-30.md:5). The\n   scaling-strategy design leads with \"Option B -- sampled-from-real\" -- scale\n   DOWN (_project/design/track2-joinorder-scaling-strategy.md:116), and\n   self-discloses the divergence (lines 134-151, \"a genuine divergence to\n   reconcile at kickoff\"). The project has two leading candidates locked in by\n   neither.\n\n2. The replicated_imdb \"stale-statistics axis\" is largely degenerate. Because\n   offset replicas are value-identical and disjoint, per-predicate selectivity\n   is scale-invariant; the only staleness exposed is a uniform xN row-count\n   miss, not the correlated/skewed mis-estimation the framework's own\n   hypothesis targets (decision doc lines 124-125 concede \"drift is bounded\n   because replicas are disjoint\" while line 168 still markets a \"genuine\n   statistics-maintenance axis\"). Decide whether that axis is worth the\n   replication cost, or whether sampled-from-real better serves the stated\n   research question.\n\n3. Licensing framing. The scale-stress licensing ADR concludes the\n   transformation is \"not material\" to redistribution risk\n   (joinorder-scale-stress-licensing-2026-06-30.md:24), but it engages only the\n   \"launder\" concept and never the earlier ADR's operative \"must not be\n   altered\" term (joinorder-canonical-data-licensing-2026-05-12.md:46). Offset\n   replication IS an alteration, which arguably raises rather than matches the\n   risk. Bottom-line posture (accepted residual risk, not cleared) is\n   consistent, but \"not material\" should be defended against \"altered\" or\n   softened.\n\nOutput: an updated/superseding decision that picks a single Track-2 scaling\ndirection and records the resolution of concerns 2 and 3. No code.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "joinorder-track2-scaling-direction-reconciliation",
+        "needs_item": "joinorder-scale-stress-decision-framework"
+      }
+    ],
+    "item_meta": {
+      "category": "Benchmark Development",
+      "created_at": "2026-07-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "verifications": [
+      {
+        "command": "grep -niE 'recommend|decision|chosen|supersed' _project/decisions/joinorder-scale-stress-decision-2026-06-30.md",
+        "description": "The updated/superseding decision names exactly one chosen Track-2 scaling direction",
+        "expected": "a single chosen scaling direction is stated (replicated_imdb OR sampled-from-real, not both as co-leading)",
+        "item_id": "joinorder-track2-scaling-direction-reconciliation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-track2-scaling-direction-reconciliation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-track2-scaling-direction-reconciliation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-track2-scaling-direction-reconciliation",
+        "notes": "Compare against the stated Track-2 research question (statistics\nmaintenance x predicate selectivity). Record the pick and rationale as an\nupdate to, or supersession of, the 2026-06-30 decision note; update the\nscaling-strategy doc's \"divergence to reconcile\" section accordingly.\nDone 2026-07-04: project-owner decision = sampled-from-real first,\nreplicated_imdb deferred (prototype stays gated). Recorded in\n_project/decisions/joinorder-track2-scaling-direction-2026-07-04.md;\nsupersession banner + qualified Recommendation line added to the\n2026-06-30 note (its anchored `^Recommendation:` gate line intentionally\nno longer matches, keeping the replicated prototype blocked); resolution\nnote added to the scaling-strategy doc's divergence section.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reconcile replicated_imdb (scale-up) vs sampled-from-real (scale-down) into one decision",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-track2-scaling-direction-reconciliation",
+        "notes": "Given value-identical disjoint replicas make selectivity scale-invariant,\nstate explicitly what statistics signal replicated_imdb does/doesn't expose,\nand reconcile decision-doc lines 124-125 vs 168.\nDone 2026-07-04: resolved as \"not worth pursuing for the Track-2 research\nquestion\" -- the axis is a uniform xN row-count staleness signal only.\nStated explicitly in the superseding ADR's \"Why sampled-from-real\"\nsection, and the 2026-06-30 note's rationale paragraph now carries the\nbounded-signal qualification instead of the unqualified \"genuine\nstatistics-maintenance axis\" claim.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve whether the offset-replication stale-stats axis is worth pursuing",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-track2-scaling-direction-reconciliation",
+        "notes": "Address joinorder-canonical-data-licensing-2026-05-12.md:46 (\"must not be\naltered\") directly in the scale-stress licensing ADR, or soften \"not\nmaterial\" to an explicitly-argued risk-parity judgement.\nDone 2026-07-04 (owner chose the soften-to-risk-parity option): the\nPosture section now concedes replication IS an alteration under the\nupstream term, drops the \"not material\" claim, and argues explicit risk\nparity with the already-accepted canonical posture; the Status header\nrecords that the recommendation it was pinned for is deferred but the\nposture stays pinned, and the superseding ADR extends the same reasoning\nto the sampled-from-real direction.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tighten the licensing 'transformation not material' argument against the 'altered' term",
+        "wid": "w3"
+      }
+    ]
+  }
+}

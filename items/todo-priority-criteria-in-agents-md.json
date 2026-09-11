@@ -1,0 +1,83 @@
+{
+  "description": "`todo-priority-criteria-definition` (filed in the 2026-06-08 batch) targets\n`_project/TODO/README.md` and `TODO_ENTRY_TEMPLATE.yaml`. Those files are\nread by humans authoring TODOs.\n\nAGENTS.md (at the repo root) is the behavioral guidance file read by\nautomated agents at session start. Without priority criteria in AGENTS.md,\nagents performing prioritization or triage cannot apply the agreed-upon\ndefinitions — they fall back to implicit heuristics that differ from the\ndocumented criteria.\n\nOnce `todo-priority-criteria-definition` is done and the criteria are in\nREADME.md, add a concise cross-reference or summary section to AGENTS.md\nso agents have the same definitions available.\n",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "todo-priority-criteria-in-agents-md",
+        "needs_item": "todo-priority-criteria-definition"
+      }
+    ],
+    "item_meta": {
+      "category": "Process and Workflow",
+      "created_at": "2026-06-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "AGENTS.md existing sections and their ordering remain intact",
+        "item_id": "todo-priority-criteria-in-agents-md"
+      },
+      {
+        "behavior": "Criteria in AGENTS.md stay in sync with TODO/README.md (one drives, the other references)",
+        "item_id": "todo-priority-criteria-in-agents-md"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "AGENTS.md: root-level agent guidance file — extend, do not replace",
+        "decision": "extend",
+        "item_id": "todo-priority-criteria-in-agents-md",
+        "path": "AGENTS.md"
+      },
+      {
+        "concept": "_project/TODO/README.md: source of truth for priority criteria (added by todo-priority-criteria-definition)",
+        "decision": "reuse",
+        "item_id": "todo-priority-criteria-in-agents-md",
+        "path": "_project/TODO/README.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -A 10 'Priority' AGENTS.md",
+        "description": "AGENTS.md contains a priority-level reference legible without reading README.md",
+        "expected": "Criteria or pointer visible for Critical, High, Medium-High, Medium, Low",
+        "item_id": "todo-priority-criteria-in-agents-md",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-priority-criteria-in-agents-md",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "todo-priority-criteria-in-agents-md",
+        "notes": "Look for an existing section about TODO/backlog management, task\nprioritization, or agent decision-making. The criteria should live\nnear any existing guidance about how agents should approach TODO items.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Read AGENTS.md to find the right insertion point",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-priority-criteria-in-agents-md",
+        "notes": "Options in order of preference:\n  1. Short inline table (5 rows, one per level) with the key\n     distinguishing question — avoids agents having to read README.md.\n  2. One-paragraph summary + pointer to _project/TODO/README.md.\nDo not duplicate the full criteria verbatim; maintain a single source\nof truth in TODO/README.md.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a Priority Definitions summary or cross-reference to AGENTS.md",
+        "wid": "w2"
+      }
+    ]
+  }
+}

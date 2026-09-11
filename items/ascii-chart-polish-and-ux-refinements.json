@@ -1,0 +1,207 @@
+{
+  "context": "Work chart-by-chart, not feature-by-feature. Each phase is self-contained and testable.\n\nPhase 1 (naming) modifies result_plotter.py only - add a _disambiguate_modes() method similar\nto existing _disambiguate_platforms(). Call it after _disambiguate_platforms() in __init__().\n\nPhase 2 (truncation) modifies individual chart files. Replace hardcoded caps with dynamic\ncalculation: `min(max(len(label) for label in labels), 30)`. Adjust the bar/data area width\nby subtracting the label width from the total width, with a floor of 40 chars for data.\n\nPhase 3 (metadata) adds a new _render_subtitle() to base.py, similar to _render_title().\nThread metadata as an optional dict through chart constructors. Modify _render_single_ascii_chart()\nin visualization.py to extract metadata from NormalizedResult and pass to chart.\n\nPhases 4-7 are localized to individual chart files - follow existing patterns in each file.\n",
+  "description": "The ASCII charting module (benchbox/core/visualization/ascii/, ~2,976 lines across 11 files) is\nfunctionally complete with 11 chart types, but real-world usage reveals several UX issues that make\ncharts harder to read and interpret. These are cosmetic/readability issues, not functional bugs -\nall chart types render correctly and return valid strings.\n\nIssues identified from head_to_head and comparison template output with DataFusion SQL vs DataFrame:\n\n1. **Asymmetric series naming**: When comparing SQL vs DataFrame, one series is labeled\n   \"DataFusion\" and the other \"DataFusion (dataframe)\". Both should carry their mode suffix\n   for symmetry - e.g., \"DataFusion (sql)\" vs \"DataFusion (df)\". Prefer abbreviated mode\n   labels: \"df\" not \"dataframe\", \"sql\" stays \"sql\".\n\n2. **Aggressive label truncation**: Platform names are truncated to as few as 8 characters\n   (comparison_bar.py:81), causing \"DataFusion\" → \"DataFu..\". Labels should accommodate full\n   names by shrinking the data area or wrapping to a second line.\n\n3. **No chart metadata**: Scale factor, platform version, and tuning configuration are available\n   in NormalizedResult but never displayed. Charts should include a subtitle line showing key\n   run parameters (e.g., \"SF=1 | DataFusion 44.0.0 | tuned\").\n\n4. **Inconsistent color application**: Bar chart labels are not colored (bar_chart.py:141) while\n   histogram bars and box plot lines are colored. Colors should be applied uniformly across all\n   chart types that display series data.\n\n5. **Missing axis labels**: Charts lack axis title annotations (e.g., \"Query ID →\" on x-axis,\n   \"↑ Execution Time (ms)\" on y-axis). Only tick values and query IDs are shown.\n\n6. **Heatmap readability**: Column headers are severely truncated. The green→yellow→red color\n   scale (heatmap.py:32-38) is hard to distinguish in many terminals. User requests red→blue\n   diverging palette for better contrast.\n\n7. **Histogram outlier bars**: All bars use the same █ block character regardless of whether\n   they represent outlier values. Outlier columns should use a visually distinct character\n   (e.g., ▓ or hatched pattern) so extreme values are immediately recognizable.\n\n8. **Summary box dot-leader gap**: In comparison summary boxes, the percentage change is\n   right-justified against the border while metric text is left-aligned, leaving a wide blank\n   gap (80+ chars of whitespace). Replace with dot-leader pattern (·····) so the eye can trace\n   from the value to its percentage.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add metadata to the chart title string itself",
+        "instead": "add a separate subtitle line instead",
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "why": "titles are already long and metadata should be visually distinct"
+      },
+      {
+        "dont": "hardcode platform names or mode strings in the naming logic",
+        "instead": "use generic detection of same-platform/different-mode pairs",
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "why": "new platforms and modes are added regularly"
+      },
+      {
+        "dont": "make the blue→red heatmap palette the ONLY option",
+        "instead": "add a color_scheme parameter defaulting to 'diverging'",
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "why": "some users may prefer the sequential green→red palette"
+      },
+      {
+        "dont": "use statistical outlier detection that requires numpy",
+        "instead": "use simple IQR calculation with sorted() and len()",
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "why": "BenchBox has zero numpy dependency for core"
+      },
+      {
+        "dont": "wrap labels by splitting platform names mid-word",
+        "instead": "only wrap at natural boundaries like spaces or parentheses",
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "why": "'DataFu\\nsion' is unreadable"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-06T00:00:00Z",
+      "created_at": "2026-02-06T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "4-tier color degradation chain (truecolor -> 256 -> 16 -> none) works for all changes",
+        "item_id": "ascii-chart-polish-and-ux-refinements"
+      },
+      {
+        "behavior": "ASCIIChartBase.render() -> str contract unchanged",
+        "item_id": "ascii-chart-polish-and-ux-refinements"
+      },
+      {
+        "behavior": "ASCIIChartOptions(use_color=False) produces clean output without ANSI codes",
+        "item_id": "ascii-chart-polish-and-ux-refinements"
+      },
+      {
+        "behavior": "All 6 original chart types + 3 comparison chart types render correctly",
+        "item_id": "ascii-chart-polish-and-ux-refinements"
+      },
+      {
+        "behavior": "All existing factory functions (from_bar_data, from_query_latency_data, from_comparison_data, etc.) remain backward-compatible",
+        "item_id": "ascii-chart-polish-and-ux-refinements"
+      },
+      {
+        "behavior": "Chart width respects terminal width detection and ASCIIChartOptions.width override",
+        "item_id": "ascii-chart-polish-and-ux-refinements"
+      },
+      {
+        "behavior": "MCP generate_chart tool continues to work for all existing chart_type values",
+        "item_id": "ascii-chart-polish-and-ux-refinements"
+      },
+      {
+        "behavior": "Unicode -> ASCII fallback works for new characters (outlier bars, axis labels)",
+        "item_id": "ascii-chart-polish-and-ux-refinements"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/__init__.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/bar_chart.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/base.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/box_plot.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/comparison_bar.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/diverging_bar.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/heatmap.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/histogram.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/line_chart.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/scatter_plot.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/summary_box.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/exporters.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/result_plotter.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/visualization.py"
+      },
+      {
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/ascii/test_ascii_charts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -q",
+        "description": "All existing ASCII chart tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'visualization or ascii' -q",
+        "description": "No regressions in visualization module",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox/core/visualization/",
+        "description": "No lint errors in modified files",
+        "expected": "All checks passed or no output (clean)",
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.visualization.ascii import ASCIIBarChart, ASCIIBoxPlot, ASCIIHeatmap, ASCIIQueryHistogram, ASCIIComparisonBar, ASCIIDivergingBar, ASCIISummaryBox; print('imports ok')\"",
+        "description": "MCP generate_chart still works for all chart types",
+        "expected": "imports ok",
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox visualize --template head_to_head benchmark_runs/results/tpch_sf1_datafusion_df_20260206_141251_1d7dbb77.json benchmark_runs/results/tpch_sf1_datafusion_sql_20260206_141231_c20da81e.json",
+        "description": "Visual regression check with real results",
+        "expected": "Charts render without errors; series names are symmetric and untruncated",
+        "item_id": "ascii-chart-polish-and-ux-refinements",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

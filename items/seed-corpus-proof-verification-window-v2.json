@@ -1,0 +1,77 @@
+{
+  "context": "After the todo-db 0.3 hosted migration is separately rehearsed and authorized, replace the point-in-time historical assertion with a self-asserting latest-repair-run criterion tied to the merged workflow fix. Preserve evidence of run 30455422794 rather than deleting or rewriting its audit history.",
+  "description": "The dispatch proof run 30455422794 failed after the fixed timestamp embedded in dispatch-seed-corpus-to-prove-it-runs-green rung 3. That rung now rejects every future successful repair run because it asserts that no failure has occurred since 2026-07-28T23:23:30Z. The current tracker cannot update item specifications, and the authorized batch explicitly forbids migrating the live shared database.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "seed-corpus-proof-verification-window-v2",
+        "needs_item": "migrate-hosted-tracker-db-to-todo-db-0-3-schema"
+      }
+    ],
+    "item_meta": {
+      "category": "Tracker integrity",
+      "created_at": "2026-07-29T13:26:15Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "no live tracker migration occurs as part of this item",
+        "item_id": "seed-corpus-proof-verification-window-v2"
+      },
+      {
+        "behavior": "run 30455422794 remains recorded as the failed proof that exposed the workflow and DataFusion defects",
+        "item_id": "seed-corpus-proof-verification-window-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "seed-corpus-proof-verification-window-v2",
+        "kind": "do_not_modify",
+        "path_glob": "**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh run list --repo joeharris76/BenchBox --workflow seed-corpus.yml --event workflow_dispatch --limit 1 --json conclusion --jq \".[0].conclusion\" | grep -qx success",
+        "description": "The original item ladder can pass after a newer successful repair dispatch",
+        "expected": "latest filtered dispatch is successful",
+        "item_id": "seed-corpus-proof-verification-window-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T12:40:40Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "seed-corpus-proof-verification-window-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "seed-corpus-proof-verification-window-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace the permanently false timestamp rung with a latest successful dispatch criterion",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "seed-corpus-proof-verification-window-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run the revised ladder against a post-merge filtered dispatch and preserve run links",
+        "wid": "w2"
+      }
+    ]
+  }
+}

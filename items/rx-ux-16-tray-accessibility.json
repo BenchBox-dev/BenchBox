@@ -1,0 +1,258 @@
+{
+  "context": "The tray is role=region with an accessible name; not a dialog, not modal, no focus trap. A persistently mounted polite live region announces selection changes, debounced so multi-select produces one announcement. Appearance never moves focus. The enabled/disabled transition of the primary action is part of the same announcement. Escape collapses without clearing, with a defined return-focus rule that never leaves focus on a removed control. The collapse control is a real button with aria-expanded and aria-controls.",
+  "description": "Accessibility slice for the shared tray, separate from geometry.\n\nPrecedent to reuse: QueryHeatmap already runs a polite live region for focused-cell announcements (QueryHeatmap.tsx:145-146, 441-448). Disabled reasons are exposed via aria-describedby (PlatformIndex.tsx:961, Query.tsx:900), NOT an accessible-name suffix - an earlier revision stated the opposite and was wrong.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Switch capped or locked checkboxes to aria-disabled so the description becomes reachable",
+        "instead": "INSTEAD keep native disabled",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "why": "it adds dozens of inert tab stops, requires click and keyboard suppression on controlled Preact checkboxes, and breaks .disabled assertions in Query, PlatformIndex, Compare, QueryHeatmap and BenchmarkIndex tests"
+      },
+      {
+        "dont": "collapse on Escape without a return-focus rule",
+        "instead": "define where focus goes when the focused control is removed",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "why": "collapsing can destroy the currently focused element"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "mount the live region only when a selection exists",
+        "instead": "mount it persistently",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "why": "a region inserted at announcement time is frequently not announced"
+      },
+      {
+        "dont": "move focus to the tray when it appears",
+        "instead": "leave focus on the control the reader just operated",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "why": "stealing focus interrupts multi-select and disorients screen-reader users"
+      },
+      {
+        "dont": "put the disabled reason in the accessible name",
+        "instead": "use aria-describedby",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "why": "that is the shipped pattern in PlatformIndex and Query"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rx-ux-16-tray-accessibility",
+        "needs_item": "rx-ux-15-tray-geometry"
+      },
+      {
+        "item_id": "rx-ux-16-tray-accessibility",
+        "needs_item": "rx-ux-26-selection-status-copy"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-25T04:35:35Z",
+      "completed_pr": 1891,
+      "created_at": "2026-08-22T14:49:40Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Disabled reasons are exposed via aria-describedby (PlatformIndex.tsx:961, Query.tsx:900), not an accessible-name suffix. Follow the shipped pattern.",
+        "item_id": "rx-ux-16-tray-accessibility"
+      },
+      {
+        "behavior": "QueryHeatmap's existing live region and its focused-cell announcements",
+        "item_id": "rx-ux-16-tray-accessibility"
+      },
+      {
+        "behavior": "role=grid arrow-key navigation on the matrix",
+        "item_id": "rx-ux-16-tray-accessibility"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "tray that the announcements and collapse semantics attach to, landed by #1810",
+        "decision": "extend",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "path": "results-explorer/src/components/CompareTray.tsx"
+      },
+      {
+        "concept": "visible Compare state column already announces the reason",
+        "decision": "reuse",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "path": "results-explorer/src/pages/PlatformIndex.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-16-tray-accessibility",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-16-tray-accessibility",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/capability/accessibility-regressions.spec.ts"
+      },
+      {
+        "item_id": "rx-ux-16-tray-accessibility",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/**"
+      },
+      {
+        "item_id": "rx-ux-16-tray-accessibility",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium e2e/capability/accessibility-regressions.spec.ts",
+        "description": "Accessibility regression suite passes",
+        "expected": "no new axe violations",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium",
+        "description": "Chromium browser suite passes against a fresh build",
+        "expected": "fixtures verified, build succeeds, chromium suite green",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'tray announcement'",
+        "description": "Selection changes announce once, focus never moves to the tray",
+        "expected": "one announcement per settled selection change; document.activeElement unchanged by tray appearance",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'tray escape'",
+        "description": "Escape collapses without clearing and focus lands somewhere valid",
+        "expected": "selection retained, focus on a live element",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-16-tray-accessibility",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-16-tray-accessibility",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-16-tray-accessibility",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-16-tray-accessibility",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "rx-ux-16-tray-accessibility",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "rx-ux-16-tray-accessibility",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "rx-ux-16-tray-accessibility",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "CompareTray role=region aria-label Comparison selection, no focus trap; tray geometry preserved",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "notes": null,
+        "started_at": "2026-08-25T01:52:12Z",
+        "started_branch": "feat/rx-ux-16-tray-accessibility",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-16-tray-accessibility",
+        "status": "done",
+        "summary": "role=region with accessible name; no focus trap",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Persistently mounted polite aria-live region debounced 180ms announcing 0/1/N selections",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "notes": null,
+        "started_at": "2026-08-25T01:52:17Z",
+        "started_branch": "feat/rx-ux-16-tray-accessibility",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-16-tray-accessibility",
+        "status": "done",
+        "summary": "Persistently mounted debounced polite live region",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Toggle button aria-expanded/aria-controls compare-tray-details",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "notes": null,
+        "started_at": "2026-08-25T01:52:22Z",
+        "started_branch": "feat/rx-ux-16-tray-accessibility",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-16-tray-accessibility",
+        "status": "done",
+        "summary": "Collapse control as button with aria-expanded/aria-controls",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Escape collapses without clearing, return-focus to toggle; scoped to inside tray",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "notes": null,
+        "started_at": "2026-08-25T01:52:27Z",
+        "started_branch": "feat/rx-ux-16-tray-accessibility",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-16-tray-accessibility",
+        "status": "done",
+        "summary": "Scoped Escape with return-focus rule",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Preserved aria-describedby disabled reason; shipped pattern not aria name suffix",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "notes": null,
+        "started_at": "2026-08-25T01:52:33Z",
+        "started_branch": "feat/rx-ux-16-tray-accessibility",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-16-tray-accessibility",
+        "status": "done",
+        "summary": "Preserve visible disabled-reason text and its aria-describedby association on capped and ineligible compare checkboxes",
+        "wid": "w5"
+      },
+      {
+        "evidence": "6 tray accessibility tests pass (region, announce focus, toggle attrs, escape collapse/focus, escape scoping, disabled reason) + 8 geometry + 6 clearance; 20 tray tests pass; vitest 936",
+        "item_id": "rx-ux-16-tray-accessibility",
+        "notes": null,
+        "started_at": "2026-08-25T01:52:39Z",
+        "started_branch": "feat/rx-ux-16-tray-accessibility",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-16-tray-accessibility",
+        "status": "done",
+        "summary": "Keyboard and SR test pass over the full select-to-compare flow",
+        "wid": "w6"
+      }
+    ]
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "description": "INDEPENDENT-VERIFICATION FINDING (2026-07-04 review of PR #952): the entire\nscheduled release-canary lattice is inert. `.github/workflows/release-canary.yml`\ndeclares `on.schedule: cron \"0 8 * * *\"` (line 5-7) and now carries three\njobs the repo's safety story leans on:\n\n  1. `pypi-latest-installability` — the daily PyPI-latest install/import\n     canary added by pypi-installability-canary-and-rollback (PR #952),\n     whose DONE notes claim it \"would have caught broken 0.3.0 in a day\";\n  2. `ruleset-drift` — the daily check that pins the develop ruleset's\n     required-check wiring and the v* tag-creation ruleset via\n     _project/scripts/ruleset_review_enforcement.py (it formerly also\n     warned on the require_code_owner_review gap, but that target was\n     retired 2026-07-18 and the warning removed — see\n     docs/operations/repo-admin-settings.md);\n  3. `credential-free-non-fast` — the scheduled non-fast test sweep.\n\nNone of them has ever executed. GitHub runs `on.schedule` workflows ONLY\nfrom the DEFAULT branch's copy of the workflow file. The default branch is\n`main` (`git remote show origin` → \"HEAD branch: main\"), and\n`git ls-tree origin/main .github/workflows/` does NOT contain\nrelease-canary.yml — it exists only on `develop`. Corroborating live\nevidence gathered 2026-07-04:\n  - the Actions \"list workflows\" API returns 19 workflows and\n    release-canary is not among them (a workflow absent from the default\n    branch with zero historical runs is never registered);\n  - `GET /actions/workflows/release-canary.yml/runs` returns 404.\n\nConsequence: the PyPI-latest canary cannot alert on the currently-broken\n0.3.0 release (reconfirmed broken 2026-07-04: clean isolated install fails\nwith `ModuleNotFoundError: No module named 'pandas'`), and the daily\nruleset-drift check that several governance TODOs treat as the live\ndetection layer (e.g. auto-merge-review-gate-admin-enforcement w2) is not\nactually running. In this repo's flow, files reach `main` only at\nrelease-cut, so without deliberate action the canary stays dead until the\nnext release — the exact window it is supposed to guard.\n\nIMPORTANT EXPECTED STATE once activated: `pypi-latest-installability` will\ncorrectly go RED every day until release-recovery-v0-3-1 ships a fixed\nrelease. That is the desired signal, not a defect — do not \"fix\" the red\nby weakening the canary.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "mark the canary 'activated' because a workflow_dispatch run from develop succeeds",
+        "instead": "verify registration and a run on main's copy specifically.",
+        "item_id": "release-canary-scheduled-activation",
+        "why": "scheduled firing only ever uses the default branch's copy"
+      },
+      {
+        "dont": "silence or down-scope pypi-latest-installability to get a green first run",
+        "instead": "link the red run to release-recovery-v0-3-1 instead.",
+        "item_id": "release-canary-scheduled-activation",
+        "why": "PyPI-latest 0.3.0 is genuinely broken and red is the correct reading"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "release-canary-scheduled-activation",
+        "id": 9,
+        "reason": "That is release-recovery-v0-3-1's outcome (ship a fixed 0.3.1). This TODO only makes the canary RUN; a red result on a broken PyPI-latest is the canary working.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: _project/DONE/main/active/release-recovery-v0-3-1.yaml is already DONE — that item's outcome (fixed/green PyPI-latest canary) has landed.",
+        "summary": "Making the PyPI-latest canary green"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "release-canary-scheduled-activation",
+        "id": 10,
+        "reason": "Broader release-flow design question; only the scheduled-shell decision in w1 is needed here.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly scopes this out as a broader release-flow design question beyond the parent item's w1 scheduled-shell decision.",
+        "summary": "Auto-syncing all of main's workflow copies from develop"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Blocked (maintainer-only). w2 requires landing the canary schedule on origin/main + a repo-admin/settings action, which is not agent-authorized (main is release-only; no direct push). Per release-canary-ruleset-drift-baseline-refresh w4, this item's live scope is to be folded into that item OR dropped. UNBLOCK: maintainer decides the activation mechanism and lands it on main, then adds the scheduled-workflow liveness guard (w3); or drop-and-supersede via the ruleset item's w4 reconciliation once that item's 2026-07-22 scheduled-canary checkpoint clears.",
+      "category": "Release Tooling",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "main remains release-only: whatever lands there goes through the documented admin/release flow, never a direct agent push (CLAUDE.md: git push * main is never auto-allowed).",
+        "item_id": "release-canary-scheduled-activation"
+      },
+      {
+        "behavior": "release-canary.yml's existing job semantics on develop (credential-free-non-fast checkout target, ruleset-drift WARN-until-enforced behavior, pypi-latest-installability blocking within release-canary-result) — activation must not weaken any of them.",
+        "item_id": "release-canary-scheduled-activation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/nightly.yml — the one scheduled workflow that IS on main and does fire; reuse: its main-branch copy is the proof that schedule-from-default-branch works here, and it is the natural home for a scheduled-workflow liveness guard once one exists on main.",
+        "decision": "reuse",
+        "item_id": "release-canary-scheduled-activation",
+        "path": ".github/workflows/nightly.yml"
+      },
+      {
+        "concept": ".github/workflows/release-canary.yml:credential-free-non-fast — already checks out develop explicitly for its test sweep; extend: the same 'scheduled shell runs, then checks out develop for current logic' pattern is the candidate design for keeping the canary current between release-cuts.",
+        "decision": "extend",
+        "item_id": "release-canary-scheduled-activation",
+        "path": ".github/workflows/release-canary.yml:credential-free-non-fast"
+      },
+      {
+        "concept": "docs/operations/repo-admin-settings.md — the runbook that records deferred admin actions and live-state notes; extend it with the outcome here (main is push-restricted, so landing a file on main is an admin/release-flow action of the same class).",
+        "decision": "extend",
+        "item_id": "release-canary-scheduled-activation",
+        "path": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "release-canary-scheduled-activation",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "release-canary-scheduled-activation",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "release-canary-scheduled-activation",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "release-canary-scheduled-activation",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/release-canary.yml"
+      },
+      {
+        "item_id": "release-canary-scheduled-activation",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/release-recovery-v0-3-1.yaml"
+      },
+      {
+        "item_id": "release-canary-scheduled-activation",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh api repos/joeharris76/BenchBox/actions/workflows --jq '.workflows[] | select(.path | contains(\"release-canary\")) | {path, state}'",
+        "description": "Workflow registered and scheduled runs occurring",
+        "expected": "release-canary path present with state=active; a subsequent runs query returns at least one scheduled run",
+        "item_id": "release-canary-scheduled-activation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "(mutation probe) point the guard at a fake workflow name in a scratch run",
+        "description": "Liveness guard fails when a scheduled workflow has no recent runs",
+        "expected": "guard step exits non-zero naming the dead workflow",
+        "item_id": "release-canary-scheduled-activation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "release-canary-scheduled-activation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "release-canary-scheduled-activation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "release-canary-scheduled-activation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "release-canary-scheduled-activation",
+        "notes": "Run `git fetch origin main && git ls-tree origin/main --name-only\n.github/workflows/` (expect: no release-canary.yml) and\n`gh api repos/joeharris76/BenchBox/actions/workflows --jq\n'.workflows[].path'` (expect: no release-canary.yml). Record both\none-line results in the PR/TODO notes. If either now shows the\nworkflow, re-scope this TODO against the new live state instead of\nproceeding blind.\nDONE 2026-07-05: `git ls-tree origin/main --name-only .github/workflows/`\n-> 14 files, NO release-canary.yml; Actions list-workflows API -> 19\nworkflows, release-canary absent. Finding re-validated; recorded in\ndocs/operations/repo-admin-settings.md \"Scheduled activation\" section.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the finding: release-canary.yml still absent from origin/main and unregistered",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-canary-scheduled-activation",
+        "notes": "Options, with the trade-off each carries:\n  (a) Admin cherry-picks/pushes the current release-canary.yml to main\n      out-of-band (fastest; main is push-restricted, so admin-only;\n      content then goes stale on main between release-cuts unless (c)\n      is also adopted);\n  (b) Wait for the next release-cut to carry it (zero extra action,\n      but the canary stays dead until v0.3.1 — the exact gap it\n      guards);\n  (c) Restructure so main carries a minimal stable scheduled SHELL\n      that checks out develop and invokes the canary logic living on\n      develop (one-time admin landing, then develop-side edits take\n      effect without touching main; credential-free-non-fast already\n      half-follows this pattern).\nRecommendation: (a) + (c) together — land the shell form on main once,\nkeep logic on develop. Record the decision in\ndocs/operations/repo-admin-settings.md.\nDONE 2026-07-05: options + recommendation (a)+(c) recorded in the\nrunbook's new \"Scheduled activation of release-canary.yml\" section.\nKey observation: the current release-canary.yml ALREADY IS the (c)\nshell (test/drift jobs check out develop via RELEASE_CANARY_REF;\npypi job needs no checkout), so (a) = cherry-pick the current file\nverbatim. Final sign-off on the mechanism rests with the maintainer\nat execution time (w2).\nADDENDUM 2026-07-06 (option d, from the PR #993 branching-strategy\nreview): a fourth option supersedes (a)/(b)/(c) — make `develop` the\nGitHub DEFAULT branch (see branch-default-switch-to-develop). GitHub\nruns on.schedule workflows from the default branch's copy; since\nrelease-canary.yml already lives on develop, flipping the default\nregisters and fires it with ZERO per-release re-landing on main. If\nthat item lands, w2 (land on main) becomes moot and w3 (liveness guard)\nstill applies. Recommended resolution; sequence behind Decision A. Soft\ncross-link, not a hard dep — do not block this item on it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide the activation mechanism with the maintainer",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-canary-scheduled-activation",
+        "notes": "After landing, confirm: the workflow appears in the Actions\nlist-workflows API, and a manual `workflow_dispatch` (or the next\n08:00 UTC cron) produces a real run. Expected first result: overall\ncanary RED with pypi-latest-installability failing on 0.3.0's broken\nimport — record that run URL as proof-of-life, and cross-link it in\nrelease-recovery-v0-3-1 as live pressure for the recovery release.\nMAINTAINER HANDOFF (2026-07-05): this unit is admin-only (main is\npush-restricted; agents never push main). Exact steps are enumerated\nin docs/operations/repo-admin-settings.md \"Scheduled activation of\nrelease-canary.yml (pending admin action)\" — land the file, confirm\nregistration, dispatch, record the (expected-RED) run URL.\nNOTE 2026-07-06: if branch-default-switch-to-develop lands first, this\nunit is MOOT (develop-as-default registers the canary directly). Prefer\nthat path; keep this only as the fallback if Decision A is declined.\nUPDATE 2026-07-08: Decision A LANDED (default_branch=develop; see\n_project/DONE/main/branch-default-switch-to-develop.yaml). release-canary\nis now registered (Actions list-workflows: 26 workflows, Release Canary\nid 309070628) with no per-release re-landing on main. This w2 is now\nMOOT — no admin land-on-main action is needed. Remaining to fully close\nthis TODO: confirm the first scheduled cron run (expected RED on broken\n0.3.0) and cross-link it into release-recovery-v0-3-1, then w3 (the\nliveness guard) which already exists in nightly.yml.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Land the chosen form on main (admin/release-flow action) and confirm registration",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-canary-scheduled-activation",
+        "notes": "A repo-tree workflow with `on.schedule` that is not on the default\nbranch fails silently forever — nothing red appears anywhere. Add a\nguard in a place that provably executes: e.g. a step in the (now\nlive) canary's result job or in nightly.yml that uses the Actions API\n(GITHUB_TOKEN) to assert every `.github/workflows/*.yml` in the\nCHECKED-OUT TREE that declares `on.schedule` has at least one run in\nthe last N days, failing with a message naming this TODO. Keep the\nthreshold generous (e.g. 3 days) to tolerate outages.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a scheduled-workflow liveness guard so this class of gap cannot recur silently",
+        "wid": "w3"
+      }
+    ]
+  }
+}

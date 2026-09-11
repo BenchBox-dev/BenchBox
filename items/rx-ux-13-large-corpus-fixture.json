@@ -1,0 +1,165 @@
+{
+  "context": "Extend scripts/generate-browser-fixtures.mjs with an opt-in larger corpus. Decide size from the real condition being tested - enough rows to exceed several pages and to reproduce the 17,441px Compare document - and decide whether it runs per-PR or nightly based on generation cost. Keep the default fixture unchanged so existing specs keep their timings.",
+  "description": "The browser fixture corpus is 11 results. No paging, virtualisation or scale claim in this sequence can be verified against it. Earlier plan revisions promised document-height proof at 1440px and 390px without a fixture capable of producing the condition.\n\nThis item is entry criteria for rx-ux-17 and rx-ux-19.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bump the read-model version to make fixture generation easier",
+        "instead": "generate within the version 7 contract",
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "why": "the pin is guarded and a bump has pipeline and browser consequences"
+      },
+      {
+        "dont": "change the default fixture corpus",
+        "instead": "add an opt-in larger fixture behind a flag or env var",
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "why": "existing specs pin ids and timings against the 11-result set"
+      },
+      {
+        "dont": "cite e2e/capability/range-read-budget.spec.ts as scale or cold-load evidence",
+        "instead": "assert document height and rendered row count at 1440px and 390px",
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "why": "that spec is test.skip'ed at range-read-budget.spec.ts:56 and does not run"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T18:44:41Z",
+      "completed_pr": 1822,
+      "created_at": "2026-08-22T14:49:27Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Read-model version 7 pin in _project/scripts/explorer_pipeline/contract.py and results-explorer/src/db.ts (EXPECTED_READ_MODEL_VERSION), guarded by db-remediation-pin.test.ts.",
+        "item_id": "rx-ux-13-large-corpus-fixture"
+      },
+      {
+        "behavior": "The existing 11-result default fixture and every spec that depends on its ids (e2e/support/fixture-ids.json)",
+        "item_id": "rx-ux-13-large-corpus-fixture"
+      },
+      {
+        "behavior": "verify-browser-fixtures.mjs contract",
+        "item_id": "rx-ux-13-large-corpus-fixture"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/contract.py"
+      },
+      {
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/support/**"
+      },
+      {
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/generate-browser-fixtures.mjs"
+      },
+      {
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/verify-browser-fixtures.mjs"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium",
+        "description": "Default fixture unchanged and existing specs pass",
+        "expected": "fixtures verified; chromium suite green with unchanged ids",
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "last_result": "pass",
+        "last_run": "2026-08-22T18:44:27Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'large corpus'",
+        "description": "Larger fixture reproduces the unbounded-document condition",
+        "expected": "Compare document height exceeds several viewports with the large fixture",
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "last_result": "pass",
+        "last_run": "2026-08-22T18:44:38Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Selected 280 opt-in additions (291 total): exceeds the 200-row paging boundary and produces Compare documents above 17,441px at 1440x900 and 390x844.",
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "notes": null,
+        "started_at": "2026-08-22T18:34:41Z",
+        "started_branch": "feat/rx-ux-13-large-corpus-fixture",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-13-large-corpus-fixture",
+        "status": "done",
+        "summary": "Decide corpus size from the conditions to be tested",
+        "wid": "w1"
+      },
+      {
+        "evidence": "E2E_FIXTURE_PROFILE=large generates deterministic version-7 bundles; E2E_FIXTURE_OUTPUT_ROOT isolates them from the default corpus and fixture role IDs.",
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "notes": null,
+        "started_at": "2026-08-22T18:34:46Z",
+        "started_branch": "feat/rx-ux-13-large-corpus-fixture",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-13-large-corpus-fixture",
+        "status": "done",
+        "summary": "Add opt-in larger fixture generation",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Measured large generation 7.00s, determinism verification 7.59s, two-viewport browser proof 10.04s; retained as a per-PR Chromium case.",
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "notes": null,
+        "started_at": "2026-08-22T18:34:53Z",
+        "started_branch": "feat/rx-ux-13-large-corpus-fixture",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-13-large-corpus-fixture",
+        "status": "done",
+        "summary": "Measure generation cost and decide per-PR vs nightly",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Default generator still produces 11 results and identical fixture role IDs; full Chromium gate passed 111 regular tests plus large case, 12 skipped, 9 failure tests, and performance smoke.",
+        "item_id": "rx-ux-13-large-corpus-fixture",
+        "notes": null,
+        "started_at": "2026-08-22T18:34:58Z",
+        "started_branch": "feat/rx-ux-13-large-corpus-fixture",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-13-large-corpus-fixture",
+        "status": "done",
+        "summary": "Verify default fixture and existing specs unaffected",
+        "wid": "w4"
+      }
+    ]
+  }
+}

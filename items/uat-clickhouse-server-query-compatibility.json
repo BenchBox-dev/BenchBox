@@ -1,0 +1,275 @@
+{
+  "context": "Split observability from query compatibility. First make UAT preserve\nnonzero-run result paths so future evidence is self-describing. Then route\neach query family through the existing platform override or unsupported-query\nmechanisms, with focused live cells proving failed query counts improve. Do\nthe LAG/LEAD function-casing class first, because it is a concrete\nClickHouse dialect mismatch. Leave SF1 timeout tuning until loader and\nsmaller-scale query failures are resolved.\n",
+  "description": "The 2026-06-01 clickhouse-server corpus rerun exposed cells where schema/load\nfinished and BenchBox produced result JSON with partial query failures, but\nUAT still classified the terminal state as `no_json_nonzero` because the\nprocess exited nonzero. These are not RC-1 platform wipeouts; they are query\ndialect failures plus a UAT result-capture fidelity gap.\n\nCorpus evidence:\n  - Matrix: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/matrix_summary.tsv`\n  - Cells: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/cells.jsonl`\n\nRepresentative result JSON findings:\n  - read_primitives: 438 passed, 9 failed; first error says aggregate function `LAG` does not exist and suggests `lag`, pointing to ClickHouse's case-sensitive function naming for this path.\n  - metadata_primitives: 150 passed, 3 failed; first error references unknown `admin_option` in `system.role_grants`.\n  - tpchavoc: 591 passed, 69 failed; first error says correlated subqueries in ORDER BY are unsupported.\n  - tpchavoc SF=1 and flightdata SF=1 timed out at 1200s; retest after the loader and smaller-scale query fixes before treating them as pure performance issues.\n\nThe UAT harness should preserve the discovered result path even when the\nchild command exits with code 1 after recording query-level failures. That\nmakes future corpus triage direct instead of requiring manual stdout/log\ninspection.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate the existing TPCHavoc correlated-subquery TODO if it already owns the same root cause.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hide ClickHouse metadata gaps behind generic exception swallowing.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "mark these cells fixed only because UAT now captures the result path; query failures still need routing.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "treat JoinOrder's release-asset 404 as ClickHouse query compatibility.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-clickhouse-server-query-compatibility",
+        "id": 37,
+        "reason": "Data-hosting / shared data-fetch issue, not ClickHouse query dialect; tracked in the corpus tail TODO and existing JoinOrder planning.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Open item explicitly covers 'JoinOrder data availability and SF1 timeouts' for ClickHouse-server, matching this 404 issue. (tracked by uat-clickhouse-server-data-and-timeout-tail)",
+        "summary": "JoinOrder SF=1 release-asset 404"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "needs_item": "uat-clickhouse-server-rc1-recovery"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "w1-w4 are implemented and now verified by live Mocker ClickHouse-server cells: read SF0.01 588 successes/0 errors, metadata SF1 204 successes/0 errors, TPCHavoc SF0.01 788 successes/0 errors. w5 remains blocked because the required SF1 timeout retest is not justified by the current small-scale evidence and the dependent ClickHouse RC-1 recovery/release window is still unavailable.",
+      "category": "Platform Expansion",
+      "claimed_at": "2026-08-12T12:30:32Z",
+      "claimed_by": "joe@joe-mac-mini.local",
+      "created_at": "2026-06-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not lower-case identifiers globally; only platform-specific function names may be normalized.",
+        "item_id": "uat-clickhouse-server-query-compatibility"
+      },
+      {
+        "behavior": "Do not mutate shared benchmark SQL when platform-specific overrides are the established pattern.",
+        "item_id": "uat-clickhouse-server-query-compatibility"
+      },
+      {
+        "behavior": "Do not treat query-level failures as platform lifecycle failures once result JSON exists.",
+        "item_id": "uat-clickhouse-server-query-compatibility"
+      },
+      {
+        "behavior": "Keep query failures visible in result summaries; do not convert them to silent skips without platform-support rationale.",
+        "item_id": "uat-clickhouse-server-query-compatibility"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/planning/tpchavoc-correlated-subquery-self-binding.yaml: existing TPCHavoc correlated-subquery context",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "path": "_project/TODO/main/planning/tpchavoc-correlated-subquery-self-binding.yaml"
+      },
+      {
+        "concept": "_project/TODO/main/planning/uat-clickhouse-server-loader-type-coverage.yaml: FlightData SF=1 timeout may be downstream of smaller-scale loader failures",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "path": "_project/TODO/main/planning/uat-clickhouse-server-loader-type-coverage.yaml"
+      },
+      {
+        "concept": "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml: records corpus artifact paths and the fixed lifecycle root cause",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "path": "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml"
+      },
+      {
+        "concept": "benchbox/core/metadata_primitives/: metadata primitive query definitions and platform overrides",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "path": "benchbox/core/metadata_primitives/"
+      },
+      {
+        "concept": "benchbox/core/read_primitives/: read primitive query definitions and platform overrides",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "path": "benchbox/core/read_primitives/"
+      },
+      {
+        "concept": "tests/uat/: UAT cell execution and terminal-state classification",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "path": "tests/uat/"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/uat-clickhouse-server-query-compatibility.yaml"
+      },
+      {
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/metadata_primitives/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/metadata_primitives/**"
+      },
+      {
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/**"
+      },
+      {
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpchavoc/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpchavoc/**"
+      },
+      {
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/rules/execution_filter/**"
+      },
+      {
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "kind": "only_modify",
+        "path_glob": "docs/compat/**"
+      },
+      {
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat -q",
+        "description": "UAT preserves result JSON paths from nonzero child exits",
+        "expected": "targeted UAT terminal-state regression passes",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=read_primitives SCALE=0.01",
+        "description": "Read primitives small cell has improved ClickHouse query compatibility",
+        "expected": "result JSON is captured and failed query count is lower than the corpus baseline",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=metadata_primitives SCALE=1.0",
+        "description": "Metadata primitives representative cell has improved ClickHouse query compatibility",
+        "expected": "result JSON is captured and failed query count is lower than the corpus baseline",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpchavoc SCALE=0.01",
+        "description": "TPCHavoc small cell has routed correlated ORDER BY failures",
+        "expected": "result JSON is captured and correlated ORDER BY failures are fixed or explicitly classified",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1687 merged (commit 7e454ab1b9b4f6c2aecdd182f7cdfc981576f456): UAT captures result_path when a child exits nonzero after writing result JSON and classifies query/result failures separately from no_json_nonzero.",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "notes": "Add a regression where a child exits nonzero after printing or recording\na result JSON path. UAT should keep that path and classify the cell as a\nquery/result failure, not as missing JSON.\n",
+        "started_at": "2026-08-12T12:36:59Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Teach UAT to preserve result_path from nonzero runs when JSON was emitted",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Live Mocker ClickHouse-server UAT 2026-08-12: read_primitives SF=0.01 result /Users/joe/Developer/benchmark_runs/results/read_primitives_sf001_clickhouse_server_sql_20260812_090235_15c7a0e4.json completed with 588 SUCCESS and zero errors after lowercase lag routing and explicit cume_dist skips; focused read catalog tests pass.",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "notes": "Start with the LAG/LEAD/window-function casing class. Determine whether\nthe fix belongs in ClickHouse query overrides, function rendering, or\nbenchmark query text. Do not lower-case identifiers globally and do not\nchange base SQL if other platforms already use it correctly.\n",
+        "started_at": "2026-08-12T12:36:03Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Fix read_primitives ClickHouse function-case compatibility",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Live Mocker ClickHouse-server UAT 2026-08-12: metadata_primitives SF=1 result /Users/joe/Developer/benchmark_runs/results/metadata_primitives_sf1_clickhouse_server_sql_20260812_090251_d2062088.json completed with 204 SUCCESS and zero errors; focused metadata catalog tests pass using native system.role_grants.with_admin_option.",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "notes": "ClickHouse system metadata varies from SQL-standard privilege metadata.\nImplement platform-aware queries or skip/unsupported metadata assertions\nonly with explicit result semantics.\n",
+        "started_at": "2026-08-12T12:36:22Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Classify metadata_primitives ClickHouse system-table differences",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Live Mocker ClickHouse-server UAT 2026-08-12: TPCHavoc SF=0.01 result /Users/joe/Developer/benchmark_runs/results/tpchavoc_sf001_clickhouse_server_sql_20260812_090609_9435ffb9.json completed with 788 SUCCESS and zero errors after extending the existing ClickHouse execution-filter registry for all observed unsupported variants; targeted TPCHavoc compatibility tests pass.",
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "notes": "Reuse or extend the existing TPCHavoc correlated-subquery TODO if it\nfully covers the failure. Otherwise add ClickHouse-specific rewrites or\nexplicit unsupported-query classification.\n",
+        "started_at": "2026-08-12T12:36:38Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Route TPCHavoc ClickHouse correlated ORDER BY failures",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-server-query-compatibility",
+        "notes": "TPCHavoc SF=1 and FlightData SF=1 timed out in the corpus. FlightData\nsmaller scales fail in the loader path, and TPCHavoc smaller scales have\nquery failures, so retest after those prerequisite fixes before tuning\ntimeout behavior.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Retest SF1 timeouts after loader/query fixes",
+        "wid": "w5"
+      }
+    ]
+  }
+}

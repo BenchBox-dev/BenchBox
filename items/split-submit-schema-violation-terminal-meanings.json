@@ -1,0 +1,139 @@
+{
+  "context": "Add distinct terminal states (e.g. load_error vs integrity/schema_violation) in submit_classification, keep CLI refuse+UAT cell-failure for both unless product decides otherwise, extend contract matrix. Do not loosen publication.",
+  "description": "Adversarial review of #1577 (batch public-corpus privacy/integrity): after unvalidated was split out, schema_violation remains overloaded. classify_result_path maps JSON/OS/schema load failures and classify_loaded_result maps residual non-clean non-query non-unvalidated results both to schema_violation. Operators and UAT see the same terminal name for parse failures, failed validation, and other integrity issues. This confuses triage and package refusal messages.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "needs_item": "unvalidated-results-misclassified-as-schema-violations-20260805"
+      }
+    ],
+    "item_meta": {
+      "category": "ux",
+      "completed_at": "2026-08-05T22:18:56Z",
+      "completed_pr": 1591,
+      "created_at": "2026-08-05T20:49:47Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "benchbox submit still refuses non-submittable results with non-zero exit",
+        "item_id": "split-submit-schema-violation-terminal-meanings"
+      },
+      {
+        "behavior": "compliance_class refusal is still checked before clean-ness",
+        "item_id": "split-submit-schema-violation-terminal-meanings"
+      },
+      {
+        "behavior": "unvalidated remains distinct and is not a UAT cell failure",
+        "item_id": "split-submit-schema-violation-terminal-meanings"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/validation/**"
+      },
+      {
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md"
+      },
+      {
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/submit_classification.py"
+      },
+      {
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/**"
+      },
+      {
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/**"
+      },
+      {
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run python -c \"from benchbox.core.results.submit_classification import SubmitTerminalState as S; names=set(S.__members__); assert \\\"schema_violation\\\" in names and any(n in names for n in (\\\"load_error\\\",\\\"parse_error\\\",\\\"bundle_load_error\\\"))\"",
+        "description": "SubmitTerminalState exposes distinct load vs integrity members",
+        "expected": "exit 0 once split lands",
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "last_result": "pass",
+        "last_run": "2026-08-05T22:14:49Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_submit_classifier_contract.py -q",
+        "description": "Classifier contract suite passes",
+        "expected": "exit 0",
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "last_result": "pass",
+        "last_run": "2026-08-05T22:14:55Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventory: submit_classification, submit.py, uat runner/package/tests, contract tests",
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "notes": null,
+        "started_at": "2026-08-05T22:14:30Z",
+        "started_branch": "fix/split-submit-schema-violation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Inventory every call site that branches on schema_violation",
+        "wid": "w0"
+      },
+      {
+        "evidence": "bundle_load_error for path load/parse failures; schema_violation for loaded integrity non-clean",
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "notes": null,
+        "started_at": "2026-08-05T22:14:36Z",
+        "started_branch": "fix/split-submit-schema-violation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Introduce distinct terminal state(s) and route load vs integrity",
+        "wid": "w1"
+      },
+      {
+        "evidence": "UAT cell failure + package + contract tests updated; 51 passed",
+        "item_id": "split-submit-schema-violation-terminal-meanings",
+        "notes": null,
+        "started_at": "2026-08-05T22:14:43Z",
+        "started_branch": "fix/split-submit-schema-violation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Extend CLI messages, UAT package/report surfaces, and contract tests",
+        "wid": "w2"
+      }
+    ]
+  }
+}

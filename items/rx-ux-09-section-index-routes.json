@@ -1,0 +1,273 @@
+{
+  "context": "Register both index routes ahead of the catch-all. Each index lists every entry with coverage. Update Layout active-state. Keep every existing per-item URL working. Define and test the full state matrix for each new route: cold load, empty, loading, failure, sort, URL state.",
+  "description": "The sub-nav labels 'Benchmarks' and 'Platforms' route to /results/tpch/ and /results/p/duckdb/ (Layout.tsx:117-121): one arbitrary item presented as a section index, highlighted as though it were the section. The other 17 benchmarks are reachable only via chips at the foot of the landing page.\n\nRouting constraint: <BenchmarkIndex path='/results/:benchmark/'> is a catch-all (App.tsx). /results/benchmarks/ must be registered BEFORE it or preact-router resolves it as a benchmark slug named 'benchmarks'. Layout.tsx:114-127 active-state logic needs updating in the same change.\n\nVerification constraint: e2e/routes/pages-artifact.spec.ts SKIPS without E2E_SITE_DIR set (pages-artifact.spec.ts:19), and the public-site route matrix covers /results/ but not the deep routes. Without setting E2E_SITE_DIR the GitHub Pages 404 restore path (main.tsx:5-20) is untested for the new routes.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the per-item pages in this item",
+        "instead": "add indexes one level up and leave item pages alone",
+        "item_id": "rx-ux-09-section-index-routes",
+        "why": "keeps the routing change independently revertible"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-09-section-index-routes",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "register the index routes after the :benchmark catch-all",
+        "instead": "register them first",
+        "item_id": "rx-ux-09-section-index-routes",
+        "why": "preact-router would resolve /results/benchmarks/ as a benchmark named 'benchmarks'"
+      },
+      {
+        "dont": "verify with direct-route.spec.ts alone",
+        "instead": "run pages-artifact.spec.ts with E2E_SITE_DIR set and extend the public-site route matrix",
+        "item_id": "rx-ux-09-section-index-routes",
+        "why": "pages-artifact.spec.ts:19 skips without it, so deployed 404/session-restore stays untested"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T20:56:32Z",
+      "completed_pr": 1830,
+      "created_at": "2026-08-22T14:49:10Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing /results/:benchmark/ and /results/p/:platform/ URLs and their behaviour",
+        "item_id": "rx-ux-09-section-index-routes"
+      },
+      {
+        "behavior": "NotFound behaviour for genuinely unknown slugs",
+        "item_id": "rx-ux-09-section-index-routes"
+      },
+      {
+        "behavior": "The Pages 404 sessionStorage restore hop (main.tsx:5-20) and its key convention",
+        "item_id": "rx-ux-09-section-index-routes"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/main.tsx"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "kind": "only_modify",
+        "path_glob": "docs/development/results-explorer-browser-testing.md"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package.json"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/App.tsx"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/Layout.tsx"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/publicSiteVisual.test.ts"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/publicSiteVisual.ts"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/**"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "kind": "only_modify",
+        "path_glob": "scripts/assemble_public_site.py"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_assemble_public_site.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-09-section-index-routes",
+        "last_result": "pass",
+        "last_run": "2026-08-22T20:50:15Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium",
+        "description": "Chromium browser suite passes against a fresh build",
+        "expected": "fixtures verified, build succeeds, chromium suite green",
+        "item_id": "rx-ux-09-section-index-routes",
+        "last_result": "pass",
+        "last_run": "2026-08-22T20:55:24Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium e2e/routes/direct-route.spec.ts e2e/routes/not-found.spec.ts",
+        "description": "Existing per-item URLs still resolve",
+        "expected": "all pass",
+        "item_id": "rx-ux-09-section-index-routes",
+        "last_result": "pass",
+        "last_run": "2026-08-22T20:55:39Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "site_dir=$(mktemp -d) && make docs-build && uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/ && cd results-explorer && npm run build && cd .. && uv run -- python scripts/assemble_public_site.py --site-dir \"$site_dir\" && cd results-explorer && E2E_SITE_DIR=\"$site_dir\" E2E_PAGES_SHAPED=1 npx playwright test --project=chromium --workers=1 e2e/routes/pages-artifact.spec.ts",
+        "description": "Pages-shaped artifact routing verified for the new routes",
+        "expected": "assembled root includes production data, docs, Explorer, and root 404; both section routes restore through Pages fallback",
+        "item_id": "rx-ux-09-section-index-routes",
+        "last_result": "pass",
+        "last_run": "2026-08-22T20:56:30Z",
+        "seq": 8,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "rx-ux-09-section-index-routes",
+        "needs_wid": "w5",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "BenchmarksIndex, PlatformsIndex, and shared CorpusSectionIndex implemented; focused Vitest/typecheck passed.",
+        "item_id": "rx-ux-09-section-index-routes",
+        "notes": null,
+        "started_at": "2026-08-22T17:49:36Z",
+        "started_branch": "feat/rx-ux-09-section-index-routes",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-09-section-index-routes",
+        "status": "done",
+        "summary": "Add BenchmarksIndex and PlatformsIndex pages",
+        "wid": "w1"
+      },
+      {
+        "evidence": "App registers both slash variants before /results/:benchmark/; isolated section/direct/not-found Chromium suite passed 9/9.",
+        "item_id": "rx-ux-09-section-index-routes",
+        "notes": null,
+        "started_at": "2026-08-22T20:09:12Z",
+        "started_branch": "feat/rx-ux-09-section-index-routes",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-09-section-index-routes",
+        "status": "done",
+        "summary": "Register both routes before the :benchmark catch-all",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Layout nav targets section indexes and preserves active state on section and item routes; section-index Chromium test passed.",
+        "item_id": "rx-ux-09-section-index-routes",
+        "notes": null,
+        "started_at": "2026-08-22T20:09:17Z",
+        "started_branch": "feat/rx-ux-09-section-index-routes",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-09-section-index-routes",
+        "status": "done",
+        "summary": "Update Layout active-state for both sections",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Parametrized component tests cover loading, cold empty retry, settled empty, failure, sort, and URL updates for both indexes; focused Vitest passed.",
+        "item_id": "rx-ux-09-section-index-routes",
+        "notes": null,
+        "started_at": "2026-08-22T20:09:23Z",
+        "started_branch": "feat/rx-ux-09-section-index-routes",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-09-section-index-routes",
+        "status": "done",
+        "summary": "State matrix per index: cold, empty, loading, failure, sort, URL state",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Stored Pages verification seq 8 passed against the production-built data and reusable assembled site root; both new direct routes returned the root 404 fallback and restored successfully.",
+        "item_id": "rx-ux-09-section-index-routes",
+        "notes": null,
+        "started_at": "2026-08-22T20:09:28Z",
+        "started_branch": "feat/rx-ux-09-section-index-routes",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-09-section-index-routes",
+        "status": "done",
+        "summary": "Run pages-artifact.spec.ts with E2E_SITE_DIR and extend public-site route matrix",
+        "wid": "w5"
+      },
+      {
+        "evidence": "scripts/assemble_public_site.py replaces workflow inline assembly; assembler/workflow contract tests passed 10/10.",
+        "item_id": "rx-ux-09-section-index-routes",
+        "notes": null,
+        "started_at": "2026-08-22T20:09:33Z",
+        "started_branch": "feat/rx-ux-09-section-index-routes",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-09-section-index-routes",
+        "status": "done",
+        "summary": "Extract reusable public-site assembly and use it in workflow and Pages verification",
+        "wid": "w6"
+      },
+      {
+        "evidence": "Exact-head approval comparator and workflow vars tested: reviewed changed/unexpected allowed only with matching head plus reason; missing captures remain failures; protected develop remains baseline producer.",
+        "item_id": "rx-ux-09-section-index-routes",
+        "notes": null,
+        "started_at": "2026-08-22T20:09:39Z",
+        "started_branch": "feat/rx-ux-09-section-index-routes",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-09-section-index-routes",
+        "status": "done",
+        "summary": "Add exact-head maintainer approval for intentional visual digest and matrix additions",
+        "wid": "w7"
+      }
+    ]
+  }
+}

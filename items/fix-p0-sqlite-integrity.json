@@ -1,0 +1,67 @@
+{
+  "context": "Do not begin until the authorization and worktree gates pass. Preserve unrelated changes, use temporary outputs for tests, fail closed on uncertainty, and stop on any data-loss or false-success signal.",
+  "description": "Enable foreign keys on every connection, add a non-destructive orphan detection and repair path with backup and dry-run, and verify cascades without automatic destructive cleanup.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "fix-p0-sqlite-integrity",
+        "needs_item": "fix-gate-1-baseline"
+      }
+    ],
+    "item_meta": {
+      "category": "architecture-remediation",
+      "completed_at": "2026-08-26T20:58:07Z",
+      "completed_pr": 1925,
+      "created_at": "2026-08-26T17:08:14Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing user files, existing result artifacts, backward compatibility, rollback evidence",
+        "item_id": "fix-p0-sqlite-integrity"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-p0-sqlite-integrity",
+        "kind": "do_not_modify",
+        "path_glob": ".bossmode/**"
+      },
+      {
+        "item_id": "fix-p0-sqlite-integrity",
+        "kind": "do_not_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "fix-p0-sqlite-integrity",
+        "kind": "do_not_modify",
+        "path_glob": "test-results/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- pytest -q --override-ini=addopts= tests/unit/core/results/test_database.py",
+        "description": "SQLite integrity tests pass",
+        "expected": "all tests pass",
+        "item_id": "fix-p0-sqlite-integrity",
+        "last_result": "pass",
+        "last_run": "2026-08-26T20:58:06Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Commit 1c851f508: every SQLite connection enables foreign_keys, delete cascades are enforced, and orphan repair is dry-run by default with timestamped backup on apply. Database tests: 52 passed. Full preflight: 28,381 passed, 19 skipped.",
+        "item_id": "fix-p0-sqlite-integrity",
+        "notes": null,
+        "started_at": "2026-08-26T20:22:20Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement connection pragma and safe orphan migration checks",
+        "wid": "w1"
+      }
+    ]
+  }
+}

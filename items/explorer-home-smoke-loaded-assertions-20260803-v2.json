@@ -1,0 +1,134 @@
+{
+  "context": "Move every content assertion in home.spec.ts to after waitForDataLoaded, and assert at least one landmark that exists only on the loaded page so the test cannot pass against a skeleton. Re-audit the spec's other assertions on the same suspicion.",
+  "description": "e2e/routes/home.spec.ts asserts its heading on line 9, four lines BEFORE the data wait on line 13. Because the retired headline existed only in HomeLoadingSkeleton, that assertion has only ever matched the loading state. Proven 2026-08-03 by a three-case Playwright probe on develop 3af42e29b: asserting the heading before data load passed in 152ms, the identical assertion after data load failed, and the loaded page instead showed the curated-preview copy. This @smoke test therefore never validated the loaded Home page, and it is one of the tests gating Firefox and WebKit.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2",
+        "needs_item": "explorer-home-skeleton-h1-parity-20260803-v2"
+      }
+    ],
+    "item_meta": {
+      "category": "Explorer test integrity",
+      "completed_at": "2026-08-04T00:22:33Z",
+      "completed_pr": 1497,
+      "created_at": "2026-08-03T23:42:45Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Assertions use real navigation and real locators, never synthetic events",
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2"
+      },
+      {
+        "behavior": "Corpus-summary singular and plural coverage is retained",
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2"
+      },
+      {
+        "behavior": "The test stays tagged @smoke so Firefox and WebKit keep running it",
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/home.spec.ts"
+      },
+      {
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/support/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && awk 'BEGIN{w=0;h=0} /await waitForDataLoaded/{if(!w)w=NR} /getByRole..heading/{if(!h)h=NR} END{exit !(w && h && w<h)}' e2e/routes/home.spec.ts",
+        "description": "Data wait precedes the first heading assertion",
+        "expected": "Exits 1 on the unfixed tree because the heading is asserted on line 9 before the data wait on line 13; exits 0 once content assertions follow the wait. Verified discriminating 2026-08-03.",
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-04T00:21:23Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --workers=1 --retries=0 e2e/routes/home.spec.ts",
+        "description": "Home route spec passes on Chromium against a fresh build",
+        "expected": "Home route tests pass against loaded content",
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-04T00:21:36Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=webkit --workers=1 --retries=0 e2e/routes/home.spec.ts",
+        "description": "Home smoke passes on WebKit",
+        "expected": "WebKit smoke passes on the loaded page",
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-04T00:21:41Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Audited all three tests in home.spec.ts. Only the @smoke test asserted before the data wait (heading on line 9, waitForDataLoaded on line 13). The theme test and the browse-by-benchmark test already call waitForDataLoaded first, so no other assertion was skeleton-ambiguous.",
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2",
+        "notes": null,
+        "started_at": "2026-08-04T00:20:55Z",
+        "started_branch": "fix/explorer-home-smoke-loaded-assertions-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Audit every assertion in home.spec.ts for skeleton-vs-loaded ambiguity",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Moved the headline assertion to after waitForDataLoaded and switched it to the canonical 'BenchBox Curated Results Preview'. The Recent Results landmark, which only renders once the DuckDB snapshot attaches and listResults() resolves, is now the gate before any content assertion. Ordering guard rung flipped FAIL to PASS.",
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2",
+        "notes": null,
+        "started_at": "2026-08-04T00:21:00Z",
+        "started_branch": "fix/explorer-home-smoke-loaded-assertions-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Reorder assertions to follow the data wait and add a loaded-only landmark",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Chromium home.spec.ts 3/3 pass. Firefox @smoke 16/16 pass and WebKit @smoke 16/16 pass locally - both lanes had gone red on the item-1 branch alone, confirming this change restores them.",
+        "item_id": "explorer-home-smoke-loaded-assertions-20260803-v2",
+        "notes": null,
+        "started_at": "2026-08-04T00:21:06Z",
+        "started_branch": "fix/explorer-home-smoke-loaded-assertions-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Re-run home.spec.ts on Chromium and WebKit",
+        "wid": "w2"
+      }
+    ]
+  }
+}

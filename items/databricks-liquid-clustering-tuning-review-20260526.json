@@ -1,0 +1,150 @@
+{
+  "description": "REVALIDATED 2026-08-17. Still blocked at w4 ('Run live Databricks SF 0.01 executions ... with valid credentials'), unchanged since 2026-05-26 - roughly twelve weeks stalled on credential access rather than on engineering. Databricks Free Edition (which replaced Community Edition on 2026-01-01) is free indefinitely, provides serverless compute and a 2X-Small SQL warehouse, and needs no paid contract; LinkedIn verification raises the per-account quotas. SF 0.01 is trivially inside those quotas, so w4 is unblockable today at zero cost. w2 and w3 are pure engineering and need no credentials at all - they can proceed immediately and independently.",
+  "legacy": {
+    "item_meta": {
+      "blocked_reason": "imported from YAML status: Blocked",
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-26T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not claim Databricks live certification without successful real run(s) proving live acceptance and metadata fields.",
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526"
+      },
+      {
+        "behavior": "Do not commit raw Databricks logs or benchmark output directories; only reference artifact paths and summarize in evidence.",
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526"
+      },
+      {
+        "behavior": "Keep clear comparison boundary across zorder, liquid auto/manual, and duckdb tuned results (physical rendering / profile identity).",
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526"
+      },
+      {
+        "behavior": "No silent migration of legacy ZORDER templates to Liquid semantics.",
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/tuning/interface.py: databricks effective layout validation",
+        "decision": "reuse",
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "path": "benchbox/core/tuning/interface.py"
+      },
+      {
+        "concept": "benchbox/platforms/databricks/adapter.py: metadata and strategy application paths",
+        "decision": "reuse",
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "path": "benchbox/platforms/databricks/adapter.py"
+      },
+      {
+        "concept": "tests/unit/platforms/test_databricks_liquid_clustering.py: metadata assertions for requested/resolved/operations",
+        "decision": "reuse",
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "path": "tests/unit/platforms/test_databricks_liquid_clustering.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/tuning_profile_check.py --benchmarks tpch,tpcds --platforms databricks,duckdb --strict",
+        "description": "Re-run baseline profile and unit checks",
+        "expected": "All tuned/liquid templates map and render as expected",
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --dry-run /tmp/review_mixed ...; uv run -- benchbox run --dry-run /tmp/review_none_invalid ...; uv run -- benchbox run --dry-run /tmp/review_liquid_partition ...; uv run -- benchbox run --dry-run /tmp/review_liquid_distribution ...",
+        "description": "Re-run conflict + rendering dry-runs and confirm PASS/FAIL matrix",
+        "expected": "Expected failures for all four conflict cases",
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Preserve all evidence and rerun the listed baseline checks after any future changes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "notes": "Current behavior passes 5-key liquid_clustering_columns in /tmp/benchbox_tuning_manual_5cols.yaml without rejection.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add explicit validation for `liquid_clustering_columns` over 4 keys in manual mode and add regression test",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add runtime compatibility checks (DBR/channel/warehouse/UC/optimize-full eligibility) before emitting liquid-clustering SQL and add unit/integration assertions for each failure mode.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "notes": "Blocked until valid environment credentials and approved Databricks target are available.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run live Databricks SF 0.01 executions for tpch/tpcds liquid templates with valid credentials and verify all requested Databricks metadata fields.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "databricks-liquid-clustering-tuning-review-20260526",
+        "notes": "Verify result metadata includes requested/resolved strategy, physical rendering id, applied/skipped operations, logical tuning profile id, and platform physical tuning mechanisms.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "On successful live run, verify result metadata contains all liquid-specific fields",
+        "wid": "w5"
+      }
+    ]
+  }
+}

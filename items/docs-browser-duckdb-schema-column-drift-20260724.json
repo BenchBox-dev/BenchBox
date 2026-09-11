@@ -1,0 +1,79 @@
+{
+  "context": "Add both columns to the results table and result_detail_metrics view in the reference doc, matching the DDL order and types in duckdb_builder.py. Stretch: add a test/check that the doc's column set matches the builder DDL so it cannot drift again.",
+  "description": "The pipeline DDL in _project/scripts/explorer_pipeline/duckdb_builder.py added physical_mechanisms and physical_rendering_id to the results table and the result_detail_metrics view (ADR-2), but the reference doc docs/development/browser-duckdb-schema.sql was never updated and is missing both columns (confirmed 2026-07-24). The contract test tests/unit/scripts/explorer_pipeline/test_duckdb_browser_contract.py uses a HARDCODED expected column set (not the doc), so nothing enforces the doc's completeness and it silently drifted.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-07-29T17:25:19Z",
+      "completed_pr": 1344,
+      "created_at": "2026-07-24T12:56:05Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The duckdb_builder.py DDL is the source of truth and stays unchanged; the doc is aligned to it, not the reverse",
+        "item_id": "docs-browser-duckdb-schema-column-drift-20260724"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "docs-browser-duckdb-schema-column-drift-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "item_id": "docs-browser-duckdb-schema-column-drift-20260724",
+        "kind": "only_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "docs-browser-duckdb-schema-column-drift-20260724",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -c 'physical_rendering_id\\|physical_mechanisms' docs/development/browser-duckdb-schema.sql",
+        "description": "Doc lists both columns in the results table and the result_detail_metrics view",
+        "expected": ">= 4",
+        "item_id": "docs-browser-duckdb-schema-column-drift-20260724",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "docs-browser-duckdb-schema-column-drift-20260724",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Confirmed and WIDER than reported: comparing the doc against the schema build_full() actually produces, the results table and result_detail_metrics view are each missing SIX columns, not two — requested_config_hash, applied_ledger_hash, tuning_validation_status, tuning_policy_generation, physical_mechanisms, physical_rendering_id. The doc has been drifting since read-model v4",
+        "item_id": "docs-browser-duckdb-schema-column-drift-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T17:24:17Z",
+        "started_branch": "docs/browser-duckdb-schema-column-drift",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Re-validate that the doc is still missing physical_mechanisms and physical_rendering_id while the builder DDL has them",
+        "wid": "w0"
+      },
+      {
+        "evidence": "All six added to both the results table and the result_detail_metrics view in builder declaration order with the builder's own comments. Ladder: grep -c returns 4 (>= 4 expected). Stretch goal delivered: TestSchemaDocMatchesBuiltSchema compares the doc against the live built DuckDB schema (order-sensitive equality, both directions); proved it fails when a column is removed from the doc and passes when synced",
+        "item_id": "docs-browser-duckdb-schema-column-drift-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T17:24:20Z",
+        "started_branch": "docs/browser-duckdb-schema-column-drift",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add both columns to the doc results table and result_detail_metrics view",
+        "wid": "w1"
+      }
+    ]
+  }
+}

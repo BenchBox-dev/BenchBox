@@ -1,0 +1,173 @@
+{
+  "description": "throughput-independent-sessions-per-stream (#1095) landed the platform\ncapability seam -- a `StreamConnectionCapability` enum\n(benchbox/platforms/base/connection_wrappers.py:51) plus a\n`PlatformAdapter.new_stream_connection()` hook and\n`stream_connection_capability` class attribute\n(benchbox/platforms/base/adapter.py:120,593) -- and proved it with a\nSQLite-per-connection stand-in. But NO concrete server adapter opts in: every\nproduction adapter stays on the default `SHARED_CURSOR` path. So the seam is a\ncorrect, fail-fast, tested extension point that is currently UNUSED in\nproduction, and the TODO's business value (real multi-user throughput on cloud\nwarehouses, where a connection IS a session and cursors of one connection\nserialize or raise) is not yet realized.\n\nThis item makes the seam live: pick at least one real server-style engine and\nhave its adapter declare `INDEPENDENT_CONNECTION` and override\n`new_stream_connection()` to hand each throughput stream its own\nconnection/session. PostgreSQL (benchbox/platforms/postgresql.py) is the\nnatural first candidate -- it is already used by UAT docker cells, its driver\n(psycopg) does not support truly concurrent statement execution across cursors\nof one connection, and #1094 explicitly deferred a Postgres throughput UAT\ncell (its w4) that this would enable.\n\nIN THE SAME PASS, route the throughput MAINTENANCE (RF1/RF2) connection_factory\nclosures in benchbox/platforms/base/execution.py through the capability too:\ntoday they still call `_make_stream_cursor(connection)` directly, so a server\nengine's refresh stream shares the query stream's session. The\nindependent-sessions review flagged this as the natural companion cleanup.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "flip the default capability to INDEPENDENT_CONNECTION",
+        "instead": "opt in per server adapter only.",
+        "item_id": "server-adapter-independent-connection-optin",
+        "why": "embedded engines are correct with cursor sharing"
+      },
+      {
+        "dont": "open N real connections for engines that don't need them",
+        "instead": "(not specified)",
+        "item_id": "server-adapter-independent-connection-optin",
+        "why": "gate strictly behind the per-adapter capability."
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Embedded DuckDB (and every adapter that does not opt in) keeps SHARED_CURSOR cursor sharing with no perf regression and zero extra connections.",
+        "item_id": "server-adapter-independent-connection-optin"
+      },
+      {
+        "behavior": "Per-stream connections are still closed in _execute_stream's finally block.",
+        "item_id": "server-adapter-independent-connection-optin"
+      },
+      {
+        "behavior": "The fail-fast contract: declaring INDEPENDENT_CONNECTION without overriding new_stream_connection() still raises, never silently falls back to a shared session.",
+        "item_id": "server-adapter-independent-connection-optin"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/planning/throughput-uat-and-ci-coverage.yaml — its deferred w4 (docker Postgres throughput cell) that this unlocks.",
+        "decision": "reuse",
+        "item_id": "server-adapter-independent-connection-optin",
+        "path": "_project/DONE/main/planning/throughput-uat-and-ci-coverage.yaml"
+      },
+      {
+        "concept": "benchbox/platforms/base/adapter.py:593 — PlatformAdapter.new_stream_connection() hook to override; :120 stream_connection_capability default (SHARED_CURSOR); :637 the fail-fast NotImplementedError when INDEPENDENT_CONNECTION is declared without an override.",
+        "decision": "reuse",
+        "item_id": "server-adapter-independent-connection-optin",
+        "path": "benchbox/platforms/base/adapter.py:593"
+      },
+      {
+        "concept": "benchbox/platforms/base/connection_wrappers.py:51 — StreamConnectionCapability enum (SHARED_CURSOR / INDEPENDENT_CONNECTION).",
+        "decision": "reuse",
+        "item_id": "server-adapter-independent-connection-optin",
+        "path": "benchbox/platforms/base/connection_wrappers.py:51"
+      },
+      {
+        "concept": "benchbox/platforms/base/execution.py — the throughput query connection_factory closures already route through new_stream_connection(); the RF1/RF2 maintenance closures do NOT yet and should in this pass.",
+        "decision": "reuse",
+        "item_id": "server-adapter-independent-connection-optin",
+        "path": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "concept": "benchbox/platforms/postgresql.py — the first server adapter to opt in (fresh connection/session per stream).",
+        "decision": "reuse",
+        "item_id": "server-adapter-independent-connection-optin",
+        "path": "benchbox/platforms/postgresql.py"
+      },
+      {
+        "concept": "tests/integration/test_throughput_session_isolation.py — the existing SQLite-per-connection isolation harness to extend to a real server engine (session-local SET must not leak across streams).",
+        "decision": "extend",
+        "item_id": "server-adapter-independent-connection-optin",
+        "path": "tests/integration/test_throughput_session_isolation.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "server-adapter-independent-connection-optin",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "server-adapter-independent-connection-optin",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/postgresql.py"
+      },
+      {
+        "item_id": "server-adapter-independent-connection-optin",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "server-adapter-independent-connection-optin",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration -k 'throughput_session_isolation and postgres' -n 0 -v",
+        "description": "Postgres streams are session-isolated and the seam is exercised in production",
+        "expected": "session-local state does not leak across streams on a real server engine",
+        "item_id": "server-adapter-independent-connection-optin",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "server-adapter-independent-connection-optin",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "server-adapter-independent-connection-optin",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "server-adapter-independent-connection-optin",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "server-adapter-independent-connection-optin",
+        "notes": "Open a new connection/session from the adapter's existing connection\nconfig; ensure it is closed per stream in _execute_stream's finally\n(the seam already closes what new_stream_connection returns).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Have PostgreSQL adapter declare INDEPENDENT_CONNECTION and override new_stream_connection() to open a fresh session per stream",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "server-adapter-independent-connection-optin",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Route the throughput maintenance (RF1/RF2) connection_factory closures through new_stream_connection() as well",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "server-adapter-independent-connection-optin",
+        "notes": "Extend tests/integration/test_throughput_session_isolation.py from the SQLite stand-in to a real Postgres (docker) engine, marked slow/integration.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Prove real session isolation on Postgres: a session-local SET in one stream is invisible in another; concurrent statements do not serialize on one connection",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "server-adapter-independent-connection-optin",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add the deferred docker Postgres throughput UAT cell (throughput-uat-and-ci-coverage w4)",
+        "wid": "w4"
+      }
+    ]
+  }
+}

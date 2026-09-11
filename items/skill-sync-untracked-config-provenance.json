@@ -1,0 +1,61 @@
+{
+  "description": "An untracked skills/skill-sync.config.yaml sits in the canonical checkout since at least 2026-07-27. It resembles tool output (skill-sync has a config-generator writing skill-sync.config.yaml) possibly written into the wrong directory. The 2026-07-28 docs-skill incident showed working-tree anomalies in this repo get misread as user intent, so resolve rather than let it linger: identify what wrote it (skill-sync config-generator output path vs a hand-authored file), then either commit it where it belongs, move it to its intended location, or delete it. Logged 2026-07-29.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-29T12:16:26Z",
+        "from_item": "skill-sync-untracked-config-provenance",
+        "id": 661,
+        "reason": "scope only_modify='/Users/joe/.skill-sync/**' is an ABSOLUTE path, but check-scope matches against 'git diff --name-only' output, which is repo-relative. Proven: even skills/code/SKILL.md - the most in-scope path possible - reports 'outside only_modify allowlist'. No file can ever satisfy this rule. Separately, rung 1 is sh -c 'test -z \"?? skills/skill-sync.config.yaml\"', which applies test -z to a non-empty string literal and therefore always exits 1 regardless of repo state - the same defect class PR #1322 added lint for. Scope and verification are create-time-only fields, so neither can be repaired on this id; needs a successor item.",
+        "resolution": "promoted",
+        "resolved_item": "skill-sync-item-scope-and-rung-path-form",
+        "resolved_reason": null,
+        "summary": "Item's scope glob and verification rung are both unsatisfiable as authored"
+      }
+    ],
+    "item_meta": {
+      "completed_at": "2026-07-29T12:17:52Z",
+      "completed_pr": 14,
+      "created_at": "2026-07-29T11:42:36Z",
+      "worktree": "skill-sync-canonical"
+    },
+    "preserves": [
+      {
+        "behavior": "No other working-tree state in the canonical checkout is touched",
+        "item_id": "skill-sync-untracked-config-provenance"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "skill-sync-untracked-config-provenance",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.skill-sync/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "sh -c 'test -z \"?? skills/skill-sync.config.yaml\"'",
+        "description": "no untracked files remain in the canonical checkout",
+        "expected": "clean status after resolution",
+        "item_id": "skill-sync-untracked-config-provenance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Writer identified: skill-sync sync -> writeProjectConfig() (src/core/config-generator.ts:99) writes CONFIG_FILENAME into every target dir; ~/.claude/skills and ~/.codex/skills are both symlinks to ~/.skill-sync/skills (same inode, verified), so the sync wrote through into the canonical checkout on 2026-07-27 13:01. Never tracked (git log --all on the path is empty); content 'code: {verify: npm test}' describes the consuming project, not canonical source. Resolution = ignore, not commit (generated output would re-dirty on every sync) and not delete (next sync recreates it, and deleting drops a live-served setting). Corroborated by skill-sync's own drift.ts:111, which already exempts the filename from orphan detection. Verified: git check-ignore -v matches; with the file restored git status shows only .gitignore; skill-sync validate passes (2 pre-existing warnings). No skill content changed, so no lock regeneration. PR #14.",
+        "item_id": "skill-sync-untracked-config-provenance",
+        "notes": null,
+        "started_at": "2026-07-29T12:14:45Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Identify the writer (check skill-sync config-generator output paths), then commit/move/delete accordingly",
+        "wid": "w1"
+      }
+    ]
+  }
+}

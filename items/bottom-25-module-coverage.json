@@ -1,0 +1,314 @@
+{
+  "description": "After completing non-dataframe-test-coverage, 25 modules remain below 42%\ncoverage and were either not targeted by the previous TODO or only partially\naddressed. This plan brings each one individually to 80%+.\n\nModules by current coverage (March 24 baseline, may be slightly higher by now):\n- 0%:  core/pg_extension_comparison (68 miss), platforms/azure/config_utils (22),\n       platforms/credentials/shared (42)\n- 16%: utils/dependency_validation (83 miss) - w14 targeted 70% but tests are thin\n- 18%: platforms/databricks/dataframe_adapter (120 miss)\n- 19%: core/tuning/generators/doris (93 miss), core/coffeeshop/benchmark (88 miss)\n- 19%: core/tuning/generators/questdb (61 miss)\n- 20%: core/coffeeshop/schema (29 miss)\n- 22%: cli/commands/datagen (32 miss)\n- 23%: platforms/dataframe/pyspark_df (200 miss)\n- 27%: platforms/azure/spark_execution_utils (30 miss)\n- 29%: platforms/databend/__init__ (12 miss)\n- 31%: platforms/motherduck (99 miss)\n- 33%: cli/commands/run_official (33 miss), core/tpcdi/schema_extensions (22 miss)\n- 34%: platforms/bigquery (514 miss) - w21 gained stmts but not to 80%\n- 35%: platforms/databricks/adapter (618 miss) - same\n- 35%: mcp/__init__ (14 miss)\n- 36%: cli/system (17 miss)\n- 37%: platforms/redshift (639 miss)\n- 39%: tpch_skew (27 miss)\n- 40%: cli/commands/tuning_group (133 miss), platforms/snowflake (405 miss)\n- 41%: platforms/athena (360 miss)\n\nTesting philosophy: every test must assert on the actual output value or behavior\n(SQL string content, config field value, error message). No import-only tests,\nno assert-not-None, no mock.called checks in lieu of output assertions.\n\nCloud platform SQL generation tests: always assert the generated SQL string\ncontains specific clauses - COPY FROM S3, DISTRIBUTED BY, PARTITION BY, etc.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assert mock.called for SQL generation tests",
+        "instead": "always assert on the SQL string",
+        "item_id": "bottom-25-module-coverage",
+        "why": "called=True doesn't verify the SQL is correct"
+      },
+      {
+        "dont": "mock internal helper functions to test a dispatcher",
+        "instead": "use real inputs and assert on real output",
+        "item_id": "bottom-25-module-coverage",
+        "why": "you then test the mock, not the code"
+      },
+      {
+        "dont": "test only the happy path for CLI wrappers",
+        "instead": "test every exit(1) branch",
+        "item_id": "bottom-25-module-coverage",
+        "why": "error validation is where bugs live"
+      },
+      {
+        "dont": "test that a config field 'is not None'",
+        "instead": "assert the actual value",
+        "item_id": "bottom-25-module-coverage",
+        "why": "that can never fail once the field is populated"
+      },
+      {
+        "dont": "write a test that only calls get_available_presets() and asserts len > 0",
+        "instead": "assert the specific preset names",
+        "item_id": "bottom-25-module-coverage",
+        "why": "that can't catch a bug where a preset is removed"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "bottom-25-module-coverage",
+        "id": 304,
+        "reason": "Both require Spark session setup (SparkContext or SparkSession). PySpark tests already have a 1046-line test file at 23% because most tests skip when PySpark is not installed. Meaningful coverage requires a PySpark fixture or the separate dataframe platform CI environment. Cover in the dataframe-platform testing initiative, not here.",
+        "resolution": "promoted",
+        "resolved_item": "platforms-databricks-dataframe-adapter-18-120-miss-and-platf",
+        "resolved_reason": null,
+        "summary": "platforms/databricks/dataframe_adapter (18%, 120 miss) and platforms/dataframe/pyspark_df (23%, 200 miss)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "bottom-25-module-coverage",
+        "id": 305,
+        "reason": "Azure Spark utilities require mocking Synapse/Fabric Spark session internals. Low ROI (only 30 missing lines) and fragile mock setup. Cover alongside other Azure Spark work when a real Spark session fixture is available.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly deferred until a real Spark session fixture exists; no such fixture is tracked as available yet.",
+        "summary": "platforms/azure/spark_execution_utils (27%, 30 miss)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "bottom-25-module-coverage",
+        "id": 306,
+        "reason": "These are in the omit list of .coveragerc_core and were explicitly deferred in non-dataframe-test-coverage. Still deferred: high effort, niche benchmark, requires complex CDC/SCD fixtures. Cover after 80% overall target is sustained.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Condition was 'after 80% overall coverage target sustained'; Makefile still sets suite-wide threshold at 70%, so condition unmet.",
+        "summary": "TPC-DI ETL modules (core/tpcdi/etl/batch.py 882 miss, transformations.py 1053 miss)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "bottom-25-module-coverage",
+        "needs_item": "non-dataframe-test-coverage"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-03-26T00:00:00Z",
+      "created_at": "2026-03-26T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing tests must continue to pass - new tests are additive only",
+        "item_id": "bottom-25-module-coverage"
+      },
+      {
+        "behavior": "Cloud adapter tests must not require real credentials - mock at the connection boundary only",
+        "item_id": "bottom-25-module-coverage"
+      },
+      {
+        "behavior": "No assert-not-None, assert True, or hasattr-only assertions - every assertion must fail if the code under test is broken",
+        "item_id": "bottom-25-module-coverage"
+      },
+      {
+        "behavior": "SQL-generation assertions must check the actual SQL string content, not just that a method was called",
+        "item_id": "bottom-25-module-coverage"
+      },
+      {
+        "behavior": "Test file names must describe the behavior being tested, not contain 'coverage'",
+        "item_id": "bottom-25-module-coverage"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test pg_extension_comparison pure functions (0% → 100%)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test cli/system SystemProfiler + mcp/__init__ lazy exports (35%, 35% → 80%)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test MotherDuck adapter init, config, and mocked connection (31% → 80%)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test credentials/shared interactive prompt with mocked Rich (0% → 80%)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test tuning_group CLI commands via CliRunner (40% → 80%)",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test Redshift SQL generation - uncover remaining branches (37% → 80%)",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test Snowflake SQL generation - uncover remaining branches (40% → 80%)",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test BigQuery SQL generation - uncover remaining branches (34% → 80%)",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test Databricks adapter SQL generation - uncover remaining branches (35% → 80%)",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test Athena SQL generation - uncover remaining branches (41% → 80%)",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test Azure Synapse SQL generation - uncover remaining branches (54% → 80%)",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test config builder pure functions: azure/config_utils + databend/__init__ (0%, 29% → 80%)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test schema constant modules: coffeeshop/schema + tpcdi/schema_extensions (20%, 33% → 80%)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test dependency_validation unit functions with synthetic data (16% → 80%)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test CoffeeShop benchmark end-to-end with DuckDB (19% → 80%)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test Doris DDL generator SQL output (19% → 80%)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test QuestDB DDL generator SQL output (19% → 80%)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test CLI wrapper commands via CliRunner: datagen + run_official (22%, 33% → 80%)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "bottom-25-module-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test TPCHSkew facade validation and property delegation (39% → 80%)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

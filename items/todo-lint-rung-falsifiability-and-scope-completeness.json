@@ -1,0 +1,129 @@
+{
+  "context": "For (a), lint cannot execute rungs against a hypothetical fixed tree, so it cannot prove falsifiability in general. Two tractable options: require rung commands to be self-asserting in form (assert/grep -q/test, not a bare suite invocation), or record the pre-fix exit status at create time and reject a rung that already exits 0. The second is stronger and cheap - the author is standing in the unfixed tree when they create the item. For (b), a heuristic that would have caught the real case: if only_modify names a source file whose conventional test file exists, that test file should also be in scope. Keep it a warning - some work genuinely edits source without touching tests.",
+  "description": "lint returns 0 findings for items whose verification rungs cannot gate and whose scope omits files the work will touch. Both shipped on real items on 2026-07-30/31. (a) NON-GATING RUNG: anonymization-secret-list-diverged-from-platform-options carried the rung 'pytest tests/unit/core/results/test_platform_options_capture.py -q', which passed on the unfixed tree (44 passed, exit 0). It asserted 'the suite still passes', never 'the defect is fixed'. A rung that cannot fail for the reason it exists is not a gate, and it is more dangerous than a broken one because it reports green. (b) INCOMPLETE SCOPE: the same item listed anonymization.py in only_modify but not tests/unit/core/results/test_anonymization.py, which exists and is where that module's tests live - so the work could not land in scope. This is a DIFFERENT check from the sibling item todo-lint-unresolvable-scope-and-ladder-paths, which only catches paths that do not exist. IMPORTANT ORDERING CONSTRAINT, verified 2026-07-31: a prose-placeholder rung exits 2 and a genuinely unmet criterion exits 1, so a naive 'rung must fail before the fix' check is VACUOUSLY SATISFIED by a broken rung. Falsifiability therefore depends on todo-lint-unrunnable-verification-commands landing first; it does not subsume it.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness",
+        "needs_item": "todo-lint-unrunnable-verification-commands"
+      }
+    ],
+    "item_meta": {
+      "category": "tooling",
+      "created_at": "2026-07-31T16:38:05Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing lint findings keep firing unchanged",
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness"
+      },
+      {
+        "behavior": "Items whose work legitimately touches no tests are not made un-createable",
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_v2.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import importlib.util,inspect;s=importlib.util.spec_from_file_location('t','_project/scripts/todo_db.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m);src=inspect.getsource(m.lint_item);assert 'falsifi' in src.lower() or 'must fail' in src.lower()\"",
+        "description": "lint_item implements a rung-falsifiability check",
+        "expected": "exits 1 today (verified 2026-07-31), 0 once implemented",
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q -k lint",
+        "description": "todo_db lint tests cover the non-gating and incomplete-scope cases",
+        "expected": "all pass",
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-validate that lint still returns 0 findings for a non-gating rung and an incomplete scope",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reject or warn on a verification rung that already exits 0 on the unfixed tree",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Warn when only_modify names a source file but omits its existing test file",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-lint-rung-falsifiability-and-scope-completeness",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Tests for both checks, including that a broken rung does not vacuously satisfy w1",
+        "wid": "w3"
+      }
+    ]
+  }
+}

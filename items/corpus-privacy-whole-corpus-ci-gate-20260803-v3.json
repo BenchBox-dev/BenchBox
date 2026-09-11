@@ -1,0 +1,129 @@
+{
+  "context": "Add a repository invariant test that runs the canonical detector over every results-data JSON file and fails on any leak, and wire it into a required CI lane so a violation cannot merge. Complements the one-time cleanup in results-explorer-curated-corpus-path-sanitization, whose scope forbids workflow changes.",
+  "description": "The fail-closed privacy contract exists in scripts/validate_submission.py and benchbox/core/results/anonymization.py, but nothing scans the corpus as a whole, so pre-existing violations were never caught. Measured on develop 3af42e29b with the project's own find_public_path_leaks detector: 183 of 399 results-data JSON files fail, across execution.driver_runtime_python_executable, platform.config.working_dir, platform.raw_config.working_dir, platform.raw_metadata.driver_runtime_python_executable and platform.config.database_path. The identical 179 leaking bundles are present on the public published-results branch and have been public since 2026-05-13. Scope note verified 2026-08-03: this does NOT reach the Explorer's published output. Running AnonymizationManager over all 179 leaking bundles leaves zero leaks, and pipeline.py raises on any survivor, so the deployed site is insulated. This item prevents silent reaccumulation.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3",
+        "needs_item": "results-explorer-curated-corpus-path-sanitization"
+      }
+    ],
+    "item_meta": {
+      "category": "Corpus privacy",
+      "completed_at": "2026-08-04T01:41:00Z",
+      "completed_pr": 1501,
+      "created_at": "2026-08-03T23:45:07Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The canonical detector stays the single source of truth for both submission and explorer boundaries",
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3"
+      },
+      {
+        "behavior": "The gate fails closed when a file cannot be parsed rather than skipping it",
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3"
+      },
+      {
+        "behavior": "The gate scans every results-data JSON file, not only files changed in the PR",
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-phase-2-runbook.md"
+      },
+      {
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_corpus_privacy_invariant.py -q",
+        "description": "Whole-corpus privacy invariant holds across every results-data JSON file",
+        "expected": "Exits 1 on the unfixed tree, where 183 of 399 files still carry private absolute paths, and exits 0 only when every results-data JSON file is clean. Write the invariant test in w0 so this rung becomes runnable.",
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py -q",
+        "description": "Canonical leak detector contract still passes",
+        "expected": "Detector semantics unchanged",
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "tests/unit/scripts/test_corpus_privacy_invariant.py added (PR #1501). Scans every results-data JSON file with the canonical find_public_path_leaks; fails closed on unreadable/unparseable files rather than skipping; guards against a vacuous empty scan; pins that the detector still fires on a planted leak. Falsified: restoring one pre-migration bundle makes it fail, reporting field paths only, never echoing a private value.",
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3",
+        "notes": null,
+        "started_at": "2026-08-04T01:40:44Z",
+        "started_branch": "fix/explorer-chromium-gate-develop-trigger-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Add the whole-corpus invariant test using the canonical detector",
+        "wid": "w0"
+      },
+      {
+        "evidence": "No new workflow job needed. The gate is marked fast so it runs inside code-test, which ci-required-result gates on, and a corpus-only diff still routes to code-test (classifier fails closed - verified against the real .github/path-filters.yml). Both facts are pinned by tests in the same file so the gate cannot become decorative if the path filters or the required-check graph change.",
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3",
+        "notes": null,
+        "started_at": "2026-08-04T01:40:49Z",
+        "started_branch": "fix/explorer-chromium-gate-develop-trigger-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Wire the invariant into a required CI lane",
+        "wid": "w1"
+      },
+      {
+        "evidence": "docs/operations/results-phase-2-runbook.md section 4b records the gate, why a changed-files scan can never police an already-dirty corpus, the required-lane wiring, and the re-migration procedure.",
+        "item_id": "corpus-privacy-whole-corpus-ci-gate-20260803-v3",
+        "notes": null,
+        "started_at": "2026-08-04T01:40:55Z",
+        "started_branch": "fix/explorer-chromium-gate-develop-trigger-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Record the gate and its rationale in the phase-2 runbook",
+        "wid": "w2"
+      }
+    ]
+  }
+}

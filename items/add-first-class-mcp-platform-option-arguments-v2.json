@@ -1,0 +1,173 @@
+{
+  "context": "Inventory the CLI platform-option vocabulary, adapter consumers, sensitive keys, serialization, and the remote auth/tenancy/admission policy. Design a bounded schema with allow-listed option names and types, per-platform authorization, redaction, size limits, idempotency implications, and durable-job persistence. Decide whether options belong on synchronous local run_benchmark, remote start_benchmark, or both. Implement forwarding only through the validated path, add schema and transport parity tests, update the MCP reference and generated prompt guidance, and reject unknown or secret-bearing options with structured errors.",
+  "description": "Successor of add-first-class-mcp-platform-option-arguments, promoted from deferral #461 of prompts-landing-phase5-mcp-parity. The MCP benchmark tools currently expose platform, benchmark, scale, mode, phases, and related controls but not the adapter-specific platform options available to the CLI. Define and implement a typed, explicitly authorized MCP contract if remote callers need those options; do not pass an arbitrary dictionary through to platform adapters.",
+  "legacy": {
+    "item_meta": {
+      "category": "compatibility",
+      "completed_at": "2026-08-02T13:01:48Z",
+      "completed_pr": 1465,
+      "created_at": "2026-08-02T01:29:13Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI platform-option behavior remains unchanged outside the explicit MCP contract",
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2"
+      },
+      {
+        "behavior": "Durable jobs persist only validated bounded option data and never raw credentials or secrets",
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2"
+      },
+      {
+        "behavior": "Existing MCP benchmark calls without platform options remain wire-compatible",
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2"
+      },
+      {
+        "behavior": "Unknown, unbounded, credential-bearing, or tenant-disallowed options are rejected before adapter dispatch",
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp*.md"
+      },
+      {
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/**"
+      },
+      {
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/**"
+      },
+      {
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_benchmark_tools.py"
+      },
+      {
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_run_surface_contract.py"
+      },
+      {
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_schemas.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -q \"platform option|platform_options|allow-list\" docs/reference/mcp.md benchbox/mcp/schemas.py",
+        "description": "A typed MCP platform-option contract is specified",
+        "expected": "exits 1 on an unfixed tree; exits 0 once the bounded contract is specified",
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-02T12:51:47Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_schemas.py tests/unit/mcp/test_benchmark_tools.py -q",
+        "description": "Schema and benchmark tests cover option validation and forwarding",
+        "expected": "exits 1 on an unfixed tree if the MCP option contract is absent or unsafe; exits 0 once focused tests pass",
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-02T12:53:38Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp -q",
+        "description": "Remote integration tests prove policy and durable-job behavior",
+        "expected": "exits 1 on an unfixed tree if options bypass auth, tenancy, or durable persistence; exits 0 once the integration suite passes",
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-02T12:53:45Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Audited benchbox/core/hooks/platform_hooks.py and CLI option registrations, MCP adapter/job call paths, security middleware allowlists, and MCP tests; bounded non-secret allow-list implemented in benchbox/mcp/schemas.py",
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "notes": null,
+        "started_at": "2026-08-02T12:51:26Z",
+        "started_branch": "feat/mcp-platform-options-v2",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Revalidate CLI platform-option sources, adapter consumers, sensitive fields, and the remote policy boundary",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Defined typed per-platform MCP option allow-list with scalar parsers, enum constraints, count/value/memory bounds, and rejection of credentials, endpoints, paths, and package-install controls",
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "notes": null,
+        "started_at": "2026-08-02T12:51:31Z",
+        "started_branch": "feat/mcp-platform-options-v2",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Specify the typed allow-list, per-platform validation, redaction, limits, persistence, and compatibility contract for local and durable remote benchmark calls",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Forwarded normalized platform_options through synchronous run_benchmark and durable start_benchmark/job worker persistence to _run_benchmark_impl; existing calls remain default-compatible",
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "notes": null,
+        "started_at": "2026-08-02T12:51:37Z",
+        "started_branch": "feat/mcp-platform-options-v2",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Implement validated option schemas and forwarding through run_benchmark and the approved durable-job path without accepting arbitrary mappings",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added schema, adapter-forwarding, and authenticated durable-job rejection tests; documented the narrower MCP contract in docs/reference/mcp.md",
+        "item_id": "add-first-class-mcp-platform-option-arguments-v2",
+        "notes": null,
+        "started_at": "2026-08-02T12:51:42Z",
+        "started_branch": "feat/mcp-platform-options-v2",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Add invalid-option, secret-egress, tenant-policy, transport-parity, and durable-restart tests and update MCP docs/prompts",
+        "wid": "w3"
+      }
+    ]
+  }
+}

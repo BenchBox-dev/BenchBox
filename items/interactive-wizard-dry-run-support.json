@@ -1,0 +1,10 @@
+{
+  "description": "The `--dry-run` CLI option allows users to preview benchmark configuration without\nexecution. This critical feature is not accessible from the interactive wizard.\n\nWhen implemented, dry-run mode should:\n1. Be offered as an option after configuration is complete (Step 5)\n2. Generate a comprehensive summary of what WOULD be executed\n3. Show estimated resources (memory, disk, time)\n4. Display the equivalent CLI command for future use\n5. Preview data generation file sizes\n6. Show query list and expected phases\n\nThis is critical because new users using the interactive wizard have no way to\nvalidate their configuration before committing to a potentially long-running\nbenchmark execution.",
+  "legacy": {
+    "item_meta": {
+      "category": "User Experience",
+      "created_at": "2025-12-21T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

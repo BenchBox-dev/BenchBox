@@ -1,0 +1,693 @@
+{
+  "description": "Integrate Apache Doris as a supported BenchBox platform. Apache Doris is an\nApache Top-Level Project providing a high-performance real-time analytical\ndatabase. It's the upstream project from which StarRocks was forked, with\ncontinued active development and strong adoption (12K+ GitHub stars, used by\nXiaomi, ByteDance, Baidu, JD.com, and 4000+ enterprises globally).\n\nTechnical fit analysis:\n- SQLGlot has official 'doris' dialect support (verified)\n- MySQL protocol connectivity via PyMySQL (port 9030)\n- Full TPC-H (22 queries) and TPC-DS (99 queries) compatibility\n- Competitive performance in OLAP workloads\n- Multiple data loading options (Stream Load, Broker Load, INSERT)\n- Vectorized execution engine and columnar storage\n\nStrategic value:\n- Major Apache project with strong community and enterprise adoption\n- Enables side-by-side comparison with StarRocks (shared heritage)\n- Real-time analytics focus complements batch OLAP platforms\n- Multiple managed cloud options: VeloDB Cloud, SelectDB Cloud, ApsaraDB for SelectDB\n\nNote: Apache Doris and StarRocks share common ancestry but have diverged\nsignificantly. Both are valuable benchmarking targets for different user bases.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "conflict with ClickHouse's PyMySQL usage",
+        "instead": "ensure connection configuration is fully isolated",
+        "item_id": "apache-doris-olap-platform",
+        "why": "both platforms use PyMySQL on different ports"
+      },
+      {
+        "dont": "create a shared DorisStarRocksBase class",
+        "instead": "implement independently",
+        "item_id": "apache-doris-olap-platform",
+        "why": "the projects have diverged and coupling creates fragile inheritance"
+      },
+      {
+        "dont": "modify existing adapter files",
+        "instead": "create a new doris.py file",
+        "item_id": "apache-doris-olap-platform",
+        "why": "Doris is additive"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-17T00:00:00Z",
+      "created_at": "2026-01-18T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "apache-doris-olap-platform"
+      },
+      {
+        "behavior": "ClickHouse adapter's PyMySQL usage unaffected by Doris's PyMySQL dependency",
+        "item_id": "apache-doris-olap-platform"
+      },
+      {
+        "behavior": "Platform registry autodiscovery continues working for all existing platforms",
+        "item_id": "apache-doris-olap-platform"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "apache-doris-olap-platform",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/starrocks.py"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/credentials/doris.py"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/doris.py"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_doris_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.doris import DorisAdapter; print('import OK')\"",
+        "description": "New adapter imports correctly",
+        "expected": "import OK",
+        "item_id": "apache-doris-olap-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_doris_adapter.py -v --tb=short",
+        "description": "Unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "apache-doris-olap-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "Existing platform tests unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "apache-doris-olap-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w10",
+        "wid": "w12"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w10",
+        "wid": "w13"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w16",
+        "wid": "w17"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w16",
+        "wid": "w18"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w19",
+        "wid": "w20"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w19",
+        "wid": "w21"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w19",
+        "wid": "w22"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w23",
+        "wid": "w24"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w23",
+        "wid": "w25"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w23",
+        "wid": "w26"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w27",
+        "wid": "w28"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w27",
+        "wid": "w29"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w27",
+        "wid": "w30"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w31",
+        "wid": "w32"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w31",
+        "wid": "w33"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w31",
+        "wid": "w34"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w35",
+        "wid": "w36"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w35",
+        "wid": "w37"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w35",
+        "wid": "w38"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w39",
+        "wid": "w40"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "apache-doris-olap-platform",
+        "needs_wid": "w6",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create benchbox/platforms/doris.py adapter",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement schema creation with Doris-specific DDL",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support Duplicate/Aggregate/Unique Key table models",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement DISTRIBUTED BY HASH clause generation",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support PARTITION BY RANGE for large tables",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register platform in platform_registry.py",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add pymysql to optional dependencies in pyproject.toml",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement query cache control",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Disable query cache via SET enable_query_cache = false",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add validation that cache is disabled",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement platform optimizations",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement DorisAdapter class inheriting from PlatformAdapter",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Bloom filter index support for high-cardinality columns",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Bitmap index support for low-cardinality columns",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement ANALYZE for statistics collection",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create tuning profile for Doris",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define TPC-H specific tuning (distribution keys, indexes)",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define TPC-DS specific tuning",
+        "wid": "w25"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document colocate join configuration for multi-table joins",
+        "wid": "w26"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create unit tests for Doris adapter",
+        "wid": "w27"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test connection handling and configuration",
+        "wid": "w28"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test SQL generation and dialect handling",
+        "wid": "w29"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set _dialect = 'doris' for SQLGlot transpilation",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test Stream Load request formatting",
+        "wid": "w30"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create integration tests",
+        "wid": "w31"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Docker Compose for local Doris cluster",
+        "wid": "w32"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test TPC-H SF=0.01 end-to-end",
+        "wid": "w33"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test TPC-DS SF=1 end-to-end",
+        "wid": "w34"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create documentation",
+        "wid": "w35"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create docs/platforms/doris.md with connection guide",
+        "wid": "w36"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document Stream Load data loading process",
+        "wid": "w37"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add deployment options (self-hosted, VeloDB Cloud, SelectDB Cloud, ApsaraDB)",
+        "wid": "w38"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create example script",
+        "wid": "w39"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement create_connection() using PyMySQL",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create examples/getting_started/sql/doris_tpch.py",
+        "wid": "w40"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement execute_query() with timing and row count validation",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement data loading via Stream Load HTTP API",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create HTTP PUT to FE/BE node for CSV data loading",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle chunked loading for large files",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "apache-doris-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement load status checking and error handling",
+        "wid": "w9"
+      }
+    ]
+  }
+}

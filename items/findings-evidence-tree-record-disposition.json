@@ -1,0 +1,113 @@
+{
+  "context": "Re-sync the record at v4 so related_paths and suggested_sweep land in their columns, explicitly retire the 3 hand-mapped evidence rows, verify the finding round-trips losslessly, then delete the file. Do it BEFORE phase 6 so demolition has nothing untracked left to miss, or add the file explicitly to phase 6's deletion list.",
+  "description": "_project/blind-spots/2026-07-18-190500-evidence-tree-sha-provenance-mismatch.md is UNTRACKED in git (it exists only in the primary clone's working tree, not in any commit). Phase 6 deletes the tracked _project/blind-spots/*.md records, so a git-based deletion will not necessarily remove this one -- it can silently survive demolition, leaving exactly the kind of stray in-tree findings record the whole domain exists to eliminate (R4).\n\nIts finding IS already landed in production (disposition=open, awaiting triage) and was verified lossless at the time, BUT its related_paths and suggested_sweep were hand-mapped into 3 finding_evidence rows -- the anti-pattern that findings-schema-legacy-frontmatter-mapping-20260724 forbids. Now that v4 has real columns for both, the record should be re-synced from source so its representation matches the pipeline, then the file removed.\n\nOrdering matters and is not obvious: because the source file declares no `evidence:` key, a plain re-sync will NOT clear those 3 rows (parse_draft records evidence_declared, and reconcile only runs when the draft asserts the key -- deliberate, so a legacy record's curated rows are never destroyed). Clearing them is therefore an explicit step, not a side effect of re-syncing.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assume phase 6 will remove this file because it lives under _project/blind-spots/",
+        "instead": "handle it explicitly here, or add it by name to phase 6's deletion list",
+        "item_id": "findings-evidence-tree-record-disposition",
+        "why": "it is untracked, so a git-based deletion of tracked records skips it entirely"
+      },
+      {
+        "dont": "Delete the file before its content round-trips losslessly from the v4 columns",
+        "instead": "re-sync at v4, verify the round-trip, retire the evidence rows, then delete",
+        "item_id": "findings-evidence-tree-record-disposition",
+        "why": "the file is the only copy of the original framing, and its DB representation currently uses the forbidden evidence-row fold"
+      }
+    ],
+    "item_meta": {
+      "category": "tracker",
+      "completed_at": "2026-07-31T02:23:14Z",
+      "completed_pr": 1373,
+      "created_at": "2026-07-30T18:45:36Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "No content is lost when the hand-mapped evidence rows are retired -- related_paths and suggested_sweep must be in their v4 columns first",
+        "item_id": "findings-evidence-tree-record-disposition"
+      },
+      {
+        "behavior": "The finding's prose stays byte-identical to the source file through the re-sync",
+        "item_id": "findings-evidence-tree-record-disposition"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-evidence-tree-record-disposition",
+        "kind": "do_not_modify",
+        "path_glob": "_project/blind-spots/2026-0[1-6]*.md"
+      },
+      {
+        "item_id": "findings-evidence-tree-record-disposition",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "findings-evidence-tree-record-disposition",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-07-18-190500-evidence-tree-sha-provenance-mismatch.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test ! -f _project/blind-spots/2026-07-18-190500-evidence-tree-sha-provenance-mismatch.md",
+        "description": "the file is gone and the finding still round-trips from its v4 columns",
+        "expected": "exit 0; and todo finding show reports related_paths + suggested_sweep from their columns",
+        "item_id": "findings-evidence-tree-record-disposition",
+        "last_result": "pass",
+        "last_run": "2026-07-31T02:23:11Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-evidence-tree-record-disposition",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "findings-evidence-tree-record-disposition",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-synced the record at v4 (PR #1373 first fixes the prerequisite: there was NO update path for the v4 columns, since related_paths/suggested_sweep sit outside _CONTENT_FIELDS and the reconcile covered only evidence). After the fix, 'todo finding sync' reported 'updated 1' and production now holds related_paths=['_project/audits/todo-db-hosted-acceptance-2026-07-18.md','_project/scripts/audit_sha_check.py'] and the full suggested_sweep string, both verified byte-equal to the source frontmatter.",
+        "item_id": "findings-evidence-tree-record-disposition",
+        "notes": null,
+        "started_at": "2026-07-31T02:23:02Z",
+        "started_branch": "fix/findings-reconcile-v4-columns",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Re-sync the record at v4 so related_paths and suggested_sweep land in their columns",
+        "wid": "w1"
+      },
+      {
+        "evidence": "The 3 hand-mapped finding_evidence rows are retired (evidence rows now 0); their content lives in the related_paths and suggested_sweep columns, which is the mapping the anti-pattern demanded. NOTE they were removed as a SIDE EFFECT of a second defect found in the same run -- reconcile triggered by another field replaced evidence unconditionally, bypassing the evidence_declared guard. Outcome matches this unit's intent, mechanism was a bug; fixed with a regression test in PR #1373.",
+        "item_id": "findings-evidence-tree-record-disposition",
+        "notes": null,
+        "started_at": "2026-07-31T02:23:05Z",
+        "started_branch": "fix/findings-reconcile-v4-columns",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Explicitly retire the 3 hand-mapped finding_evidence rows once their content is in the v4 columns",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Verified lossless round-trip against the source file: related_paths match=True, suggested_sweep match=True, all three prose sections present. Then deleted the untracked file /Users/joe/Developer/BenchBox/_project/blind-spots/2026-07-18-190500-evidence-tree-sha-provenance-mismatch.md; primary clone git status clean (nothing tracked changed, confirming it was untracked). Phase 6 can no longer miss it.",
+        "item_id": "findings-evidence-tree-record-disposition",
+        "notes": null,
+        "started_at": "2026-07-31T02:23:09Z",
+        "started_branch": "fix/findings-reconcile-v4-columns",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Verify the lossless round-trip, then delete the untracked source file",
+        "wid": "w3"
+      }
+    ]
+  }
+}

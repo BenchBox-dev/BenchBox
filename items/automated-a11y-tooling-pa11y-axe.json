@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #332 of landing-prompts-launch-gates.\nDeferred: Automated a11y tooling (pa11y/axe)\nReason deferred: Filed as follow-up unless added during w3; manual checklist covers MVP.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:34Z",
+      "worktree": "main"
+    }
+  }
+}

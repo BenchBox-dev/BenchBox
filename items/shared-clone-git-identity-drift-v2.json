@@ -1,0 +1,151 @@
+{
+  "context": "Keep known agent/service identities as an error and preserve the existing explicit override escape hatch. Add a separate warning channel/diagnostic for any repo-local user.* values, test JSON and human-readable output plus exit status, and add one concise AGENTS.md operational rule. Verify from a temporary repository so the test does not mutate BenchBox/.git/config. Do not rewrite history, edit the shared config, or add an agent Co-Authored-By trailer.",
+  "description": "Add a visible, non-fatal audit warning whenever the shared repository config contains any repo-local user.name or user.email, while retaining a fatal finding for known agent/service identities. Document that agents must not write user.* into the shared clone and must use per-command git -c identity overrides. The guard is detection and instruction hardening, not prevention: do not claim that the audit can stop another live session from writing .git/config. Evidence: the current audit only rejects known agent identities, while a human repo-local identity silently passes; five live sessions share the config. This is the R1 disposition. Corrected successor.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not claim the warning prevents writes by another agent.",
+        "instead": "State the detection-only boundary in the code, tests, and AGENTS.md rule.",
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "why": "The audit runs after configuration may already have changed."
+      },
+      {
+        "dont": "Do not edit the shared .git/config or global Git configuration as part of this PR.",
+        "instead": "Make the audit and AGENTS.md warning visible, then use per-command git -c identity overrides.",
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "why": "The shared clone is used by multiple live sessions and direct repair is itself the race the item is addressing."
+      },
+      {
+        "dont": "Do not make every human repo-local identity fatal.",
+        "instead": "Emit a non-fatal warning for any repo-local user.* and retain fatal status only for disallowed identities.",
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "why": "That would turn a visibility guard into a compatibility break and obscure the known-agent safety check."
+      }
+    ],
+    "item_meta": {
+      "category": "repository-maintenance",
+      "created_at": "2026-08-02T20:29:52Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Known Claude/agent/service identities remain fatal unless the existing explicit override is used.",
+        "item_id": "shared-clone-git-identity-drift-v2"
+      },
+      {
+        "behavior": "Normal per-commit git -c user.name=... -c user.email=... workflow remains supported.",
+        "item_id": "shared-clone-git-identity-drift-v2"
+      },
+      {
+        "behavior": "The audit remains non-mutating and does not attempt to prevent concurrent config writes.",
+        "item_id": "shared-clone-git-identity-drift-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "kind": "do_not_modify",
+        "path_glob": ".git/config"
+      },
+      {
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_agent_instruction_audit.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'import importlib.util, subprocess, tempfile; from pathlib import Path; p=Path(tempfile.mkdtemp()); subprocess.run([\"git\",\"init\",\"-q\",str(p)],check=True); subprocess.run([\"git\",\"-C\",str(p),\"config\",\"user.name\",\"Joe Harris\"],check=True); subprocess.run([\"git\",\"-C\",str(p),\"config\",\"user.email\",\"joe@example.invalid\"],check=True); s=importlib.util.spec_from_file_location(\"audit\",\"_project/scripts/agent_instruction_audit.py\"); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); result=m.audit_git_identity(p); assert any(\"repo-local\" in str(x).lower() for x in result), result'",
+        "description": "Unfixed-tree gate: a temporary repository with human repo-local user.name and user.email must produce a visible repo-local identity warning; current develop exits without that warning.",
+        "expected": "FAIL on unfixed develop: human repo-local user.* values are silently accepted; the command exits 1 before the warning guard and 0 after the fix.",
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'import importlib.util; from pathlib import Path; s=importlib.util.spec_from_file_location(\"audit\",\"_project/scripts/agent_instruction_audit.py\"); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); p=Path(\".\"); errors=m.audit_git_identity(p, config_values={\"user.name\":\"Claude\",\"user.email\":\"noreply@anthropic.com\"}); assert errors; allowed=m.audit_git_identity(p, config_values={\"user.name\":\"Claude\",\"user.email\":\"noreply@anthropic.com\"}, allow_agent_identity=True); assert not allowed, allowed'",
+        "description": "Regression guard: known agent identity remains rejected and the explicit override remains accepted.",
+        "expected": "PASS on current develop and after the change: known agent identity behavior is retained.",
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-drive the human and known-agent identity cases on current develop before editing.",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement separate warning output and the shared-clone identity rule.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "shared-clone-git-identity-drift-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add behavior tests and run the fatal, warning, and override guards.",
+        "wid": "w2"
+      }
+    ]
+  }
+}

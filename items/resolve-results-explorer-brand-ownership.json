@@ -1,0 +1,129 @@
+{
+  "context": "This is a product/business decision, not a technical one. Gather the relevant\ncontext about Oxbow Research, evaluate tradeoffs, and make a clear call.\nThe working default (BenchBox placement) is valid until overridden - so this\ndecision affects domain/identity configuration, not which code to write.\n",
+  "description": "The results explorer could live under the BenchBox brand (benchbox.dev/results/)\nor the Oxbow Research brand (a separate domain/subsite). This decision affects:\n\n- **Domain and hosting**: benchbox.dev vs a separate Oxbow Research property\n- **Curation authority**: who curates and is responsible for published results\n- **Visual identity**: BenchBox design system vs Oxbow Research design system\n- **Submission model** (Phase 2+): who can submit, under which brand's trust\n- **Business positioning**: is the explorer a BenchBox feature or a standalone\n  Oxbow Research product that happens to use BenchBox data\n\n**Working default:** BenchBox placement (benchbox.dev/results/). All\nimplementation proceeds under this assumption. This TODO validates that default\nor overrides it with a different brand placement. It must be resolved before\nlaunch, but does not block scaffolding or implementation that uses the default.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "defer the brand decision past the Phase 1 launch",
+        "instead": "scaffold may proceed under the BenchBox default, but the decision must be finalized before launch-results-explorer-acceptance-and-seed executes",
+        "item_id": "resolve-results-explorer-brand-ownership",
+        "why": "URL structure and domain assumptions baked into routing and CI during scaffold will need rework if the brand overrides the working default"
+      },
+      {
+        "dont": "split the explorer across two brands without explicit intent",
+        "instead": "pick one home",
+        "item_id": "resolve-results-explorer-brand-ownership",
+        "why": "a benchbox.dev/results/ entry point that redirects to another domain confuses users and breaks search indexing"
+      },
+      {
+        "dont": "treat this as a technical spike",
+        "instead": "gather context and make a call rather than prototyping both options",
+        "item_id": "resolve-results-explorer-brand-ownership",
+        "why": "it is a product/business decision"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "resolve-results-explorer-brand-ownership",
+        "needs_item": "define-results-platform-product-and-launch-strategy"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-03T00:00:00Z",
+      "created_at": "2026-03-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All downstream TODOs must reflect the chosen domain and identity",
+        "item_id": "resolve-results-explorer-brand-ownership"
+      },
+      {
+        "behavior": "The strategy memo must be updated with the resolved brand decision",
+        "item_id": "resolve-results-explorer-brand-ownership"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "resolve-results-explorer-brand-ownership",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "resolve-results-explorer-brand-ownership",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -c 'brand\\|Oxbow\\|BenchBox placement' _project/analysis/benchbox-results-platform-strategy.md",
+        "description": "Strategy memo contains a brand decision section",
+        "expected": "≥1 (brand decision documented in strategy memo)",
+        "item_id": "resolve-results-explorer-brand-ownership",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rn 'brand ownership\\|Oxbow Research\\|benchbox.dev/results' _project/analysis/ | grep -c 'decision\\|resolved\\|placement'",
+        "description": "Decision ADR or memo section exists",
+        "expected": "≥1 (decision recorded)",
+        "item_id": "resolve-results-explorer-brand-ownership",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "resolve-results-explorer-brand-ownership",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "resolve-results-explorer-brand-ownership",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "resolve-results-explorer-brand-ownership",
+        "notes": "Clarify: is Oxbow Research a parent brand, a sibling product, a company\nentity, or something else? Research steps:\n- Check for any existing oxbow.dev / oxbow-research.com / oxbowresearch.io\n  web presence and what it publishes\n- Search git log for \"Oxbow Research\" mentions and note existing uses\n- Check GitHub org / domain registrations for any oxbow-* properties\n- Check README, CLAUDE.md, and _project/analysis/ for any prior positioning\nOutput: 1-paragraph summary of Oxbow Research's current identity and scope.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define what Oxbow Research is and how it relates to BenchBox",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "resolve-results-explorer-brand-ownership",
+        "notes": "BenchBox placement:\n- Pro: explorer drives traffic to the tool, integrated brand, simpler deployment\n- Con: explorer is tied to BenchBox's scope and identity\n\nOxbow Research placement:\n- Pro: broader positioning, can encompass results beyond BenchBox\n- Con: separate domain/hosting, split brand awareness, more infrastructure\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Evaluate the tradeoffs of each brand placement",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "resolve-results-explorer-brand-ownership",
+        "notes": "Record the decision as an ADR or in the strategy memo. Update all downstream\nTODOs with the resolved domain, base URL, and design direction.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make the decision and document rationale",
+        "wid": "w3"
+      }
+    ]
+  }
+}

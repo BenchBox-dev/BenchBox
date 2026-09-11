@@ -1,0 +1,11 @@
+{
+  "description": "todo_db.py:1809 sets 'passed = proc.returncode == 0'. The per-verification 'expected' text authored at create time is displayed but never evaluated, so any rung whose intent is about OUTPUT rather than exit status cannot be expressed. Concrete case from timing-policy-check-misreports-pytest-failure-as-violation (PR for it): rung 1 runs the checker under --strict in a deliberately broken environment and expects it to 'report a tooling/environment error, not Fast lane policy violations: 4'. The correct behaviour there is a NON-ZERO exit -- a policy check that never ran must not report success -- so the rung reports fail forever even though the implementation is right. Because verifications are create-time-only, the item's author cannot repair the rung afterwards either. Options: evaluate the expected string against stdout/stderr when it is not an exit-code phrase; or add an explicit expected_exit_code / expect_failure field; or at minimum document that rungs must be phrased as exit-code assertions so authors stop writing output expectations. Related create-time-only constraint: promote() cannot set scope/verifications at all, so promoted items get no ladder.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-25T20:12:41Z",
+      "completed_pr": 1311,
+      "created_at": "2026-07-25T16:23:37Z",
+      "worktree": "main"
+    }
+  }
+}

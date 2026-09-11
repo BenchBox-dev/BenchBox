@@ -1,0 +1,331 @@
+{
+  "context": "Add the facet chips through the existing facet contract rather than a parallel filter, so URL state, aliases and the SQL clause builder all keep working. Add hardware and engine-version columns to the cohort tables, and a group-by control that splits rows into labelled groups without changing the underlying ranking semantics.\n\nRespect the coverage decision from the hardware read-model item: a facet whose corpus coverage is a single bucket does not ship as a visible chip. Ship the column and defer the chip.\n\nWhere the basis control appears on an index page, changing it must genuinely change the figures. A statistic switch that scales every row identically and leaves the ordering untouched is a control that does nothing.",
+  "description": "Once architecture, CPU family and engine version exist as structured read-model fields, they still are not browsable. `FacetRail` and the Home filter band expose benchmark, scale, phase, platform, execution mode, tuning mode, trust tier, validation status, deployment class, cloud provider, cloud region, instance or warehouse, storage format, cost status and date window -- and no hardware or version axis. The cohort tables on BenchmarkIndex and PlatformIndex show platform and metrics but not the hardware a run executed on.\n\nSo the corpus cannot answer 'show me arm64 versus x86_64 across engines' without opening the Query workbench and writing SQL. This item closes that: hardware and engine version become filter chips and table columns, with a group-by control that turns the cohort table into a hardware or engine comparison in place.\n\nIt also puts the measurement basis on these pages. A leaderboard that does not say what its numbers mean is the same defect the compare work is fixing, so the index pages carry the same basis statement and the same median-or-min control.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add hardware filtering as page-local state on BenchmarkIndex because it is quicker than extending the facet contract.",
+        "instead": "Use the facet keys added by the hardware read-model item so URL state, aliases and SQL clauses all work.",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "why": "Page-local filter state does not survive a shared link and immediately drifts from the rail, the drawer and the Query workbench."
+      },
+      {
+        "dont": "Implement the min statistic by applying a constant factor to every row.",
+        "instead": "Compute each run's min from its own executions, which moves noisier engines more than stable ones.",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "why": "A uniform factor leaves every ratio and the entire ordering unchanged, so the control demonstrably does nothing -- exactly the bug caught in the design prototype."
+      },
+      {
+        "dont": "Let the group-by control change ranking or eligibility.",
+        "instead": "Keep it a presentation-level split of the same ranked rows.",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "why": "Ranking semantics are governed by a separate contract with its own release gate; a grouping control must not become a second, hidden ranking policy."
+      },
+      {
+        "dont": "Ship a chip for a facet that has one populated value across the whole corpus.",
+        "instead": "Ship the column, defer the chip, and record it as blocked on corpus coverage.",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "why": "A filter with a single bucket implies a choice the data cannot offer, and it makes the corpus look broader than it is."
+      },
+      {
+        "dont": "Show a run's hardware as a guessed vendor when only arch was recorded.",
+        "instead": "Show the architecture and mark the CPU as not recorded.",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "why": "Most of the committed corpus has arch only; a guessed vendor would fabricate the very axis these facets exist to compare."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-30T08:57:52Z",
+        "from_item": "explorer-basis-browse-hardware-engine-facets",
+        "id": 723,
+        "reason": "w2 asks for architecture, CPU and engine-version columns on BenchmarkIndex and PlatformIndex. Only engine version is possible within this item's scope.\n\nVerified against a read-model-v8 snapshot: benchmark_rankings carries no hardware column at all, and platform_index_rows carries only driver_version/platform_version. BenchmarkIndex reads the results table (platform_version only) and PlatformIndex reads platform_index_rows. arch/cpu_family/cpu_model live in result_environment and result_detail_metrics, which are per-result detail tables neither index page queries.\n\nClosing the gap needs one of two things, both outside this item: adding the columns to the index tables in _project/scripts/explorer_pipeline/ (explicitly do_not_modify here, and it would need another read-model version bump), or a bulk-read helper in results-explorer/src/lib/duckdbQueries.ts (outside the only_modify allowlist).\n\nNot worked around client-side on purpose: a per-row detail fetch would be one query per row on a page that renders a whole cohort, which is precisely the performance budget w3's own decision gate exists to protect.\n\nEngine-version column and engine-version group-by ship in w2. Architecture and CPU columns need the read-model change first.",
+        "resolution": "promoted",
+        "resolved_item": "explorer-index-read-model-hardware-and-executions",
+        "resolved_reason": null,
+        "summary": "Architecture and CPU columns on the cohort index tables"
+      },
+      {
+        "created_at": "2026-08-30T09:02:07Z",
+        "from_item": "explorer-basis-browse-hardware-engine-facets",
+        "id": 724,
+        "reason": "w3's decision gate, taken on its documented fallback path. Deferred for query SHAPE, not data volume.\n\nMeasured: largest cohort (tpch sf0.01 power) is 12 runs / 972 execution rows; whole corpus is 22136 rows; native DuckDB fetch of the largest cohort is 3 ms. Against interaction budgets of 500 ms p50 / 1000 ms p95 in e2e/performance.spec.ts, the volume is not close to a problem.\n\nThe blocker is that index pages read results and platform_index_rows, neither of which carries per-execution data, and the only existing accessor is getQueryExecutions(resultId) -- one result per call. Computing a non-default basis for a cohort is therefore N queries where N is the run count (12 today, growing with the corpus). Twelve sequential DuckDB-WASM round trips against a 500 ms p50 budget is a real risk that worsens as the corpus grows.\n\nThe fix is a bulk accessor in results-explorer/src/lib/duckdbQueries.ts, outside this item's only_modify allowlist -- the same boundary as deferral #723. Not worked around by looping the per-result accessor: that is exactly the N-query shape the budget is at risk from, and shipping it to find out would use the leaderboard as the experiment.\n\nThe basis statement ships on both index pages, per the gate's fallback instruction.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Same root cause as deferral #723 and covered by the item promoted from it, explorer-index-read-model-hardware-and-executions, whose description carries this deferral's measurement verbatim as BLOCKED PIECE 2. Dismissed as a duplicate route to the same work rather than promoted, because promote always creates a new item and would have split one read-model change across two trackers.",
+        "summary": "Median-or-min basis control on the cohort index pages"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "needs_item": "explorer-basis-hardware-identity-read-model"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-08-30T09:13:08Z",
+      "completed_pr": 1960,
+      "created_at": "2026-08-29T19:12:49Z",
+      "worktree": "explorer-measurement-basis"
+    },
+    "preserves": [
+      {
+        "behavior": "A facet chip's count must reflect the corpus honestly, including zero, and a filter that matches nothing must say so rather than silently showing everything.",
+        "item_id": "explorer-basis-browse-hardware-engine-facets"
+      },
+      {
+        "behavior": "A statistic control on an index page must actually change the figures and may change the ordering; a control that scales every row identically must not ship.",
+        "item_id": "explorer-basis-browse-hardware-engine-facets"
+      },
+      {
+        "behavior": "Compare selection from these pages must keep obeying MAX_COMPARE_SELECTIONS and must route to the layout matching the selection count.",
+        "item_id": "explorer-basis-browse-hardware-engine-facets"
+      },
+      {
+        "behavior": "Every facet URL parameter and alias that resolves today must keep resolving; existing shared filter links must not break.",
+        "item_id": "explorer-basis-browse-hardware-engine-facets"
+      },
+      {
+        "behavior": "Facets whose corpus coverage is a single bucket must not ship as visible chips, per the hardware read-model item's coverage gate.",
+        "item_id": "explorer-basis-browse-hardware-engine-facets"
+      },
+      {
+        "behavior": "Mobile and responsive behaviour of the facet rail and drawer must be preserved.",
+        "item_id": "explorer-basis-browse-hardware-engine-facets"
+      },
+      {
+        "behavior": "Ranking semantics and ranking eligibility must not change. Grouping and filtering rearrange and narrow rows; they do not alter how a rank is computed.",
+        "item_id": "explorer-basis-browse-hardware-engine-facets"
+      },
+      {
+        "behavior": "The default basis on index pages must reproduce today's published figures exactly.",
+        "item_id": "explorer-basis-browse-hardware-engine-facets"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing selection tray enforcing the compare selection cap. Reuse so a multi-run selection routes correctly to the new compare layouts.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "path": "results-explorer/src/components/CompareTray.tsx"
+      },
+      {
+        "concept": "The established faceted filter rail and drawer, with chips, counts and group structure. Add the new facet groups here.",
+        "decision": "extend",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "path": "results-explorer/src/components/FacetRail.tsx"
+      },
+      {
+        "concept": "FACET_KEYS and the URL serde and SQL clause builder extended by the hardware read-model item. Consume those keys rather than adding new filter state.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "path": "results-explorer/src/lib/facetModel.ts"
+      },
+      {
+        "concept": "Query workbench filter state and ALLOWED_COLUMNS, which already permits driver_version as a column. Keep its vocabulary consistent with the new facets.",
+        "decision": "extend",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "path": "results-explorer/src/lib/queryFilters.ts"
+      },
+      {
+        "concept": "Existing cohort page with a SegmentedControl view switch and compare checkboxes feeding CompareTray. Extend with hardware columns and group-by rather than a new page.",
+        "decision": "extend",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "path": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/facetModel.ts"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/measurementBasis.ts"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/explorer-basis-browse-hardware-engine-facets/**"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/**"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/FacetChip.tsx"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/FacetRail.tsx"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MeasurementBasisBar.tsx"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/**"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/facetDisplay.ts"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/queryFilters.ts"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test",
+        "description": "Explorer unit and page tests pass, including facet URL back-compatibility and the group-by ranking invariant",
+        "expected": null,
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "last_result": "pass",
+        "last_run": "2026-08-30T09:11:36Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/BenchmarkIndex.a11y.test.tsx src/pages/__tests__/PlatformIndex.a11y.test.tsx",
+        "description": "Index page accessibility tests pass with the new facets and columns",
+        "expected": null,
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "last_result": "pass",
+        "last_run": "2026-08-30T09:11:38Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --workers=1 e2e/responsive.spec.ts",
+        "description": "Responsive behaviour of the facet rail is preserved",
+        "expected": null,
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "last_result": "pass",
+        "last_run": "2026-08-30T09:13:01Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Explorer typechecks",
+        "expected": null,
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "last_result": "pass",
+        "last_run": "2026-08-30T09:13:05Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cat _project/verification-logs/explorer-basis-browse-hardware-engine-facets/w0.log",
+        "description": "Facet coverage gate was honoured",
+        "expected": null,
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "last_result": "pass",
+        "last_run": "2026-08-30T09:13:06Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "w0.log - coverage gate: platform_version 7 buckets SHIPS a chip; cpu_family (apple_silicon 151) and arch (arm64) are single-bucket and DEFER to columns. Gate answer unchanged but its reason changed after #1953's backfill: 0 buckets -> 1 bucket, which looks like real coverage and is the worse hazard",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "notes": "Confirm the facet keys and coverage decisions from the hardware read-model item are landed, and re-read that item's w0 log for which facets were cleared to ship as chips.\n\nCapture current BenchmarkIndex, PlatformIndex and Home behaviour: which facets render, current row counts, current ranking order, and the responsive breakpoints the rail uses. Store in `_project/verification-logs/explorer-basis-browse-hardware-engine-facets/w0.log`.\n\nDECISION GATE: ship chips only for facets cleared by that coverage gate. If none were cleared, land columns and group-by only, and record the chips as blocked on corpus coverage rather than shipping single-bucket filters.",
+        "started_at": "2026-08-30T08:14:39Z",
+        "started_branch": "feat/explorer-basis-browse-hardware-facets",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-browse-hw-facets",
+        "status": "done",
+        "summary": "Confirm facet coverage and pin current index behaviour",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Engine-version chip rendered on Home via RENDERED_FACET_KEYS; arch and cpu_family deliberately absent per the coverage gate but still labelled so an existing URL summarizes readably; types widened to ExplorerFacetKey; 3 gate tests; suite 1098 passed",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "notes": "Add the cleared facet groups to FacetRail and the Home filter band, following the existing chip, count and group conventions.\n\nAdd a regression test asserting every facet URL parameter and alias that resolved before still resolves, and that a filter matching zero rows renders an explicit empty state rather than an unfiltered list.",
+        "started_at": "2026-08-30T08:56:15Z",
+        "started_branch": "feat/explorer-basis-browse-hardware-facets",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-browse-hw-facets",
+        "status": "done",
+        "summary": "Hardware and engine-version facet chips",
+        "wid": "w1"
+      },
+      {
+        "evidence": "groupCohortRows: presentation-only engine-version grouping, order-preserving, 'Not recorded' kept and sorted last; 11 tests pinning that ranking order and eligibility are untouched and no row is lost. Architecture/CPU columns deferred (#723) - the read model's index tables do not carry them and both fixes are out of this item's scope",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "notes": "Add architecture, CPU and engine-version columns to the BenchmarkIndex and PlatformIndex tables, and a group-by control splitting rows by architecture or engine with labelled group headers and per-group counts.\n\nGroup-by is presentation only. Add a test asserting that ranking order within the full set is unchanged by grouping, and that eligibility is untouched.\n\nA run with no CPU data shows its architecture and 'not recorded' for CPU.",
+        "started_at": "2026-08-30T08:59:03Z",
+        "started_branch": "feat/explorer-basis-browse-hardware-facets",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-browse-hw-facets",
+        "status": "done",
+        "summary": "Hardware columns and group-by on the cohort tables",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Basis statement shipped on BenchmarkIndex and PlatformIndex with identical wording; median-or-min control deferred per w3's decision gate with the measurement recorded in w0.log (deferral #724). Suite 1112 passed",
+        "item_id": "explorer-basis-browse-hardware-engine-facets",
+        "notes": "Add the basis statement and the median-or-min control to the cohort pages, reading through the basis model.\n\nAdd a test that switching to min changes at least one row's figure by a different proportion than another row's -- that is, that the control cannot be implemented as a uniform scale factor. This test is the guardrail against the no-op control.\n\nDECISION GATE: if computing a non-default basis for a whole cohort in the browser exceeds the page's existing performance budget, do not ship the control on index pages. Keep the basis statement, record the measurement, and note the control as deferred.",
+        "started_at": "2026-08-30T09:02:10Z",
+        "started_branch": "feat/explorer-basis-browse-hardware-facets",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-browse-hw-facets",
+        "status": "done",
+        "summary": "Measurement basis on the index pages",
+        "wid": "w3"
+      }
+    ]
+  }
+}

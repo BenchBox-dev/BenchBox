@@ -1,0 +1,10 @@
+{
+  "description": "Implement a tuning configuration framework for DataFrame adapters that parallels the\nSQL tuning system. Unlike SQL adapters where tuning affects schema and table creation,\nDataFrame tuning focuses on runtime execution parameters, memory management, and\nparallelism settings.\n\nCurrent State:\n- DataFrame adapters have ZERO tuning framework integration\n- SQL adapters use UnifiedTuningConfiguration with 13 TuningType options\n- DataFrame adapters only accept constructor parameters for basic settings\n- No way to load/save DataFrame tuning configs from YAML\n- No validation or platform compatibility checking\n\nThis TODO implements a parallel tuning system designed for DataFrame semantics.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Enhancement",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "dataframe-tuning"
+    }
+  }
+}

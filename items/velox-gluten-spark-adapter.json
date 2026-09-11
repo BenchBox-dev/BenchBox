@@ -1,0 +1,761 @@
+{
+  "context": "Follow the LakeSail adapter as the structural template, and the\nApache Spark adapter for local-mode session construction. Concretely:\n\n  1. New file benchbox/platforms/velox.py defines VeloxAdapter\n     inheriting (SparkDataLoadMixin, SparkQueryExecutionMixin,\n     PlatformAdapter), mirroring LakeSail's class layout.\n\n  2. Two deployment modes via a `deployment` config field:\n       - \"local\":   builds a SparkSession (classic or Spark-Connect via\n                    pysail-style in-process server is NOT applicable\n                    here; use pyspark.sql.SparkSession.builder.master\n                    'local[*]'). Adds Gluten jar to spark.jars and\n                    classpath, sets plugin + off-heap + columnar shuffle.\n       - \"remote\":  treats the endpoint as a pre-configured Spark-Connect\n                    server (mirror LakeSail _parse_endpoint / _is_server\n                    _reachable). Does NOT auto-start a server.\n\n  3. Config knobs (CLI + --platform-option):\n       deployment        = local | remote          (default local)\n       endpoint          = sc://host:port          (remote only)\n       gluten_jar_path   = /abs/path/to/bundle.jar (local only; required)\n       gluten_version    = 1.4.0                    (informational; surfaced in platform_info)\n       offheap_size      = 8g                       (default conservative)\n       shuffle_partitions, adaptive_enabled, driver_memory, app_name,\n       table_format, spark_config, disable_cache     (identical to LakeSail)\n\n  4. `_get_spark_conf()` merges LakeSail-style base conf with Gluten-\n     mandatory keys; in remote mode the conf is advisory (the server\n     already has it - send only what Spark-Connect respects).\n\n  5. `_create_spark_session()`:\n       - local:  SparkSession.builder.master('local[*]')\n                   .config('spark.plugins', 'org.apache.gluten.GlutenPlugin')\n                   .config('spark.jars', gluten_jar_path)\n                   .config('spark.driver.extraClassPath', gluten_jar_path)\n                   .config('spark.executor.extraClassPath', gluten_jar_path)\n                   .config('spark.memory.offHeap.enabled', 'true')\n                   .config('spark.memory.offHeap.size', offheap_size)\n                   .config('spark.shuffle.manager',\n                           'org.apache.spark.shuffle.sort.ColumnarShuffleManager')\n                   .getOrCreate()\n       - remote: SparkSession.builder.remote(endpoint) + conf overlay.\n\n  6. `get_platform_info()` reports: deployment mode, gluten_version,\n     gluten_jar_path (redacted), offheap_size, Spark version, PySpark\n     version, and (best-effort) backend fingerprint:\n       - EXPLAIN a trivial query, look for 'VeloxColumnar' nodes to\n         confirm Velox is actually active; store `velox_active: bool`.\n\n  7. Query plan capture (`get_query_plan`) uses EXPLAIN EXTENDED (as\n     LakeSail does) and additionally greps for Velox columnar nodes so\n     the get_query_plan MCP tool can show native-vs-fallback.\n\n  8. Fallback telemetry (stretch, in w-series): hook into Spark logs\n     or Gluten metrics (SparkListener) to count JVM-fallback\n     operators per query and attach to BenchmarkResults query metadata.\n\n  9. Dependency + registry wiring (four touchpoints, mirroring LakeSail):\n       - pyproject.toml extra \"velox\" pins pyspark==3.5.x (matching the\n         bundle jar); the jar itself is NOT packaged.\n       - utils/dependencies.py adds DependencyInfo(\"velox\", ...) with\n         packages=[\"pyspark\"] and an extra `external_artifacts` note\n         pointing to docs/platforms/velox_jar_setup.md.\n       - platforms/__init__.py: register \"VeloxAdapter\" in the lazy\n         adapter map (mirroring the \"LakeSailAdapter\" entry at line 89),\n         add \"velox\" (and optional \"gluten-velox\") to the platform-name\n         lookup, add availability constant entry for\n         list_available_platforms().\n       - platforms/adapter_factory.py: register the Velox dispatch entry\n         so get_platform_adapter(\"velox\", **config) resolves.\n       - At the bottom of velox.py, define `_build_velox_config` and\n         call PlatformHookRegistry.register_config_builder(\"velox\", ...)\n         exactly as LakeSail does (credential loading, driver_package\n         = \"pyspark\", platform_fields listing Velox-specific knobs).\n\n 10. Jar provisioning helper (small utility in benchbox/platforms/velox\n     or a scripts/ helper): given gluten_version + spark_version + arch,\n     prints the canonical jar URL (Apache dist mirror) and checksum.\n     Do NOT auto-download during benchmark runs (supply-chain risk);\n     provide an opt-in `benchbox fetch-velox-jar` CLI later if demanded.\n\n 11. Docker-based local dev + CI path (primary workflow on macOS/Windows,\n     recommended on Linux):\n\n       docker/velox/Dockerfile\n         FROM apache/spark:3.5.2-scala2.12-java17-python3-ubuntu\n         ARG GLUTEN_VERSION=1.4.0\n         ARG TARGETARCH        # amd64 | arm64 (inferred by buildx)\n         RUN curl -fsSL ${APACHE_MIRROR}/gluten/${GLUTEN_VERSION}/\\\n             gluten-velox-bundle-spark3.5_2.12-linux_${TARGETARCH}-${GLUTEN_VERSION}.jar \\\n             -o /opt/gluten.jar\n         COPY --chown=spark:spark . /opt/benchbox\n         RUN pip install -e /opt/benchbox[velox]\n         COPY docker/velox/entrypoint.sh /entrypoint.sh\n         ENTRYPOINT [\"/entrypoint.sh\"]\n\n       docker/velox/docker-compose.yml defines two services:\n         - 'velox-connect': starts Spark-Connect server on :50051 with\n           Gluten conf, for adapter-only dev from the host.\n         - 'velox-runner':  runs `benchbox run --platform velox …`\n           end-to-end inside the container, for one-shot benchmarks\n           and CI.\n\n       Build and publish multi-arch images via `docker buildx build\n       --platform linux/amd64,linux/arm64` so Apple Silicon and Intel\n       developers get native execution.\n\n       The adapter code DOES NOT manage Docker lifecycle - that is the\n       user's responsibility via `docker compose up`. The adapter only\n       needs to (a) accept a `sc://localhost:50051` endpoint, and\n       (b) document the Docker path prominently.\n\n 12. Validation strategy for first PR: run TPC-H Q1, Q6, Q3, Q9 at\n     SF 0.01 under local mode *inside* the Docker image on both\n     linux/amd64 and linux/arm64 runners (matrix), assert\n     'VeloxColumnar' nodes appear in EXPLAIN for at least Q1/Q6.\n     This becomes the single live_integration test; all other tests\n     use mocked pyspark like existing LakeSail tests.\n",
+  "description": "Add a BenchBox platform adapter for Apache Gluten with the Velox backend -\na plugin to Apache Spark that offloads physical operators to a highly\noptimized native C++ engine (Velox) while preserving Spark's fault\ntolerance, distributed scheduling, and DataFrame/SQL APIs.\n\nUnlike LakeSail (a standalone Rust/DataFusion Spark-Connect server),\nGluten+Velox runs *inside* Apache Spark via jar + plugin configuration.\nFrom a client perspective, a Gluten-accelerated Spark cluster still speaks\nstandard Spark (Connect or classic) - the acceleration is invisible to the\napplication. The adapter's job is therefore primarily to:\n\n  1. Own the lifecycle of a Gluten-enabled SparkSession / Spark-Connect\n     server (jars on the classpath, required conf set, off-heap memory).\n  2. Expose Gluten/Velox-specific configuration knobs as CLI options.\n  3. Capture native-execution metadata (backend = Velox vs. JVM fallback)\n     in platform info and query plans.\n  4. Reuse all Spark load/query/tuning plumbing already proven on\n     LakeSail and Apache Spark adapters.\n\nReference performance: TPC-H ~3.3x overall / up to ~23x on individual\nqueries, TPC-DS ~3x overall / up to ~13.7x on individual queries (Gluten\ncommunity numbers, March 2024). This makes Velox a natural fit next to\nLakeSail, Photon-backed Databricks, and Fabric native acceleration in\nBenchBox's \"accelerated Spark\" tier.\n\nUpstream references:\n  - https://gluten.apache.org/\n  - https://github.com/apache/gluten (ASF Top-Level Project since Feb 2026)\n  - https://velox-lib.io/\n  - https://apache.github.io/incubator-gluten/get-started/Velox.html",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "attempt a native macOS / Darwin build of Gluten or Velox as part of this work",
+        "instead": "direct macOS/Windows developers to the Docker workflow in docker/velox/ instead.",
+        "item_id": "velox-gluten-spark-adapter",
+        "why": "upstream does not support or test this path (see apache/incubator-gluten #5006, #5491) and any local success would diverge from published benchmark numbers"
+      },
+      {
+        "dont": "auto-download the Gluten bundle jar inside the adapter",
+        "instead": "require the user to supply `gluten_jar_path` (or pre-stage via an explicit, documented CLI command).",
+        "item_id": "velox-gluten-spark-adapter",
+        "why": "silent network fetches during benchmark runs are a supply-chain and reproducibility hazard"
+      },
+      {
+        "dont": "edit benchbox/platforms/lakesail.py or benchbox/platforms/spark.py",
+        "instead": "all new code lives in velox.py and the small registration deltas in __init__.py / dependencies.py.",
+        "item_id": "velox-gluten-spark-adapter",
+        "why": "Velox is additive and those adapters must remain byte-identical to avoid regressing existing benchmarks"
+      },
+      {
+        "dont": "have the adapter call out to `docker` / manage container lifecycle",
+        "instead": "treat Docker as user-operated infrastructure (like a Spark cluster), documented in docker/velox/README .md, and have the adapter speak only to an already-running endpoint or in-process SparkSession.",
+        "item_id": "velox-gluten-spark-adapter",
+        "why": "coupling benchmark runs to an implicit Docker daemon hides failure modes and confuses CI"
+      },
+      {
+        "dont": "pin pyspark to a version outside the Gluten-supported set (3.2.2 / 3.3.1 / 3.4.4 / 3.5.5 as of 1.4.x)",
+        "instead": "expose `gluten_version` and validate pyspark version matches on session creation.",
+        "item_id": "velox-gluten-spark-adapter",
+        "why": "the native bundle is ABI-coupled to the Spark minor version"
+      },
+      {
+        "dont": "require Velox jar for unit tests",
+        "instead": "mock SparkSession and gate live integration tests behind the `live_integration` + Linux markers.",
+        "item_id": "velox-gluten-spark-adapter",
+        "why": "CI runners don't have the ~150MB native bundle and may not be Linux"
+      },
+      {
+        "dont": "run the Docker image under Rosetta or qemu emulation when the host arch differs from the image arch",
+        "instead": "ship multi-arch images (linux/amd64 + linux/arm64) via docker buildx and fail fast with a clear warning if the adapter detects emulation at session startup.",
+        "item_id": "velox-gluten-spark-adapter",
+        "why": "emulated SIMD / off-heap allocation destroys timing fidelity (this is the whole point of Velox)"
+      },
+      {
+        "dont": "silently omit spark.shuffle.manager=ColumnarShuffleManager",
+        "instead": "fail fast with a clear error if the user overrides it to a non-columnar value while deployment=local.",
+        "item_id": "velox-gluten-spark-adapter",
+        "why": "forgetting it forfeits most of the Velox shuffle speedup and produces misleading benchmark numbers"
+      },
+      {
+        "dont": "subclass LakeSailAdapter or SparkAdapter",
+        "instead": "create a new VeloxAdapter that reuses the Spark mixins directly, following the LakeSail file as a structural template.",
+        "item_id": "velox-gluten-spark-adapter",
+        "why": "Velox is a distinct deployment shape with required conf that would leak into those adapters if inherited"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "velox-gluten-spark-adapter",
+        "id": 600,
+        "reason": "Would require editing SparkQueryExecutionMixin (violates scope_limit) or adding a new mixin; valuable for honest benchmarking but not blocking v1. Split into its own TODO after v1 lands and we see how often users hit fallback in practice.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Fallback-operator counter split into its own TODO only if v1 usage shows frequent fallback hits; no such usage evidence, not yet tracked.",
+        "summary": "SparkListener-based fallback-operator counter attached to per-query metadata in BenchmarkResults"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "velox-gluten-spark-adapter",
+        "id": 601,
+        "reason": "Track NVIDIA/Velox cuDF GA before committing to a GPU adapter; keep CPU Velox as baseline first.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly gated on NVIDIA/Velox cuDF reaching GA; no evidence that has happened, and remove-or-integrate-legacy-cudf-platform-module (open) is a different, unrelated cleanup.",
+        "summary": "GPU variant (Velox + NVIDIA cuDF) as separate 'velox-gpu' adapter"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "velox-gluten-spark-adapter",
+        "id": 602,
+        "reason": "Config hooks only, no lifecycle management in v1. Spin out per-provider items if user demand appears.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Managed Spark integrations (EMR/Dataproc/Fabric) explicitly conditioned on user demand appearing; no evidence of that.",
+        "summary": "Managed Spark integrations (EMR, Dataproc, Fabric native execution)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "velox-gluten-spark-adapter",
+        "id": 603,
+        "reason": "Supply-chain and reproducibility risk - document the Apache mirror URL + checksum instead; add only if users ask.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly 'add only if users ask'; no evidence of user demand for automatic Velox jar provisioning.",
+        "summary": "Automatic jar provisioning CLI (`benchbox fetch-velox-jar`)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "velox-gluten-spark-adapter",
+        "id": 604,
+        "reason": "Prebuilt aarch64 bundle jars exist but we have no aarch64 CI runners today; add when infra is available.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Arm64 CI matrix entry explicitly gated on aarch64 CI runner availability, which the reason states does not exist today.",
+        "summary": "Arm64 live CI matrix entry"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "velox-gluten-spark-adapter",
+        "id": 605,
+        "reason": "Gluten supports these formats but each needs its own validation pass; separate from core adapter work.",
+        "resolution": "promoted",
+        "resolved_item": "iceberg-hudi-delta-read-acceleration-coverage",
+        "resolved_reason": null,
+        "summary": "Iceberg / Hudi / Delta read acceleration coverage"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-04-26T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform unit tests pass: uv run -- python -m pytest tests/unit/platforms/ -q",
+        "item_id": "velox-gluten-spark-adapter"
+      },
+      {
+        "behavior": "Existing LakeSail adapter (benchbox/platforms/lakesail.py) behavior unchanged - Velox adapter must be a new file, not a subclass modifying LakeSail",
+        "item_id": "velox-gluten-spark-adapter"
+      },
+      {
+        "behavior": "Existing Spark adapter (benchbox/platforms/spark.py) behavior unchanged when Velox jar / plugin not configured",
+        "item_id": "velox-gluten-spark-adapter"
+      },
+      {
+        "behavior": "Platform registry autodiscovery still loads every existing platform after Velox is added",
+        "item_id": "velox-gluten-spark-adapter"
+      },
+      {
+        "behavior": "SparkDataLoadMixin and SparkQueryExecutionMixin contracts preserved - Velox adapter consumes them, does not edit them",
+        "item_id": "velox-gluten-spark-adapter"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/cloud_spark.py"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/spark_execution_mixin.py"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/lakesail.py"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/spark.py"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py         # registration lines only"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/adapter_factory.py  # dispatch entry only"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/velox.py"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/dependencies.py         # new DependencyInfo entry only"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "docker/velox/Dockerfile"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "docker/velox/README.md"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "docker/velox/docker-compose.yml"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "docker/velox/entrypoint.sh"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/index.md"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/velox.md"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/velox_docker_dev.md"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/velox_jar_setup.md"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml                          # new optional-dependency group only"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/test_velox_live.py"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_velox_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.velox import VeloxAdapter; print('import OK')\"",
+        "description": "Adapter module imports cleanly without Gluten jar present",
+        "expected": "import OK",
+        "item_id": "velox-gluten-spark-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms import list_available_platforms; assert 'velox' in list_available_platforms(); print('registered')\"",
+        "description": "Platform registry exposes 'velox' via list_available_platforms()",
+        "expected": "registered",
+        "item_id": "velox-gluten-spark-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.adapter_factory import get_adapter_class; cls = get_adapter_class('velox'); assert cls.__name__ == 'VeloxAdapter'; print('dispatch OK')\"",
+        "description": "adapter_factory dispatches 'velox' to VeloxAdapter class",
+        "expected": "dispatch OK",
+        "item_id": "velox-gluten-spark-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_velox_adapter.py -q",
+        "description": "Unit tests for new adapter pass (mocked SparkSession)",
+        "expected": "exit code 0",
+        "item_id": "velox-gluten-spark-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -q",
+        "description": "All existing platform unit tests still pass (exit 0)",
+        "expected": "exit code 0",
+        "item_id": "velox-gluten-spark-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_lakesail.py tests/unit/platforms/test_spark_adapter.py -q",
+        "description": "LakeSail and Spark adapter tests specifically unaffected",
+        "expected": "exit code 0",
+        "item_id": "velox-gluten-spark-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.utils.dependencies import DEPENDENCIES; assert 'velox' in DEPENDENCIES; print('dep OK')\"",
+        "description": "Dependency introspection reports velox extra",
+        "expected": "dep OK",
+        "item_id": "velox-gluten-spark-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox/platforms/velox.py && uv run ty check benchbox/platforms/velox.py",
+        "description": "Lint + typecheck clean on new file",
+        "expected": "exit code 0",
+        "item_id": "velox-gluten-spark-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "docker buildx build --platform linux/amd64,linux/arm64 -f docker/velox/Dockerfile -t benchbox-velox:test .",
+        "description": "Docker image builds cleanly on both architectures",
+        "expected": "exit code 0 for both platforms",
+        "item_id": "velox-gluten-spark-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd docker/velox && docker compose up -d velox-connect && timeout 60 bash -c 'until nc -z localhost 50051; do sleep 1; done' && docker compose down",
+        "description": "Docker-compose 'velox-connect' service starts and accepts Spark-Connect on :50051",
+        "expected": "exit code 0 (port 50051 reachable within 60s)",
+        "item_id": "velox-gluten-spark-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 10,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "docker run --rm benchbox-velox:test python -m pytest tests/integration/platforms/test_velox_live.py::test_tpch_q1_velox_active -m live_integration -q",
+        "description": "Live smoke (runs INSIDE the Docker image; gated by live_integration marker): TPC-H Q1 at SF 0.01 reports velox_active=True",
+        "expected": "exit code 0 (test asserts platform_info['velox_active'] is True and row count matches TPC-H Q1 expected)",
+        "item_id": "velox-gluten-spark-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 11,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w7",
+        "wid": "w11"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w5",
+        "wid": "w12"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w6",
+        "wid": "w12"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w11",
+        "wid": "w13"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w8",
+        "wid": "w13"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w9",
+        "wid": "w13"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w1",
+        "wid": "w14"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w7",
+        "wid": "w14"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w14",
+        "wid": "w15"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w15",
+        "wid": "w16"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w12",
+        "wid": "w17"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w13",
+        "wid": "w17"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w15",
+        "wid": "w17"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w7",
+        "wid": "w18"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w16",
+        "wid": "w19"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w18",
+        "wid": "w20"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w19",
+        "wid": "w20"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w12",
+        "wid": "w21"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w13",
+        "wid": "w21"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w14",
+        "wid": "w21"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w18",
+        "wid": "w21"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w19",
+        "wid": "w21"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "velox-gluten-spark-adapter",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": "Output: a one-pager in docs/platforms/velox_jar_setup.md with exact\njar URLs (both arches), sha256 sums, Spark/Java/OS compatibility\nmatrix, and the base image tag. This is prerequisite for every\nfollowing unit because it pins the test + Docker matrix.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research spike - pin Gluten 1.4.x + Spark 3.5.x + base Docker image, document jar URLs + sha256 for linux_amd64 and linux_arm64",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add CLI arguments (add_cli_arguments) for --velox-deployment, --velox-endpoint, --velox-jar, --velox-version, --offheap-size, reuse Spark args where possible",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement SparkTuningMixin wiring (supports_tuning_type, generate_tuning_clause, apply_unified_tuning) - copy LakeSail, partitioning + sorting only",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": "Model on tests/unit/platforms/test_lakesail.py. Must run without\npyspark installed (gated import, mock at module level).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit tests: config building, dependency check failure path, endpoint parsing, local vs remote dispatch (mocked SparkSession)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit tests: velox_active probe parsing, get_query_plan fallback annotation, SparkTuningMixin behavior",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": "Build with: docker buildx build --platform linux/amd64,linux/arm64\nValidate on Apple Silicon (arm64) and Intel/CI (amd64) separately\nbefore the full matrix.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Author docker/velox/Dockerfile - multi-arch (linux/amd64 + linux/arm64) FROM apache/spark:3.5.2, bundle jar via ARG TARGETARCH, install benchbox[velox]",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Author docker/velox/entrypoint.sh + docker-compose.yml with two services: velox-connect (:50051) and velox-runner (one-shot benchbox run)",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Author docker/velox/README.md - service selection, buildx arch, --memory limits, jar placement, troubleshooting",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": "Must be runnable via `docker run benchbox-velox:test pytest …`.\nSkipped outside the image; mark with `requires_docker` fixture.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Live integration test (live_integration marker): TPC-H Q1+Q6 at SF 0.01 inside the Docker image, asserts velox_active=True",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Author docs/platforms/velox.md - overview, when to choose Velox over Spark/LakeSail, config examples, known caveats; link prominently to velox_docker_dev.md",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Author docs/platforms/velox_docker_dev.md - Docker dev workflow: prereqs, buildx, compose recipes, arch selection, memory sizing, CI integration, troubleshooting",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": "Pure skeleton - no session logic yet. Goal: module imports cleanly\nwith pyspark missing, same try/except shape as LakeSail.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Scaffold VeloxAdapter skeleton in benchbox/platforms/velox.py by copying LakeSail structure - class, __init__, from_config, platform_name, get_target_dialect",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docs/platforms/index.md and platform matrix to list Velox under accelerated-Spark tier, with explicit 'Linux/Docker only' note",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full smoke: uv run -- python -m pytest -m fast -q and new unit tests; build both-arch Docker images; fix any drift",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": "Single work unit because the four edits are trivial individually\nand must land together for the adapter to be reachable. Commit\nas one change. The pyproject extra pins pyspark to a\nGluten-supported version (3.2.2 / 3.3.1 / 3.4.4 / 3.5.5).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register adapter across four wiring points - platforms/__init__.py, adapter_factory.py, utils/dependencies.py DependencyInfo, pyproject.toml 'velox' extra",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add _build_velox_config + PlatformHookRegistry.register_config_builder('velox', ...) at the bottom of velox.py, mirroring _build_lakesail_config",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": "Mirror benchbox/platforms/spark.py for builder construction; add\nGluten-specific conf.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement local-mode _create_spark_session - SparkSession.builder with required Gluten conf, jar classpath, off-heap, ColumnarShuffleManager; validate gluten_jar_path exists with clear error",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement remote-mode _create_spark_session and _ensure_server_ready (endpoint parse, socket probe) - mirror LakeSail but do NOT auto-start a server",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire in SparkDataLoadMixin and SparkQueryExecutionMixin by implementing load_data, execute_query, create_schema, close_connection - all thin delegates, same as LakeSail",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement get_platform_info including a 'velox_active' probe via EXPLAIN on SELECT 1 looking for VeloxColumnar plan nodes",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "velox-gluten-spark-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement get_query_plan using EXPLAIN EXTENDED and annotate whether each query is fully native or contains fallback nodes",
+        "wid": "w9"
+      }
+    ]
+  }
+}

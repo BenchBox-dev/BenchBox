@@ -1,0 +1,131 @@
+{
+  "description": "_parse_work_flag (_project/scripts/todo_db.py ~4603) parses WID:SUMMARY[:needs=w1,w2] as:\n\n    parts = spec.split(':', 2)\n    if len(parts) == 3 and parts[2].startswith('needs='):\n        needs = ...\n    work.append({'id': parts[0], 'summary': parts[1], 'needs': needs})\n\nWhen SUMMARY itself contains a colon, split(':', 2) puts the tail in parts[2]. That tail does not start with 'needs=', so the needs branch is skipped, parts[2] is DISCARDED, and the summary is silently truncated at the first colon. Any needs= clause that followed is lost with it. No error, no warning, exit 0.\n\nObserved live while filing worktree-release-force-does-not-force-past-dirty-tree-20260806:\n\n  --add-work 'w2:Regression coverage: a dirty pool slot releases and resets under FORCE=1:needs=w1'\n  stored -> summary 'Regression coverage', needs []\n\nTwo units of information were destroyed by one flag: most of the summary, and the w1 dependency that would have ordered the unit. The item looked fine in the create output; the loss is only visible on a later show.\n\nINCONSISTENT WITH ITS SIBLINGS\n- _parse_work_edits (~2206), backing --edit-work, uses split(':', 1) and therefore PRESERVES colons in the summary. So the same text survives --edit-work but is truncated by --work/--add-work. That is why repairing the unit above worked.\n- _parse_verify_flag (~4616) uses '::' as its field separator, which is the right shape for free text and should be the model to copy.\n\nFIX OPTIONS (a is the minimum, b is the ergonomic one)\na. Fail loudly. If len(parts) == 3 and parts[2] does not start with 'needs=', raise TodoError instead of discarding. Backward compatible, converts silent data loss into a visible error.\nb. Parse the needs clause off the END rather than by position. Detect a trailing ':needs=...' suffix and treat everything before it as the summary. Makes colons in summaries just work, matching --edit-work.\nc. Consider accepting '::' as the needs separator for symmetry with --verify, keeping ':needs=' as a deprecated alias.\n\nAlso note there is no --drop-work, so a unit added with a mangled summary can only be repaired via --edit-work (summary only). A lost needs= clause cannot be restored at all without recreating the item.\n\nScope note: this is a tracker CLI defect and touches no benchmark code.",
+  "legacy": {
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-09T12:49:49Z",
+      "completed_pr": 1646,
+      "created_at": "2026-08-07T02:00:20Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "--edit-work keeps preserving colons in summaries",
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806"
+      },
+      {
+        "behavior": "Well-formed WID-SUMMARY and WID-SUMMARY-needs specs keep their current parse and stored result",
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/green_unmerged_sweep.py"
+      },
+      {
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/required_lane.py"
+      },
+      {
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/soundness_drain_report.py"
+      },
+      {
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -k 'todo and work' -q",
+        "description": "Work-flag parsing tests pass",
+        "expected": "exit 0",
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "last_result": "pass",
+        "last_run": "2026-08-09T12:46:30Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -k todo -q",
+        "description": "Tracker unit tests pass",
+        "expected": "exit 0",
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "last_result": "pass",
+        "last_run": "2026-08-09T12:47:22Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1646 _parse_work_flag: split(:,1)+rsplit(:needs=) preserves colons, raises on stray trailer",
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "notes": null,
+        "started_at": "2026-08-09T12:42:57Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Stop discarding a non-needs third field - raise instead of silently dropping it",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1646 _parse_work_flag: rsplit needs clause off end so colons in summaries survive",
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "notes": null,
+        "started_at": "2026-08-09T12:43:02Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Parse the needs clause off the end so colons in summaries survive",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1646 verified w/ todo_db unit tests - colon summaries with/without needs",
+        "item_id": "todo-work-flag-silently-truncates-summaries-at-colons-20260806",
+        "notes": null,
+        "started_at": "2026-08-09T12:43:08Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Unit tests for colon-bearing summaries with and without a trailing needs clause",
+        "wid": "w2"
+      }
+    ]
+  }
+}

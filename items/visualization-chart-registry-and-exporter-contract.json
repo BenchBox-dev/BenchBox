@@ -1,0 +1,367 @@
+{
+  "context": "Start with failing drift tests, then choose the smallest registry\nconsolidation that makes those tests meaningful. Treat raw textcharts\nprimitives and BenchBox semantic result-aware charts as different layers.\nKeep public/exported APIs compatible unless the contract map explicitly\nauthorizes deprecation.\n",
+  "description": "Independent verification of the visualization architecture review confirmed\nthat BenchBox has too many chart-type registration surfaces for one semantic\nchart addition. The local review at SHA a63ae1a76 found:\n\n  - `benchbox/core/visualization/chart_types.py` declares 16 semantic chart\n    specs and calls itself canonical.\n  - `benchbox/core/visualization/ascii_runtime.py` has a separate 16-entry\n    `_CHART_TYPE_DISPATCH` map that is the renderer path users actually hit.\n  - `benchbox/core/visualization/exporters.py` has a separate 15-entry\n    `_CHART_BUILDERS` map and already omits `power_bar`.\n  - `benchbox/core/visualization/templates.py`, MCP suggestions, CLI help,\n    MCP help/docstrings, discovery metadata, and Results Explorer registry\n    files each carry chart-type knowledge.\n  - The current registry test pins only CLI/MCP descriptions and templates\n    against `ALL_CHART_TYPES`; it does not pin runtime dispatch, exporter\n    builders, MCP suggestions, discovery metadata, or Explorer parity.\n\nThis TODO defines the chart-type contract and then collapses or guards the\ndrift-prone registries. The first implementation target is not a broad\nvisualization rewrite: it is a durable add-one-chart workflow with tests that\nfail when a registered chart cannot render or cannot be discovered.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add another hand-maintained chart-type list to solve this.",
+        "instead": "(not specified)",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "delete `render_ascii_chart` only because in-repo production callers are absent; it is a lazy export.",
+        "instead": "(not specified)",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "derive BenchBox semantic chart IDs directly from textcharts primitive IDs without preserving names such as `performance_bar`, `query_heatmap`, and `power_bar`.",
+        "instead": "(not specified)",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make `chart_types.py` claim to be canonical if runtime dispatch can still drift silently.",
+        "instead": "(not specified)",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "visualization-chart-registry-and-exporter-contract",
+        "id": 513,
+        "reason": "Renderer classes already live in textcharts; this TODO addresses BenchBox's registration and result-aware contract layer.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason clarifies renderer classes already live in textcharts; this TODO's registration/contract layer is the correct scope, not a rewrite.",
+        "summary": "Rewrite all ASCII renderer implementations"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "visualization-chart-registry-and-exporter-contract",
+        "id": 514,
+        "reason": "Explorer has its own browser rendering surface; this TODO aligns IDs/contracts rather than replacing UI components with ASCII renderers.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly rejects the action: Explorer keeps its own browser rendering surface; parent item aligns IDs/contracts rather than removing UI components.",
+        "summary": "Remove Results Explorer chart components"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "visualization-chart-registry-and-exporter-contract",
+        "id": 515,
+        "reason": "It is exported through `benchbox.core.visualization`; deletion needs a public-contract decision or compatibility window.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: docs/reference/public-contracts.md documents benchbox.core.visualization.render_ascii_chart as an intentionally-retained beta-public compat renderer with a promotion rule. The chart-registry item (DONE) chose to keep it, superseding 'delete immediately'.",
+        "summary": "Delete `render_ascii_chart` immediately"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      }
+    ],
+    "item_meta": {
+      "category": "Visualization",
+      "completed_at": "2026-05-21T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing chart IDs remain accepted by CLI and MCP unless a public-contract deprecation is documented.",
+        "item_id": "visualization-chart-registry-and-exporter-contract"
+      },
+      {
+        "behavior": "Do not weaken current template validation.",
+        "item_id": "visualization-chart-registry-and-exporter-contract"
+      },
+      {
+        "behavior": "Results Explorer chart ID parity stays synchronized with Python semantic chart IDs.",
+        "item_id": "visualization-chart-registry-and-exporter-contract"
+      },
+      {
+        "behavior": "Textcharts renderer imports remain lazy enough that command registration does not eagerly import heavy chart dependencies.",
+        "item_id": "visualization-chart-registry-and-exporter-contract"
+      },
+      {
+        "behavior": "`power_bar` remains renderable from result-aware paths and remains included in templates that already reference it.",
+        "item_id": "visualization-chart-registry-and-exporter-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/visualization/ascii_runtime.py: runtime result-aware render dispatch - must be covered by the contract.",
+        "decision": "reuse",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "path": "benchbox/core/visualization/ascii_runtime.py"
+      },
+      {
+        "concept": "benchbox/core/visualization/chart_types.py: current semantic chart metadata source - reuse or supersede deliberately.",
+        "decision": "supersede",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "path": "benchbox/core/visualization/chart_types.py"
+      },
+      {
+        "concept": "benchbox/core/visualization/exporters.py: public data-first ASCII exporter - preserve, deprecate, or document partial coverage.",
+        "decision": "reuse",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "path": "benchbox/core/visualization/exporters.py"
+      },
+      {
+        "concept": "benchbox/core/visualization/templates.py: chart bundles - keep validated against the registry.",
+        "decision": "reuse",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "path": "benchbox/core/visualization/templates.py"
+      },
+      {
+        "concept": "benchbox/mcp/tools/discovery.py: MCP discovery metadata - decide whether partial chart lists are acceptable.",
+        "decision": "reuse",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "path": "benchbox/mcp/tools/discovery.py"
+      },
+      {
+        "concept": "docs/reference/public-contracts.md: contract tier map - update for exported visualization APIs.",
+        "decision": "reuse",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "path": "docs/reference/public-contracts.md"
+      },
+      {
+        "concept": "results-explorer/src/lib/chartRegistry.ts: browser chart registry - align ID parity without replacing UI components.",
+        "decision": "reuse",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "path": "results-explorer/src/lib/chartRegistry.ts"
+      },
+      {
+        "concept": "textcharts.commands.registry.REGISTRY: external raw primitive registry - do not confuse primitive IDs with BenchBox semantic chart IDs.",
+        "decision": "reuse",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "path": "textcharts.commands.registry.REGISTRY"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark execution or platform adapter code"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "do_not_modify",
+        "path_glob": "result JSON schema fields unrelated to visualization"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "do_not_modify",
+        "path_glob": "textcharts package source under .venv/"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/visualize.py"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/discovery.py"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/visualization.py"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/chartRegistry.meta.test.ts"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/chartRegistry.parity.test.ts"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartRegistry.ts"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/visualization/"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/test_chart_type_registry.py tests/unit/core/visualization/test_chart_generator.py tests/unit/core/visualization/test_visualization_exporters.py -q",
+        "description": "Visualization registry parity tests pass.",
+        "expected": "Registry, chart generator, and exporter compatibility tests pass with no chart-type drift.",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run src/__tests__/chartRegistry.meta.test.ts src/__tests__/chartRegistry.parity.test.ts",
+        "description": "Results Explorer chart registry parity tests pass.",
+        "expected": "Explorer chart IDs match the Python semantic registry.",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python - <<'PY'\nfrom benchbox.core.visualization.chart_types import ALL_CHART_TYPES\nfrom benchbox.core.visualization.ascii_runtime import _CHART_TYPE_DISPATCH\nprint(sorted(set(ALL_CHART_TYPES) - set(_CHART_TYPE_DISPATCH)))\nprint(sorted(set(_CHART_TYPE_DISPATCH) - set(ALL_CHART_TYPES)))\nPY",
+        "description": "Current registry runtime check has no unapproved drift.",
+        "expected": "Both printed lists are empty.",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph remains valid after implementation.",
+        "expected": "TODO validation and graph checks pass.",
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "notes": "Before editing, rerun the evidence on the implementation branch and\nrecord checked SHA, textcharts version, registry counts, and mismatches in\nthe PR body or TODO completion notes. Do not commit raw stdout.\n\nRequired checks:\n  - `uv run -- python - <<'PY'` snippet that imports\n    `ALL_CHART_TYPES`, `CHART_TYPE_SPECS`,\n    `ascii_runtime._CHART_TYPE_DISPATCH`, `exporters._CHART_BUILDERS`,\n    `textcharts.commands.registry.REGISTRY`, and\n    `importlib.metadata.version(\"textcharts\")`; print counts and\n    set differences.\n  - `rg -n \"_CHART_TYPE_DISPATCH|_CHART_BUILDERS|_build_chart_suggestions|CHART_TYPE_DESCRIPTIONS|SUPPORTED_CHART_TYPES|ALL_CHART_IDS|chartRegistry|performance_bar|power_bar\" benchbox results-explorer tests --glob '*.py' --glob '*.ts' --glob '*.tsx' --glob '!build/**' --glob '!docs/_build/**' --glob '!.venv/**'`.\n  - Inspect `benchbox/mcp/tools/discovery.py` for chart-type metadata\n    separate from the visualization MCP tool.\n  - Inspect `tests/unit/visualization/test_chart_type_registry.py`,\n    `tests/unit/core/visualization/test_chart_generator.py`,\n    `results-explorer/src/__tests__/chartRegistry.meta.test.ts`, and\n    `results-explorer/src/__tests__/chartRegistry.parity.test.ts`.\n\nDecision gate: if current `origin/develop` already fixed any listed drift,\nupdate the implementation scope to preserve the new source of truth rather\nthan reintroducing an older registry shape.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate chart registries, textcharts version, and drift surfaces against the current branch",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "notes": "Add or update tests so CI fails when:\n  - `set(ascii_runtime._CHART_TYPE_DISPATCH) != set(ALL_CHART_TYPES)`;\n  - templates reference an unregistered chart;\n  - MCP chart descriptions are missing any registered chart;\n  - Results Explorer `ALL_CHART_IDS` diverges from the Python registry;\n  - discovery metadata claims a stale chart subset without documenting it\n    as intentionally partial.\n\nThe test should distinguish required coverage from intentionally partial\nsurfaces. For example, discovery metadata may be allowed to expose a short\n\"common chart types\" list only if the code names it as partial and links\nto the full registry.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the semantic chart-type contract and add registry parity tests for renderer-critical maps",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "notes": "Decide whether `chart_types.py` stays canonical with handler metadata\nattached elsewhere, or whether `_CHART_TYPE_DISPATCH` becomes canonical\nand derives `ALL_CHART_TYPES` and descriptions.\n\nAcceptable outcomes:\n  - One registry object owns chart ID, description, `requires_two_results`,\n    runtime render handler, and optional feature flags; or\n  - A narrower first step keeps `chart_types.py` as metadata source but\n    adds non-bypassable parity tests and removes misleading \"canonical\"\n    language from any map that is not complete.\n\nDecision gate: adding a new result-aware semantic chart must require one\nprimary registry edit plus targeted renderer/suggestion implementation,\nnot hand-editing disconnected type lists.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose and implement one source of truth for semantic chart specs and runtime render handlers",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "notes": "Treat `benchbox.core.visualization.render_ascii_chart` as a public or\nbeta-public compatibility surface until the public-contract map says\notherwise. Choose one path:\n  - Keep it and fold `_CHART_BUILDERS` into the shared registry or a\n    documented primitive-builder registry, including a deliberate answer\n    for `power_bar`; or\n  - Deprecate it with docs/tests and leave a compatibility window; or\n  - Delete it only after maintainer confirmation that external embedder\n    and notebook use is not a supported contract.\n\nIf kept, add tests that explain why it may have fewer entries than\nresult-aware `ALL_CHART_TYPES` if `power_bar` cannot be data-first.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve the public `render_ascii_chart` exporter gap without silently breaking external callers",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "notes": "Reconcile `results-explorer/src/lib/chartRegistry.ts`,\n`results-explorer/src/__tests__/chartRegistry.meta.test.ts`,\n`results-explorer/src/components/ChartPanel.tsx`, and\n`benchbox/mcp/tools/discovery.py` with the selected source-of-truth\ncontract.\n\nReplace brittle count-only checks such as \"expected 16 chart types\" with\nchecks that name missing and extra IDs. Count checks may remain only as a\nquick smoke signal after the bidirectional set comparison exists.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update Explorer, discovery metadata, and chart-count guards to follow the chosen contract",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-chart-registry-and-exporter-contract",
+        "notes": "Add concise documentation near the registry or in\n`docs/reference/public-contracts.md` explaining:\n  - semantic result-aware chart IDs vs raw textcharts primitive IDs;\n  - which chart IDs are public CLI/MCP/Explorer contracts;\n  - what files/tests must change for a new chart type;\n  - whether `render_ascii_chart` is supported, deprecated, or internal;\n  - how textcharts dependency updates are validated.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the add-one-chart workflow and public compatibility boundary",
+        "wid": "w5"
+      }
+    ]
+  }
+}

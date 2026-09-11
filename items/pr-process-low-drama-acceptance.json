@@ -1,0 +1,294 @@
+{
+  "description": "Own the final outcome across readiness, continuation, reproducibility, attribution, local validation, native queue integration and the amended measurement/review items. Prior art is session 01a07292, existing event_fanout_v1 metrics and the four 2026-04-30 queue blind spots (global-test-lock CPU protection, single-point failure, dwell contract, post-merge safety tension). These concerns are rehomed here without reviving the rejected steward or rewriting historical evidence. Passing component tests is not proof the process is low drama.\n\nORDERING CORRECTION: the earlier w0 note about freezing before implementation is fulfilled by ci-baseline-representative-remeasure-sample/w0, which owns _project/analysis/pr-process-acceptance-baseline.json and precedes implementation. This item's w0 only validates and consumes that immutable preregistration. Do not select thresholds or redefine scenarios after seeing results. The final acceptance validator must bind the preregistration digest and registration commit/time, verify it precedes dependent implementation, and reject changed criteria or unreported cohort changes.\n\nFEATURE-BATCH ACCEPTANCE: consume the prerequisite feature-level criteria without rewriting them. Include at least two legitimate cohesive batch deliveries within the existing prospective 10-PR/7-day cohort, each with multiple members, and at least one explicit internal implementation dependency; preserve all original cohort strata and safety/efficiency targets. If suitable work has not occurred, evidence remains insufficient. Exercise wrong start revision, A-prepared/B-dependent, external dependency blocked, lost receipt after merge, conflicting member edit, abandoned batch, late member after readiness, dirty concurrent writer, draft push CI and partial closeout. Assert one final develop PR per declared delivery, no feature-base PRs, no lost or falsely completed member. Report feature-start-to-land and total effort including assembly; compare equivalent delivered outcomes, not raw PR count. Validate installed skill/runtime/source parity, live scenario evidence and retained operator steps in the existing final acceptance manifest.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Treat a snapshot, a queued review, a skipped hook or an unbound passing check as completion",
+        "instead": "Bind actual evidence to the relevant PR/head/input and retain an explicit owned next action",
+        "item_id": "pr-process-low-drama-acceptance",
+        "why": "The observed session repeatedly lost asynchronous work or overstated evidence"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_item": "batch-skill-pinned-rollout"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_item": "ci-baseline-representative-remeasure-sample"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_item": "develop-pr-concurrency-discards-nearly-complete-gates"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_item": "exact-refresh-eligibility-penalises-staying-current"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_item": "native-queue-local-landing"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_item": "post-merge-attribution-recovery"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_item": "pr-followup-resumable-ownership"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_item": "pr-local-validation-singleflight"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_item": "pr-revision-readiness-transaction"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_item": "publication-ledger-reproducible-inputs"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_item": "review-remediations-verify-per-instance"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_item": "skill-integrity-ci-lane-live-validation"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-09-08T02:40:55Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "KEEP_IDLE and SHADOW_ONLY remain in force for skip/shard/demotion/reduced-refresh proposals; this plan does not activate them.",
+        "item_id": "pr-process-low-drama-acceptance"
+      },
+      {
+        "behavior": "Keep GitHub native merge queue as the only merger; no privileged steward, bypass actor, direct protected-branch push, or new bot credential.",
+        "item_id": "pr-process-low-drama-acceptance"
+      },
+      {
+        "behavior": "Preserve required PR, merge_group, and post-merge coverage, soundness maintainer review, explicit user authority, and durable hold labels.",
+        "item_id": "pr-process-low-drama-acceptance"
+      },
+      {
+        "behavior": "The prerequisite baseline owns preregistration; final acceptance cannot rewrite criteria or mask missing evidence after observing results.",
+        "item_id": "pr-process-low-drama-acceptance"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "pr-process-low-drama-acceptance",
+        "path": "_project/blind-spots/2026-04-30-114723-queue-dwell-contract.md"
+      },
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "pr-process-low-drama-acceptance",
+        "path": "_project/scripts/dev_loop_pr_metrics.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "kind": "do_not_modify",
+        "path_glob": ".agents/skills/**"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "kind": "do_not_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/pr-process-acceptance.json"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/pr-process-acceptance.md"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/dev_loop_pr_metrics.py"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/review-protocol.md"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/dev-loop-worktrees.md"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/worktree/test_pr_process.py"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_dev_loop_pr_metrics.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/integration/worktree/test_pr_process.py tests/unit/scripts/test_dev_loop_pr_metrics.py -q",
+        "description": "Incident replays exercise the whole PR workflow",
+        "expected": "exit 0; behavioral negative controls fail on the prior implementation",
+        "item_id": "pr-process-low-drama-acceptance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-process-acceptance _project/analysis/pr-process-acceptance.json",
+        "description": "Final integrated acceptance manifest meets safety, cohort and efficiency criteria",
+        "expected": "exit 0 only when the prospective cohort, incident controls, complete evidence and stated efficiency targets pass; otherwise remain incomplete",
+        "item_id": "pr-process-low-drama-acceptance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_wid": "w6",
+        "wid": "w2"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "pr-process-low-drama-acceptance",
+        "needs_wid": "w1",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "pr-process-low-drama-acceptance",
+        "notes": "Freeze the incident replay manifest and acceptance dimensions before implementation measurement. Cover #2051 integrated ranking/browser failure, #2055/#2056 queued revision, #2076 late-fix merge, #2071/#2073 identity confusion, both bad reverts, test-lock contention, pending review at turn end, and external-ref movement. Record coverage rather than claiming every future bug can be prevented.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Validate and consume the prerequisite incident manifest and acceptance thresholds",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-process-low-drama-acceptance",
+        "notes": "Run isolated end-to-end scenarios using actual existing commands with fake GitHub/event inputs: two writers, new comment before push, restart after push before reply, superseded head, protected review hold, base advance, genuine merge conflict, transient job failure, missing evidence and substantive post-merge regression. Require zero wrong-PR mutations, stranded authorized commits, omitted required checks, duplicate actions or falsely clean outcomes.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replay the full workflow including competing writers and asynchronous events",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-process-low-drama-acceptance",
+        "notes": "Observe a fixed prospective cohort of at least 10 legitimate PRs over at least 7 days, including product, content/skill, concurrent/base-movement and review-remediation cases; missing strata keep acceptance insufficient, not fabricated canaries. At least one operator-approved soundness flow must remain held until its real approval. After initial monitoring authorization, zero user repeat/check nudges for supported routine transitions; human decisions are reported separately.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Observe a representative prospective cohort without routine user nudges",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-process-low-drama-acceptance",
+        "notes": "Use the amended existing collector to report user interventions, review rounds, authored/refresh push count, duplicate local invocations, successful/cancelled runner minutes, queue dwell, time-to-merge and post-merge incidents by lane and interarrival stratum. Require at least 50% fewer avoidable refresh/duplicate-validation actions than the incident baseline and no added required-lane failure or measured p95 regression attributable to coordination. Report sample limitations and do not invent elapsed-time savings.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Measure interventions and avoided work without hiding failures or changing input cohorts",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-process-low-drama-acceptance",
+        "notes": "Publish exact merged implementation SHAs, actual gate receipts, incident outcomes, remaining human-owned approvals and rollback commands. All dependencies must be complete with integrated behavior proven; fail or remain pending when any safety counterexample remains or the live cohort is insufficient.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Publish integrated evidence, residual human steps and rollback commands",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-process-low-drama-acceptance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Validate the acceptance manifest mechanically before final closeout",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-process-low-drama-acceptance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replay installed feature-batch behavior before the prospective delivery cohort",
+        "wid": "w6"
+      }
+    ]
+  }
+}

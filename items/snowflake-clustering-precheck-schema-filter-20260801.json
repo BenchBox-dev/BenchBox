@@ -1,0 +1,201 @@
+{
+  "context": "Fix the comparison by parsing BOTH sides through parse_clustering_key (snowflake_introspection.py:52) and comparing normalized column tuples - robust to LINEAR(...) or bare forms, so it does not depend on resolving the tracked live-verification question first. Fix the schema filter by normalizing case to match Snowflake identifier storage (uppercase unquoted) and using a parameterized query or strict identifier validation instead of raw f-string interpolation. Add the doc paragraph on key-vs-physical-clustering semantics. Update the tracked live-verification item's description to list all three dependent sites (via todo update on snowflake-clustering-key-live-verification-20260730).",
+  "description": "From the 2026-07-31 adversarial review. Two adapter-side defects that hang on the same unverified LINEAR(...) question as the tracked item snowflake-clustering-key-live-verification-20260730 - that item currently names only the introspector's defensive parse, so these are additional sites (the tracked item is understated).\n\nDefect 1 (R4): benchbox/platforms/snowflake.py:1726-1728 compares INFORMATION_SCHEMA.TABLES.CLUSTERING_KEY (documented form 'LINEAR(A, B)') against a hand-built bare '(A, B)'. They can never be equal, so the 'already has desired clustering key' branch is dead and every reused-DB run re-issues ALTER TABLE ... CLUSTER BY plus RESUME RECLUSTER (snowflake.py:1730-1741) - Snowflake credit spend and silent re-arming of automatic reclustering on every reuse. Note the re-ALTER currently guarantees the ledger entry that corroboration depends on for reused DBs, so the fix must keep corroboration working (see preserves).\n\nDefect 2 (SF1): snowflake_introspection.py:89-93 interpolates self._schema raw and case-sensitively into WHERE TABLE_SCHEMA = '{schema}'. Snowflake stores unquoted schemas uppercase, so a lowercase-configured schema returns zero rows -> every cluster intent ABSENT -> tuned Snowflake runs silently never verify. Also a config-controlled SQL-injection surface (a quote in the schema breaks the read; fails closed, still wrong).\n\nRelated smell to note in the same PR (no code change required): applied_verified on Snowflake certifies the clustering KEY in the catalog, not physical clustering - ALTER is metadata-instant, reclustering is async, and the RESUME RECLUSTER failure is swallowed at snowflake.py:1740-1741. Document the asymmetry vs ClickHouse (where CREATE-time keys are the physical layout) in the receipts design note.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not 'fix' the injection surface by escaping quotes into the f-string",
+        "instead": "parameterize or validate against a strict identifier pattern and uppercase unquoted names",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "why": "escaping is a denylist; identifier handling needs normalization plus parameterization or strict validation"
+      },
+      {
+        "dont": "Do not resolve the comparison by assuming LINEAR(...) is the one true catalog form",
+        "instead": "compare via parse_clustering_key normalization that accepts both forms",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "why": "the live shape is exactly what the tracked open item says is unconfirmed"
+      },
+      {
+        "dont": "Do not skip the ALTER without deciding what the ledger records for an already-clustered reused table",
+        "instead": "make the skip path explicit and tested end-to-end for the reused-DB status outcome",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "why": "the current always-re-ALTER is accidentally what makes reused-DB corroboration possible; silently skipping it changes verification behavior"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-01T15:15:02Z",
+        "from_item": "snowflake-clustering-precheck-schema-filter-20260801",
+        "id": 676,
+        "reason": "The resolved project wrapper does not advertise standalone-only todo update; task requires a deferral instead of hand-editing tracker state.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "The target follow-up item snowflake-clustering-key-live-verification-20260730 already exists, so promotion would create a duplicate; the deferral audit records the two missing dependent sites until a standalone update-capable CLI is available.",
+        "summary": "Refresh snowflake-clustering-key-live-verification-20260730 with adapter precheck and schema-filter dependent sites"
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness",
+      "completed_at": "2026-08-01T15:50:02Z",
+      "completed_pr": 1409,
+      "created_at": "2026-08-01T12:32:46Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Introspector never raises: all failures keep degrading to IntrospectedState(error=...), refusing the upgrade.",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801"
+      },
+      {
+        "behavior": "No live Snowflake calls in tests - unit-level fakes only; live confirmation stays in the tracked item.",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801"
+      },
+      {
+        "behavior": "Reused-DB corroboration keeps working: when the desired clustering key is already present and the ALTER is skipped, the run must still have an honest ledger/receipt story (skipped-as-already-clustered must not silently produce applied_verified without a corroboratable footprint, nor break the fresh-DB path).",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801"
+      },
+      {
+        "behavior": "parse_clustering_key keeps accepting both LINEAR(...) and bare forms until snowflake-clustering-key-live-verification-20260730 confirms the live shape.",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      },
+      {
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/snowflake_introspection.py"
+      },
+      {
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/development/tuning-introspection-receipts.md"
+      },
+      {
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_snowflake_introspection.py tests/unit/platforms -k snowflake -q",
+        "description": "Snowflake introspection + adapter unit tests green",
+        "expected": "all pass including the new pre-check and schema-case tests",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T15:17:24Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.snowflake_introspection import parse_clustering_key as p; assert p('LINEAR(A, B)') == p('(A, B)') == ('a','b')\"",
+        "description": "Both catalog forms normalize identically (guard while live shape unconfirmed)",
+        "expected": "exit 0",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T15:17:26Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite green",
+        "expected": "no regressions",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T15:24:43Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated on develop f4f042883: dead raw LINEAR-vs-bare comparison snowflake.py:1726-1728; precheck and metadata raw schema interpolation 1717-1722 and 1553-1565; RESUME RECLUSTER failure swallowed 1737-1741; introspector raw case-sensitive interpolation snowflake_introspection.py:83-99; parse accepts both forms 49-66; tuning recording path is snowflake.py:1780 through base/tuning_config.py:21-40. No cited premise is stale.",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "notes": "Point-in-time evidence from the 2026-07-31 review: snowflake.py:1726-1741 dead LINEAR-vs-bare comparison and swallowed RESUME RECLUSTER failure; snowflake_introspection.py:89-93 raw case-sensitive schema filter. Confirm each behavior still exists on develop; adjust plan/anchors if the code has moved.",
+        "started_at": "2026-08-01T14:57:46Z",
+        "started_branch": "fix/snowflake-clustering-precheck-schema-filter-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Re-validate cited premises against current develop and refresh file:line anchors before implementing",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added tests for LINEAR-vs-bare skip, explicit dropped-intent evidence, lowercase bound schema/table parameters, and unsafe-schema degradation. Pre-fix focused run: 5 failed, 21 passed, reproducing every required defect.",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "notes": "Add failing unit tests: (a) pre-check comparison with current_clustering='LINEAR(A, B)' and desired (A, B) must be treated as already-clustered (today it re-ALTERs); (b) introspector configured with lowercase schema must still find the uppercase-stored schema's rows (fake connection asserting the emitted query/params); (c) a schema name with a quote must be rejected or parameterized, never interpolated.",
+        "started_at": "2026-08-01T15:08:23Z",
+        "started_branch": "fix/snowflake-clustering-precheck-schema-filter-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Failing unit tests: LINEAR(A, B) vs desired (A, B) must count as already-clustered; lowercase schema must still match; quoted schema rejected or parameterized",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Precheck compares parse_clustering_key(current) to parsed desired tuple. Matching LINEAR/bare keys skip ALTER+RESUME and record an already-present dropped intent; fresh path still records both executed DDL statements. Focused suite 27 passed.",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "notes": "Fix apply_table_tunings pre-check to compare parse_clustering_key(current) against the normalized desired column tuple; make the skip branch's ledger/verification outcome explicit and tested (reused DB, key already present).",
+        "started_at": "2026-08-01T15:10:15Z",
+        "started_branch": "fix/snowflake-clustering-precheck-schema-filter-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Fix pre-check to compare via parse_clustering_key on both sides; make the skip-branch ledger/verification outcome explicit and tested",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Introduced strict unquoted schema normalization and Snowflake-supported %s tuple binding for introspector, clustering precheck, and metadata query. Unsafe schema degrades non-fatally in introspector; focused suite 27 passed.",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "notes": "Fix SnowflakeTuningIntrospector schema scoping: uppercase/normalize unquoted schema names, parameterize or strictly validate the schema literal, and add the same treatment to the adapter's other INFORMATION_SCHEMA queries touched by this path (snowflake.py:1563, 1717-1722).",
+        "started_at": "2026-08-01T15:10:18Z",
+        "started_branch": "fix/snowflake-clustering-precheck-schema-filter-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Introspector schema scoping: normalize identifier case, parameterize or validate the schema literal; same treatment for adapter INFORMATION_SCHEMA queries",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Documented that Snowflake applied_verified certifies clustering-key metadata, not completion of asynchronous physical reclustering, contrasted with ClickHouse physical CREATE-time layout. Logged deferral #676 because wrapper lacks standalone todo update.",
+        "item_id": "snowflake-clustering-precheck-schema-filter-20260801",
+        "notes": "Document the Snowflake key-vs-physical-clustering semantics asymmetry in the receipts design note, and update snowflake-clustering-key-live-verification-20260730 (todo update) to list the adapter pre-check and schema-filter sites as additional dependents of the live confirmation.",
+        "started_at": "2026-08-01T15:15:56Z",
+        "started_branch": "fix/snowflake-clustering-precheck-schema-filter-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Document key-vs-physical clustering asymmetry; todo update the tracked live-verification item to list the two extra dependent sites",
+        "wid": "w4"
+      }
+    ]
+  }
+}

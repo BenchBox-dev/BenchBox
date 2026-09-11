@@ -1,0 +1,292 @@
+{
+  "context": "Define the durable job contract and lifecycle before implementation, including tenant ownership, idempotency, terminal states, cancellation races, retries, leases, artifact publication, retention, and crash recovery. Reuse existing benchmark execution and result-bundle creation behind a worker boundary. Return explicit execution_id handles immediately, persist state transitions and ownership transactionally, and make status/result/cancel safe on any worker. Preserve the synchronous run_benchmark tool for compatible local clients until a separately reviewed deprecation decision.",
+  "description": "Current MCP benchmark execution is synchronous even though results already have explicit execution IDs and files. For remote multi-user and horizontally scaled operation, long-running runs need durable application state that survives worker changes, deploys, retries, and cancellation. Introduce start_benchmark, get_benchmark_status, get_benchmark_result, and cancel_benchmark around a shared job store and queue. Do not turn the currently unused process-global ExecutionTracker into the authoritative HTTP state store.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "activate benchbox.mcp.execution.ExecutionTracker as the HTTP job store",
+        "instead": "use a durable shared repository and queue",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "why": "process-global memory is lost across workers, restarts, and deploys"
+      },
+      {
+        "dont": "hold an MCP request open for the full remote benchmark run",
+        "instead": "return an execution_id and expose explicit status/result/cancel tools",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "why": "long requests are fragile across proxies, clients, and deployments"
+      },
+      {
+        "dont": "infer job ownership from an MCP protocol session",
+        "instead": "persist authenticated principal ownership with the job",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "why": "modern MCP requests are sessionless and can hit any worker"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "needs_item": "mcp-http-auth-tenancy-admission-controls-v2"
+      }
+    ],
+    "item_meta": {
+      "category": "architecture",
+      "completed_at": "2026-08-01T23:40:37Z",
+      "completed_pr": 1458,
+      "created_at": "2026-08-01T15:48:33Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "A completed result is published atomically and never reported complete before its artifact is durable",
+        "item_id": "mcp-durable-benchmark-job-handles-v2"
+      },
+      {
+        "behavior": "Every job and artifact is bound to the authenticated principal/workspace and inaccessible across tenants",
+        "item_id": "mcp-durable-benchmark-job-handles-v2"
+      },
+      {
+        "behavior": "Existing benchmark execution semantics and exported result-bundle format remain unchanged",
+        "item_id": "mcp-durable-benchmark-job-handles-v2"
+      },
+      {
+        "behavior": "Existing synchronous run_benchmark remains available for compatible local clients until separately deprecated",
+        "item_id": "mcp-durable-benchmark-job-handles-v2"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "unused process-global execution tracker",
+        "decision": "supersede",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "path": "benchbox/mcp/execution.py"
+      },
+      {
+        "concept": "existing synchronous benchmark execution and execution_id creation",
+        "decision": "extend",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "path": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "concept": "artifact containment beneath configured roots",
+        "decision": "reuse",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "path": "benchbox/mcp/tools/path_utils.py"
+      },
+      {
+        "concept": "existing result discovery by filename and execution ID",
+        "decision": "extend",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "path": "benchbox/mcp/tools/results.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/benchmarks/**"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp*.md"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp*.md"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/**"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -q -k 'job or execution or cancel or lease or retry'",
+        "description": "Durable job state-machine unit tests pass",
+        "expected": "Fails on the unfixed tree before this item is implemented; all job lifecycle unit tests pass",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_durable_jobs.py -q -k 'two_worker'",
+        "description": "A job submitted on one worker can be observed and completed on another",
+        "expected": "worker alternation preserves state and result access",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_durable_jobs.py -q -k 'restart or lease or recovery'",
+        "description": "Interrupted jobs recover deterministically after worker restart",
+        "expected": "lease expiry and recovery reach the specified terminal state without duplicate publication",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_durable_jobs.py -q -k 'tenant'",
+        "description": "Cross-tenant job status, result, and cancellation are denied",
+        "expected": "all cross-principal operations fail closed",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_benchmark_tools.py -q",
+        "description": "Legacy synchronous benchmark MCP coverage remains green",
+        "expected": "existing run_benchmark behavior remains compatible",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Specified persisted queued/running/publishing/completed/failed/cancelled states, principal ownership, request-key idempotency, renewable leases, cooperative cancellation commit point, bounded retries, retention, and expired-lease recovery in benchbox/mcp/jobs.py with focused unit coverage.",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "notes": null,
+        "started_at": "2026-08-01T23:33:46Z",
+        "started_branch": "feat/mcp-durable-jobs",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Specify the durable job state machine, ownership model, idempotency, leases, cancellation, retries, retention, and recovery semantics",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Implemented WAL SQLite shared repository with BEGIN IMMEDIATE submission/claim/recovery transitions, global bounded active queue, unique principal idempotency, and conditional lease-owner fencing; two repository instances verified.",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "notes": null,
+        "started_at": "2026-08-01T23:33:52Z",
+        "started_branch": "feat/mcp-durable-jobs",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Implement a shared job repository and bounded queue with transactional state transitions",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added remote worker lifespan and sync execution thread boundary; staged tenant result/data artifacts are recursively fsynced, marked, atomically renamed, directory-fsynced, then conditionally completed.",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "notes": null,
+        "started_at": "2026-08-01T23:33:58Z",
+        "started_branch": "feat/mcp-durable-jobs",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Extract existing benchmark execution behind a worker boundary that publishes result bundles atomically",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Registered remote-only start_benchmark/get_benchmark_status/get_benchmark_result/cancel_benchmark tools with SDK scopes and policy checks; normal remote run_benchmark now redirects to durable start while local synchronous compatibility remains.",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "notes": null,
+        "started_at": "2026-08-01T23:34:05Z",
+        "started_branch": "feat/mcp-durable-jobs",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add tenant-scoped start_benchmark, get_benchmark_status, get_benchmark_result, and cancel_benchmark tools",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Covered duplicate-key conflicts, stale-worker fencing, lease expiry, restart requeue, publishing recovery, cancellation races, retry exhaustion, retention, invalid artifacts, and durable marker recovery without duplicate publication.",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "notes": null,
+        "started_at": "2026-08-01T23:34:11Z",
+        "started_branch": "feat/mcp-durable-jobs",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Handle duplicate submission, worker loss, lease expiry, cancellation races, retries, and orphaned artifacts",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Added two-worker/restart/tenant HTTP acceptance tests and local inventory contract checks; full MCP suite passed 554 tests, Ruff and targeted ty passed, and all five tracker verification rungs passed.",
+        "item_id": "mcp-durable-benchmark-job-handles-v2",
+        "notes": null,
+        "started_at": "2026-08-01T23:34:17Z",
+        "started_branch": "feat/mcp-durable-jobs",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add two-worker and restart recovery tests plus compatibility coverage for synchronous run_benchmark",
+        "wid": "w6"
+      }
+    ]
+  }
+}

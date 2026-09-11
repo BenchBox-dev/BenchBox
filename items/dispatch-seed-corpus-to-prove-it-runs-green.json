@@ -1,0 +1,92 @@
+{
+  "context": "Dispatch on develop with the benchmark input set to a single cheap benchmark first - that also exercises the SELECTED env filter #1320 introduced, confirming selected steps run and unselected ones skip. Inspect the run for real job output rather than a green tick. Only then consider an unfiltered dispatch: NEEDS JOE'S OK, since SF 1.0 TPC-DS entries can take 30+ minutes each across 8 matrix jobs at a 60-minute timeout. Finally decide whether a schedule trigger or a documented manual cadence is needed so the corpus does not silently rot - today nothing ever runs it.",
+  "description": "Seed Corpus has never executed a single job. Every run in its history is event=push, conclusion=failure, jobs=[] - phantom startup failures GitHub recorded while validating an invalid workflow file. Queried directly: zero runs with conclusion=success ever, zero runs with event=workflow_dispatch ever. PR #1320 fixed the startup failure and post-fix pushes correctly produce no runs (5 develop pushes, zero seed-corpus runs), but that proves only that the file parses and no longer fails at startup. The eight matrix entries (tpch/tpcds across duckdb, datafusion, polars-df and clickhouse-cloud, sf 0.01-1.0) have never been exercised, so the corpus is not being generated and the workflow body is unverified. Separately, the rung on verify-seed-corpus-recovery-post-1320 was unusable: 'gh run list --jq -e EXPR' is malformed (gh consumes -e as the expression and exits with usage), and asserting on the latest automatic develop run can never pass for a dispatch-only workflow.",
+  "legacy": {
+    "item_meta": {
+      "blocked_reason": "Filtered proof run 30455422794 failed. PR #1337 repairs the workflow-owned output root, but SSB/DataFusion remains tracked by datafusion-normalize-seed-corpus-table-paths. Original verification rung 3 is permanently false after this observed failure and cannot be updated until migration-dependent seed-corpus-proof-verification-window-v2. Do not complete from the aggregation job success; the workflow conclusion was failure.",
+      "category": "ci",
+      "created_at": "2026-07-29T11:46:56Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "no unfiltered full-matrix dispatch without Joe's explicit approval (compute cost)",
+        "item_id": "dispatch-seed-corpus-to-prove-it-runs-green"
+      },
+      {
+        "behavior": "the workflow stays dispatch-only unless a schedule is explicitly agreed",
+        "item_id": "dispatch-seed-corpus-to-prove-it-runs-green"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dispatch-seed-corpus-to-prove-it-runs-green",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/seed-corpus.yml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test \"$(gh run list --repo joeharris76/BenchBox --workflow seed-corpus.yml --event workflow_dispatch --limit 1 --json databaseId --jq 'length')\" -eq 1",
+        "description": "A workflow_dispatch run of seed-corpus exists at all",
+        "expected": "exit 0",
+        "item_id": "dispatch-seed-corpus-to-prove-it-runs-green",
+        "last_result": "pass",
+        "last_run": "2026-08-01T12:40:42Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh run list --repo joeharris76/BenchBox --workflow seed-corpus.yml --event workflow_dispatch --limit 1 --json conclusion --jq '.[0].conclusion' | grep -qx success",
+        "description": "The most recent dispatched run concluded success",
+        "expected": "exit 0",
+        "item_id": "dispatch-seed-corpus-to-prove-it-runs-green",
+        "last_result": "pass",
+        "last_run": "2026-08-01T12:40:45Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test \"$(gh run list --repo joeharris76/BenchBox --workflow seed-corpus.yml --limit 30 --json createdAt,conclusion --jq '[.[]|select(.createdAt > \"2026-07-28T23:23:30Z\" and .conclusion==\"failure\")]|length')\" -eq 0",
+        "description": "No seed-corpus failure recorded since the #1320 fix",
+        "expected": "exit 0",
+        "item_id": "dispatch-seed-corpus-to-prove-it-runs-green",
+        "last_result": "fail",
+        "last_run": "2026-08-01T12:40:48Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dispatch-seed-corpus-to-prove-it-runs-green",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Dispatched Seed Corpus run 30455422794 on develop with benchmark=ssb. All 11 non-SSB matrix jobs completed as no-op success and all 6 selected SSB jobs executed. The run exposed two genuine blockers: the locate step searched checkout-local benchmark_runs although BenchBox writes to a sibling root, and both selected SSB/DataFusion jobs failed with str has no attribute is_dir. Workflow-only output-root repair is implemented on fix/seed-corpus-output-root; SSB/DataFusion is outside this item scope.",
+        "item_id": "dispatch-seed-corpus-to-prove-it-runs-green",
+        "notes": null,
+        "started_at": "2026-07-29T13:18:41Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Dispatch on develop with a single-benchmark filter and confirm selected steps run while others skip",
+        "wid": "w1"
+      },
+      {
+        "evidence": "No schedule trigger added. The current dispatch-only contract is preserved because the handoff explicitly forbids enabling a schedule without separate agreement, and no cadence was authorized in this batch.",
+        "item_id": "dispatch-seed-corpus-to-prove-it-runs-green",
+        "notes": null,
+        "started_at": "2026-07-29T13:23:04Z",
+        "started_branch": "fix/seed-corpus-output-root",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Decide and record whether a schedule trigger is needed so the corpus does not rot",
+        "wid": "w2"
+      }
+    ]
+  }
+}

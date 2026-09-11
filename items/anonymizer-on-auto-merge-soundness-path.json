@@ -1,0 +1,103 @@
+{
+  "context": "Decide one of: (a) add benchbox/core/results/anonymization.py to SOUNDNESS_PREFIXES, (b) add a separate privacy-path list feeding the same auto-merge stop, or (c) record an explicit decision to exclude it. Whichever is chosen, leave an in-file comment stating the rationale so the next reader does not re-litigate, matching how the existing prefixes are annotated.",
+  "description": "_project/scripts/auto_merge_soundness_paths.py SOUNDNESS_PREFIXES does not cover benchbox/core/results/anonymization.py. Consequence observed 2026-08-04: PR #1512 changed the public anonymizer, which changed every published byte and every public result_id for the whole corpus, and 'make pr-open' enabled auto-merge on it without owner review because the classifier did not rate the path soundness-critical. The classifier's recorded scope is benchmark CORRECTNESS - the comments describe it as what defines a 'correct' result (comparators, plan parsers, expected_results, rewrite-rule dispatch). Publication privacy and public identity are a different axis, so adding the anonymizer is a deliberate surface WIDENING, and the file's own comments record that widening is an owner decision made under the 'soundness-surface-widening' rationale rather than a mechanical edit. Hence this is filed as a decision, not a fix. Arguments for adding it: a bug there can leak private values or silently repartition public pseudonym identity, and neither failure raises. Argument against: it is a different risk axis than soundness and widening the list dilutes its meaning - a separate privacy-path list feeding the same auto-merge gate may be the better shape. Note the classifier is already self-protecting (it lists itself), so a PR editing it will not auto-merge. There is currently no test module for the classifier under tests/unit/scripts/.",
+  "legacy": {
+    "item_meta": {
+      "category": "governance",
+      "completed_at": "2026-08-04T15:56:06Z",
+      "completed_pr": 1529,
+      "created_at": "2026-08-04T12:21:42Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The classifier stays self-protecting - it must keep listing itself and the release and auto-merge workflow files",
+        "item_id": "anonymizer-on-auto-merge-soundness-path"
+      },
+      {
+        "behavior": "pr.yml stays deliberately excluded per the recorded soundness-surface-widening decision",
+        "item_id": "anonymizer-on-auto-merge-soundness-path"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "anonymizer-on-auto-merge-soundness-path",
+        "kind": "only_modify",
+        "path_glob": ".github/CODEOWNERS"
+      },
+      {
+        "item_id": "anonymizer-on-auto-merge-soundness-path",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/auto_merge_soundness_paths.py"
+      },
+      {
+        "item_id": "anonymizer-on-auto-merge-soundness-path",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "anonymizer-on-auto-merge-soundness-path",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      },
+      {
+        "item_id": "anonymizer-on-auto-merge-soundness-path",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_auto_merge_soundness_paths.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -q 'results/anonymization' _project/scripts/auto_merge_soundness_paths.py",
+        "description": "The anonymizer's auto-merge treatment is explicitly recorded either way",
+        "expected": "Exits 0 once the file either lists the anonymizer or carries a comment naming it as a deliberate exclusion",
+        "item_id": "anonymizer-on-auto-merge-soundness-path",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts -q -k soundness",
+        "description": "Classifier behaviour is covered by a test",
+        "expected": "Write the test in w1 so this rung becomes runnable",
+        "item_id": "anonymizer-on-auto-merge-soundness-path",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "anonymizer-on-auto-merge-soundness-path",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Commit 32415ca888. DECIDED option (a): widen SOUNDNESS_PREFIXES rather than add a separate privacy list or record an exclusion. Joe chose this shape when the fork was put to him. Rationale: the list already carries non-soundness categories under their own labeled blocks - release.yml is present because it publishes to PyPI, and the self-protection block covers the gate machinery - and is_soundness_path's own docstring already reads 'needs review before auto-merge', which is broader than soundness. A separate list would have required widening the 1:1 CODEOWNERS pin and every any_soundness_path caller for no behavioural gain.",
+        "item_id": "anonymizer-on-auto-merge-soundness-path",
+        "notes": null,
+        "started_at": "2026-08-04T12:48:13Z",
+        "started_branch": "chore/anonymizer-review-gate",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Decide the shape - widen SOUNDNESS_PREFIXES, add a separate privacy list, or record an explicit exclusion",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Commit 32415ca888. Rationale recorded in-file in both _project/scripts/auto_merge_soundness_paths.py and .github/CODEOWNERS, matching how every other category in the list annotates itself. Added anonymization_specs.yaml alongside the module - not in the original plan - because that file DEFINES which keys get hashed, so dropping an entry there is a silent leak with no code diff to review; same failure mode, smaller diff. Both are exact-file entries, not the benchbox/core/results/ package, and the auto-mergeable parametrization now pins that exporter.py and schema.py stay outside the gate. tests/unit/test_auto_merge_soundness_paths.py: 36 pass, including the pre-existing test_codeowners_matches_soundness_prefixes_1to1 which enforces the mirror. Verified behaviourally: the predicate returns true for anonymization.py and false for exporter.py.",
+        "item_id": "anonymizer-on-auto-merge-soundness-path",
+        "notes": null,
+        "started_at": "2026-08-04T12:48:28Z",
+        "started_branch": "chore/anonymizer-review-gate",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Record the rationale in-file and cover the decision with a test",
+        "wid": "w1"
+      }
+    ]
+  }
+}

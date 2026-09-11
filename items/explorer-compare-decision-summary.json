@@ -1,0 +1,308 @@
+{
+  "context": "Build compare summary math in a testable library first, then render it in\nCompare.tsx. Keep guardrails separate from summary claims so a severe mismatch\ncan suppress winner language while still showing raw rows. Move the diff table\nabove charts because it is the most information-dense evidence for platform\nselection.\n",
+  "description": "Improve the compare workflow so it answers the top-line question before\npresenting charts. A benchmark user comparing two or more result bundles needs\nan immediate conclusion such as \"Polars is faster on 22/22 queries and 3.65x\nfaster by geomean\" plus clear warnings when the selected runs are not directly\ncomparable. This builds on the existing sticky compare bar and compare route.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "claim a winner across different benchmark/scale/phase cohorts",
+        "instead": "show a mismatch warning and raw evidence only.",
+        "item_id": "explorer-compare-decision-summary",
+        "why": "that is not a valid comparison"
+      },
+      {
+        "dont": "force pairwise-only compare",
+        "instead": "make baseline selection explicit.",
+        "item_id": "explorer-compare-decision-summary",
+        "why": "users may compare several variants"
+      },
+      {
+        "dont": "make charts the first compare artifact",
+        "instead": "lead with summary and diff table.",
+        "item_id": "explorer-compare-decision-summary",
+        "why": "users need the conclusion and per-query evidence first"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "needs_item": "explorer-run-receipt-methodology-disclosure"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "needs_item": "results-normalized-cost-contract-cloud-facets"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-05-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Compare still supports more than two selected results.",
+        "item_id": "explorer-compare-decision-summary"
+      },
+      {
+        "behavior": "Existing `/results/compare?ids=...` URLs continue to load.",
+        "item_id": "explorer-compare-decision-summary"
+      },
+      {
+        "behavior": "The sticky compare bar remains available from benchmark and platform pages.",
+        "item_id": "explorer-compare-decision-summary"
+      },
+      {
+        "behavior": "Warnings do not prevent users from inspecting mismatched selections; they prevent unsupported winner claims.",
+        "item_id": "explorer-compare-decision-summary"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "docs/development/dependency-audit-raw.md"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "docs/development/dependency-compatibility.md"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/failures/compare-hard-block.spec.ts"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/compare.spec.ts"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ComparabilityBanner.tsx"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CompareSummary.tsx"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/DivergingBarChart.tsx"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryDiffTable.tsx"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/CompareSummary.test.tsx"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryDiffTable.test.tsx"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/compareSummary.ts"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_pipeline.py"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Frontend typecheck and compare tests pass.",
+        "expected": "Compare summary, guardrail, and baseline tests pass.",
+        "item_id": "explorer-compare-decision-summary",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium -- --grep \"Compare\"",
+        "description": "Manual compare smoke.",
+        "expected": "Chromium compare smoke verifies same-cohort compare routing, rendering, and mismatched guardrails.",
+        "item_id": "explorer-compare-decision-summary",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-compare-decision-summary",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-compare-decision-summary",
+        "notes": "At the top of Compare.tsx, render a compact summary:\n  - winner by primary cohort metric\n  - geomean difference or power-score ratio\n  - per-query wins/losses/ties\n  - p50/p90/p99 comparison when present\n  - cost/performance delta when normalized cost is present\nThe copy should be generated from data, not hand-written per benchmark.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add compare decision summary computed from selected results",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-compare-decision-summary",
+        "notes": "Add a dense query-level diff table immediately after the summary:\nquery ID, baseline latency, candidate latency, ratio, absolute delta,\nstatus, and optional cost/phase context. Charts should follow this table,\nnot precede it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move diff table ahead of secondary charts",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-compare-decision-summary",
+        "notes": "Let the user choose baseline result from a segmented/select control.\nDefault to the first URL id for backwards compatibility. Ratios and\ndiverging bars should update without changing selected result membership.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add explicit baseline controls for multi-result comparisons",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-compare-decision-summary",
+        "notes": "Consumes the ComparabilityReceipt component owned by\n`explorer-run-receipt-methodology-disclosure` w3 — this work unit does\nNOT define the receipt's API or styling, only its placement and the\nseverity rules that flow into it. If selected results differ in\nbenchmark, scale factor, phase, tuning mode, validation status, platform\nversion, driver version, cost model, or major environment fields, show\nwarnings before the summary. For severe mismatch (different benchmark or\nscale), label the comparison \"Not directly comparable\" and suppress\nwinner language.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Render cohort guardrails before claims",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-compare-decision-summary",
+        "notes": "Sticky compare bars in BenchmarkIndex and PlatformIndex should show\nplatform, benchmark, scale, phase, date, trust, and short id for selected\nrows. Preserve current URL ids, but prefer short ids where available for\nshareability.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Improve compare tray metadata and URL shareability",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-compare-decision-summary",
+        "notes": "Extend Compare.test.tsx with same-cohort, mismatched-cohort, missing-query,\nmulti-result, and baseline-switch cases. Include no-cost and normalized\ncost cases once cost fields are available. Final browser verification also\npinned native DuckDB below 1.4 so generated results.duckdb snapshots remain\nattachable by the current @duckdb/duckdb-wasm runtime.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for summary math, baseline selection, and guardrails",
+        "wid": "w6"
+      }
+    ]
+  }
+}

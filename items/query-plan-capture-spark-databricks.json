@@ -1,0 +1,315 @@
+{
+  "context": "Start with fixture collection (w1) to confirm the exact SQL issued and output\nformat. Implement the parser (w2) targeting the physical plan section of EXPLAIN\nEXTENDED or EXPLAIN (whichever get_query_plan() already uses). Test the parser (w3).\nWire get_query_plan_parser() into the mixin (w4) and add the capture call in\n_execute_query_spark() (w5). Assess Databricks (w6) based on its inheritance chain.\nFinish with wiring unit tests (w7).\n",
+  "description": "SparkAdapter has `get_query_plan()` implemented in\n`benchbox/platforms/base/spark_execution_mixin.py` (line 688), but no parser\nexists and `execute_query()` (line 470, via `_execute_query_spark`) never calls\n`capture_query_plan()`. Databricks likely has a similar or inherited state.\n\nSpark's EXPLAIN output has multiple modes:\n  - `df.explain()` / `EXPLAIN <query>` — text plan with three sections:\n      == Parsed Logical Plan ==\n      == Analyzed Logical Plan ==\n      == Optimized Logical Plan ==\n      == Physical Plan ==\n  - `df.explain(extended=True)` — all four sections\n  - `df.explain(mode='formatted')` — Spark 3.x formatted tree\n  - `df.explain(mode='cost')` — cost-annotated plan\n\nThe physical plan section uses indentation-based text similar to DuckDB/ClickHouse\ntext format. Operator names include: FileScan, Filter, Project, HashAggregate,\nExchange, Sort, BroadcastHashJoin, SortMergeJoin, etc.\n\nA separate DataFrame profiling path exists at\n`benchbox/core/dataframe/profiling.py` for DataFrame-based Spark plan capture —\nthis TODO covers only the SQL execution path (`execute_query()`), not DataFrame\nprofiling, which is a parallel system.\n\nNote on SparkQueryExecutionMixin: execute_query() at line 470 delegates to\n`_execute_query_spark()` (line 491). The capture call should go into\n`_execute_query_spark()` after the timed SQL block.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add Databricks-specific logic to SparkQueryExecutionMixin if it only applies to Databricks Connect.",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-spark-databricks",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "issue EXPLAIN during execution when capture_plans=False.",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-spark-databricks",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "modify benchbox/core/dataframe/profiling.py",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-spark-databricks",
+        "why": "that is a separate DataFrame plan system."
+      },
+      {
+        "dont": "parse all four plan sections (Parsed, Analyzed, Optimized, Physical)",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-spark-databricks",
+        "why": "parse only the physical plan for fingerprinting to reduce noise across Spark versions."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "query-plan-capture-spark-databricks",
+        "id": 595,
+        "reason": "The DataFrame profiling system is a parallel architecture to the SQL execution path. Merging the two systems is a larger refactor that should be a separate TODO. This TODO covers only execute_query() SQL path.",
+        "resolution": "promoted",
+        "resolved_item": "wire-plan-capture-for-dataframe-execution-path-in-benchbox-c",
+        "resolved_reason": null,
+        "summary": "Wire plan capture for DataFrame execution path in benchbox/core/dataframe/profiling.py"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-06-02T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "DataFrame profiling in benchbox/core/dataframe/profiling.py must not be modified — it is out of scope.",
+        "item_id": "query-plan-capture-spark-databricks"
+      },
+      {
+        "behavior": "Plan capture failure must be silent when strict_plan_capture=False.",
+        "item_id": "query-plan-capture-spark-databricks"
+      },
+      {
+        "behavior": "SparkAdapter.execute_query() result dict shape must not change for non-plan fields.",
+        "item_id": "query-plan-capture-spark-databricks"
+      },
+      {
+        "behavior": "_execute_query_spark() must not issue EXPLAIN when capture_plans=False.",
+        "item_id": "query-plan-capture-spark-databricks"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/dataframe/profiling.py — parallel DataFrame plan system; do not modify",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-spark-databricks",
+        "path": "benchbox/core/dataframe/profiling.py"
+      },
+      {
+        "concept": "benchbox/core/query_plans/parsers/base.py — abstract interface to implement",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-spark-databricks",
+        "path": "benchbox/core/query_plans/parsers/base.py"
+      },
+      {
+        "concept": "benchbox/core/query_plans/parsers/duckdb.py — closest text-format parser (DuckDB text mode)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-spark-databricks",
+        "path": "benchbox/core/query_plans/parsers/duckdb.py"
+      },
+      {
+        "concept": "benchbox/platforms/base/spark_execution_mixin.py:491 — _execute_query_spark() to add capture to",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-spark-databricks",
+        "path": "benchbox/platforms/base/spark_execution_mixin.py:491"
+      },
+      {
+        "concept": "benchbox/platforms/base/spark_execution_mixin.py:688 — existing get_query_plan() implementation",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-spark-databricks",
+        "path": "benchbox/platforms/base/spark_execution_mixin.py:688"
+      },
+      {
+        "concept": "benchbox/platforms/duckdb.py:969 — canonical capture integration pattern",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-spark-databricks",
+        "path": "benchbox/platforms/duckdb.py:969"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/profiling.py"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/cloud_spark/"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/platform-expansion/planning/query-plan-capture-spark-databricks.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/registry.py"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/spark.py"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/spark_execution_mixin.py"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databricks.py"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/spark.py"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/query_plans/"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_spark_plan_capture.py"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/query_plans/test_spark_parser.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/query_plans/test_spark_parser.py -v",
+        "description": "Spark parser unit tests pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "query-plan-capture-spark-databricks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_spark_plan_capture.py -v",
+        "description": "Spark adapter wiring tests pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "query-plan-capture-spark-databricks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/ -q",
+        "description": "Full unit suite passes",
+        "expected": "0 failures, 0 errors",
+        "item_id": "query-plan-capture-spark-databricks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "query-plan-capture-spark-databricks",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-spark-databricks",
+        "notes": "Check what SQL string get_query_plan() in spark_execution_mixin.py currently\nissues (EXPLAIN? EXPLAIN EXTENDED? EXPLAIN FORMATTED?). Capture the output\nfrom a live Spark session against a simple TPC-H query. Record:\n  - Exact SQL issued\n  - Full text output (all plan sections)\n  - Spark version\nStore as tests/fixtures/query_plans/spark_explain_sample.txt.\nIf get_query_plan() issues bare EXPLAIN, it returns only the physical plan.\nIf EXPLAIN EXTENDED, all four sections are returned. Decide which sections\nto parse (physical plan is most useful for fingerprinting).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Collect Spark EXPLAIN text samples and confirm format used by get_query_plan()",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-spark-databricks",
+        "notes": "Implement QueryPlanParser abstract interface:\n  - parse(raw_plan: str) -> QueryPlanDAG\n  - If EXPLAIN EXTENDED is used, extract the physical plan section\n    (text between '== Physical Plan ==' and end of output)\n  - Parse indentation-based physical plan tree\n  - Operator name normalization:\n      FileScan parquet / FileScan csv → SCAN\n      Filter → FILTER\n      Project → PROJECT\n      HashAggregate / ObjectHashAggregate → AGGREGATE\n      Exchange / ShuffleExchange → EXCHANGE (map to a suitable LogicalOperatorType)\n      BroadcastHashJoin / SortMergeJoin / BroadcastNestedLoopJoin → JOIN\n      Sort → SORT\n  - Register in parsers/registry.py under dialect=\"spark\" with version 3.0.0+\nFollow DuckDB text parser as the closest structural template.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement SparkQueryPlanParser in benchbox/core/query_plans/parsers/spark.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-spark-databricks",
+        "notes": "Create tests/unit/query_plans/test_spark_parser.py. Cover:\n  - Parse of fixture sample produces valid QueryPlanDAG\n  - Physical plan section correctly extracted when EXPLAIN EXTENDED is used\n  - Operator normalization maps to expected LogicalOperatorType\n  - Malformed / empty input triggers graceful error recovery\n  - Parser registered in registry under \"spark\" dialect\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for SparkQueryPlanParser using fixture samples",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-spark-databricks",
+        "notes": "In benchbox/platforms/spark.py or spark_execution_mixin.py (whichever is\nmost appropriate for the mixin hierarchy):\n  def get_query_plan_parser(self):\n      from benchbox.core.query_plans.parsers.spark import SparkQueryPlanParser\n      return SparkQueryPlanParser()\nIf get_query_plan_parser() is on SparkQueryExecutionMixin, SparkAdapter\ninherits it automatically.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add get_query_plan_parser() override to SparkAdapter (or SparkQueryExecutionMixin)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-spark-databricks",
+        "notes": "In benchbox/platforms/base/spark_execution_mixin.py, inside\n_execute_query_spark() (line 491), after the timed SQL execution block:\n  if self.capture_plans:\n      query_plan, plan_capture_time_ms = self.capture_query_plan(\n          connection, query, query_id\n      )\n      if query_plan:\n          plan_fingerprint = query_plan.plan_fingerprint\nPropagate into the return dict.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate capture_query_plan() into _execute_query_spark()",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-spark-databricks",
+        "notes": "Inspect benchbox/platforms/databricks.py (if it exists). If Databricks\ninherits SparkAdapter or SparkQueryExecutionMixin, it will inherit plan\ncapture automatically. If it has its own execute_query() or connection\nmodel, add the capture call there. Databricks Connect uses the same\nPySpark API but may return different EXPLAIN text for Unity Catalog queries.\nConfirm with a w1-style EXPLAIN sample if a Databricks workspace is available.\nIf credentials are unavailable, defer Databricks live validation to a\nfollow-up UAT and note the deferred status here.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Assess Databricks adapter inheritance and wire or override as needed",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-spark-databricks",
+        "notes": "Create tests/unit/platforms/test_spark_plan_capture.py. Cover:\n  - get_query_plan_parser() returns SparkQueryPlanParser\n  - _execute_query_spark() with capture_plans=True calls capture_query_plan()\n  - result dict includes query_plan and plan_fingerprint when capture succeeds\n  - graceful degradation on EXPLAIN failure\nMock SparkSession / DataFrame to avoid requiring a live cluster.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add wiring unit tests for SparkAdapter plan capture",
+        "wid": "w7"
+      }
+    ]
+  }
+}

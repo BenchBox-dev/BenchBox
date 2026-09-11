@@ -1,0 +1,234 @@
+{
+  "context": "Establish which published identifier fields have a named consumer before choosing a remedy. Prefer removing unread fields over salting them; salt only what a named consumer needs. Whatever is chosen must preserve the #1512 fixed point, so a stored corpus is never re-pseudonymized in place. This decision must be made before #1537 merges: fixing it afterwards costs a second full result_id rotation, and today the rotation is free.",
+  "description": "machine_id_salt defaults to None, so the public pseudonym digest is computed over an empty salt, and the algorithm is documented. That makes every published pseudonym an offline confirmation oracle: a candidate value can be hashed and matched against the corpus with certainty, no false positives. A one-second dictionary sweep of 1550 candidates over the 1615 pseudonym occurrences in results-data confirmed two distinct tokens, and the double-hashed form of one of them is present on the public published-results branch, so double hashing provides no protection. The corpus privacy gate cannot see this: find_public_path_leaks detects plaintext only, so it reports the corpus clean while the corpus is recoverable by dictionary. Separately, machine_id appears nowhere in _project/scripts/ or results-explorer/src/ and the read model has no machine or host column, so the grouping these pseudonyms exist to support is not implemented; and none of working_dir, driver_runtime_python_executable, submission_path, database_path or engine_host is named as a published field in the hosted results contract. Not publishing a field dominates salting it. Do not record recovered plaintext values in this item, a commit message, or a PR body - _project/todo-db-export is committed to the repository, so this text is public. Tokens only.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-05T00:17:47Z",
+        "from_item": "published-pseudonym-oracle-and-field-set",
+        "id": 690,
+        "reason": "w2 (field removal at the publication boundary), w3 (dictionary-recovery gate) and w4 (re-derive and re-mirror) remain. w2+w4 rewrite every bundle in results-data and rotate all 207 result_ids, and they must land as ONE re-derivation together with the open draft #1537 so ids rotate once rather than twice. That needs its own PR against a decided field set, which is exactly what w0/w1 produced. Precondition now satisfied: explorer-fixture-ids-cover-every-spec-role landed in PR #1545, so the browser suite is immune to anonymization output moving.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Implemented in fix/published-identifier-field-drop: field removal at publication boundary, recovery gate, and single-pass corpus re-derive (207 result_id rotations).",
+        "summary": "Implement the field removal, the recovery gate, and the corpus re-derivation as one PR"
+      }
+    ],
+    "item_meta": {
+      "category": "privacy",
+      "completed_at": "2026-08-05T20:28:42Z",
+      "completed_pr": 1578,
+      "created_at": "2026-08-04T23:42:40Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Accepting the oracle is a legitimate outcome, but it is recorded and the item is dropped with that reason - it is never completed on a green ladder",
+        "item_id": "published-pseudonym-oracle-and-field-set"
+      },
+      {
+        "behavior": "No recovered plaintext value is written into the tracker, a commit message, or a PR body",
+        "item_id": "published-pseudonym-oracle-and-field-set"
+      },
+      {
+        "behavior": "Pseudonym identity is never treated as a provenance or trust signal; trust labels cover provenance",
+        "item_id": "published-pseudonym-oracle-and-field-set"
+      },
+      {
+        "behavior": "Publication stays a fixed point - a stored corpus is never re-pseudonymized in place (#1512)",
+        "item_id": "published-pseudonym-oracle-and-field-set"
+      },
+      {
+        "behavior": "The pseudonym pass-through stays scoped to one prefix and the exact emitted digest width",
+        "item_id": "published-pseudonym-oracle-and-field-set"
+      },
+      {
+        "behavior": "explorer-fixture-ids-cover-every-spec-role lands before any change that moves anonymization output, or the browser gate reddens for a second unrelated reason",
+        "item_id": "published-pseudonym-oracle-and-field-set"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/results_explorer_corpus_migrate.py"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization_specs.yaml"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "kind": "only_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/golden/results/**"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_output.py"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/**"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -rq database_5d7b725135a6 results-data",
+        "description": "a confirmed-recoverable database token is gone from the corpus",
+        "expected": "Fails on the unfixed tree today (measured exit 1) - the token is present 24 times",
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "last_result": "fail",
+        "last_run": "2026-08-05T20:28:39Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -rq path_1c98692f827e results-data",
+        "description": "a confirmed-recoverable path token is gone from the corpus",
+        "expected": "Fails on the unfixed tree today (measured exit 1)",
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "last_result": "pass",
+        "last_run": "2026-08-05T20:28:21Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_corpus_pseudonym_recovery.py -q",
+        "description": "the privacy gate fails on a dictionary-recoverable pseudonym",
+        "expected": "Fails on the unfixed tree today (measured non-zero - the gate does not exist)",
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "last_result": "pass",
+        "last_run": "2026-08-05T20:28:27Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_corpus_privacy_invariant.py -q",
+        "description": "the existing corpus privacy invariants stay green",
+        "expected": "Passes today and must stay passing - this is the regression rung, not the falsifying one",
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "last_result": "pass",
+        "last_run": "2026-08-05T20:28:36Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Consumer audit across the pipeline (_project/scripts/explorer_pipeline, explorer_publish.py), the Explorer app (results-explorer/src), and the published contract (docs/reference/hosted-results-contract.md), for the 9 pseudonymised field names present in the corpus. Six have NO consumer in any of the three: machine_id, working_dir, driver_runtime_python_executable, database_path, data_path, engine_host. They account for roughly 1320 of the 1615 pseudonym occurrences. Three do: submission_path (contract only), database_name (Explorer app), endpoint (pipeline, app, and contract). The read model has no machine or host column at all, so the grouping these pseudonyms were introduced to protect - the stated motivation for #1512 - is not implemented anywhere. Confirms the reframe: for the six, not publishing dominates salting, because a pseudonym with no reader is pure liability and the transform is a public confirmation oracle.",
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "notes": null,
+        "started_at": "2026-08-05T00:16:23Z",
+        "started_branch": "fix/e2e-derive-fixture-ids",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Establish which published identifier fields have a named consumer, first-party or contractual",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Recorded as docs/development/adr/adr-published-identifier-field-set.md, Accepted. Decision: do not publish the six identifier fields with no consumer (machine_id, working_dir, driver_runtime_python_executable, database_path, data_path, engine_host); remove them at the publication boundary rather than pseudonymising them. Keep publishing pseudonyms for the three with readers (endpoint, database_name, submission_path) and leave the salt question open for those. Alternatives recorded with reasons: minting a default salt (rejected as primary - does not close the oracle for already-published bytes and keeps paying a privacy cost for data nothing reads; still right for the three with readers), and accepting the oracle (rejected - the exposure scales with contributors, and choosing to publish confirmable identifiers on their behalf is not ours to make silently). The ADR states the id-rotation consequence explicitly and that this supersedes #1537's field set so ids rotate once, not twice.",
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "notes": null,
+        "started_at": "2026-08-05T00:16:48Z",
+        "started_branch": "fix/e2e-derive-fixture-ids",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Decide and record drop-the-unread-fields versus salt-what-remains versus accept-the-oracle",
+        "wid": "w1"
+      },
+      {
+        "evidence": "pool-02 e650db50a5: public_drop_keys omit six unread fields in anonymization walker; exporter no longer re-injects machine_id; unit tests updated",
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "notes": null,
+        "started_at": "2026-08-05T19:58:34Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement the decision at the publication boundary",
+        "wid": "w2"
+      },
+      {
+        "evidence": "tests/unit/scripts/test_corpus_pseudonym_recovery.py: drop keys absent, path token gone, safe dictionary does not recover path/machine/host tokens",
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "notes": null,
+        "started_at": "2026-08-05T19:58:37Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Extend the corpus privacy gate to fail on dictionary-recoverable pseudonyms, not only plaintext",
+        "wid": "w3"
+      },
+      {
+        "evidence": "efc319c916 re-derive: changed_bundles=207, result_id_changes=207; path_1c98692f827e gone; drop keys 0 hits; residual database_5d7b725135a6 under retained database_name per ADR keep-list",
+        "item_id": "published-pseudonym-oracle-and-field-set",
+        "notes": null,
+        "started_at": "2026-08-05T20:15:23Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-derive and re-mirror if the decision changes published bytes",
+        "wid": "w4"
+      }
+    ]
+  }
+}

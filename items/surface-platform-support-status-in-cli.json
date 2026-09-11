@@ -1,0 +1,105 @@
+{
+  "context": "Add a support_status column to platforms list, sourced from the registry the same way benchmarks does it, and rename the existing column to something that says what it means (Driver / Installed / Available). Do not change the taxonomy in public-contracts.md - it is correct and test-enforced. Consider a second, separate signal for whether a platform has ever produced a published result, which is a different question again from both columns.",
+  "description": "docs/reference/public-contracts.md defines the support taxonomy correctly and warns explicitly that support_status 'is different from local dependency availability: a stable platform can be unavailable on a developer machine because an optional SDK is not installed'. The CLI then breaks exactly that distinction. 'benchbox platforms list' prints a column headed 'Status' whose values are dependency availability ('Enabled' when the driver imports), and it never shows support_status at all - grep for support_status across benchbox/cli/ returns no platform-side hit. Benchmarks already do this correctly: benchbox/cli/benchmarks.py renders 'Support: <status>' from registry metadata. So this is a parity gap on the platform surface, not a taxonomy problem. Registry today: stable=5, beta=28, experimental=17, deprecated=1. Users choosing among 51 platforms currently get no runtime signal that Onehouse Quanton is experimental and DuckDB is stable.",
+  "legacy": {
+    "item_meta": {
+      "category": "cli",
+      "completed_at": "2026-08-18T23:46:37Z",
+      "completed_pr": 1771,
+      "created_at": "2026-08-17T23:29:36Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "surface-platform-support-status-in-cli",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "surface-platform-support-status-in-cli",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox platforms list",
+        "description": "Platform support status reaches the CLI",
+        "expected": "shows support status distinct from driver availability",
+        "item_id": "surface-platform-support-status-in-cli",
+        "last_result": "pass",
+        "last_run": "2026-08-18T23:46:34Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "surface-platform-support-status-in-cli",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "surface-platform-support-status-in-cli",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "surface-platform-support-status-in-cli",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "surface-platform-support-status-in-cli",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated the current manifest and CLI path in the PR worktree; `uv run -- benchbox platforms list` exited 0 and rendered separate Driver and Support columns with registry tiers.",
+        "item_id": "surface-platform-support-status-in-cli",
+        "notes": null,
+        "started_at": "2026-08-18T23:45:56Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Revalidate",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PlatformRegistry now carries manifest support_status into PlatformInfo; focused registry and CLI tests pass, including stable DuckDB, beta Snowflake, and experimental Quanton assertions.",
+        "item_id": "surface-platform-support-status-in-cli",
+        "notes": null,
+        "started_at": "2026-08-18T23:46:02Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add support_status to platforms list from registry metadata, matching the benchmarks surface",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Platform status output now labels local dependency state as Driver and product tier as Support; no conflated Status column remains.",
+        "item_id": "surface-platform-support-status-in-cli",
+        "notes": null,
+        "started_at": "2026-08-18T23:46:11Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Rename the dependency column so it no longer reads as product support",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added CLI tests asserting both headings and independent signal behavior; focused suite passed 123 tests, Ruff and format checks passed.",
+        "item_id": "surface-platform-support-status-in-cli",
+        "notes": null,
+        "started_at": "2026-08-18T23:46:17Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add a test asserting platforms list shows both signals and never conflates them",
+        "wid": "w3"
+      }
+    ]
+  }
+}

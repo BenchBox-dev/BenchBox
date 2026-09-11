@@ -1,0 +1,134 @@
+{
+  "context": "Options to weigh rather than a fixed design: (a) have fast_lane_ratchet_check.py report consumption against the most recent entry stated purpose so erosion is visible before it forces a bump; (b) record a per-program reserved allotment in the policy JSON that the PR-lane delta guard reads; (c) accept erosion and bump on a schedule, treating the log entry rationale as narrative only. Prior art: _project/config/fast_lane_ceiling_log.md convention header, docs/operations/fast-lane-budget.md, scripts/fast_lane_ratchet_check.py.",
+  "description": "The quantum convention (+500, headroom floor 250) assumes a bump buys runway for the work that motivated it, but nothing binds the reservation to that work. The 2026-08-04 entry bumped 27050->27550 and stated its purpose explicitly: the one-engine program had eight items still to land, three of which add parity and characterization suites. Between #1567 and #1600 roughly 30 unrelated PRs (results-privacy identifier drops, submit terminal-state classification, CI plumbing, tracker tooling, quality guards) took the lane from 26834 to 27278 -- consuming 444 of the 716 reserved -- while zero one-engine items landed, forcing a fifth standalone ceiling PR (#1611) one day later. This is now a repeating shape: five quantum-convention bumps, three of them carrying no test-count change of their own, and the 2026-08-03 entry documents a crossing that produced two misattributed auto-revert PRs (#1491, #1492). The convention successfully ended minimal-headroom bumps but does not make a reservation legible to the next PR author, so headroom is consumed first-come rather than as budgeted.",
+  "legacy": {
+    "item_meta": {
+      "category": "process",
+      "completed_at": "2026-08-10T14:59:40Z",
+      "completed_pr": 1676,
+      "created_at": "2026-08-06T00:46:49Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "The +500 quantum and the 250 headroom floor stay in force; this adds visibility, it does not relax the ceiling.",
+        "item_id": "fast-lane-ceiling-reservation-erosion"
+      },
+      {
+        "behavior": "The ceiling remains the enforced backstop in --strict, make ci-lint, and develop-post-merge.yml.",
+        "item_id": "fast-lane-ceiling-reservation-erosion"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "kind": "only_modify",
+        "path_glob": "_project/config/**"
+      },
+      {
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/fast_lane_ratchet_check.py"
+      },
+      {
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/fast-lane-budget.md"
+      },
+      {
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "kind": "only_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_fast_lane_ratchet_check.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_fast_lane_ratchet_check.py -q -n 0",
+        "description": "Focused reservation tests",
+        "expected": "all pass under the existing medium marker",
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "last_result": "pass",
+        "last_run": "2026-08-10T14:55:00Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/fast_lane_ratchet_check.py --help",
+        "description": "Reservation CLI help exposes the signal",
+        "expected": "help names the optional reservation and headroom behavior",
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "last_result": "pass",
+        "last_run": "2026-08-10T14:55:02Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added optional {program, headroom_floor} reservation metadata; nightly ratchet uses the larger reservation floor as its action threshold and suggested quantum bump target while leaving the hard ceiling and PR delta guard unchanged.",
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "notes": null,
+        "started_at": "2026-08-10T14:51:42Z",
+        "started_branch": "fix/fast-lane-reservation-erosion-20260810",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Add optional named headroom reservation to fast-lane policy and ratchet signal",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Documented activation, early erosion signal, explicit clearing, and why the completed one-engine program is not retroactively activated; shipped policy is reservation=null.",
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "notes": null,
+        "started_at": "2026-08-10T14:55:19Z",
+        "started_branch": "fix/fast-lane-reservation-erosion-20260810",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Document activation, erosion signal, and explicit clearing after the named program lands",
+        "wid": "w2"
+      },
+      {
+        "evidence": "17 medium tests pass, including malformed policy controls and a negative regression proving a 500-floor reservation at 278 headroom recommends +500 rather than +0; self-test passes 6 scenarios.",
+        "item_id": "fast-lane-ceiling-reservation-erosion",
+        "notes": null,
+        "started_at": "2026-08-10T14:55:25Z",
+        "started_branch": "fix/fast-lane-reservation-erosion-20260810",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Add pure negative/control coverage without adding fast-lane tests",
+        "wid": "w3"
+      }
+    ]
+  }
+}

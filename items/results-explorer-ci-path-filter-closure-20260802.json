@@ -1,0 +1,169 @@
+{
+  "context": "Map every non-local Vitest input, add only the missing dependency paths, and test changed-filter, fixture-only, and unrelated-path decisions.",
+  "description": "The explorer-vitest path group omits .github/workflows/pr.yml, .github/path-filters.yml, tests/unit/core/tuning/fixtures/tuning_mode_vocabulary.yaml, and tests/parity/fixtures/chart_ids.json even though Vitest reads them. Configuration or shared-fixture changes can therefore skip the gate that should detect them.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a repository-wide catch-all",
+        "instead": "add explicit dependency paths",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "why": "that destroys path-filter cost boundaries"
+      },
+      {
+        "dont": "assume a filter is self-covering",
+        "instead": "include filter and workflow configuration",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "why": "the filter can skip its own change"
+      },
+      {
+        "dont": "test only source changes",
+        "instead": "add one classifier case per omitted path",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "why": "the misses are workflow and fixture paths"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "needs_item": "results-explorer-ci-gate-runtime-closure-20260802"
+      }
+    ],
+    "item_meta": {
+      "category": "CI reliability",
+      "completed_at": "2026-08-10T00:20:30Z",
+      "completed_pr": 1669,
+      "created_at": "2026-08-02T16:26:45Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Explorer source and build inputs remain covered",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802"
+      },
+      {
+        "behavior": "Fixture changes cannot bypass their consumer gate",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802"
+      },
+      {
+        "behavior": "Unrelated Python-only PRs still skip Node",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing explorer-vitest group",
+        "decision": "extend",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "path": ".github/path-filters.yml"
+      },
+      {
+        "concept": "Generated chart fixture",
+        "decision": "reuse",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "path": "tests/parity/fixtures/chart_ids.json"
+      },
+      {
+        "concept": "Shared tuning fixture",
+        "decision": "reuse",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "path": "tests/unit/core/tuning/fixtures/tuning_mode_vocabulary.yaml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "kind": "only_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'import yaml; p=yaml.safe_load(open(\".github/path-filters.yml\")); paths=set(p[\"explorer-vitest\"]); assert {\".github/workflows/pr.yml\",\".github/path-filters.yml\",\"tests/unit/core/tuning/fixtures/tuning_mode_vocabulary.yaml\",\"tests/parity/fixtures/chart_ids.json\"} <= paths'",
+        "description": "Filter contains workflow, filter, tuning, and chart dependencies",
+        "expected": "Exit 0",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:15:38Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q",
+        "description": "Workflow tests pass",
+        "expected": "All workflow tests pass",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:15:48Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Audited Results Explorer Vitest consumers: chartRegistry parity tests read tests/parity/fixtures/chart_ids.json; tuningModeVocabulary tests read tests/unit/core/tuning/fixtures/tuning_mode_vocabulary.yaml; the PR gate is governed by .github/workflows/pr.yml and the shared classifier in .github/path-filters.yml. These four paths are the omitted non-local inputs.",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "notes": null,
+        "started_at": "2026-08-10T00:13:54Z",
+        "started_branch": "fix/results-explorer-ci-path-filter-closure-20260809",
+        "started_worktree": "/private/tmp/bb-results-explorer-ci-path-filter-20260809",
+        "status": "done",
+        "summary": "Inventory non-local Vitest inputs",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added only the four missing explicit explorer-vitest paths to .github/path-filters.yml and added four parameterized classifier regressions plus an unrelated Python negative case in tests/unit/workflows/test_pr_workflow_path_classifier.py. YAML verification and the focused workflow classifier file pass (25 tests).",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "notes": null,
+        "started_at": "2026-08-10T00:14:28Z",
+        "started_branch": "fix/results-explorer-ci-path-filter-closure-20260809",
+        "started_worktree": "/private/tmp/bb-results-explorer-ci-path-filter-20260809",
+        "status": "done",
+        "summary": "Add minimal filter paths and classifier regressions",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Exact YAML path-set verification passes; full tests/unit/workflows suite passes (190 passed); focused classifier tests pass (25 passed); Ruff check/format and git diff --check pass. The unrelated Python path remains explorer-vitest skipped while each four omitted paths now arms the gate.",
+        "item_id": "results-explorer-ci-path-filter-closure-20260802",
+        "notes": null,
+        "started_at": "2026-08-10T00:15:07Z",
+        "started_branch": "fix/results-explorer-ci-path-filter-closure-20260809",
+        "started_worktree": "/private/tmp/bb-results-explorer-ci-path-filter-20260809",
+        "status": "done",
+        "summary": "Verify dependency and unrelated-path decisions",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "- \"benchbox/platforms/databricks.py: load_data now uses COPY INTO for each table, infers delimiter (tbl → `|`, csv → `,`), counts rows, logs timings, and optionally OPTIMIZEs Delta tables. Supports staging via:\"\n- Enforces staging location presence (raises ValueError if missing) and eliminates temporary views/INSERT SELECT.\n- \"Tests: tests/unit/platforms/test_databricks_copy_into.py validates COPY INTO SQL, absence of temp views/INSERT, UC Volume staging, and error on missing staging.\"\n- Path normalization for remote output roots added separately for consistency across CLI/unified runner.",
+  "legacy": {
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

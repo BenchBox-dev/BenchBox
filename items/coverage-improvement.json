@@ -1,0 +1,10 @@
+{
+  "description": "Address test execution gaps and coverage enforcement. Analysis (Dec 2025) found:\n- 7,876 total tests (7,318 unit + 558 integration)\n- Platform adapter test coverage: 94% (17/18 adapters have tests)\n- CRITICAL: 90.5% of unit test files lack @pytest.mark markers\n- CI only runs tests marked \"fast\", causing unmarked tests to be skipped\n- This gap caused the PYSPARK_AVAILABLE NameError bug (commit 9d524094)",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "observability-quality"
+    }
+  }
+}

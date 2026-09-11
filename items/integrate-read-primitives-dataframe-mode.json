@@ -1,0 +1,11 @@
+{
+  "description": "Integrate existing Read Primitives DataFrame query support with benchmark\nregistry metadata, runner execution, and user-visible reporting.\n\nDataFrame query implementations already exist; this item closes mode and\ndiscoverability gaps.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-07T00:00:00Z",
+      "created_at": "2026-02-07T00:00:00Z",
+      "worktree": "dataframe-benchmarks"
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "context": "Confirm the todo-db >= 0.3 packaging and how the wrapper is expected to delegate (see .claude/skills/todo-db/SKILL.md rule 4 for wrappers), then wire it so 'todo update' works in-repo without the wrapper itself becoming a handler for it. Verify the TestSkillThinness disjointness tests still pass.",
+  "description": "Amendment is already solved upstream: todo-db >= 0.3 ships an 'update' verb, declared machine-readably in the skill sidecar as standalone_only_commands and deliberately NOT implemented by this repo's embedded _project/scripts/todo_db.py wrapper. Two tests in tests/unit/scripts/test_todo_wrapper.py enforce that boundary (TestSkillThinness), one hardcoding 'update' as the example of a wrapper-unsupported verb. So the repo currently cannot amend an item at all: scope, verifications and descriptions stay create-time-only, and three separate instances of that biting were recorded in the 2026-07-25/26 batches -- four promoted items born with no scope or ladder, a verification rung that can never pass, and an item description recommending an approach research had disproved. Decide and implement the adoption path: either take todo-db >= 0.3 as a dependency and route _project/scripts/todo to it, or have the wrapper delegate specifically its unsupported verbs to the standalone CLI when installed. Either way keep the disjointness invariant the wrapper tests encode.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "created_at": "2026-07-28T23:03:06Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "standalone_only_commands and wrapper handlers stay disjoint (TestSkillThinness)",
+        "item_id": "adopt-todo-db-standalone-cli-for-amendable-items"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "adopt-todo-db-standalone-cli-for-amendable-items",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo"
+      },
+      {
+        "item_id": "adopt-todo-db-standalone-cli-for-amendable-items",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "adopt-todo-db-standalone-cli-for-amendable-items",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py -q",
+        "description": "Wrapper boundary tests still pass",
+        "expected": "exit 0",
+        "item_id": "adopt-todo-db-standalone-cli-for-amendable-items",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

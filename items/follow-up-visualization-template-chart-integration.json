@@ -1,0 +1,392 @@
+{
+  "context": "Introduce a single chart-type capability registry and derive CLI help,\n--chart-type validation, MCP validation, and template parity checks from it.\nExtend runtime rendering dispatch to cover all chart types currently declared\nin templates using existing ASCII chart adapters and conversion helpers.\n\nFor template rendering, replace silent drop behavior with explicit skipped\nreasons when a chart is inapplicable (for example, insufficient runs or\nmissing query data). Keep rendering resilient while making omissions visible.\n\nFor heatmap readability, standardize fixed-width cell geometry so shaded\nblocks and right-aligned numerals consistently occupy the same width in each\nplatform column, with explicit separators retained between columns.\n\nFor query distribution output, remove series marker prefixes from labels\n(for example square/diamond glyphs) when they do not encode plotted data.\n\nRevisit template composition and add targeted templates where appropriate\n(latency deep dive, regression triage, executive summary) only if backed by\nimplemented render paths and tests.\n",
+  "description": "Recent visualization enhancements introduced additional ASCII chart types,\nbut template and selection workflows are not fully integrated end-to-end.\nSeveral chart types are declared in named templates yet silently skipped at\nrender time because chart registries and render dispatch paths are out of sync.\n\nThis follow-up aligns chart type registries, rendering support, template\ncomposition, and recommendation logic so named templates are trustworthy and\ndirectly selectable chart types match actual capabilities.\n\nThe implementation must also prevent silent omissions by surfacing explicit\n\"not applicable\" reasons, and add regression tests for template/chart parity.\n\nIn addition, no-color readability regressions must be addressed in this\nfollow-up: query heatmap cells need consistent block widths with improved\nnumeric spacing, and query distribution labels must remove decorative series\nmarker prefixes that are not part of plotted geometry.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add new chart names directly in multiple modules",
+        "instead": "define one canonical source and import it",
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "why": "duplicated registries drift"
+      },
+      {
+        "dont": "prepend decorative series glyphs to box-plot labels when glyphs are not used in the plot body",
+        "instead": "use plain series names",
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "why": "they waste label width and add noise"
+      },
+      {
+        "dont": "render heatmap cells with mixed-width fill/value layouts",
+        "instead": "enforce fixed cell width and right-aligned numerals",
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "why": "scanability collapses across rows"
+      },
+      {
+        "dont": "silently skip unsupported template chart types",
+        "instead": "emit explicit skip reasons and test them",
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "why": "users cannot trust template output completeness"
+      },
+      {
+        "dont": "widen comparison charts to arbitrary N-way semantics without design",
+        "instead": "enforce two-run expectations or provide explicit selection",
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "why": "current logic is pairwise and order-sensitive"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "follow-up-visualization-template-chart-integration",
+        "id": 186,
+        "reason": "Current follow-up is scoped to ASCII chart integration and template correctness",
+        "resolution": "promoted",
+        "resolved_item": "add-non-ascii-png-html-equivalents-for-new-template-bundles",
+        "resolved_reason": null,
+        "summary": "Add non-ASCII (PNG/HTML) equivalents for new template bundles"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-18T00:00:00Z",
+      "created_at": "2026-02-18T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing chart outputs for performance_bar, distribution_box, query_heatmap, query_histogram, cost_scatter, and time_series remain unchanged for identical inputs",
+        "item_id": "follow-up-visualization-template-chart-integration"
+      },
+      {
+        "behavior": "No regression in no-color/no-unicode rendering behavior for comparison and summary charts",
+        "item_id": "follow-up-visualization-template-chart-integration"
+      },
+      {
+        "behavior": "Query distribution labels remain text-first with no unused marker glyph prefixes",
+        "item_id": "follow-up-visualization-template-chart-integration"
+      },
+      {
+        "behavior": "Query heatmap no-color rendering keeps fixed-width per-cell layout with stable column separators",
+        "item_id": "follow-up-visualization-template-chart-integration"
+      },
+      {
+        "behavior": "benchbox visualize existing templates (default, flagship, head_to_head, trends, cost_optimization, comparison) remain valid CLI choices",
+        "item_id": "follow-up-visualization-template-chart-integration"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/execution/"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/visualize.py"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/visualization.py"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_visualization_tools.py"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py tests/unit/visualization/test_nocolor_rendering.py -q",
+        "description": "Visualization unit tests pass for ASCII charts and no-color rendering",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_visualization_tools.py -q",
+        "description": "MCP visualization tool tests pass with updated chart registry expectations",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox/core/visualization/ benchbox/cli/commands/visualize.py benchbox/mcp/tools/visualization.py tests/unit/visualization/ tests/unit/mcp/test_visualization_tools.py",
+        "description": "Ruff passes on touched visualization and CLI modules",
+        "expected": "no lint errors",
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -k \"heatmap or box_plot\" -q",
+        "description": "Heatmap and box-plot readability regressions are covered by focused tests",
+        "expected": "all selected tests pass, 0 failures",
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w3",
+        "wid": "w10"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w4",
+        "wid": "w10"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w5",
+        "wid": "w10"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w4",
+        "wid": "w9"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w7",
+        "wid": "w9"
+      },
+      {
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create canonical chart capability registry shared by templates, CLI, and MCP",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression tests for template-chart parity, registry consistency, skip reasons, heatmap layout, and box-plot label formatting",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run verification suite and finalize with updated TODO indexes",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement missing render dispatch paths for template-declared chart types",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align CLI --chart-type validation/help and all/auto behavior with canonical registry",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align MCP validation and docs with canonical registry; update suggestion logic for new charts",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add explicit template skip reporting for inapplicable charts instead of silent omission",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define/enforce comparison chart input semantics (two-run enforcement or explicit selection)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Improve query heatmap no-color scanability with fixed-width cell blocks and numeral spacing",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove non-semantic series marker prefixes from query distribution labels",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "follow-up-visualization-template-chart-integration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Evaluate and update named templates (existing and optional new templates) based on supported chart/data fit",
+        "wid": "w9"
+      }
+    ]
+  }
+}

@@ -1,0 +1,140 @@
+{
+  "context": "Run --unsafe-fixes once, then split the diff into directory-scoped commits for\nreviewability. The Python default encoding is platform-dependent (locale on\nLinux, utf-8 on macOS, mbcs on Windows) - adding explicit utf-8 is strictly\nsafer. For the few files that intentionally write CSV/TSV with platform\nencoding, document and noqa per-line.\n",
+  "description": "Quality plan Phase 1a/1b/1d. The repo currently has 238 ruff violations, 235 of\nthem PLW1514 (open() without explicit encoding=). All are auto-fixable with\n--unsafe-fixes. Apply the bulk fix in reviewed chunks, then ratchet the gates\nso the gain is locked:\n  - PLW1514 stays selected (currently selected - make sure CI fails on regression)\n  - B904 (raise-from) added to ruff select as error\n  - McCabe max-complexity lowered from 20 → 18, fix any new violations\n\nThis is a low-risk, high-signal cleanup that gives the rest of the quality plan\na clean baseline.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle the ratchet config changes with the bulk fix",
+        "instead": "separate commits per work unit",
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet",
+        "why": "it makes review impossible"
+      },
+      {
+        "dont": "silence violations with broad `noqa`",
+        "instead": "fix or per-line noqa with reason",
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet",
+        "why": "that defeats the gate"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-12T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All currently-passing tests continue to pass",
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet"
+      },
+      {
+        "behavior": "Existing per-file ruff ignores remain in place",
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet"
+      },
+      {
+        "behavior": "No behavior changes - encoding=\"utf-8\" is the safe default; only deviate where existing files document a different encoding",
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run ruff check .",
+        "description": "Ruff is clean",
+        "expected": "All checks passed",
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff format --check .",
+        "description": "Ruff format is clean",
+        "expected": "All files would be left unchanged",
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast test suite passes",
+        "expected": "all tests pass",
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run `uv run ruff check --fix --unsafe-fixes .` and review the diff in chunks (benchbox/, tests/, scripts/) - confirm encoding choices match file purpose (utf-8 for text, utf-8-sig only where needed)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add B904 to [tool.ruff.lint.select] in pyproject.toml and fix any newly-surfaced raise-from violations",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Lower McCabe max-complexity from 20 → 18 in pyproject.toml; refactor or noqa any newly-violating functions (with rationale)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-bulk-fix-encoding-lint-and-ratchet",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full fast test suite + verify CI is green; commit ratchet config in a separate commit from the bulk fix so review is easy",
+        "wid": "w4"
+      }
+    ]
+  }
+}

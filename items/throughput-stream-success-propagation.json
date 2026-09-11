@@ -1,0 +1,169 @@
+{
+  "context": "Wire success/errors into ThroughputTestPhase and the exported JSON, fail the phase on any dead/failed stream at the runner/export seam (so every consumer inherits it), fix the streams count derivation, and pin the stream-0 invariant. Depends on tpch-tpcds-throughput-at-size-formula because both touch runner.py/result_capture.py and metric tests.",
+  "description": "2026-07-21 adversarial UAT review finding (P2): stream success is computed then dropped. TPCHThroughputTest sets result.success from min_success_rate (throughput_test.py:214-218) but _execute_tpch_throughput_test only PRINTS it (execution.py:473-477); _create_throughput_phase copies streams + metric only (result_capture.py:1553-1576). TPCHThroughputTest.validate_results (throughput_test.py:616-635) - the only code checking streams_successful == num_streams and 22-queries-per-stream - has ZERO callers (dead code).\n\nConsequence: a stream that dies before its first query (connection_factory throws, throughput_test.py:444, caught at :594-596) exports zero queries[] rows, while compute_metrics multiplies the REQUESTED num_streams over the survivors' TTT (runner.py:361-374) -> plain `benchbox run`/`run-official` outside the UAT harness publishes a valid-looking result from an invalid run. The nightly UAT lane does catch it (tests/uat/runner.py:262-278 + nightly.yml assert step) - the product path must too.\n\nAlso in scope: run.streams derived as max(stream_id) (off-by-one; schema.py::_build_run_section, cited at tests/uat/throughput.py:152-156), and the accidental-but-load-bearing stream-0 validation invariant: set_query_context called WITHOUT stream_id (throughput_test.py:505-506) is the only reason validation runs on streams >0 at all, because registry.get_expected_result returns None for stream_id>0 (registry.py:89-99). Pin it with a comment + test before anyone 'fixes' it into silently disabling validation.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "enforce partial-stream fatality only in the UAT lane",
+        "instead": "enforce at the runner/export seam so every consumer inherits it",
+        "item_id": "throughput-stream-success-propagation",
+        "why": "plain benchbox run-official can publish an invalid throughput result today; the defect is in the product path"
+      },
+      {
+        "dont": "exclude failed streams from S and still emit a metric",
+        "instead": "any failed/dead stream fails the throughput phase; no metric",
+        "item_id": "throughput-stream-success-propagation",
+        "why": "that understates offered load and launders a failed measurement into a result"
+      },
+      {
+        "dont": "pass stream_id to set_query_context without registry support",
+        "instead": "pin current behavior with a test first; change only together with per-stream expected-results support",
+        "item_id": "throughput-stream-success-propagation",
+        "why": "registry.get_expected_result returns None for stream_id>0, which would silently disable validation on streams 1..N-1"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "throughput-stream-success-propagation",
+        "needs_item": "tpch-tpcds-throughput-at-size-formula"
+      }
+    ],
+    "item_meta": {
+      "category": "Bug Fixes",
+      "completed_at": "2026-07-21T13:53:46Z",
+      "completed_pr": 1246,
+      "created_at": "2026-07-21T11:43:22Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing per-query row schema unchanged (additive fields only).",
+        "item_id": "throughput-stream-success-propagation"
+      },
+      {
+        "behavior": "Nightly UAT lane checks (tests/uat/runner.py:262-278, nightly.yml assert step) unchanged and green.",
+        "item_id": "throughput-stream-success-propagation"
+      },
+      {
+        "behavior": "Seed derivation helper _derive_query_seed and its generation/validation symmetry untouched.",
+        "item_id": "throughput-stream-success-propagation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "dead validate_results - the orphaned check this item either wires in or replaces",
+        "decision": "supersede",
+        "item_id": "throughput-stream-success-propagation",
+        "path": "benchbox/core/tpch/throughput_test.py:616-635"
+      },
+      {
+        "concept": "validate_throughput_result - the UAT-lane stream-count/per-stream-success checks to mirror in the product path",
+        "decision": "reuse",
+        "item_id": "throughput-stream-success-propagation",
+        "path": "tests/uat/throughput.py:266-293"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "throughput-stream-success-propagation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "throughput-stream-success-propagation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/throughput/"
+      },
+      {
+        "item_id": "throughput-stream-success-propagation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/throughput_test.py"
+      },
+      {
+        "item_id": "throughput-stream-success-propagation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/"
+      },
+      {
+        "item_id": "throughput-stream-success-propagation",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'throughput and stream' -q",
+        "description": "Dead stream is fatal and visible",
+        "expected": "a stream failing before its first query fails the phase; export carries per-stream success; streams count is exact",
+        "item_id": "throughput-stream-success-propagation",
+        "last_result": "pass",
+        "last_run": "2026-07-21T13:44:19Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'stream and (context or validation)' -q",
+        "description": "Stream-0 invariant pinned",
+        "expected": "test fails if someone threads stream_id without registry support",
+        "item_id": "throughput-stream-success-propagation",
+        "last_result": "pass",
+        "last_run": "2026-07-21T13:44:32Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "throughput-stream-success-propagation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Strict stream outcomes and errors propagate through ThroughputTestPhase/schema v2; 243 focused tests and tracker verification 1 pass.",
+        "item_id": "throughput-stream-success-propagation",
+        "notes": null,
+        "started_at": "2026-07-21T13:32:18Z",
+        "started_branch": "codex/throughput-stream-success-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.isolated-throughput-success-20260721",
+        "status": "done",
+        "summary": "Propagate per-stream success + errors into ThroughputTestPhase and the exported result JSON (result_capture.py:1553-1576 seam)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Shared StreamRunner rejects dead, zero-query, partial-query, errored, or missing streams; adapter suppresses Throughput@Size and marks the product phase failed. 243 focused tests and both tracker verifications pass.",
+        "item_id": "throughput-stream-success-propagation",
+        "notes": null,
+        "started_at": "2026-07-21T13:44:56Z",
+        "started_branch": "codex/throughput-stream-success-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.isolated-throughput-success-20260721",
+        "status": "done",
+        "summary": "Fail the phase in the product path when any stream is dead or failed (no metric emitted); wire validate_results in or delete it in favor of the new check",
+        "wid": "w2"
+      },
+      {
+        "evidence": "schema.py now derives run.streams from len(distinct stream ids); export regression composed into existing timing-contract test.",
+        "item_id": "throughput-stream-success-propagation",
+        "notes": null,
+        "started_at": "2026-07-21T13:32:21Z",
+        "started_branch": "codex/throughput-stream-success-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.isolated-throughput-success-20260721",
+        "status": "done",
+        "summary": "Fix run.streams derivation: count distinct executed streams, not max(stream_id)",
+        "wid": "w3"
+      },
+      {
+        "evidence": "TPC-H call site documents canonical stream-0 context; composed compliance regression asserts 44 context calls omit stream_id; tracker verification 2 passes.",
+        "item_id": "throughput-stream-success-propagation",
+        "notes": null,
+        "started_at": "2026-07-21T13:32:24Z",
+        "started_branch": "codex/throughput-stream-success-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.isolated-throughput-success-20260721",
+        "status": "done",
+        "summary": "Pin the stream-0 validation-context invariant with a call-site comment + regression test; thread stream_id only with an explicit registry design decision",
+        "wid": "w4"
+      }
+    ]
+  }
+}

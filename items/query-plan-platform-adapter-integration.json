@@ -1,0 +1,11 @@
+{
+  "description": "Extend PlatformAdapter base class and all 8+ platform adapters to support\nquery plan capture. Add capture_query_plan() method that executes EXPLAIN,\nparses output, and returns QueryPlanDAG. Integrate with execute_query() flow.\n\n**Integration Strategy**:\n- Modify base adapter to add capture_query_plan() abstract method\n- Each platform implements method using its parser\n- execute_query() optionally captures plan based on --capture-plans flag\n- Graceful handling when parser unavailable or fails",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2025-11-23T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-adapters"
+    }
+  }
+}

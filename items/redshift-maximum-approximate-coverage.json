@@ -1,0 +1,335 @@
+{
+  "context": "Pure catalog-only work (operations.yaml + queries.yaml + 2 docs +\nchangelog). No Python, no schema.py, no loader.py, no benchmark.py\nchanges. Mirrors the structure of the ClickHouse-native expansion\nTODO — same shape, different engine.\n\nFor the read_primitives variant (w1), use the existing per-engine\nvariant mechanism. If the variant_contracts checker can't parse\nAPPROXIMATE PERCENTILE_DISC, investigate whether the checker has a\nparse-failure allowlist OR whether the variant should be guarded by\nthe same skip_on as before with a different mechanism (e.g., a\ncomment-based opt-out). w1's research output will determine the\nright path.\n\nFor the write_primitives HLL ops (w2-w5), each Redshift override\nemits its own self-contained DDL → INSERT → optional SELECT → DROP,\nmatching the existing DuckDB / Databricks / Snowflake / BigQuery\npattern. HLLSKETCH constraints (no DISTKEY/SORTKEY/PK/GROUP BY) are\nexpressed in the SQL itself, not factored into the BINARY translator.\n\nInitial tolerance bounds for the HLL merge ★ op are estimates\n(HLL++ vs DataSketches Theta have different bias profiles); cloud\nverification re-tunes them. This matches the strategy used for the\ncloud overrides in PR #112.\n\nDocumentation lands last (w7), after the ops are verified to parse\nand load. Changelog (w8) is the final commit.\n",
+  "description": "Audit of Redshift's approximate-aggregate surface (2026-05-02)\nfound that BenchBox supports Redshift to maximum extent on **2 of 5**\nnew read_primitives approximate queries and **0 of 4** HLL-applicable\nwrite_primitives sketch ops. Closable gap is **1 read variant + 4\nwrite HLL variants** in a single catalog-only PR.\n\nRedshift's complete approximate surface is **HLL-only**: no top-K, no\nT-Digest, no KLL, no Theta, no CMS, no frequency-estimation\naggregate. The April 2026 \"Top-K optimization\" announcement was an\ninternal optimizer change for `ORDER BY … LIMIT N`, not a new\nfunction family. So \"maximum coverage\" means: (a) every existing\nquery that maps to an HLL or `APPROXIMATE PERCENTILE_DISC` path runs\non Redshift; (b) the HLL persist + merge + requery loop is exercised\nend-to-end; (c) ops that can't run on Redshift skip with explicit\nrationale comments instead of bare `null`.\n\nThis TODO closes the gap. Verification end-to-end requires Redshift\ncredentials BenchBox doesn't currently have locally — the catalog\nchanges ship pre-cloud-verification with sqlglot static-parse\nvalidation, then the cloud-verification TODO\n(`write-primitives-sketch-cloud-verification`) picks up Redshift as\nanother engine to run when creds become available.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "activate the existing _BINARY_TYPE_BY_DIALECT[redshift] = HLLSKETCH translator",
+        "instead": "keep ops self-contained with explicit redshift: DDL.",
+        "item_id": "redshift-maximum-approximate-coverage",
+        "why": "HLLSKETCH semantics (no DISTKEY/SORTKEY/GROUP BY) don't fit the generic BINARY abstraction and silently breaking on Redshift in some other op would be very hard to debug"
+      },
+      {
+        "dont": "attempt UDF emulation of top-K, KLL, T-Digest etc. on Redshift",
+        "instead": "let those ops stay skipped with explicit rationale comments.",
+        "item_id": "redshift-maximum-approximate-coverage",
+        "why": "the resulting numbers would measure UDF dispatch overhead, not sketch performance, and would mislead cross-engine comparisons"
+      },
+      {
+        "dont": "rename ops to reflect the HLL family substitution (e.g., sketch_insert_theta_per_partition → sketch_insert_hll_or_theta_per_partition)",
+        "instead": "keep the ID as 'theta' and document the per-engine substitution in the cross-platform doc.",
+        "item_id": "redshift-maximum-approximate-coverage",
+        "why": "the op ID is the user-facing measurement key and changing it breaks cross-engine comparison"
+      },
+      {
+        "dont": "tune Redshift expected_value_min/max bounds tightly without empirical observations",
+        "instead": "set initial bounds wide with a 'Redshift bounds initial estimate; re-tune in cloud-verification TODO' inline comment.",
+        "item_id": "redshift-maximum-approximate-coverage",
+        "why": "HLL++ vs DataSketches bias differs and cloud-verification can't run locally"
+      },
+      {
+        "dont": "use HLLSKETCH columns in DISTKEY / SORTKEY / GROUP BY / ORDER BY / DISTINCT",
+        "instead": "DDL must use DISTSTYLE EVEN (or AUTO) and queries must group by a non-sketch column (e.g., region or activity_date).",
+        "item_id": "redshift-maximum-approximate-coverage",
+        "why": "Redshift rejects these placements"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "redshift-maximum-approximate-coverage",
+        "id": 547,
+        "reason": "Functionally identical to APPROXIMATE COUNT(DISTINCT) which sqlglot already rewrites to. Adding HLL(col) explicitly would double-count the same code path without measuring anything different.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason states native HLL(col) is functionally identical to the already-rewritten APPROXIMATE COUNT(DISTINCT) path; adds no new coverage.",
+        "summary": "Native HLL(col) one-shot variant of approx_count_distinct_simple"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "redshift-maximum-approximate-coverage",
+        "id": 548,
+        "reason": "Useful for combining sketches across pre-aggregated tables via a join — but the current write_primitives shape is single-table partition-merge. Out of scope until a multi-table sketch op is added.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly out of scope until a multi-table sketch op is added to write_primitives; no evidence that's happened, no open item.",
+        "summary": "HLL_COMBINE_SKETCHES scalar variant for join-style sketch combinations"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "redshift-maximum-approximate-coverage",
+        "id": 549,
+        "reason": "Nice-to-have; would eliminate the need for the hand-written w1 variant. Not blocking — per-engine variant works today. File as a separate sqlglot upstream issue if/when bandwidth allows.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly 'nice-to-have... file as separate sqlglot upstream issue if/when bandwidth allows'; per-engine variant works today, non-blocking.",
+        "summary": "sqlglot upstream PR for APPROXIMATE PERCENTILE_DISC parsing"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "redshift-maximum-approximate-coverage",
+        "id": 550,
+        "reason": "Per-op explicit DDL in platform_overrides is safer than the generic translator (HLLSKETCH semantic constraints don't fit the BINARY abstraction — DISTKEY / SORTKEY / GROUP BY restrictions). Leave the mapping in place as documentation but keep ops self-contained with explicit DDL.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicit design decision to keep per-op explicit DDL over the generic HLLSKETCH translator path; mapping kept only as documentation.",
+        "summary": "Activating the existing _BINARY_TYPE_BY_DIALECT[redshift] = HLLSKETCH translator path"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-02T00:00:00Z",
+      "created_at": "2026-05-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All 117 existing write_primitives operations execute identically — the only changes are 4 platform_overrides moving from null to a real SQL block, plus inline rationale comments on 4 still-null entries.",
+        "item_id": "redshift-maximum-approximate-coverage"
+      },
+      {
+        "behavior": "All 157 existing read_primitives queries continue to load and execute identically — the only change is dropping `redshift` from one skip_on list and adding one variant.",
+        "item_id": "redshift-maximum-approximate-coverage"
+      },
+      {
+        "behavior": "The existing _BINARY_TYPE_BY_DIALECT[redshift] = 'HLLSKETCH' mapping is NOT activated by any op (per-op explicit DDL is the chosen pattern); the mapping stays as documentation only.",
+        "item_id": "redshift-maximum-approximate-coverage"
+      },
+      {
+        "behavior": "variant_contracts checker passes against the augmented Redshift variant for approx_quantile_groupby — may require an allowlist entry if sqlglot can't parse APPROXIMATE PERCENTILE_DISC, investigate during w1.",
+        "item_id": "redshift-maximum-approximate-coverage"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/benchmark.py"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/variant_contracts.py"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/schema.py"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/catalog/queries.yaml"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/read-primitives-approximate-functions.md"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/write-primitives-sketch-functions.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/read_primitives tests/unit/core/read_primitives -q -m fast",
+        "description": "All read_primitives unit tests pass with the new Redshift variant",
+        "expected": "all tests pass; variant_contracts checker accepts (or explicitly allowlists) the APPROXIMATE PERCENTILE_DISC variant",
+        "item_id": "redshift-maximum-approximate-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/write_primitives -q",
+        "description": "All write_primitives unit tests pass with augmented Redshift overrides",
+        "expected": "all tests pass, including catalog_loader tests with the 4 new Redshift overrides",
+        "item_id": "redshift-maximum-approximate-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark write_primitives --scale 0.01 --queries sketch_ddl_create_persistent_table,sketch_insert_theta_per_partition,sketch_insert_kll_per_partition,sketch_insert_topk_per_shard,sketch_query_theta_union_merge,sketch_query_kll_quantiles_merge,sketch_query_topk_combine,sketch_drop_persistent_table",
+        "description": "DuckDB regression: all 8 sketch ops still pass (no DuckDB-side changes expected)",
+        "expected": "8/8 pass on DuckDB",
+        "item_id": "redshift-maximum-approximate-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark read_primitives --scale 0.01 --queries approx_count_distinct_simple,approx_count_distinct_groupby,approx_quantile_groupby,approx_quantiles_array,approx_top_k_lineitem",
+        "description": "DuckDB regression: 5 read_primitives approx queries still pass",
+        "expected": "5/5 pass on DuckDB",
+        "item_id": "redshift-maximum-approximate-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform redshift --benchmark write_primitives --scale 0.01 --queries sketch_ddl_create_persistent_table,sketch_insert_theta_per_partition,sketch_query_theta_union_merge,sketch_drop_persistent_table",
+        "description": "Redshift cloud verification (BLOCKED — needs Redshift creds)",
+        "expected": "4/4 pass on Redshift; merged distinct estimate within tuned bounds — REQUIRES creds, will land via the cloud-verification TODO when available",
+        "item_id": "redshift-maximum-approximate-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "redshift-maximum-approximate-coverage",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "redshift-maximum-approximate-coverage",
+        "notes": "In `benchbox/core/read_primitives/catalog/queries.yaml`,\nadd a `redshift:` entry under the existing `variants:` block of\n`approx_quantile_groupby`:\n\n  redshift: |2\n\n    SELECT\n        l_shipmode,\n        APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY l_quantity) as median_quantity\n    FROM lineitem\n    GROUP BY l_shipmode;\n\nDrop `redshift` from the existing `skip_on: [redshift, sqlite]`\nlist (leave sqlite). The variant_contracts checker will fail to\nparse the variant via sqlglot — confirm the existing checker\ngracefully accepts a variant_parse_error vs hard-failing the\ncatalog. If it hard-fails, the variant_contracts test needs an\nallowlist entry for this specific Redshift parse limitation\n(precedent: investigate during w1 — may need a follow-up\n`# variant_contracts: allow-parse-failure(redshift)` marker if\nno precedent exists).\n\nl_shipmode has 7 distinct values, well under any per-node group\ncap, so the GROUP BY size restriction doesn't apply here.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add hand-written redshift: variant for approx_quantile_groupby using APPROXIMATE PERCENTILE_DISC",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "redshift-maximum-approximate-coverage",
+        "notes": "In `benchbox/core/write_primitives/catalog/operations.yaml`,\nreplace the `redshift: null` for `sketch_ddl_create_persistent_table`\nwith:\n\n  redshift: |\n    DROP TABLE IF EXISTS sketch_ops_daily_users;\n    CREATE TABLE sketch_ops_daily_users (\n      activity_date DATE,\n      region VARCHAR(25),\n      user_sketch HLLSKETCH,\n      rev_sketch HLLSKETCH\n    )\n    DISTSTYLE EVEN;\n\nNotes:\n  - DISTSTYLE EVEN required: HLLSKETCH cannot be DISTKEY/SORTKEY.\n  - No PRIMARY KEY / FOREIGN KEY on these scratch tables: not needed\n    for benchmark semantics, and avoids mixing informational\n    constraints into HLLSKETCH-specific DDL.\n  - This activates the previously-unused HLLSKETCH path on Redshift.\n\nFor the validation_query, the existing `SELECT COUNT(*) FROM\ninformation_schema.tables WHERE table_name = 'sketch_ops_daily_users'`\nshould work as-is.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Redshift HLL DDL override for sketch_ddl_create_persistent_table",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "redshift-maximum-approximate-coverage",
+        "notes": "Replace `redshift: null` with:\n\n  redshift: |\n    DROP TABLE IF EXISTS sketch_ops_daily_users;\n    CREATE TABLE sketch_ops_daily_users (\n      activity_date DATE, region VARCHAR(25),\n      user_sketch HLLSKETCH, rev_sketch HLLSKETCH\n    ) DISTSTYLE EVEN;\n    INSERT INTO sketch_ops_daily_users\n    SELECT l_shipdate, l_returnflag,\n           HLL_CREATE_SKETCH(l_orderkey),\n           HLL_CREATE_SKETCH(CAST(l_extendedprice AS BIGINT))\n    FROM lineitem\n    GROUP BY l_shipdate, l_returnflag;\n\nThis is the HLL equivalent of the theta-style persist op. The op\nID stays `sketch_insert_theta_per_partition` because the\nbenchmark measurement is \"build a sketch per partition\" — HLL is\nRedshift's expression of that capability. Document the family\nsubstitution in the cross-platform doc (w7).\n\nThe existing validation_query (`SELECT COUNT(*) as partitions\nFROM sketch_ops_daily_users` with `expected_rows_min: 1`) works\nunchanged.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Redshift HLL insert override for sketch_insert_theta_per_partition (replaces theta with HLL)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "redshift-maximum-approximate-coverage",
+        "notes": "Replace `redshift: null` with the HLL persist+merge+requery\nlifecycle:\n\n  redshift: |\n    DROP TABLE IF EXISTS sketch_ops_daily_users;\n    CREATE TABLE sketch_ops_daily_users (\n      activity_date DATE, region VARCHAR(25),\n      user_sketch HLLSKETCH, rev_sketch HLLSKETCH\n    ) DISTSTYLE EVEN;\n    INSERT INTO sketch_ops_daily_users\n    SELECT l_shipdate, l_returnflag,\n           HLL_CREATE_SKETCH(l_orderkey),\n           HLL_CREATE_SKETCH(CAST(l_extendedprice AS BIGINT))\n    FROM lineitem GROUP BY l_shipdate, l_returnflag;\n    SELECT HLL_CARDINALITY(HLL_COMBINE(user_sketch)) AS distinct_orders\n    FROM sketch_ops_daily_users;\n\nFor the validation_query, mirror the existing DuckDB\n`theta_estimate_in_range` pattern — the SELECT returns the\nmerged distinct estimate; assert it falls in\n[expected_value_min, expected_value_max].\n\nTolerance bounds: HLL++ (Redshift's implementation) produces\ndifferent bias than DataSketches Theta. Cannot tune empirically\nwithout Redshift creds — set initial bounds wide\n(initial recommendation: [14500, 15500] for Redshift HLL logm=15\nat SF=0.01, subject to live observation) and document\n\"Redshift bounds initial estimate; re-tune in cloud-verification\nTODO\" inline. Same approach used for cloud overrides in PR #112.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Redshift HLL merge override for sketch_query_theta_union_merge ★ headline op",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "redshift-maximum-approximate-coverage",
+        "notes": "Trivial mirror of w2 with explicit DROP at the end:\n\n  redshift: |\n    DROP TABLE IF EXISTS sketch_ops_daily_users;\n    CREATE TABLE sketch_ops_daily_users (\n      activity_date DATE, region VARCHAR(25),\n      user_sketch HLLSKETCH, rev_sketch HLLSKETCH\n    ) DISTSTYLE EVEN;\n    DROP TABLE sketch_ops_daily_users;\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Redshift DROP override for sketch_drop_persistent_table",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "redshift-maximum-approximate-coverage",
+        "notes": "For these ops, replace bare `redshift: null` with an explicit\nrationale comment:\n  - sketch_insert_kll_per_partition:\n    `redshift: null  # Redshift has no KLL or T-Digest sketch family`\n  - sketch_insert_topk_per_shard:\n    `redshift: null  # Redshift has no top-K function family`\n  - sketch_query_kll_quantiles_merge:\n    `redshift: null  # Redshift has no KLL or T-Digest sketch family`\n  - sketch_query_topk_combine:\n    `redshift: null  # Redshift has no top-K function family`\n\nDocumentation hygiene: prevents the next reader re-asking\n\"could we add Redshift coverage for this op\" because it's\nalready answered inline.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tighten skip-rationale comments on the 4 ops that legitimately stay null on Redshift",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "redshift-maximum-approximate-coverage",
+        "notes": "Two docs touched:\n\n`docs/benchmarks/read-primitives-approximate-functions.md`:\n  - In the Single-quantile table, change Redshift from \"(skipped)\"\n    to \"APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY x)\n    — YAML variant\" with a footnote on the per-node GROUP BY size\n    cap.\n\n`docs/benchmarks/write-primitives-sketch-functions.md`:\n  - In the family × engine support matrix: change Redshift from\n    \"(skipped)\" on Theta to \"HLL substitution (HLL_CREATE_SKETCH /\n    HLL_COMBINE / HLL_CARDINALITY)\" with a footnote explaining\n    HLL is Redshift's expression of distinct-counting persist+\n    merge.\n  - Confirm the per-engine column-type table still says\n    \"Redshift: HLLSKETCH (HLL family only)\" — it does, but\n    add the constraint annotations (cannot be DISTKEY/SORTKEY/\n    GROUP BY/etc.).\n  - Add a \"Redshift HLL-only ceiling\" subsection noting that\n    Redshift fundamentally lacks Theta / KLL / Top-K and thus\n    stays skipped on those sketch families. Pre-empts the\n    \"why no top-K\" question.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update cross-platform sketch docs with Redshift HLL coverage and HLL-only ceiling",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "redshift-maximum-approximate-coverage",
+        "notes": "Two terse user-facing bullets:\n\"read_primitives: add Redshift variant for approx_quantile_groupby\nusing APPROXIMATE PERCENTILE_DISC. Was skipped (sqlglot parser gap).\"\n\"write_primitives sketch: add Redshift HLL coverage for the 4\nHLL-applicable ops (DDL, theta-style insert, theta-style merge,\ndrop) using HLL_CREATE_SKETCH / HLL_COMBINE / HLL_CARDINALITY.\nKLL / Top-K ops stay skipped — Redshift has no equivalent.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add changelog entry under unreleased",
+        "wid": "w8"
+      }
+    ]
+  }
+}

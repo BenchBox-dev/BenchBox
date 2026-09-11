@@ -1,0 +1,170 @@
+{
+  "description": "From the 2026-07-12 tuning review, finding R7 (evidence pinned to commit\nacfb8992). 467 tuning unit tests pass while every soundness boundary has zero\ncoverage:\n\n- No test covers requested-vs-applied integrity (tunings_applied vs executed\n  statements).\n- Validation-status tests pin \"PASSED\" (test_tpc_tuning_template_parity.py:231,270),\n  a value production never emits (real set: NOT_APPLICABLE/APPLIED/\n  FAILED_TO_SAVE/NOT_VALIDATED).\n- No test calls get_ddl_generator at all; no registry-completeness test.\n- No cross-consistency test across the capability sources (interface compat\n  map, generator registry, platform_capabilities mapping).\n- No tests for hash stability/canonicality (get_configuration_hash,\n  hash_tuning_template).\n- No shared Python<->TypeScript tuning_mode vocabulary pin; Python emits\n  \"balanced\" (cli/tuning.py:52,56) unknown to the explorer.\n- Resolver's emitted fallback log marker and coverage.py's parser expectation\n  can drift silently (coverage tests hand-write the strings).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "No tests that merely mirror implementation constants",
+        "instead": "(not specified)",
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "why": "each must encode an invariant that catches drift"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "tuning-soundness-test-coverage-20260712",
+        "id": 284,
+        "reason": "Ledger shape gated on ADR-1; w6 pins today's requested-side behavior first",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Full applied-ledger integrity assertions are covered by open item tuning-applied-ledger-and-validation-status-20260712 (applied-tuning ledger + honest validation_status).",
+        "summary": "Full applied-ledger integrity assertions"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "needs_item": "tuning-generator-registry-completeness-20260712"
+      },
+      {
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "needs_item": "tuning-platform-identity-canonical-keys-20260712"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing 467 passing tuning tests (modify only the fictional-vocabulary fixtures)",
+        "item_id": "tuning-soundness-test-coverage-20260712"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/results/schema_specs.yaml + benchmark_specs.yaml: existing YAML-spec-consumed-by-code pattern — reuse for the shared tuning_mode vocabulary pin",
+        "decision": "reuse",
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "path": "benchbox/core/results/schema_specs.yaml"
+      },
+      {
+        "concept": "tests/uat/data/tuning_coverage.tsv: existing checked-in matrix asserted by tests — same enforcement shape",
+        "decision": "reuse",
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "path": "tests/uat/data/tuning_coverage.tsv"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/tests/**"
+      },
+      {
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/coverage.py"
+      },
+      {
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/**/__tests__/**"
+      },
+      {
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning tests/unit/cli/test_tuning* -q",
+        "description": "New suites pass and fail-on-drift is demonstrated (mutate one registry entry locally, observe failure, revert)",
+        "expected": "All passing; drift-demo documented in PR body",
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "needs_wid": "w1",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "notes": "Replaced both \"PASSED\" fixtures in test_tpc_tuning_template_parity.py\n(lines 231, 270) with \"APPLIED\" (a value adapter.py actually emits).\nAdded tests/unit/core/tuning/test_validation_status_vocabulary.py,\nwhich statically extracts every string literal adapter.py assigns to\n`tuning_validation_status` via `ast` (not a hand-copied set) plus the\nBenchmarkResults dataclass default, and pins the union against\n{NOT_APPLICABLE, APPLIED, FAILED_TO_SAVE, NOT_VALIDATED}.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pin the real validation-status vocabulary in tests; remove fictional 'PASSED' fixtures",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "notes": "tests/unit/core/tuning/test_hash_canonicality.py covers both\nBenchmarkTunings.get_configuration_hash (insertion-order stability,\ndistinctness, full 64-char sha256 hexdigest -- NOT truncated) and\nprofile_validation.hash_tuning_template (same properties, but\nconfirmed truncated to 16 hex chars/64 bits). The 16-char truncation's\ncollision posture (non-negligible birthday-bound collisions past\n~2**32 configs; not a cryptographic identity proof on its own) is\ndocumented directly in that test's assertion message.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Hash canonicality tests: dict-ordering stability, semantic-equivalence, distinctness across differing configs, truncation posture documented",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "notes": "Narrowed per the orchestrator's guidance: PR #1174 already landed a\nsync test between _PLATFORM_COMPATIBILITY_MAP and\n_KNOWN_COMPATIBILITY_PLATFORMS (test_platform_identity_keys.py) --\nthose two literally cannot diverge (one is derived from the other), so\nthis TODO does not duplicate it. tests/unit/core/tuning/\ntest_capability_source_drift.py instead covers the two sources #1174\ndidn't touch: get_ddl_generator()'s registry (keys extracted via `ast`\nfrom its own dict literal, not re-declared) vs _PLATFORM_COMPATIBILITY_MAP,\nand platform_capabilities.map_candidate_to_platform's empirically-\nprobed supported set (by calling the real function across every\nWorkloadTuningCandidate role, not re-implementing its branch logic) vs\n_PLATFORM_COMPATIBILITY_MAP. Every current divergence is enumerated in\nan EXPECTED_* allowlist with a reason (ADR-3 gates consolidation);\nexact-match assertions against those allowlists fail on both new drift\nand stale (over-broad) allowlist entries, mirroring\ntest_ddl_generator_registry.py's stale-exemption check. Drift-demo:\ntemporarily removed the \"mysql\" entry from\n_PLATFORM_COMPATIBILITY_MAP in interface.py -- 2 of the 6 new tests\nfailed with clear stale-allowlist messages naming \"mysql\"; reverted via\nthe pre-edit backup and the suite returned to green (see PR body / this\ncompletion note; no diff left in interface.py).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cross-source consistency test over capability registries (expected-drift allowlist so it fails only on NEW drift until consolidation lands)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "notes": "tests/unit/cli/test_tuning_marker_coverage_roundtrip.py calls the real\nresolve_tuning() (notuning / tuned-fallback-no-template / tuned-\nfallback-no-platform-benchmark / tuned-auto-discovered / auto /\nexplicit-file) and feeds its actual TuningResolution.info_messages\nstraight into coverage.py's real status_from_log_text() -- no marker\nsubstrings are hand-written in the test. No changes to coverage.py\nwere needed; status_from_log_text and the three status constants were\nalready public/importable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolver marker <-> coverage.py parser round-trip test (resolver emits, parser classifies; no hand-written strings)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "notes": "Shared artifact: tests/unit/core/tuning/fixtures/tuning_mode_vocabulary.yaml\n(NOT under a `data/` directory -- the repo .gitignore blanket-ignores\nthose; caught this via `git status` showing the file untracked/`!!`\nafter the first write and relocated it). Pins ADR-2's decided set\n{tuned, tuned-fallback, notuning, auto, custom} plus the\nnot-recorded sentinel as a TEST CONTRACT, not current-emitter\ncompliance (cli/tuning.py still emits \"balanced\";\nTuningBadge.tsx/TUNING_CONFIG still only knows tuned/notuning/auto --\nmigrating those is the separate, unstarted\ntuning-mode-vocabulary-and-facet-implementation-20260712).\ntests/unit/core/tuning/test_tuning_mode_vocabulary.py (Python) and\nresults-explorer/src/lib/__tests__/tuningModeVocabulary.test.ts\n(TypeScript) both assert directly against that same YAML file: the TS\ntest loads it via a `uv run -- python -c` subprocess, the same\nshell-out pattern already established by db-remediation-pin.test.ts,\nrather than maintaining a separate hardcoded TS mirror that would need\nits own regex-based cross-check. This satisfies ADR-2 §2's \"single\nshared artifact\" requirement more directly than the originally-sketched\nTS-constants-plus-regex-parse fallback.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Shared vocabulary pin: single source (JSON/YAML) asserted by both pytest and vitest for tuning_mode values",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-soundness-test-coverage-20260712",
+        "notes": "tests/unit/core/tuning/test_requested_vs_applied_capture.py builds a\nstub PlatformAdapter (tuning_enabled=True) whose apply_unified_tuning\ndeliberately executes only a constraint statement against a recording\nconnection, skipping every requested table-level tuning (simulating a\nsilent partial-application). Calling the real\n_setup_fresh_database_phases and reproducing adapter.py's real\nrun_enhanced_benchmark derivation (tunings_applied_dict =\neffective_tuning_config.to_dict(); tuning_validation_status = \"APPLIED\"\nif tuning_metadata_saved else \"FAILED_TO_SAVE\") shows the documented\ngap: tunings_applied still lists both tables' sort tunings even though\nthe connection only ever saw one statement, and\ntuning_validation_status=\"APPLIED\" reflects only that the metadata row\nwas saved. Named and documented explicitly as pinning requested-config\ncapture, not applied verification, per the applied-ledger deferral\nbelow.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Requested-vs-applied harness: adapter-level test with a recording connection asserting executed tuning statements are reflected in captured metadata (deepens once the applied ledger lands)",
+        "wid": "w6"
+      }
+    ]
+  }
+}

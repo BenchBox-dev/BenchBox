@@ -1,0 +1,78 @@
+{
+  "context": "Add a 'key_id' part to _SECRET_KEY_PARTS (it normalizes to 'keyid' and would then match s3_key_id, aws_key_id, key_id). Check the existing platform-options tests for any key that would newly redact and would be a behavior change worth calling out.",
+  "description": "is_secret_option_key() in benchbox/core/results/platform_options.py normalizes keys by stripping non-alphanumerics and matches against _SECRET_KEY_PARTS, which includes 'access_key' but not 'key_id'. So s3_key_id normalizes to 's3keyid' and is NOT redacted, and an explicit --platform-option s3_key_id=AKIA... reaches exported result metadata verbatim. Companion keys are covered: pg_password -> 'pgpassword' matches 'password', s3_secret -> 's3secret' matches 'secret'. Low severity - an AWS access key ID is an identifier rather than the secret half of the pair - but it is still credential material in published data.",
+  "legacy": {
+    "item_meta": {
+      "category": "security",
+      "completed_at": "2026-07-29T23:20:26Z",
+      "completed_pr": 1346,
+      "created_at": "2026-07-29T12:18:42Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Already-redacted keys (password/token/secret/...) keep their current behavior",
+        "item_id": "platform-options-key-id-not-redacted"
+      },
+      {
+        "behavior": "Non-secret option keys still export their real values",
+        "item_id": "platform-options-key-id-not-redacted"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platform-options-key-id-not-redacted",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/platform_options.py"
+      },
+      {
+        "item_id": "platform-options-key-id-not-redacted",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_platform_options.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_platform_options.py -q",
+        "description": "s3_key_id is redacted in sanitized platform options",
+        "expected": "all pass; new case asserts REDACTED_VALUE for s3_key_id",
+        "item_id": "platform-options-key-id-not-redacted",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-options-key-id-not-redacted",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "benchbox/core/results/platform_options.py: added 'key_id' to _SECRET_KEY_PARTS (normalizes to 'keyid'); s3_key_id AND kms_key_id both now redact, sort_key/partition_key/primary_key unaffected",
+        "item_id": "platform-options-key-id-not-redacted",
+        "notes": null,
+        "started_at": "2026-07-29T23:16:02Z",
+        "started_branch": "fix/platform-options-key-id-redaction",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Extend _SECRET_KEY_PARTS so *_key_id keys are recognized as secret-like",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/core/results/test_platform_options_capture.py: test_provider_prefixed_key_id_keys_are_redacted (6 params), test_non_credential_key_names_are_not_redacted (9 params, over-redaction guard), test_sanitize_redacts_key_id_end_to_end_without_touching_sort_keys; 44 passed in file, 8792 passed across tests/unit/core/results + tests/unit/platforms; mutation check - removing 'key_id' fails 7. NOTE: tests placed in the existing test_platform_options_capture.py, not the test_platform_options.py named in scope/ladder (does not exist)",
+        "item_id": "platform-options-key-id-not-redacted",
+        "notes": null,
+        "started_at": "2026-07-29T23:16:38Z",
+        "started_branch": "fix/platform-options-key-id-redaction",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Test coverage for s3_key_id plus a guard that ordinary keys are untouched",
+        "wid": "w2"
+      }
+    ]
+  }
+}

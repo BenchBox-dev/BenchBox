@@ -1,0 +1,82 @@
+{
+  "description": "Non-required findings surfaced by the code review of the timing-policy hook\nsplit (commit 0c8e6e2ba) and its follow-up fixes (default_install_hook_types,\nlist[Finding] typing, and removing the dead marker gate in conftest).\n\nAll Required/Critical fixes from the review have landed. This item tracks\nthree deferred polish/robustness items that were intentionally scoped out of\nthe immediate fix.",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-05-26T00:00:00Z",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DB-setup subprocess in conftest.py still runs for all currently-passing invocations",
+        "item_id": "timing-policy-split-review-followups"
+      },
+      {
+        "behavior": "timing-policy-check pre-commit hook stays <1s (allowlist scan only)",
+        "item_id": "timing-policy-split-review-followups"
+      },
+      {
+        "behavior": "timing-policy-fast-lane pre-push hook still runs pytest --collect-only",
+        "item_id": "timing-policy-split-review-followups"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run ty check _project/scripts/timing_policy_check.py",
+        "description": "Typecheck still clean after TypedDict promotion (w3)",
+        "expected": "All checks passed!",
+        "item_id": "timing-policy-split-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast tests still pass if w2 is implemented",
+        "expected": "all green",
+        "item_id": "timing-policy-split-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "timing-policy-split-review-followups",
+        "notes": "`default_install_hook_types: [pre-commit, pre-push]` in\n.pre-commit-config.yaml:6 only takes effect on the next\n`pre-commit install` invocation.  Contributors who already ran\n`pre-commit install` before that key was added will NOT automatically\nget the pre-push `timing-policy-fast-lane` hook (:30-35) until they\nre-run install.\n\nWithout local pre-push enforcement, fast-lane violations are caught\nonly in CI (.github/workflows/lint.yml:40) - the exact regression the\nFix 1 change was meant to prevent.\n\nDecide between:\n  (a) Add a one-line note to CONTRIBUTING.md:37 and\n      docs/contributing-results.md:140 telling existing contributors\n      to re-run `pre-commit install` once.\n  (b) Accept CI-only enforcement for existing clones and drop the\n      claim; document that fresh clones get both stages.\n\nA prior attempt at (a) was reverted; confirm author intent before\nre-applying.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document pre-commit re-install requirement for existing clones",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-policy-split-review-followups",
+        "notes": "tests/conftest.py:270 - the dead marker gate was removed because\n`session.items` is empty at `pytest_sessionstart` (pre-collection).\nConsequence: DB setup via `tests/databases/create_test_databases.py`\nruns on every pytest invocation, including `-m fast`.\n\nCurrently harmless - DB creation is idempotent and cheap.  If the\nsubprocess cost grows past ~1s (e.g., more test-DB fixtures are\nadded), re-introduce the gate in `pytest_collection_modifyitems`\nwhere `session.items` is populated.\n\nPrerequisite before wiring the gate: audit \"unit\" tests for implicit\nDB dependency.  Any unit test that reads/writes `tests/databases/*.duckdb`\nwithout declaring the `database` or `integration` marker must either\ngain the marker or be refactored, or the gated skip will break it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Gate DB-setup properly in pytest_collection_modifyitems if cost grows",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-policy-split-review-followups",
+        "notes": "_project/scripts/timing_policy_check.py:18,26 - `_load_allowlist`\nreturns `list[dict[str, Any]]` and `_load_fast_lane_policy` returns\n`dict[str, Any]`.\n\nThese are genuinely heterogeneous JSON structures (allowlist entries\ncarry optional `path_glob`, `symbol`, `line_regex`; fast-lane policy\nmixes `enabled: bool`, `max_fast_tests: int`,\n`forbidden_marker_expressions: list[str]`, `forbidden_path_substrings:\nlist[str]`).\n\nPromote both to TypedDicts (`AllowlistEntry`, `FastLanePolicy`).\nImproves type-checking on the `.get(...)` reads at :36-45 and :91-97.\nZero behavior change; pure hygiene.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tighten config-loader return types in timing_policy_check.py",
+        "wid": "w3"
+      }
+    ]
+  }
+}

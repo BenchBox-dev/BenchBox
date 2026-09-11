@@ -1,0 +1,10 @@
+{
+  "description": "Comparison and visualization paths assume LogicalOperatorType enums and call\n.value on unknown operator strings. Any new/unsupported operator from parsers\ncauses crashes in compare-plans and show-plan. Add safe handling for string\noperator types, surface unknown-type warnings, and keep output usable instead\nof failing hard. Expand tests so future parsers can introduce new operators\nwithout breaking downstream tooling.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2025-11-26T00:00:00Z",
+      "worktree": "query-plan-remediation"
+    }
+  }
+}

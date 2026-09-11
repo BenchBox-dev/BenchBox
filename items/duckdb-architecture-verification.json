@@ -1,0 +1,148 @@
+{
+  "description": "Verify the claim in duckdb-architecture.md that DuckDB processes TPC-H SF10\n\"in under 10 seconds\" on a modern laptop.\n\nCurrent text (line 17-19):\n> \"DuckDB regularly matches or beats traditional data warehouses on TPC-H\n> benchmarks. This isn't marketing - on a modern laptop, DuckDB processes\n> TPC-H SF10 (60 million lineitem rows) in under 10 seconds.\"\n\nThis claim has no citation and should be verified with our own benchmark.\nQuick validation run, update the draft with actual measured time.\n\nReference draft: _blog/platform-deep-dives/drafts/duckdb-architecture.md",
+  "legacy": {
+    "item_meta": {
+      "category": "Blog Revision",
+      "completed_at": "2026-02-20T00:00:00Z",
+      "created_at": "2025-12-15T00:00:00Z",
+      "worktree": "blog-content"
+    },
+    "work_needs": [
+      {
+        "item_id": "duckdb-architecture-verification",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "duckdb-architecture-verification",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "duckdb-architecture-verification",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "duckdb-architecture-verification",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "duckdb-architecture-verification",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "duckdb-architecture-verification",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "duckdb-architecture-verification",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "duckdb-architecture-verification",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "duckdb-architecture-verification",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "duckdb-architecture-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm local benchmark environment and exact DuckDB TPC-H SF10 run configuration",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-architecture-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Execute baseline DuckDB TPC-H SF10 benchmark command and capture raw timing output",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-architecture-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run two additional trials and record per-run timings plus median runtime",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-architecture-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Record hardware context used for the benchmark (CPU, RAM, storage, OS)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-architecture-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update draft claim with measured runtime and variability context from captured runs",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-architecture-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add reproducibility command and run notes for readers",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-architecture-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cross-check all updated performance statements against captured benchmark evidence",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-architecture-verification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Final editorial pass for consistency, citation clarity, and reproducibility wording",
+        "wid": "w8"
+      }
+    ]
+  }
+}

@@ -1,0 +1,188 @@
+{
+  "context": "First decide the wide-table strategy: scale to fit, reduce columns, or declare the matrix routes unsupported for print. Then implement: hide tray, facet rail, site header and pagination; keep the caption line carrying constant columns; break-inside: avoid on rows; explicit light-theme reset; a policy for the cloned sticky header. Verify with a rendered page, not only a rule assertion.",
+  "description": "There is no @media print block or @page rule anywhere in the Explorer and no print test. rx-ux-01 suppresses the tray; this item defines what printing actually produces.\n\nKnown hazards from review: overflow:visible alone does not make min-w-max tables fit paper and does not defeat enclosing overflow-hidden wrappers (Home.tsx:534, Query.tsx:725); QueryHeatmap's cloned sticky header (QueryHeatmap.tsx:598) needs its own policy; and printing while the dark theme is active produces illegible or ink-heavy output without an explicit reset.\n\nNote: the Explorer exports CSV and JSON (Query.tsx:700). It has no PDF export - an earlier revision claimed otherwise in error.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-20-print-stylesheet",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "print the dark theme",
+        "instead": "reset to light inside @media print",
+        "item_id": "rx-ux-20-print-stylesheet",
+        "why": "dark backgrounds are illegible and ink-heavy on paper"
+      },
+      {
+        "dont": "prove print with an emulateMedia rule assertion alone",
+        "instead": "verify a rendered page or PDF for clipping and pagination",
+        "item_id": "rx-ux-20-print-stylesheet",
+        "why": "hiding the tray proves one rule, not readable output"
+      },
+      {
+        "dont": "rely on overflow: visible to make wide tables printable",
+        "instead": "choose scale, reduce, or declare unsupported",
+        "item_id": "rx-ux-20-print-stylesheet",
+        "why": "min-w-max tables clip at page width and enclosing overflow-hidden still clips"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rx-ux-20-print-stylesheet",
+        "needs_item": "rx-ux-01-overlay-clearance-and-print-suppression"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T23:12:26Z",
+      "completed_pr": 1831,
+      "created_at": "2026-08-22T14:50:00Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Dark theme on screen",
+        "item_id": "rx-ux-20-print-stylesheet"
+      },
+      {
+        "behavior": "Screen rendering is unchanged; every rule is inside @media print",
+        "item_id": "rx-ux-20-print-stylesheet"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-20-print-stylesheet",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/chartTheme.ts"
+      },
+      {
+        "item_id": "rx-ux-20-print-stylesheet",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-20-print-stylesheet",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/**"
+      },
+      {
+        "item_id": "rx-ux-20-print-stylesheet",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'print'",
+        "description": "Print rendering has no chrome and no clipped table content",
+        "expected": "tray, facet rail and header absent; table content within page width per the chosen strategy",
+        "item_id": "rx-ux-20-print-stylesheet",
+        "last_result": "pass",
+        "last_run": "2026-08-22T23:07:27Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium",
+        "description": "Screen rendering unchanged",
+        "expected": "chromium suite green",
+        "item_id": "rx-ux-20-print-stylesheet",
+        "last_result": "pass",
+        "last_run": "2026-08-22T23:12:24Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-20-print-stylesheet",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-20-print-stylesheet",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-20-print-stylesheet",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-20-print-stylesheet",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "rx-ux-20-print-stylesheet",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "rx-ux-20-print-stylesheet",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Print policy: A4 landscape with compact, wrapping table cells and removed sticky/min-width constraints; hide interactive chrome and the cloned sticky header; preserve semantic captions. Rendered PDF plus page-width geometry must prove no horizontal clipping.",
+        "item_id": "rx-ux-20-print-stylesheet",
+        "notes": null,
+        "started_at": "2026-08-22T22:47:14Z",
+        "started_branch": "fix/rx-ux-20-print-stylesheet",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-20-print-stylesheet",
+        "status": "done",
+        "summary": "Decide wide-table print strategy and record it",
+        "wid": "w1"
+      },
+      {
+        "evidence": "results-explorer/src/index.css: A4 landscape print rules hide global/explorer chrome, facets, controls, tray/spacer and footer; compact tables, preserve captions, and avoid row/card breaks.",
+        "item_id": "rx-ux-20-print-stylesheet",
+        "notes": null,
+        "started_at": "2026-08-22T22:47:19Z",
+        "started_branch": "fix/rx-ux-20-print-stylesheet",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-20-print-stylesheet",
+        "status": "done",
+        "summary": "Implement @media print: hide chrome, keep caption, break-inside",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Print-scoped light token reset plus color-scheme: light !important overrides the runtime inline dark-theme choice; focused dark-theme Chromium assertion passes.",
+        "item_id": "rx-ux-20-print-stylesheet",
+        "notes": null,
+        "started_at": "2026-08-22T22:52:35Z",
+        "started_branch": "fix/rx-ux-20-print-stylesheet",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-20-print-stylesheet",
+        "status": "done",
+        "summary": "Explicit light reset for print under dark theme",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Print CSS hides query-heatmap-page-sticky-header-shell while retaining the canonical grid header as a repeating table-header-group.",
+        "item_id": "rx-ux-20-print-stylesheet",
+        "notes": null,
+        "started_at": "2026-08-22T22:52:40Z",
+        "started_branch": "fix/rx-ux-20-print-stylesheet",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-20-print-stylesheet",
+        "status": "done",
+        "summary": "Policy for QueryHeatmap cloned sticky header",
+        "wid": "w4"
+      },
+      {
+        "evidence": "npm run build && E2E_PORT=4515 npx playwright test --project=chromium --grep print-rendering: 2 passed; each case generated a valid PDF and asserted visible-table page-width geometry.",
+        "item_id": "rx-ux-20-print-stylesheet",
+        "notes": null,
+        "started_at": "2026-08-22T22:52:45Z",
+        "started_branch": "fix/rx-ux-20-print-stylesheet",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-20-print-stylesheet",
+        "status": "done",
+        "summary": "Rendered-page verification for clipping and pagination",
+        "wid": "w5"
+      }
+    ]
+  }
+}

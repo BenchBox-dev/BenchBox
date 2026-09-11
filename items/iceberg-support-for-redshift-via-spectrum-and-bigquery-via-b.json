@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #567 of cloud-sql-open-table-format-loading.\nDeferred: Iceberg support for Redshift (via Spectrum) and BigQuery (via BigLake)\nReason deferred: Lower priority than Delta; both platforms have evolving Iceberg support",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:56Z",
+      "worktree": "main"
+    }
+  }
+}

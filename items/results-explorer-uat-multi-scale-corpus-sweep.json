@@ -1,0 +1,346 @@
+{
+  "context": "This is a UAT item, not an engineering item. Run scope is bounded by\nthe 10-minute-per-run cap and the scale-ladder early-stop rules; do\nnot chase a long tail of slow benchmarks. Use the local stress\nscript as a knowledge source, not an entrypoint -- the BenchBox CLI\nis the system under test for both the runs and the submission flow,\nso invoking the script would defeat the UAT purpose.\n\nDefer until the listed `deps.needs` items are Completed. Running\nthis against a moving explorer or before the environment-capture\nfields land would produce findings against the wrong target and\nwaste the corpus. When picking up this TODO, first re-verify the\ndeps are in fact Completed and update this approach if the dep set\nhas shifted.\n\nBefore starting w5 (submission flow), resolve the cloud-platform\ninclusion and publish-vs-draft questions with the user (see\n`open_questions` Q2 and Q3). Both materially change the run matrix\nand the risk profile of what lands in `published-results`; deciding\nthem after the corpus is generated forces rework.\n",
+  "description": "Run a structured UAT sweep that simultaneously (a) expands the published\nresults corpus across scales 0.01, 0.1, and 1.0 for every viable local\nplatform/benchmark pair, and (b) evaluates the improved Results Explorer\nand the results submission flow using the corpus produced by the sweep.\n\nThe runs are the means; the explorer/submission UAT is the deliverable.\nThe corpus is what makes cross-scale comparison views meaningful for the\nfirst time, so this work must run *after* the in-flight explorer and\nenvironment-capture changes have landed -- otherwise the UAT findings\nwill be against the wrong target. Defer until the listed deps are\nCompleted.\n\nOperating bar: act like a first-time external user, not an implementer.\nCapture every rough edge, even the small ones. Fixes for those edges\nbelong in separate follow-up TODOs filed at the end -- this item only\nobserves, runs, submits, and reports.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "chase the long tail of slow benchmarks past the 10-minute cap",
+        "instead": "timing-out a cell is a valid 'deferred' outcome.",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "why": "the goal is broad coverage at smoke scales, not full-corpus runs"
+      },
+      {
+        "dont": "investigate deep failures during the sweep",
+        "instead": "triage in <=5 minutes per failure, then defer to a follow-up TODO.",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "why": "every minute spent on one engine crash is a minute the rest of the matrix sits idle"
+      },
+      {
+        "dont": "invoke `scripts/local_stress_test.sh`",
+        "instead": "read the script for knowledge only and call `benchbox run` directly.",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "why": "this is a UAT of the BenchBox CLI itself, and using the script would skip the surface under test"
+      },
+      {
+        "dont": "modify benchmark queries, dialect adapters, datagen code, or platform implementations to make failing runs pass",
+        "instead": "log the failure as deferred and move on.",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "why": "the corpus is only valuable if it reflects real platform behavior"
+      },
+      {
+        "dont": "pre-judge explorer findings as too small to file",
+        "instead": "nits go in the report, doc/UX changes get a TODO.",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "why": "rough edges are the deliverable here"
+      },
+      {
+        "dont": "run platforms in parallel to save wall-clock",
+        "instead": "run sequentially, accept the wall-clock cost.",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "why": "concurrent runs contaminate timings and corrupt the corpus"
+      },
+      {
+        "dont": "silently kill processes the agent did not start during pre-flight",
+        "instead": "surface them and ask first.",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "why": "they may be the user's in-progress work"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-uat-multi-scale-corpus-sweep",
+        "id": 258,
+        "reason": "Out of scope for a local sweep; credentials, cost, and tenant-side variability make these unsuitable here. File a separate `results-explorer-uat-cloud-corpus` if/when the explorer's cloud-facet surface is ready to be tested under load.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: The named follow-up (results-explorer-uat-cloud-corpus) was never filed; credentials/cost/tenant variability still make cloud UAT unsuitable per the original reasoning.",
+        "summary": "Cloud platform UAT (Snowflake, BigQuery, Redshift, Athena, Databricks, ClickHouse Cloud, Firebolt)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-uat-multi-scale-corpus-sweep",
+        "id": 259,
+        "reason": "This sweep runs `--phases load,power` only. Throughput adds a multiplicative wall-clock cost that the 10-minute cap cannot absorb at SF>=0.1. Consider after the load/power UAT lands and the explorer's throughput rendering is ready to be tested.",
+        "resolution": "promoted",
+        "resolved_item": "throughput-phase-coverage",
+        "resolved_reason": null,
+        "summary": "Throughput phase coverage"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-uat-multi-scale-corpus-sweep",
+        "id": 260,
+        "reason": "Default validation is sufficient for a UAT corpus. Strict validation produces additional failure modes that belong in a dedicated correctness sweep, not this UX-focused one.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly says strict/full validation belongs in a separate future correctness sweep, not a concrete action now.",
+        "summary": "Validation = full / strict comparisons"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-uat-multi-scale-corpus-sweep",
+        "id": 261,
+        "reason": "Scale ladder is intentionally capped at SF=1.0 to fit the 10-minute-per-run budget. SF=10 belongs in a perf-focused sweep on dedicated hardware, not a local UAT.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: UAT scale ladder is intentionally capped at SF=1 for the 10-min budget; SF>=10 is explicitly out of scope for local UAT and no dedicated-hardware perf-sweep initiative exists to host it. Deliberate boundary, not pending work.",
+        "summary": "Larger scale rungs (SF >= 10)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-uat-multi-scale-corpus-sweep",
+        "id": 262,
+        "reason": "This TODO observes, runs, submits, and reports. Each above-nit finding becomes its own follow-up TODO with its own scope -- mixing observation and implementation muddied the existing dry-run TODO retrospectives and that lesson applies here.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Meta-instruction only; per the item's own scope, each above-nit finding already became its own follow-up TODO.",
+        "summary": "Implementing the fixes the sweep produces"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_item": "explorer-facet-model-environment-contract-refactor"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_item": "explorer-leaderboard-first-identity-unification"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_item": "explorer-mobile-density-responsive-tables"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_item": "explorer-performance-perceived-latency"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_item": "explorer-selection-facets-coverage-at-scale"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_item": "results-complete-execution-environment-capture"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing local environment state -- agent does not kill processes it did not start without user approval.",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep"
+      },
+      {
+        "behavior": "Methodology integrity -- runs sequential, no parallel platforms, hard 10-minute cap honored.",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep"
+      },
+      {
+        "behavior": "Real platform behavior in the corpus -- no source modifications to make a benchmark pass.",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep"
+      },
+      {
+        "behavior": "Trust label distinction -- any submitted result keeps the appropriate community/maintainer label.",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep"
+      },
+      {
+        "behavior": "User autonomy -- pre-flight contamination is surfaced to the user, not silently 'cleaned up'.",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "kind": "do_not_modify",
+        "path_glob": "_binaries/"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/local_stress_test.sh"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-uat-defect-*.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/results-explorer-uat-retrospective-*.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "manual",
+        "description": "Final UAT report delivered to user covering all six required sections.",
+        "expected": "report contains: matrix, submitted, fixes, deferred, explorer findings, environment notes",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_phases.py tests/uat/test_report_accounting.py -q",
+        "description": "Current UAT artifact durability and report accounting contracts pass",
+        "expected": "focused UAT artifact and report tests pass",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo list --state planning --json > /dev/null",
+        "description": "Current Results Explorer UAT and submission issue state is queryable",
+        "expected": "exit 0",
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "notes": "Before any run, verify the host is not contaminated by other\nmemory/CPU intensive processes. Noisy neighbors invalidate timings\nand corrupt the corpus.\n  - `ps -Ao pid,pcpu,pmem,rss,comm | sort -k3 -nr | head -30`\n    Look for: prior benchmark sessions, browsers with heavy tabs,\n    video calls, IDE indexers (JetBrains scanning), `mds_stores`\n    (Spotlight reindex), `backupd` (Time Machine), background AI\n    processes.\n  - `docker ps` -- stop any leftover `benchbox-*` containers from\n    aborted prior runs (they collide on ports).\n  - Check Docker Desktop's memory ceiling. The local stress script\n    flags Velox specifically as memory-constrained at the\n    Docker Desktop ~11.7 GB ceiling; record the actual ceiling.\n  - `df -h ~/Developer/benchmark_runs` -- abort and surface to the\n    user if less than ~40 GB free; SF=1 datagen for some\n    benchmarks costs tens of GB.\n  - Confirm `BENCHBOX_OUTPUT_DIR` (default\n    `~/Developer/benchmark_runs`).\nIf anything is contaminated, surface specific process/container\nnames to the user before starting. Do not \"just proceed\" and do\nnot reflexively kill processes you did not start.\n\nBlocked pre-flight record (2026-05-02):\n  - `df -h ~/Developer/benchmark_runs` reported only 8.7 GiB\n    available on `/System/Volumes/Data`, below the then-required\n    ~50 GiB free threshold for SF=1 data generation.\n  - `docker ps` and `docker info` could not connect to\n    `unix:///Users/joe/.docker/run/docker.sock`, so Docker\n    containers and Docker Desktop memory ceiling could not be\n    inspected.\n  - `ps -Ao pid,pcpu,pmem,rss,comm | sort -k3 -nr | head -30`\n    showed active high-CPU/noisy-neighbor candidates including\n    Messages.app at ~100% CPU, `cmux` at ~33% CPU, WindowServer\n    at ~40% CPU, and `mds_stores` present.\n  - Per this work unit's operating notes, do not start W2/W3\n    until the user has freed disk, started Docker Desktop, and\n    confirmed the noisy processes are acceptable or quieted.\n\nResume recheck (2026-05-02):\n  - Disk improved but still blocks the sweep:\n    `df -h ~/Developer/benchmark_runs` reported 37 GiB available\n    on `/System/Volumes/Data`, below both the original ~50 GiB\n    threshold and the revised ~40 GiB threshold.\n  - Docker is now reachable with no running containers.\n    `docker info` reported Docker Desktop with MemTotal\n    12,528,578,560 bytes and 10 CPUs.\n  - Noisy-neighbor candidates are still present, including\n    `cmux` at ~34% CPU, WindowServer at ~22% CPU, a Claude\n    process at ~17% CPU, `mds_stores`, and DaisyDisk. Do not\n    proceed until the user confirms these are acceptable or they\n    settle.\n\nSecond recheck (2026-05-02):\n  - Disk improved again but still blocked the sweep under the\n    then-active cutoff:\n    `df -h ~/Developer/benchmark_runs` reported 47 GiB available\n    on `/System/Volumes/Data`, below the then-active ~50 GiB\n    threshold but above the revised ~40 GiB threshold.\n  - Docker remains reachable with no running containers.\n    `docker info` again reported Docker Desktop with MemTotal\n    12,528,578,560 bytes and 10 CPUs.\n  - Noisy-neighbor candidates remain, including `cmux` at ~49%\n    CPU, WindowServer at ~27% CPU, a Codex process at ~37% CPU,\n    a Claude process at ~11% CPU, and `mds_stores`.\n\nThird recheck (2026-05-02):\n  - Disk still blocked the sweep under the then-active cutoff:\n    `df -h ~/Developer/benchmark_runs` reported 46 GiB available\n    on `/System/Volumes/Data`, below the then-active ~50 GiB\n    threshold but above the revised ~40 GiB threshold.\n  - Docker remains reachable with no running containers.\n    `docker info` again reported Docker Desktop with MemTotal\n    12,528,578,560 bytes and 10 CPUs.\n  - `sysctl -n hw.ncpu hw.logicalcpu hw.physicalcpu` reported\n    10 / 10 / 10 CPUs. Current process load is therefore less\n    concerning than the earlier scans, but active candidates still\n    include `cmux` at ~39% CPU, WindowServer at ~28% CPU, Claude\n    at ~8% CPU, Codex at ~5% CPU, and `mds_stores`.\n\nCutoff update and passing recheck (2026-05-02):\n  - User updated the free-disk cutoff from ~50 GiB to ~40 GiB.\n  - `df -h ~/Developer/benchmark_runs` reported 46 GiB available\n    on `/System/Volumes/Data`, above the revised ~40 GiB cutoff.\n  - Docker remains reachable with no running containers.\n    `docker info` reported Docker Desktop with MemTotal\n    12,528,578,560 bytes and 10 CPUs.\n  - User confirmed this computer has 10 CPU cores; `sysctl -n\n    hw.ncpu hw.logicalcpu hw.physicalcpu` reported 10 / 10 / 10.\n    With that capacity, the observed host processes are acceptable\n    for proceeding with the sequential UAT sweep.\n\nActive disk policy update (2026-05-03):\n  - User superseded the earlier ~40 GiB cutoff. Do not stop work\n    because available space is below 40 GiB. Treat that as\n    telemetry only.\n  - Stop only if `df -h ~/Developer/benchmark_runs` shows less\n    than 5 GiB available, a command fails due to disk exhaustion,\n    or another hard runtime failure blocks progress.\n  - Keep reuse-aware cleanup active: preserve reusable generated\n    source data under `~/Developer/benchmark_runs/datagen/`, and\n    prune loaded database artifacts only after every benchmark that\n    can reuse that source/scale has completed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pre-flight: confirm a quiet local environment",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "notes": "Read `scripts/local_stress_test.sh` for *knowledge*; do not invoke\nit. It is the authoritative source for:\n  - platform groupings (FAST_NATIVE, FAST_DOCKER, SLOW_NATIVE,\n    SLOW_DOCKER, DF_PLATFORMS)\n  - SQL-only benchmarks (`SQL_ONLY_BENCHMARKS`)\n  - per-platform port maps (`get_platform_port`) for TCP probing\n  - per-platform `--platform-option` overrides\n    (`get_platform_extra_opts`) -- pass these through on every\n    invocation for that platform\n  - per-platform CLI flags (`get_platform_cli_flags`) -- notably\n    velox needs `--iterations 1`\n  - per-platform uv extras (`get_platform_uv_extra`) --\n    `clickhouse-local`, `singlestore`, `influxdb` require\n    `uv run --extra <name> -- benchbox run ...`; all others use\n    `--no-sync`.\nThen enumerate benchmarks live from the registry:\n  uv run --no-sync -- python -c \"\n  from benchbox.core.benchmark_registry import (\n      BENCHMARK_METADATA, get_benchmarks_by_category, get_categories,\n  )\n  import json\n  print(json.dumps({\n      c: list(get_benchmarks_by_category(c).keys())\n      for c in get_categories()\n  }, indent=2))\n  print('SQL-only:', [\n      i for i, m in BENCHMARK_METADATA.items()\n      if not m.get('supports_dataframe', True)\n  ])\n  print('Min/max scales:', {\n      i: (m.get('min_scale'), m.get('max_scale'))\n      for i, m in BENCHMARK_METADATA.items()\n  })\n  \"\nRespect each benchmark's `min_scale`/`max_scale`: skip 0.01, 0.1,\nor 1.0 rungs that fall outside the supported range. TPC-DS subscale\n(SF<1) requires the patched dsdgen bundled with BenchBox -- this\nis supported, just be aware.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build the run matrix from the registry (do not hardcode)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "notes": "For each viable (platform, benchmark) pair, run the scale ladder\n0.01 -> 0.1 -> 1.0. Stop ascending the ladder for that pair as\nsoon as any of the following is true:\n  - the previous scale failed (don't waste time on a larger scale\n    of a broken pair);\n  - the previous scale took longer than ~3 minutes wall-clock\n    (10x scale typically means >=10x time; the next rung will\n    likely blow the 10-minute cap);\n  - the next scale violates the benchmark's metadata constraints.\nHard cap each invocation at 10 minutes wall-clock with a real\ntimeout (`timeout 600 ...` or `gtimeout 600 ...`). A run that hits\nthe cap is \"deferred -- too slow at this scale\", not a failure to\ninvestigate.\n\nInvocation template (adapt per platform):\n  timeout 600 uv run [--no-sync | --extra <extra>] -- \\\n    benchbox run \\\n      --platform <p> --benchmark <b> --scale <sf> \\\n      --phases load,power --non-interactive \\\n      [--platform-option ...]    # from get_platform_extra_opts\n      [--iterations 1]           # velox only\n\nCapture stdout+stderr per run to a per-run log file under\n`~/Developer/benchmark_runs/logs/uat_<YYYYMMDD>/<platform>_<benchmark>_<sf>.log`.\nRecord the result JSON path printed in the run output (matches\n`.../benchmark_runs/results/.*\\.json`).\n\nRun platforms sequentially, never in parallel. Concurrent platform\nruns contaminate each other's timings, defeating the\ncorpus-quality goal of this exercise.\n\nInclude reuse-aware database cleanup in the runner. The cleanup\nboundary is the loaded database artifact, not the generated source\ndata: keep `~/Developer/benchmark_runs/datagen/` directories while\nlater platforms can reuse them, but delete platform-specific loaded\ndatabase files under `~/Developer/benchmark_runs/databases/` once\nno remaining cell in the current platform/source group can consume\nthem. In particular, do not delete `tpch_sf*` loaded databases\nimmediately after `tpch`, because `read_primitives`,\n`write_primitives`, `transaction_primitives`, and `ai_primitives`\nreuse the TPC-H source data and, depending on the adapter path, can\nshare the same loaded database namespace. Prefer cleanup after the\nwhole platform finishes; if cleanup is needed mid-platform, only do\nit after all consumers for that source/scale have completed.\n\nPartial execution record (2026-05-02):\n  - Log directory:\n    `~/Developer/benchmark_runs/logs/uat_20260502/`.\n  - Summary file:\n    `~/Developer/benchmark_runs/logs/uat_20260502/matrix_summary.tsv`.\n  - Sentinel file:\n    `~/Developer/benchmark_runs/logs/uat_20260502/.sweep_start`.\n  - Host had no `timeout`/`gtimeout`; W3 used a Perl\n    process-group timeout wrapper with the required 600-second cap.\n  - Partial result counts before the blocker: 46 passed, 1 failed,\n    1 timed out, 1 blocked-disk.\n  - Completed DuckDB through `vector_search` SF 1.0. Next cell is\n    `duckdb/tpcds_obt` SF 1.0.\n  - Hard blocker: before `duckdb/tpcds_obt` SF 1.0, `df -k\n    ~/Developer/benchmark_runs` reported 41,432,632 KiB available,\n    below the revised 40 GiB cutoff of 41,943,040 KiB. Do not\n    resume W3 until the output volume has enough free space above\n    that cutoff.\n  - User override: do not use the 40 GiB free-space cutoff to stop\n    work. Treat disk free space as telemetry unless available space\n    falls below 5 GiB. Resume from `duckdb/tpcds_obt` SF 1.0 and\n    only stop if free space drops below 5 GiB, a benchmark command\n    actually fails due to disk exhaustion, or another hard runtime\n    failure prevents the sweep driver itself from continuing.\n  - Cleanup override: include reuse-aware cleanup as part of the\n    W3 process so loaded local databases do not grow without\n    bounds. Preserve reusable datagen inputs; prune only loaded DB\n    files at safe reuse boundaries.\n  - The first resume attempt was operator-interrupted to add this\n    cleanup rule. Treat the resulting `duckdb/tpcds_obt` SF 1.0\n    `exit=143` summary row as retriable operator interruption, not\n    a benchmark defect.\n\nCompletion record (2026-05-03):\n  - Completed the full 1,530-cell latest-status candidate matrix:\n    434 passed, 85 failed, 8 timed out, 133 skipped by scale-ladder\n    pruning, and 870 skipped because TCP-backed platforms were not\n    reachable locally.\n  - Attempted 527 real benchmark cells under the 600-second cap.\n    Recorded 434 passed cells. The summary captured 388 unique\n    result JSON paths for those passed cells, and all captured\n    paths exist. The 46 passed cells without captured result paths\n    are early DuckDB rows from before the result-path extractor was\n    improved; W5 should recover those from the logs/result\n    directory before submission.\n  - Log directory:\n    `~/Developer/benchmark_runs/logs/uat_20260502/`.\n  - Summary file:\n    `~/Developer/benchmark_runs/logs/uat_20260502/matrix_summary.tsv`.\n    Interpret this by latest `(platform, benchmark, scale)` row;\n    it contains earlier duplicate retriable rows from the disk\n    cutoff and operator-interruption resumes.\n  - Database cleanup log:\n    `~/Developer/benchmark_runs/logs/uat_20260502/database_cleanup_20260502.log`.\n  - Reuse-aware cleanup preserved reusable datagen and pruned loaded\n    local DB state only at safe boundaries. Notable cleanup actions:\n    DuckDB after TPC-H-source consumers, ClickHouse Local at a\n    mid-platform safe boundary and platform completion, SQLite at\n    mid-platform and platform completion boundaries, and worktree\n    local Spark warehouses after Spark/PySpark had completed.\n  - The malformed ClickHouse Local cleanup log row with empty\n    timestamp/`after_kib` came from a shell variable mistake while\n    recording telemetry; the immediately following\n    `mid-platform-safe-boundary-corrected` row is the valid cleanup\n    record.\n  - Free disk never fell below the user-defined 5 GiB hard stop.\n    Dask temporarily drove free space into the mid-30 GiB range\n    during exit-137 cells, then released the space when the\n    subprocess exited.\n  - W4 should triage by defect cluster, not per-cell: partial\n    success exits with query failures, FlightData SF 1.0 failures,\n    Lakesail missing `pysail`/Sail server, Modin all-fast-fail\n    environment setup, Dask exit-137/resource spikes, Spark/PySpark\n    expression/analysis failures, SQLite slow/timeout behavior,\n    DuckDB ClickBench load failure, and unreachable TCP platforms.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Execute the scale ladder with hard 10-minute per-run cap",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "notes": "When a run fails, classify in this order. Do NOT spend more than\n~5 minutes per failure on the first two buckets before deferring.\n\n1. Trivially fixable config/syntax -> fix and rerun once. Examples:\n   wrong port option, missing\n   `--platform-option password=`, wrong uv extra, stale Docker\n   container holding the port, missing image\n   (`docker compose pull`), benchmark name typo, an obvious flag\n   rename surfaced by `benchbox run --help`. Note the fix in the\n   report so the team can decide whether default config or the\n   stress script needs an upstream change.\n\n2. Environmental (Docker memory, disk full, port collision,\n   license/credential prompt for a cloud platform) -> log clearly\n   with the specific signal, stop attempting that platform, move\n   on.\n\n3. Anything else (engine crash, query semantic error, validation\n   mismatch, dialect translation bug, datagen failure, segfault,\n   OOM at small scale) -> DO NOT INVESTIGATE. Log\n   platform/benchmark/scale, the failing phase, the last ~30 lines\n   of the log, and a one-line hypothesis. These become follow-up\n   engineering TODOs in w7.\n\nThe agent is explicitly NOT authorized to modify benchmark\nqueries, dialect adapters, datagen code, or platform\nimplementations to make a run pass. The corpus is only valuable\nif it reflects real platform behavior.\n\nCompletion record (2026-05-03):\n  - Classified W3 failures into environment, resource-budget,\n    too-slow, and deferred-engineering buckets in the retrospective\n    handoff under \"W4 Failure Triage\".\n  - Applied no trivial fixes. The apparent fixable items\n    (`pysail`, Modin dependencies, TCP services) require explicit\n    environment provisioning and would change the UAT surface; they\n    are logged for follow-up instead.\n  - Did not modify benchmark queries, dialect adapters, datagen,\n    platform code, or result corpus files.\n  - Filed no follow-up TODOs yet; per this item's work breakdown,\n    W7 owns creating `_project/TODO/main/planning/results-explorer-uat-defect-*.yaml`\n    entries from these clusters.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Failure triage: fix trivia, log everything else",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "notes": "Discover the exact submission entrypoint yourself. Likely\ncandidates: `benchbox submit`, `benchbox results`,\n`benchbox explore`, MCP tools (`get_results`, `analyze_results`,\n`generate_chart`, `suggest_charts`). Check `benchbox --help` and\nthe MCP tool list. The submission target is the\n`published-results` branch (per project convention), not main.\n\nFor each result you submit, act as a first-time user, not an\nimplementer. Capture in the report:\n  - submission flow friction: confusing prompts, unclear\n    validation errors, missing confirmation, ambiguous \"did it\n    work?\" signal, file-path gotchas, anything that would\n    frustrate an external contributor;\n  - the cross-reference of the agent-proxy dry-runs already\n    performed (see `external-contributor-submission-dry-run`\n    updates 2026-04-28 / 2026-04-29) and whether the issues they\n    surfaced still reproduce.\n\nCompletion record (2026-05-03):\n  - Exercised the Phase 2 local PR-package submission flow. No\n    hosted `--service` upload was attempted, no irreversible\n    publish action was run, and no `results-data/` PR was opened\n    from the full staged set.\n  - Submission artifacts:\n    `~/Developer/benchmark_runs/logs/uat_20260502/submission_paths_20260502.txt`,\n    `~/Developer/benchmark_runs/logs/uat_20260502/submission_packaging_20260502.log`,\n    `~/Developer/benchmark_runs/logs/uat_20260502/submission_validation_20260502.log`,\n    and\n    `~/Developer/benchmark_runs/logs/uat_20260502/submission_validation_valid_20260502.log`.\n  - Attempted 388 captured result paths. `benchbox submit --output`\n    packaged 376 bundles and refused 12 TPC-DS results via\n    compliance guardrails: eight `unofficial_subscale` and four\n    `unofficial_nonstandard`.\n  - Full package validation reported `Validated 376 bundle(s): 188\n    error(s), 212 warning(s)`. The 171 failing bundles clustered\n    around normalized-cost contract errors and all-zero query\n    timings.\n  - Built validator-clean subset\n    `~/Developer/benchmark_runs/submissions/uat_20260502_valid`\n    with 205 bundles and 205 manifests. Validation reported\n    `Validated 205 bundle(s): 0 error(s), 126 warning(s)`.\n  - `benchbox submit --dry-run` exited 0 for a ClickHouse Local\n    result that later failed `scripts/validate_submission.py` on\n    the normalized-cost contract, so dry-run validation coverage is\n    incomplete relative to the hosted-results contract text.\n  - W6 should exercise the explorer against the validator-clean\n    subset or a derived `DATA_DIR/bundles/` copy. Do not copy the\n    full staged package into `results-data/`, and do not open a\n    `published-results` PR until invalid-bundle clusters are fixed\n    or deliberately filtered.\n  - Current cleanup state: the W3 reuse-aware cleanup left no\n    loaded database artifacts under\n    `~/Developer/benchmark_runs/databases/`. W6 should use the\n    staged bundles only and should not generate or load new\n    benchmark databases.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Submit results through the BenchBox submission flow",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "notes": "Once the new SF=0.01/0.1/1.0 corpus is published, exercise the\nResults Explorer end-to-end against it. Capture defects with\nseverity (blocker / major / minor / nit), reproduction steps,\nobserved vs expected, and the result file(s) that trigger the\nissue.\n\nSpecifically test the surfaces these in-flight TODOs are touching\n(so the UAT validates them under real corpus pressure rather than\nagainst fixture data):\n  - leaderboard-first identity unification: skeleton tokens, Home\n    first-render geometry;\n  - selection-facets coverage-at-scale: facet completeness at\n    SF=1 corpus shape;\n  - perceived-latency: cold load, first leaderboard, query\n    response, pagination, table rendering;\n  - facet-model environment-contract refactor: filtering by\n    runtime type, container vs cloud vs embedded, region/compute\n    shape -- needs the `results-complete-execution-environment-capture`\n    fields populated;\n  - mobile density / responsive tables.\n\nDefects you would NOT have found without a multi-scale\nmulti-platform corpus are the highest-signal findings -- call\nthem out separately. Cross-scale comparison UX (SF=0.01 vs 0.1\nvs 1.0 for the same platform/benchmark) is the headline thing\nthis corpus enables; does the explorer let you actually see it\ncleanly?\n\nCompletion record (2026-05-03):\n  - Built a local explorer UAT corpus from the W5 validator-clean\n    subset without touching `results-data/` or\n    `results-explorer/public/data/`.\n    Source/data root:\n    `~/Developer/benchmark_runs/explorer_uat/uat_20260502_valid/`.\n  - `benchbox explorer build --data-dir .../source --output\n    .../data --trust-label community-submission --visibility\n    public-self-reported` processed 205 results across 51 cohorts.\n    Output contained `results.duckdb` plus 205 copied bundles.\n  - Snapshot checks: 205 rows in `results`, `platform_index_rows`,\n    `benchmark_rankings`, `result_detail_metrics`, and\n    `short_ids`; 13,146 `benchmark_matrix_cells`; 9,057\n    `query_display_timings`; 26,975 `query_executions`.\n    Platform counts were DataFusion 68, Polars 41, PySpark 34,\n    SQLite 28, Spark 25, DuckDB 9. Scale counts were SF 0.01=70,\n    SF 0.1=63, SF 1.0=72.\n  - Built the explorer app into external dist\n    `~/Developer/benchmark_runs/explorer_uat/uat_20260502_valid/dist`\n    and served it with `results-explorer/scripts/serve-browser-tests.mjs`\n    pointed at the external data snapshot.\n  - Terminating Playwright smoke used the installed Google Chrome\n    channel and covered desktop Home, desktop Query with Deployment\n    filter, desktop TPC-H benchmark page, and mobile Query filter\n    drawer. All four checks passed with no horizontal overflow.\n    Screenshots and logs are under\n    `~/Developer/benchmark_runs/explorer_uat/uat_20260502_valid/screenshots/`\n    and\n    `~/Developer/benchmark_runs/explorer_uat/uat_20260502_valid/logs/`.\n  - Performance marks on the 205-result snapshot: Home `db-init`\n    553.8 ms, `home-leaderboard-data` 571.0 ms,\n    `leaderboard-render-after-data` 17.8 ms; Query `db-init`\n    542.6 ms and `query-workbench-render-after-db` 74.5 ms.\n  - W6 findings for W7 follow-up triage:\n    1. Minor: `benchbox explorer build --help` still documents\n       `manifest.json`, but the current pipeline intentionally\n       deletes legacy JSON manifests and emits only `results.duckdb`\n       plus copied bundles.\n    2. Minor: Query facet accessible labels are easy to match\n       ambiguously; a partial label for Deployment `local` also\n       matches Cost status `not_applicable_local`.\n    3. Minor/corpus limitation: local-only UAT data validates facet\n       rendering/filtering mechanics, but cloud/provider/region and\n       instance facets are `unknown`-only, so cloud/container\n       differentiation still needs a dedicated cloud or provisioned\n       local-service corpus.\n    4. Nit: Home load requests `/results/favicon.svg`, which is a\n       404 under the static test server.\n  - Current cleanup state remained healthy after W6: no loaded\n    benchmark databases under `~/Developer/benchmark_runs/databases/`;\n    W6 generated only external explorer artifacts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Exercise the Results Explorer against the new corpus",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-multi-scale-corpus-sweep",
+        "notes": "Produce a single report (delivered in chat to the user) with:\n  1. Run matrix summary -- table of (platform x scale) cells per\n     benchmark with status: passed, failed-fixed, failed-deferred,\n     timed-out, skipped-unreachable, skipped-min-scale.\n  2. Submitted results -- count and list of paths/IDs that\n     landed in the corpus.\n  3. Fixes applied during the run (the \"trivially fixable\"\n     bucket) -- one bullet each with the exact change. These are\n     candidate small PRs.\n  4. Deferred failures (the \"anything else\" bucket) -- one bullet\n     each with platform/benchmark/scale, failing phase,\n     hypothesis, log path. File one follow-up TODO per cluster\n     under\n     `_project/TODO/main/planning/results-explorer-uat-defect-*.yaml`\n     (one TODO per defect cluster, not one per run).\n  5. Explorer & submission UAT findings -- severity-grouped list.\n     This is the most important section. File one follow-up TODO\n     per defect cluster.\n  6. Environment notes -- pre-run state, anything killed,\n     anything the harness should automate.\n\nSave the run logs directory\n(`~/Developer/benchmark_runs/logs/uat_<YYYYMMDD>/`) for ~30 days,\nthen prune. Do not check logs into the repo.\n\nCompletion record (2026-05-03):\n  - Filed 14 follow-up TODOs under `_project/TODO/main/planning/`\n    for the above-nit UAT clusters:\n    `results-explorer-uat-defect-partial-success-exit-contract`,\n    `results-explorer-uat-defect-flightdata-sf1-corpus-integrity`,\n    `results-explorer-uat-defect-dask-resource-envelope`,\n    `results-explorer-uat-defect-spark-pyspark-expression-compat`,\n    `results-explorer-uat-defect-local-platform-provisioning`,\n    `results-explorer-uat-defect-sqlite-slow-partial-cells`,\n    `results-explorer-uat-defect-duckdb-clickbench-load`,\n    `results-explorer-uat-defect-normalized-cost-unavailable-bundles`,\n    `results-explorer-uat-defect-zero-query-timing-bundles`,\n    `results-explorer-uat-defect-submit-dry-run-validation-parity`,\n    `results-explorer-uat-defect-submission-batch-path-affordances`,\n    `results-explorer-uat-defect-explorer-build-output-contract-docs`,\n    `results-explorer-uat-defect-query-facet-label-ambiguity`,\n    and `results-explorer-uat-defect-environment-facet-cloud-coverage`.\n  - Retained run logs and external explorer UAT artifacts under\n    `~/Developer/benchmark_runs/logs/uat_20260502/` and\n    `~/Developer/benchmark_runs/explorer_uat/uat_20260502_valid/`.\n    Do not check those artifacts into the repo. Prune them after\n    roughly 30 days once follow-up TODO owners no longer need\n    per-run evidence.\n  - Verified the follow-up TODO YAML files and dependency graph\n    before marking W7 done.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write report, file follow-up TODOs, retire run logs",
+        "wid": "w7"
+      }
+    ]
+  }
+}

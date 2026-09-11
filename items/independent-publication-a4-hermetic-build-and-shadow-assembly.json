@@ -1,0 +1,240 @@
+{
+  "context": "Build release API docs in the release environment and mount/link the artifact into the prose site. Build Explorer and publisher artifacts from pinned develop commits and lockfiles. Build corpus read models from the exact accepted corpus SHA and trusted publisher digest. The assembler verifies all attestations, path ownership, cross-links, assets, direct-route fallbacks, provenance, size budgets, and deterministic output.",
+  "description": "Build each publication lane into an immutable content-addressed artifact, then assemble the complete Pages tree in shadow without deploying it. Split versioned API docs from prose so site updates do not rebuild against arbitrary package source. Require zero-skip corpus publishing and exact accepted-bundle to result-id accounting.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Accept publisher skips with warnings",
+        "instead": "require a zero-skip bijection or explicit approved disposition",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "why": "partial output silently loses accepted results"
+      },
+      {
+        "dont": "Build final Pages directly from arbitrary source checkouts",
+        "instead": "consume immutable attested lane artifacts",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "why": "the full transitive build closure is not pinned"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "needs_item": "independent-publication-a3-control-plane-and-artifact-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Publication Architecture",
+      "completed_at": "2026-09-01T20:58:10Z",
+      "completed_pr": 2009,
+      "created_at": "2026-08-31T20:37:22Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A publisher warning or skipped bundle is a failed corpus artifact, not a successful partial publish.",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly"
+      },
+      {
+        "behavior": "Existing privacy, secret, and sensitive-path scrubbers remain mandatory in every assembled artifact.",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly"
+      },
+      {
+        "behavior": "Existing public URLs, direct routes, assets, and versioned API documentation remain valid.",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Separate release API documentation from prose rather than importing arbitrary package source",
+        "decision": "supersede",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "path": "docs/conf.py"
+      },
+      {
+        "concept": "Reuse exact asset synchronization conventions",
+        "decision": "reuse",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "path": "scripts/capture_chart_images.py"
+      },
+      {
+        "concept": "Reuse result transformation semantics while making skips fatal",
+        "decision": "extend",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "path": "scripts/publish_results.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/*publication*"
+      },
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "kind": "only_modify",
+        "path_glob": "publication/**"
+      },
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/**"
+      },
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run pytest tests/unit/scripts/publication/test_assembler.py tests/unit/scripts/publication/test_artifacts.py -q",
+        "description": "Shadow assembly is deterministic and all lane attestations and paths verify",
+        "expected": "all tests pass",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "last_result": "pass",
+        "last_run": "2026-09-01T20:58:13Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/check_corpus_bijection.py --accepted-ref origin/published-results --artifact publication/out/site/results/data/results.duckdb",
+        "description": "Exact accepted corpus paths map bijectively to published result IDs with zero unexplained skips",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "last_result": "pass",
+        "last_run": "2026-09-01T20:58:14Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/verify_shadow_site.py publication/out/site",
+        "description": "Assembled docs links, Explorer routes, assets, and Sphinx references pass",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "last_result": "pass",
+        "last_run": "2026-09-01T20:58:15Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/check_artifact_privacy.py publication/out/site",
+        "description": "Final assembled artifacts pass privacy, secret, and sensitive-path scans",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "last_result": "pass",
+        "last_run": "2026-09-01T20:58:16Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "feat(publication): create lane artifact models, compute_tree_digest, and assembler in scripts/publication/assembler.py",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "notes": null,
+        "started_at": "2026-09-01T20:55:17Z",
+        "started_branch": "feat/publication-a4-shadow-assembly",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a4-shadow-assembly",
+        "status": "done",
+        "summary": "Create immutable prose, API docs, Explorer, publisher, and corpus artifact builders",
+        "wid": "w1"
+      },
+      {
+        "evidence": "feat(publication): implement zero-skip corpus path-to-result-id bijection checker in scripts/publication/check_corpus_bijection.py",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "notes": null,
+        "started_at": "2026-09-01T20:56:45Z",
+        "started_branch": "feat/publication-a4-shadow-assembly",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a4-shadow-assembly",
+        "status": "done",
+        "summary": "Enforce zero-skip corpus path-to-result-id bijection and explicit dispositions",
+        "wid": "w2"
+      },
+      {
+        "evidence": "feat(publication): implement SiteAssembler with path collision checks and receipt generation in scripts/publication/assembler.py",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "notes": null,
+        "started_at": "2026-09-01T20:56:50Z",
+        "started_branch": "feat/publication-a4-shadow-assembly",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a4-shadow-assembly",
+        "status": "done",
+        "summary": "Implement deterministic whole-site assembler with path ownership",
+        "wid": "w3"
+      },
+      {
+        "evidence": "feat(publication): add shadow site link/route verifier in scripts/publication/verify_shadow_site.py",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "notes": null,
+        "started_at": "2026-09-01T20:56:55Z",
+        "started_branch": "feat/publication-a4-shadow-assembly",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a4-shadow-assembly",
+        "status": "done",
+        "summary": "Run shadow builds across current and prior compatible lane SHAs",
+        "wid": "w4"
+      },
+      {
+        "evidence": "feat(publication): add sensitive data and privacy scanner in scripts/publication/check_artifact_privacy.py",
+        "item_id": "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "notes": null,
+        "started_at": "2026-09-01T20:57:01Z",
+        "started_branch": "feat/publication-a4-shadow-assembly",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a4-shadow-assembly",
+        "status": "done",
+        "summary": "Establish hard Pages size, duration, artifact, and bandwidth margins",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "description": "Result handling inside the concurrent streams both distorts measurement and\nis inconsistent between the two benchmarks.\n\n1. FULL MATERIALIZATION UNDER THE GIL: every stream calls\n   `cursor.fetchall()` for every query:\n   - TPC-H: benchbox/core/tpch/throughput_test.py:238 `rows = cursor.fetchall()`\n     then `result_count = len(rows)`.\n   - TPC-DS: benchbox/core/tpcds/throughput_test.py:314-315 fetchall() then\n     the result is DISCARDED.\n   fetchall materializes the entire result set into Python objects while\n   holding the GIL. For embedded engines (DuckDB) that release the GIL during\n   query execution but not during Python-object materialization, this\n   serializes result handling across streams -- an artificial bottleneck that\n   grows with result size and stream count, again masking real platform\n   scaling. It is also timed inside execution_time_seconds.\n\n2. INCONSISTENT ROW-COUNT SEMANTICS: TPC-H reports len(rows); TPC-DS hardcodes\n   result_count = 0 (throughput_test.py:365). Downstream the adapter maps this\n   to `rows_returned` (execution.py:427, :... ), so TPC-DS throughput rows all\n   report 0 rows -- rows/sec and any result-volume sanity check are impossible\n   for TPC-DS, and the two benchmarks are not comparable.\n\nFix: (a) use a row-count that does not require full Python materialization\nwhere the driver supports it (e.g. consume the cursor / use rowcount / fetch\nin bounded batches), and only materialize when validation actually needs the\nrows; (b) make TPC-DS report real row counts like TPC-H; (c) document the GIL\nimplication for embedded engines so users interpret in-process throughput\ncorrectly.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-09T00:00:00Z",
+      "created_at": "2026-07-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Result-count validation used by PlatformAdapterConnection still fires when enabled.",
+        "item_id": "throughput-result-handling-and-metrics"
+      },
+      {
+        "behavior": "TPC-H result_count remains correct.",
+        "item_id": "throughput-result-handling-and-metrics"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/tpcds/throughput_test.py:_run_single_stream_query — fetchall-then-discard; align with TPC-H counting.",
+        "decision": "reuse",
+        "item_id": "throughput-result-handling-and-metrics",
+        "path": "benchbox/core/tpcds/throughput_test.py:_run_single_stream_query"
+      },
+      {
+        "concept": "benchbox/core/tpch/throughput_test.py:238 — the len(fetchall()) pattern to replace with a non-materializing count where possible.",
+        "decision": "reuse",
+        "item_id": "throughput-result-handling-and-metrics",
+        "path": "benchbox/core/tpch/throughput_test.py:238"
+      },
+      {
+        "concept": "benchbox/platforms/base/connection_wrappers.py:PlatformAdapterConnection — where result validation already inspects platform_result; the right layer to standardize row counting.",
+        "decision": "reuse",
+        "item_id": "throughput-result-handling-and-metrics",
+        "path": "benchbox/platforms/base/connection_wrappers.py:PlatformAdapterConnection"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "throughput-result-handling-and-metrics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/throughput_test.py"
+      },
+      {
+        "item_id": "throughput-result-handling-and-metrics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/throughput_test.py"
+      },
+      {
+        "item_id": "throughput-result-handling-and-metrics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/connection_wrappers.py"
+      },
+      {
+        "item_id": "throughput-result-handling-and-metrics",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/tpc-ds.md"
+      },
+      {
+        "item_id": "throughput-result-handling-and-metrics",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/tpc-h.md"
+      },
+      {
+        "item_id": "throughput-result-handling-and-metrics",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_tpcds_throughput_test.py -v",
+        "description": "TPC-DS throughput rows report non-zero counts where results exist",
+        "expected": "result_count reflects actual rows",
+        "item_id": "throughput-result-handling-and-metrics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "throughput-result-handling-and-metrics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "throughput-result-handling-and-metrics",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "throughput-result-handling-and-metrics",
+        "notes": "Prefer cursor.rowcount or a bounded consume loop over fetchall(); fall\nback to len(fetchall()) only where the driver gives no count and\nvalidation needs rows anyway.\n\nDone: count_query_rows() added to connection_wrappers.py; also fixed\nPlatformAdapterCursor._extract_rows()'s first_row-over-rows_returned\npriority bug (see completed_note) and made .rows lazy.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Introduce a shared, non-materializing row-count/consume helper for stream query results",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-result-handling-and-metrics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make TPC-DS report real result_count (parity with TPC-H)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-result-handling-and-metrics",
+        "notes": "Extend docs/benchmarks/tpc-h.md and tpc-ds.md concurrency caveats.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document GIL / result-materialization implications for embedded-engine throughput",
+        "wid": "w3"
+      }
+    ]
+  }
+}

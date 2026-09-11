@@ -1,0 +1,446 @@
+{
+  "context": "Implement this as a derived archive builder in its own module\n(`benchbox/core/joinorder_replicated/`), not by teaching canonical\nJoinOrderGenerator to synthesize larger data. The module separation\nenforces the canonical/derived boundary at the file-system level —\nagents working on canonical joinorder cannot accidentally touch\nreplicated logic and vice versa.\n\nKeep the implementation deterministic and manifest-driven. Use the\ncanonical oracle artifacts (foundation TODO's\n`_project/joinorder/reference_cardinalities.json`) to prove expected\nquery/cardinality scaling before interpreting engine performance.\n\nResult-bundle tagging: registered as `joinorder_replicated` in\nbenchmark_registry.py with `surface: internal` (matching the\njoinorder_synthetic precedent — derived/research workloads stay\nhidden from the public explorer until promoted explicitly).\n",
+  "description": "Prototype the lowest-risk derived scale-up mode for JOB: offset-replicating\nthe canonical IMDB tables by integer scale factor while preserving predicate\nvalues and consistently offsetting primary and foreign keys.\n\nThis is an infrastructure and measurement baseline for future job_scale_stress\nwork. It is not intended to model \"IMDb got 10x larger\" perfectly and must be\nlabeled as replicated_imdb, not canonical_imdb.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate lookup tables by default",
+        "instead": "keep lookup tables single-copy.",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "why": "lookup predicates should remain stable and FKs can point to the same lookup rows"
+      },
+      {
+        "dont": "publish replicated_imdb results as canonical JOB",
+        "instead": "label result bundles accordingly.",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "why": "replicated components are an artificial derived scale mode"
+      },
+      {
+        "dont": "run expensive cloud matrices during the prototype",
+        "instead": "defer cloud until w6 approves continuation.",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "why": "the first gate is semantic validity and local measurement"
+      },
+      {
+        "dont": "start implementation until licensing and stats/analyze phase prerequisites are resolved",
+        "instead": "(not specified)",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "why": "the prototype otherwise cannot produce shippable or interpretable scale-stress evidence."
+      },
+      {
+        "dont": "suffix predicate string values to make rows unique",
+        "instead": "offset IDs instead.",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "why": "JOB predicates depend on exact values"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-replicated-imdb-scale-prototype",
+        "id": 24,
+        "reason": "Only worth implementing after replicated_imdb establishes baseline measurements and gaps.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Deferral is a sub-detail (graph-expanded generator) of its own parent item, which is still open (planning) and covers this scope. (tracked by joinorder-replicated-imdb-scale-prototype)",
+        "summary": "Profiled graph-expanded IMDB generator"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-replicated-imdb-scale-prototype",
+        "id": 25,
+        "reason": "Explorer work depends on final result-bundle metadata and prototype evaluation.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Deferral's own parent item is still open/planning; explorer support is a documented dependent sub-scope of it. (tracked by joinorder-replicated-imdb-scale-prototype)",
+        "summary": "Public result explorer support for replicated_imdb cohorts"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-replicated-imdb-scale-prototype",
+        "id": 26,
+        "reason": "Start local to validate semantics and measurement before spending cloud resources.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Cloud/distributed scale-stress matrix explicitly sequenced after local semantics validation; parent joinorder-replicated-imdb-scale-prototype is itself still open/planning.",
+        "summary": "Cloud/distributed platform scale-stress matrix"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "needs_item": "joinorder-scale-stress-decision-framework"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "needs_item": "track2-joinorder-stats-phase"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "needs_item": "track2-joinorder-stats-phase-controls"
+      }
+    ],
+    "item_meta": {
+      "category": "Benchmark Development",
+      "created_at": "2026-05-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All replicated_imdb code lives under benchbox/core/joinorder_replicated/ — never in benchbox/core/joinorder/ — to enforce the canonical/derived separation at the module boundary.",
+        "item_id": "joinorder-replicated-imdb-scale-prototype"
+      },
+      {
+        "behavior": "Canonical joinorder remains SF=1 canonical_imdb and literature-comparable only.",
+        "item_id": "joinorder-replicated-imdb-scale-prototype"
+      },
+      {
+        "behavior": "Lookup tables must not be duplicated unless the schema contract explicitly requires it.",
+        "item_id": "joinorder-replicated-imdb-scale-prototype"
+      },
+      {
+        "behavior": "No hosted replicated_imdb archive may ship unless the IMDb/JOB data licensing decision explicitly approves derived archive redistribution (decision-framework w8 produces this).",
+        "item_id": "joinorder-replicated-imdb-scale-prototype"
+      },
+      {
+        "behavior": "Predicate-bearing values must not be suffixed or mutated in the replicated baseline.",
+        "item_id": "joinorder-replicated-imdb-scale-prototype"
+      },
+      {
+        "behavior": "The benchmark identifier registered in benchmark_registry.py is `joinorder_replicated` (not `joinorder` with a derived mode flag); silent selection via canonical joinorder is forbidden.",
+        "item_id": "joinorder-replicated-imdb-scale-prototype"
+      },
+      {
+        "behavior": "replicated_imdb result bundles record source canonical dataset_version, derived manifest hash, replica factor, and builder version.",
+        "item_id": "joinorder-replicated-imdb-scale-prototype"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/joinorder/reference_cardinalities.json (foundation TODO) — reuse as oracle: w4 validates replicated query cardinalities by deriving expected scaled values from the canonical Postgres oracle, not by re-running queries on the replicated archive itself",
+        "decision": "reuse",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "path": "_project/joinorder/reference_cardinalities.json"
+      },
+      {
+        "concept": "benchbox/core/benchmark_registry.py — extend: register `joinorder_replicated` as a separate benchmark id with surface=internal; do not add a 'derived mode' flag on canonical joinorder (silent canonical→derived selection is forbidden by must_preserve)",
+        "decision": "extend",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "path": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "concept": "benchbox/core/data_fetch + data_manifest.toml (foundation TODO) — reuse: derived archive carries its own data_manifest.toml with source_dataset_version pointing back to canonical; replicated builder writes a derived manifest with the same schema",
+        "decision": "reuse",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "path": "benchbox/core/data_fetch"
+      },
+      {
+        "concept": "benchbox/core/joinorder/ (canonical, post-cutover) — supersede location: replicated logic NEVER lives under canonical to keep the canonical/derived separation at the file-system boundary; replicated code is in benchbox/core/joinorder_replicated/",
+        "decision": "supersede",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "path": "benchbox/core/joinorder/"
+      },
+      {
+        "concept": "benchbox/core/joinorder_synthetic/ (created by canonical-cutover w2-w4) — reuse: sibling module-and-registry-entry precedent for a derived/non-canonical joinorder workload; replicated module follows the same `surface: internal` registry pattern",
+        "decision": "reuse",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "path": "benchbox/core/joinorder_synthetic/"
+      },
+      {
+        "concept": "benchbox/core/publishing/bundle_publisher.py (cutover w12 dataset_version field) — reuse: derived bundles record source canonical dataset_version, derived manifest hash, replica factor, builder version through the same manifest field surface",
+        "decision": "reuse",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "path": "benchbox/core/publishing/bundle_publisher.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "do_not_modify",
+        "path_glob": "_project/joinorder/reference_cardinalities.json"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder_synthetic/"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/joinorder-replicated-imdb-prototype-*.md"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder_replicated/"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/join-order.md"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/joinorder_replicated/"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/publishing/test_replicated_imdb_bundle_metadata.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -hEc '^Recommendation: (replicated_imdb baseline|staged combination)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'",
+        "description": "Decision-framework approved replicated_imdb explicitly (not 'no scaled JOB' or other path)",
+        "expected": "1",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -hEc '^Stats phase gate: (completed|smoke-only|dependency:track2-joinorder-stats-phase)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'",
+        "description": "Stats/analyze phase handling is decided with a concrete gate",
+        "expected": "1",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -hEq '^Stats phase gate: dependency:track2-joinorder-stats-phase' _project/decisions/joinorder-scale-stress-decision-*.md || rg -n 'track2-joinorder-stats-phase' _project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml",
+        "description": "Stats/analyze dependency gate is reflected in prototype dependencies before coding",
+        "expected": "no output unless dependency gate is selected; otherwise TODO references the dependency",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/joinorder_replicated/test_builder_determinism.py -q",
+        "description": "Replicated archive builder produces deterministic output (re-run same input → same sha256)",
+        "expected": "all tests pass",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/joinorder_replicated/test_fk_integrity.py -q",
+        "description": "FK integrity is validated across replicas",
+        "expected": "all tests pass",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/joinorder_replicated/test_predicate_preservation.py -q",
+        "description": "Predicate-bearing string values unchanged in derived archive (anti-pattern guard)",
+        "expected": "all tests pass",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/joinorder_replicated/test_lookup_table_singleton.py -q",
+        "description": "Lookup tables remain single-copy (anti-pattern guard)",
+        "expected": "all tests pass",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/publishing/test_replicated_imdb_bundle_metadata.py -q",
+        "description": "Result bundles tagged replicated_imdb carry source canonical dataset_version",
+        "expected": "all tests pass",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -hEc '^## (Useful stats or physical-scale|Replication artifacts|Keep as derived baseline|Next step)' _project/decisions/joinorder-replicated-imdb-prototype-*.md | awk '{ s += $1 } END { print s }'",
+        "description": "Prototype evaluation note covers all required questions (multi-file safe — sums section-header counts across any dated decision files)",
+        "expected": ">= 4",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "Prototype keeps TODO graph valid",
+        "expected": "Graph validation passed",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 10,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml",
+        "description": "This item validates individually",
+        "expected": "is valid",
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 11,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "notes": "Do not start implementation unless joinorder-scale-stress-decision-framework\nchooses replicated_imdb as an approved baseline. Copy the chosen prototype\nscope and success criteria from that decision note into this TODO before\ncoding.\n\nAlso confirm:\n  - the IMDb/JOB data licensing decision allows the intended local or\n    hosted derived-data workflow;\n  - any required first-class stats/analyze phase TODO is completed or this\n    prototype is explicitly narrowed to a measurement smoke that does not\n    claim stats-maintenance conclusions; NOTE \"completed\" for\n    publication-quality stale-stats conclusions means BOTH\n    track2-joinorder-stats-phase (phase mechanics, DONE) AND\n    track2-joinorder-stats-phase-controls (the reset/persist control) --\n    the mechanics seed alone only supports the measurement-smoke path;\n  - the scale-stress decision note contains exactly one `Stats phase gate:\n    completed`, `Stats phase gate: smoke-only`, or `Stats phase gate:\n    dependency:track2-joinorder-stats-phase` line; if the\n    dependency gate is used, add that TODO to this item's `deps.needs`\n    before coding;\n  - result-bundle labels and manifest fields for replicated_imdb are\n    already specified by the decision framework.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm licensing, stats-phase, and decision-framework prerequisites",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "notes": "Build a table-by-table offset map from the canonical schema:\n  - replicated entity/fact tables get PK offsets per replica,\n  - FK columns pointing to replicated tables get matching offsets,\n  - small lookup tables remain single-copy,\n  - self references such as title.episode_of_id are offset,\n  - dual references such as movie_link.movie_id and linked_movie_id are\n    both offset.\nDocument the map in the code or manifest so future schema changes cannot\nsilently corrupt joins.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Map JOB primary keys, foreign keys, and lookup tables",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "notes": "Add a builder that reads a canonical dataset directory and writes a derived\nreplicated_imdb dataset for integer SF values such as 2, 5, and 10. Keep\npredicate-bearing values unchanged. Record source dataset_version,\nreplica factor, builder version, seed if any, and per-table checksums in\nthe derived manifest.\nIf hosted redistribution is not approved, the builder must be documented as\na local user-run conversion path and must not produce a BenchBox-hosted\nderived archive.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement a deterministic replicated_imdb archive builder",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "notes": "Validate:\n  - FK integrity,\n  - row counts scale as expected,\n  - predicate-domain frequencies scale as expected for fixed values,\n  - null counts scale for replicated tables and remain unchanged for\n    lookup tables,\n  - the fixed 113 JOB queries' final result stays UNCHANGED from the\n    canonical oracle (they are scalar MIN(...) aggregates, so\n    value-identical offset replication returns the same one-row\n    aggregate value -- do not expect an N-times final-result scaling),\n  - the underlying predicate-match counts and important join-subgraph\n    cardinalities (the actual measurement gates) scale by the replica\n    count instead.\nMatches the decision framework's corrected oracle description\n(`_project/decisions/joinorder-scale-stress-decision-2026-06-30.md`,\n\"Recommendation and prototype scope\" / options table): \"unchanged\ncanonical final-result oracle\" plus \"underlying and join-subgraph\ncardinalities\" scaling, not final-result cardinalities scaling N times.\nUse the canonical oracle artifacts produced by joinorder-canonical-foundation\n(specifically `_project/joinorder/reference_cardinalities.json` from foundation w11).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Validate replicated cardinalities and predicate preservation",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "notes": "Run a narrow matrix, likely DuckDB and PostgreSQL first, at canonical SF=1\nand replicated SF=2. Capture load time, stats/analyze time, planning time,\nexecution time, plan shape, and cardinality estimates where available.\nThis is a measurement smoke, not a leaderboard.\nIf first-class stats/analyze phase accounting is not yet implemented, the\nreport must mark stats/analyze timing as unavailable or manually captured\nand must not use it as publication-quality evidence.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run a narrow scale-stress comparison on local engines",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-replicated-imdb-scale-prototype",
+        "notes": "Write `_project/decisions/joinorder-replicated-imdb-prototype-<date>.md`.\nIt must answer:\n  - Does replicated_imdb reveal useful stats or physical-scale behavior?\n  - Does replication introduce artifacts too large to accept?\n  - Should BenchBox keep it as a derived baseline?\n  - Should the next step be expanded_imdb graph generation,\n    parameterized queries, or no further scale work?\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Write the prototype evaluation and decide whether to continue",
+        "wid": "w6"
+      }
+    ]
+  }
+}

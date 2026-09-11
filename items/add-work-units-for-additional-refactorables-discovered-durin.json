@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #231 of reduce-cc13-complexity-ceiling.\nDeferred: Add work units for additional refactorables discovered during w1 classification\nReason deferred: The 11 refactorable functions in w3-w13 come from the top-20 sample.\nw1 will classify the remaining 67 CC=13 functions, likely identifying\n~25-35 more refactorables. Each should be added as an individual work\nunit following the w3-w13 format (one function per unit, with file path,\npattern, and approach). w14 needs-edges must be updated to include them.\n",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:55Z",
+      "worktree": "main"
+    }
+  }
+}

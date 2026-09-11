@@ -1,0 +1,192 @@
+{
+  "context": "Step 1: characterization test capturing current outputs of all three implementations over shared fixture data (including edge cases: zero/negative times filtered by analytics.py:260-269 run_type=='measurement' and ms>0, odd/even counts, single element). Step 2: extend core with any missing functions, choosing one percentile definition; record the rationale in the module docstring. Step 3: migrate mcp/tools/analytics.py and cli/commands/aggregate.py onto core; delete local copies. Step 4: cross-surface equivalence test (same fixture -> identical numbers via CLI aggregate path and MCP analytics path). If chosen-method outputs differ from a surface's previous outputs, list the delta explicitly in the PR description.",
+  "description": "Three implementations of the same statistics exist: benchbox/core/results/metrics.py (canonical), benchbox/mcp/tools/analytics.py:932-971 (_calculate_metric geometric mean via logs, _percentile linear interpolation, _std_dev sample variance), and benchbox/cli/commands/aggregate.py:154-174 (_compute_query_statistics geomean/p50/p95/p99). For a benchmarking product this is a credibility defect: the same result files can yield different numbers per surface. Consolidate on one core module (extend core/results/metrics.py or a sibling statistics module) and migrate both consumers. Percentile interpolation methods may genuinely differ between the three copies -- characterize first, pick one method deliberately, and document the choice.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "leave a params-compatible copy of _percentile in mcp or cli 'for fallback'",
+        "instead": "delete the local copies in the same PR",
+        "item_id": "one-engine-unify-statistics",
+        "why": "the whole point is one implementation; fallbacks resurrect drift"
+      },
+      {
+        "dont": "silently change reported numbers during migration",
+        "instead": "characterize first; any numeric delta is listed explicitly in the PR",
+        "item_id": "one-engine-unify-statistics",
+        "why": "published/archived results are compared against new runs; unexplained metric shifts destroy trust"
+      }
+    ],
+    "item_meta": {
+      "category": "core",
+      "completed_at": "2026-08-04T18:46:24Z",
+      "completed_pr": 1551,
+      "created_at": "2026-08-04T17:14:20Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "MCP analytics measurement-row filter semantics (run_type=='measurement', ms>0) keep their current behavior.",
+        "item_id": "one-engine-unify-statistics"
+      },
+      {
+        "behavior": "TPCMetricsCalculator's existing public API is extended, not broken.",
+        "item_id": "one-engine-unify-statistics"
+      },
+      {
+        "behavior": "aggregate CSV column contract: existing output columns keep names and order.",
+        "item_id": "one-engine-unify-statistics"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Canonical TPCMetricsCalculator and existing metric helpers",
+        "decision": "extend",
+        "item_id": "one-engine-unify-statistics",
+        "path": "benchbox/core/results/metrics.py"
+      },
+      {
+        "concept": "Cross-surface parity test pattern (CLI and MCP import the same core registry)",
+        "decision": "reuse",
+        "item_id": "one-engine-unify-statistics",
+        "path": "tests/unit/visualization/test_chart_type_registry.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-unify-statistics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "one-engine-unify-statistics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/security.py"
+      },
+      {
+        "item_id": "one-engine-unify-statistics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "one-engine-unify-statistics",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "one-engine-unify-statistics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/aggregate.py"
+      },
+      {
+        "item_id": "one-engine-unify-statistics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "one-engine-unify-statistics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/analytics.py"
+      },
+      {
+        "item_id": "one-engine-unify-statistics",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -rn 'def _percentile\\|def _std_dev\\|def _calculate_metric\\|def _compute_query_statistics' benchbox/mcp benchbox/cli",
+        "description": "No private statistics implementations remain in the surface layers",
+        "expected": "Statistics helpers exist only in benchbox/core.",
+        "item_id": "one-engine-unify-statistics",
+        "last_result": "pass",
+        "last_run": "2026-08-04T18:19:17Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'statistics and (equivalence or parity)' -q",
+        "description": "Cross-surface equivalence test passes",
+        "expected": "CLI aggregate and MCP analytics produce identical numbers on shared fixtures.",
+        "item_id": "one-engine-unify-statistics",
+        "last_result": "pass",
+        "last_run": "2026-08-04T18:19:34Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp tests/unit/cli -m fast -q",
+        "description": "Both consumer suites green",
+        "expected": "No behavior regressions in either surface.",
+        "item_id": "one-engine-unify-statistics",
+        "last_result": "pass",
+        "last_run": "2026-08-04T18:19:46Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-unify-statistics",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-unify-statistics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "one-engine-unify-statistics",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Three implementations confirmed at HEAD: core metrics.py nearest-rank; mcp analytics _percentile linear interpolation + _std_dev + _calculate_metric; cli aggregate _compute_query_statistics median/quantiles. Call sites: analytics.py 663, 771-779; aggregate.py 137.",
+        "item_id": "one-engine-unify-statistics",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:47Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Re-verify the three implementations at HEAD and collect their exact call sites",
+        "wid": "w0"
+      },
+      {
+        "evidence": "tests/unit/core/results/test_timing_statistics.py: 5 shared fixtures, SUPERSEDED_PERCENTILES delta table, and tests that re-run the deleted implementations to prove the recorded numbers describe the deleted code.",
+        "item_id": "one-engine-unify-statistics",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:50Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Characterization tests over shared fixtures for all three copies",
+        "wid": "w1"
+      },
+      {
+        "evidence": "percentile_ms/geometric_mean_ms/sample_stdev_ms/calculate_named_metric added to core/results/metrics.py; nearest-rank chosen and justified in the docstring (returns an observed measurement; zero drift in archived bundles). TimingStatsCalculator delegates, behavior identical.",
+        "item_id": "one-engine-unify-statistics",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:54Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Extend core statistics; document chosen percentile method",
+        "wid": "w2"
+      },
+      {
+        "evidence": "MCP analytics and CLI aggregate migrated; all four local helpers deleted with no fallback copy; cross-surface equivalence test added. Deltas disclosed in PR #1551 (CLI tpch22 p95 293.5 -> 200.0, MCP p99 286.9 -> 310.0, etc). Rungs 1-3 pass.",
+        "item_id": "one-engine-unify-statistics",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:58Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Migrate MCP analytics + CLI aggregate onto core; delete local copies; equivalence test",
+        "wid": "w3"
+      }
+    ]
+  }
+}

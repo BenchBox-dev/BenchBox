@@ -1,0 +1,160 @@
+{
+  "context": "Pure deletion PR. Before deleting, grep the whole repo (including docs, _project, results-explorer) for each symbol to confirm zero live references beyond the re-exports and own tests. If docs/reference/mcp.md or public-contracts mention the symbols, update in the same change.",
+  "description": "Remove dead code identified in the 2026-08-04 review. (1) benchbox/mcp/execution.py (428 lines): ExecutionTracker/ExecutionState/run_benchmark_async are referenced only by tests/unit/mcp/test_execution.py and the lazy __getattr__ re-export at benchbox/mcp/__init__.py:172-179; no tool or server path uses them -- superseded by jobs.py's durable queue. It also contains a duplicate _get_platform_adapter (execution.py:289) that ignores mode. (2) benchbox/mcp/observability.py (333 lines): ToolCallContext/get_metrics_collector only re-exported lazily (__init__.py:168-171), imported by no tool module. (3) benchbox/mcp/schemas.py:789-1007: Pydantic input models (RunBenchmarkInput, DryRunInput, ValidateConfigInput, GetBenchmarkInfoInput, ListRecentRunsInput, GetResultsInput, CompareResultsInput, ExportSummaryInput) not wired into any registered tool, referencing tool names that no longer exist and encoding stale defaults (ValidateConfigInput.scale_factor=1.0 vs live 0.01). Delete modules, their tests, and the lazy re-exports.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete the whole of schemas.py's model section by line range",
+        "instead": "delete exactly the orphaned classes after confirming each is unreferenced",
+        "item_id": "one-engine-delete-dead-mcp",
+        "why": "validate_platform_options and the allowlist constants in the same file are live security code"
+      },
+      {
+        "dont": "keep the dead modules 'just in case' behind deprecation shims",
+        "instead": "delete outright; git history preserves them",
+        "item_id": "one-engine-delete-dead-mcp",
+        "why": "the one-engine program replaces this layer; shims would be migrated for nothing"
+      }
+    ],
+    "item_meta": {
+      "category": "MCP",
+      "completed_at": "2026-08-04T18:46:16Z",
+      "completed_pr": 1549,
+      "created_at": "2026-08-04T17:14:12Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "Public import surface: importing benchbox.mcp must keep working; only the dead lazy attrs are removed.",
+        "item_id": "one-engine-delete-dead-mcp"
+      },
+      {
+        "behavior": "core's ExecutionContext (benchbox/core/schemas.py) is a different symbol from mcp ExecutionState -- do not confuse the two.",
+        "item_id": "one-engine-delete-dead-mcp"
+      },
+      {
+        "behavior": "jobs.py durable queue, telemetry.py, and the live validate_platform_options path in schemas.py are untouched.",
+        "item_id": "one-engine-delete-dead-mcp"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "The durable job queue that superseded execution.py's in-memory tracker",
+        "decision": "reuse",
+        "item_id": "one-engine-delete-dead-mcp",
+        "path": "benchbox/mcp/jobs.py"
+      },
+      {
+        "concept": "Live telemetry middleware that superseded observability.py",
+        "decision": "reuse",
+        "item_id": "one-engine-delete-dead-mcp",
+        "path": "benchbox/mcp/telemetry.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-delete-dead-mcp",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "one-engine-delete-dead-mcp",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "one-engine-delete-dead-mcp",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "one-engine-delete-dead-mcp",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/telemetry.py"
+      },
+      {
+        "item_id": "one-engine-delete-dead-mcp",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "one-engine-delete-dead-mcp",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "item_id": "one-engine-delete-dead-mcp",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/"
+      },
+      {
+        "item_id": "one-engine-delete-dead-mcp",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test ! -f benchbox/mcp/execution.py && test ! -f benchbox/mcp/observability.py",
+        "description": "Dead modules are gone",
+        "expected": "Both files removed.",
+        "item_id": "one-engine-delete-dead-mcp",
+        "last_result": "pass",
+        "last_run": "2026-08-04T17:50:50Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import benchbox.mcp; from benchbox.mcp.server import create_benchbox_server; s = create_benchbox_server()\" ",
+        "description": "benchbox.mcp imports cleanly and the server still registers 12 local tools",
+        "expected": "Import and server construction succeed without the dead modules.",
+        "item_id": "one-engine-delete-dead-mcp",
+        "last_result": "pass",
+        "last_run": "2026-08-04T17:50:53Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -m fast -q",
+        "description": "MCP fast suite green after deletion",
+        "expected": "No test references the deleted symbols.",
+        "item_id": "one-engine-delete-dead-mcp",
+        "last_result": "pass",
+        "last_run": "2026-08-04T17:51:03Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-delete-dead-mcp",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Repo-wide symbol sweep (py/md/json/ts/yaml) over 13 symbols: all confined to their own module + own tests + lazy re-exports, except docs/operations/mcp-remote-security.md:222 citing MetricsCollector -- scope amended via todo scope-update.",
+        "item_id": "one-engine-delete-dead-mcp",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:25Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Re-verify deadness at HEAD: repo-wide symbol grep for every deleted class/function",
+        "wid": "w0"
+      },
+      {
+        "evidence": "execution.py + observability.py + 8 orphaned Pydantic models + lazy re-exports + 2 test modules deleted; 2 security assertions retargeted to the live validate_platform_options path rather than dropped. Rungs 1-3 pass. PR #1549.",
+        "item_id": "one-engine-delete-dead-mcp",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:29Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Delete execution.py + observability.py + orphaned models + lazy re-exports + their tests",
+        "wid": "w1"
+      }
+    ]
+  }
+}

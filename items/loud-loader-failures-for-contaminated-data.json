@@ -1,0 +1,174 @@
+{
+  "context": "Target file: benchbox/platforms/base/data_loading.py\n- Line 1972: Replace one-liner list comprehension with explicit for-loop categorizing\n  each path as is_file(), is_dir(), or missing\n- Lines 1975-1976: Replace `table_stats[table_name] = 0` with raise DataLoadingError\n  including table name, original path count, dir/missing counts, and --force datagen hint\n- Line 2042: Add is_dir() check before existing not-exists check in _load_single_file,\n  raising DataLoadingError with stale-data hint\n- Follow through on the remaining single-file gap: when the missing path came\n  from explicit manifest or benchmark.tables input, raise DataLoadingError\n  instead of warning+return-0; if provenance is not currently available at the\n  call site, lift the decision to the caller or thread a narrow context flag\n- DataLoadingError is already defined in data_loading.py\n",
+  "description": "The shared SQL/file loader at data_loading.py silently records 0 rows when\nmanifest-listed shard paths don't exist as files on disk (line 1972-1976).\nThis causes cryptic downstream query failures instead of an immediate,\nactionable load error. Similarly, _load_single_file doesn't fully guard\nagainst directory inputs or missing explicit single-file inputs, allowing\nIsADirectoryError or silent skip behavior to propagate.\n\nRoot cause: stale Iceberg table directories (customer/, lineitem/) coexist\nwith valid manifest-tracked files. The exists() filter passes for directories,\nbut handlers can't load them. When all shards filter out, 0 rows is recorded\nsilently.\n\nThis is the highest-value fix because it protects users regardless of the\ncontamination source - stale Iceberg dirs, bad paths, permissions, etc.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "leave explicit single-file manifest or benchmark-table paths on the legacy warn+return-0 branch",
+        "instead": "(not specified)",
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "return 0 silently for manifest-provided paths",
+        "instead": "(not specified)",
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "why": "raise errors instead, because silent failures cause cryptic downstream query failures"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-03-11T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Handler factory and FileFormatRegistry dispatch logic unchanged",
+        "item_id": "loud-loader-failures-for-contaminated-data"
+      },
+      {
+        "behavior": "Legitimate sharded loading still works when all shard files exist",
+        "item_id": "loud-loader-failures-for-contaminated-data"
+      },
+      {
+        "behavior": "Non-explicit discovery flows should not become noisier unless the loader can prove the missing path came from manifest or benchmark table input",
+        "item_id": "loud-loader-failures-for-contaminated-data"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/base/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base/ -k data_loading -v",
+        "description": "Loader regression tests pass",
+        "expected": "All loader tests, including missing-single-file coverage, pass; no regressions in existing tests",
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/ -k 'tpch and duckdb' -x -q --no-header 2>/dev/null || uv run -- python -m pytest -m fast -q",
+        "description": "Happy path: legitimate sharded and single-file loading still works",
+        "expected": "Existing loading paths pass without regression",
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace exists() shard filter with three-way categorization (files/directories/missing)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Raise DataLoadingError when resolved shard file list is empty (replace silent table_stats = 0)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add is_dir() guard in _load_single_file before the existing exists() check",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add loader regression tests: empty shards raises, directory shard filtered+warned, single-file directory raises",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fail fast for missing single-file inputs when the path came from explicit manifest or benchmark table mappings instead of warn+return-0",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "loud-loader-failures-for-contaminated-data",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression coverage for missing explicit single-file inputs while preserving legitimate loading behavior",
+        "wid": "w6"
+      }
+    ]
+  }
+}

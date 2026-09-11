@@ -1,0 +1,229 @@
+{
+  "description": "TARGET ARCHITECTURE (supersedes the additive design of\nquery-plan-capture-isolation-phase-design):\n\nQuery plan capture is, and must be, a FULLY SEPARATE and FULLY ISOLATED concern\nfrom measurement runs. There is exactly one capture path: a post-measurement\nisolated phase that runs after all timed queries complete, on a connection that\ncannot perturb the measured run. The ONLY user-facing capture option is\nanalyze_plans: ANALYZE (re-run each query once, post-measurement, for full\nexecution detail) vs. estimated (a static EXPLAIN, no re-execution). Capture is\nNOT interleaved with measurement for any engine, and there is no per-adapter\n\"is this engine allowed to use the phase\" opt-in.\n\nCURRENT STATE (develop, verified 2026-06-15) — how far we are:\n  - The isolated phase exists (benchbox/core/plan_capture_phase.py) and is wired\n    into ONE execution path (execution.py:_execute_all_queries / power+standard)\n    behind an opt-in capability flag (PlatformAdapter.plan_capture_phase_eligible),\n    enabled on only 6 adapters: DuckDB, MotherDuck, PostgreSQL, Redshift, SQLite,\n    DataFusion.\n  - Inline capture (capture inside execute_query) is STILL PRESENT in ~16\n    adapters and is NOT removed; for the 6 eligible adapters it is merely\n    suppressed in the power/standard path and left active everywhere else.\n  - Consequence A (dual path): the same eligible adapter captures via the\n    ISOLATED phase in power/standard mode but via the INLINE path in throughput,\n    maintenance, and combined modes (the phase logic lives only in\n    _execute_all_queries; throughput drivers do not suppress inline or run the\n    phase). Capture semantics depend on (adapter x test-type) — incoherent.\n  - Consequence B (dead knob): the phase calls run_plan_capture_phase WITHOUT\n    analyze_plans, so it is hard-coded structural-only and ignores the adapter's\n    analyze_plans. `--capture-plans` on eligible adapters silently lost ANALYZE\n    timing — a regression and the deletion of the one knob that should exist.\n    (Fixed by query-plan-capture-phase-respect-analyze.)\n  - Consequence C (wrong exclusions): Spark and Databricks are excluded from the\n    phase on the premise that they \"depend on inline / side-effect capture\", but\n    both use EXPLAIN EXTENDED and are FULLY isolatable with no loss. Only\n    BigQuery-class engines (plan/stats are a true side effect of the executed\n    job) are a genuine exception, and BigQuery is not wired for capture at all.\n\nThis TODO is the umbrella for reaching the target. It depends on the analyze\nknob fix landing first, coordinates the side-effect exception policy, and tracks\nthe remaining structural work: universal eligibility, all-test-type coverage,\nremoval of the inline path, knob-surface collapse, and the post-measurement\ndivergence decision.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add knobs beyond analyze_plans",
+        "instead": "retire sampling/first_n and keep display as a separate concern.",
+        "item_id": "query-plan-capture-canonical-isolation",
+        "why": "the contract is ANALYZE-vs-estimated only"
+      },
+      {
+        "dont": "capture inside concurrent throughput streams",
+        "instead": "capture once after all streams finish.",
+        "item_id": "query-plan-capture-canonical-isolation",
+        "why": "that re-contends on stream connections"
+      },
+      {
+        "dont": "keep capture as a per-adapter opt-in",
+        "instead": "make the isolated phase the default for all EXPLAIN engines.",
+        "item_id": "query-plan-capture-canonical-isolation",
+        "why": "it produces a dual path and per-test-type inconsistency"
+      },
+      {
+        "dont": "leave inline capture in EXPLAIN-based adapters as a permanent fallback",
+        "instead": "remove it once the phase covers all test types.",
+        "item_id": "query-plan-capture-canonical-isolation",
+        "why": "two live capture paths drift and contradict"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "needs_item": "query-plan-capture-phase-respect-analyze"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-06-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DML/write-DDL is never executed twice by capture.",
+        "item_id": "query-plan-capture-canonical-isolation"
+      },
+      {
+        "behavior": "Genuine side-effect engines (BigQuery) keep a working capture path defined by the side-effect-policy TODO.",
+        "item_id": "query-plan-capture-canonical-isolation"
+      },
+      {
+        "behavior": "Measured timing (per-query, power, throughput) stays free of capture cost.",
+        "item_id": "query-plan-capture-canonical-isolation"
+      },
+      {
+        "behavior": "plan_fingerprints / query_plan / plan_capture_time_ms continue to land on query_results and aggregate stats exactly as today (compute_plan_capture_stats stays valid).",
+        "item_id": "query-plan-capture-canonical-isolation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/plan_capture_phase.py"
+      },
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "kind": "only_modify",
+        "path_glob": "docs/features/query-plan-analysis.md"
+      },
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/ -k 'capture_phase and (throughput or maintenance or combined)' -v",
+        "description": "Inline capture never fires for EXPLAIN engines across all test types",
+        "expected": "capture happens only in the post-measurement phase for every test type",
+        "item_id": "query-plan-capture-canonical-isolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -q",
+        "description": "Full platform suite green after inline removal",
+        "expected": "0 failures, 0 errors",
+        "item_id": "query-plan-capture-canonical-isolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "query-plan-capture-canonical-isolation",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-canonical-isolation",
+        "notes": "Record the contract above as the single source of truth. Add a superseded note\n+ pointer on query-plan-capture-isolation-phase-design (its additive cutover is\nan intermediate step, not the destination); narrow its anti-patterns that\nenshrine permanent inline coexistence to the true exception (BigQuery-class).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Ratify the canonical contract and update isolation-phase-design as superseded",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-canonical-isolation",
+        "notes": "Invert plan_capture_phase_eligible from opt-in to default-True, with an explicit\nexception list for genuine side-effect engines. Enable Spark/Databricks and the\ninline-only EXPLAIN engines (athena, doris, questdb, singlestore, presto/trino,\nclickhouse, databend). Verify each produces a parseable plan via the phase.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Default phase eligibility ON for all EXPLAIN-based engines (incl. Spark/Databricks)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-canonical-isolation",
+        "notes": "Move the suppress-inline + post-measurement-capture logic out of\n_execute_all_queries into a shared place that throughput, maintenance, and\ncombined drivers all reach, so capture fires once per run after the last timed\nquery regardless of test type. Do NOT capture inside concurrent streams.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the capture phase for ALL test types, not just power/standard",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-canonical-isolation",
+        "notes": "Delete the inline capture calls from execute_query in the EXPLAIN-based adapters\n(the _merge_plan_capture_into_result / capture_query_plan blocks), leaving only\nget_query_plan + get_query_plan_parser. Retire the now-moot sampling machinery\n(plan_first_n/plan_sampling_rate) and the _plan_capture_iteration_counts lock\n(added only for the concurrent inline path). Keep inline ONLY for the genuine\nside-effect exception engines.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove the inline capture path from EXPLAIN-based adapters and its dead complexity",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-canonical-isolation",
+        "notes": "Reduce the user-facing surface to: --capture-plans (run the phase) and\nanalyze_plans (the one mode knob, promoted from a buried --platform-option to a\nfirst-class option). Reconcile show_query_plans (display) as an orthogonal\nconcern (see query-plan-capture-display-decouple), not coupled to capture.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Collapse the capture knob surface to analyze_plans",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-canonical-isolation",
+        "notes": "Document capture as a single isolated post-measurement phase with analyze_plans\nas the only knob; add an integration test asserting capture fires after every\ntest type, inline never fires for EXPLAIN engines, and plan_fingerprints land in\nresults identically to today.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Docs + end-to-end test for the canonical model",
+        "wid": "w6"
+      }
+    ]
+  }
+}

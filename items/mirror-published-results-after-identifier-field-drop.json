@@ -1,0 +1,103 @@
+{
+  "context": "After #1578 is on develop: workflow_dispatch the sync workflow, verify tip has zero drop-field keys and still satisfies find_public_path_leaks, merge draft mirror PR. Do not force-push history.",
+  "description": "PR #1578 re-derives results-data (207 result_id rotations, six identifier fields omitted). Until develop is mirrored, origin/published-results tip can lag and still serve pre-drop public bytes for any not-yet-mirrored content. The class of failure fixed by #1535/#1538 (stale public corpus) recurs operationally if the sync is skipped. After #1578 merges to develop, trigger sync-results-data-to-published.yml (draft PR, never auto-merge), review, and merge the mirror. Coordinate with corpus-drift-canary-direction-and-leak-check so community submissions on published-results are not clobbered.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "mirror-published-results-after-identifier-field-drop",
+        "needs_item": "published-pseudonym-oracle-and-field-set"
+      }
+    ],
+    "item_meta": {
+      "category": "privacy",
+      "created_at": "2026-08-05T20:49:41Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The mirror PR stays a draft until human review; it must never auto-merge",
+        "item_id": "mirror-published-results-after-identifier-field-drop"
+      },
+      {
+        "behavior": "published-results history is not rewritten as a side effect",
+        "item_id": "mirror-published-results-after-identifier-field-drop"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mirror-published-results-after-identifier-field-drop",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "mirror-published-results-after-identifier-field-drop",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git fetch -q origin published-results && ! git grep -q \"\\\"machine_id\\\"\" origin/published-results -- results-data || true",
+        "description": "published-results tip has no unread drop-field keys after mirror",
+        "expected": "scripted check preferred in w2",
+        "item_id": "mirror-published-results-after-identifier-field-drop",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f .github/workflows/corpus-drift-check.yml",
+        "description": "corpus-drift canary path still exists",
+        "expected": "exit 0",
+        "item_id": "mirror-published-results-after-identifier-field-drop",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mirror-published-results-after-identifier-field-drop",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mirror-published-results-after-identifier-field-drop",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm #1578 is on develop and measure tip drift vs published-results",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "mirror-published-results-after-identifier-field-drop",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Trigger sync-results-data-to-published and land the draft mirror after review",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mirror-published-results-after-identifier-field-drop",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify published-results tip",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Designed and implemented the Write Primitives benchmark on top of TPC-H data, harmonised CLI exposure/documentation, upgraded the result schema to v1.1 for iteration metadata, and added integration coverage to ensure adapters execute the new workload predictably.",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (Should-Fix Before Release)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

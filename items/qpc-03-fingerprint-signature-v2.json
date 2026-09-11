@@ -1,0 +1,200 @@
+{
+  "description": "PARTIAL as of 2026-07-06 (still OPEN): the ADJACENT literal-normalization work\nlanded via #987 (harden-normalized-plan-fingerprint) + #1008 (ordinal\nprotection) — atomic numeric grammar, `#` ordinal preservation, and a\n`normalization_scheme` + PlanFingerprintSchemeMismatchError guard. But this\nitem's TWO CORE findings are STILL REPRODUCIBLE on develop and remain open:\n  - F2.1 tree-shape collision: `Join[Scan(t1),Scan(t2)]` (two children) and\n    `Join[Scan(t1)->Scan(t2)]` (nested chain) both yield the signature\n    `Join|Scan|table:t1|Scan|table:t2` and hash identically — children are\n    still joined flat with `|`, so tree shape is NOT encoded. Verified\n    2026-07-06.\n  - F2.2 trust laundering: a plan with its stored fingerprint field removed is\n    recomputed and marked VERIFIED/trusted in __post_init__, so dropping the\n    field bypasses STALE tamper-detection. Verified 2026-07-06.\nThe tree-shape re-encoding (`op(child1,...)`), field escaping, fingerprint_version,\nand the integrity-trust fix below are the remaining work.\n\nget_structural_signature flattens children with the same '|' separator as\nscalar fields, so tree shape is not encoded: Join[Scan(t1), Scan(t2)] and\nJoin[Scan(t1) -> Scan(t2)] produce identical SHA256 fingerprints\n(reproduced). Separator injection also collides: filters [\"a\",\"b\"] ==\n[\"a,b\"]; table_name \"x|filters:y\" == table x + filter y. The comparator's\ntrusted fast path (comparison.py:181) then declares structurally different\nplans identical — masking exactly the plan-regression class the tool exists\nto catch.\n\nIntegrity: a plan whose stored fingerprint is missing gets recomputed and\nmarked VERIFIED in __post_init__ (query_plan_models.py:345-349), so\ndeleting the fingerprint field bypasses STALE tamper-detection;\nrefresh_on_mismatch launders tampered plans into trusted RECOMPUTED.\n\nFindings: F2.1, F2.2.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "compare v1 and v2 fingerprints for equality anywhere, including history flap detection.",
+        "instead": "(not specified)",
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "keep '|'/',' joining with ad-hoc escaping",
+        "instead": "(not specified)",
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "why": "use a canonical encoder (JSON) so the next field added cannot re-introduce injection."
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness / Data Integrity",
+      "completed_at": "2026-07-07T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "Fingerprints remain structure-only (no costs/rows/operator ids)",
+        "item_id": "qpc-03-fingerprint-signature-v2"
+      },
+      {
+        "behavior": "Old bundles (no fingerprint_version / v1 fingerprints) still load; they compare via tree walk, never via cross-version fingerprint equality",
+        "item_id": "qpc-03-fingerprint-signature-v2"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/query_plans/comparison.py:167-182 trusted fast path",
+        "decision": "reuse",
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "path": "benchbox/core/query_plans/comparison.py:167-182"
+      },
+      {
+        "concept": "benchbox/core/results/query_plan_models.py:250-308 get_structural_signature",
+        "decision": "reuse",
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "path": "benchbox/core/results/query_plan_models.py:250-308"
+      },
+      {
+        "concept": "benchbox/core/results/query_plan_models.py:311-317 FingerprintIntegrity",
+        "decision": "reuse",
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "path": "benchbox/core/results/query_plan_models.py:311-317"
+      },
+      {
+        "concept": "scratchpad repro repro_fingerprint.py — collision and trust repros to convert into tests",
+        "decision": "reuse",
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "path": "scratchpad"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/comparison.py"
+      },
+      {
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/query_plan_models.py"
+      },
+      {
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_query_plan_models.py -q",
+        "description": "Collision repros now produce distinct fingerprints",
+        "expected": "all pass, including new collision tests",
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/query_plans/test_query_plans_comparison.py -q",
+        "description": "Comparator falls back to tree walk on version mismatch and untrusted integrity",
+        "expected": "all pass",
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "notes": "get_structural_signature now emits canonical JSON via a recursive _structural_signature_obj: children nested as a \"children\" list (tree shape encoded) and list fields kept as JSON arrays (no ,/| injection). Added FINGERPRINT_VERSION=2 + fingerprint_version field on QueryPlanDAG, in to_dict/from_dict and surfaced at the companion entry level.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: rewrite the structural signature to encode tree shape and escape fields; add fingerprint_version=2 to model and companion payload.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "notes": "from_dict: absent stored fp -> RECOMPUTED (not VERIFIED); legacy v1 fp (no version) loads as v1 and lands STALE on recompute. compare_plans and the summary flap path both require matching fingerprint_version AND trusted integrity before any fp-equality fast path, else full tree walk. Documented that integrity states are internal consistency, not provenance.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: honest integrity semantics — missing stored fingerprint yields RECOMPUTED; comparator fast path requires version match + trust.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "notes": "Added TestFingerprintV2Encoding (sibling-vs-nested, filter/table separator injection, canonical-JSON, set-vs-ordered fields), TestFingerprintVersioningAndIntegrity (fresh/roundtrip/absent-fp-RECOMPUTED/ tampered-STALE/legacy-v1-STALE) and TestFingerprintVersionMismatchInComparison (cross-version equal-string falls back to tree walk; same-version control).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: regression tests from the review repros — sibling-vs-nested collision, separator injection, deleted-fingerprint trust, version mismatch falls back to tree walk.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Review: adversarial code review (hash stability across Python versions, unicode expressions, empty-list vs None fields).",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix: address review findings; re-run verification.",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-03-fingerprint-signature-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Submit PR referencing qpc-03; call out the fingerprint-version break loudly in the PR body.",
+        "wid": "w6"
+      }
+    ]
+  }
+}

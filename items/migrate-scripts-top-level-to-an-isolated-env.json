@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #181 of extract-project-scripts-to-isolated-env.\nDeferred: Migrate `scripts/` (top-level) to an isolated env\nReason deferred: Out of scope. `scripts/` may include pieces that ship in the wheel or are otherwise coupled to runtime; needs separate audit.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:22Z",
+      "worktree": "main"
+    }
+  }
+}

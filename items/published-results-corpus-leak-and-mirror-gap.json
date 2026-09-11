@@ -1,0 +1,125 @@
+{
+  "context": "Fix the exposure first: trigger sync-results-data-to-published.yml via workflow_dispatch (it opens a DRAFT PR and never auto-merges) or open the mirror PR by hand, then review and merge. Then fix the class of bug: (a) find out why the push trigger did not fire for #1467 and (b) add a corpus-drift canary between develop and published-results, mirroring how submission-validator-drift-check.yml already watches the validator, so a stale public corpus is loud instead of silent. Finally decide, separately and explicitly, what to do about the leaked values retained in that branch's git history.",
+  "description": "origin/published-results is a branch of a PUBLIC repo whose own README calls it 'the public results corpus ... used directly by the static build pipeline'. It carries the PRE-#1467 unsanitized bundles. Measured 2026-08-04 against origin/published-results: 183 of 207 primary bundles are flagged by the repo's own canonical find_public_path_leaks (fields like platform.config.working_dir, execution.driver_runtime_python_executable), and 206 of 207 expose the raw 16-hex internal machine_id rather than the 12-hex public pseudonym. develop's corpus is clean (0 leaks) - only the public mirror is stale. ROOT CAUSE: .github/workflows/sync-results-data-to-published.yml triggers on push to develop under results-data/bundles/**. #1467 (37370ce5e4, 2026-08-03) changed 399 files under exactly that path. The workflow is 'active' but its last run was 2026-08-02 for #1486 and it has had ZERO runs on or after 2026-08-03. No PR targets published-results either, so the sanitization has never reached the public branch. Nothing alerted: submission-validator-drift-check.yml watches validator drift between the branches but nothing watches CORPUS drift, and the whole-corpus privacy invariant (tests/unit/scripts/test_corpus_privacy_invariant.py) scans the working tree of the branch under test, so it guards develop and has never looked at published-results - that test file does not even exist on that branch. SECOND-ORDER: sanitizing the tip does NOT remove the leaked values from that branch's git history, which is public. Decide separately whether history rewriting is warranted; do not force-push without an explicit decision.",
+  "legacy": {
+    "item_meta": {
+      "category": "privacy",
+      "completed_at": "2026-08-05T19:54:02Z",
+      "completed_pr": 1538,
+      "created_at": "2026-08-04T13:08:58Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The mirror PR stays a draft - it must never auto-merge",
+        "item_id": "published-results-corpus-leak-and-mirror-gap"
+      },
+      {
+        "behavior": "published-results stays slim per adr-published-results-slim-corpus-branch.md",
+        "item_id": "published-results-corpus-leak-and-mirror-gap"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "published-results-corpus-leak-and-mirror-gap",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "published-results-corpus-leak-and-mirror-gap",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/**"
+      },
+      {
+        "item_id": "published-results-corpus-leak-and-mirror-gap",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git fetch -q origin published-results && git ls-tree -r --name-only origin/published-results 'results-data/' | grep '[.]json$' | while read f; do git show \"origin/published-results:\"; done | uv run -- python -c 'import json,sys; from benchbox.core.results.anonymization import find_public_path_leaks' ",
+        "description": "published-results tip is free of private paths",
+        "expected": "Replace with a scripted scan in w0; must exit 0 only when every bundle on that branch is leak-free",
+        "item_id": "published-results-corpus-leak-and-mirror-gap",
+        "last_result": "pass",
+        "last_run": "2026-08-05T19:53:59Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rq 'published-results' .github/workflows/ && test -n \".github/workflows/submission-validator-drift-check.yml\n.github/workflows/seed-corpus.yml\n.github/workflows/validate-submission.yml\n.github/workflows/sync-results-data-to-published.yml\"",
+        "description": "a corpus-drift canary exists",
+        "expected": "Exits 0 once some workflow compares develop's corpus to the published-results copy",
+        "item_id": "published-results-corpus-leak-and-mirror-gap",
+        "last_result": "pass",
+        "last_run": "2026-08-05T19:53:26Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "published-results-corpus-leak-and-mirror-gap",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "published-results-corpus-leak-and-mirror-gap",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "published-results-corpus-leak-and-mirror-gap",
+        "needs_wid": "w0",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1535 merged 2026-08-04, published-results now at 7ce84ab784 (mirror of develop@aecbadcf). Verified against origin/published-results directly after the merge: 400 JSON files scanned, 0 flagged by find_public_path_leaks (was 183 of 207), and all 206 machine_id values are 12-hex public pseudonyms (was 206 raw 16-hex internal ids). The live exposure on the public branch tip is closed. Mirror was produced by triggering sync-results-data-to-published.yml via workflow_dispatch; the run completed green in 19s, confirming the workflow itself is functional and that the silent non-firing for #1467 is a trigger/delivery问题 tracked in w1. NOTE w3 remains open and is NOT addressed by this merge: the pre-#1467 values are still present in that public branch's git history.",
+        "item_id": "published-results-corpus-leak-and-mirror-gap",
+        "notes": null,
+        "started_at": "2026-08-04T13:20:07Z",
+        "started_branch": "fix/rederive-corpus-single-pass",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Mirror develop's sanitized corpus to published-results and confirm 0 leaks on that branch",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1538, commit ec03398741. NOT a configuration bug. The sync workflow's path filter is correct, the workflow is 'active', and it ran green in 19s on workflow_dispatch. Root cause: GitHub delivered NO push events for three consecutive develop merges on 2026-08-03 in a ~20 minute window - 045a6c90fc (#1502, 21:38), 37370ce5e4 (#1467, 21:51) and 703a269f7a (#1503, 21:57). Evidence: enumerating all develop runs between 2026-08-03T20:00Z and 2026-08-04T12:00Z shows runs for 1a26679ea4, cd11dada28, 3b537741a8, 3f6a9f32d2, c18aaf90ec, 1a61724531, 6e8f646d26 and d8afb2fa9a but nothing at all for those three SHAs - not even 'Develop post-merge', which fires on every develop push. Deliveries resumed normally at the next commit. So the mirror never opened because the event that starts it was never delivered.",
+        "item_id": "published-results-corpus-leak-and-mirror-gap",
+        "notes": null,
+        "started_at": "2026-08-04T16:25:56Z",
+        "started_branch": "chore/corpus-drift-canary",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Diagnose why the push trigger did not fire for #1467",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1538, commit ec03398741. Added .github/workflows/corpus-drift-check.yml. Deliberately SCHEDULED (daily cron + workflow_dispatch) rather than push-triggered, because w1 established the root cause was lost push events - every existing drift guard in the repo, including submission-validator-drift-check.yml, is push-only and shares that failure mode. It reports only; opening the mirror stays a human dispatch, so the workflow needs no write access to a public branch. Negative control against the real incident: the canary's diff reports 0 drifted paths against published-results today (in sync after #1535) and 400 drifted paths against published-results@e8e6db4427, the state it held throughout the exposure - so it would have fired on day one.",
+        "item_id": "published-results-corpus-leak-and-mirror-gap",
+        "notes": null,
+        "started_at": "2026-08-04T16:26:15Z",
+        "started_branch": "chore/corpus-drift-canary",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Add a corpus-drift canary so a stale public corpus is loud",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1538, commit ec03398741. DECIDED: retain published-results history, do not rewrite. Recorded as docs/development/adr/adr-published-results-history-retention.md with the measured exposure (183/207 bundles leaking, 206/207 raw machine_id, public repo), the rationale, and the alternatives rejected. Reasoning: a force-push cannot retract already-public content - clones, forks and cached commit views survive it - so it converts a known exposure into an exposure plus a false belief it was undone, while breaking every clone and fork of a branch whose purpose is external consumption. Exposure class is machine-local absolute paths and usernames, not secrets; credentials and connection strings are redacted on a separate path that was working correctly. The ADR states explicitly that the decision does NOT extend to a higher severity class - a credential, token or customer data is a rotate-then-decide situation where rewriting may be justified because the secret can actually be invalidated - and points at salt rotation as the cheaper way to change published pseudonym identity without touching history.",
+        "item_id": "published-results-corpus-leak-and-mirror-gap",
+        "notes": null,
+        "started_at": "2026-08-04T16:26:19Z",
+        "started_branch": "chore/corpus-drift-canary",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Decide explicitly whether the leaked values in published-results git history need rewriting",
+        "wid": "w3"
+      }
+    ]
+  }
+}

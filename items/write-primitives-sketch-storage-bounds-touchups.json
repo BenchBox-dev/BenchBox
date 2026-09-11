@@ -1,0 +1,86 @@
+{
+  "description": "## Background\n\nCaptured during the multi-PR review of the write-primitives sketch\ncluster. PR #184 (parameter-sweep variants) was OPEN at review time\nand the lgmm10 storage-size lower bound `[500, 5000]` was flagged\nas potentially too tight: at `lg_max_map_size=10` (1024 buckets)\nover only 7 distinct shipmodes in TPC-H lineitem, the merged\nfrequent-items sketch may stay near its empty-state baseline\n(~600B-ish) and false-fail.\n\nThe fix could not land in the current followup PR\n(`fix/write-primitives-review-followups`) because the lgmm10 op\ndoesn't exist on `develop` until PR #184 merges. This TODO\ncaptures the deferred bound-retouchup work.\n\n## What this delivers\n\n1. Re-run `sketch_query_topk_combine_lgmm10` (and its lgmm8\n   counterpart for symmetry) at SF=0.01 against the installed\n   datasketches extension. Capture observed storage-size bytes.\n\n2. Adjust bounds in\n   `benchbox/core/write_primitives/catalog/operations.yaml` to\n   bracket the observation ±50% (or wider if the variance is high).\n\n3. While there: spot-check the Theta `_lgk10` and `_lgk14` storage\n   bounds against the current build if/when the\n   `datasketch_theta` extension drift is resolved\n   (`_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`).\n   Inherit-broken-from-parent bounds were spec-derived, not\n   measured.\n\n## Verification\n\n```bash\nuv run -- benchbox run --platform duckdb --benchmark write_primitives \\\n  --scale 0.01 \\\n  --queries sketch_query_topk_combine_lgmm10,sketch_query_topk_combine_lgmm8\n```\n\nExpected: both ops pass with the re-tuned bounds; observed storage\nsize is captured in inline comments next to the bound.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "write-primitives-sketch-storage-bounds-touchups",
+        "needs_item": "write-primitives-sketch-parameter-sweeps"
+      }
+    ],
+    "item_meta": {
+      "category": "Verification",
+      "completed_at": "2026-05-04T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-sketch-storage-bounds-touchups",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-storage-bounds-touchups",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/dataframe_operations.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-storage-bounds-touchups",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-storage-bounds-touchups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-primitives-sketch-storage-bounds-touchups",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "write-primitives-sketch-storage-bounds-touchups",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-storage-bounds-touchups",
+        "notes": "Theta lgk10/lgk14 only if the datasketch_theta extension drift\nis resolved; otherwise skip those and re-flag via the existing\nblind-spot.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run lgmm10 / lgmm8 / lgk10 / lgk14 ops at SF=0.01 on the installed extension and capture observed bytes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-storage-bounds-touchups",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retune each variant's storage_size bounds to bracket the observation",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-storage-bounds-touchups",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update inline yaml comments with the observed value",
+        "wid": "w3"
+      }
+    ]
+  }
+}

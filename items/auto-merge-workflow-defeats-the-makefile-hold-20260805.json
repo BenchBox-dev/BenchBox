@@ -1,0 +1,115 @@
+{
+  "context": "Decide first whether the workflow backstop should keep arming at 'opened' at all, or only at 'ready_for_review'. The draft carve-out suggests the intended signal for 'this is final' already exists and the workflow simply does not require it. Whatever is chosen, the test must assert on the enablement POLICY across both layers rather than on Makefile text, or the same hole reopens the next time one layer is edited.",
+  "description": "#1567 moved the auto-merge enablement point out of 'make pr-open' so a PR is not armed before the work is final. The change is real in the Makefile and its tests pass, but it does not achieve the stated goal, because .github/workflows/auto-merge-on-open.yml arms auto-merge independently on the 'opened' event for any non-draft PR targeting develop. Its own header says so: it is a 'Backstop for the local make pr-open flow: if a PR is opened against develop via the GitHub UI, gh pr create directly, or any path that skips gh pr merge --auto --squash, this workflow turns auto-merge on.'\n\nPROVEN LIVE, not theorised. PRs #1568 and #1569 were opened with 'gh pr create' during this session. Nothing armed auto-merge locally - the whole point of #1567 - and both merged to develop on their own the moment checks went green (0299b506fb and faa1dd8367). The race #1567 exists to close is therefore still fully open: open a non-draft PR, the workflow arms it, checks pass, it merges while the follow-up commit from review feedback is still being written.\n\nWHY THE TEST DID NOT CATCH IT: tests/unit/workflows/test_auto_merge_enablement_point.py asserts only on Makefile text - that 'gh pr merge --auto --squash' is absent from the pr-open recipe and appears exactly once in the file. Every assertion is true while the hole is wide open one layer up. This is the classic wrong-layer test: it pins the artefact that was edited rather than the behaviour that was claimed.\n\nMITIGATIONS THAT ALREADY EXIST, so scope this carefully: the workflow skips drafts ('opening a draft is the user's signal that the PR is not yet ready'), and it re-evaluates on 'synchronize' so a later soundness-touching commit flips auto-merge back off. Neither closes the timing race for an ordinary PR.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-05T22:31:09Z",
+        "from_item": "auto-merge-workflow-defeats-the-makefile-hold-20260805",
+        "id": 697,
+        "reason": "Script still classifies intentional holds as stranded; out of this TODO scope (_project/scripts). Needs follow-up item.",
+        "resolution": "promoted",
+        "resolved_item": "green-unmerged-sweep-false-positives-after-auto-merge-hold",
+        "resolved_reason": null,
+        "summary": "green_unmerged_sweep false-positives after auto-merge hold"
+      }
+    ],
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-05T22:32:52Z",
+      "completed_pr": 1592,
+      "created_at": "2026-08-05T15:31:30Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A finished branch still reaches auto-merge without ceremony; the fix must not make every PR a manual merge",
+        "item_id": "auto-merge-workflow-defeats-the-makefile-hold-20260805"
+      },
+      {
+        "behavior": "Soundness-path PRs still have auto-merge withheld and revoked on synchronize - auto-merge-on-open.yml's soundness logic must not be weakened",
+        "item_id": "auto-merge-workflow-defeats-the-makefile-hold-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "auto-merge-workflow-defeats-the-makefile-hold-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "auto-merge-workflow-defeats-the-makefile-hold-20260805",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "auto-merge-workflow-defeats-the-makefile-hold-20260805",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "auto-merge-workflow-defeats-the-makefile-hold-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "auto-merge-workflow-defeats-the-makefile-hold-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q -k auto_merge_enablement",
+        "description": "No layer arms auto-merge merely because a PR was opened",
+        "expected": "Fails on the unfixed tree, where auto-merge-on-open.yml lists 'opened' in its trigger types and arms unconditionally for non-draft PRs",
+        "item_id": "auto-merge-workflow-defeats-the-makefile-hold-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-05T22:32:42Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows/test_auto_merge_partial_stack_race.py -q",
+        "description": "Soundness withholding and revocation are unchanged",
+        "expected": "No regression in the soundness controls",
+        "item_id": "auto-merge-workflow-defeats-the-makefile-hold-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-05T22:32:49Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "auto-merge-workflow-defeats-the-makefile-hold-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "policy: arm only on ready_for_review / make pr-ready; never on opened/synchronize enable",
+        "item_id": "auto-merge-workflow-defeats-the-makefile-hold-20260805",
+        "notes": null,
+        "started_at": "2026-08-05T22:18:28Z",
+        "started_branch": "fix/auto-merge-enablement-hold",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Decide whether the workflow arms at opened or only at ready_for_review, and reconcile it with the Makefile hold",
+        "wid": "w0"
+      },
+      {
+        "evidence": "d6827a2743 tests green: 8 enablement + 7 partial-stack race",
+        "item_id": "auto-merge-workflow-defeats-the-makefile-hold-20260805",
+        "notes": null,
+        "started_at": "2026-08-05T22:20:15Z",
+        "started_branch": "fix/auto-merge-enablement-hold",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Implement the reconciled policy and replace the Makefile-text test with one that pins the policy across both layers",
+        "wid": "w1"
+      }
+    ]
+  }
+}

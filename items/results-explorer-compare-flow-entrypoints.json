@@ -1,0 +1,301 @@
+{
+  "context": "Prefer one shared compare-selection helper or tray over page-specific logic\nwhere the data shape already matches. Keep result ids hidden from ordinary\ntable layout unless the user explicitly enables the Result ID column. Treat\nthe empty Compare page as a task-start page, not an error page.\n",
+  "description": "Build a complete in-page compare flow for Results Explorer so users can\ndiscover, select, and compare compatible runs without editing URLs. Defects\nthis item addresses were flagged in the 2026-05-08 Results Explorer\nfollow-up review (chat-only artifact, not committed to _project/audits/).\nw0 rebinds the review evidence against develop tip and captures it to\n_project/verification-logs/results-explorer-compare-flow-entrypoints/w0.log\nbefore any other work unit runs; that log replaces the previous \"review row\n#1/#2/#4/#5/#34/#35/#36\" citations as the durable reference.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "allow mixed-cohort compares and then fail after navigation.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "duplicate incompatible compare-selection implementations across each page.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "require manual URL editing.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Comparable cohort rules: benchmark, scale, phase, metric, and unit stay fixed.",
+        "item_id": "results-explorer-compare-flow-entrypoints"
+      },
+      {
+        "behavior": "Existing `/results/compare?ids=...` deep links must keep working.",
+        "item_id": "results-explorer-compare-flow-entrypoints"
+      },
+      {
+        "behavior": "Static export compatibility; no server endpoint or runtime database dependency.",
+        "item_id": "results-explorer-compare-flow-entrypoints"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "kind": "do_not_modify",
+        "path_glob": "Generated result snapshot content unless a missing result_id field is proven to be the blocker."
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/compare-entrypoint-inventory-2026-05-08.md"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/Compare.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/Home.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx",
+        "description": "Targeted compare entrypoint tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: browser-check /results/compare, /results/query, /results/, /results/tpch/, /results/p/polars/, and /results/r/<id> for end-to-end selection and launch'",
+        "description": "Manual compare flow browser check is complete",
+        "expected": "manual evidence captured in PR notes or audit artifact",
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "notes": "Walk /results/compare (empty), /results/r/<id> (single-result compare\nCTA), /results/query (no compare selection), /results/ (Home leaderboard\nand Recent Results compare affordances), /results/tpch/ (Benchmark\ndetail row selection), and /results/p/<platform>/ (Platform detail row\nselection) against the current develop tip. Capture observed defects\n(URL-editing prompts, dead-end CTAs, missing checkboxes, mixed-cohort\nacceptance, hidden result_id availability) to\n_project/verification-logs/results-explorer-compare-flow-entrypoints/w0.log.\nOutput is the rebind reference for w1-w7 acceptance.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rebind compare-flow review evidence against develop tip",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "notes": "Inventory Compare, ResultDetail, Query, Home, BenchmarkIndex, and\nPlatformIndex. Record current compare route contracts, link helpers,\nselection state, and which transformed row datasets already carry a\nusable hidden result id. Write the inventory to\n_project/audits/compare-entrypoint-inventory-2026-05-08.md so w2-w6 can\ncite it instead of re-deriving.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory current compare route contracts and id availability",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "notes": "Replace the empty `/results/compare` state that tells users to add\n`?ids=id1,id2` with a compare builder. The builder exposes benchmark,\nplatform, scale, phase, and metric-contract filters; renders selectable\ncandidate runs; and disables launch until two compatible ids are\nselected.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace the empty Compare URL-editing error with an in-page builder",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "notes": "Fix ResultDetail \"Compare this result\" so one selected result opens the\ncompare builder with that run pinned and compatible candidates listed.\nThe page must not redirect to a broken compare state or silently no-op\nwith only one id.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support single-result compare starts from Result Detail",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "notes": "Query Workbench grew a sticky-left \"Compare\" column with per-row\ncheckboxes plus a tray (`data-testid=\"query-compare-tray\"`) above\nthe table. The first selection locks the cohort signature\n(benchmark, scale_factor, phase, primary_metric); subsequent rows\nthat don't match render their checkbox disabled with a tooltip\nexplaining the lock. Hidden `result_id` is already on every row\nvia the View link, so no new plumbing was needed. The launch\naffordance switches between a disabled \"Compare (need 2+)\" stub\nand an enabled `<a>` pointing at `buildCompareUrl(...)` once\ntwo compatible rows are picked. Verification log:\n_project/verification-logs/results-explorer-compare-flow-entrypoints/w456.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Query Workbench compare selection",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "notes": "Home's leaderboard cohort selector now ends with a \"Start a\ncomparison →\" link (`data-testid=\"home-compare-entrypoint\"`) that\nroutes to `/results/compare/`. The CompareBuilder shipped in #284\nhandles the empty-state flow, so users land on cohort filters and\npick from candidates without any URL editing. Row-level checkboxes\non the meta-leaderboard were rejected as out of scope: the matrix\nrenders aggregate cohort cells, not individual runs, so per-row\ncheckboxes would need to drill in. The prefilled-builder route\nmatches the YAML's \"or route to the compare builder\" alternative.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Home leaderboard and recent-result compare entrypoints",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "notes": "`PlatformIndex.tsx` now derives a cohort lock signature\n(benchmark, scale_factor, phase, primary_metric) from the first\nselected row. Each row checkbox carries an explicit\n`data-testid=\"platform-compare-checkbox-<result_id>\"` so tests\ncan target it precisely; rows that don't match the locked\nsignature render disabled with a tooltip listing the mismatched\nfields. Compatible rows stay selectable, and deselecting back to\nzero releases the lock. BenchmarkIndex was already constrained\nby the page-level scale/phase contract (the heatmap only renders\none cohort at a time), so no change was needed there.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Constrain compatible cohort selection on detail pages",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-flow-entrypoints",
+        "notes": "Add unit and browser coverage for the empty Compare builder,\nsingle-result start, Query Workbench selection, Home selection/routing,\nBenchmark detail selection, and Platform detail selection. Tests must\nassert that users are never told to edit the URL to start comparison.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover compare entrypoints with automated and browser checks",
+        "wid": "w7"
+      }
+    ]
+  }
+}

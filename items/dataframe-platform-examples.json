@@ -1,0 +1,10 @@
+{
+  "description": "Create example Python scripts for DataFrame platforms.\n\nDataFrame mode is a key differentiator for BenchBox but lacks examples.\nNeed examples for:\n- Polars (fastest DataFrame platform)\n- CuDF (GPU-accelerated)\n\nExamples should demonstrate:\n- DataFrame adapter initialization\n- TPC-H benchmark execution\n- Result interpretation",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation and User Experience",
+      "created_at": "2025-12-13T00:00:00Z",
+      "worktree": "docs-experience"
+    }
+  }
+}

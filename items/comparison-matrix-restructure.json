@@ -1,0 +1,11 @@
+{
+  "description": "The platform comparison matrix (docs/platforms/comparison-matrix.md) is severely\nincomplete and structurally inadequate. Currently documents only 8 of 28 SQL platforms\n(28% coverage) and 4 of 7 DataFrame platforms (57% coverage).\n\nKey problems identified in documentation review:\n- 20 SQL platforms missing from all comparison tables\n- 3 DataFrame platforms missing (Modin, Dask, cuDF)\n- Azure platforms incorrectly marked as \"planned\" when fully implemented\n- Tables with 8+ columns are unreadable on most screens\n- No categorical grouping makes navigation difficult\n- Decision framework doesn't include most available options\n\nProposed solution: Restructure into grouped comparison tables by category,\nreducing column count per table while achieving 100% platform coverage.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2025-01-14T00:00:00Z",
+      "created_at": "2025-01-14T00:00:00Z",
+      "worktree": "docs-experience"
+    }
+  }
+}

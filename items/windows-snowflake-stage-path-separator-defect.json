@@ -1,0 +1,41 @@
+{
+  "context": "Fix in the product at the stringification boundary in _match_snowflake_stage so the predicate and get_cloud_path_info cannot drift: normalize backslashes to forward slashes when the input was a Path (a stage reference is a Snowflake URI grammar, not a local filesystem path, so a Path-typed one should be interpreted with '/' separators). Keep rejecting non-str/non-Path input. Add coverage using PureWindowsPath so the regression reproduces on Linux CI rather than only in the Windows nightly.",
+  "description": "Genuine PRODUCT cross-platform defect, not a test artifact. benchbox/utils/cloud_storage.py:425 is_snowflake_stage_path accepts Union[str, Path] in its signature, but _match_snowflake_stage stringifies the Path and matches _SNOWFLAKE_STAGE_RE, which requires '/' after the stage token. On Windows str(WindowsPath('@~/benchbox')) == '@~\\\\benchbox', so the regex never matches and the predicate returns False for a valid Snowflake user-stage reference. Confirmed mechanically: PureWindowsPath('@~/benchbox') -> '@~\\\\benchbox' vs PurePosixPath -> '@~/benchbox'. Surfaced by tests/unit/utils/test_cloud_storage_snowflake_stage.py::TestIsSnowflakeStagePath::test_accepts_path_objects_and_rejects_non_string_input in Nightly run 30473819253. The test is asserting correct behavior - fix the product, not the test.",
+  "legacy": {
+    "item_meta": {
+      "category": "core-functionality",
+      "created_at": "2026-07-30T01:09:03Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "abfss://container@account... URIs must still never be misrouted to the stage matcher; str inputs behave exactly as today",
+        "item_id": "windows-snowflake-stage-path-separator-defect"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-snowflake-stage-path-separator-defect",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/**"
+      },
+      {
+        "item_id": "windows-snowflake-stage-path-separator-defect",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from pathlib import PureWindowsPath; from benchbox.utils.cloud_storage import is_snowflake_stage_path; assert is_snowflake_stage_path(PureWindowsPath('@~/benchbox'))\"",
+        "description": "a Windows-style Path stage reference is recognized",
+        "expected": "exit 0",
+        "item_id": "windows-snowflake-stage-path-separator-defect",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

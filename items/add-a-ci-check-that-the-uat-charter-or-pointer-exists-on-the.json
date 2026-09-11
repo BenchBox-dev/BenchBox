@@ -1,0 +1,118 @@
+{
+  "description": "Add a CI check that the UAT charter (or pointer) exists on the release branch.\n\nRe-evaluated 2026-08-09: tests/uat/CHARTER.md and _project/release-evidence/README.md pointer already exist on develop, but no .github CI job verifies they exist on the `release` branch (where UAT charter must be present for release-gate). Keep as guard for release branch drift, not for creation.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-15T14:43:55Z",
+      "completed_pr": 1742,
+      "created_at": "2026-07-19T12:36:37Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import yaml; yaml.safe_load(open(\\\".github/workflows/release.yml\\\"))\"",
+        "description": "Release workflow YAML parses",
+        "expected": "exits 0",
+        "item_id": "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the",
+        "last_result": "pass",
+        "last_run": "2026-08-15T14:43:44Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f tests/uat/CHARTER.md && test -f _project/release-evidence/README.md",
+        "description": "UAT charter and release evidence pointer remain present on the development baseline",
+        "expected": "both files exist",
+        "item_id": "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the",
+        "last_result": "pass",
+        "last_run": "2026-08-15T14:43:46Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q",
+        "description": "Scoped workflow tests pass",
+        "expected": "exits 0",
+        "item_id": "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the",
+        "last_result": "pass",
+        "last_run": "2026-08-15T14:43:53Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "release.yml triggers tag/dispatch, verify-tag-on-release proves release ancestry, and git ls-tree confirms tests/uat/CHARTER.md plus _project/release-evidence/README.md are current canonical candidates",
+        "item_id": "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the",
+        "notes": null,
+        "started_at": "2026-08-15T14:36:36Z",
+        "started_branch": "fix/uat-charter-release-guard",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-uat-charter-release-guard",
+        "status": "done",
+        "summary": "Confirm the release workflow ref contract and the canonical UAT charter or pointer paths",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added verify-uat-charter release job and made build depend on it; targeted workflow contract test passed",
+        "item_id": "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the",
+        "notes": null,
+        "started_at": "2026-08-15T14:37:46Z",
+        "started_branch": "fix/uat-charter-release-guard",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-uat-charter-release-guard",
+        "status": "done",
+        "summary": "Add a blocking release workflow guard before build and publish that requires a committed charter or pointer",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Workflow contract tests cover both committed candidates and the missing-candidate fail-closed branch",
+        "item_id": "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the",
+        "notes": null,
+        "started_at": "2026-08-15T14:38:56Z",
+        "started_branch": "fix/uat-charter-release-guard",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-uat-charter-release-guard",
+        "status": "done",
+        "summary": "Add workflow contract coverage for present and missing charter or pointer cases",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Release YAML parse, canonical pointer presence, and full tests/unit/workflows suite passed",
+        "item_id": "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the",
+        "notes": null,
+        "started_at": "2026-08-15T14:39:18Z",
+        "started_branch": "fix/uat-charter-release-guard",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-uat-charter-release-guard",
+        "status": "done",
+        "summary": "Run scoped workflow validation and document the release-branch drift protection",
+        "wid": "w3"
+      }
+    ]
+  }
+}

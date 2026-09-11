@@ -1,0 +1,156 @@
+{
+  "context": "Revalidate the current seven-prompt server inventory and landing catalog first. Reuse the existing public MCP client adapters and transport fixtures. Exercise prompts/list and prompts/get through a real stdio subprocess and the stateless HTTP ASGI route, compare names, ordering, roles, and rendered text against the registered prompt contract, and assert no MCP session affinity is required. Wire the coverage into the MCP integration gate and document any intentional catalog-only differences.",
+  "description": "Promoted from open deferral #462 on prompts-landing-phase5-mcp-parity. Unit and render-smoke tests cover prompt generation, but the actual MCP server transport has not been exercised for prompts/list and prompts/get. Add live coverage for the supported stdio and sessionless Streamable HTTP transports, including rendered content, ordering, arguments, and the generated landing catalog mapping. This is a compatibility test follow-up; do not add new MCP tools or alter prompt semantics.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-08-02T01:21:22Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "No new MCP tool or prompt is added solely to make the integration test pass",
+        "item_id": "mcp-live-prompt-integration-coverage-v2"
+      },
+      {
+        "behavior": "The seven registered MCP prompts, their ordering, roles, arguments, and rendered semantics remain unchanged",
+        "item_id": "mcp-live-prompt-integration-coverage-v2"
+      },
+      {
+        "behavior": "stdio remains compatible and Streamable HTTP remains sessionless and loopback-only",
+        "item_id": "mcp-live-prompt-integration-coverage-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/**"
+      },
+      {
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp*.md"
+      },
+      {
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/test_stateless_http.py"
+      },
+      {
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/test_transport_contract_parity.py"
+      },
+      {
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/landing/test_landing_quickstarts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f tests/integration/mcp/test_stateless_http.py && rg -q \"prompts/list|list_prompts\" tests/integration/mcp/test_stateless_http.py && rg -q \"prompts/get|get_prompt\" tests/integration/mcp/test_stateless_http.py",
+        "description": "Prompt transport coverage is present and exercises both transports",
+        "expected": "exits 1 until live prompt assertions are added; exits 0 once both operations are covered",
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_stateless_http.py tests/integration/mcp/test_transport_contract_parity.py -q",
+        "description": "The prompt integration tests pass",
+        "expected": "exits 1 until the new prompt assertions are implemented; exits 0 once the transport suites pass",
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/generate_landing_quickstarts.py --validate-only",
+        "description": "Landing catalog and MCP prompt mapping remain valid",
+        "expected": "exits 1 if the catalog or MCP mapping drifts; exits 0 once the current mapping validates",
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate the current registered prompt inventory, landing catalog mapping, and supported stdio/sessionless HTTP policy",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add real stdio prompts/list and prompts/get coverage with representative arguments and rendered-content assertions",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add real stateless Streamable HTTP prompts/list and prompts/get coverage and assert no Mcp-Session-Id dependency",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-live-prompt-integration-coverage-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Compare transport results with the landing catalog, wire the tests into the MCP integration gate, and document intentional differences",
+        "wid": "w3"
+      }
+    ]
+  }
+}

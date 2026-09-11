@@ -1,0 +1,146 @@
+{
+  "description": "INDEPENDENT-VERIFICATION FINDING (2026-07-04 review of PR #952): the\n\"package-smoke + dependency-audit now BLOCK develop PRs\" remediation\nshipped inert. The classify step wrote `packaging-needed`/`viz-needed` to\nGITHUB_OUTPUT (scripts/path_filter_decision.py:186-199), and the gated\njobs' `if:` conditions referenced `needs.ci-paths.outputs.<group>-needed`,\nbut the `ci-paths` JOB's `outputs:` block never mapped those step outputs.\nGitHub Actions only exposes job outputs that are explicitly declared, so\nthe `if:` expressions always saw an empty string and package-smoke,\ndependency-audit, and parity-check skipped on EVERY PR — with\nci-required-result's skip-counts-as-pass rule rendering that green.\nEmpirical proof: PR #952's own CI skipped both packaging jobs while the PR\nchanged pyproject.toml, uv.lock, and benchbox/__init__.py.\n\nThe wiring itself was fixed in PR #955 (commit 8652d135: `packaging-needed`\nand `viz-needed` added to the ci-paths outputs block, pr.yml:27-28 on\ncurrent develop). What is STILL missing is the regression pin: #955 added\nno workflow test for the mapping, and the existing pinned tests\n(tests/unit/workflows/test_pr_workflow_path_classifier.py:160-233) check\nthe aggregator env plumbing and the `if:` STRINGS but never that the\nreferenced outputs are actually declared — exactly the blind spot the bug\nlived in. path-filters.yml is designed to grow new groups (\"Add a new\ngroup by adding a key here — no script changes required\"), so the same\nbug re-arms every time a group is added unless the lockstep is pinned.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assert on raw YAML text/regex for the outputs block",
+        "instead": "use yaml.safe_load structure like the neighboring tests do.",
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "why": "formatting drift would false-positive"
+      },
+      {
+        "dont": "hardcode ['packaging', 'viz'] in the test",
+        "instead": "derive the list from path-filters.yml/extra_group_keys.",
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "why": "the whole point is catching the NEXT group's missing mapping"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-05T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing assertions in test_pr_workflow_path_classifier.py (aggregator needs-list, parity-check demotion pin, skip-counts-as-pass semantics) keep passing unchanged.",
+        "item_id": "pr-gate-path-filter-output-lockstep-test"
+      },
+      {
+        "behavior": "The 'add a new group with no script changes' contract of path-filters.yml: the new test must derive groups from the rules file, not freeze today's {packaging, viz} set.",
+        "item_id": "pr-gate-path-filter-output-lockstep-test"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "scripts/path_filter_decision.py:extra_group_keys — reuse: derive the expected group list from the same function/rules file the classifier uses, so the test tracks path-filters.yml automatically instead of hardcoding today's two groups.",
+        "decision": "reuse",
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "path": "scripts/path_filter_decision.py:extra_group_keys"
+      },
+      {
+        "concept": "tests/unit/test_auto_merge_soundness_paths.py::test_codeowners_covers_soundness_paths — reuse: the repo's established two-files-in-lockstep pinning pattern (SOUNDNESS_PREFIXES vs CODEOWNERS), applied here to path-filters.yml groups vs pr.yml job outputs.",
+        "decision": "reuse",
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "path": "tests/unit/test_auto_merge_soundness_paths.py::test_codeowners_covers_soundness_paths"
+      },
+      {
+        "concept": "tests/unit/workflows/test_pr_workflow_path_classifier.py:160-193 — extend: already yaml.safe_load's pr.yml and asserts needs-list/if-string wiring; add the missing outputs-declaration axis to this same file rather than creating a new test module.",
+        "decision": "extend",
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "path": "tests/unit/workflows/test_pr_workflow_path_classifier.py:160-193"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "kind": "do_not_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/path_filter_decision.py"
+      },
+      {
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_pr_workflow_path_classifier.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows/test_pr_workflow_path_classifier.py -q",
+        "description": "New lockstep test passes on the fixed tree",
+        "expected": "all tests pass, including the new outputs-lockstep test",
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "sed -i '/packaging-needed: \\${{ steps.classify.outputs.packaging-needed }}/d' .github/workflows/pr.yml && uv run -- python -m pytest tests/unit/workflows/test_pr_workflow_path_classifier.py -q; git checkout -- .github/workflows/pr.yml",
+        "description": "Mutation probe goes red",
+        "expected": "test run fails naming packaging-needed while the mapping is deleted; tree restored afterward",
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "notes": "`grep -n 'packaging-needed\\|viz-needed' .github/workflows/pr.yml` —\nexpect the two job-level `outputs:` mappings (currently pr.yml:27-28)\nplus the three `if:` references. Record the line numbers in the test's\ndocstring-adjacent comment or PR body. If absent (revert/refactor),\nrestore the mapping first in the same change.\nDONE 2026-07-05: mappings present at pr.yml:27-28; `if:` references\nat pr.yml:772 (package-smoke), :814 (dependency-audit), :865\n(parity-check). Fix confirmed present on origin/develop 7c59f574.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the #955 fix is present on develop before pinning it",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "notes": "In tests/unit/workflows/test_pr_workflow_path_classifier.py: load\n.github/path-filters.yml groups via the same logic as\nscripts/path_filter_decision.py (import extra_group_keys if cleanly\nimportable; otherwise parse the YAML with the same core-bucket\nexclusions). Assert BOTH directions:\n  (1) for every extra group `<g>`, `jobs.ci-paths.outputs` contains\n      key `<g>-needed` mapped to `steps.classify.outputs.<g>-needed`;\n  (2) every `needs.ci-paths.outputs.*` reference found in any job's\n      `if:` string names an output key that ci-paths declares (catches\n      a future job referencing a never-declared output even outside\n      the extra-group convention).\nInclude a comment naming the #952/#955 incident so the test's reason\nsurvives.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add the lockstep test: every referenced <group>-needed output is declared on the ci-paths job",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-gate-path-filter-output-lockstep-test",
+        "notes": "Locally (uncommitted): delete the `packaging-needed:` mapping line from\npr.yml, run the new test, confirm it FAILS with a message naming the\nmissing key; restore the file (`git checkout -- .github/workflows/pr.yml`)\nand confirm green. Record the probe result in the PR body — a lockstep\ntest that cannot go red is the same bug one level up.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Mutation-probe the new test",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "The MCP server currently exposes only 11 tools while the CLI has ~34 commands.\nThis creates a significant gap in what AI agents can accomplish via MCP vs CLI.\n\nCurrent MCP coverage:\n- Discovery: 4 tools (list_platforms, list_benchmarks, get_benchmark_info, system_profile)\n- Execution: 4 tools (run_benchmark, dry_run, validate_config, get_query_details)\n- Results: 3 tools (list_recent_runs, get_results, compare_results)\n\nMajor gaps identified:\n- Data preparation (datagen, convert)\n- Query plan analysis (show-plan, plan-history)\n- Dependency checking (check-deps)\n- Performance analytics (report trends, regressions, rankings)\n- Result aggregation and export\n\nThis TODO adds 7+ new MCP tools and 2 new MCP prompts to close the most important gaps.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-19T00:00:00Z",
+      "worktree": "mcp-integration"
+    }
+  }
+}

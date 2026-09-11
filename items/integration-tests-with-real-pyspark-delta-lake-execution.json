@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #196 of implement-transaction-primitives-dataframe-execution.\nDeferred: Integration tests with real PySpark + Delta Lake execution\nReason deferred: Requires PySpark + Delta Lake runtime. Add to live_integration test suite.\nThe unit tests in w3 verify delegation via mocks; integration tests verify\nthat the operations manager actually produces correct results on real tables.\n",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:37Z",
+      "worktree": "main"
+    }
+  }
+}

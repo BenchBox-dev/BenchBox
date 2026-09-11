@@ -1,0 +1,83 @@
+{
+  "context": "Prefer a general fix over another one-off path: make codespell honor .gitignore (or drive it from `git ls-files`) so the next gitignored directory does not need a third patch. If that is not workable, add @~ to the --skip list at Makefile:947 and say why the general fix was rejected.",
+  "description": "Second instance of the defect class fixed for node_modules by #1348. .gitignore:72 ignores `@~/`, but the codespell invocation at Makefile:947 has no matching --skip entry, so `make spellcheck` scans ./@~/benchbox/*.dss and exits 65 in /Users/joe/Developer/BenchBox (observed 2026-07-30: psuedo, whithout, auxillaries x2, setence and more). This makes `make pr-preflight` fail for anyone working in the primary clone. It is invisible to CI and to pool worktrees because @~/ is a main-clone-only stray directory, which is exactly why it has gone unnoticed. Promoted from deferral #670 on spellcheck-node-modules-skip-never-landed-v2.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-01T13:26:04Z",
+      "completed_pr": 1388,
+      "created_at": "2026-07-30T19:27:30Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Real source-tree typos are still caught; --ignore-words behaviour unchanged",
+        "item_id": "spellcheck-scans-gitignored-at-tilde-dir"
+      },
+      {
+        "behavior": "The node_modules skip added by #1348 keeps working",
+        "item_id": "spellcheck-scans-gitignored-at-tilde-dir"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "spellcheck-scans-gitignored-at-tilde-dir",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "mkdir -p \"@~/benchbox\" && printf \"recieve teh occured\\n\" > \"@~/benchbox/probe.dss\" && make spellcheck; rc=$?; rm -rf \"@~\"; exit $rc",
+        "description": "spellcheck passes with a gitignored @~/ directory present",
+        "expected": "exit 0",
+        "item_id": "spellcheck-scans-gitignored-at-tilde-dir",
+        "last_result": "pass",
+        "last_run": "2026-08-01T12:45:36Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "mkdir -p results-explorer/node_modules/pkg && printf \"recieve teh occured\\n\" > results-explorer/node_modules/pkg/index.js && make spellcheck; rc=$?; rm -rf results-explorer/node_modules; exit $rc",
+        "description": "the node_modules skip from #1348 is not regressed",
+        "expected": "exit 0",
+        "item_id": "spellcheck-scans-gitignored-at-tilde-dir",
+        "last_result": "pass",
+        "last_run": "2026-08-01T12:45:40Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "spellcheck-scans-gitignored-at-tilde-dir",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Reproduced in the primary clone: make spellcheck exits 65 on TWO gitignored paths, not one -- ./@~/benchbox/dists.dss (.gitignore:72) and ./results-explorer/dist/assets/index-BIHIG_7T.js (results-explorer/.gitignore:2). Neither directory exists in a fresh pool worktree, where the gate is green; that asymmetry is the whole defect.",
+        "item_id": "spellcheck-scans-gitignored-at-tilde-dir",
+        "notes": null,
+        "started_at": "2026-08-01T12:47:31Z",
+        "started_branch": "fix/spellcheck-scans-gitignored-paths",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Reproduce",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Chose the general fix over adding @~ by name: the narrow option would still leave the gate red on results-explorer/dist/, and more gitignored dirs exist (.codex/, .gemini/, .todo-db/). spellcheck now scans the TRACKED file list (git ls-files) so no gitignored path can ever be scanned. Proof in pool-06: rung 1 exit 0, rung 2 exit 0, results-explorer/dist/ fixture exit 0, and a planted typo in the tracked benchbox/utils/clock.py still fails the gate (exit 2, 3 hits) so must-preserve holds.",
+        "item_id": "spellcheck-scans-gitignored-at-tilde-dir",
+        "notes": null,
+        "started_at": "2026-08-01T12:47:37Z",
+        "started_branch": "fix/spellcheck-scans-gitignored-paths",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Make the gate skip gitignored paths generally, or add @~ with a recorded rationale",
+        "wid": "w2"
+      }
+    ]
+  }
+}

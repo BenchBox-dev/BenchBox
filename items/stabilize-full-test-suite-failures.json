@@ -1,0 +1,10 @@
+{
+  "description": "\"COMPLETED: Schema v1.0 migration test failures have been resolved. CLI exporter tests (30/30 passing) and result schema tests (12/12 passing) now pass. Test collection works correctly (3576 tests, 0 errors). Documentation exists at docs/testing.md covering platform smoke suites and dependency setup. Remaining work moved to separate TODO items for optional dependency handling and test suite optimization.\n\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (Should-Fix Before Release)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "testing-improvements"
+    }
+  }
+}

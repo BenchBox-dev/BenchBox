@@ -1,0 +1,316 @@
+{
+  "context": "Lift the filter in `_query_timings` only. Leave the `run_type == \"measurement\"` selection inside `_query_display_ms` and `_geomean_ms`, so every derived figure keeps its current definition and the corpus snapshot is provably unchanged except for added `query_executions` rows.\n\nAdd a per-result basis-availability summary to the read model so the UI can disable a basis a bundle never recorded (legacy bundles ingested before this change, runs configured with zero warmup, queries that lost a pass) instead of rendering a silently empty comparison.\n\nProve the no-change property by diffing every non-`query_executions` table between a pre-change and post-change snapshot built from the same corpus at the same SHA. Gate explicitly on the RG-2 range-read byte budget, because `query_executions` grows by roughly a third and that table is range-read in the browser.",
+  "description": "The explorer pipeline discards every non-measurement query row at ingest. `_query_timings` in `_project/scripts/explorer_pipeline/transformer.py` skips any row whose `run_type` is not `measurement`, so the published browser snapshot contains no warmup executions at all.\n\nVerified counts over the 213 bundles in `results-explorer/public/data/bundles/` (scanned 2026-08-29): run_type is `measurement` 25,532 rows, `warmup` 8,338 rows, `metadata` 60 rows, `summary` 6 rows.\n\nNOTE THE FOUR VALUES. run_type is NOT a two-valued field. The `metadata` and `summary` rows are not executions at all -- the observed metadata rows carry ms=0 and status=SKIPPED with synthetic ids such as QAPPROX_COUNT_DISTINCT_GROUPBY -- and lifting the ingest filter naively would ingest all 66 of them into query_executions as if they were timed runs. The filter must be narrowed to admit warmup, not removed.\n\nThe raw data is otherwise already shaped correctly. Bundles record one object per execution -- {\"id\", \"iter\", \"ms\", \"rows\", \"run_type\", \"status\", \"stream\", \"test_type\"} -- with iter 0 for warmup and 1..N for measurement. The snapshot table `query_executions` already declares run_type, iter and stream columns (`_project/scripts/explorer_pipeline/duckdb_builder.py`). Only the ingest filter stands between the corpus and a warmup-aware UI.\n\nEvery measurement-basis surface in the approved design -- warmup vs warm median, warm pass 1 vs warm pass 3, min vs median, and the per-pass view on Result Detail -- is unbuildable until those rows reach the snapshot. This item admits warmup rows and makes pass provenance an explicit part of the read model WITHOUT changing a single published figure.\n\nThe published-figure invariant is the whole risk. `display_ms` is defined by `_query_display_ms` as the median of passing measurement rows, and display_geomean_ms, geomean_ms, power_score, ranking eligibility, comparison eligibility and every leaderboard position derive from it. Widening what `_query_timings` returns must not widen what those functions consume.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Accept a snapshot-size regression on the grounds that the data is useful.",
+        "instead": "Measure against the RG-2 budget at w0 and take the aggregate-only fallback if the raw rows do not fit.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "why": "The byte budget is a shipped capability gate; blowing it degrades cold-load time for every visitor, including those who never open a comparison."
+      },
+      {
+        "dont": "Add a second per-pass table alongside query_executions.",
+        "instead": "Populate the existing query_executions table, which already declares run_type, iter and stream.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "why": "A parallel table would drift from the one the browser already range-reads and would double the snapshot growth this item is trying to bound."
+      },
+      {
+        "dont": "Delete the run_type check in _query_timings outright so every row is ingested.",
+        "instead": "Narrow the filter to an explicit allow-list of measurement and warmup.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "why": "The corpus contains metadata and summary pseudo-rows with ms=0 and SKIPPED status; ingesting them would put 66 fake zero-millisecond executions into query_executions and into any min statistic computed from it."
+      },
+      {
+        "dont": "Infer a missing warmup pass as 'warmup equals the first measurement pass'.",
+        "instead": "Record basis availability honestly and let the UI disable the basis with a stated reason.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "why": "A fabricated warmup value would make the warmup-penalty figure a lie, and that figure is the stated justification for excluding warmup from rankings."
+      },
+      {
+        "dont": "Remove the run_type filter from _query_display_ms or _geomean_ms as well, so warmup rows start feeding published figures.",
+        "instead": "Widen only _query_timings; the display and geomean helpers keep selecting measurement rows internally.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "why": "Warmup is a cold-cache pass. Letting it into display_ms would silently move every leaderboard position and invalidate every published comparison."
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-29T20:08:24Z",
+      "completed_pr": 1947,
+      "created_at": "2026-08-29T19:12:15Z",
+      "worktree": "explorer-measurement-basis"
+    },
+    "preserves": [
+      {
+        "behavior": "Bundles that never recorded a warmup pass must remain fully valid and ingestible; absence of warmup is not an error.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance"
+      },
+      {
+        "behavior": "Leaderboard ordering and meta_leaderboard ranks must be unchanged for the committed corpus.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance"
+      },
+      {
+        "behavior": "The RG-2 range-read byte budget must still pass after the snapshot grows.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance"
+      },
+      {
+        "behavior": "display_geomean_ms, geomean_ms, sample_geomean_ms, power_score and percentile_stats must be bit-identical for every existing corpus bundle before and after this change.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance"
+      },
+      {
+        "behavior": "display_ms must remain the median of passing measurement-run executions per logical query. Widening _query_timings must not widen what _query_display_ms consumes.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance"
+      },
+      {
+        "behavior": "is_valid_display_timing, timing_exclusion_reason, display_exclusion_reason, comparison_exclusion_reason and ranking_exclusion_reason must not change for any existing bundle.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance"
+      },
+      {
+        "behavior": "run_type rows other than measurement and warmup must never reach query_executions. metadata and summary rows are not executions; the observed metadata rows carry ms=0 and status=SKIPPED.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance"
+      },
+      {
+        "behavior": "sample_count must continue to count only the executions that fed display_ms, not the newly ingested warmup rows.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "`query_executions` already declares run_type/iter/stream and is populated by `_populate_query_executions`. No new table is needed for per-pass data.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "path": "_project/scripts/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "concept": "`_query_timings` is the single ingest filter that drops warmup rows; `_query_display_ms` and `_geomean_ms` independently re-filter to measurement rows. Widen the first, leave the other two alone.",
+        "decision": "extend",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "path": "_project/scripts/explorer_pipeline/transformer.py"
+      },
+      {
+        "concept": "Existing release-blocking snapshot invariant checker. Add basis-availability and warmup-presence invariants here rather than creating a second checker.",
+        "decision": "extend",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "path": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "concept": "Declared browser snapshot contract; must be updated in the same change as any column or semantic addition.",
+        "decision": "extend",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "path": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "concept": "RG-2 byte budget (10% of on-disk DB per cold load) is the existing gate on snapshot growth. Reuse it as this item's growth gate.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "path": "results-explorer/e2e/capability/range-read-budget.spec.ts"
+      },
+      {
+        "concept": "Open medium-high gate that must independently certify real-corpus geomean, percentile and ranking direction. The no-change invariant proven in w3 is exactly the property that gate certifies; hand it the table-level diff as evidence rather than re-deriving it.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "path": "todo:results-explorer-release-certification-independent-oracles-20260802"
+      },
+      {
+        "concept": "Open planning item to rewrite explorer transformer.py to typed models throughout. This item edits the same file for a narrow behavioural reason and deliberately does NOT attempt that rewrite; the rewrite item stays open and is not superseded. Keep this change small enough to rebase onto it.",
+        "decision": "extend",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "path": "todo:rewrite-explorer-transformer-to-use-typed-models-throughout"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/models.py"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/transformer.py"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/explorer-basis-ingest-warmup-pass-provenance/"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/explorer-basis-ingest-warmup-pass-provenance/*"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "kind": "only_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/*"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- pytest tests/unit/scripts/explorer_pipeline -q",
+        "description": "Pipeline unit tests pass, including the new warmup-ingest and display-invariance tests",
+        "expected": null,
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "last_result": "pass",
+        "last_run": "2026-08-29T20:08:13Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make explorer-snapshot-check",
+        "description": "Snapshot invariants pass on the rebuilt snapshot, including the new basis-availability invariant",
+        "expected": null,
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "last_result": "pass",
+        "last_run": "2026-08-29T20:08:14Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cat _project/verification-logs/explorer-basis-ingest-warmup-pass-provenance/w3.log",
+        "description": "Every table except query_executions is unchanged between the pre-change and post-change snapshot for the committed corpus",
+        "expected": null,
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "last_result": "pass",
+        "last_run": "2026-08-29T20:08:15Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --workers=1 e2e/capability/range-read-budget.spec.ts",
+        "description": "RG-2 range-read byte budget still passes with the larger query_executions table",
+        "expected": null,
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "last_result": "pass",
+        "last_run": "2026-08-29T20:08:22Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import duckdb;con=duckdb.connect('results-explorer/public/data/results.duckdb',read_only=True);print(con.execute('SELECT run_type, count(*) FROM query_executions GROUP BY 1 ORDER BY 1').fetchall())\"",
+        "description": "No non-execution run_type rows reached query_executions",
+        "expected": "only measurement and warmup appear; metadata and summary are absent, and no row has duration_ms = 0 with a SKIPPED-equivalent status",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "last_result": "pass",
+        "last_run": "2026-08-29T20:08:23Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "_project/verification-logs/explorer-basis-ingest-warmup-pass-provenance/w0.log",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "notes": "Build the browser snapshot from the committed corpus at the current SHA. Record the SHA, snapshot path and checksum, and:\n  - total query_executions rows, and the count by run_type;\n  - on-disk snapshot size in bytes, and the size of query_executions;\n  - the current RG-2 cold-load byte figure from e2e/capability/range-read-budget.spec.ts;\n  - per-bundle counts of distinct (run_type, iter) pairs, to establish how many bundles actually recorded a warmup pass.\n\nThen build a second snapshot with the _query_timings filter removed as a throwaway spike (do not commit the spike) and record the same numbers.\n\nDECISION GATE. Compare projected cold-load bytes against the RG-2 10% budget:\n  - If the widened query_executions still passes the budget, proceed to w1 as designed (raw per-execution rows).\n  - If it does not, STOP and do not proceed to w1. Record the shortfall and take the fallback: persist a per-(result_id, query_id, run_type, iter) aggregate instead of raw rows, or move query_executions behind a lazily fetched sidecar. Write the chosen fallback into this item's approach via `todo update` and get it approved in a later user message before writing code.\n\nStore all figures, the SQL used, and the decision in `_project/verification-logs/explorer-basis-ingest-warmup-pass-provenance/w0.log`.",
+        "started_at": "2026-08-29T19:46:09Z",
+        "started_branch": "feat/explorer-basis-ingest-warmup-pass-provenance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-ingest-warmup-pass-provenance",
+        "status": "done",
+        "summary": "Baseline the current snapshot and decide whether raw warmup rows fit the byte budget",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Modified _query_timings in transformer.py to admit measurement and warmup while filtering out metadata/summary non-execution pseudo-rows; updated _query_display_ms to only use measurement rows (fallback to unlabelled legacy, never warmup); verified geomean_ms and sample_count isolation. All 371 unit tests pass.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "notes": "In `_query_timings`, stop skipping rows whose run_type is not `measurement`. Keep every other field mapping identical, including the id/query_id fallback, the ms/execution_time_ms fallback and the pass-status normalisation.\n\nConfirm by reading the code -- not by assuming -- that `_query_display_ms` and `_geomean_ms` each still select `run_type == \"measurement\"` from whatever list they are handed, and that their fallback-to-all-passing-rows branch cannot now pick up warmup rows for a bundle that has measurement rows. That fallback is the sharp edge: before this change a bundle with no measurement rows fell back to an empty list; after it, the same bundle would fall back to warmup rows. Decide deliberately and write the decision in the code as a comment.\n\nDECISION GATE: if the fallback branch would change behaviour for any bundle in the committed corpus, fix the fallback to be explicit about measurement-only before proceeding to w2.",
+        "started_at": "2026-08-29T19:48:31Z",
+        "started_branch": "feat/explorer-basis-ingest-warmup-pass-provenance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-ingest-warmup-pass-provenance",
+        "status": "done",
+        "summary": "Lift the ingest filter without changing any published figure",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added BasisAvailability model, wired into ManifestEntry and DetailResult; implemented _compute_basis_availability in transformer.py; created and populated result_basis_availability table in duckdb_builder.py; updated docs/development/browser-duckdb-schema.sql.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "notes": "Emit, per result, which measurement bases the bundle can actually answer: whether a warmup pass exists, how many measurement passes were recorded, and the per-query pass count where it varies. Surface it through the pipeline models and the snapshot so the frontend can disable a basis with a stated reason instead of rendering an empty comparison.\n\nKeep it derived and additive: no existing column changes meaning, and a legacy bundle with no warmup rows reports warmup as unavailable rather than as an error.\n\nUpdate `docs/development/browser-duckdb-schema.sql` in the same commit as any schema addition.",
+        "started_at": "2026-08-29T19:54:50Z",
+        "started_branch": "feat/explorer-basis-ingest-warmup-pass-provenance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-ingest-warmup-pass-provenance",
+        "status": "done",
+        "summary": "Add per-result basis availability to the read model",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Table-level diff across all 11 existing tables/views showed zero differences; query_executions admitted exactly 8,338 warmup rows while keeping 25,532 measurement rows intact; result_basis_availability populated; 5 unit tests passed; snapshot invariants passed; verification log recorded at _project/verification-logs/explorer-basis-ingest-warmup-pass-provenance/w3.log.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "notes": "Build a snapshot before and after the change from the same corpus at the same SHA. Diff every table except query_executions and assert zero differences: result_detail_metrics, benchmark_matrix_cells, benchmark_rankings, meta_leaderboard, result_environment and the display-timing tables.\n\nAdd unit tests under tests/unit/scripts/explorer_pipeline that pin, as executable assertions rather than prose:\n  - a bundle with 1 warmup + 3 measurement passes yields 4 query_executions rows for that query, and a display_ms equal to the median of the 3 measurement values;\n  - a bundle with no warmup rows ingests cleanly and reports warmup as an unavailable basis;\n  - a query with fewer measurement passes than its siblings reports its own pass count;\n  - display_ms does not move when warmup rows are present.\n\nAdd the basis-availability invariant to `_project/scripts/results_explorer_snapshot_invariants.py` so a snapshot that claims a basis it cannot serve fails the release gate.\n\nStore the table-level diff output in `_project/verification-logs/explorer-basis-ingest-warmup-pass-provenance/w3.log`.",
+        "started_at": "2026-08-29T19:55:00Z",
+        "started_branch": "feat/explorer-basis-ingest-warmup-pass-provenance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-ingest-warmup-pass-provenance",
+        "status": "done",
+        "summary": "Prove the no-change property and lock it with tests",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Re-evaluated range-read byte budgets with Playwright test: passed diagnostics; cold-load transfer untouched; snapshot size increased +19.5% to 10.0MB comfortably within budget; all 77 vitest files (928 tests) passed cleanly; log written to _project/verification-logs/explorer-basis-ingest-warmup-pass-provenance/w4.log.",
+        "item_id": "explorer-basis-ingest-warmup-pass-provenance",
+        "notes": "Rebuild the published snapshot and run the RG-2 range-read budget spec against it. Record the before and after cold-load byte figures in `_project/verification-logs/explorer-basis-ingest-warmup-pass-provenance/w4.log`.\n\nDECISION GATE: if the budget fails here despite the w0 projection, do not widen the budget. Revert to the w0 fallback design and record why the projection was wrong.",
+        "started_at": "2026-08-29T19:55:41Z",
+        "started_branch": "feat/explorer-basis-ingest-warmup-pass-provenance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-explorer-basis-ingest-warmup-pass-provenance",
+        "status": "done",
+        "summary": "Re-run the byte-budget gate on the real snapshot",
+        "wid": "w4"
+      }
+    ]
+  }
+}

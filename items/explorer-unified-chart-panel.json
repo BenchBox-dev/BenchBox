@@ -1,0 +1,236 @@
+{
+  "context": "Do w1 (extract helper) as a pure refactor first, land it, then w2\n(introduce ChartPanel alongside existing tab clusters without\nremoving anything). Only after w3 parity test is green do w4-w7 page\nmigrations happen - one page per commit so diffs stay reviewable.\nResultDetail's migration (w7) must be coordinated with\nexplorer-result-detail-median-first so display_timings is wired as\nthe median source before ChartPanel's detail-kind context is\nconsumed by chart components that used to pull from queries[].\n",
+  "description": "Phase D of the Results Explorer strategy revision\n(plans/purring-jingling-petal-ultraplan).\n\nThe canonical CLI chart catalog lives in\n`benchbox/core/visualization/chart_types.py` (16 specs) and is\nmirrored web-side in `results-explorer/src/lib/chartRegistry.ts`.\nEvery page currently hardcodes its own tab subset - BenchmarkIndex: 8,\nCompare: 6, ResultDetail: 1, Home: 0. The registry is unused at the\ncall sites it was built for, which is how the drift between CLI and\nbrowser chart sets keeps appearing.\n\nReplace those ad-hoc tab clusters with a single `<ChartPanel>`\ncomponent that walks `CHART_REGISTRY`, computes applicable chart IDs\nfrom `entry.requires` vs. the provided `ChartContext`, and dispatches\nto the existing chart components. Add a parity test asserting the\nweb-side registry IDs are a subset of the CLI's\n`_CHART_TYPE_DISPATCH` keys so future drift trips CI.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle multiple page migrations into one commit",
+        "instead": "one page per commit",
+        "item_id": "explorer-unified-chart-panel",
+        "why": "a rollback needs per-page granularity"
+      },
+      {
+        "dont": "introduce a second chart registry",
+        "instead": "extend it in place",
+        "item_id": "explorer-unified-chart-panel",
+        "why": "src/lib/chartRegistry.ts is already the mirror of the CLI"
+      },
+      {
+        "dont": "regress visible tab sets on any page",
+        "instead": "verify via Vitest snapshots page-by-page",
+        "item_id": "explorer-unified-chart-panel",
+        "why": "tab visibility drives user expectations"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_item": "explorer-result-detail-median-first"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-17T00:00:00Z",
+      "created_at": "2026-04-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All currently-visible chart tabs in BenchmarkIndex/Compare/ResultDetail continue to render for results that have the required data",
+        "item_id": "explorer-unified-chart-panel"
+      },
+      {
+        "behavior": "CLI _CHART_TYPE_DISPATCH behavior is untouched (web-side change only)",
+        "item_id": "explorer-unified-chart-panel"
+      },
+      {
+        "behavior": "chartRegistry.ts entry.requires gating semantics remain identical - centralization is mechanical",
+        "item_id": "explorer-unified-chart-panel"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Explorer typecheck + Vitest suites (including new parity test) stay green",
+        "expected": "all green, chartRegistry.parity.test.ts passes",
+        "item_id": "explorer-unified-chart-panel",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run dev",
+        "description": "Every migrated page renders the expected applicable chart set",
+        "expected": "BenchmarkIndex / Compare / PlatformIndex / ResultDetail all show full registry-driven tab sets; unsupported charts disappear (not grayed)",
+        "item_id": "explorer-unified-chart-panel",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "explorer-unified-chart-panel",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-unified-chart-panel",
+        "notes": "The gating logic currently inlined in BenchmarkIndex.tsx:374-391\nand Compare.tsx:371-391 both walk requires[] against per-context\ncapabilities. Lift into `applicableCharts(context: ChartContext)`\nin src/lib/chartRegistry.ts so the three contexts (summary /\ncompare / detail) share one implementation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract applicableCharts(context) helper into chartRegistry.ts",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-unified-chart-panel",
+        "notes": "New file: src/components/ChartPanel.tsx. Props shape per plan:\n  type ChartContext =\n    | { kind: \"summary\"; summary: BenchmarkSummary; historical?: ManifestEntry[] }\n    | { kind: \"compare\"; results: DetailResult[]; artifact: ComparisonArtifact | null }\n    | { kind: \"detail\";  detail: DetailResult; historical?: ManifestEntry[] };\nRenders a tab list of applicableCharts(context).map(id) and\ndispatches to the existing chart components in\nsrc/components/charts/. Missing capabilities hide the tab (not\ngrayed-out).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build <ChartPanel> that accepts ChartContext and renders the applicable registry slice",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-unified-chart-panel",
+        "notes": "New file: src/__tests__/chartRegistry.parity.test.ts.\nLoad the CLI dispatch keys from a JSON fixture generated by a\nsmall Python one-liner (or read them from the checked-in\nsnapshot of _CHART_TYPE_DISPATCH). Assert\n`new Set(web_ids).isSubsetOf(cli_ids)` - web must not ship a\nchart the CLI can't produce (logical parity anchor per plan).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "CLI↔web parity test for registry IDs",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-unified-chart-panel",
+        "notes": "Pass {kind:\"summary\", summary, historical}. Replace the tab\ncluster at lines 30, 370-435. One commit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate BenchmarkIndex.tsx to <ChartPanel>",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-unified-chart-panel",
+        "notes": "Pass {kind:\"compare\", results, artifact}. Replace the tab\ncluster at lines 32, 448-525. One commit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate Compare.tsx to <ChartPanel>",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-unified-chart-panel",
+        "notes": "Pass {kind:\"summary\", summary:null,\nhistorical:allPlatformResults} for trend + derived distribution\nviews. One commit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate PlatformIndex.tsx to <ChartPanel>",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-unified-chart-panel",
+        "notes": "Pass {kind:\"detail\", detail}. Replaces the standalone\nQueryTimingChart with the full registry. Coordinate with\nexplorer-result-detail-median-first (dep) so display_timings is\nthe source of truth before this migration lands. One commit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate ResultDetail.tsx to <ChartPanel>",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-unified-chart-panel",
+        "notes": "tests live in src/components/__tests__/ChartPanel.test.tsx. At\nminimum: each ChartContext kind renders the expected applicable\ntab set and hides tabs whose `requires` aren't satisfied.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ChartPanel unit tests covering all three kinds",
+        "wid": "w8"
+      }
+    ]
+  }
+}

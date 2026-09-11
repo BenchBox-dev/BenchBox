@@ -1,0 +1,132 @@
+{
+  "context": "New file: docs/usage/driver-version-management.md\n\nStructure:\n  1. How BenchBox selects a driver version (no pin = use installed, pin = validate/install)\n  2. Why uv run may not respect manually-installed versions (uv.lock sync behavior)\n  3. Three reliable patterns:\n     a. driver_version + driver_auto_install=true (BenchBox manages the install)\n     b. uv run --with \"duckdb==X\" (inline uv override, no lock mutation)\n     c. uv add \"duckdb==X\" --allow-prereleases (update the lock file)\n  4. Verifying the actual version used: result JSON platform.client_version and\n     execution.driver_version_actual fields\n\nCross-link from: docs/reference/cli/configuration.md, docs/platforms/duckdb.md\n",
+  "description": "BenchBox's driver version selection logic is non-obvious to users who approach it from\nthe Python packaging angle (e.g., \"I installed version X, why didn't it use X?\"). The\nbehavior is correct but the interaction with uv.lock and uv run is undocumented.\n\nCurrent documentation gaps:\n  1. No explanation of how BenchBox selects a driver version when none is specified\n     (it uses whatever is installed, as reported by importlib.metadata)\n  2. No explanation that `uv run` syncs the environment to uv.lock before launching,\n     which can silently revert manually-installed versions\n  3. No dedicated \"How to test a specific driver version\" guide - examples exist in\n     --help-topic examples but not in docs/\n  4. The docs/reference/cli/configuration.md driver_version/driver_auto_install entries\n     describe the flags but not the underlying selection algorithm or the uv.lock\n     interaction\n\nTarget: a clear, concise explanation in docs/concepts/ (or docs/usage/) that answers:\n  - How does BenchBox decide which driver version to use?\n  - Why might my manually-installed version not be respected?\n  - How do I reliably benchmark a specific version (including dev/pre-release)?\n  - How do I verify which version actually ran?\n\nThis should reference the result JSON's driver_version_actual field as the source of truth.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create a new top-level docs section for this",
+        "instead": "place in docs/usage/ alongside existing guides",
+        "item_id": "document-driver-version-selection-behavior",
+        "why": "it's a usage guide"
+      },
+      {
+        "dont": "over-explain uv internals",
+        "instead": "describe observable behavior (version was reverted) and the fix, not the mechanism",
+        "item_id": "document-driver-version-selection-behavior",
+        "why": "most users don't care"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-02-23T00:00:00Z",
+      "created_at": "2026-02-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No existing documentation files are removed or renamed (only additions and cross-links)",
+        "item_id": "document-driver-version-selection-behavior"
+      },
+      {
+        "behavior": "docs/ build succeeds: uv run -- python -m sphinx docs/ docs/_build/html -b html",
+        "item_id": "document-driver-version-selection-behavior"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "document-driver-version-selection-behavior",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/duckdb.md"
+      },
+      {
+        "item_id": "document-driver-version-selection-behavior",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/cli/configuration.md"
+      },
+      {
+        "item_id": "document-driver-version-selection-behavior",
+        "kind": "only_modify",
+        "path_glob": "docs/usage/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "wc -l docs/usage/driver-version-management.md",
+        "description": "New guide file exists and is non-empty",
+        "expected": "File exists with at least 50 lines",
+        "item_id": "document-driver-version-selection-behavior",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m sphinx docs/ docs/_build/html -b html -q 2>&1 | tail -5",
+        "description": "Docs build succeeds with new file (sphinx is in [dependency-groups].dev at pyproject.toml line 460 - available in standard dev install)",
+        "expected": "Build succeeded with 0 errors",
+        "item_id": "document-driver-version-selection-behavior",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep 'driver-version-management' docs/platforms/duckdb.md",
+        "description": "duckdb.md contains cross-link to new guide",
+        "expected": "At least one reference to driver-version-management",
+        "item_id": "document-driver-version-selection-behavior",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "document-driver-version-selection-behavior",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "document-driver-version-selection-behavior",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "document-driver-version-selection-behavior",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write docs/usage/driver-version-management.md: version selection algorithm, uv.lock revert behavior, three reliable version-pinning patterns, and verifying via result JSON",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "document-driver-version-selection-behavior",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docs/reference/cli/configuration.md driver_version and driver_auto_install entries to cross-link to the new guide",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "document-driver-version-selection-behavior",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a brief 'Testing a specific version' callout to docs/platforms/duckdb.md that links to the new guide",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,342 @@
+{
+  "context": "Minimal-surface-area change in strict dependency order:\n\n1) Change the DEFAULT_CACHE_DIR constant - this is the one-line core fix.\n2) Update DataCache docstring to reflect the new default.\n3) Add a path helper to path_utils.py for consistency with existing helpers.\n4) Wire BENCHBOX_CACHE_DIR through DataFrameRunOptions.cache_dir in runner.py\n   so the runner explicitly sets the cache directory rather than relying on\n   the module-level default.\n5) Register dataframe-data/ in DirectoryManager so it is created alongside\n   datagen/, results/, and databases/.\n6) Update existing test assertions to expect the new path.\n7) Add a parity test that asserts SQL and DataFrame defaults share the same\n   benchmark_runs/ root.\n8) Full verification: fast suite, smoke run, confirm output appears locally.\n",
+  "description": "DataFrame and SQL benchmarks use inconsistent default storage locations:\n\n- SQL: `./benchmark_runs/datagen/{benchmark}_{sf}` (project-local, CWD-relative)\n- DataFrame: `~/.benchbox/dataframe-data/{benchmark}/sf_{N}/{format}/` (user home, global)\n\nThis creates a confusing asymmetry where raw source data lives locally but\nformat conversions cache globally. Both should default to project-local under\n`benchmark_runs/` so that all benchmark artifacts live together and are easy\nto find, inspect, and clean up.\n\nThe core fix is a one-line constant change:\n\n    # Before (data_loader.py:63):\n    DEFAULT_CACHE_DIR = Path.home() / \".benchbox\" / \"dataframe-data\"\n\n    # After:\n    DEFAULT_CACHE_DIR = Path.cwd() / \"benchmark_runs\" / \"dataframe-data\"\n\nPlus wiring through runner construction, DirectoryManager, and test updates.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "auto-migrate existing ~/.benchbox/dataframe-data/",
+        "instead": "migration is deferred and should be opt-in if ever implemented",
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "why": "users may have multiple projects sharing that cache"
+      },
+      {
+        "dont": "change the internal cache directory structure (benchmark/sf_N/format/)",
+        "instead": "only the root prefix changes",
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "why": "this is an implementation detail that works correctly"
+      },
+      {
+        "dont": "move SQL paths to a global location",
+        "instead": "the fix is bringing DataFrame in line with SQL, not the reverse",
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "why": "the current CWD-relative SQL default is correct and predictable"
+      },
+      {
+        "dont": "remove or disable caching",
+        "instead": "only the default location changes, caching behavior is preserved",
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "why": "DataFrame format conversions (CSV->Parquet etc.) are expensive"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "unify-dataframe-sql-default-storage-location",
+        "id": 77,
+        "reason": "Not needed for initial fix; can be added later if users request it",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly deferred until users request a global-cache opt-in flag; no evidence of that demand.",
+        "summary": "CLI --global-cache flag to opt into ~/.benchbox/ location"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "unify-dataframe-sql-default-storage-location",
+        "id": 78,
+        "reason": "Users may share global cache across projects; migration should be explicit and opt-in",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason rejects auto-migration specifically ('should be explicit and opt-in'); no concrete opt-in migration tool is specified or tracked.",
+        "summary": "Auto-migration of existing ~/.benchbox/dataframe-data/ contents"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "unify-dataframe-sql-default-storage-location",
+        "id": 79,
+        "reason": "Different naming serves different purposes; unifying names is a separate cosmetic concern",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly states different cache-dir naming serves different purposes and unifying is 'a separate cosmetic concern' with no real need.",
+        "summary": "Unify cache subdirectory naming between SQL (datagen/) and DataFrame (dataframe-data/)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-09T00:00:00Z",
+      "created_at": "2026-02-09T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "BENCHBOX_CACHE_DIR environment variable continues to override the default cache directory",
+        "item_id": "unify-dataframe-sql-default-storage-location"
+      },
+      {
+        "behavior": "DataFrameDataLoader public API (constructor signature, load_data return type) unchanged",
+        "item_id": "unify-dataframe-sql-default-storage-location"
+      },
+      {
+        "behavior": "Existing runs with data in ~/.benchbox/dataframe-data/ continue to work if BENCHBOX_CACHE_DIR points there",
+        "item_id": "unify-dataframe-sql-default-storage-location"
+      },
+      {
+        "behavior": "Internal cache directory structure below the root (benchmark/sf_N/format/) unchanged",
+        "item_id": "unify-dataframe-sql-default-storage-location"
+      },
+      {
+        "behavior": "Manifest file format and content unchanged",
+        "item_id": "unify-dataframe-sql-default-storage-location"
+      },
+      {
+        "behavior": "SQL data paths remain exactly as-is: Path.cwd() / 'benchmark_runs' / 'datagen' / ... (benchbox/base.py unchanged)",
+        "item_id": "unify-dataframe-sql-default-storage-location"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/capabilities.py"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/context.py"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/query.py"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/config.py"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/data_loader.py"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/benchmark_mixin.py"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/path_utils.py"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/dataframe/test_data_loader.py"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/dataframe/test_storage_location_parity.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run _project/scripts/validate_todo.py _project/TODO/core-functionality/active/unify-dataframe-sql-default-storage-location.yaml",
+        "description": "TODO schema validation passes for this new item",
+        "expected": "is valid",
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run _project/scripts/todo_cli.py check-graph",
+        "description": "No dependency cycles in TODO graph",
+        "expected": "No cycles detected",
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/dataframe/test_data_loader.py -v",
+        "description": "Existing data_loader tests pass (baseline before changes)",
+        "expected": "All tests pass",
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast smoke suite remains green after storage location changes",
+        "expected": "Fast marker tests pass with no regressions",
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m benchbox run --platform polars-df --benchmark tpch --scale 0.01 --phases load,power --queries Q1 --non-interactive",
+        "description": "DataFrame smoke run produces output under benchmark_runs/",
+        "expected": "Run completes and data appears under benchmark_runs/dataframe-data/",
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Change DEFAULT_CACHE_DIR from Path.home() / '.benchbox' / 'dataframe-data' to Path.cwd() / 'benchmark_runs' / 'dataframe-data'",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update DataCache class docstring to document the new default location and BENCHBOX_CACHE_DIR override",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add get_benchmark_runs_dataframe_path() helper to benchbox/utils/path_utils.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire BENCHBOX_CACHE_DIR through DataFrameRunOptions.cache_dir in runner.py and benchmark_mixin.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'dataframe-data/' to DirectoryManager._ensure_directories() in cli/config.py",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "notes": "No test changes needed - existing tests use explicit cache_dir or mocks, none assert the old ~/.benchbox default",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update existing test_data_loader.py test assertions to expect the new default path",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add test_storage_location_parity.py asserting SQL and DataFrame defaults share benchmark_runs/ root",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-dataframe-sql-default-storage-location",
+        "notes": "92 relevant tests pass (57 data_loader + 8 parity + 25 dataframe_runner + 2 extras). 3 pre-existing failures in modin/dask/cudf tests are unrelated (trailing delimiter refactor in unstaged changes).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Full verification gate: fast suite, smoke run, confirm project-local output under benchmark_runs/",
+        "wid": "w8"
+      }
+    ]
+  }
+}

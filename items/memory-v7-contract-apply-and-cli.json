@@ -1,0 +1,154 @@
+{
+  "context": "On authorization only: apply v7-recalibration.patch, extend score --contract choices and promotion_blockers for v7, update contract status from DRAFT to applied, re-score committed v6 evidence to scratch and confirm diagnostics remain additive where claimed. Do not spend model quota for a new matrix unless separately authorized.",
+  "description": "v7-recalibration.patch is committed but unapplied. docs/evaluation/behavioral-v7-contract.md is DRAFT. score CLI still only accepts --contract {v5,v6}. Applying moves promotion criteria (gate attributable components; regress decision_correct). Requires explicit Joe authorization before edit of frozen thresholds. After apply: republish Codex packet under v7 if a score is requested.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "apply threshold changes without Joe authorization",
+        "instead": "stop at planning until authorization is recorded",
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "why": "frozen acceptance criteria are a human gate"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Implementation committed as 453553d, but the memory-governance repository has no origin remote; publication and complete --pr cannot proceed until a repository remote/PR path is provided.",
+      "category": "Evaluation",
+      "created_at": "2026-08-05T22:10:09Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Committed evidence is never rewritten in place",
+        "item_id": "memory-v7-contract-apply-and-cli"
+      },
+      {
+        "behavior": "No live memory tree is touched",
+        "item_id": "memory-v7-contract-apply-and-cli"
+      },
+      {
+        "behavior": "v5/v6 contracts remain selectable and re-scoreable",
+        "item_id": "memory-v7-contract-apply-and-cli"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "DRAFT v7 contract",
+        "decision": "extend",
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "path": "/Users/joe/Developer/memory-governance/docs/evaluation/behavioral-v7-contract.md"
+      },
+      {
+        "concept": "Unapplied v7 threshold patch",
+        "decision": "extend",
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "path": "/Users/joe/Developer/memory-governance/v7-recalibration.patch"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v6/**"
+      },
+      {
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "kind": "do_not_modify",
+        "path_glob": "reports/ab-results-v6-codex.json"
+      },
+      {
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation.md"
+      },
+      {
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/behavioral-v7-contract.md"
+      },
+      {
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "kind": "only_modify",
+        "path_glob": "docs/manual/evaluate.md"
+      },
+      {
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/behavioral/src/memory_tooling/score.py"
+      },
+      {
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      },
+      {
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "kind": "only_modify",
+        "path_glob": "v7-recalibration.patch"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q",
+        "description": "Behavioral scorer tests pass",
+        "expected": "v7 selection tests green; v5/v6 still work",
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Current user explicitly authorized this named batch implementation; v7 frozen-criteria application was therefore authorized for this item.",
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "notes": null,
+        "started_at": "2026-08-15T13:15:40Z",
+        "started_branch": "fix/memory-v7-contract",
+        "started_worktree": "/Users/joe/Developer/memory-governance.wt-v7",
+        "status": "done",
+        "summary": "Obtain explicit Joe authorization to apply frozen-criteria patch",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Applied v7-recalibration.patch content, wired --contract v7, and added mutation tests. ........................................................................ [ 46%]\n........................................................................ [ 92%]\n...........                                                              [100%]\n155 passed in 1.22s passed (155 tests).",
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "notes": null,
+        "started_at": "2026-08-15T13:15:53Z",
+        "started_branch": "fix/memory-v7-contract",
+        "started_worktree": "/Users/joe/Developer/memory-governance.wt-v7",
+        "status": "done",
+        "summary": "Apply patch, wire --contract v7, tests for threshold selection",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Marked v7 applied in docs and re-scored committed v6 evidence to /tmp/memory-v7-rescore.json without rewriting committed reports: 180 runs, promotion_eligible=true, no blockers.",
+        "item_id": "memory-v7-contract-apply-and-cli",
+        "notes": null,
+        "started_at": "2026-08-15T13:16:09Z",
+        "started_branch": "fix/memory-v7-contract",
+        "started_worktree": "/Users/joe/Developer/memory-governance.wt-v7",
+        "status": "done",
+        "summary": "Mark v7 contract applied; optional re-score of committed evidence to scratch",
+        "wid": "w2"
+      }
+    ]
+  }
+}

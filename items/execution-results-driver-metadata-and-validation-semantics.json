@@ -1,0 +1,321 @@
+{
+  "context": "Centralize metadata propagation by strengthening the existing shared helper,\nthen reduce runner-local code to a wrapper. Treat validation applicability as\na small lifecycle contract: absent capability means no validation record;\nattempted validation failures remain failures.\n",
+  "description": "Independent verification found two lifecycle/result consistency risks in\n`benchbox/core/runner/runner.py`.\n\nDriver metadata propagation exists in two places: the shared\n`benchbox/core/results/driver_metadata.py:apply_driver_metadata()` helper\nused by CLI/orchestrator paths, and runner-local\n`_enrich_driver_runtime_metadata()` plus `_apply_driver_meta_to_dicts()`.\nThe original critic overstated precedence divergence: both paths prefer\nadapter values over database config fallbacks. The real divergence is that\nthe runner also writes driver fields into `result.platform_info` with\n`setdefault()`, while the shared helper only writes result attributes and\n`execution_metadata`.\n\nPost-load validation also conflates not-applicable validation with failed\nvalidation. `_run_postload_validation()` returns `None` for `adapter is None`,\nbut returns a synthetic invalid `ValidationResult` when an adapter lacks\n`create_connection`/`close_connection`. Consumers already treat `None` as\n\"no validation record\" and aggregate `is_valid=False` as a failed stage.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add another wrapper helper in runner.py that recreates the same field map under a new name.",
+        "instead": "(not specified)",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "change result JSON key names for driver metadata as part of helper consolidation.",
+        "instead": "(not specified)",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "remove runner platform_info driver metadata population without replacing it in the shared helper",
+        "instead": "(not specified)",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "why": "existing exports may rely on those setdefault fields."
+      },
+      {
+        "dont": "turn all validation exceptions into `None`",
+        "instead": "(not specified)",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "why": "that would hide real failed validation attempts."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "execution-results-driver-metadata-and-validation-semantics",
+        "id": 397,
+        "reason": "This TODO fixes the confirmed not-applicable vs failed conflation; a typed validation model is larger result-schema work.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Redesign all validation stages as typed applicability/pass/fail objects"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "execution-results-driver-metadata-and-validation-semantics",
+        "id": 398,
+        "reason": "Monitoring import-gate tests patch this helper; a compatibility wrapper is safer unless a focused audit proves no external/test reliance remains.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Removal gated on a focused reliance audit proving no external/test dependency on the patch point; audit not done.",
+        "summary": "Remove `_enrich_driver_runtime_metadata()` public patch point immediately"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "needs_item": "result-schema-policy-and-explorer-input-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "Results",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Actual post-load validation exceptions still surface as failed validation, not as not-run.",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics"
+      },
+      {
+        "behavior": "Adapter-sourced driver metadata remains higher precedence than database_config fallbacks.",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics"
+      },
+      {
+        "behavior": "DataFrame post-load validation remains skipped unless a separate TODO changes DataFrame validation support.",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics"
+      },
+      {
+        "behavior": "Driver metadata still serializes through schema-v2 platform/execution blocks as before.",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics"
+      },
+      {
+        "behavior": "Existing platform_info keys are not overwritten by driver metadata propagation.",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/results/driver_metadata.py: shared metadata helper already used by CLI paths - extend this rather than keeping runner-local duplication.",
+        "decision": "extend",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "path": "benchbox/core/results/driver_metadata.py"
+      },
+      {
+        "concept": "benchbox/core/results/schema.py: driver metadata collection for export - verify exported fields remain stable.",
+        "decision": "reuse",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "path": "benchbox/core/results/schema.py"
+      },
+      {
+        "concept": "benchbox/core/runner/runner.py: current platform_info setdefault behavior - preserve while routing through shared helper.",
+        "decision": "reuse",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "path": "benchbox/core/runner/runner.py"
+      },
+      {
+        "concept": "tests/unit/cli/test_run_metadata_contract.py: existing shared-helper contract tests - expand for platform_info and runner parity.",
+        "decision": "reuse",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "path": "tests/unit/cli/test_run_metadata_contract.py"
+      },
+      {
+        "concept": "tests/unit/core/test_runner_helpers.py: existing post-load validation tests - update to the explicit applicability semantics.",
+        "decision": "reuse",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "path": "tests/unit/core/test_runner_helpers.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/driver_metadata.py"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/result-formats.md"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_run_metadata_contract.py"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_runner_helpers.py"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_runner_lifecycle.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_run_metadata_contract.py tests/unit/core/test_runner_helpers.py -q",
+        "description": "Driver metadata contract tests pass.",
+        "expected": "Metadata and validation helper tests pass.",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_runner_lifecycle.py tests/unit/core/results/test_schema_timing_contract.py --tb=short",
+        "description": "Focused lifecycle tests pass.",
+        "expected": "Lifecycle result metadata and schema contract tests pass.",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite catches path parity regressions.",
+        "expected": "Fast tests pass.",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph remains valid after implementation.",
+        "expected": "TODO validation and graph checks pass.",
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "notes": "Re-run source checks before editing and capture a compact summary with\nchecked SHA, command, and counts. Do not commit raw stdout.\n\nRequired checks:\n  - `rg -n \"apply_driver_metadata|_enrich_driver_runtime_metadata|_apply_driver_meta_to_dicts|_CONFIG_FIELD_MAP|_EXEC_META_SETDEFAULT\" benchbox tests --glob '!build/**' --glob '!docs/_build/**' --glob '!.venv/**'`.\n  - `rg -n \"_run_postload_validation|postload_result|validation_records|_finalize_validation_metadata|ValidationResult\\\\(is_valid=False\" benchbox tests --glob '!build/**' --glob '!docs/_build/**' --glob '!.venv/**'`.\n  - Inspect `tests/unit/core/test_runner_helpers.py` for tests pinning current missing-method invalid behavior.\n\nDecision gate: if result-schema policy or public-contract docs currently\npromise a failed stage for validation-not-applicable, preserve that public\nbehavior and document why this TODO should not change it.\n\nCompleted 2026-05-22 at checked SHA\n`f997b0aebc354f69bf32ca6b431dd4bd7e177404`: driver metadata rg returned\n28 lines, post-load validation rg returned 55 lines. Public contracts\nreserve `summary.validation=\"passed\"` for actual validation evidence and\nsay missing validation records finalize as `not_run`; no contract requires\nunsupported connection validation to record a failed stage.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate driver metadata call sites and post-load validation consumers",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "notes": "Update `benchbox/core/results/driver_metadata.py` so the shared helper\ncan also populate `result.platform_info` using the same `setdefault()`\nbehavior currently present in runner-local `_apply_driver_meta_to_dicts()`.\n\nPreserve these semantics:\n  - adapter values win over database config values;\n  - config values fill only missing adapter values;\n  - `driver_version_resolved` falls back to requested `driver_version`;\n  - `driver_package` and `driver_version_requested` in execution metadata\n    use `setdefault`;\n  - `driver_auto_install_used` remains recorded even when false;\n  - platform_info population never overwrites existing platform metadata.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend the shared driver metadata helper to preserve runner platform_info behavior",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "notes": "Replace the runner-local duplication in\n`_enrich_driver_runtime_metadata()` with calls to\n`apply_driver_metadata(...)`. Delete or shrink `_DRIVER_STR_FIELDS`,\n`_CONFIG_FIELD_MAP`, `_EXEC_META_SETDEFAULT`, and\n`_apply_driver_meta_to_dicts()` if they become unused.\n\nKeep `_enrich_driver_runtime_metadata()` as a small compatibility wrapper\nif tests or monitoring import gates patch it directly. The wrapper should\nbe boring: call the shared helper and return the result.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Route runner lifecycle metadata enrichment through the shared helper",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "notes": "Decide and implement one explicit semantic rule:\n  - not applicable: return `None`, do not add a validation stage;\n  - attempted and failed: return `ValidationResult(is_valid=False)`;\n  - attempted and passed/warned: return the engine result.\n\nApply that rule to `_run_postload_validation()`. The likely change is\nreturning `None` when the adapter lacks `create_connection` or\n`close_connection`, while preserving synthetic failure for exceptions\nraised after validation is actually attempted.\n\nUpdate tests currently expecting invalid for missing adapter methods to\nassert `None` if the public-contract check in w0 allows the change.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define validation applicability semantics and update post-load validation behavior",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-driver-metadata-and-validation-semantics",
+        "notes": "Cover:\n  - CLI/orchestrator path and runner lifecycle path produce the same\n    top-level driver fields and `execution_metadata` fields;\n  - runner path still backfills `platform_info` without overwriting\n    existing platform_info values;\n  - missing connection validation hooks produce no validation stage after\n    the semantics change;\n  - actual post-load validation exceptions still produce a failed stage.\n\nPrefer focused unit tests around `apply_driver_metadata()`,\n`_enrich_driver_runtime_metadata()`, `_run_postload_validation()`, and\n`_finalize_validation_metadata()` before broad lifecycle tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add metadata and validation regression tests for lifecycle and CLI parity",
+        "wid": "w4"
+      }
+    ]
+  }
+}

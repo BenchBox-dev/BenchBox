@@ -1,0 +1,141 @@
+{
+  "context": "Fix the explicit raw_config fallback at the boundary selected by the result schema/environment/exporter contract; then add a behavior-driven sentinel sweep with stable secret tokens and an allowlist only for documented, non-secret identifiers. Keep anonymize=False path identity behavior while guaranteeing credential absence.",
+  "description": "The shipped result path still allows an explicit BenchmarkResults.platform_raw_config to bypass structural filtering when ResultExporter(anonymize=False) is used, which is the documented MCP path. A driven origin/develop export contained RAW_PASSWORD and RAW_API verbatim. Make every public result export redact credential material at the raw-config boundary while preserving non-secret tuning/config values. Use this PR to add the permanent L3 sentinel invariant test: enumerate all 47 registered adapters with sentinel credentials where constructible, drive the normalized metadata, JSON, and companion/export chokepoints, and fail closed for any unexpected platform that cannot be constructed on the host. Record the two macOS ODBC blockers as explicit test diagnostics rather than silently shrinking coverage. Do not introduce SecretStr or the unapproved four-layer design.",
+  "legacy": {
+    "item_meta": {
+      "category": "Security",
+      "created_at": "2026-08-02T01:41:11Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "all unrelated worktree content and the documented MCP local-consumer contract",
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate"
+      },
+      {
+        "behavior": "anonymize=False retains legitimate paths, hostnames, and tuning configuration but never credential values",
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate"
+      },
+      {
+        "behavior": "public anonymization behavior for existing identifiers and tuple recursion",
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/environment.py"
+      },
+      {
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_credential_egress_sentinel_invariant.py"
+      },
+      {
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_environment_anonymization.py"
+      },
+      {
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_export_anonymization_surfaces.py"
+      },
+      {
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_platform_config_secret_filtering.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "PYTHONPATH=. uv run --all-extras -- python -c 'import json; from datetime import datetime; from benchbox.core.results.models import BenchmarkResults; from benchbox.core.results.schema import build_result_payload; r=BenchmarkResults(benchmark_name=\"tpch\", platform=\"duckdb\", scale_factor=0.01, execution_id=\"gate\", timestamp=datetime.now(), duration_seconds=1.0, total_queries=1, successful_queries=1, failed_queries=0, platform_info={\"name\":\"duckdb\"}, platform_raw_config={\"password\":\"RAW_PASSWORD\",\"api_key\":\"RAW_API\",\"threads\":4}); out=json.dumps(build_result_payload(r, sanitize_platform_secrets=False)); assert \"RAW_PASSWORD\" not in out and \"RAW_API\" not in out'",
+        "description": "explicit raw_config credentials are absent from the result payload even on the non-anonymized export path",
+        "expected": "exits 1 on an unfixed tree because explicit raw_config credentials are present; exits 0 after the boundary fix",
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run --all-extras -- pytest tests/unit/core/results/test_platform_config_secret_filtering.py tests/unit/core/results/test_environment_anonymization.py tests/unit/core/results/test_export_anonymization_surfaces.py -q",
+        "description": "existing platform-config and export anonymization regressions remain green",
+        "expected": "passes before and after as a regression guard",
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run --all-extras -- ruff check benchbox/core/results/schema.py benchbox/core/results/environment.py benchbox/core/results/exporter.py tests/unit/core/results/test_platform_config_secret_filtering.py tests/unit/core/results/test_environment_anonymization.py tests/unit/core/results/test_export_anonymization_surfaces.py tests/unit/core/results/test_credential_egress_sentinel_invariant.py",
+        "description": "result boundary files remain formatted and lint-clean",
+        "expected": "passes after implementation as a regression guard",
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-drive explicit raw_config leakage and inventory all 47 adapter/export chokepoints",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement boundary filtering and the permanent sentinel invariant test",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "result-export-explicit-raw-config-egress-sentinel-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run focused result export and anonymization regression suites",
+        "wid": "w2"
+      }
+    ]
+  }
+}

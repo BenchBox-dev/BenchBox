@@ -1,0 +1,261 @@
+{
+  "context": "Code first (w1-w4), spec last (w6) so the spec describes shipped\nreality exactly once. The w3 guard is the regression net for the whole\nconfig corpus -- write it to emit WHICH config and field failed. This\nTODO deliberately lands last in the batch: every earlier TODO changes\nsurfaces the spec must describe.\n",
+  "description": "The charter spec's schema-enforcement table (Section 3,\n_project/specs/uat-framework.md:355-368) claims at least 7 load-time\nvalidations that do not exist -- two verified empirically on develop @\nfc31f3604 by loading configs through validate_config:\n`scales: {rungs: [0.01, 0.1], override: 1.0}` is ACCEPTED (spec says\nerror) and `validator_clean_rate_floor: 1.5` is ACCEPTED (spec says\nerror). Also runtime-only: package.submit_terminal_state vocabulary +\nservice-required checks live in package.py:56-68 not config.py; not\nenforced anywhere: cross_scale_coverage_min_pairs-without-report,\npreflight-fields-without-preflight warning. Silent coercions:\nphases_arg: [load] str()-coerces to \"['load']\" (config.py:311);\nrungs: [true] passes as 1.0; output.* templates str()-coerce mappings.\nphases: order and duplicates are unvalidated (config.py:175-185) --\n`phases: [report, execute]` produced an empty report pre-\nuat-fail-advance-consistency; duplicates run a phase twice.\n\nEnumeration gap: resolve_platforms appends `include` entries WITHOUT\nregistry validation (matrix.py:153-156) -- a retired platform in a\nfrozen shard surfaces only at execute time (benchmark includes get\nvisible pruned-accounting rows, enumerate.py:106-117; platforms should\nmatch). All 32 configs currently load and enumerate non-empty (verified\nby running the loader 2026-07-10), but nothing guards this: zero tests\nreference the 18 generated shards. The frozen-config-replay blind spot's\nsuggested guard was never added.\n\nLifecycle-policy drift: 9 of 15 top-level configs carry neither\n# TEMPLATE nor # HISTORICAL headers despite the Section 9 policy;\ndocs/operations/uat-framework.md:21 tells operators to run the\nHISTORICAL config that :310-313 forbids re-running.\n\nSPEC REALIGNMENT (after the code changes above land, rewrite the stale\nsections in one pass): Section 1.4 still declares throughput out of\nscope (tests/uat/throughput.py shipped 2026-07-10); Section 2 module\ntable omits artifact_hygiene/container_cleanup/throughput and carries a\nstale ~6,500 LOC budget (actual ~7,957 pre-batch -- re-measure at\nrealignment time); Section 3 schema table must match the NOW-implemented\nvalidations and document fields code enforces but the spec omits\n(local_platforms_check, benchmark_runs_dir_template, extra_args,\nofficial/streams/seed, release_gate_runtime_envelopes); Section 4 make-\ntarget args are stale for uat-validate/report/explorer-smoke/package and\nomit uat-artifact-hygiene/bring-up/docker-cleanup (+ gate-check once\nlanded); Section 4's description of test_no_cli_surface_drift.py claims\nit \"fails on submit signature drift\" while the guard now allowlists ~28\nCLI files and SKIPS submit.py/run.py signature checks\n(test_no_cli_surface_drift.py:50-66) -- describe the real guarantee;\nSection 6 documents a 9-column TSV (actual: 12+, REPORT_HEADER\nreport.py:53-58) and a parity test that \"matches row count\" (actual:\nheader-only, test_replay_2026_05_02.py:25); Section 2:133/3:313 claim\ndraft-pr/merged-to-published-results open PRs (stubs, package.py:34,\n:126-132 -- either document as unimplemented or remove from the vocab);\nresume sections already scrubbed by uat-resume-retirement.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make new validations warn-only to avoid fixing violating configs",
+        "instead": "(not specified)",
+        "item_id": "uat-config-schema-spec-realignment",
+        "why": "fix the configs."
+      },
+      {
+        "dont": "rewrite spec sections beyond the enumerated stale claims; the charter's decisions (Path A vocabulary, Section 8 adversarial framing, Section 10 non-assertions) stand.",
+        "instead": "(not specified)",
+        "item_id": "uat-config-schema-spec-realignment",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-config-schema-spec-realignment",
+        "id": 43,
+        "reason": "Tooling nicety; a dated manual re-measure with the realignment is sufficient and the table drifts slowly. Promoted to [[uat-spec-module-loc-table-autogen]] (2026-07-16), which needs this item.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Already promoted per its own reason text into open item uat-spec-module-loc-table-autogen (2026-07-16).",
+        "summary": "Auto-generating the spec's module/LOC table from the tree"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "needs_item": "nightly-throughput-gate-restoration"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "needs_item": "uat-operator-provisioning"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "needs_item": "uat-release-gate-enforcement"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-07-19T23:54:27Z",
+      "completed_pr": 1234,
+      "created_at": "2026-07-11T00:00:00Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "All 32 existing configs (including every generated shard) still load and enumerate after the new validations -- if any legitimately violates a new rule, fix the CONFIG in the same PR and note it; do not weaken the rule.",
+        "item_id": "uat-config-schema-spec-realignment"
+      },
+      {
+        "behavior": "HISTORICAL config contents remain unedited except the header-comment line if missing.",
+        "item_id": "uat-config-schema-spec-realignment"
+      },
+      {
+        "behavior": "Unknown-field rejection everywhere (config.py:169-172 pattern) stays.",
+        "item_id": "uat-config-schema-spec-realignment"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "tests/uat/config.py:_reject_unknown_fields + per-section validators -- the enforcement machinery; new rules are additional checks inside existing section validators, not a new validation layer. Extend.",
+        "decision": "extend",
+        "item_id": "uat-config-schema-spec-realignment",
+        "path": "tests/uat/config.py:_reject_unknown_fields"
+      },
+      {
+        "concept": "tests/uat/phases/enumerate.py:106-117 -- benchmark-include pruned-accounting rows; mirror for platform includes. Reuse pattern.",
+        "decision": "reuse",
+        "item_id": "uat-config-schema-spec-realignment",
+        "path": "tests/uat/phases/enumerate.py:106-117"
+      },
+      {
+        "concept": "tests/uat/test_config.py:237-275 reader-evidence test -- extend coverage beyond stress-default.yaml fields.",
+        "decision": "extend",
+        "item_id": "uat-config-schema-spec-realignment",
+        "path": "tests/uat/test_config.py:237-275"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/README.md"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/config.py"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/matrix.py"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/enumerate.py"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_config.py"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_matrix.py"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_config.py tests/uat/test_matrix.py tests/uat/test_replay_2026_05_02.py -q",
+        "description": "Schema enforcement + corpus guard",
+        "expected": "pass; new rules verified; all 32+ configs load and enumerate",
+        "item_id": "uat-config-schema-spec-realignment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from tests.uat.config import validate_config; import sys;\nfor payload in ({'name':'x','phases':['execute'],'scales':{'rungs':[0.1],'override':1.0}}, {'name':'x','phases':['execute','validate'],'validate':{'validator_clean_rate_floor':1.5}}):\n    try: validate_config(payload); sys.exit('ACCEPTED: '+str(payload))\n    except Exception: pass\nprint('both rejected')\"",
+        "description": "Spec claims spot-check: the two empirically-false rows now enforce",
+        "expected": "both rejected",
+        "item_id": "uat-config-schema-spec-realignment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "uat-config-schema-spec-realignment",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1234: load-time enforcement (rungs/override, floor[0,1], bool-rungs, phases order/dup, phases_arg/output types, package vocab)",
+        "item_id": "uat-config-schema-spec-realignment",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:36Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Load-time enforcement: rungs/override exclusion, floor in [0,1], terminal-state vocab + service, phases order/duplicate rejection, bool rejection for rungs, phases_arg/output type checks",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1234: platforms.include registry validation + pruned rows at enumerate",
+        "item_id": "uat-config-schema-spec-realignment",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:39Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Registry-validate platforms.include at enumerate with pruned-accounting rows (mirroring benchmark includes); unknown platform in include becomes a visible pruned row, not an execute-time surprise",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1234: corpus runnability guard over all 32 configs incl. generated shards",
+        "item_id": "uat-config-schema-spec-realignment",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:41Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Shard/config runnability guard: fast test that loads + enumerates every YAML under tests/uat/configs/ (including generated-rerun-shards/) asserting non-empty cells and zero unknown includes",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #1234: lifecycle headers on 10 configs; fixed release-gate-0N missing package block",
+        "item_id": "uat-config-schema-spec-realignment",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:43Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Lifecycle headers: add class headers to the 9 unlabeled configs; fast test asserting every top-level config carries a recognized header",
+        "wid": "w4"
+      },
+      {
+        "evidence": "PR #1234: operator-doc contradiction fixed; spec Section 9 aligned",
+        "item_id": "uat-config-schema-spec-realignment",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:46Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Fix the operator-doc contradiction (quick-ref pointing at the HISTORICAL config) and spec Section 9 to match the enforced header policy",
+        "wid": "w5"
+      },
+      {
+        "evidence": "PR #1234: spec realignment (scope, LOC table, schema table, make targets, CLI guard, TSV, stubs)",
+        "item_id": "uat-config-schema-spec-realignment",
+        "notes": null,
+        "started_at": "2026-07-19T23:49:48Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Spec realignment pass over uat-framework.md per the description list (scope, module/LOC table, schema table, make targets, CLI-guard description, TSV shape, package stubs)",
+        "wid": "w6"
+      }
+    ]
+  }
+}

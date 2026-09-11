@@ -1,0 +1,210 @@
+{
+  "description": "BenchBox delivery coordination for canonical todo-db support needed by the approved feature-branch batch process. The batch skill is the batch action of todo-db, owned by joeharris76/todo-db: skills/todo-db/references/batch.md, selected by BenchBox skill-sync.yaml source_name=todo-db. A docs-only instruction to prepare A, release it and take dependent B cannot work: item dependencies require done; release loses baseline; finish checks a cumulative diff and current-tree attestation. Implement the smallest persisted batch/prepared-evidence extension in the canonical owner, together with its skill contract. This BenchBox item coordinates external delivery; its local scope covers the design and source receipt only, not foreign repository writes. Canonical implementation runs in its own authorized isolated repo workflow and registered project MCP profile; create/link the upstream TODO there when that profile is available. Do not use the BenchBox database as proof of external source scope. Source integration and deployment evidence are required before this item closes.\n\nThe source receipt includes source_worktree (the clean isolated canonical verification checkout) and source_revision (the exact reviewed, merged revision). The behavioral verification rung runs the bounded upstream suite there and rejects checkout drift. The separate live source-PR/main-ancestry verification in w5 remains required; a caller-supplied path or recorded success is not proof of merged provenance.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Mark prepared members done, reset their baselines, or widen their scopes to make a batch pass",
+        "instead": "Preserve durable prepared receipts and verify each member plus the final combined tree",
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "why": "That would bypass dependency and attribution guarantees rather than implement branch delivery"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "needs_item": "ci-baseline-representative-remeasure-sample"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-09-08T11:46:17Z",
+      "worktree": "batch-source-coordination"
+    },
+    "preserves": [
+      {
+        "behavior": "GitHub native merge queue remains the only protected-branch merger; feature branches are never supported PR bases in this mode.",
+        "item_id": "batch-prepared-delivery-tracker-and-skill"
+      },
+      {
+        "behavior": "No generated skill edits as source, new scheduler, privileged bot, direct protected-branch push, force push of a shared integration branch, or automatic destructive cleanup.",
+        "item_id": "batch-prepared-delivery-tracker-and-skill"
+      },
+      {
+        "behavior": "Prepared and integrated are not done; required reviews, final-tree verification, external dependencies, publication approval and soak conditions remain enforced.",
+        "item_id": "batch-prepared-delivery-tracker-and-skill"
+      },
+      {
+        "behavior": "Preserve normal single-item and serial batch behavior, one active member claim per principal, current verification authority and existing audit history.",
+        "item_id": "batch-prepared-delivery-tracker-and-skill"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Canonical serial guide to extend",
+        "decision": "extend",
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "path": "/Users/joe/Developer/todo-db/skills/todo-db/references/batch.md"
+      },
+      {
+        "concept": "Existing claim baseline, scope and verification gate",
+        "decision": "extend",
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "path": "/Users/joe/Developer/todo-db/src/todo_db/agent.py"
+      },
+      {
+        "concept": "Dependency eligibility, audit and claim release",
+        "decision": "extend",
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "path": "/Users/joe/Developer/todo-db/src/todo_db/tracker.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "kind": "do_not_modify",
+        "path_glob": ".agents/skills/**"
+      },
+      {
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "kind": "do_not_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/batch-source-delivery.json"
+      },
+      {
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/batch-tracker-contract.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m json.tool _project/analysis/batch-source-delivery.json",
+        "description": "BenchBox source receipt is parseable; upstream behavioral and merged evidence remains a separate required work gate",
+        "expected": "exit 0; w4 and w5 must additionally contain independently checked upstream behavioral and merged-source evidence",
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'import json,pathlib,subprocess; d=json.loads(pathlib.Path(\"_project/analysis/batch-source-delivery.json\").read_text()); p=pathlib.Path(d[\"source_worktree\"]).resolve(); head=subprocess.check_output([\"git\",\"rev-parse\",\"HEAD\"],cwd=p,text=True).strip(); assert head==d[\"source_revision\"], \"source checkout differs from reviewed receipt\"; assert not subprocess.check_output([\"git\",\"status\",\"--porcelain\"],cwd=p,text=True).strip(), \"source checkout must be clean\"; subprocess.run([\"uv\",\"run\",\"--\",\"python\",\"-m\",\"pytest\",\"tests/test_batch_delivery.py\",\"tests/test_agent_service.py\",\"tests/test_agent_git.py\",\"tests/test_concurrency.py\",\"tests/test_mcp_server.py\",\"tests/test_mcp_stdio.py\",\"-q\"],cwd=p,check=True)'",
+        "description": "Canonical batch behavior passes in the exact recorded source checkout",
+        "expected": "exit 0 only at the clean recorded source revision, with real public-MCP, Git, dependency, migration, scope and recovery negative controls passing; w5 separately verifies canonical merged provenance",
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "notes": "Document source owner, source tracker identity/linked TODO, exact baseline and source PR. Upstream allowlist: src/todo_db/{agent.py,tracker.py,database.py,models.py,errors.py}, src/todo_db/mcp/{tools_work.py,tools_query.py,instructions.py,envelope.py}, additive src/todo_db/migrations/NNN_batch_delivery.sql, tests/{test_batch_delivery.py,test_agent_service.py,test_agent_git.py,test_concurrency.py,test_mcp_server.py,test_mcp_stdio.py,test_migrations.py}, skills/todo-db/SKILL.md and references/{batch,implement,handoff,closeout,recovery}.md, source generated mirrors/lock only through source-native sync. Existing migration files immutable; choose next sequence from live source, not the recorded schema7. Reuse source services and audit events; no parallel execution engine. Source repository rules and tracker scope must independently authorize these paths.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Bind canonical ownership, implementation scope and cross-repository delivery evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "notes": "Register explicit project/repo, owner generation, integration branch/worktree and immutable start head, ordered members, rollback/delivery boundary and declared terminal outcome. Ordinary member claim remains exclusive. Prepare validates claim, original base-to-accepted-head range, per-item scope definition hash, member work/verification evidence and clean local state, stores durable receipts atomically and releases the active member claim without done status or baseline loss. Reject duplicate enrollment, foreign/active claims, stale generations and missing capability. Reuse registered MCP surface; schema migration and local/hosted atomicity tests land together.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Persist bounded batch membership and prepared evidence without completing members",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "notes": "Only explicitly registered same-batch implementation edges may consume valid prepared receipts whose accepted content is present at the current integration head. Untyped edges and external/merge/review/approval/soak/deployment gates remain done-only. take/ready/next/context/finish must agree. Preserve edges instead of deleting them. Validate member ranges against individual scopes and integrated union against frozen batch scope; attribute resolution/follow-up deltas to members and invalidate changed member/downstream evidence. No release/re-take baseline laundering or current-clean-tree shortcut.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Apply scoped prepared dependencies and preserve per-member attribution",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "notes": "Final member contracts are verified on the combined final tree under the existing human verification authority; earlier receipts prove preparation only. One declared final PR binds all members and their commit mappings; for BenchBox completion requires reviewed merge plus required post-merge evidence. Closeout is atomic or resumably idempotent per member; fail/abort/partial merge never creates false done. Retry/restart after every checkpoint preserves original ranges, owner generation and pending member closeouts. Update canonical batch/implement/handoff/closeout/recovery instructions; serial mode remains default for unrelated/cross-repo/approval-separated work. No task inferred permission to merge protected refs.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Close and recover batches through exact final-tree evidence and canonical instructions",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "notes": "In the canonical implementation worktree run uv run -- python -m pytest tests/test_batch_delivery.py tests/test_agent_service.py tests/test_agent_git.py tests/test_concurrency.py tests/test_mcp_server.py tests/test_mcp_stdio.py -q. Include A-prepared->B eligible only for explicit local edge, external B blocked, stale receipts/tokens, wrong repo/head, missing predecessor content, cumulative unauthorized file, conflict edits, current-tree attestation invalidation, interrupted prepare/close/abort and unchanged serial clients. Test migration from current and prior supported schemas, concurrent hosted prepare, old-client fail-closed capability and rollback leaving ordinary work available. Preserve human-only execution of stored verification commands. Record exact source tests, revisions and CI outcomes; do not claim a schema checker proves behavior.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Prove source behavior through public MCP and migration negative controls",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "batch-prepared-delivery-tracker-and-skill",
+        "notes": "Source implementation must reach canonical main through its own authorized PR workflow. Independently read merged PR, commit ancestry, required CI/review and test artifacts. Record source tracker link, repo/PR/revisions, API capability/schema version, test node IDs/results and rollback instructions in batch-source-delivery.json. Live source evidence is required; a local document, open PR or parser pass cannot close this item. Do not activate BenchBox feature mode here.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify merged upstream delivery and record a source receipt for consumer rollout",
+        "wid": "w5"
+      }
+    ]
+  }
+}

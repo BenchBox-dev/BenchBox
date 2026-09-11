@@ -1,0 +1,294 @@
+{
+  "context": "Add plain-name extras as ALIASES first (w1), keeping all dataframe- names functional.\nThen merge the 2 conflicting dual-extras (w2, w3) into unified extras. Then update\ninternal references to prefer plain names (w4-w7). Every intermediate state is valid:\nthe dataframe- names never break, they just become the less-preferred spelling.\nConvenience groups (dataframe-pandas-family, dataframe-expression-family, dataframe-all)\nare kept as-is - they are rarely typed by users and \"dataframe-all\" is semantically clear.\n",
+  "description": "The `dataframe-` prefix on pyproject.toml extras (e.g., `dataframe-dask` instead of `dask`)\ncreates a poor UX: users must know the prefix convention to install optional dependencies.\nRunning `uv sync --extra dask` fails with a confusing error - the correct incantation is\n`uv sync --extra dataframe-dask`.\n\nInvestigation found the prefix serves no real purpose for any of the 7 DataFrame platforms:\n- **5 platforms** (polars, pandas, dask, modin, cudf) have no SQL-mode counterpart at all.\n- **DataFusion** has `datafusion` (SQL+pyarrow) and `dataframe-datafusion` (DataFrame only).\n  The only difference is pyarrow - a lightweight transitive dep that both modes benefit from.\n  Merge into one `datafusion` extra including pyarrow.\n- **PySpark/Spark** has `spark` (pyspark>=4.0.1) and `dataframe-pyspark` (pyspark>=3.5.0).\n  The >=4.0.1 floor on `spark` is unjustified - every other pyspark reference in pyproject.toml\n  uses >=3.5.0 (cloud-spark groups, dataframe-all, test deps). The Spark SQL adapter uses\n  standard SparkSession APIs available since 3.x. Align to pyspark>=3.5.0 for both.\n\nThis item adds plain-name extras, merges the 2 conflicting dual-extras into single extras,\nand updates all references to prefer plain names.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "batch all pyproject.toml changes into one commit",
+        "instead": "commit w1, w2, w3 separately with dry-run verification.",
+        "item_id": "simplify-dataframe-extra-naming",
+        "why": "a typo in extras can break all installs"
+      },
+      {
+        "dont": "remove dataframe- extras from pyproject.toml",
+        "instead": "keep as aliases indefinitely.",
+        "item_id": "simplify-dataframe-extra-naming",
+        "why": "downstream users/scripts may reference them"
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Experience",
+      "completed_at": "2026-02-15T00:00:00Z",
+      "created_at": "2026-02-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing `dataframe-*` extra names continue to resolve - verify: `uv sync --extra dataframe-dask --extra dataframe-pandas --dry-run` succeeds.",
+        "item_id": "simplify-dataframe-extra-naming"
+      },
+      {
+        "behavior": "No change to runtime behavior - this is purely an installation/naming change.",
+        "item_id": "simplify-dataframe-extra-naming"
+      },
+      {
+        "behavior": "Platform adapters resolve correctly with plain names - verify: `uv run -- python -c \"from benchbox.platforms import get_adapter; get_adapter('polars-df')\"` succeeds.",
+        "item_id": "simplify-dataframe-extra-naming"
+      },
+      {
+        "behavior": "`uv sync --extra all` and `uv sync --extra cloud` continue to work unchanged.",
+        "item_id": "simplify-dataframe-extra-naming"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "do_not_modify",
+        "path_glob": "_binaries/"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/platform_checker.py"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/dependencies.py"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "only_modify",
+        "path_glob": "docs/tutorials/dataframe-quickstart.md"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_platform_checker.py"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_dataframe_factory.py"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/test_dependencies.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv sync --extra dask --extra pandas --extra modin --extra polars --extra pyspark --extra datafusion --dry-run",
+        "description": "Plain-name extras resolve for all 7 DataFrame platforms",
+        "expected": "Resolution succeeds without errors",
+        "item_id": "simplify-dataframe-extra-naming",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv sync --extra dataframe-dask --extra dataframe-pandas --extra dataframe-pyspark --extra dataframe-datafusion --dry-run",
+        "description": "Existing dataframe- extras still resolve",
+        "expected": "Resolution succeeds without errors",
+        "item_id": "simplify-dataframe-extra-naming",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import tomllib; d=tomllib.load(open('pyproject.toml','rb')); print(d['project']['optional-dependencies']['spark'])\"",
+        "description": "Spark SQL extra uses aligned version",
+        "expected": "['pyspark>=3.5.0']",
+        "item_id": "simplify-dataframe-extra-naming",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-fast",
+        "description": "Tests pass after naming changes",
+        "expected": "All tests pass, no new failures",
+        "item_id": "simplify-dataframe-extra-naming",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "simplify-dataframe-extra-naming",
+        "needs_wid": "w5",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "simplify-dataframe-extra-naming",
+        "notes": "Add these new extras that forward to existing dataframe- extras:\n  dask = [\"dask[distributed]>=2024.1.0\", \"pandas>=2.0.0\"]\n  modin = [\"modin[ray]>=0.32.0\", \"pandas>=2.0.0\"]\n  pandas = [\"pandas>=2.0.0\"]\n  polars = [\"polars>=1.35.2\"]\n  cudf = []   # placeholder - same as dataframe-cudf\nKeep `dataframe-*` variants as-is for backward compatibility.\nVerify: `uv sync --extra dask --dry-run` resolves without errors.\nCommit: pyproject.toml only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add plain-name extra aliases in pyproject.toml for 5 non-conflicting DataFrame platforms",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dataframe-extra-naming",
+        "notes": "Current state:\n  datafusion = [\"datafusion>=50.1.0\", \"pyarrow>=10.0.0\"]     # SQL mode\n  dataframe-datafusion = [\"datafusion>=50.1.0\"]                # DataFrame mode\nAction: make `dataframe-datafusion` an alias pointing to the full `datafusion` deps:\n  dataframe-datafusion = [\"datafusion>=50.1.0\", \"pyarrow>=10.0.0\"]\npyarrow is lightweight (~30MB) and useful in both modes. One extra, one dep list.\nUpdate PLATFORM_TO_EXTRA: \"datafusion-df\" → \"datafusion\".\nVerify: `uv sync --extra datafusion --dry-run` resolves correctly.\nCommit: pyproject.toml only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Merge DataFusion into single `datafusion` extra with pyarrow",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dataframe-extra-naming",
+        "notes": "Current state:\n  spark = [\"pyspark>=4.0.1\"]                                   # SQL mode\n  dataframe-pyspark = [\"pyspark>=3.5.0\"]                       # DataFrame mode\nAction:\n  1. Lower `spark` extra to pyspark>=3.5.0 (matches every other pyspark ref in pyproject.toml).\n  2. Add plain-name alias: `pyspark = [\"pyspark>=3.5.0\"]`\n  3. Make `dataframe-pyspark` an alias: `dataframe-pyspark = [\"pyspark>=3.5.0\"]`\nAll three names (`spark`, `pyspark`, `dataframe-pyspark`) install pyspark>=3.5.0.\nUpdate PLATFORM_TO_EXTRA: \"pyspark-df\" → \"pyspark\".\nVerify: `uv sync --extra spark --extra pyspark --dry-run` resolves correctly.\nCommit: pyproject.toml only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align PySpark to single version floor and add `pyspark` plain-name alias",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dataframe-extra-naming",
+        "notes": "File: benchbox/utils/dependencies.py\nChanges:\n  - PLATFORM_TO_EXTRA: update DataFrame platform entries to use plain names\n    (e.g., \"polars-df\" → \"polars\", \"pandas-df\" → \"pandas\", \"datafusion-df\" → \"datafusion\",\n     \"pyspark-df\" → \"pyspark\", \"dask-df\" → \"dask\", \"modin-df\" → \"modin\", \"cudf-df\" → \"cudf\")\n  - DATAFRAME_DEPENDENCY_GROUPS: update install_command strings to use plain names\n    (e.g., \"uv add benchbox --extra polars\" not \"--extra dataframe-polars\")\n  - DEPENDENCY_GROUPS: update any entries referencing dataframe- extras to plain names\nVerify: `uv run -- python -c \"from benchbox.utils.dependencies import PLATFORM_TO_EXTRA; print(PLATFORM_TO_EXTRA)\"` shows plain names.\nCommit: benchbox/utils/dependencies.py only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update PLATFORM_TO_EXTRA and DEPENDENCY_GROUPS in dependencies.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dataframe-extra-naming",
+        "notes": "Files:\n  - benchbox/platforms/dataframe/platform_checker.py: extra_name params, get_installation_suggestion()\n  - benchbox/platforms/__init__.py: get_dataframe_requirements() messages\nChange all user-facing strings from \"dataframe-X\" to plain \"X\" names.\nExample: \"uv add benchbox --extra polars\" not \"uv add benchbox --extra dataframe-polars\".\nVerify: `uv run -- python -c \"from benchbox.platforms.dataframe.platform_checker import get_installation_suggestion; print(get_installation_suggestion('polars'))\"` shows plain name.\nCommit: both files together.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update error messages and install suggestions in platform_checker and __init__",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dataframe-extra-naming",
+        "notes": "Files:\n  - tests/unit/platforms/test_dataframe_factory.py: update \"dataframe-pandas\" etc. assertions\n  - tests/unit/platforms/dataframe/test_platform_checker.py: update install suggestion assertions\n  - tests/unit/utils/test_dependencies.py: update group structure and naming assertions\nAdd parametrized tests verifying both plain and dataframe- names map to correct packages.\nVerify: `uv run -- python -m pytest tests/unit/platforms/test_dataframe_factory.py tests/unit/platforms/dataframe/test_platform_checker.py tests/unit/utils/test_dependencies.py -v`\nCommit: all three test files together.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update tests to use plain extra names",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dataframe-extra-naming",
+        "notes": "Files:\n  - docs/platforms/quick-reference.md\n  - docs/platforms/comparison-matrix.md\n  - docs/tutorials/dataframe-quickstart.md\n  - docs/platforms/dataframe.md\n  - Individual platform docs (polars.md, pandas-dataframe.md, etc.)\n  - CLAUDE.md CLI quick reference (if applicable)\nUse plain names in all install examples. Mention dataframe- as legacy alias once in\ndocs/platforms/dataframe.md only.\nVerify: `rg \"dataframe-polars|dataframe-pandas|dataframe-dask|dataframe-modin|dataframe-pyspark|dataframe-datafusion\" docs/` returns only the legacy-alias note.\nCommit: all docs files together.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update documentation to use plain extra names",
+        "wid": "w7"
+      }
+    ]
+  }
+}

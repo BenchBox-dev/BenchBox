@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #223 of platform-live-integration-tests.\nDeferred: CI pipeline for Docker-based integration tests\nReason deferred: Requires GitHub Actions with Docker compose support (services or docker compose in workflow). Design after local Docker tests are proven stable. Could use scheduled runs (nightly) rather than per-PR.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:51Z",
+      "worktree": "main"
+    }
+  }
+}

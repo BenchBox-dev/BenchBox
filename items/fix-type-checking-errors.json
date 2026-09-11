@@ -1,0 +1,10 @@
+{
+  "description": "The codebase has accumulated significant type checking errors that are currently\nignored in the ty configuration. These represent technical debt that reduces\nthe value of type checking and should be addressed incrementally.\n\nUPDATE (2026-01-16): Full analysis completed. 5 quick-win rules enabled as errors (56 fixes).\n\nCRITICAL FINDING: Remaining 7 rules have ~4,000+ errors (not ~2,600 as estimated).\nMost stem from intentional dynamic typing patterns in DataFrame adapters and\nbenchmark inheritance hierarchies. These are false positives requiring major\narchitectural refactoring to \"fix\" - not appropriate for type: ignore comments.",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-01-17T00:00:00Z",
+      "worktree": "main"
+    }
+  }
+}

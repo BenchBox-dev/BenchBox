@@ -1,0 +1,271 @@
+{
+  "context": "Follow existing shared-pattern boundaries:\n\n1) For write-primitives table-existence checks, introduce/reuse a small shared\nSQL execution compatibility helper (execute-or-sql fallback) that can be used\nby benchmark setup code without encoding DataFusion-specific logic in multiple\ncall sites. Keep the fallback narrow and deterministic.\n\n2) For read-primitives map queries, implement DataFusion-specific `variants`\nSQL in `queries.yaml` rather than broad skips, using syntax validated against\nthe installed DataFusion SQL dialect. Keep the default query text intact for\nother platforms.\n\n3) For concurrent working-dir cleanup, apply the minimum fix around DataFusion\ndirectory delete/recreate paths (lock file or equivalent scoped mutex) and\npreserve existing database reuse checks so compatible data is reused rather than\nalways recreated.\n\n4) Add focused unit/integration regression tests that assert parity behavior\n(equivalent execution intent, not necessarily identical timings).\n",
+  "description": "DataFusion runs for `write_primitives` and `read_primitives` are not behaviorally\nequivalent to the SQL baseline due to three concrete defects:\n\n1. Write-primitives setup checks call `connection.execute(...)` directly in\n   `WritePrimitivesBenchmark._table_exists()` and related setup probes, but\n   DataFusion SQL execution uses `SessionContext.sql(...).collect()`.\n   This causes false negatives for required TPC-H source table existence and\n   aborts most operations before execution.\n\n2. Read-primitives MAP queries (`map_construction`, `map_access`, `map_keys_values`)\n   currently use SQL forms that fail on DataFusion parser/planner. These queries\n   are still scheduled for DataFusion without a working dialect variant, so\n   runs fail despite equivalent intent being possible.\n\n3. Concurrent DataFusion runs targeting the same working directory can race on\n   directory removal, producing intermittent `Could not remove existing database`\n   failures. This also undermines reliable database reuse decisions.\n\nGoal: restore platform parity so the same benchmark command (SQL mode) performs\nthe equivalent action on DataFusion, while preserving existing adapter architecture,\nshared validation/reuse flow, and avoiding one-off duplicated logic.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bypass base adapter lifecycle with ad-hoc cleanup in benchmark code",
+        "instead": "integrate minimal locking at the adapter boundary",
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "why": "reuse and compatibility checks already live in shared adapter flow"
+      },
+      {
+        "dont": "force `force_recreate=True` as a race workaround",
+        "instead": "serialize destructive cleanup only when needed",
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "why": "it destroys reuse effectiveness"
+      },
+      {
+        "dont": "hardcode `if platform == datafusion` branches at every write-primitives call site",
+        "instead": "centralize execution compatibility in one helper path",
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "why": "this duplicates connection handling logic"
+      },
+      {
+        "dont": "solve map-query failures by globally skipping map category on DataFusion",
+        "instead": "add DataFusion variants with validated syntax",
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "why": "parity requires equivalent behavior"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-11T00:00:00Z",
+      "created_at": "2026-02-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Base adapter reuse/recreate flow in `benchbox/platforms/base/adapter.py` remains the single source of truth for database lifecycle decisions",
+        "item_id": "fix-datafusion-read-write-primitives-parity"
+      },
+      {
+        "behavior": "DataFusion benchmark commands that already pass (for non-map read queries) continue to run without regression",
+        "item_id": "fix-datafusion-read-write-primitives-parity"
+      },
+      {
+        "behavior": "Existing DuckDB/PostgreSQL/SQLite write-primitives setup behavior remains unchanged",
+        "item_id": "fix-datafusion-read-write-primitives-parity"
+      },
+      {
+        "behavior": "Read-primitives catalog variant and skip_on semantics in `benchbox/core/read_primitives/catalog/loader.py` and `benchbox/core/read_primitives/queries.py` remain backward compatible",
+        "item_id": "fix-datafusion-read-write-primitives-parity"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/connection.py"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/catalog/queries.yaml"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_datafusion_adapter.py"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_read_primitives_datafusion.py"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/benchmarks/test_write_primitives_core.py"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/read_primitives/test_query_manager_variants.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py -k \"table_exists or setup\" -v",
+        "description": "Write-primitives setup check uses DataFusion-compatible SQL execution path and no longer false-negatives source tables",
+        "expected": "targeted write-primitives setup tests pass with no DataFusion API mismatch failures",
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_read_primitives_datafusion.py -k \"map_construction or map_access or map_keys_values\" -v",
+        "description": "Read-primitives map queries have valid DataFusion SQL variants and execute successfully",
+        "expected": "map query integration tests pass on DataFusion",
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_datafusion_adapter.py -k \"concurrent or working_dir or reuse\" -v",
+        "description": "Concurrent DataFusion run setup no longer fails on working-dir cleanup races",
+        "expected": "no intermittent `Could not remove existing database` errors across repeated runs",
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m benchbox run --platform datafusion --benchmark write_primitives --scale 1 --non-interactive --phases power",
+        "description": "End-to-end parity sanity for both primitive benchmarks on DataFusion SQL mode",
+        "expected": "write-primitives runs queries instead of failing setup on missing source tables",
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m benchbox run --platform datafusion --benchmark read_primitives --scale 1 --non-interactive --queries map_construction,map_access,map_keys_values --phases power",
+        "description": "End-to-end read-primitives map category runs on DataFusion without parser failure",
+        "expected": "all three map queries execute or fail only for non-syntax reasons",
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design and add a shared SQL execution compatibility helper that supports DB-API `execute()` and DataFusion `sql(...).collect()` paths",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor write-primitives setup/table-existence checks to use the compatibility helper and verify source-table detection on DataFusion",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research DataFusion map SQL syntax and implement dialect `variants` for map_construction/map_access/map_keys_values in read-primitives catalog",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add/adjust read-primitives variant tests to assert DataFusion map variants are selected and executable",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement minimal concurrency guard for DataFusion working-dir delete/recreate path while preserving base adapter reuse semantics",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression tests for DataFusion cleanup race and reuse behavior under repeated/concurrent initialization",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-datafusion-read-write-primitives-parity",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run targeted unit/integration and command-level verification for read/write primitives parity, then document outcomes in TODO item notes",
+        "wid": "w7"
+      }
+    ]
+  }
+}

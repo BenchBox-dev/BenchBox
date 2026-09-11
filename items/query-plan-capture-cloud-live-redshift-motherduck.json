@@ -1,0 +1,193 @@
+{
+  "context": "w2 and w3 are independent and can be written immediately — the adapter\nwiring already exists and the tests can be validated locally by anyone with\ncredentials. w4 lands last so the workflow change references test classes\nthat exist. w1 (adding actual secret values) is a repo-admin action that can\nhappen any time; the job degrades to all-skip until then.\n",
+  "description": "Redshift and MotherDuck adapters already have query plan capture fully wired:\n  - RedshiftAdapter (benchbox/platforms/redshift.py)\n    - get_query_plan() at line 2414, get_query_plan_parser() at line 2427\n    - _merge_plan_capture_into_result() called in execute_query() at line 2125\n  - MotherDuckAdapter (benchbox/platforms/motherduck.py)\n    - get_query_plan() at line 227, get_query_plan_parser() at line 256\n    - _merge_plan_capture_into_result() called in execute_query() at line 314\n\nBut this wiring has never been verified against a live cluster/account —\nunit tests use stubbed connections and fixture EXPLAIN text. This TODO adds\ncredential-gated live verification, following the decision to store cloud\ncredentials as GitHub Actions secrets (not UAT-only, not a credentials file).\n\nThe PostgreSQL service-container precedent (PR #777,\ntests/integration/platforms/test_postgresql_live.py\nTestLivePostgreSQLQueryPlanCapture) established the test shape:\n  - get_query_plan() returns parseable output\n  - capture_query_plan() returns a QueryPlanDAG with logical_root\n  - plan_fingerprint is a 64-char SHA256 hex string\n  - fingerprint is stable across repeated identical queries\n\nThis TODO replicates that test class for Redshift and MotherDuck in their\nexisting live test files, and adds a nightly CI job that runs them when\nsecrets are configured. Existing fixtures in\ntests/integration/platforms/conftest.py already skip gracefully when\ncredentials are absent (get_env_or_skip / has_redshift_credentials), so the\njob is safe to add before the secrets exist — tests skip, job stays green.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add the cloud live job to pr.yml",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "why": "PR-triggered cloud queries from arbitrary branches incur uncontrolled billing; nightly-only."
+      },
+      {
+        "dont": "assert json.loads on Redshift EXPLAIN output",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "why": "Redshift returns text-format plans with XN operators, unlike PostgreSQL FORMAT JSON."
+      },
+      {
+        "dont": "gate the job on secret presence via job-level if",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "why": "secrets are not available in job-level if context; rely on the conftest env-var skip instead."
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-06-11T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing tests in test_redshift_live.py and test_motherduck_live.py must be untouched.",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck"
+      },
+      {
+        "behavior": "Live tests must skip (not fail) when credentials are absent — forks and contributors without secrets must stay green.",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck"
+      },
+      {
+        "behavior": "No secret values may appear in workflow logs — do not echo env vars; pytest -v output must not print connection strings.",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck"
+      },
+      {
+        "behavior": "Test queries must be trivial (SELECT 1) — Redshift and MotherDuck bill per compute; no benchmark-scale queries in CI.",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/nightly.yml — postgres-integration job pattern (PR #777)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "path": ".github/workflows/nightly.yml"
+      },
+      {
+        "concept": "tests/integration/platforms/conftest.py — redshift_credentials / motherduck_credentials fixtures with env-var skip",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "path": "tests/integration/platforms/conftest.py"
+      },
+      {
+        "concept": "tests/integration/platforms/test_motherduck_live.py — existing live test file with live_motherduck marker",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "path": "tests/integration/platforms/test_motherduck_live.py"
+      },
+      {
+        "concept": "tests/integration/platforms/test_postgresql_live.py — TestLivePostgreSQLQueryPlanCapture test class shape (PR #777)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "path": "tests/integration/platforms/test_postgresql_live.py"
+      },
+      {
+        "concept": "tests/integration/platforms/test_redshift_live.py — existing live test file with live_redshift marker",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "path": "tests/integration/platforms/test_redshift_live.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/platform-expansion/planning/query-plan-capture-cloud-live-redshift-motherduck.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/test_motherduck_live.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/test_redshift_live.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/platforms/test_redshift_live.py tests/integration/platforms/test_motherduck_live.py -m 'live_redshift or live_motherduck' --collect-only -q --override-ini='addopts='",
+        "description": "New live test classes collect under their markers",
+        "expected": "New plan capture tests listed for both files",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/platforms/test_redshift_live.py -m live_redshift --tb=short -q",
+        "description": "Tests skip cleanly without credentials",
+        "expected": "All tests skipped, 0 failures (when no credentials configured)",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- pre-commit run check-yaml --files .github/workflows/nightly.yml",
+        "description": "Workflow YAML is valid",
+        "expected": "check yaml...Passed",
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "notes": "Secrets to add (names match the env vars the conftest fixtures read):\n  REDSHIFT_HOST, REDSHIFT_USER, REDSHIFT_PASSWORD,\n  REDSHIFT_DATABASE (default \"dev\"), REDSHIFT_PORT (default \"5439\"),\n  MOTHERDUCK_TOKEN, MOTHERDUCK_DATABASE (default \"benchbox_test\")\nAdding the secrets themselves is a repo-admin action outside the PR;\nthe PR documents the expected names in the workflow file comments so\nthe mapping is discoverable. Do not echo secret values in any step.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document and configure GitHub Actions secrets for Redshift and MotherDuck",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "notes": "Mirror TestLivePostgreSQLQueryPlanCapture from test_postgresql_live.py:\n  - test_get_query_plan_returns_text: get_query_plan() returns non-empty\n    text (Redshift EXPLAIN is text format with XN-prefixed operators,\n    not JSON — assert non-empty string, not json.loads)\n  - test_capture_query_plan_returns_dag\n  - test_capture_query_plan_has_fingerprint (64-char SHA256 hex)\n  - test_capture_query_plan_fingerprint_stable\nUse a fixture variant that passes capture_plans=True to RedshiftAdapter\n(reuse _get_redshift_credentials() from conftest for connection params).\nKeep existing pytestmark (live_redshift et al.) — module-level markers\napply to the new class automatically.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add TestLiveRedshiftQueryPlanCapture to test_redshift_live.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "notes": "Same four-test shape as w2. MotherDuck reuses the DuckDB parser, so\nget_query_plan() output is DuckDB EXPLAIN JSON. A fixture variant with\ncapture_plans=True is needed; base it on motherduck_credentials from\nconftest. Note: MotherDuck queries run against cloud compute — keep\ntest queries trivial (SELECT 1) to bound cost.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add TestLiveMotherDuckQueryPlanCapture to test_motherduck_live.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-live-redshift-motherduck",
+        "notes": "Follow the postgres-integration job pattern in nightly.yml but without\na service container. Pass secrets as env vars at the job level:\n  env:\n    REDSHIFT_HOST: ${{ secrets.REDSHIFT_HOST }}\n    ... (all names from w1)\nRun ONLY the plan-capture classes added in w2/w3, not the whole marked\nmodules — selecting the modules with -m \"live_redshift or live_motherduck\"\nwould also run the heavy TPC-H load / S3 COPY / warehouse-cost live tests\nin those files and violate the SELECT-1 / billing guardrail below:\n  uv run -- python -m pytest\n    \"tests/integration/platforms/test_redshift_live.py::TestLiveRedshiftQueryPlanCapture\"\n    \"tests/integration/platforms/test_motherduck_live.py::TestLiveMotherDuckQueryPlanCapture\"\n    -m \"live_redshift or live_motherduck\" --tb=short -v\n(Node-id selection keeps the markers as a secondary safety filter so the\nclasses still skip cleanly when credentials are absent.)\nJob must NOT use continue-on-error: nightly is where persistent\nfailures surface (same posture as postgres-integration in nightly).\nWhen secrets are unset the env vars are empty strings and the conftest\nfixtures skip all tests, so the job passes green on forks and before\nsecrets are configured. Nightly-only — do NOT add to pr.yml: cloud\nqueries are billing-sensitive and PR-triggered runs from arbitrary\nbranches would leak spend.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add cloud-live-verification job to nightly.yml",
+        "wid": "w4"
+      }
+    ]
+  }
+}

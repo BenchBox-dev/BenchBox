@@ -1,0 +1,483 @@
+{
+  "context": "Single PR, narrow scope. Apply work units in order — catalog and\ngenerator first so tests stay green, then the layout/CSS bugs in\nisolation, then the structural simplification (remove blocks, merge\nprompts), then visual polish, then copy + decision record. Run\n`make prompt-quickstarts-write` once after w2 catalog edit; the only\nexpected committed include change is the agent label, the hint field,\nand the scale strings.\n",
+  "description": "PR #404 landed the /prompts/ launch on 2026-05-14. Walking the live page\nsurfaced (a) a semantic conflation — \"Generic / manual\" was implemented\nas a fallback for \"no agent at all\", when the user's actual intent\n(Pi, OpenCode, Cline, Aider, etc.) was for Generic to be a real\ncoding-agent option — and (b) several rendering bugs:\n  - H1 hidden behind the fixed nav (insufficient top padding).\n  - Platform A/B fields leak into Test-one mode, and the single\n    Platform field leaks into Compare mode, because the CSS\n    `display: flex` on `.prompts-field` overrides the HTML `hidden`\n    attribute set by JS.\n  - MCP mode renders TWO natural-language prompt blocks (Agent prompt\n    + MCP prompt) doing roughly the same job.\n  - A \"CLI commands\" block is always shown even though the page H1 is\n    about composing agent prompts.\n  - Page lede ends \"or run the commands yourself\" — a manual-mode\n    legacy.\n\nDecisions ratified by the user before this TODO was created:\n  - Agent label = \"Generic\" with a hint \"Pi, OpenCode, Cline, Aider, …\"\n    visible only when Generic is selected.\n  - CLI commands block fully removed; the agent prompt is the artefact.\n  - Emoji glyphs on block titles are acceptable to add visual interest.\n  - One PR (not split).\n  - Default agent remains Generic.\n\nBranch: `fix/landing-prompts-generic-semantics-and-layout`. Base: `develop`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add `landing/prompts/recipes.json`",
+        "instead": "keep catalog data as an implementation include.",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "why": "same hidden-API risk as before"
+      },
+      {
+        "dont": "edit `benchbox/cli/`, `benchbox/mcp/`, `benchbox/core/`, or `results-explorer/`",
+        "instead": "(not specified)",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "why": "same scope-limit posture as the original chain."
+      },
+      {
+        "dont": "keep any string containing 'manual' in user-facing copy",
+        "instead": "search and remove.",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "why": "the corrected design has no manual mode"
+      },
+      {
+        "dont": "toggle visibility via JS `el.style.display`",
+        "instead": "use the HTML `hidden` attribute together with the new `[hidden] { display: none !important }` CSS rule.",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "why": "CSS already has `display: flex` on `.prompts-field`"
+      },
+      {
+        "dont": "touch `landing/index.html` (root) or `docs/_templates/page.html`",
+        "instead": "(not specified)",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "why": "nav already final."
+      },
+      {
+        "dont": "wire analytics",
+        "instead": "(not specified)",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "why": "still deferred until 2026-08-13."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-generic-semantics-and-layout-fixes",
+        "id": 325,
+        "reason": "Still deferred per landing-prompts-launch-gates; this PR doesn't change that decision.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: landing-prompts-launch-gates (DONE) already recorded this same deferral (automated browser/a11y matrix) pending route traffic growth; condition not shown met.",
+        "summary": "Automated browser-driven smoke test (Playwright / pa11y)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-generic-semantics-and-layout-fixes",
+        "id": 326,
+        "reason": "Emoji ships first; SVG can come later if visual polish demands.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Cosmetic emoji->SVG swap explicitly conditioned on future visual-polish demand; no such demand evidenced or tracked.",
+        "summary": "Replace emoji glyphs with SVG icons"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-generic-semantics-and-layout-fixes",
+        "id": 327,
+        "reason": "Still deferred per static-route open_questions.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: 'Compact builder teaser on root landing' is a speculative UI nicety explicitly parked in static-route open_questions with no committed requirement; not a necessary action. Landing prompt builder already works.",
+        "summary": "Compact builder teaser embedded on root landing"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-generic-semantics-and-layout-fixes",
+        "id": 328,
+        "reason": "Deferred until 2026-08-13 per decision record.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly deferred until 2026-08-13 per decision record; today is 2026-07-19, the condition has not yet been reached.",
+        "summary": "Analytics wire-up"
+      }
+    ],
+    "item_meta": {
+      "category": "Product and Documentation",
+      "completed_at": "2026-05-14T00:00:00Z",
+      "created_at": "2026-05-14T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Catalog generator anti-patterns (no recipes.json, managed safety_terms required, two -p flags in compare template) — all still enforced.",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes"
+      },
+      {
+        "behavior": "Default state on first load remains Generic + CLI + Test one platform + SQL + Local + duckdb + tpch + 0.01.",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes"
+      },
+      {
+        "behavior": "No analytics provider gets wired (deferred until 2026-08-13).",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes"
+      },
+      {
+        "behavior": "No automated browser/a11y tooling added — manual checklist remains the launch gate.",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes"
+      },
+      {
+        "behavior": "No edits to `landing/index.html` (root landing) or `docs/_templates/page.html` — nav is already wired and final.",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes"
+      },
+      {
+        "behavior": "No new public CLI/MCP API surfaces.",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes"
+      },
+      {
+        "behavior": "URL parameter names pinned by static-route (goal, agent, surface, interface, deployment, platform, platformA, platformB, benchmark, scale) — do not rename.",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/decisions/landing-prompts-route.md — extend with correction subsection rather than rewriting from scratch",
+        "decision": "extend",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "path": "_project/decisions/landing-prompts-route.md"
+      },
+      {
+        "concept": "landing/prompts/catalog.yaml:agents[] — reuse the list, rename label + add hint field",
+        "decision": "reuse",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "path": "landing/prompts/catalog.yaml:agents[]"
+      },
+      {
+        "concept": "landing/prompts/prompts.js:buildAgentPrompt() — extend the existing builder to handle CLI vs MCP surfaces in one place",
+        "decision": "extend",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "path": "landing/prompts/prompts.js:buildAgentPrompt()"
+      },
+      {
+        "concept": "landing/style.css:.hero::before — reuse the radial-gradient pattern for prompts main background",
+        "decision": "reuse",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "path": "landing/style.css:.hero::before"
+      },
+      {
+        "concept": "landing/style.css:.nav fixed positioning — top padding must clear ~80px (mirrors landing hero)",
+        "decision": "reuse",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "path": "landing/style.css:.nav"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "docs/_templates/page.html"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "docs/conf.py"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "landing/index.html"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "landing/script.js"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "landing/style.css"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/landing-prompts-route.md"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.generated.js"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.yaml"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/index.html"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/prompts.css"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/prompts.js"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_landing_quickstarts.py"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/landing/test_landing_quickstarts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/generate_landing_quickstarts.py --check && uv run -- python -m pytest tests/unit/landing/ -q",
+        "description": "Generator check and catalog tests still pass",
+        "expected": "exit 0; tests pass",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "node --check landing/prompts/prompts.js",
+        "description": "JS parses cleanly",
+        "expected": "exit 0",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -ni 'manual' landing/prompts/index.html landing/prompts/prompts.js landing/prompts/prompts.css landing/prompts/catalog.yaml",
+        "description": "No 'manual' literal remains in user-facing files",
+        "expected": "exit 0; negated rg finds no matches",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n 'block-cli|block-mcp-prompt' landing/prompts/index.html landing/prompts/prompts.js",
+        "description": "Removed blocks no longer present in markup or JS",
+        "expected": "exit 0; both ids fully removed",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'prompts-field\\[hidden\\]|prompts-block\\[hidden\\]' landing/prompts/prompts.css",
+        "description": "Hidden-attribute CSS override is present",
+        "expected": "rule present in CSS",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -nF '## Correction (2026-05-14)' _project/decisions/landing-prompts-route.md",
+        "description": "Decision record correction subsection landed",
+        "expected": "subsection present",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! git diff --name-only origin/develop...HEAD | rg '^(landing/index\\.html$|landing/style\\.css$|landing/script\\.js$|docs/_templates/page\\.html$|benchbox/|results-explorer/|\\.github/workflows/docs\\.yml$)'",
+        "description": "Only allow-listed files were modified vs develop",
+        "expected": "exit 0; only landing/prompts/, decision record, generator, and tests touched",
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "needs_wid": "w8",
+        "wid": "w11"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "notes": "- Confirm `develop` tip on the main clone has #404 merged\n  (`git log origin/develop --oneline -5`).\n- Confirm `landing/prompts/{index.html,prompts.js,prompts.css,catalog.yaml,catalog.generated.js,a11y-checklist.md}`\n  all exist on `develop`.\n- Confirm `_project/decisions/landing-prompts-route.md` is current.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate current state before editing",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "notes": "- `landing/prompts/index.html`: rewrite the lede to\n  \"Pick an agent, surface, platform, benchmark, and scale. Copy\n  the prompt into your coding agent. Defaults to a safe local\n  DuckDB + TPC-H quickstart.\" Drop the trailing\n  \"or run the commands yourself\" parenthetical.\n- Add `<link rel=\"icon\" href=\"data:,\" />` to silence the dev\n  server `favicon.ico` 404.\n- Refresh the `<noscript>` text so it no longer implies a manual\n  mode — keep the one-line `uv add … && uv run benchbox run …`\n  recipe as a fallback, but frame it as \"if JavaScript is\n  disabled, here is the default quickstart\".\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Page copy refresh + favicon (B7, A1)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "notes": "- `_project/decisions/landing-prompts-route.md`:\n  - Prepend a `## Correction (2026-05-14)` subsection (just below\n    the metadata block, before `## Context`) noting the original\n    conflation between \"generic coding agent\" and \"manual no-agent\n    recipe\", and pointing at this PR.\n  - Rewrite the rationale paragraph in\n    `## Default agent and surface` to drop the\n    \"without an MCP-capable agent\" framing; the new rationale is\n    \"vendor-neutral default that does not pre-bias toward OpenAI\n    or Anthropic; Generic is a first-class coding-agent option\".\n  - Replace the entire `## Generic-agent semantics` section:\n    registry key `generic`; intent = any coding agent with shell\n    or MCP capability that isn't named Codex/Claude Code;\n    vendor-neutral output wording; same block shape as the\n    named-agent options; no manual-recipe mode.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decision-record correction (D1, D2, D3)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "notes": "- `landing/prompts/catalog.yaml`: change `agents[0].label` from\n  \"Generic / manual\" to \"Generic\"; add a new\n  `hint: \"Pi, OpenCode, Cline, Aider, …\"` field on that entry.\n- Coerce scales to canonical string form\n  (`\"0.01\"`, `\"0.1\"`, `\"1.0\"`, `\"10.0\"`) so YAML does not strip\n  trailing zeros via numeric coercion.\n- Run `make prompt-quickstarts-write` to regenerate\n  `landing/prompts/catalog.generated.js`.\n- `make prompt-quickstarts-check` exits 0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename agent label and refresh catalog",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "notes": "- `scripts/generate_landing_quickstarts.py`: accept string scales\n  (the current code passes them through; verify no numeric\n  coercion remains). Optionally extend validation so an agent\n  entry's `label` cannot contain \"manual\".\n- `tests/unit/landing/test_landing_quickstarts.py`:\n  - Update `test_defaults_resolve_to_known_ids` to compare against\n    canonical string scales.\n  - Add `test_no_manual_label_anywhere`: walk `agents[].label`\n    and assert no entry contains \"manual\" (case-insensitive).\n  - Add `test_generic_agent_has_hint`: assert the `generic` agent\n    entry has a non-empty `hint` field.\n- `uv run -- python -m pytest tests/unit/landing/ -q` is green.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Generator + tests follow-on",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "notes": "- `landing/prompts/prompts.css`: change `.prompts-main` top\n  padding from `var(--space-xl)` to\n  `calc(80px + var(--space-xl))` so the fixed nav stops covering\n  the H1. This mirrors the landing hero's\n  `padding: calc(80px + var(--space-3xl)) 0 ...`.\n- Tighten `.prompts-form { margin-bottom: var(--space-lg); }` so\n  the form does not float above the output blocks.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix H1 underlap (B1) and form→output gap (V2)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "notes": "Add a CSS override so the HTML `hidden` attribute beats\n`display: flex` on `.prompts-field`:\n\n    .prompts-field[hidden],\n    .prompts-block[hidden] { display: none !important; }\n\nAfter this, JS toggling `el.hidden = true/false` is sufficient and\nno JS-driven `display` mutation is needed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix Platform A/B visibility bug (B8)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "notes": "- `landing/prompts/prompts.css`: add a `.prompts-main::before`\n  radial-gradient overlay using `--accent-primary`/`--accent-secondary`\n  rgba tints, mirroring the landing `.hero::before` pattern.\n- Promote `.prompts-header, .prompts-form, .prompts-output` to\n  `position: relative; z-index: 1;` so the gradient sits behind\n  the panels.\n- Leave existing panel fills (`--bg-secondary`) alone — they are\n  already strong enough against the new background.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Background visual treatment (V1)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "notes": "- `landing/prompts/index.html`: delete `<div id=\"block-cli\">` and\n  `<div id=\"block-mcp-prompt\">` entirely. Rename the surviving\n  MCP block heading from \"MCP server setup\" to \"MCP server config\".\n- `landing/prompts/prompts.js`: remove the rendering paths for\n  both deleted blocks; collapse `renderOutput()` so it manages\n  only `block-prompt`, `block-mcp-setup`, and `block-cloud-safety`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove CLI-commands block (B4) and the redundant MCP prompt block (B5)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "notes": "- `landing/prompts/prompts.js` `buildAgentPrompt()`: replace the\n  generic branch's \"Here is a manual recipe…\" line with\n  \"You are a coding agent (e.g. Pi, OpenCode, Cline, Aider) with\n  shell access. Help me run a BenchBox benchmark end-to-end.\"\n- When `state.surface === \"mcp\"`, render the MCP-flavoured prompt\n  (the body that currently goes into `mcp-prompt-text`) into\n  `block-prompt` instead. There is exactly one natural-language\n  prompt block per render.\n- Set `$(\"block-prompt\").hidden = false;` unconditionally.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make Agent prompt the single natural-language block (B3, B6)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-generic-semantics-and-layout-fixes",
+        "notes": "- `landing/prompts/index.html`: add\n  `<small class=\"prompts-field-hint\" id=\"agent-hint\" hidden></small>`\n  under the Agent select. Prepend a single emoji glyph to each\n  block title: \"📋 Agent prompt\", \"🔧 MCP server config\". The\n  existing \"⚠ \" on managed-cloud safety stays.\n- `landing/prompts/prompts.js`:\n  - Add `syncAgentHint(state)` to show the hint only when\n    `agent === \"generic\"` (text comes from `catalog.agents[].hint`).\n  - Change the scale select to render the canonical string label\n    directly (no `String(numericScale)` coercion that strips\n    trailing zeros).\n  - Add a `COPY_LABELS` map so the `aria-live` region announces\n    \"Copied agent prompt\" instead of \"Copied prompt-text\".\n- `landing/prompts/prompts.css`: add `.prompts-field-hint` style\n  (smaller, `--text-muted`); add `transition: background 0.15s`\n  on `.prompts-copy`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Visual polish — block titles, copy buttons, scale rendering (V3, V4)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

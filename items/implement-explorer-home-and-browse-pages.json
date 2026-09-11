@@ -1,0 +1,194 @@
+{
+  "context": "Build pages as Preact components that render from manifest.json on initial\nload, then enhance with DuckDB-WASM for interactive filtering. Pre-render\nat build time for SEO. Keep the UI simple - data tables with sort/filter,\nnot complex dashboards.\n",
+  "description": "Build the primary navigation pages for the results explorer: the home/landing\npage and the browse-by-benchmark and browse-by-platform index pages. These\nare the entry points that let users discover what results are available and\nnavigate to specific result detail pages.\n\nAll pages consume data from the manifest.json and DuckDB read model produced\nby the static build pipeline. Pages should work without JavaScript for basic\ncontent (pre-rendered) but use DuckDB-WASM for interactive filtering.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "build custom filter UI when a simple dropdown + text input suffices",
+        "instead": "start minimal",
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "why": "over-engineering the filter UX delays launch"
+      },
+      {
+        "dont": "load the full DuckDB database just to render the home page",
+        "instead": "lazy-load DuckDB only when filtering is activated",
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "why": "manifest.json is sufficient for navigation"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "needs_item": "build-static-pipeline-bundles-to-read-model"
+      },
+      {
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "needs_item": "scaffold-results-explorer-frontend"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-03T00:00:00Z",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Explorer home and browse pages must work with the pre-built manifest.json - no runtime API calls",
+        "item_id": "implement-explorer-home-and-browse-pages"
+      },
+      {
+        "behavior": "Pre-rendered HTML must be valid and useful without JavaScript for SEO and accessibility",
+        "item_id": "implement-explorer-home-and-browse-pages"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "kind": "do_not_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Vite build succeeds with no TypeScript errors",
+        "expected": "Build completes with exit code 0",
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build && test -f dist/index.html && grep -q 'Results Explorer' dist/index.html",
+        "description": "Home page is pre-rendered with real data",
+        "expected": "Exit code 0 - home page exists and contains expected content",
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && ls dist/tpch/index.html dist/duckdb/index.html",
+        "description": "Browse pages are pre-rendered for each benchmark and platform in manifest",
+        "expected": "Both files exist",
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run build",
+        "description": "Unit tests for page components pass",
+        "expected": "Typecheck and build both pass",
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "notes": "The home page should show:\n- Hero section: \"BenchBox Results Explorer\" with a brief description\n- Summary cards: count of results, benchmarks, platforms\n- Recent results: last 10 results with benchmark, platform, scale, date, duration\n- Quick navigation: links to benchmark index and platform index\n- Search/filter teaser: \"Filter results by benchmark, platform, or scale factor\"\n\nData source: `manifest.json` (pre-loaded, no DuckDB needed for initial render).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the explorer home page at /results/",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "notes": "One page per benchmark (e.g., `/results/tpch/`, `/results/tpcds/`):\n- Benchmark name, description, and metadata (query count, official spec link)\n- Results table: all results for this benchmark, sorted by date desc\n  Columns: platform, scale_factor, total_duration_ms, queries_passed, date\n- Filters: scale factor dropdown, platform multi-select\n- \"Compare\" checkboxes: select 2+ results and click \"Compare\" to navigate\n  to the compare view\n\nData source: `manifest.json` filtered by benchmark, with DuckDB for\ninteractive filtering.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the benchmark index page at /results/{benchmark}/",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "notes": "One page per platform (e.g., `/results/duckdb/`, `/results/datafusion/`):\n- Platform name, description, and metadata (supported benchmarks)\n- Results table: all results for this platform, sorted by date desc\n  Columns: benchmark, scale_factor, total_duration_ms, queries_passed, date\n- Filters: benchmark dropdown, scale factor dropdown\n- \"Compare\" checkboxes: only enabled when selected results share the same\n  benchmark AND scale factor. Cross-benchmark and cross-scale compare\n  entry points must NOT be offered because the compare view hard-blocks\n  those combinations. Disable or hide checkboxes for results that would\n  create an incompatible cohort with the current selection.\n\nData source: same as benchmark index, filtered by platform.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the platform index page at /results/{platform}/",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "notes": "Enhance browse pages with DuckDB-WASM powered filtering:\n- Filter by scale factor, date range, platform/benchmark\n- Sort by any column (duration, date, query count)\n- URL query params reflect active filters (shareable filtered views)\n- Loading indicator while DuckDB initializes\n- Graceful degradation: if DuckDB fails to load, manifest.json data\n  still renders (just without interactive filtering)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add interactive DuckDB-WASM filtering to browse pages",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-explorer-home-and-browse-pages",
+        "notes": "During Vite build, read manifest.json and generate static HTML for:\n- Each benchmark: `/results/tpch/index.html`, `/results/tpcds/index.html`, etc.\n- Each platform: `/results/duckdb/index.html`, `/results/datafusion/index.html`, etc.\nThis ensures browse pages are crawlable by search engines and load instantly\nwithout client-side rendering. JavaScript enhances with interactive filtering.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pre-render known browse pages at build time",
+        "wid": "w5"
+      }
+    ]
+  }
+}

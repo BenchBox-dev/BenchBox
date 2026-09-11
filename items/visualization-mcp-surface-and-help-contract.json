@@ -1,0 +1,318 @@
+{
+  "context": "Treat M5 as a product contract question first and a code question second.\nUse runtime tool-list evidence when available. For the confirmed N1 drift,\nderive MCP help from chart and template registries so help text changes with\nthe actual supported surfaces.\n",
+  "description": "Independent verification partially confirmed a product-surface concern: the\ninstalled external dependency `textcharts==0.1.2` ships its own MCP server\nwith raw primitive tools such as `textcharts_bar`, while BenchBox ships\nresult-aware MCP tools `suggest_charts` and `generate_chart`.\n\nStatic repository inspection at SHA a63ae1a76 found that BenchBox's MCP\nserver registers BenchBox tool groups only and does not directly register or\nforward textcharts MCP tools. However, the broader harness/session may expose\nboth MCP surfaces independently. That runtime exposure cannot be settled from\nsource alone.\n\nThe same review confirmed a smaller drift surface: BenchBox MCP docstrings\nhardcode chart/template examples while CLI help derives chart/template choices\nfrom registries. This TODO makes the MCP boundary explicit and ensures help\ntext comes from the registry/template sources selected by the chart-registry\nTODO.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "claim BenchBox registers textcharts MCP tools unless the runtime tool list proves it.",
+        "instead": "(not specified)",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hide an externally configured MCP server from user tooling by changing BenchBox source alone.",
+        "instead": "(not specified)",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "leave hardcoded template prose after adding or changing templates.",
+        "instead": "(not specified)",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "mix raw textcharts primitive names into BenchBox chart-type validation.",
+        "instead": "(not specified)",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "visualization-mcp-surface-and-help-contract",
+        "id": 516,
+        "reason": "This is a product decision with namespace and support implications; document the boundary before adding registration behavior.",
+        "resolution": "promoted",
+        "resolved_item": "mcp-textcharts-surface-boundary-v2",
+        "resolved_reason": null,
+        "summary": "Bundle or proxy the external textcharts MCP server through BenchBox"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "visualization-mcp-surface-and-help-contract",
+        "id": 517,
+        "reason": "Renderer shims depend on textcharts; this TODO concerns MCP/help boundaries, not renderer extraction.",
+        "resolution": "promoted",
+        "resolved_item": "remove-textcharts-as-a-dependency",
+        "resolved_reason": null,
+        "summary": "Remove textcharts as a dependency"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "visualization-mcp-surface-and-help-contract",
+        "id": 518,
+        "reason": "Only visualization chart/template help drift is in scope.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: 'Build an MCP schema generator for every BenchBox tool' is a broad aspirational infra effort out of the viz item's scope, with no concrete design, owner, or committed driver.",
+        "summary": "Build an MCP schema generator for every BenchBox tool"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "needs_item": "visualization-chart-registry-and-exporter-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Visualization",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "BenchBox MCP `generate_chart` and `suggest_charts` remain result-file-aware tools.",
+        "item_id": "visualization-mcp-surface-and-help-contract"
+      },
+      {
+        "behavior": "BenchBox semantic chart IDs remain distinct from textcharts primitive command names.",
+        "item_id": "visualization-mcp-surface-and-help-contract"
+      },
+      {
+        "behavior": "FastMCP tool descriptions remain readable and useful after any generated-help change.",
+        "item_id": "visualization-mcp-surface-and-help-contract"
+      },
+      {
+        "behavior": "No textcharts MCP tool registration is added or removed without runtime evidence and a product decision.",
+        "item_id": "visualization-mcp-surface-and-help-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/visualization/templates.py: template registry - derive help text from this rather than hardcoding.",
+        "decision": "reuse",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "path": "benchbox/core/visualization/templates.py"
+      },
+      {
+        "concept": "benchbox/mcp/server.py: BenchBox MCP instructions - update the user-facing charting surface here.",
+        "decision": "reuse",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "path": "benchbox/mcp/server.py"
+      },
+      {
+        "concept": "benchbox/mcp/tools/discovery.py: current chart metadata returned by discovery - align with the visualization registry.",
+        "decision": "reuse",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "path": "benchbox/mcp/tools/discovery.py"
+      },
+      {
+        "concept": "benchbox/mcp/tools/visualization.py: result-aware `suggest_charts` and `generate_chart` tools - keep semantic chart namespace here.",
+        "decision": "reuse",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "path": "benchbox/mcp/tools/visualization.py"
+      },
+      {
+        "concept": "docs/reference/public-contracts.md: support-tier map for MCP tool contracts - extend with visualization surface boundaries.",
+        "decision": "extend",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "path": "docs/reference/public-contracts.md"
+      },
+      {
+        "concept": "textcharts/mcp_server.py in the installed dependency: raw primitive MCP server - document as separate unless runtime registration proves otherwise.",
+        "decision": "reuse",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "path": "textcharts/mcp_server.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "kind": "do_not_modify",
+        "path_glob": ".venv/"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "kind": "do_not_modify",
+        "path_glob": "CLI visualization behavior beyond generated/shared help text"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark execution or results schema code"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "kind": "do_not_modify",
+        "path_glob": "textcharts package source"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/server.py"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/discovery.py"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/visualization.py"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/development/"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_visualization_tools.py tests/unit/mcp/test_discovery_tools.py -q",
+        "description": "MCP visualization and discovery tests pass.",
+        "expected": "Visualization and discovery MCP tests pass.",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_visualization_tools.py tests/unit/mcp/test_discovery_tools.py -k 'template or help or discovery or chart' -q",
+        "description": "MCP help references valid current templates.",
+        "expected": "MCP help/discovery tests prove chart and template text follows registry/template sources or is explicitly marked as examples.",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"textcharts|raw primitive|result-aware|generate_chart|suggest_charts\" docs/reference/public-contracts.md benchbox/mcp/server.py benchbox/mcp/tools/visualization.py",
+        "description": "Textcharts MCP exposure evidence is recorded.",
+        "expected": "Docs/instructions clearly distinguish BenchBox result-aware charts from textcharts raw primitive tools.",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph remains valid after implementation.",
+        "expected": "TODO validation and graph checks pass.",
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "notes": "Revalidated against checked SHA\n`4d436d76e4f2bd59a2a0588afb66ac672ff0605d` with installed\n`textcharts==0.1.2`. Source inspection shows BenchBox registers\n`register_visualization_tools()` from `benchbox/mcp/server.py`; it does\nnot import or forward `textcharts.mcp_server`. The installed dependency\nexposes a separate `textcharts-mcp` server with `textcharts_*` primitive\ntools. Runtime FastMCP inspection observed 12 BenchBox tools\n(`generate_chart`, `suggest_charts`, and other BenchBox tools) and 17\nseparate textcharts tools when creating the textcharts server directly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate actual MCP tool exposure and help-text drift against the current branch/runtime",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "notes": "Updated public contracts and MCP reference docs to classify BenchBox\n`generate_chart`/`suggest_charts` as result-file-aware semantic charting.\nTextcharts MCP tools are documented as a separate raw primitive server\nnamespace if a user configures that server independently.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Record the product contract between raw textcharts MCP tools and BenchBox result-aware MCP tools",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "notes": "Added stable module-level MCP help constants in\n`benchbox/mcp/tools/visualization.py`, derived from\n`CHART_TYPE_DESCRIPTIONS` and `list_templates()`, and passed them to\nFastMCP as explicit tool descriptions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Generate or centralize MCP chart/template help text from registries",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "notes": "Updated server instructions and chart discovery metadata to identify the\ncomplete BenchBox semantic chart registry, supported ASCII output, and\ntextcharts as an external namespace. Discovery does not advertise raw\ntextcharts primitive IDs as BenchBox chart types.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align MCP server instructions and discovery metadata with the chosen chart-surface contract",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-mcp-surface-and-help-contract",
+        "notes": "Added tests asserting MCP help includes every current template and\nsemantic chart ID, registered FastMCP descriptions use the generated\nhelp constants, discovery metadata exposes the complete semantic\nregistry, and raw `bar`/`heatmap` primitive IDs are not BenchBox\nchart IDs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression tests for MCP help, discovery metadata, and chart namespace clarity",
+        "wid": "w4"
+      }
+    ]
+  }
+}

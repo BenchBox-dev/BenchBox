@@ -1,0 +1,10 @@
+{
+  "description": "The cost estimation subsystem (benchbox/core/cost/) currently supports these\ncloud platforms: Snowflake, BigQuery, Redshift, Databricks, Athena.\n\nThree commercial cloud platforms are missing cost estimation support:\n- Firebolt: Consumption-based pricing (compute + storage credits)\n- Azure Fabric DW: Capacity Units (CU) based pricing\n- Azure Synapse: DWU-based pricing (provisioned) or serverless bytes scanned\n\nWithout cost support, benchmark runs on these platforms report total_cost: 0,\nwhich is misleading for users doing cost/performance analysis.\n\nThis work complements the Athena cost estimation fix completed on 2024-12-24.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2024-12-24T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

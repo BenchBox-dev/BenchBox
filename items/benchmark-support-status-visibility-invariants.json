@@ -1,0 +1,343 @@
+{
+  "context": "Treat `surface` as visibility, `support_status` as product support level, and\n`supports_dataframe` as capability. First write the policy table so tests have\na clear target. Then add metadata-only fixture tests for future statuses and\nfocused real-registry tests for current public beta/experimental and internal\nrepo_only benchmarks. Keep explicit-ID behavior stable unless the policy table\nexplicitly changes it.\n",
+  "description": "PR #502 added benchmark support status and exposed it on MCP discovery. The\nimmediate review follow-up fixed CLI labeling for public benchmark listings\nand prevented MCP query-detail support-status leakage for internal/repo-only\nbenchmarks. The broader invariant still needs a durable test matrix: future\nrepo_only, document_only, deprecated, beta, and experimental benchmark entries\nshould fail loudly if a public surface exposes or hides them contrary to the\nsupport taxonomy and `surface` policy.\n\nAdd cross-surface invariant tests and policy documentation that prove\n`support_status`, `surface`, and `supports_dataframe` remain separate. The\ngoal is not to change visibility for current benchmarks. The goal is to make\nfuture status additions safe and reviewable across CLI, MCP discovery, MCP\nquery details, docs, and result/explorer inputs where applicable.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "build tests that depend on rich color codes",
+        "instead": "assert labels and fields.",
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "why": "styling is incidental"
+      },
+      {
+        "dont": "expose repo_only or document_only support claims over MCP discovery",
+        "instead": "omit or filter claims on explicit-ID surfaces.",
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "why": "the public taxonomy says those are not MCP-exposed"
+      },
+      {
+        "dont": "hide all experimental benchmarks by changing support_status behavior alone",
+        "instead": "use explicit surface decisions for hiding.",
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "why": "visibility is controlled by surface"
+      },
+      {
+        "dont": "use supports_dataframe to infer support_status",
+        "instead": "assert it separately.",
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "why": "DataFrame support is a capability dimension"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "needs_item": "benchmark-support-status-and-discovery-policy"
+      }
+    ],
+    "item_meta": {
+      "category": "Benchmark Architecture",
+      "completed_at": "2026-05-25T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "MCP discovery continues to expose support_status for public benchmarks.",
+        "item_id": "benchmark-support-status-visibility-invariants"
+      },
+      {
+        "behavior": "Public beta and experimental benchmarks remain visible unless a separate surface/deprecation decision changes them.",
+        "item_id": "benchmark-support-status-visibility-invariants"
+      },
+      {
+        "behavior": "joinorder_synthetic remains hidden from public discovery lists.",
+        "item_id": "benchmark-support-status-visibility-invariants"
+      },
+      {
+        "behavior": "joinorder_synthetic remains runnable by explicit ID where it was already supported.",
+        "item_id": "benchmark-support-status-visibility-invariants"
+      },
+      {
+        "behavior": "supports_dataframe continues to control DataFrame routing independently of support_status.",
+        "item_id": "benchmark-support-status-visibility-invariants"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/benchmarks.py: BenchmarkManager public benchmark filtering - extend tests without changing explicit-ID run behavior.",
+        "decision": "extend",
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "path": "benchbox/cli/benchmarks.py"
+      },
+      {
+        "concept": "benchbox/core/benchmark_registry.py:get_benchmark_support_status and get_benchmark_registry_summary - reuse for status assertions.",
+        "decision": "reuse",
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "path": "benchbox/core/benchmark_registry.py:get_benchmark_support_status"
+      },
+      {
+        "concept": "benchbox/core/benchmark_registry.py:get_benchmark_surface and list_public_benchmark_ids - reuse for discovery visibility decisions.",
+        "decision": "reuse",
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "path": "benchbox/core/benchmark_registry.py:get_benchmark_surface"
+      },
+      {
+        "concept": "benchbox/mcp/tools/benchmark.py: get_query_details benchmark_info - preserve explicit-ID compatibility while preventing unsupported support-status claims.",
+        "decision": "reuse",
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "path": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "concept": "benchbox/mcp/tools/discovery.py: public benchmark discovery filtering - reuse as MCP listing contract.",
+        "decision": "reuse",
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "path": "benchbox/mcp/tools/discovery.py"
+      },
+      {
+        "concept": "tests/unit/core/test_registry_surface_field.py: patch.dict surface tests - reuse fixture pattern for synthetic status/surface combinations.",
+        "decision": "reuse",
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "path": "tests/unit/core/test_registry_surface_field.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/benchmarks.py"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/resources/registry.py"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/discovery.py"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_benchmark_manager_behavioral.py"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_benchmark_selection.py"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_benchmark_api_contract.py"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_registry_surface_field.py"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_discovery_tools.py"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_mcp_tool_handlers.py"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_resources.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_benchmark_api_contract.py tests/unit/core/test_registry_surface_field.py -q",
+        "description": "Benchmark registry and surface invariants pass.",
+        "expected": "All benchmark registry and surface tests pass.",
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_benchmark_manager_behavioral.py tests/unit/cli/test_benchmark_selection.py -q",
+        "description": "CLI benchmark manager support-status labeling tests pass.",
+        "expected": "All selected CLI benchmark manager tests pass.",
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_discovery_tools.py tests/unit/mcp/test_resources.py tests/unit/mcp/test_mcp_tool_handlers.py -q",
+        "description": "MCP discovery/resource/query-detail support-status tests pass.",
+        "expected": "All selected MCP tests pass.",
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "notes": "Re-check CLI interactive listing, CLI explicit benchmark execution, MCP\nlist_available, MCP get_benchmark_info, MCP get_query_details, resources,\nresult publisher discovery, explorer ingestion, and result-integrity docs.\nRecord which surfaces are discovery surfaces and which are explicit-ID\nexecution or inspection surfaces.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory current public, internal, and explicit-ID benchmark surfaces",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "notes": "Specify expected behavior for stable, beta, experimental, repo_only,\ndeprecated, and document_only when `surface` is public or internal. Include\nwhether each should be listed by default, labeled, hidden, runnable by\nexplicit ID, exposed over MCP discovery, exposed over MCP query details,\nand eligible for DataFrame routing if `supports_dataframe` is true.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write a visibility policy table for support_status x surface x capability",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "notes": "Use patch.dict or small helper fixtures to create temporary benchmark\nmetadata entries for repo_only, document_only, deprecated, beta, and\nexperimental statuses. Assert discovery hiding, public labeling, and\nexplicit-ID behavior according to the policy. Avoid importing heavy\nbenchmark classes when metadata-only behavior is sufficient.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add synthetic invariant tests for future repo_only and document_only benchmark metadata",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "notes": "Keep the immediate CLI tests from the review fix, then broaden them to\ncover public beta and experimental cases in list trees, selection tables,\npreview panels, MCP list_available, MCP get_benchmark_info, and benchmark\nresources. Tests should check contract shape, not rich color styling.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend CLI and MCP tests so non-stable public benchmarks are visibly labeled",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "notes": "If explicit-ID surfaces can inspect internal benchmarks, document what\nmetadata may be returned and which support claims must be omitted. Keep the\ndocumentation aligned with the public contract map and MCP docs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document explicit-ID exceptions and support-status exposure policy",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-support-status-visibility-invariants",
+        "notes": "Run the narrowest tests for benchmark registry, CLI benchmark manager, MCP\ndiscovery/resources/tool handlers, and any result/explorer path touched by\nthe invariant work. Escalate to fast tests before PR submission.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run focused contract and MCP/CLI tests after invariant coverage lands",
+        "wid": "w5"
+      }
+    ]
+  }
+}

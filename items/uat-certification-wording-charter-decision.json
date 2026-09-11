@@ -1,0 +1,134 @@
+{
+  "context": "Settle the A-vs-B decision first; it gates the budget reconciliation. Then\neither reword to the chartered term or formally charter the new term — do not\nleave a third, undocumented state.\n",
+  "description": "Outcome of a 4-round adversarial architecture review of the UAT layer. The\nreview's narrowed, agreed finding distinguishes three things:\n\n  (a) Evidence/audit artifacts — CHARTERED. The spec names them by hand:\n      matrix-summary TSV, validator-clean-rate rollup, packaging with\n      explicit terminal-state, resume manifest, explorer smoke, and the\n      \"historical configs are evidence\" policy\n      (_project/specs/uat-framework.md:31,35-38,268,688). The spec also\n      self-describes as a \"release-gate orchestration layer\" (line 693).\n  (b) The WORD/PROCESS \"certification\" — NOT CHARTERED. The spec has ZERO\n      \"certif\" hits (verified). The \"Certification re-run\" section and the\n      certification-0{1,2,3}-*.yaml configs are develop-only retrofits using\n      vocabulary the charter never granted.\n  (c) The standing certification-OPERATIONS surface beyond the named\n      artifacts — NOT CHARTERED. This is the out-of-charter residue.\n\nThe critic withdrew its earlier \"invented charter\" overreach: evidence\norchestration WAS chartered. The surviving, narrower charge is the\nvocabulary/scope mismatch in (b) and (c).\n\nDecision required. Pick ONE:\n  (A) Rename the \"Certification re-run\" section + config vocabulary to the\n      spec's own term \"release-gate orchestration\" and drop the standing\n      cert-operations framing; OR\n  (B) Re-open _project/specs/uat-framework.md to explicitly charter\n      \"certification\" with scope + budget if the team wants the word/process.\n\nEither way: no standing cert-operations surface beyond the named artifacts\nuntil the spec is re-opened. The decision work unit produces exactly one\nimplementation path; the unchosen path is recorded as deferred, not left as a\npending work unit that blocks TODO completion.\n\nDIRECT COLLISION — there is already an in-progress TODO,\n[[uat-certification-rerun-ordering-and-gate]] (Medium-High, In Progress),\nthat institutionalizes exactly the certification re-run runbook + approval\ngate this item questions the charter of. The A-vs-B decision (w1) MUST be\nreconciled with that item: path B legitimizes it (charter the term + its\noperations); path A means its \"certification\" vocabulary should be reworded\nto \"release-gate orchestration.\" Do not let the two diverge — settle the\ncharter, then align that TODO's wording/scope to the outcome.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-certification-wording-charter-decision",
+        "id": 501,
+        "reason": "Only if path B is chosen and the team wants an operations process; out of scope for the wording reset.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: uat-certification-wording-charter-decision (DONE) recorded Path A (release-gate vocabulary; do NOT charter certification). The SOP/runbook was conditional on Path B, which was rejected, so the condition will not be met.",
+        "summary": "Define a formal certification SOP/runbook"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-certification-wording-charter-decision",
+        "id": 502,
+        "reason": "The A-vs-B decision is intentionally exclusive; the unchosen path must not remain pending work.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Reason explicitly states the A-vs-B charter decision is intentionally exclusive; the unchosen path must not remain pending work.",
+        "summary": "Execute the charter path not selected in w1"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2026-05-31T00:00:00Z",
+      "worktree": "main"
+    },
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/planning/uat-certification-rerun-ordering-and-gate.yaml — reconcile the existing in-progress certification runbook with the selected vocabulary",
+        "decision": "reuse",
+        "item_id": "uat-certification-wording-charter-decision",
+        "path": "_project/TODO/main/planning/uat-certification-rerun-ordering-and-gate.yaml"
+      },
+      {
+        "concept": "_project/specs/uat-framework.md:691-696 — reuse the existing release-gate orchestration wording unless certification is explicitly chartered",
+        "decision": "reuse",
+        "item_id": "uat-certification-wording-charter-decision",
+        "path": "_project/specs/uat-framework.md:691-696"
+      },
+      {
+        "concept": "docs/operations/uat-framework.md Certification re-run section — reword or charter this current operations surface, do not create a third term",
+        "decision": "reuse",
+        "item_id": "uat-certification-wording-charter-decision",
+        "path": "docs/operations/uat-framework.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-certification-wording-charter-decision",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/*.py (no behavior change in this item)"
+      },
+      {
+        "item_id": "uat-certification-wording-charter-decision",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md"
+      },
+      {
+        "item_id": "uat-certification-wording-charter-decision",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-certification-wording-charter-decision",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/ (cert-named config renames, path A only)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -rni certif _project/specs/uat-framework.md docs/operations/uat-framework.md tests/uat/configs/",
+        "description": "No orphan certification vocabulary (path A) OR spec charters it (path B)",
+        "expected": "path A: zero hits in configs/docs; path B: hits only where the spec now charters the term",
+        "item_id": "uat-certification-wording-charter-decision",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-certification-wording-charter-decision",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-certification-wording-charter-decision",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-certification-wording-charter-decision",
+        "notes": "grep -i certif on _project/specs/uat-framework.md (expect empty). Inventory\nthe \"Certification re-run\" doc section, certification-0{1,2,3}-*.yaml\nconfigs, and any cert vocabulary in docs/operations/uat-framework.md.\nRecord a compact summary.\n\nRE-VALIDATION (2026-07-16): the decision has already been made AND landed.\nThis item was misfiled in DONE with a stale `status: Not Started` field and\nrestored to planning on that basis (PR #1181); the work was executed.\nEvidence:\n  - _project/specs/uat-framework.md:746-754 carries an explicit\n    \"Vocabulary (charter decision, 2026-05-31)\" block recording\n    \"Decision: Path A — use release-gate vocabulary ... do not charter a\n    standing cert-operations surface beyond the named evidence artifacts.\"\n  - The mechanical rename landed: docs/operations \"Release-gate re-run\",\n    tests/uat/configs/release-gate-0{1,2,3}-*.yaml, and\n    tests/uat/phases/report.py:release_gate_ordering_violations.\n  - Zero cert-named configs remain (`ls tests/uat/configs | grep -i cert`\n    -> none). The only surviving 'certif' hit is the historical-record\n    sentence inside the decision block itself, which is expected under\n    path A (it documents the rejected wording).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate: confirm zero 'certif' in the spec and inventory all certification-named surfaces",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-certification-wording-charter-decision",
+        "notes": "This is a product/scope decision — see open_questions. It must be settled\nbefore [[uat-loc-budget-reconciliation]] because chartered scope\ndetermines the budget, AND it must be reconciled with the in-progress\n[[uat-certification-rerun-ordering-and-gate]] (which builds the very\ncert-operations surface in question).\n\nDECIDED (2026-05-31, recorded in spec:746-754): Path A. \"Release-gate\norchestration\" is the chartered term; no standing cert-operations surface\nbeyond the named evidence artifacts. Path B (charter \"certification\") is\nrecorded as deferred below.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide path A (reword to release-gate) vs path B (charter certification in spec)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-certification-wording-charter-decision",
+        "notes": "If w1 chooses path A, reword the \"Certification re-run\" section and\ncert-named configs to the chartered \"release-gate orchestration\" language\nand defer path B. If w1 chooses path B, add an explicit certification\ncharter section to _project/specs/uat-framework.md defining scope and an\nLOC/operations budget, then defer path A. Keep the named evidence\nartifacts either way.\n\nDONE (path A): the \"Certification re-run\" runbook section, the\ncertification-0{1,2,3}-*.yaml configs, and the ordering helper were all\nreworded to \"release-gate\" (release-gate-0{1,2,3}-*.yaml,\nreport.py:release_gate_ordering_violations). Named evidence artifacts\npreserved. Path B recorded as deferred. NOTE: the in-progress\n[[uat-certification-rerun-ordering-and-gate]] should already reflect the\nrelease-gate vocabulary — its wording alignment is tracked there, not a\nresidual work unit of this decision item.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the selected charter outcome and record the unchosen path as deferred",
+        "wid": "w2"
+      }
+    ]
+  }
+}

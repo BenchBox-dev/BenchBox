@@ -1,0 +1,214 @@
+{
+  "description": "OBSOLETED on 2026-04-26: superseded by the single-repo migration plan\n(_project/TODO/main/planning/single-repo-migration-phase-*.yaml). The\nis_public_path predicate exists to maintain a curated public mirror of\na private repo; the migration deletes the curation apparatus entirely.\nPhase 6 of that migration explicitly removes this work item's target\ncode (workflow.py).\n\nOriginal description below preserved for historical context.\n\n---\n\nToday, \"what goes into the public repo\" is decided in two structurally different\ncode paths:\n\n1. `benchbox/release/workflow.py::get_syncable_files` (filesystem walk +\n   `_should_exclude_file`) - used by `compare_repos`, which `benchbox-sync`\n   calls for status/push/pull operations.\n2. `benchbox/release/workflow.py::prepare_public_release` (whitelist iteration\n   via `_copy_root_files` + `_copy_sources_selective`) - used by\n   `scripts/prepare_release.py`, which `automate_release.py` calls during a\n   release.\n\nBoth consult the same constants (`HOLD_BACK_PATHS`, `ALLOWED_ROOT_FILES`,\n`_SOURCES_INCLUDE_PATHS`, `DOCS_DIR_EXCLUDES`, `TESTS_DIR_EXCLUDES`,\n`GLOBAL_EXCLUDES`, `FORBIDDEN_PATTERNS`, `ALLOWED_DATA_PATHS`) but combine them\nthrough different control flow. If they ever drift, a release can ship a file\nthat `benchbox-sync status` reports as in-sync, or vice versa.\n\nGoal: extract a single `is_public_path(rel_path: Path) -> bool` predicate as\nthe source of truth for inclusion. Both code paths consult it. The predicate\nis orthogonal to `should_transform` (content rewrites) and `CLEANUP_PATTERNS`\n(post-copy cleanup) - those remain separate concerns.\n\nPlan file: /Users/joe/.claude/plans/make-a-detailed-and-dynamic-bentley.md\n(Phase A).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "collapse should_transform into is_public_path",
+        "instead": "(not specified)",
+        "item_id": "unify-public-path-curation-predicate",
+        "why": "they are orthogonal concerns (a file can be public AND require content transformation), and merging them would tangle two separate decision axes; keep them as independent predicates."
+      },
+      {
+        "dont": "remove HOLD_BACK_PATHS, ALLOWED_ROOT_FILES, or other constants",
+        "instead": "(not specified)",
+        "item_id": "unify-public-path-curation-predicate",
+        "why": "they are the data; is_public_path is just the function that combines them; keep the data tables and the function separate so the data stays grep-able."
+      },
+      {
+        "dont": "remove the parity test (w3) before w6 lands",
+        "instead": "(not specified)",
+        "item_id": "unify-public-path-curation-predicate",
+        "why": "it is the invariant that catches regressions during the multi-step refactor; remove it only when _should_exclude_file is defined in terms of is_public_path."
+      },
+      {
+        "dont": "rewrite the predicate using regex",
+        "instead": "(not specified)",
+        "item_id": "unify-public-path-curation-predicate",
+        "why": "path matching is fast and grep-able with tuple membership and Path.is_relative_to; regex would obscure intent and slow down a per-file hot path."
+      },
+      {
+        "dont": "skip the tree-diff regression check in w5",
+        "instead": "(not specified)",
+        "item_id": "unify-public-path-curation-predicate",
+        "why": "that is the load-bearing assertion that the refactor preserves behaviour; running tests alone does not catch every divergence."
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-04-26T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing tests in `tests/unit/release/test_release_sync_unit.py` and `tests/unit/test_release_exclusion_invariants.py` pass without modification.",
+        "item_id": "unify-public-path-curation-predicate"
+      },
+      {
+        "behavior": "Sync subcommand behaviour - `benchbox-sync status`, `push`, `pull` produce identical output before and after the refactor for a given source/target pair.",
+        "item_id": "unify-public-path-curation-predicate"
+      },
+      {
+        "behavior": "The `CLEANUP_PATTERNS` post-copy cleanup behaviour is unchanged. Files like .venv, .ruff_cache, node_modules continue to be stripped after copy.",
+        "item_id": "unify-public-path-curation-predicate"
+      },
+      {
+        "behavior": "The existing public-vs-private file boundary - no file currently shipped to public should be added to or removed from the public tree by this refactor. The tree-diff regression check (w5) is the load-bearing assertion.",
+        "item_id": "unify-public-path-curation-predicate"
+      },
+      {
+        "behavior": "The functions `should_transform` and `apply_transform` remain orthogonal to inclusion. Files that get transformed today must still get transformed (e.g., pyproject.toml, .gitignore, benchbox/cli/commands/__init__.py, .github/workflows/test.yml, pytest.ini, pytest-ci.ini).",
+        "item_id": "unify-public-path-curation-predicate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "unify-public-path-curation-predicate",
+        "kind": "only_modify",
+        "path_glob": "benchbox/release/workflow.py"
+      },
+      {
+        "item_id": "unify-public-path-curation-predicate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/release/test_is_public_path.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/release/test_is_public_path.py -v",
+        "description": "is_public_path tests pass",
+        "expected": "all tests pass",
+        "item_id": "unify-public-path-curation-predicate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/release tests/unit/test_release_scripts.py tests/unit/test_release_exclusion_invariants.py -v",
+        "description": "Full release-tests suite passes",
+        "expected": "all tests pass",
+        "item_id": "unify-public-path-curation-predicate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "diff -r /tmp/release-old /tmp/release-new && echo OK",
+        "description": "Tree-diff regression: prepare_release output is byte-identical before and after refactor",
+        "expected": "OK",
+        "item_id": "unify-public-path-curation-predicate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "unify-public-path-curation-predicate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "unify-public-path-curation-predicate",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "unify-public-path-curation-predicate",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "unify-public-path-curation-predicate",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "unify-public-path-curation-predicate",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "unify-public-path-curation-predicate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "unify-public-path-curation-predicate",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "unify-public-path-curation-predicate",
+        "notes": "Add the new predicate as a public function in `benchbox/release/workflow.py`.\nLogic, in order:\n  1. If rel_path.parts[0] not in ALLOWED_ROOT_FILES -> False\n  2. If matches GLOBAL_EXCLUDES glob -> False\n  3. If matches HOLD_BACK_PATHS (prefix or exact) -> False\n  4. If under docs/ and matches DOCS_DIR_EXCLUDES -> False\n  5. If under tests/ and matches TESTS_DIR_EXCLUDES -> False\n  6. If under _sources/ -> True only if rel_path matches _SOURCES_INCLUDE_PATHS\n  7. If matches FORBIDDEN_PATTERNS and not under ALLOWED_DATA_PATHS -> False\n  8. Otherwise -> True\nReuse existing helpers `_matches_hold_back_paths`, `_matches_global_excludes`,\n`_matches_dir_specific_excludes` (workflow.py:797-843) - rename to\n`_check_*` for clarity if helpful, but do not duplicate logic.\nAdd to `__all__` at workflow.py:1275.\nDo NOT yet change any callers - this work unit is additive only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add is_public_path() to workflow.py with composition logic",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-public-path-curation-predicate",
+        "notes": "Create `tests/unit/release/test_is_public_path.py`. Use a table-driven\nstyle (parametrize) with at least these representative cases:\n  - benchbox/__init__.py -> True\n  - benchbox/release/workflow.py -> False (HOLD_BACK_PATHS)\n  - release/notes.md -> False (HOLD_BACK_PATHS top-level)\n  - _sources/tpc-h/queries/q1.sql -> True\n  - _sources/tpc-h/data/junk.tbl -> False (FORBIDDEN_PATTERNS)\n  - tests/databases/foo.py -> False (TESTS_DIR_EXCLUDES)\n  - docs/_build/index.html -> False (DOCS_DIR_EXCLUDES)\n  - benchbox/__pycache__/x.pyc -> False (GLOBAL_EXCLUDES)\n  - .DS_Store anywhere -> False\n  - top-level random/foo.py -> False (not in ALLOWED_ROOT_FILES)\n  - examples/quickstart.py -> True\nRun `uv run -- python -m pytest tests/unit/release/test_is_public_path.py -v`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add table-driven unit tests for is_public_path",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-public-path-curation-predicate",
+        "notes": "Transitional invariant test - kept for one release cycle then removed.\nFor every file in the source repo (walk from project root, skip .git/),\nassert `is_public_path(rel) == (not _should_exclude_file(rel))`.\nGoal: catch regressions during the refactor in w5.\nAdd to `tests/unit/release/test_is_public_path.py` as a separate test\nfunction (not parametrized over individual paths - one test, one walk).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add parity test: is_public_path agrees with _should_exclude_file across the live repo",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-public-path-curation-predicate",
+        "notes": "Assert `set(get_syncable_files(source)) == {rel for rel in walk(source)\nif is_public_path(rel)}`. This is the integration check that the new\npredicate is congruent with the existing sync-side filter.\nPlace in `tests/unit/release/test_is_public_path.py`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add equivalence test: get_syncable_files matches the is_public_path filter",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-public-path-curation-predicate",
+        "notes": "Rewrite `_copy_root_files` (workflow.py ~414) to walk the source tree and\ncopy each path where `is_public_path(rel)` is True. Drops the bespoke\nper-dir exclude branching.\nCollapse `_copy_sources_selective` (~323) into the same walk - the\n`_sources/` case is already handled by `is_public_path` via\n`_SOURCES_INCLUDE_PATHS`. Remove `_copy_sources_selective` if no longer\nreferenced.\nCritical regression check (run BEFORE committing):\n  # On main:\n  uv run python scripts/prepare_release.py /tmp/release-old --source . \\\n    --version 0.0.0-test --no-clean\n  # On this branch:\n  uv run python scripts/prepare_release.py /tmp/release-new --source . \\\n    --version 0.0.0-test --no-clean\n  diff -r /tmp/release-old /tmp/release-new\nMUST produce zero diff. If non-empty, debug before continuing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Refactor prepare_public_release to walk-and-filter via is_public_path",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-public-path-curation-predicate",
+        "notes": "Change `_should_exclude_file` to a one-liner:\n  def _should_exclude_file(rel_path): return not is_public_path(rel_path)\nOr remove it and update callers to use `is_public_path` directly.\nThen remove the parity test added in w3 (no longer meaningful when\n_should_exclude_file is defined in terms of is_public_path).\nRun full release-tests suite to confirm green.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reduce _should_exclude_file to a thin wrapper and remove the parity test",
+        "wid": "w6"
+      }
+    ]
+  }
+}

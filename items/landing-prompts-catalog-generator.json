@@ -1,0 +1,354 @@
+{
+  "context": "Keep the generator small and deterministic. Use registry metadata for facts,\nYAML only for curated marketing choices and explicit exclusions, and tests\nfor cross-surface drift. Treat the browser catalog as generated page data\n(`catalog.generated.js`), not as a public API.\n",
+  "description": "Implement the data-generation and validation layer for the `/prompts/`\nlanding route after `landing-prompts-decision-gates` resolves the product\ngates.\n\nThe generator must keep the marketing prompt builder aligned with existing\nBenchBox runtime metadata without adding a new public CLI or MCP surface.\nIt should fan out from registry/platform/benchmark metadata, validate command\nshapes against existing Click command definitions where practical, and emit\na deterministic include file for the static page.\n\nMVP must not publish a standalone `recipes.json` endpoint. The generator\nemits `landing/prompts/catalog.generated.js` (a `window.__BENCHBOX_PROMPT_CATALOG__ = {...};`\nassignment) that the static route loads via a `<script>` tag. This is page\nimplementation detail, not a public API.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "copy MCP prompt bodies into catalog data",
+        "instead": "reference existing prompt/tool names and arguments.",
+        "item_id": "landing-prompts-catalog-generator",
+        "why": "`benchbox/mcp/prompts/registry.py` already owns MCP guidance"
+      },
+      {
+        "dont": "emit a fetchable `recipes.json` in MVP",
+        "instead": "emit `catalog.generated.js` as a page implementation include instead.",
+        "item_id": "landing-prompts-catalog-generator",
+        "why": "third parties can treat it as an API"
+      },
+      {
+        "dont": "hand-maintain platform capability lists in YAML",
+        "instead": "derive capabilities from the registry and use YAML only for overrides/exclusions.",
+        "item_id": "landing-prompts-catalog-generator",
+        "why": "they will drift from `PlatformRegistry`"
+      },
+      {
+        "dont": "invoke the generator with `uv run --project _project/scripts",
+        "instead": "because that env lacks `benchbox` and the script imports `PlatformRegistry`/`BENCHMARK_METADATA` - always use `uv run -- python scripts/generate_landing_quickstarts.py`.",
+        "item_id": "landing-prompts-catalog-generator",
+        "why": "...`"
+      },
+      {
+        "dont": "make cloud recipes live-run-first",
+        "instead": "make dry-run/setup-first behavior mandatory.",
+        "item_id": "landing-prompts-catalog-generator",
+        "why": "managed runs can consume money or fail on credentials"
+      },
+      {
+        "dont": "use `Server` as an internal deployment value",
+        "instead": "use `self-hosted` and map to a friendly label.",
+        "item_id": "landing-prompts-catalog-generator",
+        "why": "it is not a registry literal"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-catalog-generator",
+        "id": 320,
+        "reason": "MVP should avoid adding an unversioned public API. If this becomes a product requirement, create a separate versioned API decision.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Publishing a versioned prompt-catalog API is explicitly conditional on it becoming a stated product requirement; no such requirement exists.",
+        "summary": "Publish a documented prompt catalog JSON API"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-catalog-generator",
+        "id": 321,
+        "reason": "Out of scope; generator validates and references existing surfaces instead.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicit scope decision: generator validates/references existing surfaces rather than adding new public runtime commands.",
+        "summary": "Generate CLI/MCP prompt content by adding public runtime commands"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "needs_item": "landing-prompts-decision-gates"
+      }
+    ],
+    "item_meta": {
+      "category": "Product and Documentation",
+      "completed_at": "2026-05-13T00:00:00Z",
+      "created_at": "2026-05-13T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing platform and benchmark registries remain the source of truth; catalog YAML is not allowed to duplicate canonical metadata.",
+        "item_id": "landing-prompts-catalog-generator"
+      },
+      {
+        "behavior": "Existing root landing page and results explorer build paths continue to work.",
+        "item_id": "landing-prompts-catalog-generator"
+      },
+      {
+        "behavior": "No new public CLI commands are introduced.",
+        "item_id": "landing-prompts-catalog-generator"
+      },
+      {
+        "behavior": "No new public MCP tools are introduced.",
+        "item_id": "landing-prompts-catalog-generator"
+      },
+      {
+        "behavior": "No standalone `landing/prompts/recipes.json` or equivalent stable JSON endpoint is shipped for MVP.",
+        "item_id": "landing-prompts-catalog-generator"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/commands/compare.py:dual-mode compare command — validate repeated `-p` for platform comparison",
+        "decision": "reuse",
+        "item_id": "landing-prompts-catalog-generator",
+        "path": "benchbox/cli/commands/compare.py:dual-mode"
+      },
+      {
+        "concept": "benchbox/cli/commands/run.py:Click run command options — validate emitted run command shape",
+        "decision": "reuse",
+        "item_id": "landing-prompts-catalog-generator",
+        "path": "benchbox/cli/commands/run.py:Click"
+      },
+      {
+        "concept": "benchbox/core/benchmark_registry.py:BENCHMARK_METADATA — reuse as benchmark source of truth",
+        "decision": "reuse",
+        "item_id": "landing-prompts-catalog-generator",
+        "path": "benchbox/core/benchmark_registry.py:BENCHMARK_METADATA"
+      },
+      {
+        "concept": "benchbox/core/platform_registry.py:PlatformRegistry.get_all_platform_metadata — reuse as platform source of truth",
+        "decision": "reuse",
+        "item_id": "landing-prompts-catalog-generator",
+        "path": "benchbox/core/platform_registry.py:PlatformRegistry.get_all_platform_metadata"
+      },
+      {
+        "concept": "benchbox/mcp/prompts/registry.py:existing MCP prompt registration — reference existing prompt names where useful",
+        "decision": "reuse",
+        "item_id": "landing-prompts-catalog-generator",
+        "path": "benchbox/mcp/prompts/registry.py:existing"
+      },
+      {
+        "concept": "benchbox/mcp/tools/benchmark.py:run_benchmark tool schema — validate MCP tool guidance",
+        "decision": "reuse",
+        "item_id": "landing-prompts-catalog-generator",
+        "path": "benchbox/mcp/tools/benchmark.py:run_benchmark"
+      },
+      {
+        "concept": "scripts/check_example_syntax.py:existing --check style root script — reuse CLI shape and exit semantics",
+        "decision": "reuse",
+        "item_id": "landing-prompts-catalog-generator",
+        "path": "scripts/check_example_syntax.py:existing"
+      },
+      {
+        "concept": "scripts/generate_changelog_entry.py:existing root generator pattern — match invocation style `uv run -- python scripts/...` (NOT `--project _project/scripts`)",
+        "decision": "reuse",
+        "item_id": "landing-prompts-catalog-generator",
+        "path": "scripts/generate_changelog_entry.py:existing"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/prompts/"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/tools/"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/index.html"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/prompts.css"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/prompts.js"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.generated.js"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.yaml"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_landing_quickstarts.py"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/landing/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/generate_landing_quickstarts.py --check",
+        "description": "Generator check reports generated catalog is current",
+        "expected": "exit 0",
+        "item_id": "landing-prompts-catalog-generator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f landing/prompts/catalog.generated.js && rg -n 'window.__BENCHBOX_PROMPT_CATALOG__' landing/prompts/catalog.generated.js",
+        "description": "Generated include file exists with the expected assignment",
+        "expected": "exit 0; assignment present",
+        "item_id": "landing-prompts-catalog-generator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/landing/test_landing_quickstarts.py -q",
+        "description": "Focused catalog tests pass",
+        "expected": "all tests pass",
+        "item_id": "landing-prompts-catalog-generator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! test -f landing/prompts/recipes.json",
+        "description": "No standalone recipes JSON file was added",
+        "expected": "exit 0",
+        "item_id": "landing-prompts-catalog-generator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "landing-prompts-catalog-generator",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-catalog-generator",
+        "notes": "Before coding, read `_project/decisions/landing-prompts-route.md`.\nConfirm chosen public label, default agent, default surface, analytics\nposture, cloud safety policy, generic-agent semantics, and JSON/API\nposture. If the decision record is missing or incomplete, stop and\nreturn to `landing-prompts-decision-gates`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Read the landing prompts decision record and confirm implementation boundaries",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-catalog-generator",
+        "notes": "Define a compact catalog structure that stores registry keys internally:\nagents, surfaces, goals, deployment modes, platforms, benchmarks, scale\noptions, warnings, command templates, and MCP references. Use\n`local`, `self-hosted`, and `managed` internally. UI labels may be\nfriendlier.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design the minimal catalog schema with registry-backed keys",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-catalog-generator",
+        "notes": "The generator lives at root `scripts/generate_landing_quickstarts.py`\nand runs in the main project environment (so it can `import benchbox`):\n`uv run -- python scripts/generate_landing_quickstarts.py ...`. The\n`_project/scripts/` env does NOT contain benchbox; do not use\n`--project _project/scripts` for this script.\n\nIt should read a small source file at `landing/prompts/catalog.yaml`,\nimport `PlatformRegistry` and `BENCHMARK_METADATA`, inspect existing\nCLI/MCP anchors, and emit a single deterministic include file at\n`landing/prompts/catalog.generated.js` that assigns\n`window.__BENCHBOX_PROMPT_CATALOG__ = {...};`. The static-route page\nwill load this include via a `<script>` tag. Do NOT write to\n`landing/prompts/index.html`; the static-route TODO owns that file.\nDo NOT emit a separate fetchable JSON file (see anti_patterns).\n\nSupport `--write` (regenerate the include), `--check` (fail nonzero if\nregeneration would change the file), and `--validate-only` (validate\nsource YAML without writing).\n\nThe source YAML should describe patterns and curated marketing choices,\nnot enumerate every derived platform recipe by hand.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement scripts/generate_landing_quickstarts.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-catalog-generator",
+        "notes": "Add validation that fails when:\n- a platform ID is not in `PlatformRegistry`\n- a benchmark ID is not in `BENCHMARK_METADATA`\n- a deployment mode is not `local`, `self-hosted`, or `managed`\n- a DataFrame recipe selects a SQL-only platform\n- a SQL recipe selects a DataFrame-only platform without deliberate mode handling\n- a compare recipe lacks repeated `-p/--platform` arguments\n- an MCP recipe references a non-existent MCP prompt or tool\n- a managed cloud recipe lacks dry-run-first and no-secret warnings\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate platform, benchmark, deployment, CLI, and MCP references",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-catalog-generator",
+        "notes": "Add `tests/unit/landing/test_landing_quickstarts.py` with explicit\n`pytest.mark.fast` and `pytest.mark.unit`. Tests must cover deterministic\nregeneration, registry coverage or explicit exclusions, command parsing\nwhere practical, MCP reference validation, and cloud safety assertions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add focused generator and catalog tests",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-catalog-generator",
+        "notes": "Prefer a small Make target `prompt-quickstarts-check` that invokes\n`uv run -- python scripts/generate_landing_quickstarts.py --check`,\nfollowing the convention of other generator/check targets in `Makefile`\n(e.g. `scripts/check_complexity.py`, `scripts/check_example_syntax.py`).\nIf a Make target is not added, document the exact invocation in\n`AGENTS.md` and the launch-gates TODO so CI can call it directly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a make target or documented command for stale generated catalog detection",
+        "wid": "w6"
+      }
+    ]
+  }
+}

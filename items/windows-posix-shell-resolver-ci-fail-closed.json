@@ -1,0 +1,120 @@
+{
+  "context": "Centralize the unavailable-shell policy behind a helper that distinguishes supported Windows absence from contract violations. Unit-test the policy by monkeypatching os.name/CI inputs and posix_shell() without depending on the host shell. Keep the probe script's bash-specific features unchanged.",
+  "description": "The verified-shell resolver correctly rejects the Windows WSL launcher and /bin/sh implementations that cannot execute the bashisms used by workflow fragments. However skip_without_posix_shell() and requires_posix_shell() currently turn a resolver regression into a green skip even on Linux/macOS, where repository CI is required to provide bash. Preserve a narrow skip only for Windows hosts with no verified Git-for-Windows bash; fail with an actionable message on POSIX and in CI environments where bash is part of the runner contract.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Apply a module-level skip to mixed test modules",
+        "instead": "Retain call-site granularity for shell-executing helpers.",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed",
+        "why": "That would hide YAML and regex assertions that require no shell."
+      },
+      {
+        "dont": "Relax the probe to POSIX sh syntax",
+        "instead": "Keep the bash capability probe and change only the no-shell disposition.",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed",
+        "why": "The tested workflow fragments use set -o pipefail and here-strings."
+      }
+    ],
+    "item_meta": {
+      "category": "CI soundness",
+      "created_at": "2026-08-01T14:01:50Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "/bin/sh or dash remains rejected because workflow fragments require bash semantics.",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed"
+      },
+      {
+        "behavior": "C:\\Windows\\System32\\bash.exe remains rejected.",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed"
+      },
+      {
+        "behavior": "Windows contributors without Git Bash may skip only shell-executing tests, not unrelated tests.",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utilities/test_posix_shell.py"
+      },
+      {
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed",
+        "kind": "only_modify",
+        "path_glob": "tests/utilities/posix_shell.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/utilities/test_posix_shell.py -q",
+        "description": "Resolver policy tests pass",
+        "expected": "exit 0",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/test_release_infrastructure.py tests/unit/workflows/test_validate_submission_changed_bundles.py -q",
+        "description": "Representative workflow shell-contract tests still execute",
+        "expected": "exit 0",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed",
+        "notes": "Cover Windows/no shell -> pytest.skip, POSIX/no shell -> pytest.fail or RuntimeError, and CI/no required shell -> fail.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add host-independent tests for skip versus fail-closed policy",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed",
+        "notes": "requires_posix_shell and skip_without_posix_shell must agree; error text must identify BENCHBOX_TEST_POSIX_SHELL.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement the explicit unavailable-shell policy in both helper APIs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run resolver tests and representative workflow shell-contract tests",
+        "wid": "w2"
+      }
+    ]
+  }
+}

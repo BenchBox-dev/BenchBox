@@ -1,0 +1,137 @@
+{
+  "context": "Reduce hero vertical cost at desktop and wide breakpoints so at least two leaderboard rows fall above the fold, or re-baseline the budget only with an explicit recorded product rationale. Fix the layout first; treat a budget change as a last resort that needs sign-off.",
+  "description": "Newly discovered 2026-08-03 and previously invisible. responsive.spec.ts sets test.describe.configure serial mode (line 35), so the stale-headline failure aborted the block before the remaining viewports ran. With the headline corrected locally, Chromium reports two real failures: 'home keeps headline, cohort summary, and leaderboard rows high in the viewport at desktop' and 'at wide', both failing responsive.spec.ts:81 with Expected >= 2, Received 1. Mobile and tablet pass. Only one leaderboard row now lands above the fold at large viewports, against a budget of two. Most likely cause is the taller hero introduced by #1482, which added ActiveLeaderboardSummary above the rows.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "needs_item": "explorer-home-skeleton-h1-parity-20260803"
+      }
+    ],
+    "item_meta": {
+      "category": "Explorer UI regression",
+      "created_at": "2026-08-03T23:35:01Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Mobile and tablet above-the-fold behaviour keeps passing",
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803"
+      },
+      {
+        "behavior": "The curated-preview headline and ActiveLeaderboardSummary both remain present",
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803"
+      },
+      {
+        "behavior": "The desktop above-fold budget stays at two rows unless a recorded decision changes it",
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/**"
+      },
+      {
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -q -F \"MIN_HOME_ROWS_ABOVE_FOLD_DESKTOP = 2\" results-explorer/e2e/responsive.spec.ts",
+        "description": "Desktop above-fold budget was not silently lowered",
+        "expected": "Exit 0 while the budget remains two rows",
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --workers=1 --retries=0 e2e/responsive.spec.ts --grep \"high in the viewport\"",
+        "description": "Home viewport test passes at every viewport including desktop and wide",
+        "expected": "All four viewports pass, not just mobile and tablet",
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --workers=1 --retries=0 e2e/responsive.spec.ts",
+        "description": "Full responsive spec passes with no silently skipped tests",
+        "expected": "Zero failures and zero did-not-run entries",
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Measure hero height contribution at desktop and wide against the fold",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reduce hero vertical cost so two rows clear the fold",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-home-abovefold-desktop-wide-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-run all four viewports and confirm no regression at mobile or tablet",
+        "wid": "w2"
+      }
+    ]
+  }
+}

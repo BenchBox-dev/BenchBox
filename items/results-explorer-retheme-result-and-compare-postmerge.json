@@ -1,0 +1,211 @@
+{
+  "description": "PR #269 (`fix(explorer): address retheme release audit gaps`) was authored\non a base where Result Detail and Compare were already tokenized. PR #268\n(`fix/pr246 result compare evidence`) merged onto develop ~1 hour earlier\nand introduced a new literal-styled Result summary panel, ResultMetricCard\nhelper, and Compare guardrails section. The PR #269 squash kept #268's\nliteral-styled sections, so the merged tree on develop carried a tokenization\ngap that the PR #269 release-readiness report did not flag (it was generated\nagainst the PR branch, not the post-merge tree).\n\nThis follow-up retokenizes the regressed surfaces against the develop tip\nand extends the cleanup to the remaining literal-color sites surfaced by a\nfull Tailwind palette scan over `results-explorer/src`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "mark the retheme ready against a tree the report was not generated from.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "replace tokenized surfaces with raw Tailwind palette literals during merge resolution.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "skip the develop-tip token scan on retheme follow-ups.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "needs_item": "results-explorer-retheme-result-and-compare"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Compare route share URL contract and severe-mismatch suppression text.",
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge"
+      },
+      {
+        "behavior": "QueryDiffTable suppression copy and BenchmarkIndex matrix/rank error copy.",
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge"
+      },
+      {
+        "behavior": "Result detail route `/results/r/{result_id}` and visible heading.",
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge"
+      },
+      {
+        "behavior": "TrustBadge / ValidationBadge / TuningBadge / curated visibility surfaces.",
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/planning/results-explorer-retheme-result-and-compare-postmerge.yaml"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-token-scan-ci-gate.yaml"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/FacetRail.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/PercentileLadder.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryDiffTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -rE '\\b(text|bg|border|ring|divide|placeholder|fill|stroke|outline|shadow)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(50|100|200|300|400|500|600|700|800|900|950)\\b' results-explorer/src || echo CLEAN",
+        "description": "Token scan returns zero raw Tailwind palette literals",
+        "expected": "CLEAN",
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Compare.test.tsx src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx src/components/__tests__/QueryDiffTable.test.tsx",
+        "description": "Targeted unit tests for retokenized components pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run build",
+        "description": "Typecheck and build are clean",
+        "expected": "no errors",
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "notes": "Outcome: `<section aria-label=\"Result summary\">` switched from\n`rounded-xl border border-gray-200 bg-white p-5 shadow-sm` to\n`panel-elevated p-5`, the curated visibility chip uses `<StatusBadge\nrole=\"visibility\" tone=\"success\">`, and headings/body copy use the\n`--bb-data-fg-primary`/`--bb-data-fg-muted` tokens. `ResultMetricCard`\nmoved from `border-gray-100 bg-gray-50 text-gray-500/900` to\n`panel-muted` with `--bb-data-fg-subtle`/`primary`/`muted` tokens.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retokenize Result Detail Result-summary panel and ResultMetricCard helper",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "notes": "Outcome: `<CompareGuardrailSummary>` switched from\n`rounded-lg border border-gray-200 bg-white p-4 shadow-sm` plus\n`badge badge-yellow|badge-green` to `panel-elevated p-4` with a\n`<StatusBadge role=\"comparison\" tone=\"warning|success\">`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retokenize Compare guardrails section",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "notes": "Outcome: QueryDiffTable suppression callout and BenchmarkIndex matrix/rank\nerror callouts switched to `tone-warning` + `--bb-data-border`.\nNormalizedSpeedupChart empty-state panel now uses `panel-muted` and\nforeground tokens. PercentileLadder SVG `<text>` fills moved to\n`fill-[var(--bb-data-fg-{subtle,muted,primary})]`. MetaLeaderboard\nrank=1 highlight switched from `text-green-700` to\n`text-[var(--bb-tone-success-fg)]`. FacetRail mobile drawer apply/reset\nbuttons moved to shared `btn btn-primary`/`btn btn-secondary` and the\ndivider border now uses `--bb-data-border`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retokenize remaining literal-color callouts and chart text",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "notes": "Outcome: index.css `@media (max-width: 47.999rem)` now carries an\ninline comment explaining that var() and calc() are not valid in @media\nqueries, so this literal must stay aligned with `--bb-bp-mobile: 48rem`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Comment the @media breakpoint literal so it stays in sync with --bb-bp-mobile",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-result-and-compare-postmerge",
+        "notes": "Outcome: `grep -rE '\\\\b(text|bg|border|ring|divide|placeholder|fill|stroke|outline|shadow)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(50|100|200|300|400|500|600|700|800|900|950)\\\\b' results-explorer/src` returns zero matches at this branch tip. Codified into\na follow-up CI gate TODO (`results-explorer-token-scan-ci-gate`).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify token scan is empty across results-explorer/src",
+        "wid": "w5"
+      }
+    ]
+  }
+}

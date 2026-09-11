@@ -1,0 +1,331 @@
+{
+  "context": "Close the gap between semantic parity and visual parity. Prefer one shared\nclass/asset contract for all surfaces; when that is impossible, make the\nmirror explicit and test it with bounding-box and screenshot/DOM assertions.\nTreat the parity test as the release gate that prevents future drift.\n",
+  "description": "The visible global header on Results now has the same major labels as the\nlanding/docs/blog header, but the implementation is still structurally\nseparate: landing/docs/prompts consume the shared static `benchbox-site-header`\ncontract, while Results renders a hand-built Preact/Tailwind header in\n`results-explorer/src/components/Layout.tsx`. Current tests assert labels,\ndestinations, and basic mobile behavior, but they do not prove pixel or DOM\nparity with the landing header.\n\nThe root cause is that \"identical header\" was verified semantically instead\nof visually and structurally. This leaves the same blind spot that caused the\noriginal complaint: Results can drift in height, spacing, active underline,\ntheme toggle placement, CTA styling, focus rings, or mobile menu behavior\nwhile every label-based test remains green.\n\nThis TODO should create a durable cross-surface header parity gate. The\npreferred implementation is for Results to consume a generated/shared header\ncontract or a deliberately tested mirror of the shared static header. If a\nsingle shared runtime component is not practical because Results is a Vite\napp and landing/docs are static/Sphinx surfaces, the PR must document that\nconstraint and add a parity test strong enough to catch visual drift.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "commit broad screenshot batches outside the established visual-test artifact path.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "create another independent header stylesheet for Results without a parity gate.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make the header identical only in dark mode; parity must hold in both light and dark themes.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "move Results subnav links into the global header to make tests easier.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "rely only on link-label tests; they already missed spacing and visual-contract drift.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-global-header-visual-parity-gate",
+        "id": 482,
+        "reason": "This TODO is scoped to the shared global header; broader page visual diffs belong in a separate release-gate TODO.",
+        "resolution": "promoted",
+        "resolved_item": "full-public-site-visual-regression-suite",
+        "resolved_reason": null,
+        "summary": "Full public-site visual regression suite"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-global-header-visual-parity-gate",
+        "id": 483,
+        "reason": "The secondary Results nav is intentionally separate from global-header parity.",
+        "resolution": "promoted",
+        "resolved_item": "rework-results-secondary-navigation-information-architecture",
+        "resolved_reason": null,
+        "summary": "Rework Results secondary navigation information architecture"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-15T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Results keeps its secondary `Leaderboards / Benchmarks / Platforms / Compare / Query` nav outside the global header.",
+        "item_id": "results-explorer-global-header-visual-parity-gate"
+      },
+      {
+        "behavior": "Static landing/docs/blog deployment does not gain a hard dependency on the Results Vite bundle.",
+        "item_id": "results-explorer-global-header-visual-parity-gate"
+      },
+      {
+        "behavior": "The global header is identical between landing, docs/blog, prompts, and Results at the user-visible level.",
+        "item_id": "results-explorer-global-header-visual-parity-gate"
+      },
+      {
+        "behavior": "The header remains keyboard navigable with visible focus in light and dark themes.",
+        "item_id": "results-explorer-global-header-visual-parity-gate"
+      },
+      {
+        "behavior": "Theme selection and persistence continue to work in the header.",
+        "item_id": "results-explorer-global-header-visual-parity-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/planning/benchbox-site-header-unification.yaml:w5 — completed TODO that required cross-surface parity tests",
+        "decision": "reuse",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "path": "_project/DONE/main/planning/benchbox-site-header-unification.yaml:w5"
+      },
+      {
+        "concept": "docs/_templates/page.html — docs/blog header template integration",
+        "decision": "reuse",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "path": "docs/_templates/page.html"
+      },
+      {
+        "concept": "landing/index.html — landing header consumer and canonical first-viewport behavior",
+        "decision": "reuse",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "path": "landing/index.html"
+      },
+      {
+        "concept": "landing/shared/site-header.css — shared static header style contract used outside Results",
+        "decision": "reuse",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "path": "landing/shared/site-header.css"
+      },
+      {
+        "concept": "prompts/index.html — additional public surface using the shared header contract",
+        "decision": "reuse",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "path": "prompts/index.html"
+      },
+      {
+        "concept": "results-explorer/e2e/routes/header.spec.ts — current semantic header coverage",
+        "decision": "reuse",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "path": "results-explorer/e2e/routes/header.spec.ts"
+      },
+      {
+        "concept": "results-explorer/src/components/Layout.tsx — current Preact header implementation that can drift from shared static markup",
+        "decision": "reuse",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "path": "results-explorer/src/components/Layout.tsx"
+      },
+      {
+        "concept": "results-explorer/src/components/__tests__/Layout.test.tsx — current Layout/header unit coverage",
+        "decision": "reuse",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "path": "results-explorer/src/components/__tests__/Layout.test.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/corpus.ts"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/_static/"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/_templates/"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "only_modify",
+        "path_glob": "landing/index.html"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "only_modify",
+        "path_glob": "landing/shared/"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "only_modify",
+        "path_glob": "landing/style.css"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "only_modify",
+        "path_glob": "prompts/"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/header.spec.ts"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/Layout.tsx"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/Layout.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/components/__tests__/Layout.test.tsx && npx playwright test --project=chromium --workers=1 e2e/routes/header.spec.ts",
+        "description": "Header unit and route tests pass",
+        "expected": "Layout/header tests pass and include cross-surface parity assertions where the harness supports them",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'benchbox-site-header|site-header|Run benchmark|Instruct an agent|theme' landing docs prompts results-explorer/src/components/Layout.tsx results-explorer/e2e/routes/header.spec.ts",
+        "description": "Header source no longer has untested independent contracts",
+        "expected": "Output shows Results either consumes the shared class contract or has an explicit tested mirror",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Results Explorer still builds",
+        "expected": "Vite build succeeds",
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "notes": "Compare:\n- `landing/shared/site-header.css`;\n- `landing/index.html`;\n- `docs/_templates/page.html`;\n- `prompts/index.html`;\n- `results-explorer/src/components/Layout.tsx`;\n- existing header tests under `results-explorer/e2e/routes/header.spec.ts`\n  and `results-explorer/src/components/__tests__/Layout.test.tsx`.\n\nCapture a compact matrix in the PR covering class names, header height,\nmax width, padding, link order, CTA treatment, active state, theme toggle,\nfocus-visible treatment, and mobile behavior. Include whether each surface\nconsumes the shared static contract or manually mirrors it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory the rendered and source-level header contract across landing, docs, blog, prompts, and Results",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "notes": "Decision gate: choose one strategy before editing:\n- Strategy A: Results imports shared header CSS/assets and renders markup\n  that uses the same `benchbox-site-header` class contract.\n- Strategy B: Results keeps a Preact wrapper but renders a generated or\n  test-enforced mirror of the same class contract.\n- Strategy C: Results cannot consume the class contract; document why and\n  add screenshot/perceptual parity tests across surfaces.\n\nStrategy A is preferred if it can be done without breaking Vite, static\ndeployment, or theme initialization. Strategy C is acceptable only with a\nclear technical reason and strong visual regression coverage.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose the implementation strategy for Results header parity",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "notes": "Update `results-explorer/src/components/Layout.tsx` and related styles so\nResults no longer invents untested local header spacing, CTA treatment, or\ntheme toggle placement. Keep the Results secondary nav separate below the\nglobal header with its own aria label and active-state tests.\n\nPreserve the SPA routing behavior and current theme toggle behavior. Do\nnot move Results-specific navigation items into the global header.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align Results global header markup/classes or add an explicit tested mirror",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "notes": "Extend browser coverage so it compares the global header on:\n- landing `/`;\n- docs `/docs/` if locally served in the test harness;\n- blog `/blog/` if locally served in the test harness;\n- prompts `/prompts/` if that surface remains public;\n- Results `/results/`.\n\nAssert at minimum:\n- identical visible global labels and order;\n- identical CTA label and target;\n- identical active-link semantics for current page;\n- identical theme-toggle placement/accessible label;\n- matching header bounding-box height within a very small tolerance;\n- no Results secondary-nav nodes inside the global header.\n\nAdd screenshots or DOM snapshots only if they are kept as stable test\nartifacts and do not commit large raw evidence outside the established\nsnapshot path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add cross-surface desktop and mobile header parity tests",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-global-header-visual-parity-gate",
+        "notes": "Verify the parity gate in `light`, `dark`, and `system` when the harness\ncan control `prefers-color-scheme`. Confirm that the header remains\nvisually identical across surfaces after switching theme and after a page\nreload that restores persisted theme state.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run parity checks in both light and dark themes",
+        "wid": "w4"
+      }
+    ]
+  }
+}

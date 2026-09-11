@@ -1,0 +1,10 @@
+{
+  "description": "The CLI supports `--force all|datagen|upload` to force regeneration of data\nor re-upload to cloud storage. This is not accessible from the interactive\nwizard.\n\nUsers need force options when:\n1. Testing data generation changes\n2. Recovering from interrupted runs\n3. Forcing re-upload after cloud storage changes\n4. Regenerating data with different compression",
+  "legacy": {
+    "item_meta": {
+      "category": "User Experience",
+      "created_at": "2025-12-21T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

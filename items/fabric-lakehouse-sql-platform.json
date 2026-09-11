@@ -1,0 +1,713 @@
+{
+  "description": "Integrate Microsoft Fabric Lakehouse SQL Analytics Endpoint as a read-only SQL\nquery platform for benchmarking pre-loaded Delta Lake tables.\n\n**Critical Architectural Constraint**:\nThe Lakehouse SQL Analytics Endpoint is READ-ONLY. This is a fundamental Fabric\ndesign choice, not a BenchBox limitation:\n- NO DDL: Cannot CREATE TABLE, DROP TABLE, ALTER TABLE\n- NO DML: Cannot INSERT, UPDATE, DELETE, MERGE\n- QUERY ONLY: SELECT statements only\n\n**Data Loading Requirement**:\nData MUST be loaded via Microsoft Fabric Spark Notebooks (see related TODO:\nfabric-spark-notebooks-platform.yaml). The workflow is:\n1. Use Fabric Spark to load data into Lakehouse Delta tables\n2. Use this adapter to benchmark query performance via SQL endpoint\n\nThis is a valid benchmarking pattern for:\n- Measuring query-only performance (common for BI/reporting workloads)\n- Comparing Lakehouse SQL endpoint vs Fabric Warehouse performance\n- Testing Delta Lake query optimization (V-Order, Z-Order effects)\n\nThe adapter will explicitly validate the read-only constraint and fail fast\nwith helpful error messages if users attempt write operations.\n\nTechnical characteristics:\n- T-SQL dialect (subset compatible with Synapse/SQL Server)\n- TDS protocol via pyodbc (same as Fabric Warehouse)\n- Entra ID authentication only\n- Automatic Delta Lake to SQL type mapping\n- OneLake-backed storage (transparent to queries)\n\nReference: fabric_warehouse.py:14-30 documents this limitation explicitly:\n\"Lakehouse: SQL Analytics Endpoint is READ-ONLY (not supported)\"\nThis adapter provides READ-ONLY support as a deliberate feature.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_item": "fabric-spark-notebooks-platform"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-19T00:00:00Z",
+      "created_at": "2026-01-12T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "work_needs": [
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w6",
+        "wid": "w10"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w11",
+        "wid": "w13"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w11",
+        "wid": "w14"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w15",
+        "wid": "w16"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w15",
+        "wid": "w17"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w15",
+        "wid": "w18"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w19",
+        "wid": "w20"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w19",
+        "wid": "w21"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w19",
+        "wid": "w22"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w23",
+        "wid": "w24"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w23",
+        "wid": "w25"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w26",
+        "wid": "w27"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w26",
+        "wid": "w28"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w26",
+        "wid": "w29"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w30",
+        "wid": "w31"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w30",
+        "wid": "w32"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w33",
+        "wid": "w34"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w33",
+        "wid": "w35"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w36",
+        "wid": "w37"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w36",
+        "wid": "w38"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w36",
+        "wid": "w39"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w40",
+        "wid": "w41"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w40",
+        "wid": "w42"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w43",
+        "wid": "w44"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w43",
+        "wid": "w45"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w43",
+        "wid": "w46"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w43",
+        "wid": "w47"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "fabric-lakehouse-sql-platform",
+        "needs_wid": "w6",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create benchbox/platforms/fabric_lakehouse.py adapter",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create helpful error messages pointing to Fabric Spark",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement query execution",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement execute_query() for SELECT statements",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle result set parsing and row counting",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement query timeout handling",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement table discovery and validation",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Query INFORMATION_SCHEMA to discover available tables",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate expected benchmark tables exist before run",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Report table row counts for verification",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement skip-load workflow support",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement FabricLakehouseAdapter inheriting from PlatformAdapter",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add --skip-load flag handling (load phase becomes no-op)",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate data exists when load is skipped",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the Spark-first, SQL-query workflow",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement schema compatibility checking",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Compare discovered schema against benchmark expectations",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Warn on schema mismatches (column types, missing columns)",
+        "wid": "w25"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement platform info collection",
+        "wid": "w26"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture SQL endpoint version information",
+        "wid": "w27"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Report Delta Lake table metadata (V-Order status, etc.)",
+        "wid": "w28"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document capacity/region information",
+        "wid": "w29"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set _dialect = 'tsql' for SQLGlot transpilation",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement query plan capture",
+        "wid": "w30"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Use SET SHOWPLAN_TEXT ON for explain plans",
+        "wid": "w31"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Parse and format execution plans",
+        "wid": "w32"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add result cache handling",
+        "wid": "w33"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document cache behavior (may not be controllable)",
+        "wid": "w34"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement cache-clearing if supported",
+        "wid": "w35"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create unit tests",
+        "wid": "w36"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test read-only enforcement (DDL/DML rejection)",
+        "wid": "w37"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test connection string building",
+        "wid": "w38"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test query execution mocking",
+        "wid": "w39"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Entra ID authentication (reuse from fabric_warehouse.py)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create integration tests",
+        "wid": "w40"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test against pre-loaded Fabric Lakehouse",
+        "wid": "w41"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document test data setup via Fabric Spark",
+        "wid": "w42"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create documentation",
+        "wid": "w43"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create docs/platforms/fabric-lakehouse.md",
+        "wid": "w44"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the two-phase workflow (Spark load → SQL query)",
+        "wid": "w45"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Explain Lakehouse vs Warehouse differences clearly",
+        "wid": "w46"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add troubleshooting for common read-only errors",
+        "wid": "w47"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build Lakehouse SQL endpoint connection string",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement read-only enforcement",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Override create_schema() to raise ReadOnlyPlatformError",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Override load_data() to raise ReadOnlyPlatformError with guidance",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-lakehouse-sql-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement query validation to reject DDL/DML statements",
+        "wid": "w9"
+      }
+    ]
+  }
+}

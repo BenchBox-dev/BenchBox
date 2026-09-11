@@ -1,0 +1,10 @@
+{
+  "description": "The CLI supports `--seed <int>` for reproducible query parameter generation, which\nis critical for:\n1. Reproducible benchmark runs\n2. Official TPC-compliant benchmarks\n3. Performance regression testing\n4. Comparing results across different runs\n\nThe interactive wizard passes seed=None, making benchmark results non-reproducible.",
+  "legacy": {
+    "item_meta": {
+      "category": "User Experience",
+      "created_at": "2025-12-21T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "context": "Lint-time resolution against the current tree. A literal path that matches nothing may be a planned new file - keep that legal (warn only for globs with wildcards matching nothing, or literal paths whose PARENT directory does not exist, or names that are a near-miss of an existing file). Conservative warn-level findings.",
+  "description": "Successor of todo-lint-unresolvable-scope-and-ladder-paths (dropped 2026-07-31). The predecessor had the same two defects as its sibling: (1) its rung invoked lint via `uv run -- python _project/scripts/todo_db.py`, which runs in the root venv without libsql and cannot execute against the hosted backend at all (exits 1 with an import error regardless of lint behavior); (2) its w3 promised tests but only_modify named only todo_db.py. Premise (re-validated 2026-07-31 against the hosted DB): the done item motherduck-token-leak-via-chained-cause has only_modify tests/unit/platforms/test_motherduck_adapter.py, which does not exist (the real file is tests/unit/platforms/test_motherduck.py), and `todo lint` reports 0 findings. lint should resolve only_modify/do_not_modify globs against the working tree and report ones matching nothing, and do the same for file-path arguments inside verification commands.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "completed_at": "2026-08-01T00:16:56Z",
+      "completed_pr": 1383,
+      "created_at": "2026-07-31T23:34:02Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "An item whose scope legitimately names a not-yet-created file is not made un-createable",
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths-2"
+      },
+      {
+        "behavior": "Existing lint findings (including the has-work-units-but-no-scope-rules check) keep firing unchanged",
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths-2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths-2",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths-2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_v2.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo lint motherduck-token-leak-via-chained-cause | grep -qi 'test_motherduck_adapter'",
+        "description": "lint reports the known unresolvable only_modify glob on a done item",
+        "expected": "exits 1 on the unfixed tree because lint prints '0 finding(s)' (verified 2026-07-31, hosted backend, wrapper invocation); exits 0 once lint reports the glob. Needs the hosted tracker env.",
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q -k lint",
+        "description": "todo_db lint suite still green",
+        "expected": "all pass before and after - regression guard, not a gate",
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths-2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths-2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths-2",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated: motherduck-token-leak-via-chained-cause's nonexistent test_motherduck_adapter.py path linted clean pre-fix; post-fix lint reports it on both the scope rule and the rung command",
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths-2",
+        "notes": null,
+        "started_at": "2026-08-01T00:06:20Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-lint-unresolvable",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Re-validate: the unresolvable glob on motherduck-token-leak-via-chained-cause still lints clean on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "_unresolvable_scope_findings: state-aware resolution (settled items flag anything unresolvable; open items flag only near-miss literals at 0.87 cutoff; prospective wildcard allowlists and absolute paths stay legal). Calibrated against the live backlog: 65 naive findings -> 0 false positives on open items",
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths-2",
+        "notes": null,
+        "started_at": "2026-08-01T00:06:24Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-lint-unresolvable",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Resolve only_modify/do_not_modify globs during lint and report ones matching nothing",
+        "wid": "w1"
+      },
+      {
+        "evidence": "_unresolvable_command_path_findings: same rules over shlex tokens (pytest node-ids and glued shell separators stripped; unrunnable rungs excluded - already their own finding)",
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths-2",
+        "notes": null,
+        "started_at": "2026-08-01T00:06:27Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-lint-unresolvable",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Resolve file-path arguments in verification commands the same way",
+        "wid": "w2"
+      },
+      {
+        "evidence": "TestLintUnresolvableScopeAndLadderPaths: resolvable clean, prospective glob legal, planned new file legal, near-miss flagged, settled-state flagged, node-id resolution; 156 passed across the todo_db suites",
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths-2",
+        "notes": null,
+        "started_at": "2026-08-01T00:06:31Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-lint-unresolvable",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Tests covering a resolvable glob, an unresolvable one, and a not-yet-created-file case that must stay legal",
+        "wid": "w3"
+      }
+    ]
+  }
+}

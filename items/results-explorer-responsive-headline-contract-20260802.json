@@ -1,0 +1,167 @@
+{
+  "context": "Make the responsive assertion use the approved curated-preview wording and retain viewport, summary, and leaderboard checks. Validate with real page navigation and locators through blocking Chromium.",
+  "description": "PR #1482 changed the home heading to BenchBox Curated Results Preview, but responsive.spec.ts still asserts BenchBox Database Leaderboards. The blocking Chromium run fails solely on this stale assertion. Update the acceptance contract without reverting the narrower product claim.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete responsive assertions",
+        "instead": "change only the approved heading",
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "why": "the acceptance path remains required"
+      },
+      {
+        "dont": "revert product copy to satisfy the old test",
+        "instead": "update the test contract",
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "why": "the copy change intentionally narrowed the claim"
+      },
+      {
+        "dont": "validate only with Vitest",
+        "instead": "run the real Chromium spec",
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "why": "the failure is in browser CI"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "needs_item": "results-explorer-cohort-identity-and-launch-claim-contract"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Superseded in approach by explorer-home-skeleton-h1-parity-20260803-v2. This item scopes do_not_modify results-explorer/src/pages/Home.tsx and its anti-pattern mandates a test-only fix, but the root cause is in Home.tsx: the retired headline exists ONLY in HomeLoadingSkeleton (~598), so a test-only change leaves every heading assertion timing-dependent. Its rung 2 ('All responsive tests pass') also cannot pass as written - with the headline corrected, Chromium still fails desktop and wide on the above-fold budget (Expected >= 2, Received 1), tracked in explorer-home-abovefold-desktop-wide-20260803-v2. Unblock only after deciding whether to retarget this item or drop it in favour of the two replacements.",
+      "category": "Browser acceptance",
+      "created_at": "2026-08-02T16:26:52Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Curated-preview wording remains narrower than Database Leaderboards",
+        "item_id": "results-explorer-responsive-headline-contract-20260802"
+      },
+      {
+        "behavior": "Evidence uses real navigation and locators",
+        "item_id": "results-explorer-responsive-headline-contract-20260802"
+      },
+      {
+        "behavior": "Responsive layout and data assertions remain blocking",
+        "item_id": "results-explorer-responsive-headline-contract-20260802"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Blocking responsive contract",
+        "decision": "extend",
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "path": "results-explorer/e2e/responsive.spec.ts"
+      },
+      {
+        "concept": "Home copy contract",
+        "decision": "reuse",
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "path": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/responsive.spec.ts"
+      },
+      {
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/support/**"
+      },
+      {
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! rg -q \"BenchBox Database Leaderboards\" results-explorer/e2e/responsive.spec.ts",
+        "description": "Retired headline is absent from responsive spec",
+        "expected": "Exit 0",
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --workers=1 e2e/responsive.spec.ts",
+        "description": "Responsive Chromium suite passes",
+        "expected": "All responsive tests pass",
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record approved headline ownership",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update responsive contract and drift assertion",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-responsive-headline-contract-20260802",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run blocking Chromium at all viewports",
+        "wid": "w2"
+      }
+    ]
+  }
+}

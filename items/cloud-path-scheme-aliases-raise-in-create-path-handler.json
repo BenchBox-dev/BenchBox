@@ -1,0 +1,11 @@
+{
+  "description": "is_cloud_path() accepts the scheme list [s3, gs, gcs, az, abfss, azure, dbfs], but cloudpathlib only registers az://, gs://, s3:// (plus http/https). So create_path_handler('azure://c/x'), ('gcs://b/x') and ('abfss://c@a.dfs.core.windows.net/x') each raise ValueError 'Invalid cloud path format'. Any code path that classifies first and constructs second will therefore accept a path and then blow up -- including the Snowflake output-location examples, which advertise azure:// and gcs:// and must keep doing so per reconcile-snowflake-output-location-sources' must-preserve list. Verified pre-existing: the scheme list predates the 2026-07-24 batch and PR #1299 only appended the stage predicate. Fix options: normalise the aliases before handing to cloudpathlib (azure->az, gcs->gs), or give them explicit handler branches. abfss:// needs a separate decision since Databricks paths are handled by DatabricksPath via the dbfs:/ scheme. Repro: uv run -- python -c \"from benchbox.utils.cloud_storage import create_path_handler; create_path_handler('azure://c/x')\"",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-25T14:35:44Z",
+      "completed_pr": 1303,
+      "created_at": "2026-07-25T04:47:26Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "description": "Code review of the cloud-integration-test-infrastructure implementation\n(bcccb82..877e7452d) scored 7/10. Bug fixes were committed (5f8caffb2),\nraising it to ~8.5. Four structural gaps remain:\n\n1. Test depth parity - Firebolt (4 tests), Starburst (5), MotherDuck (5)\n   are significantly thinner than Snowflake (9), BigQuery (10), Databricks (9).\n   Missing: SchemaManagement, DataLoading, TPC-H QueryExecution, SpecificFeatures.\n2. Scope creep - PREFER_PLATFORM_FORMAT_ORDER production code refactor\n   (format_capabilities.py, data_loading.py) was bundled in a test TODO.\n   Already committed; acknowledge in commit message only.\n3. Comparison test fragility - test_pg_extension_comparison.py shells out\n   to CLI via subprocess. Depends on --output flag + JSON schema stability.\n   Should use Python adapter API directly.\n4. S3 test fixture gap - test_s3_parquet_query assumes pre-existing\n   test.parquet in S3. No setup script or fixture creates it.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-03-29T00:00:00Z",
+      "created_at": "2026-03-28T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "work_needs": [
+      {
+        "item_id": "cloud-integration-test-gaps",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "cloud-integration-test-gaps",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "cloud-integration-test-gaps",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "cloud-integration-test-gaps",
+        "needs_wid": "w0",
+        "wid": "w5"
+      },
+      {
+        "item_id": "cloud-integration-test-gaps",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "cloud-integration-test-gaps",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "cloud-integration-test-gaps",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "cloud-integration-test-gaps",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-gaps",
+        "notes": "In test_pg_duckdb_live.py, replace s3_test_bucket fixture with\ns3_test_parquet fixture that:\n1. Skips if BENCHBOX_S3_TEST_BUCKET / AWS creds not set\n2. Generates small parquet (100 rows) via pyarrow\n3. Uploads to s3://{bucket}/benchbox_test/test.parquet via boto3\n4. Yields {\"bucket\", \"key\", \"row_count\": 100}\n5. Deletes S3 object in teardown\nUpdate test_s3_parquet_query to use new fixture, assert exact row count.\nRemove inner try/except pytest.skip guard (fixture guarantees file exists).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "S3 test fixture - replace pre-existing file assumption with self-contained setup/teardown",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-gaps",
+        "notes": "Add to test_firebolt_live.py:\n- TestLiveFireboltSchemaManagement: test_create_and_drop_database\n  (Firebolt uses databases not schemas)\n- TestLiveFireboltDataLoading: test_tpch_data_load\n  (TPCH, dialect=\"postgres\", adapter.load_data, verify stats)\n- TestLiveFireboltQueryExecution: add test_tpch_query_1\n  (get_query(1, seed=42), execute, assert results > 0, skip if no data)\n- TestLiveFireboltSpecificFeatures: test_result_cache_control, test_cleanup\nTarget: 4→9 tests. Add `from benchbox import TPCH`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Firebolt test depth - add SchemaManagement, DataLoading, TPC-H QueryExecution, SpecificFeatures",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-gaps",
+        "notes": "Add to test_motherduck_live.py:\n- TestLiveMotherDuckSchemaManagement: test_schema_creation\n  (CREATE SCHEMA, verify via information_schema, cleanup)\n- TestLiveMotherDuckDataLoading: test_tpch_data_load\n  (DuckDB dialect, connection.execute() pattern)\n- TestLiveMotherDuckQueryExecution: add test_tpch_query_1\n- TestLiveMotherDuckSpecificFeatures: move test_duckdb_extensions here,\n  add test_cloud_databases (SHOW DATABASES), test_cleanup\nTarget: 5→9 tests. Add `from benchbox import TPCH`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "MotherDuck test depth - add SchemaManagement, DataLoading, TPC-H QueryExecution, SpecificFeatures",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-gaps",
+        "notes": "Add to test_starburst_live.py:\n- Module-level starburst_writable_catalog() fixture\n  (skips if STARBURST_WRITABLE_CATALOG not set)\n- TestLiveStarburstSchemaManagement: test_schema_creation\n  (in writable catalog, gated on fixture)\n- TestLiveStarburstDataLoading: test_tpch_data_load\n  (in writable catalog, dialect=\"trino\")\n- TestLiveStarburstQueryExecution: add test_tpch_builtin_query\n  (query tpch.tiny.lineitem with GROUP BY, guard TrinoUserError)\n- TestLiveStarburstSpecificFeatures: move test_show_catalogs here,\n  add test_information_schema, test_cleanup\nTarget: 5→9 tests. Update module docstring for STARBURST_WRITABLE_CATALOG.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Starburst test depth - add SchemaManagement, DataLoading, TPC-H QueryExecution, SpecificFeatures",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-gaps",
+        "notes": "In test_pg_extension_comparison.py:\n1. Remove subprocess/json imports, remove _run_benchmark_for_platform()\n2. Add TPCH import, add adapter_class paths to PG_EXTENSIONS dict\n3. New _run_benchmark_via_adapter():\n   - Instantiate adapter, TPCH(scale=0.01), generate_data()\n   - adapter.create_schema(), adapter.load_data()\n   - adapter.execute_query() for each query, collect timings\n   - Assemble result dict matching expected structure\n   - Lowercase status field (adapter returns \"SUCCESS\", test checks \"success\")\n   - Cleanup in finally\n4. Update comparison_results fixture to call new function\n5. Test classes and assertions remain unchanged\nDepends on w1-w3 for familiarity with adapter API patterns.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Comparison test refactor - replace subprocess CLI with Python adapter API",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-gaps",
+        "notes": "Include in the final commit message a note about the PREFER_PLATFORM_FORMAT_ORDER\nproduction code refactor (commit ccbd69f56) that was bundled in the original\ntest infrastructure TODO. No code changes needed - documentation only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Scope creep acknowledgment - note in commit message",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "context": "Fix the divergence at the source by having both surfaces derive execution type from one core function, then invert the characterization test: assert the two surfaces AGREE on all 127 subsets, and delete the SUPERSEDED-style divergence table into a recorded delta the way #1551 did for percentiles. Disclose the MCP behavior change explicitly -- two-phase MCP requests will begin running both phases.",
+  "description": "The CLI and MCP execution-type divergence was fixed in merged PR #1692, merge commit 54ffe68605e25b8bd61a86c8786750d496a7b3b1. benchbox/mcp/tools/benchmark.py no longer owns phase-to-execution translation; both surfaces use the shared benchbox.core.run_service derivation. The current parity suite tests all 127 phase subsets and asserts that none diverge. Verification passed on 2026-08-13: tests/unit/test_run_orchestration_characterization.py passed 33 tests, including the no-subset-diverges and all-subsets-agree assertions. Keep this item done; its historical dependency on the adoption item is satisfied. External stateless deployment acceptance and the final release gate remain separate operator and release gates.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "cli-mcp-execution-type-divergence-still-live",
+        "needs_item": "one-engine-mcp-adoption-not-actually-done"
+      }
+    ],
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-12T21:40:28Z",
+      "completed_pr": 1692,
+      "created_at": "2026-08-11T12:56:17Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "Single-query-phase and three-query-phase requests keep their current execution types on both surfaces (the 79 agreeing subsets).",
+        "item_id": "cli-mcp-execution-type-divergence-still-live"
+      },
+      {
+        "behavior": "The 'statistics' token keeps being threaded independently of execution-type derivation, per the comment at benchbox/mcp/tools/benchmark.py:536.",
+        "item_id": "cli-mcp-execution-type-divergence-still-live"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cli-mcp-execution-type-divergence-still-live",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "cli-mcp-execution-type-divergence-still-live",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/**"
+      },
+      {
+        "item_id": "cli-mcp-execution-type-divergence-still-live",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "cli-mcp-execution-type-divergence-still-live",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_run_orchestration_characterization.py -q && printf '%s\\n' 'No subset diverges across CLI and MCP.'",
+        "description": "The surfaces agree on every phase subset",
+        "expected": "No subset diverges across CLI and MCP.",
+        "item_id": "cli-mcp-execution-type-divergence-still-live",
+        "last_result": "pass",
+        "last_run": "2026-08-12T21:39:56Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

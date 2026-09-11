@@ -1,0 +1,243 @@
+{
+  "context": "Start with zero-effort wins (ruff rule, matrix entry) before building\nnew tooling. Each work unit is independently shippable - no need to\nbatch. Follow the existing CI structure in .github/workflows/test.yml.\n",
+  "description": "Codebase audit identified several categories of Windows issues that can\nslip past the current CI matrix (Windows + Python 3.12 running fast tests\nonly). The codebase is reasonably Windows-aware (good pathlib usage, .exe\nsuffix handling, /proc/ fallbacks), but gaps remain in encoding, static\nanalysis, and integration test coverage on Windows.\n\nKey findings from audit:\n- ~6 open() calls in core/dryrun.py missing encoding=\"utf-8\" (silent\n  data corruption on Windows where default is cp1252)\n- 3 os.access(path, os.X_OK) checks that are no-ops on Windows\n- Integration tests (integration-smoke, test-package, pyspark) run\n  Ubuntu-only - test-package uses bash-isms (source activate)\n- Only Python 3.12 tested on Windows; 3.10 has different encoding defaults\n- No static analysis catches Windows anti-patterns pre-merge",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add Windows-only workarounds with sys.platform checks scattered through business logic",
+        "instead": "(not specified)",
+        "item_id": "windows-ci-hardening",
+        "why": "centralize platform abstractions in utils/"
+      },
+      {
+        "dont": "make integration tests conditional on platform",
+        "instead": "(not specified)",
+        "item_id": "windows-ci-hardening",
+        "why": "fix the tests to be cross-platform instead"
+      },
+      {
+        "dont": "use continue-on-error: true for Windows jobs",
+        "instead": "(not specified)",
+        "item_id": "windows-ci-hardening",
+        "why": "that hides failures instead of catching them"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "windows-ci-hardening",
+        "id": 525,
+        "reason": "The full integration suite (not just smoke) on Windows would add\nsignificant CI time. Defer until Windows smoke tests are stable\nand we have data on what additional issues the full suite catches.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Gated on Windows smoke tests being stable with supporting data; no tracked item confirms that threshold was reached.",
+        "summary": "Run full integration suite on Windows"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "windows-ci-hardening",
+        "id": 526,
+        "reason": "A @pytest.mark.windows_sensitive marker for tests that exercise\nplatform-dependent code. Useful for targeted local testing but\nrequires ongoing discipline to apply. Revisit after w7 establishes\nwhich tests are actually platform-sensitive.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Revisit conditioned on w7 test-sensitivity findings from the same now-done item; no evidence of a concrete need or open tracking.",
+        "summary": "Add Windows-specific pytest marker"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-04-02T00:00:00Z",
+      "created_at": "2026-04-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing tests continue to pass on Linux/macOS (no regressions)",
+        "item_id": "windows-ci-hardening"
+      },
+      {
+        "behavior": "CI time for the common case (Ubuntu PR) does not increase",
+        "item_id": "windows-ci-hardening"
+      },
+      {
+        "behavior": "Windows matrix entries use fail-fast: false to avoid masking issues",
+        "item_id": "windows-ci-hardening"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-ci-hardening",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "windows-ci-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dryrun.py"
+      },
+      {
+        "item_id": "windows-ci-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/generator/runner.py"
+      },
+      {
+        "item_id": "windows-ci-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/generator.py"
+      },
+      {
+        "item_id": "windows-ci-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/tpc_compilation.py"
+      },
+      {
+        "item_id": "windows-ci-hardening",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml (ruff config only)"
+      },
+      {
+        "item_id": "windows-ci-hardening",
+        "kind": "only_modify",
+        "path_glob": "scripts/ (new static checker)"
+      },
+      {
+        "item_id": "windows-ci-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/ (new platform-dependent tests)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run ruff check benchbox/ --select PLW1514",
+        "description": "Ruff catches open() calls without encoding",
+        "expected": "No violations",
+        "item_id": "windows-ci-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests -m fast -q --tb=short",
+        "description": "All existing tests still pass",
+        "expected": "All tests pass",
+        "item_id": "windows-ci-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rn 'os.access.*X_OK' benchbox/",
+        "description": "No unguarded os.X_OK usage",
+        "expected": "Zero matches or all wrapped in platform check",
+        "item_id": "windows-ci-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-ci-hardening",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "windows-ci-hardening",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "windows-ci-hardening",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "windows-ci-hardening",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-ci-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enable ruff PLW1514 rule for open() without explicit encoding",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-ci-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Windows + Python 3.10 to CI test matrix",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-ci-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make test-package job cross-platform",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-ci-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run integration-smoke tests on Windows",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-ci-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add static analysis script for Windows anti-patterns",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-ci-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix existing Windows anti-pattern violations",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-ci-hardening",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add targeted unit tests for platform-dependent code paths",
+        "wid": "w7"
+      }
+    ]
+  }
+}

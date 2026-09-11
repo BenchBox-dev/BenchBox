@@ -1,0 +1,83 @@
+{
+  "context": "Confirm whether platform_info already flows into the exported payload - if it does this may be grouping-only. Note pg_user/pg_password are deliberately omitted from get_platform_info and must stay omitted; only the backend KIND and storage location are wanted, never connection credentials.",
+  "description": "ADR decision w12 (docs/development/adr/adr-ducklake-maturity-and-publishability.md) makes remote-backed DuckLake results publishable and ranking-eligible ON CONDITION that each run records its catalog backend and storage location, so comparisons do not silently mix backings - a DuckLake-on-S3 number partly measures object-store latency and must not be ranked against DuckLake-on-local-disk as the same system. The ADR states this wiring is follow-up work and does not cover it. get_platform_info() already exposes catalog_backend, data_path and data_path_is_cloud, and the registry models the two axes as four deployment modes since the w10 fix, so the vocabulary exists; what is missing is that these reach exported result metadata and are used for comparison grouping.",
+  "legacy": {
+    "item_meta": {
+      "category": "results",
+      "completed_at": "2026-07-30T19:23:57Z",
+      "completed_pr": 1364,
+      "created_at": "2026-07-30T18:14:55Z",
+      "worktree": "ducklake-platform"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing exported result fields keep their current names and meanings",
+        "item_id": "ducklake-record-catalog-and-storage-in-result-metadata"
+      },
+      {
+        "behavior": "pg_user/pg_password stay absent from platform info and exported results",
+        "item_id": "ducklake-record-catalog-and-storage-in-result-metadata"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ducklake-record-catalog-and-storage-in-result-metadata",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "ducklake-record-catalog-and-storage-in-result-metadata",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/ducklake.py"
+      },
+      {
+        "item_id": "ducklake-record-catalog-and-storage-in-result-metadata",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_ducklake_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_ducklake_adapter.py -q",
+        "description": "An exported DuckLake result records catalog backend and storage location",
+        "expected": "all pass; new case asserts both fields present and no credentials",
+        "item_id": "ducklake-record-catalog-and-storage-in-result-metadata",
+        "last_result": "pass",
+        "last_run": "2026-07-30T19:22:55Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ducklake-record-catalog-and-storage-in-result-metadata",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "benchbox/platforms/ducklake.py get_normalized_result_metadata() override: populates platform_storage with catalog_backend + data_path_is_cloud + storage_location (the generic builder leaves it empty for ducklake), and scrubs _CREDENTIAL_CONFIG_KEYS from platform_raw_config. FOUND A LIVE LEAK: pg_user reached exported metadata via adapter.platform_config - get_platform_info omits it but the normalized builder also reads the raw constructor config, where pg_password matches the shared secret matcher and pg_user does not. Verified: both axes recorded, zero credential leaks for postgres+s3 and duckdb+local",
+        "item_id": "ducklake-record-catalog-and-storage-in-result-metadata",
+        "notes": null,
+        "started_at": "2026-07-30T19:17:51Z",
+        "started_branch": "fix/ducklake-record-backing-metadata",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Ensure catalog backend + storage location reach exported result metadata",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/platforms/test_ducklake_adapter.py TestDuckLakeResultMetadataRecordsBacking: 7 tests - both axes across 5 catalog/storage combinations, a sentinel-based no-credential-leak assertion over the whole serialized metadata, and a guard that pg_host/pg_database are still exported so the scrub does not gut the block. 112 pass in file; 8300+ across results+platforms. Mutation: removing the scrub fails the leak test",
+        "item_id": "ducklake-record-catalog-and-storage-in-result-metadata",
+        "notes": null,
+        "started_at": "2026-07-30T19:19:08Z",
+        "started_branch": "fix/ducklake-record-backing-metadata",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Test that both are present and that no credential material rides along",
+        "wid": "w2"
+      }
+    ]
+  }
+}

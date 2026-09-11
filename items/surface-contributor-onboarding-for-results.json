@@ -1,0 +1,189 @@
+{
+  "description": "`docs/contributing-results.md` was added in PR #53 but it is not linked\nfrom the docs navigation, the README, or the explorer header. Phase 2\nproduces zero contributions if no one can find the door.\n\nThis item makes the contribution path discoverable from the three places\na prospective contributor will plausibly start: the explorer (which is\nwhere they encounter results in the first place), the docs nav (where\nthey look for \"how do I…\"), and the repo README (where they land from\nGitHub search). It also adds a homepage callout on the explorer landing\npage once the corpus is large enough to make the call-to-action credible.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add the CTA before the corpus is broad enough to look credible",
+        "instead": "(not specified)",
+        "item_id": "surface-contributor-onboarding-for-results",
+        "why": "inviting contributors to a sparse corpus invites questions about why their result would matter; sequence after `expand-seed-corpus-to-sf-0-1` lands."
+      },
+      {
+        "dont": "create a separate landing page that duplicates the contributor guide",
+        "instead": "(not specified)",
+        "item_id": "surface-contributor-onboarding-for-results",
+        "why": "it splits the source of truth and rots independently; surface the existing page from multiple entry points."
+      },
+      {
+        "dont": "put the CTA card on every explorer page",
+        "instead": "(not specified)",
+        "item_id": "surface-contributor-onboarding-for-results",
+        "why": "it becomes noise once the visitor is deep in a comparison; landing-only is sufficient."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "surface-contributor-onboarding-for-results",
+        "needs_item": "implement-pr-based-result-submission-workflow"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-04-12T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing README structure and pitch (additive only - small new section).",
+        "item_id": "surface-contributor-onboarding-for-results"
+      },
+      {
+        "behavior": "Existing explorer header layout and styling (additive only).",
+        "item_id": "surface-contributor-onboarding-for-results"
+      },
+      {
+        "behavior": "The existing `docs/contributing-results.md` content (this TODO surfaces it, doesn't rewrite it).",
+        "item_id": "surface-contributor-onboarding-for-results"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "surface-contributor-onboarding-for-results",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "surface-contributor-onboarding-for-results",
+        "kind": "only_modify",
+        "path_glob": "docs/index.rst"
+      },
+      {
+        "item_id": "surface-contributor-onboarding-for-results",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/Header.tsx"
+      },
+      {
+        "item_id": "surface-contributor-onboarding-for-results",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -r 'contributing-results' results-explorer/src/components/",
+        "description": "Header component references the contributor guide",
+        "expected": "at least one match",
+        "item_id": "surface-contributor-onboarding-for-results",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -r 'contributing-results' docs/index.rst docs/*.rst",
+        "description": "Sphinx toctree references the contributor guide",
+        "expected": "at least one match in a toctree",
+        "item_id": "surface-contributor-onboarding-for-results",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'contributing-results' README.md",
+        "description": "README references the contributor guide",
+        "expected": ">= 1",
+        "item_id": "surface-contributor-onboarding-for-results",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "surface-contributor-onboarding-for-results",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "surface-contributor-onboarding-for-results",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "surface-contributor-onboarding-for-results",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "surface-contributor-onboarding-for-results",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "surface-contributor-onboarding-for-results",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "surface-contributor-onboarding-for-results",
+        "notes": "Edit `results-explorer/src/components/Header.tsx` (or equivalent -\nconfirm the actual file). Add a nav link \"Submit a result\" pointing\nto the contributor guide URL on benchbox.dev/docs/contributing-results.\nStyle consistently with existing nav items. Open in same tab.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'Submit a result' link to the explorer site header",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "surface-contributor-onboarding-for-results",
+        "notes": "Add a small card to the explorer landing page (after the summary\ncards) inviting visitors to contribute their own results. Card title:\n\"Run BenchBox on your platform - submit your results\". Link to\ncontributor guide. Include a one-line summary of the workflow\n(run → submit → PR). Skip the card on benchmark/platform browse pages\n(top-level landing only).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a homepage CTA card on the explorer landing page",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "surface-contributor-onboarding-for-results",
+        "notes": "Edit `docs/index.rst` (or the appropriate Sphinx toctree) to include\n`contributing-results` under a \"Contributing\" section. If a\n\"Contributing\" toctree section doesn't exist, create one alongside\nthe existing top-level sections (Concepts, Platforms, etc.).\nConfirm the page renders in `docs/_build/html/contributing-results.html`\nafter a local sphinx build.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'Contributing Results' to the docs nav",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "surface-contributor-onboarding-for-results",
+        "notes": "Add a short section after the existing \"Quick Start\" / installation\nsection. Two paragraphs maximum:\n  1. The pitch (you can publish your own results in the public corpus)\n  2. The link to the full guide\nMatch the README's existing voice. Do not duplicate the full guide\ncontent here.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a 'Contributing Results' section to README.md",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "surface-contributor-onboarding-for-results",
+        "notes": "- Build the explorer locally; click the new header link and CTA card.\n- Build sphinx docs locally; navigate to the new entry from the docs\n  nav.\n- Render README.md preview (e.g. via `gh repo view --web` after push,\n  or VS Code preview); confirm link works.\n- Confirm all links resolve to the same URL\n  (`/docs/contributing-results.html` or equivalent published path).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify all four entry points render and resolve correctly",
+        "wid": "w5"
+      }
+    ]
+  }
+}

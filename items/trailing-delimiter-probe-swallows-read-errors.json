@@ -1,0 +1,98 @@
+{
+  "context": "Narrow the except to the failures that genuinely mean 'cannot classify' - FileNotFoundError, PermissionError, UnicodeDecodeError, the CompressionError already imported - and let anything else propagate. Decide deliberately what an unreadable file should mean: returning False is a guess, and raising is probably right for a data file the caller is about to parse anyway. Check each of the ten call sites for whether they can tolerate an exception before changing the contract; several are inside larger load paths that may already handle it. Add a test that an unreadable file does not silently classify as clean.",
+  "description": "benchbox/utils/file_format.py::_check_first_nonempty_line wraps its whole body in 'except Exception: return False'. Any failure reading the probe file - permissions, truncation, a decode failure, a broken compressed stream - is silently reported as 'this file has no trailing delimiter' rather than surfacing. That is not a neutral default: for a file that DOES carry a trailing delimiter, the caller then omits the synthetic column and PyArrow fails downstream with a column-count mismatch that names neither the real cause nor the file. Ten callers depend on this classification: duckdb.py:408, datafusion.py:903 and :1425, polars_platform.py:544, and the pandas/dask/pyspark/cudf/modin/datafusion dataframe adapters. Found while working crlf-framing-coverage-and-text-mode-invariant (PR #1355); that item pinned the CRLF text-mode invariant and deliberately did not widen into error handling, so this was left unlogged until an end-of-effort audit. Note the interaction: the blanket except is exactly what would convert a future binary-read change into a silent misclassification, which is why #1355's docstring calls it out.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-07-30T19:26:47Z",
+      "completed_pr": 1365,
+      "created_at": "2026-07-30T18:55:20Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "callers that legitimately probe optional files keep working",
+        "item_id": "trailing-delimiter-probe-swallows-read-errors"
+      },
+      {
+        "behavior": "the four framing/terminator classifications pinned by TestHasTrailingDelimiterFraming stay unchanged",
+        "item_id": "trailing-delimiter-probe-swallows-read-errors"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "trailing-delimiter-probe-swallows-read-errors",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/file_format.py"
+      },
+      {
+        "item_id": "trailing-delimiter-probe-swallows-read-errors",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/utils/test_file_format.py -q -k 'trailing_delimiter and (unreadable or error)'",
+        "description": "An unreadable file does not silently classify as 'no trailing delimiter'",
+        "expected": "exit 0",
+        "item_id": "trailing-delimiter-probe-swallows-read-errors",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/utils/test_file_format.py -q -k TrailingDelimiterFraming",
+        "description": "Existing framing classification is untouched",
+        "expected": "exit 0",
+        "item_id": "trailing-delimiter-probe-swallows-read-errors",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -q",
+        "description": "All ten callers still pass their platform tests",
+        "expected": "exit 0",
+        "item_id": "trailing-delimiter-probe-swallows-read-errors",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "trailing-delimiter-probe-swallows-read-errors",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Removed the blanket 'except Exception: return False' from _check_first_nonempty_line entirely rather than narrowing it. Narrowing still swallows; the question 'does this file have a trailing delimiter' has no answer when the file cannot be read, and every one of the eleven call sites passes a path it is about to load, so surfacing the original error is strictly more useful than guessing. Only one False remains and it means 'answered': a file with no non-empty line genuinely has no framing. Note the uncompressed read uses errors='replace', so decode errors were never the concern - the swallow was hiding real I/O and decompression failures. Five tests pin it: missing file, unreadable file (chmod 000), a directory in place of a file, empty file still False, blank-lines-only file still False. Proven to fail: restoring the blanket except fails exactly the three raise tests and leaves the two legitimate-False tests passing.",
+        "item_id": "trailing-delimiter-probe-swallows-read-errors",
+        "notes": null,
+        "started_at": "2026-07-30T19:19:29Z",
+        "started_branch": "fix/trailing-delimiter-read-errors",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Narrow the except clause and decide what an unreadable file means",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Audited all eleven call sites (duckdb.py:408, datafusion.py:903 and :1425, polars_platform.py:544, and the pandas/dask/pyspark/cudf/modin/datafusion_df adapters). Every one passes a path it is immediately about to load, and none probes an optional or possibly-absent file, so propagation is safe. Ran the full caller surface: tests/unit/platforms/ + tests/unit/utils/ + tests/unit/core/ = 19675 passed. ONE caller did depend on the swallow: test_duckdb_adapter.py::test_load_data_with_sharded_zstd_files wrote PLAIN TEXT to a path named customer.tbl.1.zst, with a comment asserting 'actual contents won't be read because connection is mocked'. That premise was false - the probe reads the first line - and the test only passed because the decompression failure was swallowed into 'no trailing delimiter'. Fixed the fixture to write genuinely compressed bytes. SCOPE EXCEPTION, disclosed not hidden: that file is outside this item's only_modify allowlist (benchbox/utils/file_format.py, tests/unit/utils/**), and check-scope --strict reports it. It is a direct and necessary consequence of the in-scope change - the two cannot land separately without a red suite - and scope rules are create-time-only so the allowlist could not be corrected in place.",
+        "item_id": "trailing-delimiter-probe-swallows-read-errors",
+        "notes": null,
+        "started_at": "2026-07-30T19:25:43Z",
+        "started_branch": "fix/trailing-delimiter-read-errors",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Audit the ten call sites for exception tolerance",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #592 of postgres-extension-benchmarking-infrastructure.\nDeferred: pg_analytics (ParadeDB) and Citus extension support\nReason deferred: Lower priority than pg_duckdb and pg_mooncake - plan after initial extensions are stable",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:37:07Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

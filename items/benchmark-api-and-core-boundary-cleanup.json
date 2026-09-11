@@ -1,0 +1,293 @@
+{
+  "context": "Start with API classification and small ambiguity removals. Treat a\nbenchmark-family plugin seam as a design gate before extraction, and use tests\nto keep wrappers, registries, and loaders aligned.\n",
+  "description": "Benchmark APIs are split across tested top-level wrappers, a public\nbenchbox.base.BaseBenchmark, a small remaining core.base_benchmark class,\nlazy registries, loaders, and benchmark-family code inside broad core/base\nmixins. The wrappers are not accidental; tests assert facade behavior. The\ncleanup target is the remaining ambiguous base/loader split and the lack of a\nbenchmark-family extension boundary, not a wrapper purge.\n\nThis item classifies benchmark API surfaces, retires or justifies the second\nbase class, and prepares a benchmark-family plugin seam without a broad\nrewrite.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create a third benchmark base class while cleaning up two existing bases",
+        "instead": "(not specified)",
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "why": "remove, alias, or justify the secondary base."
+      },
+      {
+        "dont": "interpret duplicate wrapper reachability as accidental",
+        "instead": "classify first.",
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "why": "tests assert facade behavior"
+      },
+      {
+        "dont": "split core by moving files mechanically",
+        "instead": "(not specified)",
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "why": "dependency direction and public API status must drive the boundary."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-api-and-core-boundary-cleanup",
+        "id": 349,
+        "reason": "Large structural refactor should follow the public API decision and plugin-seam ADR.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Split all of benchbox/core into engine and benchmark packages"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-api-and-core-boundary-cleanup",
+        "id": 350,
+        "reason": "Wrappers are tested as public facades unless explicitly deprecated.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly rejects removal: wrapper facades are tested public surfaces unless explicitly deprecated.",
+        "summary": "Remove all wrapper facades"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Architecture",
+      "completed_at": "2026-05-21T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not break top-level wrapper facade tests unless an explicit deprecation path lands in the same PR.",
+        "item_id": "benchmark-api-and-core-boundary-cleanup"
+      },
+      {
+        "behavior": "Do not introduce platform adapter imports into core engine modules.",
+        "item_id": "benchmark-api-and-core-boundary-cleanup"
+      },
+      {
+        "behavior": "Do not move benchmark-family code in a way that changes result bundle shape.",
+        "item_id": "benchmark-api-and-core-boundary-cleanup"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "docs/development/run-lifecycle-map.md: existing lifecycle documentation -- align any plugin seam with this flow.",
+        "decision": "reuse",
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "path": "docs/development/run-lifecycle-map.md"
+      },
+      {
+        "concept": "docs/reference/backward-compatibility.md: existing base-class lifecycle entries -- update rather than invent separate lifecycle docs.",
+        "decision": "reuse",
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "path": "docs/reference/backward-compatibility.md"
+      },
+      {
+        "concept": "tests/unit/test_wrapper_facades_fast.py: existing wrapper contract tests -- preserve as public API evidence.",
+        "decision": "reuse",
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "path": "tests/unit/test_wrapper_facades_fast.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/__init__.py"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/__init__.py"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/base_benchmark.py"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_loader.py"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "only_modify",
+        "path_glob": "docs/design/"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "only_modify",
+        "path_glob": "tests/docs/"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_wrapper_facades_fast.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_wrapper_facades_fast.py tests -k 'benchmark_loader or base_benchmark' --tb=short",
+        "description": "Run wrapper facade and benchmark loader tests.",
+        "expected": "Wrapper and loader tests pass.",
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests -k 'import_boundary or core_boundary' --tb=short",
+        "description": "Run import-boundary check added by this item.",
+        "expected": "Core/platform dependency boundary tests pass or known exemptions are documented.",
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "notes": "Completed evidence at checked SHA\n1d454632ba73911bc4ff0cf0a3fb8ec22227a7a8:\n  - benchbox/base.py remains the beta-public BaseBenchmark surface;\n    run_with_platform remains the beta-public adapter execution hook.\n  - benchbox/core/base_benchmark.py remains a distinct deprecated\n    internal compatibility base, not an alias.\n  - Production imports of the deprecated core base are limited to\n    benchbox/core/datavault/benchmark.py and\n    benchbox/core/tpcds_obt/benchmark.py.\n  - tests/unit/test_wrapper_facades_fast.py asserts wrapper behavior;\n    wrapper reachability is not accidental.\n  - benchbox/__init__.py exposes 21 top-level benchmark facades: 7 eager\n    imports and 14 lazy _BENCHMARK_REGISTRY entries.\n  - benchbox/core/benchmark_loader.py resolves 23 core benchmark families\n    from registry-backed CORE_BENCHMARK_CLASS_NAMES.\n  - docs/reference/backward-compatibility.md now records the remaining\n    core-base migration target explicitly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate benchmark API surfaces, wrapper tests, registries, and core boundary issues",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "notes": "Decision recorded in docs/reference/public-contracts.md:\n  - CLI, top-level benchmark wrappers, benchbox.base.BaseBenchmark,\n    BaseBenchmark.run_with_platform, registry metadata, and MCP remain\n    beta-public surfaces.\n  - benchbox.core.benchmark_loader is internal.\n  - benchbox.core.base_benchmark.BaseBenchmark is deprecated internal\n    compatibility.\n\nNo wrapper facade was collapsed or deprecated.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decision gate: define wrapper-vs-CLI-vs-loader public API contract",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "notes": "Justified as a documented deprecated internal compatibility base. It is\nretained only for datavault and tpcds_obt until those implementations\nmigrate to benchbox.base.BaseBenchmark. Runtime modules expose surface\nmarkers and docs/reference/backward-compatibility.md carries the target.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retire, alias, or justify benchbox/core/base_benchmark.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "notes": "Added tests/unit/core/test_benchmark_api_contract.py to lock:\n  - 23 registry metadata entries.\n  - 23 loader-resolved core families.\n  - 22 public discovery entries.\n  - 21 top-level Python benchmark facades.\n  - 14 lazy facades and 7 eager facades.\n  - 2 core-only benchmark IDs: ai_primitives and joinorder_synthetic.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reconcile benchmark registry, wrapper, and loader counts",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "notes": "Added docs/design/future-state/benchmark-family-plugin-seam/README.md and\nlinked it from the future-state index. The design keeps wrappers and\nresult bundles stable, defines family-owned versus shared-runtime\nresponsibilities, and requires one pilot family before any broad package\nextraction.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design the benchmark-family plugin seam as an ADR before extraction",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-api-and-core-boundary-cleanup",
+        "notes": "Added a narrow AST import-boundary check over benchbox/base.py,\nbenchbox/core/base_benchmark.py, benchbox/core/benchmark_loader.py,\nbenchbox/core/__init__.py, and benchbox/core/tuning/. The check forbids\nconcrete benchbox.platforms imports in those benchmark API and tuning\nboundary files while avoiding unrelated existing core/platform couplings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add an import-boundary check for core modules that depend on platform adapters",
+        "wid": "w5"
+      }
+    ]
+  }
+}

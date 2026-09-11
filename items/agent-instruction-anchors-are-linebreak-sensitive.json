@@ -1,0 +1,36 @@
+{
+  "description": "agent_instruction_audit.py checks CANONICAL/PROJECT anchors with 'anchor.casefold() not in section.casefold()' against the raw file text. Anchors are multi-word phrases, so a line break inside one makes the check fail: reflowing AGENTS.md split 'not authorization' across two lines and produced 'project COMMIT-IDENTITY-001 semantics drifted; missing anchors: not authorization'. That message reads as a semantics change when nothing semantic changed, and it fires on exactly the edit the byte budget forces you to make - rewrapping to save space. Normalise whitespace on both sides before matching.",
+  "legacy": {
+    "item_meta": {
+      "category": "Developer Tooling",
+      "completed_at": "2026-08-17T00:15:53Z",
+      "completed_pr": 1752,
+      "created_at": "2026-08-04T17:23:02Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "agent-instruction-anchors-are-linebreak-sensitive",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "item_id": "agent-instruction-anchors-are-linebreak-sensitive",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_agent_instruction_audit.py -q -k anchor",
+        "description": "a reflowed anchor phrase still matches",
+        "expected": "exits 1 on an unfixed tree - no test covers a line-wrapped anchor today",
+        "item_id": "agent-instruction-anchors-are-linebreak-sensitive",
+        "last_result": "pass",
+        "last_run": "2026-08-17T00:15:50Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "description": "The UAT `explorer_smoke` phase did not complete the browser smoke check\nin the 2026-05-05 sweep — not because of an Explorer UI regression, but\nbecause `tests/uat/phases/explorer_smoke.py` calls a stale CLI contract\nfor both the build step and the browser step.\n\nSource: `_project/handoffs/results-explorer-uat-tuned-followup-20260505.md`\n(sections \"Explorer Smoke\" + \"Defect Classification → UAT-infrastructure\").\nFollow-up to PR #235.\n\nObserved drift:\n\n  - **Build side** — `benchbox explorer build` now expects `--data-dir`,\n    not `--bundles-dir`. The handoff says the build-side wiring was\n    partially fixed in the worktree that became PR #235; this TODO\n    covers anything still drifting and the regression guard.\n  - **Browser side** — `results-explorer/scripts/serve-browser-tests.mjs`\n    does not accept `--data-dir` or `--browsers`. It expects `--dist-dir`\n    and `--fixture-dir`, and is a server helper, not a one-shot\n    Playwright runner. The phase needs to launch Playwright directly\n    against a built Explorer app.\n\nUntil this is fixed, `make uat-explorer-smoke` will continue to fail\nbefore it asserts anything browser-side, and any UI regression in\nExplorer is invisible to UAT.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "depend on `serve-browser-tests.mjs` from the UAT phase",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "why": "that script is a developer-loop server helper; coupling UAT to it re-creates the contract drift."
+      },
+      {
+        "dont": "introduce a fourth way to run Explorer browser tests",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "why": "the workflow uses `npx playwright test`, this phase must use the same entrypoint, because divergent invocations are how the original drift happened."
+      },
+      {
+        "dont": "silently fall back to a smaller browser set",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "why": "if a requested browser is unavailable, fail loudly so operators see it."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-06T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All eight `make uat-*` targets continue to work unchanged.",
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli"
+      },
+      {
+        "behavior": "Existing `explorer_smoke.browsers` config field (the default and the validator stay).",
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli"
+      },
+      {
+        "behavior": "The Chromium blocking-gate behaviour from `.github/workflows/results-explorer-browser.yml` — the UAT phase mirrors it, does not redefine it.",
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/explorer.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/scripts/serve-browser-tests.mjs"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/_cli.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/explorer_smoke.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_explorer_smoke.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'from tests.uat.phases.explorer_smoke import build_argv; print(build_argv())' | grep -- --data-dir",
+        "description": "Phase invokes the current CLI surface",
+        "expected": "non-empty (contains --data-dir)",
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -rn 'bundles-dir' tests/uat/ --include='*.py'",
+        "description": "Phase no longer references --bundles-dir",
+        "expected": "no matches (exit 0)",
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -rn 'serve-browser-tests' tests/uat/ --include='*.py'",
+        "description": "Phase no longer launches `serve-browser-tests.mjs`",
+        "expected": "no matches (exit 0)",
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_explorer_smoke.py -m fast -q",
+        "description": "End-to-end smoke against fixture corpus passes",
+        "expected": "all green",
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "notes": "Evidence-durability gate per `_project/verification-logs/README.md`.\nThe fix in w2/w3 targets a specific contract; pin it before\nrewriting so a reviewer can replay:\n\n  uv run -- benchbox explorer build --help\n  node results-explorer/scripts/serve-browser-tests.mjs --help 2>&1 || true\n  grep -n -- '--bundles-dir\\|--data-dir\\|--browsers\\|--dist-dir\\|--fixture-dir' \\\n    tests/uat/phases/explorer_smoke.py \\\n    results-explorer/scripts/serve-browser-tests.mjs\n\nCapture stdout under\n`_project/verification-logs/results-explorer-uat-defect-explorer-smoke-current-cli/w0.log`\nand commit. If `--bundles-dir` no longer appears anywhere (handoff\ndrift was already closed), this TODO collapses to w4 only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture the current `benchbox explorer build` and `serve-browser-tests.mjs` CLI shape",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "notes": "Read `benchbox/cli/commands/explorer.py` and\n`results-explorer/scripts/serve-browser-tests.mjs` end-to-end. List\nevery flag/arg the phase passes today vs. what each consumer actually\naccepts. Output: a short audit note in this TODO (or a captured\nverification log) so the fix in w2 has a clear surface contract.\n\nAudit: `benchbox explorer build` accepts `--data-dir` + `--output`;\nit does not accept `--bundles-dir`. The old UAT build step already\nused `--data-dir`, but `make uat-explorer-smoke` / `_cli.py` still\nexposed the stale `--bundles-dir` flag. Browser-side UAT invoked the\nserver helper with unsupported `--data-dir` and `--browsers`; the\nhelper's actual flags are `--dist-dir` and `--fixture-dir`. The phase\nnow uses `npx playwright test --grep @smoke --project <browser>` from\n`results-explorer/` after `npm ci` and `npm run build`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit current `tests/uat/phases/explorer_smoke.py` against the Explorer's actual CLI surface",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "notes": "Replace the misuse of `serve-browser-tests.mjs` with the real\nPlaywright smoke flow used by the `results-explorer-browser.yml`\nworkflow:\n  cd results-explorer\n  npm ci\n  npm run build  # or equivalent to populate dist/\n  BENCHBOX_DATA_DIR=<built data dir> npx playwright test --grep @smoke\nWrap that in `_run_browser_smoke(config, build_output_dir)` inside\nthe phase. Honor `config.explorer_smoke.browsers` (Chromium-only by\ndefault; Firefox/WebKit are advisory until the\n`graduate-browser-smoke-to-blocking-gates` TODO lands).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rewrite the browser-side step to invoke Playwright directly against a built Explorer app",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "notes": "Grep `tests/uat/` and `Makefile` for `--bundles-dir`. Replace each\nwith `--data-dir` matching the current CLI. The handoff says this\nwas partially done; close the loop and add a regression test:\n  def test_explorer_smoke_uses_data_dir_flag(...): ...\nthat asserts the phase's argv builder emits `--data-dir`, not\n`--bundles-dir`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm build-side wiring uses `--data-dir`; remove any residual `--bundles-dir` references",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-explorer-smoke-current-cli",
+        "notes": "Test takes 5-10 staged bundles from `results-data/bundles/`, runs the\nphase against them, asserts: (a) `benchbox explorer build` exits 0,\n(b) Playwright smoke exits 0 (Chromium-only). Mark `slow` if it\nexceeds the fast-test budget; otherwise fast.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a fast-marked smoke that runs the phase against a fixture corpus end-to-end",
+        "wid": "w4"
+      }
+    ]
+  }
+}

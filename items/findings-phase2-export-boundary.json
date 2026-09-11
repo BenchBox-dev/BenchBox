@@ -1,0 +1,208 @@
+{
+  "context": "Replace the implicit table selection in _export_all_unlocked with an explicit ALLOWLIST constant (items domain: items + its child tables + deferrals + events). Add a pinning test asserting (a) every allowlisted table is exported, (b) no table outside the allowlist ever appears in export output — written so any future 'finding%' table fails the test by construction, before such tables exist. Add events to the export payload (already in TRANSFER_TABLES, so restore compat exists). Correct the workflow header claim. Assert the standalone lossless path is excluded from repo commits or remains disabled (TODO_DB_PACKAGE_VERSION unset) with a workflow-level guard note.",
+  "description": "CRITICAL-path gate (review finding C1): .github/workflows/todo-db-export.yml runs weekly, git-adds _project/todo-db-export/ (workflow :224) and auto-merges a PR into develop (:287); .gitignore:103-105 force-tracks that directory as a 'provenance trail'. If findings tables land in the shared DB with no export boundary, the next Sunday 09:00 UTC run commits finding content into Git with no human in the loop — silently violating the out-of-Git requirement. This phase pins the boundary BEFORE phase 3 puts findings tables in production. Second, independent fix bundled here (review finding M3): the in-repo export omits the events audit table entirely — _export_all_unlocked (todo_db.py:1770-1823) never reads events even though TRANSFER_TABLES (:650-662) includes it — while the workflow header (:200-203) overclaims 'hash-chained audit events' (true only for the gated standalone-package path; in-repo log_event :959-969 is a plain autoincrement, not hash-chained).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Defer this phase until after the findings schema lands",
+        "instead": "Phase 3 depends on this phase; enforce via tracker deps",
+        "item_id": "findings-phase2-export-boundary",
+        "why": "One weekly cron tick between schema-in-prod and boundary-merged commits finding content to develop via auto-merge"
+      },
+      {
+        "dont": "Filter finding tables out by name-prefix blocklist",
+        "instead": "Explicit allowlist; unknown tables fail closed in the pinning test",
+        "item_id": "findings-phase2-export-boundary",
+        "why": "A blocklist silently admits any future table someone forgets to list; the leak reappears"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-22T22:23:55Z",
+        "from_item": "findings-phase2-export-boundary",
+        "id": 641,
+        "reason": "phase2 w4. Deferred from cloud batch session: safe implementation needs the external standalone todo-db package to test against (its export-envelope table layout is unverifiable here; blind-filtering envelope['tables'] risks dropping legitimate non-item tables like meta/migrations and breaking the pinned source==restored restore round-trip). The artifact-only alternative conflicts with the pinned test_restore_validation_compares_the_complete_export_envelope. Maintainer design fork. Standalone path is currently DISABLED (no TODO_DB_PACKAGE_VERSION) so there is no live leak; the always-on committed snapshot already honors the allowlist (w1/w2).",
+        "resolution": "promoted",
+        "resolved_item": "findings-phase2-standalone-guard",
+        "resolved_reason": null,
+        "summary": "Guard standalone package export: keep findings tables out of the committed lossless todo-db.json (filter envelope['tables'] to EXPORT_TABLE_ALLOWLIST, or pin the standalone lossless envelope to the CI artifact channel only)"
+      }
+    ],
+    "item_meta": {
+      "category": "export",
+      "completed_at": "2026-07-22T22:46:15Z",
+      "completed_pr": 1271,
+      "created_at": "2026-07-22T12:50:43Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "Export determinism (stable ordering, reproducible diffs) — the committed snapshot's provenance-trail property",
+        "item_id": "findings-phase2-export-boundary"
+      },
+      {
+        "behavior": "READ_ONLY_COMMANDS export path works with the read-only Turso token",
+        "item_id": "findings-phase2-export-boundary"
+      },
+      {
+        "behavior": "Weekly workflow cadence and auto-merge behavior for the items-domain snapshot",
+        "item_id": "findings-phase2-export-boundary"
+      },
+      {
+        "behavior": "restore/round-trip compatibility for existing snapshots",
+        "item_id": "findings-phase2-export-boundary"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "90-day artifact upload path — becomes the only channel for findings-inclusive snapshots (phase 3+)",
+        "decision": "extend",
+        "item_id": "findings-phase2-export-boundary",
+        "path": ".github/workflows/todo-db-export.yml:212-218"
+      },
+      {
+        "concept": "TRANSFER_TABLES already enumerates the full transfer set including events — derive the export allowlist explicitly, add events to export output",
+        "decision": "extend",
+        "item_id": "findings-phase2-export-boundary",
+        "path": "_project/scripts/todo_db.py:650-662"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-phase2-export-boundary",
+        "kind": "do_not_modify",
+        "path_glob": ".gitignore"
+      },
+      {
+        "item_id": "findings-phase2-export-boundary",
+        "kind": "do_not_modify",
+        "path_glob": "_project/blind-spots/**"
+      },
+      {
+        "item_id": "findings-phase2-export-boundary",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/todo-db-export.yml"
+      },
+      {
+        "item_id": "findings-phase2-export-boundary",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-phase2-export-boundary",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "findings-phase2-export-boundary",
+        "kind": "only_modify",
+        "path_glob": "_project/todo-db-export/README.md"
+      },
+      {
+        "item_id": "findings-phase2-export-boundary",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db*.py"
+      },
+      {
+        "item_id": "findings-phase2-export-boundary",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_export_workflow.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_export_workflow.py tests/unit/scripts -k 'export' -q",
+        "description": "Export pinning suite green",
+        "expected": "all passed",
+        "item_id": "findings-phase2-export-boundary",
+        "last_result": "pass",
+        "last_run": "2026-07-22T22:22:45Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'finding' _project/todo-db-export/*.jsonl",
+        "description": "Weekly workflow dry-run produces no finding content",
+        "expected": "0 matches (exit 1 from grep)",
+        "item_id": "findings-phase2-export-boundary",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_standalone_compat.py -q -k export_writes_lossless_envelope_and_legacy_views",
+        "description": "Compatibility export contains events from the same lossless snapshot",
+        "expected": "focused export test passes",
+        "item_id": "findings-phase2-export-boundary",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-phase2-export-boundary",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "findings-phase2-export-boundary",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "findings-phase2-export-boundary",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "todo_db.py: added EXPORT_TABLE_ALLOWLIST (independent frozenset, subset of TRANSFER_TABLES) + _ITEM_NESTED_EXPORT_TABLES; write_export emits events.jsonl (ORDER BY seq, deterministic) and asserts coverage==allowlist (fail-closed RuntimeError on drift); _export_events_unlocked/export_events added; _cmd_export prints 3 paths. seq2 pass.",
+        "item_id": "findings-phase2-export-boundary",
+        "notes": null,
+        "started_at": "2026-07-22T22:23:15Z",
+        "started_branch": "claude/findings-domain-batch-wvbod8",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "EXPORT_TABLE_ALLOWLIST in todo_db.py; _export_all_unlocked iterates it; events rows exported deterministically",
+        "wid": "w1"
+      },
+      {
+        "evidence": "New tests/unit/scripts/test_todo_db_export_allowlist.py [unit,medium]: allowlist excludes finding%, subset of TRANSFER_TABLES, coverage==allowlist; finding_evidence sentinel row fails closed (absent from every export file); write_export raises on coverage drift; events round-trip deterministic. 6 passed; seq1 export suite 16 passed. seq3 mis-spec (grep -c finding=203 matches item PROSE); intent-check grep for findings-table JSON keys=0.",
+        "item_id": "findings-phase2-export-boundary",
+        "notes": null,
+        "started_at": "2026-07-22T22:23:19Z",
+        "started_branch": "claude/findings-domain-batch-wvbod8",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Pinning test: exported tables == allowlist exactly; unlisted tables (incl. future finding%) fail closed; events round-trip",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Fixed .github/workflows/todo-db-export.yml README heredoc + committed _project/todo-db-export/README.md: committed snapshot = items domain only (EXPORT_TABLE_ALLOWLIST), findings excluded/artifact-only; documented events.jsonl; corrected hash-chained overclaim (legacy events.jsonl is plain append-only; hash-chaining is standalone todo-db.json audit only). make lint/lint-markers/lint-imports pass.",
+        "item_id": "findings-phase2-export-boundary",
+        "notes": null,
+        "started_at": "2026-07-22T22:23:22Z",
+        "started_branch": "claude/findings-domain-batch-wvbod8",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Fix todo-db-export.yml hash-chained overclaim; document committed snapshot = items domain only, findings via artifact only",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Scoped out to follow-up findings-phase2-standalone-guard via deferral #641 (promoted). Standalone path is DISABLED today (no live leak); always-on committed snapshot honors the allowlist. Deferred because safe implementation requires the external standalone package to test against + a maintainer design fork (filter committed todo-db.json vs artifact-only), untestable in this cloud session.",
+        "item_id": "findings-phase2-export-boundary",
+        "notes": null,
+        "started_at": "2026-07-22T22:24:16Z",
+        "started_branch": "claude/findings-domain-batch-wvbod8",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Guard standalone package path: committed output honors allowlist, or gated steps pinned artifact-only",
+        "wid": "w4"
+      }
+    ]
+  }
+}

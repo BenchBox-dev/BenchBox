@@ -1,0 +1,240 @@
+{
+  "description": "The retheme should not be considered complete after isolated component or page\nchanges. The final release gate must rerun the maintained Results Explorer QA\nplan plus the specific 2026-05-07 design audit checks: brand coherence,\nvisual hierarchy, retheme completeness, usability, accessibility,\nresponsiveness, and data-presentation quality.\n\nThis item closes the remediation sequence. It should produce durable evidence\nthat every public route renders without internal errors, looks coherent at the\nrequested breakpoints, and communicates benchmark rigor without visual or\nsemantic ambiguity.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bury residual defects in prose; every release-blocking issue needs a concrete TODO or fix.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-release-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "ignore console or network errors because the page looks acceptable.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-release-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "mark the retheme ready while any raw internal error is visible.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-release-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "substitute unit tests for visual and interaction QA on this retheme.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-release-gate",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "needs_item": "results-explorer-retheme-browse-pages"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "needs_item": "results-explorer-retheme-leaderboard-semantics"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "needs_item": "results-explorer-retheme-query-workbench"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "needs_item": "results-explorer-retheme-responsive-accessibility"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "needs_item": "results-explorer-retheme-result-and-compare"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "needs_item": "results-explorer-retheme-schema-cost-regression"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "needs_item": "results-explorer-retheme-theme-system-foundation"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Final evidence is stored under `_project/audits/` and can be replayed by future reviewers.",
+        "item_id": "results-explorer-retheme-release-gate"
+      },
+      {
+        "behavior": "Maintained QA plan in `docs/operations/results-explorer-qa.md` remains the baseline.",
+        "item_id": "results-explorer-retheme-release-gate"
+      },
+      {
+        "behavior": "No launch-ready verdict without benchmark and platform pages rendering data.",
+        "item_id": "results-explorer-retheme-release-gate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test && npm run build",
+        "description": "Frontend verification suite passes",
+        "expected": "all commands pass",
+        "item_id": "results-explorer-retheme-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium",
+        "description": "Chromium browser smoke passes",
+        "expected": "all Chromium e2e checks pass",
+        "item_id": "results-explorer-retheme-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -n \"$(find _project/audits -maxdepth 1 -name 'results-explorer-retheme-final-*.md' -print -quit)\"",
+        "description": "Final readiness report exists",
+        "expected": "at least one final readiness report exists",
+        "item_id": "results-explorer-retheme-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-retheme-release-gate",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-release-gate",
+        "notes": "Outcome: final matrix now covers 12 public states at 390px, 768px,\n1280px, and 1600px: Home, TPC-H benchmark, SSB benchmark, DuckDB\nplatform, DataFusion platform, Polars platform, representative Result\nDetail, same-cohort Compare, mismatch Compare, empty Compare, Query, and\nthe supported-but-empty ClickBench state. This closes the earlier gap where\nResult Detail and real Compare were omitted from release evidence.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prepare the final QA run plan and route matrix",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-release-gate",
+        "notes": "Outcome: capture spec cold-loads each route in a fresh browser context,\nwaits for the shell and a route-specific loaded landmark, and records\nconsole warnings/errors, page errors, and HTTP >=400 responses. The final\n`console-network-2026-05-07.log` contains only its header line across\n48 route/viewport loads.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run cold-load route checks with console and network capture",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-release-gate",
+        "notes": "Outcome: 48 fullPage screenshots are stored under\n`_project/audits/screenshots/results-explorer-retheme-final-2026-05-10/`\n(12 routes × 4 widths), including Result Detail and same/mismatch Compare\nroutes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture final screenshots across the viewport matrix",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-release-gate",
+        "notes": "Outcome: existing chromium e2e coverage exercises Home mode/sort controls,\nbenchmark controls, benchmark/platform selection to Compare, Compare\nbaseline/share URL, Query filters/row limit/visible columns/export/SQL,\nResult Detail methodology/sample disclosures, navigation, and breadcrumbs.\nThe final capture matrix adds visual evidence for the Result Detail and\nreal Compare states that were previously missing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run interaction QA for filters, modes, compare, query, and disclosures",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-release-gate",
+        "notes": "Outcome: follow-up verification ran `npm run typecheck`, full `npm test --\n--run` (45 files / 506 tests), `npm run build`, Chromium Playwright smoke\non a fresh E2E port (53 passed / 6 skipped opt-in capture/performance\nspecs), and the opt-in final capture spec. Firefox/WebKit remain outside\nthis retheme gate per the existing browser-support policy.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run automated checks and browser smoke",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-release-gate",
+        "notes": "Outcome: `_project/audits/results-explorer-retheme-final-2026-05-10.md`\nnow contains the expanded route matrix, 48-screenshot index,\nconsole/network summary, accessibility/responsive summary, and residual\nminor product UX items. No blocker or unowned major finding remains.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write the release-readiness report and file residual defects",
+        "wid": "w6"
+      }
+    ]
+  }
+}

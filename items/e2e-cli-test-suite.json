@@ -1,0 +1,11 @@
+{
+  "description": "Create a comprehensive end-to-end CLI test suite for benchbox that executes\nthe CLI completely and evaluates result output files to confirm correct execution.\n\nTests are grouped by platform types:\n- Local platforms (DuckDB, SQLite, DataFusion, PostgreSQL)\n- Cloud platforms (Snowflake, BigQuery, Redshift, Athena, Databricks)\n- DataFrame platforms (Pandas, Polars, Dask, PySpark, cuDF)\n\nThe goal is to test all primary code paths users would touch to ensure product\nfunctionality before shipping. This includes:\n- Full benchmark execution with result validation\n- Output file structure verification\n- Phase execution completeness\n- Error handling and edge cases\n- CLI options and flags coverage",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-01-16T00:00:00Z",
+      "created_at": "2026-01-16T00:00:00Z",
+      "worktree": "e2e-cli-tests"
+    }
+  }
+}

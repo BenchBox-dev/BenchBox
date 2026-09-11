@@ -1,0 +1,143 @@
+{
+  "context": "Split the two questions the canary conflates. Direction-aware staleness detection answers 'is the mirror behind', and a separate scan of published-results answers 'is the public branch leaking', which is the harm. The second does not depend on develop at all.",
+  "description": "corpus-drift-check.yml compares with git diff --name-only FETCH_HEAD HEAD, which reports differences in either direction, then unconditionally reports that published-results is behind develop and recommends running the sync workflow. Community submissions land on published-results, so the first one makes the canary fire and advise an action that removes it. It also excludes nothing for legacy submission-manifest.json files. Deeper: the canary tests staleness, but the incident it was built for was a leak. A scheduled job running find_public_path_leaks against published-results itself would have caught all 183 leaking bundles directly, without depending on the two branches being comparable.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci-defect",
+      "completed_at": "2026-08-05T21:17:30Z",
+      "completed_pr": 1584,
+      "created_at": "2026-08-04T23:42:48Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A recommendation the canary prints must never be an action that deletes public content",
+        "item_id": "corpus-drift-canary-direction-and-leak-check"
+      },
+      {
+        "behavior": "Stays report-only; it must not gain write access to a public branch",
+        "item_id": "corpus-drift-canary-direction-and-leak-check"
+      },
+      {
+        "behavior": "Stays scheduled rather than push-triggered - dropped push events are the root cause it exists for",
+        "item_id": "corpus-drift-canary-direction-and-leak-check"
+      },
+      {
+        "behavior": "Still fires when develop is genuinely ahead - that is the leak this canary exists to catch",
+        "item_id": "corpus-drift-canary-direction-and-leak-check"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/corpus-drift-check.yml"
+      },
+      {
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -q 'FETCH_HEAD HEAD' .github/workflows/corpus-drift-check.yml",
+        "description": "the canary no longer uses a direction-blind diff",
+        "expected": "Fails on the unfixed tree today (measured exit 1)",
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "last_result": "pass",
+        "last_run": "2026-08-05T21:13:58Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_corpus_drift_canary.py -q",
+        "description": "canary behaviour is covered by a test that includes published-only content",
+        "expected": "Fails on the unfixed tree today (measured non-zero - the test does not exist)",
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "last_result": "pass",
+        "last_run": "2026-08-05T21:14:04Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Directional A/D/M classification in corpus-drift-check.yml; FETCH_HEAD HEAD removed",
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "notes": null,
+        "started_at": "2026-08-05T21:10:28Z",
+        "started_branch": "fix/corpus-drift-canary-direction",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Make the comparison directional so published-only content is not reported as drift",
+        "wid": "w0"
+      },
+      {
+        "evidence": "published-only reported with Do NOT run a full mirror; mirror recipe only on stale path",
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "notes": null,
+        "started_at": "2026-08-05T21:13:42Z",
+        "started_branch": "fix/corpus-drift-canary-direction",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Report published-only paths separately without recommending a destructive mirror",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Privacy scan step over origin/published-results results-data JSON via find_public_path_leaks",
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "notes": null,
+        "started_at": "2026-08-05T21:13:48Z",
+        "started_branch": "fix/corpus-drift-canary-direction",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add a scheduled privacy scan of published-results itself for plaintext leaks",
+        "wid": "w2"
+      },
+      {
+        "evidence": "tests/unit/scripts/test_corpus_drift_canary.py: 6 passed including published-only fixture",
+        "item_id": "corpus-drift-canary-direction-and-leak-check",
+        "notes": null,
+        "started_at": "2026-08-05T21:13:53Z",
+        "started_branch": "fix/corpus-drift-canary-direction",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Cover both with tests whose fixture includes a published-only bundle",
+        "wid": "w3"
+      }
+    ]
+  }
+}

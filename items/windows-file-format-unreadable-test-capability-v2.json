@@ -1,0 +1,104 @@
+{
+  "context": "Patch the narrow open/read seam for this test only; do not add racy mode-bit checks or change product exception handling.",
+  "description": "The unreadable-file regression uses chmod 000, which does not deny reads under Windows ACLs or root. The product contract is platform independent: an OSError at the read boundary must propagate. Inject that failure deterministically while retaining real missing-file and directory coverage.",
+  "legacy": {
+    "item_meta": {
+      "category": "Test portability",
+      "completed_at": "2026-08-01T15:55:53Z",
+      "completed_pr": 1393,
+      "created_at": "2026-08-01T14:04:48Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Missing paths and directories still exercise real filesystem errors.",
+        "item_id": "windows-file-format-unreadable-test-capability-v2"
+      },
+      {
+        "behavior": "Readable empty files still return false.",
+        "item_id": "windows-file-format-unreadable-test-capability-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-file-format-unreadable-test-capability-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/utils/file_format.py"
+      },
+      {
+        "item_id": "windows-file-format-unreadable-test-capability-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/test_file_format.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/utils/test_file_format.py -q",
+        "description": "File-format unit tests",
+        "expected": "fails on the unfixed Windows or root tree; exit 0 after repair",
+        "item_id": "windows-file-format-unreadable-test-capability-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -z \"$(git diff --name-only origin/develop...HEAD -- benchbox/utils/file_format.py)\"",
+        "description": "Production module untouched",
+        "expected": "exit 0",
+        "item_id": "windows-file-format-unreadable-test-capability-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-file-format-unreadable-test-capability-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-file-format-unreadable-test-capability-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Exact seam is Path.open in _check_first_nonempty_line; Nightly run 30690807993 showed chmod fixture did not raise",
+        "item_id": "windows-file-format-unreadable-test-capability-v2",
+        "notes": null,
+        "started_at": "2026-08-01T15:46:47Z",
+        "started_branch": "fix/windows-file-format-unreadable-capability",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Identify the exact file-open seam",
+        "wid": "w0"
+      },
+      {
+        "evidence": "chmod fixture replaced by Path.open PermissionError injection at production read seam",
+        "item_id": "windows-file-format-unreadable-test-capability-v2",
+        "notes": null,
+        "started_at": "2026-08-01T15:46:53Z",
+        "started_branch": "fix/windows-file-format-unreadable-capability",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Replace chmod-based denial with injected PermissionError",
+        "wid": "w1"
+      },
+      {
+        "evidence": "uv run -- python -m pytest -n 0 tests/unit/utils/test_file_format.py -q: 195 passed; production module unchanged",
+        "item_id": "windows-file-format-unreadable-test-capability-v2",
+        "notes": null,
+        "started_at": "2026-08-01T15:48:04Z",
+        "started_branch": "fix/windows-file-format-unreadable-capability",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Run the full file-format unit module and inspect scope",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "context": "Do not begin until the authorization and worktree gates pass. Preserve unrelated changes, use temporary outputs for tests, fail closed on uncertainty, and stop on any data-loss or false-success signal.",
+  "description": "Review the complete diff, fix Critical and Required findings, run pr-preflight, stage only authorized paths, preserve unrelated changes, and stop before publication if any gate fails.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "fix-gate-5-final-review",
+        "needs_item": "fix-gate-4-packaging-release-review"
+      }
+    ],
+    "item_meta": {
+      "category": "architecture-remediation",
+      "completed_at": "2026-08-26T21:28:43Z",
+      "completed_pr": 1925,
+      "created_at": "2026-08-26T17:08:39Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing user files, existing result artifacts, backward compatibility, rollback evidence",
+        "item_id": "fix-gate-5-final-review"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-gate-5-final-review",
+        "kind": "do_not_modify",
+        "path_glob": ".bossmode/**"
+      },
+      {
+        "item_id": "fix-gate-5-final-review",
+        "kind": "do_not_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "fix-gate-5-final-review",
+        "kind": "do_not_modify",
+        "path_glob": "test-results/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make pr-preflight",
+        "description": "Final closeout gate passes",
+        "expected": "all required gates pass",
+        "item_id": "fix-gate-5-final-review",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1925 is open from fix/architecture-integrity-batch with auto-merge withheld. Final fixes are committed in 7bbd7d3f7, focused tests pass 54, hooks pass, and make pr-preflight passes.",
+        "item_id": "fix-gate-5-final-review",
+        "notes": null,
+        "started_at": "2026-08-26T21:28:37Z",
+        "started_branch": "fix/architecture-integrity-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-architecture-integrity-batch",
+        "status": "done",
+        "summary": "Run adversarial diff review, pr-preflight, and guarded closeout",
+        "wid": "w1"
+      }
+    ]
+  }
+}

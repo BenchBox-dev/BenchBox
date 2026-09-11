@@ -1,0 +1,134 @@
+{
+  "context": "Make the parser format-agnostic (recognize both 'hash filename' and 'MD5 (filename) = hash'), OR standardize all bundled checksums.md5 to GNU format. Either way add a guard test that every bundled TPC-H/TPC-DS checksums.md5 entry matches its on-disk binary, so a stale manifest fails CI instead of silently passing.",
+  "description": "benchbox/utils/tpc_compilation.py::_verify_checksum parses checksums.md5 by splitting on whitespace (parts[0]=hash, parts[-1]=filename). This matches GNU-format manifests (e.g. darwin-arm64 'hash dbgen') but for BSD-format manifests ('MD5 (dbgen) = hash', used by darwin-x86_64 and others) the filename never matches, so the code silently falls through to 'No checksum entry found' and returns True (assume valid). Effect: the runtime integrity check is a no-op for every BSD-format platform, and a shipped binary that does not match its own manifest (confirmed for darwin-x86_64 packaged dbgen, 2026-07-21) passes unverified. Surfaced during PR #1256 review.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-10T00:12:21Z",
+      "completed_pr": 1651,
+      "created_at": "2026-07-22T00:43:46Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "A binary whose bytes match its manifest still verifies as valid; only genuine mismatches now fail",
+        "item_id": "harden-tpc-binary-checksum-verification"
+      },
+      {
+        "behavior": "GNU-format manifests (darwin-arm64) continue to verify exactly as today",
+        "item_id": "harden-tpc-binary-checksum-verification"
+      },
+      {
+        "behavior": "No bundled binary bytes are modified by this change",
+        "item_id": "harden-tpc-binary-checksum-verification"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "harden-tpc-binary-checksum-verification",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/tpc_compilation.py"
+      },
+      {
+        "item_id": "harden-tpc-binary-checksum-verification",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpch/"
+      },
+      {
+        "item_id": "harden-tpc-binary-checksum-verification",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpch tests/unit/utils -k 'checksum or verify' -q",
+        "description": "Checksum verifier unit tests pass",
+        "expected": "exit 0",
+        "item_id": "harden-tpc-binary-checksum-verification",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:11:23Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -k bundled_checksums -q",
+        "description": "New guard: every bundled checksums.md5 entry matches its binary",
+        "expected": "exit 0",
+        "item_id": "harden-tpc-binary-checksum-verification",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:11:39Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "harden-tpc-binary-checksum-verification",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "harden-tpc-binary-checksum-verification",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "harden-tpc-binary-checksum-verification",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "harden-tpc-binary-checksum-verification",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1651 reproduced and fixed the BSD-manifest bypass with a GNU/BSD parser and guard tests; PR #1657 resynced darwin-x86_64 dbgen/qgen and checksums.md5. Current origin/develop guard passes.",
+        "item_id": "harden-tpc-binary-checksum-verification",
+        "notes": null,
+        "started_at": "2026-08-10T00:11:52Z",
+        "started_branch": "fix/batch-verify-flag-separator-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Revalidate that BSD-format manifests still bypass _verify_checksum and that at least one shipped binary (darwin-x86_64 dbgen) mismatches its manifest on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1651 changed benchbox/utils/tpc_compilation.py to parse GNU and BSD checksum formats without changing matching-binary behavior.",
+        "item_id": "harden-tpc-binary-checksum-verification",
+        "notes": null,
+        "started_at": "2026-08-10T00:11:59Z",
+        "started_branch": "fix/batch-verify-flag-separator-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Make _verify_checksum handle both GNU and BSD manifest formats (or standardize manifests)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1651 added tests/unit/utils/test_bundled_tpc_checksums.py; todo verify seq 2 passes with the bundled checksum guard.",
+        "item_id": "harden-tpc-binary-checksum-verification",
+        "notes": null,
+        "started_at": "2026-08-10T00:12:05Z",
+        "started_branch": "fix/batch-verify-flag-separator-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add a guard test asserting every bundled TPC checksums.md5 entry matches its binary",
+        "wid": "w2"
+      },
+      {
+        "evidence": "todo verify seq 1 passes (18 checksum/verify tests); current origin/develop includes PR #1651 and binary resync PR #1657.",
+        "item_id": "harden-tpc-binary-checksum-verification",
+        "notes": null,
+        "started_at": "2026-08-10T00:12:11Z",
+        "started_branch": "fix/batch-verify-flag-separator-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Confirm all platforms now verify (no silent skips) and CI is green",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Adversarial review of platform-config-audit.md identified forced connection/network\nsettings that are NOT documented. These are infrastructure-level configurations\n(timeouts, keepalives) distinct from query-level behavior.\n\nSource: docs/platform-config-audit.md adversarial review (2025-11-26)",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Configuration",
+      "completed_at": "2025-11-27T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "platform-config-audit"
+    }
+  }
+}

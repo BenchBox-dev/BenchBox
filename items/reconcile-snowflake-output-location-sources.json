@@ -1,0 +1,220 @@
+{
+  "context": "Pick ONE story for Snowflake output locations and make both sources tell it. Once the stage-path classification item lands, internal stages are genuinely supported, so the registry examples for snowflake should list the user-stage form alongside the external-stage URIs and the credential prompt should keep its default. If stage support is instead judged out of scope, the credential prompt must stop offering '@~/benchbox' as the default and stop whitelisting it. Either way the two must not disagree. For the dead config key, either wire output.directory into the default-root resolution as a lower-precedence source below BENCHBOX_OUTPUT_DIR, or drop the key and its env mapping and stop writing it in preferences.py — do not leave a persisted setting that silently does nothing.",
+  "description": "Two sources tell the user what a valid Snowflake output location is, and they disagree. benchbox/platforms/credentials/snowflake.py::_prompt_default_output_location advertises internal user stages, offers '@~/benchbox' as the Prompt.ask DEFAULT (so pressing Enter accepts it), and explicitly whitelists the form via `is_user_stage = cloud_path.startswith('@~')`. PlatformRegistry.get_cloud_path_examples('snowflake') lists only external stage URIs — s3://, azure://, gcs:// — and is what benchbox/cli/cloud_storage.py::prompt_cloud_output_location shows at run time. Verified on 2026-07-24 @ 14b0271c1: the maintainer's stored Snowflake credential is default_output_location '@~/benchbox', i.e. the prompt's default was accepted, and that value is what the run path then mis-resolved into a literal in-repo directory. Separately, ~/.benchbox/config.yaml persists output.directory './benchmark_runs/results' and benchbox/cli/config.py maps BENCHBOX_OUTPUT_DIR into that same ('output','directory') key, but nothing in the run path reads it back — resolution goes straight to os.environ via resolve_benchmark_runs_root. Only benchbox/cli/preferences.py writes it. It is dead config that documents a root the tool does not actually consult, reinforcing the wrong mental model about where runs land.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Change the credential prompt's default without checking what the registry examples say",
+        "instead": "Change both in the same commit and add the test that pins their agreement",
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "why": "That is exactly how the two drifted apart; fixing one side in isolation recreates the contradiction from the other direction"
+      },
+      {
+        "dont": "Leave output.directory persisted but unread as a 'harmless' leftover",
+        "instead": "Either give it real precedence in the documented chain or remove it end-to-end including the writer",
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "why": "A config key that looks authoritative and does nothing is what makes a user believe their runs are going somewhere they are not"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-25T04:39:59Z",
+        "from_item": "reconcile-snowflake-output-location-sources",
+        "id": 649,
+        "reason": "cloudpathlib only registers az://, gs://, s3:// (and http/https) prefixes, so the three alias schemes in is_cloud_path's list classify as cloud and then blow up at handler construction: create_path_handler('azure://c/x') -> ValueError 'Invalid cloud path format'. Verified pre-existing: the scheme list predates this batch and PR #1299 only appended the stage predicate, so no batch item introduced it. Out of scope for this item -- benchbox/utils/cloud_storage.py is do_not_modify here, and the must-preserve list requires azure:// and gcs:// to REMAIN valid Snowflake output locations, so they cannot simply be dropped from the examples. The fix is to normalise the aliases (azure->az, gcs->gs) or map them explicitly before handing off to cloudpathlib, and to decide what abfss:// should do given DatabricksPath handles dbfs:/ separately.",
+        "resolution": "promoted",
+        "resolved_item": "cloud-path-scheme-aliases-raise-in-create-path-handler",
+        "resolved_reason": null,
+        "summary": "is_cloud_path accepts azure://, gcs:// and abfss:// but create_path_handler raises ValueError for all three"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "needs_item": "classify-snowflake-stage-paths-as-non-local"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Support",
+      "completed_at": "2026-07-25T04:48:25Z",
+      "completed_pr": 1302,
+      "created_at": "2026-07-24T19:03:52Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing stored credentials keep working — no migration is forced on a user whose default_output_location is already set",
+        "item_id": "reconcile-snowflake-output-location-sources"
+      },
+      {
+        "behavior": "External stage URIs (s3://, azure://, gcs://) remain valid Snowflake output locations",
+        "item_id": "reconcile-snowflake-output-location-sources"
+      },
+      {
+        "behavior": "If output.directory is removed, reading an older ~/.benchbox/config.yaml that still contains it must not raise",
+        "item_id": "reconcile-snowflake-output-location-sources"
+      },
+      {
+        "behavior": "The credential setup flow stays fully non-interactive-safe and does not gain a required prompt",
+        "item_id": "reconcile-snowflake-output-location-sources"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runtime_paths.py"
+      },
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/utils/cloud_storage.py"
+      },
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/config.py"
+      },
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/preferences.py"
+      },
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/credentials/snowflake.py"
+      },
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/"
+      },
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -k snowflake -q",
+        "description": "Snowflake credential and registry unit tests pass",
+        "expected": "exit 0",
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "last_result": "pass",
+        "last_run": "2026-07-25T04:44:08Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -k 'snowflake and (output_location or stage)' -q",
+        "description": "The prompt's advertised default is accepted by the run-path classifier",
+        "expected": "exit 0",
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "last_result": "pass",
+        "last_run": "2026-07-25T04:44:21Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/ -q",
+        "description": "No orphaned reference to the output.directory config key remains if it was removed",
+        "expected": "exit 0",
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "last_result": "pass",
+        "last_run": "2026-07-25T04:44:38Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast lane stays green",
+        "expected": "exit 0",
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "last_result": "pass",
+        "last_run": "2026-07-25T04:46:02Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on develop @155a8b24f (all three batch deps merged). (1) Disagreement confirmed: get_cloud_path_examples('snowflake') returns only s3://, azure://, gcs:// -- no stage form at all -- while the credential prompt advertises '@~/benchbox' as its Prompt.ask default and calls it 'Recommended: User Stage (easiest)'. After PR #1299 that default IS classified as cloud (is_cloud_path('@~/benchbox')=True), so the registry examples are now the stale side. (2) output.directory confirmed DEAD: it appears at exactly two sites, both writers -- config.py:146 env mapping BENCHBOX_OUTPUT_DIR->('output','directory',str) and config.py:254 default './benchmark_runs/results' -- and has zero readers anywhere in benchbox/. The run path resolves BENCHBOX_OUTPUT_DIR directly via runtime_paths/path_utils, never through this key. Also noted the prompt validates with a narrower ad-hoc startswith('@~') check alongside is_cloud_path, which is exactly the drift surface this item targets.",
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "notes": "The prompt at benchbox/platforms/credentials/snowflake.py still defaults to '@~/benchbox'; PlatformRegistry.get_cloud_path_examples('snowflake') still lists only s3://, azure:// and gcs://. Separately confirm only benchbox/cli/preferences.py writes ('output','directory') and nothing reads it back.",
+        "started_at": "2026-07-25T04:35:10Z",
+        "started_branch": "fix/reconcile-snowflake-output-location-sources",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Re-validate on develop that the credential prompt and the registry examples still disagree, and that no run-path code reads the output.directory config key",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Single-sourced the accepted output-location forms. Added SNOWFLAKE_DEFAULT_OUTPUT_LOCATION='@~/benchbox' to benchbox/core/platform_registry.py next to get_cloud_path_examples(), and made it the FIRST entry of the snowflake example list (user stage before external stages, matching the prompt's 'Recommended: User Stage' framing). The credential prompt now (a) defaults to that same constant instead of a duplicated literal, and (b) renders its example bullets FROM get_cloud_path_examples('snowflake'), split into stage vs external by a leading '@' -- so the two sides are now one source and cannot re-diverge. Also dropped the prompt's ad-hoc startswith('@~') validation, which was NARROWER than the run-path classifier (it rejected named/table/qualified stages that PR #1299 made valid); validation is now is_cloud_path() alone, the same classifier the run path uses. Verified: default is_cloud_path=True, examples[0]==default, all 4 examples classify as cloud.",
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "notes": null,
+        "started_at": "2026-07-25T04:35:47Z",
+        "started_branch": "fix/reconcile-snowflake-output-location-sources",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Align get_cloud_path_examples('snowflake') and the credential prompt on a single set of accepted output-location forms, consistent with whatever the stage-classification item settled",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Removed the dead output.directory key end-to-end (the 'remove' arm: wiring it into the precedence chain was impossible in scope because path_utils.py and runtime_paths.py are both do_not_modify for this item). Deleted the BENCHBOX_OUTPUT_DIR->('output','directory',str) env mapping at cli/config.py:146 and the './benchmark_runs/results' default at :254, each replaced by a comment naming the real resolver so the key is not reintroduced. Its stale repo-relative default also contradicted PR #1300's work-tree-anchored root. Must-preserves verified empirically: (a) a legacy ~/.benchbox/config.yaml still containing output.directory loads WITHOUT raising and keeps the key verbatim (BenchBoxConfig.output is dict[str,Any] with extra='allow'), (b) fresh defaults no longer emit the key, (c) BENCHBOX_OUTPUT_DIR still drives the run path -- resolve_benchmark_runs_dir() returned /tmp/probe-root. tests/unit/cli/test_cli_config.py (which fixtures a config containing the key) still passes 19/19.",
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "notes": "End-to-end removal means the key itself, its env mapping in benchbox/cli/config.py, and its writer in benchbox/cli/preferences.py. Reading an older ~/.benchbox/config.yaml that still contains the key must not raise either way.",
+        "started_at": "2026-07-25T04:37:05Z",
+        "started_branch": "fix/reconcile-snowflake-output-location-sources",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Resolve the dead output.directory key — either wire it in below BENCHBOX_OUTPUT_DIR in the documented precedence chain, or remove it end-to-end",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added tests/unit/platforms/test_snowflake_output_location_agreement.py (19 tests, all pass) pinning all three sources together: the prompt default classifies as cloud and never yields a relative handler; it IS a registry example and is listed first; every registry example classifies as cloud; external s3/azure/gcs coverage is retained (must-preserve). Plus source-level drift guards asserting the prompt uses SNOWFLAKE_DEFAULT_OUTPUT_LOCATION (no duplicated literal), renders bullets from get_cloud_path_examples('snowflake'), and validates with is_cloud_path rather than the old narrower startswith('@~'). Plus regression guards that output.directory is absent from default config, its env mapping is gone, and a legacy config containing it still loads. Checked docs/platforms/snowflake.md: it documents --staging-root and stage_type=user, which is consistent with the reconciled guidance, so no doc edit was needed. One finding deferred: azure://, gcs:// and abfss:// classify as cloud but raise in create_path_handler (pre-existing cloudpathlib alias gap).",
+        "item_id": "reconcile-snowflake-output-location-sources",
+        "notes": null,
+        "started_at": "2026-07-25T04:38:26Z",
+        "started_branch": "fix/reconcile-snowflake-output-location-sources",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Add a test asserting the credential prompt's default output location is accepted by the same classifier the run path uses, so the two can never drift apart again",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,225 @@
+{
+  "context": "Introduce a dedicated marker for table-format-dependent tests, apply it to\nDelta/Iceberg presorted integration checks, and register the marker in both\npytest configuration locations. Then add a focused CI job that installs the\nrequired optional dependencies and runs only marker-selected tests.\n\nKeep dependency-based skip guards in tests for local ergonomics, but ensure at\nleast one required CI path always has dependencies installed so these tests are\nexecuted.\n",
+  "description": "Ensure Delta and Iceberg integration assertions for presorted dataset generation\nare executed consistently in CI rather than being silently skipped when optional\ndependencies are missing.\n\nThe current tests are dependency-gated and can pass in environments that do not\ninstall deltalake/pyiceberg, which leaves a regression blind spot for open table\nformat output paths.\n\nThis item adds explicit marker-based selection, a dedicated CI job that installs\ntable-format dependencies, and contributor documentation so coverage is durable\nand understandable.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle this into unrelated CI jobs",
+        "instead": "keep a dedicated table-format integration job",
+        "item_id": "table-format-integration-ci-coverage",
+        "why": "failures become harder to diagnose"
+      },
+      {
+        "dont": "move deltalake/pyiceberg into core runtime dependencies",
+        "instead": "install them in CI via dev group or table-formats extras",
+        "item_id": "table-format-integration-ci-coverage",
+        "why": "BenchBox core should remain minimal"
+      },
+      {
+        "dont": "remove skip guards from tests",
+        "instead": "use marker-scoped CI execution to guarantee coverage",
+        "item_id": "table-format-integration-ci-coverage",
+        "why": "local environments may intentionally lack optional deps"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-02-24T00:00:00Z",
+      "created_at": "2026-02-24T00:00:00Z",
+      "worktree": "ci-infrastructure"
+    },
+    "preserves": [
+      {
+        "behavior": "Current CI fast/unit jobs remain unchanged in scope and runtime profile",
+        "item_id": "table-format-integration-ci-coverage"
+      },
+      {
+        "behavior": "Default local pytest runs remain lightweight and continue to skip optional table-format tests when extras are not installed",
+        "item_id": "table-format-integration-ci-coverage"
+      },
+      {
+        "behavior": "Existing presorted integration tests for row-count equivalence and sort monotonicity keep current behavior",
+        "item_id": "table-format-integration-ci-coverage"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "kind": "only_modify",
+        "path_glob": "docs/development/testing.md"
+      },
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "kind": "only_modify",
+        "path_glob": "docs/guides/data-organization-strategies.md"
+      },
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "kind": "only_modify",
+        "path_glob": "pytest.ini"
+      },
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/core/data_organization/test_presorted_generation.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest --collect-only -q tests/integration/core/data_organization/test_presorted_generation.py -m 'requires_table_formats'",
+        "description": "Marker registration is valid and test discovery succeeds",
+        "expected": "collection succeeds without unknown-marker errors",
+        "item_id": "table-format-integration-ci-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -q tests/integration/core/data_organization/test_presorted_generation.py -m 'requires_table_formats'",
+        "description": "Table-format integration tests execute in a dependency-enabled environment",
+        "expected": "Delta/Iceberg marker-selected tests run (not skipped for missing deps)",
+        "item_id": "table-format-integration-ci-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -q tests/integration/core/data_organization/test_presorted_generation.py",
+        "description": "Default local test path remains stable",
+        "expected": "row-count/sort monotonic tests still pass; marker-gated tests follow dependency availability",
+        "item_id": "table-format-integration-ci-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "table-format-integration-ci-coverage",
+        "needs_wid": "w3",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "table-format-integration-ci-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define and register requires_table_formats pytest marker in project configs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-format-integration-ci-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply requires_table_formats marker to Delta/Iceberg presorted integration tests while keeping dependency skip guards",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-format-integration-ci-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add dedicated CI job that installs table-format dependencies and runs marker-selected integration tests",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-format-integration-ci-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the table-format CI test lane and local execution expectations for contributors",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-format-integration-ci-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate marker discovery and run the targeted integration suite with dependency-enabled environment",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-format-integration-ci-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document rollout checklist including manual branch-protection update to require the new CI check",
+        "wid": "w6"
+      }
+    ]
+  }
+}

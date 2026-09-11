@@ -1,0 +1,10 @@
+{
+  "description": "Implement NYC Taxi benchmark using real-world NYC taxi trip data for OLAP analytics, providing authentic multi-dimensional workloads with temporal and basic geospatial dimensions",
+  "legacy": {
+    "item_meta": {
+      "category": "\"Technical Debt & Refactoring\"",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "benchmark-expansion"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Added stubs and skip guards so optional dependency gaps no longer break local test runs.",
+  "legacy": {
+    "item_meta": {
+      "category": "Test Infrastructure",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

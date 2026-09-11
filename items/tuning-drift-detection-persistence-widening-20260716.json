@@ -1,0 +1,97 @@
+{
+  "description": "Residual from review finding R6, verified still present post-batch:\nTuningMetadataManager._as_benchmark_tunings (benchbox/core/tuning/metadata.py)\npersists only pk/fk flags + table tunings, dropping unique/check constraints\nand ALL platform optimizations. Reused-database drift detection is therefore\nblind to z-order/liquid/session-relevant drift. Widen the persisted record\n(schema-compatible: add typed rows or a config-hash-per-section) and the\nvalidate_unified_tunings comparison to cover the full UnifiedTuningConfiguration,\nfeeding the richer result into the drift_check companion field added by the\napplied-ledger work.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing benchbox_tuning_metadata tables written by older versions must still load (versioned or additive schema)",
+        "item_id": "tuning-drift-detection-persistence-widening-20260716"
+      },
+      {
+        "behavior": "save failure remains non-fatal to the run",
+        "item_id": "tuning-drift-detection-persistence-widening-20260716"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-drift-detection-persistence-widening-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/metadata.py"
+      },
+      {
+        "item_id": "tuning-drift-detection-persistence-widening-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/**"
+      },
+      {
+        "item_id": "tuning-drift-detection-persistence-widening-20260716",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning -q -k 'metadata or drift'",
+        "description": "Drift tests green incl. platform-optimization drift",
+        "expected": "All passing",
+        "item_id": "tuning-drift-detection-persistence-widening-20260716",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-drift-detection-persistence-widening-20260716",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-drift-detection-persistence-widening-20260716",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-drift-detection-persistence-widening-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend the metadata persistence to cover unique/check constraints and platform optimizations",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-drift-detection-persistence-widening-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend validate_unified_tunings comparison + drift_check payload; migration handling for old metadata tables",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-drift-detection-persistence-widening-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tests: drift in a platform optimization (e.g. z_ordering toggled) is detected on reuse; old-format tables load without error",
+        "wid": "w3"
+      }
+    ]
+  }
+}

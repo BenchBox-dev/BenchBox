@@ -1,0 +1,113 @@
+{
+  "context": "For BaseQueryCatalog:\n- Check if ai_primitives, metadata_primitives, read_primitives query classes\n  already share a base. If so, add get_query there. If not, create a mixin.\n- The shared get_query needs: self._entries dict, self._queries dict,\n  ValueError on missing, skip_on check, variant selection.\n\nFor TranslatableQueryMixin:\n- Create a simple mixin with translate_query_text that delegates to\n  benchbox.utils.dialect_utils.translate_sql_query\n- Parameterize source_dialect (currently hardcoded as \"netezza\" in all copies)\n  as a class attribute with default \"netezza\"\n- Have amplab, coffeeshop, h2odb, read_primitives, ssb inherit from mixin\n",
+  "description": "Two groups from the duplicate-check report identify consolidation targets\nin the query catalog and translation layer:\n\n- Group 27 (74 lines): `get_query` is char-for-char identical across\n  ai_primitives/queries.py, metadata_primitives/queries.py, and\n  read_primitives/queries.py. The logic (lookup, skip_on check, variant\n  selection, fallback) is a generic query catalog pattern.\n\n- Group 12 (95 lines): `translate_query_text` is byte-for-byte identical\n  across 5 benchmark classes (amplab, coffeeshop, h2odb, read_primitives, ssb).\n  All call `translate_sql_query(query=..., target_dialect=..., source_dialect=\"netezza\")`.\n\nThese should be extracted to:\n1. A `BaseQueryCatalog` class with the shared `get_query` implementation\n2. A `TranslatableQueryMixin` with the shared `translate_query_text`",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-21T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "get_query(query_id, dialect) returns identical results for all query IDs",
+        "item_id": "dedup-query-catalog-base"
+      },
+      {
+        "behavior": "translate_query_text(text, dialect) returns identical translations",
+        "item_id": "dedup-query-catalog-base"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'primitives or amplab or coffeeshop or h2odb or ssb'",
+        "description": "All affected benchmark tests pass",
+        "expected": "all tests pass",
+        "item_id": "dedup-query-catalog-base",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dedup-query-catalog-base",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dedup-query-catalog-base",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dedup-query-catalog-base",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dedup-query-catalog-base",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dedup-query-catalog-base",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create BaseQueryCatalog with shared get_query (~37 lines per copy, 3 copies)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-query-catalog-base",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor ai_primitives, metadata_primitives, read_primitives to use BaseQueryCatalog",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-query-catalog-base",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create TranslatableQueryMixin with shared translate_query_text",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-query-catalog-base",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor amplab, coffeeshop, h2odb, read_primitives, ssb to use TranslatableQueryMixin",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-query-catalog-base",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run tests to verify no regressions",
+        "wid": "w5"
+      }
+    ]
+  }
+}

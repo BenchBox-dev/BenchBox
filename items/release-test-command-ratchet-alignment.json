@@ -1,0 +1,263 @@
+{
+  "context": "Start by running w0 and updating the TODO or PR body with the current evidence\nsummary. Then fix only the stale command/test ratchets. Prefer extending\nexisting tests under `tests/unit/test_standardized_test_commands.py` and\n`tests/unit/test_release_infrastructure.py` so future drift fails in the fast\nlane. Treat coverage threshold changes as a policy decision, not a mechanical\nedit.\n",
+  "description": "The release-path adversarial review found several test-command and ratchet\nmismatches that create false confidence before any stronger release gate can\nbe made trustworthy.\n\nBaseline evidence from 2026-05-25:\n  - Required PR test jobs use fast-only pytest selection.\n  - `pr-preflight-fast-tests` uses `-m fast -q`, while CI excludes\n    slow/stress/resource/live tests and enforces coverage.\n  - `tests/unit/test_release_infrastructure.py` is `medium`, outside the\n    required fast gate, and the review run found stale workflow/template\n    assertions in that file.\n  - `make test-ci` is not part of mandatory CI and uses a legacy marker\n    expression plus the separate `pytest-ci.ini` coverage scope.\n  - CI enforces coverage at 70%, while `tests/conftest.py` only warns below\n    80% when pytest-cov is active.\n\nThis TODO is the prerequisite cleanup item. It does NOT decide the final\nrelease quality contract; it makes the existing command surfaces honest,\nrevalidates the stale-release-ratchet failures, and removes mismatches that\nwould otherwise hide or confuse release-gate work.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "broaden `make pr-preflight` into a full release suite",
+        "instead": "create release-specific gates in dependent TODOs instead.",
+        "item_id": "release-test-command-ratchet-alignment",
+        "why": "local preflight is intentionally lightweight"
+      },
+      {
+        "dont": "commit `/tmp` logs, `.coverage`, `coverage.xml`, `test-results.xml`, or build artifacts.",
+        "instead": "(not specified)",
+        "item_id": "release-test-command-ratchet-alignment",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "edit generated workflow mirrors or indexes directly",
+        "instead": "run the project TODO index command after edits.",
+        "item_id": "release-test-command-ratchet-alignment",
+        "why": "TODO indexes are generated"
+      },
+      {
+        "dont": "hide currently failing release ratchets by deleting assertions",
+        "instead": "update them to assert the current architecture.",
+        "item_id": "release-test-command-ratchet-alignment",
+        "why": "those tests are the evidence trail for release confidence"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "release-test-command-ratchet-alignment",
+        "id": 468,
+        "reason": "Owned by `release-required-main-pr-test-contract`; this cleanup item only removes misleading command drift.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: release-required-main-pr-test-contract (the item said to own this) is already DONE, so defining the release-critical suite was resolved there.",
+        "summary": "Define the final release-critical suite"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-25T00:00:00Z",
+      "created_at": "2026-05-25T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No raw test logs or coverage files are committed; compact evidence belongs in TODO notes, PR body, or CI artifacts.",
+        "item_id": "release-test-command-ratchet-alignment"
+      },
+      {
+        "behavior": "Required GitHub PR checks continue to report the existing `lint`, `test (ubuntu-latest, 3.12)`, and `ci-required-result` names unless a downstream ruleset TODO updates the required contexts.",
+        "item_id": "release-test-command-ratchet-alignment"
+      },
+      {
+        "behavior": "`make pr-preflight` remains a lightweight local gate and still skips code tests for safe content-only PRs through the existing path classifier.",
+        "item_id": "release-test-command-ratchet-alignment"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/pr.yml:code-test — reuse as authoritative required develop PR test expression",
+        "decision": "reuse",
+        "item_id": "release-test-command-ratchet-alignment",
+        "path": ".github/workflows/pr.yml:code-test"
+      },
+      {
+        "concept": "Makefile:ci-test and pr-preflight-fast-tests — extend existing local/CI command mirrors instead of adding another shell wrapper",
+        "decision": "extend",
+        "item_id": "release-test-command-ratchet-alignment",
+        "path": "Makefile:ci-test"
+      },
+      {
+        "concept": "tests/unit/test_release_infrastructure.py — repair existing release ratchets rather than adding parallel workflow tests",
+        "decision": "reuse",
+        "item_id": "release-test-command-ratchet-alignment",
+        "path": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "concept": "tests/unit/test_standardized_test_commands.py — extend existing command-surface ratchets",
+        "decision": "extend",
+        "item_id": "release-test-command-ratchet-alignment",
+        "path": "tests/unit/test_standardized_test_commands.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/release-test-command-ratchet-alignment.yaml"
+      },
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "kind": "only_modify",
+        "path_glob": "pytest-ci.ini"
+      },
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "kind": "only_modify",
+        "path_glob": "pytest.ini"
+      },
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "kind": "only_modify",
+        "path_glob": "tests/conftest.py"
+      },
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_standardized_test_commands.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_release_infrastructure.py -q",
+        "description": "Repaired release-infrastructure tests pass",
+        "expected": "all tests pass",
+        "item_id": "release-test-command-ratchet-alignment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_standardized_test_commands.py -q",
+        "description": "Command-surface ratchets pass",
+        "expected": "all tests pass",
+        "item_id": "release-test-command-ratchet-alignment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/timing_policy_check.py --only-fast-lane --strict",
+        "description": "Fast lane policy remains green",
+        "expected": "Fast lane policy violations: 0",
+        "item_id": "release-test-command-ratchet-alignment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/release-test-command-ratchet-alignment.yaml\n",
+        "description": "TODO graph remains valid after this item is moved or updated",
+        "expected": "exit 0",
+        "item_id": "release-test-command-ratchet-alignment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "release-test-command-ratchet-alignment",
+        "needs_wid": "w0",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "release-test-command-ratchet-alignment",
+        "notes": "Capture raw output under `/tmp/release-test-command-ratchet-w0/` and\ncommit only a compact summary in the PR body or TODO notes.\n\nRequired commands:\n  - `git status --short --branch`\n  - `uv run -- python -m pytest tests/unit/test_release_infrastructure.py -q`\n  - `BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest --collect-only -q -n 0 -m fast tests/test_tpcds_direct.py`\n  - `BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest --collect-only -q -n 0 -m \"fast and not (slow or stress or resource_heavy or live_integration)\" tests/test_tpcds_direct.py`\n  - `BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest -c pytest-ci.ini --collect-only -q -n 0 -m \"not (slow or flaky or local_only)\"`\n\nDecision gate:\n  - If `test_release_infrastructure.py` no longer fails, update the work\n    notes to name the fixing commit before changing tests.\n  - If `make test-ci` becomes an actual required workflow target before\n    implementation starts, stop and split that work into the release gate\n    TODO instead of treating it as cleanup.\n\nImplementation evidence, 2026-05-25 on branch\n`todo/release-test-command-ratchet`:\n  - `test_release_infrastructure.py` still failed before edits with 3\n    stale assertions: PR template sections, `test.yml` matrix shape, and\n    removed `release.yml:check-ci-passed`.\n  - `tests/test_tpcds_direct.py -m fast` collected 3 tests; the CI marker\n    expression collected 2 tests, proving local `-m fast` did not mirror\n    the required CI selector.\n  - `make test-ci` collection succeeded and collected 24450/24883 tests,\n    so the target was stale/unwired but not dead.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the release-test command drift evidence against the current branch",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-test-command-ratchet-alignment",
+        "notes": "Update `tests/unit/test_release_infrastructure.py` so it asserts the\ncurrent release architecture rather than the retired one:\n  - `release.yml` has `dependency-bounds`, `build`, `publish`,\n    `github-release`, and `test-installation`; it must not expect the\n    removed `check-ci-passed` job.\n  - `test.yml` must be inspected as the current job set; do not assume a\n    matrix under `jobs.test` unless the workflow actually has one.\n  - PR template checks must match `.github/PULL_REQUEST_TEMPLATE.md`.\n  - Add a narrow assertion documenting that `release.yml` itself runs no\n    pytest, so future reviewers see the release-path dependency clearly.\n\nDecision gate:\n  - If the repaired assertions run in <10s and do not build artifacts,\n    mark this file `fast` and `unit` so release-infrastructure drift is\n    covered by mandatory fast gates.\n  - If any assertion needs build/package work, split that single assertion\n    into a separate `medium` test and keep the pure workflow parsing tests\n    fast.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Repair stale release-infrastructure ratchet tests and place them in the correct lane",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-test-command-ratchet-alignment",
+        "notes": "Compare `Makefile:pr-preflight-fast-tests` with both required fast-test\nsurfaces:\n  - `.github/workflows/pr.yml:code-test` for develop PRs.\n  - `.github/workflows/test.yml:test` for main/release PRs.\n\nPreferred outcome:\n  - Change local preflight to use the same marker expression as CI:\n    `fast and not (slow or stress or resource_heavy or live_integration)`.\n  - Add a workflow/Makefile ratchet test that fails if the Makefile,\n    develop PR workflow, and main PR workflow expressions drift again.\n\nDecision gate:\n  - Do not add the full coverage run to local preflight unless the runtime\n    cost is explicitly accepted in the PR body. If coverage remains CI-only,\n    update `Makefile` help/comments so preflight no longer claims to fully\n    mirror CI.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align local preflight test selection with the required CI test job or rename the local guarantee",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-test-command-ratchet-alignment",
+        "notes": "Decide whether `make test-ci` should survive as a broad local command.\n\nAcceptable paths:\n  - Maintain it: register any intentionally used markers in both pytest\n    configs, align the coverage source with the authoritative CI scope,\n    add a fast unit ratchet for the command string, and document what it\n    covers that `ci-test` does not.\n  - De-emphasize it: rename or update help/comments so it is not presented\n    as a current CI mirror, and prefer `ci-test`/release-specific targets.\n\nDecision gate:\n  - Do not silently keep `test-ci` with divergent coverage semantics. The\n    PR must state whether it is maintained, deprecated, or re-scoped.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make `test-ci` either a maintained command or remove its broad-CI implication",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-test-command-ratchet-alignment",
+        "notes": "Pick one explicit policy:\n  - Raise CI `--cov-fail-under` to 80 if the project intends 80 as the\n    real floor.\n  - Lower/remove the local 80 warning if 70 is the intended enforced\n    release floor.\n  - Keep both only if docs/comments explain 70 as blocking and 80 as\n    advisory, with a test proving the warning remains non-failing.\n\nDecision gate:\n  - Do not change the threshold opportunistically to make current CI pass.\n    Record the current measured coverage from the updated CI command and\n    justify the selected threshold.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve the 70% enforced coverage floor vs 80% local warning mismatch",
+        "wid": "w4"
+      }
+    ]
+  }
+}

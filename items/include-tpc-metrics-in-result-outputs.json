@@ -1,0 +1,11 @@
+{
+  "description": "TPC benchmark metrics (Power@Size, Throughput@Size, QphH@Size/QphDS@Size) are currently\ncalculated correctly in power/throughput test runners and displayed in CLI output, but\nthey are NOT propagated to BenchmarkResults or included in JSON result files.\n\nThese metrics are a KEY DIFFERENTIATOR for BenchBox - they are the official TPC\nbenchmark performance metrics that users need for comparison and reporting.\n\nImplementation uses `qph_at_size` as a single internal field, with the H/DS suffix\nonly added for presentation/output based on benchmark type.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-25T00:00:00Z",
+      "created_at": "2026-01-25T00:00:00Z",
+      "worktree": "main"
+    }
+  }
+}

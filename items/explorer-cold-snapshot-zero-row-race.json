@@ -1,0 +1,59 @@
+{
+  "description": "Surfaced during the funding-chip work (PRs #1091, #1105). Results-explorer\ne2e tests intermittently fail with `No result found for \"<real-id>\"` (or a\nheading like `TPC-H Results` / `TPC-H - DuckDB` never becoming visible) on a\nresult id that genuinely exists in the corpus.\n\nRoot cause (verified, NOT an id-churn / fixture bug):\n  - The id is present. Regenerating the corpus with\n    `npm run test:e2e:fixtures` and querying the snapshot shows the row in\n    both `bench.results` and `bench.result_detail_metrics`.\n  - `queryRows` (results-explorer/src/db.ts) does NOT swallow errors, so this\n    is a genuine ZERO-ROW read, not a masked exception, and the snapshot HTTP\n    fetch is 200 OK (confirmed from the CI Playwright trace's network log).\n  - `getResultDetailMetrics` / the index queries run `WHERE result_id = ?`\n    against a cold, partially-fetched HTTP-backed `results.duckdb`. The\n    readiness probe `waitForSnapshotRows` / `validateAttachedSnapshot`\n    (src/db.ts) only does `SELECT <col> FROM <view> LIMIT 1` per required\n    view, which a cold snapshot can satisfy while a keyed lookup on the same\n    view still returns nothing.\n  - A zero-row detail result is then rendered as a TERMINAL \"No result found\"\n    with no retry (ResultDetail.tsx: `if (data === null) setError(...)`).\n\nWhere it bites: the FIRST page load after a fresh build (local ~40s cold vs\n~9s warm; warm re-runs 3/3 clean). CI is always cold, so CI is where it shows\n— especially the WebKit `@smoke` lane (slowest engine, smoke-only, so its\nfirst test always eats the cold start) and the first snapshot-hitting spec in\nthe Chromium full suite. Re-running the identical commit passes. A real user\ndeep-linking a detail URL against a cold CDN cache can hit the same thing.\n\nKey files:\n  - results-explorer/src/db.ts — waitForSnapshotRows / SNAPSHOT_READY_SCANS\n    (probe is existence-only, not keyed); queryRows (retry wrapper, only\n    retries isTransientDuckDbSnapshotError, not a cold zero-row read).\n  - results-explorer/src/lib/duckdbQueries.ts — getResultDetailMetrics,\n    getPlatformIndexRows (the keyed lookups that come back empty).\n  - results-explorer/src/pages/ResultDetail.tsx — renders null as a terminal\n    \"No result found\" with no retry.\n\nRelated project memory: project_explorer_cold_snapshot_race. Same\ndevelop-red-from-flakes churn family as the auto-revert misattribution note.\n",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-30T19:52:13Z",
+      "completed_pr": 1368,
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "work_needs": [
+      {
+        "item_id": "explorer-cold-snapshot-zero-row-race",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-cold-snapshot-zero-row-race",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Reproduced deterministically two ways. (a) Unit: fake connections in src/__tests__/snapshotReadiness.test.ts model the exact shapes — unkeyed LIMIT 1 scans answer while keyed WHERE result_id=? returns [], and COUNT(*) reports the true total while the column materializes fewer rows. (b) e2e: with #1340's re-navigation mitigation reduced to a single attempt, the Chromium suite fails reproducibly on Compare/responsive/external-corpus routes — the harness-independent signal",
+        "item_id": "explorer-cold-snapshot-zero-row-race",
+        "notes": "Add a focused test (or a throttled-fetch harness) that attaches a cold\nHTTP-backed snapshot and shows `SELECT ... LIMIT 1` on a required view\nsucceeding while `WHERE result_id = ?` on the same view returns 0 rows in\nthe same window. This pins the defect independently of wall-clock timing.\n",
+        "started_at": "2026-07-30T19:50:57Z",
+        "started_branch": "fix/explorer-cold-snapshot-zero-row-race",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Reproduce deterministically: force a cold snapshot and assert the keyed-lookup zero-row window",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Readiness gating alone is INSUFFICIENT — measured, not assumed. Three progressively stricter gates were each defeated: (1) keyed probe on the last result_id -> Compare still failed on short_ids; (2) completeness (COUNT(*) vs materialized) on results/result_detail_metrics/short_ids -> Compare still failed on the per-query evidence tables; (3) completeness across ALL 8 snapshot tables -> still 3 failures on other routes. Readability is not monotonic per query, so the fix must live at the read: queryRows now re-issues an EMPTY result within a 15s post-attach window (bounded by QUERY_RETRY_ATTEMPTS). Both the strengthened readiness gate and the read-layer retry are kept",
+        "item_id": "explorer-cold-snapshot-zero-row-race",
+        "notes": "Two candidate fixes (pick one, document why in the PR):\n(a) Strengthen waitForSnapshotRows to do a keyed probe (or a COUNT that\n    cannot be satisfied from metadata) so the DB instance is not exposed\n    until keyed lookups resolve; or\n(b) Treat a cold zero-row keyed read as transient in getDetailResult /\n    getResultDetailMetrics and retry a bounded number of times before\n    concluding null, so a real id is never rendered as \"No result found\"\n    during the cold window.\nDo NOT weaken the genuine not-found path — an id that truly is absent must\nstill surface \"No result found\" promptly.\n",
+        "started_at": "2026-07-30T19:51:02Z",
+        "started_branch": "fix/explorer-cold-snapshot-zero-row-race",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Make the readiness gate keyed, or make a cold zero-row read retryable",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Regression coverage: 14 tests in snapshotReadiness.test.ts (keyed-probe, completeness, and shouldRetryColdEmptyRead boundary/attempt/never-attached cases); verified 5 of them fail against pre-fix code. Suite: 844 vitest, 26061 fast lane, typecheck clean. Decisive proof: 3 consecutive Chromium runs fully green with the e2e re-navigation mitigation disabled (single 26s attempt) — the first time that has ever passed. Perf improved: cold init P50 437ms vs 564ms baseline. WebKit/Firefox graduation NOT recommended yet: only Chromium was exercised locally and there is no post-fix CI flake data",
+        "item_id": "explorer-cold-snapshot-zero-row-race",
+        "notes": "Add the w1 repro as a standing regression test. Once green, this unblocks\n(or de-risks) graduate-browser-smoke-to-blocking-gates, whose 10-green\ncriterion this flake was defeating on the WebKit lane.\n",
+        "started_at": "2026-07-30T19:51:06Z",
+        "started_branch": "fix/explorer-cold-snapshot-zero-row-race",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Regression coverage + reassess graduating WebKit/Firefox smoke to blocking",
+        "wid": "w3"
+      }
+    ]
+  }
+}

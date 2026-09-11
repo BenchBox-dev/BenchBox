@@ -1,0 +1,276 @@
+{
+  "context": "First prove whether the route failure is reproducible, then add route-state\ntests that cover both hard reload and in-app navigation. In parallel,\ncentralize the small copy rules that repeatedly surface in compare UI.\n",
+  "description": "The review found an intermittent direct-route failure on `/results/p/polars/`\nwhere the page briefly rendered as `polars Results` with `No results found`,\nplus several copy defects such as `1 warnings` pluralization and duplicated\npunctuation in guardrail text. This TODO adds direct-route regression tests\nand centralizes small but trust-eroding microcopy states.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "cache empty arrays before the route has enough data to know the platform is genuinely empty.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "fix direct route failures by adding arbitrary timeouts.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "leave count/pluralization copy embedded separately in each component.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "style passive status pills like clickable buttons.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Reliability",
+      "completed_at": "2026-05-11T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "results-explorer-followup-todo-review"
+    },
+    "preserves": [
+      {
+        "behavior": "Direct URLs remain static-export friendly and do not require server-side routing.",
+        "item_id": "results-explorer-direct-route-and-copy-hardening"
+      },
+      {
+        "behavior": "Legitimate empty filtered states still render as empty states with reset actions.",
+        "item_id": "results-explorer-direct-route-and-copy-hardening"
+      },
+      {
+        "behavior": "Microcopy changes do not alter eligibility or ranking semantics.",
+        "item_id": "results-explorer-direct-route-and-copy-hardening"
+      },
+      {
+        "behavior": "Passive badges are visually distinct from buttons unless they are interactive.",
+        "item_id": "results-explorer-direct-route-and-copy-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/src/lib/compareSummary.ts may already format guardrail messages.",
+        "decision": "reuse",
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "path": "results-explorer/src/lib/compareSummary.ts"
+      },
+      {
+        "concept": "results-explorer/src/lib/duckdbQueries.ts contains platform query caching.",
+        "decision": "reuse",
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "path": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "concept": "results-explorer/src/pages/Compare.tsx and ComparabilityReceipt components render warning copy.",
+        "decision": "reuse",
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "path": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "concept": "results-explorer/src/pages/PlatformIndex.tsx owns direct platform detail loading and page heading.",
+        "decision": "reuse",
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "path": "results-explorer/src/pages/PlatformIndex.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-direct-route-and-copy-hardening/"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ComparabilityReceipt.tsx"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/copyFormatters.ts"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e -- --project=chromium --grep \"direct route\"",
+        "description": "Direct-route tests pass",
+        "expected": "all direct-route tests pass",
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run src/lib/__tests__/copyFormatters.test.ts src/pages/__tests__/Compare.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx",
+        "description": "Microcopy unit tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"Polars Results|No results found|1 warning|warnings|coverage\\.\\.|PASS|FAIL\" _project/verification-logs/results-explorer-direct-route-and-copy-hardening/",
+        "description": "Browser evidence confirms no false empty states or bad pluralization",
+        "expected": "logs include route and copy pass/fail evidence",
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "notes": "Test hard reload and direct navigation on the checked git SHA, capturing\nfinal URL, H1, row count, console/network errors, loading-state transitions,\nand whether the route matches in-app navigation for:\n  - `/results/p/polars/`;\n  - `/results/p/duckdb/`;\n  - `/results/tpch/`;\n  - `/results/query`;\n  - `/results/compare`.\nAlso capture the exact one-warning and multi-warning Compare copy, including\nduplicated punctuation and passive badge affordance states. Store results in\n`_project/verification-logs/results-explorer-direct-route-and-copy-hardening/w0.log`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce and instrument direct platform route loading",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "notes": "Inspect DuckDB loading/caching in platform queries. Ensure route components\ndistinguish loading, not found, empty filtered result, and real no-data\nstates. Do not cache transient zero-row results for a platform if the\nplatform index has not loaded or if DuckDB is still initializing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prevent transient empty platform caches from becoming terminal state",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "notes": "Add browser or integration tests that hard-load each route in w0 and\ncompare it with in-app navigation. Assert canonical capitalization\n(`Polars Results`, not `polars Results`), expected row count, visible\nfilters/pivots, and absence of false `No results found` states.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add direct-route parity tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "notes": "Add or extend a shared formatter for:\n  - `1 warning` vs `N warnings`;\n  - no duplicated punctuation such as `coverage..`;\n  - selected row count states;\n  - compare guardrail badge labels;\n  - missing/unranked status labels if not already covered by the\n    leaderboard semantics TODO.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Centralize warning/count/status microcopy",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "notes": "Update Compare header, Comparability Guardrails, Decision Summary, receipt,\nand button copy to use shared formatting. Any badge that visually looks\nclickable must either be a real button/link or be restyled as passive text.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply microcopy formatter to Compare and guardrail surfaces",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-direct-route-and-copy-hardening",
+        "notes": "Browser-check the routes from w0 plus a compare route with exactly one\nwarning and one with multiple warnings. Decision gate: do not complete if\nany direct route can land in a false empty state, any visible copy shows\nincorrect pluralization/punctuation, or any passive badge looks like a\nclickable button.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run direct-route and microcopy browser checks",
+        "wid": "w5"
+      }
+    ]
+  }
+}

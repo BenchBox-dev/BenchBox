@@ -1,0 +1,143 @@
+{
+  "context": "First make the critical section explicit: only one process should decide and\npopulate a shared archive path at a time. Then switch the downloader to a\nprocess-unique temporary path plus atomic replace, so the final path is\neither absent or checksum-verified. Keep the implementation generic in\n`data_fetch`, not JoinOrder-specific.\n",
+  "description": "Housekeeping for the JoinOrder canonical cutover audited\n`benchbox/core/data_fetch/` and found that archive downloads are not guarded\nagainst concurrent callers writing the same destination file.\n\n`fetch_data()` resolves the archive path under the benchmark output\ndirectory and calls `download(manifest.url, archive_path, ...)` when table\nfiles are missing. `download()` writes directly to `dest_path`, resumes from\nexisting bytes with a Range request, and verifies the final checksum. There is\nno per-archive lock, no unique `.part` path per process, and no atomic\n`os.replace()` from a completed temp file. Two processes that start with a\nmissing archive can therefore append/truncate the same file concurrently and\neither corrupt the archive or waste a large download before checksum failure.\n\nThis affects every benchmark that uses `benchbox/core/data_fetch/`, not just\nJoinOrder, so the housekeeping TODO deliberately records it as a separate\nfollow-up instead of fixing it inline.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix this only in joinorder",
+        "instead": "(not specified)",
+        "item_id": "data-fetch-concurrent-download-race",
+        "why": "data_fetch is shared by future real-data benchmarks"
+      },
+      {
+        "dont": "remove checksum verification to make concurrent downloads appear to pass",
+        "instead": "(not specified)",
+        "item_id": "data-fetch-concurrent-download-race",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "write directly to the shared final archive path from multiple processes",
+        "instead": "(not specified)",
+        "item_id": "data-fetch-concurrent-download-race",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-08-29T12:39:02Z",
+      "completed_pr": 907,
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Downloader test seams remain mockable without live network access",
+        "item_id": "data-fetch-concurrent-download-race"
+      },
+      {
+        "behavior": "Existing checksum mismatch errors keep surfacing expected and actual sha256 values",
+        "item_id": "data-fetch-concurrent-download-race"
+      },
+      {
+        "behavior": "Pre-populated verified table files still skip network access",
+        "item_id": "data-fetch-concurrent-download-race"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/data_fetch/downloader.py:download — current direct-to-destination streaming implementation to harden",
+        "decision": "reuse",
+        "item_id": "data-fetch-concurrent-download-race",
+        "path": "benchbox/core/data_fetch/downloader.py:download"
+      },
+      {
+        "concept": "benchbox/core/data_fetch/manager.py:fetch_data — current archive path resolution and checksum verification path to extend",
+        "decision": "extend",
+        "item_id": "data-fetch-concurrent-download-race",
+        "path": "benchbox/core/data_fetch/manager.py:fetch_data"
+      },
+      {
+        "concept": "tests/conftest.py test lock — existing interprocess lock pattern to consider before adding a new dependency",
+        "decision": "reuse",
+        "item_id": "data-fetch-concurrent-download-race",
+        "path": "tests/conftest.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "data-fetch-concurrent-download-race",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/data_fetch/"
+      },
+      {
+        "item_id": "data-fetch-concurrent-download-race",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/data_fetch/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/data_fetch -q",
+        "description": "Concurrent fetch_data callers cannot corrupt the final archive",
+        "expected": "data_fetch concurrency tests pass",
+        "item_id": "data-fetch-concurrent-download-race",
+        "last_result": "pass",
+        "last_run": "2026-08-29T12:39:01Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "data-fetch-concurrent-download-race",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "data-fetch-concurrent-download-race",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "data-fetch-concurrent-download-race",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "data-fetch-concurrent-download-race",
+        "notes": "Use an existing project locking pattern if one exists. The lock should\ncover the check-download-verify handoff so a second process reuses the\nverified archive after the first completes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a per-archive interprocess lock around download/extract verification",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "data-fetch-concurrent-download-race",
+        "notes": "Avoid writing directly to the shared final path. Preserve the current\nchecksum failure diagnostics.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Download to a process-unique temp file and atomically replace the archive only after checksum verification",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "data-fetch-concurrent-download-race",
+        "notes": "Tests should prove one completed archive is reused and no caller observes\na partially written final archive.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add concurrency tests for two fetch_data callers targeting the same missing archive",
+        "wid": "w3"
+      }
+    ]
+  }
+}

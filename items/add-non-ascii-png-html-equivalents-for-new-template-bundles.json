@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #186 of follow-up-visualization-template-chart-integration.\nDeferred: Add non-ASCII (PNG/HTML) equivalents for new template bundles\nReason deferred: Current follow-up is scoped to ASCII chart integration and template correctness",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:25Z",
+      "worktree": "main"
+    }
+  }
+}

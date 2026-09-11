@@ -1,0 +1,38 @@
+{
+  "context": "Pin TODO_DB_FINDING_DRAFTS_DIR=~/.benchbox/finding-drafts in the BenchBox wrapper/env at cutover (or migrate drafts once with provenance preserved); align the banner's draft glob with the bound dir.",
+  "description": "BenchBox binds finding drafts to ~/.benchbox/finding-drafts/ while the standalone defaults to ~/.todo-db/finding-drafts/<project-id>/. At cutover, finding sync reports 'synced 0' and the ready banner counts zero unsynced drafts while a real draft (2026-07-24-150447-guards-only-cover-configured-root.md) sits stranded in the BenchBox dir — silent no-op, not an error. Frontmatter schemas are verified compatible; only the location diverges.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-07-29T17:02:56Z",
+      "completed_pr": 1341,
+      "created_at": "2026-07-26T13:03:28Z",
+      "worktree": "findings-domain"
+    },
+    "verifications": [
+      {
+        "command": "TODO_DB_FINDING_DRAFTS_DIR=~/.benchbox/finding-drafts _project/scripts/todo finding candidates",
+        "description": "Draft visible",
+        "expected": null,
+        "item_id": "finding-drafts-dir-bridge",
+        "last_result": "pass",
+        "last_run": "2026-07-29T16:56:25Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Chose bridge over migrate: added DRAFTS_DIR_ENV/resolve_drafts_dir() honoured by create, candidates, sync and surfacing_banner, so no draft moves and provenance is preserved. Verified against the real stranded draft: env-pinned 'finding candidates' lists 2026-07-24-150447-guards-only-cover-configured-root.md (1 unsynced), and a pinned empty dir reports 0, proving the env var drives resolution. 5 new tests; 1115 passed.",
+        "item_id": "finding-drafts-dir-bridge",
+        "notes": null,
+        "started_at": "2026-07-29T16:56:23Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Choose bridge vs migrate; implement; verify the stranded draft becomes visible to sync",
+        "wid": "w1"
+      }
+    ]
+  }
+}

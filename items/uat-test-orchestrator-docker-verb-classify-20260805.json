@@ -1,0 +1,58 @@
+{
+  "context": "Replace the two-way classify with the same up/ps/down form used in tests/uat/test_phases.py (_docker_verb) and tests/uat/test_sweep_durability.py. If a third call site appears, lift a shared helper rather than copying it a fourth time.",
+  "description": "tests/uat/test_orchestrator.py's _startup_fail_clickhouse_docker classifies compose argvs two ways ('up' if 'up' in argv else 'down'), so the post-start readiness 'compose ps' re-check is labelled 'down'. The full UAT suite is green today because that fake only consults 'action' to decide whether to fail the clickhouse compose-up, and the DockerCommandResult it returns for every other call has empty stdout -- which compose_ps_unhealthy_services reads as healthy. The correctness is incidental: any future change that branches on 'action' for teardown, or that asserts on a call sequence, silently gets the readiness probe counted as a teardown.",
+  "legacy": {
+    "item_meta": {
+      "category": "tests",
+      "completed_at": "2026-08-22T17:04:07Z",
+      "completed_pr": 1631,
+      "created_at": "2026-08-06T01:15:23Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "The clickhouse-server compose-up still fails and its cells still land in startup_failed.",
+        "item_id": "uat-test-orchestrator-docker-verb-classify-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-test-orchestrator-docker-verb-classify-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "uat-test-orchestrator-docker-verb-classify-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/phases/"
+      },
+      {
+        "item_id": "uat-test-orchestrator-docker-verb-classify-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_orchestrator.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -q '\"up\" if \"up\" in argv else \"down\"' tests/uat/test_orchestrator.py",
+        "description": "No two-way docker verb classifier remains in test_orchestrator.py",
+        "expected": "exits 0 once the fake classifies ps separately",
+        "item_id": "uat-test-orchestrator-docker-verb-classify-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:03:59Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_orchestrator.py -q",
+        "description": "The orchestrator suite still passes",
+        "expected": "all tests pass, startup_failed accounting unchanged",
+        "item_id": "uat-test-orchestrator-docker-verb-classify-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:04:05Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

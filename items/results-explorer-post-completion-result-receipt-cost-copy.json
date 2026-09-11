@@ -1,0 +1,203 @@
+{
+  "context": "Reuse and extend results-explorer/src/lib/costDisplay.ts rather than adding\ndisplay conditionals directly inside RunReceipt. Keep the mapping small and\nexplicit so raw values remain available in data but not in user-facing copy.\n",
+  "description": "The 2026-05-09 post-completion review on develop dbac33ee1 found that result\nreceipts still leak raw enum values in the Cost section, for example\n\"compute only, billing: not_applicable, region: not_applicable\" on\n/results/r/tpch-polars-sf0.1-20260502-0093bb7a.\n\nThis item addresses review finding #12 recorded in\n_project/audits/results-explorer-post-completion-review-2026-05-09.md.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change cost data generation to solve a presentation-only copy issue.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "globally strip underscores from every enum value.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hide the whole Cost section when only billing or region is not applicable.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend UX",
+      "completed_at": "2026-05-10T00:00:00Z",
+      "created_at": "2026-05-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cost model version/source remains visible when recorded.",
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy"
+      },
+      {
+        "behavior": "Local normalized-cost status remains distinguishable from missing cost data.",
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy"
+      },
+      {
+        "behavior": "Result receipt field grouping remains unchanged.",
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-post-completion-result-receipt-cost-copy/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/userFacingStringHygiene.test.ts"
+      },
+      {
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RunReceipt.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/RunReceipt.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/costDisplay.test.ts"
+      },
+      {
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/costDisplay.ts"
+      },
+      {
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/lib/__tests__/costDisplay.test.ts src/components/__tests__/RunReceipt.test.tsx src/pages/__tests__/ResultDetail.test.tsx src/__tests__/userFacingStringHygiene.test.ts",
+        "description": "Cost display and receipt tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual/browser: result receipt Cost section does not render not_applicable raw enum values'",
+        "description": "Manual receipt cost-copy check passes",
+        "expected": "manual evidence captured in PR notes or verification log",
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "notes": "Static-source revalidation captured against develop tip 21376cb58\nto _project/verification-logs/results-explorer-post-completion-result-receipt-cost-copy/w0.log.\nFinding #12 reproduces in `costDisplay.ts:48-58` `costScopeSummary`:\ntruthy-only check on `billing_unit`/`pricing_region` interpolates\nraw `\"not_applicable\"` into the rendered string. RunReceipt.tsx:117\nsurfaces it under \"Cost scope\".\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate cost-copy enum leakage on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "notes": "`costDisplay.ts` grew `humanizeBillingFragment(value)`. Returns\n`null` for sentinel values (`not_applicable`, `unknown`, `none`,\n`n/a`, `na`, empty/whitespace) — case-insensitive — so callers can\ndrop the fragment. Otherwise returns the trimmed underscore-replaced\nhumanization. Existing `costStatusLabel(\"not_applicable_local\")`\n→ `\"local\"` mapping is unchanged.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Map not-applicable cost fields to user-facing labels",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "notes": "`costScopeSummary` now uses `humanizeBillingFragment` for both\n`billing_unit` and `pricing_region`. Local-no-cloud rows render\njust the cost scope (e.g. `\"compute only\"`); rows with real\nvalues still surface them. Cost model/version/source rendering is\nunchanged. RunReceipt and ResultDetail consume `costScopeSummary`\nvia existing imports, so no call-site changes were needed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply cost display mapping to Run Receipt",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-result-receipt-cost-copy",
+        "notes": "New `costDisplay.test.ts` (15 tests) covers the helper contract:\nnull/whitespace/sentinel handling for `humanizeBillingFragment`,\nfour `costScopeSummary` shapes (sentinel both, real both, mixed,\nall-missing), and pre-existing `costStatusLabel` /\n`normalizedCost*` paths to prove they were unaffected.\nRunReceipt.test.tsx grows a regression case\n(\"does not leak raw not_applicable enum into the Cost section\ncopy (finding #12)\") that pins the audited route's behavior.\nThe broad `userFacingStringHygiene.test.ts` scanner was not\nextended because `not_applicable_local` is a legitimate\n`cost_status` enum referenced in source code; a focused\nregex-on-rendered-output assertion in the receipt test owns the\ncontract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add hygiene tests for user-facing cost strings",
+        "wid": "w3"
+      }
+    ]
+  }
+}

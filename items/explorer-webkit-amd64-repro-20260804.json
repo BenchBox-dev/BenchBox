@@ -1,0 +1,97 @@
+{
+  "context": "Re-run the harness recorded in docs/operations/browser-ci.md under --platform linux/amd64 (Rosetta emulation on Apple silicon) against both current develop and the known-bad tree at feat/results-explorer-corpus-sanitization, then record the outcome in the same section. If the failure reproduces on amd64, that is the root cause channel and the investigation continues from a real reproduction. If it does not, record that the failure is not reproducible outside GitHub-hosted runners and consider whether the harness should run in CI on a schedule instead.",
+  "description": "The 2026-08-03 investigation (PR #1502) refuted three causal hypotheses for the WebKit data-bound failure on /results/tpch/: the known-bad tree passes at its own Playwright 1.59.1 pin and at 1.62.1, and develop passes 3/3 under a 2-core/2GB constraint. The failure has not recurred on any tree containing #1484 and all three browser jobs are green. One variable was never tested: the documented reproduction harness runs linux/arm64 in a local container, while GitHub's ubuntu-latest is linux/amd64. Until the harness has been run under --platform linux/amd64 the investigation has an open end, and the next occurrence would restart from zero. This item exists so that gap is visible rather than implied by a green lane.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-04T12:41:24Z",
+      "completed_pr": 1525,
+      "created_at": "2026-08-04T11:33:01Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Chromium and Firefox lanes keep passing throughout",
+        "item_id": "explorer-webkit-amd64-repro-20260804"
+      },
+      {
+        "behavior": "No data-wait budget is widened and no assertion weakened - the harness message forbids that as a fix",
+        "item_id": "explorer-webkit-amd64-repro-20260804"
+      },
+      {
+        "behavior": "The documented distinction between this failure and the cold-snapshot zero-row race stays accurate",
+        "item_id": "explorer-webkit-amd64-repro-20260804"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-webkit-amd64-repro-20260804",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-webkit-amd64-repro-20260804",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/browser-ci.md"
+      },
+      {
+        "item_id": "explorer-webkit-amd64-repro-20260804",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -q -F 'linux/amd64' docs/operations/browser-ci.md",
+        "description": "The amd64 arm of the investigation is recorded",
+        "expected": "Exits 1 on the unfixed tree, where browser-ci.md documents only the arm64 harness and names amd64 solely as the untested variable, and exits 0 once the amd64 run and its outcome are written up.",
+        "item_id": "explorer-webkit-amd64-repro-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:40:23Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows/test_results_explorer_browser_gate.py -q",
+        "description": "Browser gate contract tests still pass",
+        "expected": "Lane wiring unchanged by the investigation",
+        "item_id": "explorer-webkit-amd64-repro-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:40:31Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-webkit-amd64-repro-20260804",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Ran the harness under --platform linux/amd64 (Rosetta emulation; required softwareupdate --install-rosetta, which succeeded without elevation - without it the container fails to bootstrap with 'Rosetta is not installed'). develop tree: benchmark-index fails 3/3, full WebKit @smoke fails 10 of 16, exact CI signature - waitForDataLoaded throwing at e2e/support/fixtures.ts:124 from benchmark-index.spec.ts:14. arm64 same tree passes 16/16. CONFOUNDED, not a reproduction: emulated run took 10.5 minutes vs 58 seconds on arm64 (~11x slower), and every failure is a data-bound wait exhausting its 10s+8s+8s budget, which an 11x slowdown produces regardless of cause. GitHub runners are native amd64, not emulated, and the WebKit lane is green there.",
+        "item_id": "explorer-webkit-amd64-repro-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T12:40:12Z",
+        "started_branch": "fix/explorer-webkit-amd64-repro-20260804",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/upbeat-knuth-7adfae",
+        "status": "done",
+        "summary": "Run the documented harness under linux/amd64 against develop and the known-bad tree",
+        "wid": "w0"
+      },
+      {
+        "evidence": "browser-ci.md gains an 'amd64 arm (2026-08-04)' subsection: the run, the ~11x emulation confound, the Rosetta prerequisite, and the conclusion that the architecture hypothesis is NOT supported since native amd64 is green in CI. Adds a hypotheses-table row and an explicit 'do not run the emulated amd64 arm again'. Records the robustness fact it did establish - data-bound budgets fail by timeout under load rather than degrading - and names the next real step: a native amd64 run via workflow_dispatch, not a local one.",
+        "item_id": "explorer-webkit-amd64-repro-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T12:40:17Z",
+        "started_branch": "fix/explorer-webkit-amd64-repro-20260804",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/upbeat-knuth-7adfae",
+        "status": "done",
+        "summary": "Record the amd64 outcome and the resulting conclusion in browser-ci.md",
+        "wid": "w1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "context": "Implement against the design doc spec. Land the phase-model schema change\nfirst, then the per-engine ANALYZE knob and result-bundle field, then opt-in\nper benchmark. Do not detect-and-disable engine auto-analyze; document it and\nattribute zero wall-clock with stats_mode metadata (the design doc's lean).\n",
+  "description": "Track-2 (future) implementation TODO seeded by joinorder-track2-groundwork w2.\nImplements a first-class \"statistics\" phase between load and query so that\noptimizer-statistics build time is measured separately from load and query\ntime. Without this separation, Track 2's research question — the interplay of\nstatistics maintenance and predicate selectivity — cannot be measured: an\nengine with expensive auto-stats looks N seconds slower at load OR at\nfirst-query, neither attribution being correct.\n\nImplementation spec: `_project/design/track2-joinorder-stats-as-phase.md`\n(authored by joinorder-track2-groundwork w1). That doc surveys the current\nphase model, identifies the gap, proposes the load → statistics → query\nordering, and defines the migration strategy and open design questions.\n\nThis is a seed at status Identified. It stays in planning/ until Track 2 is\npicked up; the work units below are summary-level, not a full implementation\nplan.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "track2-joinorder-stats-phase",
+        "needs_item": "joinorder-canonical-cutover"
+      }
+    ],
+    "item_meta": {
+      "category": "Benchmark Development",
+      "created_at": "2026-06-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing benchmarks default to the legacy load-includes-stats behavior; no historical result bundle is invalidated.",
+        "item_id": "track2-joinorder-stats-phase"
+      },
+      {
+        "behavior": "The phase-model change lands after the joinorder rename + canonical wiring (cutover), per deps.needs.",
+        "item_id": "track2-joinorder-stats-phase"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "track2-joinorder-stats-phase",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "track2-joinorder-stats-phase",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "track2-joinorder-stats-phase",
+        "notes": "Schema change to the phase model and per-phase timing manifest. Default\nlegacy behavior (no explicit statistics phase) is preserved for existing\nbenchmarks. See the design doc's Proposed change and Migration strategy.\nDone 2026-07-05: StatisticsGatheringPhase dataclass +\nSetupPhase.statistics_gathering (core/results/models.py), CLI `statistics`\ntoken (_parse_phases_list), LifecyclePhases.statistics, RunConfig\ngather_statistics, call site between validation and query execution in\nrun_enhanced_benchmark plus the load-only lifecycle branch.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a statistics phase to the runner phase model (load -> statistics -> query)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "track2-joinorder-stats-phase",
+        "notes": "Explicit ANALYZE call per platform adapter; where the engine auto-analyzes\nduring load, document it and report zero stats-phase wall-clock with\nstats_mode: auto-on-load rather than double-building. Cover the engines in\nthe design doc's compatibility matrix.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a per-engine ANALYZE / COMPUTE STATISTICS knob for the statistics phase",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "track2-joinorder-stats-phase",
+        "notes": "Result-bundle field for statistics-phase timing and stats_mode metadata,\nkept separate from load and query timing. Dataset/schema version\ndistinguishes pre- vs post-phase-model bundles.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Carry per-phase statistics timing in the result-bundle manifest",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "track2-joinorder-stats-phase",
+        "notes": "Opt-in per benchmark so historical bundles remain interpretable. joinorder,\ntpch, tpcds enable the new phase once this lands.\nDone 2026-07-05: supports_statistics_phase flag in benchmark_registry.yaml\n(joinorder/tpch/tpcds) + catalog_schema.py field; the adapter gates the\nphase on it and reports a skip note for non-opted-in benchmarks. w2 done\nvia the base-adapter gather_statistics hook (analyze_tables ->\nanalyze_table -> unsupported resolution) with the Redshift auto-on-load\noverride; w3 done via phases.statistics {status, duration_ms, stats_mode,\ntables_analyzed} in the exported result schema (schema.py +\nschema_specs.yaml phase_key_order + public-contracts inventory row).\nVerified end-to-end on DuckDB: tpch --phases generate,load,statistics,power\nemits phases.statistics (explicit, 8 tables); default run emits no block;\nssb + statistics skips with a note.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Opt-in mechanism: enable the statistics phase for joinorder/tpch/tpcds",
+        "wid": "w4"
+      }
+    ]
+  }
+}

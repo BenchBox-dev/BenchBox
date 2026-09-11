@@ -1,0 +1,89 @@
+{
+  "context": "Add sslrootcert (and sibling libpq spellings sslcert/sslkey if present in adapters) to the path-hashing keys in the public spec.",
+  "description": "Driven 2026-08-01: anonymize_result_payload leaves '/Users/joe/certs/root.pem' under the sslrootcert key (redshift.py:129, libpq spelling) intact - the key ends in neither 'path' nor 'file', so no identifier rule fires, and the value regexes miss bare absolute paths. Leaks the home-directory username. ca_cert_path / ssl_cert_path are correctly path-hashed. Not a credential; privacy-level severity.",
+  "legacy": {
+    "item_meta": {
+      "category": "security",
+      "completed_at": "2026-08-01T19:10:02Z",
+      "completed_pr": 1429,
+      "created_at": "2026-08-01T12:41:51Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing path-hash behavior for ca_cert_path/ssl_cert_path is unchanged",
+        "item_id": "public-export-sslrootcert-path-unhashed"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "public-export-sslrootcert-path-unhashed",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "public-export-sslrootcert-path-unhashed",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization_specs.yaml"
+      },
+      {
+        "item_id": "public-export-sslrootcert-path-unhashed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_anonymization.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import json;from benchbox.core.results.anonymization import AnonymizationManager,AnonymizationConfig as C;m=AnonymizationManager(C());out=json.dumps(m.anonymize_result_payload({'platform_metadata':{'platform_raw_config':{'sslrootcert':'/Users/joe/certs/root.pem'}}}),default=str);assert '/Users/joe' not in out\"",
+        "description": "sslrootcert path is no longer emitted verbatim publicly",
+        "expected": "exits 1 on an unfixed tree (verified 2026-08-01), 0 once path-hashed",
+        "item_id": "public-export-sslrootcert-path-unhashed",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py -q",
+        "description": "anonymization suite still green",
+        "expected": "all pass before and after - regression guard",
+        "item_id": "public-export-sslrootcert-path-unhashed",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "public-export-sslrootcert-path-unhashed",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on develop 2026-08-01: /Users/joe survived the public path under sslrootcert (rung exits 1)",
+        "item_id": "public-export-sslrootcert-path-unhashed",
+        "notes": null,
+        "started_at": "2026-08-01T18:30:07Z",
+        "started_branch": "fix/public-export-sslrootcert-hash",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Re-validate the path survives the public layer on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "sslrootcert added to path_keys (only libpq spelling real adapters use - redshift.py:129; sslcert/sslkey unused per grep); 2 tests; suite 82 passed; rung 1 exits 0",
+        "item_id": "public-export-sslrootcert-path-unhashed",
+        "notes": null,
+        "started_at": "2026-08-01T18:30:14Z",
+        "started_branch": "fix/public-export-sslrootcert-hash",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Add the libpq spellings to path-hash keys with tests",
+        "wid": "w1"
+      }
+    ]
+  }
+}

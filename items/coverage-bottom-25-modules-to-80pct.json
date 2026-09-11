@@ -1,0 +1,589 @@
+{
+  "context": "Original work units (w1-w14) - completed except w3:\n  w1-w4 and w6-w9 are fully independent. w5 before w10 (mock patterns).\n  w8 → w13, w12 → w14 (file extension chains).\n\nNew work units (w15-w24) - dependency chains:\n  w15 depends on w4, w2, w5 (extends their test files)\n  w16 depends on w2, w9 (extends comparison and cloud adapter tests)\n  w17 depends on w6, w10 (extends staging and fabric tests)\n  w18 depends on w1, w6 (extends core primitive tests)\n  w19 depends on w7, w5 (extends spark and credential tests)\n  w20 depends on w10 (extends snowflake test file from w10)\n  w21 depends on w11 (extends bigquery test file from w11)\n  w22 depends on w13 (extends databricks test file from w8/w13)\n  w23 depends on w14 (extends redshift test file from w12/w14)\n  w24 depends on w23 (extends redshift further)\n\nParallelism: w15-w19 are independent of each other (different files).\nw20-w22 are independent of each other.\nw23 must complete before w24.\n\nCritical: verify per-module coverage after each work unit, not just overall.\nUse: make coverage-fast 2>&1 | grep \"module_path\" to check individual modules.\n\nFor each work unit:\n1. Run coverage on the target module first to identify the exact uncovered lines:\n   uv run -- python -m pytest --cov=benchbox/<module> --cov-report=term-missing -m fast -q\n2. Add tests targeting the uncovered lines\n3. Verify module coverage ≥80% before committing\n4. Run the full fast smoke suite to confirm no regressions\n\nRecommended mock setup for cloud SDKs:\n- boto3: patch at \"benchbox.platforms.redshift.boto3\" etc. (not at boto3 root)\n- google.cloud: use MagicMock() for both bigquery.Client and storage.Client\n- snowflake.connector: patch \"benchbox.platforms.snowflake.snowflake.connector.connect\"\n- databricks.sql: patch \"benchbox.platforms.databricks.adapter.databricks\"\n- pyspark: patch \"benchbox.platforms.dataframe.pyspark_df.SparkSession\"\n- pyodbc: patch \"benchbox.platforms.fabric_warehouse.pyodbc.connect\"\n",
+  "description": "Current fast-test coverage sits at 80.04% (85,262 / 106,518 lines) - just 47\ncovered lines above the 80% threshold. The buffer is dangerously thin: a single\nbad merge could drop us below the gate.\n\nThis item systematically brings the 25 lowest-coverage modules up to ≥80% each,\nadding robustness to the overall coverage floor and reducing the risk of accidental\nregression below the gate.\n\nCoverage gaps (lines needed to reach 80% per module):\n  databricks/dataframe_adapter.py      23.57% →  +89 lines\n  dataframe/pyspark_df.py              28.06% → +145 lines\n  azure/spark_execution_utils.py       34.78% →  +21 lines\n  databricks/adapter.py                41.68% → +396 lines\n  bigquery.py                          42.15% → +321 lines\n  redshift.py                          42.98% → +435 lines\n  spark.py                             46.04% → +133 lines\n  snowflake.py                         46.43% → +245 lines\n  dataframe/lakesail_df.py             48.94% →  +88 lines\n  credentials/redshift.py              50.96% → +121 lines\n  tpcds/generator/streaming.py         52.20% →  +57 lines\n  motherduck.py                        52.60% →  +42 lines\n  base/cloud_spark/staging.py          53.24% →  +99 lines\n  tpchavoc/benchmark.py                53.51% →  +30 lines\n  credentials/snowflake.py             54.26% →  +48 lines\n  fabric_warehouse.py                  55.68% → +109 lines\n  clickhouse/diagnostics.py            56.18% →  +21 lines\n  transaction_primitives/dataframe_operations.py  56.18% →  +89 lines\n  tpcdi/financial_data.py              56.33% →  +38 lines\n  starburst.py                         56.73% →  +24 lines\n  comparison/suite.py                  56.97% →  +56 lines\n  results/anonymization.py             57.20% →  +59 lines\n  write_primitives/benchmark.py        57.35% → +109 lines\n  gcp/dataproc_adapter.py              58.14% →  +56 lines\n  aws/athena_spark_adapter.py          58.66% →  +60 lines\n\nTotal: ~2,891 new covered lines across 12 work units (original estimate).\n\n--- Progress Review (2026-04-02) ---\n\nAfter 13 of 14 original work units (w1-w2, w4-w14), overall coverage rose from\n80.04% to 81%. However, only 3 of 25 target modules actually reached 80%:\n\n  Module                                  Before → After    Status\n  ─────────────────────────────────────────────────────────────────\n  results/anonymization.py                57.20% → 89%      ✅ HIT\n  tpchavoc/benchmark.py                   53.51% → 85%      ✅ HIT\n  starburst.py                            56.73% → 82%      ✅ HIT\n  motherduck.py                           52.60% → 77%      Near (needs +4)\n  tpcds/generator/streaming.py            52.20% → 73%      Near (needs +15)\n  comparison/suite.py                     56.97% → 65%      Gap  (needs +37)\n  gcp/dataproc_adapter.py                 58.14% → 66%      Gap  (needs +37)\n  aws/athena_spark_adapter.py             58.66% → 63%      Gap  (needs +47)\n  credentials/snowflake.py                54.26% → 55%      Gap  (needs +46)\n  transaction_primitives/dataframe_ops    56.18% → 56%      Gap  (needs +88)\n  clickhouse/diagnostics.py               56.18% → 57%      Gap  (needs +20)\n  write_primitives/benchmark.py           57.35% → 58%      Gap  (needs +104)\n  fabric_warehouse.py                     55.68% → 59%      Gap  (needs +96)\n  base/cloud_spark/staging.py             53.24% → 54%      Gap  (needs +97)\n  spark.py                                46.04% → 50%      Gap  (needs +116)\n  credentials/redshift.py                 50.96% → 52%      Gap  (needs +117)\n  snowflake.py                            46.43% → 54%      Gap  (needs +186)\n  databricks/adapter.py                   41.68% → 53%      Gap  (needs +274)\n  bigquery.py                             42.15% → 48%      Gap  (needs +273)\n  redshift.py                             42.98% → 48%      Gap  (needs +372)\n  dataframe/pyspark_df.py                 28.06% → 28%      w3 pending\n  dataframe/lakesail_df.py                48.94% → 49%      w3 pending\n  databricks/dataframe_adapter.py         23.57% → 24%      w3 pending\n\nRoot cause: the original work units under-estimated the number of new covered\nlines required. Large adapter modules (bigquery, redshift, databricks, snowflake)\nhave deep call trees with many branches that need dedicated test scenarios for\neach path through connection setup, data loading, query execution, SQL generation,\nand tuning application.\n\nAdditional work units w15-w24 added below to close the remaining ~1,744 lines\nof coverage gap across the 19 modules that haven't yet reached 80%.\nCombined with w3 (~322 lines), total remaining work is ~2,066 new covered lines.\n\nAll tests MUST carry the @pytest.mark.fast marker so they run in the fast lane.\nAll external SDKs (databricks, pyspark, snowflake-connector, boto3, google-cloud,\npyodbc, duckdb, requests) are mocked - no live connections.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add @pytest.mark.slow, @pytest.mark.live_integration, or @pytest.mark.resource_heavy markers",
+        "instead": "use only @pytest.mark.fast",
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "why": "those markers cause tests to be excluded from the fast lane and won't count toward the 80% coverage gate"
+      },
+      {
+        "dont": "batch all 25 modules into a single test file",
+        "instead": "keep per-module or per-group test files aligned with existing test directory structure",
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "why": "monolithic test files make coverage diffs unreadable and slow down targeted reruns"
+      },
+      {
+        "dont": "call list() on color_cycle() return values",
+        "instead": "(not specified)",
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "why": "color_cycle() returns an infinite itertools.cycle; use list(theme.palette or DEFAULT_PALETTE) instead"
+      },
+      {
+        "dont": "import or instantiate real cloud SDK clients in tests",
+        "instead": "mock all external SDK calls with unittest.mock.patch",
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "why": "CI has no cloud credentials and live calls cause flakiness and violate the fast-lane contract"
+      },
+      {
+        "dont": "modify production source files to make them more testable",
+        "instead": "only add/extend test files",
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "why": "changes to production code require their own review cycle and could introduce regressions that dwarf the coverage gain"
+      },
+      {
+        "dont": "use -o 'addopts=' to override pytest.ini",
+        "instead": "(not specified)",
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "why": "this strips -n auto and makes tests 10x slower"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-04-02T00:00:00Z",
+      "created_at": "2026-04-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "@pytest.mark.fast marker present on every new test function",
+        "item_id": "coverage-bottom-25-modules-to-80pct"
+      },
+      {
+        "behavior": "All existing passing tests continue to pass - zero regressions",
+        "item_id": "coverage-bottom-25-modules-to-80pct"
+      },
+      {
+        "behavior": "No live network calls - all external SDK clients mocked with unittest.mock.patch",
+        "item_id": "coverage-bottom-25-modules-to-80pct"
+      },
+      {
+        "behavior": "No production source files modified - tests only",
+        "item_id": "coverage-bottom-25-modules-to-80pct"
+      },
+      {
+        "behavior": "Overall fast-lane coverage stays ≥80.04% after every individual work unit commit",
+        "item_id": "coverage-bottom-25-modules-to-80pct"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_anonymization.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_comparison.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpcdi/test_financial_data_coverage.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpcds/generator/test_streaming_coverage.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/transaction_primitives/test_dataframe_ops_coverage.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/write_primitives/test_benchmark_execution.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/aws/test_athena_spark_coverage.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/azure/test_spark_execution_utils.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/base/cloud_spark/test_staging.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/credentials/test_redshift_defaults.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/credentials/test_snowflake_defaults.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_lakesail_df.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_pyspark_df.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/gcp/test_dataproc_coverage.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_bigquery_adapter_coverage.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_clickhouse_cloud_coverage.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_databricks_adapter_coverage.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_microsoft_fabric_adapter.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_motherduck.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_redshift_adapter_coverage.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_snowflake_adapter_coverage.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_spark_adapter_coverage.py"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_starburst.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -m fast -q --cov=benchbox/platforms/databricks --cov=benchbox/platforms/dataframe --cov=benchbox/platforms/azure --cov=benchbox/platforms/bigquery --cov=benchbox/platforms/redshift --cov=benchbox/platforms/spark --cov=benchbox/platforms/snowflake --cov=benchbox/platforms/credentials --cov=benchbox/platforms/motherduck --cov=benchbox/platforms/base/cloud_spark --cov=benchbox/platforms/fabric_warehouse --cov=benchbox/platforms/clickhouse --cov=benchbox/platforms/starburst --cov=benchbox/platforms/gcp --cov=benchbox/platforms/aws --cov=benchbox/core/tpcds/generator --cov=benchbox/core/tpchavoc --cov=benchbox/core/comparison --cov=benchbox/core/results/anonymization --cov=benchbox/core/write_primitives --cov=benchbox/core/transaction_primitives --cov=benchbox/core/tpcdi --cov-report=term-missing 2>&1 | grep -E '(FAILED|ERROR|PASSED|[0-9]+%)'",
+        "description": "All 25 target modules individually reach ≥80% coverage in the fast lane",
+        "expected": "All target modules show ≥80% coverage; no FAILED or ERROR lines",
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q --cov=benchbox --cov-report=term 2>&1 | tail -5",
+        "description": "Overall fast-lane coverage stays at or above 80.04%",
+        "expected": "Total coverage ≥ 80%",
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q 2>&1 | tail -5",
+        "description": "No regressions - full fast test suite passes",
+        "expected": "passed, 0 failed",
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w8",
+        "wid": "w13"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w12",
+        "wid": "w14"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w2",
+        "wid": "w15"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w4",
+        "wid": "w15"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w5",
+        "wid": "w15"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w2",
+        "wid": "w16"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w9",
+        "wid": "w16"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w10",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w6",
+        "wid": "w17"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w1",
+        "wid": "w18"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w6",
+        "wid": "w18"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w5",
+        "wid": "w19"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w7",
+        "wid": "w19"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w10",
+        "wid": "w20"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w11",
+        "wid": "w21"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w13",
+        "wid": "w22"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w14",
+        "wid": "w23"
+      },
+      {
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "needs_wid": "w23",
+        "wid": "w24"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pure-logic core utilities: financial_data, dataframe_operations, anonymization, spark_execution_utils",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "fabric_warehouse.py and snowflake.py: auth logic and connection config",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "bigquery.py: GCS integration, auth, and query execution branches",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "redshift.py part 1: connector selection, connection setup, S3 URI parsing",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "databricks/adapter.py part 2: data loading, DBFS upload, error handling",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "redshift.py part 2: data loading flow, SQL generation, WLM query group",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Small top-ups: motherduck, streaming, clickhouse/diagnostics, credentials/snowflake",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Mid-tier adapters part 2: comparison/suite, dataproc, athena_spark",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cloud infrastructure: staging.py providers + fabric_warehouse data loading",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Core primitives part 2: transaction dataframe_ops + write_primitives benchmark",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "spark.py part 2 + credentials/redshift part 2",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "TPC generators and comparison suite: streaming, tpchavoc, comparison/suite",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "snowflake.py part 2: connection, external tables, query execution, tuning",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "bigquery.py part 2: metadata, validation, loading, execution, tuning",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "databricks/adapter.py part 3: from_config, UC volumes, data loading, tuning",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "redshift.py part 3: from_config, platform info, drop_database, S3 loading",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "redshift.py part 4: external tables, query execution, statistics, tuning",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "DataFrame expression builders: pyspark_df, lakesail_df, databricks DF adapter",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Small cloud adapters: motherduck, starburst, clickhouse diagnostics",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Credential modules: credentials/snowflake and credentials/redshift",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cloud staging URI parsing and write-primitives validation logic",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "spark.py: deployment modes, config validation, resource allocation",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "databricks/adapter.py part 1: warehouse selection, clustering, SQL generation",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-bottom-25-modules-to-80pct",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "AWS Athena Spark + GCP Dataproc: state polling and job lifecycle",
+        "wid": "w9"
+      }
+    ]
+  }
+}

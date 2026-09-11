@@ -1,0 +1,272 @@
+{
+  "context": "Extend the existing formatSelectedCount helper to carry the ceiling and call it from all four surfaces. This is a copy and live-region fix, not a new component and not a tray migration - CompareTray already exists and already renders the real Compare link at CompareTray.tsx:91. Delete the dead span rather than replacing it, or revert it to the disabled 'Select N more' control. Collapse PlatformIndex to one status surface.",
+  "description": "Four compare entry points describe one operation four ways and only Query names the 4-run ceiling. BenchmarkIndex.tsx:129 says 'Select two or more platforms' (states a floor, omits the ceiling). PlatformIndex renders THREE simultaneous status surfaces - the guidance card :152, the table header count :716, and a leftover paragraph :848 - which at exactly one selection say the same thing three times in three wordings. Query.tsx:834 is the only correct one ('4 results selected (maximum)'). The Compare builder states 'two to four runs' in its intro at :916 then drops the ceiling from the live status at :984. Separately, once a selection becomes valid, BenchmarkIndex.tsx:684 and PlatformIndex.tsx:665 replace the Compare button with a non-interactive span reading 'Use sticky tray to compare', and aria-live=polite sits on THAT static span (:687 and :668) while the guidance paragraph that actually changes on every selection has no live region at all. lib/copyFormatters.ts:35 already exports formatSelectedCount(count, noun). Verified at HEAD 39ead3a41.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Invent a new four-state copy contract or a new shared status component",
+        "instead": "INSTEAD extend the existing helper",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "why": "lib/copyFormatters.ts:35 already exports formatSelectedCount and the divergence is copy, not structure"
+      },
+      {
+        "dont": "Migrate Query or the Compare builder onto CompareTray as part of this item",
+        "instead": "INSTEAD leave tray adoption to rx-ux-18 with its scope corrected",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "why": "Query's tray is inline and never occluded and the builder is itself the compare surface, and both adversarial reviews recommended stopping tray adoption at two of four surfaces"
+      },
+      {
+        "dont": "Restore a real Compare link in the guidance card to replace the dead span",
+        "instead": "INSTEAD delete the span or revert it to the disabled Select N more control",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "why": "CompareTray.tsx:91 already renders one and BenchmarkIndex.test.tsx:649,705 plus PlatformIndex.test.tsx:660 use getByRole which throws on two matches"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "needs_item": "rx-ux-25-cap-enforcement-leak"
+      }
+    ],
+    "item_meta": {
+      "category": "bug",
+      "completed_at": "2026-08-24T14:38:14Z",
+      "completed_pr": 1874,
+      "created_at": "2026-08-24T12:38:28Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Exactly one link matching /Compare N selected/ per page - three tests use getByRole which throws on duplicates",
+        "item_id": "rx-ux-26-selection-status-copy"
+      },
+      {
+        "behavior": "Query keeps its inline tray - it is never fixed and never occluded anything",
+        "item_id": "rx-ux-26-selection-status-copy"
+      },
+      {
+        "behavior": "The Compare builder keeps its intro card",
+        "item_id": "rx-ux-26-selection-status-copy"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "already supplies the real Compare link",
+        "decision": "reuse",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "path": "results-explorer/src/components/CompareTray.tsx"
+      },
+      {
+        "concept": "formatSelectedCount(count, noun)",
+        "decision": "extend",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "path": "results-explorer/src/lib/copyFormatters.ts"
+      },
+      {
+        "concept": "the one status string that names the ceiling",
+        "decision": "reuse",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "path": "results-explorer/src/pages/Query.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/components/CompareTray.tsx"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/compare-entrypoints.spec.ts"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/compare.spec.ts"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/query.spec.ts"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/result-detail.spec.ts"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/**"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/copyFormatters.ts"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx",
+        "description": "Only one Compare link per page",
+        "expected": "pass - getByRole link resolves uniquely",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "last_result": "pass",
+        "last_run": "2026-08-24T16:16:29Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && grep -rn 'formatSelectedCount' src/pages/",
+        "description": "Ceiling named on every surface",
+        "expected": "four call sites",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "last_result": "pass",
+        "last_run": "2026-08-24T16:16:34Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && grep -n -B3 'aria-live' src/pages/BenchmarkIndex.tsx src/pages/PlatformIndex.tsx",
+        "description": "No aria-live on static text",
+        "expected": "attached to the changing count line only",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "last_result": "pass",
+        "last_run": "2026-08-24T16:16:37Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run",
+        "description": "Explorer unit suite green",
+        "expected": "all pass",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "last_result": "pass",
+        "last_run": "2026-08-24T16:17:42Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-26-selection-status-copy",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "formatSelectedCount now accepts a maximum and labels count 4 as maximum; unit assertions cover below-cap and at-cap output.",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "notes": null,
+        "started_at": "2026-08-24T14:30:23Z",
+        "started_branch": "fix/rx-ux-26-selection-status-copy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-26-selection-status-copy",
+        "status": "done",
+        "summary": "Extend formatSelectedCount to carry the ceiling and cover it with unit tests in lib/__tests__",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Selected the persistently mounted guidance-card paragraph as the canonical Benchmark and Platform status surface; Query inline tray and Compare builder status remain their canonical surfaces.",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "notes": null,
+        "started_at": "2026-08-24T14:30:29Z",
+        "started_branch": "fix/rx-ux-26-selection-status-copy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-26-selection-status-copy",
+        "status": "done",
+        "summary": "GATE - choose ONE canonical status surface per page and record which of the three PlatformIndex lines survives",
+        "wid": "w2"
+      },
+      {
+        "evidence": "BenchmarkIndex, PlatformIndex, Query, and Compare builder all use formatSelectedCount with MAX_COMPARE_SELECTIONS.",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "notes": null,
+        "started_at": "2026-08-24T14:30:35Z",
+        "started_branch": "fix/rx-ux-26-selection-status-copy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-26-selection-status-copy",
+        "status": "done",
+        "summary": "Adopt the shared string on BenchmarkIndex PlatformIndex Query and the Compare builder",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Deleted both non-interactive Use sticky tray to compare spans; CompareTray remains the sole Compare link.",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "notes": null,
+        "started_at": "2026-08-24T14:30:40Z",
+        "started_branch": "fix/rx-ux-26-selection-status-copy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-26-selection-status-copy",
+        "status": "done",
+        "summary": "Delete the dead Use sticky tray span on both pages without adding a second Compare link",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Moved polite atomic live-region semantics to the persistently mounted changing guidance paragraphs.",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "notes": null,
+        "started_at": "2026-08-24T14:30:45Z",
+        "started_branch": "fix/rx-ux-26-selection-status-copy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-26-selection-status-copy",
+        "status": "done",
+        "summary": "Move aria-live onto the count line and remove it from the static span",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Removed Platform table-header selection count and standalone one-selection prompt; tests assert the header remains count-free.",
+        "item_id": "rx-ux-26-selection-status-copy",
+        "notes": null,
+        "started_at": "2026-08-24T14:30:51Z",
+        "started_branch": "fix/rx-ux-26-selection-status-copy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-26-selection-status-copy",
+        "status": "done",
+        "summary": "Delete the duplicate PlatformIndex table-header count and one-selection paragraph",
+        "wid": "w6"
+      }
+    ]
+  }
+}

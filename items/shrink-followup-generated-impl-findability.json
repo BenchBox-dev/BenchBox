@@ -1,0 +1,150 @@
+{
+  "context": "Reuse the existing QueryRegistry abstraction (joinorder already constructs\none) rather than inventing a new container. The Protocol for the impl\nsignature is the typing anchor that makes the dispatch ty-visible. Start in\nread_primitives (the densest globals() user), then apply the same shape to\njoinorder.\n",
+  "description": "The dataframe-query shrink (notably PR #603) replaced families of\nnear-identical query functions with generators that inject impls into the\nmodule namespace:\n\n  benchbox/core/read_primitives/dataframe_queries.py:307,393,456,578  (writes)\n  benchbox/core/read_primitives/dataframe_queries.py:1385,4329         (dynamic dispatch reads)\n  benchbox/core/joinorder/dataframe_queries.py:446-447                  (same pattern)\n\nThis is the correct mechanism for collapsing repeated implementation\nfamilies (it is exactly what the goal endorses) and the generated impls set\nreal __name__/__doc__, so stack traces are fine. The legitimate residual\ncost: the impls are not grep-able as `def <name>`, and the dispatch sites\n(`globals()[f\"{impl_base}_{family}_impl\"]`) are Any-typed and invisible to\n`ty`. The fix must restore findability/typing WITHOUT reverting to explicit\nper-query defs (which would re-inflate the surface the factory removed).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "revert to one explicit `def` per query",
+        "instead": "use a typed registry/Protocol instead",
+        "item_id": "shrink-followup-generated-impl-findability",
+        "why": "that undoes the shrink the factory achieved"
+      },
+      {
+        "dont": "silence the dispatch with `# type: ignore`",
+        "instead": "make the dispatch actually typed",
+        "item_id": "shrink-followup-generated-impl-findability",
+        "why": "that hides the problem rather than fixing findability"
+      }
+    ],
+    "item_meta": {
+      "category": "Technical Debt",
+      "completed_at": "2026-05-24T00:00:00Z",
+      "created_at": "2026-05-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All dataframe query tests pass (read_primitives and joinorder)",
+        "item_id": "shrink-followup-generated-impl-findability"
+      },
+      {
+        "behavior": "Generated impls keep explicit __name__/__doc__",
+        "item_id": "shrink-followup-generated-impl-findability"
+      },
+      {
+        "behavior": "No re-inflation: line count does not return toward the pre-factory baseline",
+        "item_id": "shrink-followup-generated-impl-findability"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/joinorder/dataframe_queries.py:427-447 — the factory already sets __name__/__doc__; extend with Protocol typing",
+        "decision": "extend",
+        "item_id": "shrink-followup-generated-impl-findability",
+        "path": "benchbox/core/joinorder/dataframe_queries.py:427-447"
+      },
+      {
+        "concept": "benchbox/core/joinorder/dataframe_queries.py:QueryRegistry — reuse this container for an explicit typed registry",
+        "decision": "reuse",
+        "item_id": "shrink-followup-generated-impl-findability",
+        "path": "benchbox/core/joinorder/dataframe_queries.py:QueryRegistry"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "shrink-followup-generated-impl-findability",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/dataframe_queries.py"
+      },
+      {
+        "item_id": "shrink-followup-generated-impl-findability",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/dataframe_queries.py"
+      },
+      {
+        "item_id": "shrink-followup-generated-impl-findability",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make typecheck",
+        "description": "Type check is clean and the dispatch is no longer Any",
+        "expected": "0 errors; dispatch site resolves to the Protocol type",
+        "item_id": "shrink-followup-generated-impl-findability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rnE 'QueryImpl|registry\\[|GENERATED_IMPL_NAMES|Protocol' benchbox/core/read_primitives/dataframe_queries.py",
+        "description": "Generated impl names are statically discoverable",
+        "expected": "typed registry/index present",
+        "item_id": "shrink-followup-generated-impl-findability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/read_primitives/ tests/unit/core/joinorder/ -q",
+        "description": "Dataframe query tests pass",
+        "expected": "all pass",
+        "item_id": "shrink-followup-generated-impl-findability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "shrink-followup-generated-impl-findability",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "shrink-followup-generated-impl-findability",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-generated-impl-findability",
+        "notes": "Confirm the dispatch returns Any (run `make typecheck` and inspect the\nreveal at the dispatch lines). List every generated-name family and the\nfactory that produces it, in both read_primitives and joinorder.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Assess ty coverage of the dispatch sites and enumerate the generated-name families",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-generated-impl-findability",
+        "notes": "GATING. Options:\n(a) Populate an explicit `dict[str, QueryImpl]` registry (typed via a\n    Protocol) instead of injecting into globals(); dispatch reads the\n    dict and is fully typed.\n(b) Keep globals() injection but add: a typed Protocol for the impl\n    signature, a generated-name index (module docstring or a tuple of\n    produced names), and a typed accessor wrapping the globals() read.\nPrefer (a) if it does not complicate the call sites.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide: explicit typed registry, vs globals()+Protocol+generated-name index",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-generated-impl-findability",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the chosen path; ty sees typed dispatch, names discoverable",
+        "wid": "w3"
+      }
+    ]
+  }
+}

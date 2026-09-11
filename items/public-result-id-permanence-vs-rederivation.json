@@ -1,0 +1,82 @@
+{
+  "context": "Decide the reconciliation: either (a) narrow the contract so permanence attaches at publication rather than at commit, which matches reality today and makes #1537 legal, or (b) keep commit-time minting and add an alias/redirect table the Explorer consumes, seeded from path-privacy-migration.manifest.json which already records every old-to-new pair. Also correct the documented format to include the sha8 suffix. Record as an ADR either way, and do it before the Explorer first deploys.",
+  "description": "Codex P1 on PR #1537. docs/reference/hosted-results-contract.md defines public_result_id with Stability 'Permanent once minted. Never reused for a different result.' and Minting 'Phase 1: on commit to results-data/'. By that definition IDs mint on commit, and #1537 re-derives all 207. The Explorer pipeline has no consumer for path-privacy-migration.manifest.json and publishes no aliases or redirects, so any ID change is unrecoverable for an external link. Assessment: no PRACTICAL breakage today - the Explorer has never deployed (docs.yml has only ever run on pull_request events, origin/release carries zero bundles), so no /results/r/<id> URL has ever resolved publicly and nothing can be bookmarked. But the contract's own minting definition is commit-time, and the corpus is now public on published-results, so the letter of the contract is violated even though no consumer exists. The two must be reconciled BEFORE any public launch, because after launch the same re-derivation becomes impossible without a redirect map. Note the documented format in that table also omits the -{sha8} suffix the implementation actually appends, so the contract already diverges from the code.",
+  "legacy": {
+    "item_meta": {
+      "category": "contract",
+      "created_at": "2026-08-04T17:18:04Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Whatever is decided must hold before the Explorer's first public deploy",
+        "item_id": "public-result-id-permanence-vs-rederivation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "public-result-id-permanence-vs-rederivation",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "public-result-id-permanence-vs-rederivation",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/**"
+      },
+      {
+        "item_id": "public-result-id-permanence-vs-rederivation",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/hosted-results-contract.md"
+      },
+      {
+        "item_id": "public-result-id-permanence-vs-rederivation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -q 'Permanent' docs/reference/hosted-results-contract.md",
+        "description": "the contract states when permanence attaches",
+        "expected": "Manual read; the rung pins that the section still exists",
+        "item_id": "public-result-id-permanence-vs-rederivation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "public-result-id-permanence-vs-rederivation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "public-result-id-permanence-vs-rederivation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide permanence-at-commit vs permanence-at-publication and record it",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "public-result-id-permanence-vs-rederivation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Correct the documented public_result_id format to include the sha8 suffix",
+        "wid": "w1"
+      }
+    ]
+  }
+}

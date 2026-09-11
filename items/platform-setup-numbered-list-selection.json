@@ -1,0 +1,11 @@
+{
+  "description": "The `benchbox platforms setup` interactive wizard currently requires users to type\nfull platform names when selecting actions or platforms. This is error-prone and\ntedious, especially with many platforms available.\n\nReplace string-based prompts with numbered list selection for better UX:\n- Actions: Show numbered menu (1. Enable, 2. Disable, 3. Install, etc.)\n- Platforms: Show numbered list grouped by availability status\n- Allow both number and name input for flexibility",
+  "legacy": {
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-01-07T00:00:00Z",
+      "created_at": "2025-12-13T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

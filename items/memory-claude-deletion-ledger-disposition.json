@@ -1,0 +1,118 @@
+{
+  "context": "After or with window close: Joe decides none vs approve-list. If none: record Deletion-ledger decision: none in final-acceptance and mark parent w7 done with evidence. If approve-list: dry-run verify-ledger then apply only exact entries.",
+  "description": "Parent work unit w7 requires per-entry Joe approval before any delete/sanitize. Current disposition: no deletions approved (STALE-001 earlier; ledger-review rejects implicit deletes). Formalize either (1) written decision that zero deletions are approved and w7 is satisfied by no-op with evidence, or (2) rebuild ledger in a fresh window and approve exact entries, or (3) keep blocked until Joe approves. Must not delete source sessions, transcripts, credentials, or ambiguous paths.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "approve deletes implied by tree-diff rename noise",
+        "instead": "content-hash ledger and per-entry approval",
+        "item_id": "memory-claude-deletion-ledger-disposition",
+        "why": "forty rename false-deletes already burned once"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-claude-deletion-ledger-disposition",
+        "needs_item": "memory-claude-monitoring-window-close"
+      }
+    ],
+    "item_meta": {
+      "category": "Operations",
+      "created_at": "2026-08-05T22:11:03Z",
+      "worktree": "memory-rollout"
+    },
+    "preserves": [
+      {
+        "behavior": "No deletion without exact approved ledger entry",
+        "item_id": "memory-claude-deletion-ledger-disposition"
+      },
+      {
+        "behavior": "Source sessions and transcripts are never cleanup targets",
+        "item_id": "memory-claude-deletion-ledger-disposition"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Ledger review rejecting implicit deletes",
+        "decision": "reuse",
+        "item_id": "memory-claude-deletion-ledger-disposition",
+        "path": "/Users/joe/Developer/memory-governance/reports/rollout/claude/ledger-review.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-claude-deletion-ledger-disposition",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/history.jsonl"
+      },
+      {
+        "item_id": "memory-claude-deletion-ledger-disposition",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/sessions/**"
+      },
+      {
+        "item_id": "memory-claude-deletion-ledger-disposition",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/sessions/**"
+      },
+      {
+        "item_id": "memory-claude-deletion-ledger-disposition",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/src/memory_tooling/rollout.py"
+      },
+      {
+        "item_id": "memory-claude-deletion-ledger-disposition",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/tests/test_rollout.py"
+      },
+      {
+        "item_id": "memory-claude-deletion-ledger-disposition",
+        "kind": "only_modify",
+        "path_glob": "reports/rollout/claude/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && test -f reports/rollout/claude/final-acceptance.md && rg -q '^Deletion-ledger decision:' reports/rollout/claude/final-acceptance.md",
+        "description": "Final acceptance records deletion-ledger decision",
+        "expected": "Explicit none or approved-entry summary recorded",
+        "item_id": "memory-claude-deletion-ledger-disposition",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-claude-deletion-ledger-disposition",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "memory-claude-deletion-ledger-disposition",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Joe chooses none / approve-list / rebuild-later",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-claude-deletion-ledger-disposition",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Execute chosen path with dry-run first; record evidence on parent w7",
+        "wid": "w1"
+      }
+    ]
+  }
+}

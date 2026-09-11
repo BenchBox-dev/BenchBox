@@ -1,0 +1,250 @@
+{
+  "context": "Pure planning + audit work. Read git history, write markdown, edit two\nYAML planning files, add a small spec.\n\nSequencing matters only for w4 (which needs the inventories from w1/w2);\nw1/w2/w3 can be a single sitting.\n",
+  "description": "The single-repo migration's Phase-4 commit `f9d08d38b` (\"Migration:\npopulate develop branch from private working tree (Phase 4 w4)\",\n2026-04-27) added new public-ish surfaces to the codebase as a side\neffect of a bulk import — most visibly the `benchbox explorer` CLI\nsubgroup, plus the `benchbox.core.explorer_pipeline` package. Neither\nwas reviewed as a discrete API decision; both arrived inside a 221-line\nnew file in a squash commit. The audit on 2026-05-14 surfaced this as a\nsystematic risk, not a one-off: the migration channel is a stealth\nsurface-expansion pathway, and Phases 8 and 9 are still pending.\n\nThis TODO does two things:\n\n  1. **Retrospectively reconcile** every new public surface introduced\n     by Phase-4 (and its post-migration follow-ons) against an explicit\n     approved-surface inventory. Where surfaces are not approved, either\n     file a sibling TODO to remove/hide them, or document them as\n     deliberate.\n\n  2. **Prospectively gate** Phases 8 and 9 (and any future bulk migrations)\n     with a required \"API-surface diff\" exit gate: the PR description\n     must enumerate every new CLI command, console_script entry point,\n     importable public Python module, and new file-system convention,\n     with explicit accept/reject per item by the maintainer.\n\nThis is process work, not code. It produces audits and updates to two\nin-flight planning TODOs. It is independent of all the other explorer\nTODOs and can land in parallel.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create a parallel review tool or new CI lint for surface diffs. The gate is a checklist in the PR description; complexity here is unwarranted for two remaining phases.",
+        "instead": "(not specified)",
+        "item_id": "migration-phase-api-surface-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "extend the audit scope to all of `benchbox/` retroactively",
+        "instead": "(not specified)",
+        "item_id": "migration-phase-api-surface-gate",
+        "why": "bounded to the Phase-4 commit window so the work is finite."
+      },
+      {
+        "dont": "use this TODO to litigate which surfaces should be public",
+        "instead": "(not specified)",
+        "item_id": "migration-phase-api-surface-gate",
+        "why": "that's per-surface work owned by sibling TODOs. This TODO only classifies (approved / move / hide) and files the follow-ups."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "migration-phase-api-surface-gate",
+        "id": 213,
+        "reason": "Out of scope for the two remaining phases; revisit if a third bulk migration is anticipated.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly deferred pending a third bulk migration being anticipated; no evidence one is planned.",
+        "summary": "Auto-generated API surface diff via a tool."
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "migration-phase-api-surface-gate",
+        "id": 214,
+        "reason": "Most non-migration PRs are scoped and reviewed already; this gate exists to catch bulk-import smuggling, not normal feature work.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly states the gate is scoped to migration PRs by design; extending it to normal feature work isn't wanted.",
+        "summary": "Apply the same gate to non-migration PRs."
+      }
+    ],
+    "item_meta": {
+      "category": "Process",
+      "completed_at": "2026-05-14T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "migration-phase-api-surface-gate"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing approved CLI surfaces remain as-is — this TODO classifies and gates, it does not remove.",
+        "item_id": "migration-phase-api-surface-gate"
+      },
+      {
+        "behavior": "Phase 4's already-merged commits are not rewritten or reverted by this TODO. The audit is retrospective; remediation flows through other TODOs.",
+        "item_id": "migration-phase-api-surface-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/planning/single-repo-migration-phase-3-new-release-flow.yaml — closed phase; reference for plan format.",
+        "decision": "reuse",
+        "item_id": "migration-phase-api-surface-gate",
+        "path": "_project/DONE/main/planning/single-repo-migration-phase-3-new-release-flow.yaml"
+      },
+      {
+        "concept": "_project/TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml — current Phase-4 TODO; this surface gate retroactively applies to its scope.",
+        "decision": "reuse",
+        "item_id": "migration-phase-api-surface-gate",
+        "path": "_project/TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml"
+      },
+      {
+        "concept": "_project/TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml — needs the new exit gate added.",
+        "decision": "reuse",
+        "item_id": "migration-phase-api-surface-gate",
+        "path": "_project/TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml"
+      },
+      {
+        "concept": "_project/TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml — needs the new exit gate added.",
+        "decision": "reuse",
+        "item_id": "migration-phase-api-surface-gate",
+        "path": "_project/TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml"
+      },
+      {
+        "concept": "_project/audits/ — existing directory for audit artifacts; reuse for the Phase-4 retro inventory.",
+        "decision": "reuse",
+        "item_id": "migration-phase-api-surface-gate",
+        "path": "_project/audits/"
+      },
+      {
+        "concept": "_project/specs/uat-framework.md — established multi-W spec format; reference for any spec updates.",
+        "decision": "reuse",
+        "item_id": "migration-phase-api-surface-gate",
+        "path": "_project/specs/uat-framework.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "migration-phase-api-surface-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml"
+      },
+      {
+        "item_id": "migration-phase-api-surface-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml"
+      },
+      {
+        "item_id": "migration-phase-api-surface-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/phase-4-cli-surface-retro-*.md"
+      },
+      {
+        "item_id": "migration-phase-api-surface-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/migration-api-surface-gate.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "ls _project/audits/phase-4-cli-surface-retro-*.md",
+        "description": "Audit file exists and lists the Phase-4 CLI + import surfaces.",
+        "expected": "at least one file",
+        "item_id": "migration-phase-api-surface-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo show single-repo-migration-phase-8-first-post-migration-release --json | rg -q \"API surface diff\"",
+        "description": "Phase 8 retains the API-surface-diff gate",
+        "expected": "exit 0",
+        "item_id": "migration-phase-api-surface-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo show single-repo-migration-phase-9-decommission-archive --json | rg -q \"API surface diff\"",
+        "description": "Phase 9 retains the API-surface-diff gate",
+        "expected": "exit 0",
+        "item_id": "migration-phase-api-surface-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo audit verify",
+        "description": "Current tracker audit chain remains valid",
+        "expected": "exit 0 with a valid event hash chain",
+        "item_id": "migration-phase-api-surface-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "migration-phase-api-surface-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "migration-phase-api-surface-gate",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "migration-phase-api-surface-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "migration-phase-api-surface-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "migration-phase-api-surface-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "migration-phase-api-surface-gate",
+        "notes": "Method:\n  - `git log f9d08d38b..HEAD -- benchbox/cli/` for the post-migration window.\n  - For the migration commit itself: `git diff f9d08d38b^ f9d08d38b -- benchbox/cli/`.\n  - For each new `@click.command` or `@click.group` introduced, record:\n    - command path under `benchbox`\n    - intended audience (end-user benchmarker vs maintainer/CI)\n    - has it been reviewed in a discrete PR?\n    - approve / move / hide recommendation\n\nOutput: a table committed at `_project/audits/phase-4-cli-surface-retro-<DATE>.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory every CLI surface introduced from `f9d08d38b` to HEAD",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "migration-phase-api-surface-gate",
+        "notes": "Method:\n  - `git diff f9d08d38b^ f9d08d38b --name-only -- 'benchbox/**/__init__.py'`\n    to find modules that became publicly importable.\n  - For each new package directory, check whether it appears in\n    `__all__` lists or is imported from outside its own tree.\n  - Classify as: public-API (deliberate), internal (move under\n    underscore-prefixed module or restructure), or out-of-place\n    (relocate per a sibling TODO).\n\nOutput: appended to the same audit file from w1.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory every newly-public Python import surface in the same window",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "migration-phase-api-surface-gate",
+        "notes": "Likely small. The explorer surface is already owned by\n`explorer-cli-surface-adr` + `explorer-cli-surface-migration`, so it\ndoes not need a new TODO here — cross-reference instead.\n\nFor each other unapproved surface (if any), file a TODO with a\none-line scope and link from this audit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "File sibling TODOs for any unapproved surface uncovered",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "migration-phase-api-surface-gate",
+        "notes": "For each of:\n  - `_project/TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml`\n  - `_project/TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml`\n\nAdd a new work unit (or `success_metrics` entry) requiring the PR\ndescription to include a section:\n\n    ## API surface diff\n    - New CLI commands: <list, with audience tag>\n    - New console_script entry points: <list>\n    - New public Python imports: <list>\n    - New file-system conventions (config dirs, env vars, etc.): <list>\n    - Each item is either explicitly approved by the maintainer in\n      this PR or covered by a referenced ADR.\n\nWithout this section, the migration phase is not Done.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add an API-surface-diff exit gate to Phase 8 and Phase 9 plans",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "migration-phase-api-surface-gate",
+        "notes": "Two reasonable hosts:\n  - `_project/specs/migration-api-surface-gate.md` (new short spec).\n  - A section in an existing migration spec / playbook.\n\nPick whichever already exists; do not create a new directory just\nfor this. The spec should be one page: what to enumerate, how to\nclassify, what counts as approval, what to do for genuinely-internal\nsurfaces.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Codify the gate in a reusable place",
+        "wid": "w5"
+      }
+    ]
+  }
+}

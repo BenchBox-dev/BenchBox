@@ -1,0 +1,82 @@
+{
+  "context": "Return the two named capture groups explicitly (or otherwise narrow both values to str) while preserving the current empty-string fallback and parsed Git identity behavior. Add focused positive and malformed-output coverage if the existing test does not lock both cases.",
+  "description": "The repository's type checker reports invalid-return-type in _resolved_git_identity at _project/scripts/agent_instruction_audit.py: the function promises tuple[str, str], while re.Match.groups() is inferred as a variadic tuple containing optional strings. The warning reproduces on origin/develop and was not introduced by the anchor-whitespace change. Log it separately rather than hiding it in an unrelated PR.",
+  "legacy": {
+    "item_meta": {
+      "category": "maintainability",
+      "created_at": "2026-08-17T03:10:20Z",
+      "worktree": "ci-automation"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not weaken agent/service identity detection or change Git config precedence and failure behavior.",
+        "item_id": "agent-instruction-audit-git-identity-return-type"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agent-instruction-audit-git-identity-return-type",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "item_id": "agent-instruction-audit-git-identity-return-type",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_agent_instruction_audit.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_agent_instruction_audit.py -q",
+        "description": "Focused audit tests",
+        "expected": "all tests pass",
+        "item_id": "agent-instruction-audit-git-identity-return-type",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ty check _project/scripts/agent_instruction_audit.py",
+        "description": "Targeted type check",
+        "expected": "no invalid-return-type diagnostic",
+        "item_id": "agent-instruction-audit-git-identity-return-type",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agent-instruction-audit-git-identity-return-type",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "agent-instruction-audit-git-identity-return-type",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Narrow _resolved_git_identity to return exactly two strings without suppressing the type checker",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "agent-instruction-audit-git-identity-return-type",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Cover successful Git identity parsing, command failure, and malformed output",
+        "wid": "w2"
+      }
+    ]
+  }
+}

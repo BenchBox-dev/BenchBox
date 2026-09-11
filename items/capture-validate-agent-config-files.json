@@ -1,0 +1,215 @@
+{
+  "context": "Start from the existing instruction-target metadata and read-only audit, then compare the current skill materializer, lockfile, tracked snapshots, and generated target configuration. Define a manifest model for global and project-local files, including path expansion, precedence, ownership boundaries, redaction or opt-in rules, and portability. Implement capture, verify, drift reporting, and restore or export behavior with atomic writes and conflict checks. Add unit, contract, and integration coverage using temporary homes and projects; document the model, recovery guarantees, and rejected alternatives.",
+  "description": "Build a high-quality local MVP for Claude, Codex, and Gemini Markdown instruction files. Capture and validate the exact global files ~/.claude/CLAUDE.md, ~/.codex/AGENTS.md, and ~/.gemini/GEMINI.md plus root-level project-local CLAUDE.md, AGENTS.md, and GEMINI.md. Provide local snapshots, content and hash drift detection, and explicit conflict-safe restore. First define the small MVP contract, explicit six-file allowlist, local snapshot location, and source-of-truth rules. Implement exact content capture with SHA-256 metadata, validation and drift diagnostics, dry-run behavior, and atomic restore that refuses to overwrite changed files unless explicitly forced. Use temporary home and project fixtures for tests. This MVP intentionally excludes settings, hooks, permissions, trusted-folder state, nested or arbitrary rule files, remote sync, multi-agent translation, and cross-platform behavior until later requirements justify them. Keep the existing skills lock, skill materialization, and tracked skill snapshot behavior unchanged.",
+  "legacy": {
+    "item_meta": {
+      "category": "feature",
+      "completed_at": "2026-08-13T15:38:55Z",
+      "completed_pr": 17,
+      "created_at": "2026-08-10T21:12:34Z",
+      "worktree": "/Users/joe/Developer/skill-sync"
+    },
+    "preserves": [
+      {
+        "behavior": "Credentials, tokens, and unrelated agent settings must not be captured by default.",
+        "item_id": "capture-validate-agent-config-files"
+      },
+      {
+        "behavior": "Existing skill sync behavior, lockfile reproducibility, and tracked skill snapshots must remain compatible unless the new configuration model explicitly versions the change.",
+        "item_id": "capture-validate-agent-config-files"
+      },
+      {
+        "behavior": "Existing user-authored content in global and project-local instruction files must not be silently overwritten or deleted.",
+        "item_id": "capture-validate-agent-config-files"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "capture-validate-agent-config-files",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/**"
+      },
+      {
+        "item_id": "capture-validate-agent-config-files",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/**"
+      },
+      {
+        "item_id": "capture-validate-agent-config-files",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.gemini/**"
+      },
+      {
+        "item_id": "capture-validate-agent-config-files",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "capture-validate-agent-config-files",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "capture-validate-agent-config-files",
+        "kind": "only_modify",
+        "path_glob": "package.json"
+      },
+      {
+        "item_id": "capture-validate-agent-config-files",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.yaml"
+      },
+      {
+        "item_id": "capture-validate-agent-config-files",
+        "kind": "only_modify",
+        "path_glob": "src/**"
+      },
+      {
+        "item_id": "capture-validate-agent-config-files",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "npm run test:run -- tests/unit/core/agent-config.test.ts",
+        "description": "MVP unit tests pass",
+        "expected": "The six-file capture, validation, drift, and restore unit tests pass",
+        "item_id": "capture-validate-agent-config-files",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:38:37Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "npm run test:run -- tests/contract/core/agent-config.contract.test.ts",
+        "description": "MVP contract tests pass",
+        "expected": "The public CLI or operation contract is covered and passes",
+        "item_id": "capture-validate-agent-config-files",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:38:40Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "npm run check",
+        "description": "TypeScript checks pass",
+        "expected": "The implementation type-checks successfully",
+        "item_id": "capture-validate-agent-config-files",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:38:45Z",
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "npm run lint",
+        "description": "Lint passes",
+        "expected": "Lint reports no errors",
+        "item_id": "capture-validate-agent-config-files",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:38:48Z",
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --check -- src tests docs README.md package.json skill-sync.yaml",
+        "description": "Patch has no whitespace errors",
+        "expected": "Git reports no whitespace errors in the allowed implementation paths",
+        "item_id": "capture-validate-agent-config-files",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:38:50Z",
+        "seq": 9,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f tests/unit/core/agent-config.test.ts && test -f tests/contract/core/agent-config.contract.test.ts",
+        "description": "MVP test suites are present",
+        "expected": "Exits 1 on the unfixed tree and 0 after both MVP test suites are added",
+        "item_id": "capture-validate-agent-config-files",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:38:52Z",
+        "seq": 11,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "capture-validate-agent-config-files",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "capture-validate-agent-config-files",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "capture-validate-agent-config-files",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "capture-validate-agent-config-files",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "docs/cli.md and docs/sync-model.md define the exact six-file allowlist, .skill-sync/agent-config snapshot format, source-of-truth rules, missing-file behavior, validation/restore/force/dry-run semantics, atomic rollback, and out-of-scope surfaces",
+        "item_id": "capture-validate-agent-config-files",
+        "notes": null,
+        "started_at": "2026-08-10T22:07:47Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Define the MVP contract and inventory the six supported paths, snapshot location, source of truth, and out-of-scope surfaces",
+        "wid": "w1"
+      },
+      {
+        "evidence": "src/core/agent-config.ts implements the explicit six-file allowlist, byte-preserving capture, SHA-256/size metadata, missing-state entries, and atomic local snapshot replacement; npm run check and npm run lint pass",
+        "item_id": "capture-validate-agent-config-files",
+        "notes": null,
+        "started_at": "2026-08-10T22:12:44Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement explicit capture and local snapshot metadata for the six Markdown files",
+        "wid": "w2"
+      },
+      {
+        "evidence": "src/core/agent-config.ts and src/cli/commands/agent-config.ts implement per-file drift reporting, dry-run capture/restore, conflict refusal, explicit --force replacement, staged same-directory atomic renames, and rollback; focused MVP unit and contract suites pass",
+        "item_id": "capture-validate-agent-config-files",
+        "notes": null,
+        "started_at": "2026-08-10T22:14:48Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement validation, drift reporting, dry-run, and conflict-safe atomic restore",
+        "wid": "w3"
+      },
+      {
+        "evidence": "npm run test:run -- tests/unit/core/agent-config.test.ts (8 passed) and npm run test:run -- tests/contract/core/agent-config.contract.test.ts (2 passed) cover all six paths, global/project-only and missing state, identical/modified drift, snapshot creation, restore conflicts, force, dry-run, atomic staging failure, and JSON CLI output",
+        "item_id": "capture-validate-agent-config-files",
+        "notes": null,
+        "started_at": "2026-08-10T22:14:54Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add fixture-based unit and contract tests for global and project files, missing files, drift, and restore conflicts",
+        "wid": "w4"
+      },
+      {
+        "evidence": "docs/cli.md and docs/sync-model.md document commands, snapshot/source-of-truth rules, limitations, and recovery; final gates from /Users/joe/Developer/skill-sync pass: unit 8, contract 2, check, lint, diff --check, focused instruction-audit 15, and full suite 40 files/416 tests; tracker verify runs 5,6,7,8,9,11 all pass; check-scope reports only pre-existing out-of-scope skill mirrors/archive/lock changes",
+        "item_id": "capture-validate-agent-config-files",
+        "notes": null,
+        "started_at": "2026-08-10T22:18:43Z",
+        "started_branch": "main",
+        "started_worktree": "/Users/joe/Developer/skill-sync",
+        "status": "done",
+        "summary": "Document MVP behavior, commands, limitations, and recovery procedure; run release gates",
+        "wid": "w5"
+      }
+    ]
+  }
+}

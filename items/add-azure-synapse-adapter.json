@@ -1,0 +1,9 @@
+{
+  "description": "Build an adapter for Azure Synapse Dedicated SQL Pools to complete coverage of the major cloud data warehouses.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "context": "Confirm from git history that 0dd61b48b (#1756) wrote 31.3 in both files and fe3b352c0 (#1774) recomputed only the audit to 27.5 over 33 gaps. Correct the decision record's summary sentence and the 'under 31 min' percentage to match the audit, as a dated correction naming #1774 as the origin of the drift. Do not touch 31.4 (a gate duration). Do not recompute the sample or alter the audit. Grep for other documents quoting 31.3.",
+  "description": "_project/decisions/behind-pr-occurrence-throughput-2026-08-16.md line 19 states \"p50 31.3 min\". Its cited evidence, _project/audits/behind-pr-occurrence-throughput-2026-08-16.md line 41, states 27.5. The decision also says \"50% of gaps under 31 min\" where the audit says 51.5%.\n\nThis is a STALENESS defect, not a day-one misread. Both files originally said 31.3 over 32 gaps (0dd61b48b, PR #1756). PR #1774 (fe3b352c0) recomputed the audit to 27.5 over 33 gaps and left the sibling decision record untouched. So the miss belongs to #1774's follow-up sweep, and any correction should say so rather than implying the 2026-08-16 author wrote 31.3 against a 27.5 table.\n\nBeware a near-miss in the same paragraph: 31.4 is a required-gate DURATION, not the interarrival p50. Do not \"correct\" it.\n\nDiscovered 2026-08-20 while revalidating why green develop PRs go BEHIND. The concrete harm is that the decision record is the summary readers quote; the wrong figure was propagated into a session report before the audit was checked. Priority is low because 27.5 vs 31.3 does not change the decision's conclusion that gate duration is a material fraction of interarrival.\n\nBoth files are Accepted records, so correct by dated erratum rather than a silent overwrite of history.",
+  "legacy": {
+    "item_meta": {
+      "category": "Dev Loop",
+      "created_at": "2026-08-20T20:25:01Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "correct-misstated-p50-in-behind-pr-throughput-decision",
+        "kind": "do_not_modify",
+        "path_glob": "_project/audits/**"
+      },
+      {
+        "item_id": "correct-misstated-p50-in-behind-pr-throughput-decision",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/behind-pr-occurrence-throughput-2026-08-16.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'p50' _project/decisions/behind-pr-occurrence-throughput-2026-08-16.md _project/audits/behind-pr-occurrence-throughput-2026-08-16.md",
+        "description": "Decision matches its evidence",
+        "expected": "both report 27.5",
+        "item_id": "correct-misstated-p50-in-behind-pr-throughput-decision",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rn '31.3' _project/decisions/ _project/audits/",
+        "description": "No stale 31.3 remains",
+        "expected": "no uncorrected occurrence",
+        "item_id": "correct-misstated-p50-in-behind-pr-throughput-decision",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "correct-misstated-p50-in-behind-pr-throughput-decision",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "correct-misstated-p50-in-behind-pr-throughput-decision",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm the audit table is the measured source and identify every document quoting 31.3",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "correct-misstated-p50-in-behind-pr-throughput-decision",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Correct the decision record summary as a dated correction, not a silent overwrite",
+        "wid": "w1"
+      }
+    ]
+  }
+}

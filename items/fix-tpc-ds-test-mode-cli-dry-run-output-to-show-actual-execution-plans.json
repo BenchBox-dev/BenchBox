@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Files Affected**:\"\n- \"**Success Criteria (100% Execution Consistency with Platform Adapter)**:\"\n- \"**Impact**: Guarantees dry run accuracy by executing real test methods with full platform adapter pipeline, eliminates discrepancies between dry run and actual execution, provides users with exact preview of target database SQL that will be executed\"\n- \"**Implementation Summary (COMPLETED)**:\"\n- \"**Files Modified**:\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

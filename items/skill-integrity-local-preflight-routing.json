@@ -1,0 +1,291 @@
+{
+  "context": "Treat this as a dependent local-process refactor, separate from required workflow wiring. First classify existing `ci-lint` guards as universal, skill-relevant, or product-only and pin the inventory in tests. Then add/reuse a `skill-integrity-check` Make target and choose commands from one classifier decision. Preserve product behavior exactly and run both contracts for mixed diffs.",
+  "description": "After the required skill-integrity CI lane lands, local `make pr-preflight` will still run `ci-lint` unconditionally before its existing path-gated fast tests. Narrow the local process only after inventorying every lint guard: pure skill diffs should run the mandatory provenance, mirror, instruction, identity, wrapper, and artifact controls without unrelated product lint/type/quality checks; product and unknown diffs retain current full behavior. Consume `scripts/path_filter_decision.py` JSON and path lists rather than creating shell path rules. Delete-only and mixed diffs must remain fail-closed, and an unavailable trusted verifier must fail rather than print a successful skip.\n\nThis item has a hard sequencing prerequisite on `behind-pr-occurrence-01-pr-open-currency`: do not edit `Makefile` until PR #1755 is merged, then fetch/rebase onto that `develop` before implementation. The tracker CLI currently cannot add an item dependency through `todo update`, so this textual prerequisite is binding. Local skill classification may compare with current `origin/develop`, but publication must still pass 01's `git merge-base --is-ancestor origin/develop HEAD` gate.\n\nRegression coverage must prove this refactor does not remove or bypass the ancestry gate, consume `STALE=1` internally, run `git merge origin/develop` inside `pr-open`, make `pr-fanout` refresh multiple worktrees, arm auto-merge at open, or treat branch ancestry as a skill/product classification dimension. `make pr-refresh` remains the only default one-PR absorb and `make pr-ready` remains the normal arm path.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "copy skill path globs into Makefile or shell conditionals",
+        "instead": "consume the existing classifier JSON and generated path lists",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "why": "parallel classifiers drift and eventually disagree about safety"
+      },
+      {
+        "dont": "make all ci-lint guards conditional without an inventory and behavioral pins",
+        "instead": "separate universal, skill-relevant, and product-only guards explicitly",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "why": "the current unconditional target includes identity and artifact controls that must not disappear"
+      },
+      {
+        "dont": "optimize content-only or post-merge ci-lint in this item",
+        "instead": "limit scope to pure/mixed skill local preflight after the CI contract exists",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "why": "broader lint decomposition requires separate evidence and increases regression risk"
+      },
+      {
+        "dont": "treat a missing local skill-sync CLI as a successful skip",
+        "instead": "verify the required pin or build the trusted verifier in a temporary cache and fail if unavailable",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "why": "the current skip branch provides no integrity evidence"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "needs_item": "skill-integrity-specialized-ci-lane"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-17T13:18:11Z",
+      "completed_pr": 1759,
+      "created_at": "2026-08-17T00:26:06Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Commit-range identity, source trust, instruction authority, lock/mirror integrity, wrapper contracts, and artifact hygiene remain mandatory for skill diffs",
+        "item_id": "skill-integrity-local-preflight-routing"
+      },
+      {
+        "behavior": "Local routing consumes the same classifier decision artifact as CI and has no second path-pattern implementation",
+        "item_id": "skill-integrity-local-preflight-routing"
+      },
+      {
+        "behavior": "Product, unknown, empty, and mixed product diffs retain the existing full local lint and fast-test contract",
+        "item_id": "skill-integrity-local-preflight-routing"
+      },
+      {
+        "behavior": "Required GitHub workflow and ruleset behavior are unchanged by this local-only process item",
+        "item_id": "skill-integrity-local-preflight-routing"
+      },
+      {
+        "behavior": "Unavailable trusted skill verification fails selected skill preflight instead of silently succeeding",
+        "item_id": "skill-integrity-local-preflight-routing"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing report-all local guard contract and environment boundary",
+        "decision": "extend",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "path": "Makefile:ci-lint"
+      },
+      {
+        "concept": "existing local consumption of path_filter_decision JSON and path lists",
+        "decision": "extend",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "path": "Makefile:pr-preflight-fast-tests"
+      },
+      {
+        "concept": "single documented boundary for runner-inapplicable local guards",
+        "decision": "reuse",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "path": "_project/scripts/ci_lint_environment_gate.py"
+      },
+      {
+        "concept": "behavioral pin between local commands and the PR lint lane",
+        "decision": "extend",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "path": "tests/system/test_ci_lint_parity.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "do_not_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/path_filter_decision.py"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/ci-local-parity.md"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "only_modify",
+        "path_glob": "make/help.mk"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "only_modify",
+        "path_glob": "make/inventory.json"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "only_modify",
+        "path_glob": "tests/system/test_ci_lint_parity.py"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_check_release_curation.py"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_ci_lint_environment_boundary.py"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_standardized_test_commands.py"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_pr_workflow_path_classifier.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/system/test_ci_lint_parity.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/test_standardized_test_commands.py tests/unit/workflows/test_pr_workflow_path_classifier.py -q",
+        "description": "Local command-selection and CI parity tests pass",
+        "expected": "all selected tests pass",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "last_result": "pass",
+        "last_run": "2026-08-17T12:50:07Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_standardized_test_commands.py -k skill_integrity_preflight -q",
+        "description": "A pure skill fixture runs skill controls without the product fast-test marker selection",
+        "expected": "all pure, mixed, delete-only, unknown, and missing-tool behavior cases pass",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "last_result": "pass",
+        "last_run": "2026-08-17T12:50:16Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Final local process preflight remains green",
+        "expected": "exit 0 with selected lane(s) printed",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "last_result": "pass",
+        "last_run": "2026-08-17T12:53:17Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_release_infrastructure.py tests/unit/test_standardized_test_commands.py -k 'pr_open or pr_refresh or pr_fanout or skill_integrity_preflight' -q",
+        "description": "Local skill routing preserves the merged pr-open ancestry gate and one-at-a-time refresh policy",
+        "expected": "behind heads are refused unless the caller explicitly supplies STALE=1; preflight never consumes the escape, merges develop, bulk-refreshes, or arms auto-merge",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "last_result": "pass",
+        "last_run": "2026-08-17T12:50:25Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "skill-integrity-local-preflight-routing",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1755 merged; origin/develop includes fail-closed pr-open ancestry gate, STALE=1 escape, one-at-a-time pr-refresh, and non-refreshing pr-fanout; existing preflight inventory recorded",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "notes": "Document which guards are universal, skill integrity, product-only, or environment-inapplicable. Commit-range, source trust, instruction audit, lock/mirror verification, wrapper contracts, and artifact hygiene are mandatory for skill diffs.",
+        "started_at": "2026-08-17T12:31:15Z",
+        "started_branch": "fix/skill-integrity-local-preflight-routing",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-skill-integrity-local-preflight-routing",
+        "status": "done",
+        "summary": "Wait for PR 1755, rebase, then inventory preflight guards and the ancestry contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Fail-closed skill-integrity-check clean-clones/builds policy VERIFIER_REF in mktemp, verifies with empty HOME, and enforces mirror/instruction/identity/wrapper/artifact controls; real target passed; missing git probe fails",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "notes": "Reuse the CI contract where locally meaningful. Verify the installed CLI revision or fetch/build the independently pinned verifier in a temporary cache. Missing tool is an error for a selected skill lane, not a skip.",
+        "started_at": "2026-08-17T12:33:27Z",
+        "started_branch": "fix/skill-integrity-local-preflight-routing",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-skill-integrity-local-preflight-routing",
+        "status": "done",
+        "summary": "Add a fail-closed local skill-integrity-check target",
+        "wid": "w1"
+      },
+      {
+        "evidence": "pr-preflight produces one classifier JSON/list artifact; pure approved skill uses focused lane, mixed uses both, all other cases retain full historical path; 104 parity/selection tests passed",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "notes": "Do not repeat path patterns in Make or shell. Preserve full product preflight for product/unknown/empty diffs. Run skill plus product contracts for mixed diffs; de-duplicate only guards proven identical and pinned by tests.",
+        "started_at": "2026-08-17T12:40:17Z",
+        "started_branch": "fix/skill-integrity-local-preflight-routing",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-skill-integrity-local-preflight-routing",
+        "status": "done",
+        "summary": "Refactor pr-preflight to consume one path-decision artifact and select required lanes",
+        "wid": "w2"
+      },
+      {
+        "evidence": "10 pure/mixed/delete/unknown/empty/malformed/missing-tool tests and 12 ancestry/pr-open/pr-refresh/pr-fanout tests passed; route contains no path globs, STALE, merge, push, PR, or auto-merge behavior",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "notes": "Behavioral tests must execute extracted Make recipes or their commands, not merely grep comments. Ensure delete-only skill diffs still verify the resulting tree and untracked mirror policy.",
+        "started_at": "2026-08-17T12:40:28Z",
+        "started_branch": "fix/skill-integrity-local-preflight-routing",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-skill-integrity-local-preflight-routing",
+        "status": "done",
+        "summary": "Pin skill routing without bypassing ancestry, STALE, pr-refresh, or pr-fanout safety",
+        "wid": "w3"
+      },
+      {
+        "evidence": "ci-local-parity docs and make help describe selected-lane output, temporary pinned verifier, fail-closed boundaries, full-path preservation, and one-at-a-time currency policy",
+        "item_id": "skill-integrity-local-preflight-routing",
+        "notes": "State any intentional local/runner difference and keep CI lane authoritative. Do not claim generic Markdown lint coverage for generated skills.",
+        "started_at": "2026-08-17T12:40:40Z",
+        "started_branch": "fix/skill-integrity-local-preflight-routing",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-skill-integrity-local-preflight-routing",
+        "status": "done",
+        "summary": "Document selected-lane output and local-to-CI parity boundaries",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,453 @@
+{
+  "description": "Update the existing TimescaleDB cloud deployment mode to reflect the\nTigerData rebrand (Timescale → TigerData, Timescale Cloud → TigerData).\nRename environment variables from TIMESCALE_* to TIGERDATA_* (with backward\ncompatibility), update registry display names, error messages, docstrings,\nand tests. Add platform documentation, example scripts, and comparison\nmatrix entry consistent with other cloud adapters.\n\nThe core cloud connection logic already works (SSL, service URL parsing,\nenv var auth, skip_database_management). This TODO focuses on the rebrand\nalignment and the documentation/example gap.\n\nNote: TigerData still uses *.tsdb.cloud.timescale.com hostnames, tsdbadmin\ndefault user, and tsdb default database - the infrastructure is unchanged,\nonly the branding.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "break existing self-hosted TimescaleDB mode",
+        "instead": "cloud rebrand changes only affect cloud-mode code paths and user-facing strings",
+        "item_id": "timescaledb-cloud-deployment",
+        "why": "self-hosted users depend on current behavior"
+      },
+      {
+        "dont": "change the colon syntax from timescaledb:cloud",
+        "instead": "update only display_name and description in registry",
+        "item_id": "timescaledb-cloud-deployment",
+        "why": "this is the established convention and TimescaleDB is still the extension name"
+      },
+      {
+        "dont": "remove TIMESCALE_* env var support",
+        "instead": "add TIGERDATA_* as primary with TIMESCALE_* as documented fallback",
+        "item_id": "timescaledb-cloud-deployment",
+        "why": "existing users may have these configured"
+      },
+      {
+        "dont": "rename the adapter module from timescaledb.py",
+        "instead": "only update display names and user-facing strings",
+        "item_id": "timescaledb-cloud-deployment",
+        "why": "TimescaleDB is still the extension name and the platform identifier"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "timescaledb-cloud-deployment",
+        "id": 576,
+        "reason": "Moved to separate TODO (tigerdata-cloud-enhancements)",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Reason explicitly states this was moved to tigerdata-cloud-enhancements, which is open (planning).",
+        "summary": "Connection pooling, verify-full SSL, and live integration tests"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-17T00:00:00Z",
+      "created_at": "2026-01-14T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "timescaledb-cloud-deployment"
+      },
+      {
+        "behavior": "Existing TimescaleDB unit tests continue to pass: uv run -- python -m pytest tests/unit/platforms/test_timescaledb_adapter.py -v",
+        "item_id": "timescaledb-cloud-deployment"
+      },
+      {
+        "behavior": "Existing self-hosted TimescaleDB mode unchanged - no behavior change for self-hosted users",
+        "item_id": "timescaledb-cloud-deployment"
+      },
+      {
+        "behavior": "Platform registry autodiscovery continues working for all existing platforms",
+        "item_id": "timescaledb-cloud-deployment"
+      },
+      {
+        "behavior": "TIMESCALE_* environment variables still work (backward compatibility)",
+        "item_id": "timescaledb-cloud-deployment"
+      },
+      {
+        "behavior": "timescaledb:cloud colon syntax unchanged",
+        "item_id": "timescaledb-cloud-deployment"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/postgresql.py"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "kind": "do_not_modify",
+        "path_glob": "tests/unit/platforms/test_timescaledb_adapter.py"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/timescaledb.py"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/comparison-matrix.md"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/index.md"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/timescaledb.md"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "examples/getting_started/cloud/tigerdata_tpch.py"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_timescaledb_cloud.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_timescaledb_cloud.py -v --tb=short",
+        "description": "TimescaleDB cloud unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "timescaledb-cloud-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_timescaledb_adapter.py -v --tb=short",
+        "description": "TimescaleDB adapter unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "timescaledb-cloud-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "All platform tests unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "timescaledb-cloud-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import os; os.environ['TIGERDATA_HOST']='x.com'; os.environ['TIGERDATA_PASSWORD']='p'; from benchbox.platforms.timescaledb import TimescaleDBAdapter; a = TimescaleDBAdapter(deployment_mode='cloud'); assert a.host == 'x.com'; print('OK')\"",
+        "description": "TIGERDATA_* env vars work",
+        "expected": "OK",
+        "item_id": "timescaledb-cloud-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import os; os.environ['TIMESCALE_HOST']='y.com'; os.environ['TIMESCALE_PASSWORD']='p'; from benchbox.platforms.timescaledb import TimescaleDBAdapter; a = TimescaleDBAdapter(deployment_mode='cloud'); assert a.host == 'y.com'; print('OK')\"",
+        "description": "TIMESCALE_* env vars still work (backward compat)",
+        "expected": "OK",
+        "item_id": "timescaledb-cloud-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m py_compile examples/getting_started/cloud/tigerdata_tpch.py",
+        "description": "Example script syntax check",
+        "expected": "no output (success)",
+        "item_id": "timescaledb-cloud-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w6",
+        "wid": "w10"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w11",
+        "wid": "w13"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w10",
+        "wid": "w14"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w10",
+        "wid": "w15"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w11",
+        "wid": "w15"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w14",
+        "wid": "w15"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "timescaledb-cloud-deployment",
+        "needs_wid": "w5",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update _configure_cloud_mode() env vars: add TIGERDATA_* as primary with TIMESCALE_* fallback for HOST, PASSWORD, USER, PORT, DATABASE, SERVICE_URL",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full test suite and fix any regressions: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create docs/platforms/timescaledb.md covering both self-hosted and TigerData cloud modes, connection setup, env vars (TIGERDATA_* primary, TIMESCALE_* fallback), SSL requirements, and example commands",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docs/platforms/index.md: add TimescaleDB entry under Cloud Data Warehouses section with TigerData cloud note, add to toctree",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docs/platforms/comparison-matrix.md: add TimescaleDB/TigerData row to all comparison tables (protocol: PostgreSQL, auth: password, SSL: required, storage: managed)",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create examples/getting_started/cloud/tigerdata_tpch.py following conventions from databend_tpch.py: show TIGERDATA_* env var setup, timescaledb:cloud platform syntax, TPC-H at scale 0.01",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run all verification commands from this TODO's verification section, confirm all pass",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update error messages in _configure_cloud_mode(): 'Timescale Cloud requires host' → 'TigerData requires host', update env var examples to show TIGERDATA_HOST with TIMESCALE_HOST as fallback",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docstrings: module docstring line 11 'Timescale Cloud' → 'TigerData', _configure_cloud_mode() docstring, _parse_service_url() docstring, cloud-mode log messages",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update error message for invalid service URL: 'Invalid TIMESCALE_SERVICE_URL' → 'Invalid TIGERDATA_SERVICE_URL (or TIMESCALE_SERVICE_URL)'",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update platform_registry.py cloud deployment: display_name → 'TigerData', description → 'TigerData managed PostgreSQL service'",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update test_timescaledb_cloud.py: add tests for TIGERDATA_* env vars (TIGERDATA_HOST, TIGERDATA_PASSWORD, etc.), verify they take priority over TIMESCALE_* equivalents",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update test_timescaledb_cloud.py: add test that TIMESCALE_* env vars still work when TIGERDATA_* are not set (backward compatibility)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update test_timescaledb_cloud.py: update error message assertions to check for 'TigerData' instead of 'Timescale Cloud' in validation errors",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "timescaledb-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update test registry assertions: verify cloud display_name is 'TigerData'",
+        "wid": "w9"
+      }
+    ]
+  }
+}

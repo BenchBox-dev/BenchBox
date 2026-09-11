@@ -1,0 +1,281 @@
+{
+  "context": "Treat current adapter-mixin execution as the likely production path, but prove\nit before changing docs. Separate lifecycle cleanup from result-bundle parity\nso old-runner decisions do not block the most important contract test.\n",
+  "description": "Production DataFrame execution appears to route through adapter.run_benchmark\nand the DataFrame benchmark mixin. The older core/runner/dataframe_runner.py\nstill exists, is documented like a live runner, and has tests. The sharper\narchitectural risk is not that production has three canonical paths; it is\nthat an old path has unclear lifecycle status and no real exported-bundle\nSQL-vs-DataFrame contract guards the result boundary.\n\nThis item classifies dataframe_runner.py as supported, internal compatibility,\nor deprecated, then adds one real SQL-vs-DataFrame exported-result bundle\ncontract test.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "call every DataFrame path canonical",
+        "instead": "classify the old runner instead.",
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "why": "production appears adapter-mixin based"
+      },
+      {
+        "dont": "fully unify SQL and DataFrame builders as a first move",
+        "instead": "start with exported invariants.",
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "why": "that may over-couple different execution models"
+      },
+      {
+        "dont": "write only synthetic parity tests",
+        "instead": "compare real exported bundles.",
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "why": "synthetic builders miss export-time omissions"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dataframe-runner-lifecycle-and-bundle-parity",
+        "id": 368,
+        "reason": "May be unnecessary if exported-bundle parity catches drift with less coupling.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Reason self-negates: 'may be unnecessary if exported-bundle parity catches drift' -- parity was the chosen approach.",
+        "summary": "Unify all SQL and DataFrame result builders into one implementation"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dataframe-runner-lifecycle-and-bundle-parity",
+        "id": 369,
+        "reason": "Only safe after lifecycle classification and compatibility-window decision.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Parent item's w1/w2 explicitly rejected immediate deletion and classified dataframe_runner.py as a deprecated compat shim; file still present by design.",
+        "summary": "Delete dataframe_runner.py immediately"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "needs_item": "result-schema-policy-and-explorer-input-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "DataFrame",
+      "completed_at": "2026-05-21T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not break production DataFrame platforms: polars-df, pandas-df, datafusion-df, and dask-df.",
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity"
+      },
+      {
+        "behavior": "Do not compare exact execution timings between SQL and DataFrame parity bundles.",
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity"
+      },
+      {
+        "behavior": "Do not remove tested wrapper facade behavior while classifying DataFrame runner internals.",
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/dataframe/benchmark_mixin.py: current DataFrame adapter execution path -- prefer as production reference.",
+        "decision": "reuse",
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "path": "benchbox/platforms/dataframe/benchmark_mixin.py"
+      },
+      {
+        "concept": "docs/reference/backward-compatibility.md: existing lifecycle registry for harmonization shims -- register dataframe_runner.py status here.",
+        "decision": "reuse",
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "path": "docs/reference/backward-compatibility.md"
+      },
+      {
+        "concept": "tests/unit/core/results/test_result_parity.py: synthetic parity coverage -- extend with real exported-bundle coverage, not a replacement.",
+        "decision": "extend",
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "path": "tests/unit/core/results/test_result_parity.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/athena.py"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "only_modify",
+        "path_glob": "docs/design/architecture.md"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/validation/"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/dataframe/"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/runner/"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpch/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k 'dataframe and parity' --tb=short",
+        "description": "Run focused DataFrame runner and parity tests.",
+        "expected": "Focused DataFrame parity tests pass.",
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results -q",
+        "description": "Run focused result export tests.",
+        "expected": "Result export tests pass.",
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "notes": "Completed 2026-05-21 at checked SHA\n8604d0a413f6c3d4bd7db211bb472c2370a932c3.\n\nRevalidation summary:\n  - `benchbox/core/runner/runner.py` routes DataFrame execute and\n    load-only branches through `adapter.run_benchmark()` with\n    `DataFramePhases` and `DataFrameRunOptions`.\n  - `benchbox/platforms/dataframe/benchmark_mixin.py` is the production\n    DataFrame lifecycle owner for result construction, phase status,\n    query execution, skip summaries, and plan-capture counters.\n  - `benchbox/core/runner/dataframe_runner.py` is not called by the\n    production lifecycle runner; remaining references are docs, tests, and\n    internal helper imports in CLI/dry-run/monitoring paths.\n  - `docs/design/architecture.md` pointed at the old runner before this\n    change.\n  - `tests/unit/core/results/test_result_parity.py` had synthetic\n    payload parity only; exported JSON parity was added here.\n\nCommit a compact summary of checked SHA, production execution path, old\nrunner call sites, docs references, and existing parity tests.\n\nMinimum evidence to re-check:\n  - benchbox/core/runner/runner.py DataFrame adapter branch.\n  - benchbox/platforms/dataframe/benchmark_mixin.py run_benchmark path.\n  - benchbox/core/runner/dataframe_runner.py call sites and tests.\n  - docs/design/architecture.md DataFrame runner references.\n  - tests/unit/core/results/test_result_parity.py.\n  - focused TPC-DI/write/read primitive SQL-vs-DataFrame parity tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate current SQL and DataFrame execution paths and parity coverage",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "notes": "Decision: `benchbox/core/runner/dataframe_runner.py` is a deprecated\ninternal compatibility runner. Production DataFrame execution is the\nadapter-mixin path:\n`run_benchmark_lifecycle()` -> `adapter.run_benchmark()` ->\n`BenchmarkExecutionMixin.run_benchmark()`.\n\nProduction behavior tests are DataFrame mixin/adapter lifecycle tests and\nexported bundle parity. `tests/unit/core/runner/test_dataframe_runner.py`\nand `tests/unit/core/runner/test_dataframe_runner_lifecycle.py` are\ncompatibility tests for the deprecated standalone runner.\n\nChoose exactly one status and record it in\ndocs/reference/backward-compatibility.md and docs/reference/public-contracts.md:\n  - supported public/internal runner,\n  - internal compatibility shim,\n  - deprecated compatibility fossil,\n  - removed after one beta window.\n\nThe decision must identify which tests are production behavior tests and\nwhich are compatibility tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decision gate: classify core/runner/dataframe_runner.py lifecycle",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "notes": "Added module lifecycle constants and docstring guidance to\n`benchbox/core/runner/dataframe_runner.py`, registered the lifecycle in\n`docs/reference/backward-compatibility.md`, and updated\n`docs/reference/public-contracts.md` plus\n`docs/design/architecture.md` to direct production DataFrame execution to\n`adapter.run_benchmark()` and `BenchmarkExecutionMixin`.\n\nIf w1 chooses deprecation or compatibility fossil: update docs so\nDataFrame execution is described through adapter.run_benchmark and the\nDataFrame benchmark mixin. Keep only narrow compatibility tests for\ndataframe_runner.py until the removal window ends.\n\nDo not delete the runner in the same change unless the compatibility\nregistry says the removal window is already closed.\n\nIf w1 chooses supported/internal runner: dataframe_runner.py should\ndelegate to the same adapter-mixin production path or share a lower-level\nhelper so field population cannot drift.\n\nAvoid maintaining a separate result-construction path unless a contract\ntest proves the divergence is intentional.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the selected dataframe_runner.py lifecycle path",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "notes": "Added `test_exported_sql_and_dataframe_bundles_share_cross_mode_contract`\nin `tests/unit/core/results/test_result_parity.py`. The test creates a\nSQL result through a concrete `PlatformAdapter.run_benchmark()` path,\ncreates a DataFrame result through `BenchmarkExecutionMixin.run_benchmark()`,\nexports both through `ResultExporter`, reloads the JSON payloads, and\ncompares schema version, benchmark/config identity, phases, query IDs,\nrows, validation, errors, execution metadata keys, and timing field\nnames/units without comparing exact timing values.\n\nPick the smallest reliable benchmark/platform pair available in fast or\nfocused integration tests. Compare exported bundle fields, not synthetic\ndataclass construction alone.\n\nRequired invariants:\n  - schema version,\n  - benchmark/config identity,\n  - phase presence and skipped/not-run semantics,\n  - query IDs,\n  - row counts when available,\n  - validation state,\n  - error fields,\n  - execution metadata keys,\n  - timing field names and units.\n\nDo not assert exact timing values.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add one real SQL-vs-DataFrame exported-bundle parity contract test",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dataframe-runner-lifecycle-and-bundle-parity",
+        "notes": "Documented SQL/DataFrame result bundle invariants and allowed differences\nin `docs/reference/public-contracts.md`. Allowed differences include\nexecution mode, platform metadata, benchmark-managed DataFrame loading\nstatus such as `SKIPPED`, and exact timing values.\n\nAdd a short section to docs/reference/public-contracts.md or a dedicated\nresult contract doc that states which fields must match between SQL and\nDataFrame runs, which may differ, and why.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document cross-mode invariants and known allowed differences",
+        "wid": "w4"
+      }
+    ]
+  }
+}

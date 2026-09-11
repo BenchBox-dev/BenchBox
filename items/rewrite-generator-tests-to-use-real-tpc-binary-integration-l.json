@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #238 of remediate-coverage-theater.\nDeferred: Rewrite generator tests to use real TPC binary (integration-level)\nReason deferred: Requires TPC binary availability - harder to test in CI",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:03Z",
+      "worktree": "main"
+    }
+  }
+}

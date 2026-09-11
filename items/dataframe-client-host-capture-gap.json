@@ -1,0 +1,91 @@
+{
+  "context": "Attach a system profile in the DataFrame adapter family the same way base/adapter.py does for SQL, so both hierarchies produce the same client_host block. Prefer lifting the profile collection to a point both families share over duplicating the call into each of the five DataFrame adapters.",
+  "description": "Every DataFrame result publishes an environment block containing only platform_runtime. No client_host is recorded: no os, arch, python, cpu_count, memory_gb or CPU identity. Verified across the whole archive -- 0 of 107 sampled raw DataFrame results carry client_host.arch, and all 43 DataFrame bundles in the published corpus (pandas 15, polars 19, read_primitives 4, pyspark 2, tpch_skew 3) lack it. Every SQL run has it; no DataFrame run does.\n\nRoot cause is structural, not a missing call. The SQL adapters descend from benchbox/platforms/base/adapter.py, whose _build_execution_metadata calls get_system_info() and attaches the result as system_profile. The DataFrame adapters descend from a separate hierarchy (ExpressionFamilyAdapter / PandasFamilyAdapter) that never runs that path, so result.system_profile stays unset and _build_environment_block emits an empty client_host that _compact then drops.\n\nFound while validating CPU identity capture for #1948/#1951. Once #1951 lands, DataFrame runs do gain cpu_model and cpu_vendor -- but only because from_system_profile's detection fallback fires when the profile is wholly absent, which is exactly the symptom. They still record no host, so ~28% of the corpus stays blank on every hardware axis.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-30T06:14:52Z",
+      "completed_pr": 1956,
+      "created_at": "2026-08-30T02:35:01Z",
+      "worktree": "dataframe-client-host-capture-gap"
+    },
+    "preserves": [
+      {
+        "behavior": "A DataFrame result must record the same client_host fields a SQL result does: os, arch, python, cpu_count, memory_gb, cpu_model, cpu_vendor.",
+        "item_id": "dataframe-client-host-capture-gap"
+      },
+      {
+        "behavior": "Detection must stay at capture time only; the load path must never stamp the re-deriving machine's hardware onto a stored result.",
+        "item_id": "dataframe-client-host-capture-gap"
+      },
+      {
+        "behavior": "Existing DataFrame bundles must keep loading unchanged; this adds capture, it does not alter historical data.",
+        "item_id": "dataframe-client-host-capture-gap"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dataframe-client-host-capture-gap",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/**"
+      },
+      {
+        "item_id": "dataframe-client-host-capture-gap",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/**"
+      },
+      {
+        "item_id": "dataframe-client-host-capture-gap",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dataframe-client-host-capture-gap",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "dataframe-client-host-capture-gap",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR 1956",
+        "item_id": "dataframe-client-host-capture-gap",
+        "notes": null,
+        "started_at": "2026-08-30T06:14:44Z",
+        "started_branch": "fix/dataframe-client-host-capture",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-df-client-host",
+        "status": "done",
+        "summary": "Pin the gap - enumerate which adapters and which fields, from the raw archive and the published corpus",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR 1956",
+        "item_id": "dataframe-client-host-capture-gap",
+        "notes": null,
+        "started_at": "2026-08-30T06:14:46Z",
+        "started_branch": "fix/dataframe-client-host-capture",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-df-client-host",
+        "status": "done",
+        "summary": "Attach the system profile in the DataFrame adapter family",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR 1956",
+        "item_id": "dataframe-client-host-capture-gap",
+        "notes": null,
+        "started_at": "2026-08-30T06:14:49Z",
+        "started_branch": "fix/dataframe-client-host-capture",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-df-client-host",
+        "status": "done",
+        "summary": "Assert SQL and DataFrame runs produce the same client_host field set",
+        "wid": "w2"
+      }
+    ]
+  }
+}

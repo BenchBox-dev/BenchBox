@@ -1,0 +1,321 @@
+{
+  "context": "The smart field-count detection from FormatConverter._needs_trailing_dummy_column() is the\ncanonical approach: read the first non-empty line, split by delimiter, compare field count\nto expected column count. This correctly handles both TPC-H files (which have trailing |)\nand TPC-DS files like time_dim.dat (which do not). Move this logic to file_format.py as\nthe single source of truth, then update all 13 call sites to use it. For SQL adapters,\nonly standardize the column name -- the unconditional add-then-drop pattern is safe there.\n",
+  "description": "TPC benchmark data files (.tbl/.dat) use | as a field terminator (not separator),\ncreating an extra empty field when split. This is currently handled in 13+ locations\nacross 9 files using 3 different detection approaches and 3 different dummy column\nnames (_trailing_, _trailing_delimiter, _trailing_ignore). The inconsistency caused\nregressions (e.g., time_dim.dat conversion failure where the naive \"ends with |\"\ncheck incorrectly added a dummy column).\n\nApproach: Extract the smart field-count detection logic into benchbox/utils/file_format.py\nas a shared utility. Update all 13 locations to use the shared constant and, where\nappropriate, the shared detection function. Remove has_trailing_delimiter from\nFileFormatInfo (it's always False -- dead code).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "unconditionally add dummy columns in DataFrame adapters",
+        "instead": "(not specified)",
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "why": "it breaks when the file has no trailing delimiter (extra NaN column)"
+      },
+      {
+        "dont": "use delimiter == '|' as a proxy for has_trailing_delimiter",
+        "instead": "(not specified)",
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "why": "not all pipe-delimited files have trailing pipes"
+      },
+      {
+        "dont": "use naive 'ends with delimiter' check",
+        "instead": "(not specified)",
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "why": "it incorrectly flags TPC-DS files like time_dim.dat that end with | as field content"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-09T00:00:00Z",
+      "created_at": "2026-02-09T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing TPC-H and TPC-DS data loading must continue to work identically",
+        "item_id": "consolidate-trailing-delimiter-handling"
+      },
+      {
+        "behavior": "Compressed file support in trailing delimiter detection (via CompressionManager)",
+        "item_id": "consolidate-trailing-delimiter-handling"
+      },
+      {
+        "behavior": "DuckDB SQL EXCLUDE pattern and PyArrow include_columns filtering remain unconditional (they handle both with/without trailing delimiter)",
+        "item_id": "consolidate-trailing-delimiter-handling"
+      },
+      {
+        "behavior": "Schema-less fallback for has_trailing_delimiter when column_names is None",
+        "item_id": "consolidate-trailing-delimiter-handling"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/data_loader.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/utils.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/cudf.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/cudf_df.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/dask_df.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/datafusion_df.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/modin_df.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/pandas_df.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/pyspark_df.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/polars_platform.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/spark.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/file_format.py"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/format_converters/base.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run ruff check .",
+        "description": "Lint passes",
+        "expected": null,
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "All fast tests pass",
+        "expected": null,
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox run --platform datafusion --benchmark tpcds --scale 0.01 --mode dataframe",
+        "description": "TPC-DS time_dim loads correctly via DataFusion DataFrame mode",
+        "expected": null,
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -r '_trailing_' benchbox/ --include='*.py'",
+        "description": "No stale trailing column references remain",
+        "expected": "Only references to TRAILING_DUMMY_COLUMN or its value '_trailing_delimiter_'",
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "notes": "Add to benchbox/utils/file_format.py:\n- TRAILING_DUMMY_COLUMN = \"_trailing_delimiter_\" -- canonical constant\n- has_trailing_delimiter(path, delimiter, column_names=None) -> bool -- moved from\n  FormatConverter._needs_trailing_dummy_column(), with schema-less fallback (checks\n  if first line ends with delimiter when column_names is None)\n- get_column_names_with_trailing(column_names, has_trailing) -> list[str] -- helper\n  that appends the dummy column name when needed\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add shared utility to file_format.py (TRAILING_DUMMY_COLUMN, has_trailing_delimiter(), get_column_names_with_trailing())",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "notes": "File: benchbox/core/dataframe/data_loader.py\n- Delete _needs_trailing_dummy_column() static method\n- Replace calls with file_format.has_trailing_delimiter()\n- Replace \"_trailing_\" with TRAILING_DUMMY_COLUMN\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update FormatConverter in data_loader.py to use shared utility",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "notes": "File: benchbox/platforms/dataframe/datafusion_df.py\n- Delete duplicated _needs_trailing_dummy_column() instance method\n- Replace calls with file_format.has_trailing_delimiter()\n- Replace \"_trailing_\" with TRAILING_DUMMY_COLUMN\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update DataFusion DF adapter to use shared utility",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "notes": "Files: pandas_df.py, modin_df.py, cudf_df.py, dask_df.py\nReplace the unconditional add-then-drop pattern:\n  Before: if is_tpc_format(path) and names: extended_names = names + [\"_trailing_\"]\n  After: if is_tpc_format(path) and names and has_trailing_delimiter(path, delimiter, names):\n             extended_names = names + [TRAILING_DUMMY_COLUMN]\nUpdate the drop check to use TRAILING_DUMMY_COLUMN.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update pandas-family DataFrame adapters (pandas_df, modin_df, cudf_df, dask_df)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "notes": "File: benchbox/platforms/dataframe/pyspark_df.py\n- Bug fix: Replace path_str.endswith(\".tbl\") with is_tpc_format(path) (currently misses .dat)\n- Apply same smart detection + constant pattern as Phase 4\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix PySpark DF adapter bug (.tbl-only check misses .dat) and update to shared utility",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "notes": "Files:\n- benchbox/utils/format_converters/base.py -- change \"_trailing_delimiter\" -> TRAILING_DUMMY_COLUMN\n- benchbox/platforms/base/data_loading.py -- change \"_trailing_ignore\" -> TRAILING_DUMMY_COLUMN\nKeep the unconditional add-then-drop pattern here (DuckDB SQL EXCLUDE and PyArrow\ninclude_columns handle both cases robustly).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Standardize column names in SQL adapters (format_converters/base.py, data_loading.py)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "notes": "File: benchbox/platforms/base/utils.py\n- Remove has_trailing_delimiter field from FileFormatInfo (always False, misleading)\n- Update detect_file_format() to return 2-field tuple\nDownstream updates:\n- benchbox/platforms/polars_platform.py -- remove 3rd element from _detect_file_format(),\n  use shared detection in _load_csv()\n- benchbox/platforms/datafusion.py -- simplify _detect_csv_format() to return just delimiter\n- benchbox/platforms/spark.py -- remove dead format_info.has_trailing_delimiter check\n- benchbox/platforms/cudf.py -- remove dead format_info.has_trailing_delimiter check\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove dead has_trailing_delimiter from FileFormatInfo and update downstream consumers",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "consolidate-trailing-delimiter-handling",
+        "notes": "- tests/unit/utils/test_file_format.py -- add tests for has_trailing_delimiter(),\n  TRAILING_DUMMY_COLUMN, get_column_names_with_trailing()\n- Update any test referencing \"_trailing_\", \"_trailing_ignore\", or \"_trailing_delimiter\"\n  to use the constant\n- Update tests consuming FileFormatInfo for the removed field\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update tests for shared utility, constant references, and FileFormatInfo changes",
+        "wid": "w8"
+      }
+    ]
+  }
+}

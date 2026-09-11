@@ -1,0 +1,112 @@
+{
+  "context": "Documentation-only change. Read the current docs/features/query-plan-analysis.md,\nlocate the Performance Impact section and the PostgreSQL platform section, and\napply the two corrections above. No code changes.\n",
+  "description": "docs/features/query-plan-analysis.md contains two inaccuracies added by PR #776:\n\n1. Performance overhead table (the \"Other platforms: ~10-50ms\" claim):\n   The table lists \"Other platforms (Redshift, PostgreSQL, etc.): ~10-50ms overhead\n   per query capture\". This is false for PostgreSQL with EXPLAIN ANALYZE.\n   PostgreSQLAdapter.get_query_plan() uses EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON),\n   which physically re-executes the query. The overhead for PostgreSQL is\n   approximately 1× query execution time, not a flat 10-50ms. A slow TPC-H query\n   (e.g., Q18 at SF=1 can take seconds) would cost double that time with plan\n   capture active. The 10-50ms estimate is only valid for platforms that use\n   a static EXPLAIN without ANALYZE.\n\n2. DML note in the PostgreSQL section:\n   The note says \"DML statements (INSERT/UPDATE/DELETE/MERGE/COPY) use FORMAT JSON\n   without ANALYZE to prevent double-execution side effects\". This is incorrect for\n   PostgreSQL — the adapter currently has NO DML guard (postgresql.py:704 always\n   issues EXPLAIN ANALYZE regardless of query type). The DML-without-ANALYZE note\n   accurately describes DuckDB (which has the guard), not PostgreSQL. PR #776\n   incorrectly projected DuckDB behavior onto PostgreSQL.\n   This is tracked as a separate correctness fix in query-plan-capture-postgresql-dml-guard.\n   The docs note should be corrected to reflect reality: DuckDB has the guard;\n   PostgreSQL does not yet; the fix is tracked separately.\n\nBoth corrections are documentation-only and do not change any code.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2026-06-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DuckDB platform section DML note must remain accurate — DuckDB already has the guard.",
+        "item_id": "query-plan-capture-docs-overhead-correction"
+      },
+      {
+        "behavior": "Performance Impact section structure must remain intact — only the table values and prose change.",
+        "item_id": "query-plan-capture-docs-overhead-correction"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/duckdb.py:1058 — ANALYZE vs FORMAT JSON branch (the DML guard that DuckDB has)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-docs-overhead-correction",
+        "path": "benchbox/platforms/duckdb.py:1058"
+      },
+      {
+        "concept": "benchbox/platforms/postgresql.py:704 — options = ['ANALYZE', 'BUFFERS', 'FORMAT JSON'] (no DML guard)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-docs-overhead-correction",
+        "path": "benchbox/platforms/postgresql.py:704"
+      },
+      {
+        "concept": "docs/features/query-plan-analysis.md — Performance Impact section, DuckDB/PostgreSQL platform sections",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-docs-overhead-correction",
+        "path": "docs/features/query-plan-analysis.md"
+      },
+      {
+        "concept": "query-plan-capture-postgresql-dml-guard — the code fix for the DML issue",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-docs-overhead-correction",
+        "path": "query-plan-capture-postgresql-dml-guard"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-docs-overhead-correction",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/query-plan-capture-docs-overhead-correction.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-docs-overhead-correction",
+        "kind": "only_modify",
+        "path_glob": "docs/features/query-plan-analysis.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- pre-commit run check-yaml --files docs/features/query-plan-analysis.md",
+        "description": "Docs still render without broken links",
+        "expected": "Passes (YAML check is a proxy; main check is visual inspection)",
+        "item_id": "query-plan-capture-docs-overhead-correction",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'DML' docs/features/query-plan-analysis.md",
+        "description": "Docs claim about DML guard correctly attributes DuckDB, not PostgreSQL",
+        "expected": "DML note attributes the guard to DuckDB and notes PostgreSQL guard is pending",
+        "item_id": "query-plan-capture-docs-overhead-correction",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-docs-overhead-correction",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-docs-overhead-correction",
+        "notes": "In the Performance Impact section, revise the \"Other platforms\" row to\ndistinguish ANALYZE and non-ANALYZE paths:\n  | Platform | Overhead per query capture |\n  |----------|---------------------------|\n  | DuckDB (analyze_plans=True, default) | ~1× query execution time |\n  | DuckDB (analyze_plans=False) | ~5-20ms (static EXPLAIN only) |\n  | PostgreSQL (SELECT queries) | ~1× query execution time (EXPLAIN ANALYZE) |\n  | PostgreSQL (DML queries) | ~10-50ms (EXPLAIN without ANALYZE, once guard lands) |\n  | Redshift | ~10-50ms (plain EXPLAIN, no ANALYZE) |\n  | MotherDuck | ~1× query execution time (EXPLAIN ANALYZE, same as DuckDB) |\nMark the PostgreSQL DML row with \"(after query-plan-capture-postgresql-dml-guard)\"\nor a note that the guard is pending. Revise the prose that generalizes\n~10-50ms to \"ANALYZE-based adapters\" vs \"static EXPLAIN adapters\".\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Correct the performance overhead table for PostgreSQL",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-docs-overhead-correction",
+        "notes": "The DML note currently says: \"DML statements use FORMAT JSON without ANALYZE\nto prevent double-execution side effects.\" Replace with:\n  DuckDB guards DML queries by using FORMAT JSON without ANALYZE, avoiding\n  double-execution. PostgreSQL's DML guard is pending\n  (query-plan-capture-postgresql-dml-guard) — until then, DML queries\n  with --capture-plans active will execute twice on PostgreSQL.\nAfter query-plan-capture-postgresql-dml-guard is merged, revisit this note\nto confirm it accurately describes both platforms.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Correct the DML note in the PostgreSQL platform section",
+        "wid": "w2"
+      }
+    ]
+  }
+}

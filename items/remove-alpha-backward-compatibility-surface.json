@@ -1,0 +1,536 @@
+{
+  "context": "Use docs/reference/backward-compatibility.md as the single source of truth and process\nremovals module-by-module in deterministic waves: core/platform/cli first, then tests,\nthen docs. Prefer deleting code paths over redirecting aliases. When a legacy path and\ncanonical path share logic, extract canonical behavior first, then remove branching.\n",
+  "description": "Remove all backward-compatibility elements currently tracked in\ndocs/reference/backward-compatibility.md to align with alpha-stage product policy.\n\nBaseline inventory at kickoff tracked 89 compatibility markers\n(67 active, 22 deprecate).\nThis item executes immediate removal of the entire compatibility surface, including:\n- alias/re-export compatibility shims\n- legacy argument and field fallbacks\n- legacy mode and path synonyms\n- old result-shape adaptation logic where still retained\n- compatibility-only CLI branches and helper wrappers\n\nThis work intentionally allows API and behavior changes in favor of a smaller,\ncleaner, canonical pre-1.0 interface. Documentation and tests must be updated\nin the same implementation window so CI remains green on the canonical paths.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "batch unverified removals across unrelated subsystems",
+        "instead": "validate each wave before proceeding.",
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "why": "regression root-cause becomes opaque"
+      },
+      {
+        "dont": "keep aliases with deprecation warnings",
+        "instead": "remove symbols outright in alpha.",
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "why": "this prolongs surface-area and maintenance cost"
+      },
+      {
+        "dont": "update only docs or only tests without deleting code branches",
+        "instead": "delete implementation first then align tests/docs.",
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "why": "stale compatibility paths will remain executable"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-18T00:00:00Z",
+      "created_at": "2026-02-14T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Canonical benchmark execution paths (`benchbox run` with supported platforms/benchmarks) remain functional.",
+        "item_id": "remove-alpha-backward-compatibility-surface"
+      },
+      {
+        "behavior": "Core result generation and export for the canonical schema continue to work end-to-end.",
+        "item_id": "remove-alpha-backward-compatibility-surface"
+      },
+      {
+        "behavior": "Non-compatibility feature behavior (query execution correctness and validation semantics) is not changed beyond compatibility removal.",
+        "item_id": "remove-alpha-backward-compatibility-surface"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "do_not_modify",
+        "path_glob": "_binaries/"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "do_not_modify",
+        "path_glob": "_sources/"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/_indexes/"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/_indexes/"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/remove-alpha-backward-compatibility-surface.yaml"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/backward-compatibility.md"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/index.md"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n \"^\\| `benchbox/\" docs/reference/backward-compatibility.md",
+        "description": "Backward-compatibility registry no longer contains active benchbox compatibility rows",
+        "expected": "No output, or the registry page has been replaced by a historical note without active benchbox compatibility rows",
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"backward compatibility|Backward compatibility|legacy compatibility|for backward compatibility|backward-compatible|LegacyGetTablesSource|compatibility alias\" benchbox",
+        "description": "No compatibility-shim markers remain in production code",
+        "expected": "No matches representing compatibility shims",
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make ci-lint",
+        "description": "Lint and formatting checks pass",
+        "expected": "All lint/format checks pass",
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make typecheck-uv",
+        "description": "Type checks pass",
+        "expected": "Type checking passes with no errors",
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make ci-test",
+        "description": "Fast CI test profile passes",
+        "expected": "Fast tests pass at project CI gate",
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w1",
+        "wid": "w10"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w1",
+        "wid": "w11"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w10",
+        "wid": "w12"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w2",
+        "wid": "w12"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w3",
+        "wid": "w12"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w4",
+        "wid": "w12"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w5",
+        "wid": "w12"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w6",
+        "wid": "w12"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w7",
+        "wid": "w12"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w8",
+        "wid": "w12"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w9",
+        "wid": "w12"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w10",
+        "wid": "w13"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w11",
+        "wid": "w13"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w2",
+        "wid": "w13"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w3",
+        "wid": "w13"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w4",
+        "wid": "w13"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w5",
+        "wid": "w13"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w6",
+        "wid": "w13"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w7",
+        "wid": "w13"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w8",
+        "wid": "w13"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w9",
+        "wid": "w13"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w12",
+        "wid": "w14"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w14",
+        "wid": "w15"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w15",
+        "wid": "w16"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w16",
+        "wid": "w17"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "needs_wid": "w1",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Convert each registry row into a remove/change action with owner module and expected replacement behavior.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Freeze canonical API contract and define removal matrix from registry",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Covers tuning interface legacy constructors/merge paths, validation legacy properties, and config re-export compatibility layers.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove compatibility surfaces in tuning/validation/config utilities",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Covers filename normalization fallbacks, database naming legacy fallbacks, datagen manifest legacy handlers, and similar utility shims.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove remaining utility compatibility shims and legacy defaults",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Remove tests asserting alias/fallback behavior; preserve and expand canonical behavior tests.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete compatibility-specific tests and rewrite tests to canonical API behavior",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Update reference/platform/guides and rewrite backward-compatibility page as historical removal record or replace with breaking-changes policy.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docs to remove compatibility claims and document alpha break policy",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Run ruff/type/targeted tests incrementally to localize regressions before final CI run.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run module-wave quality gates and fix regressions after each wave",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Execute CI-equivalent checks and fix any end-to-end regressions introduced by compatibility removals.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full CI profile and resolve remaining failures",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Demonstrate that all registry-tracked compatibility elements were removed or intentionally reclassified.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Produce final before/after compatibility inventory diff",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Produce explicit list of deleted symbols/branches and canonical replacements for contributors.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Finalize removal report with before/after inventory and migration notes",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Covers entrypoint aliases and compatibility exports in TPCH/TPCDS modules.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove core package alias/re-export shims in benchbox/core",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Covers tpc_compliance, tpcds benchmark legacy dataclasses/phase names, and power/throughput compatibility attributes.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove core benchmark compatibility structs and legacy benchmark fields",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Covers platform alias mappings and compatibility exports across platform registries.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove platform alias/synonym compatibility in adapter registration",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Covers sqlite nested connection keys, clickhouse deployment compatibility paths, firebolt mode fallbacks, and related adapter fallback logic.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove platform legacy connection/config normalization fallbacks",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Targets run/shell/setup/platform hooks and compatibility-only CLI type re-exports.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove CLI compatibility branches and wrapper command paths",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Delete legacy result-shape adaptation and compatibility-only read/write paths; keep canonical result schema behavior.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove compatibility behavior in result export/load/schema boundaries",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Covers unified_frame legacy tuple format handling and profiling compatibility conversion methods.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove DataFrame-layer compatibility format branches",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-alpha-backward-compatibility-surface",
+        "notes": "Drop legacy QUERIES paths, compatibility query loaders, alias classes, and benchmark kwargs compatibility paths.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove compatibility surfaces in DataVault and TPC-DI modules",
+        "wid": "w9"
+      }
+    ]
+  }
+}

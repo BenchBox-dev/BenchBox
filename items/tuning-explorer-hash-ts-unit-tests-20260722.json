@@ -1,0 +1,11 @@
+{
+  "description": "RunReceipt + ComparabilityReceipt tests asserting the labeled Requested-config/Applied-ledger hash rows render for non-null values, and the mode-only fallback is not shown as a fingerprint. Deferred from tuning-explorer-consume-bundle-hashes-20260716 (node_modules absent locally).",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-23T12:59:32Z",
+      "completed_pr": 1278,
+      "created_at": "2026-07-22T20:25:30Z",
+      "worktree": "main"
+    }
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "description": "dask-df pre-emptively SKIPPED TPC-H Q10 in the default local envelope via a\nresource guard (benchbox/platforms/dataframe/dask_df.py:\n_RESOURCE_ENVELOPE_SKIP_QUERY_IDS = {\"Q10\"}, _guarded_resource_query_diagnostic,\n_collect_skip_query_ids override). The guard's premise was that Q10's\nPandas-family Dask graph terminates the parent process with exit 137 (OOM) on\nlocal runs.\n\nInvestigation on 2026-05-29/30 (during uat-dask-stability-under-sweep) showed\nthe guard was OBSOLETE:\n\n- Dask 2026.3.0 makes the dask-expr query optimizer MANDATORY. Disabling it\n  raises NotImplementedError (\"The legacy implementation is no longer\n  supported\"). The optimizer auto-applies projection + filter pushdown, so the\n  naive Q10 graph that OOMed on legacy Dask no longer materializes.\n- The unmodified q10_pandas_impl ran within the 2GB/1-worker/spill local\n  envelope at SF1 in 2.6s (parquet) and 13.9s (CSV, the real benchbox IO),\n  producing 37,967 groups — no OOM, no exit 137.\n- A projection-pushdown rework (select needed columns, push the\n  l_returnflag='R' filter before the lineitem join, group by the narrow\n  integer keys c_custkey/c_nationkey then rejoin detail columns) is byte-\n  identical to the current result (same all_hash, same top-20) and also fits.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change Q10 semantics",
+        "instead": "(not specified)",
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "why": "the rework returns the identical result set."
+      },
+      {
+        "dont": "remove the generic _run_with_resource_diagnostics worker-death catch",
+        "instead": "(not specified)",
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "why": "only the Q10 pre-emptive skip is obsolete."
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-05-30T00:00:00Z",
+      "created_at": "2026-05-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All other dask-df TPC-H cells that pass must not regress.",
+        "item_id": "dask-q10-guard-staleness-and-projection-rework"
+      },
+      {
+        "behavior": "Q10 result is identical (same rows) before and after the rework.",
+        "item_id": "dask-q10-guard-staleness-and-projection-rework"
+      },
+      {
+        "behavior": "The generic worker-death -> DaskResourceEnvelopeError -> FAIL safety net stays (only the Q10 pre-emptive skip is removed).",
+        "item_id": "dask-q10-guard-staleness-and-projection-rework"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/tpch/dataframe_queries.py:q10_pandas_impl — reworked with projection pushdown; q10_expression_impl unchanged",
+        "decision": "reuse",
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "path": "benchbox/core/tpch/dataframe_queries.py:q10_pandas_impl"
+      },
+      {
+        "concept": "benchbox/platforms/dataframe/dask_df.py: removed _RESOURCE_ENVELOPE_SKIP_QUERY_IDS / _guarded_resource_query_diagnostic / _collect_skip_query_ids override / _is_local_envelope / _tpch_q10_resource_envelope_diagnostic",
+        "decision": "reuse",
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "path": "benchbox/platforms/dataframe/dask_df.py"
+      },
+      {
+        "concept": "tests/unit/platforms/dataframe/test_dask_df_coverage.py — replaced the Q10-guard tests with test_q10_not_preemptively_skipped_on_dask_local_envelope",
+        "decision": "reuse",
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "path": "tests/unit/platforms/dataframe/test_dask_df_coverage.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/dataframe_queries.py"
+      },
+      {
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/dask_df.py"
+      },
+      {
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox run --platform dask-df --benchmark tpch --scale 0.1 --queries Q10 --non-interactive --phases load,power",
+        "description": "dask-df Q10 runs and returns rows (no pre-emptive skip)",
+        "expected": "Q10 executes (not SKIPPED) and returns rows; no exit 137",
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/test_dask_df_coverage.py -q",
+        "description": "dask coverage tests pass",
+        "expected": "all pass",
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "notes": "SF1 (= scale 1.0) validated via the real adapter IO paths: parquet 2.6s,\nCSV 13.9s, 37,967 groups, no exit 137. Live dask-df Q10 @0.1 after guard\nremoval: Q10 executed (not skipped), 1.3s, 100% success. 0.01 is trivially\nwithin envelope.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate: confirm unmodified Q10 runs within the default local envelope at 0.01/0.1/1 with the guard bypassed",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "notes": "Byte-identical to the prior output (verified: same all_hash, same top-20,\n37,967 groups). 178 tests/unit/core/tpch dataframe/pandas tests pass.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the projection-pushdown rework to q10_pandas_impl",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "notes": "Removed the pre-emptive guard: execute_query/execute_query_profiled\noverrides, _guarded_resource_query_diagnostic, _collect_skip_query_ids /\n_build_skipped_results overrides, _is_local_envelope,\n_has_explicit_local_resource_settings, _is_tpch_benchmark,\n_tpch_q10_resource_envelope_diagnostic, and the guard constants. KEPT the\ngeneric worker-death safety net (_run_with_resource_diagnostics,\n_resource_envelope_diagnostic, _RESOURCE_ENVELOPE_PATTERNS,\nDaskResourceEnvelopeError) and the memory/worker caps.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove/relax the dask Q10 skip guard so Q10 runs in the default local envelope",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dask-q10-guard-staleness-and-projection-rework",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update tests: drop the Q10-guard tests, add coverage that Q10 is no longer skipped",
+        "wid": "w3"
+      }
+    ]
+  }
+}

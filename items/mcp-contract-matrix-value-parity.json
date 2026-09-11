@@ -1,0 +1,205 @@
+{
+  "context": "Extend the EXISTING parity test past preparation rather than adding a parallel one. For each allow-listed platform, feed the prepared options into the real adapter (from_config for SQL adapters; the constructor for dataframe adapters, which have no from_config -- _get_platform_adapter passes them as kwargs) and assert the value is observable on the constructed object. Deriving the observable attribute from the contract's `consumer` string is ideal; a small explicit option->attribute map is acceptable and still catches a dropped pass-through key. A platform whose optional dependency is absent must xfail/skip LOUDLY and be counted, because a silent skip is how this defect class hides.\n  For the classification: write the rule in docs/development/mcp-platform-option-contract.md FIRST ('connection' = the option can change which endpoint the server talks to), then reclassify whatever does not match, then pin the rule with a test.",
+  "description": "MCP_PLATFORM_OPTION_CONTRACT records, per option, a `consumer` string and a `security_class`. Nothing verifies either, so both drift silently. Two instances found in the 2026-08-04 adversarial review of the mcp-v2-platform-options batch (develop 4836e3988d):\n\n1. THE PARITY TEST STOPS ONE RUNG SHORT OF THE DEFECT CLASS IT WAS WRITTEN FOR.\n   tests/unit/mcp/test_benchmark_tools.py:412 test_every_matrix_option_reaches_effective_preparation asserts on the OUTPUT of _prepare_adapter_platform_options. The DuckDB defect that motivated it (#1514) lived one rung further out, in DuckDBAdapter.from_config, which dropped `thread_limit` from its pass-through list. For duckdb the test asserts `prepared == {'thread_limit': value}` -- already true BEFORE the fix, because the rename always worked and only the from_config forwarding was broken. The original item said exactly this: 'Forwarding test passes, setting never applies.' The systemic test therefore cannot catch the systemic defect; only the duckdb-specific TestMCPThreadsReachTheEffectiveSetting does, for duckdb alone.\n   I walked the missing rung by hand for all 14 allow-listed platforms during the review and every option does survive from_config today (the one apparent miss, clickhouse-server.connection_profile -> port, forwards via ClickHouseServerAdapter's parent). Nothing pins that.\n\n2. security_class IS ASSIGNED INCONSISTENTLY.\n   `velox.deployment` is classified 'connection'; `clickhouse.deployment_mode` is classified 'execution'. Both flip an in-process engine to a network client. Whichever is right, security_class is not currently a reliable review signal -- and the ClickHouse remediation's rule ('connection-class options must name a server-owned destination, never describe one') is only as good as the classification it keys off. [mcp-velox-remote-destination-boundary-fix] depends on this rule being written down first.\n\nThis is the first item in the sequence because it builds the test that would catch the whole defect class and settles the classification rule the velox fix argues from.\n\nSUPERSEDES `mcp-option-contract-matrix-enforcement` (and before it, the original id dropped the same day). Both were dropped minutes after creation while fitting this item to the tracker's own schema and lint gates; `drop` is a soft state change, not a delete, so neither id could be reused. The tombstones carry the reasons.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a second parallel sweep test alongside the existing one",
+        "instead": "extend test_every_matrix_option_reaches_effective_preparation in place",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "why": "two sweeps drift, and the weaker one becomes the one people trust when the stronger fails"
+      },
+      {
+        "dont": "let a platform whose optional dependency is missing pass the sweep by being silently skipped",
+        "instead": "xfail/skip with an explicit reason and assert on the count of platforms actually exercised, so a newly-unimportable adapter fails the sweep",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "why": "a silent skip reports green for a platform that was never checked, which is precisely how the DuckDB from_config gap survived a passing test suite"
+      },
+      {
+        "dont": "move the allow-list or contract matrix into benchbox.core to satisfy the one-engine ADR",
+        "instead": "keep admission at the MCP layer; only the option APPLICATION path is a candidate for core",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "why": "the ADR and one-engine-mcp-run-service-adoption both scope security policy to the MCP surface: the CLI legitimately allows what MCP must forbid"
+      },
+      {
+        "dont": "reclassify velox.deployment down to 'execution' so the written rule fits the current data",
+        "instead": "write the rule from the security property first, then let the reclassification and [mcp-velox-remote-destination-boundary-fix] follow from it",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "why": "that inverts the finding -- the classification exists to flag destination-changing options, and bending it to match the code erases the only signal the ClickHouse rule keys off"
+      }
+    ],
+    "item_meta": {
+      "category": "MCP",
+      "completed_at": "2026-08-08T18:03:47Z",
+      "created_at": "2026-08-04T23:52:55Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "benchbox.mcp still never imports benchbox.cli (tests/unit/mcp/test_run_surface_contract.py TestMCPImplementationBoundary)",
+        "item_id": "mcp-contract-matrix-value-parity"
+      },
+      {
+        "behavior": "test_every_allowlisted_option_has_an_explicit_contract keeps enforcing allow-list/contract key parity",
+        "item_id": "mcp-contract-matrix-value-parity"
+      },
+      {
+        "behavior": "validate_platform_options fail-closed behaviour is unchanged: this item adds coverage and corrects classification, it does not widen or narrow the allow-list",
+        "item_id": "mcp-contract-matrix-value-parity"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_prepare_adapter_platform_options is the boundary the sweep currently stops at; the sweep must cross it, the function itself is unchanged by this item",
+        "decision": "reuse",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "path": "benchbox/mcp/tools/benchmark.py:98"
+      },
+      {
+        "concept": "the existing allow-list sweep, which stops at _prepare_adapter_platform_options -- extend it in place rather than adding a second parallel sweep that would drift",
+        "decision": "extend",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "path": "tests/unit/mcp/test_benchmark_tools.py:412"
+      },
+      {
+        "concept": "allow-list/contract KEY parity is already enforced here; this item layers VALUE parity on top of it",
+        "decision": "extend",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "path": "tests/unit/mcp/test_schemas.py:229"
+      },
+      {
+        "concept": "TestMCPThreadsReachTheEffectiveSetting is the per-platform effective-setting shape to generalize across all 14 allow-listed platforms",
+        "decision": "extend",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "path": "tests/unit/platforms/test_duckdb_adapter.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-contract-matrix-value-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/**"
+      },
+      {
+        "item_id": "mcp-contract-matrix-value-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "mcp-contract-matrix-value-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-contract-matrix-value-parity",
+        "kind": "only_modify",
+        "path_glob": "docs/development/mcp-platform-option-contract.md"
+      },
+      {
+        "item_id": "mcp-contract-matrix-value-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "bash -c 'set -e; f=benchbox/platforms/duckdb.py; cp \"$f\" \"$f.bak\"; trap \"mv $f.bak $f\" EXIT; python3 - \"$f\" <<EOF\nimport pathlib,sys\np=pathlib.Path(sys.argv[1]); s=p.read_text()\nt=\"            \\\"thread_limit\\\",\\n\"\nassert t in s, \"pass-through key not found; update this control\"\np.write_text(s.replace(t,\"\",1))\nEOF\n! PYTHONPATH=. uv run -- pytest tests/unit/mcp/test_benchmark_tools.py -q -n 0 -k every_matrix_option'",
+        "description": "The parity test fails when an adapter stops forwarding an allow-listed option (negative control)",
+        "expected": "exits 1 on the unfixed tree: the sweep still passes with thread_limit removed from from_config, which proves it is vacuous. Exits 0 once the sweep reaches the constructed adapter.",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/mcp/test_schemas.py -q -n 0 -k contract",
+        "description": "Every security_class assignment matches the written rule",
+        "expected": "exits 0, with a new case asserting every option able to change the server's network destination is classified 'connection'",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/mcp -q -n 0",
+        "description": "MCP suite and the surface boundary stay green",
+        "expected": "exits 0",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-contract-matrix-value-parity",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-contract-matrix-value-parity",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-contract-matrix-value-parity",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-contract-matrix-value-parity",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-verified at HEAD 442e68e118: parity test still stopped at _prepare_adapter_platform_options pre-fix; by-hand sweep across 14 allow-listed platforms confirmed every option survives from_config today. Negative control now fails when thread_limit removed.",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "notes": null,
+        "started_at": "2026-08-08T18:03:30Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-verify at HEAD: confirm the parity test still stops at _prepare_adapter_platform_options and re-run the by-hand from_config sweep across all 14 allow-listed platforms",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Wrote Security classification rule in docs/development/mcp-platform-option-contract.md: connection = endpoint-changing, must name server-owned destination. Commit 442e68e118.",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "notes": null,
+        "started_at": "2026-08-08T18:03:35Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Write the security_class rule in docs/development/mcp-platform-option-contract.md, including why 'connection' is the class that requires a server-owned destination",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Extended parity test past preparation into constructed adapter with loud skip and exercised count (>=10 platforms). Verified negative control fails when thread_limit removed; full mcp suite 687 passed. Commit 442e68e118.",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "notes": null,
+        "started_at": "2026-08-08T18:03:37Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Extend the parity test past preparation into the constructed adapter, with loud skips and an exercised-platform count",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Reclassified clickhouse.deployment_mode to connection per rule; pinned via test_connection_class_covers_every_destination_changing_option. Commit 442e68e118.",
+        "item_id": "mcp-contract-matrix-value-parity",
+        "notes": null,
+        "started_at": "2026-08-08T18:03:40Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Reclassify any option that does not match the written rule and pin the rule with a test",
+        "wid": "w3"
+      }
+    ]
+  }
+}

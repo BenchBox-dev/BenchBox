@@ -1,0 +1,107 @@
+{
+  "description": "When a TODO's only_modify includes a living policy/spec/goal document and the description quotes that document, require a w0 that re-reads current text and diffs it against the quoted claims. Score the item 0 on evidence durability if that re-read is absent. Do not treat line-number citations as durable evidence. Preserve existing evidence-durability rules for dependency versions and harness PASS. Do not expand into general TODO-review semantic guardrails (that is todo-review-semantic-guardrails).",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-17T15:00:33Z",
+      "completed_pr": 1764,
+      "created_at": "2026-08-17T13:15:44Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "todo-review-own-edit-target-freshness",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "todo-review-own-edit-target-freshness",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/todo/**"
+      },
+      {
+        "item_id": "todo-review-own-edit-target-freshness",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.skill-sync/skills/todo/**"
+      },
+      {
+        "item_id": "todo-review-own-edit-target-freshness",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/todo-review.md"
+      },
+      {
+        "item_id": "todo-review-own-edit-target-freshness",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_review_own_edit_freshness.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo lint todo-review-own-edit-target-freshness",
+        "description": "TODO lint still runs on a sample planning item",
+        "expected": "exit 0 or documented remaining gaps",
+        "item_id": "todo-review-own-edit-target-freshness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'own-edit-target|edit target' docs/agent/todo-review.md /Users/joe/.skill-sync/skills/todo",
+        "description": "Review guidance names own-edit-target freshness",
+        "expected": "match",
+        "item_id": "todo-review-own-edit-target-freshness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-review-own-edit-target-freshness",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-review-own-edit-target-freshness",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Confirmed review.md and generated todo skill omit own-edit-target freshness; local skill source and docs/agent/todo-review.md now name it.",
+        "item_id": "todo-review-own-edit-target-freshness",
+        "notes": null,
+        "started_at": "2026-08-17T14:53:48Z",
+        "started_branch": "fix/todo-review-own-edit-target-freshness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-todo-review-own-edit-target-freshness",
+        "status": "done",
+        "summary": "Confirm the current TODO-review rubric still omits own-edit-target freshness",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added own-edit-target re-read rule to ~/.skill-sync/skills/todo/references/review.md and docs/agent/todo-review.md.",
+        "item_id": "todo-review-own-edit-target-freshness",
+        "notes": null,
+        "started_at": "2026-08-17T14:56:05Z",
+        "started_branch": "fix/todo-review-own-edit-target-freshness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-todo-review-own-edit-target-freshness",
+        "status": "done",
+        "summary": "Add the own-edit-target re-read rule to the TODO review guidance",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/scripts/test_todo_review_own_edit_freshness.py fails if the rule is removed.",
+        "item_id": "todo-review-own-edit-target-freshness",
+        "notes": null,
+        "started_at": "2026-08-17T14:56:17Z",
+        "started_branch": "fix/todo-review-own-edit-target-freshness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-todo-review-own-edit-target-freshness",
+        "status": "done",
+        "summary": "Add a lint or review fixture that fails a TODO quoting a drifted spec/goal file without a re-read unit",
+        "wid": "w2"
+      }
+    ]
+  }
+}

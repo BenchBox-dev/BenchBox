@@ -1,0 +1,129 @@
+{
+  "context": "One-line guard per loop -- require a non-empty derived path before the existence check:\n\n    if [ -n \"$bundle\" ] && git cat-file -e \"HEAD:${bundle}\" 2>/dev/null && ...\n\nApply to all three loops (manifest, applied, plans/tuning). Do not change the --diff-filter=ACMRD choice: including deletions is deliberate and documented in the surrounding comments, and a removed companion beside a surviving bundle must still trip validation.\n\nAdd a workflow unit test alongside the existing tests/unit/workflows/test_validate_submission_changed_bundles.py that pins the empty-derivation case: a diff deleting a bundle+manifest pair must contribute nothing to CHANGED.\n\nThis must land as its own develop PR. The workflow's own self-green guard rejects any submission PR that touches validator or workflow files, so it cannot ride along with a corpus change.",
+  "description": "CONFIRMED by local reproduction on 2026-08-28 while opening PR #1940 (pre-2026-08-23 corpus withdrawal against published-results).\n\nIn .github/workflows/validate-submission.yml, the \"Find changed bundles\" step derives a paired primary bundle for each changed companion. It uses --diff-filter=ACMRD, so deletions are included by design (a removed manifest beside a surviving bundle must still trip validation).\n\nWhen BOTH the manifest and its bundle are deleted, the awk lookup finds nothing and $bundle is the empty string. The guard is:\n\n    if git cat-file -e \"HEAD:${bundle}\" 2>/dev/null && ! printf '%s\\n' \"$CHANGED\" | grep -qxF \"$bundle\"; then\n\n`git cat-file -e \"HEAD:\"` resolves to the ROOT TREE and SUCCEEDS, so an empty string is appended to CHANGED once per deleted manifest. Those empty lines reach /tmp/changed_bundles.txt and are passed as empty ARGV entries by `xargs -d '\\n'`. scripts/validate_submission.py expands each empty path argument to the entire live bundles directory.\n\nReproduced directly:\n\n    python scripts/validate_submission.py --require-manifest <one-real-bundle> \"\" \"\"\n    -> Validated 19 bundle(s)      # 1 + 9 + 9, the live corpus twice\n\nOn PR #1940 (117 deleted manifests, 1 added bundle) CI reported \"Validated 10 bundle(s): 11 error(s)\" and failed every surviving bundle with \"Submission manifest not found\", plus one spurious \"summary.validation must be 'passed', got 'partial'\". None of those bundles were touched by the PR.\n\nFails closed (over-validates, red) rather than open, so it is a false-positive generator that blocks legitimate maintainer PRs, not a bypass.\n\nWhy it was not seen before: a PURE deletion PR leaves CHANGED empty of ACMR primaries, has_bundles=false, and the validate step is skipped entirely -- the empty strings are injected but never consumed. That is why PR #1882 (154-file withdrawal) passed. Only a PR that both deletes pairs AND adds/modifies a primary trips it.\n\nAll three companion loops share the defect: manifest, applied-ledger, and plans/tuning.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-09-10T23:06:50Z",
+      "completed_pr": 2044,
+      "created_at": "2026-08-29T12:10:45Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "--diff-filter=ACMRD in all three companion loops: including deletions is deliberate, so a removed companion beside a surviving bundle still trips validation",
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus"
+      },
+      {
+        "behavior": "The four-signal manifest waiver confined to auto/results-mirror-* bot PRs",
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus"
+      },
+      {
+        "behavior": "set -euo pipefail in the Validate bundles step: it is load-bearing for the exit code through the tee pipe (see PR #1629)",
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "bash reproduction of the Find changed bundles step over a deletion-only diff",
+        "description": "Deleted bundle+manifest pair contributes nothing to CHANGED",
+        "expected": "CHANGED contains zero empty lines",
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- pytest tests/unit/workflows/ -q",
+        "description": "Workflow unit tests pass",
+        "expected": "all pass",
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/workflows/test_validate_submission_changed_bundles.py -q",
+        "description": "Workflow unit tests verify empty-bundle derivation produces no empty argument",
+        "expected": "exit 0",
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Merged in #2044 commit 58dda68c4e666ea62068ed8c88e86d4288ce100a; reproduction verified in tests/unit/workflows/test_validate_submission_changed_bundles.py",
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce the empty-arg expansion in a scratch clone",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Merged in #2044 commit 58dda68c4e666ea62068ed8c88e86d4288ce100a (.github/workflows/validate-submission.yml:288,305,332)",
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Guard all three companion loops with [ -n $bundle ] before the git cat-file existence check",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Merged in #2044 commit 58dda68c4e666ea62068ed8c88e86d4288ce100a (tests/unit/workflows/test_validate_submission_changed_bundles.py)",
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a workflow unit test pinning the empty-derivation case beside test_validate_submission_changed_bundles.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Merged in PR #2044 commit 58dda68c4e666ea62068ed8c88e86d4288ce100a; all required checks passed",
+        "item_id": "validate-submission-empty-bundle-arg-scans-live-corpus",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Open as a standalone develop PR; the self-green guard forbids workflow changes in a submission PR",
+        "wid": "w3"
+      }
+    ]
+  }
+}

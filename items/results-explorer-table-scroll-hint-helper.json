@@ -1,0 +1,118 @@
+{
+  "description": "PR #270 added the `bb-scroll-affordance` cue across six dense tables\n(Home recent results, MetaLeaderboard, DataTable, Query results, Query SQL,\nResultDetail timings, ResultDetail samples, QueryDiff). PR #270's follow-up\n(this branch) standardized placement so the hint always sits OUTSIDE the\n`.overflow-x-auto` container — but the copies still duplicate the same\n`<div class=\"mb-2 flex justify-end\"><span class=\"bb-scroll-affordance\">…</span></div>`\nscaffolding in 6+ places.\n\nExtract a `<TableScrollHint testId=\"…\" label=\"…\" />` helper that owns the\nlayout + class wiring, and refactor every existing call site to use it.\nOptional: also accept an `onlyWhenOverflowing` prop that gates visibility\non `scrollWidth > clientWidth` for parity with the QueryHeatmap pattern at\n`results-explorer/src/components/QueryHeatmap.tsx`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "inline new `bb-scroll-affordance` spans after the helper exists",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-table-scroll-hint-helper",
+        "why": "every cue should route through the helper"
+      },
+      {
+        "dont": "silently change copy on the longer Home/MetaLeaderboard hints; they intentionally describe what scrolls",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-table-scroll-hint-helper",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend / Refactor",
+      "completed_at": "2026-05-10T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing `data-testid` values for scroll hints — Playwright responsive.spec.ts and capture spec depend on them",
+        "item_id": "results-explorer-table-scroll-hint-helper"
+      },
+      {
+        "behavior": "CSS visibility threshold (`max-width: 48rem`) — the helper renders the same `bb-scroll-affordance` class, no inline display override",
+        "item_id": "results-explorer-table-scroll-hint-helper"
+      },
+      {
+        "behavior": "Hint placement OUTSIDE `.overflow-x-auto` (so the hint stays put when the user scrolls)",
+        "item_id": "results-explorer-table-scroll-hint-helper"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f results-explorer/src/components/TableScrollHint.tsx",
+        "description": "Helper exists and is exported",
+        "expected": "exit 0",
+        "item_id": "results-explorer-table-scroll-hint-helper",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rE 'bb-scroll-affordance' results-explorer/src/ --exclude-dir=__tests__ | grep -v 'TableScrollHint.tsx' | grep -v 'index.css'",
+        "description": "No remaining inline `bb-scroll-affordance` spans outside the helper",
+        "expected": "no matches",
+        "item_id": "results-explorer-table-scroll-hint-helper",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep responsive",
+        "description": "responsive Playwright grep still passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-table-scroll-hint-helper",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-table-scroll-hint-helper",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-table-scroll-hint-helper",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-table-scroll-hint-helper",
+        "notes": "New `results-explorer/src/components/TableScrollHint.tsx` exports\n`TableScrollHint({ label?, testId?, className?, wrapperClassName? })`.\nDefault label is \"← scroll →\"; default wrapper is\n`mb-2 flex justify-end`. `wrapperClassName={null}` renders only the\nspan (used inside meta-rows). Six-test vitest suite at\n`__tests__/TableScrollHint.test.tsx` covers default, custom label\n+ className, custom wrapper class, bare-span (null wrapper), and\nomitted-testId paths.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add TableScrollHint component with the standardized markup",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-table-scroll-hint-helper",
+        "notes": "Eight call sites converted: QueryDiffTable, DataTable,\nMetaLeaderboard, Home (Recent Results), Query (results meta bar),\nQuery (SQL meta bar), ResultDetail (timings),\nResultDetail (samples). Each preserves its existing data-testid;\nthe meta-bar sites use `wrapperClassName={null}` to keep the\nbare-span layout. Verified by `grep -rE 'bb-scroll-affordance'\nresults-explorer/src/ --include=\"*.tsx\"`: only TableScrollHint.tsx\nitself references the class string now.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor existing call sites to use TableScrollHint",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-table-scroll-hint-helper",
+        "notes": "Deferred — explicitly out of scope for this PR. The TODO marks w3\nas \"Optional\"; adopting `onlyWhenOverflowing` on DataTable would\nrequire a `data-scroll-container` ancestor contract that does not\nyet exist on every call site, plus a `useLayoutEffect` measure +\nResizeObserver pattern. Not landing now to keep the helper PR\nfocused on the layout/class-wiring consolidation; create a\nfollow-up TODO if the hint visually competes with content on\nfew-column DataTable instances.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Optional: gate hint on actual overflow",
+        "wid": "w3"
+      }
+    ]
+  }
+}

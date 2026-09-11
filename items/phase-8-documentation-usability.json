@@ -1,0 +1,10 @@
+{
+  "description": "Create comprehensive user-facing and developer documentation for the query\nplan feature. Improve CLI help text, add examples, create troubleshooting\nguides, and document API contracts and data formats.\n\n**Current State**: Minimal documentation, no user guides, unclear limitations\n**Target State**: Complete documentation enabling self-service usage",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-remediation"
+    }
+  }
+}

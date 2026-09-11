@@ -1,0 +1,10 @@
+{
+  "description": "The CLI supports `--official` mode for TPC-compliant benchmark runs which:\n1. Validates scale factors against TPC-allowed values (1, 10, 30, 100, etc.)\n2. Requires seed for reproducibility\n3. Warns about multi-stream requirements\n4. Displays compliance banner\n\nThis mode is not exposed in the interactive wizard, preventing users from\nrunning official TPC-compliant benchmarks interactively.",
+  "legacy": {
+    "item_meta": {
+      "category": "User Experience",
+      "created_at": "2025-12-21T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

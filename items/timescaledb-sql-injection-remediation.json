@@ -1,0 +1,11 @@
+{
+  "description": "The TimescaleDB adapter (benchbox/platforms/timescaledb.py) uses f-string interpolation\nto construct SQL queries with user-controlled values, creating SQL injection vulnerabilities.\n\nIdentified in code review on 2025-12-24 (commit e58ed40e).\n\nAffected locations:\n- Lines 300-310: create_hypertable() with chunk_interval parameter\n- Lines 362-380: add_compression_policy() with compression_after parameter\n- Line 410: ANALYZE with qualified_table\n\nExample vulnerable code:\n```python\ncursor.execute(f\"\"\"\n    SELECT create_hypertable(\n        '{qualified_table}',  # table_name from config\n        'time',\n        chunk_time_interval => INTERVAL '{self.chunk_interval}',  # user-controlled!\n        ...\n    )\n\"\"\")\n```\n\nIf chunk_interval contains `'; DROP TABLE users; --`, it could execute arbitrary SQL.",
+  "legacy": {
+    "item_meta": {
+      "category": "Security and Compliance",
+      "completed_at": "2025-12-24T00:00:00Z",
+      "created_at": "2025-12-24T00:00:00Z",
+      "worktree": "security-hardening"
+    }
+  }
+}

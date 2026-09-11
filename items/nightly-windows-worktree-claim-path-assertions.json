@@ -1,0 +1,73 @@
+{
+  "context": "Normalize path comparison in the tests (or emit native paths from the script); make the signal-trap test skip or assert correctly where bash signal semantics differ on Windows runners.",
+  "description": "Nightly integration-smoke (windows-latest, 3.12) fails tests/integration/worktree/test_worktree_claim_benchbox_scratch.py (2 tests): asserts 'WORKTREE_PATH=C:\\Users\\...' but the claim script emits '/c/Users/...' (MSYS form under Git Bash). Also test_worktree_claim_signal_exit.py::test_worktree_claim_int_trap_exits_nonzero_after_cleanup fails ('assert 0 != 0' — INT trap exits 0 on Windows). Pre-existing before the agent-instruction PRs; discovered 2026-07-29.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-29T11:59:09Z",
+      "completed_pr": 1330,
+      "created_at": "2026-07-29T11:39:59Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "POSIX behavior of worktree claim scripts unchanged",
+        "item_id": "nightly-windows-worktree-claim-path-assertions"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "nightly-windows-worktree-claim-path-assertions",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "nightly-windows-worktree-claim-path-assertions",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/worktree/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/worktree/test_worktree_claim_benchbox_scratch.py tests/integration/worktree/test_worktree_claim_signal_exit.py -q -n 0",
+        "description": "worktree claim tests pass locally",
+        "expected": "all pass; Windows proof via next nightly",
+        "item_id": "nightly-windows-worktree-claim-path-assertions",
+        "last_result": "pass",
+        "last_run": "2026-07-29T11:57:51Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "nightly-windows-worktree-claim-path-assertions",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "The recipe prints whatever its own shell considers the path to be; on Windows that shell is Git Bash/MSYS, which renders C:\\\\Users\\\\... as /c/Users/.... The assertion compared that against Path.resolve()'s native spelling, so it failed on spelling alone. Replaced the substring check with an exact comparison on a canonical form: normalize_path() lowercases and translates a leading /X/ drive segment, but ONLY when os.name == 'nt' - on POSIX a leading single-letter segment like /a/b is an ordinary directory and must not be rewritten. emitted_worktree_path() additionally asserts exactly one WORKTREE_PATH= line, so this is strictly stronger than the substring test it replaces. Verified both branches by exercising normalize_path directly against the literal strings from the nightly log: emitted '/c/Users/runneradmin/AppData/.../BenchBox.pool-01' and native 'C:\\\\Users\\\\runneradmin\\\\AppData\\\\...\\\\BenchBox.pool-01' now compare equal under os.name='nt', while under posix '/a/b/c' is untouched and case is preserved. Locally 4 passed.",
+        "item_id": "nightly-windows-worktree-claim-path-assertions",
+        "notes": null,
+        "started_at": "2026-07-29T11:57:36Z",
+        "started_branch": "fix/nightly-windows-worktree-claim-paths",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Normalize WORKTREE_PATH assertion for MSYS vs native path forms",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Platform-gated rather than 'fixed', because the test is POSIX-only by construction and the behaviour it exercises does not exist on Windows. It shims git with an extensionless '#!/bin/sh' script placed first on PATH, but Windows resolves git.exe/git.cmd and never executes an extensionless file, so the shim is bypassed entirely; it then drives the recipe's INT trap with 'kill -INT $PPID', which has no Windows equivalent. The nightly evidence matches exactly: returncode 0 with stderr \"Switched to a new branch 'feature/signal-test'\" - the real git ran, the claim succeeded, and there was no interrupt to trap, so 'assert result.returncode != 0' failed as 'assert 0 != 0'. Added pytest.mark.skipif(os.name == 'nt') to the module pytestmark with that reasoning as the skip reason. POSIX behaviour is untouched: the test still runs and passes on macOS/Linux (4 passed locally), and no script under _project/scripts was modified.",
+        "item_id": "nightly-windows-worktree-claim-path-assertions",
+        "notes": null,
+        "started_at": "2026-07-29T11:58:12Z",
+        "started_branch": "fix/nightly-windows-worktree-claim-paths",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Fix or platform-gate the INT-trap exit-code test",
+        "wid": "w2"
+      }
+    ]
+  }
+}

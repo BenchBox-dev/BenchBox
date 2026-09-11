@@ -1,0 +1,254 @@
+{
+  "context": "Treat cleanup as a controlled operations task. First prove the root cause is\nfixed or guarded. Then inventory all repo and pool worktree local\n`benchmark_runs` trees, classify datagen-only duplicates versus durable\nresult evidence, compare against the shared root, and ask for explicit\napproval with exact paths and byte counts before deletion. Finish with a\nrepresentative external-root smoke to prove cleanup does not immediately\nregress.\n",
+  "description": "Once output-root propagation and artifact guardrails are in place, audit and\nclean the already-written duplicate generated data from repo and pool\nworktrees.\n\nKnown duplicate/generated locations from the 2026-06-01 investigation:\n\n- `/Users/joe/Developer/BenchBox/benchmark_runs`: about 6.2G, mostly\n  `datagen/`, containing SF1 data for TPCH variants, Vector Search, H2ODB,\n  SSB, Nyctaxi, ClickBench, and related benchmarks.\n- `/Users/joe/Developer/BenchBox.pool-01/benchmark_runs`: about 4.2G,\n  mostly `datagen/`, with large files including `tpch_skew_sf1/lineitem.tbl`,\n  `vector_search_sf1/vectors.csv.zst`, `h2odb_sf1/trips.tbl.zst`,\n  `ssb_sf1/lineorder.tbl.zst`, `nyctaxi_1.0/trips.csv.zst`, and\n  `clickbench_sf1/hits.csv.zst`.\n\nCleanup must happen only after the root cause is fixed or protected, because\notherwise the next UAT/corpus run can recreate the same duplicate data.\nCleanup must also preserve any unique result bundles, manifests, or evidence\nthat are not redundant with the shared root under `~/Developer/benchmark_runs`.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "clean before the output-root bug is fixed or guarded",
+        "instead": "(not specified)",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "why": "that only frees space temporarily."
+      },
+      {
+        "dont": "delete result bundles or manifests just because they live under a duplicate root",
+        "instead": "(not specified)",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "why": "classify and preserve unique evidence first."
+      },
+      {
+        "dont": "run `rm -rf` from a parent directory or with a glob",
+        "instead": "(not specified)",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "why": "cleanup must list exact approved paths."
+      },
+      {
+        "dont": "use Docker/system prune as part of this task",
+        "instead": "(not specified)",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "why": "the target is BenchBox-generated filesystem data only."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "needs_item": "benchmark-runs-local-artifact-guardrails"
+      },
+      {
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "needs_item": "benchmark-runs-output-root-propagation"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-06-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cleanup commands are path-specific; no global filesystem prune or unbounded recursive deletion.",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup"
+      },
+      {
+        "behavior": "Git-tracked files and pool worktree metadata are untouched.",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup"
+      },
+      {
+        "behavior": "No deletion happens until `benchmark-runs-output-root-propagation` and `benchmark-runs-local-artifact-guardrails` are merged or explicitly confirmed active.",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup"
+      },
+      {
+        "behavior": "Unique result JSON, manifests, lifecycle logs, and submission evidence are preserved before any datagen cleanup.",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchmark_runs/ repository ignore conventions — preserve generated data out of git",
+        "decision": "reuse",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "path": "benchmark_runs/"
+      },
+      {
+        "concept": "docs/operations/uat-framework.md:Long-Running UAT — reuse shared-root conventions for durable UAT evidence",
+        "decision": "reuse",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "path": "docs/operations/uat-framework.md:Long-Running"
+      },
+      {
+        "concept": "tests/uat validation/submission tooling — use existing manifest/result validators before discarding any non-datagen evidence",
+        "decision": "reuse",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "path": "tests/uat"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "find ~/Developer -maxdepth 2 -type d -name benchmark_runs -path '*BenchBox*' -print",
+        "description": "Inventory report covers every BenchBox clone/pool worktree with a local benchmark_runs tree",
+        "expected": "all candidate local benchmark_runs paths are listed and classified",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Cleanup approval names exact paths and byte counts",
+        "expected": "user approval explicitly covers each destructive path",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "du -sh /Users/joe/Developer/BenchBox/benchmark_runs /Users/joe/Developer/BenchBox.pool-*/benchmark_runs 2>/dev/null || true",
+        "description": "Post-cleanup audit shows approved duplicate paths removed or reduced as expected",
+        "expected": "approved duplicate datagen paths are absent or no longer contain redundant generated data",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 --queries Q1 --phases generate --non-interactive",
+        "description": "External-root smoke does not recreate worktree-local generated data",
+        "expected": "shared root receives expected output; active worktree-local benchmark_runs remains absent or unchanged",
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "notes": "Record the merged PR numbers or checked SHA(s). If either prerequisite is\nnot available, stop after producing an audit report and do not delete data.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm root-cause fix and guardrails are merged or active before deleting anything",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "notes": "Produce a compact inventory with path, size, newest mtime, file count,\ntop large files, and whether each directory is datagen-only or contains\nresult bundles/manifests. Raw command output stays in `/tmp`; the durable\nsummary can go in a PR body, TODO note, or small markdown report.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Inventory repo and pool worktree `benchmark_runs` directories",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "notes": "Identify which generated data is redundant with the shared root and which\nevidence, if any, is unique. Preserve unique run results, manifests,\nlifecycle logs, and submission evidence before cleanup.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Compare worktree-local artifacts against `~/Developer/benchmark_runs`",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "notes": "Present the specific paths, byte counts, and preservation plan. Do not\ninfer approval from this TODO alone because deletion is intentionally\ndestructive.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Request explicit approval for the exact cleanup operation",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "notes": "Prefer removing redundant datagen-only directories. If unique evidence is\nfound, move it to the approved shared root or an agreed archive location\nbefore deleting the duplicate worktree-local tree.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Remove or archive only approved duplicate generated data",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-runs-duplicate-artifact-cleanup",
+        "notes": "Run a lightweight external-root smoke after cleanup. Confirm the cleaned\nworktree-local path remains absent or unchanged and the shared root\nreceives any expected generated artifacts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify no new worktree-local artifacts appear after a representative external-root smoke",
+        "wid": "w5"
+      }
+    ]
+  }
+}

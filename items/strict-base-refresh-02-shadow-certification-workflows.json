@@ -1,0 +1,298 @@
+{
+  "context": "Add a minimal evidence job or step to .github/workflows/pr.yml and a new .github/workflows/develop-refresh-shadow.yml using pull_request_target synchronize. The shadow workflow checks out only the trusted base SHA, fetches untrusted commits as Git objects, and never executes PR-controlled code. Use contents/actions/pull-requests read permissions only. The classifier output is observational and cannot satisfy ci-required-result.",
+  "description": "Integrate the classifier in shadow mode. Full Develop PR runs must emit enough evidence to identify the tested synthetic merge tree. A separate trusted default-branch workflow must evaluate synchronize events, query current ruleset/check/run state, and publish only a non-required shadow artifact and summary. Existing required contexts, job conditions, auto-merge behavior, and subordinate jobs remain unchanged.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add the shadow job as a required context",
+        "instead": "keep all existing required contexts untouched",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "why": "shadow evidence is not yet an activation gate"
+      },
+      {
+        "dont": "Change long-lane if conditions during shadow rollout",
+        "instead": "run the complete current fleet",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "why": "shadow mode must preserve the full comparison oracle"
+      },
+      {
+        "dont": "Let a missing artifact look like a full certification",
+        "instead": "record full_required and fail the evidence validation",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "why": "absence cannot prove a tested tree"
+      },
+      {
+        "dont": "Use pull_request_target and then checkout the PR head",
+        "instead": "checkout trusted base code and treat PR commits as Git data",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "why": "that executes untrusted code in a privileged context"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "needs_item": "strict-base-refresh-01-trusted-certification-classifier"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-14T18:03:43Z",
+      "completed_pr": 1738,
+      "created_at": "2026-08-14T12:10:55Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Auto-merge remains revoke-only in hosted automation and locally armed through the existing operator path",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows"
+      },
+      {
+        "behavior": "Every existing code PR lane still runs in shadow mode",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows"
+      },
+      {
+        "behavior": "The trusted workflow never checks out or executes PR-controlled source",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows"
+      },
+      {
+        "behavior": "ci-required-result, Results Explorer browser gate, and ruleset-drift remain required and unchanged",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "trusted pull_request_target base-code pattern",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "path": ".github/workflows/develop-ruleset-drift.yml"
+      },
+      {
+        "concept": "Develop PR required umbrella and synthetic merge execution",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "path": ".github/workflows/pr.yml"
+      },
+      {
+        "concept": "always-reporting required aggregate pattern",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "path": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "concept": "workflow output and job topology pins",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "path": "tests/unit/workflows/test_pr_workflow_outputs.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-ruleset-drift.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-refresh-shadow.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_pr_refresh_shadow_workflow.py"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_pr_workflow_outputs.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows/test_pr_refresh_shadow_workflow.py -q",
+        "description": "Shadow workflow trust and permission tests pass",
+        "expected": "all tests pass",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "last_result": "pass",
+        "last_run": "2026-08-14T18:03:26Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows/test_pr_workflow_outputs.py tests/unit/workflows/test_pr_workflow_path_classifier.py -q",
+        "description": "Existing Develop PR workflow contract tests still pass",
+        "expected": "all tests pass",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "last_result": "pass",
+        "last_run": "2026-08-14T18:03:32Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'pull_request_target|permissions:|ref:|persist-credentials|pull_request.head.sha' .github/workflows/develop-refresh-shadow.yml",
+        "description": "No shadow workflow step checks out the PR head or grants write permission",
+        "expected": "Trusted-base checkout and read-only permissions are evident; no PR-head checkout",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "last_result": "pass",
+        "last_run": "2026-08-14T18:03:34Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/joeharris76/BenchBox/rulesets/15611785 --jq '.rules[] | select(.type == \"required_status_checks\") | [.parameters.required_status_checks[].context] | sort'",
+        "description": "Live required contexts remain exactly the pre-change set",
+        "expected": "Same contexts recorded by TODO 00",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "last_result": "pass",
+        "last_run": "2026-08-14T18:03:36Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo lint strict-base-refresh-02-shadow-certification-workflows",
+        "description": "This TODO passes tracker quality lint",
+        "expected": "0 findings",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "last_result": "pass",
+        "last_run": "2026-08-14T18:03:40Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "local shadow workflow + identity/lane artifacts; tests 35 passed",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "notes": "Preserve current required job behavior. Evidence failure must be visible but must not create a false certification.",
+        "started_at": "2026-08-14T17:17:32Z",
+        "started_branch": "fix/strict-base-refresh-02-shadow",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-02",
+        "status": "done",
+        "summary": "Add immutable full-run evidence for PR head, base, synthetic merge SHA/tree, workflow fingerprint, run ID, and lane outcomes",
+        "wid": "w0"
+      },
+      {
+        "evidence": "local shadow workflow + identity/lane artifacts; tests 35 passed",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "notes": "Trigger only opened, reopened, synchronize, and ready_for_review as needed; classify only synchronize as potentially eligible.",
+        "started_at": "2026-08-14T17:21:53Z",
+        "started_branch": "fix/strict-base-refresh-02-shadow",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-02",
+        "status": "done",
+        "summary": "Create trusted pull_request_target shadow workflow with minimal permissions and no execution of PR content",
+        "wid": "w1"
+      },
+      {
+        "evidence": "local shadow workflow + identity/lane artifacts; tests 35 passed",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "notes": "If GitHub data is unavailable, emit full_required with an API failure reason; never silently omit a record.",
+        "started_at": "2026-08-14T17:21:59Z",
+        "started_branch": "fix/strict-base-refresh-02-shadow",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-02",
+        "status": "done",
+        "summary": "Query live required contexts, Check Runs, Actions run metadata, and current PR head/base before producing the shadow result",
+        "wid": "w2"
+      },
+      {
+        "evidence": "local shadow workflow + identity/lane artifacts; tests 35 passed",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "notes": "Do not persist tokens, full API responses, or PR-controlled text. Retain enough data for replay and reviewer audit.",
+        "started_at": "2026-08-14T17:22:04Z",
+        "started_branch": "fix/strict-base-refresh-02-shadow",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-02",
+        "status": "done",
+        "summary": "Upload a bounded JSON artifact and job summary containing decision, evidence identities, reasons, and timing",
+        "wid": "w3"
+      },
+      {
+        "evidence": "local shadow workflow + identity/lane artifacts; tests 35 passed",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "notes": "Pin pull_request_target trust rules and prove pr.yml still runs every currently required subordinate lane exactly as before.",
+        "started_at": "2026-08-14T17:22:10Z",
+        "started_branch": "fix/strict-base-refresh-02-shadow",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-02",
+        "status": "done",
+        "summary": "Add workflow-structure tests that prohibit write permissions, PR-code execution, required-context changes, and skip conditions",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Adversarial review passed: trusted-base checkout, read-only perms, no required-context or skip-condition changes. #1738 ran full CI (lint/test/medium/correctness executed). Shadow is pull_request_target from develop so it could not self-report on #1738; workflow is now on develop at c72ee4efd.",
+        "item_id": "strict-base-refresh-02-shadow-certification-workflows",
+        "notes": "The PR must demonstrate no required job skipped and no auto-merge or ruleset setting changed.",
+        "started_at": "2026-08-14T18:02:52Z",
+        "started_branch": "fix/strict-base-refresh-03-replay",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-03",
+        "status": "done",
+        "summary": "Run adversarial workflow review and verify a real same-repository refresh remains full CI while shadow evidence reports",
+        "wid": "w5"
+      }
+    ]
+  }
+}

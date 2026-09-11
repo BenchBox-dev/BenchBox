@@ -1,0 +1,87 @@
+{
+  "context": "A guard is the higher-value half - it catches the case regardless of who or what ran the lock. Pin or document a minimum uv version as the complement. Follow whichever guard idiom the repo already uses for mechanical drift (pre-commit hook vs _project/scripts checker wired into a make target).",
+  "description": "uv.lock is committed with 'revision = 3'. Any lock-updating command run under uv 0.7.3 (current local install) rewrites it to 'revision = 2' alongside the intended change - observed 2026-07-30 while adding the ducklake extra, where the real diff was 3 added lines and the revision downgrade rode along invisibly. Caught only by reading the diff, and reverted by hand. Nothing warns, and it is easy to commit unnoticed because the substantive part of the diff looks correct. (Supersedes dropped uv-lock-revision-downgraded-by-older-uv, which had no scope rules.)",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "created_at": "2026-07-30T18:18:16Z",
+      "worktree": "ci-infrastructure"
+    },
+    "preserves": [
+      {
+        "behavior": "Legitimate uv.lock updates still work without special ceremony",
+        "item_id": "uv-lock-revision-downgrade-guard"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uv-lock-revision-downgrade-guard",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "uv-lock-revision-downgrade-guard",
+        "kind": "only_modify",
+        "path_glob": ".pre-commit-config.yaml"
+      },
+      {
+        "item_id": "uv-lock-revision-downgrade-guard",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "uv-lock-revision-downgrade-guard",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "uv-lock-revision-downgrade-guard",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "<new guard invocation>",
+        "description": "A uv.lock revision decrease is rejected",
+        "expected": "fails on a revision 3 -> 2 diff, passes when the revision is unchanged",
+        "item_id": "uv-lock-revision-downgrade-guard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uv-lock-revision-downgrade-guard",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uv-lock-revision-downgrade-guard",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a guard rejecting a uv.lock revision decrease",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uv-lock-revision-downgrade-guard",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document or enforce the minimum uv version for contributors",
+        "wid": "w2"
+      }
+    ]
+  }
+}

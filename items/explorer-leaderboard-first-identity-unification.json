@@ -1,0 +1,275 @@
+{
+  "context": "Treat benchbox.dev as the source of brand expression and the explorer as the\ndata-dense product surface. Start by extracting the shared shell/tokens, then\nrearrange Home so leaderboard data appears before submission/list chrome. Use\ndensity from llm-stats for the table treatment, but keep BenchBox's code-first\ncredibility from the landing page. Test DOM order and labels so later visual\nedits cannot regress the first-impression hierarchy.\n",
+  "description": "Redesign the Results Explorer front door and shell so it feels like part of\nthe BenchBox product rather than a separate light dashboard. The user clarified\nthat the primary audience is benchmark users choosing a database, while the\nleaderboard browser must remain attention-grabbing because it feeds the\nsubmission flywheel. The target frame is therefore:\n\n\"BenchBox Database Leaderboards: reproducible rankings for choosing OLAP\nplatforms by workload, scale, deployment, and normalized cost.\"\n\nThis item covers identity, first impression, first-viewport density, and the\nshared BenchBox narrative. It should preserve the existing home\nMetaLeaderboard work, but make it the first meaningful content rather than\nburying it below generic hero/stat chrome.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "build a marketing landing page inside `/results/`",
+        "instead": "make the leaderboard the first usable screen.",
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "why": "users came for benchmark answers"
+      },
+      {
+        "dont": "copy LLM leaderboard language such as model/provider/token throughput",
+        "instead": "translate labels to platform, workload, latency, throughput, load time, and cost.",
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "why": "BenchBox benchmarks database platforms"
+      },
+      {
+        "dont": "hide submission CTAs entirely",
+        "instead": "place them as compact secondary affordances near the data.",
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "why": "leaderboard attention feeds the submission flywheel"
+      },
+      {
+        "dont": "use a single dark/purple palette across charts and brand chrome",
+        "instead": "keep brand tokens and chart tokens separate.",
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "why": "data encodings need semantic contrast"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "created_at": "2026-05-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Chart color encodings remain data-driven and accessible; brand colors must not become categorical chart colors by default.",
+        "item_id": "explorer-leaderboard-first-identity-unification"
+      },
+      {
+        "behavior": "Recent Results remains accessible, but not ahead of the primary leaderboard on the home page.",
+        "item_id": "explorer-leaderboard-first-identity-unification"
+      },
+      {
+        "behavior": "The MetaLeaderboard keeps Times/Ranks/Speedup modes and URL-backed filters from the completed home leaderboard work.",
+        "item_id": "explorer-leaderboard-first-identity-unification"
+      },
+      {
+        "behavior": "The existing `/results/`, `/results/{benchmark}/`, `/results/p/{platform_id}/`, `/results/r/{result_id}`, `/results/compare`, and `/results/query` routes remain stable.",
+        "item_id": "explorer-leaderboard-first-identity-unification"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "kind": "do_not_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/BrandShell.tsx"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/Layout.tsx"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/LoadingSpinner.tsx"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/BrandShell.test.tsx"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/Layout.test.tsx"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test && npm run build",
+        "description": "Frontend typecheck, unit tests, and production build pass.",
+        "expected": "All commands pass with new Home/Layout coverage.",
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium -- --grep \"Home\"",
+        "description": "Manual browser smoke at desktop and mobile widths.",
+        "expected": "Chromium browser smoke verifies `/results/` renders the Home shell and leaderboard; DOM-order unit tests cover first-viewport hierarchy.",
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "needs_wid": "w5",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "notes": "Read-only audit of `landing/` (tokens are extracted into the explorer;\n`landing/` itself is not edited in this work). Add the following CSS\ncustom properties to `results-explorer/src/index.css`:\n  - surfaces: `--bb-bg-primary`, `--bb-bg-panel`, `--bb-bg-elevated`\n  - text: `--bb-fg-primary`, `--bb-fg-muted`, `--bb-fg-inverse`\n  - borders: `--bb-border-default`, `--bb-border-subtle`\n  - accent: `--bb-accent`, `--bb-accent-hover`\n  - status: `--bb-status-success`, `--bb-status-warning`,\n    `--bb-status-danger`\n  - code surfaces: `--bb-code-bg`, `--bb-code-fg`\n  - typography: `--bb-font-sans`, `--bb-font-mono`, plus type-scale\n    tokens `--bb-text-xs|sm|base|lg|xl|2xl`.\nChart palettes stay in their own `--bb-chart-*` namespace and must not\nbe aliased to brand tokens. Where landing and the existing explorer dark\ntheme disagree, defer to landing for chrome and to the explorer for\nchart/data encodings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract shared BenchBox brand tokens from landing page into explorer theme variables",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "notes": "In results-explorer/src/components/Layout.tsx, add a compact global nav\nmatching benchbox.dev: BenchBox wordmark/name, Docs, Blog, Results, GitHub,\nand primary submit/run CTA. Below it, keep explorer-specific navigation\nfor Leaderboards, Benchmarks, Platforms, Compare, and Query. Results should\nbe visibly active when on `/results/`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace generic explorer header with shared global BenchBox navigation plus explorer subnav",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "notes": "In results-explorer/src/pages/Home.tsx, first viewport should contain:\n  - H1: \"BenchBox Database Leaderboards\"\n  - supporting line: \"Reproducible OLAP benchmark rankings by workload,\n    scale, deployment, and normalized cost.\"\n  - one dense cohort selector row: benchmark, scale factor, phase,\n    deployment/cost coverage.\n  - the MetaLeaderboard table immediately visible above the fold.\nUse a dark technical band or code-led surface from benchbox.dev only as\nframing; do not let decorative copy push the leaderboard down.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rewrite Home first viewport around a live leaderboard, not a brochure hero",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "notes": "Replace ambiguous stat cards with explicit labels such as:\n  - \"22 supported benchmarks\"\n  - \"N public result bundles\"\n  - \"N platforms with public results\"\n  - \"PR-validated corpus\"\nAvoid implying every supported benchmark has public leaderboard coverage.\nIf a value is unavailable from DuckDB metadata, compute it from existing\nmanifest/cohort tables or label it as \"supported\" rather than \"published\".\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Clarify supported vs published corpus stats in the home proof strip",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "notes": "Add a compact three-step strip or inline CTA cluster near the leaderboard:\n\"Run a benchmark\", \"Compare your result\", \"Submit a bundle\". Each should\nlink to the existing docs/submission flow where available. This should be\nsecondary to the leaderboard, not a marketing section.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Run -> Compare -> Submit flywheel affordance without reducing data density",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "notes": "This item OWNS the skeleton design system: token names, animation,\nsizing scale, and the Home + Layout consumers. The downstream\n`explorer-performance-perceived-latency` item then applies the same\nskeletons to MetaLeaderboard/BenchmarkIndex/Query/Compare without\nredesigning them. Replace generic spinner-only states on Home and the\nshell with dense skeletons that reserve final table geometry. Loading\nshould communicate that a static DuckDB snapshot is initializing,\nwithout blocking the brand/header render.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define skeleton tokens and Home/Layout loading states",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-leaderboard-first-identity-unification",
+        "notes": "Replace any reliance on manual smoke with mechanical assertions in\n`Home.test.tsx` and `Layout.test.tsx`:\n  - The MetaLeaderboard region appears before any \"Recent Results\" or\n    submission CTA region in DOM order (`compareDocumentPosition` /\n    `getAllByRole` index check).\n  - The H1 text is exactly \"BenchBox Database Leaderboards\".\n  - Global nav exposes Docs, Blog, Results, GitHub, and the run/submit\n    CTA; the Results entry is visibly active when the route is `/`.\n  - Stat cards use explicit `supported` / `published` labels (no\n    ambiguous \"benchmarks\" copy).\nThese assertions back the manual browser smoke described under\n`verification`; the DOM-order guarantee is what stops a future visual\nedit from regressing first-impression hierarchy.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add automated DOM-order tests for first-viewport leaderboard hierarchy",
+        "wid": "w7"
+      }
+    ]
+  }
+}

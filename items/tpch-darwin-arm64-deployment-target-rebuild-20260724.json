@@ -1,0 +1,142 @@
+{
+  "context": "Rebuild dbgen and qgen from _sources/tpc-h/dbgen/ with an explicit lower MACOSX_DEPLOYMENT_TARGET (e.g. 15.0) or on an older runner, verify with `vtool -show` that minos <= 15.0, confirm generation still matches the reference query/data set, then re-bless benchbox/_binaries/tpc-h/darwin-arm64/checksums.md5.",
+  "description": "chatgpt-codex-connector review finding on merged PR #1256 (P2), deferred from the first PR-review sweep (PR #1259) and tracked in GitHub issue #1260.\n\nThe packaged darwin-arm64 binaries committed in #1256 were built on macOS 26 and carry LC_BUILD_VERSION minos 26.0 (verified with `vtool -show` on both qgen and dbgen; the previous packaged qgen had minos 15.0). On macOS 15.x and earlier dyld rejects a binary whose minos exceeds the host OS. Because benchbox/_binaries/tpc-h/darwin-arm64/checksums.md5 MATCHES these binaries, ensure_tpc_binaries() selects the precompiled path instead of rebuilding, so TPC-H data/query generation fails on Apple Silicon installs running macOS <= 15.\nThread: https://github.com/joeharris76/BenchBox/pull/1256#discussion_r3626428542\nIssue: https://github.com/joeharris76/BenchBox/issues/1260\n\nWhy this was deferred from the code sweep: re-blessing a committed binary's checksum is provenance-governed (make audit-sha-check, SHA-provenance evidence tree), the rebuilt bytes depend on the local toolchain, and TPC spec-correctness of the rebuilt generator needs verification beyond a code-fix sweep.\n\nRelated open item: resync-tpch-darwin-x86-64-binaries covers the x86_64 drift; consider doing both rebuilds in one controlled session.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle this binary rebuild into an unrelated code PR",
+        "instead": "land it as its own PR with the vtool evidence in the body",
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "why": "binary diffs are unreviewable alongside code and the provenance decision needs to be explicit"
+      },
+      {
+        "dont": "re-bless checksums.md5 before verifying generated output against the reference set",
+        "instead": "verify generation first, then update the manifest",
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "why": "the checksum only pins bytes; it proves nothing about spec-correctness"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-08-09T15:03:01Z",
+      "completed_pr": 1656,
+      "created_at": "2026-07-24T16:23:31Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "TPC-H generated data and queries stay spec-correct and byte-comparable to the reference set",
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724"
+      },
+      {
+        "behavior": "The EOL_HANDLING trailing-pipe framing guard still passes for the rebuilt dbgen",
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724"
+      },
+      {
+        "behavior": "checksums.md5 stays in the GNU 'hash filename' format the verifier parses",
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/equivalence/**"
+      },
+      {
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/expected_results/**"
+      },
+      {
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "kind": "only_modify",
+        "path_glob": "_sources/compilation/**"
+      },
+      {
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "kind": "only_modify",
+        "path_glob": "_sources/tpc-h/**"
+      },
+      {
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "kind": "only_modify",
+        "path_glob": "benchbox/_binaries/tpc-h/darwin-arm64/**"
+      },
+      {
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpch/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "vtool -show benchbox/_binaries/tpc-h/darwin-arm64/qgen | grep minos",
+        "description": "Rebuilt binaries target macOS <= 15",
+        "expected": "minos 15.0 (or lower)",
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py -m slow -q",
+        "description": "TPC-H binary framing guard passes",
+        "expected": "all pass",
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "vtool -show minos 15.0, commit 3b9e04ddb8 PR 1656",
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "notes": null,
+        "started_at": "2026-08-09T15:02:30Z",
+        "started_branch": "fix/tpch-darwin-arm64-15",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Rebuild darwin-arm64 dbgen + qgen with MACOSX_DEPLOYMENT_TARGET=15.0 and confirm `vtool -show` reports minos <= 15.0",
+        "wid": "w1"
+      },
+      {
+        "evidence": "pytest test_tpch_dbgen_framing_binaries -m slow 2 passed",
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "notes": null,
+        "started_at": "2026-08-09T15:02:37Z",
+        "started_branch": "fix/tpch-darwin-arm64-15",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Verify the rebuilt generators produce spec-correct output (reference query set + data framing guard) before blessing",
+        "wid": "w2"
+      },
+      {
+        "evidence": "checksums.md5 GNU updated PR 1656",
+        "item_id": "tpch-darwin-arm64-deployment-target-rebuild-20260724",
+        "notes": null,
+        "started_at": "2026-08-09T15:02:46Z",
+        "started_branch": "fix/tpch-darwin-arm64-15",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Update benchbox/_binaries/tpc-h/darwin-arm64/checksums.md5 and confirm ensure_tpc_binaries() selects the precompiled path",
+        "wid": "w3"
+      }
+    ]
+  }
+}

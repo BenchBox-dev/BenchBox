@@ -1,0 +1,147 @@
+{
+  "description": "Follow-up to execution-harness-extraction-throughput-maintenance-combined (#937),\nwhich routed all four TPC dispatch methods (power/throughput/maintenance/combined)\nin platforms/base/execution.py through the power_harnesses capability registry, so\nexecution.py carries no literal TPC benchmark names in any dispatch method.\n\nToday the registry only maps the two TPC families (tpch, tpcds). Generalize the\nregistration API so a NON-TPC benchmark family with multi-phase shapes can register\nits power/throughput/maintenance/combined harnesses declaratively, without editing\nexecution.py's dispatch.\n\nReadiness gate (why this is not started immediately): TPC is currently the only\nbenchmark family with multi-phase power/throughput/maintenance shapes, so there is\nno second consumer to validate the generalized API against. This item is tracked as\nactionable work that ACTIVATES when a second multi-phase family is introduced —\ndesigning the abstraction against a single consumer risks the wrong shape. Do the\ngeneralization together with (or immediately before) that second family, using it\nas the second consumer that proves the API.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a parallel dispatch mechanism; extend the existing power_harnesses registry.",
+        "instead": "(not specified)",
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "design the generalized API against a single (TPC-only) consumer",
+        "instead": "(not specified)",
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "why": "activate this with the second family as the second consumer."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "generalize-multiphase-harness-registry-non-tpc",
+        "id": 23,
+        "reason": "No second consumer to validate the abstraction against; activate this together with the second family.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Deferral's own from_item is itself the open planning item generalize-multiphase-harness-registry-non-tpc; already tracked.",
+        "summary": "Building the generalized API before a second multi-phase family exists."
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "STILL BLOCKED (demand-gate) — re-validated 2026-07-22T22:31:51Z against origin/develop@3be9de39 (incl. PR #1269). Condition UNCHANGED: benchbox/core/power_harnesses.py registers only tpch+tpcds (8 capability entries), and zero non-TPC multi-phase (throughput/maintenance) harness methods exist anywhere in benchbox/. No second multi-phase family exists as the second consumer the item's own anti-pattern requires ('DO NOT design the generalized API against a single TPC-only consumer'). Do NOT build a speculative abstraction; activate when a second family lands. [Original w0 finding same date: registry tpch/tpcds only; all multi-phase harness methods are TPC.]",
+      "category": "Code Quality and Technical Debt",
+      "created_at": "2026-07-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Byte-identical benchmark execution for TPC families through the generalization (the #937 guarantee is not regressed).",
+        "item_id": "generalize-multiphase-harness-registry-non-tpc"
+      },
+      {
+        "behavior": "execution.py dispatch stays family-agnostic — no literal family names for any registered family.",
+        "item_id": "generalize-multiphase-harness-registry-non-tpc"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': 'benchbox/core/power_harnesses.py (#937 registry: resolve_power/throughput/maintenance/combined_harness)', 'note': \"The registry to generalize; keep the single-registry design, extend it to register a family's harnesses as data.\"}",
+        "decision": "extend",
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/platforms/base/execution.py (the four dispatch methods)', 'note': 'Dispatch must stay family-agnostic (no literal family names) for every registered family, not just TPC.'}",
+        "decision": "reuse",
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/power_harnesses.py"
+      },
+      {
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -k literal_tpc_benchmark_names -q",
+        "description": "No literal family names remain in dispatch for any registered family",
+        "expected": "the guard asserts family-agnostic dispatch across all registered families",
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "notes": "When a second multi-phase family lands, define how a family registers its phase\nharness methods (power/throughput/maintenance + combined label/methods) as data,\nso both TPC and the new family register uniformly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Define the generalized family-registration API against the incoming second multi-phase family",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "notes": "execution.py dispatch resolves harnesses purely by registry lookup for any\nregistered family; no per-family branch remains.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Migrate TPC and the new family onto the generalized registry",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-multiphase-harness-registry-non-tpc",
+        "notes": "Extend test_dispatch_paths_have_no_literal_tpc_benchmark_names (or a sibling) so\nthe metric holds for the generalized registry, not just TPC.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Broaden the dispatch-literal guard test to assert no literal family names for ANY registered family",
+        "wid": "w3"
+      }
+    ]
+  }
+}

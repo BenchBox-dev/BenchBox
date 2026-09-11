@@ -1,0 +1,118 @@
+{
+  "context": "Drive the bulk path end-to-end against the existing fake_libsql fixture: stage a small fixture corpus, seed the fake target with a colliding finding_events row so the PK offset is genuinely exercised, transfer, then assert parity_report ok plus the expected row counts per findings table. Assert the items domain on the target is untouched.",
+  "description": "`todo finding import --bulk` has 7 tests covering its refuse-by-default target guard (missing/mismatched --confirm-target, local backend, missing token, missing replica, dry-run never transferring), but ZERO tests exercise the path that actually moves data: stage_corpus_import -> offset_staging_pks -> bulk_transfer(tables=FINDINGS_TRANSFER_TABLES) -> parity_report against the target.\n\nThat flow was proven once, by hand, against a scratch Turso database (64 records, 432 rows, 3.0s, parity ok). Nothing in CI would catch a regression in it. The guard tests give a misleading impression of coverage: they all fail BEFORE any transfer happens, so the transfer could break entirely and every test would still pass.\n\ntests/unit/scripts/test_todo_db_hosted.py already has a `fake_libsql` fixture that stands in for the hosted backend, which is the obvious vehicle -- the phase-3 hosted migration test uses it the same way.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assert only that the call returns without raising",
+        "instead": "assert per-table row counts on the target and a clean parity_report",
+        "item_id": "findings-bulk-import-transfer-test-coverage",
+        "why": "the defect class here is silent partial transfer, which a smoke assertion cannot distinguish from success"
+      },
+      {
+        "dont": "Mark the new tests 'fast'",
+        "instead": "use unit + medium markers, matching the sibling findings and hosted suites",
+        "item_id": "findings-bulk-import-transfer-test-coverage",
+        "why": "the fast-lane cap in _project/config/fast_test_lane_policy.json has near-zero headroom and CI's timing_policy_check --strict trips on any addition"
+      },
+      {
+        "dont": "Seed the fake target empty",
+        "instead": "pre-seed a row whose id collides with staging so the PK offset is actually exercised",
+        "item_id": "findings-bulk-import-transfer-test-coverage",
+        "why": "an empty target is precisely what hid the finding_events.seq=1 collision during the real scratch rehearsal"
+      }
+    ],
+    "item_meta": {
+      "category": "test-coverage",
+      "completed_at": "2026-07-31T01:38:02Z",
+      "completed_pr": 1372,
+      "created_at": "2026-07-30T18:45:54Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "No new test module lands in the fast lane",
+        "item_id": "findings-bulk-import-transfer-test-coverage"
+      },
+      {
+        "behavior": "The existing guard tests keep passing unchanged",
+        "item_id": "findings-bulk-import-transfer-test-coverage"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-bulk-import-transfer-test-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-bulk-import-transfer-test-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_findings.py"
+      },
+      {
+        "item_id": "findings-bulk-import-transfer-test-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "findings-bulk-import-transfer-test-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q",
+        "description": "findings script tests pass, including an end-to-end bulk transfer against the fake hosted backend",
+        "expected": "all pass",
+        "item_id": "findings-bulk-import-transfer-test-coverage",
+        "last_result": "pass",
+        "last_run": "2026-07-31T01:37:58Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/timing_policy_check.py --strict",
+        "description": "the fast-lane timing policy still holds",
+        "expected": "exit 0",
+        "item_id": "findings-bulk-import-transfer-test-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-bulk-import-transfer-test-coverage",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added TestFindingsBulkTransfer to tests/unit/scripts/test_todo_db_hosted.py, driving bulk_transfer(tables=FINDINGS_TRANSFER_TABLES) through the existing FakePrimary harness (real SQL against a real SQLite file). Target pre-seeded with finding_events.seq=1 so offset_staging_pks is genuinely exercised, plus the FK target item so the DEFERRABLE link resolves.",
+        "item_id": "findings-bulk-import-transfer-test-coverage",
+        "notes": null,
+        "started_at": "2026-07-31T01:37:31Z",
+        "started_branch": "test/findings-bulk-transfer-coverage",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Drive stage -> offset -> bulk_transfer -> parity end-to-end against the fake_libsql fixture, with a pre-seeded colliding finding_events row",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Asserts per-table row counts on the target (findings=1, evidence=1, links=1, sections=1, events=4) AND content: related_paths/suggested_sweep columns, the finding_sections heading+text, and the resolved-by link target. Separate test pins the items-domain must-preserve (count unchanged at 1). Pre-existing seq=1 row verified intact after transfer. 1189 passed; timing policy clean.",
+        "item_id": "findings-bulk-import-transfer-test-coverage",
+        "notes": null,
+        "started_at": "2026-07-31T01:37:34Z",
+        "started_branch": "test/findings-bulk-transfer-coverage",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Assert per-table row counts on the target and that its items domain is untouched by the findings transfer",
+        "wid": "w2"
+      }
+    ]
+  }
+}

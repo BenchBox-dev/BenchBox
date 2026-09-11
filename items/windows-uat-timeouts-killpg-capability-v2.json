@@ -1,0 +1,94 @@
+{
+  "context": "Test-only monkeypatch of the timeouts module signal attributes with restoration handled by pytest; retain fallback test and exact two-signal ordering.",
+  "description": "The production fallback for hosts without os.killpg is correct. The positive-branch test injects os.killpg on Windows but then references absent signal.SIGKILL. Inject deterministic SIGTERM/SIGKILL sentinels for the test and assert both calls, without changing timeout production logic.",
+  "legacy": {
+    "item_meta": {
+      "category": "Test portability",
+      "completed_at": "2026-08-01T14:53:15Z",
+      "completed_pr": 1400,
+      "created_at": "2026-08-01T14:06:26Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "POSIX production uses SIGTERM then SIGKILL on the process group.",
+        "item_id": "windows-uat-timeouts-killpg-capability-v2"
+      },
+      {
+        "behavior": "Windows production falls back to proc.kill when os.killpg is unavailable.",
+        "item_id": "windows-uat-timeouts-killpg-capability-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-uat-timeouts-killpg-capability-v2",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/timeouts.py"
+      },
+      {
+        "item_id": "windows-uat-timeouts-killpg-capability-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_timeouts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/uat/test_timeouts.py -q",
+        "description": "Timeout tests",
+        "expected": "fails on the unfixed Windows tree with missing SIGKILL; exit 0 after repair",
+        "item_id": "windows-uat-timeouts-killpg-capability-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-uat-timeouts-killpg-capability-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-uat-timeouts-killpg-capability-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "uv run -- python missing-SIGKILL harness: EXPECTED_BASELINE_FAILURE AttributeError",
+        "item_id": "windows-uat-timeouts-killpg-capability-v2",
+        "notes": null,
+        "started_at": "2026-08-01T14:46:26Z",
+        "started_branch": "fix/windows-timeout-sigkill",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Pin missing-SIGKILL simulation",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Injected opaque SIGTERM/SIGKILL sentinels with raising=False; missing-SIGKILL harness passes",
+        "item_id": "windows-uat-timeouts-killpg-capability-v2",
+        "notes": null,
+        "started_at": "2026-08-01T14:46:41Z",
+        "started_branch": "fix/windows-timeout-sigkill",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Inject portable signal sentinels in the positive branch test",
+        "wid": "w1"
+      },
+      {
+        "evidence": "uv run -- python -m pytest -n 0 tests/uat/test_timeouts.py -q: 8 passed; git status shows only tests/uat/test_timeouts.py",
+        "item_id": "windows-uat-timeouts-killpg-capability-v2",
+        "notes": null,
+        "started_at": "2026-08-01T14:47:16Z",
+        "started_branch": "fix/windows-timeout-sigkill",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Run timeout tests and verify production module is unchanged",
+        "wid": "w2"
+      }
+    ]
+  }
+}

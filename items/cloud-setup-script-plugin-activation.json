@@ -1,0 +1,69 @@
+{
+  "description": "A fresh claude.ai/code cloud session loads committed skills and commands, but\nNOT plugins or PostToolUse hooks. Validated 2026-06-30 (see\n_project/decisions/claude-settings-cloud-ownership-2026-06-29.md, cloud\naddendum):\n\n- Plugins: not auto-installed by design. Per the docs (Claude Code >= v2.1.195)\n  a plugin enabled only by a project's .claude/settings.json from an external\n  source does not load until explicitly installed. No setting/flag/env var\n  overrides this.\n- Hooks: PostToolUse ruff/ty hook never fires in cloud (command valid when run\n  manually); cloud likely blocks project hooks (allowManagedHooksOnly) or does\n  not wire PostToolUse in the web runtime.\n\nscripts/cloud-claude-setup.sh now performs the plugin install step: it derives\nthe marketplace + enabled-plugin list from .claude/settings.json and runs\n`claude plugin marketplace add` + `claude plugin install <plugin>@<marketplace>\n--scope user`. It is idempotent and no-ops without the claude CLI / python.\n\nRemaining work is wiring + verification, not authoring.\n\nHooks are intentionally OUT OF SCOPE: the ruff/ty hooks are an edit-time\nconvenience already enforced by CI (make lint / make typecheck / pr-preflight),\nso the cloud gap is cosmetic. Do not chase hook activation in cloud.\n",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "cloud-setup-script-plugin-activation",
+        "id": 15,
+        "reason": "Edit-time convenience already covered by CI; cloud may block project hooks via allowManagedHooksOnly, so injecting them into VM user settings is unreliable and buys nothing CI does not already guarantee.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Parent item cloud-setup-script-plugin-activation is itself still open (planning) and is the natural owner of this activation sub-task.",
+        "summary": "Provision PostToolUse ruff/ty hooks in cloud"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-06-30T00:00:00Z",
+      "worktree": "chore-cloud-parity-setup-script"
+    },
+    "work_needs": [
+      {
+        "item_id": "cloud-setup-script-plugin-activation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "cloud-setup-script-plugin-activation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cloud-setup-script-plugin-activation",
+        "notes": "Configured in the claude.ai/code environment settings (web UI), not a repo file. Setup scripts are cached per environment BUILD, not per session: a later change to .claude/settings.json enabledPlugins will not retroactively reach sessions in an already-built environment, and there is no supported per-session hook to bust that cache in cloud (project hooks are unreliable there — see the cloud addendum's PostToolUse evidence). Document this as a known limitation, not something w1 needs to solve; the manual remedy is rebuilding the environment after a plugin-config change.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wire scripts/cloud-claude-setup.sh as the claude.ai/code env setup script",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-setup-script-plugin-activation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify in a fresh cloud session: claude plugin list shows the 7 plugins and namespaced agents/commands are available",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-setup-script-plugin-activation",
+        "notes": "Hooks expected to stay FAIL (out of scope, documented).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-run the cloud-parity validation prompt; confirm plugins now PASS",
+        "wid": "w3"
+      }
+    ]
+  }
+}

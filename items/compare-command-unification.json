@@ -1,0 +1,11 @@
+{
+  "description": "The `benchbox compare` and `benchbox compare-plans` commands serve related\npurposes (performance comparison vs optimizer analysis) but are completely\nseparate. This fragments the UX and creates confusion about which command\nto use.\n\nThese should be unified so that all comparison functionality is accessible\nfrom `benchbox compare`, with plan comparison as an optional deep-dive.",
+  "legacy": {
+    "item_meta": {
+      "category": "ux-improvements",
+      "completed_at": "2025-12-14T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "context": "After the date-window fix, re-add benchbox/core/equivalence/builders/flightdata.py (benchmark.generate_data(); tables airlines/airports/flights; FLIGHTDATA_DATAFRAME_QUERIES.get_or_raise), export it, and register flightdata in STAGED_GATES with scale_factor=0.01 -- advisory-first per the campaign's must-preserve, promoted to GATES only once observed stable. The scale MUST stay below 0.1 or a routine PR fetches a real dataset over the network. Triage any residual divergences; do NOT baseline them.",
+  "description": "FlightData is the only genuinely gateable benchmark left in the coverage map's dual-surface UNGUARDED set: 20 SQL and 20 DataFrame query ids overlap VERBATIM, and its downloader always synthesizes rather than fetching BTS data when SF < 0.1, so a bounded offline cell at SF=0.01 is possible. A builder plus a STAGED_GATES registration was prototyped and RUN in this session: it generated data offline and compared 40 of 40 query-backend cells, so the wiring itself works. It is not landed because the gate is 100% red for reasons outside the gate: the CSV-header loader defect (fixed, PR #1441) and the DataFrame 2018 date window that matches zero rows (this item's dependency). Registering it while red would flip flightdata from UNGUARDED to guarded in the oracle coverage map -- STAGED gates count as a cross-surface oracle -- overstating coverage, which is exactly what that map exists to prevent.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-17T01:25:44Z",
+        "from_item": "wire-the-flightdata-cross-surface-gate",
+        "id": 712,
+        "reason": "The clean SF=0.01 probe compared all 40 cells but found 24 divergences shared by expression and pandas. Evidence: /tmp/flightdata-cross-surface-gate.log. Classes include SQL/DataFrame output-column ordering, FLOOR(crs_dep_time/100) hour bucketing, aggregate formula/order mismatches, and top-N ORDER BY contracts. Product fixes are outside this gate item's only-modify equivalence/tests/Makefile scope; do not baseline them.",
+        "resolution": "promoted",
+        "resolved_item": "flightdata-cross-surface-output-contract-burn-down",
+        "resolved_reason": null,
+        "summary": "Burn down 24 FlightData cross-surface divergences across 12 queries"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "wire-the-flightdata-cross-surface-gate",
+        "needs_item": "flightdata-dataframe-date-params-miss-the-generated-data"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "SF=0.01 full probe compared 40/40 cells but found 24 unclassified divergences across 12 queries; registering STAGED_GATES would overstate coverage. Product-fix burn-down is now tracked by flightdata-cross-surface-output-contract-burn-down. Resume only after that item is done and the gate is 40/40 clean.",
+      "category": "coverage",
+      "created_at": "2026-08-01T20:39:57Z",
+      "worktree": "dataframe-benchmarks"
+    },
+    "preserves": [
+      {
+        "behavior": "Gate scale stays under SF=0.1 so the cell is always offline synthetic, never a BTS download",
+        "item_id": "wire-the-flightdata-cross-surface-gate"
+      },
+      {
+        "behavior": "Lands in STAGED_GATES, not GATES: no new hard CI gate lands before it is observed stable",
+        "item_id": "wire-the-flightdata-cross-surface-gate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "wire-the-flightdata-cross-surface-gate",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "wire-the-flightdata-cross-surface-gate",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/equivalence/**"
+      },
+      {
+        "item_id": "wire-the-flightdata-cross-surface-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark flightdata",
+        "description": "the flightdata gate runs clean",
+        "expected": "exit 0 once wired and green; on an unfixed tree the benchmark is not a registered choice and argparse exits 2",
+        "item_id": "wire-the-flightdata-cross-surface-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "wire-the-flightdata-cross-surface-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "wire-the-flightdata-cross-surface-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-add the builder and register flightdata in STAGED_GATES at SF=0.01",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "wire-the-flightdata-cross-surface-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run the gate and triage residual divergences without baselining them",
+        "wid": "w2"
+      }
+    ]
+  }
+}

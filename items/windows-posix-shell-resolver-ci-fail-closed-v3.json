@@ -1,0 +1,104 @@
+{
+  "context": "Add host-independent tests for Windows skip and POSIX failure, centralize the unavailable-shell disposition, and retain the probe that rejects WSL bash and dash.",
+  "description": "The shared shell helper skips when no capable Bash resolves on every host. That is appropriate only on Windows without Git Bash; on POSIX CI it hides a broken resolver and silently drops shell-contract coverage.",
+  "legacy": {
+    "item_meta": {
+      "category": "testing",
+      "completed_at": "2026-08-01T15:14:36Z",
+      "completed_pr": 1405,
+      "created_at": "2026-08-01T15:02:49Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Only shell-executing tests may skip on Windows without Git Bash.",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v3"
+      },
+      {
+        "behavior": "WSL bash stub and dash remain rejected.",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v3"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_posix_shell_resolver.py"
+      },
+      {
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/utilities/posix_shell.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/test_posix_shell_resolver.py -q",
+        "description": "Resolver policy tests",
+        "expected": "Fails on the unfixed tree when POSIX no-shell is simulated; exits 0 after repair",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/test_release_infrastructure.py tests/unit/workflows/test_validate_submission_changed_bundles.py -q",
+        "description": "Representative shell contracts",
+        "expected": "Exits 0",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Unfixed resolver suite: POSIX module guard fails to raise and per-test guard skips; 1 failed, 1 skipped",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v3",
+        "notes": null,
+        "started_at": "2026-08-01T15:03:33Z",
+        "started_branch": "fix/posix-shell-ci-fail-closed",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Add host-independent skip-versus-fail policy tests",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Shared three-way disposition implemented; resolver policy suite 7 passed with Ruff, format, and ty clean",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v3",
+        "notes": null,
+        "started_at": "2026-08-01T15:04:44Z",
+        "started_branch": "fix/posix-shell-ci-fail-closed",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Implement a shared unavailable-shell disposition",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Resolver 7 passed; representative release and changed-bundle shell contracts 73 passed, 2 deselected",
+        "item_id": "windows-posix-shell-resolver-ci-fail-closed-v3",
+        "notes": null,
+        "started_at": "2026-08-01T15:05:24Z",
+        "started_branch": "fix/posix-shell-ci-fail-closed",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Run resolver and workflow shell-contract tests",
+        "wid": "w2"
+      }
+    ]
+  }
+}

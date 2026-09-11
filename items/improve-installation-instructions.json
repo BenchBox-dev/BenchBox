@@ -1,0 +1,10 @@
+{
+  "description": "Expanded the installation materials to cover core vs. optional setups, added a platform matrix, surfaced troubleshooting guidance, and enhanced the CLI dependency checker with a matrix view.",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (COMPLETED)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

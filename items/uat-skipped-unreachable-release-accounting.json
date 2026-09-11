@@ -1,0 +1,112 @@
+{
+  "description": "UAT records skipped and unreachable cells, but the release report's candidate\ncounts do not fully represent them - so a release can look more complete than it\nis. When skipped/unreachable cells silently shrink the denominator, a \"passed N\nof N\" summary reads as full coverage when some cells never actually ran. That is\na release-evidence integrity problem, not a cosmetic one: the report is the\nartifact a release decision is made against.\n\nAudit the UAT report/validate accounting so skipped and unreachable cells appear\nas explicit, reconciling denominators (e.g. passed / attempted / total-defined,\nwith skipped and unreachable broken out), and a non-zero unreachable count is\nsurfaced loudly in the summary rather than quietly absorbed.",
+  "legacy": {
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-06-28T00:00:00Z",
+      "created_at": "2026-06-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing UAT report consumers (TSV columns) keep working; add columns/lines rather than renaming existing ones unless necessary.",
+        "item_id": "uat-skipped-unreachable-release-accounting"
+      },
+      {
+        "behavior": "Pass/fail classification of cells is unchanged; only the denominator representation and visibility change.",
+        "item_id": "uat-skipped-unreachable-release-accounting"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': \"_project/ UAT charter (#729: 'release-gate orchestration, not certification', Path A)\", 'note': 'The charter this report serves; counts must support a release-GATE decision, so unreachable cells must be visible, not hidden.'}",
+        "decision": "reuse",
+        "item_id": "uat-skipped-unreachable-release-accounting",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'Makefile:1881 (uat-report), :1870 (uat-validate)', 'note': 'The make entry points wrapping tests/uat/_cli; CELLS_JSONL/OUTPUT_TSV contract stays unchanged.'}",
+        "decision": "reuse",
+        "item_id": "uat-skipped-unreachable-release-accounting",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'tests/uat/_cli.py (the `report` and `validate` subcommands; make uat-report runs `python -m tests.uat._cli report`, Makefile:1886)', 'note': 'The actual report/validate generator whose accounting must reconcile; reuse its existing JSONL cell records and TSV emitter, do not add a parallel reporter.'}",
+        "decision": "reuse",
+        "item_id": "uat-skipped-unreachable-release-accounting",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-skipped-unreachable-release-accounting",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "uat-skipped-unreachable-release-accounting",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_report_accounting.py -q",
+        "description": "Totals reconcile and unreachable is surfaced",
+        "expected": "passed+failed+skipped+unreachable == total-defined; U>0 flagged in summary",
+        "item_id": "uat-skipped-unreachable-release-accounting",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-skipped-unreachable-release-accounting",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-skipped-unreachable-release-accounting",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-skipped-unreachable-release-accounting",
+        "notes": "Build a small fixture CELLS_JSONL of UAT cell records with N defined cells, K\nskipped, U unreachable, P passed, F failed. Run `python -m tests.uat._cli\nreport` over it and record exactly how skipped/unreachable cells are\ncounted (or dropped) today - specifically whether they fall out of the\ndenominator.\nCommit a compact summary (command, inputs, observed totals, the SHA reviewed:\ndevelop @ cb49cecf5) so the defect is pinned before the fix. This re-validates\nthe description's claim rather than assuming it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce and characterize the undercount with a fixture (re-validate the claim)",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-skipped-unreachable-release-accounting",
+        "notes": "Update the report/validate accounting so the summary reports passed /\nattempted / total-defined with skipped and unreachable broken out as explicit\nlines that reconcile to total-defined (passed + failed + skipped + unreachable\n== total-defined). A non-zero unreachable count must appear prominently in the\nsummary (not only in a detail row). Do not change what counts as pass/fail;\nonly fix denominator representation and visibility.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make report totals reconcile and surface unreachable loudly",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-skipped-unreachable-release-accounting",
+        "notes": "Add a test on the report generator asserting totals reconcile for the w0\nfixture and that U>0 is flagged in the summary output. Keep it fast and\nfixture-driven (no live UAT run).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regression test the reconciliation",
+        "wid": "w2"
+      }
+    ]
+  }
+}

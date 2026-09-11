@@ -1,0 +1,87 @@
+{
+  "context": "In the lint pass, resolve each only_modify/do_not_modify glob and each verification command's file-path arguments against the repo working tree; report any that match nothing. Globs legitimately match nothing when a file is still to be created, so this likely wants to be a warning-level finding, or to only fire for paths under an existing directory. Check how lint classifies severity today before choosing.",
+  "description": "Two items promoted on 2026-07-29 (motherduck-token-leak-via-chained-cause, platform-options-key-id-not-redacted) carried only_modify globs and verification-ladder commands naming test files that never existed - test_motherduck_adapter.py and test_platform_options.py, where the real files are test_motherduck.py and test_platform_options_capture.py. Consequences: check-scope reported a violation for the CORRECT file, and verify --run would have exited non-zero on a correct implementation, so the rung was left unrun. Scope and ladders are create-time-only, so neither could be repaired. Confirmed: 'todo lint <id>' returns 0 findings on the motherduck item today. lint DOES already flag 'has work units but no scope rules', so the machinery and the reporting path exist - this is a missing check, not new infrastructure.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "created_at": "2026-07-30T18:14:08Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "An item whose scope legitimately names a not-yet-created file is not made un-createable",
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths"
+      },
+      {
+        "behavior": "Existing lint findings (including the has-work-units-but-no-scope-rules check) keep firing unchanged",
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/todo_db.py lint motherduck-token-leak-via-chained-cause | grep -qi 'test_motherduck_adapter'",
+        "description": "lint reports an unresolvable only_modify glob",
+        "expected": "the known-bad glob is reported",
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Resolve only_modify/do_not_modify globs during lint and report ones matching nothing",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Resolve file-path arguments in verification commands the same way",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-lint-unresolvable-scope-and-ladder-paths",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Tests covering a resolvable glob, an unresolvable one, and a not-yet-created-file case",
+        "wid": "w3"
+      }
+    ]
+  }
+}

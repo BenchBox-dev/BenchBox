@@ -1,0 +1,686 @@
+{
+  "context": "Start with the result contract and tests, then wire producers. Do not try to\ninfer Docker or cloud shape from platform name alone; record source and\ncollection status for every normalized field. Reuse the existing\n`platform_info` output and `platform_config_utils` helpers where possible,\nbut treat them as inputs to a normalized contract rather than the contract\nitself. Add Docker inspection as an optional metadata collection step outside\nmeasured benchmark timing. For cloud platforms, prefer observed metadata when\npermissions allow and fall back to sanitized requested config with\n`source=\"requested\"` when observation is unavailable.\n",
+  "description": "Benchmark results currently capture the client host environment and a\nplatform-specific `platform_info` block, but they do not fully describe where\nthe measured database engine actually ran. This is misleading for common local\ndevelopment and integration-test workflows where BenchBox runs on macOS while\nthe data platform runs in a Linux Docker container because the platform is not\nnatively compatible with macOS.\n\nThe same gap exists for cloud runs. Some adapters capture useful fields such\nas region, warehouse size, workgroup, storage bucket, reservation, or cluster\nmetadata, but those fields are adapter-specific and exported as raw config\nrather than a stable result contract. Downstream consumers cannot reliably\ncompare or filter benchmark results by runtime type, container image, cloud\nprovider, region, compute shape, storage configuration, or whether a field was\nrequested by the user vs observed from the platform.\n\nBuild a normalized execution-environment contract for result artifacts that\nseparates:\n  - the BenchBox client process host;\n  - the measured platform runtime;\n  - requested platform options;\n  - observed platform deployment details;\n  - cloud provider, region, compute, and storage facets;\n  - raw adapter metadata retained for compatibility; and\n  - anonymized/redacted public export behavior.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add Docker inspection to measured query execution timing",
+        "instead": "collect before/after measured phases and record collection status.",
+        "item_id": "results-complete-execution-environment-capture",
+        "why": "environment capture must not perturb benchmark timings"
+      },
+      {
+        "dont": "fail a benchmark because cloud metadata APIs lack permission",
+        "instead": "record unavailable metadata with the error class and continue.",
+        "item_id": "results-complete-execution-environment-capture",
+        "why": "benchmark execution can still be valid"
+      },
+      {
+        "dont": "flatten cloud region, compute, and storage into adapter-specific `platform.config` only",
+        "instead": "emit normalized `platform.cloud`, `platform.compute`, and `platform.storage` blocks.",
+        "item_id": "results-complete-execution-environment-capture",
+        "why": "downstream consumers need stable cross-platform facets"
+      },
+      {
+        "dont": "make every adapter implement a new required abstract method in one migration",
+        "instead": "add optional hooks and conservative defaults.",
+        "item_id": "results-complete-execution-environment-capture",
+        "why": "that creates a risky broad adapter change"
+      },
+      {
+        "dont": "persist raw platform options directly",
+        "instead": "sanitize, classify, and apply anonymization before export.",
+        "item_id": "results-complete-execution-environment-capture",
+        "why": "they can contain credentials and infrastructure identifiers"
+      },
+      {
+        "dont": "represent localhost server adapters as native local database processes",
+        "instead": "use `unknown` until Docker or explicit runtime metadata proves the substrate.",
+        "item_id": "results-complete-execution-environment-capture",
+        "why": "many localhost services are Docker-backed Linux runtimes on macOS"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-complete-execution-environment-capture",
+        "id": 241,
+        "reason": "Tracked separately by `results-normalized-cost-contract-cloud-facets`; this TODO captures environment and deployment metadata needed by that cost work.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Owning TODO results-normalized-cost-contract-cloud-facets is Completed; cloud cost/deployment-metadata normalization already shipped.",
+        "summary": "Normalize benchmark cost from cloud compute and storage metadata"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-complete-execution-environment-capture",
+        "id": 242,
+        "reason": "Historical artifacts often lack enough raw data to reconstruct runtime/container/cloud metadata reliably; add compatibility markers first, then decide on backfill policy.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Gated on deciding a backfill policy first (not yet decided per own reasoning); no concrete backfill task is defined yet.",
+        "summary": "Backfill every historical benchmark artifact"
+      }
+    ],
+    "item_meta": {
+      "category": "Result Integrity",
+      "completed_at": "2026-05-02T00:00:00Z",
+      "created_at": "2026-05-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Anonymized exports never include raw passwords, tokens, private keys, access keys, credential file paths, or full connection strings.",
+        "item_id": "results-complete-execution-environment-capture"
+      },
+      {
+        "behavior": "Benchmarks do not fail when Docker, cloud metadata APIs, or permissioned system introspection are unavailable; results must record unavailable metadata explicitly.",
+        "item_id": "results-complete-execution-environment-capture"
+      },
+      {
+        "behavior": "Existing `platform_info`, `platform.config`, `system_profile`, `driver_metadata`, and `engine_version` consumers keep receiving equivalent data during the migration.",
+        "item_id": "results-complete-execution-environment-capture"
+      },
+      {
+        "behavior": "Existing cloud adapters remain lazy about optional SDK imports and do not require cloud credentials during unit tests.",
+        "item_id": "results-complete-execution-environment-capture"
+      },
+      {
+        "behavior": "Existing result JSON artifacts without normalized environment fields continue to load and export through the compatibility path.",
+        "item_id": "results-complete-execution-environment-capture"
+      },
+      {
+        "behavior": "No benchmark timing path includes Docker or cloud metadata collection in the measured query execution duration.",
+        "item_id": "results-complete-execution-environment-capture"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "do_not_modify",
+        "path_glob": "_binaries/"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_config.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/schemas.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/athena.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse_cloud.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse_server.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend/"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databricks/"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/doris.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/firebolt.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/platform_config_utils.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/postgresql.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/presto.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/presto_trino_utils.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/redshift.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/singlestore.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/starrocks/"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/trino.py"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "docs/development/"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_execution_environment_contract.py tests/unit/core/results/test_platform_options_capture.py tests/unit/core/results/test_environment_anonymization.py -q",
+        "description": "Result environment contract unit tests pass.",
+        "expected": "All result environment, platform option, and anonymization tests pass.",
+        "item_id": "results-complete-execution-environment-capture",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_docker_runtime_metadata.py -q",
+        "description": "Docker runtime metadata tests pass without requiring a live Docker daemon.",
+        "expected": "Docker metadata tests pass using mocked Docker inspect output and unavailable-daemon fixtures.",
+        "item_id": "results-complete-execution-environment-capture",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-docker-postgresql",
+        "description": "Optional live Docker smoke captures a container-backed localhost runtime when Docker is available.",
+        "expected": "PostgreSQL Docker integration passes and result assertions show a Darwin/macOS client host separately from a Docker/Linux platform runtime when run on macOS.",
+        "item_id": "results-complete-execution-environment-capture",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_cloud_environment_metadata.py -q",
+        "description": "Cloud metadata normalization tests pass without live cloud credentials.",
+        "expected": "Cloud metadata tests pass for Snowflake, BigQuery, Redshift, Athena, Databricks, ClickHouse Cloud, and Firebolt fixtures.",
+        "item_id": "results-complete-execution-environment-capture",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite still passes after result-schema changes.",
+        "expected": "Fast test suite passes with no regressions.",
+        "item_id": "results-complete-execution-environment-capture",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results -q",
+        "description": "Result artifact export remains compatible with existing fixtures.",
+        "expected": "Existing and new result export tests pass.",
+        "item_id": "results-complete-execution-environment-capture",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w1",
+        "wid": "w10"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w5",
+        "wid": "w10"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w1",
+        "wid": "w11"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w5",
+        "wid": "w11"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w1",
+        "wid": "w12"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w5",
+        "wid": "w12"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w10",
+        "wid": "w13"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w11",
+        "wid": "w13"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w12",
+        "wid": "w13"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w2",
+        "wid": "w13"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w6",
+        "wid": "w13"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w7",
+        "wid": "w13"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w8",
+        "wid": "w13"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w9",
+        "wid": "w13"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w10",
+        "wid": "w14"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w11",
+        "wid": "w14"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w12",
+        "wid": "w14"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w3",
+        "wid": "w14"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w4",
+        "wid": "w14"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w6",
+        "wid": "w14"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w7",
+        "wid": "w14"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w8",
+        "wid": "w14"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w9",
+        "wid": "w14"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w14",
+        "wid": "w15"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w1",
+        "wid": "w9"
+      },
+      {
+        "item_id": "results-complete-execution-environment-capture",
+        "needs_wid": "w5",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Add explicit result-model fields for:\n  - `environment.client_host`: current `system_profile` shape, kept for\n    backward compatibility with existing host metadata.\n  - `environment.platform_runtime`: runtime type\n    (`local_process`, `docker_container`, `remote_server`,\n    `managed_cloud`, `serverless`, `dataframe_process`, `unknown`),\n    OS, arch, engine process host when known, and collection status.\n  - `environment.container`: Docker engine/version, image, image digest,\n    container id/name, container OS/arch, requested platform, CPU limit,\n    memory limit, port mappings, relevant bind mounts/volumes, and\n    collection errors. This block must be absent or explicitly\n    `collection_status=\"unavailable\"` when Docker is not involved.\n  - `platform.deployment`: deployment type, connection mode, service\n    endpoint class (`localhost_port`, `remote_host`, `cloud_endpoint`,\n    `embedded_process`), and whether runtime metadata was requested,\n    observed, inferred, or unavailable.\n  - `platform.cloud`: provider, region/location, account/project/workspace\n    identifiers after anonymization policy is applied.\n  - `platform.compute`: warehouse, cluster, serverless slots, RPU, node\n    type/count, worker/driver shape, cache/result-cache flags, and source.\n  - `platform.storage`: data table format, staging location, bucket/prefix,\n    storage tier, compression, cleanup policy, and source.\n  - `platform.raw_config` and `platform.raw_metadata`: existing\n    adapter-specific output retained for compatibility and diagnostics.\nKeep the current top-level `environment` and `platform.config` keys\nreadable by old consumers during the transition, but make the normalized\nfields the canonical contract in tests and docs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the normalized execution-environment result contract",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Map Databricks requested config and SDK-observed warehouse metadata into\nthe new contract: workspace host, catalog/schema/http path, warehouse\nid/name/size/type, serverless flag, photon flag, min/max clusters, spot\npolicy, runtime/channel, and state. Add an explicit region field when it\ncan be configured or observed; otherwise record\n`collection_status=\"unavailable\"`. Add fixture-backed tests without live\nDatabricks credentials.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize Databricks cloud metadata",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Map ClickHouse Cloud requested config and any observed service metadata\ninto the new contract: managed deployment, auth mode, service endpoint,\nstaging URL type, and region/compute fields when exposed by config or API\nmetadata. Add fixture-backed tests for fully populated and sparse metadata\ncases.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize ClickHouse Cloud metadata",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Map Firebolt requested config and observed metadata into the new contract:\naccount/engine/database identifiers, endpoint class, deployment mode,\nengine shape when available, and explicit missing-region status when the\nregion cannot be observed. Add fixture-backed tests for core and cloud\ndeployment modes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize Firebolt cloud metadata",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Current export anonymization focuses on host environment. Extend it to\nevery field that can reveal infrastructure identity:\n  - hostnames, account ids, project ids, workspace urls, http paths,\n    bucket names, prefixes, database/schema names, warehouse names,\n    workgroup names, cluster ids, IAM role ARNs, container names, bind\n    mount paths, and usernames;\n  - secret-like keys such as password, token, secret, access_key,\n    private_key, session token, connection string, and credential file.\nPublic export should hash stable identifiers when comparisons need\ngrouping and redact values when grouping is not needed. Private/internal\nresult export can preserve raw metadata only behind an explicit option.\nAdd tests that prove no raw secrets or obvious infrastructure identifiers\nremain after anonymized JSON export.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend anonymization and redaction across platform, config, and execution metadata",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Add focused fixtures for:\n  - local embedded DuckDB or DataFrame process;\n  - macOS client plus Docker-backed localhost platform;\n  - remote self-hosted server with no Docker proof;\n  - managed cloud warehouse;\n  - serverless cloud query engine;\n  - missing/permission-denied metadata collection.\nTests should assert the normalized fields, backward-compatible raw fields,\nanonymized export behavior, and that old minimal result objects still\nserialize without failure.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add result-schema compatibility tests and golden fixtures",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Update development and result-artifact docs with the canonical field\nmeanings, source/provenance rules, anonymization policy, and examples for\nlocal process, Docker-backed local server, remote self-hosted server,\nmanaged cloud warehouse, and serverless cloud. Include a migration note\nfor existing `platform.config`, `system_profile`, and `platform_metadata`\nconsumers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the environment-capture contract and migration guidance",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "The CLI already parses `--platform-option` and uses those values to build\n`DatabaseConfig`, but the standard lifecycle does not reliably persist\nthem into `execution_metadata.run_config.platform_options`.\nUpdate the run/orchestration path so result artifacts include sanitized\nrequested platform options with source provenance:\n  - registered default;\n  - saved credential/config;\n  - environment variable;\n  - CLI option;\n  - runtime override.\nPreserve enough detail to reconstruct region, warehouse/instance shape,\nstorage bucket/prefix, table format, deployment mode, and local Docker\nservice hints. Do not persist raw secrets; secret-like keys must be\nredacted before reaching result export.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Propagate requested platform options into result metadata with provenance",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Touch `BenchmarkResults`, `ResultBuilder`, `result_factory`, and\n`schema.build_result_payload` so the result object carries both the\nBenchBox process host profile and the measured platform runtime profile.\nExisting `system_profile` input should continue to work and populate\n`environment.client_host`. New normalized runtime/deployment fields should\nbe generated by the builder even when adapters only provide legacy\n`platform_info`, using conservative `unknown`/`unavailable` statuses\nrather than guesses.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor result builder/exporter to emit client host vs platform runtime",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Add a small Docker metadata collector that is optional, best-effort, and\nunit-testable without a live daemon. It should discover BenchBox-managed\nor known integration-test containers by compose labels, service name,\nimage name, exposed host port, and adapter config. Capture image tag and\ndigest, container platform, OS/arch, CPU/memory limits, port mappings,\nbind mounts/volumes, container state, Docker engine version when\navailable, and collection errors. When Docker is absent, unavailable, or\npermission-denied, the result must say so explicitly without failing the\nbenchmark.\nCover ClickHouse Server, Trino, Presto, PostgreSQL, StarRocks, Doris,\nSingleStore, Databend, and other Docker integration platforms that connect\nthrough localhost ports.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Docker runtime discovery for local container-backed platforms",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Add base-platform helpers so adapters can return normalized metadata\nwithout duplicating schema assembly. The default path should map existing\n`get_platform_info()` output into conservative normalized fields:\n  - embedded engines and DataFrame adapters become local process or\n    dataframe process runtimes;\n  - localhost server adapters remain `unknown` until Docker discovery or\n    explicit runtime metadata proves containerization;\n  - remote host adapters become `remote_server`;\n  - cloud adapters become `managed_cloud` or `serverless`.\nAvoid making every adapter implement a new required abstract method in\none PR. Add optional hooks/mixins and migrate adapters incrementally.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add base adapter hooks for normalized runtime and deployment metadata",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Map existing Snowflake requested config and observed metadata into the\nnew contract: cloud provider, region, account, role, database/schema,\nwarehouse name/size/type, min/max clusters, auto suspend/resume, query\nacceleration, scaling policy, and result cache. Add fixture-backed unit\ntests that cover both successful warehouse metadata collection and\npermission-denied/unavailable metadata without live Snowflake credentials.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize Snowflake cloud metadata",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Map existing BigQuery requested config and observed metadata into the new\ncontract: provider, project, dataset, location, storage bucket/prefix,\njob priority/cache settings, reservation assignment, slot capacity, and\npricing/reservation model when available. Add fixture-backed unit tests\nthat cover on-demand, reservation-backed, and metadata-unavailable cases\nwithout live BigQuery credentials.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize BigQuery cloud metadata",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Map existing Redshift requested config and observed metadata into the new\ncontract: AWS region, serverless vs provisioned deployment,\nnamespace/workgroup or cluster id, RPU or node type/count, storage\ncapacity when available, S3 staging bucket/prefix, IAM role presence, and\nresult cache. Add fixture-backed tests for both serverless and\nprovisioned metadata shapes without live AWS credentials.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize Redshift cloud metadata",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-complete-execution-environment-capture",
+        "notes": "Map Athena requested config into the new serverless contract: AWS\nprovider, region, workgroup, catalog/database, S3 output location,\nstaging root, data format, compression, cleanup policy, and serverless\nruntime type. Add fixture-backed tests that prove missing optional fields\nare represented as unavailable, not silently omitted.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize Athena cloud metadata",
+        "wid": "w9"
+      }
+    ]
+  }
+}

@@ -1,0 +1,357 @@
+{
+  "context": "Work through each item independently - they are isolated fixes in separate modules.\nFor the query plan comparators (w1-w3), add unit tests that exercise the new\ncomparisons. For the timing fix (w8), use elapsed_seconds(start_time) pattern\nalready established in _finalize_maintenance_result. For the NaN fix (w6),\nreplace inf with a large finite value before normalization.\n",
+  "description": "During the adversarial code review of complexity batches 8-10, several\npre-existing issues were identified in the refactored functions. These were\nfaithfully carried over from the original code (not introduced by the\nrefactoring) but are now more visible and worth addressing.\n\nGrouped by severity and module:\n\n## WARNING-level (7 items)\n\n### Query plan comparison gaps (comparison.py)\n1. _OPERATOR_COMPARATORS missing Limit (limit_count, offset_count) and\n   Project (projection_expressions) comparators - first-class LogicalOperator\n   fields silently ignored during plan comparison\n2. Aggregate comparator only checks aggregation_functions, ignores group_by_keys\n3. Set difference output in _compare_set_diff is non-deterministic (list(set - set))\n   - affects snapshot test stability\n\n### Visualization null safety (visualization.py)\n4. _format_physical_properties calls phys.properties.get() without guarding\n   against phys.properties being None - AttributeError when show_physical=True\n   and PhysicalOperator has properties=None\n\n### Exception chain loss (primitives/catalog/loader.py)\n5. raise error_class(...) without `from exc` in expected_rows_affected\n   int() parsing - loses original TypeError/ValueError context\n\n### Analysis edge cases (ranking.py)\n6. _normalize_scores produces NaN when float(\"inf\") is present in raw scores\n   (platform with no query times) - NaN propagates into composite rankings\n\n### CLI truthiness (benchmarks.py)\n7. spec.default truthiness check on choices branch (line ~1414): falsy defaults\n   like 0, False, \"\" silently overridden by spec.choices[0]\n\n## INFO-level (selected actionable items)\n\n### Timing domain mismatch (maintenance_test.py)\n8. _execute_maintenance_operation uses mono_time() for start but time.time()\n   for end - operation.duration is cross-domain nonsense. Should use\n   mono_time()/elapsed_seconds() consistently.\n\n### Stub function naming (runner.py)\n9. _execute_single_stream only parses stream file comment headers, never\n   executes SQL - function name and result dict (success=True,\n   queries_successful=N) are misleading\n\n### Docstring gaps\n10. _validate_query_overlap/_detect_outliers docstrings understate mutation\n    side-effects (they modify caller-owned lists in-place)\n11. _compute_raw_scores docstring doesn't document float(\"inf\") behavior",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change public function signatures",
+        "instead": "only fix internal behavior",
+        "item_id": "preexisting-complexity-review-findings",
+        "why": "callers depend on them"
+      },
+      {
+        "dont": "change the _OPERATOR_COMPARATORS dispatch pattern",
+        "instead": "only add new entries",
+        "item_id": "preexisting-complexity-review-findings",
+        "why": "it was just introduced and is the right structure"
+      },
+      {
+        "dont": "use time.time() for duration measurement",
+        "instead": "use mono_time()/elapsed_seconds() consistently",
+        "item_id": "preexisting-complexity-review-findings",
+        "why": "it is affected by NTP adjustments and clock skew"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "preexisting-complexity-review-findings",
+        "id": 74,
+        "reason": "Requires understanding the full TPC-DS throughput test pipeline; may affect ConcurrentQueryExecutor integration",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: benchbox/core/tpcds/benchmark/runner.py:_execute_single_stream is now a NotImplementedError stub that no longer parses files. The rename premise ('reflect file-parsing purpose') is obsolete; misleading-name concern already resolved by the raise+docstring.",
+        "summary": "Rename _execute_single_stream to reflect its file-parsing (not SQL-execution) purpose"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-21T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "QueryPlanComparator.compare() returns identical ComparisonResult for all existing operator types",
+        "item_id": "preexisting-complexity-review-findings"
+      },
+      {
+        "behavior": "TPC-DS maintenance test success criteria (>=90% success rate) unchanged",
+        "item_id": "preexisting-complexity-review-findings"
+      },
+      {
+        "behavior": "_format_operator_properties() output format unchanged for existing properties",
+        "item_id": "preexisting-complexity-review-findings"
+      },
+      {
+        "behavior": "_parse_operation_entry raises same error_class with same message text for invalid expected_rows_affected",
+        "item_id": "preexisting-complexity-review-findings"
+      },
+      {
+        "behavior": "_prompt_single_option honors falsy defaults (0, False, '') when spec.default is not None",
+        "item_id": "preexisting-complexity-review-findings"
+      },
+      {
+        "behavior": "_rank_by_composite() composite scoring formula and weight handling unchanged",
+        "item_id": "preexisting-complexity-review-findings"
+      },
+      {
+        "behavior": "prompt_platform_options() correctly prompts for all option types including falsy defaults",
+        "item_id": "preexisting-complexity-review-findings"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/benchmarks.py"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/comparison.py"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/ranking.py"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/comparison.py"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/visualization.py"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/maintenance_test.py"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/analysis/"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/query_plans/"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpcds/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/query_plans/ -v",
+        "description": "Query plan comparison tests pass",
+        "expected": "all tests pass",
+        "item_id": "preexisting-complexity-review-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k tpcds",
+        "description": "TPC-DS tests pass",
+        "expected": "all tests pass",
+        "item_id": "preexisting-complexity-review-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/ -v",
+        "description": "CLI tests pass",
+        "expected": "all tests pass",
+        "item_id": "preexisting-complexity-review-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/ -v",
+        "description": "Core analysis tests pass",
+        "expected": "all tests pass",
+        "item_id": "preexisting-complexity-review-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/query_plans/ -v -k 'compare or diff'",
+        "description": "Query plan snapshot tests produce deterministic output",
+        "expected": "all tests pass with stable output ordering",
+        "item_id": "preexisting-complexity-review-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'in-place\\|mutate\\|float.*inf' benchbox/core/analysis/ranking.py benchbox/core/analysis/comparison.py",
+        "description": "Docstrings document mutation and inf behavior",
+        "expected": "matches found in docstrings of _validate_query_overlap, _detect_outliers, _compute_raw_scores, _normalize_scores",
+        "item_id": "preexisting-complexity-review-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "needs_wid": "w1",
+        "wid": "w10"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "needs_wid": "w2",
+        "wid": "w10"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "needs_wid": "w3",
+        "wid": "w10"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "needs_wid": "w4",
+        "wid": "w10"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "needs_wid": "w5",
+        "wid": "w10"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "needs_wid": "w6",
+        "wid": "w10"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "preexisting-complexity-review-findings",
+        "needs_wid": "w6",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "preexisting-complexity-review-findings",
+        "notes": "Compare limit_count/offset_count for Limit, projection_expressions for Project",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Limit and Project comparators to _OPERATOR_COMPARATORS dispatch dict in comparison.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "preexisting-complexity-review-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run complexity check and full test suite to verify no regressions",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "preexisting-complexity-review-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add group_by_keys comparison to Aggregate comparator in comparison.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "preexisting-complexity-review-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Sort set-difference output in _compare_set_diff for deterministic results",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "preexisting-complexity-review-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Guard phys.properties against None in _format_physical_properties in visualization.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "preexisting-complexity-review-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `from exc` to raise in _parse_operation_entry int() parsing in loader.py",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "preexisting-complexity-review-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Clamp float('inf') values before normalization in _normalize_scores in ranking.py",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "preexisting-complexity-review-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix spec.default truthiness check to use `is not None` in benchmarks.py",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "preexisting-complexity-review-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix timing domain mismatch in _execute_maintenance_operation (mono_time vs time.time)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "preexisting-complexity-review-findings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Improve docstrings for mutation side-effects and inf behavior in analysis helpers",
+        "wid": "w9"
+      }
+    ]
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "context": "This is a small, surgical fix: remove the implicit write-then-fail\nbehavior from the missing-file branch so it degrades to a plain\npytest.fail with no side effect, matching how a content mismatch already\nbehaves (compare and fail, never auto-write). Optionally extract a small\nhelper (see w2) if it makes the new test cleaner, but a minimal patch of\nthe existing branch is acceptable if extraction adds more churn than\nvalue.\n",
+  "description": "`tests/contracts/visualization/test_ascii_golden_output.py::test_golden_output`\n(parametrized over all 15 ASCII chart builders) is meant to catch\nunintended rendering changes by diffing against a stored golden file per\nchart, with regeneration gated behind an explicit `--update-golden` CLI\nflag (registered in `tests/contracts/visualization/conftest.py:9`).\n\nThe gate works correctly for the \"intentional change, want to update\"\npath (lines 342-345: `if update_golden: ... write ... pytest.skip(...)`).\nIt does NOT work for the \"golden file is simply missing\" path\n(lines 347-350):\n\n    if not golden_path.exists():\n        golden_path.parent.mkdir(parents=True, exist_ok=True)\n        golden_path.write_text(normalized, encoding=\"utf-8\")\n        pytest.fail(f\"Golden file did not exist - created {golden_path}. Re-run to verify parity.\")\n\nThis block writes the golden file unconditionally (without\n`--update-golden`) and then fails once with a message telling the human\nto re-run. On the very next run, the freshly-written file exists and the\ntest passes by construction - there was never an actual parity check.\n\nConcretely, this means: if a golden fixture file under\n`tests/fixtures/golden/ascii/` is accidentally deleted, renamed, or\ngitignored, or if a rebase/merge drops it, CI fails ONCE (as a\n`pytest.fail`, indistinguishable at a glance from a real mismatch), then\nquietly self-heals and goes green on the next CI run or re-run - with\nwhatever the current (possibly buggy) rendering happened to produce\nbaked in as the new \"golden\" answer. Nobody has to run `--update-golden`\nor review a diff for this to happen. This defeats the purpose of a golden\ntest, which is specifically to catch renders changing without human\nreview.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the golden file format, comparison normalization (_normalize), or ChartOptions fixture values",
+        "instead": "(not specified)",
+        "item_id": "ascii-golden-selfheal-fix",
+        "why": "out of scope for this hygiene fix."
+      },
+      {
+        "dont": "fold the missing-file case into the --update-golden branch's write path",
+        "instead": "only the NO-flag path needs to stop writing.",
+        "item_id": "ascii-golden-selfheal-fix",
+        "why": "--update-golden already handles 'file doesn't exist yet' correctly (it writes unconditionally)"
+      },
+      {
+        "dont": "make the missing-golden case regenerate automatically even with a warning",
+        "instead": "it must be a hard fail with zero file writes.",
+        "item_id": "ascii-golden-selfheal-fix",
+        "why": "that's the exact self-healing behavior being removed"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-04T00:00:00Z",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All 15 existing golden files continue to compare successfully with no changes to their content.",
+        "item_id": "ascii-golden-selfheal-fix"
+      },
+      {
+        "behavior": "Normal content-mismatch failures (line 353-355, existing golden differs from rendered output) are unchanged.",
+        "item_id": "ascii-golden-selfheal-fix"
+      },
+      {
+        "behavior": "The --update-golden path (lines 342-345) continues to regenerate and pytest.skip for BOTH new and changed golden files - do not require running the test twice for a brand-new chart type.",
+        "item_id": "ascii-golden-selfheal-fix"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ascii-golden-selfheal-fix",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/ascii/"
+      },
+      {
+        "item_id": "ascii-golden-selfheal-fix",
+        "kind": "do_not_modify",
+        "path_glob": "tests/contracts/visualization/conftest.py"
+      },
+      {
+        "item_id": "ascii-golden-selfheal-fix",
+        "kind": "do_not_modify",
+        "path_glob": "tests/fixtures/golden/ascii/"
+      },
+      {
+        "item_id": "ascii-golden-selfheal-fix",
+        "kind": "only_modify",
+        "path_glob": "tests/contracts/visualization/test_ascii_golden_output.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -v",
+        "description": "All 15 existing golden-output tests still pass unchanged",
+        "expected": "15 passed, 0 failed, 0 skipped",
+        "item_id": "ascii-golden-selfheal-fix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -q --update-golden",
+        "description": "--update-golden still regenerates and skips cleanly",
+        "expected": "15 skipped (each reporting 'Updated golden file: ...')",
+        "item_id": "ascii-golden-selfheal-fix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/contracts/visualization/ -k missing_golden -v",
+        "description": "New test proves a missing golden file hard-fails without writing anything",
+        "expected": "Test passes; asserts pytest.fail raised and no file created in the tmp golden dir",
+        "item_id": "ascii-golden-selfheal-fix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ascii-golden-selfheal-fix",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ascii-golden-selfheal-fix",
+        "notes": "In `test_golden_output` (tests/contracts/visualization/test_ascii_golden_output.py:336-355),\nchange the `not golden_path.exists()` branch (lines 347-350) so it\ndoes NOT create the file or write anything - it should behave like a\nnormal comparison failure:\n\n    if not golden_path.exists():\n        pytest.fail(\n            f\"Golden file missing: {golden_path}. If this chart is \"\n            f\"new or the rendering intentionally changed, regenerate \"\n            f\"with --update-golden and review the diff before \"\n            f\"committing; do not let this test create it implicitly.\"\n        )\n\nRegeneration for a genuinely-missing (e.g. brand-new chart type)\ngolden file should go through the SAME `--update-golden` path used\nfor intentional changes (lines 342-345), which already\nunconditionally writes+skips regardless of whether the file\npreviously existed - so no special-casing is needed there; only the\nno-flag path (347-350) needs to stop self-writing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make a missing golden file a hard failure that does not write anything",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-golden-selfheal-fix",
+        "notes": "Add a test (in the same file, or a small standalone test module\nunder tests/contracts/visualization/) that:\n  1. Points GOLDEN_DIR (or a monkeypatched copy of it) at a tmp_path\n     with no golden file present for a given chart name.\n  2. Runs the equivalent of `test_golden_output`'s body (or invokes\n     it directly with `update_golden=False`) against that empty dir.\n  3. Asserts `pytest.fail` is raised (e.g. via `pytest.raises` around\n     the extracted comparison logic, or via `pytester`/subprocess if\n     testing the actual collected test) AND that no file was created\n     in the tmp golden dir afterward.\nIf `test_golden_output`'s body isn't easily unit-testable in\nisolation (chart_name/golden_path/write logic is inlined), consider\nfactoring the compare-or-fail logic into a small helper function\n(e.g. `_compare_or_fail(normalized, golden_path, update_golden)`)\nthat both `test_golden_output` and the new missing-file test can\ncall directly - this also makes w1's change easier to unit test\nwithout spinning up a full chart builder.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a test covering the missing-golden-file hard-fail path",
+        "wid": "w2"
+      }
+    ]
+  }
+}

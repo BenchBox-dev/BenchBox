@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #356 of benchmark-support-status-and-discovery-policy.\nDeferred: Use benchmark support status to redesign the explorer benchmark browser\nReason deferred: Explorer UX changes should follow the metadata contract and public discovery decision.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:46Z",
+      "worktree": "main"
+    }
+  }
+}

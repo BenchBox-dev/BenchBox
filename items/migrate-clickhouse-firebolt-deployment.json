@@ -1,0 +1,16 @@
+{
+  "description": "Align existing ClickHouse and Firebolt adapters with the new deployment registry\npattern, migrating their ad-hoc mode handling to use the standardized deployment\nmode configuration.\n\nBoth adapters currently use a 'mode' config key for deployment selection. This\nwork migrates to 'deployment_mode' and integrates with the registry system.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "migrate-clickhouse-firebolt-deployment",
+        "needs_item": "deployment-factory-integration"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-14T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

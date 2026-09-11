@@ -1,0 +1,285 @@
+{
+  "description": "Result Detail and Compare are where users decide whether a result is credible\nand whether one platform is meaningfully faster. The audit found that Result\nDetail overweights the Run Receipt in the first viewport while primary\nmetrics are inline text, and Compare has chart overflow/blank-space issues in\nthe speedup chart. Both pages also inherit the broader badge, table, chart\ncontrol, and light-surface inconsistencies.\n\nThis item should redesign the information hierarchy for single-result and\nmulti-result analysis. It must preserve reproducibility and methodology\ndetail, but make the first read sharper: what was run, what metric matters,\nwhat can be trusted, what differs between runs, and where to inspect query\ndetails.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "claim a winner when severe benchmark/scale mismatches suppress winner claims.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "demote reproducibility so far that the result no longer feels auditable.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "introduce a user-selectable primary metric toggle unless the benchmark-derived contract is intentionally reopened.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use chart labels that overflow the SVG viewport or require horizontal page scroll.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "needs_item": "results-explorer-retheme-theme-system-foundation"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Benchmark-derived primary metric semantics.",
+        "item_id": "results-explorer-retheme-result-and-compare"
+      },
+      {
+        "behavior": "Comparability receipt logic and mismatch suppression behavior.",
+        "item_id": "results-explorer-retheme-result-and-compare"
+      },
+      {
+        "behavior": "Compare route `?ids=` share URL contract and compact ID canonicalization.",
+        "item_id": "results-explorer-retheme-result-and-compare"
+      },
+      {
+        "behavior": "Result detail route `/results/r/{result_id}`.",
+        "item_id": "results-explorer-retheme-result-and-compare"
+      },
+      {
+        "behavior": "Run Receipt reproducibility details and download links.",
+        "item_id": "results-explorer-retheme-result-and-compare"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/*Chart*.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ComparabilityReceipt.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CompareSummary.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryDiffTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RunReceipt.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Compare.test.tsx src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx src/components/__tests__/QueryDiffTable.test.tsx",
+        "description": "Result Detail and Compare tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- src/components/__tests__/charts.smoke.test.tsx src/components/__tests__/ChartPanel.test.tsx",
+        "description": "Chart smoke tests pass",
+        "expected": "chart tests pass",
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: capture result detail and compare at 390, 768, 1280, 1600; inspect first viewport, charts, tables, disclosures, and overflow'",
+        "description": "Manual compare/detail responsive captures are clean",
+        "expected": "manual evidence captured in _project/audits/",
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "notes": "Outcome: hierarchy is now encoded in the pages. Result Detail leads with a\ncompact result-summary panel (workload, platform, trust/visibility badges,\nscale, date, primary metric, geomean, wall-clock, driver), followed by the\nRun Receipt and then environment/actions/charts/tables. Compare leads with\na compact comparison summary, then comparability receipt, decision summary,\nbaseline control, query-level diff, result cards, and charts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Map the decision hierarchy for Result Detail and Compare",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "notes": "Outcome: inline metric text was replaced with tokenized metric cards in a\n`panel-elevated` summary. The Run Receipt remains prominent immediately\nbelow the summary so reproducibility stays in the first analytical read\nwithout consuming the whole first viewport.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Redesign Result Detail top summary and receipt placement",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "notes": "Outcome: Environment, Tuning Config, Actions, Query Timings, Individual\nsamples, MethodologyDisclosure, and RunReceipt now use the shared surface,\ntext, border, status, and scroll-affordance tokens. ChartPanel already\nconsumed the shared chart-control shell from the foundation pass; chart SVGs\nnow opt into `.bb-chart-svg` to prevent container overflow.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retheme Result Detail environment, actions, charts, timing tables, and methodology sections",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "notes": "Outcome: Compare now leads with a tokenized comparison-summary panel, and\nComparabilityReceipt uses differentiated StatusBadge roles/tones for match,\ndiffers, missing, warnings, and no-difference states. The baseline selector\nuses the shared `<Select>` primitive and sits directly above the query-level\nevidence it controls.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Redesign Compare top summary, comparability receipt, and baseline control",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "notes": "Outcome: chart SVGs used by Result Detail and Compare adopt `.bb-chart-svg`\nso their outer SVG cannot exceed the containing scroll surface at narrow\nwidths. Existing benchmark-derived chart eligibility/default behavior is\npreserved; this pass does not reopen the primary-metric contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix Compare chart layout, overflow, labels, and default chart choice",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "notes": "Outcome: QueryDiffTable, CompareSummary, ComparabilityReceipt, and Compare\nresult cards use tokenized surfaces and StatusBadge tones. Faster/slower/\ntie/missing states remain semantically distinct without relying on legacy\nbadge color class names.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retheme Query-Level Diff and result cards",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-result-and-compare",
+        "notes": "Outcome: existing ResultDetail, Compare, chart smoke, CompareSummary,\nComparabilityReceipt, and QueryDiffTable tests remain the regression\ncontract. The release-gate capture matrix now includes representative\nResult Detail, same-cohort Compare, and mismatch Compare routes so visual\nQA no longer skips these public surfaces.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add focused regression coverage for charts and hierarchy",
+        "wid": "w7"
+      }
+    ]
+  }
+}

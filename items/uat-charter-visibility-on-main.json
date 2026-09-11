@@ -1,0 +1,120 @@
+{
+  "context": "Lightest option that makes the charter discoverable from main; bundle with the\nnext UAT contract change rather than a standalone commit.\n",
+  "description": "Outcome of a 4-round adversarial architecture review of the UAT layer. The\napproving design contract, _project/specs/uat-framework.md, is develop-only —\nABSENT from origin/main (verified) — yet it governs UAT release-gate behavior\nthat ships on main (tests/uat/ IS on main).\n\nThis produced a real second-order problem during the review: origin/main was\nbriefly (and wrongly) used as the \"what was approved\" baseline, when the actual\ncharter lives only on develop. The gate ships without its charter.\n\nMinor hygiene fix: when the UAT contract next changes, land the design contract\n(or a pointer/stub to it) on main so the release-gate and its charter are\nco-located on the release branch.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-charter-visibility-on-main",
+        "id": 503,
+        "reason": "Automation is a follow-up once the convention is established.",
+        "resolution": "promoted",
+        "resolved_item": "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the",
+        "resolved_reason": null,
+        "summary": "Add a CI check that the UAT charter (or pointer) exists on the release branch"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-05-31T00:00:00Z",
+      "created_at": "2026-05-31T00:00:00Z",
+      "worktree": "main"
+    },
+    "prior_art": [
+      {
+        "concept": "_project/specs/uat-framework.md — extend/reuse as the canonical design contract when it is acceptable to ship the full charter",
+        "decision": "extend",
+        "item_id": "uat-charter-visibility-on-main",
+        "path": "_project/specs/uat-framework.md"
+      },
+      {
+        "concept": "docs/operations/uat-framework.md — reuse as the operator-facing pointer target; do not duplicate operational instructions in a stub",
+        "decision": "reuse",
+        "item_id": "uat-charter-visibility-on-main",
+        "path": "docs/operations/uat-framework.md"
+      },
+      {
+        "concept": "tests/uat/README.md — extend only for a short developer-facing pointer if the full spec stays off main",
+        "decision": "extend",
+        "item_id": "uat-charter-visibility-on-main",
+        "path": "tests/uat/README.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-charter-visibility-on-main",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/*.py (no behavior change)"
+      },
+      {
+        "item_id": "uat-charter-visibility-on-main",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md (or a pointer/stub file)"
+      },
+      {
+        "item_id": "uat-charter-visibility-on-main",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/ (pointer/stub only)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git ls-tree origin/main -- _project/specs/uat-framework.md tests/uat/CHARTER.md 2>/dev/null",
+        "description": "Charter or pointer is reachable from main",
+        "expected": "the charter or a pointer/stub is present on main",
+        "item_id": "uat-charter-visibility-on-main",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-charter-visibility-on-main",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-charter-visibility-on-main",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-charter-visibility-on-main",
+        "notes": "Confirm: git ls-tree origin/main -- _project/specs/uat-framework.md (absent);\ntests/uat present on origin/main. Record a compact summary.\nRE-VALIDATED 2026-05-31 (origin/main fetched fresh):\n  - git ls-tree origin/main _project/specs/uat-framework.md -> ABSENT (empty)\n  - git ls-tree origin/main tests/uat/ -> PRESENT (e.g. tests/uat/README.md blob c842c6c)\nResolution: chose the pointer (w1) and bundled it into the explorer-smoke\nrelease-hygiene PR (a UAT-contract change) per w2 -> added tests/uat/CHARTER.md.\nNOTE: main is release-only in this repo; the pointer reaches main at the next\ndevelop->release merge. The success-metric main-presence check is satisfied at\nthat release, not on the develop PR. The deferred CI-presence check remains.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate that the spec is absent from origin/main while tests/uat is present",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-charter-visibility-on-main",
+        "notes": "A pointer/stub (e.g. a short README in tests/uat/ or _project/specs/ that\nlinks the charter and its branch) may be sufficient if landing the full\nspec on main is undesirable. Choose the lightest option that makes the\ncharter discoverable from main.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide: land the full spec on main, or a pointer/stub referencing the develop charter",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-charter-visibility-on-main",
+        "notes": "Bundle with the next UAT-affecting PR so gate and charter ship together,\nrather than a standalone churn commit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Land the charter or pointer on main alongside the next UAT contract change",
+        "wid": "w2"
+      }
+    ]
+  }
+}

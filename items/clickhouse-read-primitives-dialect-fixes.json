@@ -1,0 +1,237 @@
+{
+  "context": "Categorize each of the 22 failing queries into: fixable (dialect override),\nexpected_failure (platform limitation), or needs-investigation. Work through\nfixable queries first using ClickHouse override patterns. Window function and\nQUALIFY fixes may require subquery rewrites rather than simple function substitutions.\n",
+  "description": "64/450 query failures across 22 unique queries in read_primitives on ClickHouse.\nThese break into several categories:\n\nDialect fixes needed:\n- any_value_simple, any_value_with_filter: WHERE x = ANY(subquery) → WHERE x IN (subquery) (Pattern F)\n- array_length: LENGTH(array_col) mistranslated to lengthUTF8() → should use length()\n- statistical_percentiles, intrinsic_appx_median: PERCENTILE_CONT WITHIN GROUP → quantile() (Pattern C)\n- statistical_correlation: likely CORR() function differences\n- timeseries_trend_analysis, window_moving_frame, window_multiple_orderings: window function syntax differences\n- qualify_cume_dist: QUALIFY clause not supported in ClickHouse\n\nExpected failures (not fixable as dialect issues):\n- aggregation_groupby_large: Timeout (907s vs 300s limit)\n- fulltext_boolean_search, fulltext_phrase_search, fulltext_simple_search: full-text search syntax not portable\n\nSecondary bug: The result JSON shows no error messages for most failures. The ClickHouse\nadapter is capturing failure status but swallowing the exception message (Pattern G).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "mark fixable queries as expected_failure",
+        "instead": "(not specified)",
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "why": "dialect overrides are preferred over skipping"
+      },
+      {
+        "dont": "modify base query files",
+        "instead": "create clickhouse_sql/ overrides instead",
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "why": "other platforms depend on standard SQL"
+      },
+      {
+        "dont": "use skip_on for runtime-only timeout risk",
+        "instead": "(not specified)",
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "why": "reserve skip_on for queries that are genuinely unsupported on that dialect"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "clickhouse-read-primitives-dialect-fixes",
+        "id": 577,
+        "reason": "Tracked separately in clickhouse-error-message-capture TODO",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Target TODO _project/DONE/platform-expansion/planning/clickhouse-error-message-capture.yaml already exists and is DONE.",
+        "summary": "Fix ClickHouse adapter error message capture (Pattern G)"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-04-12T00:00:00Z",
+      "created_at": "2026-04-08T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Base read_primitives query files unchanged - other platforms use standard SQL",
+        "item_id": "clickhouse-read-primitives-dialect-fixes"
+      },
+      {
+        "behavior": "Existing ClickHouse read_primitives results for passing queries unaffected",
+        "item_id": "clickhouse-read-primitives-dialect-fixes"
+      },
+      {
+        "behavior": "Override queries return identical column names, types, and row semantics",
+        "item_id": "clickhouse-read-primitives-dialect-fixes"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'read_primitives and clickhouse'",
+        "description": "ClickHouse read_primitives overrides load and pass",
+        "expected": "Tests pass confirming IN-subquery, length(), quantile(), window, and QUALIFY overrides",
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/read_primitives/test_benchmark_variants.py -k aggregation_groupby_large",
+        "description": "Timeout-only ClickHouse query remains selectable",
+        "expected": "aggregation_groupby_large still appears in clickhouse get_queries() output",
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix ANY(subquery) → IN (subquery) for any_value_simple and any_value_with_filter queries",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix array_length LENGTH() → length() (not lengthUTF8) for array columns",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add PERCENTILE_CONT → quantile() overrides for statistical_percentiles and intrinsic_appx_median",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Keep working fulltext_* ClickHouse variants enabled and document aggregation_groupby_large as a timeout-risk query without hard-skipping it",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix window function syntax failures: timeseries_trend_analysis, window_moving_frame, window_multiple_orderings - adjust frame specs and ORDER BY for ClickHouse",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix QUALIFY clause failures: qualify_cume_dist - rewrite as subquery with WHERE on window result",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix statistical function failures: statistical_correlation - investigate CORR() syntax differences",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-read-primitives-dialect-fixes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify all overrides and expected_failure markers",
+        "wid": "w8"
+      }
+    ]
+  }
+}

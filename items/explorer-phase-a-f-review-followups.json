@@ -1,0 +1,251 @@
+{
+  "description": "Non-required nits surfaced during code review of the six explorer-*\nTODOs completed 2026-04-17 (ultraplan phases A-F):\n\n  - explorer-result-detail-median-first        (Phase A)\n  - explorer-master-leaderboard-home           (Phase B)\n  - explorer-query-workbench                   (Phase C)\n  - explorer-unified-chart-panel               (Phase D)\n  - explorer-url-synced-filter-state           (Phase E)\n  - explorer-pipeline-meta-leaderboard-widening (Phase F)\n\nAll typecheck and Vitest tests are green; post-feature fix commits\n(59aa46440, a79af024c) already addressed required issues. These are\ncleanup items only.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "explorer-phase-a-f-review-followups",
+        "needs_item": "explorer-master-leaderboard-home"
+      },
+      {
+        "item_id": "explorer-phase-a-f-review-followups",
+        "needs_item": "explorer-pipeline-meta-leaderboard-widening"
+      },
+      {
+        "item_id": "explorer-phase-a-f-review-followups",
+        "needs_item": "explorer-query-workbench"
+      },
+      {
+        "item_id": "explorer-phase-a-f-review-followups",
+        "needs_item": "explorer-result-detail-median-first"
+      },
+      {
+        "item_id": "explorer-phase-a-f-review-followups",
+        "needs_item": "explorer-unified-chart-panel"
+      },
+      {
+        "item_id": "explorer-phase-a-f-review-followups",
+        "needs_item": "explorer-url-synced-filter-state"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-04-18T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing Vitest suites continue to pass (229 tests across 23 files as of 2026-04-18)",
+        "item_id": "explorer-phase-a-f-review-followups"
+      },
+      {
+        "behavior": "Python explorer_pipeline tests continue to pass",
+        "item_id": "explorer-phase-a-f-review-followups"
+      },
+      {
+        "behavior": "meta_leaderboard.json artifact shape remains backward-compatible for any frontend older than w5",
+        "item_id": "explorer-phase-a-f-review-followups"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Explorer typecheck + Vitest",
+        "expected": "all green",
+        "item_id": "explorer-phase-a-f-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ -q",
+        "description": "Pipeline tests",
+        "expected": "all green",
+        "item_id": "explorer-phase-a-f-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "Home.tsx line 98 rounds avg_rank to 2 decimals; MetaLeaderboard.tsx\nline 218 renders via `.toFixed(1)`. Pick one (1 decimal is enough\nfor visual scan) and drop the more precise round at the source.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align avg_rank decimal precision across Home.tsx and MetaLeaderboard.tsx",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "ResultDetail.tsx uses <th onClick={toggleSort(...)}> without\nrole=\"button\", tabIndex, or onKeyDown. Add keyboard affordances\nmatching the MetaLeaderboard a11y pattern: role=\"button\",\ntabIndex=0, Enter/Space activation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Keyboard-enable sortable table headers in ResultDetail.tsx",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "`sortedMedians` / `sortedRawQueries` (lines 68-86) sort on every\nrender. Low impact but easy useMemo win.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Memoize sorted arrays in ResultDetail.tsx",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "ResultDetail.tsx:282 and BenchmarkIndex/Compare/PlatformIndex\npass `context={{ kind: \"...\", ... }}` as inline literals. Each\nrender produces a new object identity, invalidating the\napplicableCharts/summary/historical/compareRows useMemos inside\nChartPanel. Wrap each site's context in useMemo or let\nChartPanel accept discrete props (kind, detail, summary, ...)\nand build the discriminated union internally.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Memoize ChartPanel context objects at call sites",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "chartRegistry.parity.test.ts regex-matches _CHART_SPECS in\nchart_types.py. Any Python syntax change (formatting, comments\ninside the tuple) risks silently breaking the extraction.\nGenerate `tests/parity/fixtures/chart_ids.json` from Python\nduring make parity-fixtures and have the test read that file\ninstead. Related to follow-up nit w11 on\nexplorer-visualization-review-followup-nits.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Emit chart spec IDs as a JSON fixture for the parity test",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "ChartPanel.tsx:419 hardcodes `benchmark === \"tpch\" || benchmark === \"tpcds\"`\nas the Power@Size carve-out when summary.ranking is missing. The\nranking config emitted by the pipeline should always be present\n- if it isn't, error/log rather than guess. Alternatively read\na shared RANKING_METRIC_BY_FAMILY mirror on the frontend.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Broaden SummaryBoxPanel primary-metric fallback",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "Call sites like Home.tsx:23-24 pass fresh `[]` as `initial`. The\npopstate useEffect at useUrlState.ts:116 depends on `initial`,\nso it re-subscribes on every render. Behavior is correct\n(cleanup runs) but wasteful. Either hoist the empty-array\nliterals to module-level constants or ignore `initial` in the\neffect dep array (it is semantically a constant after mount).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Stabilize useUrlState's initial/value references at call sites",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "useUrlState.ts:126 returns a new setValue function each render.\nDownstream memoized subtrees re-render when it is passed as a\nprop. useCallback((v) => ..., [key, initial]) is a minor but\neasy win.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Memoize useUrlState's setValue via useCallback",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "Home.tsx buildCohortHref (lines 161-168) only carries `tuning` to\nthe cohort landing page. Passing `trust` and `window` (date) as\nwell would keep the filter slice consistent when navigating to a\ncohort detail - verify BenchmarkIndex reads the same param names.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Preserve trust and date-window filters in MetaLeaderboard cohort hrefs",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "MetaLeaderboard.tsx line 304 falls back to `${rank.rank}/${rank.total}`\nwhen renderCellValue returns JSX (\"ranks\" mode). Factor the a11y\nannouncement text out of renderCellValue so describeCell doesn't\nmirror the formatting logic.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Clean up describeCell's JSX-vs-string coupling in MetaLeaderboard.tsx",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "pipeline.py _build_meta_leaderboard (line 242) uses\n`len(sorted_rows)` for `total`, which counts platforms whose\nprimary metric is None. A cohort of 3 where 1 platform has no\nmetric currently shows \"1/3\" and \"2/3\" - arguably it should be\n\"1/2\" and \"2/2\". Consider `sum(1 for r in sorted_rows if _get_val(r) is not None)`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Clarify MetaRank `total` - count only rankable rows, not null-metric rows",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "pipeline.py:240-247 duplicates primary_metric/primary_order into\nevery rank cell when it's already on the parent cohort record.\nFrontend reads cohort.primary_order anyway - we can trim the\nper-cell copies to keep meta_leaderboard.json smaller and remove\nthe divergence risk. Requires follow-up on frontend: drop the\noptional fields from MetaRank and update MetaLeaderboard.tsx\ncellShadeMetric to pull from the cohort.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Drop duplicated primary_metric/primary_order from per-cell MetaRank",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "Query.tsx:285-295 hardcodes `{count: 0}` for each date-window\noption. Add a dedicated facet query that buckets rows by\n(now − 30d, 90d, 365d) so users see the impact before clicking.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Populate Query workbench date-window facet counts",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "Query.tsx:192 uses\n  COPY (...) TO '${exportName}' (FORMAT CSV, ...)\nexportName is currently built from Date.now() so injection is\nimpossible today, but any future change that weaves user input\ninto the filename would silently become injectable. Either\nruntime-assert `exportName` matches `/^benchbox-query-export-\\d+\\.csv$/`\nor use DuckDB parameterization if the driver supports it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Defensively sanitize or parameterize exportName in CSV COPY TO",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "Query.tsx:399 uses `Object.keys(sqlRows[0]!)` to derive headers.\nHeterogeneous rows (UNION ALL over schema-drifted views) would\nmiss columns only present in later rows. Compute the union of\nkeys across all rows, or warn the user.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Stabilize Advanced SQL result column derivation",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-phase-a-f-review-followups",
+        "notes": "Query.tsx line 232 uses literal backticks in prose - they render\nas visible characters rather than code styling. Replace with\n`<code>results.duckdb</code>` spans.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Render code-marker backticks as inline <code> in Query.tsx copy",
+        "wid": "w9"
+      }
+    ]
+  }
+}

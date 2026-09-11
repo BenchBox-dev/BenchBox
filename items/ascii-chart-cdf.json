@@ -1,0 +1,205 @@
+{
+  "context": "Reuse the grid-based rendering pattern from benchbox/core/visualization/ascii/line_chart.py\n(grid creation, Bresenham-like line drawing, axis rendering) but with CDF-specific logic:\n\n1. Create CDFSeriesData (name, values list[float]) dataclass.\n2. Create ASCIICDFChart(ASCIIChartBase) with render().\n3. For each series: sort values, compute cumulative proportions (i/n for each value).\n4. Plot on a grid where X = execution time, Y = cumulative proportion (0-100%).\n5. Reuse the marker system from ASCIILineChart (*, +, o, x, ^, v, #, @) for multi-series.\n6. Add percentile annotations: vertical dashed lines at P50, P95, P99 positions.\n7. Add from_query_results() factory.\n\nKeep Y-axis fixed at 0-100% (no auto-scaling). X-axis scales to data range.\n",
+  "description": "Add a new ASCII chart type that renders a cumulative distribution function (CDF) plot\nshowing the proportion of queries completing within a given time threshold. The X-axis\nis execution time, the Y-axis is the cumulative proportion (0% to 100%), and each\nplatform is a separate line/curve.\n\nCDF plots are the standard academic and industry method for visualizing latency\ndistributions, used extensively in TailBench, YCSB, and database vendor whitepapers.\nThey answer: \"what percentage of my queries finish within T milliseconds?\" which maps\ndirectly to SLA compliance analysis.\n\nExample output:\n```\nCumulative Distribution of Query Latency\n────────────────────────────────────────────────────\n100%│                         ****+++++++++++\n    │                    ****++++\n 75%│                ****+++\n    │            ***++++\n 50%│         **+++\n    │       *+++\n 25%│     *++\n    │    *+\n  0%└────────────────────────────────────────\n    0      50    100    150    200    300 ms\n  * DuckDB    + Polars\n```\n\nSteeper curves indicate more consistent performance. Curves that rise quickly and\nplateau show tight latency distributions; long tails that slowly reach 100% reveal\nproblematic outlier queries.\n\nThis is distinct from the Box Plot (quartile summary statistics that collapse\ndistribution shape), the Histogram (per-query latency, not cumulative), and the\nLine Chart (time-series trends over runs, not distribution functions). CDF reveals\nbimodal distributions, heavy tails, and performance cliffs that quartile summaries hide.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add numpy/scipy dependency",
+        "instead": "CDF computation is trivial with sorted arrays",
+        "item_id": "ascii-chart-cdf",
+        "why": "the visualization module has zero external deps"
+      },
+      {
+        "dont": "reuse ASCIILineChart directly",
+        "instead": "create a dedicated class that borrows rendering patterns",
+        "item_id": "ascii-chart-cdf",
+        "why": "CDF has fixed 0-100% Y-axis and different data preparation (sorted cumulative)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-15T00:00:00Z",
+      "created_at": "2026-02-14T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "ASCIILineChart behavior unchanged (CDF is a distribution chart, line chart is time-series)",
+        "item_id": "ascii-chart-cdf"
+      },
+      {
+        "behavior": "All 9 existing chart types continue to render identically",
+        "item_id": "ascii-chart-cdf"
+      },
+      {
+        "behavior": "render_ascii_chart() in exporters.py handles all existing chart_type strings",
+        "item_id": "ascii-chart-cdf"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ascii-chart-cdf",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/"
+      },
+      {
+        "item_id": "ascii-chart-cdf",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/exporters.py"
+      },
+      {
+        "item_id": "ascii-chart-cdf",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/templates.py"
+      },
+      {
+        "item_id": "ascii-chart-cdf",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/ascii/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.visualization.ascii.cdf_chart import ASCIICDFChart, CDFSeriesData; data = [CDFSeriesData('DuckDB', [10, 20, 30, 50, 120]), CDFSeriesData('Polars', [15, 25, 45, 80, 310])]; chart = ASCIICDFChart(data=data); print(chart.render())\"",
+        "description": "New chart class renders without error",
+        "expected": "Rendered chart with two CDF curves, Y-axis 0-100%",
+        "item_id": "ascii-chart-cdf",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v",
+        "description": "Existing chart tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "ascii-chart-cdf",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ascii-chart-cdf",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ascii-chart-cdf",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ascii-chart-cdf",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ascii-chart-cdf",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ascii-chart-cdf",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "ascii-chart-cdf",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ascii-chart-cdf",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ascii-chart-cdf",
+        "needs_wid": "w5",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-cdf",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create CDFSeriesData dataclass and ASCIICDFChart class with grid-based render()",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-cdf",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement CDF computation (sort values, compute cumulative proportions) and grid plotting",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-cdf",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add optional percentile annotation lines (P50, P95, P99 vertical markers on X-axis)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-cdf",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add from_query_results() factory for creating CDF from NormalizedResult data",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-cdf",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register chart in __init__.py and add 'cdf_chart' case to render_ascii_chart() in exporters.py",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-cdf",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests (single series, multi-series, identical values, single value, large dataset)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-cdf",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add cdf_chart to flagship template in templates.py",
+        "wid": "w7"
+      }
+    ]
+  }
+}

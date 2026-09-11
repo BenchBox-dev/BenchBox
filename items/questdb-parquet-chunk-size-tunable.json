@@ -1,0 +1,76 @@
+{
+  "description": "`_load_parquet_via_chunked_csv` hardcodes `batch_size=200_000`.  The comment\nsays this keeps each HTTP request \"well under 50 MB\", but that budget assumes\na narrow schema (~250 bytes/row).\n\nThe tpcds_obt table is a very wide denormalized OBT with 50+ columns.  At\n200k rows × ~250 bytes/column × 50 columns = ~2.5 GB, far exceeding the\nbudget.  In practice pandas' CSV representation is lighter, but the estimate\nis schema-dependent and unverifiable without the actual row width.\n\nHardcoded batch sizes also prevent operators from tuning the chunk count vs.\nmemory tradeoff for their specific hardware and workload.\n\nFlagged during Phase 1 remediation review (2026-04-16) as a nit.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add parquet_chunk_rows to the CLI --platform-option help text for other platforms",
+        "instead": "(not specified)",
+        "item_id": "questdb-parquet-chunk-size-tunable",
+        "why": "this is QuestDB-specific, scoped to questdb.py only"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Support",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing TestLoadParquetViaChunkedCsv tests continue to pass",
+        "item_id": "questdb-parquet-chunk-size-tunable"
+      },
+      {
+        "behavior": "Default behaviour unchanged: parquet_chunk_rows defaults to 200_000",
+        "item_id": "questdb-parquet-chunk-size-tunable"
+      },
+      {
+        "behavior": "from_config round-trip: config dict → adapter.parquet_chunk_rows",
+        "item_id": "questdb-parquet-chunk-size-tunable"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_questdb_coverage.py -k 'parquet' -v",
+        "description": "Default and custom chunk rows round-trip through adapter",
+        "expected": "All parquet-related tests pass including new chunk_rows tests",
+        "item_id": "questdb-parquet-chunk-size-tunable",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "questdb-parquet-chunk-size-tunable",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "questdb-parquet-chunk-size-tunable",
+        "notes": "In `benchbox/platforms/questdb.py`:\n\n1. `__init__` (around line 277):\n   self.parquet_chunk_rows = int(config.get(\"parquet_chunk_rows\", 200_000))\n\n2. `from_config` (around line 228):\n   adapter_config[\"parquet_chunk_rows\"] = config.get(\"parquet_chunk_rows\", 200_000)\n\n3. `_load_parquet_via_chunked_csv` (line 876):\n   for batch in pf.iter_batches(batch_size=self.parquet_chunk_rows):\n\nNo other files need changing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add parquet_chunk_rows to QuestDB __init__ and from_config",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-parquet-chunk-size-tunable",
+        "notes": "Add one test in TestAdapterInitEdgeCases:\n\n  def test_parquet_chunk_rows_custom(self, questdb_stubs):\n      adapter = QuestDBAdapter(parquet_chunk_rows=50_000)\n      assert adapter.parquet_chunk_rows == 50_000\n\nAnd one test in TestLoadParquetViaChunkedCsv verifying the value flows\ninto iter_batches:\n\n  def test_custom_chunk_rows_passed_to_iter_batches(self, questdb_stubs, tmp_path):\n      adapter = QuestDBAdapter(parquet_chunk_rows=500)\n      ...\n      mock_pf.iter_batches.assert_called_once_with(batch_size=500)\n\nDocument in CLAUDE.md or a QuestDB platform README:\n  --platform-option parquet_chunk_rows=50000   # lower for wide tables\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add test and document the platform-option key",
+        "wid": "w2"
+      }
+    ]
+  }
+}

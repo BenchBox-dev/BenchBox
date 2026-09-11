@@ -1,0 +1,229 @@
+{
+  "context": "Pure read-only investigation. Run `gh api` calls in sequence,\npaste raw JSON into the decision record, then write conclusions.\nDo not modify branch protection, rulesets, or any workflow during\nthis TODO. The single artifact is a markdown file documenting\nwhat is true today.\n",
+  "description": "Decision-gate item that precedes Steps 1-4 of the dev-loop simplification\nplan. The plan rests on three load-bearing assumptions: (a) \"Require\nbranches to be up to date before merging\" is enabled on `develop`,\n(b) PR-tier CI on `develop` is heavier than necessary, (c) native\nGitHub Merge Queue is unavailable on this user-owned repo.\n\nThis TODO produces a written decision record. If any assumption is\nwrong, downstream TODOs (Step 1-4) must be re-planned BEFORE shipping.\n\nNo commits are produced by this TODO except the decision record itself.\n\nContext (for future readers): see `_project/blind-spots/` for the L2\naudit findings that motivated the dev-loop simplification, captured\nin Step 1.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "begin Step 1-4 work in parallel with this TODO",
+        "instead": "wait for the GO signal in the decision record",
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "why": "the verification may invalidate downstream plans"
+      },
+      {
+        "dont": "paraphrase API responses in the decision record",
+        "instead": "paste verbatim JSON",
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "why": "future re-plans need raw values"
+      },
+      {
+        "dont": "skip w2 (rulesets)",
+        "instead": "checking only one surface gives a false answer",
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "why": "GitHub repos commonly encode protection in rulesets rather than classic branch protection"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-0-verify-assumptions",
+        "id": 375,
+        "reason": "Each downstream step is a separate TODO with its own scope and verification",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Refers to dev-loop Steps 1-4 implementation, already superseded — project has progressed to Steps 5/6, both already open tracked items.",
+        "summary": "Acting on the findings (Steps 1-4 implementation)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-30T00:00:00Z",
+      "created_at": "2026-04-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All API outputs recorded verbatim, not paraphrased — future agents may need the raw values",
+        "item_id": "dev-loop-step-0-verify-assumptions"
+      },
+      {
+        "behavior": "No code or workflow changes during this step — verification only",
+        "item_id": "dev-loop-step-0-verify-assumptions"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml (Step 4 owns this)"
+      },
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml (audited but not edited)"
+      },
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/test.yml (Step 3 owns this)"
+      },
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "kind": "do_not_modify",
+        "path_glob": "CLAUDE.md, AGENTS.md (no edits — Steps 1-4 update these)"
+      },
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub branch protection / rulesets (Step 0 reads via gh api; never PATCH)"
+      },
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile (no edits — read-only investigation)"
+      },
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/dev-loop-verification-2026-04-30.md (new file, the decision record)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/decisions/dev-loop-verification-2026-04-30.md && grep -cE '^## (W[1-6]|Conclusion)' _project/decisions/dev-loop-verification-2026-04-30.md",
+        "description": "Decision record exists and contains all six findings",
+        "expected": ">= 7",
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'Step [1-6]:' _project/decisions/dev-loop-verification-2026-04-30.md",
+        "description": "Decision record explicitly addresses each downstream step",
+        "expected": ">= 4",
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "notes": "Run: `gh api repos/joeharris76/BenchBox/branches/develop/protection\n--jq '.required_status_checks'` and record the value of `strict`.\nIf strict is already false, the staleness diagnosis is wrong and\nStep 3.4 (disable strict-base) is a no-op. Re-plan before Step 3.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Check classic branch protection on develop for `strict: true`",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "notes": "Required checks may be encoded in a ruleset, not in classic\nbranch protection. Run: `gh api repos/joeharris76/BenchBox/rulesets`\nand inspect each ruleset that targets `develop`. Record:\n  - Ruleset names targeting develop\n  - Required status checks per ruleset\n  - Whether `require_branches_up_to_date` is set in any of them\nThe Step 3.4 toggle must be applied wherever it's encoded.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Check GitHub rulesets targeting develop for required-checks and strict-base",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "notes": "Read `.github/workflows/test.yml` `on:` block; identify which jobs\nrun on `pull_request` to develop. Cross-reference with recent run\ndurations: `gh run list --workflow test.yml --branch develop --limit 20\n--json conclusion,startedAt,updatedAt,name`. Record P50/P95 CI\nduration on develop PRs today. This is the baseline that Step 3.1\n(cut to lint + Ubuntu 3.12 fast tests) reduces.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit current PR-tier CI cost on develop",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "notes": "Run: `gh run list --workflow develop-post-merge.yml --branch develop\n--limit 30 --json conclusion`. Record current red/green ratio. If\nalready noisy, Step 4 needs to handle false positives carefully.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit develop-post-merge.yml health",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "notes": "Use a concrete proxy rather than free-text grep. For the last 50\nmerged PRs targeting develop, compute the gap between the last\nsuccessful CI run start and the PR merge time. A gap > 30 minutes\nwith intervening pushes is a strong signal of a strict-base re-CI\ncycle (the PR was green, develop advanced, CI re-ran):\n  - `gh pr list --state merged --base develop --limit 50 \\\n      --json number,mergedAt,headRefOid,labels,statusCheckRollup`\n  - For each PR, compute `merged_at - last_successful_check_started_at`\n    across `statusCheckRollup` entries\n  - Count PRs where that gap > 30 min AND statusCheckRollup has\n    >= 2 distinct startedAt timestamps for the same check name\n    (proxy for re-CI after a base push)\nSecondary signal (lower confidence): run\n`gh pr list --state merged --base develop --limit 50 --json number,comments`\nand grep PR comments for explicit `pr-refresh`, `make pr-refresh`,\nor `merged develop into branch`. Use only as corroboration.\n\nRecord:\n  - Strict-base re-CI rate (primary proxy, %)\n  - Explicit pr-refresh mentions (secondary, count)\nIf the primary proxy is < 5%, the queue is overkill even if Step 4\nmetrics later say otherwise — Step 6 should reflect that.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Estimate actual pr-refresh / staleness pain rate",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "notes": "Run: `gh api repos/joeharris76/BenchBox --jq '{visibility,\nowner_type: .owner.type, owner_login: .owner.login,\nfull_name, default_branch, private}'`. Also inspect the branch\nprotection / ruleset surfaces from w1/w2 for any native merge-queue\nrule. Do NOT infer merge-queue availability from unrelated repo\nfields such as `.has_issues`; that field only says whether Issues\nare enabled.\n\nNative MQ generally requires org-owned repos (with plan-dependent\navailability for private repos). User-owned repos should be treated\nas \"native MQ unavailable\" unless GitHub's protection/ruleset API\nshows merge-queue rules can be applied. Record the evidence so Step 6\npicks the right path (native vs steward) without re-investigation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm native GitHub Merge Queue availability",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-0-verify-assumptions",
+        "notes": "Single markdown file with: timestamp, raw outputs of w1-w6,\nconclusions, and explicit GO/NO-GO/RE-PLAN signal for each of\nSteps 1-4. Future agents read this before starting any downstream\nstep.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write decision record at _project/decisions/dev-loop-verification-2026-04-30.md",
+        "wid": "w7"
+      }
+    ]
+  }
+}

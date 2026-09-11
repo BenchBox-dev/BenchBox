@@ -1,0 +1,146 @@
+{
+  "context": "Add a small, reusable readiness layer for local provisioning checks and wire it into existing platform CLI\ndiagnostics. Keep checks side-effect-free: import/package discovery and bounded localhost TCP probes only.\nDo not instantiate adapters, start services, initialize Ray, or create/drop databases. Treat missing services\nand missing optional runtimes as environment readiness gaps, not benchmark failures.\n",
+  "description": "The UAT sweep skipped 870 TCP-backed SQL cells because local service ports were\nunreachable. Lakesail also failed every first-rung cell due missing `pysail`\nand no Sail server at `sc://localhost:50051`, and Modin failed immediately due\nmissing runtime dependencies. These are environment/provisioning issues, not\nbenchmark query failures, but the local user path does not make that boundary\nobvious enough.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "turn missing TCP services into benchmark failures",
+        "instead": "classify them as local environment readiness gaps.",
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "why": "the benchmark was never run"
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Experience",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Missing optional runtimes remain non-fatal to base BenchBox installs.",
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning"
+      },
+      {
+        "behavior": "The CLI must not start, stop, or mutate local services without explicit user action.",
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/results-explorer-uat-defect-local-platform-provisioning.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/platform.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/platform_readiness.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/lakesail.md"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/modin-dataframe.md"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/quick-reference.md"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/cli/workflows.md"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_platform.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_platform_readiness.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_platform_readiness.py tests/unit/cli/test_platform.py -k 'platform and readiness' -q",
+        "description": "Platform readiness/help checks terminate and classify missing services cleanly.",
+        "expected": "selected readiness tests pass",
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast tests remain green.",
+        "expected": "all selected tests pass",
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "notes": "Inventory findings:\n- TCP-backed local services are currently encoded only in `scripts/local_stress_test.sh`, not in the reusable\n  `benchbox platforms check/status` path. The 15 service platforms are `clickhouse-server:localhost:9000`,\n  `cedardb:localhost:5435`, `starrocks:localhost:19030`, `postgresql:localhost:5432`,\n  `presto:localhost:18081`, `trino:localhost:18080`, `databend:localhost:8000`,\n  `doris:localhost:19031`, `influxdb:localhost:8181`, `pg-duckdb:localhost:5432`,\n  `pg-mooncake:localhost:5432`, `timescaledb:localhost:5432`, `questdb:localhost:8812`,\n  `singlestore:localhost:13306`, and `velox:localhost:50051`. PostgreSQL-family platforms share\n  `localhost:5432` but must stay separate readiness results because they represent different provisioned\n  services/schemas.\n- `benchbox platforms check` currently reports package availability only; it does not probe configured\n  service endpoints, so a platform can look \"ready\" before a local server is listening.\n- LakeSail SQL and DataFrame modes both require the PySpark client plus a Sail Spark Connect endpoint at\n  `sc://localhost:50051` by default. The SQL adapter can auto-start a local `pysail` server when `pysail` is\n  installed and the endpoint is unreachable, but readiness diagnostics must not instantiate the adapter or\n  trigger that managed subprocess path. LakeSail DataFrame mode connects to an already-running endpoint.\n- Modin readiness is more than importing `modin`: the default Ray backend must also import `ray`, and the Dask\n  backend must import `dask`. Probing must not start a Ray cluster or mutate runtime state.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory exact provisioning checks for TCP services, Lakesail, and Modin",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "notes": "Work-unit-owned files before editing:\n- `benchbox/cli/platform_readiness.py` (new side-effect-free readiness probes)\n- `benchbox/cli/platform.py` (surface readiness diagnostics from `benchbox platforms check/status`)\n- `docs/reference/cli/workflows.md`\n- `docs/platforms/quick-reference.md`\n- `docs/platforms/lakesail.md`\n- `docs/platforms/modin-dataframe.md`\nProcess cleanup:\n- Check free space before and after verification. If available space is below 40GB, remove loaded local database\n  artifacts under `benchmark_runs/databases/` when present, but preserve reusable generated data under\n  `benchmark_runs/datagen/` because TPC-H and derived/read-primitive runs can reuse it. Stop only if available\n  space falls below 5GB.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add or improve readiness diagnostics and documentation",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-local-platform-provisioning",
+        "notes": "Work-unit-owned files before editing:\n- `tests/unit/cli/test_platform_readiness.py` (new targeted readiness unit coverage)\n- `tests/unit/cli/test_platform.py` (CLI command rendering/exit-code coverage if needed)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify unreachable/missing-runtime paths are classified as environment skips",
+        "wid": "w3"
+      }
+    ]
+  }
+}

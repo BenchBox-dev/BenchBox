@@ -1,0 +1,10 @@
+{
+  "description": "Improve error messages across cloud platform adapters with actionable context.\n\nCurrent issues:\n- Generic \"Query failed\" errors without diagnosis hints\n- Network errors don't suggest common causes\n- Authentication failures lack credential verification steps\n- Quota/limit errors not clearly identified\n\nGoal: Wrap common exceptions with context that helps users\ndiagnose and fix issues without searching external docs.\n\nPlatforms to improve:\n- BigQuery (quota, auth, project errors)\n- Redshift (security group, cluster state, IAM)\n- Snowflake (warehouse suspend, role permissions)\n- Databricks (cluster state, token expiry)",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Polish",
+      "created_at": "2025-12-13T00:00:00Z",
+      "worktree": "observability-quality"
+    }
+  }
+}

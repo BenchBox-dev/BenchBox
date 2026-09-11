@@ -1,0 +1,173 @@
+{
+  "context": "The geomean_ms field will exist in the manifest after explorer-extend-manifest-\nand-pipeline lands. This TODO is a UI-layer change: swap the field used for\nsorting, update column labels, and add a metric definition. No new data\nfetching or computation needed.\n\nTooltip copy: \"Geometric mean of per-query execution times (measurement\nruns only). More comparable than wall-clock total when query counts differ.\"\n",
+  "description": "Post-launch audit (2026-04-14) found a metric discrepancy: the CLI uses\ngeometric mean of per-query times as the primary comparison metric; the\nexplorer uses total_duration_s (wall-clock sum). These produce different\nnumbers for the same result, and two results with different query counts\n(e.g., full TPC-H vs a query subset) produce incomparable totals.\n\nThis TODO:\n  1. Makes geomean_ms the primary sort/compare axis in the Compare view,\n     Browse tables, and any cohort summary\n  2. Relabels total_duration_s wherever it appears so readers know what\n     they are looking at\n  3. Adds a clear metric definition in the UI (tooltip or footnote)\n\nPrerequisite: explorer-extend-manifest-and-pipeline must land first\n(geomean_ms must exist in the manifest before this TODO can consume it).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "recompute geomean in the browser",
+        "instead": "read manifest.geomean_ms directly",
+        "item_id": "explorer-align-duration-metric",
+        "why": "it is precomputed in the manifest"
+      },
+      {
+        "dont": "remove total_duration_s from the UI",
+        "instead": "demote it, don't delete it",
+        "item_id": "explorer-align-duration-metric",
+        "why": "it is useful context"
+      },
+      {
+        "dont": "silently show geomean as 'Duration'",
+        "instead": "always label it",
+        "item_id": "explorer-align-duration-metric",
+        "why": "that hides the metric choice from the reader"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-align-duration-metric",
+        "needs_item": "explorer-extend-manifest-and-pipeline"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-14T00:00:00Z",
+      "created_at": "2026-04-14T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All data loading logic - this is display/labeling changes only",
+        "item_id": "explorer-align-duration-metric"
+      },
+      {
+        "behavior": "Existing URL/query-param format for compare view",
+        "item_id": "explorer-align-duration-metric"
+      },
+      {
+        "behavior": "Null-safety: if geomean_ms is null (e.g., old bundle), fall back to total_duration_s display with a 'N/A' geomean",
+        "item_id": "explorer-align-duration-metric"
+      },
+      {
+        "behavior": "total_duration_s remains visible - it is honest wall-clock data; just secondary",
+        "item_id": "explorer-align-duration-metric"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-align-duration-metric",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/ (pipeline changes are in the prerequisite TODO)"
+      },
+      {
+        "item_id": "explorer-align-duration-metric",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/components/ (no component changes needed)"
+      },
+      {
+        "item_id": "explorer-align-duration-metric",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'geomean_ms' results-explorer/src/pages/Compare.tsx",
+        "description": "Compare view sorts by geomean_ms",
+        "expected": "at least one sort reference to geomean_ms",
+        "item_id": "explorer-align-duration-metric",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'Wall-clock\\|total_duration' results-explorer/src/pages/Compare.tsx",
+        "description": "total_duration_s is still visible but labeled",
+        "expected": "present with descriptive label",
+        "item_id": "explorer-align-duration-metric",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "TypeScript compiles cleanly",
+        "expected": "(no errors)",
+        "item_id": "explorer-align-duration-metric",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-align-duration-metric",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-align-duration-metric",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-align-duration-metric",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-align-duration-metric",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-align-duration-metric",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update Compare.tsx: use geomean_ms as primary sort/compare axis. Keep total_duration_s as secondary column labeled 'Wall-clock total'.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-align-duration-metric",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update BenchmarkIndex.tsx and PlatformIndex.tsx browse tables: sort default by geomean_ms ascending. Relabel 'Duration' column to 'Geomean (ms)' with a tooltip explaining the metric.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-align-duration-metric",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update ResultDetail.tsx summary section: show geomean_ms as 'Geomean query time' prominently; move total_duration_s to secondary metadata row with label 'Total wall-clock'.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-align-duration-metric",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add metric definition tooltip or footnote: 'Geometric mean of per-query execution times (measurement runs only). Lower is faster. Comparable across runs with different query counts.'",
+        "wid": "w4"
+      }
+    ]
+  }
+}

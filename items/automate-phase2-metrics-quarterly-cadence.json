@@ -1,0 +1,205 @@
+{
+  "context": "Build w1 (JSON output) first since w2 and w3 both depend on it. w3\n(the workflow) is the load-bearing piece — w2 and w4 are conveniences\nthat the workflow can adopt incrementally.\n",
+  "description": "`scripts/phase2_metrics.py` (landed 2026-04-27) computes the six\nPhase 2 → Phase 3 promotion metrics on demand and writes a markdown\nhandoff. The script is sound, but the **cadence depends on a human\nremembering to run it quarterly** — the same failure mode the metrics\nwere introduced to prevent.\n\nThis TODO closes the loop: machine-readable output, automatic diff\nagainst the previous review, and a scheduled CI hook so the report is\nproduced on the first Monday of each quarter without intervention.\n\nSurfaced by the post-merge review of PR #33 (commit d6daac8c5).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "auto-promote the Phase 3 design TODOs from the workflow",
+        "instead": "only generate the report",
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "why": "the human-judgment paragraph per metric is the safeguard against false-positive promotion"
+      },
+      {
+        "dont": "run the workflow on every push",
+        "instead": "quarterly + manual dispatch is correct",
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "why": "the cadence is what gives the metrics meaning"
+      },
+      {
+        "dont": "schedule the workflow on the first calendar day while documenting first Monday",
+        "instead": "use the 1-7 day cron plus Monday guard.",
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "why": "the cadence must be machine-checkable"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "needs_item": "define-phase-3-promotion-metrics"
+      }
+    ],
+    "item_meta": {
+      "category": "Tooling",
+      "completed_at": "2026-05-26T00:00:00Z",
+      "created_at": "2026-04-27T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Markdown output remains the default (the existing handoff file format)",
+        "item_id": "automate-phase2-metrics-quarterly-cadence"
+      },
+      {
+        "behavior": "Read-only: no GitHub writes from the metrics script itself; the workflow opens a PR but does not auto-merge",
+        "item_id": "automate-phase2-metrics-quarterly-cadence"
+      },
+      {
+        "behavior": "The decision rule (two thresholds, two consecutive quarters) stays in `_project/analysis/phase-3-promotion-metrics.md`, not the script",
+        "item_id": "automate-phase2-metrics-quarterly-cadence"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/nightly.yml and .github/workflows/release-canary.yml — existing scheduled workflow idioms; REUSE cron plus workflow_dispatch structure",
+        "decision": "reuse",
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "path": ".github/workflows/nightly.yml"
+      },
+      {
+        "concept": ".github/workflows/sync-results-data-to-published.yml and .github/workflows/seed-corpus.yml — existing GitHub Actions PR-creation flows; REUSE scoped write permissions and gh-cli PR creation rather than adding a bespoke GitHub client",
+        "decision": "reuse",
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "path": ".github/workflows/sync-results-data-to-published.yml"
+      },
+      {
+        "concept": "_project/handoffs/phase-3-review-baseline-2026-04-27.md — current markdown report shape; EXTEND with JSON sidecar/diff data without breaking markdown default output",
+        "decision": "extend",
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "path": "_project/handoffs/phase-3-review-baseline-2026-04-27.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      },
+      {
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "kind": "only_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "bash -o pipefail -c 'uv run -- python scripts/phase2_metrics.py --format json | uv run -- python -c \"import json,sys; json.load(sys.stdin)\"'",
+        "description": "JSON output validates as JSON",
+        "expected": "",
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -q '0 9 1-7 1,4,7,10 \\*' .github/workflows/phase3-promotion-review.yml && rg -q 'date -u \\+%u' .github/workflows/phase3-promotion-review.yml",
+        "description": "Workflow file exists and implements first-Monday quarterly cadence",
+        "expected": "cron and Monday guard are both present",
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/phase2_metrics.py | grep -c 'Trend vs'",
+        "description": "Diff section appears when at least two reviews exist",
+        "expected": ">= 1",
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "notes": "Today the script always emits markdown. Add `--format {markdown,json}`\nand emit a JSON object with: generated_at, repo, base_branch,\nresults: [{name, value, breached, threshold, note}],\nextraction_triggers: [...]. Markdown remains the default. The JSON\nshape is what the diff-vs-last-review step (w2) and the scheduled\ncheck (w3) consume.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `--format json` to phase2_metrics for automation consumers",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "notes": "Walk `_project/handoffs/phase-3-review-*.md` (or the JSON sidecars\nfrom w1), pick the most recent before today, and append a \"Trend\nvs <date>\" section to the report — per metric, value-then vs\nvalue-now, plus a status-change column (ok→BREACHED, etc.).\nThe \"two consecutive quarters\" hysteresis rule in\n`_project/analysis/phase-3-promotion-metrics.md` is the primary\nconsumer of this signal — surface it explicitly so the reviewer\ndoesn't have to diff manually.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Compute diff vs the most recent prior review",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "notes": "`.github/workflows/phase3-promotion-review.yml` runs on a cron of\n`0 9 1-7 1,4,7,10 *` plus a shell guard that exits unless\n`date -u +%u` is `1`. That implements \"first Monday of each\nquarter\" without relying on day-of-month/day-of-week OR semantics.\n`workflow_dispatch` remains available for manual recovery.\nStep 1: `uv run -- python scripts/phase2_metrics.py --output\n_project/handoffs/phase-3-review-$(date +%Y-%m-%d).md`.\nStep 2: open a PR titled `chore(phase-3): quarterly promotion review\n<date>` with the handoff committed. The maintainer reviews the PR\nand writes the one-paragraph interpretation per metric per the\nprocedure in `phase-3-promotion-metrics.md`, then merges or rejects.\nNo auto-merge — the human-judgment paragraph is the point.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a GitHub Actions workflow that runs the script quarterly",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "notes": "Optional flag for users who want to wire this into a non-quarterly\ncheck (e.g., a weekly cron during a high-throughput period). Off by\ndefault — the canonical use is quarterly review where the report is\nalways generated regardless of breach state.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `--exit-non-zero-on-breach` for ad-hoc CI gating",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "automate-phase2-metrics-quarterly-cadence",
+        "notes": "Update `_project/analysis/phase-3-promotion-metrics.md` \"Review\nCadence and Procedure\" section: replace step 2 (\"Run the metrics\nscript\") with \"Review the auto-generated PR titled <title-pattern>\"\nand document the manual fallback (`workflow_dispatch` if the cron\nmisses).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the automation in phase-3-promotion-metrics.md",
+        "wid": "w5"
+      }
+    ]
+  }
+}

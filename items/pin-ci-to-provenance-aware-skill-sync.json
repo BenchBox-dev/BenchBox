@@ -1,0 +1,84 @@
+{
+  "context": "Update the exact Git SHA in pr.yml, run the CI parity test, and execute the pinned npx verify command against this worktree.",
+  "description": "Full-diff review found required CI still pinned an older skill-sync revision even though this PR uses Git source subdirectories and lock provenance refresh behavior added by skill-sync PRs 8 and 9. Pin CI to the merged provenance-aware engine so the cloud verification path can read the committed manifest and lock.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pin-ci-to-provenance-aware-skill-sync",
+        "needs_item": "pin-benchbox-skill-source-and-restore-docs"
+      }
+    ],
+    "item_meta": {
+      "completed_at": "2026-07-28T16:20:25Z",
+      "completed_pr": 1318,
+      "created_at": "2026-07-28T15:20:47Z",
+      "worktree": "chore/agent-instruction-todos"
+    },
+    "preserves": [
+      {
+        "behavior": "CI uses an immutable full commit SHA and verifies the committed tracked mirror",
+        "item_id": "pin-ci-to-provenance-aware-skill-sync"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pin-ci-to-provenance-aware-skill-sync",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/system/test_ci_lint_parity.py -q -n 0",
+        "description": "CI parity test",
+        "expected": "exit 0",
+        "item_id": "pin-ci-to-provenance-aware-skill-sync",
+        "last_result": "pass",
+        "last_run": "2026-07-28T15:20:58Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "npx -y github:joeharris76/skill-sync#7e8926ae3ee03c8b0cc7c0fab498e5ed1917638b verify --project .",
+        "description": "pinned cloud verifier",
+        "expected": "exit 0",
+        "item_id": "pin-ci-to-provenance-aware-skill-sync",
+        "last_result": "pass",
+        "last_run": "2026-07-28T15:21:05Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pin-ci-to-provenance-aware-skill-sync",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Commit 6919f5f2d pins required CI to merged skill-sync PR 9 commit 7e8926ae3ee03c8b0cc7c0fab498e5ed1917638b.",
+        "item_id": "pin-ci-to-provenance-aware-skill-sync",
+        "notes": null,
+        "started_at": "2026-07-28T15:20:53Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Update required CI to merged skill-sync PR 9 SHA",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Exact npx Git-SHA command verified the tracked Claude snapshot; tests/system/test_ci_lint_parity.py passed.",
+        "item_id": "pin-ci-to-provenance-aware-skill-sync",
+        "notes": null,
+        "started_at": "2026-07-28T15:20:55Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Verify the exact pinned cloud command",
+        "wid": "w2"
+      }
+    ]
+  }
+}

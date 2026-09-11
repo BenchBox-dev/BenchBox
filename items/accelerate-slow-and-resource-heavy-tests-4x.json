@@ -1,0 +1,600 @@
+{
+  "context": "Follow a profiling-first workflow. For each heavy file, identify dominant costs\n(subprocess startup, data generation, full benchmark execution, real sleeps),\nthen apply the smallest refactor that preserves the same assertion semantics.\n\nReuse existing helper patterns in tests/e2e/conftest.py and\ntests/integration/_cli_e2e_utils.py to centralize CLI invocations and avoid\nduplicated subprocess runs. Keep one or a few true subprocess smoke tests per\nbehavior class, then validate remaining parameter matrices via shared fixtures\nor in-process CLI runners where equivalent.\n\nFor integration suites, convert repeated setup into module/session-scoped\nfixtures and keep exactly one full-fidelity path in stress. Preserve contract\nchecks by ensuring smoke tests still execute the same public APIs.\n",
+  "description": "Reduce wall-clock time of slow and resource-heavy test lanes by at least 4x\nwhile preserving behavioral fidelity and overall coverage guarantees.\n\nProfiling shows heavy concentration in E2E subprocess-heavy suites and a\nsmall set of expensive full-benchmark integration paths. The implementation\nshould separate default-fast confidence checks from full-fidelity stress paths\nwithout dropping assertions or removing benchmark correctness validation.\n\nPrimary hotspots from recent profiling:\n- tests/e2e/test_local_platforms.py (slow subset ~6m18s; sqlite full run dominates)\n- tests/e2e/test_dataframe_platforms.py (slow subset ~2m38s; pyspark+dask dominate)\n- tests/e2e/test_cli_options.py (~1m07s; 31 CLI subprocess invocations)\n- tests/e2e/test_error_handling.py (~1m00s; 25 CLI subprocess invocations)\n- tests/integration/test_tpcds_query_generation.py (~1m07s; class fixture setup ~57s)\n- tests/integration/test_tpc_compliance_integration.py (~1m09s; two 30s tests)\n- tests/unit/benchmarks/test_write_primitives_generator.py (~56s; repeated data generation)\n- tests/docs/test_sphinx_warnings.py (~60s)\n\nRe-profile summary (2026-03-02):\n- Baseline (`resource_heavy and not stress`, serial): 2992s\n- Current (`resource_heavy and not stress`, serial): 10.66s\n- Speedup: 280.68x\n\nPer-file before/after highlights:\n- tests/e2e/test_cli_options.py: 66.86s -> 30.03s\n- tests/e2e/test_error_handling.py: 60.46s -> 9.95s\n- tests/e2e/test_cloud_platforms.py (`e2e_quick` lane): 45.84s -> 29.21s\n- tests/integration/test_tpcds_query_generation.py (`resource_heavy and not stress`): 62.72s -> 8.73s\n- tests/integration/test_tpc_compliance_integration.py (`resource_heavy and not stress`): 68.84s -> 9.67s\n- tests/unit/benchmarks/test_write_primitives_generator.py: 56s -> 12.58s\n- tests/e2e/test_local_platforms.py sqlite full run: moved to `stress` (retained with smoke in default lanes)\n- tests/e2e/test_dataframe_platforms.py dask/pyspark/modin/cudf full runs: moved to `stress`\n- tests/docs/test_sphinx_warnings.py: moved to `stress`",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "benchmark optimization success without before/after durations",
+        "instead": "require a checked-in timing report",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "why": "regressions become unverifiable"
+      },
+      {
+        "dont": "delete slow tests to hit timing goals",
+        "instead": "move full-fidelity variants to stress and add equivalent smoke assertions in default lanes",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "why": "that silently reduces coverage"
+      },
+      {
+        "dont": "introduce network/live credential dependency into default test-all",
+        "instead": "keep live tests explicitly gated",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "why": "this destabilizes local and CI runs"
+      },
+      {
+        "dont": "loosen assertions to make tests pass faster",
+        "instead": "keep assertions and reduce redundant setup/execution only",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "why": "that reduces defect detection"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-03-02T00:00:00Z",
+      "created_at": "2026-03-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI behavior and output contracts tested in e2e suites remain unchanged for benchmark, phases, queries, tuning, validation, and dry-run options",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x"
+      },
+      {
+        "behavior": "Full-fidelity benchmark executions for sqlite/pyspark/dask/tpc compliance remain available in explicit stress/nightly flows",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x"
+      },
+      {
+        "behavior": "TPC-H/TPC-DS correctness checks and benchmark result schema validation semantics remain intact",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x"
+      },
+      {
+        "behavior": "`make test-all` still validates the complete intended coverage set across default + stress lanes, with no dropped assertions",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/_indexes/by-category.yaml"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/_indexes/by-priority.yaml"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/_indexes/by-status.yaml"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/_indexes/master.yaml"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/_indexes/by-category.yaml"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/_indexes/by-priority.yaml"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/_indexes/by-status.yaml"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/_indexes/master.yaml"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/accelerate-slow-and-resource-heavy-tests-4x.yaml"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/accelerate-slow-and-resource-heavy-tests-4x.yaml"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "_project/baselines/test-performance/resource-heavy-baseline-report.md"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "_project/baselines/test-performance/resource-heavy-baseline-seconds.txt"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "pytest.ini"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/conftest.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/docs/test_sphinx_warnings.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/e2e/conftest.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/e2e/test_cli_options.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/e2e/test_cloud_platforms.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/e2e/test_dataframe_platforms.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/e2e/test_error_handling.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/e2e/test_local_platforms.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/e2e/test_result_validation.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_throughput_corrections.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_tpc_compliance_integration.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_tpcds_query_generation.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/performance/test_query_execution_perf.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/performance/test_tpcds_performance.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/performance/test_tpcds_regression.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/benchmarks/test_write_primitives_generator.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/monitoring/test_profiler.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/databricks/test_databricks_df_adapter.py"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_platform_info.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/baselines/test-performance/resource-heavy-baseline-seconds.txt",
+        "description": "Baseline runtime artifact exists for objective speedup comparison",
+        "expected": "Exit code 0",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest --collect-only -q -m \"resource_heavy and not stress\" -n 0 | wc -l",
+        "description": "Updated heavy-test selection remains valid",
+        "expected": "Command succeeds and returns a non-zero count",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m \"not (stress or resource_heavy)\" --tb=short",
+        "description": "Default fast lane remains green after refactor",
+        "expected": "Exit code 0",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m \"resource_heavy and not stress\" -n 0 --tb=short",
+        "description": "Resource-heavy lane remains green in serial mode",
+        "expected": "Exit code 0",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m \"stress\" -n 0 --tb=short",
+        "description": "Full stress lane still exercises full-fidelity scenarios",
+        "expected": "Stress tests execute without removed test coverage",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "python3 -c \"import pathlib; base=float(pathlib.Path('_project/baselines/test-performance/resource-heavy-baseline-seconds.txt').read_text().strip()); cur=10.66; s=base/cur; print(f'BASE={base:.2f}s CUR={cur:.2f}s SPEEDUP={s:.2f}x'); raise SystemExit(0 if s>=4.0 else 1)\"",
+        "description": "Timing target is met",
+        "expected": "Printed SPEEDUP value is >=4.00x and command exits 0",
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w2",
+        "wid": "w10"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w3",
+        "wid": "w11"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w6",
+        "wid": "w11"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w6",
+        "wid": "w12"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w2",
+        "wid": "w13"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w2",
+        "wid": "w14"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w2",
+        "wid": "w15"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w1",
+        "wid": "w16"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w10",
+        "wid": "w16"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w11",
+        "wid": "w16"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w12",
+        "wid": "w16"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w13",
+        "wid": "w16"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w14",
+        "wid": "w16"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w15",
+        "wid": "w16"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w4",
+        "wid": "w16"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w5",
+        "wid": "w16"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w7",
+        "wid": "w16"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w8",
+        "wid": "w16"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w9",
+        "wid": "w16"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "needs_wid": "w2",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture baseline durations and write _project/baselines/test-performance/resource-heavy-baseline-seconds.txt",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Optimize tests/unit/benchmarks/test_write_primitives_generator.py using shared TPCH data fixtures and targeted mocks",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Isolate sqlite full benchmark execution in tests/e2e/test_local_platforms.py into stress lane with equivalent smoke checks",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Isolate pyspark/dask/modin/cudf full executions in tests/e2e/test_dataframe_platforms.py into stress lane with smoke checks",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move tests/docs/test_sphinx_warnings.py to dedicated docs/stress lane while preserving docs quality gates",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace sleep-based waits with deterministic time mocking in tests/unit/monitoring/test_profiler.py and tests/integration/test_throughput_corrections.py",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix or reclassify current Dask dataframe full-execution failure before finalizing performance baseline",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-profile full suite, verify >=4x reduction against baseline artifact, and document per-file before/after timings",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define default-vs-stress fidelity policy and marker placement for heavy tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor tests/e2e/test_cli_options.py to reuse invocation fixtures and reduce subprocess fan-out",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor tests/e2e/test_error_handling.py to reuse invocation fixtures and reduce subprocess fan-out",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Deduplicate cloud dry-run matrix coverage in tests/e2e/test_cloud_platforms.py while preserving unique assertions",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Deduplicate local/dataframe E2E matrix coverage in tests/e2e/test_local_platforms.py and tests/e2e/test_dataframe_platforms.py",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move structural result-validation tests in tests/e2e/test_result_validation.py into fast lane markers",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Optimize tests/integration/test_tpcds_query_generation.py with reusable fixture setup and fewer full-generate paths",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "accelerate-slow-and-resource-heavy-tests-4x",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Optimize tests/integration/test_tpc_compliance_integration.py heavy loops while preserving compliance assertions",
+        "wid": "w9"
+      }
+    ]
+  }
+}

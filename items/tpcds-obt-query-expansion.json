@@ -1,0 +1,10 @@
+{
+  "description": "Convert all 93 convertible TPC-DS queries to work with the One Big Table (OBT) schema. 87 via automatic conversion, 6 via manual rewrites. 6 queries blocked (inventory).",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "benchmark-expansion"
+    }
+  }
+}

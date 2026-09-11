@@ -1,0 +1,97 @@
+{
+  "context": "Add node_modules to the codespell --skip list in the Makefile spellcheck target (and consider results-explorer/dist and other generated JS output). Prefer making codespell ignore-file aware, or driving the skip list from .gitignore, over hand-maintaining a parallel exclusion list that will drift again. Do NOT weaken --ignore-words.",
+  "description": "Supersedes spellcheck-node-modules-skip-never-landed (dropped only to attach a work breakdown; same finding). spellcheck-scans-gitignored-node-modules is marked done, but the fix is not in the tree and that item's own verification rung ('make spellcheck exits 0 with node_modules present') fails. Makefile:942 passes a --skip list with no node_modules and no results-explorer entry, and codespell does not honour .gitignore. Reproduced on develop @ 74aee99: creating results-explorer/node_modules/pkg/index.js containing 'recieve teh occured' makes make spellcheck report three hits and exit non-zero (Error 65). Impact: make pr-preflight is red for every developer who has installed the results-explorer npm deps, which trains people to ignore a real gate. Either the fix was reverted or the item was completed without it landing.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-30T19:26:54Z",
+        "from_item": "spellcheck-node-modules-skip-never-landed-v2",
+        "id": 670,
+        "reason": "Same defect class as node_modules but a different path, and outside this item's node_modules-scoped title. Evidence: .gitignore:72 ignores '@~/', yet codespell scans ./@~/benchbox/dists.dss and make spellcheck exits 65 in /Users/joe/Developer/BenchBox on 2026-07-30 (5+ hits: psuedo, whithout, auxillaries, setence). Not reproducible in pool worktrees because @~/ is a main-clone-only stray directory, which is why CI and worktree runs stay green and only the primary clone is red.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Not dropped - TRACKED at spellcheck-scans-gitignored-at-tilde-dir (created 2026-07-30 with the full deferral content: description, approach, scope, 2 preserves, 2 work units, 2 verification rungs). Dismissed rather than promoted only because the item was created directly a moment before the promote call, and promote --to-item has no link-to-existing mode; re-promoting would have required dropping the item, which is terminal and reserves the slug forever. No work is lost.",
+        "summary": "make spellcheck still scans the gitignored @~/ directory, so it fails in the primary clone"
+      }
+    ],
+    "item_meta": {
+      "category": "ci-infrastructure",
+      "completed_at": "2026-07-30T19:28:26Z",
+      "completed_pr": 1348,
+      "created_at": "2026-07-30T12:08:01Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Real source-tree typos are still caught; --ignore-words behaviour unchanged",
+        "item_id": "spellcheck-node-modules-skip-never-landed-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "spellcheck-node-modules-skip-never-landed-v2",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "mkdir -p results-explorer/node_modules/pkg && printf 'recieve teh occured\\n' > results-explorer/node_modules/pkg/index.js && make spellcheck; rc=$?; rm -rf results-explorer/node_modules; exit $rc",
+        "description": "spellcheck passes with gitignored node_modules present",
+        "expected": "exit 0",
+        "item_id": "spellcheck-node-modules-skip-never-landed-v2",
+        "last_result": "pass",
+        "last_run": "2026-07-30T19:27:09Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "spellcheck-node-modules-skip-never-landed-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "spellcheck-node-modules-skip-never-landed-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on current develop (pool-09 @ HEAD, includes 1e9b26413/#1348): the item's rung 1 now EXITS 0. make spellcheck passes with a gitignored results-explorer/node_modules/pkg/index.js containing 'recieve teh occured' present.",
+        "item_id": "spellcheck-node-modules-skip-never-landed-v2",
+        "notes": null,
+        "started_at": "2026-07-30T19:26:38Z",
+        "started_branch": "fix/spellcheck-node-modules-skip-verify",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Re-validate that make spellcheck still fails with gitignored node_modules present on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Already landed by PR #1348 (1e9b26413, 'fix(ci): skip gitignored node_modules in the spellcheck gate'). Makefile:947 codespell --skip list now ends in ',node_modules'. No further change needed.",
+        "item_id": "spellcheck-node-modules-skip-never-landed-v2",
+        "notes": null,
+        "started_at": "2026-07-30T19:26:42Z",
+        "started_branch": "fix/spellcheck-node-modules-skip-verify",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Add node_modules and other generated JS output to the codespell skip list",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Ran the original item's rung with node_modules present - the check that was never performed. Command: mkdir -p results-explorer/node_modules/pkg && printf 'recieve teh occured' > .../index.js && make spellcheck -> exit 0, output 'Spellcheck passed'. Cleanup removed the fixture.",
+        "item_id": "spellcheck-node-modules-skip-never-landed-v2",
+        "notes": null,
+        "started_at": "2026-07-30T19:26:50Z",
+        "started_branch": "fix/spellcheck-node-modules-skip-verify",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Re-run the original item's rung with node_modules present - the check that was never performed",
+        "wid": "w2"
+      }
+    ]
+  }
+}

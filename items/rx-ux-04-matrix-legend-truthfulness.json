@@ -1,0 +1,157 @@
+{
+  "context": "Rewrite the three per-mode legend strings to match lightnessForCell's direction. Add a unit test asserting the legend text against the direction the function implements, so copy and math cannot diverge. No change to chartMath.ts and no change to the parity fixtures.",
+  "description": "In `times` mode the landing matrix legend reads 'Heat: darker = faster within each ranking' (MetaLeaderboard.tsx:250). The rendering does the opposite: lightnessForCell maps fastest to 95% lightness and 10x slower to 25% (chartMath.ts:199-204), so darker is SLOWER. BenchmarkIndex's legend is correct. The landing page therefore misteaches its own encoding to every first-time reader.\n\nAn earlier plan proposed inverting the heat scale to match the legend. All three reviewers rejected that: it would break Python/TypeScript parity fixtures, invert the working QueryHeatmap, and cross dark mode, reduced-colour and forced-contrast paths. The fix is the legend text, and a test that stops the two drifting again.\n\nAlso correct the speedup-mode legend: it says 'darker = closer to ranking best (>=1.00x)', but the convention caps the best at exactly 1.00x, so >= is wrong.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the default matrix mode as part of this item",
+        "instead": "leave the default to rx-ux-00 D1",
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "why": "the default is a documented contract in results-explorer-qa.md S2.2"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "invert the heat scale so darker means better",
+        "instead": "fix the legend copy",
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "why": "the scale is pinned by Python/TypeScript parity fixtures and shared with QueryHeatmap"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T17:17:25Z",
+      "completed_pr": 1813,
+      "created_at": "2026-08-22T14:48:52Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Heat direction: lightnessForCell maps fastest to 95% lightness and 10x slower to 25% (chartMath.ts:199-204), pinned by tests/parity/fixtures/lightness_for_cell.json. Darker means slower/worse in BOTH MetaLeaderboard and QueryHeatmap. Do not invert it.",
+        "item_id": "rx-ux-04-matrix-legend-truthfulness"
+      },
+      {
+        "behavior": "QueryHeatmap's legend, which is already correct",
+        "item_id": "rx-ux-04-matrix-legend-truthfulness"
+      },
+      {
+        "behavior": "docs/operations/results-explorer-qa.md S2.2 pins three matrix modes with `times` as default and `?mode=` as URL state.",
+        "item_id": "rx-ux-04-matrix-legend-truthfulness"
+      },
+      {
+        "behavior": "tests/parity/fixtures/lightness_for_cell.json stays byte-identical",
+        "item_id": "rx-ux-04-matrix-legend-truthfulness"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/chartMath.ts"
+      },
+      {
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "kind": "do_not_modify",
+        "path_glob": "tests/parity/fixtures/**"
+      },
+      {
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/chartTheme.test.ts"
+      },
+      {
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:17:21Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git -C /Users/joe/Developer/BenchBox status --short tests/parity/fixtures",
+        "description": "Chart parity fixtures unchanged",
+        "expected": "empty output",
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:17:21Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run src/__tests__/chartTheme.test.ts",
+        "description": "Legend direction test fails if the legend is reverted",
+        "expected": "legend-direction assertions pass",
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:17:24Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "MetaLeaderboard legend now says darker = worse for times and ranks; targeted component tests pass",
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "notes": null,
+        "started_at": "2026-08-22T17:08:23Z",
+        "started_branch": "fix/rx-ux-04-matrix-legend",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-04-matrix-legend",
+        "status": "done",
+        "summary": "Rewrite times/ranks/speedup legend strings to match rendering",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Speedup legend names exactly 1.00x as ranking best and below-1.00x values as worse; targeted tests pass",
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "notes": null,
+        "started_at": "2026-08-22T17:08:26Z",
+        "started_branch": "fix/rx-ux-04-matrix-legend",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-04-matrix-legend",
+        "status": "done",
+        "summary": "Correct the speedup legend's >=1.00x wording to 1.00x",
+        "wid": "w2"
+      },
+      {
+        "evidence": "MetaLeaderboard copy assertions and chartTheme lightness direction assertion pass: 38 targeted tests",
+        "item_id": "rx-ux-04-matrix-legend-truthfulness",
+        "notes": null,
+        "started_at": "2026-08-22T17:09:52Z",
+        "started_branch": "fix/rx-ux-04-matrix-legend",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-04-matrix-legend",
+        "status": "done",
+        "summary": "Test pinning legend text against lightnessForCell direction",
+        "wid": "w3"
+      }
+    ]
+  }
+}

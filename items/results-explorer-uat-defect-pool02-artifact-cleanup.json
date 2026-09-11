@@ -1,0 +1,168 @@
+{
+  "description": "The 2026-05-05 tuned UAT sweep wrote runtime artifacts under the\nworktree-local `benchmark_runs/` because `BENCHBOX_OUTPUT_DIR` was not\npropagated to `benchbox run` subprocesses. Results have been mirrored\ninto the shared `~/Developer/benchmark_runs/` (handoff confirms 0\nmissing JSONs post-copy), so the pool-02 tree is now redundant.\n\nPool-local artifacts to reclaim:\n\n  - `/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen` — 8.6 GiB\n  - `/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases` — 21 GiB\n  - Total — 29.6 GiB\n\nSource: `_project/handoffs/results-explorer-uat-tuned-followup-20260505.md`\n(\"Runtime Path Audit\" + \"Consolidation performed\"). Follow-up to PR #235.\n\n**Status: Completed after explicit user approval.** This was a destructive\nfilesystem operation, limited to the pool-02 `datagen` and `databases`\ntrees. The `results` tree was preserved.\n\nThe propagation defect itself was fixed in PR #235 (UAT execute now\npasses a non-worktree root as `BENCHBOX_OUTPUT_DIR`), so future sweeps\nwill not recreate this situation. This TODO is purely about the\none-time cleanup.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "chain deletion to the worktree-pool-sweep-stale workflow",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "why": "that operates on stale claims; this is a one-time artifact cleanup."
+      },
+      {
+        "dont": "generalize this TODO into a recurring sweep job",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "why": "the propagation bug is fixed, future sweeps will not write to pool-local paths, so a recurring cleanup masks rather than surfaces any regression."
+      },
+      {
+        "dont": "run `rm -rf` without the verification step (w1) confirming results are mirrored, because a single missed result JSON is unrecoverable and breaks the corpus inventory.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "needs_item": "results-explorer-uat-defect-disk-budget-resume-plan"
+      }
+    ],
+    "item_meta": {
+      "category": "Operations",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-06T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cross-pool symmetry — do not delete other pools' artifacts as a side effect.",
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup"
+      },
+      {
+        "behavior": "Pool-02 result JSONs under `benchmark_runs/results/` until corpus integration is closed.",
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup"
+      },
+      {
+        "behavior": "Pool-02 worktree itself (release via `make worktree-release` is a separate operation).",
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/results/ in any worktree"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test ! -d /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen && echo OK",
+        "description": "Pool-02 datagen tree is gone",
+        "expected": "OK",
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test ! -d /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases && echo OK",
+        "description": "Pool-02 databases tree is gone",
+        "expected": "OK",
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "ls ~/Developer/benchmark_runs/results | wc -l",
+        "description": "Result JSONs still present in shared root",
+        "expected": ">= 183 (the count from the handoff)",
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "df -h /Users/joe/Developer/BenchBox.pool-02 | tail -1",
+        "description": "Pool-02 free disk recovered (target: ~30 GiB more free than pre-cleanup)",
+        "expected": "non-empty; capture in verification log",
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "notes": "Evidence-durability gate per `_project/verification-logs/README.md`.\nThe handoff anchors this TODO to a specific 29.6 GiB footprint;\ncapture the current footprint so the reviewer-days-later (or the\noperator approving the destructive op) sees the live size, not a\nstale citation:\n\n  du -sh /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen \\\n          /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases \\\n          /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/results\n  df -h /Users/joe/Developer/BenchBox.pool-02\n\nCapture stdout under\n`_project/verification-logs/results-explorer-uat-defect-pool02-artifact-cleanup/w0.log`\nand commit. Also confirms the trees still exist — if the\n`disk-budget-resume-plan/w1` inventory already harvested everything\nit needs, this w0 confirms it BEFORE deletion is requested.\n\nCaptured current footprint before approval: datagen 3.1 MiB,\ndatabases 36 KiB, results 24 KiB. The original 29.6 GiB had already\nbeen mostly reclaimed before this PR reached the destructive step.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate cited disk footprint before any cleanup",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "notes": "Repeat the post-copy diff from the handoff:\n  diff <(ls /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/results) \\\n       <(ls ~/Developer/benchmark_runs/results)\nExpected: every pool-02 result JSON has a same-name counterpart in\nthe shared root. If anything is missing, copy it BEFORE w2.\n\nMirror check found 6 pool-local JSONs not yet present in the shared\nroot; copied those 6 files to `~/Developer/benchmark_runs/results/`\nand re-ran the diff to a clean result before deletion.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify pool-02 result JSONs are still mirrored to the shared root before removal",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "notes": "Hard prerequisite: `results-explorer-uat-defect-disk-budget-resume-plan/w1`\n(per-platform/benchmark/scale disk inventory) must have completed.\nThat work unit harvests data from these exact trees; deleting them\nfirst destroys its source. The `deps.needs` edge above gates the\nwhole cleanup TODO on that ancestor TODO, but call it out here too\nso a single-work-unit operator sees the constraint inline.\n\nOperator command (run only after the user authorizes AND\ndisk-budget-resume-plan/w1 is done):\n  rm -rf /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen\n  rm -rf /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases\nCapture before/after `du -sh` to a verification log.\nDo NOT rm `benchmark_runs/results` — those JSONs are the run record\nand stay until the corpus integration is closed out.\n\nUser approval was received in chat (`Approve`) on 2026-05-07. Removed\nonly `/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen`\nand `/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "After explicit user approval, remove the pool-02 datagen and databases trees",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-pool02-artifact-cleanup",
+        "notes": "`df -h /Users/joe/Developer/BenchBox.pool-02` and\n`make worktree-pool-status` should show pool-02 healthy.\nUpdate the handoff with the final reclaimed-bytes figure.\n\nFinal verification: both target trees are gone, pool-02 results remain\npresent, and the shared results root contains 2634 entries. Reclaimed\nfrom the approved deletion itself was ~3.1 MiB + 36 KiB because the\npreviously cited 29.6 GiB footprint had already been reduced.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm pool-02 free disk recovered and the worktree is reusable",
+        "wid": "w3"
+      }
+    ]
+  }
+}

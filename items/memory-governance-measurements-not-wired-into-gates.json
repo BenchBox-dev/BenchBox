@@ -1,0 +1,166 @@
+{
+  "context": "Wire each measurement into the path that would actually consult it, and make the packet-facing ones visible in the scored report rather than only on demand. Prefer surfacing over blocking: these are diagnostics and freshness signals, and turning a heuristic into a categorical gate failure is the defect this effort has repeatedly hit. Fix the mtime and empty-report holes with content hashing and an explicit unguarded-report case.",
+  "description": "The 2026-08-03 batch added four integrity measurements and left all four as library functions no automated path calls, verified by inspecting the CLI entrypoints: identity_drift (cross-generation environment drift) is absent from behavioral audit main; class_coverage and candidate_staleness are absent from the Codex audit CLI; and the per-run prose_verification_conflict diagnostic is emitted on every scored run but never aggregated or surfaced in the report. A measurement nothing runs is a measurement that silently rots, and the facts they expose are exactly the ones a promotion packet must not omit - the v5 candidate being stale against 49 changed live files, and 5 of 6 gate-exercised record classes being absent from the artifact under promotion. Two smaller defects from the same batch belong here: candidate_staleness compares mtimes, so touching a file without changing content reports false staleness; and _refuse_clobber returns without guarding when the existing report has no scores key or an empty one, leaving a report that was once written empty permanently unprotected.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "completed_at": "2026-08-04T12:46:08Z",
+      "created_at": "2026-08-04T11:58:51Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Committed evidence, isolation manifests, and scored reports keep their values",
+        "item_id": "memory-governance-measurements-not-wired-into-gates"
+      },
+      {
+        "behavior": "Diagnostics stay diagnostics; no text heuristic becomes a categorical gate failure",
+        "item_id": "memory-governance-measurements-not-wired-into-gates"
+      },
+      {
+        "behavior": "Live Codex and Claude memory and settings remain byte-unchanged",
+        "item_id": "memory-governance-measurements-not-wired-into-gates"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v3/**"
+      },
+      {
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v4/**"
+      },
+      {
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v5/**"
+      },
+      {
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/**"
+      },
+      {
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q -k wiring",
+        "description": "Every new measurement is reachable from a CLI entrypoint",
+        "expected": "Tests assert each measurement is invoked by an audit or score entrypoint rather than only importable",
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling/codex -- python -m pytest memory_tooling/codex/tests -q -k staleness",
+        "description": "Staleness survives a content-preserving touch",
+        "expected": "A touched but unchanged file no longer reports the candidate stale",
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && ./evaluation_runs/run-all-tests.sh",
+        "description": "All suites stay green",
+        "expected": "Every project's suite passes under one command",
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "a6bb8e8: behavioral audit --check-evaluation-isolation emits identity_drift against every generation on disk; codex audit --strict emits class_coverage and candidate_staleness. Pinned by tests/scorers -k wiring (5 passed).",
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "notes": null,
+        "started_at": "2026-08-04T12:45:51Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Surface identity_drift, class_coverage, and candidate_staleness through the audit CLIs so a packet author cannot omit them",
+        "wid": "w0"
+      },
+      {
+        "evidence": "a6bb8e8: score.diagnostics() rolls prose_verification_conflict into report.diagnostics with is_blocker=false; test_wiring_diagnostics_never_become_promotion_blockers pins that it never contributes a blocker.",
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "notes": null,
+        "started_at": "2026-08-04T12:45:54Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Aggregate the prose_verification_conflict diagnostic into the scored report so flagged runs are visible without re-reading every record",
+        "wid": "w1"
+      },
+      {
+        "evidence": "a6bb8e8: candidate_staleness compares source_snapshot_sha256 (content hashes) instead of mtimes; test_candidate_staleness_survives_a_content_preserving_touch passes with mtime forced +10000s. Candidate schema 6 pins source_snapshot_sha256 + source_files.",
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "notes": null,
+        "started_at": "2026-08-04T12:38:01Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Compare source content hashes rather than mtimes so a touched file does not report false staleness",
+        "wid": "w2"
+      },
+      {
+        "evidence": "a6bb8e8: _refuse_clobber now guards on 'scores' key presence rather than a truthy run set, so an all-evidence-unavailable report is protected; test_clobber_guard_protects_a_report_that_scored_nothing.",
+        "item_id": "memory-governance-measurements-not-wired-into-gates",
+        "notes": null,
+        "started_at": "2026-08-04T12:45:59Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Close the clobber-guard hole where an existing report with no scores is treated as unprotected",
+        "wid": "w3"
+      }
+    ]
+  }
+}

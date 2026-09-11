@@ -1,0 +1,233 @@
+{
+  "context": "Use the router/location source already used by the app instead of reading\n`window.location` once at module render time. Keep the pivot controls\ncompact and local to the current detail page; do not create new index or\nlanding pages.\n",
+  "description": "Correct stale navigation indicators and add sibling-pivot controls on detail\npages so users can switch benchmark/platform context without backing out to\nan index. Defects this item addresses were flagged in the 2026-05-08\nResults Explorer follow-up review (chat-only artifact, not committed to\n_project/audits/). w0 rebinds the review evidence against develop tip and\ncaptures it to\n_project/verification-logs/results-explorer-navigation-and-pivot-controls/w0.log\nbefore any other work unit runs; that log replaces the previous \"review row\n#3/#6/#7/#32\" citations as the durable reference.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add sibling links that drop the user into a 404 or empty dataset for valid choices.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "solve stale nav with full-page reloads.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend UX",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Breadcrumb links back to `/results/`.",
+        "item_id": "results-explorer-navigation-and-pivot-controls"
+      },
+      {
+        "behavior": "Existing result URLs and static-export routes.",
+        "item_id": "results-explorer-navigation-and-pivot-controls"
+      },
+      {
+        "behavior": "Keyboard access to nav and switcher controls.",
+        "item_id": "results-explorer-navigation-and-pivot-controls"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "kind": "do_not_modify",
+        "path_glob": "Result snapshot generation unless switcher data is missing from exported metadata."
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/Layout.tsx"
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/components/__tests__/Layout.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Home.test.tsx",
+        "description": "Targeted navigation and pivot tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: browser-check /results/query, /results/tpch/, and /results/p/polars/ for active nav and sibling switching'",
+        "description": "Manual nav browser check is complete",
+        "expected": "manual evidence captured in PR notes or audit artifact",
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "notes": "Routes walked against develop tip 6c28d2b45 in\n_project/verification-logs/results-explorer-navigation-and-pivot-controls/w234.log.\nThe original w0.log captured Layout subnav reactivity defects that\nshipped via #284 (w1). The fresh log covers w2/w3/w4: benchmark\nswitcher absence, platform switcher absence, and Home filter\nplacement.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rebind navigation and pivot review evidence against develop tip",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "notes": "Shipped in #284. `Layout.tsx` now consumes `useRouter` so the\nactive-tab class updates on every client-side route change.\nLayout regression test added in the same PR keeps the contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make the Results subnav active state reactive to route changes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "notes": "`BenchmarkIndex.tsx` grew a `<select data-testid=\"benchmark-switcher\">`\nin the controls strip beside the existing Scale/Phase/Tuning/Trust\nfilters. Options come from `BENCHMARK_LABELS` deduplicated by display\nlabel so SSB and TSBS DevOps each list once (canonical slug wins).\nSelecting a sibling calls `route(\"/results/<slug>/\")`, preserving\n`view=` because UI mode is benchmark-agnostic and dropping\nbenchmark-specific params (sf, phase, tuning, trust). New regression\ntest in `src/pages/__tests__/BenchmarkIndex.test.tsx` asserts the\nswitcher routes to the chosen sibling and clears the\nbenchmark-specific query params. Verification log:\n_project/verification-logs/results-explorer-navigation-and-pivot-controls/w234.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a benchmark switcher to Benchmark detail pages",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "notes": "`PlatformIndex.tsx` grew a `<select data-testid=\"platform-switcher\">`\nin the controls strip beside the existing Tuning filter. Options\ncome from the unique `(platform_id, platform)` pairs in the loaded\n`getPlatformIndexRows()` payload so the list reflects what the\ncorpus actually contains. Selecting a sibling calls\n`route(\"/results/p/<platform_id>/\")` without preserving tuning\n(platform-specific). New regression test in\n`src/pages/__tests__/PlatformIndex.test.tsx`. Verification log:\n_project/verification-logs/results-explorer-navigation-and-pivot-controls/w234.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a platform switcher to Platform detail pages",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "notes": "`Home.tsx` now renders the \"Leaderboard cohort selector\"\n`<section>` immediately above `<MetaLeaderboard>` in the main\ncontent column. The hero's `ActiveLeaderboardSummary` (read-state)\nstays where it was; pairing it with the editable filter section\ndirectly above the matrix gives the user a top-of-page edit path\nwithout scrolling. `<CoverageEmptyState>` remains in the matrix\nslot so the empty hint stays where the matrix would have been.\nThe Home document-order test was updated to assert\n`selector → leaderboard → workflow/recent` (the previous order\n`leaderboard → selector` directly contradicted w4's intent — no\nassertion was weakened, only the ordering relationship was\ninverted to match the new contract). Verification log:\n_project/verification-logs/results-explorer-navigation-and-pivot-controls/w234.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Home leaderboard filters above the affected matrix",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-navigation-and-pivot-controls",
+        "notes": "Add regression tests for SPA subnav updates, benchmark switcher\nrouting, platform switcher routing, and Home filter placement/state.\nInclude a browser smoke check that active nav does not remain on\nLeaderboards after opening Query.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover nav and sibling pivots with regression tests",
+        "wid": "w5"
+      }
+    ]
+  }
+}

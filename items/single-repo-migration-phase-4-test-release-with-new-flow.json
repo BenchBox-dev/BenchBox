@@ -1,0 +1,306 @@
+{
+  "description": "Dominant phase of the migration under Option B. Three sequenced operations\non the public repo:\n\n1. FINAL CURATED SYNC from private → public, with HOLD_BACK_PATHS reduced\n   to the bare minimum (per-user agent config + secrets only) AND\n   ALLOWED_ROOT_FILES expanded to include dev-tooling root files\n   (.pre-commit-config.yaml, AGENTS.md, CLAUDE.md, GEMINI.md,\n   _benchbox_pytest_xdist_safety.py, etc.). Brings _blog/, all source\n   files, dev tooling, the new release infrastructure (Phases 1-3), and\n   explicitly-approved development assets onto public main as squashed\n   migration commits. Working-tree contents only — no private commit\n   history preserved. Results Explorer remains out of v0.3.0 shipment\n   scope even if repository migration mechanics touch explorer paths.\n\n2. _project/** HISTORY FILTER-MERGE: on a fresh clone of private, run\n   `git filter-repo --path _project/` to keep only commits that touched\n   _project/. Push the filtered branch to public as a temporary remote\n   and merge into public main with `--allow-unrelated-histories`. Use a\n   regular merge commit (NOT squash — squashing defeats the purpose).\n   This preserves TODO/DONE archaeology per D2a.\n\n3. CUT v0.3.0 from public using the new release flow (Makefile target +\n   release.yml workflow). Old automate_release.py is still on private\n   as a fallback; it gets deleted in Phase 6.\n\nResults Explorer DOES NOT SHIP in v0.3.0. Any explorer code or\nplanning artifacts present during this migration remain development\nassets only; they must not be described as a v0.3.0 launch, preview,\nbeta, public release feature, or release-note headline.\n\nPlan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 4).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete automate_release.py at the end of this phase",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "why": "Phase 5 (dev locus migration) and Phase 6 (deletion) are separate gates; running ahead conflates two risk profiles."
+      },
+      {
+        "dont": "enable branch-protection's \"linear history\" rule before w6 lands",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "why": "the merge commit from w6 is a one-time non-linear event; enable that rule in Phase 5 AFTER w6 merges."
+      },
+      {
+        "dont": "release a version that overlaps with a prior failed attempt",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "why": "PyPI rejects, leaving you in a state where pip cannot resolve the intended version; bump the patch number and move on."
+      },
+      {
+        "dont": "skip the diff -rq inspection in w4",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "why": "surprises in what the curated sync includes/excludes are the most common way the final sync goes wrong; manual review is the gating step."
+      },
+      {
+        "dont": "skip the post-publish smoke test (w8)",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "why": "release.yml going green only proves the workflow ran; it does not prove the wheel is installable; only a fresh pip install does."
+      },
+      {
+        "dont": "squash-merge the _project/** history PR (w6)",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "why": "squashing collapses the preserved history into a single commit, defeating the D2a decision; use a regular merge commit specifically for this PR."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "needs_item": "release-recovery-v0-3-1"
+      },
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "needs_item": "single-repo-migration-phase-3-new-release-flow"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "PyPI versioning is monotonic - if 0.3.0 fails partway through and needs a re-cut, the next attempt is 0.3.1. PyPI rejects re-uploads of the same version.",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow"
+      },
+      {
+        "behavior": "Results Explorer DOES NOT SHIP in v0.3.0. Do not describe repository presence, migration mechanics, or dev assets as a feature-complete launch, preview, beta, public feature, or release-note headline.",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow"
+      },
+      {
+        "behavior": "The 9 pre-existing curated commits on public main are preserved untouched (no force-push, no rewrite).",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow"
+      },
+      {
+        "behavior": "The fallback path (automate_release.py on private) is not deleted yet - if release.yml fails for any reason, the old flow is one command away.",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow"
+      },
+      {
+        "behavior": "_project/** retains its original commit graph on public; `git blame` on TODO/DONE files resolves to original private-side commits with their original SHAs, dates, and authors.",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "kind": "only_modify",
+        "path_glob": "benchbox/__init__.py"
+      },
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "kind": "only_modify",
+        "path_glob": "benchbox/release/workflow.py"
+      },
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "kind": "only_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "kind": "only_modify",
+        "path_glob": "~/Developer/benchbox-public/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --isolated --with pip -- python -m pip index versions benchbox 2>&1 | grep -c '0.3.0'",
+        "description": "PyPI has v0.3.0",
+        "expected": "at least 1",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git -C ~/Developer/benchbox-public rev-parse v0.3.0",
+        "description": "Tag exists on public main",
+        "expected": "valid SHA",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git -C ~/Developer/benchbox-public log --oneline -- _project/TODO/ | wc -l",
+        "description": "_project/** history is preserved on public",
+        "expected": "more than 1 (multiple commits, not just a single migration commit)",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f ~/Developer/benchbox-public/.pre-commit-config.yaml && echo OK",
+        "description": ".pre-commit-config.yaml landed on public",
+        "expected": "OK",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --isolated --with pip -- python -m pip show -f benchbox | grep -E '_project|automate_release|benchbox/release/' | wc -l",
+        "description": "Installed wheel is clean of maintainer scaffolding",
+        "expected": "0",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --isolated --no-project --with 'benchbox==0.3.1' -- python -c 'import benchbox; print(benchbox.__version__)'",
+        "description": "Installability gate closed via the v0.3.1 recovery release (NOT the failed v0.3.0 run)",
+        "expected": "0.3.1 — closure is recovery-complete per release-recovery-v0-3-1; the original v0.3.0 release.yml run (26160520298) is expected `failure` and is explicitly NOT a closure criterion",
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "notes": "Read benchbox/release/workflow.py:18-43. Remove from HOLD_BACK_PATHS:\n  - benchbox/core/explorer_pipeline\n  - benchbox/cli/commands/explorer.py\n  - tests/unit/core/explorer_pipeline\n  - tests/unit/cli/test_explorer_build_contract.py\n  - .github/workflows/results-explorer-browser.yml\n  - docs/development/results-explorer-*.md\nDo not treat removal from HOLD_BACK_PATHS, if still needed for repo\nmigration mechanics, as a release-scope decision. Results Explorer\ndoes not ship in v0.3.0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm explorer remains out of v0.3.0 shipment scope while handling sync allowlists",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "notes": "After w1 confirms explorer remains out of v0.3.0 shipment scope,\nfurther reduce HOLD_BACK_PATHS to contain only paths that should\nNEVER reach public:\n  HOLD_BACK_PATHS = (\n    \".claude\",       # per-user agent config\n    \".codex\",        # per-user agent config\n    \".gemini\",       # per-user agent config\n    # any specific secrets / .env files / credentials\n  )\nMost of the previously-held-back paths are specific to release\nmachinery and are deleted in Phase 6 anyway. Some (like _project,\n_blog) are now part of the canonical repo per D3/D4.\n\nExplicitly leave on public (these become canonical):\n  - _project/ (TODO/DONE/decisions/scripts) - history via w4 below\n  - _blog/ (working tree only, no history per D4)\n  - _chart_data/, release/, scripts/automate_release.py and friends\n    (still present today; deleted in Phase 6)\n  - todo.config.yaml, skill-sync.yaml, skill-sync.lock\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reduce HOLD_BACK_PATHS to the bare minimum for the final sync",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "notes": "The curated flow uses an ALLOWED_ROOT_FILES allowlist. Files at repo\nroot NOT in the allowlist are silently dropped — including dev-tooling\nfiles that DO belong on public going forward. Verified gap (root files\nin private, missing from public clone today):\n  - .pre-commit-config.yaml      # dev guardrail; needs to come over\n  - .coveragerc_core              # coverage config\n  - .dockerignore                 # meta-file\n  - .env.example                  # example env (no secrets)\n  - .mcp.json                     # MCP server config (verify not per-user)\n  - AGENTS.md                     # agent instructions, project-wide\n  - CLAUDE.md                     # project memory (after Phase 7 cleanup of two-remote section)\n  - GEMINI.md                     # agent instructions\n  - _benchbox_pytest_xdist_safety.py  # dev tool\nAdd each of these to ALLOWED_ROOT_FILES in benchbox/release/workflow.py\nBEFORE running the final sync. (workflow.py is deleted in Phase 6, so\nthis edit is short-lived but load-bearing for the final sync.)\n\nFiles to keep excluded (verify they are NOT in ALLOWED_ROOT_FILES):\n  - .DS_Store, coverage.json/xml, test-results.xml — generated junk\n  - evil.duckdb, memory.db — appear to be local test artefacts\n  - setup.cfg, setup.py, tox.ini — verify load-bearing (likely vestigial\n    with pyproject.toml; if not used, exclude)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Expand ALLOWED_ROOT_FILES to include dev-tooling root files currently silently excluded",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "notes": "cd /Users/joe/Developer/BenchBox\n# First do a dry-run to inspect:\nuv run python scripts/prepare_release.py --target /tmp/final-sync-preview \\\n  --no-commit\n# Diff the previewed tree against ~/Developer/benchbox-public to confirm\n# only the expected NEW additions appear (_blog, dev-tooling root\n# files, and any explicitly-approved dev assets) and no SURPRISE\n# removals:\ndiff -rq /tmp/final-sync-preview ~/Developer/benchbox-public | head -50\n# Investigate every \"Only in\" line. Surprises = bugs. Fix HOLD_BACK or\n# ALLOWED_ROOT_FILES until happy.\n# When clean, sync via PR (preferred over force-push since branch\n# protection may be on public main):\ncd ~/Developer/benchbox-public\ngit checkout -b migration/final-sync\n# Apply tree from /tmp/final-sync-preview onto this branch:\nrsync -a --delete --exclude='.git' /tmp/final-sync-preview/ ./\ngit add -A\ngit commit -m \"Migration: final curated sync from private\"\ngit push origin migration/final-sync\ngh pr create --title \"Migration: final sync from private\" \\\n  --body \"Brings _blog working tree, dev tooling, release infrastructure, and explicitly-approved dev assets. Results Explorer does not ship in v0.3.0.\"\n# Squash-merge.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the final curated sync (last use of prepare_release.py)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "notes": "git filter-repo lives outside core git: install it first:\n  pip install git-filter-repo  (or brew install git-filter-repo)\n\ngit clone --no-local /Users/joe/Developer/BenchBox /tmp/private-project-history\ncd /tmp/private-project-history\ngit remote remove origin   # avoid accidental pushes\ngit filter-repo --path _project/ --force\n\n# Verify:\ngit log --oneline | wc -l   # should be many commits\ngit ls-files | grep -v '^_project/' | wc -l   # should be 0\ngit log --oneline -- _project/TODO/ | head -5  # should show real commits\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Filter-clone private's _project/** history into a temp directory",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "notes": "cd ~/Developer/benchbox-public\ngit remote add private-project-history /tmp/private-project-history\ngit fetch private-project-history\ngit checkout -b migration/project-history-merge main\ngit merge --allow-unrelated-histories private-project-history/main \\\n  -m \"Merge _project/** history from private (TODO/DONE archaeology preserved)\"\n\n# Verify:\ngit log --graph --oneline | head -20   # should show two roots merging\ngit log --oneline -- _project/TODO/ | head -5   # original SHAs preserved\ngit blame _project/TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml | head\n\ngit push origin migration/project-history-merge\ngh pr create --title \"Migration: merge _project/** history (preserve TODO/DONE archaeology)\" \\\n  --body \"Filter-merged from private. Use a regular MERGE COMMIT not squash — squashing defeats the purpose.\"\n\n# IMPORTANT: this PR is the one explicit exception to the squash-merge\n# convention (D5). Use \"Create a merge commit\" in the GitHub UI, NOT\n# \"Squash and merge\". If branch protection enforces squash-only at\n# this point, temporarily disable it for this PR.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Merge _project/** history into public main with --allow-unrelated-histories",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "notes": "Completed after the 2026-04-27 deferral. The public repo has tag\n`v0.3.0` at `038ad548875a674cc6de0a8956677e052eac1033`, the GitHub\nrelease `BenchBox 0.3.0` was published at `2026-05-20T11:49:42Z`,\nand PyPI lists `benchbox 0.3.0` as the latest available version.\n\nRelevant PRs:\n  - #466 \"Release v0.3.0\" merged to `main` on 2026-05-19.\n  - #472 \"Release v0.3.0 recovery\" merged to `main` on 2026-05-20.\n  - #473 \"Release v0.3.0 pandas runtime dependency repair\" merged\n    to `main` after the tag; it cannot repair the immutable PyPI\n    `0.3.0` artifact.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Determine release version (likely v0.3.0) and cut release",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-4-test-release-with-new-flow",
+        "notes": "CLOSED 2026-07-09 as recovery-complete via `release-recovery-v0-3-1`.\nImmutable `0.3.0` was never re-tagged or re-uploaded; the installability\ngate is satisfied by the later monotonic `v0.3.1`:\n  - `release.yml` run 29055922350 (tag `v0.3.1`) concluded `success`,\n    including every `test-installation` job across ubuntu/macos/windows.\n  - `pip index versions benchbox` lists `0.3.1` as available/latest.\n  - `uv run --isolated --no-project --with 'benchbox==0.3.1' -- python -c 'import benchbox; print(benchbox.__version__)'`\n    prints `0.3.1`; pandas is absent from the 29 resolved packages.\n  - `pip show -f benchbox` shows zero maintainer-scaffolding entries.\n`0.3.0` remains permanently broken on PyPI by design; it is superseded,\nnot repaired.\n\n---- original blocker record (2026-05-25) ----\n\nBlocked as of 2026-05-25. The publish half succeeded, but the\ninstallability half failed and cannot be repaired in-place because\nPyPI rejects replacement uploads for an existing version.\n\nEvidence:\n  - `gh run list --repo joeharris76/BenchBox --workflow=release.yml --limit 1`\n    returned run `26160520298`, conclusion `failure`.\n  - `gh run view 26160520298 --repo joeharris76/BenchBox --json jobs`\n    showed build, PyPI publish, and GitHub release jobs succeeded.\n  - The same run showed all `test-installation` jobs failed.\n  - `uv run --isolated --no-project --with 'benchbox==0.3.0' -- python -c 'import benchbox; print(benchbox.__version__)'`\n    fails with `ModuleNotFoundError: No module named 'pandas'`.\n\nRecovery path:\n  - Do not re-tag or re-upload `0.3.0`.\n  - Complete `release-recovery-v0-3-1`; if its `v0.3.1` release\n    passes clean PyPI install/import, record that evidence here and\n    close this work item as recovery-complete rather than pretending\n    immutable `0.3.0` became installable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify the release published to PyPI and is installable",
+        "wid": "w8"
+      }
+    ]
+  }
+}

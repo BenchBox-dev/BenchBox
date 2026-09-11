@@ -1,0 +1,118 @@
+{
+  "context": "Lint side: flag any do_not_modify glob that resolves to nothing AND either (a) contains annotation characters (space/parens - can never match a git path) or (b) has a near-named sibling at a LOWER deny-specific cutoff (~0.75) or a same-stem package directory (path.py vs path/). A clean nonexistent future path stays legal - it forbids creating that file. Do not change check_paths matching semantics.",
+  "description": "check_paths fnmatches deny globs against changed files with no resolution check, and lint exempts non-resolving deny globs via the prospective-allowlist rationale that only applies to only_modify. Driven 2026-08-01: deny 'scripts/generate_corpus_inventory.py (item 4, done)' (annotated glob) and deny 'benchbox/core/runner.py' (real module is the runner/ package) both produce ZERO check_paths violations for changed files they were meant to protect. Standing open instances: 6 items deny benchbox/core/runner.py, 3 items (created 2026-08-01) deny benchbox/core/results/result_capture.py which never existed in git (near-miss result_factory.py 0.76, below the 0.87 cutoff), plus an annotated-glob cluster. A deny that matches nothing protects nothing.",
+  "legacy": {
+    "item_meta": {
+      "category": "Tracker integrity",
+      "completed_at": "2026-08-01T13:19:28Z",
+      "completed_pr": 1387,
+      "created_at": "2026-08-01T12:41:58Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "A deny naming a clean nonexistent future path stays legal (it forbids creating that file)",
+        "item_id": "todo-lint-inert-deny-rules"
+      },
+      {
+        "behavior": "Existing lint findings keep firing unchanged",
+        "item_id": "todo-lint-inert-deny-rules"
+      },
+      {
+        "behavior": "check_paths matching semantics are unchanged - this is a lint-visibility fix",
+        "item_id": "todo-lint-inert-deny-rules"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-lint-inert-deny-rules",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "todo-lint-inert-deny-rules",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_v2.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo lint geospatial-primitives-benchmark | grep -qi 'do_not_modify'",
+        "description": "lint reports the standing inert deny rule on a real item",
+        "expected": "exits 1 on the unfixed tree (verified 2026-08-01, hosted backend: lint prints only a falsifiability finding); exits 0 once inert deny rules are flagged. Needs the hosted tracker env.",
+        "item_id": "todo-lint-inert-deny-rules",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q -k 'inert_deny or deny_rule'",
+        "description": "the new checks have dedicated tests",
+        "expected": "exits 5 on the unfixed tree (no tests collected, verified 2026-08-01); all pass once w2 lands. Test names must contain 'inert_deny' or 'deny_rule'.",
+        "item_id": "todo-lint-inert-deny-rules",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q -k lint",
+        "description": "existing lint suite still green",
+        "expected": "all pass before and after - regression guard, not a gate",
+        "item_id": "todo-lint-inert-deny-rules",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-lint-inert-deny-rules",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-lint-inert-deny-rules",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Driven on develop d5aa8f398: check_paths([changed], [annotated deny, runner.py deny]) returned zero violations; hosted lint of geospatial-primitives-benchmark printed only a falsifiability finding",
+        "item_id": "todo-lint-inert-deny-rules",
+        "notes": null,
+        "started_at": "2026-08-01T12:47:12Z",
+        "started_branch": "fix/todo-lint-inert-deny-rules",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Re-validate: drive check_paths with the annotated and runner.py deny rules and confirm zero violations on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "todo_db.py: _deny_unresolved_finding with annotation/package-shadow/0.75-cutoff classes wired into _unresolvable_scope_findings; rung 1 now exits 0 (lint reports the shadowed runner.py deny)",
+        "item_id": "todo-lint-inert-deny-rules",
+        "notes": null,
+        "started_at": "2026-08-01T12:47:18Z",
+        "started_branch": "fix/todo-lint-inert-deny-rules",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Add the deny-rule resolution finding to lint with the annotation and near-named-sibling classes",
+        "wid": "w1"
+      },
+      {
+        "evidence": "6 dedicated tests (inert_deny naming) pass; lint suite 33 passed; full tests/unit/scripts 1267 passed",
+        "item_id": "todo-lint-inert-deny-rules",
+        "notes": null,
+        "started_at": "2026-08-01T12:47:24Z",
+        "started_branch": "fix/todo-lint-inert-deny-rules",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Dedicated tests: annotated glob, package-dir shadow, lower deny cutoff, clean-future-path stays legal",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,248 @@
+{
+  "description": "The 2026-05-07 retheme audit found that the benchmark and platform browse\nroutes cannot render their primary data surfaces. `/results/tpch/`,\n`/results/star_schema/`, and `/results/p/duckdb/` display DuckDB binder\nerrors because frontend queries reference `r.normalized_cost_usd` and\nrelated cost-model fields that are not present in the current\n`bench.results` snapshot. The visible error exposes raw SQL and prevents\nmeaningful design, usability, accessibility, or data-presentation QA on\nthose pages.\n\nThis is the first remediation item because every page-level retheme depends\non a working data read model. The fix must reconcile the Explorer's query\ncontract with the generated DuckDB snapshot and add regression coverage so\nfuture read-model drift fails in tests instead of in the public UI.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add per-page ad hoc SQL fallbacks; schema compatibility belongs in the data/query layer.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hide the binder error with a broad catch while leaving the query contract broken.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "require cost data for benchmark ranking eligibility unless the product decision explicitly changes ranking semantics.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Benchmark and platform pages continue to render when normalized cost is unavailable.",
+        "item_id": "results-explorer-retheme-schema-cost-regression"
+      },
+      {
+        "behavior": "Cost fields remain optional where the corpus does not provide cost data.",
+        "item_id": "results-explorer-retheme-schema-cost-regression"
+      },
+      {
+        "behavior": "Existing published result IDs and route contracts under `/results/r/{result_id}`.",
+        "item_id": "results-explorer-retheme-schema-cost-regression"
+      },
+      {
+        "behavior": "The Query Workbench column picker continues to reflect the actual snapshot schema.",
+        "item_id": "results-explorer-retheme-schema-cost-regression"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/results-explorer-cost-schema-compatibility-*.md"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-retheme-schema-cost-regression/"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/costDisplay.ts"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbSchema.ts"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test -- src/lib/__tests__/duckdbQueries.test.ts src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx",
+        "description": "Frontend typecheck and targeted tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Production bundle builds",
+        "expected": "Vite build completes without errors",
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --grep \"benchmark|platform\"",
+        "description": "Browser routes do not expose DuckDB binder errors",
+        "expected": "benchmark and platform smoke checks pass with no visible Binder Error",
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "notes": "Run the dev server against the committed fixture corpus and cold-load:\n  - `/results/tpch/?sf=0.01&phase=standard`\n  - `/results/star_schema/?sf=0.1&phase=power`\n  - `/results/p/duckdb/`\n  - `/results/p/datafusion/`\n\nCapture the exact visible error, browser console output, and the DuckDB\nquery source that emitted `normalized_cost_usd`. Save the reproduction\nlog under `_project/verification-logs/results-explorer-retheme-schema-cost-regression/w1.log`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce and capture the current benchmark/platform route failures",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "notes": "Inspect:\n  - `results-explorer/src/lib/duckdbQueries.ts`\n  - `results-explorer/src/lib/duckdbSchema.ts`\n  - `results-explorer/src/lib/costDisplay.ts`\n  - fixture generation under `results-explorer/scripts/`\n  - the generated DuckDB snapshot in `results-explorer/public/data/`\n\nProduce a field matrix for `cost_usd`, `normalized_cost_usd`,\n`cost_model_version`, `cost_model_scope`, `cost_status`, and any display\nalias used by Home, BenchmarkIndex, PlatformIndex, Query, ResultDetail,\nand Compare. The matrix must name the source table/view, nullability, and\nexpected fallback behavior.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit the current snapshot schema against every Explorer query that reads cost fields",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "notes": "Choose one path and record the decision in\n`_project/analysis/results-explorer-cost-schema-compatibility-<date>.md`:\n  1. regenerate or migrate the snapshot to include normalized cost fields;\n  2. make frontend queries tolerate older snapshots by projecting nulls\n     when fields are absent;\n  3. change the canonical Explorer cost contract back to `cost_usd`\n     only, if normalized cost is no longer product-owned.\n\nThe decision must explain impact on published bundles, fixture\ngeneration, Query Workbench visible columns, and the planned retheme\nrelease gate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose and document the compatibility strategy",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "notes": "Apply the chosen compatibility strategy in the smallest owning layer.\nIf the frontend is made tolerant of missing fields, centralize that\nbehavior in `duckdbSchema`/`duckdbQueries` rather than sprinkling\n`try/catch` across pages. If the snapshot is regenerated, add a guard\nthat verifies the expected columns before the app renders benchmark or\nplatform pages.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the query/read-model fix with a schema-readiness guard",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "notes": "Add tests that fail when BenchmarkIndex or PlatformIndex query a missing\ncost column. Include at least:\n  - one DuckDB query test for the projected schema;\n  - one BenchmarkIndex render test for TPC-H;\n  - one PlatformIndex render test for DuckDB;\n  - one browser smoke assertion that the routes do not show `Binder Error`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit and browser regression coverage for benchmark and platform page readiness",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-schema-cost-regression",
+        "notes": "Cold-load the four routes from w1 at 390px and 1280px. Confirm:\n  - no raw SQL/internal error is visible;\n  - table/matrix content renders;\n  - empty states, if any, explain corpus absence rather than query failure;\n  - console has no route-level errors.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify the fixed routes before any visual retheme work begins",
+        "wid": "w6"
+      }
+    ]
+  }
+}

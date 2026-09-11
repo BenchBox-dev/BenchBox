@@ -1,0 +1,199 @@
+{
+  "description": "Follow-up to the DONE items ci-lint-parity-pin-2 (WS3) and guards-fix-regen-target-2 (WS5) of _project/planning/ci-failure-reduction-plan.md. PR #2093 (query-template docs) hit three guard failures that fired first in CI, each a full remote round trip, and none reachable from `make ci-lint` / `make pr-preflight` / `make guards-fix`:\n\n1. Adding one Make target (`query-docs`) drifted `make/inventory.json`. `guards-fix` (WS5) regenerates dependency inventory, oracle map, parity fixtures, UAT LOC table, curation list, and skill-sync — but NOT `make/check_makefile_inventory.py --write`. And `makefile-inventory-check` runs only as a pytest (`test_check_makefile_inventory.py`), never as a lint-job step, so the WS3 parity pin (scoped to the pr.yml lint job) does not cover it.\n2. `tests/unit/scripts/test_check_release_curation.py:175` asserts the exact string `\"Makefile inventory OK: 205 targets, 199 public, default=test\"`. Every target addition needs this hand-edited, for zero safety value — the exact count is already verified by `test_check_makefile_inventory.py::test_repository_inventory_matches_manifest`.\n3. `scripts/publication/verify_lane_isolation.py` runs only in `.github/workflows/publication-lane-docs.yml`. A build-input script added to `docs/`-adjacent tooling (here `scripts/generate_query_docs.py`) is \"unclassified\" and fails the site lane check with no local equivalent.\n\nNon-obvious constraints: `verify_lane_isolation` is a diff-vs-base check (needs the PR's changed-file list), so it belongs in `pr-content-guard` (which already computes PATH_LISTS) not `ci-lint` (a current-tree check). Strict-local-vs-CI is acceptable, silent-CI-only is not (the WS3 codespell precedent). `guards-fix` stays operator-only — never wired into CI to self-heal, per its own header comment.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "needs_item": "ci-lint-parity-pin-2"
+      },
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "needs_item": "guards-fix-regen-target-2"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-09-10T21:53:08Z",
+      "worktree": "."
+    },
+    "preserves": [
+      {
+        "behavior": "Adding a local guard that CI lacks is acceptable (strict-local); a guard that runs only in CI is not.",
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation"
+      },
+      {
+        "behavior": "The exact Make target count stays verified by test_check_makefile_inventory.py::test_repository_inventory_matches_manifest.",
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation"
+      },
+      {
+        "behavior": "ci-lint stays a current-tree check; the diff-vs-base lane check lives in pr-content-guard.",
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation"
+      },
+      {
+        "behavior": "guards-fix stays an operator-only command, never wired into CI to self-heal (its header comment).",
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/ci-local-parity.md"
+      },
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "kind": "only_modify",
+        "path_glob": "make/check_makefile_inventory.py"
+      },
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "kind": "only_modify",
+        "path_glob": "make/documentation.mk"
+      },
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "kind": "only_modify",
+        "path_glob": "make/inventory.json"
+      },
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/verify_lane_isolation.py"
+      },
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "kind": "only_modify",
+        "path_glob": "tests/system/test_ci_lint_parity.py"
+      },
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_check_makefile_inventory.py"
+      },
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_check_release_curation.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -q tests/unit/scripts/test_check_makefile_inventory.py",
+        "description": "guards-fix regenerates the Make inventory when a target is added",
+        "expected": null,
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make ci-lint",
+        "description": "ci-lint runs and passes the makefile inventory check",
+        "expected": null,
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -q tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_makefile_inventory.py",
+        "description": "curation + inventory tests pass and the curation assertion is no longer count-brittle",
+        "expected": null,
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/publication/verify_lane_isolation.py --lane site --changed-paths 'scripts/unclassified_new.py docs/benchmarks/x.md'; test $? -eq 1",
+        "description": "lane-isolation-check catches an unclassified script",
+        "expected": null,
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -q tests/system/test_ci_lint_parity.py",
+        "description": "the widened ci-lint parity pin passes",
+        "expected": null,
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add check_makefile_inventory.py --write to guards-fix and makefile-inventory-check to ci-lint (with a comment); name guards-fix in the check's failure message; both clean on develop",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace the exact-count string assertion in test_check_release_curation.py with structural (returncode 0, 'Makefile inventory OK:' and 'public, default=test' in stdout)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a lane-isolation-check Make target running verify_lane_isolation.py for site/explorer/corpus against the base diff, and invoke it from pr-content-guard",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "ci-local-parity-gaps-inventory-lane-isolation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Widen test_ci_lint_parity.py from the lint job to every merge-gating run: guard (test-job --check guards, publication-lane-docs.yml); each needs a local equivalent or documented exemption",
+        "wid": "w4"
+      }
+    ]
+  }
+}

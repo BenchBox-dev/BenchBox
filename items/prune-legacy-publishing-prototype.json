@@ -1,0 +1,195 @@
+{
+  "description": "The gap matrix (_project/_archive/publishing-gap-matrix.md) recommends PRUNE for the\noriginal prototype publishing module. The new BundlePublisher + PublicationStore is now\nthe supported implementation (merged via PR #13/#50, 143 tests passing).\n\nThe prototype has:\n- Zero runtime consumers outside its own tests\n- In-memory-only state (doesn't survive process exit)\n- Non-canonical JSON serialization (duplicates the exporter)\n- Fake permalink generation with no resolver service\n- Declared-but-unimplemented features (secondary_storage, notifications, PARQUET)\n\nLegacy files to remove:\n- benchbox/core/publishing/publisher.py (460 lines)\n- benchbox/core/publishing/artifacts.py (340 lines)\n- benchbox/core/publishing/permalink.py (~200 lines)\n- benchbox/core/publishing/config.py (~200 lines)\n\nLegacy test files to remove:\n- tests/unit/core/publishing/test_publisher.py\n- tests/unit/core/publishing/test_artifacts.py\n- tests/unit/core/publishing/test_permalink.py\n- tests/unit/core/publishing/test_publishing_config.py\n\nLegacy __init__.py exports to remove: 12 symbols (PublishFormat, PublishingConfig,\nRetentionPolicy, StorageConfig, StorageProvider, Artifact, ArtifactManager,\nArtifactMetadata, ArtifactStatus, ArtifactType, Permalink, PermalinkGenerator,\nPermalinkRegistry, PublishBatchResult, Publisher, PublishResult)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "remove files piecemeal without verifying zero consumers first",
+        "instead": "scan the full tree before deleting",
+        "item_id": "prune-legacy-publishing-prototype",
+        "why": "hidden imports cause runtime ImportError"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "prune-legacy-publishing-prototype",
+        "needs_item": "productize-result-publishing-and-artifact-sharing"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality & Build",
+      "created_at": "2026-04-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "BundlePublisher, PublicationStore, BundlePublishResult, PublicationRecord, build_reference must remain",
+        "item_id": "prune-legacy-publishing-prototype"
+      },
+      {
+        "behavior": "benchbox publish CLI command group must remain functional",
+        "item_id": "prune-legacy-publishing-prototype"
+      },
+      {
+        "behavior": "benchbox run --publish integration must remain functional",
+        "item_id": "prune-legacy-publishing-prototype"
+      },
+      {
+        "behavior": "test_publish_store.py and test_publish_cli.py must remain and pass",
+        "item_id": "prune-legacy-publishing-prototype"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "prune-legacy-publishing-prototype",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/publish.py"
+      },
+      {
+        "item_id": "prune-legacy-publishing-prototype",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/publishing/bundle_publisher.py"
+      },
+      {
+        "item_id": "prune-legacy-publishing-prototype",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/publishing/store.py"
+      },
+      {
+        "item_id": "prune-legacy-publishing-prototype",
+        "kind": "do_not_modify",
+        "path_glob": "tests/integration/test_publish_cli.py"
+      },
+      {
+        "item_id": "prune-legacy-publishing-prototype",
+        "kind": "do_not_modify",
+        "path_glob": "tests/unit/core/publishing/test_publish_store.py"
+      },
+      {
+        "item_id": "prune-legacy-publishing-prototype",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/publishing/"
+      },
+      {
+        "item_id": "prune-legacy-publishing-prototype",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/publishing/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run ruff check benchbox/core/publishing/ && ! grep -r 'ArtifactManager\\|PermalinkRegistry\\|PermalinkGenerator' benchbox/ --include='*.py' | grep -v '__pycache__'",
+        "description": "No legacy publishing imports remain",
+        "expected": "No matches",
+        "item_id": "prune-legacy-publishing-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/publishing/ tests/integration/test_publish_cli.py -q",
+        "description": "All publishing tests still pass",
+        "expected": "All tests pass (count will drop by ~80 from removing legacy tests)",
+        "item_id": "prune-legacy-publishing-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Full fast test suite passes",
+        "expected": "All tests pass",
+        "item_id": "prune-legacy-publishing-prototype",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "prune-legacy-publishing-prototype",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "prune-legacy-publishing-prototype",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "prune-legacy-publishing-prototype",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "prune-legacy-publishing-prototype",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "prune-legacy-publishing-prototype",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "prune-legacy-publishing-prototype",
+        "notes": "grep for imports of Publisher, ArtifactManager, PermalinkGenerator, etc.\nConfirm the only consumers are __init__.py re-exports and test files.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify zero runtime imports of legacy symbols outside tests and __init__.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "prune-legacy-publishing-prototype",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Remove legacy source files (publisher.py, artifacts.py, permalink.py, config.py)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "prune-legacy-publishing-prototype",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Remove legacy test files (test_publisher.py, test_artifacts.py, test_permalink.py, test_publishing_config.py)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "prune-legacy-publishing-prototype",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Clean up __init__.py: remove legacy imports and __all__ entries",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "prune-legacy-publishing-prototype",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run full test suite to verify no regressions",
+        "wid": "w5"
+      }
+    ]
+  }
+}

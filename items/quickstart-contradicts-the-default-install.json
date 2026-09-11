@@ -1,0 +1,204 @@
+{
+  "context": "DECISION GATE w1: decide whether the quickstart pins 'benchbox[duckdb]' as its single install command, or whether duckdb moves into the core dependency set. Weigh install weight and the lean-import guarantee (see cli-lean-import-guarantee, already done) against a first-run path that cannot fail. Record the decision; do not do both.\n\nThen make the quickstart self-contained -- install command inline, correct step count, and a first result before any taxonomy -- and pin it with a test that executes the documented commands in order on a clean environment. Reordering the README is the last step, not the first, and must not delete content: the taxonomy, contracts and comparisons move into docs/, they do not disappear.",
+  "description": "VERIFIED 2026-08-23 on develop.\n\ndocs/usage/getting-started.md ('Getting Started in 5 Minutes') Step 2 says: run 'benchbox profile' and 'duckdb should be Ready immediately'. That is false for the install the reader most likely performed. DuckDB is an optional extra: pyproject core dependencies do not include duckdb, and README.md:162 states plainly that a plain 'uv add benchbox' installs SQLite only. Step 1 links out to the installation guide rather than pinning the command, so a reader can arrive at Step 2 having installed the core package and hit a contradiction on their second command. Step 3 then runs a DuckDB benchmark that cannot work.\n\nTwo smaller defects in the same path:\n - getting-started.md says 'Follow these four steps' and then lists Step 0 through Step 5.\n - README.md is 57,826 bytes / 1,303 lines. The first install command is at line 149 (11% in) which is acceptable, but the first actual 'benchbox run' -- the command that produces a result -- is at line 469 (36% in), behind versioning policy, beta disclaimers, registry counts and three competitor comparisons.\n\nThe engine itself is good and fast: 'benchbox run --platform duckdb --benchmark tpch --scale 0.01' completes 22 queries in about 4 seconds, and TPC-DS completes 103 queries in about 37 seconds. Nothing here is an engine problem; it is purely the path a first-time reader walks.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add duckdb to core dependencies without weighing the lean-import guarantee",
+        "instead": "INSTEAD make it part of the w1 decision",
+        "item_id": "quickstart-contradicts-the-default-install",
+        "why": "that guarantee is separately tracked and already closed"
+      },
+      {
+        "dont": "Delete the taxonomy, contracts or competitor sections while shortening README",
+        "instead": "INSTEAD move them into docs/ and link them",
+        "item_id": "quickstart-contradicts-the-default-install",
+        "why": "they are load-bearing for support-status claims and were written deliberately"
+      },
+      {
+        "dont": "Fix docs CLI examples here",
+        "instead": "INSTEAD keep this item to the install/quickstart contradiction and README ordering",
+        "item_id": "quickstart-contradicts-the-default-install",
+        "why": "documentation-accuracy-drift-burndown already owns broken imports, fictional make targets and removed CLI options across docs/"
+      },
+      {
+        "dont": "Fix the wording to say duckdb 'may' be ready",
+        "instead": "INSTEAD make the documented install produce a working Step 3",
+        "item_id": "quickstart-contradicts-the-default-install",
+        "why": "the reader still cannot complete Step 3"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-08-29T13:05:32Z",
+      "completed_pr": 1850,
+      "created_at": "2026-08-23T13:09:47Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Every fact currently in README (support taxonomy, public contracts, registry counts, competitor comparisons) survives somewhere in docs/ and stays linked",
+        "item_id": "quickstart-contradicts-the-default-install"
+      },
+      {
+        "behavior": "Registry-count markers stay driven by the generated block so the README cannot drift from runtime metadata",
+        "item_id": "quickstart-contradicts-the-default-install"
+      },
+      {
+        "behavior": "The lean-import guarantee for import benchbox and benchbox --help",
+        "item_id": "quickstart-contradicts-the-default-install"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing home for support taxonomy and contract tiers",
+        "decision": "extend",
+        "item_id": "quickstart-contradicts-the-default-install",
+        "path": "docs/reference/public-contracts.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "quickstart-contradicts-the-default-install",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "quickstart-contradicts-the-default-install",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "quickstart-contradicts-the-default-install",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "quickstart-contradicts-the-default-install",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/"
+      },
+      {
+        "item_id": "quickstart-contradicts-the-default-install",
+        "kind": "only_modify",
+        "path_glob": "docs/usage/"
+      },
+      {
+        "item_id": "quickstart-contradicts-the-default-install",
+        "kind": "only_modify",
+        "path_glob": "tests/docs/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "follow docs/usage/getting-started.md verbatim in an empty venv",
+        "description": "The quickstart works as written from a clean environment",
+        "expected": "every documented command succeeds; duckdb reports Ready before it is used",
+        "item_id": "quickstart-contradicts-the-default-install",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c '^## Step' docs/usage/getting-started.md",
+        "description": "Documented step count matches the document",
+        "expected": "matches the number stated in the intro sentence",
+        "item_id": "quickstart-contradicts-the-default-install",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'benchbox run' README.md | head -1",
+        "description": "A result-producing command appears early in README",
+        "expected": "first occurrence is well inside the first quarter of the file",
+        "item_id": "quickstart-contradicts-the-default-install",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quickstart-contradicts-the-default-install",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "quickstart-contradicts-the-default-install",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "quickstart-contradicts-the-default-install",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quickstart-contradicts-the-default-install",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Reproduced: pyproject core deps exclude duckdb; README.md:162 states a plain install is SQLite-only; getting-started Step 2 asserts duckdb is Ready; Step 3 runs DuckDB. Page also advertised 'benchbox platforms setup' which rejects --platform, and claimed 'four steps' while listing Step 0-5.",
+        "item_id": "quickstart-contradicts-the-default-install",
+        "notes": null,
+        "started_at": "2026-08-23T18:22:12Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Reproduce the contradiction from a clean environment",
+        "wid": "w0"
+      },
+      {
+        "evidence": "DECISION: pin 'uv add benchbox --extra duckdb' in the quickstart rather than promote duckdb to a core dependency. Reason: core install weight and the lean-import guarantee (cli-lean-import-guarantee, already closed) are worth keeping, and a one-line docs change buys the same working first run. Reversible.",
+        "item_id": "quickstart-contradicts-the-default-install",
+        "notes": null,
+        "started_at": "2026-08-23T18:22:15Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "DECISION GATE - pin benchbox[duckdb] in the quickstart, or promote duckdb to a core dependency; record the reason",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1845: Step 1 pins the extra inline with pip form and an explicit optional-dependency note; Step 2 explains rather than asserts; 'platforms setup' replaced with 'benchbox setup --platform'; 'four steps' claim dropped.",
+        "item_id": "quickstart-contradicts-the-default-install",
+        "notes": null,
+        "started_at": "2026-08-23T18:22:17Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Make getting-started.md self-contained and internally consistent (inline install command, correct step count)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "tests/unit/docs/test_quickstart_commands_are_real.py walks the page's fenced bash blocks and asserts each benchbox invocation resolves to a real command with real options (distinguishing 'uv run -- benchbox' from 'uv add benchbox'), plus three regression pins: extra installed, no platforms-setup reference, step count not contradicted. 15 tests pass.",
+        "item_id": "quickstart-contradicts-the-default-install",
+        "notes": null,
+        "started_at": "2026-08-23T18:22:20Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add a test that executes the quickstart's commands in order and fails when a documented command cannot run as written",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #1850. Quick Start moved from line 390 of 1303 to line 54, so the first 'benchbox run' is at line 133 instead of 469; the Beta Software honesty notice still precedes it. Also found and fixed the same false-install defect the docs page had: step 1 offered a bare 'uv add benchbox' under the comment 'For local development (DuckDB only)', while step 3 does 'import duckdb' and 'benchbox run --platform duckdb'. duckdb is not in project.dependencies -- it is the [duckdb] extra -- so that path could not work. The Installation section 180 lines below already said so correctly, which is how the contradiction survived. New guard tests/unit/docs/test_readme_quickstart_installs_what_it_uses.py: 4 tests including a premise test that duckdb is not a core dependency. Negative control: three of four fail against the previous README and the premise test still passes. pr-preflight 28023 passed, exit 0.",
+        "item_id": "quickstart-contradicts-the-default-install",
+        "notes": null,
+        "started_at": "2026-08-23T20:00:18Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "README reorder deferred - the first benchbox run is at line 469/1303. Separable from the first-run fix and safe to do independently",
+        "wid": "w4"
+      }
+    ]
+  }
+}

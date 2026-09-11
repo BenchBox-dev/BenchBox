@@ -1,0 +1,291 @@
+{
+  "description": "REVALIDATED 2026-08-23 with a fresh end-to-end run on current develop. The public corpus still has zero plain tpcds bundles (only tpcds_obt=5 and tpcdi=9) across 207 bundles.\n\nMEASURED COST OF w2 -- this is a day of work, not a project:\n  $ uv run -- benchbox run --official --seed 42 --platform duckdb --benchmark tpcds --scale 1\n  41 seconds wall clock; 309/309 queries passed; benchmark.compliance_class = official;\n  execution.official = true; phases.validation.status = PASSED and summary.validation = passed\n  (consistent, unlike 112 of the 207 legacy corpus bundles); power_at_size = 256,866.\n  Bundle: ~/Developer/benchmark_runs/results/tpcds_sf1_duckdb_sql_20260823_085826_fc9467d8.json\n\nThis supersedes any lingering doubt from tpcds-can-never-be-published-official-flag-not-wired: that item's remaining w2 is an integration TEST, and the classifier itself demonstrably works on develop as of 2026-08-23. The bundle above was produced by post-#1770 code, unlike the 2026-08-18 bundle that item warns about.\n\nTwo adversarial reviewers on 2026-08-23 independently agreed TPC-DS at SF1 is the highest-value corpus addition available and that SF10/SF100 should NOT gate it.\n\nCustomer framing: TPC-DS is advertised in the README benchmark catalogue and on the landing page, is the single most-searched benchmark in this category, and the public corpus has none of it. Maximum scale factor across the entire existing corpus is 1.0.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Block SF1 publication on SF10/SF100 capacity",
+        "instead": "INSTEAD ship SF1 and treat larger scales as the w3 decision",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "why": "SF1 takes under a minute per platform and SF100 needs dedicated hardware"
+      },
+      {
+        "dont": "Publish TPC-DS at SF0.01 or SF0.1 to close the gap quickly",
+        "instead": "INSTEAD publish SF1 or above",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "why": "sub-scale TPC-DS is classified unofficial_subscale, is refused by submit, and is not the result readers are looking for"
+      },
+      {
+        "dont": "Re-diagnose the --official wiring",
+        "instead": "INSTEAD generate and submit",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "why": "it was fixed in PR #1770 and re-verified end to end on 2026-08-23"
+      },
+      {
+        "dont": "add a single-platform cohort to results-data",
+        "instead": "INSTEAD run results-data/validate_corpus.py before opening any corpus PR; it is not part of pr-preflight, so a green preflight does not cover it",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "why": "results-data/validate_corpus.py exits 1 on any (benchmark, scale) cohort with fewer than 3 platforms, and PR #1854 added TPC-DS SF10 with DuckDB alone, which broke that invariant on develop"
+      },
+      {
+        "dont": "bundle this with the SF 0.1 expansion PR",
+        "instead": "(not specified)",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "why": "they answer different questions (depth-per-cohort vs benchmark-coverage) and reviewer attention shouldn't be split."
+      },
+      {
+        "dont": "pick the benchmark by guessing",
+        "instead": "(not specified)",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "why": "the choice has strategic implications (head-to-head with ClickBench vs broader TPC family); document the trade-off explicitly in w1."
+      },
+      {
+        "dont": "treat TPC-DS corpus expansion as a Results Explorer launch blocker",
+        "instead": "INSTEAD publish TPC-DS in parallel after or with the v0.4.0 cut",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "why": "the curated preview is defined over the current corpus"
+      },
+      {
+        "dont": "use TPC-DS fractional scale factors below 1",
+        "instead": "(not specified)",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "why": "they violate CLAUDE.md's hard rule and produce non-standard, non-comparable results."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "needs_item": "automate-corpus-inventory-generation"
+      },
+      {
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "needs_item": "verify-ci-validation-workflow-end-to-end"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-24T07:12:38Z",
+      "completed_pr": 1859,
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cohort isolation per strategy doc - never compare across benchmark families.",
+        "item_id": "add-third-benchmark-cohort-to-corpus"
+      },
+      {
+        "behavior": "Existing TPC-H and SSB cohorts untouched.",
+        "item_id": "add-third-benchmark-cohort-to-corpus"
+      },
+      {
+        "behavior": "Maintainer-run trust label on all generated bundles.",
+        "item_id": "add-third-benchmark-cohort-to-corpus"
+      },
+      {
+        "behavior": "Published TPC-DS bundles carry compliance_class=official and real validation, or they are not published at all",
+        "item_id": "add-third-benchmark-cohort-to-corpus"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "every committed cohort must have at least 3 platforms (hard validator gate)",
+        "decision": "reuse",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "path": "results-data/SEED_CORPUS_SPEC.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/third-cohort-selection-*.md"
+      },
+      {
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "kind": "only_modify",
+        "path_glob": "results-data/corpus-inventory.json"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run python -c \"import json; d=json.load(open('results-data/corpus-inventory.json')); print(sorted(set(b['benchmark'] for b in d['bundles'])))\"",
+        "description": "Inventory now lists 3+ distinct benchmark families",
+        "expected": "list contains tpch, ssb, and one of {tpcds, clickbench}",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python results-data/validate_corpus.py",
+        "description": "Each new bundle validates",
+        "expected": "all bundles valid",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --official --seed 42 --platform duckdb --benchmark tpcds --scale 1",
+        "description": "An official TPC-DS run is reproducible end to end on current develop",
+        "expected": "309/309 queries pass and the bundle carries compliance_class=official",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import json;d=json.load(open('results-data/corpus-inventory.json'));print({b['benchmark']:b['scale_factor'] for b in d['bundles'] if b['benchmark']=='tpcds'})\"",
+        "description": "TPC-DS is present in the public corpus at SF1 or above",
+        "expected": "at least three platforms at scale_factor >= 1.0",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "needs_wid": "w2",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "TPC-DS confirmed; official DuckDB SF1 packaged via benchbox submit in PR #1786",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "notes": "Compare on three axes:\n  1. Platform parity: which 3+ supported platforms can run it cleanly\n     at SF 0.01? (DuckDB and DataFusion run both; Polars/SQLite vary.)\n  2. Runtime + storage: TPC-DS has 99 queries; ClickBench has 43.\n     Estimate wall-clock per cohort.\n  3. Strategic value: TPC-DS aligns with the \"TPC family\" framing in\n     the strategy doc; ClickBench creates direct head-to-head visibility.\n\nDocument the decision and rationale in\n`_project/analysis/third-cohort-selection-<date>.md` and link it from\nthis TODO before starting w2.\n",
+        "started_at": "2026-08-20T16:53:02Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm TPC-DS as the cohort (decision made 2026-08-17) and size the datagen and runtime budget",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1859. TPC-DS SF10 cohort completed to 3 platforms; results-data/validate_corpus.py back to exit 0 with 'tpcds SF=10.0: 3 platforms ([DataFusion, DuckDB, Spark]) [OK]'. Corpus now 213 bundles.\n\n  DuckDB      309/309  power@size 497,999\n  DataFusion  309/309  power@size 151,089\n  Spark       308/309  no power@size\n\nSpark's single failure is honest and published rather than hidden: query 95 died after 2.2s with SparkOutOfMemoryError [UNABLE_TO_ACQUIRE_MEMORY] against the 4g default driver heap on a 16GB machine with a 10GB dataset -- a resource limit, not a correctness defect. The bundle records validation=partial and no power_at_size, so the Explorer excludes it from ranking with reason failed_queries and it cannot be read as a clean comparison. Re-running at a larger heap on the same 16GB machine would trade the OOM for swapping, which is a worse measurement, not a better one.\n\nFollow-on from that finding: PR #1860 registers spark driver_memory as a real --platform-option. The adapter has read config.get('driver_memory') (default 4g) all along and add_cli_arguments documents --driver-memory, but it was never a registered option spec, so a user hitting this OOM had no lever. Same class as the thirteen keys declared in #1844.",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "notes": null,
+        "started_at": "2026-08-24T04:06:07Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Complete the TPC-DS SF10 cohort to 3 platforms (DataFusion, Spark) so results-data/validate_corpus.py passes again",
+        "wid": "w11"
+      },
+      {
+        "evidence": "PR #1839: TPC-DS SF1 official on DuckDB (309/309, power 269,803, geomean 13.4ms), DataFusion (309/309, 72,794, 51.3ms), Spark (309/309, 6,211, 566.5ms). All compliance_class=official with consistent validation (phase PASSED + summary passed). validate_submission 0 errors 0 warnings on all three. Corpus cohorts meeting >=3-platform depth: 45 -> 46.",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "notes": "Same approach as the SF 0.1 expansion TODO: clean tuned runs, full\nquery set, document any failures rather than shipping partial coverage.\nFor TPC-DS, do NOT use fractional scale factors below 1 (per CLAUDE.md);\nuse SF 1 if SF 0.01 isn't valid for TPC-DS.\n",
+        "started_at": "2026-08-23T14:30:11Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Generate TPC-DS on at least 3 platforms at SF1 minimum, not SF0.01",
+        "wid": "w2"
+      },
+      {
+        "evidence": "DECISION AND EXECUTION COMPLETE. PR #1854. DuckDB TPC-DS SF10, --official --seed 42: 309/309 passed, validation passed, compliance_class official, power@size 497,999 (SF1 was 269,803). Bundle validates clean; inventory row carries trust_label maintainer-run.\n\nDecision recorded: SF10 yes, SF100 no for now. SF1 tells a reader how fast an engine is on this hardware; two points tell them how it scales, which is what a corpus is for. SF100 costs roughly ten times the runtime and ~100GB on disk for a third point that mostly confirms the trend, and can be added later without redoing either.\n\nScope: DuckDB only, not a repeat of the three-platform cohort. At SF1 DataFusion was 3.8x slower than DuckDB and Spark 42x, so a three-platform SF10 run is dominated by Spark's runtime to re-establish a ranking SF1 already shows. Cross-platform comparison lives at SF1; the scale ladder lives at SF10.\n\nSequencing respected: SF10 is its own branch off develop, so PR #1839 (SF1) is not delayed. Known consequence: results-data/corpus-inventory.json conflicts between #1839 and #1854; it is generated, so whichever lands second regenerates it. Also resolved that same conflict on #1839 against current develop (merge 680fd95eb) -- inventory regenerated to 210 bundles, all maintainer-run, pr-preflight 28042 passed.\n\nCleared a related risk: the three SF1 bundles carry no sidecar, and under the merged #1843 logic rule 4 a sidecar-less bundle defaults to maintainer-run. Verified on the merged branch: 210/210 maintainer-run. No bundle lands mislabelled.",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "notes": "Only if the w2 cohort proves quick enough to run the higher SF in <1\nhour per platform on local hardware. Skip if it pushes the corpus over\n100MB or runs > 4 hours total. Document the decision in the cohort\nselection memo.\n",
+        "started_at": "2026-08-23T21:31:26Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "DECISION GATE - decide whether SF10/SF100 is worth the runtime budget, only AFTER SF1 is published; SF1 must not wait on it",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #1786 vs published-results: official TPC-DS DuckDB SF1 via benchbox submit; validate_submission PASS",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "notes": "Single PR with all w2 (and w3 if generated) bundles. Same flow as the\nSF 0.1 expansion TODO. Validate-submission CI must pass.\n",
+        "started_at": "2026-08-20T16:54:22Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Submit, validate via CI, merge to published-results",
+        "wid": "w4"
+      },
+      {
+        "evidence": "No explorer code change needed: benchmark navigation is data-driven from the corpus snapshot, and results-explorer/src/utils.ts already maps tpcds -> 'TPC-DS' and tpcds_obt -> 'TPC-DS-OBT'. Verified on the PR #1839 branch: results-data/corpus-inventory.json lists tpcds: 3 (DuckDB, DataFusion, Spark at SF1, 309/309 each) alongside tpcds_obt: 5, so BenchmarkIndex picks them up once the bundles land. The only hardcoded 'tpch' strings in the explorer are three starter-query examples in src/lib/starterQueries.ts, which are illustrative SQL, not navigation.",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "notes": "After redeploy:\n  - Benchmark selector lists 3 benchmarks (or 4 if both TPC-DS and the\n    previous two)\n  - Browse view per benchmark renders\n  - Compare view restricts to within-benchmark cohorts\n  - Cross-benchmark compare attempts are hard-blocked (per strategy\n    doc cohort rules)\n",
+        "started_at": "2026-08-23T19:49:55Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Verify explorer adds the new benchmark to navigation",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Confirmed: not a launch blocker and not a human gate. The Explorer ships on the current corpus; TPC-DS reaches the public site through PR #1839 plus the mirror. Note the real launch dependency found today is unrelated to this item: the mirror to published-results has been blocked since 2026-08-06 by stale sidecar hashes (PR #1847), so nothing merged since 2026-08-05 was reaching benchbox.dev regardless.",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "notes": null,
+        "started_at": "2026-08-23T19:49:58Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Not a launch blocker and not a human gate; Explorer ships on the current corpus while this item publishes TPC-DS",
+        "wid": "w6"
+      },
+      {
+        "evidence": "Confirmed: all three new bundles carry phases.validation.status=PASSED and summary.validation=passed, so they do NOT inherit the legacy 112-bundle NOT_RUN-claiming-passed defect.",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "notes": null,
+        "started_at": "2026-08-23T14:30:14Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm the published TPC-DS bundles carry consistent validation metadata (phases.validation.status PASSED and summary.validation passed) so they do not inherit the legacy corpus defect",
+        "wid": "w7"
+      },
+      {
+        "evidence": "Filed as sqlite-tpcds-fails-every-query-cursor-passed-as-connection (medium-high). Root cause measured, not assumed: every query fails with \"'sqlite3.Cursor' object has no attribute 'cursor'\" -- a Cursor reaching SQLiteAdapter.execute_query (benchbox/platforms/sqlite.py:530) where a Connection is expected. Adapter plumbing, not a SQL dialect limit; SQLite runs TPC-H fine. Reproduces in seconds at SF0.01 with a single query, so it is not scale-dependent. Second defect recorded in the same item: the bundle records error=null on every FAILED row, so the reason never leaves the console.",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "notes": null,
+        "started_at": "2026-08-23T19:54:22Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "SQLite fails all 103 TPC-DS queries at SF1 - file as its own defect, it is not a cohort blocker",
+        "wid": "w8"
+      },
+      {
+        "evidence": "Filed as dataframe-results-can-never-be-submitted-no-compliance-class (high). Root cause located: benchbox/core/runner/dataframe_runner.py:232-239 and benchbox/platforms/dataframe/benchmark_mixin.py:287-294 both construct BenchmarkInfoInput without compliance_class, and from benchmark_config rather than the benchmark instance, so PR #1770's config threading cannot reach them. Measured on the same benchmark down both paths: polars-df emits a benchmark block of only id/name/scale_factor/test_type with compliance_class ABSENT and validation not_run, while the SQL path emits unofficial_subscale. Refused twice over by submit (compliance class) and publish_admission (non-clean validation), so no DataFrame result can be published -- about half the corpus.",
+        "item_id": "add-third-benchmark-cohort-to-corpus",
+        "notes": null,
+        "started_at": "2026-08-23T19:54:24Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "polars-df completes 309/309 TPC-DS but the DataFrame path sets no compliance_class and runs no validation even under --official, so DataFrame results can never be submitted - file separately",
+        "wid": "w9"
+      }
+    ]
+  }
+}

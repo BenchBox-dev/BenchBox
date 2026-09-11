@@ -1,0 +1,10 @@
+{
+  "description": "Audit and complete documentation for all 18+ platform adapters.\n\nCurrent state: docs/platforms/ contains 24 files covering most platforms, but\ncoverage depth varies. Some platforms have comprehensive guides while others\nhave minimal stub documentation.\n\nGoal: Every platform has consistent documentation covering:\n- Prerequisites and installation\n- Authentication/credentials setup\n- Basic usage example\n- Platform-specific options\n- Known limitations\n- Troubleshooting tips",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation and User Experience",
+      "created_at": "2025-12-12T00:00:00Z",
+      "worktree": "docs-experience"
+    }
+  }
+}

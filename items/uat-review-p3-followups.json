@@ -1,0 +1,180 @@
+{
+  "context": "One small PR (or two: code vs docs). Nothing here changes gate verdicts; anything that grows behavioral splits out.",
+  "description": "Itemized P3 findings from the 2026-07-21 adversarial UAT review, batched because each is small and none changes gate behavior:\n\n(a) enumerate double-count: tests/uat/phases/enumerate.py:119-138 adds a (missing-platform x missing-benchmark) cell to BOTH accounting buckets, contradicting the single-bucket contract in report.py:242-247; reproduced live (2 rows for 1 cell). Introduced by #1238.\n(b) doc drift: docs/operations/uat-framework.md:404 still says startup-failed platforms' cells are 'recorded as skipped-unreachable'; since the fail-advance split they land in the separate startup_failed accounting (execute.py:104-107, cells_io.py:61,105).\n(c) spec drift: _project/specs/uat-framework.md Section 3 says free_space_min_gib <= 0 is a validation error; config.py:270-281 deliberately accepts 0 as the documented disk-gate opt-out.\n(d) stale docstring: benchbox/core/expected_results/tpch_results.py:14,40 claims seed 0o0101000000 = '16843008 decimal' (hex misreading); actual value is 17039360 (constant is correct at benchbox/core/tpch/benchmark.py:30-32).\n(e) Makefile engine drift: Makefile:413-440 pg-extensions test targets hardcode `docker compose` while sibling targets use $(CONTAINER_ENGINE); also document the CONTAINER_ENGINE (make) vs BENCHBOX_CONTAINER_CLI (env) split so operators set both or one derives from the other.\n(f) scripts/uat-bring-up/uat_bring_up.py:135-138: a failed standalone bring-up leaves the partial stack up (returns without down) - document the behavior (debugging aid) or add an opt-in --down-on-fail.\n(g) volume-reuse provenance: deterministic compose project names + docker_platform_switch containers/off reattach prior-run named volumes with no provenance mark (docker_assets.py:426-437, execute.py:499-541); add a docs note that only 'volumes' mode guarantees fresh data (release-gate configs already use it).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix (d) by changing the constant to match the docstring",
+        "instead": "fix the docstring",
+        "item_id": "uat-review-p3-followups",
+        "why": "17039360 is the correct qgen reference seed; the prose is the bug"
+      },
+      {
+        "dont": "grow this sweep into behavior changes",
+        "instead": "split anything behavioral into its own item",
+        "item_id": "uat-review-p3-followups",
+        "why": "P3 sweep = accounting/doc/cosmetic; mixing behavior in makes the diff unreviewable and risks the gate"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Implementation and verification complete at c03d068d6 (853 UAT tests passed; both stored verification rungs pass). Publication is blocked by the reused batch gate snapshot: unrelated existing fast-test failure tests/unit/scripts/explorer_pipeline/test_privacy_rejection.py::test_privacy_rejection_makes_the_publish_command_exit_non_zero.",
+      "category": "Code Quality",
+      "claim_token": "ac1a74d45e0b8f1192872c6a8353abe0",
+      "claimed_at": "2026-08-22T16:56:14Z",
+      "claimed_branch": "fix/uat-review-p3-followups",
+      "claimed_by": "joe@joe-mac-mini.local",
+      "claimed_worktree": "/Users/joe/Developer/BenchBox.wt-uat-review-p3-followups",
+      "created_at": "2026-07-21T11:43:52Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "No gate verdict, exit code, or cells.jsonl schema change anywhere in this sweep.",
+        "item_id": "uat-review-p3-followups"
+      },
+      {
+        "behavior": "Release-gate configs unchanged (already use docker_platform_switch: volumes).",
+        "item_id": "uat-review-p3-followups"
+      },
+      {
+        "behavior": "Seed CONSTANT (17039360) untouched - only the prose is wrong.",
+        "item_id": "uat-review-p3-followups"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "$(CONTAINER_ENGINE)-based COMPOSE variable the pg-extensions targets should use",
+        "decision": "reuse",
+        "item_id": "uat-review-p3-followups",
+        "path": "Makefile:452-453"
+      },
+      {
+        "concept": "the single-bucket accounting contract (a) must satisfy",
+        "decision": "reuse",
+        "item_id": "uat-review-p3-followups",
+        "path": "tests/uat/phases/report.py:242-247"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-review-p3-followups",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "uat-review-p3-followups",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md"
+      },
+      {
+        "item_id": "uat-review-p3-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/expected_results/tpch_results.py"
+      },
+      {
+        "item_id": "uat-review-p3-followups",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-review-p3-followups",
+        "kind": "only_modify",
+        "path_glob": "scripts/uat-bring-up/"
+      },
+      {
+        "item_id": "uat-review-p3-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      },
+      {
+        "item_id": "uat-review-p3-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/enumerate.py"
+      },
+      {
+        "item_id": "uat-review-p3-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_matrix.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_phases.py tests/uat/test_report_accounting.py -q",
+        "description": "Accounting single-bucket",
+        "expected": "typo'd (platform, benchmark) pair counted exactly once; all pass",
+        "item_id": "uat-review-p3-followups",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:01:39Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat -q",
+        "description": "Full UAT unit lane green",
+        "expected": "all pass",
+        "item_id": "uat-review-p3-followups",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:01:52Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "uv run -- python -m pytest -n 0 tests/uat/test_matrix.py -k \"registry_missing or both_unknown\" -q (3 passed)",
+        "item_id": "uat-review-p3-followups",
+        "notes": null,
+        "started_at": "2026-08-22T16:56:19Z",
+        "started_branch": "fix/uat-review-p3-followups",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-uat-review-p3-followups",
+        "status": "done",
+        "summary": "(a) fix enumerate double-count so the pair lands in exactly one bucket; regression test with a typo'd include list",
+        "wid": "w1"
+      },
+      {
+        "evidence": "docs/operations/uat-framework.md documents retained-volume provenance; startup_failed wording already corrected by PR #1151 and free_space_min_gib=0 spec row already corrected by PR #1252 on claim-time develop",
+        "item_id": "uat-review-p3-followups",
+        "notes": null,
+        "started_at": "2026-08-22T16:57:24Z",
+        "started_branch": "fix/uat-review-p3-followups",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-uat-review-p3-followups",
+        "status": "done",
+        "summary": "(b)+(c)+(g) doc/spec corrections: startup_failed wording, free_space_min_gib=0 opt-out row, volume-reuse freshness note",
+        "wid": "w2"
+      },
+      {
+        "evidence": "No change required: benchbox/core/expected_results/tpch_results.py already says 17039360 decimal after PR #1254; seed constant untouched",
+        "item_id": "uat-review-p3-followups",
+        "notes": null,
+        "started_at": "2026-08-22T16:58:33Z",
+        "started_branch": "fix/uat-review-p3-followups",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-uat-review-p3-followups",
+        "status": "done",
+        "summary": "(d) tpch_results.py seed docstring 16843008 -> 17039360",
+        "wid": "w3"
+      },
+      {
+        "evidence": "No change required: PR #1644 removed the obsolete pg-extensions Make targets; docs/operations/uat-framework.md already documents the CONTAINER_ENGINE versus BENCHBOX_CONTAINER_CLI split",
+        "item_id": "uat-review-p3-followups",
+        "notes": null,
+        "started_at": "2026-08-22T16:58:38Z",
+        "started_branch": "fix/uat-review-p3-followups",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-uat-review-p3-followups",
+        "status": "done",
+        "summary": "(e) pg-extensions targets use $(CONTAINER_ENGINE); document the CONTAINER_ENGINE vs BENCHBOX_CONTAINER_CLI convention split",
+        "wid": "w4"
+      },
+      {
+        "evidence": "docs/operations/uat-framework.md now documents that failed standalone bring-up intentionally leaves the partial project for diagnosis and requires targeted cleanup",
+        "item_id": "uat-review-p3-followups",
+        "notes": null,
+        "started_at": "2026-08-22T16:58:43Z",
+        "started_branch": "fix/uat-review-p3-followups",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-uat-review-p3-followups",
+        "status": "done",
+        "summary": "(f) uat_bring_up failed-stack behavior: document as debugging aid or add opt-in --down-on-fail",
+        "wid": "w5"
+      }
+    ]
+  }
+}

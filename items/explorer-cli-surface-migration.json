@@ -1,0 +1,404 @@
+{
+  "context": "Strictly a relocation + caller-update PR. Read the ADR's \"Consequences\"\nlist and execute it line-by-line. Do not introduce new behavior, new\nflags, or new pipeline logic. Schema-versioning and dev-DX are explicit\nout-of-scope items handled by sibling TODOs.\n\nSequencing: relocate (w2, w3) before updating callers (w4) so the\ncallers point at the new live location, not a future path. Add the\npinning test (w5) last so it asserts the steady state.\n",
+  "description": "Execute the decision locked by TODO `explorer-cli-surface-adr`:\n  - Remove `explorer` from the user-facing `benchbox` CLI surface.\n  - Relocate `benchbox/cli/commands/explorer.py` (and, per ADR sub-question\n    a, optionally `benchbox/core/explorer_pipeline/`) to the destination\n    the ADR chose.\n  - Update every call site: CI workflow, browser-fixture generator, UAT\n    explorer-smoke phase, runbook, developer docs, frontend remediation\n    string in `results-explorer/src/db.ts:196`, and audit cross-refs.\n  - Delete the incorrect provenance breadcrumb at\n    `.github/workflows/docs.yml:105` that misattributes the CLI surface\n    to PR #46.\n  - Add a regression test that pins the frontend remediation text to the\n    live invocation of whatever entry point the ADR chose, so renames\n    do not silently rot the user-facing error message.\n\nThis TODO does NOT redesign the read-model contract (TODO\n`explorer-read-model-schema-versioning`) or address the stale-snapshot\ndev-DX wall (TODO `explorer-dev-snapshot-dx`). Those are separable.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the snapshot's output contract or column schema",
+        "instead": "(not specified)",
+        "item_id": "explorer-cli-surface-migration",
+        "why": "that work is owned by TODO `explorer-read-model-schema-versioning`."
+      },
+      {
+        "dont": "fix the stale-snapshot dev-DX wall in this PR",
+        "instead": "(not specified)",
+        "item_id": "explorer-cli-surface-migration",
+        "why": "that's TODO `explorer-dev-snapshot-dx`. Mixing them makes review harder and entangles the rename with behavioral change."
+      },
+      {
+        "dont": "keep `benchbox explorer` as a permanent alias unless the ADR explicitly chose option (b) with a deprecation shim. A bare `pass`-through alias defeats the whole point.",
+        "instead": "(not specified)",
+        "item_id": "explorer-cli-surface-migration",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "update historical audit docs that record commands actually run at the time. Only the active runbook and developer docs need updates; history can read 'we ran benchbox explorer build on 2026-05-10'.",
+        "instead": "(not specified)",
+        "item_id": "explorer-cli-surface-migration",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-cli-surface-migration",
+        "id": 157,
+        "reason": "Owned by TODO `explorer-dev-snapshot-dx`.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Owning TODO explorer-dev-snapshot-dx is completed (_project/DONE/main/active/explorer-dev-snapshot-dx.yaml).",
+        "summary": "Pre-dev rebuild hook or in-tree dev snapshot."
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-cli-surface-migration",
+        "id": 158,
+        "reason": "Owned by TODO `explorer-read-model-schema-versioning`.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: explorer-read-model-schema-versioning.yaml is already in _project/DONE — this work is complete.",
+        "summary": "Schema versioning for the read-model contract."
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-cli-surface-migration",
+        "id": 159,
+        "reason": "Owned by TODO `migration-phase-api-surface-gate`.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Owning TODO migration-phase-api-surface-gate is Completed; the Phase 8/9 API-surface gate already executed.",
+        "summary": "Phase 8/9 migration API-surface gate."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "needs_item": "explorer-cli-surface-adr"
+      }
+    ],
+    "item_meta": {
+      "category": "Refactoring",
+      "completed_at": "2026-05-14T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "explorer-cli-surface-migration"
+    },
+    "preserves": [
+      {
+        "behavior": "Browser-fixture generator continues to produce byte-identical fixture sets (verified by `verify-browser-fixtures.mjs`).",
+        "item_id": "explorer-cli-surface-migration"
+      },
+      {
+        "behavior": "CI explorer-build step in `.github/workflows/docs.yml` continues to produce a valid `results-explorer/public/data/results.duckdb` (only the invocation changes).",
+        "item_id": "explorer-cli-surface-migration"
+      },
+      {
+        "behavior": "Existing tests under `tests/unit/core/explorer_pipeline/` continue to pass (relocated if needed but not rewritten).",
+        "item_id": "explorer-cli-surface-migration"
+      },
+      {
+        "behavior": "Output contract (schema of `results.duckdb` and copied bundles) is unchanged by this TODO.",
+        "item_id": "explorer-cli-surface-migration"
+      },
+      {
+        "behavior": "UAT `make uat-explorer-smoke` continues to pass with the new invocation.",
+        "item_id": "explorer-cli-surface-migration"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/docs.yml:103-105 — CI invocation + the wrong PR #46 attribution comment; update invocation, delete the comment.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-migration",
+        "path": ".github/workflows/docs.yml:103-105"
+      },
+      {
+        "concept": "benchbox/cli/commands/explorer.py — current location; remove and relocate per ADR.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-migration",
+        "path": "benchbox/cli/commands/explorer.py"
+      },
+      {
+        "concept": "benchbox/core/explorer_pipeline/ — pipeline package; relocation gated by ADR sub-question (a).",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-migration",
+        "path": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "concept": "docs/development/browser-test-architecture.md:35,119,130 — developer docs referencing the old command.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-migration",
+        "path": "docs/development/browser-test-architecture.md:35,119,130"
+      },
+      {
+        "concept": "docs/operations/results-phase-2-runbook.md:109 — runbook references the old command.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-migration",
+        "path": "docs/operations/results-phase-2-runbook.md:109"
+      },
+      {
+        "concept": "results-explorer/scripts/explorer-build-contract.mjs:17 — EXPECTED_COMMAND constant; update to the new invocation.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-migration",
+        "path": "results-explorer/scripts/explorer-build-contract.mjs:17"
+      },
+      {
+        "concept": "results-explorer/scripts/generate-browser-fixtures.mjs:489 — Node-side caller; update spawn invocation.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-migration",
+        "path": "results-explorer/scripts/generate-browser-fixtures.mjs:489"
+      },
+      {
+        "concept": "results-explorer/src/db.ts:196 — frontend remediation string; update to the new invocation and pin to it via test.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-migration",
+        "path": "results-explorer/src/db.ts:196"
+      },
+      {
+        "concept": "tests/uat/.../explorer_smoke.py + Makefile target `uat-explorer-smoke` (line ~1612) — UAT phase invocation.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-migration",
+        "path": "tests/uat/.../explorer_smoke.py"
+      },
+      {
+        "concept": "tests/unit/cli/test_explorer_build_contract.py — existing contract tests; if the CLI moves out of benchbox/cli/, this test file moves with it or is replaced.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-migration",
+        "path": "tests/unit/cli/test_explorer_build_contract.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "<ADR-chosen destination paths>"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/__init__.py"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/explorer.py"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/help.py"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/**"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "docs/development/browser-test-architecture.md"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-phase-2-runbook.md"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/explorer-build-contract.mjs"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/generate-browser-fixtures.mjs"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/**"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/**"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_explorer_build_contract.py"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run benchbox --help | grep -c '^\\s*explorer'",
+        "description": "`explorer` is no longer in the public `benchbox` CLI surface.",
+        "expected": "0",
+        "item_id": "explorer-cli-surface-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-fast",
+        "description": "Fast tests pass.",
+        "expected": "exit 0",
+        "item_id": "explorer-cli-surface-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make lint && make typecheck",
+        "description": "Lint + typecheck pass.",
+        "expected": "exit 0",
+        "item_id": "explorer-cli-surface-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "<ADR-chosen new invocation> --data-dir results-data --output /tmp/explorer-migration-smoke && test -f /tmp/explorer-migration-smoke/results.duckdb",
+        "description": "Explorer-build pipeline still produces the snapshot via the new invocation.",
+        "expected": "exit 0, file exists",
+        "item_id": "explorer-cli-surface-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run db-remediation-pin",
+        "description": "Frontend Vitest pin test passes.",
+        "expected": "test exits 0",
+        "item_id": "explorer-cli-surface-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'added in PR #46' .github/workflows/docs.yml",
+        "description": "The wrong PR-#46 attribution is deleted from docs.yml.",
+        "expected": "0",
+        "item_id": "explorer-cli-surface-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-cli-surface-migration",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-cli-surface-migration",
+        "notes": "Read `docs/development/adr/adr-explorer-cli-surface.md` end-to-end.\nIf the inventories of call sites and pipeline imports already exist\nthere, reuse them; do not redo. Build the migration checklist from\nthe ADR's \"Consequences\" section.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-confirm the ADR is merged and read its inventories",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cli-surface-migration",
+        "notes": "Move `benchbox/cli/commands/explorer.py` to the ADR's chosen\ndestination. Update:\n  - `benchbox/cli/commands/__init__.py:22,62,106` — remove the\n    `from .explorer import explorer_group` import and `explorer_group`\n    registration + `__all__` entry.\n  - `benchbox/cli/help.py` — any references to explorer commands in\n    the help text.\nRun `uv run benchbox --help` and confirm `explorer` no longer appears.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Relocate the CLI entry point per ADR",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cli-surface-migration",
+        "notes": "Gated by ADR sub-question (a). If \"yes\": move the package + its tests\nunder `tests/unit/core/explorer_pipeline/` to the ADR's destination.\nUpdate imports in the relocated CLI entry from w2.\n\nIf \"no\": leave the package in place. Note this in the migration PR\ndescription so future readers understand the half-move was deliberate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Relocate `benchbox/core/explorer_pipeline/` if the ADR requires it",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cli-surface-migration",
+        "notes": "Process each of the call sites from the ADR's w1 inventory. Specifically:\n  - `.github/workflows/docs.yml:103` — replace invocation; DELETE the\n    `# Note: requires 'benchbox explorer' CLI subcommand (added in PR #46)`\n    line at :105 (the attribution is wrong; PR #46 is a docs PR).\n  - `results-explorer/scripts/generate-browser-fixtures.mjs:489`\n  - `results-explorer/scripts/explorer-build-contract.mjs:17`\n    (EXPECTED_COMMAND constant)\n  - `tests/uat/.../explorer_smoke.py` and `Makefile:uat-explorer-smoke`\n  - `docs/development/browser-test-architecture.md`\n  - `docs/operations/results-phase-2-runbook.md:109`\n  - `results-explorer/src/db.ts:196` (remediation string)\n  - audit docs that cite the old command — only the active runbook is\n    load-bearing; historical audits can keep the old command since they\n    record what was run at the time. Decide per-file in the PR review.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update every call site identified in the ADR inventory",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cli-surface-migration",
+        "notes": "The current failure mode: `results-explorer/src/db.ts:196` embeds the\nstring `'benchbox explorer build'`. If the CLI is renamed, nothing\nforces this string to update. Two options:\n\n  (i) Import the canonical invocation from a shared TS module sourced\n      from the same contract file the Node scripts already use\n      (`results-explorer/scripts/explorer-build-contract.mjs`), so\n      there is one source of truth.\n  (ii) Add a test that asserts the current `db.ts` remediation string\n      matches the exported `EXPECTED_COMMAND` from the contract\n      script.\n\nPrefer (i). Implement in the Vitest suite under\n`results-explorer/src/lib/__tests__/`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a regression test pinning the frontend remediation string",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cli-surface-migration",
+        "notes": "Local verification:\n  - `uv run benchbox --help | grep -c explorer` → 0\n  - `cd results-explorer && npm run lint && npm test`\n  - `make lint && make typecheck`\n  - `make test-fast`\n  - Manual: run the relocated entry point against `results-data/` and\n    confirm `results.duckdb` is generated with the expected schema.\n\nOpen PR via `make pr-open`. Title prefix `refactor(explorer):`. Body\nreferences the merged ADR and lists each call site touched.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the full verification matrix and open the PR",
+        "wid": "w6"
+      }
+    ]
+  }
+}

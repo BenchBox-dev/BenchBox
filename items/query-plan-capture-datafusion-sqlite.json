@@ -1,0 +1,269 @@
+{
+  "context": "Start with DataFusion (w1-w4): confirm the exact EXPLAIN JSON API against the\ninstalled datafusion version, then wire the three integration points. The\nparser already exists, so this is plumbing work. Then replicate for SQLite\n(w5-w8), which uses a text-tree format rather than JSON. Both platforms are\nlocally runnable so all unit tests can use real in-process connections rather\nthan mocks if desired.\n",
+  "description": "DataFusion and SQLite each have fully-implemented parsers\n(`benchbox/core/query_plans/parsers/datafusion.py` and\n`benchbox/core/query_plans/parsers/sqlite.py`). Neither adapter currently\noverrides `get_query_plan()` or `get_query_plan_parser()`, and neither\n`execute_query()` calls `capture_query_plan()`. Both platforms run entirely\nlocally with no cloud credentials required — this is the lowest-friction\ngroup to complete after the PostgreSQL family.\n\nGap summary per adapter:\n  - DataFusionAdapter (benchbox/platforms/datafusion.py)\n      • get_query_plan(): ❌ no override — base returns None\n      • get_query_plan_parser(): ❌ no override — base returns None\n      • execute_query(): ❌ never calls capture_query_plan()\n      • DataFusion EXPLAIN format: JSON — `EXPLAIN FORMAT JSON <query>`\n        or `EXPLAIN ANALYZE FORMAT JSON <query>` (includes execution stats)\n  - SQLiteAdapter (benchbox/platforms/sqlite.py — or embedded in another file)\n      • get_query_plan(): ❌ no override — base returns None\n      • get_query_plan_parser(): ❌ no override — base returns None\n      • execute_query(): ❌ never calls capture_query_plan()\n      • SQLite EXPLAIN format: `EXPLAIN QUERY PLAN <query>` returns rows of\n        (id, parent, notused, detail) — text-based tree representation\n\nBoth parsers already handle their respective formats and are covered by unit\ntests. The only work is adding the three-point integration:\nget_query_plan() → get_query_plan_parser() → execute_query() capture call.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "import DataFusionQueryPlanParser at module level in datafusion.py",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "why": "keep lazy to avoid import cost when DataFusion is not installed."
+      },
+      {
+        "dont": "use EXPLAIN ANALYZE for SQLite",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "why": "SQLite's EXPLAIN QUERY PLAN does not support ANALYZE and will raise an error."
+      },
+      {
+        "dont": "use ctx.sql().to_pandas() for EXPLAIN output",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "why": "use collect() and extract the scalar text to avoid an unnecessary pandas dependency."
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-06-03T00:00:00Z",
+      "created_at": "2026-06-02T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "DataFusion EXPLAIN queries must not be issued when capture_plans=False — avoid performance overhead on every query.",
+        "item_id": "query-plan-capture-datafusion-sqlite"
+      },
+      {
+        "behavior": "DataFusionAdapter.execute_query() and SQLiteAdapter.execute_query() must continue to return identical result dict keys to existing callers.",
+        "item_id": "query-plan-capture-datafusion-sqlite"
+      },
+      {
+        "behavior": "Plan capture failure must never fail the benchmark when strict_plan_capture=False.",
+        "item_id": "query-plan-capture-datafusion-sqlite"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/query_plans/parsers/datafusion.py — existing DataFusion JSON parser (20KB)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "path": "benchbox/core/query_plans/parsers/datafusion.py"
+      },
+      {
+        "concept": "benchbox/core/query_plans/parsers/sqlite.py — existing SQLite text-tree parser",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "path": "benchbox/core/query_plans/parsers/sqlite.py"
+      },
+      {
+        "concept": "benchbox/platforms/duckdb.py:1069 — get_query_plan_parser() override pattern",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "path": "benchbox/platforms/duckdb.py:1069"
+      },
+      {
+        "concept": "benchbox/platforms/duckdb.py:969 — canonical execute_query plan-capture integration pattern",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "path": "benchbox/platforms/duckdb.py:969"
+      },
+      {
+        "concept": "tests/unit/platforms/test_duckdb_plan_capture.py — unit test pattern to replicate",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "path": "tests/unit/platforms/test_duckdb_plan_capture.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/datafusion.py"
+      },
+      {
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/sqlite.py"
+      },
+      {
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/platform-expansion/planning/query-plan-capture-datafusion-sqlite.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/sqlite.py"
+      },
+      {
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_datafusion_plan_capture.py"
+      },
+      {
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_sqlite_plan_capture.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_datafusion_plan_capture.py -v",
+        "description": "DataFusion plan capture unit tests pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_sqlite_plan_capture.py -v",
+        "description": "SQLite plan capture unit tests pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -q",
+        "description": "Full unit test suite still passes",
+        "expected": "0 failures, 0 errors",
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "notes": "Run a trivial DataFusion query with EXPLAIN FORMAT JSON in the BenchBox\nharness or a standalone script. Record the exact SQL syntax that works\nwith the installed datafusion version and confirm the output matches what\nDataFusionQueryPlanParser expects. Capture to /tmp/datafusion-explain-w1.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm DataFusion EXPLAIN JSON syntax via live query and document in TODO",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "notes": "In benchbox/platforms/datafusion.py add:\n  def get_query_plan(self, connection, query):\n      ctx = connection  # DataFusion uses a SessionContext\n      result = ctx.sql(f\"EXPLAIN FORMAT JSON {query}\")\n      return result.collect()[0][0].as_py()  # adjust to actual API\n\n  def get_query_plan_parser(self):\n      from benchbox.core.query_plans.parsers.datafusion import DataFusionQueryPlanParser\n      return DataFusionQueryPlanParser()\nAdjust the exact RecordBatch extraction to match the DataFusion Python API\nas confirmed in w1.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add get_query_plan() and get_query_plan_parser() to DataFusionAdapter",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "notes": "Locate the result-assembly block in DataFusionAdapter.execute_query(). After\nthe timed execution block, add the same capture_plans guard as DuckDB:\n  if self.capture_plans:\n      query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)\n      if query_plan:\n          plan_fingerprint = query_plan.plan_fingerprint\nPropagate query_plan and plan_fingerprint into the return dict.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate capture_query_plan() into DataFusionAdapter.execute_query()",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "notes": "Create tests/unit/platforms/test_datafusion_plan_capture.py. Cover:\n  - get_query_plan_parser() returns DataFusionQueryPlanParser\n  - execute_query() with capture_plans=True triggers capture\n  - execute_query() with capture_plans=False does not trigger capture\n  - plan_fingerprint present in result dict when capture succeeds\n  - graceful degradation on parse failure\nMock the DataFusion SessionContext to avoid requiring datafusion package\nin the base unit test run if it is not installed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for DataFusion plan capture wiring",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "notes": "Run `EXPLAIN QUERY PLAN <simple_query>` against an in-memory SQLite database\nand compare the raw rows to what SQLiteQueryPlanParser expects.\nSQLite returns (id, parent, notused, detail) tuples. Verify parser handles\nthem correctly. Capture to /tmp/sqlite-explain-w5.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm SQLite EXPLAIN QUERY PLAN syntax and parser compatibility",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "notes": "In benchbox/platforms/sqlite.py (or wherever SQLiteAdapter lives) add:\n  def get_query_plan(self, connection, query):\n      cursor = connection.cursor()\n      cursor.execute(f\"EXPLAIN QUERY PLAN {query}\")\n      rows = cursor.fetchall()\n      cursor.close()\n      # Format as text tree for the parser\n      return \"\\n\".join(f\"{r[0]}|{r[1]}|{r[2]}|{r[3]}\" for r in rows)\n\n  def get_query_plan_parser(self):\n      from benchbox.core.query_plans.parsers.sqlite import SQLiteQueryPlanParser\n      return SQLiteQueryPlanParser()\nConfirm the text format matches what SQLiteQueryPlanParser expects.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add get_query_plan() and get_query_plan_parser() to SQLiteAdapter",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "notes": "Same pattern as w3 but for SQLiteAdapter.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate capture_query_plan() into SQLiteAdapter.execute_query()",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-datafusion-sqlite",
+        "notes": "Create tests/unit/platforms/test_sqlite_plan_capture.py. Same coverage as\nw4 but using SQLiteQueryPlanParser and Python's stdlib sqlite3 connections.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for SQLite plan capture wiring",
+        "wid": "w8"
+      }
+    ]
+  }
+}

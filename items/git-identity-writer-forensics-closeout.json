@@ -1,0 +1,90 @@
+{
+  "context": "Read-only inspection plus local capture only. Enumerate every stash with `git stash list --format='%gd %ai %an <%ae> %gs'` and correlate each timestamp against the pool worktree it came from and against known session times, to date the last agent-authored write. Relocate the preserved config snapshot from /tmp into ~/.benchbox with restrictive permissions, keeping the original filename inside the record. State plainly whether a contaminated .git/config was ever captured live; if it was not, say so rather than implying it was. Produce a short durable record under ~/.benchbox so the next investigator does not re-derive this. No repository files change, so no worktree claim is needed for the investigation itself; claim one only if the findings warrant a documentation change, and treat that as separate work.",
+  "description": "Two forensic loose ends remain after the identity investigation, and both bear on whether the recurrence is closed or merely quiet. First, the stash count moved: the original catalogue listed FIVE Claude-authored stashes spanning 2026-07-21 to 2026-07-27 across four pool worktrees; a later local inspection listed EIGHT (stash@{1} through stash@{8}). Either the writer was active after 07-27, or some entries were produced during remediation work itself. Those two readings imply opposite conclusions about whether the mechanism is still live, and the question is answerable from stash timestamps and the reflog. Second, the preserved evidence copy was written to /tmp/benchbox-primary-git-config-before-identity.txt; on macOS /tmp is cleared on reboot, which is unsound for an investigation already spanning weeks. AGENTS.md already designates ~/.benchbox for local capture under [REVIEW-CAPTURE-001]. A third ambiguity should be resolved while here: the recorded 'before the previous remediation' snapshot shows .git/config resolving to Joe Harris, i.e. a repo-local [user] block holding the HUMAN value, not the agent value. That is not the contaminated state, so it is unclear whether the contaminated config was ever captured live or whether the block had already flipped back. Record which it was, because it determines what any future verification is comparing against.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Drop, apply, or rewrite any stash to tidy the list",
+        "instead": "Read them with git stash list and leave them exactly as they are",
+        "item_id": "git-identity-writer-forensics-closeout",
+        "why": "The stashes are the primary forensic record of when the identity was effective locally, and they cannot be reconstructed once dropped"
+      },
+      {
+        "dont": "Report the stash-count discrepancy as resolved without dating the most recent agent-authored entry",
+        "instead": "Give the date of the newest agent-authored stash and say which reading it supports",
+        "item_id": "git-identity-writer-forensics-closeout",
+        "why": "The whole value of this item is distinguishing 'writer still live' from 'artifacts of our own remediation', and only the timestamps separate them"
+      },
+      {
+        "dont": "Rewrite author or committer metadata on any existing commit",
+        "instead": "Leave history alone; the merge-time guard keeps agent-authored commits off develop",
+        "item_id": "git-identity-writer-forensics-closeout",
+        "why": "A prior identity-history rewrite in this repository corrupted 2286 commits on main and 1850 on published-results, undetected for roughly 2.5 months"
+      },
+      {
+        "dont": "Sync any of this to the hosted tracker as a finding without separate authorization",
+        "instead": "Write the record under ~/.benchbox and report it",
+        "item_id": "git-identity-writer-forensics-closeout",
+        "why": "[REVIEW-CAPTURE-001] confines in-review capture to local ~/.benchbox drafts; hosted sync needs its own approval"
+      }
+    ],
+    "item_meta": {
+      "category": "investigation",
+      "created_at": "2026-08-04T01:28:58Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Every existing stash entry, unmodified and in its current order",
+        "item_id": "git-identity-writer-forensics-closeout"
+      },
+      {
+        "behavior": "The full reflog and all existing commit history",
+        "item_id": "git-identity-writer-forensics-closeout"
+      },
+      {
+        "behavior": "The primary clone's working tree and config, which this item only reads",
+        "item_id": "git-identity-writer-forensics-closeout"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "git-identity-writer-forensics-closeout",
+        "kind": "do_not_modify",
+        "path_glob": "**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -s \"$HOME/.benchbox/git-identity-forensics/primary-git-config-before-identity.txt\"",
+        "description": "A durable evidence record exists outside /tmp",
+        "expected": "the preserved config snapshot survives a reboot",
+        "item_id": "git-identity-writer-forensics-closeout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test \"$(git -C /Users/joe/Developer/BenchBox stash list | wc -l | tr -d ' ')\" -ge 8",
+        "description": "Every stash present at the start of this item is still present",
+        "expected": "no stash was dropped during the investigation",
+        "item_id": "git-identity-writer-forensics-closeout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git -C /Users/joe/Developer/BenchBox diff --quiet && git -C /Users/joe/Developer/BenchBox diff --cached --quiet",
+        "description": "The repository working tree was not modified by this investigation",
+        "expected": "read-only investigation left no tracked change",
+        "item_id": "git-identity-writer-forensics-closeout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

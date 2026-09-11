@@ -1,0 +1,228 @@
+{
+  "description": "Consolidates deferred live integration test work from completed platform\nadapter TODOs. Each adapter was implemented with full unit test coverage but\ndeferred live cloud testing due to account provisioning requirements.\n\nPlatforms with deferred live tests:\n- Firebolt Cloud (from firebolt-cloud-deployment)\n- StarRocks (from starrocks-olap-platform)\n- Starburst Galaxy (from starburst-platform-adapter)\n- MotherDuck (from motherduck-platform-adapter)\n- pg_duckdb via MotherDuck (from pg-duckdb-platform-adapter)\n- pg_mooncake object storage (from pg-mooncake-platform-adapter)\n\nAlso consolidates deferred CI infrastructure items:\n- Docker-based PostgreSQL extension testing (from postgres-extension-benchmarking-infrastructure)\n- Automated multi-extension comparison pipeline\n\nMotherDuck adapter feature work (credential wizard, cloud upload, cache\ncontrol) has been split to motherduck-cloud-features.yaml - this TODO covers\nonly test infrastructure and smoke tests.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-03-28T00:00:00Z",
+      "created_at": "2026-02-18T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "work_needs": [
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w1",
+        "wid": "w10"
+      },
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w6",
+        "wid": "w11"
+      },
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w8",
+        "wid": "w11"
+      },
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "cloud-integration-test-infrastructure",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-infrastructure",
+        "notes": "Produce a provisioning checklist covering:\n1. Which accounts already exist (check for env vars / config files)\n2. Minimum viable setup per platform (free tier? trial? Docker alternative?)\n   - StarRocks: Docker Compose (free, local) - already has docker/starrocks/\n   - pg_duckdb / pg_mooncake: Docker (free, local)\n   - MotherDuck: free tier available (10 GB)\n   - Firebolt: trial account required\n   - Starburst Galaxy: trial account required\n3. Required env vars per platform for skip-when-unavailable logic\n4. Estimated monthly cost for platforms without free tiers\n5. Recommendation: prioritize Docker-based tests (free) first, then\n   free-tier cloud, then paid-tier cloud\nDecision: Docker-based tests (w7) should run in CI from the start since\nthey are free and deterministic. Cloud tests remain local-only until\ncredentials are available in CI secrets.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research - inventory cloud accounts, document provisioning steps, estimate costs",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-infrastructure",
+        "notes": "Register new markers (live_firebolt, live_starburst, live_motherduck,\nlive_pg_duckdb, live_pg_mooncake) in pyproject.toml.\nAdd a shared fixture or helper for the standard smoke test pattern:\nconnect → create table → load SF=0.01 → run TPC-H Q1 → validate row count.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add per-platform live test markers to pyproject.toml and create shared cloud test fixtures",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-infrastructure",
+        "notes": "Create unified Docker Compose config under docker/pg-extensions/ that\nbrings up PostgreSQL with all three extensions. Wire into Makefile as\nmake test-docker-up-pg-extensions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Docker-based PostgreSQL extension CI harness - Docker Compose for pg_duckdb, pg_mooncake, pg_analytics",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-infrastructure",
+        "notes": "Script or pytest fixture that runs the same benchmark suite against\npg_duckdb, pg_mooncake, and pg_analytics, collecting results per extension.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Multi-extension comparison orchestration - run benchmarks across pg extensions sequentially",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-infrastructure",
+        "notes": "Takes collected results from w11 and generates comparison report\n(ASCII table + optional HTML chart). Integrate with existing\nresult_plotter.py infrastructure.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Multi-extension comparison report generation - produce comparison tables from orchestrated results",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-infrastructure",
+        "notes": "External blocker: requires Firebolt Cloud trial/paid account with\nprovisioned engine and S3 credentials for data loading.\nEnv vars: FIREBOLT_HOST, FIREBOLT_USER, FIREBOLT_PASSWORD, FIREBOLT_DATABASE.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Firebolt Cloud live smoke tests - connect, create table, run TPC-H Q1, validate result",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-infrastructure",
+        "notes": "No external blocker - Docker Compose setup already exists at\ndocker/starrocks/docker-compose.yml. Use skip_unless_docker_service()\ntargeting localhost:19030.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "StarRocks live smoke tests - connect, create table, run TPC-H Q1, validate result",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-infrastructure",
+        "notes": "External blocker: requires Starburst Galaxy trial/paid account and\nrunning cluster.\nEnv vars: STARBURST_HOST, STARBURST_USER, STARBURST_PASSWORD, STARBURST_CATALOG.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Starburst Galaxy live smoke tests - connect, create table, run TPC-H Q1, validate result",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-infrastructure",
+        "notes": "Free tier available (10 GB). Env var: MOTHERDUCK_TOKEN.\nUse get_env_or_skip(\"MOTHERDUCK_TOKEN\", \"MotherDuck\").\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "MotherDuck live smoke tests - connect, create table, run TPC-H Q1, validate result",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-infrastructure",
+        "notes": "Requires Docker (pg_duckdb extension) + MOTHERDUCK_TOKEN for MotherDuck mode.\nTwo-phase skip: skip_unless_docker_service for pg, get_env_or_skip for token.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "pg_duckdb MotherDuck mode integration tests - connect via MotherDuck, run TPC-H Q1",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-infrastructure",
+        "notes": "External blocker: requires S3 bucket with Parquet/Iceberg test data.\nEnv vars: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, BENCHBOX_S3_TEST_BUCKET.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "pg_duckdb S3 Parquet/Iceberg data lake query tests",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-infrastructure",
+        "notes": "External blocker: requires S3 or GCS bucket with credentials and a\nDocker PostgreSQL instance with pg_mooncake extension.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "pg_mooncake S3/GCS object storage integration tests",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-integration-test-infrastructure",
+        "notes": "Requires pg_mooncake Docker setup from w8 plus WAL configuration.\nTests replication lag measurement and benchmark consistency under WAL load.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "pg_mooncake pg_moonlink WAL replication benchmarking tests",
+        "wid": "w9"
+      }
+    ]
+  }
+}

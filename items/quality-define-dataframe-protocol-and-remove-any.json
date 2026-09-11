@@ -1,0 +1,157 @@
+{
+  "context": "Use typing.Protocol (PEP 544) for structural typing - no inheritance changes\nto existing dataframe libraries. Mark with @runtime_checkable so the\nconformance test can use isinstance().\n\nFor methods that genuinely vary across backends (e.g., Polars lazy vs Pandas\neager), keep the library-specific type at the dispatch site and document why.\n\nBe honest about Any: if a method genuinely takes \"anything that has __array__\",\nkeep Any with a one-line comment explaining why a more specific type is wrong.\nThe goal is not zero Any; it is meaningful Any.\n",
+  "description": "Quality plan Phase 4b. The audit found 6,059 `Any` annotations across\nbenchbox/, concentrated in the dataframe interop layer\n(benchbox/platforms/dataframe/unified_frame.py: 4,138 lines). This is the\nlargest single source of typing evasion in the project. The 190 `# type: ignore`\ndirectives cluster in the same area.\n\nDefine a DataFrameProtocol capturing the common surface across Polars,\nPandas, PyArrow, Modin, Dask, cudf - operations actually used by BenchBox\n(read_parquet, filter, group_by/agg, join, collect, schema, len). Replace\nAny annotations with the protocol where dispatch is generic, and with\nconcrete library types where dispatch is library-specific.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add runtime type checks at every call site",
+        "instead": "type-check at boundaries only",
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "why": "that's slow and noisy"
+      },
+      {
+        "dont": "inherit from a base class",
+        "instead": "use Protocol",
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "why": "dataframe libraries don't share one and we can't modify them"
+      },
+      {
+        "dont": "touch unified_frame.py runtime behavior",
+        "instead": "annotations only",
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "why": "that's a separate concern"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-13T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All dataframe-platform tests pass on Polars, Pandas, PyArrow at minimum",
+        "item_id": "quality-define-dataframe-protocol-and-remove-any"
+      },
+      {
+        "behavior": "Lazy-loading semantics for optional dataframe backends preserved",
+        "item_id": "quality-define-dataframe-protocol-and-remove-any"
+      },
+      {
+        "behavior": "Runtime behavior of unified_frame.py unchanged - this is type annotations only (plus protocol definition)",
+        "item_id": "quality-define-dataframe-protocol-and-remove-any"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run ty check benchbox/platforms/dataframe/ > /tmp/ty_after.txt; diff /tmp/ty_baseline.txt /tmp/ty_after.txt | grep '^>' || true",
+        "description": "Type checker shows no new errors on dataframe layer vs pre-refactor baseline captured in w1",
+        "expected": "no lines emitted (additions to baseline = new errors; removals are tolerated and filtered out)",
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/ -q",
+        "description": "All dataframe tests pass",
+        "expected": "all tests pass",
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/test_protocol_conformance.py -v",
+        "description": "Protocol conformance test passes for every backend",
+        "expected": "all tests pass",
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture ty-check baseline to /tmp/ty_baseline.txt, then classify unified_frame.py methods: generic dispatch → protocol, library-specific → concrete type, escape hatch → keep Any",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define benchbox/platforms/dataframe/protocol.py with DataFrameProtocol covering the common surface (use typing.Protocol + runtime_checkable)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace Any annotations in unified_frame.py per the survey classification",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run `uv run ty check benchbox/platforms/dataframe/` - fix any newly-surfaced errors (these are real bugs the prior Any was hiding)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-define-dataframe-protocol-and-remove-any",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a regression test that asserts DataFrameProtocol satisfies isinstance() check for each supported backend",
+        "wid": "w5"
+      }
+    ]
+  }
+}

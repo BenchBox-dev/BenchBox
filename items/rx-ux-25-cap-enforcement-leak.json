@@ -1,0 +1,219 @@
+{
+  "context": "Enforcement first, cosmetics second, in one commit. Add a genuine cap guard to QueryHeatmap.toggleRow using selectedIds.size against MAX_COMPARE_SELECTIONS, mirroring the local-derivation pattern already used at Query.tsx:951. Derive the cap-blocked state inside QueryHeatmap from selectedIds rather than accepting a new prop. Only once the guard is proven by test may selectionAwareMatrixSummary be deleted. The cap reason must remain discoverable somewhere for the whole matrix; it must not simply disappear when the per-row copy is removed.",
+  "description": "QueryHeatmap.toggleRow (components/QueryHeatmap.tsx:238-246) checks only isComparable(row) and contains no MAX_COMPARE_SELECTIONS check. The only thing enforcing the 4-run cap on the benchmark matrix is BenchmarkIndex.tsx:463 selectionAwareMatrixSummary, which writes a fabricated comparison_exclusion_reason into every unselected row once the cap is reached; isComparable (lib/displayEligibility.ts:92) is literally row.comparison_exclusion_reason === null, so the fake data reads back as enforcement. Session state is stored in a read-model field that describes the result bundle. Two consequences. First, any change that removes the mutation without adding a real guard silently removes the cap (updateSelectedIds in BenchmarkIndex is a silent no-op backstop, so the checkbox would look enabled and clicking would do nothing). Second, because the limit is expressed as row data, QueryHeatmap renders it per row inside the 176px sticky platform cell (desktop :713, mobile cards :526), so a matrix at the cap shows one wrapped Disabled reason block per unselected row and row heights roughly double. Query.tsx:951, PlatformIndex.tsx:825 and the Compare builder all derive the same cap reason locally without touching the row; only the matrix mutates, because QueryHeatmap receives a whole summary object. Verified at HEAD 39ead3a41 and confirmed independently by two adversarial reviews.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Delete selectionAwareMatrixSummary and pass a display-only atSelectionCap prop",
+        "instead": "INSTEAD land the toggleRow guard first and prove it, then remove the mutation",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "why": "toggleRow has no cap check, so the mutation IS the enforcement and removing it first silently disables the cap"
+      },
+      {
+        "dont": "Remove the per-row cap reason without landing a replacement in the same commit",
+        "instead": "INSTEAD gate removal on w3 choosing the replacement location",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "why": "BenchmarkIndex.test.tsx asserts the reason is reachable and the matrix would become the only surface that hides why a checkbox is dead"
+      },
+      {
+        "dont": "Switch capped checkboxes to aria-disabled to make them focusable",
+        "instead": "INSTEAD keep native disabled and drop the inert aria-describedby association",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "why": "the reason is already visible in row text, this adds dozens of inert tab stops, needs click suppression on a controlled Preact checkbox, and breaks .disabled assertions in six test files"
+      }
+    ],
+    "item_meta": {
+      "category": "bug",
+      "completed_at": "2026-08-24T13:13:17Z",
+      "completed_pr": 1872,
+      "created_at": "2026-08-24T12:38:18Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "A fifth selection is refused on the benchmark matrix at every commit in this item",
+        "item_id": "rx-ux-25-cap-enforcement-leak"
+      },
+      {
+        "behavior": "Genuine per-row exclusions keep their existing reason copy and placement",
+        "item_id": "rx-ux-25-cap-enforcement-leak"
+      },
+      {
+        "behavior": "The cap reason stays discoverable on the matrix at every commit - no commit may leave the matrix the only surface that hides it",
+        "item_id": "rx-ux-25-cap-enforcement-leak"
+      },
+      {
+        "behavior": "comparison_exclusion_reason continues to mean a property of the result bundle, never session state",
+        "item_id": "rx-ux-25-cap-enforcement-leak"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "coded reason with shortText detailText recoveryHint",
+        "decision": "reuse",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "path": "results-explorer/src/lib/compareExclusionReasons.ts"
+      },
+      {
+        "concept": "same local derivation at :825",
+        "decision": "reuse",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "path": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "concept": "local cap-reason derivation without mutating row data",
+        "decision": "reuse",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "path": "results-explorer/src/pages/Query.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/displayEligibility.ts"
+      },
+      {
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+      },
+      {
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/BenchmarkIndex.test.tsx",
+        "description": "Fifth selection refused with mutation deleted",
+        "expected": "pass - cap held by toggleRow guard, not by data",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "last_result": "pass",
+        "last_run": "2026-08-24T13:12:57Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run",
+        "description": "Explorer unit suite green",
+        "expected": "all pass",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "last_result": "pass",
+        "last_run": "2026-08-24T13:13:15Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && ! grep -n 'comparison_exclusion_reason:' src/pages/BenchmarkIndex.tsx",
+        "description": "No session state written into read-model fields",
+        "expected": "pass - no matches",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "last_result": "pass",
+        "last_run": "2026-08-24T13:13:15Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "npx vitest run src/components/__tests__/QueryHeatmap.test.tsx: 29 tests passed; direct component test refuses fifth selection",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "notes": null,
+        "started_at": "2026-08-24T12:50:35Z",
+        "started_branch": "fix/rx-ux-25-cap-enforcement-leak",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-25-cap-enforcement-leak",
+        "status": "done",
+        "summary": "Add MAX_COMPARE_SELECTIONS guard to QueryHeatmap.toggleRow and prove a fifth selection is refused with the mutation still in place",
+        "wid": "w1"
+      },
+      {
+        "evidence": "QueryHeatmap derives selectionAtCap from selectedIds and disables only unselected rows; focused test 29 passed",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "notes": null,
+        "started_at": "2026-08-24T12:53:00Z",
+        "started_branch": "fix/rx-ux-25-cap-enforcement-leak",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-25-cap-enforcement-leak",
+        "status": "done",
+        "summary": "Derive cap-blocked row state inside QueryHeatmap from selectedIds without adding an atSelectionCap prop",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Decision: global cap reason lives in CompareTray summary because it describes the whole selected set; avoids a per-row wall and a new matrix column",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "notes": null,
+        "started_at": "2026-08-24T12:53:06Z",
+        "started_branch": "fix/rx-ux-25-cap-enforcement-leak",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-25-cap-enforcement-leak",
+        "status": "done",
+        "summary": "GATE - decide where the cap reason lives for the matrix before removing per-row copy - options are a tray-level status line or a Compare state column matching PlatformIndex and Compare",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Deleted selectionAwareMatrixSummary; QueryHeatmap receives analysisSummary ?? filteredSummary directly; grep finds no comparison_exclusion_reason assignment",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "notes": null,
+        "started_at": "2026-08-24T12:54:24Z",
+        "started_branch": "fix/rx-ux-25-cap-enforcement-leak",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-25-cap-enforcement-leak",
+        "status": "done",
+        "summary": "Delete selectionAwareMatrixSummary and assert the summary passed to QueryHeatmap is reference-equal to the un-augmented summary",
+        "wid": "w4"
+      },
+      {
+        "evidence": "BenchmarkIndex cap test now asserts disabled fifth row plus tray-level maximum/recovery copy; 64 focused tests passed",
+        "item_id": "rx-ux-25-cap-enforcement-leak",
+        "notes": null,
+        "started_at": "2026-08-24T12:54:30Z",
+        "started_branch": "fix/rx-ux-25-cap-enforcement-leak",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-25-cap-enforcement-leak",
+        "status": "done",
+        "summary": "Rewrite BenchmarkIndex.test.tsx cap assertions to target the new reason location rather than deleting them",
+        "wid": "w5"
+      }
+    ]
+  }
+}

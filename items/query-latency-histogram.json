@@ -1,0 +1,11 @@
+{
+  "description": "Add a new \"query latency histogram\" chart type that displays one vertical bar per query,\nshowing the execution latency for each query. This provides a quick visual overview of\nquery performance distribution across a benchmark run.\n\nWhen more than ~33 queries are graphed, the visualization should automatically split\ninto multiple charts to maintain readability. This is particularly useful for TPC-DS\n(99 queries) where a single chart would be too dense.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-05T00:00:00Z",
+      "created_at": "2025-02-05T00:00:00Z",
+      "worktree": "main"
+    }
+  }
+}

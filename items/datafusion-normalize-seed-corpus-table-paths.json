@@ -1,0 +1,102 @@
+{
+  "context": "Reproduce with a DataSource whose table payload contains serialized string paths, then normalize at the earliest DataFusion adapter boundary using the shared path-normalization contract. Preserve directory-format detection and multi-shard behavior.",
+  "description": "Seed Corpus workflow_dispatch run 30455422794 selected SSB only. Both DataFusion cells failed during load with AttributeError: str object has no attribute is_dir at DataFusion directory-format detection, while SSB generation completed. DataFusion custom load_tables wraps scalar values in a list but does not normalize string paths to Path before calling _detect_directory_format. The shared data-loading layer already has normalize_table_paths; establish the correct reuse boundary and cover the real SSB source shape.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform adapter",
+      "created_at": "2026-07-29T13:26:11Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Path inputs, multi-shard lists, and Delta or Iceberg directory detection remain behaviorally unchanged",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths"
+      },
+      {
+        "behavior": "adapter imports stay lazy and the fix adds no eager DataFusion dependency",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "datafusion-normalize-seed-corpus-table-paths",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "datafusion-normalize-seed-corpus-table-paths",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit -k \"datafusion and (path or load)\" -q",
+        "description": "String paths reach DataFusion loading as Path objects",
+        "expected": "all selected tests pass",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform datafusion --benchmark ssb --scale 0.01 --phases generate,load,power --compression zstd:9 --non-interactive",
+        "description": "Tiny SSB DataFusion lifecycle gets past table loading",
+        "expected": "exit 0 with a clean result bundle",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "datafusion-normalize-seed-corpus-table-paths",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "datafusion-normalize-seed-corpus-table-paths",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "datafusion-normalize-seed-corpus-table-paths",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reproduce the SSB string-path DataSource failure in a focused DataFusion adapter test",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "datafusion-normalize-seed-corpus-table-paths",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Normalize scalar and list table paths before format detection and loading",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "datafusion-normalize-seed-corpus-table-paths",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run a tiny local SSB DataFusion lifecycle and the focused adapter suite",
+        "wid": "w3"
+      }
+    ]
+  }
+}

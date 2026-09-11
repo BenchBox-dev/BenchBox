@@ -1,0 +1,10 @@
+{
+  "description": "Implement a TPC-DS-OBT benchmark that collapses all TPC-DS sales + returns + needed attributes into ONE truly wide table. The benchmark must output only one table (e.g., `tpcds_sales_returns_obt`) that merges store/web/catalog sales and returns, embeds any dimension attributes inline, and is the sole table referenced by the adapted queries. No auxiliary dimension tables are part of the benchmark.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "benchmark-expansion"
+    }
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "description": "Follow-up spun out of PR #886 (the boundary-tie probe, w1 of\ncross-surface-comparator-boundary-tie-soundness) and its self-review. It records\na known, accepted residual limitation in the order-aware tie-aware validator so\nit is tracked rather than forgotten.\n\n`ResultValidator._validate_order_aware` accepts a differing FINAL tie group under\na trailing `LIMIT` when:\n\n    if i == last_index and tie_aware and (len(orig_rows) >= 2 or final_key_tied_beyond_limit):\n        continue\n\nThe `len(orig_rows) >= 2` branch (landed by #878, preserved by #886) accepts a\nmembership difference in any final group that has >= 2 visible rows sharing the\norder key - WITHOUT evidence that the `LIMIT` actually truncated that tie. That\nis unsound for a COMPLETE, non-truncated final tie group: e.g.\n`... ORDER BY a DESC LIMIT 10` over a table with exactly 10 rows whose last two\nrows tie at `a`. There is no truncation, so both surfaces should return the SAME\ntwo tied rows; a membership difference like `[(5,'a'),(5,'b')]` vs\n`[(5,'a'),(5,'c')]` is a genuine value bug, yet the `>= 2` branch accepts it as a\n\"boundary swap\" and the gate goes silently green.\n\n#886's boundary-tie probe (`final_key_tied_beyond_limit`) is the exact signal\nneeded to distinguish a truncated tie from a complete one, but #886 scoped it to\nthe single-visible-row case only (its stated charter). For the >= 2 case the\nprobe is deliberately NOT consulted, and `cross_surface._final_key_tied_beyond_limit`\neven short-circuits (returns False, skipping the extra query) whenever the\nreference's final group already spans >= 2 rows - so today the >= 2 branch has no\ntruncation evidence at all.\n\nAccepted tradeoff (decided on #886): the failure mode is a MASKED bug (a false\nnegative) confined to a narrow shape - a complete, non-truncated, multi-row final\ntie group whose members differ between surfaces. All six enforced cross-surface\ngates currently pass with 0 unclassified divergent, so this is latent and\ndata-dependent, not an active breakage. It is documented in-code at the guard\nsite. Closing it is a deliberate, separately-scoped change (below), not a\ndrive-by, because it alters the #872/#878 established semantics and forces a\ntest + cost change.\n\nPriority raised Low -> Medium (2026-06-28, holistic-review remediation): for a\nbenchmark tool, false confidence in a correctness gate is the worst outcome, so a\ndocumented masked-value-bug path in the comparator warrants Medium and should be\nclosed before the next published cross-platform comparison claim. (The fix is\nalready scoped in w1; this is the only change to this item.)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "broaden scope into a general LIMIT-removal or untruncated-result comparison rewrite.",
+        "instead": "(not specified)",
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "disable tie-aware validation or weaken mismatch reporting to preserve current green gates.",
+        "instead": "(not specified)",
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "keep accepting a multi-row final tie group on row count alone; require truncation evidence.",
+        "instead": "(not specified)",
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "id": 135,
+        "reason": "Out of scope - changing query shape would change what the cross-surface gate measures; the per-query probe is the targeted, additive fix (same rationale as #886).",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Explicitly rejected: reworking the gate to drop LIMITs was ruled out of scope in favor of the per-query probe fix that shipped instead.",
+        "summary": "Reworking the gate to compare untruncated result sets generally (dropping LIMITs)"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-06-28T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All enforced cross-surface gates remain green with 0 unclassified divergences after the tighter final-tie check.",
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness"
+      },
+      {
+        "behavior": "TPC-Havoc strict validation behavior is byte-identical when order_aware/tie_aware is disabled.",
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness"
+      },
+      {
+        "behavior": "The fix remains targeted to boundary-tie soundness; it does not rewrite queries or compare untruncated result sets.",
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness"
+      },
+      {
+        "behavior": "Truncated ORDER BY/LIMIT boundary swaps remain accepted only when the probe proves the final key extends past the LIMIT.",
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': 'PR #872', 'note': 'Introduced the order-aware/tie-aware comparator; original final-group accept was unconditional.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'PR #878', 'note': 'Tightened the final-group accept to len(orig_rows) >= 2 (catches the single-row value bug).'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'PR #886', 'note': 'Added the boundary-tie probe (final_key_tied_beyond_limit) for the single-visible-row case and documented this residual >= 2 gap at the guard site.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/core/tpchavoc/validation.py:_validate_order_aware', 'note': 'The guard site: `if i == last_index and tie_aware and (len(orig_rows) >= 2 or final_key_tied_beyond_limit)`.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/equivalence/cross_surface.py"
+      },
+      {
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpchavoc/validation.py"
+      },
+      {
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_validator_order_aware.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_validator_order_aware.py -q -k 'final_tie or boundary'",
+        "description": "Complete final tie with differing members now fails",
+        "expected": "complete non-truncated >=2 final tie membership difference raises; genuinely truncated boundary swap still passes",
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make ssb-cross-surface-equivalence-report && make clickbench-cross-surface-equivalence-report && make tpchavoc-equivalence-report",
+        "description": "Cross-surface and TPC-Havoc behavior stays green",
+        "expected": "cross-surface gates remain 0 unclassified divergent; tpchavoc strict result counts unchanged",
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cross-surface-comparator-complete-final-tie-group-soundness",
+        "notes": "Make the order-aware final-group acceptance require evidence that the LIMIT\nactually truncated the tie, for BOTH the single-row and the >= 2 case, so a\ncomplete (non-truncated) final tie group difference is CAUGHT. The probe\nalready answers exactly this (\"does the final order key recur past the\ncutoff?\"), so the targeted shape is to consult `final_key_tied_beyond_limit`\nfor the >= 2 branch too rather than accepting on row count alone.\n\nScope to evaluate (this is NOT a one-liner - it ripples through three places):\n  1. validation.py `_validate_order_aware`: change the guard so the >= 2\n     branch also requires truncation evidence. Keep it ADDITIVE for callers\n     that do not opt into the probe.\n  2. cross_surface.py `_final_key_tied_beyond_limit`: today it short-circuits\n     (returns False, skips the extra LIMIT n+1 query) when the reference final\n     group already has >= 2 rows - precisely the case w1 now needs the probe\n     for. That optimization must be removed/relaxed for the >= 2 case, at the\n     cost of one extra bounded probe query for those queries.\n  3. tests/integration/test_validator_order_aware.py\n     `test_order_aware_truncated_limit_boundary_swap_is_not_flagged` encodes\n     the CURRENT behavior (a 2-row final swap accepted with tie_aware but NO\n     probe). It must be re-framed to pass the probe signal, and a NEW test\n     added for the complete (table-exhausted, non-truncated) 2-row final tie\n     that must now RAISE.\n\nHard constraints (same as #886): the TPC-Havoc strict path (no order_aware/\ntie_aware) stays byte-identical; all six enforced cross-surface gates stay\ngreen with 0 unclassified divergent; tpchavoc 220/220 and 440/440 unchanged.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Gate the >=2 final-tie-group accept on truncation evidence so a complete final tie no longer masks a value bug",
+        "wid": "w1"
+      }
+    ]
+  }
+}

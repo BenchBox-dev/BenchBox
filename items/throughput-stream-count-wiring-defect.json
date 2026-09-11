@@ -1,0 +1,138 @@
+{
+  "description": "Strong evidence that the number of concurrent streams a user requests never\nreaches the throughput test, which silently runs at the hard-coded default\n(2). Two independent breaks in the chain:\n\n1. `run-official --streams N` VALIDATES that --streams is provided\n   (benchbox/cli/commands/run_official.py:36-38), prints it (line 46, 52-53\n   \"Note: Stream configuration ({streams} streams) applies when supported\"),\n   then invokes `run` WITHOUT passing `streams`\n   (run_official.py:56-67). The value is discarded.\n\n2. Through the main pipeline, the run config carries `concurrent_streams`\n   (from BenchmarkConfig.concurrency): benchbox/cli/execution_pipeline.py:106,\n   benchbox/cli/orchestrator.py:494, benchbox/core/runner/runner.py:726,\n   benchbox/core/schemas.py:98 (`RunConfig.concurrent_streams`). But the\n   throughput drivers read a DIFFERENT key:\n   - benchbox/platforms/base/execution.py:368\n     `num_streams = run_config.get(\"num_streams\", run_config.get(\"streams\", 2))`\n   - benchbox/platforms/base/execution.py:233 (TPC-DS) `run_config.get(\"num_streams\", 2)`.\n   Neither `num_streams` nor `streams` is ever populated from\n   `concurrent_streams`, so both default to 2 regardless of user input.\n\nNet effect: `benchbox run ... --phases throughput` and `run-official\n--streams 8` both execute 2 streams. The headline throughput metric is\ncomputed for the wrong concurrency level, and QphH/QphDS composed from it is\nwrong. This is a functional defect, not just a UX gap.\n\nNOTE (w0): confirm the break end-to-end with a live run before fixing, since\na legacy alias could exist somewhere not yet found. If a path is found that\nDOES honor the count, narrow the fix accordingly.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "rename concurrent_streams across the schema",
+        "instead": "map it at the driver boundary instead.",
+        "item_id": "throughput-stream-count-wiring-defect",
+        "why": "it is used by cost models and result metrics"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "throughput-stream-count-wiring-defect",
+        "id": 496,
+        "reason": "run.py is not in this TODO's scope_limit.only_modify\n(benchbox/platforms/base/execution.py,\nbenchbox/cli/commands/run_official.py, tests/integration/ only).\nAdding a real CLI option there is a small, low-risk one-line-per-call\nchange (a new click.option + concurrency=... in the three\nBenchmarkConfig(...) constructions in _run_dry_run/_run_direct/the\ninteractive flow) but is out of scope for this fix and needs its own\nreviewed change.\n",
+        "resolution": "promoted",
+        "resolved_item": "add-a-streams-concurrency-cli-option-to-benchbox-run-itself",
+        "resolved_reason": null,
+        "summary": "Add a --streams/--concurrency CLI option to `benchbox run` itself\n(benchbox/cli/commands/run.py) so BenchmarkConfig.concurrency is\nreachable from the canonical (non-deprecated) `run` command, not just\nthe deprecated `run-official` shim. Confirmed there is currently NO way\nto set concurrency>1 through `run`'s direct-execution path\n(benchbox/cli/commands/run.py `_run_direct`) at all -- every\n`BenchmarkConfig(...)` construction in that file omits `concurrency=`,\nso it always takes the schema default of 1. docs/usage/faq.md already\ndocuments `benchbox run --platform duckdb --benchmark tpch --scale 1\n--phases throughput --streams 4` as valid usage (see the sibling\nconcurrency-docs-alignment TODO's \"do not document it as working until\nit does\" caveat) -- that example remains non-functional until this\nfollow-up lands, since run.py was out of this TODO's scope_limit.\n"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-09T00:00:00Z",
+      "created_at": "2026-07-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing default of 2 streams when the user requests nothing.",
+        "item_id": "throughput-stream-count-wiring-defect"
+      },
+      {
+        "behavior": "back-compat callers that already pass num_streams= directly (official_benchmark.py path).",
+        "item_id": "throughput-stream-count-wiring-defect"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "throughput-stream-count-wiring-defect",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run_official.py"
+      },
+      {
+        "item_id": "throughput-stream-count-wiring-defect",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "throughput-stream-count-wiring-defect",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration -k throughput_stream_count -v",
+        "description": "Requesting N streams runs N streams against DuckDB",
+        "expected": "test asserts streams_executed == requested N for N in {1,4}",
+        "item_id": "throughput-stream-count-wiring-defect",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "throughput-stream-count-wiring-defect",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "throughput-stream-count-wiring-defect",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "throughput-stream-count-wiring-defect",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "throughput-stream-count-wiring-defect",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "throughput-stream-count-wiring-defect",
+        "notes": "Confirmed against a real (file-based) DuckDB TPC-H run (SF=0.01):\nrun_config carried concurrent_streams=4 (exactly what RunConfig\npopulates from BenchmarkConfig.concurrency), but\n_execute_tpch_throughput_test only reads num_streams/streams, so\nstreams_executed=2 (the driver's own hardcoded default) regardless of\nthe request. Command + output captured to\n/tmp/throughput-wiring-w0.log. This is now the regression oracle\nexercised by tests/integration/test_throughput_stream_count.py.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prove the defect end-to-end: run throughput with --streams/concurrency=4 and assert only 2 streams execute today",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-stream-count-wiring-defect",
+        "notes": "Added a shared _resolve_requested_stream_count(run_config) helper in\nbenchbox/platforms/base/execution.py, used by both\n_execute_tpch_throughput_test and _execute_tpcds_throughput_test.\nPrecedence: num_streams/streams (back-compat, existing callers/tests\nthat hand-build run_config) -> concurrent_streams (the canonical\nRunConfig/BenchmarkConfig field) -> 2 (only when none of the three\nkeys are present at all, preserving must_preserve's back-compat\ndefault for bare/legacy run_config dicts).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Thread concurrent_streams -> num_streams through the adapter throughput drivers",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-stream-count-wiring-defect",
+        "notes": "Discovered run() (benchbox/cli/commands/run.py) has NO\n--streams/--concurrency CLI option at all (out of this TODO's\nscope_limit), so `streams` cannot be forwarded to ctx.invoke(run, ...)\nas a keyword arg -- there's no matching parameter to receive it. Fixed\nwithin run_official.py alone: added _forward_requested_streams(), a\ncontext manager that transiently patches\nBenchmarkOrchestrator.execute_benchmark (the one seam run()'s direct\nexecution path always passes through) to set\nBenchmarkConfig.concurrency = streams immediately before execution --\nthe same canonical field the w1 driver fix reads, per\nanti_patterns (no parallel field, no schema rename). Verified live via\n`benchbox run-official tpch --platform duckdb --scale 1 --phases\nthroughput --streams 4 --seed 42`: BenchmarkOrchestrator.execute_benchmark\nnow observes config.concurrency == 4 (confirmed with a spy on the real\nCLI path). Also replaced the misleading \"applies when supported\" note\nwith an accurate one. See the `deferred` section below for the\nrun.py-level gap this uncovered.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pass --streams from run-official into run (or route through the same concurrency field)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-stream-count-wiring-defect",
+        "notes": "tests/integration/test_throughput_stream_count.py: real DuckDB TPC-H\n(parametrized N in {1,4}) and TPC-DS (N=2) driver-level tests asserting\nstreams_executed == requested; a back-compat test confirming the\ndefault of 2 is preserved when no stream-count key is present at all;\na back-compat test confirming num_streams= still wins over\nconcurrent_streams for legacy callers; and two focused tests of the\nrun_official.py _forward_requested_streams bridge (sets concurrency,\nand is a no-op when --streams is absent). All 7 tests pass under the\ncanonical verification command.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "End-to-end regression test: requesting N streams executes N streams",
+        "wid": "w3"
+      }
+    ]
+  }
+}

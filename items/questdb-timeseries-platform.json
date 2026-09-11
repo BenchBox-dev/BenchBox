@@ -1,0 +1,595 @@
+{
+  "description": "Integrate QuestDB as a supported BenchBox platform. QuestDB is a high-performance\nopen-source time-series database (Apache 2.0 license) optimized for fast ingestion\nand SQL queries over time-series data. It has strong adoption in financial services,\nIoT, and observability use cases (14K+ GitHub stars).\n\nTechnical fit analysis:\n- PostgreSQL wire protocol support (port 8812) - can use psycopg2/asyncpg\n- Standard SQL support with time-series extensions (SAMPLE BY, LATEST ON)\n- SQLGlot may need custom dialect or 'postgres' with adjustments\n- High-performance InfluxDB Line Protocol (ILP) ingestion endpoint\n- REST API for queries and data import (CSV upload)\n- Columnar storage with SIMD-optimized execution\n\nStrategic value:\n- Fills gap in time-series database coverage (alongside TimescaleDB, InfluxDB)\n- Enables benchmarking time-series specific workloads and ingestion rates\n- Growing adoption in real-time analytics and financial data scenarios\n- Complements existing OLAP platforms with specialized time-series focus\n\nNote: QuestDB's strengths are in time-series workloads; TPC-H/TPC-DS may not\nshowcase its optimal use case. Consider time-series specific benchmarks as\nfuture enhancement.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-16T00:00:00Z",
+      "created_at": "2026-01-18T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "work_needs": [
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w10",
+        "wid": "w12"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w10",
+        "wid": "w13"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w16",
+        "wid": "w17"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w16",
+        "wid": "w18"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w16",
+        "wid": "w19"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w20",
+        "wid": "w21"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w20",
+        "wid": "w22"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w20",
+        "wid": "w23"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w24",
+        "wid": "w25"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w24",
+        "wid": "w26"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w27",
+        "wid": "w28"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w27",
+        "wid": "w29"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w27",
+        "wid": "w30"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w31",
+        "wid": "w32"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w31",
+        "wid": "w33"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w31",
+        "wid": "w34"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w35",
+        "wid": "w36"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w35",
+        "wid": "w37"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w35",
+        "wid": "w38"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w39",
+        "wid": "w40"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "questdb-timeseries-platform",
+        "needs_wid": "w6",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create benchbox/platforms/questdb.py adapter",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement schema creation with QuestDB-specific DDL",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle timestamp column designation (designated timestamp)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support partitioning (PARTITION BY DAY/MONTH/YEAR)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle QuestDB-specific data types (symbol, timestamp)",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register platform in platform_registry.py",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add psycopg2 to optional dependencies in pyproject.toml",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Assess TPC-H query compatibility",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test all 22 TPC-H queries for syntax compatibility",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document any required query modifications",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement query rewrites if needed",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement QuestDBAdapter class inheriting from PlatformAdapter",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement platform optimizations",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure appropriate partition schemes for TPC tables",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Optimize symbol columns for low-cardinality fields",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test and tune parallel query execution",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create tuning profile for QuestDB",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define TPC-H specific tuning (partitioning, indexes)",
+        "wid": "w25"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document optimal configuration for benchmark runs",
+        "wid": "w26"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create unit tests for QuestDB adapter",
+        "wid": "w27"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test connection handling and configuration",
+        "wid": "w28"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test SQL generation and any dialect handling",
+        "wid": "w29"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Determine SQLGlot dialect (postgres or custom)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test REST API import request formatting",
+        "wid": "w30"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create integration tests",
+        "wid": "w31"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Docker Compose for local QuestDB instance",
+        "wid": "w32"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test TPC-H SF=0.01 end-to-end",
+        "wid": "w33"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate query results against reference",
+        "wid": "w34"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create documentation",
+        "wid": "w35"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create docs/platforms/questdb.md with connection guide",
+        "wid": "w36"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document data loading options and best practices",
+        "wid": "w37"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add notes on time-series specific considerations",
+        "wid": "w38"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create example script",
+        "wid": "w39"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement create_connection() using psycopg2 (PG wire protocol)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create examples/getting_started/sql/questdb_tpch.py",
+        "wid": "w40"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement execute_query() with timing and row count validation",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement data loading options",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Primary: REST API CSV import (/imp endpoint)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Alternative: InfluxDB Line Protocol for time-series data",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-timeseries-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fallback: COPY command via PG protocol",
+        "wid": "w9"
+      }
+    ]
+  }
+}

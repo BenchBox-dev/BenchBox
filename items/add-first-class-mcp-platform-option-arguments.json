@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #461 of prompts-landing-phase5-mcp-parity.\nDeferred: Add first-class MCP platform option arguments\nReason deferred: Requires MCP tool API work outside the landing prompt batch.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:20Z",
+      "worktree": "main"
+    }
+  }
+}

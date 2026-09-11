@@ -1,0 +1,10 @@
+{
+  "description": "Create a new AI/ML Primitives benchmark to test cross-platform SQL-based AI/ML\nfunctions. This benchmark covers built-in AI functions that execute within the\ndata warehouse, NOT external ML frameworks or vector search (covered separately).\n\nFocus areas:\n- LLM/Generative AI functions (Snowflake Cortex, BigQuery ML, Databricks AI)\n- Sentiment analysis, text classification, summarization\n- Entity extraction, translation\n- SQL-invokable ML predictions (not model training)\n\nThis differs from the existing Vector Search benchmark which focuses on\nembedding storage and similarity search. This benchmark tests AI function\ninvocation performance and output quality consistency.",
+  "legacy": {
+    "item_meta": {
+      "category": "Benchmark Development",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "benchmark-expansion"
+    }
+  }
+}

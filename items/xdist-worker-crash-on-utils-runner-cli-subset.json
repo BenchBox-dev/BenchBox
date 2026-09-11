@@ -1,0 +1,41 @@
+{
+  "context": "Bisect which directory pair triggers it, then which module -- suspect adapters that spin up native clients at import or fixture time. Reproduce with -p no:randomly and a fixed -n value to pin the ordering, then either fix the offending import/fixture teardown or isolate that module to its own xdist group.",
+  "description": "Running 'uv run -- python -m pytest tests/unit/utils/ tests/unit/core/runner/ tests/unit/cli/ -q' aborts a pytest-xdist worker with 'Fatal Python error: gilstate_tss_set: failed to set current tstate (TSS)'. The crash cascades into 5-7 reported FAILUREs whose membership CHANGES between identical runs -- observed sets included test_cli_test_execution + test_quiet_mode, then test_quiet_mode + test_run_driver_version_announcement, then test_platform + test_run_command_interactive_paths. Every affected file passes in isolation. Confirmed pre-existing and change-independent: reproduced on a clean tree with all working changes stashed, during PR #1304. The full fast lane (-m fast, 25775 tests) does NOT reproduce it, so CI is unaffected -- but it makes ad-hoc local subset runs untrustworthy and can send an agent chasing a phantom regression, which is exactly what it did here. Likely a native-extension/threading interaction (a C extension touching the GIL from a non-Python thread) surfaced by a particular module import order under xdist.",
+  "legacy": {
+    "item_meta": {
+      "category": "test-infrastructure",
+      "completed_at": "2026-07-25T20:33:25Z",
+      "completed_pr": 1312,
+      "created_at": "2026-07-25T15:14:14Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "The fast lane keeps running under -n auto with its current worker count",
+        "item_id": "xdist-worker-crash-on-utils-runner-cli-subset"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/utils/ tests/unit/core/runner/ tests/unit/cli/ -q",
+        "description": "The three-directory subset completes without a fatal worker error",
+        "expected": "no 'Fatal Python error' in output, exit 0",
+        "item_id": "xdist-worker-crash-on-utils-runner-cli-subset",
+        "last_result": "pass",
+        "last_run": "2026-07-25T20:30:43Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast lane stays green",
+        "expected": "exit 0",
+        "item_id": "xdist-worker-crash-on-utils-runner-cli-subset",
+        "last_result": "pass",
+        "last_run": "2026-07-25T20:32:25Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

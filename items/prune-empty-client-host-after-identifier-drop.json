@@ -1,0 +1,85 @@
+{
+  "context": "After public anonymization walk, drop empty dict shells for known optional blocks (client_host and similar) when no remaining keys; unit test; optional corpus re-derive only if product wants cleaner bytes.",
+  "description": "After #1578 omits machine_id from environment.client_host, many public bundles leave client_host as an empty object {}. Cosmetic residual from adversarial review C6; no privacy leak, but pollutes payload shape and Explorer/read-model noise.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "prune-empty-client-host-after-identifier-drop",
+        "needs_item": "published-pseudonym-oracle-and-field-set"
+      }
+    ],
+    "item_meta": {
+      "category": "cleanup",
+      "completed_at": "2026-08-05T21:43:06Z",
+      "completed_pr": 1587,
+      "created_at": "2026-08-05T20:50:01Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Non-empty client_host profiles (os, arch, cpu, memory) still export",
+        "item_id": "prune-empty-client-host-after-identifier-drop"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "prune-empty-client-host-after-identifier-drop",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "prune-empty-client-host-after-identifier-drop",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "prune-empty-client-host-after-identifier-drop",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run python -c \"from benchbox.core.results.anonymization import AnonymizationManager as A; o=A().anonymize_result_payload({\\\"environment\\\":{\\\"client_host\\\":{\\\"machine_id\\\":\\\"x\\\"}}}); assert \\\"client_host\\\" not in o.get(\\\"environment\\\",{})\"",
+        "description": "Empty client_host is omitted after anonymize",
+        "expected": "exit 0 once pruned",
+        "item_id": "prune-empty-client-host-after-identifier-drop",
+        "last_result": "pass",
+        "last_run": "2026-08-05T21:36:22Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "prune-empty-client-host-after-identifier-drop",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Omit empty optional maps (clienthost) after public walk drops identifier-only content",
+        "item_id": "prune-empty-client-host-after-identifier-drop",
+        "notes": null,
+        "started_at": "2026-08-05T21:36:08Z",
+        "started_branch": "fix/prune-empty-client-host",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Prune empty optional blocks after public anonymize",
+        "wid": "w0"
+      },
+      {
+        "evidence": "unit tests empty vs non-empty client_host; verify rung exit 0",
+        "item_id": "prune-empty-client-host-after-identifier-drop",
+        "notes": null,
+        "started_at": "2026-08-05T21:36:15Z",
+        "started_branch": "fix/prune-empty-client-host",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Unit tests for empty vs non-empty client_host",
+        "wid": "w1"
+      }
+    ]
+  }
+}

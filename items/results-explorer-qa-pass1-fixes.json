@@ -1,0 +1,343 @@
+{
+  "context": "Investigate before patching. w1 and w2 are research units that produce\ndecisions; w3-w7 are mechanical once those decisions exist. Run them in\nthe order: w1 → (w3, w4, w5, w6 in parallel) → w7 → w8.\n\nNote on file surface: `files_affected.modified` lists the maximal set\nacross all hypotheses. The actual files touched in w3 depend on which\nhypothesis (H1/H2/H3) wins in w1 — H1 may not require any code change\nin duckdbQueries.ts or PlatformIndex.tsx at all (loading-state nuance\nonly). Re-baseline files_affected at the start of w3 if needed.\n\nReuse existing patterns:\n  - Sort handlers (B1): copy ResultDetail's `<th><button onClick=toggleSort()>`\n    pattern verbatim.\n  - Unknown-benchmark guard (B3): the cohort_metadata table already\n    enumerates valid benchmarks; query it once on mount.\n  - Key uniqueness (B4): every result has a stable `result_id`; use it\n    directly rather than inventing a new key.\n\nFor the failing PlatformIndex (B2), do NOT skip the diagnosis step. The\ntest report data shows the rows are in the DB, so jumping to a fix risks\npatching the wrong layer.\n",
+  "description": "First end-to-end QA pass of the Results Explorer (run on Chromium 147 and\nFirefox 148 against the dev server at http://localhost:5173/results/) found\nfour real product bugs, plus one open question about a possibly-removed UI\ncontrol. This item tracks the investigation and remediation of each.\n\nSource: QA tester report on commit ca9a8ed9b, scored against the test plan\nwritten by the agent. Filtered out test-plan errors (the SSB route mistake)\nand known-upstream warnings (DuckDB-WASM exception-handling, JSX-source\nbabel plugin warning, Chrome-headless cold-load latency tracked separately\nas `enable-duckdb-wasm-http-range-reads-for-registered-urls`).\n\nBugs to fix:\n  B1  PlatformIndex tables have static <th> headers — no sort handlers.\n  B2  /results/p/duckdb/ and /results/p/polars/ render empty even though\n      the DuckDB browser store has 4 + 2 rows for those platforms.\n  B3  /results/does-not-exist/ renders an empty BenchmarkIndex instead of\n      the NotFound page (preact-router \":benchmark/\" matches anything).\n  B4  TimeSeries on platform pages emits a Preact duplicate-key warning\n      when multiple results share a run_date.\n\nOpen question (resolve before any UI change):\n  Q1  ResultDetail and Compare both have `primaryMetric` state read from\n      `?metric=` URL param, but no in-page toggle UI. Is this an\n      intentional URL-only contract or a regression?",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add the missing primary-metric toggle UI before w2 confirms it was actually removed",
+        "instead": "gather git evidence first.",
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "why": "it may be a deliberate URL-only contract"
+      },
+      {
+        "dont": "delete or rewrite the existing default-sort logic in PlatformIndex while adding click-sort",
+        "instead": "extend, don't replace.",
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "why": "the empty-state ordering is observable behavior"
+      },
+      {
+        "dont": "special-case duckdb/polars in PlatformIndex",
+        "instead": "find the equality / projection bug and fix it for all platforms at once.",
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "why": "the bug is almost certainly a generic data-binding mismatch"
+      },
+      {
+        "dont": "widen B3's NotFound guard to top-level routes",
+        "instead": "guard only the `:benchmark/` slug match.",
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "why": "preact-router's `default` already handles those"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-qa-pass1-fixes",
+        "id": 243,
+        "reason": "Already tracked separately by the\n`enable-duckdb-wasm-http-range-reads-for-registered-urls` work\n(see results-explorer/src/db.ts:67-77 for the full annotation).\nDo not duplicate here.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Reason explicitly states the cold-load latency issue is already tracked by enable-duckdb-wasm-http-range-reads-for-registered-urls, which is open.",
+        "summary": "Investigate Chrome-headless 30-45s cold-load latency"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-qa-pass1-fixes",
+        "id": 244,
+        "reason": "Upstream DuckDB-WASM. No local action available until the runtime\ndrops the deprecated `try` form.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Firefox WASM exception-handling deprecation warning is purely an upstream DuckDB-WASM issue with no local action available.",
+        "summary": "Suppress / upgrade Firefox WebAssembly exception-handling deprecation warning"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-qa-pass1-fixes",
+        "id": 245,
+        "reason": "Dev-only; zero user impact. Can be batched with a future Vite/Preact\ntooling bump.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Trivial dev-only cosmetic warning, zero user impact, explicitly deferred to bundle with an unrelated future Vite/Preact bump; not worth standalone tracking.",
+        "summary": "Silence Preact dev-mode '@babel/plugin-transform-react-jsx-source' warning"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-qa-pass1-fixes",
+        "id": 246,
+        "reason": "Tester did not have lhci installed and elected not to install new\ntooling for this pass. Re-attempt next QA round once tooling is\nprovisioned (or run ad-hoc via Chrome DevTools Lighthouse panel).\n",
+        "resolution": "promoted",
+        "resolved_item": "run-lighthouse-a11y-audit",
+        "resolved_reason": null,
+        "summary": "Run Lighthouse a11y audit"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-qa-pass1-fixes",
+        "id": 247,
+        "reason": "The contract recorded in w2 (\"setPrimaryMetric is only ever fed\nfrom getPrimaryMetricForBenchmark\") is observed by convention\nacross the two existing callers (ResultDetail.tsx, Compare.tsx).\nA future contributor adding a third caller could violate it\nsilently. Type-enforcement (e.g. a `usePrimaryMetric(benchmark)`\nhook that wraps useState + getPrimaryMetricForBenchmark together\nso direct setState is unreachable) would make the contract\nstructural rather than tribal. Low priority while only two\ncallsites exist; revisit when a third page emerges.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: getPrimaryMetricForBenchmark still has only two callers (ResultDetail.tsx, Compare.tsx); the stated trigger for type-enforcement (a third caller) has not occurred.",
+        "summary": "Type-enforce the benchmark-derived primaryMetric contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-01T00:00:00Z",
+      "created_at": "2026-04-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Compare's `?ids=zzz` invalid-id error path keeps showing 'Cannot compare' rather than crashing",
+        "item_id": "results-explorer-qa-pass1-fixes"
+      },
+      {
+        "behavior": "DuckDB-WASM single-attach behaviour: results.duckdb is fetched once per page-session, not per navigation",
+        "item_id": "results-explorer-qa-pass1-fixes"
+      },
+      {
+        "behavior": "Existing PlatformIndex default sort (geomean_ms ascending, nulls last) remains the initial state",
+        "item_id": "results-explorer-qa-pass1-fixes"
+      },
+      {
+        "behavior": "NotFound page continues to render for genuinely unknown top-level routes (preact-router default)",
+        "item_id": "results-explorer-qa-pass1-fixes"
+      },
+      {
+        "behavior": "ResultDetail's existing sort UI (button-in-th + sortArrow) keeps working unchanged",
+        "item_id": "results-explorer-qa-pass1-fixes"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/explorer.py"
+      },
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TimeSeries.tsx"
+      },
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run test",
+        "description": "Vitest unit tests pass after all fixes",
+        "expected": "Test Files  ... passed ... 0 failed",
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "TypeScript clean across the explorer",
+        "expected": "exit code 0; no `error TS` lines emitted",
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium",
+        "description": "Playwright e2e Chromium suite passes (includes new unknown-benchmark spec)",
+        "expected": "passed (... ms); 0 failed",
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "open http://localhost:5173/results/p/duckdb/ && open http://localhost:5173/results/p/polars/",
+        "description": "Manual smoke: /results/p/duckdb/ shows 4 rows, /results/p/polars/ shows 2 rows",
+        "expected": "DuckDB page lists 4 result rows; Polars page lists 2 result rows; neither shows the 'No results' empty state",
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "open http://localhost:5173/results/does-not-exist/",
+        "description": "Manual smoke: /results/does-not-exist/ shows the NotFound page",
+        "expected": "Page renders the NotFound component (404 copy), not an empty BenchmarkIndex shell",
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "open http://localhost:5173/results/p/duckdb/  # then check DevTools Console",
+        "description": "Manual smoke: console clean on /results/p/duckdb/ (no Preact duplicate-key warning)",
+        "expected": "No 'Each child in a list should have a unique \"key\" prop' warnings; no red error entries",
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "needs_wid": "w6",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "notes": "DECISION: B2 is real and intermittent. The casing/projection bug\nand the equality-mismatch bug are both ruled out. The mechanism\nthat produces the intermittency is NOT YET PINNED — w3 must\ninstrument before implementing a fix.\n\nEvidence (what we know):\n  - Direct DuckDB inspection: `platform_index_rows` for the\n    production corpus contains clean ASCII slugs ('duckdb',\n    'polars', 'datafusion', 'sqlite') with no whitespace, casing,\n    or NULL oddities. → rules out the projection/casing class.\n  - PlatformIndex.tsx:48 filter is `r.platform_id === platform`\n    (strict-equality ASCII strings). The same code path renders\n    the same data shape for every platform; if it failed for\n    \"polars\" it would also fail for \"sqlite\". → rules out the\n    equality-mismatch class.\n  - Three serial invocations of the original manual repro produced\n    P/F, F/F, P/P with the warm run finishing in 1-3s — strong\n    intermittency signal correlated with WASM warmth.\n\nMechanism (NOT confirmed — three plausible candidates):\n  1. DuckDB-WASM cold-load partial data: a SELECT resolves\n     before the runtime has fetched all of the table's pages.\n     Underlying range-read issue tracked as\n     `enable-duckdb-wasm-http-range-reads-for-registered-urls`\n     (see results-explorer/src/db.ts:67-77).\n  2. Preact useEffect cleanup race: PlatformIndex.tsx:24-40\n     uses `let cancelled = false; if (!cancelled) setRows(r)`.\n     A fast navigation between platform pages could drop the\n     setRows call.\n  3. Shared `initPromise` race in db.ts:48-96: `getDb()` reuses\n     `initPromise` across mounts; component-ordering quirks\n     could leave the cached `dbInstance` in an inconsistent\n     state.\n\nNone of the three has direct evidence yet. Picking a fix without\ninstrumentation risks fixing the wrong layer.\n\nThe manual overlay repro was replaced in w3 by the route-backed\nregression guard at\n`results-explorer/e2e/failures/platform-index-cold-load.spec.ts`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Investigate B2 — root-cause empty PlatformIndex for duckdb/polars",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "notes": "DECISION: No toggle should exist. The original Q1 framing was\nbased on an incomplete read of the code; the actual contract is\nstronger than \"URL-only\" — it is \"benchmark-derived, not\nuser-configurable.\"\n\nEvidence:\n  - `git log -G\"primaryMetric\"` returns ONE commit ever\n    touching the symbol in pages/ — f9d08d38b, the migration\n    that originally populated develop. There is no removed\n    button in history.\n  - ResultDetail.tsx:64-66 calls\n    `getPrimaryMetricForBenchmark(data.benchmark)` and feeds\n    the result into `setPrimaryMetric`. Compare.tsx:82-84 does\n    the same with `details[0]!.benchmark`. The setter is NEVER\n    fired from a user-driven event in either file.\n  - The metric is therefore determined by the benchmark family's\n    ranking config (e.g. ClickBench → power_score, TPC-H →\n    display_geomean_ms). Letting users override it via a toggle\n    would produce incorrect cross-benchmark comparisons.\n  - Cross-benchmark comparisons are foreclosed by Compare.tsx:64-71,\n    which rejects mixed-benchmark sets with \"Cannot compare results\n    from different benchmarks: ...\". Since every Compare and\n    ResultDetail view is single-benchmark, the per-benchmark metric\n    is unambiguous — a toggle would only enable wrong metric choices,\n    not legitimate ones.\n\nImplication for w7:\n  - Drop §4.2 (\"Primary metric toggle (power_score ↔\n    display_geomean_ms) updates the chart\") from the test plan.\n  - Drop §5.3 (same expectation in Compare).\n  - Optionally add a positive assertion that confirms the\n    benchmark-derived contract — but capture the actual axis-label\n    text emitted by chartRegistry.ts:233-240 for each benchmark's\n    primary_metric (run the relevant pages once and copy the\n    rendered label). Do NOT guess the text; the labels are\n    generated, not hard-coded.\n\nNo follow-up TODO needed; the feature should not be added.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve Q1 — confirm whether ResultDetail/Compare primary-metric toggle should exist",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "notes": "Landed in `fix(results-explorer): QA pass-1 follow-ups\nincluding B2` (#54): the confirmed mitigation is the cold-load\npartial-data path, fixed in `results-explorer/src/db.ts` with a\nbounded readiness fence that scans `bench.platform_index_rows`\nbefore exposing the cached DuckDB instance. This deliberately\ndoes not use `COUNT(*)`, because that can be satisfied from\nmetadata while the real PlatformIndex projection still needs a\nsequential scan over result rows.\n\nRegression guard:\n  - `results-explorer/e2e/failures/platform-index-cold-load.spec.ts`\n    now covers `/results/p/duckdb/` and `/results/p/polars/`\n    cold loads through the standard browser-test fixture server.\n\n`/code review W3`: no required issues. The mitigation is bounded\n(five attempts, increasing 100ms delay), still permits a genuinely\nempty future corpus after the retry window, removes the need for\ntemporary console instrumentation, and keeps the DuckDB single\nattach/cache contract intact.\n\nVerification:\n  - `cd results-explorer && npm run test:e2e:fixtures` passed.\n  - `cd results-explorer && npm run build` passed.\n  - `cd results-explorer && for i in 1 2 3 4 5 6 7 8 9 10; do npx playwright test --project=chromium --workers=1 --grep \"cold-load regression\" --reporter=list; done`\n    passed all 10 serial runs: 20 route checks passed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix B2 — instrument first, then apply mitigation matching the confirmed mechanism",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "notes": "Copied the button-in-th pattern from ResultDetail.tsx:326-352\nand applied to all five sortable columns in PlatformIndex.tsx\n(Benchmark, Scale, Date, Power Score, Geomean). Geomean was\nadded beyond the original four to keep the UX consistent —\notherwise the user would see four sort arrows and a stuck\nGeomean column.\n\nInitial sort state is `{ key: \"geomean_ms\", direction: \"asc\" }`,\npreserving the prior default (fastest first, nulls last) per\nthe must_preserve guard. The new sort comparator routes string\ncolumns through localeCompare and numeric columns through `av - bv`,\nwith nulls always last regardless of direction.\n\nNew tests in src/pages/__tests__/PlatformIndex.test.tsx cover:\n  - default sort = geomean_ms asc, nulls last\n  - Geomean click → direction flip (asc → desc, nulls still last)\n  - Benchmark click → alphabetical asc, stable sort within ties\n  - Power Score click → nulls last in both directions\n\nScope note: the original B1 listed four columns (Benchmark, Scale,\nDate, Power Score). w4 deliberately extended click-sort to Geomean\nas well — leaving four sortable headers next to a static fifth\nadjacent numeric column would have looked like a bug rather than\na constraint. Default state is unchanged so the must_preserve\nguard still holds.\n\nPost-review (W4 review): added aria-sort=\"ascending|descending|none\"\nto each sortable <th>; added an sr-only direction announcement\ninside the active button so screen readers communicate state on\nsort change. Replaced localeCompare on run_date with strict\nlexicographic compare (ISO 8601 makes this chronologically\ncorrect without dragging in locale collation). Documented the\n\"nulls last in both directions\" choice in code. Tests now resolve\nrow order via data-testid on PlatformRow's <tr>, not via parsing\naria-label substrings; added a keyboard-activation test (focus +\nkeyDown Enter + click) and an aria-sort assertion test.\n\nVerification: 285/285 vitest passes, tsc clean.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix B1 — add sort handlers to PlatformIndex table headers",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "notes": "Implemented approach (a): inside BenchmarkIndex.tsx, after\nresults finish loading and before the title is rendered, check\nwhether `benchmarkResults.length === 0` (no row in the loaded\nset whose `benchmark` matches the URL slug). Approach (b) —\nmaintaining a known-benchmarks set from cohort_metadata — was\nrejected because `results` already carries the answer; threading\na second source of truth would invite drift.\n\nPost-review (W5 review): the original guard conflated \"unknown\nslug\" with \"known slug, no data yet.\" The published corpus has\ndata for 2 of the 8 entries in BENCHMARK_LABELS (src/utils.ts);\nthe other 6 (tpcds, clickbench, nyctaxi, h2odb, datavault, plus\nssb-as-alias) all 404'd, suggesting they were unsupported. Now\na 3-state guard:\n  - Unknown slug (not in BENCHMARK_LABELS) →\n    <NotFound message=\"Benchmark X is not part of the published corpus.\" />\n  - Known benchmark with no rows → an inline empty-corpus state\n    (\"No published results yet for ClickBench. The benchmark is\n    supported by BenchBox but no runs have been ingested into\n    the public corpus.\").\n  - Known benchmark with rows → the existing BenchmarkIndex flow.\n\nSupporting changes:\n  - utils.ts: BENCHMARK_LABELS exported; new helper\n    isKnownBenchmark(slug) returns slug in BENCHMARK_LABELS.\n  - NotFound: gained an optional `message` prop so callers can\n    give the user a more specific 404 reason than the default\n    \"Page not found.\".\n\nComment near the guard documents an incidental safety property:\nthe summary-fetch useEffect is safe for both empty cases because\nits `phases.length === 0` early-return catches them. A future\ndecoupling of `phases` from `benchmarkResults` would need to add\nits own early-return.\n\ne2e coverage: three specs in routes/not-found.spec.ts —\n  - 3-segment unknown path → preact-router default → 404.\n  - Unknown :benchmark slug → 404 with benchmark-specific message.\n  - Known benchmark (clickbench) with no rows → empty-corpus\n    heading, NOT a 404.\n\nVerification: 285/285 vitest pass; tsc clean; 3/3 chromium e2e\npass.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix B3 — route unknown-benchmark slugs to NotFound",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "notes": "Root cause: TimeSeries.tsx:173 used `key={p.date}` for each\n<circle>, but two runs of the same platform on the same date\nproduced two points with the same `date`. Preact's reconciliation\nthen emitted \"Each child in a list should have a unique key prop.\"\n\nFix: thread `result_id` from the source ChartHistoricalEntry into\nthe SeriesPoint shape, then key the circle on `p.resultId`.\nresult_id is guaranteed unique per result (it's the canonical ID\nassigned by ExplorerPipeline) so no composite is needed.\n\nNew unit test in charts.smoke.test.tsx asserts:\n  - Three runs (two sharing a date) render three circles.\n  - No duplicate-key warning is emitted on console.warn or\n    console.error.\n\nVerification: 286/286 vitest pass; tsc clean.\n\nPost-review (W6 review): four findings applied.\n\nR1 — replaced the spy-on-console regression assertion with a\nstructural one. <circle> elements now carry data-result-id; the\ntest queries them and asserts new Set(ids).size === ids.length.\nIndependent of Preact's dev-mode warning channel and survives\nproduction tree-shaking.\n\nC1 — swept analogous patterns. PercentileLadder.tsx:107 used\nkey={row.platform} which would collide if two rows have the\nsame platform name (e.g. DuckDB tuned + DuckDB notuning).\nAdded result_id to PercentileStatsRow, threaded through from\nChartPanel's caller (summary.platforms.flatMap), and keyed on\nit. New unit test covers the variant-tuning case explicitly.\nDivergingBarChart.tsx:141 used key={entry.platform} on the\ninner bar map; switched to composite `${entry.platform}-${si}`\nsince the entry shape there doesn't carry result_id.\n\nN1 — TimeSeries now dedupes its `entries` prop on result_id\nbefore any further processing. Defensive against caller bugs\nthat double-count results (e.g. JOIN regressions in upstream\nqueries). New test asserts only 2 circles render when 3 entries\nwith 2 sharing a result_id are passed.\n\nN2 — comment near the new TimeSeries test explains: the\nstructural ID-uniqueness check is the true regression guard;\nfuture contributors should not delete it without an equivalent\nreplacement.\n\nVerification: 288/288 vitest pass; tsc clean.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix B4 — TimeSeries duplicate-key warning on platform pages",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "notes": "Promoted the test plan to docs/operations/results-explorer-qa.md.\nAll five deliverables landed in a single commit:\n\n  1. Doc created with the §1-§7 sections and the filled-in\n     report template at the end.\n  2. The \"/results/ssb/\" instruction was dropped from §2; in\n     its place is a paragraph explaining that SSB is a display\n     label for `star_schema`, that visiting /results/ssb/ now\n     shows an empty-corpus message (after w5's R1 fix), and\n     that the tester should test /results/star_schema/ instead.\n  3. w2's decision applied: §4 and §5 no longer expect a\n     primary-metric toggle. §4.7 is a new positive assertion\n     naming the contract — \"the chart axis label reflects the\n     benchmark's primary metric; the metric is benchmark-derived,\n     not user-toggleable.\" §5 has a parallel note plus a\n     reference to the cross-benchmark guard at Compare.tsx:64-71.\n  4. \"Prereqs (operator)\" block at the top has the explicit\n     `cd results-explorer && npm run dev` recipe plus the\n     optional production-shape DB rebuild via\n     `uv run benchbox explorer build --data-dir results-data/\n     --output results-explorer/public/data/`.\n  5. \"Expected hidden controls\" section explains that trust\n     chips and tuning dropdown auto-hide when the dataset has\n     one value, with the current-corpus values noted (all\n     maintainer-run, all tuning_mode=NULL).\n\nBonus: §3 has a one-line note pointing the tester at the B2\ncold-load known-flake (with the manual-repro doc reference) so\nthey don't false-fail on the intermittent empty-rows symptom.\n\nVerification: doc committed; no code changes in this work unit.\n\nPost-review (W7 review): seven findings applied.\n\nR1 — replaced the §3 cold-load TODO-YAML reference with a\ntester-facing cold-load warning. Added an \"Operator: when the\ntester reports BUG/SLOW\" appendix at the bottom with the\noperator-targeted pointers; the tester section is now free of\noperator metadata. After w3, the warning was tightened to mark\nany recurrence as BUG and point operators at the regression spec.\n\nR2 — tightened under-specified steps:\n  - §4.5: added the DevTools → Network status-200 verification.\n  - §6.5: gave concrete invalid-SQL examples (`SELECT FROM`,\n    `SELECT * FROM nonexistent_table`).\n  - §6.6: pinned both export buttons (CSV + JSON), gave the\n    actual filename pattern (`benchbox-query-export-<ts>.{csv,json}`).\n  - §7.5: promoted \"DevTools Lighthouse panel\" to the primary\n    instruction, naming the category, device, and threshold.\n\nC1 — stripped \"(see Q1 in the parent TODO)\" from §4.7. \"by\ndesign\" alone is sufficient at the tester layer.\n\nN1 — expanded the report template to enumerate every sub-item\nacross §1.1-§7.5 so reports come back uniformly structured.\n\nN2 — converted tester-relevant file paths to markdown links in\nthe QA appendix.\n\nN3 — added a top-of-file metadata block (Created / Owner /\nLast revised) so future drift has a maintenance trail.\n\nN4 — added a \"See also\" section to results-explorer/e2e/README.md\npointing at the QA doc. The known-flake pointer was removed after\nw3 replaced the manual repro with an automated regression.\n\nVerification: doc revised; no code changes; markdownlint clean\nvia the pre-commit gate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Promote QA test plan to docs/operations/results-explorer-qa.md and apply tester findings",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-qa-pass1-fixes",
+        "notes": "Closed by the pass-3 QA audit and current automated rerun.\n\nQA report:\n  - `_project/audits/results-explorer-qa-pass3-findings.md`\n    records P=12 F=0 Q=0.\n  - The report explicitly covers pass-1 B1, B3, and B4 plus the\n    cold-load/home readiness follow-ups from the corrected plan.\n\nCurrent branch rerun:\n  - `cd results-explorer && npm run test`: 30 files,\n    306 tests passed.\n  - `cd results-explorer && npm run typecheck`: passed.\n  - `cd results-explorer && npm run test:e2e:chromium`:\n    44 passed, 1 skipped.\n\n`/code review W8`: no required issues. The only skipped Chromium\ncase is the intentional RG-2 range-read budget gate, tracked by\n`enable-duckdb-wasm-http-range-reads-for-registered-urls`; it is\nunrelated to pass-1 bug closure.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-run the QA pass against the fixed build and confirm closure",
+        "wid": "w8"
+      }
+    ]
+  }
+}

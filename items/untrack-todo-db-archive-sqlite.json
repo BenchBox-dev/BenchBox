@@ -1,0 +1,65 @@
+{
+  "context": "git rm --cached the file (keep it on disk), add .todo-db/archive/ to .gitignore next to the existing .todo-db rules, commit. If the archive is worth keeping at all, note its provenance in _project/decisions/ instead of tracking the binary.",
+  "description": "Adversarial review (M1): commit 1fa5972b9f (message says docs) committed a 176KB SQLite binary at .todo-db/archive/todo.sqlite.local-spike-20260720. The .gitignore rules (.todo-db/*.db, *.sqlite, *.sqlite-*, replica*) match neither the archive/ subdirectory nor the .local-spike-* suffix, so it is tracked — contradicting the batch's own 'DBs ignored' evidence. Content was inspected: tracker/spec prose only, no credentials, so history rewrite is not required.",
+  "legacy": {
+    "item_meta": {
+      "category": "hygiene",
+      "completed_at": "2026-08-08T16:45:55Z",
+      "completed_pr": 1643,
+      "created_at": "2026-08-08T15:03:10Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": ".todo-db/config.json stays tracked",
+        "item_id": "untrack-todo-db-archive-sqlite"
+      },
+      {
+        "behavior": "the archive file remains on disk locally",
+        "item_id": "untrack-todo-db-archive-sqlite"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "untrack-todo-db-archive-sqlite",
+        "kind": "only_modify",
+        "path_glob": ".gitignore"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd $(git rev-parse --show-toplevel) && test \"$(git ls-files .todo-db)\" = \".todo-db/config.json\"",
+        "description": "only config.json remains tracked under .todo-db",
+        "expected": "archive binary gone from the index",
+        "item_id": "untrack-todo-db-archive-sqlite",
+        "last_result": "pass",
+        "last_run": "2026-08-08T16:40:46Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd $(git rev-parse --show-toplevel) && git check-ignore -q .todo-db/archive/todo.sqlite.local-spike-20260720",
+        "description": "archive path is ignored",
+        "expected": "future archive files cannot be committed accidentally",
+        "item_id": "untrack-todo-db-archive-sqlite",
+        "last_result": "pass",
+        "last_run": "2026-08-08T16:40:49Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "git rm --cached .todo-db/archive/todo.sqlite.local-spike-20260720 + .gitignore .todo-db/archive/, file remains on disk, verify 1/2 pass",
+        "item_id": "untrack-todo-db-archive-sqlite",
+        "notes": null,
+        "started_at": "2026-08-08T16:40:27Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Untrack the archive DB, extend .gitignore with .todo-db/archive/, commit",
+        "wid": "w1"
+      }
+    ]
+  }
+}

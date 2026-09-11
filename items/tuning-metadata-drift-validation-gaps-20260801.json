@@ -1,0 +1,212 @@
+{
+  "context": "Tests first per failing sequence. Policy decisions to make explicit in the PR: extra tunings become errors (or a documented, config-gated acceptance); persist constraint enablement and per-column sort attributes in the metadata payload with a schema-version bump AND a read path that branches on version so pre-existing DBs get a clear 'metadata too old to validate strictly' outcome instead of false drift; notuning runs that find tuning metadata in a reused DB must at minimum surface a bundle-visible drift_check (decide warn-vs-refuse and document). Keep the manager connected to the connection under validation, or document why platform_config is guaranteed equivalent.",
+  "description": "From the 2026-07-31 adversarial review of benchbox/core/tuning/metadata.py (982 lines) and platforms/base/validation.py. Four defects with concrete failing sequences, all of the form 'reused DB accepted although its physical tuning differs from what the run's bundle claims':\n\nM1 (extra tunings pass): metadata.py:805-812 - missing tables are errors but extra tables only add_warning; is_valid stays True and connection_lifecycle.py:246-258 reuses on is_valid. Sequence: run 1 tunes lineitem+orders (metadata saved for both); run 2's config tunes only orders -> extra 'lineitem' = warning -> DB reused; the bundle's requested_config_hash and tunings_applied describe an orders-only tuning while lineitem's physical layout persists; drift_check reports is_valid:true.\n\nM2 (PK/FK drift invisible): constraint enablement is neither persisted (column rows metadata.py:466-488; section markers cover only unique/check + platform optimizations, metadata.py:226-259) nor compared (_compare_tuning_configurations metadata.py:785-821 compares tables only; rebuilt existing side gets dataclass defaults at metadata.py:683). Sequence: run 1 with primary_keys.enabled=true; run 2 reuses with enabled=false, identical table tunings -> clean pass; a 'no-PK' labeled run executes against a PK-constrained database.\n\nM3 (sort attribute drift invisible): persistence keeps only (table, tuning_type, name, order) (metadata.py:477-488, rebuilt with type=UNKNOWN at 716-722); comparison reduces to (name, order) tuples (metadata.py:840-843). ASC re-requested as DESC (different physical layout on platforms honoring direction) passes clean. Same for nulls_position/compression.\n\nM4 (notuning reuse unchecked): platforms/base/validation.py:118-139 - both branches require adapter.tuning_enabled; with tuning disabled neither the drift comparison nor even the 'database contains tuning metadata' warning runs. A physically tuned DB is reused and published as a notuning baseline.\n\nCompounding smells to address opportunistically: B5 marker-write failures are silent (metadata.py:280-282) and missing markers are warnings (319-326), so section drift detection can be silently absent; B6 any load exception maps to None (657-660) then reported as 'No tuning metadata found' (767-768), misattributing connectivity failures; B7 _METADATA_SCHEMA_VERSION is written but never read (169-174); TuningMetadataManager queries go through platform_config, not the connection_config under validation (186-188 vs 300,617,647).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not fix M1 by deleting the extra tunings from the reused database",
+        "instead": "fail validation (recreate or refuse) and record the drift in drift_check",
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "why": "destructive reconciliation of a reused DB is out of scope and dangerous"
+      },
+      {
+        "dont": "Do not report connectivity failures as 'no tuning metadata found'",
+        "instead": "propagate a distinct load-error outcome into MetadataValidationResult",
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "why": "it misattributes an infrastructure error as a clean state and hides real drift"
+      },
+      {
+        "dont": "Do not widen the persisted payload without a version branch on read",
+        "instead": "bump the version, branch on it when loading, and define the legacy outcome explicitly",
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "why": "_METADATA_SCHEMA_VERSION is currently written and never read; changing the shape without a read path turns every pre-change DB into false drift"
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness",
+      "created_at": "2026-08-01T12:29:17Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing DBs with pre-change metadata get a deterministic, explained outcome via the schema version read path - not spurious drift errors.",
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801"
+      },
+      {
+        "behavior": "Fail-closed direction on validation errors: unreadable/ambiguous metadata leads to recreate-or-refuse, never silent reuse.",
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801"
+      },
+      {
+        "behavior": "Metadata persistence failure stays non-fatal to the run (tuning_metadata_saved flag semantics unchanged).",
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801"
+      },
+      {
+        "behavior": "drift_check remains descriptive in the .applied.json companion and can never be a source of applied_verified (ADR-001 addendum).",
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/result_capture.py"
+      },
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/metadata.py"
+      },
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/connection_lifecycle.py"
+      },
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/tuning_config.py"
+      },
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/validation.py"
+      },
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/development/tuning-adr-001-trust-and-hash-semantics.md"
+      },
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/**"
+      },
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning -q",
+        "description": "Metadata/drift unit suites green including the four new failing-sequence tests",
+        "expected": "all pass",
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite green",
+        "expected": "no regressions",
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms -k \"reuse or lifecycle or validation\" -q",
+        "description": "Reused-DB lifecycle behavior unchanged for genuinely matching tunings",
+        "expected": "matching-config reuse still accepted; only drifted reuse is refused",
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "notes": "Add failing tests for all four sequences: extra-table tunings accepted (M1), PK/FK enablement flip accepted (M2), sort_order/nulls_position/compression flip accepted (M3), notuning run reusing a DB that carries tuning metadata passes with no signal (M4).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Failing tests for M1-M4: extra tunings accepted, PK/FK flip accepted, sort-attribute flip accepted, notuning reuse unchecked",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "notes": "M1: extra table tunings become a validation error (policy documented); drift_check carries the extra-table list; connection_lifecycle behavior on the new error covered by test.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "M1: extra table tunings become a validation error; drift_check carries the extra-table list; lifecycle behavior tested",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "notes": "M2+M3: persist constraint enablement and per-column sort_order/nulls_position/compression; bump _METADATA_SCHEMA_VERSION, add the version read path with an explicit legacy-metadata outcome; compare the new fields in _compare_tuning_configurations.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "M2+M3: persist constraint enablement and sort attributes; bump schema version with a read path and explicit legacy outcome; compare the new fields",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "notes": "M4: validation of a reused DB under tuning-disabled runs checks for existing tuning metadata and surfaces a bundle-visible outcome (documented warn-vs-refuse decision) instead of skipping entirely.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "M4: reused-DB validation under tuning-disabled surfaces a bundle-visible outcome instead of skipping entirely",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-metadata-drift-validation-gaps-20260801",
+        "notes": "Smell cleanup: surface marker-write failure in drift_check (B5), distinguish load-error from no-metadata (B6), and either route the manager through the validated connection_config or document the platform_config equivalence invariant (B7).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Smells: surface marker-write failure in drift_check, distinguish load-error from no-metadata, resolve manager connection-config mismatch",
+        "wid": "w5"
+      }
+    ]
+  }
+}

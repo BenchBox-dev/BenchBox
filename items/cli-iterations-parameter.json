@@ -1,0 +1,156 @@
+{
+  "description": "The power test runs a fixed 3 measurement iterations (GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS\nin benchbox/core/constants.py). Users have no way to control this from the CLI, which makes\nisolation testing and statistical analysis cumbersome - the only workaround is looping the\nCLI command manually.\n\nThe orchestrator and RunConfig already fully support variable iteration counts:\n- benchbox/cli/orchestrator.py:427 reads options.get(\"power_iterations\", 3)\n- benchbox/core/schemas.py:122 carries RunConfig.iterations through to every platform adapter\n- benchbox/core/results/schema.py derives run.iterations from actual query data automatically\n\nOnly the CLI wiring is missing.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add --warmup-iterations in this change",
+        "instead": "(not specified)",
+        "item_id": "cli-iterations-parameter",
+        "why": "out of scope"
+      },
+      {
+        "dont": "change the default in constants.py",
+        "instead": "(not specified)",
+        "item_id": "cli-iterations-parameter",
+        "why": "only the CLI wiring changes"
+      },
+      {
+        "dont": "update the MCP tool",
+        "instead": "(not specified)",
+        "item_id": "cli-iterations-parameter",
+        "why": "it hardcodes phases=power and is out of scope"
+      },
+      {
+        "dont": "use @click.option instead of @advanced_option",
+        "instead": "(not specified)",
+        "item_id": "cli-iterations-parameter",
+        "why": "--iterations should be hidden from --help to avoid parameter bloat"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-10T00:00:00Z",
+      "created_at": "2026-04-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing CLI options and their behaviour unchanged",
+        "item_id": "cli-iterations-parameter"
+      },
+      {
+        "behavior": "Default behaviour: --iterations omitted → 3 measurement iterations (unchanged)",
+        "item_id": "cli-iterations-parameter"
+      },
+      {
+        "behavior": "Orchestrator and RunConfig require no changes",
+        "item_id": "cli-iterations-parameter"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cli-iterations-parameter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "cli-iterations-parameter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/constants.py"
+      },
+      {
+        "item_id": "cli-iterations-parameter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "cli-iterations-parameter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/schemas.py"
+      },
+      {
+        "item_id": "cli-iterations-parameter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "cli-iterations-parameter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "benchbox run --platform spark --benchmark tpcds --scale 1 --queries 37 --phases power",
+        "description": "Default still produces 3 iterations",
+        "expected": "run.iterations == 3 in result JSON",
+        "item_id": "cli-iterations-parameter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --platform spark --benchmark tpcds --scale 1 --queries 37 --phases power --iterations 10",
+        "description": "10 iterations produces correct result",
+        "expected": "run.iterations == 10 in result JSON",
+        "item_id": "cli-iterations-parameter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --help | grep -c iterations; benchbox run --help-topic all | grep -c iterations",
+        "description": "Flag hidden from --help, visible in --help-topic all",
+        "expected": "0 and 1 respectively",
+        "item_id": "cli-iterations-parameter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast tests pass",
+        "expected": "All tests pass",
+        "item_id": "cli-iterations-parameter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cli-iterations-parameter",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cli-iterations-parameter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add @advanced_option decorator, run() signature parameter, and phase-compat warning",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cli-iterations-parameter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Propagate to all four BenchmarkConfig options dicts",
+        "wid": "w2"
+      }
+    ]
+  }
+}

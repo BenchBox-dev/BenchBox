@@ -1,0 +1,225 @@
+{
+  "description": "DECISION MADE (do not re-litigate promote-vs-remove): keep\nbenchbox/experimental/concurrency/, but RENAME it -- the name \"concurrency\"\nis a misnomer. It is not the TPC spec concurrency (that lives in\ncore/throughput/). It is a load-testing + workload-analysis framework:\n- patterns.py: WorkloadPattern shapes (Steady/Burst/RampUp/Spike/Step/Wave)\n  -- time-varying demand profiles.\n- executor.py: ConcurrentLoadExecutor -- drives a pattern, per-stream\n  connections, dynamic concurrency targeting, background resource monitor.\n- pool_tester.py: ConnectionPoolTester -- pool exhaustion / churn / under-load.\n- analyzer.py: ConcurrencyAnalyzer -- queue-dwell, contention, scaling curves.\n\nThe package name collides conceptually with core/throughput and hides what the\ncode does. Rename to `benchbox/experimental/load_testing/` (recommended). The\nclass names already use the operative term (\"ConcurrentLoad*\", \"Workload*\"),\nso only the package name and one analyzer class are actually misleading.\n\nSCOPE: this item is a rename + honest re-documentation ONLY. It stays under\nbenchbox.experimental (unsupported, no stability guarantees, not wired into\nthe CLI/registry). Hardening and any decision to wire it into the CLI/UAT are\nDEFERRED to a separate future item -- do not do that work here.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "leave stale import paths",
+        "instead": "grep the whole repo for the old path after moving.",
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "why": "coverage config and the joinorder test import it from outside the package dir"
+      },
+      {
+        "dont": "wire it into the CLI/UAT or 'harden' it here",
+        "instead": "capture that as a separate deferred item.",
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "why": "this item is a rename only"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "rename-experimental-concurrency-to-load-testing",
+        "id": 476,
+        "reason": "Out of scope for the rename; revisit when there is time to invest in the feature.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Harden the framework and decide whether to wire it into the CLI/UAT as a supported load-testing mode"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-09T00:00:00Z",
+      "created_at": "2026-07-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing tests still pass after the path/class updates.",
+        "item_id": "rename-experimental-concurrency-to-load-testing"
+      },
+      {
+        "behavior": "Public class names ConcurrentLoadExecutor/Config/Result, the WorkloadPattern family, and the pool-tester types keep working (only the package path and ConcurrencyAnalyzer change).",
+        "item_id": "rename-experimental-concurrency-to-load-testing"
+      },
+      {
+        "behavior": "The package stays under benchbox.experimental and remains unsupported/undocumented as a product feature (no CLI/registry wiring in this item).",
+        "item_id": "rename-experimental-concurrency-to-load-testing"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "README.md:41 and docs/usage/faq.md:20 — the prose that lists 'concurrency' as an experimental subsystem; update the name there too.",
+        "decision": "reuse",
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "path": "README.md:41"
+      },
+      {
+        "concept": "benchbox/core/throughput/ — the SPEC concurrency the old name collides with; the rename exists to disambiguate from this.",
+        "decision": "reuse",
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "path": "benchbox/core/throughput/"
+      },
+      {
+        "concept": "benchbox/experimental/concurrency/__init__.py — the public surface (__all__) whose internal import paths must be rewritten to the new package name.",
+        "decision": "reuse",
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "path": "benchbox/experimental/concurrency/__init__.py"
+      },
+      {
+        "concept": "benchbox/experimental/nl2sql/, gpu/, multiregion/, aiml_functions/ — sibling experimental subsystems; keep the same 'experimental package, unsupported' shape and README/FAQ treatment.",
+        "decision": "reuse",
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "path": "benchbox/experimental/nl2sql/"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "kind": "only_modify",
+        "path_glob": ".coveragerc_core"
+      },
+      {
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/experimental/concurrency/"
+      },
+      {
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/experimental/load_testing/"
+      },
+      {
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "kind": "only_modify",
+        "path_glob": "docs/usage/faq.md"
+      },
+      {
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/concurrency/"
+      },
+      {
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/load_testing/"
+      },
+      {
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_concurrency_executor_and_joinorder.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -rn --fixed-strings 'experimental.concurrency' benchbox tests pyproject.toml .coveragerc_core",
+        "description": "No references to the old package path remain",
+        "expected": "no matches",
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/load_testing/ tests/unit/core/test_concurrency_executor_and_joinorder.py -v",
+        "description": "Renamed package imports and tests pass",
+        "expected": "all pass under the new path",
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "needs_wid": "w1",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "notes": "Update the four `from benchbox.experimental.concurrency.<mod> import`\nlines in __init__.py to the new package path. Keep __all__ unchanged.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "git mv benchbox/experimental/concurrency -> benchbox/experimental/load_testing and rewrite internal imports in __init__.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "notes": "git mv tests/unit/core/concurrency -> tests/unit/core/load_testing.\nUpdate imports in test_analyzer.py, test_executor.py, test_patterns.py,\ntest_pool_tester.py, AND tests/unit/core/test_concurrency_executor_and_joinorder.py\n(which stays put but imports the package).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename the test dir and update all importers",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "notes": "pyproject.toml:666-667 and .coveragerc_core:22,24 list\nbenchbox/experimental/concurrency/{executor,pool_tester}.py -- repoint to\nthe new path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update coverage/config references",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "notes": "Optional but recommended for consistency with the package name. Update\n__all__, the class def in analyzer.py, and its importers/tests. The\nConcurrentLoad*/Workload* classes already read correctly and can stay.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename the one class that perpetuates the confusion: ConcurrencyAnalyzer -> LoadAnalyzer (or WorkloadAnalyzer)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-experimental-concurrency-to-load-testing",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-document honestly: update README.md:41 and docs/usage/faq.md:20 to name 'load_testing' and describe it as unsupported load-testing/workload-analysis research",
+        "wid": "w5"
+      }
+    ]
+  }
+}

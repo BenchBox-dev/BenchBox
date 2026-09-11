@@ -1,0 +1,131 @@
+{
+  "context": "Add group-qualified accessible names to Query facet controls while preserving compact visible text. Desktop Query\ncheckboxes should expose names like `Deployment: local (205)` and `Cost status: not_applicable_local (205)` without\nchanging the rendered value/count layout. Shared mobile `FacetRail` checkboxes should follow the same group/value\nnaming pattern using their existing formatted display labels. Keep facet query generation, URL parameter names, and\nvisible facet labels unchanged.\n\nProcess cleanup: check free space before and after verification. If available space is below 40GB, remove loaded\nlocal database artifacts under `benchmark_runs/databases/` when present, but preserve reusable generated data under\n`benchmark_runs/datagen/` because TPC-H and derived/read-primitive runs can reuse it. Stop only if available space\nfalls below 5GB.\n",
+  "description": "The W6 Playwright smoke had to use the exact accessible name `local 205`\nbecause a partial label match for Deployment `local` also matched Cost status\n`not_applicable_local`. This is a minor but real accessibility and automation\nrough edge in the Query facet rail.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "solve this by hiding cost or deployment facets",
+        "instead": "disambiguate names instead.",
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "why": "both are needed for corpus filtering"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Screen-reader accessible names remain descriptive enough to identify facet group and value.",
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity"
+      },
+      {
+        "behavior": "Visible facet labels stay compact for dense desktop and mobile layouts.",
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/results-explorer-uat-defect-query-facet-label-ambiguity.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/query.spec.ts"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/FacetRail.tsx"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/FacetRail.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Query.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run test",
+        "description": "Results Explorer tests pass.",
+        "expected": "vitest suite passes",
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --workers=1 e2e/routes/query.spec.ts",
+        "description": "Targeted browser smoke can select Deployment local without strict-mode ambiguity.",
+        "expected": "Query browser coverage passes",
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "notes": "Inventory findings:\n- Query desktop filters are implemented locally in `results-explorer/src/pages/Query.tsx` via `FacetSection`\n  and `SingleFacetSection`. `FacetSection` checkboxes currently rely on implicit label text, so the accessible\n  name includes the visible value plus the trailing count, e.g. `local 205`.\n- Query mobile filters are built from `mobileFacetGroups` in `results-explorer/src/pages/Query.tsx` and rendered\n  by `results-explorer/src/components/FacetRail.tsx`. `FacetRail` currently sets checkbox `aria-label` to the\n  formatted option label without the facet group, so values like `local` can still collide semantically across\n  Deployment and Cost status.\n- The reusable display formatter is `results-explorer/src/lib/facetDisplay.ts`, but Query desktop facets do not\n  use it. Keep this TODO narrowly focused on accessible names rather than changing visible labels or display\n  formatting.\n- Existing component coverage for normalized cost/deployment facets lives in\n  `results-explorer/src/pages/__tests__/Query.test.tsx`; browser coverage and helper lookup live in\n  `results-explorer/e2e/routes/query.spec.ts`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Identify exact Query facet component files and label-generation helpers",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "notes": "Work-unit-owned files before editing:\n- `results-explorer/src/pages/Query.tsx`\n- `results-explorer/src/components/FacetRail.tsx`\n- `results-explorer/src/pages/__tests__/Query.test.tsx` (update existing component selectors affected by\n  accessible-name changes)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Disambiguate accessible names without making visible labels noisy",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-query-facet-label-ambiguity",
+        "notes": "Work-unit-owned files before editing:\n- `results-explorer/e2e/routes/query.spec.ts`\n- `results-explorer/src/components/__tests__/FacetRail.test.tsx` (update existing shared facet selectors affected\n  by accessible-name changes)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add browser or component coverage for ambiguous facet labels",
+        "wid": "w3"
+      }
+    ]
+  }
+}

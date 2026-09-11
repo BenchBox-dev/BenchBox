@@ -1,0 +1,102 @@
+{
+  "context": "Widen SNAPSHOT_TABLES to include findings, finding_evidence, finding_links, finding_events and finding_sections, and update RESTORE_LEGACY_REQUIRED_TABLES to match the importer's new contract - build_snapshot fails closed when they diverge, so both must move together. Do NOT touch EXPORT_TABLE_ALLOWLIST: the committed export must stay findings-free, and test_todo_db_export_allowlist.py enforces that. The snapshot is safe to widen because write_snapshot already refuses any destination inside a Git work tree, so prose cannot reach the repository. Add a test that a snapshot carries findings while a committed export still does not - the two boundaries must not drift into each other.",
+  "description": "BenchBox half of Joe's 2026-07-30 option-A decision (carry findings across the todo-db migration). PR #1354 deliberately scoped the migration snapshot to SNAPSHOT_TABLES = frozenset(TRANSFER_TABLES) | {meta}, which excludes the findings domain, because restore-legacy discarded unknown tables anyway and shipping review prose that will be thrown away only risks leaking it. Once the todo-db side lands (restore-legacy-carry-findings-and-reject-unknown-tables, in the todo-db project), that reasoning inverts: findings must be IN the snapshot or the migration is still lossy. Ordering matters - widening the snapshot first would make it fail against today's importer once that importer starts rejecting unknown tables, which is part of the same todo-db item.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "snapshot-include-findings-tables",
+        "needs_item": "migrate-hosted-tracker-db-to-todo-db-0-3-schema"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "created_at": "2026-07-30T16:53:57Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "the committed export stays findings-free (EXPORT_TABLE_ALLOWLIST unchanged, test_todo_db_export_allowlist.py still passes)",
+        "item_id": "snapshot-include-findings-tables"
+      },
+      {
+        "behavior": "write_snapshot keeps refusing destinations inside a Git work tree",
+        "item_id": "snapshot-include-findings-tables"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "snapshot-include-findings-tables",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "snapshot-include-findings-tables",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_export_allowlist.py -q -k 'snapshot and finding'",
+        "description": "A snapshot carries findings",
+        "expected": "exit 0",
+        "item_id": "snapshot-include-findings-tables",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_export_allowlist.py -q",
+        "description": "The committed export still does not",
+        "expected": "exit 0",
+        "item_id": "snapshot-include-findings-tables",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import importlib.util,sys; s=importlib.util.spec_from_file_location('t','_project/scripts/todo_db.py'); m=importlib.util.module_from_spec(s); sys.modules['t']=m; s.loader.exec_module(m); assert m.SNAPSHOT_TABLES == m.RESTORE_LEGACY_REQUIRED_TABLES\"",
+        "description": "Snapshot scope and the importer's requirements still agree",
+        "expected": "exit 0",
+        "item_id": "snapshot-include-findings-tables",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "snapshot-include-findings-tables",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "snapshot-include-findings-tables",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Widen SNAPSHOT_TABLES and RESTORE_LEGACY_REQUIRED_TABLES together to include the five findings tables",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "snapshot-include-findings-tables",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Test that a snapshot carries findings while a committed export still does not",
+        "wid": "w2"
+      }
+    ]
+  }
+}

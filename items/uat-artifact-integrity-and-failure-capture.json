@@ -1,0 +1,219 @@
+{
+  "context": "Start in tests/uat/orchestrator.py: add a single run-context object holding\nthe commit SHA + dirty flag captured once at sweep start, and a finally/\nexcept path around the execute phase that always invokes the manifest +\nreport writers (matrix_summary.partial, footer) before propagating an\nabort. Thread the run-context into phases/report.py (header + footer),\nphases/execute.py (per-cell log + cells.jsonl rows), and phases/enumerate.py\n(compatibility_pruned on abort). Add the SHA column to REPORT_HEADER and the\nmatrix_summary header. Keep stderr persistence bounded (tail only).\n",
+  "description": "The 2026-05-28/29 native + docker UAT runs could not be approved partly\nbecause the *evidence* was incomplete, not only because cells failed. An\nadversarial review of these run dirs found the process blockers below\n(paths under ~/Developer/benchmark_runs/logs/):\n\n- uat_complete_native_20260528_20260528: aborted on the /tmp disk floor\n  in the execute phase. Only resume.json survived; no matrix_summary.tsv,\n  no validator_rollup.tsv, no report footer. validate/package/\n  explorer_smoke/report never ran.\n- uat_complete_native_remaining_non_oltp_20260528_20260529 (dataframe):\n  no manifests at all (no resume.json, cells.jsonl, uat_lifecycle.log,\n  matrix_summary.tsv). Pass/fail was only reconstructable from per-cell\n  result JSONs.\n- NO_JSON failures (e.g. duckdb write_primitives/ai_primitives, all\n  modin-df cells) captured ZERO error text: the per-cell log held only\n  the command header (run with --quiet), and the tee log\n  /tmp/uat-logs/native_non_oltp_20260528.log was 0 bytes.\n- No git commit SHA is recorded in any artifact; result JSONs carry only\n  driver versions (e.g. duckdb 1.3.2), so runs cannot be pinned to source.\n\nThis item makes the framework emit a complete, source-traceable artifact\nfor EVERY sweep, including aborted ones, so a reviewer can always prove\nsource SHA, command, phase status, terminal state, and failure cause.\n\nImplementation correction from current code reading: the cited\ntests/uat/phases/execute.py:708 line is Docker command detail handling,\nnot CellResult stderr storage. Per-cell subprocess output is already\nwritten to each durable cell log by tests/uat/runner.py; the remediation\nreads a bounded tail from that log and stamps the tail/classification into\ncells.jsonl while appending a UAT_FAILURE_TAIL block for failed or\nmissing-result cells. This avoids adding output text to CellResult or\nre-capturing subprocess streams per cell.\n\nOriginal evidence pin: the stale line references above were from commit\nda6a33c14. This implementation re-confirmed the drift on current develop\nbefore relying on the code path.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "shell out to git per cell",
+        "instead": "capture the SHA once at sweep start and pass it down.",
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "why": "it adds latency to the hot path"
+      },
+      {
+        "dont": "treat the empty tee log as a fallback evidence source",
+        "instead": "(not specified)",
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "why": "it is operator redirection, not a framework artifact; the framework must self-contain its evidence."
+      },
+      {
+        "dont": "write full multi-MB stderr into per-cell logs",
+        "instead": "persist a bounded tail.",
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "why": "some failures spew huge output"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-29T00:00:00Z",
+      "created_at": "2026-05-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No new always-on subprocess cost on the hot per-cell path beyond writing already-captured text.",
+        "item_id": "uat-artifact-integrity-and-failure-capture"
+      },
+      {
+        "behavior": "Successful (non-aborted) sweeps emit byte-identical artifacts to today apart from the new SHA fields and richer status column.",
+        "item_id": "uat-artifact-integrity-and-failure-capture"
+      },
+      {
+        "behavior": "execute.parallel_platforms remains hard-rejected; sequential platform execution is unchanged.",
+        "item_id": "uat-artifact-integrity-and-failure-capture"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "tests/uat/orchestrator.py:resume.json writer — extend to also stamp run-level commit SHA + emit partial manifests on abort",
+        "decision": "extend",
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "path": "tests/uat/orchestrator.py:resume.json"
+      },
+      {
+        "concept": "tests/uat/phases/execute.py:708 detail = result.error or result.stderr ... — reuse the already-captured stderr/stdout; persist it, do not re-capture",
+        "decision": "reuse",
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "path": "tests/uat/phases/execute.py:708"
+      },
+      {
+        "concept": "tests/uat/phases/report.py:REPORT_HEADER + aborted footer (line 41) — reuse for an always-emitted matrix_summary.partial + COMPLETED/ABORTED/BLOCKED footer",
+        "decision": "reuse",
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "path": "tests/uat/phases/report.py:REPORT_HEADER"
+      },
+      {
+        "concept": "tests/uat/test_no_cli_surface_drift.py:155 _git('rev-parse', ...) — reuse the existing git rev-parse helper pattern for SHA capture",
+        "decision": "reuse",
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "path": "tests/uat/test_no_cli_surface_drift.py:155"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/orchestrator.py"
+      },
+      {
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/__init__.py"
+      },
+      {
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/enumerate.py"
+      },
+      {
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/report.py"
+      },
+      {
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_orchestrator.py"
+      },
+      {
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      },
+      {
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_report.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat -m fast -q",
+        "description": "UAT framework unit suite passes",
+        "expected": "all pass, 0 failures",
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_orchestrator.py tests/uat/test_report.py -q",
+        "description": "Simulated abort still emits a complete artifact set",
+        "expected": "abort-path tests assert cells.jsonl, matrix_summary.partial.tsv, and an ABORTED footer all exist",
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_phases.py -k 'failure or stderr or classification' -q",
+        "description": "A forced-failure cell carries its stderr tail in the per-cell log and cells.jsonl",
+        "expected": "tests assert NO_JSON classification and persisted stderr",
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "notes": "Read HEAD via the existing rev-parse pattern. Record short+full SHA\nand a working-tree-dirty boolean once at sweep start, thread it\nthrough the orchestrator into every manifest writer. A dirty tree\nmust be visibly flagged so a reviewer never mistakes an uncommitted\nrun for a pinned one.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture run commit SHA + dirty flag at sweep start; persist into resume.json, cells.jsonl, matrix_summary.tsv header, and report footer",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "notes": "The CellResult already holds the text (execute.py:708). Write the\ntail (bounded, e.g. last ~50 lines) into the per-cell .log after the\ncommand header, and into the cells.jsonl row, regardless of --quiet.\nAcceptance: a failed modin-df or duckdb cell carries its exact error\nwithout relying on the tee log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Persist captured per-cell stderr/stdout tail to the durable per-cell log on nonzero exit / NO_JSON",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "notes": "Distinguish: exited 0 but no JSON; exited nonzero with no JSON;\ntimeout (124); killed (-9 / OOM); infra-terminated (e.g. sweep abort\nbefore the cell finished). Surface the class in cells.jsonl and the\nmatrix_summary status column. Today these all collapse to \"failed\".\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add explicit NO_JSON / terminal-state classification to cell records",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-artifact-integrity-and-failure-capture",
+        "notes": "On disk-floor abort or any hard stop, still write cells.jsonl for\nattempted cells, a matrix_summary.partial.tsv, compatibility_pruned.jsonl\nfor the enumerated complement, and a report footer with an explicit\nCOMPLETED | ABORTED | BLOCKED status. Ensure dataframe/native sweeps\nalways open a run-level uat_lifecycle.log (the dataframe run wrote\nnone). report.py already supports the aborted footer; wire the\norchestrator abort path to call it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Guarantee abort-safe manifest + report emission",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,283 @@
+{
+  "context": "Treat Apple container as a *parity sandbox*, not a general test runner --\nroutine fast tests stay native on macOS (faster, no VM hop). The only\nreason to pay the VM cost is to reproduce Linux-specific behavior the Mac\ncannot. Build benchbox-agent once, reuse the persistent machine across\nsessions (home-mounted), and gate the whole adoption on the w4 finding so\nwe do not add a wrapper target that earns its keep only marginally.\n",
+  "description": "Every PR-gating job in .github/workflows/pr.yml runs on `ubuntu-latest`,\nbut the project is developed on Apple-silicon macOS. So every PR is a\nmacOS -> Linux leap of faith: a pure-Python check can pass locally on\nmacOS and then fail in CI on locale, path-case, float formatting, dict/\nhash ordering, line endings, or `uv` lock/arch resolution differences.\nThe correctness-gate and the *-cross-surface-equivalence-report jobs are\nthe sharp edge here -- they compare result digests against pinned Linux\nreference results, exactly the class of value that can format/round\ndifferently across OS.\n\nApple's `container` (v1.0.0, GA) runs Linux containers as lightweight VMs\non Apple silicon and ships a `container machine` mode: a persistent Linux\nenvironment with the Mac home directory mounted in, so you \"edit on the\nMac, build inside Linux\". This lets us reproduce the *pure-Python* Linux\nPR gate locally before submitting -- the one capability native macOS\ncannot provide.\n\nScope of THIS TODO is the runtime/agent substrate only: stand up Apple\n`container` + a `benchbox-agent` machine, run the pure-Python gate inside\nit, decide whether in-Linux digests actually diverge from macOS-local,\nand (if warranted) add an opt-in `make ci-linux` wrapper. It explicitly\ndoes NOT cover Docker Compose / `make test-docker-*` (no Compose support\nin `container`); that is tracked separately in\nmigrate-test-docker-stacks-to-mocker.\n\nSpike evidence (2026-06-30, host macOS 26.5 / arm64): `brew install\ncontainer` -> container CLI 1.0.0; `container system start` +\n`container system kernel set --recommended` (kata-static 3.28.0) brought\nthe runtime up; a single Linux container published ports to the Mac\n`localhost` and served real traffic (questdb REST `localhost:19000/exec`\n-> result; postgres `localhost:5432` psycopg round-trip -> PostgreSQL\n18.4, RW returned 42). `container machine` mode is documented and GA but\nwas NOT itself exercised in the spike -- w0/w1 must confirm it.\n\nFINDINGS (2026-07-03, container 1.0.0 / macOS 26.5 / arm64):\n- w0 PASS: container 1.0.0, apiserver running, arm64/macOS 26.5, mocker 0.5.4.\n- w1/w2 PASS: `container machine` boots ONLY with an init in the rootfs\n  (ubuntu:24.04 needs systemd-sysv for /sbin/init); home-mount exposes the\n  worktree rw at its Mac path via virtiofs. Image: docker/benchbox-agent.\n- w3: correctness-gate + ssb equivalence ran inside the machine on a targeted\n  lock-pinned env (core + duckdb 1.3.2 + polars); full `uv sync --group dev` +\n  `make ci-local` exceeded this host's ~6.6 GiB free disk (the VM sparse disk\n  only grows). Digest is DuckDB-build-tied, so the subset does not weaken w4.\n- w4 = DIVERGES (central finding): identical DuckDB 1.3.2/arm64, TPC-H SF=1 --\n  Linux correctness-gate PASS (18/18 match pinned ref); macOS FAIL on Q2/Q10/\n  Q15 (same cardinality, different value digests, deterministic over 2 runs).\n  ssb cross-surface equivalence PASS on both (self-referential -> OS-insensitive).\n  The pinned references are effectively Linux-specific, so `container` parity is\n  the only way to validate the correctness-gate pre-PR from a Mac -> shipped the\n  opt-in `make ci-linux` wrapper (w5) + AGENTS.md (w6).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make ci-linux a hard prerequisite of pr-open or any CI job",
+        "instead": "keep it opt-in with a clear skip message.",
+        "item_id": "adopt-apple-container-ci-parity",
+        "why": "most contributors are not on Apple-silicon macOS 26"
+      },
+      {
+        "dont": "rebuild the agent image per run",
+        "instead": "(not specified)",
+        "item_id": "adopt-apple-container-ci-parity",
+        "why": "create the machine once and reuse it; rebuild only when the toolchain changes."
+      },
+      {
+        "dont": "route routine `pytest -m fast` through the container",
+        "instead": "(not specified)",
+        "item_id": "adopt-apple-container-ci-parity",
+        "why": "it already runs natively on macOS; the VM hop only adds latency."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "adopt-apple-container-ci-parity",
+        "id": 301,
+        "reason": "Needs a database service, which is the Docker Compose problem tracked in migrate-test-docker-stacks-to-mocker. postgres-integration is also a non-blocking sample, not the hard gate.\n",
+        "resolution": "promoted",
+        "resolved_item": "reproduce-postgres-integration-needs-a-live-postgres-inside",
+        "resolved_reason": null,
+        "summary": "Reproduce postgres-integration (needs a live Postgres) inside container"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "adopt-apple-container-ci-parity",
+        "id": 302,
+        "reason": "Apple container is Apple-silicon + macOS-26 only; it cannot be a required step for contributors on other hardware, and CI already runs real ubuntu. Local opt-in only.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Reason itself concludes ci-linux can't be a required gate (Apple-silicon+macOS-26 only); CI already runs real ubuntu. Nothing to promote.",
+        "summary": "Make ci-linux a required/enforced step or run it in CI"
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Experience",
+      "completed_at": "2026-07-03T00:00:00Z",
+      "created_at": "2026-06-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No PR-gating CI job gains a dependency on Apple container; .github/workflows/ stays ubuntu-latest.",
+        "item_id": "adopt-apple-container-ci-parity"
+      },
+      {
+        "behavior": "make ci-local and the correctness-gate / *-cross-surface-equivalence-report targets keep working unchanged when run natively on macOS (ci-linux is purely additive).",
+        "item_id": "adopt-apple-container-ci-parity"
+      },
+      {
+        "behavior": "test-docker-* targets are untouched by this TODO.",
+        "item_id": "adopt-apple-container-ci-parity"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Makefile:1065 agent-write-preflight — pattern: agent-/ci- prefixed Make targets that guard/parameterize the dev loop; follow its naming + guard style for ci-linux.",
+        "decision": "reuse",
+        "item_id": "adopt-apple-container-ci-parity",
+        "path": "Makefile:1065"
+      },
+      {
+        "concept": "Makefile:794 ci-local — extend: ci-linux wraps the same gate bundle but executes it inside `container machine run`.",
+        "decision": "extend",
+        "item_id": "adopt-apple-container-ci-parity",
+        "path": "Makefile:794"
+      },
+      {
+        "concept": "docker/lakesail/Dockerfile, docker/velox/Dockerfile — reuse as reference for the benchbox-agent image build; do not reuse the DB stack compose files.",
+        "decision": "reuse",
+        "item_id": "adopt-apple-container-ci-parity",
+        "path": "docker/lakesail/Dockerfile"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "kind": "do_not_modify",
+        "path_glob": "docker/*/docker-compose.yml"
+      },
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "kind": "only_modify",
+        "path_glob": "docker/benchbox-agent/Dockerfile"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "container system status",
+        "description": "Apple container runtime is up",
+        "expected": "apiserver reported running",
+        "item_id": "adopt-apple-container-ci-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "container machine run -n benchbox-agent -- bash -lc 'uname -a && uv --version'",
+        "description": "benchbox-agent machine reaches a Linux shell that can sync deps",
+        "expected": "Linux ... aarch64; uv version prints",
+        "item_id": "adopt-apple-container-ci-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "container machine run -n benchbox-agent -- bash -lc 'cd <worktree> && uv sync --group dev && make ci-local'",
+        "description": "Pure-Python gate runs to completion inside the machine",
+        "expected": "ci-local completes; pass/fail recorded for w3",
+        "item_id": "adopt-apple-container-ci-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-correctness-gate  # native macOS vs inside machine, diff outputs",
+        "description": "Digest divergence finding captured (w4)",
+        "expected": "documented whether macOS-local digests match pinned Linux references",
+        "item_id": "adopt-apple-container-ci-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "needs_wid": "w2",
+        "wid": "w1"
+      },
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "adopt-apple-container-ci-parity",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "adopt-apple-container-ci-parity",
+        "notes": "Evidence-durability gate per _project/verification-logs/README.md.\nThe description cites container CLI 1.0.0 on macOS 26.5/arm64 and\nobserved localhost reachability. Before w1, confirm:\n  - `container --version` (record the version actually installed now).\n  - `container system status` reports the apiserver running after\n    `container system start`.\n  - host is Apple silicon + macOS 26+ (`uname -m`, `sw_vers`).\nCapture raw stdout to `/tmp/adopt-apple-container-ci-parity-w0.log`\nor a CI artifact; commit only a compact summary (command, version,\nPASS/FAIL, key lines) into this TODO or the PR body. If `container`\nno longer installs/starts on the current macOS, re-scope before w1.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate cited spike evidence against current container version",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "adopt-apple-container-ci-parity",
+        "notes": "`container machine create <image> --name benchbox-agent` with the Mac\nhome mounted; `container machine set -n benchbox-agent cpus/memory`;\nverify `container machine run -n benchbox-agent -- bash` lands in a\nLinux shell that can see a claimed pool worktree path. THIS is the\nstep the spike did not exercise -- prove machine mode + home-mount\nwork, not just `container run`.\nCONFIRMED (also flagged on develop): the machine is created FROM the w2\nimage, so w1 depends on w2; and `container machine` boots only when the\nrootfs has /sbin/init (systemd-sysv), which minimal ubuntu lacks.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Stand up a benchbox-agent container machine with home-mount",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "adopt-apple-container-ci-parity",
+        "notes": "ubuntu:24.04 + git, build-essential, curl, ca-certificates, uv\n(and the system libs BenchBox's deps need to `uv sync --group dev`).\nBuild with `container build --arch arm64 --tag local/benchbox-agent`.\narm64 only unless a check specifically needs x86 parity.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build the benchbox-agent OCI image (ubuntu + uv + build toolchain)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "adopt-apple-container-ci-parity",
+        "notes": "Inside a claimed worktree, run the Linux-reproducible subset of\npr.yml: `uv sync --group dev`, `make ci-local`, `make\ntest-correctness-gate`, and the *-cross-surface-equivalence-report\ntargets the correctness-gate job runs. Record pass/fail + any digest\noutput. clickhouse-integration is in-process chDB (no service) so it\nis in-scope here; postgres-integration needs a DB and is out of scope\n(see deps).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the pure-Python PR gate inside the machine; capture results",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "adopt-apple-container-ci-parity",
+        "notes": "Run the same correctness-gate + equivalence targets natively on macOS\nAND inside the Linux machine; diff the digests/outputs. This decides\nthe tool's value:\n  - If macOS-local already matches the pinned Linux references, the\n    parity win is marginal -> stop at \"documented optional tool\".\n  - If they diverge, container parity is the ONLY way to validate\n    these gates pre-PR -> proceed to w5 and recommend it.\nDocument the observed divergence (or lack of it) explicitly in the\nTODO/PR -- this is the central finding.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "DECISION GATE: do correctness/equivalence digests diverge macOS vs Linux?",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "adopt-apple-container-ci-parity",
+        "notes": "Only if w4 shows divergence (or as a convenience even if not, at\nreviewer discretion). Add a `ci-linux` target that runs the gate\nbundle inside `container machine run -n benchbox-agent`. Keep it\nadditive and clearly named -- distinct from `test-docker-*`. Must be\na no-op-with-clear-message on non-Apple-silicon / non-macOS-26 hosts,\nnever a hard CI dependency.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add opt-in `make ci-linux` wrapper (gated on w4 = diverges)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "adopt-apple-container-ci-parity",
+        "notes": "One dense block: prerequisites (Apple silicon, macOS 26), one-time\nsetup (install/start/kernel/machine-create), and the pre-PR command.\nMatch the existing terse documentation style; no bash tutorials that\nrestate `container --help`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document setup + usage in AGENTS.md (terse, house style)",
+        "wid": "w6"
+      }
+    ]
+  }
+}

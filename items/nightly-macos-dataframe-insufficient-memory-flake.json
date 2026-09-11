@@ -1,0 +1,88 @@
+{
+  "context": "These are mocked unit tests that do not actually materialize SF 1.0 data, so the memory precheck should not gate them at all. Preferred fix is to stub or bypass the precheck in the dataframe mixin unit tests so they assert the logic under test rather than the runner's free RAM; failing that, widen the margin or make the precheck advisory in unit context. Do NOT simply raise the threshold globally - that would weaken a real guard on production runs. Confirm first whether these tests intend to exercise the precheck at all; if one of them does, keep that one and isolate it.",
+  "description": "Nightly Validation run 30542333194 job 'test (macos-latest, 3.12)' failed with 22 failures across tests/unit/platforms/dataframe/test_benchmark_mixin.py and test_benchmark_mixin_behavioral.py, all downstream of 'InsufficientMemoryError: Insufficient memory: ~2.0 GB required, but only 2.4 GB available. Platform: Polars, Scale Factor: 1.0'. macOS was green in the baseline run 30473819253 and green again in the very next run 30555936402, so this is intermittent rather than a regression - the precheck sits on a ~0.4 GB margin against whatever the runner happens to have free, and when it trips it converts unit tests that never intended to allocate anything into 22 red results. Not caused by PR #1352: nothing in that branch touches memory estimation, and the same commit range was green on the following run. Signal-quality problem: a nightly that can drop 22 tests on runner memory pressure trains people to ignore it.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci-failure-reduction",
+      "created_at": "2026-07-30T18:46:52Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The production memory guard still aborts real oversized runs; only the mocked unit path stops depending on runner free RAM",
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/**"
+      },
+      {
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/platforms/dataframe/test_benchmark_mixin.py tests/unit/platforms/dataframe/test_benchmark_mixin_behavioral.py -q",
+        "description": "dataframe mixin unit tests do not depend on runner free memory",
+        "expected": "exit 0",
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Determine which of the 22 tests actually intend to exercise the memory precheck, if any",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Stub or bypass the precheck for the mocked dataframe unit tests so runner free-RAM cannot fail them",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm the production memory guard is unchanged for real runs",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Audited the core benchbox package for test-style functions, removed the embedded pytest-visible helpers from production modules, and added focused coverage in the dedicated test suite.",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release Medium Priority Tasks (COMPLETED)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

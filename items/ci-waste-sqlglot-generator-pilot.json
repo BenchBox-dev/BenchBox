@@ -1,0 +1,220 @@
+{
+  "context": "w0 re-reads sqlglot-upstream README wrapper-call-shape convention and dialect_utils.translate_sql_query. w1 adds generator cases on that harness with both call shapes and seed replay. w2 wires nightly only under the chosen disposition policy. No pr.yml edits.",
+  "description": "Fifth item in the CI-waste sequence. The only Luu application authorized after the nightly disposition policy: generate new SQL cases through BenchBox's real translator instead of calling sqlglot.transpile directly.\n\nExtend _project/sqlglot-upstream/repros/. Every case that lives behind translate_sql_query must exercise both read=<target> and read=postgres write=<target>. Shrink failures to replayable seeds. Known-fails must obey the policy from ci-waste-nightly-disposition-policy.\n\nThis item may add a nightly job only after that policy exists. It must not change required PR jobs, post-merge signature jobs, or the fast-lane ceiling except by the existing quantum bump process if collect count grows (prefer not to add fast-lane tests here).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "call sqlglot.transpile as the sole probe",
+        "instead": "drive cases through translate_sql_query at both call shapes",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "why": "BenchBox post-fixups in translate_sql_query neutralize defects a direct probe would report"
+      },
+      {
+        "dont": "promote generator cases into required PR CI by default",
+        "instead": "keep the generator on nightly; shrink confirmed bugs to named PR/post-merge regressions only when they protect a required invariant",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "why": "that recreates the promotion trap and grows the frozen corpus"
+      },
+      {
+        "dont": "replace add-hypothesis-property-tests with this item",
+        "instead": "leave it as a separate low-priority item",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "why": "that TODO is bounded pure-function work, complementary not contrary"
+      },
+      {
+        "dont": "stand up a parallel generator harness",
+        "instead": "extend that tree",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "why": "sqlglot-upstream/repros is the existing retirement and probe home"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "needs_item": "ci-waste-nightly-disposition-policy"
+      }
+    ],
+    "item_meta": {
+      "category": "CI",
+      "completed_at": "2026-09-01T00:00:22Z",
+      "completed_pr": 1986,
+      "created_at": "2026-08-27T23:11:49Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Both SQLGlot call shapes remain mandatory for translate_sql_query cases",
+        "item_id": "ci-waste-sqlglot-generator-pilot"
+      },
+      {
+        "behavior": "Hypothesis pure-function TODO add-hypothesis-property-tests is not superseded",
+        "item_id": "ci-waste-sqlglot-generator-pilot"
+      },
+      {
+        "behavior": "Mutation-testing TODOs remain separate",
+        "item_id": "ci-waste-sqlglot-generator-pilot"
+      },
+      {
+        "behavior": "Required develop PR lanes unchanged",
+        "item_id": "ci-waste-sqlglot-generator-pilot"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "non-required broader suite",
+        "decision": "extend",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "path": ".github/workflows/nightly.yml"
+      },
+      {
+        "concept": "wrapper-call-shape convention",
+        "decision": "extend",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "path": "_project/sqlglot-upstream/README.md"
+      },
+      {
+        "concept": "translate_sql_query post-fixups",
+        "decision": "reuse",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "path": "benchbox/utils/dialect_utils.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "kind": "do_not_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "kind": "only_modify",
+        "path_glob": "_project/sqlglot-upstream/**"
+      },
+      {
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "kind": "only_modify",
+        "path_glob": "scripts/check_sqlglot_generator_known_failures.py"
+      },
+      {
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'translate_sql_query' _project/sqlglot-upstream/",
+        "description": "new probes import or call translate_sql_query, not only sqlglot.transpile",
+        "expected": "generator/repro path references translate_sql_query",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "last_result": "pass",
+        "last_run": "2026-09-01T00:00:19Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --name-only origin/develop -- .github/workflows/pr.yml",
+        "description": "pr.yml unchanged",
+        "expected": "empty",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "last_result": "pass",
+        "last_run": "2026-09-01T00:00:20Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f .github/workflows/pr.yml && ! rg -n 'sqlglot|generator' .github/workflows/pr.yml",
+        "description": "ci-required-result does not gain a generator job",
+        "expected": "PR workflow exists and contains no sqlglot generator reference",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "last_result": "pass",
+        "last_run": "2026-09-01T00:00:21Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "_project/sqlglot-upstream/README.md wrapper-call-shape convention, generator-policy.json replay template, benchbox/utils/dialect_utils.py:267 translate_sql_query strict path, and current nightly.yml inspected at 99fb60881",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "notes": null,
+        "started_at": "2026-08-31T18:34:36Z",
+        "started_branch": "feat/ci-waste-sqlglot-generator-pilot",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-sqlglot-generator-pilot",
+        "status": "done",
+        "summary": "Re-read _project/sqlglot-upstream/README.md wrapper-call-shape rules and benchbox/utils/dialect_utils.py translate_sql_query call sites",
+        "wid": "w0"
+      },
+      {
+        "evidence": "_project/sqlglot-upstream/repros/generator.py plus 65 focused generator/policy tests; seed 20260831 executed 1024 unique DuckDB cases at both strict call shapes in 0.83s, 1043 attempts, clean summary, no failure artifact",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "notes": null,
+        "started_at": "2026-08-31T18:36:27Z",
+        "started_branch": "feat/ci-waste-sqlglot-generator-pilot",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-sqlglot-generator-pilot",
+        "status": "done",
+        "summary": "Add generator cases on the existing repro harness through translate_sql_query at both call shapes, with shrinking and seed replay",
+        "wid": "w1"
+      },
+      {
+        "evidence": ".github/workflows/nightly.yml adds one 10-minute Ubuntu generator job: blocking policy guard first, 1024-case/300s generator second, only exit 1 translated to advisory, all >=2 propagated; 3 medium workflow contract tests pass and pr.yml/develop-post-merge/fast-lane policy are unchanged",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "notes": null,
+        "started_at": "2026-08-31T18:59:15Z",
+        "started_branch": "feat/ci-waste-sqlglot-generator-pilot",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-sqlglot-generator-pilot",
+        "status": "done",
+        "summary": "Wire the generator to nightly only under the disposition policy; do not add it to ci-required-result",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Follow-up PR #1986 merged as 5832ce6492dfba2db95bc38616518a9d4bf8827a; nightly validates discovery evidence then propagates exit 1, so the non-required generator job remains red; branch and merge-group CI passed.",
+        "item_id": "ci-waste-sqlglot-generator-pilot",
+        "notes": null,
+        "started_at": "2026-08-31T23:58:36Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record corrective evidence that generator discovery exit 1 remains red in the non-required nightly job",
+        "wid": "w3"
+      }
+    ]
+  }
+}

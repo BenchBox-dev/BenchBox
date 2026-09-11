@@ -1,0 +1,46 @@
+{
+  "description": "`_strip_pk_constraints` in `benchbox/platforms/questdb.py` handles three\nforms of PRIMARY KEY declaration.  The named-constraint form uses `\\w+` to\nmatch the constraint name:\n\n  r\",?\\s*CONSTRAINT\\s+\\w+\\s+PRIMARY\\s+KEY\\s*\\([^)]*\\)\"\n\nThis will not match double-quoted constraint names like:\n  CONSTRAINT \"pk_lineitem\" PRIMARY KEY (l_orderkey, l_linenumber)\n\nTPC-H, TPC-DS, SSB, and all other benchmark schemas currently in BenchBox\nuse unquoted constraint names, so this is not a known active failure.  It is\na latent fragility that will bite silently if a new benchmark or a DDL\ngenerator upgrade starts quoting identifiers.\n\nFlagged during Phase 1 remediation review (2026-04-16) as a nit.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Support",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All five existing TestCreateSchemaBranches PK stripping tests continue to pass",
+        "item_id": "questdb-strip-pk-quoted-constraint-name"
+      },
+      {
+        "behavior": "_strip_fk_constraints is unchanged - only _strip_pk_constraints regex is modified",
+        "item_id": "questdb-strip-pk-quoted-constraint-name"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_questdb_coverage.py::TestCreateSchemaBranches -v",
+        "description": "All PK stripping tests pass including new quoted-name test",
+        "expected": "All tests pass (6 PK-related + existing tests)",
+        "item_id": "questdb-strip-pk-quoted-constraint-name",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "questdb-strip-pk-quoted-constraint-name",
+        "notes": "In `benchbox/platforms/questdb.py`, `_strip_pk_constraints` (around line 694):\n\nChange:\n  r\",?\\s*CONSTRAINT\\s+\\w+\\s+PRIMARY\\s+KEY\\s*\\([^)]*\\)\"\nTo:\n  r',?\\s*CONSTRAINT\\s+(?:\"[^\"]+\"|`[^`]+`|\\w+)\\s+PRIMARY\\s+KEY\\s*\\([^)]*\\)'\n\nThe pattern accepts:\n  - Double-quoted:   CONSTRAINT \"pk_t\" PRIMARY KEY (id)\n  - Backtick-quoted: CONSTRAINT `pk_t` PRIMARY KEY (id)\n  - Bare:            CONSTRAINT pk_t PRIMARY KEY (id)\n\nAdd one test in TestCreateSchemaBranches:\n\n  def test_strip_pk_constraints_quoted_name(self, questdb_stubs):\n      adapter = QuestDBAdapter()\n      stmt = 'CREATE TABLE t (id INT, CONSTRAINT \"pk_t\" PRIMARY KEY (id))'\n      result = adapter._strip_pk_constraints(stmt)\n      assert \"PRIMARY KEY\" not in result.upper()\n      assert \"CONSTRAINT\" not in result.upper()\n      assert \"id INT\" in result\n\nRun all existing _strip_pk_ tests to confirm no regressions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend named-constraint regex and add test",
+        "wid": "w1"
+      }
+    ]
+  }
+}

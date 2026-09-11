@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #163 of explorer-close-chart-type-coverage-gaps.\nDeferred: Interactive drilldowns (click chart bar to filter table)\nReason deferred: Cross-cutting UX work; better tackled as a focused interactivity item once all charts exist.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:17Z",
+      "worktree": "main"
+    }
+  }
+}

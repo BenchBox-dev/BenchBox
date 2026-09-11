@@ -1,0 +1,170 @@
+{
+  "description": "Follow-up to auto-merge-review-gate-admin-enforcement. `scripts/ruleset_drift_check.py`\n`compare_ruleset` (lines 135-180) already compares the develop ruleset's\nenforcement state, target ref, required status checks, strict-check policy,\nrequired_linear_history, non_fast_forward, deletion, and bypass actors — but\nit never inspects the ruleset's `pull_request` rule (required_approving_review_count,\nrequire_code_owner_review). So the daily `release-canary.yml` ruleset-drift job\n(and the validate-main-pr.yml bootstrap invocation) can stay green forever even\nwhile the develop ruleset still shows required_approving_review_count: 0 and\nrequire_code_owner_review: false — the documented live state in\ndocs/operations/repo-admin-settings.md:119-121.\n\nThe review-rule predicate already exists and is correct:\n`_project/scripts/ruleset_review_enforcement.py` (`review_enforcement_findings`)\nreads `SOUNDNESS_PREFIXES` from `_project/scripts/auto_merge_soundness_paths.py`\nso its narration cannot drift from the auto-merge withholding set. But today it\nonly runs (a) manually, piped from `gh api repos/.../rules/branches/develop`, or\n(b) as a pinned-logic unit test in `tests/unit/release/test_ruleset_review_enforcement.py`\nthat exercises fixture JSON, not the live ruleset. Nothing wires it into the\ndaily canary that already has ruleset-read (`RULESET_DRIFT_TOKEN`) access. That\nmeans the admin-enforcement TODO's w3 verification step (\"meta-check turns red\nif the ruleset enforcement is ever removed\") is not actually automated at the\ncanary layer — only the one-time manual verify command in the runbook covers it.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "flip the canary to enforcing without first checking whether the admin PUT from auto-merge-review-gate-admin-enforcement has actually landed",
+        "instead": "(not specified)",
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "why": "that repeats the same 'code says enforced, repo layer does not' gap this whole line of TODOs exists to close."
+      },
+      {
+        "dont": "reimplement required_approving_review_count / require_code_owner_review logic inline in ruleset_drift_check.py",
+        "instead": "(not specified)",
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "why": "import review_enforcement_findings from _project/scripts/ruleset_review_enforcement.py so the two scripts cannot drift apart."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "needs_item": "auto-merge-review-gate-admin-enforcement"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The RELEASE_READINESS_OVERRIDE_SHA/_REASON emergency override in ruleset_drift_check.py continues to short-circuit before any new check runs.",
+        "item_id": "ruleset-drift-check-review-rule-coverage"
+      },
+      {
+        "behavior": "_project/scripts/ruleset_review_enforcement.py remains the single source of truth for the review-rule predicate; ruleset_drift_check.py imports it rather than duplicating the required_approving_review_count / require_code_owner_review checks.",
+        "item_id": "ruleset-drift-check-review-rule-coverage"
+      },
+      {
+        "behavior": "scripts/ruleset_drift_check.py's existing comparisons (required checks, strict policy, linear history, non-fast-forward, deletion, bypass actors, target refs) are unchanged for both develop-squash-only and main-release-only.",
+        "item_id": "ruleset-drift-check-review-rule-coverage"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/scripts/ruleset_review_enforcement.py:review_enforcement_findings — the single source of truth for the review-rule predicate; import it, do not reimplement the required_approving_review_count / require_code_owner_review checks inline in ruleset_drift_check.py.",
+        "decision": "reuse",
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "path": "_project/scripts/ruleset_review_enforcement.py:review_enforcement_findings"
+      },
+      {
+        "concept": "scripts/ruleset_drift_check.py:compare_ruleset — reuse this comparison-and-findings pattern; add one more section rather than a parallel mechanism.",
+        "decision": "reuse",
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "path": "scripts/ruleset_drift_check.py:compare_ruleset"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/auto_merge_soundness_paths.py"
+      },
+      {
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/ruleset_review_enforcement.py"
+      },
+      {
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "kind": "only_modify",
+        "path_glob": "scripts/ruleset_drift_check.py"
+      },
+      {
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/release/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/release/ -k ruleset_review_enforcement -q",
+        "description": "ruleset_review_enforcement's own pinned test still passes",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/release/ -k ruleset_drift -q",
+        "description": "ruleset_drift_check now flags a fixture develop ruleset with required_approving_review_count=0",
+        "expected": "new/updated test asserts a review-enforcement finding is present when the fixture ruleset lacks review requirements",
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "notes": "If ruleset_drift_check.py starts asserting required_approving_review_count>=1\nand require_code_owner_review=true immediately, the daily canary goes\npermanently red until the admin action in auto-merge-review-gate-admin-enforcement\nis applied (live state is currently 0/false per\ndocs/operations/repo-admin-settings.md:119-121). Two options: (a) land this\nonly after the admin PUT is confirmed applied (this item stays blocked on\nthat TODO's w3), or (b) land a warn-only mode now (findings printed, exit 0)\nthat flips to enforcing once the admin action lands. Record the decision\nhere and in the PR description; do not silently pick one.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide sequencing: land review-rule drift coverage before or after the admin PUT lands",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "notes": "Add a call to `review_enforcement_findings` (from\n_project/scripts/ruleset_review_enforcement.py) inside or alongside\n`compare_ruleset` for the develop-squash-only ruleset only (main-release-only\nhas no equivalent requirement documented). Reuse `extract_rules` to normalize\nthe already-fetched live ruleset payload — do not re-fetch. Append its\nfindings to the existing findings list so `render_summary` and the JSON\n`--output` payload surface them the same way as other drift findings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Import ruleset_review_enforcement's predicate into ruleset_drift_check.py's compare_ruleset",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "notes": "Update docs/operations/repo-admin-settings.md's \"Ruleset drift is checked\nby scripts/ruleset_drift_check.py\" paragraph to say it now also asserts\nreview enforcement for develop, and update or retire the now-partially-\nredundant \"Verify (manual or release-canary...)\" command if the canary\ncovers it automatically. Confirm release-canary.yml (~line 160) and\nvalidate-main-pr.yml (~line 115) both still pass the token/env this needs\nand that a failure renders clearly in their job summaries (same pattern as\nexisting drift findings).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update the runbook and confirm both CI call sites surface the new failure mode",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "ruleset-drift-check-review-rule-coverage",
+        "notes": "Add a fixture-based test (alongside tests/unit/release/test_ruleset_drift_check.py\nif it exists, else tests/unit/release/) asserting compare_ruleset now flags a\ndevelop ruleset missing review enforcement, and stays silent on that axis\nonce the fixture has required_approving_review_count>=1 and\nrequire_code_owner_review=true. Keep tests/unit/release/test_ruleset_review_enforcement.py\npassing unchanged — this item extends the drift checker, not the predicate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend or add unit coverage for the merged drift+review-enforcement path",
+        "wid": "w4"
+      }
+    ]
+  }
+}

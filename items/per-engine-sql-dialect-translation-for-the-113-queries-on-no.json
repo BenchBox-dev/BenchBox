@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #414 of joinorder-canonical-cutover.\nDeferred: Per-engine SQL dialect translation for the 113 queries on non-DuckDB engines\nReason deferred: Engines not advertised as canonical-ready can get per-engine follow-up TODOs. Step 1 ships only with DuckDB plus at least one OSS engine fully passing the advertised canonical surface.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:09Z",
+      "worktree": "main"
+    }
+  }
+}

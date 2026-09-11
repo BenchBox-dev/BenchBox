@@ -1,0 +1,56 @@
+{
+  "context": "Add both keys to the from_config pass-through list alongside thread_limit. Prove the effect the way PR #1514 did: assert the constructed adapter state AND that the connection emits the SET statement, using an isolated tmp_path database and a deterministic connection spy - not a mocked-factory kwargs assertion. Check whether any existing CLI test asserts the current drop before changing it, since this makes previously-ignored user input take effect.",
+  "description": "DuckDBAdapter.from_config rebuilds its constructor config from explicit key lists. thread_limit was fixed in PR #1514, but two more keys that __init__ reads are still absent from every list: max_temp_directory_size (read at duckdb.py __init__, applied as SET max_temp_directory_size) and progress_bar (read as config.get('progress_bar'), applied as SET enable_progress_bar). A CLI or Python-API caller supplying either is silently ignored - the same class of no-op PR #1514 fixed for threads. Raised as deferral #686 during the MCP v2 platform_options batch and dismissed there because neither key is an MCP option and applying them changes existing CLI behavior outside that item's verification ladder.",
+  "legacy": {
+    "item_meta": {
+      "blocked_reason": "Sequenced behind duckdb-set-statement-value-hardening. This item adds max_temp_directory_size to DuckDBAdapter.from_config's pass-through list; benchbox/platforms/duckdb.py:795 applies that value as a raw f-string, conn.execute(f\"SET max_temp_directory_size = '{...}'\"). Landing this first makes an unhardened interpolation live from config -- the exact mistake #1514 made when it added thread_limit to the same list. Unblock once duckdb-set-statement-value-hardening lands.",
+      "category": "core-functionality",
+      "created_at": "2026-08-04T12:35:18Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing DuckDB adapter defaults when neither key is supplied",
+        "item_id": "duckdb-from-config-drops-constructor-read-keys"
+      },
+      {
+        "behavior": "MCP platform_options surface is unchanged - neither key is added to the MCP allow-list",
+        "item_id": "duckdb-from-config-drops-constructor-read-keys"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "duckdb-from-config-drops-constructor-read-keys",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "duckdb-from-config-drops-constructor-read-keys",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.duckdb import DuckDBAdapter as A; a = A.from_config({'benchmark': 'tpch', 'scale_factor': 0.01, 'database_path': '/tmp/bb_verify.duckdb', 'max_temp_directory_size': '1GB', 'progress_bar': True}); assert a.max_temp_directory_size == '1GB'; assert a.enable_progress_bar is True\"",
+        "description": "The real adapter applies both keys through from_config",
+        "expected": "exits 1 on the unfixed tree because both attributes are None/False; exits 0 once from_config passes them through",
+        "item_id": "duckdb-from-config-drops-constructor-read-keys",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms -q -k duckdb",
+        "description": "Scoped DuckDB tests and lint pass",
+        "expected": "exits 0 with the new effective-setting coverage present",
+        "item_id": "duckdb-from-config-drops-constructor-read-keys",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

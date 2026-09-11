@@ -1,0 +1,167 @@
+{
+  "description": "Phase 5 brings the /prompts/ MCP surface up to the same operational\nsafety contract as the CLI surface after Phases 1-4: smoke runs for\npaid or non-local target-scale executions, cost acknowledgment for\npaid target-scale executions, platform-option gap notes, TPC-DS\nsubscale dsdgen warnings, result analysis, provenance capture, and\noptional plan capture guidance.\n\nThe implementation deliberately uses existing MCP surfaces only. It\ndoes not add new MCP tools, and it avoids inventing unsupported\nrun_benchmark arguments for platform options.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase5-mcp-parity",
+        "id": 461,
+        "reason": "Requires MCP tool API work outside the landing prompt batch.",
+        "resolution": "promoted",
+        "resolved_item": "add-first-class-mcp-platform-option-arguments",
+        "resolved_reason": null,
+        "summary": "Add first-class MCP platform option arguments"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase5-mcp-parity",
+        "id": 462,
+        "reason": "Unit and render-smoke coverage prove prompt generation; live MCP integration is a separate surface.",
+        "resolution": "promoted",
+        "resolved_item": "mcp-live-prompt-integration-coverage-v2",
+        "resolved_reason": null,
+        "summary": "MCP live-server integration tests for rendered prompts"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Catalog MCP tool and prompt names are validated against benchbox/mcp/.",
+        "item_id": "prompts-landing-phase5-mcp-parity"
+      },
+      {
+        "behavior": "MCP prompt ordering remains list_available -> dependency check -> optional safety notes -> dry run -> live run -> summary/provenance.",
+        "item_id": "prompts-landing-phase5-mcp-parity"
+      },
+      {
+        "behavior": "MCP uses the same Phase 2-3 smoke, cost, and dsdgen predicates as CLI.",
+        "item_id": "prompts-landing-phase5-mcp-parity"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/generate_landing_quickstarts.py --validate-only",
+        "description": "Validator passes",
+        "expected": "validate-only: OK",
+        "item_id": "prompts-landing-phase5-mcp-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/generate_landing_quickstarts.py --check",
+        "description": "Generated catalog is fresh",
+        "expected": "check: OK",
+        "item_id": "prompts-landing-phase5-mcp-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make prompt-quickstarts-check",
+        "description": "Prompt quickstart make target passes",
+        "expected": "check: OK",
+        "item_id": "prompts-landing-phase5-mcp-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/landing/test_landing_quickstarts.py -n 0 -q",
+        "description": "Landing tests pass",
+        "expected": "0 failures",
+        "item_id": "prompts-landing-phase5-mcp-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "prompts-landing-phase5-mcp-parity",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "prompts-landing-phase5-mcp-parity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "prompts-landing-phase5-mcp-parity",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "prompts-landing-phase5-mcp-parity",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase5-mcp-parity",
+        "notes": "MCP tools are already non-interactive and capture output through\ntool responses rather than shell tee logs. The prompt maps CLI\nguardrails to MCP-native steps: run_benchmark smoke calls,\nuser-facing cost acknowledgment, analyze_results for compare\nresult files, system_profile for provenance, and get_query_plan\nafter optional capture_plans=true runs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory CLI-to-MCP prompt parity mapping",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase5-mcp-parity",
+        "notes": "Reuses the shared needsSmokeStep and needsCostAcknowledgment\npredicates so MCP and CLI stay aligned on cost_class, deployment,\nand scale thresholds.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend buildMcpPrompt with smoke and cost-acknowledgment steps",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase5-mcp-parity",
+        "notes": "TPC-DS dsdgen warnings mirror the CLI text. Platform-option hints\nrender as an explicit MCP surface gap because run_benchmark does\nnot expose a platform option argument; the prompt tells users to\nconfigure values via BenchBox config/env or switch to CLI.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Render platform-option hints and dsdgen warnings in MCP prompts",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase5-mcp-parity",
+        "notes": "Compare prompts call analyze_results with file1/file2 from live\nmcp_metadata.result_file responses. Single-run prompts summarize\nthe run_benchmark payload and optionally call aggregate analysis.\nProvenance calls system_profile, whose payload includes BenchBox\nversion and system fields. Optional plan capture uses\ncapture_plans=true plus get_query_plan.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Use real MCP analysis, provenance, and plan tools",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase5-mcp-parity",
+        "notes": "Added validator coverage for analysis_tool, system_profile_tool,\nand plan_tool; static prompt tests for real-tool wording and the\nplatform-option gap; generated catalog parity assertions; and\nrender smoke coverage for paid/local/compare MCP prompts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tests, generated catalog, and validation",
+        "wid": "w4"
+      }
+    ]
+  }
+}

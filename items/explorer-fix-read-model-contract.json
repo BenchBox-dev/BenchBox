@@ -1,0 +1,261 @@
+{
+  "context": "All changes are additive to the read model - no existing fields are\nremoved or renamed. Add the new functions and fields, populate them\nin the existing `to_manifest_entry` and `to_detail_result` methods.\n\nThe canonical order:\n  1. Define models + constants (w3, w4) - no behavior, just schema\n  2. Define pure functions (_platform_id, _query_display_ms, select_canonical_row)\n  3. Wire into the transformer methods\n  4. Test with fixtures that exercise the edge cases\n\nDo not change how existing fields are computed. The new fields are\nderived from the same bundle data, just with a different reduction.\n",
+  "description": "The adversarial review (2026-04-15) identified two critical invariants\nthat must hold before any matrix leaderboard can be meaningful:\n\n**Invariant 1 - Platform identity is separate from provenance/visibility.**\nThe current pipeline writes whatever string appears in the bundle's\nplatform.name field directly to manifest.json and details/. In practice\nthis produces distinct rows for \"DuckDB-trust-ci\", \"DuckDB-trust-community\",\n\"DuckDB-trust-local\", etc., even though they are the same engine variant and\nthe trust information is already captured in the separate trust_label field.\nAny cross-platform matrix built on this read model is misleading because the\nplatform axis is polluted with provenance variants.\n\nFix: extract a canonical `platform_id` (e.g., \"duckdb\") alongside the raw\nplatform name, and define explicit ranking-eligibility rules that gate which\nrows may appear in ranked tables.\n\n**Invariant 2 - One canonical display value per logical query.**\nThe transformer preserves every measurement row (iter, stream) for provenance.\n`_geomean_ms()` therefore averages *all* execution samples, including\nthroughput streams. Meanwhile, Compare.tsx calls `find()` on the queries\narray and takes the first row - currently returning 16ms for a query whose\nsamples are [16, 11, 11, 11] (cold-cache outlier, not representative).\n\nNeither approach is wrong for its stated purpose, but neither is appropriate\nas the display value in a comparison matrix. The fix is a canonical reduction:\nmedian of successful measurement runs for each distinct logical query_id,\nexposed as `display_ms` per query and `display_geomean_ms` at the result\nlevel. The raw `geomean_ms` is preserved as an audit/detail field.\n\nThis TODO does **not** implement the matrix UI or the cohort artifact - it\nonly fixes the data contracts that every downstream feature depends on.\nIt replaces the dangling `explorer-extend-manifest-and-pipeline` dependency\nthat previously blocked `explorer-emit-benchmark-summary-artifact`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "apply canonical-row selection inside to_manifest_entry",
+        "instead": "selection happens in the pipeline after all entries are loaded",
+        "item_id": "explorer-fix-read-model-contract",
+        "why": "the transformer processes one bundle at a time"
+      },
+      {
+        "dont": "hard-code 'maintainer-run' in query logic",
+        "instead": "use is_ranking_eligible()",
+        "item_id": "explorer-fix-read-model-contract",
+        "why": "the eligibility rules must be the single source of truth"
+      },
+      {
+        "dont": "rename geomean_ms to sample_geomean_ms",
+        "instead": "add display_geomean_ms alongside it",
+        "item_id": "explorer-fix-read-model-contract",
+        "why": "it breaks any existing consumers reading that field"
+      },
+      {
+        "dont": "strip the raw platform string from ManifestEntry",
+        "instead": "add platform_id as a new field",
+        "item_id": "explorer-fix-read-model-contract",
+        "why": "it is needed for display and debugging"
+      },
+      {
+        "dont": "use mean instead of median for display_ms reduction",
+        "instead": "use median for robustness",
+        "item_id": "explorer-fix-read-model-contract",
+        "why": "a single cold-cache outlier inflates the mean"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-15T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing `geomean_ms` field - raw-sample geomean preserved for backward compat; do not rename or remove",
+        "item_id": "explorer-fix-read-model-contract"
+      },
+      {
+        "behavior": "Existing `platform` field on ManifestEntry and DetailResult - raw bundle string, unchanged for display/debugging",
+        "item_id": "explorer-fix-read-model-contract"
+      },
+      {
+        "behavior": "Existing `queries: list[QueryTiming]` on DetailResult - raw per-sample timings preserved for audit; display_timings is additive",
+        "item_id": "explorer-fix-read-model-contract"
+      },
+      {
+        "behavior": "Existing manifest.json schema shape - this adds fields, does not remove or rename any existing keys",
+        "item_id": "explorer-fix-read-model-contract"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-fix-read-model-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "item_id": "explorer-fix-read-model-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/pipeline.py"
+      },
+      {
+        "item_id": "explorer-fix-read-model-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "explorer-fix-read-model-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/models.py"
+      },
+      {
+        "item_id": "explorer-fix-read-model-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/transformer.py"
+      },
+      {
+        "item_id": "explorer-fix-read-model-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer/test_read_model_contract.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'platform_id' benchbox/core/explorer_pipeline/models.py",
+        "description": "platform_id field present in ManifestEntry",
+        "expected": "field defined in ManifestEntry and DetailResult",
+        "item_id": "explorer-fix-read-model-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'display_' benchbox/core/explorer_pipeline/models.py",
+        "description": "display_timings and display_geomean_ms present in DetailResult",
+        "expected": "display_timings, display_geomean_ms, QueryDisplayTiming all present",
+        "item_id": "explorer-fix-read-model-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'RANKING_ELIGIBLE' benchbox/core/explorer_pipeline/models.py",
+        "description": "RANKING_ELIGIBLE constants exported",
+        "expected": "constants and is_ranking_eligible defined",
+        "item_id": "explorer-fix-read-model-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'select_canonical_row' benchbox/core/explorer_pipeline/models.py",
+        "description": "select_canonical_row exported",
+        "expected": "function defined",
+        "item_id": "explorer-fix-read-model-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer/test_read_model_contract.py -v",
+        "description": "Unit tests pass",
+        "expected": "all tests pass",
+        "item_id": "explorer-fix-read-model-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer/ -v",
+        "description": "Existing manifest tests still pass",
+        "expected": "all tests pass",
+        "item_id": "explorer-fix-read-model-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-fix-read-model-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-fix-read-model-contract",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-fix-read-model-contract",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-fix-read-model-contract",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-fix-read-model-contract",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-fix-read-model-contract",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-fix-read-model-contract",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-fix-read-model-contract",
+        "notes": "`_platform_id(raw: str) -> str` strips known provenance suffixes\nfrom the bundle platform.name before slugifying:\n  - Patterns to strip: `-trust-{ci,community,local,unknown}`,\n    `-{ci,community,local}` when adjacent to a version segment.\n  - After stripping, lowercase and replace spaces with dashes.\nExamples:\n  \"DuckDB-trust-ci\"        → \"duckdb\"\n  \"DuckDB\"                 → \"duckdb\"\n  \"polars-df\"              → \"polars-df\"\n  \"ClickHouse Cloud\"       → \"clickhouse-cloud\"\n\nAdd `platform_id: str` to both ManifestEntry and DetailResult.\nPopulate from `_platform_id(platform)` in `to_manifest_entry` and\n`to_detail_result`. The raw `platform` field is unchanged - it\nremains the exact string from the bundle for display and debugging.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `_platform_id()` normalizer and `platform_id` field to ManifestEntry and DetailResult",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-fix-read-model-contract",
+        "notes": "Signature:\n  `_query_display_ms(timings: list[QueryTiming], query_id: str) -> float | None`\n\nAlgorithm:\n  1. Filter to timings where `timing.query_id == query_id`\n     AND `timing.status == \"pass\"`.\n  2. From passing timings, select `run_type == \"measurement\"` rows;\n     if none have explicit run_type, accept all.\n  3. Compute median of `duration_ms` across the filtered set.\n  4. Return None if the filtered set is empty (all failed or query\n     not present).\n\nMedian is chosen over mean because a single cold-cache outlier\n(common in power-test runs that include one warmup iteration before\nmeasurement) should not dominate the display value.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define `_query_display_ms()` canonical reduction function in transformer.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-fix-read-model-contract",
+        "notes": "New model in models.py:\n  class QueryDisplayTiming(BaseModel):\n      query_id: str\n      display_ms: float | None  # None = all runs failed for this query\n      sample_count: int         # number of passing runs that contributed\n\nAdd to DetailResult:\n  display_timings: list[QueryDisplayTiming] = []\n  display_geomean_ms: float | None = None  # geomean of display_ms values\n\nThe existing `geomean_ms` field is NOT renamed or removed - it\nremains the raw-sample geomean for backward compatibility and audit.\nManifestEntry also gets `display_geomean_ms: float | None = None`\n(used by the matrix for ranking when power_score is absent).\n\nPopulate in `to_detail_result` and `to_manifest_entry` by calling\n`_query_display_ms()` for each distinct query_id, then computing\ngeomean of the non-None results.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add QueryDisplayTiming model and display_timings + display_geomean_ms fields to DetailResult",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-fix-read-model-contract",
+        "notes": "Per hosted-results-contract.md: mixed self-reported rows are not\neligible for ranked tables. Codify as frozensets:\n\n  RANKING_ELIGIBLE_VISIBILITIES: frozenset[str] = frozenset({\n      \"public-curated\",\n      \"public-verified\",\n  })\n\n  RANKING_ELIGIBLE_TRUST_LABELS: frozenset[str] = frozenset({\n      \"maintainer-run\",\n      \"ci-verified\",\n  })\n\n  def is_ranking_eligible(entry: ManifestEntry) -> bool:\n      return (\n          entry.visibility in RANKING_ELIGIBLE_VISIBILITIES\n          and entry.trust_label in RANKING_ELIGIBLE_TRUST_LABELS\n      )\n\nExport all three from models.py `__all__`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define RANKING_ELIGIBLE_VISIBILITIES and RANKING_ELIGIBLE_TRUST_LABELS constants in models.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-fix-read-model-contract",
+        "notes": "Signature:\n  `select_canonical_row(entries: list[ManifestEntry]) -> ManifestEntry | None`\n\nGiven multiple ManifestEntries for the same (platform_id, benchmark,\nscale_factor, phase), selects the single canonical row for a ranked\nmatrix display. Returns None if the list is empty.\n\nSelection priority (descending):\n  1. `is_ranking_eligible(entry)` - ranking-eligible rows win\n  2. `run_date` descending - newest run wins within the same tier\n\nThe non-canonical rows are not discarded - they remain in the\nmanifest and detail pages. Only the matrix artifact applies this\nselection when building the default ranked view.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add select_canonical_row() in models.py for matrix default ranking",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-fix-read-model-contract",
+        "notes": "Cases:\n  (a) _platform_id strips known trust suffixes correctly\n  (b) _platform_id is idempotent on clean names\n  (c) _query_display_ms returns median of passing runs, not first\n  (d) _query_display_ms returns None when all runs failed\n  (e) _query_display_ms uses measurement-only rows when run_type present\n  (f) display_geomean_ms differs from geomean_ms when samples vary\n  (g) is_ranking_eligible returns False for community-submission trust\n  (h) select_canonical_row picks ranking-eligible over non-eligible\n  (i) select_canonical_row picks newest when both are ranking-eligible\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write unit tests in tests/unit/core/explorer/test_read_model_contract.py",
+        "wid": "w6"
+      }
+    ]
+  }
+}

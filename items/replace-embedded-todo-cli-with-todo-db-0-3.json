@@ -1,0 +1,271 @@
+{
+  "context": "Add todo-db >= 0.3 as a git dependency on the v0.3.0 tag in _project/scripts/pyproject.toml (user-chosen over path/PyPI; swap to PyPI once publish-todo-db-to-pypi lands). Reduce _project/scripts/todo to a thin wrapper that execs the standalone CLI with --project-id benchbox. Delete todo_db.py and todo_findings.py. Replace the tests/unit/scripts/ suite with contract tests over the wrapper rather than reimplementing the standalone's own coverage. Update .claude/skills/todo-db/skill.yaml so standalone_only_commands no longer overlaps wrapper handlers - TestSkillThinness enforces disjointness and is what blocked the earlier attempt to implement 'update' locally.",
+  "description": "Retire the embedded tracker CLI in favour of the standalone todo-db >= 0.3 package, so amendable items (the standalone-only 'update' verb) work without the skill's rule-4 boundary being violated. Replaces roughly 7900 lines: _project/scripts/todo_db.py (3030), _project/scripts/todo_findings.py (910) and ~4700 lines across 11 test files under tests/unit/scripts/. HARD PREREQUISITE: the hosted DB must already speak the 0.3 schema - see migrate-hosted-tracker-db-to-todo-db-0-3-schema. Until that lands, todo-db cannot read the tracker at all ('no such table: schema_migrations'), so neither full replacement nor delegate-only routing is possible. Succeeds the code half of the dropped item adopt-todo-db-standalone-cli-for-amendable-items, which was scoped so it could not touch _project/scripts/pyproject.toml where the dependency has to go.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "needs_item": "migrate-hosted-tracker-db-to-todo-db-0-3-schema"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-13T21:16:51Z",
+      "completed_pr": 1710,
+      "created_at": "2026-07-29T11:33:43Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "every subcommand the embedded CLI advertises today still resolves after the swap, or its removal is deliberate and recorded",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3"
+      },
+      {
+        "behavior": "hosted auth keeps working: token minted inline with --expiration, never stored",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3"
+      },
+      {
+        "behavior": "standalone_only_commands and wrapper handlers stay disjoint (TestSkillThinness)",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/todo-db-export.yml"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/pyproject.toml"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_shadow.py"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_standalone_extensions.py"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_findings.py"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_schema_migration_check.py"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/uv.lock"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/vendor/**"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/todo-db-benchbox-extraction.md"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py -q",
+        "description": "Wrapper boundary tests pass",
+        "expected": "exit 0",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "last_result": "pass",
+        "last_run": "2026-08-13T21:15:40Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q -k SkillThinness",
+        "description": "Skill thinness holds - standalone_only_commands does not overlap wrapper handlers",
+        "expected": "exit 0",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "last_result": "pass",
+        "last_run": "2026-08-13T21:15:54Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo stats >/dev/null",
+        "description": "The wrapper resolves against the hosted DB after the swap",
+        "expected": "exit 0",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "last_result": "pass",
+        "last_run": "2026-08-13T21:15:59Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! test -e _project/scripts/todo_db.py && ! test -e _project/scripts/todo_findings.py",
+        "description": "The embedded implementation is actually gone",
+        "expected": "exit 0",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "last_result": "pass",
+        "last_run": "2026-08-13T21:16:00Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q",
+        "description": "Full scripts test suite passes",
+        "expected": "exit 0",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "last_result": "pass",
+        "last_run": "2026-08-13T21:16:25Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv sync --project _project/scripts --locked && uv run --project _project/scripts -- todo-db --version",
+        "description": "Locked project environment contains the canonical todo-db package",
+        "expected": "exit 0",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "last_result": "pass",
+        "last_run": "2026-08-13T21:16:27Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n \"todo_db\\\\.py|BENCHBOX_TODO_DB_STANDALONE|../todo-db\" _project/scripts/todo",
+        "description": "Default wrapper is package-only and has no legacy fallback",
+        "expected": "exit 0",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "last_result": "pass",
+        "last_run": "2026-08-13T21:16:29Z",
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py tests/unit/scripts/test_todo_db_standalone_compat.py -q",
+        "description": "Wrapper integration and thinness tests pass",
+        "expected": "exit 0",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "last_result": "pass",
+        "last_run": "2026-08-13T21:16:47Z",
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! test -e _project/scripts/todo_db.py && ! test -e _project/scripts/todo_findings.py",
+        "description": "Embedded implementations are absent after cleanup",
+        "expected": "exit 0",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "last_result": "pass",
+        "last_run": "2026-08-13T21:16:48Z",
+        "seq": 9,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Compared legacy todo_db.py --help with the locked todo-db 0.3.1 CLI and existing standalone adapter contracts. Canonical package behavior: init, import-yaml, create, update, show, claim, release, deps, unblock, start, done, defer, promote, dismiss, complete, drop, block, list, ready, stats, check-scope, verify, lint, sweep-stale, migrate, and config. Thin adapter translations: scope-update maps to package update; export maps package lossless export to BenchBox legacy views; doctor binds BenchBox config/identity; finding binds offline drafts and BenchBox banners. BenchBox policy extensions: renew and freeze operate against the package-opened database, with freeze guarding writes. No advertised legacy command is deliberately removed. Package-only init-project, restore, restore-legacy, and audit were never legacy wrapper verbs and remain outside this removal contract.",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "notes": null,
+        "started_at": "2026-08-13T14:37:28Z",
+        "started_branch": "fix/todo-db-0-3-replacement",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-todo-db-0-3-replacement",
+        "status": "done",
+        "summary": "Inventory every embedded command and classify it as canonical package behavior, thin adapter translation, BenchBox policy, or deliberate removal",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Published todo-db v0.3.2 from merged commit 389a3592 with wheel SHA-256 ddc8c56a8b9f11c550d8f3b81df568c6d111cc79c076cbc4bf7c03fd68a95fa4. Replaced the verified 0.3.1 wheel with the verified 0.3.2 wheel, updated _project/scripts/pyproject.toml, regenerated uv.lock, ran uv sync --locked, and confirmed the locked executable reports todo-db 0.3.2.",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "notes": null,
+        "started_at": "2026-08-13T14:56:56Z",
+        "started_branch": "fix/todo-db-0-3-replacement",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-todo-db-0-3-replacement",
+        "status": "done",
+        "summary": "Add the released todo-db package to _project/scripts/pyproject.toml and regenerate uv.lock",
+        "wid": "w1"
+      },
+      {
+        "evidence": "The stable wrapper now executes the locked package-backed todo_db_standalone_compat.py adapter, pins BENCHBOX_TODO_DB_EXPECTED_VERSION=0.3.2, and has no todo_db.py, BENCHBOX_TODO_DB_STANDALONE, or sibling checkout fallback. Version handshake reports todo-db 0.3.2; fresh local stats and hosted stats both exit 0; hosted auth/config translation remains in the wrapper.",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "notes": null,
+        "started_at": "2026-08-13T14:57:57Z",
+        "started_branch": "fix/todo-db-0-3-replacement",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-todo-db-0-3-replacement",
+        "status": "done",
+        "summary": "Make _project/scripts/todo invoke only the locked todo-db package and remove automatic legacy fallback",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Released todo-db v0.3.2 from merged commit 389a3592cb92a8afde47d6d3b807ba3930f98316; release wheel SHA-256 ddc8c56a8b9f11c550d8f3b81df568c6d111cc79c076cbc4bf7c03fd68a95fa4 was re-downloaded and matched. BenchBox now vendors and locks that wheel, routes _project/scripts/todo only through the package-backed adapter, removes todo_db.py and todo_findings.py, and removes all feature-flag, sibling, dynamic-download, and legacy workflow fallbacks. Historical 361385d1 corpus rehearsal imported/exported 1,364/1,364 items with zero field diffs and equal events/metadata.",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "notes": null,
+        "started_at": "2026-08-13T14:58:48Z",
+        "started_branch": "fix/todo-db-0-3-replacement",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-todo-db-0-3-replacement",
+        "status": "done",
+        "summary": "Delete the embedded tracker and findings implementations only after hosted migration and package parity gates pass",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Removed embedded-implementation unit suites and replaced them with BenchBox boundary coverage for the locked wheel/schema, wrapper routing and version/hash pinning, export workflow, shadow export fidelity, compatibility rendering, freeze/renew extensions, and full wrapper lifecycle. Focused boundary suite: 124 passed. Full tests/unit/scripts suite: 1,248 passed with 4 pre-existing Python 3.14 tar-filter deprecation warnings. Ruff check and format checks pass; workflow YAML parses; package/schema migration guard passes.",
+        "item_id": "replace-embedded-todo-cli-with-todo-db-0-3",
+        "notes": null,
+        "started_at": "2026-08-13T15:21:04Z",
+        "started_branch": "fix/todo-db-0-3-replacement",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-todo-db-0-3-replacement",
+        "status": "done",
+        "summary": "Replace legacy unit coverage with wrapper/package contract tests and run the full scripts suite",
+        "wid": "w4"
+      }
+    ]
+  }
+}

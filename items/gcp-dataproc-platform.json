@@ -1,0 +1,17 @@
+{
+  "description": "Add GCP Dataproc managed Spark platform adapter supporting both SQL and DataFrame modes.\nDataproc is Google Cloud's primary managed Spark service. Implementation reuses\ncloud-spark shared infrastructure for staging, session management, and config optimization.\n\nSupports both persistent and ephemeral cluster modes. Uses Dataproc Jobs API\nfor job submission and GCS for data staging.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "gcp-dataproc-platform",
+        "needs_item": "cloud-spark-shared-infrastructure"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2025-12-24T00:00:00Z",
+      "created_at": "2025-12-24T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

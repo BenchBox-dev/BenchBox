@@ -1,0 +1,10 @@
+{
+  "description": "\"Replaced the monolithic `benchbox/core/tpchavoc/variants.py` with a modular package (`variant_base`, `variant_sets`, lightweight registry), refreshed documentation, and introduced focused unit tests mirroring the new structure.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

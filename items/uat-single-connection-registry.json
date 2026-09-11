@@ -1,0 +1,239 @@
+{
+  "context": "Treat compose `ports:` as the canonical host reachability source and adapter\ndefaults as the canonical service/container source. Replace matrix.py /\ndocker_assets.py literal tables with resolution against those sources without\ncollapsing distinct endpoint roles. Lock it with a CI drift test that\nre-derives the facts and asserts equality within each role — the same shape as\nthe submit-classifier contract test.\n",
+  "description": "Outcome of a 4-round adversarial architecture review of the UAT layer\n(tests/uat/). UAT maintains its own connection-truth table that duplicates\nfacts already owned by compose files and platform adapters, and the copies\ncan disagree silently.\n\n- tests/uat/matrix.py:19-95 hardcodes PLATFORM_PORTS, PLATFORM_EXTRA_OPTS,\n  LOCAL_MANAGED_PLATFORM_EXTRA_OPTS, and credentials (e.g. password=benchbox).\n- SingleStore alone shows why the model must distinguish endpoint roles:\n    * UAT hardcodes local Docker host reachability at 13306 (matrix.py:22)\n    * compose maps ${SINGLESTORE_HOST_PORT:-13306} on the host to container port 3306\n    * adapter credentials default to the service/container port 3306 (benchbox/platforms/credentials/singlestore.py:30)\n- tests/uat/docker_assets.py:75 is yet another separate registry from matrix.py.\n\nFailure mode: set SINGLESTORE_HOST_PORT (or change a compose mapping) and UAT\nsilently probes the wrong host port even though the adapter's service-port\ndefault remains valid. A skipped-because-wrong-host-port platform looks\nidentical to a genuinely-down platform, so divergence quietly erodes the exact\ncoverage UAT exists to prove. This is the load-bearing fact a \"lightweight\nuser-exercising\" layer actually needs, and the one most certain to rot.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a fourth registry to 'unify' the three",
+        "instead": "(not specified)",
+        "item_id": "uat-single-connection-registry",
+        "why": "derive from existing canonical surfaces (adapter defaults + compose)"
+      },
+      {
+        "dont": "collapse SingleStore's host port and service/container port into one value",
+        "instead": "(not specified)",
+        "item_id": "uat-single-connection-registry",
+        "why": "model the endpoint role explicitly"
+      },
+      {
+        "dont": "hardcode the resolved SingleStore host port",
+        "instead": "(not specified)",
+        "item_id": "uat-single-connection-registry",
+        "why": "read it so SINGLESTORE_HOST_PORT overrides flow through"
+      },
+      {
+        "dont": "leave matrix.py and docker_assets.py as two registries",
+        "instead": "(not specified)",
+        "item_id": "uat-single-connection-registry",
+        "why": "collapse to one"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-single-connection-registry",
+        "id": 511,
+        "reason": "Generating compose from adapters is a larger infra change; deriving the read path is the fix.",
+        "resolution": "promoted",
+        "resolved_item": "auto-generate-compose-port-mappings-from-adapter-defaults",
+        "resolved_reason": null,
+        "summary": "Auto-generate compose port mappings from adapter defaults"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-single-connection-registry",
+        "id": 512,
+        "reason": "Scoped out by decision (2026-05-31): host reachability + adapter port= now derive from compose; credential and secondary-port literals were relocated into the single docker_assets registry but not yet derived. Env keys vary per platform (ROOT_PASSWORD/POSTGRES_PASSWORD/...) and wrong derivation risks the must_preserve 'no new skips'. Tackle in a dedicated pass.",
+        "resolution": "promoted",
+        "resolved_item": "derive-credential-secondary-port-literals-password-http-port",
+        "resolved_reason": null,
+        "summary": "Derive credential/secondary-port literals (password=, http_port=, be_http_port=) from canonical sources"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-31T00:00:00Z",
+      "created_at": "2026-05-31T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Externally-managed-platform path (docker_manage_platforms: false) still resolves connection facts correctly",
+        "item_id": "uat-single-connection-registry"
+      },
+      {
+        "behavior": "UAT continues to reach every platform it currently reaches (no new skips after the refactor)",
+        "item_id": "uat-single-connection-registry"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/credentials/*.py and platform adapters — reuse as canonical service/container defaults and credential keys",
+        "decision": "reuse",
+        "item_id": "uat-single-connection-registry",
+        "path": "benchbox/platforms/credentials/*.py"
+      },
+      {
+        "concept": "docker/*/docker-compose.yml ports mappings — reuse as canonical local host reachability facts for Docker-managed platforms",
+        "decision": "reuse",
+        "item_id": "uat-single-connection-registry",
+        "path": "docker/*/docker-compose.yml"
+      },
+      {
+        "concept": "docs/operations/local-platform-provisioning.tsv — extend/reuse for operator-facing provisioning descriptions, not as an untested runtime registry",
+        "decision": "extend",
+        "item_id": "uat-single-connection-registry",
+        "path": "docs/operations/local-platform-provisioning.tsv"
+      },
+      {
+        "concept": "tests/uat/docker_assets.py — collapse existing compose mapping into the resolved connection model rather than maintaining a second registry",
+        "decision": "reuse",
+        "item_id": "uat-single-connection-registry",
+        "path": "tests/uat/docker_assets.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-single-connection-registry",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/credentials/ (adapter defaults are canonical — read, don't change)"
+      },
+      {
+        "item_id": "uat-single-connection-registry",
+        "kind": "do_not_modify",
+        "path_glob": "docker/*/docker-compose.yml (compose mappings are canonical)"
+      },
+      {
+        "item_id": "uat-single-connection-registry",
+        "kind": "only_modify",
+        "path_glob": "tests/ (new drift test)"
+      },
+      {
+        "item_id": "uat-single-connection-registry",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/docker_assets.py"
+      },
+      {
+        "item_id": "uat-single-connection-registry",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/matrix.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -nE 'PLATFORM_PORTS|PLATFORM_EXTRA_OPTS|LOCAL_MANAGED_PLATFORM_EXTRA_OPTS' tests/uat/matrix.py || echo 'absent'",
+        "description": "No UAT-local connection registry remains in matrix.py",
+        "expected": "absent (connection facts resolve from canonical sources)",
+        "item_id": "uat-single-connection-registry",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -k connection_registry_drift -q",
+        "description": "Connection-drift contract test passes",
+        "expected": "all cases pass; compose/adapter/UAT facts agree",
+        "item_id": "uat-single-connection-registry",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "SINGLESTORE_HOST_PORT=13307 uv run -- python -m pytest -k 'uat and singlestore' -q",
+        "description": "SingleStore reachability honors overridden host port without changing adapter service default",
+        "expected": "UAT resolves host port 13307 for reachability while preserving service/container default semantics",
+        "item_id": "uat-single-connection-registry",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-single-connection-registry",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-single-connection-registry",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-single-connection-registry",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-single-connection-registry",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-single-connection-registry",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-single-connection-registry",
+        "notes": "Confirm matrix.py:19-95 tables, docker_assets.py:75 registry, compose\nports: mappings, and adapter/credentials defaults. Produce the canonical\nsource and endpoint role for each fact (host reachability port vs\nservice/container port vs credentials vs CLI option). Record a compact\nsummary so the fix targets current code without conflating domains.\nRE-VALIDATED 2026-05-31:\n  - matrix.py:20-78 held PLATFORM_PORTS / PLATFORM_EXTRA_OPTS /\n    LOCAL_MANAGED_PLATFORM_EXTRA_OPTS (hardcoded host:port, port=, password=benchbox).\n  - docker_assets.py:75-160 was a second registry reusing matrix.PLATFORM_PORTS.get() for tcp_probe_label.\n  - SingleStore split confirmed: matrix hardcoded localhost:13306; compose maps\n    \"${SINGLESTORE_HOST_PORT:-13306}:3306\"; adapter service port default 3306.\n  - Per-platform compose ports verified; naive \"first port\" is WRONG for databend\n    (MinIO 19000:9000 first, query endpoint 8000:8000) and questdb (19000:9000 first,\n    pg-wire 8812:8812) -> matched by CONTAINER service port instead.\nSCOPE (user decision): ports + collapse; credential-literal derivation deferred.\nFix: docker_assets owns the single registry; host ports derived from compose by\nmatching PLATFORM_SERVICE_PORT (container) side; matrix consumes via functions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the SingleStore host-port/service-port split and enumerate every hardcoded connection fact in UAT",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-single-connection-registry",
+        "notes": "Decide the source of truth per endpoint role: compose `ports:` for local\nhost reachability, adapter defaults for service/container defaults, and\nprovisioning TSV/docs for operator-facing descriptions when needed. Do NOT\nintroduce a brand-new fourth registry; derive from existing canonical\nsurfaces.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the canonical connection/provisioning model UAT will read",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-single-connection-registry",
+        "notes": "Remove the hardcoded PLATFORM_PORTS / *_EXTRA_OPTS / credential literals;\nresolve them at runtime from adapter defaults + compose, keeping host\nreachability ports distinct from service/container defaults. For\nSingleStore, SINGLESTORE_HOST_PORT should drive the host probe while 3306\nremains the adapter's service default.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor matrix.py to derive ports/options/credentials from the canonical source",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-single-connection-registry",
+        "notes": "docker_assets.py:75 must not be a separate registry from matrix.py.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Collapse docker_assets.py registry into the single source",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-single-connection-registry",
+        "notes": "The test parses compose `ports:` mappings and adapter defaults and asserts\nthe UAT-resolved facts match, so divergence fails loudly in CI rather than\nmanifesting as a phantom-skipped platform. Consider sharing a\nCI-contract-test harness with [[uat-shared-submit-classifier]].\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a CI drift test diffing resolved connection facts against compose + adapter defaults",
+        "wid": "w4"
+      }
+    ]
+  }
+}

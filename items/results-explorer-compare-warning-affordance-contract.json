@@ -1,0 +1,290 @@
+{
+  "context": "Treat warnings as structured state with reason codes, counts, severity, and\ntarget anchors. Then render interactive controls only when they actually move\nthe user to the warning evidence.\n",
+  "description": "Compare guardrail badges can look like buttons without being clickable, and\nwarning counts do not reliably show users where the actual warnings live.\nCopy issues such as `1 warnings` and duplicated punctuation point to the same\ndeeper issue: warning state is not represented as a structured UI contract.\n\nThis TODO makes warning counts actionable when they imply action, passive\nwhen they are only labels, and consistent across guardrails, decision\nsummaries, receipts, shareable URLs, and browser reloads.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate pluralization and punctuation in separate components.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make warning links depend on transient scroll position or unmounted receipt content.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "show a warning count without a way to inspect the warnings.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "style passive status pills like buttons.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "needs_item": "results-explorer-compare-disabled-recovery-states"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "needs_item": "results-explorer-compare-entrypoint-happy-path-gates"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "needs_item": "results-explorer-direct-route-and-copy-hardening"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "results-explorer-followup-todo-review"
+    },
+    "preserves": [
+      {
+        "behavior": "Blocking incompatibilities remain visually distinct from non-blocking warnings.",
+        "item_id": "results-explorer-compare-warning-affordance-contract"
+      },
+      {
+        "behavior": "Keyboard and screen-reader users can reach the warning details.",
+        "item_id": "results-explorer-compare-warning-affordance-contract"
+      },
+      {
+        "behavior": "Shareable Compare URLs continue to reload selected IDs and warning state.",
+        "item_id": "results-explorer-compare-warning-affordance-contract"
+      },
+      {
+        "behavior": "Warning links must not change selected runs or baseline state.",
+        "item_id": "results-explorer-compare-warning-affordance-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/src/components/ComparabilityReceipt.tsx renders detailed warning evidence.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "path": "results-explorer/src/components/ComparabilityReceipt.tsx"
+      },
+      {
+        "concept": "results-explorer/src/lib/compareSummary.ts generates warning and winner summary state.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "path": "results-explorer/src/lib/compareSummary.ts"
+      },
+      {
+        "concept": "results-explorer/src/lib/copyFormatters.ts should own shared count/pluralization copy if present.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "path": "results-explorer/src/lib/copyFormatters.ts"
+      },
+      {
+        "concept": "results-explorer/src/pages/Compare.tsx renders Compare guardrail and decision summary surfaces.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "path": "results-explorer/src/pages/Compare.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-compare-warning-affordance-contract/"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ComparabilityReceipt.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/ComparabilityReceipt.a11y.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/ComparabilityReceipt.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/compareSummary.ts"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/copyFormatters.ts"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.a11y.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/Compare.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx src/lib/__tests__/compareSummary.test.ts",
+        "description": "Compare warning tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/Compare.a11y.test.tsx src/components/__tests__/ComparabilityReceipt.a11y.test.tsx",
+        "description": "Accessibility tests cover warning affordances",
+        "expected": "Compare-specific accessibility tests pass",
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"0 warnings|1 warning|warnings|receipt|focus|passive label|PASS|FAIL\" _project/verification-logs/results-explorer-compare-warning-affordance-contract/",
+        "description": "Browser evidence confirms warning counts are actionable",
+        "expected": "logs include pass/fail evidence for zero, one, and multiple warning states",
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "notes": "Inspect Compare with zero warnings, one warning, and multiple warnings.\nCapture:\n  - warning reason codes and display strings;\n  - guardrail summary badges;\n  - decision summary badges;\n  - comparability receipt sections;\n  - anchor/link targets;\n  - reload/share URL behavior.\nStore route URLs, selected IDs, DOM text, and screenshots in\n`_project/verification-logs/results-explorer-compare-warning-affordance-contract/w0.log`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory Compare warning sources, badges, and receipt anchors",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "notes": "Define states for:\n  - no warnings;\n  - one warning;\n  - multiple warnings with grouped categories;\n  - blocking incompatibility vs non-blocking warning;\n  - passive computed-from-selected-runs label.\nFor each state, specify whether the visible pill/badge is a button/link or\npassive text. Decision gate: anything styled as a button must have an\naction, and anything with a warning count must reveal or navigate to the\nunderlying warnings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define Compare warning UI states and interactions",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "notes": "Update Compare guardrails and receipt components so warning counts use a\nshared formatter and anchor model. Clicking a warning count should scroll\nor focus the Comparability Receipt warning section. The target section must\nbe keyboard-focusable and preserve focus after navigation. Passive labels\nsuch as `Computed from selected runs` must be restyled so they do not look\nlike clickable controls.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement structured warning summary and anchors",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "notes": "Move warning count formatting, reason titles, reason detail copy, and\npunctuation into a shared formatter. Cover singular/plural labels,\nsentence-final punctuation, repeated punctuation, and category summaries.\nThis can reuse `copyFormatters` if introduced by route/copy hardening.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Centralize warning copy, pluralization, and punctuation",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "notes": "Add tests for:\n  - one warning renders `1 warning`;\n  - multiple warnings render `N warnings`;\n  - clicking the count focuses or scrolls to receipt warnings;\n  - passive labels are not buttons and do not have button styling;\n  - share URL reload preserves warning state and anchors;\n  - screen-reader labels distinguish blocking errors from non-blocking\n    warnings.\nIf no Compare-specific a11y test files exist yet, create focused tests for\n`Compare` and `ComparabilityReceipt` rather than relying on broad glob\ncommands that may miss the affected components.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add accessibility, reload, and interaction tests",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-warning-affordance-contract",
+        "notes": "In a browser, complete Compare flows that yield zero, one, and multiple\nwarnings. Click every visible warning badge/link, reload the share URL, and\nverify the warning targets remain reachable. Decision gate: do not complete\nif any warning-looking pill is inert, if warning counts fail to reveal\ndetails, or if pluralization/punctuation defects remain.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Browser-check warning affordances in Compare",
+        "wid": "w5"
+      }
+    ]
+  }
+}

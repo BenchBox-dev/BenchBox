@@ -1,0 +1,134 @@
+{
+  "context": "Decide whether to add a docs.benchbox.dev CNAME or change every reference to benchbox.dev/docs/. Changing the references is cheaper and needs no DNS change. Either add -p/-b short options to run for parity with compare, or correct the help text; correcting the help text is the narrower fix. Audit every Click command docstring for missing \\\\b markers, not only the two confirmed. A separate docs-audit thread is already fixing the doc-side copies of these strings in a worktree - coordinate before editing the same files.",
+  "description": "REVALIDATED 2026-08-20 on current develop: `uv run -- benchbox run -p duckdb -b tpch` still errors `No such option '-p'`. `benchbox --help` still prints https://docs.benchbox.dev (NXDOMAIN). Live docs are https://benchbox.dev/docs/ (HTTP 200).\n\nThe fix already exists, unpushed, as commit a98d20ca0 on branch docs/audit-v0-4-0 (worktree BenchBox.wt-docs-audit-v0-4-0): URL rewrite, quick-start flag correction, Click \\\\b markers. Do NOT wait for documentation-accuracy-drift-burndown (deferred). Isolate and land a98d20ca0 (or equivalent) into develop so it ships in v0.4.0.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "merge the 94-file docs audit in order to fix three CLI strings",
+        "instead": "INSTEAD cherry-pick or recreate a98d20ca0 as its own PR",
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "why": "that PR is deferred and unpushed"
+      }
+    ],
+    "item_meta": {
+      "category": "cli",
+      "completed_at": "2026-08-20T16:56:55Z",
+      "completed_pr": 1789,
+      "created_at": "2026-08-17T23:28:56Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/**"
+      },
+      {
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -c 'docs\\.benchbox\\.dev' benchbox/",
+        "description": "No dead docs host in shipped code",
+        "expected": "0 matches",
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --help",
+        "description": "Advertised quick-start command runs",
+        "expected": "exits 0 and help text matches real options",
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "2026-08-20: uv run -- benchbox run -p duckdb -b tpch still errors No such option -p; benchbox --help still prints docs.benchbox.dev; fix commit a98d20ca0 exists on docs/audit-v0-4-0 and is unpushed",
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "notes": null,
+        "started_at": "2026-08-20T14:52:50Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Revalidate",
+        "wid": "w0"
+      },
+      {
+        "evidence": "80ee3688d cherry-pick of a98d20ca0 onto origin/develop: docs.benchbox.dev -> https://benchbox.dev/docs/ in app.py, onboarding.py, submit.py",
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "notes": null,
+        "started_at": "2026-08-20T16:27:56Z",
+        "started_branch": "fix/customer-facing-cli-url-and-help",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-customer-facing-cli",
+        "status": "done",
+        "summary": "Land the existing a98d20ca0 URL rewrite (docs.benchbox.dev -> https://benchbox.dev/docs/); do not bundle the 94-file docs audit",
+        "wid": "w1"
+      },
+      {
+        "evidence": "80ee3688d: benchbox --help now advertises run --platform duckdb --benchmark tpch; uv run -- benchbox run -p duckdb -b tpch still errors No such option -p and help no longer advertises -p",
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "notes": null,
+        "started_at": "2026-08-20T16:27:59Z",
+        "started_branch": "fix/customer-facing-cli-url-and-help",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-customer-facing-cli",
+        "status": "done",
+        "summary": "Land the existing help-text correction so the advertised quick-start is --platform/--benchmark, not -p/-b",
+        "wid": "w2"
+      },
+      {
+        "evidence": "80ee3688d: Click \\b markers landed with the isolated cherry-pick",
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "notes": null,
+        "started_at": "2026-08-20T16:28:02Z",
+        "started_branch": "fix/customer-facing-cli-url-and-help",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-customer-facing-cli",
+        "status": "done",
+        "summary": "Land the existing Click \\b marker fixes from a98d20ca0",
+        "wid": "w3"
+      },
+      {
+        "evidence": "773e53622 tests/unit/cli/test_shipped_docs_urls.py scans shipped package for docs.benchbox.dev; 5 passed including CliRunner --help assertions",
+        "item_id": "fix-customer-facing-cli-url-and-help-defects",
+        "notes": null,
+        "started_at": "2026-08-20T16:31:38Z",
+        "started_branch": "fix/customer-facing-cli-url-and-help",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-customer-facing-cli",
+        "status": "done",
+        "summary": "Add a test that fails if any shipped user-facing string references a non-resolving benchbox hostname",
+        "wid": "w4"
+      }
+    ]
+  }
+}

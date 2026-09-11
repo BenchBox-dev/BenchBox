@@ -1,0 +1,194 @@
+{
+  "context": "Follow the established pattern in benchbox/core/visualization/ascii/bar_chart.py:\n\n1. Create a dataclass for input data (PercentileData with name, p50, p90, p95, p99).\n2. Create ASCIIPercentileLadder(ASCIIChartBase) with a render() method.\n3. Use layered horizontal bars with different block/intensity characters for each band.\n4. Use the same colorblind-friendly palette (DEFAULT_PALETTE) for percentile bands.\n5. Add a from_query_results() factory that computes percentiles from raw query timings.\n6. Register in __init__.py, exporters.py (render_ascii_chart), and add to templates.\n\nCompute percentiles using Python stdlib statistics or sorted-array interpolation\n(no numpy dependency). The chart should handle single-platform and multi-platform modes.\n",
+  "description": "Add a new ASCII chart type that visualizes percentile latency bands (P50, P90, P95, P99)\nfor each platform. Each platform gets a single row showing nested/layered bar segments\nwhere each percentile extends further right, creating a \"ladder\" appearance.\n\nThis chart answers: \"what fraction of queries finish within X ms?\" which is the gold\nstandard for tail-latency analysis in database benchmarks. The difference between P50\nand P99 reveals consistency - a platform with a tight spread is more predictable than\none with a wide gap.\n\nExample output:\n```\nPercentile Latency by Platform (ms)\n────────────────────────────────────────────────────────\n              P50         P90     P95   P99\nDuckDB   ░░░░░░░░░▒▒▒▒▒▓▓██                12 | 45 | 78 | 120\nPolars   ░░░░░░░░░░▒▒▒▒▒▒▓▓▓▓██████        15 | 52 | 95 | 310\nPandas   ░░░░░░░░░░░░░▒▒▒▒▒▒▒▒▓▓▓████      25 | 85 | 140 | 280\n────────────────────────────────────────────────────────\n░ P50   ▒ P90   ▓ P95   █ P99\n```\n\nThis is distinct from the existing Box Plot which shows IQR-based quartiles with\noutlier whiskers. The Percentile Ladder emphasizes specific tail-latency thresholds\n(P90/P95/P99) that are standard SLA metrics, rendered as layered horizontal bars\nrather than box-and-whisker diagrams.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add numpy/scipy as a dependency",
+        "instead": "compute percentiles with sorted arrays and linear interpolation",
+        "item_id": "ascii-chart-percentile-ladder",
+        "why": "the visualization module has zero external deps"
+      },
+      {
+        "dont": "modify ASCIIBoxPlot",
+        "instead": "implement as a new chart class",
+        "item_id": "ascii-chart-percentile-ladder",
+        "why": "box plots and percentile ladders serve different purposes (IQR vs tail-latency thresholds)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-15T00:00:00Z",
+      "created_at": "2026-02-14T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "ASCIIChartBase interface contract (render() method, options, metadata) unchanged",
+        "item_id": "ascii-chart-percentile-ladder"
+      },
+      {
+        "behavior": "All 9 existing chart types continue to render identically (no changes to their logic)",
+        "item_id": "ascii-chart-percentile-ladder"
+      },
+      {
+        "behavior": "render_ascii_chart() in exporters.py continues to handle all existing chart_type strings",
+        "item_id": "ascii-chart-percentile-ladder"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ascii-chart-percentile-ladder",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/"
+      },
+      {
+        "item_id": "ascii-chart-percentile-ladder",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/exporters.py"
+      },
+      {
+        "item_id": "ascii-chart-percentile-ladder",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/templates.py"
+      },
+      {
+        "item_id": "ascii-chart-percentile-ladder",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/ascii/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.visualization.ascii.percentile_ladder import ASCIIPercentileLadder, PercentileData; data = [PercentileData('DuckDB', 12, 45, 78, 120), PercentileData('Polars', 15, 52, 95, 310)]; chart = ASCIIPercentileLadder(data=data); print(chart.render())\"",
+        "description": "New chart class renders without error",
+        "expected": "Rendered chart with two platform rows showing layered bars",
+        "item_id": "ascii-chart-percentile-ladder",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v",
+        "description": "Existing chart tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "ascii-chart-percentile-ladder",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.visualization.exporters import render_ascii_chart; print('OK')\"",
+        "description": "New chart registered in exporters",
+        "expected": "OK",
+        "item_id": "ascii-chart-percentile-ladder",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ascii-chart-percentile-ladder",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ascii-chart-percentile-ladder",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ascii-chart-percentile-ladder",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ascii-chart-percentile-ladder",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "ascii-chart-percentile-ladder",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "ascii-chart-percentile-ladder",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-percentile-ladder",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create PercentileData dataclass and ASCIIPercentileLadder class with render() method",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-percentile-ladder",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement percentile computation helper (from raw query times to P50/P90/P95/P99)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-percentile-ladder",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add from_query_results() factory function for creating chart from NormalizedResult data",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-percentile-ladder",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register chart in __init__.py and add 'percentile_ladder' case to render_ascii_chart() in exporters.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-percentile-ladder",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for percentile ladder (single platform, multi-platform, edge cases)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-percentile-ladder",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add percentile_ladder to relevant templates in templates.py (flagship, default)",
+        "wid": "w6"
+      }
+    ]
+  }
+}

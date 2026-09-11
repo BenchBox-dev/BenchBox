@@ -1,0 +1,194 @@
+{
+  "context": "Inventory-first. For each undeclared import, check the actual code path\nbefore deciding:\n  - Is it shipped source or test-only?\n  - Is it guarded behind try/except?\n  - Is there a sensible extras group for it (existing `viz`, `dev`,\n    or new `ai-primitives`)?\nAdd the minimum declaration needed. Update the inventory doc to close\nthe loop.\n",
+  "description": "The dependency audit (`docs/development/dependency-inventory.md`,\nused-but-undeclared section) found three categories of imports that\nappear in shipped or tested source but have no `pyproject.toml`\ndeclaration:\n\n1. `PIL` (Pillow) - image processing in visualization image tests.\n2. `ansi2html` - terminal output → HTML conversion (likely tooling-only).\n3. AI-primitives ML stack - `sentence_transformers`, `spacy`, `textblob`,\n   `torch`, used by `benchbox/core/ai_primitives/`. All are guarded\n   behind `try/except ImportError`, but should still be declared in an\n   explicit extras group so users who want AI-primitives can install\n   a known-good set.\n\nGoal: each undeclared third-party import either gets an explicit\ndeclaration in the appropriate extras group, or is removed if the code\npath is dead. No silent transitive-reach behavior.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add deps to core just to make undeclared imports satisfied",
+        "instead": "use extras groups",
+        "item_id": "declare-undeclared-runtime-imports",
+        "why": "that bloats the minimal install"
+      },
+      {
+        "dont": "remove the guarded-import pattern in AI-primitives",
+        "instead": "declarations only",
+        "item_id": "declare-undeclared-runtime-imports",
+        "why": "the whole point is they remain optional"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "declare-undeclared-runtime-imports",
+        "id": 142,
+        "reason": "Product-level choice; out of scope for this declaration cleanup.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Decide which AI-primitive backend is the canonical default"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-15T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing guarded-import patterns in `benchbox/core/ai_primitives/` continue to work without the optional deps installed",
+        "item_id": "declare-undeclared-runtime-imports"
+      },
+      {
+        "behavior": "Fast suite green",
+        "item_id": "declare-undeclared-runtime-imports"
+      },
+      {
+        "behavior": "No new unconditional `import PIL`/`import torch`/etc - declarations only, not new imports",
+        "item_id": "declare-undeclared-runtime-imports"
+      },
+      {
+        "behavior": "Visualization image tests continue to work where PIL is currently relied on",
+        "item_id": "declare-undeclared-runtime-imports"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "declare-undeclared-runtime-imports",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "declare-undeclared-runtime-imports",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "declare-undeclared-runtime-imports",
+        "kind": "only_modify",
+        "path_glob": "docs/development/dependency-inventory.md"
+      },
+      {
+        "item_id": "declare-undeclared-runtime-imports",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "declare-undeclared-runtime-imports",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import pathlib; t = pathlib.Path('docs/development/dependency-inventory.md').read_text(); assert 'used-but-undeclared' in t.lower(); print('OK: section still present')\"",
+        "description": "Used-but-undeclared section in inventory updated to reflect new state",
+        "expected": "OK: section still present",
+        "item_id": "declare-undeclared-runtime-imports",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite passes",
+        "expected": "no failures",
+        "item_id": "declare-undeclared-runtime-imports",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "declare-undeclared-runtime-imports",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "declare-undeclared-runtime-imports",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "declare-undeclared-runtime-imports",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "declare-undeclared-runtime-imports",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "declare-undeclared-runtime-imports",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "declare-undeclared-runtime-imports",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "declare-undeclared-runtime-imports",
+        "notes": "Use: grep -rn '^from PIL\\|^import PIL' benchbox tests\nDecide: extras:viz vs dep-group:dev vs delete based on whether\nshipped source vs test-only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Locate PIL import sites; declare `pillow` in `extras:viz` or dev group, or remove the dependent code.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "declare-undeclared-runtime-imports",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Locate every ansi2html import site. If only used by tooling, add to `[dependency-groups] dev`. If used by shipped source, add to an appropriate runtime extras group.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "declare-undeclared-runtime-imports",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory AI-primitives imports: sentence_transformers, spacy, textblob, torch. Confirm guarded import pattern. Add an `ai-primitives` extras group declaring the supported optional set.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "declare-undeclared-runtime-imports",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update `docs/development/dependency-inventory.md` Used-But-Undeclared section to reflect the new declarations (or document any that were intentionally left undeclared, with reason).",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "declare-undeclared-runtime-imports",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run fast suite to confirm no install regressions.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

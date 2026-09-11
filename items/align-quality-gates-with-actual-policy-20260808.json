@@ -1,0 +1,326 @@
+{
+  "context": "Reproduce baselines with documented commands and checked commit before changing policy. Classify each gate as blocking or advisory and identify its actual CI wiring. Remove stale exclusions only after measuring the excluded functions. Add reason owner and review-expiry metadata or an equivalent validated sidecar. New hard gates require baseline and required-CI wiring in the same change. Avoid score-chasing refactors and do not lower thresholds merely to get green.",
+  "description": "The configured Ruff contract passes, so the prior claim that develop fails lint is withdrawn. However, the custom complexity report currently has a hard ceiling above the observed non-excluded maximum, 152 function exclusions hide warning visibility, the type checker passes with warnings tolerated, and duplication uses a broad ceiling. Re-derive every baseline and make blocking versus advisory status explicit. Add ownership and expiry to retained exceptions, create strict islands for newly typed architecture, and decide _project lint coverage as policy rather than misclassifying excluded-file findings as current CI failures. Recreated 2026-08-08 by adversarial TODO review from quality-gate-honesty-and-expiring-exclusions-20260808 without hard item dependencies. Its former dependencies on the canonical query-result contract and adapter capability protocol items wrongly gated six independent governance units behind two medium-high architecture items. Strict-island wiring for the new canonical run, result, and capability modules is owned and verified by those items' own ladders; this item establishes governance policy and islands for modules that exist today.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Delete complexity exclusions without measuring the excluded functions.",
+        "instead": "Measure first and classify with evidence.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "why": "An excluded function may exceed the hard ceiling."
+      },
+      {
+        "dont": "Treat explicitly excluded _project files as proof that the current Ruff contract fails.",
+        "instead": "Make coverage expansion a separate evidence-backed policy decision.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "why": "That is factually incorrect under the configured scope."
+      },
+      {
+        "dont": "Turn every warning into an immediate hard gate.",
+        "instead": "Land an honest baseline pinning and required wiring together.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "why": "Unbaselined gates create noisy or unachievable CI."
+      }
+    ],
+    "item_meta": {
+      "category": "Quality Governance",
+      "completed_at": "2026-08-09T01:19:09Z",
+      "created_at": "2026-08-08T20:35:09Z",
+      "worktree": "quality-governance"
+    },
+    "preserves": [
+      {
+        "behavior": "Advisory diagnostics remain visible and explicitly labeled.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808"
+      },
+      {
+        "behavior": "Existing production behavior is unchanged by governance-only edits.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808"
+      },
+      {
+        "behavior": "No hard quality threshold is weakened merely to obtain a passing result.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808"
+      },
+      {
+        "behavior": "The configured project Ruff contract remains green throughout the work.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Completed configured lint parity gate.",
+        "decision": "reuse",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "path": "ci-lint-parity-pin-2"
+      },
+      {
+        "concept": "Completed complexity remediation and classification workflow.",
+        "decision": "extend",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "path": "complexity-check-triage-and-remediation"
+      },
+      {
+        "concept": "Current Ruff ty complexity and duplication configuration.",
+        "decision": "extend",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "path": "pyproject.toml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/check_complexity.py"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "kind": "only_modify",
+        "path_glob": "docs/development/"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- ruff check .",
+        "description": "Configured Ruff contract passes",
+        "expected": "All checks pass under the documented scope.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T01:18:16Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make complexity-check && make complexity-report",
+        "description": "Complexity hard gate and advisory report both run with explicit status",
+        "expected": "Hard gate passes and advisory output is labeled and reproducible.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T01:18:19Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ty check",
+        "description": "Type checker exits under the approved policy",
+        "expected": "Type check exits zero and strict-island diagnostics are zero.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T01:18:22Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make duplicate-check",
+        "description": "Duplicate check passes with documented baseline",
+        "expected": "Duplicate gate passes and delta behavior matches policy.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T01:18:27Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make complexity-check",
+        "description": "Exception-expiry guard rejects a deliberately stale exclusion",
+        "expected": "The gate exits nonzero when a stale or unowned test exclusion is injected and exits zero after the invalid entry is removed.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T01:18:29Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make complexity-check",
+        "description": "Expired-exclusion negative control",
+        "expected": "Exits 1 on an unfixed tree after injecting a stale or unowned exclusion; exits 0 after restoring valid exception metadata.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T01:18:31Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-derived exact baselines: 152 exclusions measured as 0 hard, 84 advisory, 44 below advisory, 24 absent/CC<=1; Ruff scope, 641 ty advisories, duplicate 6198 base, and CI consumers inventoried.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T01:17:47Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Re-derive complexity exclusion duplication type-diagnostic Ruff scope and CI-wiring baselines with reproducible commands.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Published docs/development/quality-gate-policy.md matrix separating configured Ruff, isolated complexity, repository and strict-island ty, duplicate delta, and absolute duplicate gates with hard/advisory/ignore/baseline/consumer columns.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T01:17:50Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Publish a gate matrix distinguishing hard fail advisory report ignored path baseline threshold and required-CI consumer.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Measured all 152 legacy exclusions before removal: no score exceeds custom hard ceiling 20; classifications and removal decision documented.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T01:17:53Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Measure every complexity exclusion and classify retain remove or remediate with owner rationale and expiry.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added structured exact-pin exception validation with owner/rationale/score/line and bounded 1-90 day expiry; stale, drifted, expired, overlong, missing, and unowned metadata fail even under --no-fail; negative tests and live injected stale-target control passed.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T01:17:55Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Implement exclusion expiry and stale-entry validation without weakening the hard complexity ceiling.",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Added required strict ty island for _project/scripts/check_complexity.py; parent make quality-governance-typecheck passed with zero diagnostics while repository ty remains its existing advisory policy.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T01:17:58Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Establish strict type-check islands for governance-owned modules that exist today; island expansion for canonical run, result, and capability modules is owned by their contract items",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Evidence-backed decision expanded configured Ruff to tracked _project Python; fixed 2 lint and 5 mechanical format findings; full Ruff lint/format green without new ignores.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T01:18:01Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Decide whether _project remains intentionally Ruff-excluded or gains a separately baselined targeted lane.",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Kept duplicate delta as required PR policy and absolute ceiling as local/campaign gate; no threshold/ignore/rebaseline. Gate caught +1 regression, owning correction 4e25e77b1a removed clone, fresh delta -11 and absolute 6187/8073 pass.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T01:18:04Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Reassess duplication threshold policy and add a delta guard if it provides stronger signal than the absolute ceiling.",
+        "wid": "w6"
+      },
+      {
+        "evidence": "Wired strict type and fail-closed complexity policy into Make and develop PR aggregation; added 21 focused governance tests plus 7 CI-parity tests; documented authority, operation, rollback, alternatives, and legacy artifacts.",
+        "item_id": "align-quality-gates-with-actual-policy-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T01:18:06Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Wire approved gate changes and their pinning or drift checks atomically then document operation and rollback.",
+        "wid": "w7"
+      }
+    ]
+  }
+}

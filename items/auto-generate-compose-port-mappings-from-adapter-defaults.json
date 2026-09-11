@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #511 of uat-single-connection-registry.\nDeferred: Auto-generate compose port mappings from adapter defaults\nReason deferred: Generating compose from adapters is a larger infra change; deriving the read path is the fix.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:43Z",
+      "worktree": "main"
+    }
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "context": "Enumerate every target in ci-lint and classify each as environment-independent or local-only. For the local-only ones decide per target: make it environment-aware like #1558 did, drop it from the CI-invoked path, or split ci-lint into a locally-complete target and a CI-safe subset that develop-post-merge calls. Prefer the split if more than one or two are local-only, since it makes the boundary explicit rather than encoding it in each script. Check specifically for guards that pass vacuously on a runner, not only ones that fail.",
+  "description": "develop-post-merge.yml runs 'make ci-lint', but ci-lint aggregates guards written for a developer machine. agent-identity-check resolves the git identity from config, which on an ephemeral runner does not exist, so it failed with 'unable to resolve Git author identity' and turned every post-merge run red from #1523 until PR #1558. #1523's own comment states the intent plainly - the identity check belongs to ci-lint and the pre-commit hook, 'where the answer is meaningful' - but nothing enforces that ci-lint is only invoked locally, and develop-post-merge has been calling it all along. PR #1558 fixes the one guard that broke; the structural question is which other ci-lint members assume a local environment and would fail or, worse, silently pass for an environment-shaped reason on a runner. A guard that cannot fail on CI is the same defect #1523 removed, and it is invisible because it reports success.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-05T18:22:02Z",
+      "completed_pr": 1572,
+      "created_at": "2026-08-04T23:06:03Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Every guard that is meaningful on a runner keeps running there - the fix must not shrink CI coverage to make it green",
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804"
+      },
+      {
+        "behavior": "agent-commit-range-check stays the merge-time control for agent authorship",
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804",
+        "kind": "only_modify",
+        "path_glob": "tests/system/**"
+      },
+      {
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit -q -k ci_lint_environment_boundary",
+        "description": "No ci-lint guard fails for a purely environmental reason on a runner",
+        "expected": "Exits 1 on the unfixed tree, where ci-lint members assume a developer machine and nothing pins which are safe to run on a runner, and exits 0 once the boundary is enforced. Write the test in w2 so this rung becomes runnable.",
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-05T18:21:44Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_agent_instruction_audit.py -q",
+        "description": "Agent instruction audit contracts still pass",
+        "expected": "No regression in identity or commit-range guards",
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-05T18:21:51Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Enumerated all ~24 ci-lint guards (26 physical commands; some share a failure tag). Exactly TWO are environment-inapplicable on a GitHub-hosted runner:\n\n- agent-identity (agent-identity-check): resolves 'git config user.*'. An ephemeral runner has none. Post-#1558 an absent identity returns [] and passes; the recipe also injected a synthetic 'BenchBox CI' identity. Either input makes the check incapable of failing, so it verifies nothing there. pr.yml's code-lint job already omits it for the same reason.\n- skill-sync-check: shells out to $(SKILL_SYNC), which Makefile:747 defines as '/Users/joe/Developer/skill-sync/dist/cli/index.js' - a hardcoded developer path. Makefile:764-769 shows the target's else-branch echoes 'not installed; skipping' and exits 0. Verified directly. This is the VACUOUS-PASS half: green in the Actions log while checking nothing.\n\nEverything else inspects the checked-out tree, the installed venv, or shipped registries - none of which differ between laptop and runner. That includes agent-commit-range-check, which reads the commits a branch actually carries rather than resolved config.\n\nSEPARATE DEFECT FOUND, deliberately not fixed here: uv-lock-revision-check compares HEAD:uv.lock against the working tree with no BASE_REF passed, so it is a no-op on ANY clean checkout - true for every develop-post-merge run. Not classified as an environment boundary issue because it is equally a no-op locally on a clean tree; fixing it means passing a real baseline ref (e.g. github.event.before) from develop-post-merge.yml, which is a separable change.",
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804",
+        "notes": null,
+        "started_at": "2026-08-05T15:14:05Z",
+        "started_branch": "fix/privacy-rejection-aborts-build-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Enumerate ci-lint members and classify each as environment-independent or local-only",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Decisions.\n\nagent-identity -> SKIP on CI. Not 'adapt': there is no real developer identity on an ephemeral runner, so no synthetic input can make it meaningful - supplying one only swaps one always-passing input for another. Not 'keep failing': it was never meant to fail there.\n\nskill-sync-check -> SKIP on CI. Its real CI coverage already exists and is untouched: pr.yml's guard-skill-sync-verify, a pinned-SHA network checkout running against every PR before it can reach develop.\n\nagent-commit-range-check -> NEVER gated, per the item's must-preserve. Asserted in three separate tests plus the system parity test.\n\nAll other ~22 guards -> unchanged and unconditional.\n\nMECHANISM: one declarative table (RUNNER_INAPPLICABLE_GUARDS) consulted uniformly, replacing the inline 'if [ $GITHUB_ACTIONS = true ]' one-off. It beats the inline pattern because the exception list becomes enumerable and testable in one place - the tests assert the table contains exactly the two documented slugs and that the recipe calls the gate exactly twice, so widening it is visible rather than diffuse. Adding a third exception is a table entry, not another copy-pasted conditional.",
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804",
+        "notes": null,
+        "started_at": "2026-08-05T18:20:58Z",
+        "started_branch": "fix/ci-lint-environment-boundary-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/agent-a5db1e2bd459f27d1",
+        "status": "done",
+        "summary": "Decide per target",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Implemented in 681a545020 (Sonnet subagent) + 6bab7554e9 (my review fixes). PR #1572.\n\nREVIEW FOUND A BLOCKING DEFECT in the first implementation: the gate reproduced, one layer up, the exact defect it was written to remove. The recipe used the gate PROCESS as the 'if' condition - exit 0 run, exit 1 skip - so every way of failing to REACH a decision (uv absent, broken venv, script renamed, any traceback) also exits non-zero and was indistinguishable from a deliberate skip. The guard was then silently dropped with nothing recorded in 'failed'. Demonstrated rather than argued: 'if uv run -- python .../ci_lint_environment_gate_TYPO.py agent-identity' -> guard SILENTLY SKIPPED; 'PATH=/usr/bin:/bin uv run ...' -> guard SILENTLY SKIPPED. Fixed: decision travels on stdout as one token, recipe skips only on exact 'SKIP', anything else runs the guard, reason moved to stderr so it still reaches the Actions log.\n\nSECOND REVIEW FINDING: gating agent-identity-check made the synthetic GIT_CONFIG identity dead, and tests/system/test_ci_lint_parity.py pinned that exact text including 'recipe.count(...) == 2'. Left alone it became a vacuous test asserting a behaviour that no longer happens, AND it blocked deleting the dead block. Shipping a newly vacuous test inside the change whose purpose is removing vacuous passes is self-defeating, so the item scope was widened to tests/system/** (reason recorded via scope-update) and the test now pins the gating and asserts the synthetic identity has NOT returned.\n\nTHIRD REVIEW FINDING: test_ci_lint_environment_boundary_cli_ignores_non_true_values asserted 'main() == 0' to mean 'run'. Under the new contract main always returns 0, so it had become vacuous. It now asserts the emitted decision token.\n\nFALSIFICATION, three disjoint neuters:\n1. Revert Makefile wiring, keep the module importable -> 3 wiring tests fail with AssertionError, not ImportError.\n2. Keep wiring, make runs_on_runner always return True -> 3 classification/CLI tests fail.\n3. Revert to the exit-status construct -> TestGateFailsClosed fails. This one is behavioural: it lifts the recipe's OWN lines, replaces the gate with an uninvokable command, and runs them in sh; the shell reports 'SKIPPED' where 'RAN' is required. An earlier version of this test failed with 'could not locate the gate condition' (a regex miss), which would not have survived a plausible rewrite - strengthened deliberately.\n\nCOVERAGE: two guards now run in zero places on CI, both previously vacuous there. Neither loses real coverage - agent-identity has no meaningful CI form anywhere, and skill-sync-check's real gate is pr.yml's guard-skill-sync-verify, unchanged. Every other guard including agent-commit-range-check is untouched and unconditional.\n\nSUITES: test_ci_lint_environment_boundary.py 16 passed; test_agent_instruction_audit.py 50 passed; tests/system/test_ci_lint_parity.py 8 passed; tests/unit/scripts 1516 passed; 'make -n ci-lint' parses. check-scope OK, 5 files.",
+        "item_id": "ci-lint-targets-assume-a-local-environment-20260804",
+        "notes": null,
+        "started_at": "2026-08-05T18:21:24Z",
+        "started_branch": "fix/ci-lint-environment-boundary-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/agent-a5db1e2bd459f27d1",
+        "status": "done",
+        "summary": "Implement and cover the boundary with a test",
+        "wid": "w2"
+      }
+    ]
+  }
+}

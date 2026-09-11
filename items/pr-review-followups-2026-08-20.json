@@ -1,0 +1,232 @@
+{
+  "description": "Close the reviewed May 29-August 20, 2026 PR sweep against origin/develop. The read-only review classified 60 open threads as 26 fix, 21 already-fixed, 1 defer, and 12 reject; found two additional weakened-test defects; identified verification-command drift; and found drift in the sweep binding. Preserve exact live thread evidence and do not treat resolved state alone as proof of a fix.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Mask test failures with permissive assertions, forced CSS, broad exception lists, or always-zero shell constructs",
+        "instead": "INSTEAD add negative controls that fail on the known defect",
+        "item_id": "pr-review-followups-2026-08-20",
+        "why": "the gate can pass without proving behavior"
+      },
+      {
+        "dont": "Treat every markerless historical thread as actionable",
+        "instead": "INSTEAD retain thread state and classify only verified candidates",
+        "item_id": "pr-review-followups-2026-08-20",
+        "why": "GitHub resolution and current-tree evidence would be discarded"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-08-29T13:06:08Z",
+      "completed_pr": 1788,
+      "created_at": "2026-08-20T18:28:58Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not run live cloud or destructive UAT; use static and local targeted verification only.",
+        "item_id": "pr-review-followups-2026-08-20"
+      },
+      {
+        "behavior": "Do not weaken validation, security, benchmark timing, UAT evidence, or exact regression assertions.",
+        "item_id": "pr-review-followups-2026-08-20"
+      },
+      {
+        "behavior": "Keep public API and supported platform behavior backward compatible.",
+        "item_id": "pr-review-followups-2026-08-20"
+      },
+      {
+        "behavior": "The primary clone remains read-only; all tracked changes use the linked worktree.",
+        "item_id": "pr-review-followups-2026-08-20"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pr-review-followups-2026-08-20",
+        "kind": "do_not_modify",
+        "path_glob": "Raw benchmark results, credentials, generated binaries, or unrelated active worktrees."
+      },
+      {
+        "item_id": "pr-review-followups-2026-08-20",
+        "kind": "only_modify",
+        "path_glob": ".github/**"
+      },
+      {
+        "item_id": "pr-review-followups-2026-08-20",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/**"
+      },
+      {
+        "item_id": "pr-review-followups-2026-08-20",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "pr-review-followups-2026-08-20",
+        "kind": "only_modify",
+        "path_glob": "_project/todo-db-export/**"
+      },
+      {
+        "item_id": "pr-review-followups-2026-08-20",
+        "kind": "only_modify",
+        "path_glob": "_sources/compilation/scripts/**"
+      },
+      {
+        "item_id": "pr-review-followups-2026-08-20",
+        "kind": "only_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "pr-review-followups-2026-08-20",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "pr-review-followups-2026-08-20",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/**"
+      },
+      {
+        "item_id": "pr-review-followups-2026-08-20",
+        "kind": "only_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "pr-review-followups-2026-08-20",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite",
+        "expected": "fast suite passes",
+        "item_id": "pr-review-followups-2026-08-20",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Repository PR preflight",
+        "expected": "preflight passes",
+        "item_id": "pr-review-followups-2026-08-20",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_pr_review_followups.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/scripts/test_auto_merge_soundness_paths.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/mcp/test_run_surface_contract.py tests/unit/test_error_handling.py -q",
+        "description": "Targeted Python regression suite",
+        "expected": "all targeted tests pass",
+        "item_id": "pr-review-followups-2026-08-20",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check _project/scripts benchbox scripts tests",
+        "description": "Lint affected Python surfaces",
+        "expected": "ruff passes",
+        "item_id": "pr-review-followups-2026-08-20",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-review-followups-list PR_REVIEW_SINCE=2026-05-29 PR_REVIEW_UNTIL=2026-08-20 PR_REVIEW_FAIL_ON_PENDING=1 PR_REVIEW_USAGE_LIMIT_RETRY=0",
+        "description": "Resolution-aware live review rescan",
+        "expected": "no pending actionable review threads remain",
+        "item_id": "pr-review-followups-2026-08-20",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Implemented separate actionable and resolved-thread audit inventories, retained GraphQL thread state with nested pagination, added strict fail-closed list verification, wired Make flags, refreshed the five-axis template to origin/develop 1e8cc3dee, and passed 48 focused tests plus Ruff and audit_sha_check.",
+        "item_id": "pr-review-followups-2026-08-20",
+        "notes": null,
+        "started_at": "2026-08-20T18:30:28Z",
+        "started_branch": "fix/pr-review-followups-2026-08-20",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-pr-review-followups-2026-08-20",
+        "status": "done",
+        "summary": "Harden the resolution-aware PR sweep binding and template",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Governance, security, CI, and publication fixes implemented; focused Python suite 517 passed; Results Explorer CSP Playwright negative control passed.",
+        "item_id": "pr-review-followups-2026-08-20",
+        "notes": null,
+        "started_at": "2026-08-20T19:35:14Z",
+        "started_branch": "fix/pr-review-followups-2026-08-20",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-pr-review-followups-2026-08-20",
+        "status": "done",
+        "summary": "Fix current security, governance, CI, and publication findings",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Runtime, adapter, data-path, anonymization, percentile, and MCP surface fixes implemented; focused Python suite 517 passed.",
+        "item_id": "pr-review-followups-2026-08-20",
+        "notes": null,
+        "started_at": "2026-08-20T19:35:20Z",
+        "started_branch": "fix/pr-review-followups-2026-08-20",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-pr-review-followups-2026-08-20",
+        "status": "done",
+        "summary": "Fix current runtime, adapter, and data-path findings",
+        "wid": "w3"
+      },
+      {
+        "evidence": "UAT accounting/logging/engine fixes and ClickHouse/tuning documentation corrections implemented; focused Python suite 517 passed and docs-validate passed.",
+        "item_id": "pr-review-followups-2026-08-20",
+        "notes": null,
+        "started_at": "2026-08-20T19:35:25Z",
+        "started_branch": "fix/pr-review-followups-2026-08-20",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-pr-review-followups-2026-08-20",
+        "status": "done",
+        "summary": "Fix UAT, ClickHouse certification, and operational documentation findings",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Removed forced visual CSS and restored strict same-output concurrency behavior; focused Python suite 517 passed; visual manifest unit tests and TypeScript checks passed.",
+        "item_id": "pr-review-followups-2026-08-20",
+        "notes": null,
+        "started_at": "2026-08-20T19:35:30Z",
+        "started_branch": "fix/pr-review-followups-2026-08-20",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-pr-review-followups-2026-08-20",
+        "status": "done",
+        "summary": "Restore weakened regression-test coverage",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Repaired 27 stale rungs across 20 terminal items plus seven semantic false-positive exemplars; current-window semantic linter and tracker audit chain pass.",
+        "item_id": "pr-review-followups-2026-08-20",
+        "notes": null,
+        "started_at": "2026-08-20T19:35:36Z",
+        "started_branch": "fix/pr-review-followups-2026-08-20",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-pr-review-followups-2026-08-20",
+        "status": "done",
+        "summary": "Repair historical verification drift and add semantic negative controls",
+        "wid": "w6"
+      },
+      {
+        "evidence": "PR #1788 merged at commit 1788",
+        "item_id": "pr-review-followups-2026-08-20",
+        "notes": null,
+        "started_at": "2026-08-29T13:06:04Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run preflight, publish the remediation PR, and close out review threads",
+        "wid": "w7"
+      }
+    ]
+  }
+}

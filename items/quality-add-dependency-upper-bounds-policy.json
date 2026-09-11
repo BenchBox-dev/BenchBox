@@ -1,0 +1,157 @@
+{
+  "context": "Conservative bounds: pin to the next major version. For libraries on a\nrapid-major cadence (sqlglot ships majors quarterly), pin to `<current+2`.\nDocument each bound's rationale inline as a TOML comment.\n\nFor pydantic specifically, the v1→v2 migration was painful; we're on v2,\nso `<3.0.0` is safe and gives runway.\n",
+  "description": "Quality plan Phase 4e. The audit found pyproject.toml uses minimum-version\npinning with no upper bounds (e.g., `sqlglot>=20.0.0`). For libraries with\nhistory of breaking changes in minor releases, this is a supply-chain risk:\na `uv sync` on a fresh checkout in 6 months may install a sqlglot version\nthat breaks dialect translation silently.\n\nAdd upper bounds to the highest-risk dependencies (those with breaking\nhistory, or those whose API is deeply integrated into BenchBox internals).\nDocument the policy in AGENTS.md so the rule survives the conversation.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add bounds to every dep",
+        "instead": "only the highest-risk 5-8",
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "why": "maintenance burden grows linearly"
+      },
+      {
+        "dont": "bump bounds reactively when CI breaks",
+        "instead": "investigate the breaking change first",
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "why": "that's exactly the signal we wanted"
+      },
+      {
+        "dont": "pin to exact versions",
+        "instead": "upper bounds only",
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "why": "that breaks transitive resolution for users"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-13T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All current tests pass after lock refresh",
+        "item_id": "quality-add-dependency-upper-bounds-policy"
+      },
+      {
+        "behavior": "Minimum versions remain valid (don't accidentally bump min above what's tested)",
+        "item_id": "quality-add-dependency-upper-bounds-policy"
+      },
+      {
+        "behavior": "Optional extras' platform-specific deps still install correctly via `uv sync --extra <name>`",
+        "item_id": "quality-add-dependency-upper-bounds-policy"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv lock --check",
+        "description": "uv resolves lockfile cleanly",
+        "expected": "(no errors)",
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast test suite passes",
+        "expected": "all tests pass",
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv sync --extra duckdb --extra clickhouse-server",
+        "description": "Optional extras still install",
+        "expected": "(no errors)",
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Identify 5-8 highest-risk deps (breaking minor releases, deep API integration, no semver guarantee). Candidates: sqlglot, pydantic, click, duckdb, pyarrow.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add upper bounds to those deps in pyproject.toml: e.g., `sqlglot>=20.0.0,<30.0.0`. Pick bounds wide enough not to constrain users but narrow enough to catch breaking jumps.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run `uv lock --upgrade` and `uv run -- python -m pytest -m fast -q` to confirm no regression",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the dependency-bounds policy in AGENTS.md: when to add an upper bound, when to bump it, the review process for major bumps",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-add-dependency-upper-bounds-policy",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `_project/TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml` as a quarterly maintenance reminder",
+        "wid": "w5"
+      }
+    ]
+  }
+}

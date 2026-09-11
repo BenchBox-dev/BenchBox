@@ -1,0 +1,124 @@
+{
+  "context": "Decision: either (a) add a lightweight macOS (and windows) framing smoke to the PR gate so darwin/windows binaries are validated pre-merge, or (b) keep nightly-only but add a pre-merge checksum-consistency gate (cheap, ubuntu-runnable) as a proxy and document the nightly-only behavioral coverage. Pick based on runner-minute cost vs. how often binaries change.",
+  "description": "The framing binary guard tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py execute each bundled dbgen and assert no trailing '|'. But .github/workflows/pr.yml is ubuntu-latest only, so on the develop PR gate every non-linux binary is foreign-arch and skipped per-binary -- the darwin-arm64 binary shipped in PR #1256 is never behaviorally executed pre-merge. Full os matrix (macos-latest, windows-latest) runs only in nightly.yml (post-merge). So a green PR gate does not prove darwin/windows binaries frame correctly; that proof currently comes from local runs + the next nightly. Surfaced during PR #1256 review.",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing",
+      "completed_at": "2026-08-15T13:16:07Z",
+      "completed_pr": 1741,
+      "created_at": "2026-07-22T00:43:52Z",
+      "worktree": "ci-infrastructure"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing ubuntu PR-gate jobs and their required-check contract are unchanged",
+        "item_id": "pr-gate-tpch-binary-framing-coverage"
+      },
+      {
+        "behavior": "No change to the bundled binaries themselves",
+        "item_id": "pr-gate-tpch-binary-framing-coverage"
+      },
+      {
+        "behavior": "The nightly full-matrix framing coverage remains intact",
+        "item_id": "pr-gate-tpch-binary-framing-coverage"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pr-gate-tpch-binary-framing-coverage",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "pr-gate-tpch-binary-framing-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpch/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py -m 'unit or slow' -q",
+        "description": "Framing guard tests still pass on the host runner",
+        "expected": "exit 0",
+        "item_id": "pr-gate-tpch-binary-framing-coverage",
+        "last_result": "pass",
+        "last_run": "2026-08-15T13:16:02Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import yaml,glob; [yaml.safe_load(open(f)) for f in glob.glob('.github/workflows/*.yml')]\"",
+        "description": "Workflow YAML is valid after edit",
+        "expected": "exit 0",
+        "item_id": "pr-gate-tpch-binary-framing-coverage",
+        "last_result": "pass",
+        "last_run": "2026-08-15T13:16:04Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pr-gate-tpch-binary-framing-coverage",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "pr-gate-tpch-binary-framing-coverage",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "pr-gate-tpch-binary-framing-coverage",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "rg confirms pr.yml has no binary-framing job; nightly.yml alone runs the slow guard across ubuntu/macos/windows",
+        "item_id": "pr-gate-tpch-binary-framing-coverage",
+        "notes": null,
+        "started_at": "2026-08-15T13:07:07Z",
+        "started_branch": "chore/release-uat-deployment-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-release-uat-deployment-batch",
+        "status": "done",
+        "summary": "Revalidate that pr.yml is ubuntu-only and the darwin-arm64 framing guard is skipped pre-merge on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "uv run -- python YAML contract assertion: tpch-binary-framing covers macos-latest and windows-latest without changing ci-required-result",
+        "item_id": "pr-gate-tpch-binary-framing-coverage",
+        "notes": null,
+        "started_at": "2026-08-15T13:08:22Z",
+        "started_branch": "chore/release-uat-deployment-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-release-uat-deployment-batch",
+        "status": "done",
+        "summary": "Decide (a) add macOS/windows pre-merge framing smoke vs (b) pre-merge checksum-consistency proxy + documented nightly coverage",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added .github/workflows/pr.yml tpch-binary-framing matrix for macos-latest and windows-latest with the existing runtime framing guard",
+        "item_id": "pr-gate-tpch-binary-framing-coverage",
+        "notes": null,
+        "started_at": "2026-08-15T13:09:08Z",
+        "started_branch": "chore/release-uat-deployment-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-release-uat-deployment-batch",
+        "status": "done",
+        "summary": "Implement the chosen option in .github/workflows/",
+        "wid": "w2"
+      },
+      {
+        "evidence": "pytest framing guard, all-workflow YAML parse, and deliberate trailing-delimiter mutation rejection all passed",
+        "item_id": "pr-gate-tpch-binary-framing-coverage",
+        "notes": null,
+        "started_at": "2026-08-15T13:09:33Z",
+        "started_branch": "chore/release-uat-deployment-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-release-uat-deployment-batch",
+        "status": "done",
+        "summary": "Verify pre-merge coverage now catches a deliberately mis-framed/mismatched binary",
+        "wid": "w3"
+      }
+    ]
+  }
+}

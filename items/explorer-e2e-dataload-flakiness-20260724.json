@@ -1,0 +1,120 @@
+{
+  "context": "Evaluate levers: raise the 30s waitForDataLoaded timeout; add Playwright test-level retries for the explorer e2e job; cap/tune parallel workers so DuckDB-WASM is not starved; or reclassify the Chromium full suite as non-blocking (like WebKit/Firefox) until robust. Measure DuckDB-WASM load time under load to choose. Do not weaken real assertions to mask genuine failures.",
+  "description": "During the tuning-followups batch (2026-07-23/24), PRs #1287 and #1289 each needed 3+ Chromium full-suite e2e re-runs and WebKit smoke failed on every run. Root cause: waitForDataLoaded (results-explorer/e2e/support/fixtures.ts:28) hits its 30s timeout because DuckDB-WASM data does not load in time under parallel-worker CI load. Failures SHUFFLE across unrelated specs each run (Compare, ResultDetail, responsive, index-sort-headers, external-corpus) -- resource-starvation flakiness, not a code regression. Prior items fix-chromium-result-detail-sort-flake (done) and stabilize-webkit-browser-smoke-flake-under-parallel-workers (done) did NOT hold and need superseding. Distinct from chromium-blocking-suite-not-in-required-checks (that WIRES the gate; this makes the suite reliable).",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-29T12:48:02Z",
+        "from_item": "explorer-e2e-dataload-flakiness-20260724",
+        "id": 663,
+        "reason": "Root cause is in results-explorer/src/**, which this item lists as do_not_modify. The e2e change is mitigation only (re-navigation retries); residual flake remains at any data-bound assertion still waiting single-shot.",
+        "resolution": "promoted",
+        "resolved_item": "explorer-cold-snapshot-zero-row-race-20260729",
+        "resolved_reason": null,
+        "summary": "Fix the cold-snapshot zero-row race in results-explorer/src: gate the first keyed DuckDB-WASM query on a queryable snapshot, or re-query when it returns zero rows instead of rendering the empty state permanently"
+      }
+    ],
+    "item_meta": {
+      "category": "Test Infrastructure",
+      "completed_at": "2026-07-29T16:50:52Z",
+      "completed_pr": 1340,
+      "created_at": "2026-07-24T12:56:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "App behavior is unchanged; this is test-harness and CI robustness only",
+        "item_id": "explorer-e2e-dataload-flakiness-20260724"
+      },
+      {
+        "behavior": "Do not weaken or delete real e2e assertions to paper over genuine failures",
+        "item_id": "explorer-e2e-dataload-flakiness-20260724"
+      },
+      {
+        "behavior": "The blocking gate keeps its ability to catch real regressions",
+        "item_id": "explorer-e2e-dataload-flakiness-20260724"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-e2e-dataload-flakiness-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "explorer-e2e-dataload-flakiness-20260724",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "explorer-e2e-dataload-flakiness-20260724",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "explorer-e2e-dataload-flakiness-20260724",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/playwright.config.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium",
+        "description": "Explorer Chromium e2e passes without per-test re-runs across consecutive runs",
+        "expected": "pass",
+        "item_id": "explorer-e2e-dataload-flakiness-20260724",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-e2e-dataload-flakiness-20260724",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-e2e-dataload-flakiness-20260724",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Premise partly wrong. Reproduced locally (idle machine, --workers=1, retries=0): run 1 = 4 failed at waitForDataLoaded. But (a) the item's '30s timeout' is stale — #1307 already raised it to 45s/90s/retries2; (b) chromium has run --workers=1 since #417 (May), so #1307's 'parallel workers' diagnosis was false; (c) CI has been green 3/3 since #1307 merged 07-25",
+        "item_id": "explorer-e2e-dataload-flakiness-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T12:47:40Z",
+        "started_branch": "fix/explorer-e2e-dataload-flakiness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Re-validate that the waitForDataLoaded flakiness still reproduces and the two prior stabilization items are done-but-ineffective",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Measured: every failure burns the FULL 45s and the element never appears; perf spec reports DuckDB-WASM cold init P50=564ms/P95=978ms and data-after-init P50=6ms. So it is not latency. Real cause = cold-snapshot zero-row race (first keyed query answers 0 rows, view renders empty, never re-queries) — confirmed 3x where a shell heading rendered while rows/heatmap/grid stayed absent. Lever chosen: re-navigation between attempts (only action that clears it), NOT a bigger budget",
+        "item_id": "explorer-e2e-dataload-flakiness-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T12:47:42Z",
+        "started_branch": "fix/explorer-e2e-dataload-flakiness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Measure DuckDB-WASM load time under parallel CI load and choose the lever",
+        "wid": "w1"
+      },
+      {
+        "evidence": "fixtures.ts: 3 attempts (20s+12s+12s=44s, preserves prior worst case) re-navigating to the entry URL between attempts; new waitForResultRows() gates on real tbody rows instead of a shell heading. Applied at the 6 sites that flaked. Stability: 3 consecutive clean local runs (111 passed, retries=0) vs baseline 2 of 4 runs failing; suite time 6.3m -> 2.4m",
+        "item_id": "explorer-e2e-dataload-flakiness-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T12:47:44Z",
+        "started_branch": "fix/explorer-e2e-dataload-flakiness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Apply the chosen fix and demonstrate stability across consecutive runs",
+        "wid": "w2"
+      }
+    ]
+  }
+}

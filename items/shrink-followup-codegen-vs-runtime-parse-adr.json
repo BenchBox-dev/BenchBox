@@ -1,0 +1,107 @@
+{
+  "context": "Decision-only. Gather the import-time evidence already measured in\n[[shrink-followup-registry-lazy-cached-load]] w0 rather than re-measuring.\nBias toward the pattern that minimizes new machinery unless the evidence is\ndecisive.\n",
+  "description": "The shrink campaign moved large amounts of data (metadata, specs, query\ncatalogs) from Python into YAML loaded at runtime (PRs #590-#604), extending\nthe repo's existing six runtime catalog loaders and commit #579's\n\"tpcds specs to yaml\" precedent. The campaign chose runtime-parse\nimplicitly, without an ADR.\n\nThe shrink-campaign review surfaced a credible alternative: treat YAML as\nthe canonical source and GENERATE Python from it at build time, rather than\nparse YAML at runtime. This would address both the perf concern (no runtime\nYAML parse / module-level I/O) and the findability concern (generated .py is\ngrep-able and ty-visible) -- but adds build complexity and generated-file\nchurn, and breaks consistency with the six existing runtime loaders.\n\nThis item produces the decision, not an implementation. It exists so the\ncatalog-loading architecture is chosen deliberately and recorded, and so the\ncorrected goal statement ([[shrink-objective-function-and-guardrail]]) can\nname one official pattern.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "decide in a vacuum",
+        "instead": "reference both before recommending",
+        "item_id": "shrink-followup-codegen-vs-runtime-parse-adr",
+        "why": "the choice interacts with schema validation and the registry-load fix"
+      },
+      {
+        "dont": "implement codegen as part of this TODO",
+        "instead": "if codegen wins, file separate implementation TODOs",
+        "item_id": "shrink-followup-codegen-vs-runtime-parse-adr",
+        "why": "it is a decision artifact"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "shrink-followup-codegen-vs-runtime-parse-adr",
+        "needs_item": "shrink-followup-registry-lazy-cached-load"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-05-25T00:00:00Z",
+      "created_at": "2026-05-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No code behavior change in this item -- it is a decision artifact only",
+        "item_id": "shrink-followup-codegen-vs-runtime-parse-adr"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/*/catalog/loader.py (six loaders) — the current runtime-parse convention; the ADR either ratifies or supersedes it",
+        "decision": "reuse",
+        "item_id": "shrink-followup-codegen-vs-runtime-parse-adr",
+        "path": "benchbox/core/*/catalog/loader.py"
+      },
+      {
+        "concept": "commit #579 (move tpcds specs to yaml) — the precedent that established runtime parse",
+        "decision": "reuse",
+        "item_id": "shrink-followup-codegen-vs-runtime-parse-adr",
+        "path": "commit"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "shrink-followup-codegen-vs-runtime-parse-adr",
+        "kind": "only_modify",
+        "path_glob": "_project/"
+      },
+      {
+        "item_id": "shrink-followup-codegen-vs-runtime-parse-adr",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -rniE 'codegen|runtime.parse|canonical catalog' docs/ _project/ 2>/dev/null | grep -i adr",
+        "description": "ADR exists with decision, rationale, and rejected alternatives",
+        "expected": "ADR file present recording the decision",
+        "item_id": "shrink-followup-codegen-vs-runtime-parse-adr",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "shrink-followup-codegen-vs-runtime-parse-adr",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-codegen-vs-runtime-parse-adr",
+        "notes": "Cover: runtime-parse (current) vs build-time codegen. Dimensions: import\ntime / runtime cost, static findability + ty coverage, build complexity,\ngenerated-file churn and review noise, consistency with the six existing\nloaders, and how each interacts with the catalog schema validation\n([[shrink-followup-catalog-schema-validation]]).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document both options with measured/representative tradeoffs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "shrink-followup-codegen-vs-runtime-parse-adr",
+        "notes": "Write the ADR with decision, rationale, and rejected alternatives. If\ncodegen is chosen, note that it supersedes the runtime lazy-load fix in\n[[shrink-followup-registry-lazy-cached-load]] (which remains a safe\ninterim improvement) and file implementation follow-up TODOs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Recommend one as the canonical catalog pattern and record the ADR",
+        "wid": "w2"
+      }
+    ]
+  }
+}

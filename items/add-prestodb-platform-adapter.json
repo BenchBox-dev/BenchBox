@@ -1,0 +1,11 @@
+{
+  "description": "Implement PrestoDB (Meta's Presto fork) platform adapter to complement the existing\nTrino adapter. While Trino and PrestoDB share a common ancestry (Trino was formerly\nPrestoSQL before the 2019 fork), they have diverged significantly and require\nseparate adapters due to incompatible drivers and protocols.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2025-11-29T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "platform-expansion-presto"
+    }
+  }
+}

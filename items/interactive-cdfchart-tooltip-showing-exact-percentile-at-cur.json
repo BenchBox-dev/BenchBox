@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #314 of explorer-chart-coverage-review-followups.\nDeferred: Interactive CDFChart tooltip showing exact percentile at cursor position\nReason deferred: Interactivity is out of scope for this follow-up item",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:30Z",
+      "worktree": "main"
+    }
+  }
+}

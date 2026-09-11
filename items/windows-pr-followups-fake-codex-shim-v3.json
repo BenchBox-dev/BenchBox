@@ -1,0 +1,103 @@
+{
+  "context": "Keep production CommandRunner unchanged. Extend the test helper to expose the command prefix for its fake launcher, use that prefix in the direct version test, and intercept only codex commands in the action-loop test so the real orchestration, file creation, commit-before-reply ordering, and result parsing remain exercised.",
+  "description": "Nightly run 30717140915 shows PR #1406 fixed discovery but not execution: shutil.which resolves codex.cmd, then subprocess.run([codex,...], shell=False) raises WinError 2 in both the launcher test and action-loop test. Add a test-only invocation seam that runs the same bash fake through the resolved POSIX shell on Windows while preserving direct executable invocation on POSIX.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-01T22:15:08Z",
+      "completed_pr": 1450,
+      "created_at": "2026-08-01T20:55:14Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "POSIX continues to execute the shebang launcher directly",
+        "item_id": "windows-pr-followups-fake-codex-shim-v3"
+      },
+      {
+        "behavior": "Production executor discovery and subprocess behavior remain unchanged",
+        "item_id": "windows-pr-followups-fake-codex-shim-v3"
+      },
+      {
+        "behavior": "The action-loop test still executes a real fake process and creates codex-fix.txt",
+        "item_id": "windows-pr-followups-fake-codex-shim-v3"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-pr-followups-fake-codex-shim-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_pr_review_followups.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_pr_review_followups.py -k \"fake_codex_launcher or run_action_loop_commits_before_replying\" -q",
+        "description": "Focused fake launcher and action-loop coverage",
+        "expected": "passes after the fix and fails on the unfixed Windows tree with WinError 2",
+        "item_id": "windows-pr-followups-fake-codex-shim-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-01T21:05:00Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_pr_review_followups.py -q",
+        "description": "Complete PR-followups test module",
+        "expected": "passes after the fix and catches any orchestration regression on the unfixed tree",
+        "item_id": "windows-pr-followups-fake-codex-shim-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-01T21:05:06Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-pr-followups-fake-codex-shim-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-pr-followups-fake-codex-shim-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Nightly run 30717140915 jobs 91414534066 and 91414534071 both fail after shutil.which resolves codex.cmd because shell=False cannot execute the batch wrapper directly.",
+        "item_id": "windows-pr-followups-fake-codex-shim-v3",
+        "notes": null,
+        "started_at": "2026-08-01T21:03:35Z",
+        "started_branch": "fix/windows-codex-shim-execution-v3",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-windows-codex-shim",
+        "status": "done",
+        "summary": "Revalidate both Windows failures and the .cmd execution premise",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Test-only FakeCodexCommandRunner rewrites only codex argv through the helper-provided shell prefix on Windows; POSIX executes the Bash shim directly and production CommandRunner is unchanged.",
+        "item_id": "windows-pr-followups-fake-codex-shim-v3",
+        "notes": null,
+        "started_at": "2026-08-01T21:04:47Z",
+        "started_branch": "fix/windows-codex-shim-execution-v3",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-windows-codex-shim",
+        "status": "done",
+        "summary": "Add a cross-platform test-only fake launcher invocation seam",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Recorded verification: focused 2 passed; complete module 34 passed; Ruff passed.",
+        "item_id": "windows-pr-followups-fake-codex-shim-v3",
+        "notes": null,
+        "started_at": "2026-08-01T21:04:54Z",
+        "started_branch": "fix/windows-codex-shim-execution-v3",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-windows-codex-shim",
+        "status": "done",
+        "summary": "Run focused launcher and action-loop tests plus the complete module",
+        "wid": "w2"
+      }
+    ]
+  }
+}

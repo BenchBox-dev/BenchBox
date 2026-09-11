@@ -1,0 +1,128 @@
+{
+  "context": "Prefer a trusted-mirror validation path that keeps privacy (find_public_path_leaks) and inventory --check, while either (a) allowing partial for auto/results-mirror-* same-repo only, or (b) running a mirror-specific privacy script instead of full community validate_submission. Do not loosen community PR rules. Cover with a fixture that includes a partial seed-shaped bundle and a community partial that still fails.",
+  "description": "After #1573, sync-results-data-to-published.yml posts a real corpus-mirror/validate-bundles check that runs scripts/validate_submission.py on every changed primary bundle. That validator requires summary.validation=='passed' (community submission rule). The curated seed corpus has always included ~65 bundles with validation=partial (203 primary total). Result: every full-corpus re-derive mirror fails the check even when privacy is clean (0 path leaks, 0 drop-field keys post-#1578). PR #1583 had to be admin-merged for tip hygiene after #1578. Community submissions must still refuse partial; the defect is applying that bar to trusted maintainer auto/results-mirror-* same-repo mirrors without a waiver or a separate privacy+inventory gate.",
+  "legacy": {
+    "item_meta": {
+      "category": "privacy",
+      "completed_at": "2026-08-05T22:08:38Z",
+      "completed_pr": 1589,
+      "created_at": "2026-08-05T21:09:28Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Community submissions still refuse summary.validation != passed",
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573"
+      },
+      {
+        "behavior": "Manifest sidecar waiver remains same-repo auto/results-mirror-* only",
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573"
+      },
+      {
+        "behavior": "Trusted mirror path still fails closed on private path leaks and stale inventory",
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/sync-results-data-to-published.yml"
+      },
+      {
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573",
+        "kind": "only_modify",
+        "path_glob": "benchbox/validation/bundle.py"
+      },
+      {
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n \"must be 'passed' for public submissions\" benchbox/validation/bundle.py",
+        "description": "Community path still rejects partial",
+        "expected": "line still present",
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573",
+        "last_result": "pass",
+        "last_run": "2026-08-05T22:05:25Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'partial|validation' .github/workflows/sync-results-data-to-published.yml",
+        "description": "Trusted-mirror path documents partial seed handling",
+        "expected": "mentions policy",
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573",
+        "last_result": "pass",
+        "last_run": "2026-08-05T22:05:28Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Decision: --allow-partial-validation on trusted maintainer mirror path only; community still requires passed; privacy+inventory still fail closed",
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573",
+        "notes": null,
+        "started_at": "2026-08-05T22:03:44Z",
+        "started_branch": "fix/mirror-validate-seed-partial",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Decide waiver vs separate privacy gate for trusted mirrors",
+        "wid": "w0"
+      },
+      {
+        "evidence": "--allow-partial-validation flag + mirror workflow; community default still requires passed",
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573",
+        "notes": null,
+        "started_at": "2026-08-05T22:05:12Z",
+        "started_branch": "fix/mirror-validate-seed-partial",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Implement chosen path in sync and/or validate_submission",
+        "wid": "w1"
+      },
+      {
+        "evidence": "unit+CLI+workflow policy tests for partial seed vs community",
+        "item_id": "mirror-validate-rejects-seed-partial-after-1573",
+        "notes": null,
+        "started_at": "2026-08-05T22:05:20Z",
+        "started_branch": "fix/mirror-validate-seed-partial",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add regression coverage for partial seed mirror vs community partial",
+        "wid": "w2"
+      }
+    ]
+  }
+}

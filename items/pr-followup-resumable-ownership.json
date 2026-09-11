@@ -1,0 +1,238 @@
+{
+  "description": "Extend the repository's existing PR status/follow-up commands with a clearly separate all-open view and resumable next action. Session sweeps repeatedly ended with new reviews pending, making the user the scheduler. Prior art: _project/scripts/pr_review_followups.py, _project/scripts/green_unmerged_sweep.py, Makefile pr-status, native host scheduling/watch support. Reuse the readiness transaction for mutations. This is a client-side continuation contract, not a new merge service or autonomous source-code reviewer.\n\nFEATURE-BATCH EXTENSION: extend the durable continuation to the period before a PR exists. Track batch identity/generation, integrator, declared members, pending worker heads, accepted integration receipts and next action, then bind the eventual final PR. Resume after prepare, Git merge, push-before-PR, review edits, queue entry and partial member closeout. Missing branch/worker, claim expiry, failed conflict resolution or absent platform continuation stays owned and explicit. Never infer done from an empty PR list or lose members after final squash. Use existing host scheduling only under prior monitoring authority; the installed batch guide must not unconditionally stop and make the user reschedule routine waits.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Treat a snapshot, a queued review, a skipped hook or an unbound passing check as completion",
+        "instead": "Bind actual evidence to the relevant PR/head/input and retain an explicit owned next action",
+        "item_id": "pr-followup-resumable-ownership",
+        "why": "The observed session repeatedly lost asynchronous work or overstated evidence"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "needs_item": "batch-feature-branch-integration"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "needs_item": "native-queue-local-landing"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "needs_item": "pr-revision-readiness-transaction"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-09-08T02:40:25Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "KEEP_IDLE and SHADOW_ONLY remain in force for skip/shard/demotion/reduced-refresh proposals; this plan does not activate them.",
+        "item_id": "pr-followup-resumable-ownership"
+      },
+      {
+        "behavior": "Keep GitHub native merge queue as the only merger; no privileged steward, bypass actor, direct protected-branch push, or new bot credential.",
+        "item_id": "pr-followup-resumable-ownership"
+      },
+      {
+        "behavior": "Preserve required PR, merge_group, and post-merge coverage, soundness maintainer review, explicit user authority, and durable hold labels.",
+        "item_id": "pr-followup-resumable-ownership"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "pr-followup-resumable-ownership",
+        "path": "_project/scripts/green_unmerged_sweep.py"
+      },
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "pr-followup-resumable-ownership",
+        "path": "_project/scripts/pr_review_followups.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "do_not_modify",
+        "path_glob": ".agents/skills/**"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "do_not_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/green_unmerged_sweep.py"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/pr_review_followups.py"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/prompts/pr_review_followup.md"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/review-protocol.md"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/dev-loop-worktrees.md"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "only_modify",
+        "path_glob": "scripts/pr_landing.py"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_green_unmerged_sweep.py"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_pr_landing.py"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_pr_review_followups.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_green_unmerged_sweep.py -q",
+        "description": "Follow-up continuation and scope are correct across asynchronous events",
+        "expected": "exit 0; behavioral negative controls fail on the prior implementation",
+        "item_id": "pr-followup-resumable-ownership",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "pr-followup-resumable-ownership",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "pr-followup-resumable-ownership",
+        "notes": "Expose explicit open and merged scopes, paginate PRs/threads/top-level review signals, and label every row with scope, PR/head, review state, CI, queue entry/eviction, owner, blocker and next action. Unavailable data stays unknown rather than clean; outdated unresolved threads require evidence-based disposition.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Expose separate open and merged PR views with exact blockers and next actions",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-followup-resumable-ownership",
+        "notes": "Persist bounded local continuation state under the common repository metadata directory: owner/session, PR/head, authorized action scope, processed thread evidence, attempts, due time and next action. Use existing host scheduler or CLI watch; a host without continuation reports that capability blocker instead of claiming monitoring is complete. Make restart and duplicate delivery idempotent.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Persist bounded owner and continuation state using existing host scheduling or watch",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-followup-resumable-ownership",
+        "notes": "Once monitoring is authorized, resume after completed review/check events or bounded backoff. Rescan open scope for newly opened PRs, route findings to the authorized agent, batch cohesive fixes, and observe final PR/merge-group/post-merge outcomes. Do not re-request reviews already running for the same head or mark a sweep terminal while its own review is pending.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Continue through reviews, updates, queue integration and post-merge checks",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-followup-resumable-ownership",
+        "notes": "Retry only an evidenced transient failure on the unchanged authorized head: at most one rerun per failed job and one queue re-entry per unchanged head without escalation. Preserve holds, approvals and substantive failures. Stop and identify owner for unknown/exhausted failures. Re-enqueue never authorizes merge for a previously unauthorized PR.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Bound retries to evidenced transient failures on unchanged authorized heads",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-followup-resumable-ownership",
+        "notes": "Test restart, two observers, missed/duplicate events, newly opened PR, late review, timeout, rate limit, superseded head, queue eviction and legitimate human hold. Distinguish draft/update delivery, monitoring pending, merged, and post-merge incident; no zero-thread snapshot may claim all work complete.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Test restarts, duplicate events, new PRs, outages and terminal-state reporting",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-followup-resumable-ownership",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Resume branch assembly and per-member closeout before and after the final PR exists",
+        "wid": "w5"
+      }
+    ]
+  }
+}

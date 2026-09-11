@@ -1,0 +1,179 @@
+{
+  "description": "Phase 2 operates entirely on GitHub PRs against `published-results` plus\nCI workflows. The \"how to operate it\" knowledge currently lives only in\nthe strategy doc (high-level), the handoff files (point-in-time), and\nthe heads of the people who built it. When the next maintainer (or\nClaude session) needs to triage a stuck PR, fix a broken explorer\nbuild, or roll back a bad merge, that distributed context fails.\n\nThis item produces a single operations runbook covering the Phase 2\nroutine paths and break-glass paths. It is short, link-heavy, and lives\nnext to the contributor docs so it's easy to find. It is NOT a redesign\nof the platform; it documents what's already true.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "document Phase 3 procedures in this runbook",
+        "instead": "(not specified)",
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "why": "Phase 3 doesn't exist yet; create a separate Phase 3 runbook only after Phase 3 is built."
+      },
+      {
+        "dont": "duplicate the contributor guide content",
+        "instead": "(not specified)",
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "why": "two sources of truth drift; link to `contributing-results.md` instead of restating it."
+      },
+      {
+        "dont": "use the runbook to invent new procedures",
+        "instead": "(not specified)",
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "why": "if something needs procedural change, it needs a TODO and review, not a docs commit; runbook captures *current* practice."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "needs_item": "implement-pr-based-result-submission-workflow"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-04-12T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Strategy doc as the source of truth for *why*; runbook is *how*.",
+        "item_id": "write-results-platform-phase-2-operations-runbook"
+      },
+      {
+        "behavior": "The Phase 2 git-as-source-of-truth model - runbook documents the existing flows, doesn't add new tools.",
+        "item_id": "write-results-platform-phase-2-operations-runbook"
+      },
+      {
+        "behavior": "The contributor-facing docs at `docs/contributing-results.md` - runbook is for maintainers, not contributors; do not rewrite contributor content.",
+        "item_id": "write-results-platform-phase-2-operations-runbook"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/results-publishing-handoff-2026-04-04.md"
+      },
+      {
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-phase-2-runbook.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f docs/operations/results-phase-2-runbook.md && grep -c '^## ' docs/operations/results-phase-2-runbook.md",
+        "description": "Runbook exists and covers all 10 outlined sections",
+        "expected": ">= 10",
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -E '<sha>|<TODO>|<placeholder>' docs/operations/results-phase-2-runbook.md",
+        "description": "Each cited rollback command is a real, runnable command (no placeholders)",
+        "expected": "no matches (other than the literal example placeholder for sha which is documented as such)",
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "notes": "Headings (in order):\n  1. What Phase 2 is (one paragraph + link to strategy doc)\n  2. The submission lifecycle (contributor PR → CI → review → merge → rebuild)\n  3. Maintainer review checklist (what to accept, what to reject, what to ask for)\n  4. CI failure triage (validate-submission red checks: hash, schema, sanity, what each means and how to coach the contributor)\n  5. Backfilling corpus-inventory.json (run the generator, commit, push)\n  6. Rolling back a bad merge (revert PR, force CI rebuild, communicate)\n  7. Re-triggering an explorer rebuild without a new merge\n  8. Where the data lives (branch, paths, sidecars)\n  9. Where the code lives (key files table)\n  10. Escalation: when something breaks that this runbook doesn't cover\nSave outline as draft 1; iterate after w2-w4 to fill it in with real\nexamples.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Outline the runbook based on the actual Phase 2 surface",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "notes": "Pull from `docs/contributing-results.md` quality expectations and\nextend with reject criteria the contributor docs intentionally don't\nlist (so as not to discourage contributions):\n  - Bundle metadata missing required fields (CI catches; manual review\n    confirms)\n  - Suspicious environment metadata (e.g., 0 RAM, 0 CPU)\n  - Partial-coverage cohorts that would mislead compare view\n  - Bundle paths that don't follow `bundles/<benchmark>/<platform>/sf<scale>/<id>/`\n  - Submitter has not addressed CI feedback within 14 days → close with thanks\nEach criterion: one-line rule + one-line explanation + suggested PR\ncomment template.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the maintainer review checklist with concrete reject criteria",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "notes": "For each error class produced by `scripts/validate_submission.py`:\n  - What it means\n  - What the contributor needs to do\n  - What the maintainer should NOT do (e.g., never bypass the check\n    and merge anyway)\nPull the actual error message strings from\n`scripts/validate_submission.py` so the runbook is greppable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document CI failure triage with sample messages",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "notes": "Step-by-step:\n  1. Identify the offending merge commit on `published-results`.\n  2. `git revert -m 1 <sha>` (merge commit) - branch is private, so\n     force-push is allowed only after review.\n  3. Push the revert; CI rebuilds the explorer.\n  4. Communicate: comment on the original PR explaining the revert.\n  5. If the bundle is \"wrong\" not \"broken\" (e.g., misleading\n     metadata), keep the revert and ask for a corrected resubmission.\nInclude the explicit `gh` and `git` commands. No prose-only steps.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the rollback path with explicit commands",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-results-platform-phase-2-operations-runbook",
+        "notes": "Save as `docs/operations/results-phase-2-runbook.md`. Link from:\n  - `docs/contributing-results.md` (one line: \"Maintainers: see ops\n    runbook\")\n  - `_project/handoffs/results-publishing-handoff-2026-04-04.md`\n    (replace ad-hoc operational notes with a link to the runbook)\n  - The Phase 2 ops one-liner referenced in\n    `automate-corpus-inventory-generation` work unit w6.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Publish runbook and link from key entry points",
+        "wid": "w5"
+      }
+    ]
+  }
+}

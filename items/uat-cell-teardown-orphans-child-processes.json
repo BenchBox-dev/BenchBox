@@ -1,0 +1,217 @@
+{
+  "context": "Add `except BaseException: _kill_process_group(proc); raise` to the\ncommunicate() try-block so cancellation reaps the group before unwinding.\nGive the timeout_s==0 branch the same Popen+setsid+guarded-kill treatment.\nAdd a module-level registry of live child pgids drained by the orchestrator's\ncancel path, covering the window between Popen and communicate.\nDeliberately NOT changing the SIGTERM->SweepCancelled design: the durability\ncontract in cells_io.py depends on the KeyboardInterrupt unwinding path.\n",
+  "description": "tests/uat/timeouts.py::run_with_timeout kills the child process group ONLY inside\n`except subprocess.TimeoutExpired`. There is no `finally` and no BaseException\nhandler. tests/uat/orchestrator.py converts a sweep SIGTERM into SweepCancelled,\nwhich subclasses KeyboardInterrupt -- a BaseException. It therefore propagates\nstraight out of proc.communicate() with the child untouched.\n\nBecause run_with_timeout passes preexec_fn=os.setsid, the child is in its OWN\nsession, so it does not inherit the terminal's Ctrl-C either. The child is fully\norphaned.\n\nOBSERVED 2026-08-04 (twice, stage 1 release-gate chunking): after killing the\nsweep orchestrator, `benchbox run` and its Spark JVM survived 14+ minutes,\nholding CPU, RAM and disk, and required manual SIGKILL. This is what made disk\nexhaustion unrecoverable without operator intervention.\n\nSecond, narrower defect: the `timeout_s == 0` branch uses bare subprocess.run\nwith NO setsid and NO teardown path at all, so it leaks differently.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "catch `Exception` instead of `BaseException`",
+        "instead": "catch BaseException, kill the group, and re-raise unchanged",
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "why": "SweepCancelled inherits KeyboardInterrupt, which is NOT an Exception -- an `except Exception` clause never fires and the bug survives the fix"
+      },
+      {
+        "dont": "claim this fixed without a test that actually spawns and cancels a real child",
+        "instead": "spawn a real sleeper, cancel, and assert no surviving descendant",
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "why": "the whole defect is that a mocked communicate() looks correct while a real process survives"
+      },
+      {
+        "dont": "drop preexec_fn=os.setsid to make the child inherit terminal signals",
+        "instead": "keep setsid and make every exit path kill the group",
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "why": "the session is what makes group-kill reliable for JVM and container child trees; removing it trades one leak for a worse one"
+      },
+      {
+        "dont": "swallow the cancellation after killing the group",
+        "instead": "bare `raise` after _kill_process_group",
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "why": "the sweep must still unwind so the platform teardown and finalize markers run"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-08-05T15:00:53Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "SweepCancelled stays a KeyboardInterrupt subclass; the cells_io durability contract (.inprogress/.finalized markers, per-cell fsync) is unchanged.",
+        "item_id": "uat-cell-teardown-orphans-child-processes"
+      },
+      {
+        "behavior": "The SIGTERM handler is still installed only in the sweep's own main thread and restored on exit.",
+        "item_id": "uat-cell-teardown-orphans-child-processes"
+      },
+      {
+        "behavior": "Timeout classification is unchanged: a per-cell timeout still returns EXIT_TIMEOUT=124 with timed_out=True.",
+        "item_id": "uat-cell-teardown-orphans-child-processes"
+      },
+      {
+        "behavior": "Windows behavior is unchanged: no os.killpg, no setsid, proc.kill() fallback still applies.",
+        "item_id": "uat-cell-teardown-orphans-child-processes"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "install/restore SIGTERM shim (uat-sweep-durability-and-signal-teardown w2/w3) is the cancellation entry point; hook pgid draining there",
+        "decision": "extend",
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "path": "tests/uat/orchestrator.py"
+      },
+      {
+        "concept": "existing killpg coverage stubs os.killpg and asserts the ladder; same stubbing technique applies to the BaseException path",
+        "decision": "extend",
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "path": "tests/uat/test_timeouts.py"
+      },
+      {
+        "concept": "_kill_process_group already implements the SIGTERM->200ms->SIGKILL ladder with hasattr(os,'killpg') portability guard; reuse it verbatim, only widen who calls it",
+        "decision": "extend",
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "path": "tests/uat/timeouts.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/cells_io.py"
+      },
+      {
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/orchestrator.py"
+      },
+      {
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_sweep_durability.py"
+      },
+      {
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_timeouts.py"
+      },
+      {
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/timeouts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_timeouts.py -q",
+        "description": "Timeout wrapper unit tests pass, including the cancellation-kills-group case",
+        "expected": "all pass; a test asserts killpg fired before SweepCancelled escaped run_with_timeout",
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_sweep_durability.py -q -k orphan",
+        "description": "Sweep durability suite covers orphan reaping (pytest exits 5 if the selector matches nothing, so this rung also proves the test exists)",
+        "expected": "at least one test collected and passing",
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_sweep_durability.py -q -k 'cancel and no_survivor'",
+        "description": "A cancelled sweep leaves no surviving descendant process",
+        "expected": "spawns a real long-running cell, SIGTERMs the sweep, asserts the child pgid is gone",
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add BaseException teardown to run_with_timeout and re-raise unchanged",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Give the timeout_s==0 branch setsid plus the same guarded kill path",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Register live child pgids and drain them from the orchestrator cancel path",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-cell-teardown-orphans-child-processes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add real-process cancellation test asserting no surviving descendant",
+        "wid": "w3"
+      }
+    ]
+  }
+}

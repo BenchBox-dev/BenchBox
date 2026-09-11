@@ -1,0 +1,10 @@
+{
+  "description": "\"Decided to ship `benchbox/monitoring` package in v1.0 as opt-in helper-only module with stable API, comprehensive tests (84% coverage), and complete documentation.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (Should-Fix Before Release)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "observability-quality"
+    }
+  }
+}

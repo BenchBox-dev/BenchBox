@@ -1,0 +1,218 @@
+{
+  "context": "Provenance manifest, not a bigger COUNT check. setup() writes a single-row\n`benchbox_staging_manifest` table (benchmark, scale, spec_version,\nsource_digest, created_at). is_setup() reads it and returns True only when every\nfield matches the current run. A missing manifest returns False, so every\npre-existing database self-heals on first use -- safe by construction.\nImplement the manifest read/write ONCE in transactional/benchmark_base.py so\ntransaction_primitives and write_primitives cannot drift.\n",
+  "description": "benchbox/core/transaction_primitives/benchmark.py::is_setup and\nbenchbox/core/write_primitives/benchmark.py::is_setup decide whether staging\ntables are ready using only `SELECT COUNT(*) FROM <table>` and returning True on\nany non-zero count. There is no scale, seed, spec-version or source-data check.\n\nbenchbox/core/transactional/benchmark_base.py::_prepare_operation then does\n`if operation.requires_setup and not self.is_setup(connection): setup(...)`.\n\nCONSEQUENCE: a staging set left over from a scale-0.01 run satisfies is_setup for\na scale-1.0 run. setup() is skipped, the benchmark executes against the wrong\ndata volume, and the run is reported as a PASS. This is a silent wrong-results\nbug, not a hygiene issue -- the timings are meaningless but indistinguishable\nfrom valid ones in the result bundle.\n\nOBSERVED 2026-07-29 during release-gate stage 1; a draft exists at\n~/.todo-db/finding-drafts/benchbox/duckdb-reuse-staleness-2026-07-29.md.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix this by widening the COUNT check to compare row counts against expected scale",
+        "instead": "record explicit provenance at setup time and compare it",
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "why": "row counts collide across seeds and across partially-loaded databases, so it trades a silent wrong answer for a subtler one"
+      },
+      {
+        "dont": "implement the manifest separately in transaction_primitives and write_primitives",
+        "instead": "one implementation in benchmark_base.py, both overrides delegate",
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "why": "these two is_setup overrides already drifted (different table lists, different quoting) which is how the bug survived review"
+      },
+      {
+        "dont": "silence the extra rebuild by shipping a migration that back-fills manifests for existing databases",
+        "instead": "accept one rebuild and note it in the changelog",
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "why": "back-filling asserts a provenance nobody actually verified -- it manufactures the false confidence this item exists to remove"
+      },
+      {
+        "dont": "treat a missing manifest as 'probably fine, reuse it'",
+        "instead": "missing manifest returns False and forces one rebuild",
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "why": "every pre-existing database on every developer machine lacks the manifest; defaulting to reuse preserves the exact bug being fixed"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-08-05T15:01:04Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Intentional cross-benchmark reuse of TPC-H loaded databases (read_primitives etc.) still works when the manifest matches; this narrows reuse, it does not disable it.",
+        "item_id": "transactional-staging-reuse-ignores-provenance"
+      },
+      {
+        "behavior": "No change to result bundle schema or to any published field.",
+        "item_id": "transactional-staging-reuse-ignores-provenance"
+      },
+      {
+        "behavior": "The manifest table is created inside the same connection/transaction discipline as the staging tables; a failed setup still rolls back via _rollback_connection_after_error.",
+        "item_id": "transactional-staging-reuse-ignores-provenance"
+      },
+      {
+        "behavior": "setup(force=True) semantics are unchanged.",
+        "item_id": "transactional-staging-reuse-ignores-provenance"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "shared base already owns _prepare_operation and the abstract is_setup/setup contract; the manifest helpers belong here, not duplicated per spec",
+        "decision": "extend",
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "path": "benchbox/core/transactional/benchmark_base.py"
+      },
+      {
+        "concept": "existing in-database ledger table pattern (NOT_VALIDATED marker) for recording provenance alongside the data it describes",
+        "decision": "reuse",
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "path": "benchbox/core/tuning/applied_ledger.py"
+      },
+      {
+        "concept": "reuse-aware pruning keyed databases_root/platform/benchmark/scale -- documents the intended reuse boundary the manifest must enforce in-database",
+        "decision": "reuse",
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "path": "tests/uat/cleanup.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/"
+      },
+      {
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transaction_primitives/benchmark.py"
+      },
+      {
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transactional/benchmark_base.py"
+      },
+      {
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/transactional/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/transactional/test_staging_provenance.py -q",
+        "description": "Staging provenance unit tests pass (pytest exits 5 if the file is absent, so this rung proves the tests exist)",
+        "expected": "scale-mismatch forces rebuild; matching manifest skips rebuild; legacy populated-but-unmanifested database forces rebuild",
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python -c \"import inspect;from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark as T;from benchbox.core.write_primitives.benchmark import WritePrimitivesBenchmark as W;assert all('manifest' in inspect.getsource(c.is_setup) for c in (T,W))\"",
+        "description": "Both is_setup overrides delegate to the shared base helper rather than reimplementing it",
+        "expected": "exit 0; neither override decides readiness on COUNT alone",
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/transaction_primitives tests/unit/core/write_primitives -q",
+        "description": "Transactional and write-primitive suites stay green",
+        "expected": "all pass",
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add manifest write plus read helpers to transactional benchmark_base",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Write the manifest row from setup() with benchmark, scale, spec version and source digest",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Rewrite both is_setup overrides to require a matching manifest and populated tables",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add provenance tests covering scale mismatch, match, and legacy unmanifested database",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "transactional-staging-reuse-ignores-provenance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Changelog the one-time rebuild of existing staging databases",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,123 @@
+{
+  "description": "Promoted from deferral #120 of close-pre-beta-release-blockers.\nDeferred: Audit blog posts and historical release summaries for outdated Alpha/install language\nReason deferred: Current-state docs and package artifacts are the immediate Beta blocker; historical content can follow.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-15T14:52:14Z",
+      "completed_pr": 1743,
+      "created_at": "2026-07-19T12:33:58Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "kind": "only_modify",
+        "path_glob": "_blog/building-benchbox/published/**"
+      },
+      {
+        "item_id": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/**"
+      },
+      {
+        "item_id": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "kind": "only_modify",
+        "path_glob": "docs/blog/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make docs-validate",
+        "description": "Documentation validation passes",
+        "expected": "exits 0",
+        "item_id": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "last_result": "pass",
+        "last_run": "2026-08-15T14:52:07Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -d docs/blog && test -d _blog/building-benchbox/published",
+        "description": "Public release-summary sources remain present",
+        "expected": "both directories exist",
+        "item_id": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "last_result": "pass",
+        "last_run": "2026-08-15T14:52:09Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --check",
+        "description": "Tracked audit edits have no whitespace errors",
+        "expected": "exits 0",
+        "item_id": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "last_result": "pass",
+        "last_run": "2026-08-15T14:52:11Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventory captured in /tmp/benchbox-release-language-inventory.log; current contract cross-checked against pyproject 0.3.1/Beta, README installation guidance, docs/usage/installation.md, and download-answers CLI",
+        "item_id": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "notes": null,
+        "started_at": "2026-08-15T14:45:23Z",
+        "started_branch": "docs/audit-release-language",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-release-blog-audit",
+        "status": "done",
+        "summary": "Inventory public blog and release-summary sources and compare Alpha, Beta, and installation claims with the current package and release contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": "All Alpha hits are dated v0.2.0 historical context; v0.1.x extra-install examples are version-specific and still valid; current 0.3.1/Beta and download-answers contracts verified",
+        "item_id": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "notes": null,
+        "started_at": "2026-08-15T14:45:51Z",
+        "started_branch": "docs/audit-release-language",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-release-blog-audit",
+        "status": "done",
+        "summary": "Classify each hit as historically accurate, version-specific, or stale present-tense guidance without rewriting historical context",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Durable audit report added at _project/audits/blog-release-language-audit-2026-08-15.md; no stale public claims required correction",
+        "item_id": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "notes": null,
+        "started_at": "2026-08-15T14:47:05Z",
+        "started_branch": "docs/audit-release-language",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-release-blog-audit",
+        "status": "done",
+        "summary": "Correct stale public claims and synchronize the maintained published/source copies while preserving dated release facts",
+        "wid": "w2"
+      },
+      {
+        "evidence": "make docs-validate, make spellcheck, and git diff --check passed; audit report records classifications",
+        "item_id": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "notes": null,
+        "started_at": "2026-08-15T14:47:24Z",
+        "started_branch": "docs/audit-release-language",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-release-blog-audit",
+        "status": "done",
+        "summary": "Run documentation, spelling, link, and diff-hygiene checks and record the audited surface",
+        "wid": "w3"
+      }
+    ]
+  }
+}

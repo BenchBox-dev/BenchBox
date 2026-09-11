@@ -1,0 +1,166 @@
+{
+  "description": "`.github/workflows/auto-merge-on-open.yml` (lines 31-48: the checkout, base-branch\nfetch, and \"Check soundness-critical paths\" step) checks out the PR at its own\nHEAD and then runs `_project/scripts/auto_merge_soundness_paths.py` *from that\nsame checkout*. For a same-repo (non-fork) PR — the normal case for this\nsingle-maintainer-owned repo where contributors push branches directly — the\nscript executing the predicate is whatever version the PR itself introduces. A\nPR that edits `auto_merge_soundness_paths.py` (e.g. narrows `SOUNDNESS_PREFIXES`,\nor the workflow file itself) evaluates its own diff against its own modified\nrules, so it can neutralize its review gate in the same commit that would\notherwise have triggered it.\n\nNote honestly: with the repo-layer ruleset review requirement from\nauto-merge-review-gate-admin-enforcement enforced (once its deferred admin\naction lands), this workflow's withholding behavior is defense-in-depth, not\nthe primary control — the ruleset's `pull_request` rule would block a\nzero-approval squash-merge regardless of what this workflow decides. This item\nis still worth doing because (a) the ruleset enforcement is not yet live, and\n(b) even once it is, a same-commit self-neutralization that quietly avoids\never showing \"review required\" is a bad signal for reviewers relying on the\nauto-merge state as a triage cue.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fork auto_merge_soundness_paths.py's logic into the workflow YAML as inline shell/python",
+        "instead": "(not specified)",
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "why": "keep executing the actual script file (from the base ref) so there is exactly one implementation to maintain."
+      },
+      {
+        "dont": "skip the base-branch fetch step's existing --no-tags behavior or change its shallow/full-history semantics; only add the base-ref file materialization after it.",
+        "instead": "(not specified)",
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "treat this as a substitute for the ruleset-layer review requirement",
+        "instead": "(not specified)",
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "why": "this is documented as defense-in-depth in the description; don't let this item's success_metrics imply it replaces auto-merge-review-gate-admin-enforcement."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "needs_item": "soundness-surface-widening"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The synchronize-event re-evaluation behavior (a later push that newly touches a soundness path flips auto-merge back off) continues to work.",
+        "item_id": "auto-merge-predicate-base-ref-execution"
+      },
+      {
+        "behavior": "The workflow's output contract (steps.soundness.outputs.soundness_path, consumed by the existing enable/disable auto-merge steps) is unchanged.",
+        "item_id": "auto-merge-predicate-base-ref-execution"
+      },
+      {
+        "behavior": "make pr-open's local invocation of the predicate is unaffected by this item (base-ref execution is CI-workflow-specific; a local developer already has full repo access).",
+        "item_id": "auto-merge-predicate-base-ref-execution"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/auto-merge-on-open.yml:31-48 — the checkout + soundness-check step being hardened; keep its step names and output contract (steps.soundness.outputs.soundness_path) stable so the enable/disable steps below it don't need changes.",
+        "decision": "reuse",
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "path": ".github/workflows/auto-merge-on-open.yml:31-48"
+      },
+      {
+        "concept": "Makefile:pr-open (~line 1163) — also invokes the predicate via `uv run --project _project/scripts`; out of scope for this item's local-CLI flow (a developer running make pr-open locally already has arbitrary code execution), but keep the two invocations' semantics compatible.",
+        "decision": "reuse",
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "path": "Makefile:pr-open"
+      },
+      {
+        "concept": "_project/scripts/auto_merge_soundness_paths.py — the predicate being protected; do not fork or duplicate its logic, only change which copy of the file gets executed.",
+        "decision": "reuse",
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "path": "_project/scripts/auto_merge_soundness_paths.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/auto_merge_soundness_paths.py"
+      },
+      {
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_auto_merge_soundness_paths.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py -v",
+        "description": "Backstop workflow tests still pass with the added base-ref and self-touch assertions",
+        "expected": "all tests pass, including the extended test_backstop_workflow_uses_shared_predicate_and_skips_auto_merge",
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh run view <run-id> --log | grep -A3 'Check soundness-critical paths'",
+        "description": "A workflow_dispatch or manual trace confirms /tmp/predicate.py is materialized from origin/develop, not the PR's HEAD copy, before the predicate runs",
+        "expected": "log shows the git show origin/${{ github.base_ref }} step succeeding before the predicate invocation",
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "notes": "In the \"Check soundness-critical paths\" step, before running the predicate,\nmaterialize the base-ref version: `git show\n\"origin/${{ github.base_ref }}:_project/scripts/auto_merge_soundness_paths.py\"\n> /tmp/predicate.py` (base branch is already fetched by the preceding\n\"Fetch base branch\" step), then invoke `python /tmp/predicate.py --stdin\n--format github-output` instead of the checked-out repo path. Confirm the\nscript has no relative imports or sibling-file dependencies that would\nbreak when run standalone from /tmp (check the top of\nauto_merge_soundness_paths.py — it currently has none, keep it that way or\ncopy siblings too if that changes).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fetch and execute the base-ref copy of the predicate script instead of the PR's own checkout copy",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "notes": "Add an explicit check: if the PR's diff touches\n_project/scripts/auto_merge_soundness_paths.py or\n.github/workflows/auto-merge-on-open.yml, force soundness_path=true\nregardless of what the base-ref predicate returns for the rest of the\ndiff. This closes the residual gap where a PR could still edit the\npredicate to make future PRs unsafe, without itself needing owner review\nunder the base-ref-only check (base-ref execution alone stops the\npredicate from judging its own diff leniently, but does not by itself\nflag \"this diff touches the predicate\" as inherently review-worthy).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Treat modification of the predicate or the workflow itself as soundness=true",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "auto-merge-predicate-base-ref-execution",
+        "notes": "Extend tests/unit/test_auto_merge_soundness_paths.py's\ntest_backstop_workflow_uses_shared_predicate_and_skips_auto_merge (which\ncurrently string-matches the workflow YAML) with assertions for the new\n`git show origin/.../auto_merge_soundness_paths.py` line and the\npredicate/workflow self-touch check, so a future edit that removes the\nbase-ref execution regresses a fast unit test rather than only being\ncaught by manual review.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update or add a workflow-level test exercising the base-ref execution path",
+        "wid": "w3"
+      }
+    ]
+  }
+}

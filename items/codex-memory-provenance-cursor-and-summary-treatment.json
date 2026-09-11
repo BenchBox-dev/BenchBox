@@ -1,0 +1,275 @@
+{
+  "context": "Start from a checksummed fixture. Add source-cursor invalidation before regeneration. Regenerate the four known stale summaries from their complete sessions, then rebuild raw memories, registry, and compact summary deterministically. Normalize BenchBox pool paths to the BenchBox repository identity. Keep historical evidence searchable but out of automatic instruction context. Compare the treatment against the baseline scenario corpus before any canary.",
+  "description": "Create a candidate Codex-memory treatment without mutating the live store. Correct the four rollout summaries whose source sessions materially continued after the recorded checkpoint; add summarized-through event identity/digest; preserve completion stages proposed -> implemented -> committed -> pushed -> merged -> released -> verified; add project_id, source_kind, source_ref, observed_at, observed_commit, freshness_class, reverify_after, supersedes, authority_rank, and sensitivity metadata. Reclassify stale Oxbow/textcharts YAML state, BenchBox schema-2 findings state, PR statuses, canonical SHAs, tracker export counts, and pool/temp paths as dated historical observations rather than current facts. Reduce the global compact summary to stable human-approved preferences plus an exact-project routing index, target <=1,200 approximate tokens, and exclude drift-prone live state. Remove executable memory-generated skills from the candidate after migrating any uniquely useful procedure to the approved authoritative surface. Resolve the contradictory ad-hoc-note authority wording. Derived raw/registry/summary files must be regenerated from corrected upstream records, never patched alone.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete historical rollouts merely because their current-state claims expired",
+        "instead": "mark them historical and exclude them from automatic current-state context",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "why": "they retain useful evidence and provenance"
+      },
+      {
+        "dont": "keep branch, PR, version, count, runtime, or pool-slot state in global automatic injection",
+        "instead": "retrieve the dated evidence on exact-project demand and verify live",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "why": "those facts drift and cross-contaminate unrelated projects"
+      },
+      {
+        "dont": "patch memory_summary.md or MEMORY.md without correcting upstream records",
+        "instead": "update source metadata/generator and regenerate every derived layer",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "why": "derived files will drift again on regeneration"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "needs_item": "memory-evaluation-harness-and-scenario-corpus"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "needs_item": "memory-governance-authority-retention-decisions"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-07-27T18:21:50Z",
+      "created_at": "2026-07-27T17:33:18Z",
+      "worktree": "codex-memory"
+    },
+    "preserves": [
+      {
+        "behavior": "All 37 rollout references and source-session evidence remain recoverable unless separately approved for deletion",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment"
+      },
+      {
+        "behavior": "No source transcript or historical evidence is rewritten",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment"
+      },
+      {
+        "behavior": "Required repository behavior remains authoritative in AGENTS.md or canonical skills, not generated memory",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment"
+      },
+      {
+        "behavior": "Task-level success, partial, uncertain, and blocked distinctions remain explicit",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "task-group registry with source-session routing and outcomes",
+        "decision": "extend",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "path": "/Users/joe/.codex/memories/MEMORY.md"
+      },
+      {
+        "concept": "global compact summary containing project live state",
+        "decision": "supersede",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "path": "/Users/joe/.codex/memories/memory_summary.md"
+      },
+      {
+        "concept": "merged stage-one extraction",
+        "decision": "extend",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "path": "/Users/joe/.codex/memories/raw_memories.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/archived_sessions/**"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/sessions/**"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "kind": "only_modify",
+        "path_glob": "docs/codex-memory/**"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "kind": "only_modify",
+        "path_glob": "fixtures/codex-treatment/**"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/codex/**"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "kind": "only_modify",
+        "path_glob": "tests/codex/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && uv run --project \"$MEMORY_TOOLING_ROOT\" -- python -m memory_tooling.audit --system codex --root \"$MEMORY_TOOLING_ROOT/fixtures/codex-treatment\" --strict",
+        "description": "Codex treatment passes the deterministic audit",
+        "expected": "zero cursor, provenance, traceability, privacy, project identity, or budget violations",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "last_result": "pass",
+        "last_run": "2026-07-27T18:18:59Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && uv run --project \"$MEMORY_TOOLING_ROOT\" -- python -m memory_tooling.audit --system codex --check-source-cursors | rg -q '^stale=0$'",
+        "description": "No source summary cursor is stale",
+        "expected": "stale=0",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "last_result": "pass",
+        "last_run": "2026-07-27T18:19:01Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && uv run --project \"$MEMORY_TOOLING_ROOT\" -- python -m memory_tooling.audit --system codex --check-token-budget --max-summary-tokens 1200",
+        "description": "Compact summary meets budget",
+        "expected": "exit 0",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "last_result": "pass",
+        "last_run": "2026-07-27T18:19:02Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated 37 unique rollout/source pairs; 0 missing sources; exactly 4 have >60 seconds of later source events",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:17:27Z",
+        "started_branch": "chore/codex-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Revalidate all 37 source-session cursors and current contradictions; expand the known four-item stale set if necessary",
+        "wid": "w0"
+      },
+      {
+        "evidence": "37 normalized records include authority, project_id, source, observed/reverify times, completion stage provenance, freshness, supersession, sensitivity, and full source cursor/hash",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:17:32Z",
+        "started_branch": "chore/codex-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add provenance, completion-stage, freshness, supersession, sensitivity, project identity, and summarized-through metadata to source records",
+        "wid": "w1"
+      },
+      {
+        "evidence": "37 deterministic metadata-only rollout envelopes cover complete source event counts and prefix hashes; stale=0",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:17:36Z",
+        "started_branch": "chore/codex-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Regenerate materially stale rollout summaries from complete source sessions and verify no later events remain unprocessed",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Pool worktrees normalize through git common dir to git:benchbox; all drift-prone records are expired historical evidence with automatic_current_context=false",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:17:41Z",
+        "started_branch": "chore/codex-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Reclassify drift-prone repository/PR/version/path facts as historical and normalize pool worktrees to repository identity",
+        "wid": "w3"
+      },
+      {
+        "evidence": "retirement.json retires duplicate generated skills to repository/canonical authority and makes ad-hoc notes untrusted proposals requiring verification",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:17:45Z",
+        "started_branch": "chore/codex-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Migrate or retire the two generated memory skills and reconcile the ad-hoc extension authority contract",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Generated content-safe records, routing summary, retirement manifest, and 37 envelopes; summary estimate 334 tokens; original rollouts and sessions untouched",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:17:49Z",
+        "started_branch": "chore/codex-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Deterministically regenerate raw memories, registry, and a <=1,200-token project-routing summary from corrected upstream records",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Strict audit, source cursor check, token budget check, privacy scan, and 3 mutation/determinism tests pass in fixture",
+        "item_id": "codex-memory-provenance-cursor-and-summary-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:17:54Z",
+        "started_branch": "chore/codex-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Run structural, mutation, privacy, traceability, and scenario-corpus checks on the Codex treatment fixture",
+        "wid": "w6"
+      }
+    ]
+  }
+}

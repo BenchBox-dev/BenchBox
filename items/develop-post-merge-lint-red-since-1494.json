@@ -1,0 +1,65 @@
+{
+  "context": "Do not start by changing make ci-lint. First get the actual failing assertion out of the runner: the log is drowned in step-wrapper noise and grep does not surface the assertion, so re-run the job with debug logging enabled or add a step that tees the ci-lint output to an artifact. Then diff the runner environment against local for whichever sub-check fails. Likely candidates: the fast-lane count cache (the delta guard restores a develop-keyed cache entry that a red run may never have written, so the streak can be self-sustaining), uv resolution differences, or a check that reads more git history than the runner fetches. Only once the failing sub-check is named should a fix be chosen. Acceptance is a green Develop post-merge run on a later develop push -- not a local ci-lint pass, which already succeeds.",
+  "description": "The 'Develop post-merge' safety net has failed on every run since d8afb2fa9a (#1494, 'fix(agents): enforce human commit authorship at claim, commit and merge time'). Failing shas in develop order: d8afb2fa9a, 3b45633e2c (#1512), 08a2c4cec6 (#1522), e02d4a6567, aecbadcfab, 09faf5edf7 (#1529), and 4a909721e5 (#1527) twice. The last success was 6e8f646d26 (#1480). In every case the failing job is 'lint' and the failing step is 'Run CI lint mirror' (make ci-lint); medium-test, fast-test and explorer-tokens all pass. The metrics job reports REVERT_SUPPRESSED=true and NEW_FAILURE_IDS=[], so auto-revert deliberately does not fire and the streak is invisible unless someone reads the run list.\n\nParity caveat, important for triage: running `make ci-lint` locally against develop tip d1f7cbcdff PASSES end to end (fast-lane policy 0 violations, compat docs, DDL drift CLEAN, oracle coverage map, dependency audit 0 violations, spellcheck). So this looks environment-specific rather than a source defect. The repo has prior history of exactly that class of problem -- see the completed 'ci-lint-parity-pin-2' and the dropped 'ci-lint-local-parity-pin' -- which is why the local-vs-CI delta is the first thing to chase.\n\nIdentified 2026-08-04 while verifying that the six merged MCP v2 platform-option PRs (#1510, #1511, #1513, #1514, #1515, #1520) had not broken develop. None of the failing commits belongs to that batch; the streak starts at the commit that was develop HEAD when that work began.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "created_at": "2026-08-04T16:34:12Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "auto-revert suppression behaviour is changed only as a deliberate decision, not as a side effect",
+        "item_id": "develop-post-merge-lint-red-since-1494"
+      },
+      {
+        "behavior": "make ci-lint keeps passing locally; the fix must not be to weaken or delete a check so CI goes green",
+        "item_id": "develop-post-merge-lint-red-since-1494"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "develop-post-merge-lint-red-since-1494",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "develop-post-merge-lint-red-since-1494",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "develop-post-merge-lint-red-since-1494",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "develop-post-merge-lint-red-since-1494",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "develop-post-merge-lint-red-since-1494",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "develop-post-merge-lint-red-since-1494",
+        "kind": "only_modify",
+        "path_glob": "scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make ci-lint",
+        "description": "The failing sub-check is named in the item notes before any fix lands",
+        "expected": "exits 0 locally today, so this rung alone is NOT acceptance -- the real gate is a green Develop post-merge run on a subsequent develop push, recorded in the item notes",
+        "item_id": "develop-post-merge-lint-red-since-1494",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

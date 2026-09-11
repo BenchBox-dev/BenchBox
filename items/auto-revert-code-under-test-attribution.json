@@ -1,0 +1,102 @@
+{
+  "description": "Signature-aware comparison already suppresses persistent-red duplicates. The residual gap is first-failure attribution: a latent environment-dependent break can still open a revert against the first red post-merge SHA even when that PR did not touch the failing test. Add a guard that maps the failing test to the blamed PR diff; if the test file and its code-under-test are untouched, downgrade the revert to an advisory comment. Preserve the existing signature comparison and do not disable auto-revert for true same-subsystem first failures.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-17T14:53:09Z",
+      "completed_pr": 0,
+      "created_at": "2026-08-17T13:15:53Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "scope_rules": [
+      {
+        "item_id": "auto-revert-code-under-test-attribution",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "auto-revert-code-under-test-attribution",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "auto-revert-code-under-test-attribution",
+        "kind": "only_modify",
+        "path_glob": "scripts/post_merge_signature.py"
+      },
+      {
+        "item_id": "auto-revert-code-under-test-attribution",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_post_merge_signature.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/test_post_merge_signature.py -q",
+        "description": "Signature unit tests pass",
+        "expected": "exit 0",
+        "item_id": "auto-revert-code-under-test-attribution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'post_merge_signature.py build' .github/workflows/develop-post-merge.yml",
+        "description": "Workflow still emits signatures for lint, fast-test, and medium-test",
+        "expected": "match",
+        "item_id": "auto-revert-code-under-test-attribution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "auto-revert-code-under-test-attribution",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "auto-revert-code-under-test-attribution",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Documented first-red-SHA blame plus residual in scripts/post_merge_signature.py module docstring.",
+        "item_id": "auto-revert-code-under-test-attribution",
+        "notes": null,
+        "started_at": "2026-08-17T14:46:40Z",
+        "started_branch": "fix/auto-revert-code-under-test-attribution",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-auto-revert-code-under-test-attribution",
+        "status": "done",
+        "summary": "Document the current auto-revert blame rule and the first-red-SHA residual",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added attribute subcommand and workflow advisory path when blamed SHA misses failing test files.",
+        "item_id": "auto-revert-code-under-test-attribution",
+        "notes": null,
+        "started_at": "2026-08-17T14:49:17Z",
+        "started_branch": "fix/auto-revert-code-under-test-attribution",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-auto-revert-code-under-test-attribution",
+        "status": "done",
+        "summary": "Add a no-touch advisory-downgrade when the blamed PR did not change the failing test or its code-under-test",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added latent first-failure fixture: ducklake PR vs preflight test is advisory; stem match still reverts.",
+        "item_id": "auto-revert-code-under-test-attribution",
+        "notes": null,
+        "started_at": "2026-08-17T14:49:29Z",
+        "started_branch": "fix/auto-revert-code-under-test-attribution",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-auto-revert-code-under-test-attribution",
+        "status": "done",
+        "summary": "Add a fixture for a latent first failure whose blamed SHA is outside the failing test's ownership",
+        "wid": "w2"
+      }
+    ]
+  }
+}

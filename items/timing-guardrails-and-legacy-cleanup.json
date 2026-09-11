@@ -1,0 +1,203 @@
+{
+  "context": "Remove stale compatibility branches that were kept during migration, then add\nstatic guardrails (validation script or CI check) that detect prohibited\nelapsed timing patterns in runtime code.\n\nDocument the timing contract in contributor-facing docs and include examples\nof allowed vs forbidden clock usage.\n",
+  "description": "Finalize the timing consolidation by removing obsolete compatibility behavior\nand introducing guardrails that prevent reintroduction of inconsistent timing\nmethodology.\n\nThis phase codifies project rules:\n- monotonic clocks for elapsed/timeout logic,\n- wall-clock only for event timestamps,\n- canonical runtime query timing key `execution_time_seconds`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add overly broad lint rules that block legitimate datetime usage",
+        "instead": "scope rules to elapsed/timeout patterns",
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "why": "event timestamps are valid wall-clock uses"
+      },
+      {
+        "dont": "leave timing rules undocumented",
+        "instead": "update contributor docs with concrete examples",
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "why": "enforcement without guidance causes repeated violations"
+      },
+      {
+        "dont": "remove compatibility without validating historical artifact loading paths",
+        "instead": "(not specified)",
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "why": "existing result files still need conversion support at boundaries"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "needs_item": "timing-runtime-wide-monotonic-migration"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "created_at": "2026-02-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Developer workflows remain fast and non-interactive friendly",
+        "item_id": "timing-guardrails-and-legacy-cleanup"
+      },
+      {
+        "behavior": "Existing CLI summaries and benchmark report formats remain unchanged",
+        "item_id": "timing-guardrails-and-legacy-cleanup"
+      },
+      {
+        "behavior": "Result loading/export for historical artifacts remains operational via explicit conversion boundaries",
+        "item_id": "timing-guardrails-and-legacy-cleanup"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcdi/"
+      },
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/query_normalizer.py"
+      },
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "kind": "only_modify",
+        "path_glob": "docs/AGENTS.md"
+      },
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_todo_indexes.py"
+      },
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_loader.py"
+      },
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_normalizer.py"
+      },
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_query_normalizer.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/ -k 'timing or normalizer or schema' -q",
+        "description": "Timing guardrail check passes",
+        "expected": "Guardrail tests pass",
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/ -k 'loader or normalizer or exporter' -q",
+        "description": "Historical result normalization tests still pass",
+        "expected": "Selected tests pass",
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make ci-test",
+        "description": "Project quality gate remains green",
+        "expected": "CI test suite passes",
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove obsolete compatibility branches for legacy runtime timing key handling",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add timing guardrail checker and tests for prohibited elapsed timing patterns",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document canonical timing methodology and examples in project docs",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-guardrails-and-legacy-cleanup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run regression tests for results loading/export and overall CI quality gates",
+        "wid": "w4"
+      }
+    ]
+  }
+}

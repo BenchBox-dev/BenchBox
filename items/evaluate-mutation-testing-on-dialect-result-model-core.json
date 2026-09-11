@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #491 of testing-approach-correctness-gates.\nDeferred: Evaluate mutation testing on dialect/result-model core\nReason deferred: Useful after correctness lanes exist; not a prerequisite for closing the current CI routing gap.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:32Z",
+      "worktree": "main"
+    }
+  }
+}

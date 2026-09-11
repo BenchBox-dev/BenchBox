@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #358 of benchmark-support-status-criteria-matrix.\nDeferred: Promote vector_search beta -> stable once it has a BenchmarkSpec\nReason deferred: It is the only beta whose sole integrity-dimension gap is a missing result-integrity spec; adding one (plus a DataFrame routing decision) is the concrete blocker recorded in docs/benchmarks/support-status.md.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:48Z",
+      "worktree": "main"
+    }
+  }
+}

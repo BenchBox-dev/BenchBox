@@ -1,0 +1,310 @@
+{
+  "context": "Measure parity, do not assume it. Reuse the w1 harness as the acceptance\ntest for every stack and for the full end-to-end run, comparing Docker and\nMocker on identical compose files. Gate default adoption on the down -v\nfix (or an explicit teardown wrap), because the failure mode is silent\nstale-data corruption of benchmark results, not a visible error. Engine\nselection is an opt-in Make variable so the migration is reversible and\nCI is unaffected.\n",
+  "description": "Goal: let `make test-docker-*` run on Apple `container` via Mocker (a\nDocker-compatible CLI over Apple's Containerization framework) instead of\nDocker Desktop, removing Docker Desktop's always-on VM -- the dominant\nsource of the \"Docker Desktop overhead\" this effort started from. Apple\n`container` itself has NO Docker Compose support; Mocker is the wrapper\nthat adds it.\n\nBenchBox's integration layer is Compose-native. The generic targets call\n(Makefile:436 / Makefile:480 / Makefile:489-540):\n  docker compose -p <project> -f docker/<platform>/docker-compose.yml up -d --wait\n  docker compose -p <project> -f docker/<platform>/docker-compose.yml down -v\nacross DOCKER_PLATFORMS (Makefile:433): clickhouse trino presto postgresql\nstarrocks doris databend influxdb cedardb firebolt questdb singlestore.\nAny backend must honor `-p`, `-f`, `up -d --wait` (healthcheck gating),\nhost->container port publishing, and `down -v` (named-volume removal).\n\nSpike evidence (2026-06-30, host macOS 26.5 / arm64; container CLI 1.0.0;\nMocker 0.5.4 from us/tap) against UNMODIFIED docker/questdb (1 svc) and\ndocker/postgresql (2 svc, named volume):\n  PASS  `-p` project naming                     (container bbspike-questdb-questdb-1)\n  PASS  `up -d --wait` health gating            (-w/--wait + --wait-timeout real flags; up returned only once serving)\n  PASS  host->container reachability            (localhost:19000/exec -> result; psycopg localhost:5432 -> PG 18.4, RW=42)\n  PASS  `down` teardown                         (stopped+removed, ports closed)\n  PASS  `restart: unless-stopped` parse\n  FAIL  `down -v` named-volume removal          (-v documented but bbspike-pg-postgresql18-data SURVIVED; needed manual `mocker volume rm`)\n\nThe single blocker is the `down -v` volume leak: `make test-docker-down-*`\nrelies on `-v` for fresh state, so a leaked named volume means STALE DATA\ncarries across runs (e.g. a reused Postgres data dir) -- a correctness\nrisk for benchmarks, not a cosmetic one. Networking -- the feature every\nCompose wrapper is reported to struggle with -- worked. Until `down -v`\nis fixed or teardown is wrapped, Mocker is NOT safe as the default\ntest-docker-* backend.\n\nFINDINGS (2026-07-03, mocker 0.5.4 / container 1.0.0 / macOS 26.5 arm64):\n- w0: `down -v` still LEAKS the named volume (bbpg-postgresql18-data survived);\n  no upstream fix -> w4 = option (b) teardown-wrap.\n- w1: _project/scripts/mocker_compose_parity.sh drives the real make targets and\n  asserts health-gated up, published-port reachability, no container/volume after\n  teardown; exposed via `make test-docker-parity`.\n- Parity MEASURED: PASS on BOTH docker and mocker for questdb + postgresql,\n  including \"no named volume after teardown\" for postgres on mocker (the\n  compose_down_fresh wrap prunes the leaked volume).\n- w3: `CONTAINER_ENGINE=mocker make test-docker-questdb` -> 3 live_questdb tests\n  (parquet load + query via connector) PASS; clean teardown.\n- w2: databend multi-service -> mocker honors depends_on ordering (up --wait 4/4)\n  BUT the stack does not stay healthy (minio exits, databend :8000 empty reply);\n  the SAME stack on docker stays healthy and serves 200. So 3+ service stacks are\n  NOT reliable on mocker -> keep docker default; mocker opt-in for single-service.\n- w5: CONTAINER_ENGINE var (default docker) + COMPOSE seam; docker/*/*.yml\n  unchanged; default NOT flipped. w6: AGENTS.md documents the CI boundary.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "edit docker/*/docker-compose.yml to suit Mocker",
+        "instead": "fix wiring in the Makefile.",
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "why": "they must stay portable Compose specs for Docker + CI"
+      },
+      {
+        "dont": "flip the test-docker-* default to Mocker before w3 passes and w4 resolves",
+        "instead": "keep docker the default until proven.",
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "why": "a leaked volume silently reuses stale benchmark data"
+      },
+      {
+        "dont": "globally alias `docker`->`mocker`",
+        "instead": "gate it behind an explicit CONTAINER_ENGINE Make variable instead.",
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "why": "CI and other tooling expect real docker"
+      },
+      {
+        "dont": "run Mocker in CI",
+        "instead": "restrict it to the local dev loop and assert that in docs.",
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "why": "it is Apple-silicon/macOS-only"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "migrate-test-docker-stacks-to-mocker",
+        "id": 336,
+        "reason": "User scope is explicitly Apple container + Mocker. colima/OrbStack are mature drop-in `docker compose` backends that would also remove Docker Desktop with zero Makefile change, and are the recommended FALLBACK if w4 resolves (c). Recorded here so the rejected-for-now alternative is not re-litigated.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Recorded only to avoid relitigating a rejected-for-now fallback (colima/OrbStack); not itself actionable work.",
+        "summary": "colima or OrbStack as the lighter Compose engine instead of Mocker"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "migrate-test-docker-stacks-to-mocker",
+        "id": 337,
+        "reason": "Confirm `up --wait` actually fails/times out on an unhealthy service rather than hanging or false-passing. Nice-to-have hardening, not on the adoption critical path.\n",
+        "resolution": "promoted",
+        "resolved_item": "negative-wait-test-a-healthcheck-that-never-passes",
+        "resolved_reason": null,
+        "summary": "Negative --wait test (a healthcheck that never passes)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "needs_item": "adopt-apple-container-ci-parity"
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Experience",
+      "completed_at": "2026-07-03T00:00:00Z",
+      "created_at": "2026-06-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "CI (.github/workflows/) continues to use docker on ubuntu; Mocker never enters CI.",
+        "item_id": "migrate-test-docker-stacks-to-mocker"
+      },
+      {
+        "behavior": "Default `make test-docker-*` behavior on Docker is unchanged until the decision gate (w4) explicitly flips the default.",
+        "item_id": "migrate-test-docker-stacks-to-mocker"
+      },
+      {
+        "behavior": "Fresh-state guarantee: after teardown, no named volume from the stack survives (the property the down -v bug breaks).",
+        "item_id": "migrate-test-docker-stacks-to-mocker"
+      },
+      {
+        "behavior": "docker/*/docker-compose.yml remain standard Compose files usable by Docker and CI.",
+        "item_id": "migrate-test-docker-stacks-to-mocker"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Makefile:433 DOCKER_PLATFORMS — reuse: the engine swap must cover this exact platform list.",
+        "decision": "reuse",
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "path": "Makefile:433"
+      },
+      {
+        "concept": "Makefile:436 test-docker-up-% / Makefile:480 test-docker-% — extend: parameterize the `docker compose` driver via CONTAINER_ENGINE rather than forking the targets.",
+        "decision": "extend",
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "path": "Makefile:436"
+      },
+      {
+        "concept": "adopt-apple-container-ci-parity — extend: builds on the Apple container runtime that TODO stands up (Mocker delegates to `container`).",
+        "decision": "extend",
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "path": "adopt-apple-container-ci-parity"
+      },
+      {
+        "concept": "docker/<platform>/docker-compose.yml — reuse UNCHANGED: backend must consume the existing Compose specs; do not author Mocker-specific files.",
+        "decision": "reuse",
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "path": "docker/<platform>/docker-compose.yml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "kind": "do_not_modify",
+        "path_glob": "docker/"
+      },
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/mocker_compose_parity.sh"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "mocker compose -p bbtest -f docker/postgresql/docker-compose.yml up -d --wait && mocker compose -p bbtest -f docker/postgresql/docker-compose.yml down -v && mocker volume ls",
+        "description": "down -v leaves no named volume (the gating property)",
+        "expected": "no bbtest-* volume listed after down -v",
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "mocker compose -p bbtest -f docker/starrocks/docker-compose.yml up -d --wait",
+        "description": "Multi-service stack comes up healthy with dependency ordering",
+        "expected": "all services started; --wait returns 0 only when healthy",
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "CONTAINER_ENGINE=mocker make test-docker-questdb",
+        "description": "Full end-to-end benchmark run against a Mocker-hosted stack",
+        "expected": "data loads and queries run; target passes",
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-docker-postgresql  # no CONTAINER_ENGINE set",
+        "description": "Default engine unchanged",
+        "expected": "uses docker; behavior identical to today",
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "notes": "Evidence-durability gate per _project/verification-logs/README.md.\nThe description pins Mocker 0.5.4 / container 1.0.0 and a specific\n`down -v` bug. Before w1, re-run the minimal repro:\n  - `mocker --version`, `container --version` (record actuals).\n  - questdb up -d --wait; assert localhost:9003 -> HTTP 200.\n  - postgresql up -d --wait; `down -v`; then `mocker volume ls` and\n    assert whether the named volume is GONE (bug fixed) or PRESENT\n    (bug persists).\nCapture raw stdout to `/tmp/migrate-test-docker-stacks-to-mocker-w0.log`\nor a CI artifact; commit only a compact summary (versions, PASS/FAIL\nper check). If `down -v` now removes the volume, w4's gate flips open.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate spike findings against current Mocker/container versions",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "notes": "Add `_project/scripts/mocker_compose_parity.sh` with scripted\nassertions over the exact Makefile invocation: up -d --wait returns\nonly when healthy, published port serves a real query, down -v leaves\nNO container and NO named volume. Same script runs against Docker and\nMocker (engine as an arg) so parity is measured, not assumed. This\nbecomes the acceptance test reused for every stack in w2/w3.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build a Compose-lifecycle parity harness for questdb + postgresql",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "notes": "depends_on ordering + --wait gating + inter-service networking on the\nheavier stacks -- the spike only covered 1- and 2-service stacks.\nIP-consistency / container-to-container networking is the documented\nweak spot of the wrapper ecosystem; prove it or record the failure.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate multi-service stacks (doris=3, starrocks=3, databend=4)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "notes": "Not just compose lifecycle -- an actual `make test-docker-questdb`\n(or -postgresql) that loads benchmark data and runs queries through\nthe BenchBox connector against the Mocker-hosted stack, and passes.\nThis is the real acceptance bar.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run a full end-to-end make test-docker-<platform> on Mocker",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "notes": "Hard gate. Resolve one of:\n  (a) a Mocker release removes the named volume on `down -v` (w0\n      confirms) -> proceed to default-eligible; OR\n  (b) wrap teardown in the Makefile with an explicit volume prune\n      after `down -v` (e.g. `mocker volume rm`/`prune` scoped to the\n      project) so fresh state is guaranteed regardless; OR\n  (c) neither acceptable at parity -> do NOT adopt Mocker as default;\n      fall back (see deferred: colima/OrbStack) and close this TODO\n      as \"evaluated, not adopted\" with the finding recorded.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "DECISION GATE: down -v volume removal fixed, or teardown wrapped?",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "notes": "Introduce a CONTAINER_ENGINE (or COMPOSE_ENGINE) Make variable\ndefaulting to `docker`; `=mocker` swaps the compose driver. Do NOT\nglobally alias docker->mocker and do NOT change the default until w3\npasses and w4 resolves (a) or (b). Keep docker/*/docker-compose.yml\nfiles unchanged (they must stay portable Compose specs).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire opt-in engine selection into test-docker-* (default stays docker)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-test-docker-stacks-to-mocker",
+        "notes": "State explicitly: Mocker is Apple-silicon/macOS-26 LOCAL-DEV only and\nMUST NOT run in CI (CI is ubuntu + real docker). Terse, house style.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document Mocker-as-local-engine + the CI boundary in AGENTS.md",
+        "wid": "w6"
+      }
+    ]
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "context": "Derive the IDs at test time instead of hardcoding. The generated read model at results-explorer/test-fixtures/.generated/data/results.duckdb already contains result_id per platform; have the e2e support layer read it (or have generate-browser-fixtures.mjs emit a small ids.json alongside the data) and export SHORT_DUCKDB/SHORT_DATAFUSION/DETAIL_ID from that. Then no anonymization or fixture change can silently redden the suite. Separately decide whether the Chromium job should actually gate, since its 'blocking' label currently does not match the ruleset.",
+  "description": "The Chromium full suite (labelled blocking) fails on every PR that runs it. Failure: 'Data-bound wait failed after 3 attempts ... on /results/compare?ids=ba6a8c83,5e6c5eba' with the log explicitly stating 'this is NOT the cold-snapshot zero-row race'. Cause: results-explorer/e2e specs hardcode fixture-derived result IDs - SHORT_DUCKDB=ba6a8c83, SHORT_DATAFUSION=5e6c5eba, DETAIL_ID=tpch-duckdb-sf0.01-20260403-010ee756 - in responsive.spec.ts, failures/compare-hard-block.spec.ts and three captures/*.spec.ts. Those IDs are content-addressed: result_id ends in a sha8 of the published bundle bytes, and short_id is a sha256 prefix of result_id, so ANY change to fixture content or to anonymization output changes them. PRE-EXISTING, not caused by this session's work. Ran the generator directly: specs expect tpch-duckdb-sf0.01-20260403-010ee756; the generator produces ...-f16f0f62 with the PRE-#1512 anonymizer and ...-a995a57d with the current one. The hardcoded value matches NEITHER, so it was already stale before #1512; #1512 shifted it again. Note the 'blocking' label is misleading - develop's ruleset requires only ci-required-result, so this job cannot actually block a merge (#1538 auto-merged with it red).",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "created_at": "2026-08-04T17:15:06Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The generator must keep never touching results-data/ or public/data/",
+        "item_id": "e2e-specs-hardcode-fixture-result-ids"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "e2e-specs-hardcode-fixture-result-ids",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/browser-ci.md"
+      },
+      {
+        "item_id": "e2e-specs-hardcode-fixture-result-ids",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "e2e-specs-hardcode-fixture-result-ids",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -rqE '\"(ba6a8c83|5e6c5eba)\"|010ee756' results-explorer/e2e/",
+        "description": "no hardcoded fixture result id remains in the e2e specs",
+        "expected": "Exits 0 once the constants are derived rather than literal",
+        "item_id": "e2e-specs-hardcode-fixture-result-ids",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "e2e-specs-hardcode-fixture-result-ids",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1545, commit 5188979bfd. generate-browser-fixtures.mjs now emits fixture-ids.json beside the read model; e2e/support/fixtures.ts exposes it as fixtureIds; all 11 specs import from there. Zero literals remain (grep for ba6a8c83/5e6c5eba/010ee756 over e2e/**/*.spec.ts is empty). Canonical-bundle selection required care: tuned and community variants share the derived bundle's filename prefix so a prefix match finds three candidates; every variant suffixes run.id, so the generator selects the one whose run id still matches a verbatim source bundle and throws rather than guessing if ambiguous. Verified: fixture verifier determinism check passes (emitted file byte-identical across regenerations), path resolution confirmed from the support module location, ESM import.meta.url form matches five existing capture specs. Playwright could not be run locally - node_modules is absent in this worktree - so CI is first execution.",
+        "item_id": "e2e-specs-hardcode-fixture-result-ids",
+        "notes": null,
+        "started_at": "2026-08-04T17:27:01Z",
+        "started_branch": "fix/e2e-derive-fixture-ids",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Emit or read fixture IDs at test time and drop the hardcoded constants",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "e2e-specs-hardcode-fixture-result-ids",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide whether the Chromium job should gate merges given the ruleset",
+        "wid": "w1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,174 @@
+{
+  "context": "Propagate `_plan_capture_key` through _power_query_result and the throughput\nconverters (it already exists on the inline-recorded dict), so multi-variant rows\nattach by exact key instead of falling through the lossy public-id path. Where a row\nmust be keyed for serialization, use the capture key (or (query_id, stream_id)) so\nper-stream provenance survives build_plans_payload. Reconcile the console summary to\nthe same row-derived count used for the bundle (compute_plan_capture_stats).\n",
+  "description": "In any TPC throughput run with >= 2 streams (and in combined mode), every query\nis captured (EXPLAINed, cost paid, counted) but ZERO plans are attached to result\nrows.\n\nRoot cause: the inline chokepoint sets `_plan_capture_key` on the recorded dict,\nbut the TPC row converters rebuild rows WITHOUT it:\n  - benchbox/core/tpch/platform_power.py:25  (_power_query_result)\n  - benchbox/platforms/base/execution.py:315-325, 409-419  (throughput converters)\nAttachment then falls back to the public query_id, and `_attach_captured_plans`\n(benchbox/platforms/base/execution.py:1311-1314) maps an id to None whenever it has\n>= 2 captured variants. Throughput streams are seed-varied by spec\n(`stream_seed = seed + stream_id*1000 + position`, benchbox/core/tpch/throughput_test.py:221),\nso every query is multi-variant with >= 2 streams -> all dropped. In combined mode\nthis also strips the power-phase plan for any id that later runs in throughput.\n\nThis is currently documented as a limitation (docs/features/query-plan-analysis.md:157)\nand asserted-as-intended in a test (tests/integration/test_plan_capture_combined_divergence.py:213),\nbut seed variation is the NORMAL multi-stream configuration, not an edge case, and\nthe sibling test `test_standard_path_exact_key_attaches_each_variant` proves the\nconverters COULD carry the key and get per-variant fidelity.\n\nSecondary reporting defect: the console summary (benchbox/platforms/base/result_capture.py:1744)\nprints `self.query_plans_captured` (the per-variant counter) e.g. \"Query plans: 88/88\ncaptured\", while the bundle's row-derived count (compute_plan_capture_stats,\nbenchbox/core/results/schema.py:940) is 0 and build_plans_payload writes no\n.plans.json. The console claims success the artifact contradicts.\n\nRelated serialization defect: build_plans_payload (benchbox/core/results/schema.py:1028,1050)\nkeys plans_by_query by public query_id, so even when attachment succeeds, multiple\nstream rows for one id collapse to a single last-writer-wins entry - contradicting\ncapture_query_plan's \"one plan per (query_id, stream_id)\" docstring.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "relax the public-id fallback to 'attach any variant'",
+        "instead": "carry the exact key instead.",
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "why": "it pairs a row with another stream's plan"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "fix-multistream-throughput-plan-attachment",
+        "id": 315,
+        "reason": "Staged locally (uncommitted); fold in as a w1 guard when implementing.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Spot-checked: scratchpad/review-failing-tests/test_plan_attach_multivariant_review.py no longer exists in the repo — already resolved or discarded.",
+        "summary": "Reproducing failing test captured under scratchpad/review-failing-tests/test_plan_attach_multivariant_review.py"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "needs_item": "fix-plan-consumption-phases-and-loader-reattach"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-05T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Per-variant fidelity for rows that already carry an exact _plan_capture_key (test_standard_path_exact_key_attaches_each_variant must stay green).",
+        "item_id": "fix-multistream-throughput-plan-attachment"
+      },
+      {
+        "behavior": "The isolated post-measurement capture contract: no EXPLAIN in the timed loop or a concurrent stream; writes never re-executed.",
+        "item_id": "fix-multistream-throughput-plan-attachment"
+      },
+      {
+        "behavior": "query_plans_captured and the bundle plans_captured must agree after the fix.",
+        "item_id": "fix-multistream-throughput-plan-attachment"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/platform_power.py"
+      },
+      {
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "kind": "only_modify",
+        "path_glob": "docs/features/query-plan-analysis.md"
+      },
+      {
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_plan_capture_combined_divergence.py"
+      },
+      {
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ tests/integration/ -k 'throughput and plan' -n 0 -q",
+        "description": "A 2-stream throughput run attaches a plan to every successful row",
+        "expected": "passed",
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_plan_capture_combined_divergence.py -n 0 -q",
+        "description": "Existing exact-key and combined-divergence tests stay green",
+        "expected": "passed",
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Carry _plan_capture_key through _power_query_result and the TPC-H/TPC-DS throughput converters",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Key build_plans_payload entries so per-stream/per-variant provenance survives (not last-writer-wins on query_id)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reconcile the console 'Query plans: N/M' summary with the row-derived bundle count",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-multistream-throughput-plan-attachment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update the divergence test (line 213) and docs so multi-stream rows attach; keep the truly-ambiguous (no-key) case as the only unattached path",
+        "wid": "w4"
+      }
+    ]
+  }
+}

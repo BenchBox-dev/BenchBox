@@ -1,0 +1,239 @@
+{
+  "context": "w0 re-reads living docs and the live ruleset. w1 updates the stale ci-required-result aggregation list. w2 is a decision gate with exactly one outcome: AMEND_GOVERNANCE (docs/decision records match live ALLGREEN and 60-minute timeout) or REVERT_LIVE (operator restores ONLY_NON_FAILING and 45 minutes; this item only records the request, it does not change the ruleset). w3 applies only the docs side of the chosen outcome and notes that ruleset_drift_check does not inspect merge_queue parameters.",
+  "description": "First item in the CI-waste (Dan Luu) sequence. Make the operator-facing docs match the jobs and merge-queue parameters that actually gate develop, then choose exactly one outcome for the live-vs-recorded queue-parameter mismatch.\n\nAlso record, in the same docs change, that required-ci-coverage-deepest-reproducers remains in force: slow-marked reproducers stay in required PR CI until a later item explicitly supersedes that decision with a real post-merge slow lane (pytest -m slow plus signature plus EXPECTED_SIGNATURE_JOBS). Sending slow tests to post-merge today executes nothing.\n\nThis item does not skip required checks, does not edit pr.yml job membership, and does not mutate GitHub ruleset settings.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add merge_queue inspection to ruleset_drift_check in this item",
+        "instead": "defer a drift-check extension unless a later item authorizes it",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "why": "out of scope; only note the gap"
+      },
+      {
+        "dont": "invent a new ledger page",
+        "instead": "edit that living doc",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "why": "repo-admin-settings already owns the aggregation list and fan-out narrative"
+      },
+      {
+        "dont": "send slow-marked reproducers to post-merge as if that were a CI destination",
+        "instead": "keep them in required PR CI until a separately authorized slow lane exists",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "why": "post-merge runs make ci-test (fast) and make test-medium (medium not slow); EXPECTED_SIGNATURE_JOBS has no slow job; make test-slow has no workflow"
+      },
+      {
+        "dont": "treat live ALLGREEN/60 vs recorded ONLY_NON_FAILING/45 as a footnote",
+        "instead": "choose AMEND_GOVERNANCE or REVERT_LIVE in w2",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "why": "that mismatch is a completed-decision violation and ALLGREEN re-runs a whole group on one failure"
+      }
+    ],
+    "item_meta": {
+      "category": "CI",
+      "completed_at": "2026-08-31T15:59:36Z",
+      "completed_pr": 1976,
+      "created_at": "2026-08-27T23:11:32Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Fast-lane count regime remains; do not replace it with a wall-clock fail",
+        "item_id": "ci-waste-ledger-and-queue-reconcile"
+      },
+      {
+        "behavior": "GitHub ruleset 15611785 is not mutated by this item",
+        "item_id": "ci-waste-ledger-and-queue-reconcile"
+      },
+      {
+        "behavior": "No required PR job is skipped, demoted, or removed",
+        "item_id": "ci-waste-ledger-and-queue-reconcile"
+      },
+      {
+        "behavior": "Required develop contexts remain ci-required-result, Results Explorer browser gate, and ruleset-drift",
+        "item_id": "ci-waste-ledger-and-queue-reconcile"
+      },
+      {
+        "behavior": "required-ci-coverage-deepest-reproducers remains in force",
+        "item_id": "ci-waste-ledger-and-queue-reconcile"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "recorded merge-queue parameter bounds",
+        "decision": "extend",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "path": "_project/decisions/native-merge-queue-activation-20260822.md"
+      },
+      {
+        "concept": "operator-facing queue parameters",
+        "decision": "extend",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "path": "docs/operations/merge-queue-governance.md"
+      },
+      {
+        "concept": "ci-required-result aggregation list and synchronize fan-out",
+        "decision": "extend",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "path": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "concept": "required-check drift, not merge_queue keys",
+        "decision": "reuse",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "path": "scripts/ruleset_drift_check.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "kind": "do_not_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/path_filter_decision.py"
+      },
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/ruleset_drift_check.py"
+      },
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/"
+      },
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/native-merge-queue-activation-20260822.md"
+      },
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/merge-queue-governance.md"
+      },
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "python3 -c \"import pathlib,re; text=pathlib.Path('docs/operations/repo-admin-settings.md').read_text(); yml=pathlib.Path('.github/workflows/pr.yml').read_text(); m=re.search(r'ci-required-result:[\\s\\S]*?needs: \\[([^\\\\]]+)\\\\]', yml); jobs=[j.strip() for j in m.group(1).split(',')]; missing=[j for j in jobs if j not in text]; print('missing', missing); raise SystemExit(1 if missing else 0)\"",
+        "description": "repo-admin-settings names every job in ci-required-result.needs",
+        "expected": "exit 0, missing []",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "last_result": "pass",
+        "last_run": "2026-08-31T15:59:30Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'AMEND_GOVERNANCE|REVERT_LIVE' _project/decisions/ docs/operations/merge-queue-governance.md docs/operations/repo-admin-settings.md",
+        "description": "w2 decision record exists and names exactly one of AMEND_GOVERNANCE or REVERT_LIVE",
+        "expected": "exactly one outcome named as selected",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "last_result": "pass",
+        "last_run": "2026-08-31T15:59:31Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --name-only origin/develop -- .github/workflows/pr.yml",
+        "description": "pr.yml required-job membership is unchanged by this item",
+        "expected": "empty",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "last_result": "pass",
+        "last_run": "2026-08-31T15:59:31Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "origin/develop=88c22f03; gh api rulesets/15611785: active required contexts + ALLGREEN/60/max-build5/max-merge5; current docs and pr.yml inspected",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "notes": null,
+        "started_at": "2026-08-31T14:43:07Z",
+        "started_branch": "docs/ci-waste-ledger-queue-reconcile",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-ledger-queue-reconcile",
+        "status": "done",
+        "summary": "Re-read pr.yml ci-required-result needs, repo-admin-settings, merge-queue docs, activation bounds, and live ruleset 15611785; diff against this item",
+        "wid": "w0"
+      },
+      {
+        "evidence": "docs/operations/repo-admin-settings.md now mirrors all 16 ci-required-result needs",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "notes": null,
+        "started_at": "2026-08-31T14:44:27Z",
+        "started_branch": "docs/ci-waste-ledger-queue-reconcile",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-ledger-queue-reconcile",
+        "status": "done",
+        "summary": "Update repo-admin-settings so the ci-required-result list matches the jobs pr.yml actually aggregates, including jobs omitted today",
+        "wid": "w1"
+      },
+      {
+        "evidence": "_project/decisions/native-merge-queue-activation-20260822.md selects AMEND_GOVERNANCE from live ruleset and PR #1814 evidence",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "notes": null,
+        "started_at": "2026-08-31T14:44:30Z",
+        "started_branch": "docs/ci-waste-ledger-queue-reconcile",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-ledger-queue-reconcile",
+        "status": "done",
+        "summary": "DECISION GATE: choose exactly one of AMEND_GOVERNANCE or REVERT_LIVE for live merge-queue ALLGREEN/60 vs recorded ONLY_NON_FAILING/45; write the decision record",
+        "wid": "w2"
+      },
+      {
+        "evidence": "three in-scope docs updated; focused exact-needs, decision uniqueness, protected-path, and diff checks pass",
+        "item_id": "ci-waste-ledger-and-queue-reconcile",
+        "notes": null,
+        "started_at": "2026-08-31T14:47:37Z",
+        "started_branch": "docs/ci-waste-ledger-queue-reconcile",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-ledger-queue-reconcile",
+        "status": "done",
+        "summary": "Apply the docs/decision-record edits required by w2; if REVERT_LIVE, record the operator request and stop without mutating the ruleset; note ruleset_drift_check does not cover merge_queue keys",
+        "wid": "w3"
+      }
+    ]
+  }
+}

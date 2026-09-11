@@ -1,0 +1,309 @@
+{
+  "context": "Extend registry metadata to carry support status and diagnostics while\npreserving lazy optional imports. Generate public count claims from registry\nmetadata and give contributors a measured path for adding platforms.\n",
+  "description": "BenchBox's platform breadth is a strength, but the boundary between supported,\navailable, optional, experimental, repo-only, deprecated, and document-only is\nblurry. Optional adapter import failures are intentionally swallowed to keep\nbase imports cheap, but missing dependencies and broken adapter imports are\nhard to distinguish. Adding a new platform also touches many files and checks,\nbut that extension cost is not measured.\n\nThis item migrates the contract taxonomy into registry metadata, adds\ndiagnostics for optional imports, generates count tables from source of truth,\nand creates a new-platform acceptance checklist/scaffold.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hand-edit README platform counts after this work",
+        "instead": "update the source metadata instead.",
+        "item_id": "platform-support-status-and-extension-health",
+        "why": "generated or tested counts are the point"
+      },
+      {
+        "dont": "make _try_register_adapter loud by default",
+        "instead": "add diagnostics that can be requested.",
+        "item_id": "platform-support-status-and-extension-health",
+        "why": "optional dependency isolation is intentional"
+      },
+      {
+        "dont": "treat an unavailable optional dependency as a broken adapter",
+        "instead": "(not specified)",
+        "item_id": "platform-support-status-and-extension-health",
+        "why": "diagnostics must distinguish these causes."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "platform-support-status-and-extension-health",
+        "id": 444,
+        "reason": "Deletion should be separate unless the file is unambiguously dead and within scope.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Bulk 'delete every orphan file' needs per-file judgment per its own reason; the one concrete known case (cuDF) is already tracked separately.",
+        "summary": "Delete every orphan platform file found by inventory"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "platform-support-status-and-extension-health",
+        "id": 445,
+        "reason": "Support status and diagnostics come first; full test-derived capability metadata is a larger design.",
+        "resolution": "promoted",
+        "resolved_item": "make-platform-capabilities-entirely-test-derived",
+        "resolved_reason": null,
+        "summary": "Make platform capabilities entirely test-derived"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Architecture",
+      "completed_at": "2026-05-21T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not conflate support_status with local dependency availability.",
+        "item_id": "platform-support-status-and-extension-health"
+      },
+      {
+        "behavior": "Do not make optional platform dependencies required for base import or docs generation.",
+        "item_id": "platform-support-status-and-extension-health"
+      },
+      {
+        "behavior": "Do not remove platform files in the same change unless they are explicitly classified and scoped.",
+        "item_id": "platform-support-status-and-extension-health"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/platform_registry.py: existing metadata source -- extend rather than creating a second platform catalogue.",
+        "decision": "extend",
+        "item_id": "platform-support-status-and-extension-health",
+        "path": "benchbox/core/platform_registry.py"
+      },
+      {
+        "concept": "benchbox/platforms/__init__.py: existing lazy optional adapter wiring -- preserve base import behavior.",
+        "decision": "reuse",
+        "item_id": "platform-support-status-and-extension-health",
+        "path": "benchbox/platforms/__init__.py"
+      },
+      {
+        "concept": "docs/development/adding-new-platforms.md and adding-dataframe-platform.md: existing authoring guides -- turn into checklist/scaffold inputs.",
+        "decision": "reuse",
+        "item_id": "platform-support-status-and-extension-health",
+        "path": "docs/development/adding-new-platforms.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/rules/"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/platform_scaffold.py"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "only_modify",
+        "path_glob": "docs/development/"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_platform_registry.py"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_platform_registry_behavioral.py"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k 'platform_registry or optional import or support_status' --tb=short",
+        "description": "Run focused platform registry and optional import tests.",
+        "expected": "Registry metadata and diagnostic tests pass.",
+        "item_id": "platform-support-status-and-extension-health",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make docs-check",
+        "description": "Run generated docs/check target for platform matrices.",
+        "expected": "Docs drift checks pass or report only unrelated pre-existing issues.",
+        "item_id": "platform-support-status-and-extension-health",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'import benchbox; print(\"ok\")'",
+        "description": "Verify base import remains cheap and optional.",
+        "expected": "ok",
+        "item_id": "platform-support-status-and-extension-health",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "platform-support-status-and-extension-health",
+        "needs_wid": "w1",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "platform-support-status-and-extension-health",
+        "notes": "Completed 2026-05-21 at checked SHA ed9db3c8dbc03a01987ed97db714aee3049c71ed.\n\nRevalidation summary:\n  - `PlatformRegistry.get_all_platform_metadata()` exposed 50 metadata\n    entries: 45 SQL-capable, 19 DataFrame-capable, 14 dual-mode, and\n    5 DataFrame-only.\n  - `README.md` no longer had stale platform counts, while\n    `docs/platforms/comparison-matrix.md` still claimed 41 platforms\n    and 30 SQL + 11 DataFrame.\n  - `_try_register_adapter()` and `benchbox/platforms/__init__.py`\n    intentionally swallowed optional import failures but did not expose a\n    diagnostic split between missing SDKs, native load failures, broken\n    adapter imports, or deprecated selectors.\n  - Recent platform additions showed a minimum durable extension cost of\n    4 files for small follow-ups and 7-12 files for normal SQL/DataFrame\n    additions once registry metadata, docs, dependencies, tests, and\n    compatibility/UAT scope are included.\n  - File inventory found `benchbox/platforms/cudf.py` as a legacy\n    top-level module importing `benchbox.experimental.gpu`; removal was\n    deferred to a follow-up TODO.\n\nCommit a compact summary of checked SHA, registry platform counts,\nSQL/DataFrame capability counts, docs counts, optional import behavior,\nand files touched by recent platform additions.\n\nMinimum evidence to re-check:\n  - benchbox/core/platform_registry.py metadata and _try_register_adapter.\n  - benchbox/platforms/__init__.py optional adapter wiring.\n  - README.md platform counts.\n  - docs/platforms/comparison-matrix.md counts.\n  - docs/development/adding-new-platforms.md.\n  - docs/development/adding-dataframe-platform.md.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate registry counts, docs counts, optional import behavior, and platform-add docs",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-support-status-and-extension-health",
+        "notes": "Use the taxonomy from architecture-contract-map-and-support-taxonomy:\nstable, beta, experimental, repo_only, deprecated, document_only. Add\nvalidation so every registry platform has exactly one support_status and\ndocs can render it.\n\nDo not confuse dependency availability with support status. A stable\nplatform can be unavailable locally because an optional dependency is not\ninstalled.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add support_status to platform metadata using the accepted taxonomy",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-support-status-and-extension-health",
+        "notes": "Keep normal imports lazy and quiet for missing optional dependencies, but\nadd a diagnostic mode or command that reports:\n  - missing optional dependency,\n  - native library/load failure,\n  - broken adapter import bug,\n  - intentionally disabled/deprecated platform.\n\nDo not make base benchbox import fail because an optional platform is\nbroken.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add diagnostic mode for optional adapter import failures",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-support-status-and-extension-health",
+        "notes": "Replace hand-maintained platform count claims where feasible. Generated\ntables should include support_status, SQL/DataFrame capability, dependency\ngroup, and whether the platform is exposed in CLI/MCP/docs.\n\nAdd a docs drift check so README and comparison matrix counts cannot\ndisagree with platform registry metadata silently. Benchmark count and\nbenchmark support-status ownership stays with the benchmark API follow-up\nbecause benchmark metadata lives in `benchbox/core/benchmark_registry.py`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Generate platform count and support-status tables from registry metadata",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-support-status-and-extension-health",
+        "notes": "The checklist must cover SQL and DataFrame platforms separately:\n  - adapter/family/context files,\n  - registry metadata and support_status,\n  - optional dependency extras,\n  - SQL compatibility rules or explicit exemptions,\n  - docs and generated platform matrix updates,\n  - fast/unit/platform smoke tests,\n  - UAT/live scope where relevant,\n  - deprecation/retirement expectations.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create a new-platform acceptance checklist covering files, tests, docs, compat, and UAT",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-support-status-and-extension-health",
+        "notes": "Add either a small scaffold script or documented template set. Track\n\"files touched to add one platform\" as an architecture health metric and\ninclude a before/after number based on a recent platform addition.\n\nThe scaffold should be optional helper tooling, not a new framework that\nplatform authors must fight.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a platform scaffold or template and measure extension cost",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-support-status-and-extension-health",
+        "notes": "Identify orphan platform files, especially dead paths that import\nexperimental modules. Classify each as supported, deprecated,\nexperimental, repo-only, or removal candidate. Create follow-up TODOs for\nremoval if deletion is outside this item's scope.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory orphan/deprecated platform files and classify them",
+        "wid": "w6"
+      }
+    ]
+  }
+}

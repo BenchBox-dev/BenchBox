@@ -1,0 +1,658 @@
+{
+  "context": "Sequence is deliberate and dependency-aware:\n- w1-w3 (Critical) ship first, individually. Each is a contract bug\n  that breaks production and needs no shared infrastructure.\n- w4-w5 (shared-helper foundation) ship next. They are the leverage\n  that makes w8/w11 mechanical instead of bespoke per-adapter.\n- w6 (P11 visibility cluster) and w7 (N1 throughput inflation) are\n  independent of the foundation work — can ship in parallel with w4/w5.\n- w8/w9/w10 (modularity-drift extractions) ship after w4/w5.\n- w11/w22/w23/w12 (per-adapter regex fixes) ship after w5 in bounded\n  adapter-family slices.\n- w13/w14 are independent one-liners.\n- w15 (ABC test) ships after w3 and gates future regressions.\n- w16/w17/w24/w25/w18/w19/w26/w20 are cleanup; ship last.\n\nReference the canonical fixes already in the repo:\n- benchbox/platforms/_spark_helpers.py for balanced-paren walker,\n  SparkLikeAdapterMixin, \"Import discipline\" docstring block\n- benchbox/platforms/{spark,lakesail,velox}.py for the lambda-capture\n  pattern (w10-style), the on_pre_loop hook wiring, the\n  --platform-option error message rewrite (P3 canonical fix)\n- docker/velox/docker-compose.yml for the canonical tmpfs pattern\n  that w20 should mirror\n\nGrep before each work unit:\n  git diff 73f3a582e -- <file>     # confirm file hasn't drifted from audit baseline\n  grep -n '<exact snippet>' <file> # confirm line numbers\nAudit lines were captured at 73f3a582e; subsequent commits may shift them.\n",
+  "description": "A 13-pattern defect audit across 30 platform adapters (excluding the\nalready-fixed spark/lakesail/velox triple), shared helpers in\nbenchbox/platforms/base/, cloud_shared.py, presto_trino_utils.py,\nquestdb_rewriter.py, datafusion_*.py rewriters, benchbox/sql_compat/,\nand all docker/*/ surfaced 33 actionable findings: 3 Critical, 22 Required,\nand 8 Nit/Consider. Those findings span the original 13-pattern catalogue\nplus 4 newly-named patterns (P14 stale-flag-coexistence,\nP15 reference-before-assignment, N1 COUNT(*) throughput inflation,\nN2 ABC contract divergence).\n\nThe audit ran on commit 73f3a582e (post velox/lakesail/spark fixes for\nW8/W9/W10). The canonical fixes for patterns 1-13 already exist in\nbenchbox/platforms/_spark_helpers.py (`_strip_balanced_paren_constraints`,\nthe \"import discipline\" docstring block, the SparkLikeAdapterMixin)\nand benchbox/platforms/{spark,lakesail,velox}.py — implementers should\nport those patterns rather than reinvent.\n\nWork units are sequenced by blast radius and dependency order: Critical\ncontract bugs first, then shared-helper drift (highest leverage), then\ndestructive-op visibility, then the silent-throughput bug, then\nmodularity-drift extractions, then the long tail of P1/P2 regex bugs\nin individual adapters.\n\nAudit report and pattern catalogue are in conversation context (not\ncommitted). This TODO is intended to be self-contained enough to start\nimplementation, but every work unit must still confirm the cited snippet\nagainst the current file before editing because line numbers were captured\nat commit 73f3a582e.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "'fix' the deferred speculative items (FK column expressions, CTE column lists)",
+        "instead": "(not specified)",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "why": "they are guarded by 'speculative' for a reason. The audit explicitly downgraded them. Re-evaluate only when a real failing benchmark surfaces."
+      },
+      {
+        "dont": "batch the 3 Critical fixes into a single PR",
+        "instead": "(not specified)",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "why": "each touches different test files and orthogonal failure modes; landing them separately keeps blast radius small if one regresses"
+      },
+      {
+        "dont": "change the PG adapter from_config signatures during w9",
+        "instead": "(not specified)",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "why": "only extract the duplicated body. Caller compatibility comes first."
+      },
+      {
+        "dont": "delete questdb._strip_fk_constraints in w4 without first running questdb integration tests",
+        "instead": "(not specified)",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "why": "it carries inline-REFERENCES handling that the base helper does not yet have"
+      },
+      {
+        "dont": "promote questdb.py:476-480 pre-create DROP failures to logger.info in w6",
+        "instead": "(not specified)",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "why": "the audit specifically calls for `warning` (failed destructive intent), not info"
+      },
+      {
+        "dont": "skip w15 (ABC conformance test)",
+        "instead": "(not specified)",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "why": "without it, the next snowpark_connect-style divergence will land silently, and the C3 fix becomes wasted work the moment someone adds a new adapter"
+      },
+      {
+        "dont": "treat `_project/TODO/` or `_project/DONE/` as product-code scope during implementation",
+        "instead": "(not specified)",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "why": "TODO status moves, work-unit completion, and index regeneration are required by the workflow"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "address-cross-adapter-13-pattern-audit-findings",
+        "id": 101,
+        "reason": "Speculative — current TPC schemas don't use functional refs in column lists. Re-evaluate when a benchmark adds expressions inside REFERENCES col lists.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Speculative regex hardening explicitly deferred until a benchmark adds expression-based FK refs in column lists; no such benchmark exists yet.",
+        "summary": "P1 (Consider) — base/ddl_helpers.py:28,31 inline `[^)]*` in FK column-list regex"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "address-cross-adapter-13-pattern-audit-findings",
+        "id": 102,
+        "reason": "Speculative — bare-identifier-only CTE column lists are universal. Will be addressed when the rewriter migrates to SQLGlot AST per its own design philosophy.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly speculative; deferred to a future SQLGlot-AST migration of the rewriter that has not been scheduled.",
+        "summary": "P1 (Consider) — questdb_rewriter.py:451-454 CTE column-list `[^)]+`"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "address-cross-adapter-13-pattern-audit-findings",
+        "id": 103,
+        "reason": "Speculative — Fabric managed Spark runtime ships Iceberg JARs by default on supported runtime versions. Add probe only if a real failure surfaces.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly speculative: add fabric_spark Iceberg classpath probe only if a real failure surfaces. No failure reported.",
+        "summary": "P4 (Consider) — fabric_spark Iceberg classpath probe"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "address-cross-adapter-13-pattern-audit-findings",
+        "id": 104,
+        "reason": "Most cloud DW and embedded engines have no local docker dir; the questdb finding (w20) was the only one in the audited set.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Reason states cloud DW/embedded engines have no local docker dir; questdb was the only actual finding in the audited set — nothing left to audit.",
+        "summary": "Audit duckdb/sqlite/snowflake docker dirs for P5"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-26T00:00:00Z",
+      "created_at": "2026-04-25T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All currently-passing fast tests continue to pass: `uv run -- python -m pytest -m fast -q`",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings"
+      },
+      {
+        "behavior": "Existing CLI invocations using legacy `--<adapter>-<flag>` flags continue to work where w17 keeps a shim (deprecation must not be a hard break)",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings"
+      },
+      {
+        "behavior": "PlatformAdapter ABC method signatures stay stable; w15's conformance test enforces them going forward",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings"
+      },
+      {
+        "behavior": "PostgreSQLAdapter.create_schema(self, benchmark, connection) -> float signature stays canonical for the entire PG family",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings"
+      },
+      {
+        "behavior": "Spark/lakesail/velox triple continues to pass tests/unit/platforms/test_{spark,lakesail,velox}_*.py — they are the canonical reference for patterns 1-13",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings"
+      },
+      {
+        "behavior": "_strip_balanced_paren_constraints behavior in _spark_helpers.py is unchanged when lifted to base/ — re-export must keep import paths stable",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/lakesail.py"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/spark.py"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/velox.py"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "kind": "do_not_modify",
+        "path_glob": "docker/velox/"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "kind": "only_modify",
+        "path_glob": "docker/questdb/"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast tests still pass after every work unit",
+        "expected": "all tests pass",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/platforms/ tests/unit/platforms/",
+        "description": "Lint clean",
+        "expected": "All checks passed",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ty check benchbox/platforms/",
+        "description": "Typecheck clean",
+        "expected": "All checks passed",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_abc_conformance.py -v",
+        "description": "ABC conformance test exists and passes after w15",
+        "expected": "all concrete adapters conform to PlatformAdapter ABC",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_timescaledb_*.py -v -k rollback",
+        "description": "C1 — timescaledb rolls back on per-statement failure",
+        "expected": "rollback test passes",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_pg_mooncake_*.py -v",
+        "description": "C2 — pg_mooncake create_schema delegates correctly through parent",
+        "expected": "all tests pass; new test exercises full create_schema flow",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'import inspect; from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter; from benchbox.platforms.base.adapter import PlatformAdapter; print(inspect.signature(SnowparkConnectAdapter.create_schema))'",
+        "description": "C3 — snowpark_connect ABC conformance",
+        "expected": "(self, benchmark, connection) (or compatible)",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v -k 'log_level or destructive'",
+        "description": "P11 cluster — destructive ops visible at INFO",
+        "expected": "all destructive ops emit INFO-level log entries",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_cloud_*.py -v -k throughput",
+        "description": "N1 — clickhouse_cloud throughput regression test",
+        "expected": "total_rows_loaded matches sum of per-file row counts only",
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w5",
+        "wid": "w11"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w3",
+        "wid": "w15"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w12",
+        "wid": "w16"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w21",
+        "wid": "w16"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w13",
+        "wid": "w17"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w4",
+        "wid": "w18"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w23",
+        "wid": "w19"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w25",
+        "wid": "w19"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w6",
+        "wid": "w21"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w11",
+        "wid": "w22"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w22",
+        "wid": "w23"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w17",
+        "wid": "w24"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w24",
+        "wid": "w25"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w19",
+        "wid": "w26"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "needs_wid": "w5",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "timescaledb.py:378-393 — psycopg2 keeps the txn open after a failed\ncursor.execute. Add `connection.rollback()` in the except branch\n(mirror postgresql.py:440). Optional improvement: adopt the parent's\nFK-strip retry path instead of replacing it.\nTrigger: any benchmark whose first DDL stmt fails (extension-dependent\ntype, missing role) — every subsequent stmt then raises\nInFailedSqlTransaction and warning-logs, so the whole schema silently\nfails.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "C1 — Add per-statement rollback to timescaledb create_schema DDL loop",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "clickhouse_cloud.py:579-712 (S3, 133 lines) vs :714-851 (GCS, 137\nlines) are 95% duplicate. Extract\n`_load_data_via_object_storage(provider_kind, ...)` that takes the\nstorage SDK and the `INSERT FROM s3()`/`INSERT FROM gcs()` table\nfunction as parameters. Sequenced after w7 so the COUNT(*) fix\npropagates correctly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P12 — Consolidate clickhouse_cloud S3 + GCS load paths into one helper",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "First balanced-walker migration slice. Sites and triggers:\n- athena.py:685 `\\\\s+WITH\\\\s*\\\\([^)]*\\\\)` → breaks on\n  `WITH (partitioning = ARRAY['bucket(ws_sold_date_sk, 16)'])`\n- presto.py:852 + trino.py:852 (`WITH ([^)]*)`) → breaks on\n  `WITH (partitioning = ARRAY[date_trunc('day', ts)])`\n\nAdd unit tests covering each trigger. Keep adapter-specific PK/FK and\nClickHouse/Fabric cases in w22/w23 so failures isolate cleanly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P1 cluster A — replace WITH/DDL option regex strippers with the balanced walker from w5",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "Three asymmetric drift items between presto.py and trino.py:\n1. presto.py:847-854 strips NOT NULL for memory catalog; trino.py\n   does NOT. Trino memory catalog also rejects NOT NULL.\n2. presto.py:633-635 uses bare `raise`; trino.py:640-647 calls\n   `_build_friendly_connection_error`. Lift the helper to\n   presto_trino_utils.py and use in both.\n3. trino.py:681-696 _load_table_data sends unqualified\n   `INSERT INTO orders`; presto.py:669-697 prepends `catalog.schema.`.\n   Promote to a shared helper that always qualifies.\n\nStarburst inherits via TrinoAdapter — no separate fix needed there.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P12 — Restore Presto/Trino symmetry: NOT NULL stripping, friendly connect error, qualified _load_table_data",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "motherduck.py:56,116,135-138 — module docstring at :56 advertises\n`--platform-option token=<token>`, but `add_cli_arguments` registers\n`--motherduck-token`/`--motherduck-database` and `from_config` reads\n`motherduck_token`/`motherduck_database` keys (not `token`/`database`\nfrom options). Either (a) make from_config read both option keys\nAND the legacy ones, or (b) align the docstring with the actual flag.\nPrefer (a) — it's the migration path other adapters took.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P3 — Fix motherduck `--platform-option token=<token>` advertised in docstring but not wired",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "snowflake.py:441-453 — `database` is referenced in the except branch\nbut bound only after `_create_admin_connection(...)`. If\nconnection-build raises, the handler raises NameError and masks the\noriginal. Move\n`database = connection_config.get(\"database\", self.database)` to the\ntop of the function before any callable that can raise.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P15 — Fix snowflake.drop_database reference-before-assignment in exception handler",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "Defensive — prevents future N2 (ABC contract divergence). New test\n`tests/unit/platforms/test_abc_conformance.py` walks every concrete\nsubclass of PlatformAdapter, asserts that\n{create_schema, load_data, execute_query, drop_database} match the\nABC signature using `inspect.signature`. Snowpark Connect (after w3),\npg_mooncake (after w2) should pass; failures mean someone diverged\nagain.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ABC-conformance test that introspects every concrete adapter's method signatures",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "Smaller correctness/visibility items batched as one PR:\n- postgresql.py:444-451 — FK-stripped retry catches the second\n  exception, warning-logs, and proceeds. Promote to raise (or push\n  onto critical_failures list like SingleStore) when the second\n  attempt also fails on a CREATE TABLE. (P9 Required.)\n- presto.py:633-635 — verify the bare raise was replaced by w12's\n  shared `_build_friendly_connection_error`; do not duplicate the fix here.\n- cedardb.py:243-247 — multi-table DROP loop emits no per-table log\n  lines until final summary.\n- doris.py:643-665 — wrap bare `raise` to include host/user context.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P11/P9 cluster — postgresql FK-strip silent retry + presto bare raise + cedardb per-table drop logs",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "PG-family adapters wire BOTH `register_option_specs` AND\n`add_cli_arguments` for the same fields, with undefined precedence:\npostgresql.py:55-118, pg_duckdb.py:64-122, timescaledb.py:76-107,\ncedardb.py:56-70.\n\nPer adapter: either (a) make add_cli_arguments a thin shim that\nenumerates option-spec keys and registers them as legacy flags\npointing at the same dest, or (b) delete the duplicates after a\ndeprecation cycle. Preserve existing legacy invocations.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P14 cluster A — normalize PG-family legacy flag shims against option specs",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "Following the canonical _spark_helpers.py pattern, add the same\ndocstring paragraph to:\n- benchbox/platforms/cloud_shared.py:1-9\n- benchbox/platforms/presto_trino_utils.py:1\n- benchbox/platforms/questdb_rewriter.py:1-110\n- benchbox/platforms/datafusion_query_transformer.py\n- benchbox/platforms/datafusion_write_transformer.py\n\nOne-paragraph note: \"Adapters import these functions by name; tests\nmust monkeypatch on the adapter module\n(e.g. benchbox.platforms.snowflake.validate_session_cache_control),\nnot on this module, or the patch silently no-ops.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P7 — Add import-by-name discipline docstring to remaining shared helpers",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "Small Firebolt/ClickHouse/QuestDB cleanup slice:\n- firebolt.py:1056 — re-enable inline NOT NULL stripper (or document\n  the deliberate keep)\n- firebolt.py:1275-1315 — refactor validate_session_cache_control to\n  delegate to cloud_shared (parameterise query string)\n- clickhouse_cloud.py:75,79 — clean up docstring that mixes\n  `--clickhouse-cloud-*` and `--platform-option` forms\n- questdb.py — set `_max_identifier_length = 127` on the adapter;\n  move the override out of the mixin docstring\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Nit/Consider tail A — firebolt/clickhouse_cloud/questdb docs and helper cleanup",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "pg_mooncake.py:193-207 — current signature\n`create_schema(self, connection, schema_ddl, **kwargs)` does not match\nPostgreSQLAdapter.create_schema(self, benchmark, connection) -> float\n(verified at postgresql.py:422 and base/adapter.py:254).\n\nRefactor to override `_transform_create_statement` (the SingleStore\npattern) so the columnstore USING clause is injected per-statement\ninside the parent's normal flow. Delete the broken create_schema\noverride. Update tests/unit/platforms/test_pg_mooncake_*.py — current\ntests acknowledge they \"can't call create_schema directly without a\nreal connection,\" which is what masked the regression.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "C2 — Fix pg_mooncake.create_schema signature mismatch with parent",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "docker/questdb/docker-compose.yml:23-47 — comment claims \"Data is\nephemeral - no named volume,\" but with no `tmpfs:` block and\n`restart: unless-stopped`, state actually sticks to the container\ninstance across `docker compose restart`.\nEither (a) add `tmpfs: - <questdb_data_dir>` to make it RAM-backed,\nor (b) rewrite the comment to \"no host-mounted volume; container\nrecreate clears state.\" Mirror docker/velox/docker-compose.yml\ncanonical pattern.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P5 — Make docker/questdb truly ephemeral (or fix the misleading comment)",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "Mechanical, low-risk shared/local cleanup visibility changes. Promote\ndestructive operation logging at:\n- base/connection_lifecycle.py:255-275 (unlink/rmtree/drop_database)\n- datafusion.py:1450-1459 (shutil.rmtree(working_dir))\n- polars_platform.py:657-666 (mirror of datafusion)\n- presto_trino_utils.py:198-205 (add INFO between DROP and recreate\n  in execute_schema_statements \"already exists\" handler)\n- base/psycopg2_mixin.py:67-85 (warning, not debug, on\n  _get_existing_tables exception)\n\nSingle PR, no behavior change beyond log output. QuestDB failed\npre-create DROP attempts must stay warning-level per w6.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P11 cluster B — make shared-helper and local-dir destructive ops visible",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "Second balanced-walker migration slice. Sites and triggers:\n- duckdb.py:733-739 (table-level + inline FK) → breaks on\n  `FOREIGN KEY (...) REFERENCES date_dim(d_date_sk) ON DELETE CASCADE`\n- firebolt.py:1055,1059-1064 (PK + FK) → breaks on composite PK with\n  expression members `PRIMARY KEY (\"a\", coalesce(b,0))`\n\nAdd unit tests covering each trigger.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P1 cluster B — replace PK/FK regex strippers with the balanced walker from w5",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "Third balanced-walker migration slice. Sites and triggers:\n- clickhouse/workload.py:65-70 `Nullable\\\\([^)]+\\\\)\\\\s+NOT\\\\s+NULL`\n  → silently breaks decimal-bearing TPC-DS tables for ALL clickhouse\n  adapters (`Nullable(Decimal(38,0)) NOT NULL`)\n- clickhouse/workload.py:116 inline PK regex on parametrized types\n- fabric_warehouse.py:1218-1226 `_optimize_table_definition` uses\n  str.replace after re.search → munges `CREATE TABLE IF NOT EXISTS orders`\n\nAdd unit tests covering each trigger.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P1 cluster C — fix ClickHouse nullable and Fabric table-definition regex edge cases",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "Follow the w17 shim/deprecation pattern for:\n- singlestore.py:137-175\n- snowpark_connect.py:503-538\n\nSnowpark Connect is urgent because its unprefixed `--user`/`--password`/\n`--account` collide with other adapters' flags in shared parsers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P14 cluster B — normalize SingleStore and Snowpark Connect legacy flag shims",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "Inverse case: sqlite.py has only legacy flags and no option-spec\nregistration.\n\nEither register sqlite under\nbenchbox/platforms/__init__.py or document that sqlite intentionally\nbypasses the registry (and update the error message at sqlite.py:124-127\naccordingly).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P14 cluster C — settle sqlite option-spec registration policy",
+        "wid": "w25"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "Small SingleStore/Doris/Fabric cleanup slice:\n- singlestore.py:713-798 — extract `_extract_create_table_name(stmt)`\n  helper; replace 4 copies of the regex\n- doris.py:579-586 — delegate `_validate_identifier` to\n  benchbox.utils.sql_identifier.is_valid_sql_identifier (with\n  max_length=128)\n- fabric_lakehouse.py:230,266 — pick a single error model\n  (raise everywhere, or return-as-dict everywhere); align with\n  sibling fabric_warehouse.py\n- fabric_spark_adapter.py:730 — wrap CLI args in a parser group for\n  consistency with sibling Fabric adapters\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Nit/Consider tail B — singlestore/doris/fabric cleanup",
+        "wid": "w26"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "snowpark_connect.py:291,314,385 vs spark.py:590,632,663.\ncreate_schema(self, schema_name=None) → must accept (benchmark, connection).\nload_data(self, tables, source_dir, file_format=...) → must accept\n(benchmark, connection, data_dir).\nexecute_query(self, query, **kwargs) → must accept (connection, query,\nquery_id, ...) and return the standard dict\n{query_id, stream_id, status, execution_time_seconds, ...}.\n\nIf Snowpark Session replaces the \"connection\" arg, accept and ignore\nit positionally. The orchestrator's standard call site will TypeError\non the current code.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "C3 — Conform snowpark_connect.{create_schema,load_data,execute_query} to PlatformAdapter ABC",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "base/ddl_helpers.py:25-69 — `_FK_CLAUSE_RE` requires the table-level\n`FOREIGN KEY (...)` header. Add a second regex pass for inline\n`\\s+REFERENCES\\s+...` (mirroring questdb.py:670-675), normalize\ntrailing commas, then DELETE questdb._strip_fk_constraints since the\nbase helper now covers both forms.\n\nAlso add the \"Import discipline\" paragraph from\n_spark_helpers.py:7-13 to the module docstring (callers:\npostgresql:19, singlestore:27, doris:35, questdb:28,\ndatabend/adapter:53, starrocks/workload:12 — all import by name).\n\nVerify against TPC-DS-style inline FK form\n(`cs_sold_date_sk INTEGER REFERENCES date_dim(d_date_sk)`).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Shared helper P2 + P7 — base/ddl_helpers.py inline-REFERENCES + import-discipline docstring",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "`_strip_balanced_paren_constraints` in _spark_helpers.py is the\ncanonical fix for Pattern 1 (greedy `[^)]*` over balanced parens).\nMove it into benchbox/platforms/base/ddl_helpers.py (or a new\nbenchbox/platforms/base/sql_paren_walker.py) and re-export from\n_spark_helpers.py for backward compat. This unblocks w11 — every\nadapter rewriter can then call the same balanced walker instead of\nrolling its own broken `\\([^)]*\\)` regex.\n\nAdd unit tests with at least: `CHECK ((a>0) AND (b>0))`,\n`DECIMAL(10,2)`, `PARTITION BY (date_trunc('day',ts))`,\n`DEFAULT (now())`, `WITH (partitioning = ARRAY['bucket(x, 16)'])`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Lift balanced-paren constraint walker out of _spark_helpers.py into shared module",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "Mechanical, low-risk adapter-local visibility changes. Promote\n`logger.debug` → `logger.info` (or log_operation_complete) at:\n- athena.py:1054 (DROP staging table)\n- athena.py:1070 (S3 staging delete)\n- redshift.py:1156-1158 (DROP TABLE)\n- azure_synapse.py:452-462 (DROP TABLE in schema recreate)\n- fabric_warehouse.py:741-742 (DROP TABLE)\n- presto.py:559 (DROP TABLE)\n- questdb.py:476-480 (pre-create DROP failures → warning, not info)\n\nKeep this PR limited to adapter-local logging sites. Shared helper\nand local-working-dir destructive operations are covered by w21.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P11 cluster A — promote adapter destructive-op debug logs to info/warning",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "clickhouse_cloud.py:676-682 (S3) and :816-822 (GCS) — loop assigns\n`total_rows_loaded = SELECT COUNT(*) FROM table` per iteration; the\nsource comment acknowledges the bug. On rerun-into-non-empty-table,\nthe count includes pre-existing rows and silently inflates throughput\nin published BenchmarkResults.\n\nEither TRUNCATE before the loop, or take COUNT(*) once after the\nloop and assign once. Add a regression test that loads two files\ninto a non-empty table and asserts total_rows_loaded == sum of new\nfile row counts only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "N1 — Fix ClickHouse Cloud COUNT(*) throughput inflation in S3/GCS load loops",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "cudf.py:605-636 ≅ polars_platform.py:618-645 ≅ datafusion.py:1400-1435\ntriplicate `apply_constraint_configuration` and\n`apply_platform_optimizations`; only the platform-name string differs.\n\nAdd benchbox/platforms/base/no_constraint_enforcement_mixin.py with\nthe parameterised methods (read self.platform_name). Update the three\nadapters to inherit. Update or delete the three duplicate test files.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P12 — Extract NoConstraintEnforcementMixin (cudf, datafusion, polars_platform)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "address-cross-adapter-13-pattern-audit-findings",
+        "notes": "timescaledb.py:110-159 ≅ postgresql.py:154-201 ≅ pg_duckdb.py:124-181 ≅\npg_mooncake.py:67-116 ≅ cedardb.py:73-119 — ~30 identical lines for\nhost/port/username/password/schema/sslmode + database-naming.\n\nAdd a class method `_build_postgres_connection_kwargs(cls, config)`\non PostgreSQLAdapter that the four subclasses call. Concrete drift\nrisk: pg_mooncake/cedardb already lack `enable_timescale` and\n`statement_timeout` while sharing the same parent __init__.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "P12 — Extract _build_postgres_connection_kwargs helper for PG family from_config",
+        "wid": "w9"
+      }
+    ]
+  }
+}

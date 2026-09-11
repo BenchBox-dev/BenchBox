@@ -1,0 +1,127 @@
+{
+  "context": "Start with product shape, not implementation. The result explorer, hosted\nAPI, and local artifact publishing should each have a separate contract and\nsuccess metric. Use the existing BenchBox export path as the anchor, then map\nexternal reference patterns onto the repo's real deployment constraints.\n",
+  "description": "BenchBox currently blurs together three different concerns:\n1) local/cloud artifact publication,\n2) hosted result submission,\n3) public result browsing and analysis on benchbox.dev.\n\nThat ambiguity makes the existing publishing TODO too large and too vague to\nexecute safely. This item defines the product boundary between those concerns,\nchooses the initial site topology, and sequences the launch so BenchBox does\nnot jump directly from local result files to an open public submission portal.\n\nThe target output is a high-confidence strategy that distinguishes\n`benchbox publish`, `benchbox submit`, and `benchbox.dev/results/`, plus a\ndelivery sequence the rest of the TODO cluster can depend on.\n\n**Phase assignment:** This is a prerequisite planning item. Must complete before\nany Phase 1 implementation begins. The refined strategy memo at\n`_project/analysis/benchbox-results-platform-strategy.md` contains the current\nrecommended phasing: Phase 1 (static explorer MVP with repo-local\n`results-data/`), Phase 2 (PR-based community contributions against that\ncorpus), Phase 3 (hosted API, only if demand warrants).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assume the static docs stack can absorb a rich results explorer unchanged",
+        "instead": "choose the site topology explicitly",
+        "item_id": "define-results-platform-product-and-launch-strategy",
+        "why": "interactive compare/search/auth workflows have different needs"
+      },
+      {
+        "dont": "collapse local artifact publication and hosted submission into one command surface",
+        "instead": "define `publish` and `submit` separately",
+        "item_id": "define-results-platform-product-and-launch-strategy",
+        "why": "the storage contract and service contract differ materially"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-03-29T00:00:00Z",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The existing static GitHub Pages deployment for landing/docs/blog remains a valid baseline during planning",
+        "item_id": "define-results-platform-product-and-launch-strategy"
+      },
+      {
+        "behavior": "The schema-v2 result bundle remains the single canonical artifact for all downstream publishing and submission flows",
+        "item_id": "define-results-platform-product-and-launch-strategy"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "define-results-platform-product-and-launch-strategy",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "define-results-platform-product-and-launch-strategy",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "define-results-platform-product-and-launch-strategy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "define-results-platform-product-and-launch-strategy",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "define-results-platform-product-and-launch-strategy",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "define-results-platform-product-and-launch-strategy",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "define-results-platform-product-and-launch-strategy",
+        "notes": "Capture the current canonical result path, static-site deployment model,\nand any pre-existing hints of hosted service design.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit current BenchBox result export, results CLI, and public-site constraints",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "define-results-platform-product-and-launch-strategy",
+        "notes": "Classify what each reference teaches BenchBox about submission, browsing,\ncomparison, static hosting, and trust labels.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build a reference matrix from Geekbench, CloudSpecs, OpenBenchmarking, and ASV",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "define-results-platform-product-and-launch-strategy",
+        "notes": "Cover at least maintainers/curators, result submitters, and result readers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define personas, workflows, trust levels, and phase-by-phase success metrics",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "define-results-platform-product-and-launch-strategy",
+        "notes": "Confirm the launch topology: explorer at `/results/`, seed corpus stored\nunder repo-local `results-data/`, and a single GitHub Pages workflow for\ndeployment. Explicitly separate local/cloud publication from hosted\nsubmission. A dedicated data repo is a later optimization, not the default.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose the initial topology and command boundary for publish vs submit",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "define-results-platform-product-and-launch-strategy",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Publish the strategy artifact and update companion TODO dependencies",
+        "wid": "w5"
+      }
+    ]
+  }
+}

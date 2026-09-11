@@ -1,0 +1,274 @@
+{
+  "context": "Revalidate the actual Dask constructor timing, MCP admission limits, and deployment resource budget in w0. Define one policy function that checks worker count, threads per worker, total threads, per-worker memory, and aggregate memory; make limits configurable only by server-owned policy, not request fields. Decide how use_distributed=false interacts with worker settings and reject contradictory combinations rather than silently ignoring them. Apply the same validator to run_benchmark, start_benchmark, and the worker execution path. Add bounded tests at ordinary, boundary, and over-envelope values, and document that per-field maxima are not the security control. Do not add scheduler_address, spill_directory, endpoint, or path controls to MCP.",
+  "description": "Close the PR #1465 resource-exhaustion defect in the Dask platform_options surface. Independent maxima of n_workers=256 and threads_per_worker=256 allow one authenticated MCP request to construct a 65,536-thread LocalCluster; a per-worker memory_limit of 1TB can advertise a 256TB aggregate envelope. Dask's conservative defaults apply only when the caller omits the values, and use_distributed defaults true, so the unsafe request reaches LocalCluster during adapter construction. Define an explicit server-side aggregate CPU, worker-count, and memory envelope for MCP, with fail-closed validation before synchronous adapter creation and before durable persistence.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Apply the envelope only in the synchronous tool",
+        "instead": "Validate at request admission, persistence, and worker execution, with one shared policy function.",
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "why": "Durable workers replay persisted requests and can bypass a front-door-only guard after retries or restarts."
+      },
+      {
+        "dont": "Rely on independent n_workers and threads_per_worker maxima",
+        "instead": "Enforce aggregate CPU, worker, and memory budgets with explicit cross-field tests.",
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "why": "Their product is the actual CPU/thread pressure and is unbounded enough to exhaust a host."
+      },
+      {
+        "dont": "Start a real 65,536-thread cluster to prove rejection",
+        "instead": "Assert rejection before adapter construction and use a spy to prove LocalCluster is never called.",
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "why": "The test itself would be a denial-of-service vector."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "needs_item": "mcp-v2-platform-option-contract-matrix-v3"
+      }
+    ],
+    "item_meta": {
+      "category": "security",
+      "completed_at": "2026-08-04T11:52:40Z",
+      "completed_pr": 1511,
+      "created_at": "2026-08-02T16:37:56Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI and non-MCP Dask users retain their existing configuration surface and defaults.",
+        "item_id": "mcp-v2-dask-resource-envelope-v3"
+      },
+      {
+        "behavior": "MCP requests cannot select an external Dask scheduler, spill directory, filesystem path, or arbitrary endpoint.",
+        "item_id": "mcp-v2-dask-resource-envelope-v3"
+      },
+      {
+        "behavior": "Rejected requests fail before LocalCluster creation and before durable-job persistence, with no leaked resource values or secrets.",
+        "item_id": "mcp-v2-dask-resource-envelope-v3"
+      },
+      {
+        "behavior": "The existing server-wide and principal concurrency limits remain enforced; the new envelope is an additional per-run guard, not a replacement.",
+        "item_id": "mcp-v2-dask-resource-envelope-v3"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "principal and global MCP admission limits",
+        "decision": "extend",
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "path": "benchbox/mcp/security.py"
+      },
+      {
+        "concept": "conservative local resource-envelope defaults",
+        "decision": "extend",
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "path": "benchbox/platforms/dataframe/dask_df.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/server.py"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/modin_df.py"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/shared_loading.py"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/security.py"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/dask_df.py"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/development/mcp-platform-option-contract.md"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/test_durable_jobs.py"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_benchmark_tools.py"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_schemas.py"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_security.py"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_schemas.py tests/unit/mcp/test_benchmark_tools.py -q",
+        "description": "An over-envelope request fails before LocalCluster construction on the unfixed tree",
+        "expected": "exits 1 on the unfixed tree when the no-cluster-created assertion is present; exits 0 only after aggregate limits reject the oversized request",
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T11:51:13Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_durable_jobs.py -q",
+        "description": "Durable admission and worker replay enforce the same envelope",
+        "expected": "exits 1 on the unfixed tree if a persisted oversized request reaches the worker; exits 0 after both paths fail closed",
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T11:51:25Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/mcp benchbox/platforms/dataframe/dask_df.py tests/unit/mcp tests/unit/platforms tests/integration/mcp",
+        "description": "Dask and MCP scoped checks are clean",
+        "expected": "exits 1 on the unfixed tree if the resource guard introduces lint defects; exits 0 after scoped checks pass",
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T11:49:44Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Constructor timing: DaskDataFrameAdapter.__init__ calls _setup_distributed() -> LocalCluster(**cluster_kwargs) during construction (dask_df.py:198,323), so any guard after adapter construction would have to start the oversized cluster to detect it. Admission limits: AdmissionLimits/JobLimits (security.py:61,74) bound requests_per_minute, global/principal concurrency, queue depth and leases -- none bounds a single run's cluster size, so the envelope is additive. Approved budget: adapter local caps are _DEFAULT_LOCAL_WORKER_CAP=2, _DEFAULT_LOCAL_THREADS_PER_WORKER_CAP=2, _DEFAULT_LOCAL_MEMORY_LIMIT=2GB; server-owned aggregate defaults selected as 16 workers / 64 total threads / 64GB total, operator-overridable via BENCHBOX_MCP_DASK_MAX_*. w0 probe confirmed n_workers=256 x threads_per_worker=256 = 65536 threads admitted before the fix.",
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:45:28Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Revalidate Dask constructor timing, MCP admission limits, and the approved host resource budget",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added DaskResourceEnvelope + load_dask_resource_envelope() (env-overridable, bounded, falls back on malformed/out-of-range) and _validate_dask_options() enforcing max_workers, n_workers x threads_per_worker, and n_workers x memory_limit. Unset fields use the adapter's own local caps (2/2/2GB) so an omitted field can never contribute more than the adapter applies.",
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:45:55Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement one server-owned aggregate CPU, worker, and memory envelope with contradictory-combination rejection",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Guard is wired into _validate_cross_field_policy inside validate_platform_options -- the single function reached by synchronous run_benchmark (tools/benchmark.py:237), durable start_benchmark admission before repository.submit (jobs.py:830), and durable worker replay via _run_benchmark_impl (tools/benchmark.py:409). Verified the -df alias resolves the policy key so dask-df cannot bypass it.",
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:46:01Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Apply the guard at synchronous admission, durable persistence, and worker execution before cluster creation",
+        "wid": "w2"
+      },
+      {
+        "evidence": "tests/unit/mcp/test_schemas.py TestDaskResourceEnvelope: thread-bomb product, worker-count-alone, per-worker memory x workers, 5 exact aggregate boundary cases, omitted-field defaults, -df alias, operator widen/narrow, 7 malformed-override fallbacks. tests/unit/mcp/test_benchmark_tools.py: over-envelope request never reaches _get_platform_adapter; LocalCluster spy proves the cluster class is never called (Client also stubbed so an unfixed tree fails on the assertion, not by starting a cluster); in-envelope request still reaches the adapter with its values. tests/integration/mcp/test_durable_jobs.py: over-envelope request never enters the queue (row count 0); worker replay re-enforces a budget tightened after submission. Negative-control: removing the dask branch from _validate_cross_field_policy fails 11 of these tests.",
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:51:43Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add boundary, over-envelope, durable-retry, and no-cluster-created regression tests",
+        "wid": "w3"
+      },
+      {
+        "evidence": "docs/operations/mcp-remote-security.md: 'Dask aggregate resource envelope' section with the budget table, env overrides, per-worker memory semantics, omitted-field defaults, and the note that it is additive to admission concurrency limits. docs/reference/mcp.md: aggregate-bound bullet. docs/development/mcp-platform-option-contract.md: Dask row now names load_dask_resource_envelope() as the effective consumer (scope-update amended). Ladder rung1 143 passed, rung2 10 passed, rung3 ruff clean. CI-only gates: lint-imports 3 kept/0 broken; timing_policy_check --strict 0 violations. No real cluster was started by any test.",
+        "item_id": "mcp-v2-dask-resource-envelope-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:51:48Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Document the resource policy and run focused security/performance checks without starting a real oversized cluster",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,296 @@
+{
+  "context": "1) Define and document canonical run_type vocabulary for query rows and\nsynthetic rows.\n2) Add explicit producer-side stamping in SQL standard/throughput/maintenance\npaths so run_type is present before normalization.\n3) Propagate run_type into enhanced QueryExecution phase objects.\n4) Keep fallback inference as compatibility-only safety net (not primary path).\n5) Add contract tests that fail if any producer emits query rows without run_type.\n",
+  "description": "Query result rows currently rely on fallback inference for `run_type` in several\npaths (especially SQL `standard` execution), while other paths set run_type\nexplicitly (`warmup`/`measurement`, and DataFrame metadata/summary rows).\n\nThis creates ambiguity and repeated fallback logic in normalization/schema code,\nand can cause inconsistent downstream analytics semantics when producer paths\nomit run_type.\n\nThis TODO defines canonical run_type semantics and ensures all producer paths\nexplicitly stamp run_type before result building/export. It also aligns\nenhanced execution-phase objects and adds contract tests so missing run_type\ncannot regress silently.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change timing metric filters (measurement-only) as part of tagging cleanup",
+        "instead": "(not specified)",
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "why": "this TODO is metadata-contract hardening, not metric-policy redesign"
+      },
+      {
+        "dont": "reinterpret run_type as execution mode (`power|throughput|maintenance`)",
+        "instead": "keep run_type as per-row execution role",
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "why": "run mode is already carried by `test_execution_type`"
+      },
+      {
+        "dont": "remove fallback inference in query normalization immediately",
+        "instead": "retain compatibility while enforcing explicit tagging for new producer output",
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "why": "historical artifacts may lack run_type"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-02-18T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Backward compatibility for loading historical results without explicit run_type remains intact via normalization fallback",
+        "item_id": "enforce-explicit-query-run-type-across-executions"
+      },
+      {
+        "behavior": "DataFrame metadata/summary synthetic rows keep their current run_type values (`metadata`/`summary`)",
+        "item_id": "enforce-explicit-query-run-type-across-executions"
+      },
+      {
+        "behavior": "Existing power/throughput behavior where warmup rows are excluded from primary timing metrics remains unchanged",
+        "item_id": "enforce-explicit-query-run-type-across-executions"
+      },
+      {
+        "behavior": "`test_execution_type` continues to represent run mode (`standard|power|throughput|maintenance|combined`) and is NOT replaced by run_type",
+        "item_id": "enforce-explicit-query-run-type-across-executions"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/models.py"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/query_normalizer.py"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/models.py"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/benchmark_mixin.py"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms -k 'run_type and (standard or throughput or maintenance or power)' -q",
+        "description": "SQL adapter paths stamp run_type explicitly across execution types",
+        "expected": "selected tests pass; run_type present assertions succeed",
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results -k 'run_type or query_normalizer or schema' -q",
+        "description": "Result-layer contract tests enforce explicit run_type and compatibility fallback",
+        "expected": "selected tests pass; no missing run_type regressions",
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_mcp_results_and_analytics.py -k RunBenchmark -q",
+        "description": "MCP and result export behavior remains stable",
+        "expected": "selected run_benchmark MCP tests pass",
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define canonical run_type semantics and allowed values in a shared results-layer location",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add SQL producer-side run_type stamping for standard execution outputs",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Ensure throughput/maintenance and fallback combined paths also emit explicit run_type for query rows",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Propagate run_type into `_create_standard_execution_phase()` QueryExecution objects",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retain normalization/schema run_type fallback as compatibility-only path with clarifying comments",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add platform adapter unit tests asserting run_type presence across execution types",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add results-layer contract tests for explicit run_type and fallback compatibility",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add MCP/result export regression tests to verify run_type continuity in payloads",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "enforce-explicit-query-run-type-across-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run focused verification suite and document any residual edge cases",
+        "wid": "w9"
+      }
+    ]
+  }
+}

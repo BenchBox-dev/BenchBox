@@ -1,0 +1,11 @@
+{
+  "description": "TimescaleDB is a PostgreSQL extension for time-series data that deserves\nfirst-class platform status in BenchBox. Currently it's only supported as\na flag on PostgreSQL (--postgres-enable-timescale).\n\nA dedicated TimescaleDB adapter would:\n- Appear as a separate platform in the interactive wizard\n- Leverage hypertables for time-series optimized storage\n- Use TimescaleDB-specific compression and retention policies\n- Support TSBS (Time Series Benchmark Suite) in addition to TPC benchmarks\n- Provide TimescaleDB-specific tuning profiles\n\nThis builds on the existing PostgreSQL adapter infrastructure.\n\n**Code Review Findings (2024-12-24):**\nThe following TimescaleDB-related code already exists:\n- `--postgres-enable-timescale` CLI flag (platforms/postgresql.py:116-119)\n- `enable_timescale` config stored but NOT USED (platforms/postgresql.py:209)\n- `get_platform_info()` detects TimescaleDB version (platforms/postgresql.py:676-686)\n- `tsbs_devops/schema.py` has `timescale` dialect with hypertable creation\n- `nyctaxi/schema.py` has `timescale` dialect handling\n\nKey decision: Created separate TimescaleDBAdapter class extending PostgreSQLAdapter.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2024-12-24T00:00:00Z",
+      "created_at": "2025-12-21T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

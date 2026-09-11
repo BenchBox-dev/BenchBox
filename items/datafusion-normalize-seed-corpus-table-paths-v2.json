@@ -1,0 +1,117 @@
+{
+  "context": "Confirm PR #1349's merge commit is contained in origin/develop, inspect the focused test for the real generator-backed string payload, then run the focused test and a clean temporary-output SSB DataFusion lifecycle. Drop the superseded malformed item only after this replacement is reviewed and created.",
+  "description": "PR #1349 merged the DataFusion path-normalization fix and its focused regression tests, but the original immutable tracker item still has pending work and non-falsifiable expected text. Re-establish the work order against current develop, prove the focused regression and a clean SSB lifecycle, and bind completion to PR #1349 without rewriting the original audit history.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Mark the original pending units done without a reviewed replacement specification",
+        "instead": "Complete this corrected replacement and drop the original as superseded",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths-v2",
+        "why": "Its lint defects would remain hidden"
+      },
+      {
+        "dont": "Reuse an existing benchmark output directory",
+        "instead": "Use mktemp for the lifecycle proof",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths-v2",
+        "why": "The original defect was directory-state dependent"
+      }
+    ],
+    "item_meta": {
+      "category": "verification",
+      "completed_at": "2026-08-01T20:24:47Z",
+      "completed_pr": 1349,
+      "created_at": "2026-08-01T20:20:25Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Directory-format detection and multi-shard behavior remain covered",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths-v2"
+      },
+      {
+        "behavior": "The original item and PR audit history remain intact",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths-v2"
+      },
+      {
+        "behavior": "Verification uses a clean output directory so stale generated state cannot mask the defect",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "datafusion-normalize-seed-corpus-table-paths-v2",
+        "kind": "do_not_modify",
+        "path_glob": "**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_datafusion_load_data_path_coercion.py -q",
+        "description": "Focused DataFusion path-coercion regression",
+        "expected": "passes on current develop and fails on the unfixed tree when string paths reach directory detection",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:24:09Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "tmp_root=$(mktemp -d); trap 'rm -rf \"$tmp_root\"' EXIT; BENCHBOX_OUTPUT_DIR=\"$tmp_root/benchmark_runs\" uv run -- benchbox run --platform datafusion --benchmark ssb --scale 0.01 --phases generate,load,power --compression zstd:9 --non-interactive",
+        "description": "Clean SSB DataFusion lifecycle",
+        "expected": "exits 0 now and exits nonzero with AttributeError on the unfixed tree",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:24:27Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "datafusion-normalize-seed-corpus-table-paths-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "datafusion-normalize-seed-corpus-table-paths-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1349 merge commit 038b88c71dc4089182dd7c2ce3cce17daa6a63f0 is contained in origin/develop; original run 30455422794 failed at DataFusion string-path directory detection and later run 30574449328 succeeded.",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:22:58Z",
+        "started_branch": "fix/finish-three-workflow-ci-handoff",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-finish-ci-handoff",
+        "status": "done",
+        "summary": "Revalidate PR #1349 containment and the original failure premise",
+        "wid": "w0"
+      },
+      {
+        "evidence": "tests/unit/platforms/test_datafusion_load_data_path_coercion.py contains focused scalar-string and list-of-string cases plus directory-format coverage; PR #1349 uses normalize_table_paths before format detection.",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:23:07Z",
+        "started_branch": "fix/finish-three-workflow-ci-handoff",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-finish-ci-handoff",
+        "status": "done",
+        "summary": "Confirm the focused regression covers scalar and list string paths",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Both recorded rungs passed on current develop: 3 focused path-coercion tests passed; a clean mktemp SSB DataFusion generate/load/power lifecycle exited 0 with a result bundle.",
+        "item_id": "datafusion-normalize-seed-corpus-table-paths-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:23:13Z",
+        "started_branch": "fix/finish-three-workflow-ci-handoff",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-finish-ci-handoff",
+        "status": "done",
+        "summary": "Run focused and clean-directory lifecycle verification",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,193 @@
+{
+  "context": "1. In tests/conftest.py, add after existing imports:\n   - _TEST_LOCK_PATH = Path.home() / \".benchbox\" / \"test.lock\"\n   - _test_lock_fd: int | None = None  (module-level, keeps fd alive)\n   - _should_acquire_test_lock(config) helper function\n   - pytest_configure hook: acquires fcntl.flock(LOCK_EX | LOCK_NB), writes\n     PID+timestamp+cmd to lock file, stores fd in _test_lock_fd\n   - pytest_unconfigure hook: releases lock via flock(LOCK_UN) and closes fd\n\n2. Error message format when blocked:\n   \"[benchbox] BLOCKED: A parallel test run is already active.\n     Lock file : ~/.benchbox/test.lock\n     Holder    : pid:XXXX started:YYYY-MM-DD HH:MM:SS cmd:...\n     Options:\n       • Wait for the other run to finish and retry.\n       • Run single-threaded (no lock):  pytest -n 0 ...\n       • Bypass lock (dangerous):         BENCHBOX_SKIP_TEST_LOCK=1 pytest ...\"\n\n3. In Makefile, add test-unlock convenience target after test-fast:\n   test-unlock:\n       @echo \"Removing stale BenchBox test lock...\"\n       @rm -f ~/.benchbox/test.lock\n       @echo \"Lock cleared.\"\n",
+  "description": "pytest.ini defaults to `-n auto`, which spawns one worker per logical CPU (10 on\nthis machine). When two agent sessions each trigger `make test-fast`, the result is\n20+ concurrent pytest workers competing for CPU, bringing the machine to a halt.\n\nAdd an exclusive `fcntl.flock` lock in `tests/conftest.py` so that only one\nparallel test run can be active at a time. A second concurrent attempt fails\nimmediately with a clear, actionable error message identifying the lock holder.\n\nChosen approach: `fcntl.flock(LOCK_EX | LOCK_NB)` on `~/.benchbox/test.lock`.\nThe OS auto-releases the lock when the holder process dies (no stale lock cleanup\nneeded). No new dependencies - `fcntl` is stdlib on macOS/Linux.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add lock logic to production benchbox source",
+        "instead": "(not specified)",
+        "item_id": "parallel-test-run-lock",
+        "why": "scope is tests/ and Makefile only"
+      },
+      {
+        "dont": "store lock metadata in _test_lock_fd write until after flock succeeds",
+        "instead": "(not specified)",
+        "item_id": "parallel-test-run-lock",
+        "why": "ftruncate/write must happen only after exclusive lock is confirmed"
+      },
+      {
+        "dont": "use portalocker or filelock packages",
+        "instead": "(not specified)",
+        "item_id": "parallel-test-run-lock",
+        "why": "they add dependencies; fcntl is stdlib and sufficient for macOS/Linux"
+      },
+      {
+        "dont": "use pytest_sessionstart hook",
+        "instead": "(not specified)",
+        "item_id": "parallel-test-run-lock",
+        "why": "use pytest_configure instead. Reason: numprocesses is readable from config.option at configure time (post CLI parse, pre session); sessionstart is too late and the lock would not block workers from being spawned"
+      }
+    ],
+    "item_meta": {
+      "category": "CI Infrastructure",
+      "completed_at": "2026-02-23T00:00:00Z",
+      "created_at": "2026-02-23T00:00:00Z",
+      "worktree": "ci-infrastructure"
+    },
+    "preserves": [
+      {
+        "behavior": "All 13,000+ fast-marked tests continue to pass after the hooks are added - confirm with `make test-fast` reporting 13052 passed",
+        "item_id": "parallel-test-run-lock"
+      },
+      {
+        "behavior": "CI pipelines: lock is user-local (~/.benchbox/test.lock); CI containers with fresh filesystems must never see a pre-existing lock",
+        "item_id": "parallel-test-run-lock"
+      },
+      {
+        "behavior": "Crash recovery: after kill -9 on a running test session, the next invocation must succeed without any manual cleanup (OS auto-releases flock on exit)",
+        "item_id": "parallel-test-run-lock"
+      },
+      {
+        "behavior": "Single-threaded runs: numprocesses == 0 or None must bypass the lock entirely",
+        "item_id": "parallel-test-run-lock"
+      },
+      {
+        "behavior": "xdist workers: hasattr(config, 'workerinput') check must prevent workers from competing for the lock - only the controller process acquires it",
+        "item_id": "parallel-test-run-lock"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "parallel-test-run-lock",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "parallel-test-run-lock",
+        "kind": "only_modify",
+        "path_glob": "tests/conftest.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make test-fast & sleep 5 && make test-fast 2>&1; echo \"exit:$?\"",
+        "description": "Second concurrent parallel run is blocked with exit code 1 and BLOCKED message",
+        "expected": "output contains 'BLOCKED' and 'exit:1'",
+        "item_id": "parallel-test-run-lock",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "pytest -n 0 tests/unit/cli/test_cli_main.py -v 2>&1 | tail -3",
+        "description": "Single-threaded run is never blocked (no lock acquired)",
+        "expected": "tests pass with no BLOCKED message",
+        "item_id": "parallel-test-run-lock",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_SKIP_TEST_LOCK=1 pytest tests/unit/cli/test_cli_main.py 2>&1 | tail -1",
+        "description": "Env-var bypass allows concurrent parallel runs",
+        "expected": "tests pass (no BLOCKED error)",
+        "item_id": "parallel-test-run-lock",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-fast & sleep 3 && kill -9 $! ; sleep 1 && make test-fast 2>&1 | tail -3",
+        "description": "After a crashed run (kill -9), the next parallel run succeeds without manual cleanup",
+        "expected": "tests pass (OS auto-released flock on kill)",
+        "item_id": "parallel-test-run-lock",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "parallel-test-run-lock",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "parallel-test-run-lock",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "parallel-test-run-lock",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "parallel-test-run-lock",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "parallel-test-run-lock",
+        "notes": "Helper returns False for: xdist workers (hasattr(config, 'workerinput')),\nBENCHBOX_SKIP_TEST_LOCK env var set, numprocesses is 0/None/AttributeError.\nReturns True for numprocesses == 'auto' or any positive integer.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add _TEST_LOCK_PATH constant, _test_lock_fd module var, and _should_acquire_test_lock() helper to tests/conftest.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "parallel-test-run-lock",
+        "notes": "fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\nOn BlockingIOError: read lock file for holder info, print BLOCKED message to\nstderr, os.close(fd), sys.exit(1).\nOn success: os.ftruncate + os.write with \"pid:X started:Y cmd:Z\\n\", store fd.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add pytest_configure hook: acquire fcntl.flock, write diagnostic info to lock file, store fd",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "parallel-test-run-lock",
+        "notes": "fcntl.flock(_test_lock_fd, fcntl.LOCK_UN) then os.close().\nWrap in try/except OSError for resilience during abnormal teardown.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add pytest_unconfigure hook: release flock, close fd, reset module var",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "parallel-test-run-lock",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add test-unlock Makefile target (rm -f ~/.benchbox/test.lock)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "parallel-test-run-lock",
+        "notes": "Also verify: single-threaded bypass (pytest -n 0), env-var bypass, and\nauto-recovery after kill -9 on the first run.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run verification: two concurrent make test-fast invocations confirm second is blocked with exit 1",
+        "wid": "w5"
+      }
+    ]
+  }
+}

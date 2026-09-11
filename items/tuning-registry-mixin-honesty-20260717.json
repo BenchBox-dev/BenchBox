@@ -1,0 +1,115 @@
+{
+  "description": "Confirmed during PR #1198's implementation and its Opus review (2026-07-17).\nA repo-wide search finds ZERO production call sites for any adapter's\ngenerate_tuning_clause (singular) mixin — every hit is in tests. Production\nrendering flows through the DDL generators' generate_tuning_clauses\n(plural; core/dryrun.py, duckdb.py) or #1180's registry-driven paths.\n\nYet five pre-existing #1180-era registry entries claim physical DDL\nrendering via that dead mixin (rendered_via=\"ddl\",\nmechanism \"adapter_mixin:<Platform>Adapter.generate_tuning_clause\"):\npostgresql, snowflake, redshift, bigquery, mysql. For postgresql it is\naffirmatively false (PostgreSQLAdapter.generate_tuning_clause\nunconditionally returns \"\" - postgresql.py:898-903 - and\napply_table_tunings is a no-op). The others follow the same pattern and\nneed individual verification. An evaluator consulting the registry (or\n`benchbox tuning platforms`, now generated from it) would believe tuned\nruns on these platforms physically render tuning DDL when they may not.\n\nFix: verify each of the five against its real execution path; correct each\nentry to honest rendered_via (likely \"none\" with per-platform notes, or\n\"ddl\" only where a generator is actually consumed at execution); extend\nthe capability-source drift test so a mechanism claim naming a dead\ncode path fails (e.g. assert claimed adapter_mixin symbols have\nproduction call sites, or retire the adapter_mixin mechanism vocabulary\nentirely in favor of generator-backed mechanisms).\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete the dead generate_tuning_clause mixins in this item without checking the applied-ledger TODO's instrumentation plans",
+        "instead": "(not specified)",
+        "item_id": "tuning-registry-mixin-honesty-20260717",
+        "why": "coordinate, don't race"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-22T13:10:36Z",
+      "completed_pr": 1263,
+      "created_at": "2026-07-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "PR #1198's 9 rendered_via=none entries and the emptied allowlist",
+        "item_id": "tuning-registry-mixin-honesty-20260717"
+      },
+      {
+        "behavior": "validate_for_platform behavior for platforms with real tuned rendering (duckdb, clickhouse per #1180)",
+        "item_id": "tuning-registry-mixin-honesty-20260717"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "PR #1198: same verify-against-source method applied to the 9 gap platforms",
+        "decision": "reuse",
+        "item_id": "tuning-registry-mixin-honesty-20260717",
+        "path": "PR"
+      },
+      {
+        "concept": "benchbox/core/tuning/capability_registry.py pg-duckdb entry notes: documents the postgresql discrepancy accurately - the pattern for honest notes",
+        "decision": "reuse",
+        "item_id": "tuning-registry-mixin-honesty-20260717",
+        "path": "benchbox/core/tuning/capability_registry.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-registry-mixin-honesty-20260717",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/**"
+      },
+      {
+        "item_id": "tuning-registry-mixin-honesty-20260717",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning -q -k 'drift or registry'",
+        "description": "Registry suite green; corrected entries pinned",
+        "expected": "All passing; per-platform corrections listed in PR body",
+        "item_id": "tuning-registry-mixin-honesty-20260717",
+        "last_result": "pass",
+        "last_run": "2026-07-22T13:09:26Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-registry-mixin-honesty-20260717",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tuning-registry-mixin-honesty-20260717",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Investigated 5 platforms. generate_tuning_clause has ZERO production call sites (only defs+unit tests); real DDL from benchmark.get_create_tables_sql reads tuning_config for PK/FK flags only, never partition/cluster/dist/sort; get_ddl_generator feeds dry-run preview only; apply_unified_tuning is wired (result_capture.py:1751-1753). Reality: snowflake CLUSTERING/PARTITIONING=post_load (ALTER CLUSTER BY snowflake.py:1710); postgresql/redshift/bigquery/mysql=none (mixin ''/apply log-only; no MySQLAdapter class -> NoOpTableTuningMixin).",
+        "item_id": "tuning-registry-mixin-honesty-20260717",
+        "notes": null,
+        "started_at": "2026-07-22T13:08:55Z",
+        "started_branch": "fix/tuning-registry-mixin-honesty",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Verify each of the five platforms' execution paths; table of claim vs reality with file:line evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": "capability_registry.py: 5 entries corrected to honest rendered_via/mechanism/notes with file:line evidence - snowflake->_post_load(apply_table_tunings), postgresql/redshift/bigquery/mysql->_none(<gen>_ddl_generator:preview_only). Tuning-type key SETS preserved exactly -> is_compatible_with_platform unchanged (frozen-baseline test passes). PR #1198 nine none-entries + starrocks entry + EXPECTED_GENERATOR_ONLY_KEYS untouched.",
+        "item_id": "tuning-registry-mixin-honesty-20260717",
+        "notes": null,
+        "started_at": "2026-07-22T13:09:03Z",
+        "started_branch": "fix/tuning-registry-mixin-honesty",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Correct the five registry entries to honest rendered_via/mechanism; keep is_compatible_with_platform behavior unchanged unless the honest entry requires otherwise (document any behavior delta)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "test_capability_source_drift.py +3 guards: generate_tuning_clause has no production call site; no registry entry rests on the dead mixin; any adapter_mixin:<Class>.<method> ddl/post_load claim must exist+have a call site+not be an empty-return stub. Negative test confirmed red on reintroducing a dead claim. 62 passed (-k drift/registry); 574 passed full core/tuning; ruff/ty clean. Rebased onto #1-merged develop (fast 25383 < cap 25410, no bump).",
+        "item_id": "tuning-registry-mixin-honesty-20260717",
+        "notes": null,
+        "started_at": "2026-07-22T13:09:06Z",
+        "started_branch": "fix/tuning-registry-mixin-honesty",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Drift-test hardening: dead-mechanism claims must fail (call-site existence check or mechanism vocabulary retirement)",
+        "wid": "w2"
+      }
+    ]
+  }
+}

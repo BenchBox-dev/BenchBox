@@ -1,0 +1,104 @@
+{
+  "description": "nyctaxi, clickbench, and amplab benchmarks do not set csv_null_marker in their\ngenerator manifest metadata.  SingleStore LOAD DATA INFILE in strict mode requires\nNULL DEFINED BY to handle nullable integer columns; without it, empty fields hit\nerror 1264 \"Out of range value for column\".\n\nnyctaxi sets csv_null_marker=None explicitly (core/nyctaxi/benchmark.py:294);\nclickbench sets csv_null_marker=None (core/clickbench/generator.py:390); amplab\nsets nothing.  nyctaxi at minimum has nullable integer columns and will fail as\nsoon as a SingleStore smoke test runs against it.\n\nThis is pre-existing — not introduced by the CSV-loading work — but was surfaced\nduring that review.  Address before pointing SingleStore smoke tests at these\nbenchmarks.\n",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-04-26T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "No live SingleStore server required for verification",
+        "item_id": "singlestore-non-tpc-csv-null-marker"
+      },
+      {
+        "behavior": "TPC benchmark CSV dialects are unchanged; only nyctaxi/clickbench/amplab gain an explicit marker",
+        "item_id": "singlestore-non-tpc-csv-null-marker"
+      },
+      {
+        "behavior": "csv_null_marker='' (empty string), not None, so NULL DEFINED BY is actually emitted",
+        "item_id": "singlestore-non-tpc-csv-null-marker"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "singlestore-non-tpc-csv-null-marker",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/platform-expansion/planning/singlestore-non-tpc-csv-null-marker.yaml"
+      },
+      {
+        "item_id": "singlestore-non-tpc-csv-null-marker",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/amplab/generator.py"
+      },
+      {
+        "item_id": "singlestore-non-tpc-csv-null-marker",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/clickbench/generator.py"
+      },
+      {
+        "item_id": "singlestore-non-tpc-csv-null-marker",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/benchmark.py"
+      },
+      {
+        "item_id": "singlestore-non-tpc-csv-null-marker",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_manifest_driven_loading.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_manifest_driven_loading.py -q",
+        "description": "Manifest-driven loading / dialect resolution coverage passes",
+        "expected": "passes",
+        "item_id": "singlestore-non-tpc-csv-null-marker",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/platform-expansion/planning/singlestore-non-tpc-csv-null-marker.yaml",
+        "description": "TODO graph and schema remain valid",
+        "expected": "passes",
+        "item_id": "singlestore-non-tpc-csv-null-marker",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "singlestore-non-tpc-csv-null-marker",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "singlestore-non-tpc-csv-null-marker",
+        "notes": "Pass csv_null_marker=\"\" into each benchmark's write_generator_manifest()\ncall so manifest path (a) wins and the resolved dialect carries an explicit\nNULL marker:\n  - benchbox/core/clickbench/generator.py:385 (currently None)\n  - benchbox/core/amplab/generator.py:392 (currently sets nothing)\n  - benchbox/core/nyctaxi/benchmark.py:294 (currently None explicitly)\nEmpty string is the correct marker: SingleStore LOAD DATA INFILE emits\nNULL DEFINED BY '' so empty fields in nullable integer columns load as NULL\ninstead of raising error 1264.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Set explicit csv_null_marker=\"\" for nyctaxi, clickbench, and amplab manifests",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "singlestore-non-tpc-csv-null-marker",
+        "notes": "Add/extend a unit or integration assertion (closest harness:\ntests/integration/test_manifest_driven_loading.py) that resolve_csv_dialect\nyields a non-None null_marker for nyctaxi, clickbench, and amplab so the\nSingleStore _load_data_infile path emits NULL DEFINED BY. A dry-run check is\nacceptable if a unit assertion is impractical; do not require a live\nSingleStore server.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify the resolved CSV dialect carries a non-None null marker for each benchmark",
+        "wid": "w2"
+      }
+    ]
+  }
+}

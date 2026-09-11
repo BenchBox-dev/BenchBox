@@ -1,0 +1,36 @@
+{
+  "context": "Add node_modules to the codespell --skip list in the Makefile spellcheck target (and consider results-explorer/dist and any other generated JS output). Prefer making codespell ignore-file aware, or drive the skip list from .gitignore, over hand-maintaining a parallel exclusion list that will drift again. Do NOT weaken --ignore-words. Then re-run the original item's rung with node_modules actually present, which is the check that was never performed. Also worth asking why a done item's rung was not executed - that is a process gap beyond this fix.",
+  "description": "spellcheck-scans-gitignored-node-modules is marked done, but the fix is not in the tree and that item's own verification rung ('make spellcheck exits 0 with node_modules present') fails. Makefile:942 passes --skip=\"*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,_binaries,*.tpl,*.dst,*.tbl,_sources,benchmark_runs,*.dat,*.pdf,_project,_blog,htmlcov,.venv\" - no node_modules and no results-explorer entry, and codespell does not honour .gitignore. Reproduced on develop @ 74aee99: creating results-explorer/node_modules/pkg/index.js containing 'recieve teh occured' makes make spellcheck report three hits and exit non-zero (Error 65). Impact: make pr-preflight is red for every developer who has installed the results-explorer npm deps, which trains people to ignore a real gate. Either the fix was reverted or the item was completed without it landing.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci-infrastructure",
+      "created_at": "2026-07-30T12:06:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Real source-tree typos are still caught; --ignore-words behaviour unchanged",
+        "item_id": "spellcheck-node-modules-skip-never-landed"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "spellcheck-node-modules-skip-never-landed",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "mkdir -p results-explorer/node_modules/pkg && printf 'recieve teh occured\\n' > results-explorer/node_modules/pkg/index.js && make spellcheck; rc=$?; rm -rf results-explorer/node_modules; exit $rc",
+        "description": "spellcheck passes with gitignored node_modules present",
+        "expected": "exit 0",
+        "item_id": "spellcheck-node-modules-skip-never-landed",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

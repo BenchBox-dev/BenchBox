@@ -1,0 +1,188 @@
+{
+  "context": "Choose one canonical nullable-phase SQL expression and reuse it in facet queries, summaries, in-memory matching, and URL state. Add NULL, blank, and known-phase regressions.",
+  "description": "PR #1482 presents canonical_phase(NULL) as unknown, but facetsToWhereClause still emits test_type IN ('unknown'). SQL NULL never matches that predicate, so the visible unknown phase option returns zero rows for the rows it represents.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix only labels or only SQL",
+        "instead": "test both paths together",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "why": "counts and rows would disagree"
+      },
+      {
+        "dont": "rewrite source NULL into literal unknown",
+        "instead": "canonicalize at query/display boundaries",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "why": "that loses provenance"
+      },
+      {
+        "dont": "special-case one benchmark",
+        "instead": "use the shared canonical helper",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "why": "NULL phase is shared"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "needs_item": "results-explorer-cohort-identity-and-launch-claim-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Cohort identity",
+      "completed_at": "2026-08-10T00:41:22Z",
+      "completed_pr": 1495,
+      "created_at": "2026-08-02T16:27:27Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Known phases remain exact",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802"
+      },
+      {
+        "behavior": "SQL and in-memory filters agree",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802"
+      },
+      {
+        "behavior": "URL state remains shareable",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802"
+      },
+      {
+        "behavior": "Unknown is a display sentinel, not persisted data",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Canonical phase labels",
+        "decision": "reuse",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "path": "results-explorer/src/lib/displayLabels.ts"
+      },
+      {
+        "concept": "In-memory matcher",
+        "decision": "extend",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "path": "results-explorer/src/lib/facetMatching.ts"
+      },
+      {
+        "concept": "Facet SQL builder",
+        "decision": "extend",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "path": "results-explorer/src/lib/facetModel.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/facetMatching.test.ts"
+      },
+      {
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/facetModel.test.ts"
+      },
+      {
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/facetMatching.ts"
+      },
+      {
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/facetModel.ts"
+      },
+      {
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npx vitest run src/lib/__tests__/facetModel.test.ts src/lib/__tests__/facetMatching.test.ts",
+        "description": "Unknown phase selects NULL-backed rows in SQL and memory",
+        "expected": "Focused facet tests pass",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:41:08Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/Home.test.tsx",
+        "description": "Home unknown facet retains represented rows",
+        "expected": "Home regression passes",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:41:16Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Reconciled against origin/develop at 37949b8d22: canonicalPhase trims/lowercases and folds null/blank test_type to unknown; facetsToWhereClause uses the matching CANONICAL_PHASE_SQL contract; tests in PR #1495 cover SQL and in-memory behavior.",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "notes": null,
+        "started_at": "2026-08-10T00:39:26Z",
+        "started_branch": "fix/results-explorer-phase-facet-null-canonicalization-20260809",
+        "started_worktree": "/private/tmp/bb-results-explorer-phase-facet-20260809",
+        "status": "done",
+        "summary": "Specify unknown-phase SQL/display contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Verified the landed shared contract: SQL facetsToWhereClause canonicalizes phase values with CASE/trim/lower/coalesce, while matchesFacetRow uses canonicalPhase; URL state remains the existing phase facet token and does not persist unknown into source rows.",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "notes": null,
+        "started_at": "2026-08-10T00:39:36Z",
+        "started_branch": "fix/results-explorer-phase-facet-null-canonicalization-20260809",
+        "started_worktree": "/private/tmp/bb-results-explorer-phase-facet-20260809",
+        "status": "done",
+        "summary": "Align SQL, matching, counts, and URL state",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Fresh verification from the isolated origin/develop worktree: facetModel and facetMatching suites 39 passed; Home regression suite 28 passed. Existing tests cover null/blank/known/case variants and the Home SQL query plus cohort-link behavior.",
+        "item_id": "results-explorer-phase-facet-null-canonicalization-20260802",
+        "notes": null,
+        "started_at": "2026-08-10T00:39:45Z",
+        "started_branch": "fix/results-explorer-phase-facet-null-canonicalization-20260809",
+        "started_worktree": "/private/tmp/bb-results-explorer-phase-facet-20260809",
+        "status": "done",
+        "summary": "Add NULL/blank/known regressions",
+        "wid": "w2"
+      }
+    ]
+  }
+}

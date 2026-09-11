@@ -1,0 +1,381 @@
+{
+  "context": "Subclass, don't rebuild. DuckLake is DuckDB + a catalog ATTACH, so\nDuckLakeAdapter(DuckDBAdapter) mirrors PgDuckDBAdapter(PostgreSQLAdapter):\nsuper().create_connection() yields a DuckDB connection; INSTALL/LOAD ducklake;\nATTACH the DuckLake catalog; USE it so it becomes the default catalog. Inherited\ncreate_schema + load_data (via DataLoader) then write into DuckLake with no\noverride — verify this in w3 before assuming it. Declare platform_family/\ninherits_from='duckdb' so dialect translation and benchmark compatibility are\ninherited (motherduck pattern). Reuse the exact ATTACH SQL from\nducklake_maintenance.py:186.\n",
+  "description": "Add DuckLake as a runnable BenchBox platform so it can be benchmarked on\nTPC-H/TPC-DS/etc. alongside the other 45 SQL engines.\n\nDuckLake (GA v1.0, April 2026 — https://ducklake.select) is an open lakehouse\nformat: table DATA is Parquet on local disk or object storage, and all catalog\nMETADATA (schemas, snapshots, stats, file lists) lives in a standard SQL\ndatabase (DuckDB / SQLite / PostgreSQL) instead of Iceberg manifests or Delta\nJSON logs. It ships as a DuckDB extension and uses DuckDB's engine + SQL\ndialect unchanged:\n  INSTALL ducklake;\n  ATTACH 'ducklake:<catalog>' AS lake (DATA_PATH '<parquet_dir_or_s3>');\n  USE lake;  -- then normal CREATE TABLE / COPY / SELECT\n\nCurrent state: DuckLake already exists in BenchBox as a table *format*\n(converter benchbox/utils/format_converters/ducklake_converter.py,\nDUCKLAKE_CAPABILITY in benchbox/platforms/base/format_capabilities.py:180,\nDataFrame maintenance ops in\nbenchbox/platforms/dataframe/ducklake_maintenance.py) but NOT as a *platform*.\nThere is no DuckLakeAdapter and no `ducklake` entry in PlatformRegistry. This\nTODO adds the adapter and wires it in.\n\nThis item = the MVP: DuckLakeAdapter subclassing DuckDBAdapter, with a\nDuckDB-file catalog + local Parquet storage, full registry wiring, docs, and\nlive TPC-H/TPC-DS validation. SQLite/PostgreSQL catalogs and S3 storage are a\nfollow-on (see ducklake-catalog-storage-backends).\n\nEvidence (pinned): the worktree venv resolves duckdb==1.3.2; the `ducklake`\nextension requires DuckDB >= 1.3 (spec 0.1/0.2; 1.4 for 0.3). The global\n`duckdb` pin in pyproject.toml is intentionally `>=1.0.0,<2.0.0` (kept at 1.0\nfloor for duckdb-wasm on-disk-format compatibility — see the comment at\npyproject.toml:90-94). Do NOT raise that floor; enforce the >=1.3 requirement\nat runtime in the adapter instead.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a new SQL dialect or query driver",
+        "instead": "return 'duckdb' from get_target_dialect and inherit execution",
+        "item_id": "ducklake-platform-adapter",
+        "why": "DuckLake IS DuckDB"
+      },
+      {
+        "dont": "hardcode argparse platform choices",
+        "instead": "registration in _OPTIONAL_ADAPTERS is sufficient",
+        "item_id": "ducklake-platform-adapter",
+        "why": "CLI choices come from PlatformRegistry.get_available_platforms()"
+      },
+      {
+        "dont": "raise the global pyproject `duckdb` floor to >=1.3",
+        "instead": "enforce >=1.3 at runtime in create_connection with a clear error instead",
+        "item_id": "ducklake-platform-adapter",
+        "why": "the 1.0 floor is deliberate for duckdb-wasm on-disk-format compat (pyproject.toml:90-94)"
+      },
+      {
+        "dont": "route load through the ducklake_converter format pipeline",
+        "instead": "let inherited DuckDB load_data write into `lake` after USE",
+        "item_id": "ducklake-platform-adapter",
+        "why": "native platform load should CREATE/COPY into the attached catalog directly"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "ducklake-platform-adapter",
+        "id": 96,
+        "reason": "Tracked in ducklake-catalog-storage-backends (depends on this item)",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Tracked in ducklake-catalog-storage-backends, which is now under _project/DONE/ducklake-platform/ (already completed).",
+        "summary": "SQLite and PostgreSQL catalog backends; S3/cloud object storage for DATA_PATH"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "ducklake-platform-adapter",
+        "id": 97,
+        "reason": "Adapter parity first; lakehouse-feature benchmarks are a separate research item",
+        "resolution": "promoted",
+        "resolved_item": "ducklake-specific-benchmarks-time-travel-schema-evolution-sn",
+        "resolved_reason": null,
+        "summary": "DuckLake-specific benchmarks (time travel, schema evolution, snapshot/maintenance workloads)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "ducklake-platform-adapter",
+        "id": 98,
+        "reason": "Inherits DuckDB's unsupported_benchmarks set unchanged",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason is a statement that DuckLake inherits DuckDB's existing unsupported-benchmark set unchanged, not an action item.",
+        "summary": "Vector search / any benchmark DuckDB itself does not support"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-07-09T00:00:00Z",
+      "created_at": "2026-07-07T00:00:00Z",
+      "worktree": "ducklake-platform"
+    },
+    "preserves": [
+      {
+        "behavior": "DuckDBAdapter behavior is unchanged — DuckLakeAdapter only overrides create_connection (+ catalog targeting if w3 requires it); all existing tests/integration/*duckdb* keep passing",
+        "item_id": "ducklake-platform-adapter"
+      },
+      {
+        "behavior": "PlatformRegistry metadata/support-status validation continues to pass for all platforms",
+        "item_id": "ducklake-platform-adapter"
+      },
+      {
+        "behavior": "The existing DuckLake table-FORMAT path (ducklake_converter.py, DUCKLAKE_CAPABILITY) is untouched",
+        "item_id": "ducklake-platform-adapter"
+      },
+      {
+        "behavior": "The global pyproject.toml `duckdb` pin stays >=1.0.0,<2.0.0 (duckdb-wasm on-disk-format compat)",
+        "item_id": "ducklake-platform-adapter"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/base/format_capabilities.py:180 DUCKLAKE_CAPABILITY + utils/format_converters/ducklake_converter.py — LEAVE AS-IS (orthogonal format-conversion pipeline; native adapter load writes DuckLake via the attached catalog, not the converter)",
+        "decision": "reuse",
+        "item_id": "ducklake-platform-adapter",
+        "path": "benchbox/platforms/base/format_capabilities.py:180"
+      },
+      {
+        "concept": "benchbox/platforms/dataframe/ducklake_maintenance.py:168-189: proven INSTALL/LOAD ducklake + ATTACH 'ducklake:...' (DATA_PATH ...) SQL — REUSE the exact statements",
+        "decision": "reuse",
+        "item_id": "ducklake-platform-adapter",
+        "path": "benchbox/platforms/dataframe/ducklake_maintenance.py:168-189"
+      },
+      {
+        "concept": "benchbox/platforms/duckdb.py: create_connection:709, create_schema:775, load_data:838, execute_query:917, plan capture:1038, extension-install idiom _try_delta_scan:136 — REUSE/INHERIT unchanged; override only create_connection + catalog targeting",
+        "decision": "reuse",
+        "item_id": "ducklake-platform-adapter",
+        "path": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "concept": "benchbox/platforms/motherduck.py: platform_family/inherits_from='duckdb' metadata + get_target_dialect via resolve_dialect_for_query_translation — REUSE the family-inheritance pattern for dialect + benchmark compatibility",
+        "decision": "reuse",
+        "item_id": "ducklake-platform-adapter",
+        "path": "benchbox/platforms/motherduck.py"
+      },
+      {
+        "concept": "benchbox/platforms/pg_duckdb.py: PgDuckDBAdapter(PostgreSQLAdapter) overrides create_connection to install/configure an extension — EXTEND: primary structural template for DuckLakeAdapter(DuckDBAdapter)",
+        "decision": "extend",
+        "item_id": "ducklake-platform-adapter",
+        "path": "benchbox/platforms/pg_duckdb.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/ducklake_maintenance.py"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/utils/format_converters/ducklake_converter.py"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/ducklake.py"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/comparison-matrix.md"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/ducklake.md"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/index.md"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/support-status.md"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_ducklake_integration.py"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_ducklake_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox platforms list",
+        "description": "Platform is discoverable",
+        "expected": "output includes 'ducklake'",
+        "item_id": "ducklake-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_abc_conformance.py tests/unit/platforms/test_adapter_validation_consistency.py -q",
+        "description": "Registry metadata/support-status validation + ABC conformance pass with ducklake registered",
+        "expected": "all pass; PlatformRegistry validates ducklake metadata against its support_status without error",
+        "item_id": "ducklake-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_ducklake_adapter.py -q",
+        "description": "Adapter unit tests pass",
+        "expected": "all pass, 0 failures",
+        "item_id": "ducklake-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform ducklake --benchmark tpch --scale 0.01",
+        "description": "Live TPC-H at SF 0.01 (duckdb catalog, local storage)",
+        "expected": "all 22 queries succeed; Parquet data + .ducklake catalog written under benchmark_runs/",
+        "item_id": "ducklake-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform ducklake --benchmark tpcds --scale 0.01",
+        "description": "Live TPC-DS at SF 0.01",
+        "expected": "queries succeed; results validate",
+        "item_id": "ducklake-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ducklake-platform-adapter",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "ducklake-platform-adapter",
+        "needs_wid": "w6",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ducklake-platform-adapter",
+        "notes": "uv run -- python -c \"import duckdb; c=duckdb.connect(); c.execute('INSTALL ducklake'); c.execute('LOAD ducklake'); print(duckdb.__version__)\"\nRecord duckdb version + PASS in the PR body / commit message. Confirms the\npinned-evidence version and that the extension is fetchable in CI.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate DuckLake extension loads on the pinned DuckDB (>=1.3.2) and commit a compact summary",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ducklake-platform-adapter",
+        "notes": "Model on pg_duckdb.py. Implement: platform_name -> 'DuckLake';\nget_target_dialect -> 'duckdb'; add_cli_arguments (--ducklake-metadata-path,\n--ducklake-data-path); from_config (resolve metadata_path default under\nbenchmark_runs/databases, data_path default sibling ducklake_data/);\n__init__; create_connection = super().create_connection() then INSTALL/LOAD\nducklake, ATTACH 'ducklake:<meta>' AS lake (DATA_PATH '<dir>'), USE lake,\nwith an actionable RuntimeError if the extension fails (point to DuckDB>=1.3);\nget_platform_info adds catalog_backend/data_path/ducklake extension version.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create benchbox/platforms/ducklake.py — DuckLakeAdapter(DuckDBAdapter), DuckDB-file catalog + local DATA_PATH",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ducklake-platform-adapter",
+        "notes": "Read benchbox/platforms/base/data_loading.py DataLoader/handler SQL. If it\nissues unqualified DDL/COPY it flows into `lake` after USE — no override.\nIf it hard-qualifies `main.` or opens its own connection, override\ncreate_schema/load_data to qualify with the catalog name (lake.main.<table>).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm inherited create_schema/load_data write into the attached catalog; override to qualify if not",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "ducklake-platform-adapter",
+        "notes": "_OPTIONAL_ADAPTERS (:1234) add ('ducklake','benchbox.platforms.ducklake','DuckLakeAdapter');\n_PLATFORM_SUPPORT_STATUS (:44) add 'ducklake':'experimental';\n_PLATFORM_METADATA_JSON (:121) add a block modeled on motherduck with\ncapabilities supports_sql:true, supports_dataframe:false, default_mode:'sql',\nplatform_family:'duckdb', inherits_from:'duckdb', empty unsupported_benchmarks,\nand requirements noting DuckDB>=1.3. Registry validation cross-checks all three.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register in benchbox/core/platform_registry.py (3 places, family=duckdb)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "ducklake-platform-adapter",
+        "notes": "_LAZY_ADAPTER_ROWS (:68) add 'DuckLakeAdapter|.ducklake';\n_EXPORT_NAMES (:276) add 'DuckLakeAdapter';\n_OPTION_SPEC_ROWS (:604) add ducklake|metadata_path|... and ducklake|data_path|...\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire lazy import/export + option specs in benchbox/platforms/__init__.py",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "ducklake-platform-adapter",
+        "notes": "from_config resolution, catalog-string construction, get_target_dialect=='duckdb',\nplatform appears in registry. ABC conformance (test_abc_conformance.py) and\nadapter-validation suites parametrize over the registry automatically. Add a\nmodule-level pytestmark marker (CI enforces via test_marker_strategy.py).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit tests: tests/unit/platforms/test_ducklake_adapter.py + run ABC-conformance suite",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "ducklake-platform-adapter",
+        "notes": "New docs/platforms/ducklake.md (model on motherduck.md); add to\ndocs/platforms/index.md list + {toctree} (:183-225); add rows to\ncomparison-matrix.md and support-status.md; add to README.md SQL Platforms\nlist (:60); add a CHANGELOG.md entry.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Docs: ducklake.md + index toctree, comparison-matrix, support-status, README, CHANGELOG",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "ducklake-platform-adapter",
+        "notes": "uv run -- benchbox run --platform ducklake --benchmark tpch --scale 0.01\n(then tpcds, then SF 1). Confirm all queries pass, Parquet + .ducklake catalog\nappear on disk, results validate, and TPC-H power results/row-counts match the\n`duckdb` platform at the same SF (same engine).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Live validation: TPC-H + TPC-DS at SF 0.01 then SF 1 (duckdb catalog, local); cross-check vs duckdb platform",
+        "wid": "w8"
+      }
+    ]
+  }
+}

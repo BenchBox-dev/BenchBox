@@ -1,0 +1,299 @@
+{
+  "context": "Measure first, then optimize the specific hot paths. Prefer simple memoization,\nquery batching, and bounded rendering before adding complex virtualization.\nUse skeletons to improve perceived performance even when cold-load time cannot\nbe eliminated.\n",
+  "description": "Improve the performance feel of the static DuckDB-WASM explorer as the corpus\ngrows. The audit called out cold-load, query response, loading skeletons, and\npagination behavior as risks. This item focuses on perceived latency and\nruntime cost, not visual redesign: initialize predictably, avoid avoidable\nrepeated scans, keep table rendering bounded, and instrument the expensive\npaths so regressions are visible.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add noisy production console timing",
+        "instead": "gate it.",
+        "item_id": "explorer-performance-perceived-latency",
+        "why": "public visitors should not see debug instrumentation"
+      },
+      {
+        "dont": "optimize by removing methodology/trust data from the first page",
+        "instead": "optimize queries and rendering instead.",
+        "item_id": "explorer-performance-perceived-latency",
+        "why": "trust context is part of the product"
+      },
+      {
+        "dont": "render every row by default just because DuckDB can return it",
+        "instead": "use limits and explicit expansion.",
+        "item_id": "explorer-performance-perceived-latency",
+        "why": "DOM rendering is the likely bottleneck"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "needs_item": "explorer-leaderboard-first-identity-unification"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "needs_item": "explorer-selection-facets-coverage-at-scale"
+      }
+    ],
+    "item_meta": {
+      "category": "Performance",
+      "completed_at": "2026-05-02T00:00:00Z",
+      "created_at": "2026-05-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DuckDB-WASM remains loaded client-side from the static explorer bundle.",
+        "item_id": "explorer-performance-perceived-latency"
+      },
+      {
+        "behavior": "Generated browser fixtures remain deterministic.",
+        "item_id": "explorer-performance-perceived-latency"
+      },
+      {
+        "behavior": "Production UI does not show debug timing unless explicitly enabled.",
+        "item_id": "explorer-performance-perceived-latency"
+      },
+      {
+        "behavior": "Query Workbench retains an intentional unlimited mode for users who request it.",
+        "item_id": "explorer-performance-perceived-latency"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/performance.spec.ts"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/generate-browser-fixtures.mjs"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/verify-browser-fixtures.mjs"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/LoadingSpinner.tsx"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/LoadingSpinner.test.tsx"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/queryFilters.test.ts"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/performanceMarks.ts"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/queryFilters.ts"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Query.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test && npm run test:e2e:fixtures && npm run build",
+        "description": "Frontend typecheck, tests, fixture generation, and build pass.",
+        "expected": "All commands pass with performance instrumentation and bounded rendering.",
+        "item_id": "explorer-performance-perceived-latency",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium",
+        "description": "Performance smoke passes within budgets defined in w5.",
+        "expected": "Chromium performance smoke passes; P95 budgets in w5 are met or exceeded with margin. Test output reports both P50 and P95 for each mark.",
+        "item_id": "explorer-performance-perceived-latency",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures",
+        "description": "Fixture generation is deterministic across two consecutive runs.",
+        "expected": "Fixture invariant and determinism checks pass; output includes the documented DuckDB logical digest allow-list.",
+        "item_id": "explorer-performance-perceived-latency",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-performance-perceived-latency",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-performance-perceived-latency",
+        "notes": "Add lightweight browser performance marks around DB initialization in\n`results-explorer/src/db.ts`, first Home leaderboard data resolution, and\nfirst rendered table/chart. Log only in development or expose a debug panel\nbehind an explicit flag so production UI stays clean.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Measure DuckDB-WASM cold load and first meaningful leaderboard render",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-performance-perceived-latency",
+        "notes": "Skeleton TOKENS and the Home/Layout skeleton treatment are owned by\n`explorer-leaderboard-first-identity-unification` w6. This work unit\nonly consumes those tokens to reserve final-geometry skeletons for\nMetaLeaderboard, benchmark matrices, Query Workbench rows, and Compare\nsummary. Do not redefine skeleton primitives here; if a new skeleton\nshape is needed, add it to the upstream identity work and consume it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply identity-owned skeletons to MetaLeaderboard, BenchmarkIndex, Query, and Compare",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-performance-perceived-latency",
+        "notes": "Query Workbench already has default/unlimited row limit. Audit all table\nsurfaces for unbounded rendering and add explicit limits where corpus\ngrowth can create thousands of rows. Show visible result counts and\n\"show more\" affordances rather than rendering everything by default.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Bound large table rendering with pagination, limits, or virtualization",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-performance-perceived-latency",
+        "notes": "Review `duckdbQueries.ts`, `queryFilters.ts`, Home, BenchmarkIndex,\nPlatformIndex, and Query for repeated COUNT/DISTINCT queries. Cache stable\nmetadata for the lifetime of the loaded DuckDB snapshot and invalidate\nonly when filters change.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch or cache facet/count queries that repeat across pages",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-performance-perceived-latency",
+        "notes": "Provisional budgets, measured against the generated fixture corpus on a\nGitHub Actions Ubuntu runner with the project's standard Chromium build:\n  - DuckDB-WASM cold init (`db-init` performance mark): P50 < 4000 ms,\n    P95 < 6000 ms\n  - First Home leaderboard data resolved (`leaderboard-data-ready`):\n    P50 < 1500 ms after `db-init`, P95 < 2500 ms\n  - First leaderboard render (`leaderboard-rendered`):\n    P50 < 500 ms after `leaderboard-data-ready`, P95 < 1000 ms\n  - First Query Workbench paint with default DEFAULT_COLUMNS:\n    P50 < 600 ms, P95 < 1200 ms after `db-init`\nRun the smoke 10 times, fail on the P95 threshold, surface the P50 in\nthe test report. Tolerance is built into the gap between P50 and P95;\nno extra slack. If a budget is genuinely wrong the fix is to revise it\nin this file with rationale, not to widen tolerance silently.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Playwright performance smoke with concrete budgets",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-performance-perceived-latency",
+        "notes": "`npm run test:e2e:fixtures` already generates fixtures. Add a check\nthat re-running fixture generation produces byte-identical output (or\na documented allow-list of timestamp fields). `data/results.duckdb`\nis an allowed binary-container exception only if its logical table\ndigest is identical, so the perf smoke is not measuring regenerated\nfixtures with shifting row counts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add fixture determinism guard",
+        "wid": "w6"
+      }
+    ]
+  }
+}

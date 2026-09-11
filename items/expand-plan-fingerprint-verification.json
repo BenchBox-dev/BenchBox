@@ -1,0 +1,10 @@
+{
+  "description": "Fingerprint fast-paths currently ignore core logical structure (join conditions,\ngrouping, projections, limits/offsets), so materially different plans hash the\nsame and are marked identical. Stored fingerprints are also trusted on ingest,\nallowing stale/tampered hashes to bypass comparison. Tighten the structural\nsignature, recompute/verify fingerprints on load and before comparison, and\nupdate regression/summary flows to refuse hashes that don’t match the current\ntree. Ensure plan history and CLI outputs surface verification failures cleanly.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2025-11-26T00:00:00Z",
+      "worktree": "query-plan-remediation"
+    }
+  }
+}

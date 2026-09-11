@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #584 of pg-duckdb-platform-adapter.\nDeferred: MotherDuck cloud deployment integration testing\nReason deferred: Requires active MotherDuck account - handle in live-platform-test workflow",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:37:05Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

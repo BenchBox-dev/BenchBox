@@ -1,0 +1,128 @@
+{
+  "context": "Stop caching the entrypoint function under the submodule's name. Options: (a) keep the lazy function available but do not write it into globals() under 'main' - return it without caching, so the submodule binding is never clobbered; (b) expose the entrypoint under a distinct name (e.g. cli_main) and keep 'main' meaning the submodule, updating console_scripts and callers; (c) have __getattr__ return the submodule for 'main' and let callers reach the function through it. Prefer whichever keeps the packaging entrypoint stable - check pyproject console_scripts before choosing. Then convert the remaining string-target patches back to the plain form and confirm they still work, since the workaround indirection becomes unnecessary.",
+  "description": "benchbox/cli/__init__.py __getattr__ handles 'main' by doing 'from benchbox.cli.main import main' and then 'globals()[\"main\"] = main', binding the FUNCTION under the same name as the benchbox.cli.main SUBMODULE. The winner depends on order within a process: importing the submodule first leaves the module bound (Python sets the parent attribute on submodule import); touching the attribute first fires the lazy path and the function overwrites it. Python >= 3.11 masks the consequence because unittest.mock._get_target resolves patch targets via pkgutil.resolve_name, which imports the dotted path so the module wins; Python 3.10 walks the path with getattr and lands on the function. That is why the 2026-07-29 nightly failed on ubuntu-latest/3.10 only, and only for one test - it is order-dependent across xdist workers. Verified against the real package: package-only import followed by attribute access makes 3.10's resolver return <function main> with has get_config_manager=False, matching the nightly error verbatim. PR for nightly-py310-dataframe-options-mock-target worked around it in one test file; this item removes the shadow so every remaining caller is fixed at once.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-07-29T13:30:33Z",
+      "completed_pr": 1338,
+      "created_at": "2026-07-29T11:53:18Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "lazy import behaviour: importing benchbox.cli must not pull in polars/datafusion",
+        "item_id": "cli-package-shadows-main-submodule-with-function"
+      },
+      {
+        "behavior": "the console_scripts entrypoint keeps working (benchbox --version runs)",
+        "item_id": "cli-package-shadows-main-submodule-with-function"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cli-package-shadows-main-submodule-with-function",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/__init__.py"
+      },
+      {
+        "item_id": "cli-package-shadows-main-submodule-with-function",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/main.py"
+      },
+      {
+        "item_id": "cli-package-shadows-main-submodule-with-function",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "cli-package-shadows-main-submodule-with-function",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import benchbox.cli; _ = benchbox.cli.main; import types; assert isinstance(benchbox.cli.main, types.ModuleType), type(benchbox.cli.main)\"",
+        "description": "The submodule wins attribute resolution even when the attribute is touched first",
+        "expected": "exit 0",
+        "item_id": "cli-package-shadows-main-submodule-with-function",
+        "last_result": "pass",
+        "last_run": "2026-07-29T12:34:58Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import benchbox.cli; _ = benchbox.cli.main; from unittest.mock import patch; p=patch('benchbox.cli.main.get_config_manager'); p.start(); p.stop()\"",
+        "description": "Plain string patch targets resolve under 3.10 semantics",
+        "expected": "exit 0",
+        "item_id": "cli-package-shadows-main-submodule-with-function",
+        "last_result": "pass",
+        "last_run": "2026-07-29T12:35:01Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox --version",
+        "description": "The CLI entrypoint still runs",
+        "expected": "exit 0",
+        "item_id": "cli-package-shadows-main-submodule-with-function",
+        "last_result": "pass",
+        "last_run": "2026-07-29T12:35:06Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import sys, benchbox.cli; assert 'polars' not in sys.modules and 'datafusion' not in sys.modules\"",
+        "description": "Importing benchbox.cli stays lazy (no heavy deps pulled in)",
+        "expected": "exit 0",
+        "item_id": "cli-package-shadows-main-submodule-with-function",
+        "last_result": "pass",
+        "last_run": "2026-07-29T12:35:11Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/ -q",
+        "description": "Full cli unit suite passes",
+        "expected": "exit 0",
+        "item_id": "cli-package-shadows-main-submodule-with-function",
+        "last_result": "pass",
+        "last_run": "2026-07-29T12:37:27Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cli-package-shadows-main-submodule-with-function",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Rungs 1-4 passed; focused startup/dataframe tests 16 passed single-threaded; Ruff check/format passed",
+        "item_id": "cli-package-shadows-main-submodule-with-function",
+        "notes": null,
+        "started_at": "2026-07-29T12:31:24Z",
+        "started_branch": "fix/cli-package-main-shadow",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Remove the shadow in benchbox/cli/__init__.py without breaking the console_scripts entrypoint",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Reverted #1329 workaround to string patch; full CLI unit suite 1605 passed, 15 deselected; fast collection 25940 selected, below cap 26050",
+        "item_id": "cli-package-shadows-main-submodule-with-function",
+        "notes": null,
+        "started_at": "2026-07-29T12:33:44Z",
+        "started_branch": "fix/cli-package-main-shadow",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Revert the test-side indirection workarounds to plain string targets",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,325 @@
+{
+  "context": "First create a machine-readable target and dependency inventory plus representative behavioral smoke matrix. Select include boundaries by coherent ownership, not line count. Move one domain per reviewable slice and compare inventory and representative command behavior after each move. Keep root orchestration targets where moving them would obscure control flow. Stop if supported Make implementations or help discovery regress.",
+  "description": "The root Makefile is approximately 2735 lines and mixes testing, quality, platform, release, tracker, and agent/worktree operations. Modularize it only after the platform-manifest and quality-gate contracts are stable. Preserve every public target, help entry, environment propagation rule, shell behavior, and CI entrypoint. This is a responsibility-based extraction, not a target rename or command-modernization project. Recreated 2026-08-08 by adversarial TODO review from makefile-domain-modularization-20260808 to retarget its quality-gate dependency at align-quality-gates-with-actual-policy-20260808; the tracker blocks claims on dependencies that are not done, and a dropped dependency would have gated this item forever.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Begin before manifest and quality gates stabilize.",
+        "instead": "Honor the dependency graph and revalidate baselines first.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "why": "Concurrent gate churn creates conflicts and ambiguous regressions."
+      },
+      {
+        "dont": "Rename targets or modernize commands while moving them.",
+        "instead": "Preserve commands exactly and propose later improvements separately.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "why": "Behavior changes become indistinguishable from mechanical extraction."
+      },
+      {
+        "dont": "Split the Makefile only by size.",
+        "instead": "Use coherent responsibility boundaries.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "why": "Arbitrary chunks obscure ownership and dependencies."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "needs_item": "align-quality-gates-with-actual-policy-20260808"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "needs_item": "platform-manifest-single-source-20260808"
+      }
+    ],
+    "item_meta": {
+      "category": "Build Maintainability",
+      "completed_at": "2026-08-09T02:28:50Z",
+      "created_at": "2026-08-08T20:35:23Z",
+      "worktree": "build-maintainability"
+    },
+    "preserves": [
+      {
+        "behavior": "CI entrypoints continue invoking the same behavior.",
+        "item_id": "modularize-makefile-by-domain-20260808"
+      },
+      {
+        "behavior": "Environment variables shell flags exit codes and command ordering remain equivalent.",
+        "item_id": "modularize-makefile-by-domain-20260808"
+      },
+      {
+        "behavior": "Every public make target and alias remains available under the same name.",
+        "item_id": "modularize-makefile-by-domain-20260808"
+      },
+      {
+        "behavior": "Help output remains complete and discoverable.",
+        "item_id": "modularize-makefile-by-domain-20260808"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Current public orchestration and help contract.",
+        "decision": "extend",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "path": "Makefile"
+      },
+      {
+        "concept": "Existing pattern for complex logic delegated out of Make recipes.",
+        "decision": "reuse",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "path": "_project/scripts/"
+      },
+      {
+        "concept": "Completed evidence that Makefile and CI policy can diverge.",
+        "decision": "extend",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "path": "auto-merge-workflow-defeats-the-makefile-hold-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "only_modify",
+        "path_glob": ".gitignore"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/single-repo-migration.md"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "only_modify",
+        "path_glob": "_project/make/"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "only_modify",
+        "path_glob": "docs/development/"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "only_modify",
+        "path_glob": "make/"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_platform_registry_behavioral.py"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make help >/tmp/benchbox-make-help.txt && test -s /tmp/benchbox-make-help.txt",
+        "description": "Target inventory remains identical",
+        "expected": "Help output is nonempty and inventory parity tests pass.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T02:21:50Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make ci-lint",
+        "description": "Configured lint and quality entrypoints remain callable",
+        "expected": "The existing CI lint contract passes.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T02:23:27Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast test entrypoint remains green",
+        "expected": "Fast tests pass serially.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T02:28:11Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make agent-write-preflight",
+        "description": "Agent and worktree policy checks remain callable",
+        "expected": "Preflight succeeds in a valid claimed worktree.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T02:28:29Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make help >/tmp/benchbox-make-help.txt && test -s /tmp/benchbox-make-help.txt",
+        "description": "Target inventory guard rejects a deliberately omitted public target",
+        "expected": "The inventory parity test exits nonzero when a public target is removed during extraction and exits zero after parity is restored.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T02:28:32Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make help >/tmp/benchbox-make-help.txt && test -s /tmp/benchbox-make-help.txt",
+        "description": "Public-target inventory negative control",
+        "expected": "Exits 1 on an unfixed tree after omitting a public target from an extracted module; exits 0 after restoring inventory parity.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-09T02:28:35Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Captured monolith baseline with 198 targets, 195 public targets, default goal test, parse-ordered semantic statements, variables, macros, recipes, help, CI consumers, and environment-sensitive include behavior.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T02:20:57Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Inventory targets includes help text dependencies CI consumers environment contracts and supported Make behavior.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Defined six responsibility modules: platform tests, documentation, worktrees, worktree pool, worktree maintenance, and help; retained bootstrap variables, core testing, CI, quality, UAT, and ordering-sensitive root definitions in Makefile.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T02:21:02Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Define responsibility-based module boundaries and identify targets that must remain at the root.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added fail-closed Make inventory checker, current inventory, immutable monolith baseline, compact migration proof, and 9 regression/negative-control tests including semantic reordering and include-root injection.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T02:21:07Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add deterministic target inventory and no-drift tests before moving definitions.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Extracted first platform-tests domain and proved evaluated target/recipe/variable semantics and help/default-goal parity through deterministic inventory and literal-root consumer tests.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T02:21:13Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Extract the first low-risk domain and prove target help and command parity.",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Extracted all six approved domains in original parse order; root Makefile reduced from 2752 to 1726 lines while retaining all 198 historical targets plus the new inventory guard.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T02:21:18Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Extract remaining approved domains one slice at a time with rollback points.",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Verified makefile inventory and migration proof, 236 focused/literal tests, 11 worktree integration tests, make ci-lint, agent-write-preflight, and full serial fast suite: 27751 passed, 18 skipped.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T02:21:23Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Run representative test quality worktree tracker documentation and release dry-run commands.",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Documented module ownership, root-only bootstrap rules, extension and regeneration workflow, historical migration proof, decision cases, and rejected arbitrary/behavior-changing splits.",
+        "item_id": "modularize-makefile-by-domain-20260808",
+        "notes": null,
+        "started_at": "2026-08-09T02:21:28Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Document module ownership extension rules and rejected boundaries.",
+        "wid": "w6"
+      }
+    ]
+  }
+}

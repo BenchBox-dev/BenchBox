@@ -1,0 +1,256 @@
+{
+  "context": "Run the migration as a governed audit with explicit policy artifacts:\n1) inventory all timing call sites in runtime, tests, utilities, scripts;\n2) classify each usage as elapsed/timeout vs event timestamp;\n3) migrate elapsed/timeout to centralized monotonic helpers;\n4) retain and document approved wall-clock usages via allowlist;\n5) enforce policy with automated checks and CI validation.\n\nKeep changes reviewable by batching per top-level area (benchbox, tests,\nscripts) and update tests/tolerances where clock source changes affect\nprecision/resolution assumptions.\n",
+  "description": "Execute the maximum-scope timing consolidation across the entire repository,\nextending beyond runtime code into test utilities, scripts, and support\nmodules.\n\nThis umbrella item performs a complete audit and migration pass for elapsed\nand timeout timing logic, while preserving intentionally valid wall-clock\ntimestamp usage through an explicit, enforced allowlist.\n\nThis phase is intentionally placed after runtime migration and guardrail\ncleanup so the canonical methodology and contracts are already stable before\nrepo-wide normalization.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "alter unrelated business logic while touching timing calls",
+        "instead": "isolate timing-only diffs",
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "why": "this is a governance migration"
+      },
+      {
+        "dont": "blindly replace every time.time() usage",
+        "instead": "classify before migrating",
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "why": "some are valid event timestamps"
+      },
+      {
+        "dont": "encode allowlist as tribal knowledge",
+        "instead": "persist machine-readable allowlist in-repo",
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "why": "policy will regress"
+      },
+      {
+        "dont": "weaken checks by broad path exemptions",
+        "instead": "use narrow, justified allowlist entries",
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "why": "that hides regressions"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "needs_item": "timing-guardrails-and-legacy-cleanup"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "created_at": "2026-02-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "CI and local developer workflows remain non-interactive and deterministic",
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement"
+      },
+      {
+        "behavior": "Existing benchmark result schemas remain valid and backward-compatible at documented boundaries",
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement"
+      },
+      {
+        "behavior": "No test behavior is altered except timing methodology and tolerance adjustments needed for monotonic migration",
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement"
+      },
+      {
+        "behavior": "Wall-clock timestamps remain available where required for auditability and human event logs",
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "kind": "only_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "kind": "only_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/timing_audit.py --report",
+        "description": "Full-repo timing audit report generated and reviewed",
+        "expected": "Report enumerates all callsites, classifications, and unresolved violations",
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/timing_policy_check.py --strict",
+        "description": "Policy check passes with only allowlisted wall-clock usages",
+        "expected": "No non-allowlisted wall-clock elapsed/timeout usage",
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m 'fast or unit' -q",
+        "description": "Fast and unit suites pass after full migration",
+        "expected": "Selected suites pass",
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make ci-test",
+        "description": "Project CI quality gate remains green",
+        "expected": "CI test suite passes",
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement full-repo timing inventory tool and classify callsites by timing intent",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define machine-readable allowlist format and seed it with approved wall-clock categories",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate remaining elapsed/timeout callsites in benchbox/ to centralized monotonic helpers",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate remaining elapsed/timeout callsites in tests/ and scripts/ with tolerance updates where needed",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement strict timing policy checker that enforces allowlist exceptions",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document policy and add contributor guidance for allowed vs forbidden timing patterns",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-full-repo-audit-and-allowlist-enforcement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run repo-wide validation (policy check plus fast/unit/ci tests) and resolve remaining violations",
+        "wid": "w7"
+      }
+    ]
+  }
+}

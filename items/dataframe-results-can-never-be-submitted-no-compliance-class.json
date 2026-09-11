@@ -1,0 +1,305 @@
+{
+  "context": "Fix the compliance_class half first: pass the benchmark instance, or its compliance_class, into both DataFrame builders so they carry what result_factory already carries. Guard it the way tests/integration/test_tpcds_official_end_to_end.py guards the SQL path -- through the production construction path, ending at publish_admission, with the DataFrame path as a second parametrisation rather than a separate test. Then determine separately whether DataFrame validation exists at all: if it does, wire it; if it does not, that is a scoped feature and needs its own decision, not a silent not_run.",
+  "description": "MEASURED 2026-08-23 on develop, by running the same benchmark down both paths.\n\nDataFrame path: `benchbox run --platform polars-df --benchmark tpcds --scale 0.01` emits a bundle whose benchmark block has keys id, name, scale_factor, test_type only. compliance_class is not null -- it is ABSENT -- and summary.validation is `not_run`.\n\nSQL path, same benchmark and scale: benchmark.compliance_class is `unofficial_subscale`.\n\nROOT CAUSE. Two DataFrame result builders construct BenchmarkInfoInput without compliance_class:\n  - benchbox/core/runner/dataframe_runner.py:232-239\n  - benchbox/platforms/dataframe/benchmark_mixin.py:287-294\nThe SQL path builds through benchbox/core/results/result_factory.py:174, which passes compliance_class=getattr(benchmark, 'compliance_class', None). The two DataFrame builders also construct from benchmark_config rather than the benchmark instance, so they never see the classifier's output at all -- threading official through the config, as PR #1770 did, cannot reach them.\n\nWHY IT MATTERS. benchbox submit refuses a TPC-DS bundle whose compliance_class is in CLI_REFUSED_COMPLIANCE_CLASSES, and publish_admission independently refuses any bundle whose validation_status is non-clean -- not_run is in NON_CLEAN_VALIDATION_STATUSES. So a DataFrame result is refused twice over and can never be published, no matter what the user passes. polars-df completes 309/309 TPC-DS queries and still cannot be submitted. Roughly half the corpus is DataFrame-mode.\n\nThe two halves are separable and the second is the harder one: setting compliance_class is a small fix, whereas 'DataFrame mode runs no validation' may be a real gap in the DataFrame path rather than a wiring mistake. Establish which before promising a fix.\n\nSplit out of add-third-benchmark-cohort-to-corpus w9.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "conclude a capability is missing without searching the tracker for prior work",
+        "instead": "INSTEAD grep the tracker and the tree for the capability before asserting its absence",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "why": "I reported that no DataFrame correctness oracle existed when benchmark-cross-surface-equivalence-gate (PR #891) had built one and ~20 related items were already done, and separately claimed seven benchmarks had no DataFrame query source when all seven ship a registered dataframe_queries package"
+      },
+      {
+        "dont": "let a benchmark run return an empty result set as if it succeeded",
+        "instead": "INSTEAD raise, and check any 'return []' on a result path against what the CALLER does with it",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "why": "_execute_dataframe_queries returned [] when discovery found nothing, the caller marked power_test COMPLETED, and 60 bundles reporting 0/0 queries with exit 0 reached the public corpus"
+      },
+      {
+        "dont": "trust an existing test that asserts the current behaviour is correct",
+        "instead": "INSTEAD when a fix breaks a test, read what the test was actually asserting before assuming the fix is wrong",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "why": "tests/unit/core/runner/test_dataframe_runner_lifecycle.py::test_empty_query_list_returns_empty pinned the defect, so the 0/0-queries bug had a green test defending it"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "needs_item": "dataframe-date-comparison-breaks-nyctaxi-and-tsbs-devops"
+      }
+    ],
+    "item_meta": {
+      "category": "core",
+      "completed_at": "2026-08-24T23:57:37Z",
+      "completed_pr": 1886,
+      "created_at": "2026-08-23T19:54:08Z",
+      "worktree": "main"
+    },
+    "prior_art": [
+      {
+        "concept": "SQL is the live reference for its own DataFrame surface; no hand-maintained answer keys",
+        "decision": "reuse",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "path": "benchbox/core/equivalence/cross_surface.py"
+      },
+      {
+        "concept": "existing SQL row-count oracle and skip semantics",
+        "decision": "reuse",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "path": "benchbox/core/validation/query_validation.py"
+      },
+      {
+        "concept": "60 of 107 DataFrame bundles carry no per-query data",
+        "decision": "extend",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "path": "results-data/bundles"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/query_resolution.py"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/query_validation.py"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/benchmark_specs.yaml"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/loader.py"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/models.py"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/normalizer.py"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/query_execution.py"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema_policy.py"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema_specs.yaml"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/**"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "benchbox/validation/bundle.py"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/cli/results.md"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/hosted-results-contract.md"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/result-formats.md"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox run --official --platform polars-df --benchmark tpcds --scale 1",
+        "description": "A DataFrame TPC-DS run is classified",
+        "expected": "bundle carries benchmark.compliance_class=official",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "publish_admission on the emitted bundle",
+        "description": "That bundle is admitted",
+        "expected": "not refused with code unofficial_compliance",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "needs_wid": "w3",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "MEASURED on develop 2026-08-23 across all 207 corpus bundles, splitting by platform.config.execution_mode.\n\nCorpus-wide: 82 clean (40%), 65 with failed queries (31%, all validation=partial), 60 with NO per-query data at all (29%).\n\nBy execution mode -- the split is absolute:\n  no_queries    : dataframe 60, sql 0\n  failed_queries: dataframe 29, sql 36\n  clean         : dataframe 18, sql 64\n\nSo every one of the 60 no-query bundles is DataFrame-mode, across all three DataFrame platforms (DataFusion 21, Polars 21, PySpark 18). Only 18 of 107 DataFrame bundles are clean (17%), against 64 of 100 SQL bundles (64%).\n\nThat places the no-query class inside this item rather than in general corpus triage: the DataFrame result path is not recording per-query data, which is the same construction path (dataframe_runner.py:232 / benchmark_mixin.py:287) that omits compliance_class. Tracked as new w5/w6.\n\nConfirms w0's premise: those two builders are the DataFrame result construction sites, and both defects live there.",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "notes": null,
+        "started_at": "2026-08-24T02:58:26Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm both builders are the only DataFrame result construction sites",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1866. dataframe_compliance_class() added and wired into both builders (dataframe_runner.py:232 and benchmark_mixin.py:288). Prefers the benchmark instance, which has already run the classifier, and falls back to classifying from the config so a caller passing no instance still gets a truthful value. Emits the plain wire string: str() on the enum yields 'TpcdsComplianceClass.OFFICIAL', not 'official', which the submit and admission gates would refuse just as surely as an absent field while looking correct in a diff. Verified end to end: polars-df TPC-DS at SF0.01 now emits compliance_class 'unofficial_subscale', matching the SQL path exactly; before, the field was absent from the benchmark block entirely.",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "notes": null,
+        "started_at": "2026-08-24T11:58:17Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Carry compliance_class into both DataFrame builders",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1866. tests/integration/test_tpcds_official_end_to_end.py extended from 5 to 11 tests: the DataFrame path is asserted to classify identically to the SQL path across all four cases (official SF1, unofficial SF1, subscale 0.5, nonstandard 2.0), a bundle built the DataFrame way passes publish_admission, and the enum-vs-wire-format trap is pinned explicitly.",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "notes": null,
+        "started_at": "2026-08-24T11:58:20Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Extend the TPC-DS official end-to-end guard to cover the DataFrame path",
+        "wid": "w2"
+      },
+      {
+        "evidence": "ANSWERED: DataFrame mode runs no validation, and 'not_run' is HONEST rather than a bug.\n\nBoth DataFrame builders set validation_status only on failure. On success they leave the ResultBuilder default 'PASSED'. _finalize_validation_metadata (benchbox/core/runner/runner.py:242) then downgrades an unevidenced PASSED to NOT_RUN -- 'current_status == PASSED and not has_validation_evidence' -- so the system deliberately refuses to claim a pass that nothing verified. That is correct behaviour and should not be changed.\n\nCONSEQUENCE, and it is structural: publish_admission treats not_run as non-clean, so fixing compliance_class (w1) is NECESSARY BUT NOT SUFFICIENT. Verified directly:\n  official + not_run -> allowed=False, code=non_clean, reason=validation_status=not_run\n  official + passed  -> allowed=True\nSo every DataFrame result remains unpublishable until validation actually runs, whatever its compliance class.\n\nThe remaining question is a FEATURE question, not a defect: the SQL path validates query output against TPC answer sets, and no DataFrame equivalent is wired -- there is no answer-set comparison anywhere under benchbox/core/dataframe/ or benchbox/platforms/dataframe/. Building one is a substantial piece of work, not a fix, so it goes to w4 as a decision rather than being started unilaterally.",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "notes": null,
+        "started_at": "2026-08-24T11:58:36Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Establish whether DataFrame mode can validate at all, or whether not_run is honest",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Decision: build validation incrementally, starting with the existing TPC expected-row-count oracle only where parameters and scale are provably aligned. TPC-H SF1 with qgen-default/reference seed can produce PASSED; TPC-DS, unsupported scales/seeds/modes, missing oracles, and generic benchmarks stay UNCERTAIN or NOT_RUN. The enforced cross-surface framework remains the later full-value provider; it is not run implicitly because it requires a second execution environment.",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "notes": null,
+        "started_at": "2026-08-24T23:32:59Z",
+        "started_branch": "feat/dataframe-validation-evidence",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-dataframe-validation-evidence",
+        "status": "done",
+        "summary": "DECISION GATE - if DataFrame validation does not exist, decide whether to build it or to state plainly that DataFrame results are unpublishable",
+        "wid": "w4"
+      },
+      {
+        "evidence": "ROOT CAUSE FOUND AND FIXED, PR #1866. _get_queries_for_benchmark dispatches to handlers for tpch/tpcds/clickbench and otherwise falls back to benchmark.get_dataframe_queries(); seven families have neither, so discovery returned [] and both builders logged a warning, returned an empty list, marked power_test COMPLETED, and emitted a bundle reporting 0/0 queries with exit 0.\n\nMeasured on develop: the split by execution mode is absolute (60 DataFrame, 0 SQL) and clean by benchmark -- amplab, coffeeshop, h2odb, nyctaxi, ssb, tpch_skew and tsbs_devops have no query data in ANY bundle; the other nine families have it in all of theirs.\n\nNOT historical. Reproduced live on current develop: 'benchbox run --platform polars-df --benchmark ssb --scale 0.01' exited 0 with {failed 0, passed 0, total 0}. After the fix, exit 1 with a message naming the benchmark and pointing at SQL mode. tpch and tpcds on polars-df still pass, so working families are unaffected.\n\nNote for reviewers: an existing test, test_empty_query_list_returns_empty, asserted results == [] for this path -- it was pinning the defect rather than the behaviour, and now asserts the raise.",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "notes": null,
+        "started_at": "2026-08-24T11:58:23Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Root-cause why 60 DataFrame bundles record no per-query data at all (summary.queries.total is 0 or absent)",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Decision: withdraw rather than regenerate. The 60 historical no-query DataFrame bundles contain no per-query evidence and cannot be repaired retrospectively. The develop corpus-policy PR #1880 removes the invalid cohort from the trusted inventory; published-results PR #1882 withdraws 77 bundle+manifest pairs cohort-safely, including this class. Both remain open pending protected review/merge.",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "notes": null,
+        "started_at": "2026-08-24T23:33:04Z",
+        "started_branch": "feat/dataframe-validation-evidence",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-dataframe-validation-evidence",
+        "status": "done",
+        "summary": "Decide whether the 60 no-query bundles can be regenerated or should be withdrawn from the public corpus",
+        "wid": "w6"
+      },
+      {
+        "evidence": "PR #1886 (commit 6cb3e8b14) wires both DataFrame builders to the existing TPC expected-row-count oracle with fail-closed, schema-2.2 per-query evidence. A fresh live Polars DataFrame TPC-H SF1 load+power run emitted 66/66 PASSED measurement evidence rows, reloaded all 66, passed the standalone public submission validator with 0 errors/0 warnings, and publish_admission returned allowed=True. TPC-DS and unsupported scale/seed/mode contexts remain honestly UNCERTAIN or NOT_RUN by the approved incremental decision; they are not represented as validated.",
+        "item_id": "dataframe-results-can-never-be-submitted-no-compliance-class",
+        "notes": null,
+        "started_at": "2026-08-24T23:57:33Z",
+        "started_branch": "feat/dataframe-validation-evidence",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-dataframe-validation-evidence",
+        "status": "done",
+        "summary": "Wire the DataFrame run path to record a real validation_status using the existing cross-surface oracle or the tpch/tpcds expected results",
+        "wid": "w7"
+      }
+    ]
+  }
+}

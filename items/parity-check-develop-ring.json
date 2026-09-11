@@ -1,0 +1,181 @@
+{
+  "context": "Start with the w1 timing measurement before committing to a placement -\nthe two options (PR-blocking-but-path-filtered vs post-merge-non-blocking)\nhave different cost/latency tradeoffs and the runtime number should drive\nthe choice, not a preference. If path-filtered into pr.yml, reuse the\npath-filter-group mechanism being added by\npr-gate-package-and-audit-promotion rather than building a second,\ndivergent filtering mechanism.\n",
+  "description": "`make parity-check` (Makefile:930-937) regenerates the CLI↔explorer\nvisualization JSON fixtures under `tests/parity/fixtures/` and diffs them\nagainst the checked-in copies, catching drift between the Python\nimplementations and the fixtures the Vitest suite asserts against. The\n`parity` job in `test.yml` runs this (and the Vitest suite) but is\nexplicitly excluded from develop PRs by its own `if:` condition\n(test.yml:450: `github.base_ref != 'develop'`), and it is not part of\n`develop-post-merge.yml`'s auto-revert safety net either\n(`develop-post-merge.yml` only runs `ci-lint`, `ci-test`, and\n`explorer-tokens`, :20-69). So a viz/explorer change that drifts the\nfixtures can land on develop and stay unblocked until the next release PR\nto `main`, where `parity` finally runs.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add parity-check to every develop PR unconditionally if it is expensive",
+        "instead": "path-filter it or move it to post-merge.",
+        "item_id": "parity-check-develop-ring",
+        "why": "most PRs never touch viz/explorer code"
+      },
+      {
+        "dont": "duplicate the path-filter-group mechanism",
+        "instead": "extend the same classifier config rather than writing a parallel one.",
+        "item_id": "parity-check-develop-ring",
+        "why": "pr-gate-package-and-audit-promotion is adding one already"
+      },
+      {
+        "dont": "silently drop the Release v* PR skip when porting logic from test.yml:450",
+        "instead": "carry the same exemption into whichever new job you add.",
+        "item_id": "parity-check-develop-ring",
+        "why": "that condition exists so curation-only version-bump PRs aren't blocked on fixture regen"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Release v* PRs keep skipping parity per the existing condition (test.yml:450) if that same skip logic is reused for the new job.",
+        "item_id": "parity-check-develop-ring"
+      },
+      {
+        "behavior": "develop-post-merge.yml's existing lint and fast-test jobs (develop-post-merge.yml:20-56) are unaffected if w1 chooses post-merge placement - parity-check is an additional job, not a replacement.",
+        "item_id": "parity-check-develop-ring"
+      },
+      {
+        "behavior": "test.yml's parity job continues to run on the release/main PR path unchanged - this item adds a develop-side ring, it does not replace the existing main-release check.",
+        "item_id": "parity-check-develop-ring"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Makefile:930-937 parity-check target — reuse as-is, no new Make target needed",
+        "decision": "reuse",
+        "item_id": "parity-check-develop-ring",
+        "path": "Makefile:930-937"
+      },
+      {
+        "concept": "develop-post-merge.yml:20-56 lint/fast-test jobs — reuse as the post-merge placement pattern if w1 chooses that option",
+        "decision": "reuse",
+        "item_id": "parity-check-develop-ring",
+        "path": "develop-post-merge.yml:20-56"
+      },
+      {
+        "concept": "test.yml:445-450 parity job condition (Release v* exemption) — reuse the exemption logic for whichever new job is added",
+        "decision": "reuse",
+        "item_id": "parity-check-develop-ring",
+        "path": "test.yml:445-450"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "parity-check-develop-ring",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "parity-check-develop-ring",
+        "kind": "do_not_modify",
+        "path_glob": "tests/parity/fixtures/"
+      },
+      {
+        "item_id": "parity-check-develop-ring",
+        "kind": "do_not_modify",
+        "path_glob": "tests/parity/generate_visualization_fixtures.py"
+      },
+      {
+        "item_id": "parity-check-develop-ring",
+        "kind": "only_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "parity-check-develop-ring",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "parity-check-develop-ring",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "parity-check-develop-ring",
+        "kind": "only_modify",
+        "path_glob": "scripts/path_filter_decision.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "time make parity-check",
+        "description": "Baseline runtime measured before placement decision",
+        "expected": "wall-clock time recorded and cited in the PR/commit that implements w1",
+        "item_id": "parity-check-develop-ring",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "On a scratch branch: touch a change to a viz-generating Python module without regenerating tests/parity/fixtures, open a PR against develop, check the new job/ring",
+        "description": "A deliberately stale fixture is caught on develop (not just on release PRs)",
+        "expected": "new job fails (PR-blocking) or triggers auto-revert (post-merge), depending on w1's placement choice",
+        "item_id": "parity-check-develop-ring",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh pr checks <non-viz-develop-pr>",
+        "description": "Non-viz develop PRs are unaffected",
+        "expected": "no new required job runs, or it runs and passes trivially fast",
+        "item_id": "parity-check-develop-ring",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "parity-check-develop-ring",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "parity-check-develop-ring",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "parity-check-develop-ring",
+        "notes": "DECISION: PR-blocking, path-filtered lane in pr.yml.\n\nMeasured: `time make parity-check` — real 0m0.87s (3 runs: 0.885s,\n0.871s, 0.843s), consistently under 1s. `make parity-check` itself is\npure Python (regenerate fixtures into a tmpdir, `diff -r` against\ntests/parity/fixtures/) — it does NOT run npm/vitest (that's a\nseparate step only in nightly.yml's/test.yml's `parity` job, out of\nthis TODO's scope per do_not_modify: tests/parity/generate_visualization_fixtures.py\nand the nightly/test.yml jobs). This is comparable to or cheaper than\nexplorer-tokens (stdlib-only) once dependencies are already synced, so\nper the TODO's own heuristic (\"if cheap ... prefer path-filtering into\npr.yml as a develop-PR-blocking job\") it goes into pr.yml, not\ndevelop-post-merge.yml, as w1's \"cheap\" branch directs.\n\nReused the packaging path-filter-group mechanism added by\npr-gate-package-and-audit-promotion.yaml (that TODO's\n`extra_group_keys()` generalization in path_filter_decision.py) rather\nthan inventing a second classifier: added a `viz:` group to\n.github/path-filters.yml covering `results-explorer/**`,\n`tests/parity/**`, `_project/scripts/explorer_pipeline/**`. This\nrequired doing pr-gate-package-and-audit-promotion.yaml's w1\nclassifier extension first, which the dependency graph doesn't\nenforce (deps.needs: [] on both TODOs) but the approach note calls\nfor by name — done in this session in package/audit order first.\n\nKNOWN ISSUE FOUND (not caused by this change, fixtures/generator are\ndo_not_modify): `make parity-check` FAILS in this sandbox today —\n`tests/parity/fixtures/geomean_ms.json`'s checked-in geomean value\n(237.9081547062432) differs from a freshly-regenerated value\n(237.9081547062434) by 2e-13 (a last-bit float rounding difference),\nreproduced identically across 3 runs (deterministic, not flaky here).\nRoot cause is most likely a libm/transcendental-function (math.exp/\nmath.log, used by the geometric mean) precision difference between\nthis sandbox's environment and whatever environment last regenerated\nthe committed fixture (possibly GitHub Actions' own ubuntu-latest, in\nwhich case this fixture may ALREADY be silently failing test.yml's\n`parity` job on release PRs and nightly.yml's `parity` job — or it may\nbe sandbox-specific and clean on GHA). I did NOT touch\ntests/parity/fixtures/ or generate_visualization_fixtures.py (out of\nscope_limit; also do_not_modify). CONSEQUENCE: the new pr.yml\n`parity-check` job as wired will likely fail on ITS FIRST RUN on any\nreal develop PR that touches a viz path, exactly like\nmedium-tier-ci-home.yaml's one known pre-existing failure. Recommend:\nbefore merging, a human runs `make parity-check` on an actual GitHub\nActions ubuntu-latest runner (not this sandbox) to determine whether\nthis is sandbox-only or a real, currently-undetected fixture drift on\ndevelop; if real, regenerate fixtures via `make parity-fixtures`\nfirst (out of scope for me to do unilaterally). Original notes:\nRun `time make parity-check` to get a baseline. If it is cheap\n(comparable to the existing `explorer-tokens` job, which is\nstdlib-only and lint-fast), prefer path-filtering it into pr.yml as\na develop-PR-blocking job gated on results-explorer/viz path changes\n(extend `scripts/path_filter_decision.py` /\n`.github/path-filters.yml` the same way\npr-gate-package-and-audit-promotion does for packaging paths - reuse\nthat filter-group pattern rather than inventing a second one). If it\nis expensive (needs a Python env sync plus Vitest/npm install), place\nit in `develop-post-merge.yml` instead, mirroring the existing\n`lint`/`fast-test` jobs (develop-post-merge.yml:20-56) - non-blocking\nto the PR but caught immediately post-merge with the auto-revert\npath.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Measure make parity-check runtime, then place it in the develop-PR gate or post-merge net",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "parity-check-develop-ring",
+        "notes": "N/A (closing as done-by-non-applicability) — w1 chose PR-gate\nplacement (measured runtime <1s), not develop-post-merge.yml. This\nunit's condition (\"If placed post-merge\") does not apply, so there is\nno Makefile mirror to add. Original notes:\nOnly applies if w1 chose develop-post-merge.yml placement. Add a\n`parity-check` job to `develop-post-merge.yml` calling\n`make parity-check` directly (it is already a Makefile target,\nMakefile:930-937 - no `ci-`-prefixed wrapper needed, unlike\n`ci-lint`/`ci-test` which mirror workflow-specific pytest\ninvocations). Wire it into the same auto-revert trigger path the\n`lint`/`fast-test` jobs use so a fixture drift on develop triggers a\nrevert, not silent accumulation until the next release.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "If placed post-merge, add parity-check to the Makefile ci-test auto-revert mirror",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "parity-check-develop-ring",
+        "notes": "Done, then REVISED after review (2026-07-04): the job initially\nlanded wired into ci-required-result (skipped-counts-as-pass, the\npackage-smoke pattern), but review correctly flagged that shipping a\nblocking gate that is known-red locally (the unexplained 2e-13\ngeomean_ms.json drift, see w1) risks hard-blocking every viz-touching\ndevelop PR on arrival — including the PR introducing it — if the\ndrift reproduces on GitHub runners. DEMOTED to non-blocking in the\nsame change: the `parity-check` job keeps its viz path filter but now\nhas `continue-on-error: true` and is deliberately NOT in\n`ci-required-result.needs` (PARITY_CHECK_RESULT env + aggregator\ncheck removed). A failure shows red in the PR checks list without\nblocking merge — same visibility model as the postgres/datafusion/\nclickhouse sample jobs.\n\nPROMOTION CRITERION (also recorded in the job comment in pr.yml and\npinned by tests/unit/workflows/test_pr_workflow_path_classifier.py::\ntest_parity_check_is_demoted_to_non_blocking): promote to the\nrequired lane only after BOTH (1) one green run of this job on a real\nGitHub runner, AND (2) a decision on the geomean_ms.json float drift\n(comparison tolerance vs fixture regen — out of this TODO's scope,\nfixtures/generator are do_not_modify). Promotion is mechanical: drop\ncontinue-on-error, add parity-check to ci-required-result.needs +\nPARITY_CHECK_RESULT env + a success-or-skipped check (copy the\npackage-smoke pattern), and flip the pinned demotion test to\npackage-smoke-style assertions.\n\nTest.yml's own `parity` job\n(main-release path) is untouched, still runs its Release-v*-PR skip\ncondition unchanged — pr.yml never sees a \"Release v*\"-titled PR\nanyway (pr.yml only triggers on `pull_request: branches: [develop]`;\nrelease PRs target `main` via test.yml), so the must_preserve/\nanti-pattern about carrying that exemption forward does not actually\napply to this placement — noted here rather than silently ignored.\nOriginal notes:\nOnly applies if w1 chose PR-gate placement. Follow the same\nconditional-job pattern as pr-gate-package-and-audit-promotion's w3\n(pr.yml:789-793 pattern): add the job's result to\n`ci-required-result`'s `needs:` and success-or-skipped check so\nnon-viz PRs are unaffected.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "If placed in pr.yml, wire into ci-required-result with skipped-counts-as-pass semantics",
+        "wid": "w3"
+      }
+    ]
+  }
+}

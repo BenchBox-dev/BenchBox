@@ -1,0 +1,10 @@
+{
+  "description": "Build comprehensive visualization system to generate publication-ready charts\nfrom benchmark results. This is THE blocking feature for ALL 128 blog posts in\nthe marketing calendar - without automated chart generation, content creation\nis impossible.\n\nCurrent state: Raw JSON results with basic display.py\nTarget state: Automated generation of bar charts, line charts, scatter plots,\nheatmaps, and interactive visualizations for blog posts.",
+  "legacy": {
+    "item_meta": {
+      "category": "Marketing Content Enablement",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "content-enablement-viz"
+    }
+  }
+}

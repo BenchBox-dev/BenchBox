@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #445 of platform-support-status-and-extension-health.\nDeferred: Make platform capabilities entirely test-derived\nReason deferred: Support status and diagnostics come first; full test-derived capability metadata is a larger design.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:19Z",
+      "worktree": "main"
+    }
+  }
+}

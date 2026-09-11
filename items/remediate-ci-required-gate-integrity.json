@@ -1,0 +1,234 @@
+{
+  "description": "Source: _project/audits/results-explorer-publication-adversarial-review.md\n(develop_sha fddedf26), findings §2.9 (Critical), §2.10 (Required), §2.11\n(Advisory).\n\n§2.9 — The `ci-paths` job in `.github/workflows/pr.yml` declares only 7\noutputs (pr.yml:20-26: safe-content-only, needs-code-ci,\ncontent-guard-needed, changed-paths, code-paths, unknown-paths,\nestimated-runner-minutes-saved). But `package-smoke` (pr.yml:770) and\n`dependency-audit` (pr.yml:812) gate on\n`needs.ci-paths.outputs.packaging-needed == 'true'`, and `parity-check`\n(pr.yml:858) gates on `needs.ci-paths.outputs.viz-needed == 'true'`. The\nclassifier emits these only as STEP outputs\n(scripts/path_filter_decision.py:196-200), never re-exported at the JOB\nlevel, so `needs.ci-paths.outputs.packaging-needed`/`viz-needed` resolve to\nthe empty string and the `== 'true'` conditions are permanently false. All\nthree jobs are always skipped, and `ci-required-result` counts skipped as\npass (pr.yml:963-973). This directly defeats the work completed in\n_project/DONE/main/pr-gate-package-and-audit-promotion.yaml, whose w1 notes\nclaim it emits \"a `<group>-needed` GH Actions output\" — it added the step\noutput and job gating but not the job-level `outputs:` declaration.\n\n§2.10 — `_project/scripts/results_explorer_snapshot_invariants.py` enforces\n12 read-model invariants and its docstring says it exists \"so release gates\ncan run it,\" but nothing invokes it (grep across Makefile/.github/tests\nreturns only its own definition). docs.yml:110-118 builds the snapshot then\nruns `npm run build` with no validation between, so a malformed snapshot\ndeploys ungated.\n\n§2.11 — `make validate-imports` runs `scripts/validate_imports.py`, which\ndoes not exist (the real gate is `make lint-imports` → `lint-imports`, used\nby CI). A maintainer running the advertised target gets file-not-found.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hardcode packaging-needed as a bespoke output",
+        "instead": "re-export whatever <group>-needed keys the classifier emits.",
+        "item_id": "remediate-ci-required-gate-integrity",
+        "why": "the classifier already derives extra groups generically"
+      },
+      {
+        "dont": "make package-smoke/dependency-audit/parity-check unconditionally required",
+        "instead": "fix the output plumbing so the path filter actually reaches the gate.",
+        "item_id": "remediate-ci-required-gate-integrity",
+        "why": "unrelated PRs would pay the cost"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "remediate-ci-required-gate-integrity",
+        "id": 469,
+        "reason": "Tracked in remediate-published-results-submission-ci.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Verified DONE: remediate-published-results-submission-ci.yaml is Completed and its verification steps explicitly close the validate-submission self-green vector.",
+        "summary": "§2.7 validate-submission self-green and broader submission-CI hardening"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing 7 ci-paths outputs and their consumers remain unchanged.",
+        "item_id": "remediate-ci-required-gate-integrity"
+      },
+      {
+        "behavior": "ci-required-result's skipped-counts-as-pass semantics for genuinely path-filtered-out jobs (a docs-only PR must still not pay packaging/viz cost).",
+        "item_id": "remediate-ci-required-gate-integrity"
+      },
+      {
+        "behavior": "docs.yml explorer steps remain gated on hashFiles('results-explorer/package.json') so main builds stay a deliberate no-op.",
+        "item_id": "remediate-ci-required-gate-integrity"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/pr.yml:audit-sha job — reuse its success-or-skipped ci-required-result pattern (already correct) as the model for w2's declaration contract.",
+        "decision": "reuse",
+        "item_id": "remediate-ci-required-gate-integrity",
+        "path": ".github/workflows/pr.yml:audit-sha"
+      },
+      {
+        "concept": "_project/DONE/main/pr-gate-package-and-audit-promotion.yaml — supersede: this item completes the job-output wiring that TODO left latent.",
+        "decision": "supersede",
+        "item_id": "remediate-ci-required-gate-integrity",
+        "path": "_project/DONE/main/pr-gate-package-and-audit-promotion.yaml"
+      },
+      {
+        "concept": "scripts/path_filter_decision.py:extra_group_keys — extend/verify the existing generic <group>-needed emission; do not add a per-group special case.",
+        "decision": "extend",
+        "item_id": "remediate-ci-required-gate-integrity",
+        "path": "scripts/path_filter_decision.py:extra_group_keys"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remediate-ci-required-gate-integrity",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "item_id": "remediate-ci-required-gate-integrity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "remediate-ci-required-gate-integrity",
+        "kind": "only_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "remediate-ci-required-gate-integrity",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "remediate-ci-required-gate-integrity",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "remediate-ci-required-gate-integrity",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "remediate-ci-required-gate-integrity",
+        "kind": "only_modify",
+        "path_glob": "scripts/path_filter_decision.py"
+      },
+      {
+        "item_id": "remediate-ci-required-gate-integrity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "sed -n '/^  ci-paths:/,/^    steps:/p' .github/workflows/pr.yml | grep -E 'packaging-needed:|viz-needed:'",
+        "description": "packaging-needed and viz-needed are declared job outputs",
+        "expected": "both keys present in the outputs block",
+        "item_id": "remediate-ci-required-gate-integrity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_pr_workflow_outputs.py -q",
+        "description": "Meta-test catches an undeclared referenced output",
+        "expected": "passes; fails if any needs.ci-paths.outputs.* is undeclared",
+        "item_id": "remediate-ci-required-gate-integrity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'results_explorer_snapshot_invariants' .github/workflows/docs.yml",
+        "description": "Snapshot invariants run in the docs build",
+        "expected": "a step invokes the script after the snapshot build",
+        "item_id": "remediate-ci-required-gate-integrity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make -n validate-imports",
+        "description": "make validate-imports resolves",
+        "expected": "resolves to lint-imports (or target removed); no reference to missing scripts/validate_imports.py",
+        "item_id": "remediate-ci-required-gate-integrity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remediate-ci-required-gate-integrity",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "remediate-ci-required-gate-integrity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "remediate-ci-required-gate-integrity",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "remediate-ci-required-gate-integrity",
+        "needs_wid": "w0",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remediate-ci-required-gate-integrity",
+        "notes": "Confirm the audit still holds before changing anything. Capture stdout\nto /tmp/remediate-ci-gate-w0.log (do not commit) and summarize here:\n  1. Assert packaging-needed/viz-needed are NOT in the ci-paths outputs\n     block: `sed -n '/^  ci-paths:/,/steps:/p' .github/workflows/pr.yml`\n     — expect neither key present.\n  2. Assert the gates reference them:\n     `grep -n \"packaging-needed\\|viz-needed\" .github/workflows/pr.yml`\n     — expect the step-output emit + the three job `if:` lines.\n  3. Assert no snapshot_invariants caller:\n     `grep -rn snapshot_invariants Makefile .github/workflows tests`\n     — expect only the script's own path.\n  4. Assert missing script: `test -f scripts/validate_imports.py` → non-zero.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate all three defects still reproduce at current develop tip",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-ci-required-gate-integrity",
+        "notes": "In pr.yml `ci-paths.outputs`, add\n  packaging-needed: ${{ steps.classify.outputs.packaging-needed }}\n  viz-needed: ${{ steps.classify.outputs.viz-needed }}\n(and any other `<group>-needed` the classifier emits per\n.github/path-filters.yml extra groups). Keep the generic-classifier\nidiom from pr-gate-package-and-audit-promotion — do not special-case.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Declare packaging-needed/viz-needed (and every extra <group>-needed) in the ci-paths job outputs map",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-ci-required-gate-integrity",
+        "notes": "New test under tests/unit/scripts/ (e.g. test_pr_workflow_outputs.py):\nparse .github/workflows/pr.yml, collect every\n`needs.ci-paths.outputs.<name>` reference and every key declared in the\nci-paths `outputs:` map, assert references ⊆ declarations. This backstops\nthe whole `<group>-needed` pattern (also relied on by the planning item\nexplorer-tokens-path-classifier-output.yaml).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a meta-test asserting every needs.ci-paths.outputs.* referenced in pr.yml is declared in the ci-paths outputs map",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-ci-required-gate-integrity",
+        "notes": "Add a step in docs.yml between \"Build explorer data\" (:112) and\n\"Build results-explorer\" (:117) that runs the invariants script against\nresults-explorer/public/data/ and fails on violation. Add a matching\n`make` target (e.g. explorer-snapshot-check) so it is runnable locally.\nGate on the same hashFiles('results-explorer/package.json') sentinel the\nsurrounding explorer steps use.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Invoke results_explorer_snapshot_invariants.py in docs.yml after the snapshot build; expose a make target",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-ci-required-gate-integrity",
+        "notes": "Point `validate-imports` at `lint-imports` (uv run -- lint-imports) or\ndelete the target. Confirm no docs still tell a reader to run\n`make validate-imports` against the missing script.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Repoint make validate-imports at the real import-linter gate (or remove the stale target)",
+        "wid": "w4"
+      }
+    ]
+  }
+}

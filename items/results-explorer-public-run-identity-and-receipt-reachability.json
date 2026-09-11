@@ -1,0 +1,299 @@
+{
+  "context": "Treat run identity as a contract shared by routing, comparison, receipts, and\nlabels. Add one helper boundary for result links and visible identity, then\nwire the existing surfaces through it instead of adding component-local ID\nformatting.\n",
+  "description": "The post-remediation review found that Results Explorer now has better\nduplicate-name disambiguation, but it still leaks conflicting run identities\nand removes receipt/detail reachability from high-use benchmark views.\n\nBenchmark Matrix and Ranks views can show the runs a user wants to inspect,\nbut those rows no longer expose a result-detail or receipt affordance. Compare\nselection trays also display compact compare IDs such as `d28345e6` while row\nlabels and result-detail routes show different public result IDs such as\n`a62d0d72`. This makes the same run appear to have two identities.\n\nThis TODO defines a single public run-identity contract, separates URL\ntransport IDs from visible IDs, and restores compact detail/receipt reachability\nin Matrix and Ranks without reintroducing tall frozen rows.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "concatenate source/origin markers directly into platform names.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "fix the mismatch by hiding all IDs from selected trays.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "restore receipt reachability by reintroducing a wide frozen receipt column.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "show `short_id` in one surface and `result_id` in another without a visible relationship between them.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "results-explorer-contract-followup"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing shareable compare URLs must continue to resolve for supported ID aliases.",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability"
+      },
+      {
+        "behavior": "Matrix and Ranks density improvements must not be undone by stacking receipt text, trust badges, version, and source in one cell.",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability"
+      },
+      {
+        "behavior": "Run identity disambiguation must remain concise in tables and complete in titles/aria labels.",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability"
+      },
+      {
+        "behavior": "Selection controls must remain keyboard reachable and screen-reader labelled.",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/src/lib/resultLinks.ts currently returns `short_id || result_id` for compare URLs and display tokens.",
+        "decision": "reuse",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "path": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "concept": "results-explorer/src/lib/runIdentity.ts centralizes natural run labels but does not own compare URL aliases.",
+        "decision": "reuse",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "path": "results-explorer/src/lib/runIdentity.ts"
+      },
+      {
+        "concept": "results-explorer/src/pages/BenchmarkIndex.tsx renders Matrix, Ranks, List, compare selection, and row labels.",
+        "decision": "reuse",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "path": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "concept": "results-explorer/src/pages/Compare.tsx renders compare builder, selected cards, summary, and baseline controls.",
+        "decision": "reuse",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "path": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "concept": "results-explorer/src/pages/PlatformIndex.tsx renders platform compare rows and selected tray labels.",
+        "decision": "reuse",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "path": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "concept": "results-explorer/src/pages/Query.tsx renders Query Workbench compare selection.",
+        "decision": "reuse",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "path": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "concept": "results-explorer/src/pages/ResultDetail.tsx is the canonical result-detail surface.",
+        "decision": "reuse",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "path": "results-explorer/src/pages/ResultDetail.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-public-run-identity-and-receipt-reachability/"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/resultLinks.test.ts"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/runIdentity.test.ts"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/runIdentity.ts"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/lib/__tests__/runIdentity.test.ts src/lib/__tests__/resultLinks.test.ts",
+        "description": "Identity helper and run-identity unit tests pass",
+        "expected": "all identity/link unit tests pass",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Compare.test.tsx",
+        "description": "Benchmark, platform, query, result detail, and compare component tests pass",
+        "expected": "all targeted route tests pass",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"PASS|FAIL|Matrix|Ranks|selected tray|public ID|receipt|detail\" _project/verification-logs/results-explorer-public-run-identity-and-receipt-reachability/",
+        "description": "Browser evidence confirms consistent IDs and Matrix/Ranks detail access",
+        "expected": "verification log includes route-level pass/fail evidence",
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "notes": "On the checked SHA, capture evidence for:\n  - `/results/amplab/?scale=0.01&view=matrix` result-detail or receipt link\n    count inside the Matrix table;\n  - `/results/amplab/?scale=0.01&view=ranks` result-detail or receipt link\n    count inside the Ranks table;\n  - `/results/amplab/?scale=0.01&view=list` result-detail or receipt link\n    count inside the List table;\n  - selected compare tray labels after selecting AMPLab rows from Matrix,\n    Ranks, List, Platform detail, Query Workbench, and result detail;\n  - the public ID shown in the selected tray compared with the ID in the\n    row label, result-detail route, and receipt link.\nStore the compact findings in\n`_project/verification-logs/results-explorer-public-run-identity-and-receipt-reachability/w0.md`.\nDecision gate: if the current UI already exposes one consistent public\nidentity and detail/receipt links from Matrix and Ranks, close this TODO\nwith evidence instead of changing code.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate identity and receipt gaps on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "notes": "Adopt an explicit contract for every result-bearing surface:\n  - `result_id` is the canonical public result identity and result-detail\n    route target;\n  - `short_id` may be accepted as an input alias in compare URLs, but it\n    must not be shown as the visible run identity unless it is clearly\n    labelled as a URL token and paired with the public result ID;\n  - compact spaces may show a stable public token derived from `result_id`,\n    but the same token must appear in row labels, selected trays, detail\n    links, chart titles, and receipt affordances;\n  - platform name, version, run date, trust tier, source, and public ID are\n    separate fields and must not be concatenated into an unparseable label.\nRecord the decision in the implementation PR description or a small\nverification note. Decision gate: do not patch `compareIdForRow` or any\ncomponent until this contract is written down.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the public run identity contract before editing UI components",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "notes": "Extend the existing result-link/run-identity helpers so every component can\nrequest:\n  - compare URL ID;\n  - result-detail href;\n  - receipt href or receipt anchor when available;\n  - visible public ID token;\n  - accessible full identity string;\n  - compact row action label.\nKeep URL alias handling separate from display identity. Existing compare\nURLs using `short_id` should continue to resolve if the backend/read model\nsupports them, but visible labels should use the public identity contract\nfrom w1.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Introduce a shared result-link and visible-identity helper",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "notes": "Add a compact row action to Matrix and Ranks rows, such as a `Details`\ntext link, receipt icon link with an accessible label, or an actions column\nthat remains aligned with frozen columns. The affordance must:\n  - be reachable by keyboard;\n  - expose the target result ID in accessible text;\n  - not force trust badges, platform version, receipt text, and selection\n    controls into a tall stacked cell;\n  - preserve existing horizontal scroll and sticky-header alignment.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Restore Matrix and Ranks detail/receipt access without row bloat",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "notes": "Remove labels such as `Polars(from result detail)` from platform identity\ntext. If the UI needs to show where a selection came from, render it as a\ndistinct status chip or helper text outside the platform/run identity. The\nselected tray, row checkbox labels, compare summary, and baseline selector\nmust all use the same visible run-identity contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Separate compare-selection origin from platform/run identity",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-public-run-identity-and-receipt-reachability",
+        "notes": "Add tests that fail when:\n  - Matrix or Ranks has no reachable detail/receipt affordance for a run;\n  - the selected tray displays a compare URL token that does not match the\n    public row/detail identity;\n  - selection-origin text is concatenated into platform identity;\n  - result-detail and compare routes accept the same ID aliases but render\n    the canonical public ID consistently.\nBrowser-check Matrix, Ranks, List, Platform detail, Query Workbench, result\ndetail, and Compare.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add identity/link regression tests and browser evidence",
+        "wid": "w5"
+      }
+    ]
+  }
+}

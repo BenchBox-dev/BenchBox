@@ -1,0 +1,335 @@
+{
+  "context": "Follow existing test patterns in tests/unit/benchmarks/ (e.g., test_tpch_core.py,\ntest_tpcds_core.py). Use @pytest.mark.fast for tests <1s, @pytest.mark.unit for\nall. Mock external dependencies (file I/O, database connections, TPC binaries).\nFor dataframe_queries files, test a representative subset of queries (5-10 per\nbenchmark) rather than exhaustive coverage.\n",
+  "description": "Core benchmark module coverage has been refreshed from coverage.json generated\non 2026-02-10. Most originally-targeted files are now >=50% from prior waves.\n\nRemaining files below 50% that still require targeted unit tests:\n  - benchbox/core/ssb/benchmark.py: 48%\n  - benchbox/core/nyctaxi/benchmark.py: 49%\n  - benchbox/core/metadata_primitives/benchmark.py: 47%\n\nThis item now focuses on closing only these remaining gaps to >=50% while\npreserving existing benchmark behavior and avoiding production code changes.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create integration tests requiring live databases",
+        "instead": "use mocks and in-memory fixtures",
+        "item_id": "coverage-core-benchmarks",
+        "why": "CI has no database servers and tests must run in <1s"
+      },
+      {
+        "dont": "modify production code to improve coverage",
+        "instead": "write tests for code as-is",
+        "item_id": "coverage-core-benchmarks",
+        "why": "the goal is to verify existing behavior, not refactor"
+      },
+      {
+        "dont": "test auto-generated SQL strings character-by-character",
+        "instead": "test query structure, table references, and parameters instead",
+        "item_id": "coverage-core-benchmarks",
+        "why": "SQL formatting changes would cause false failures"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-02-11T00:00:00Z",
+      "created_at": "2026-02-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing tests continue to pass",
+        "item_id": "coverage-core-benchmarks"
+      },
+      {
+        "behavior": "No changes to production code - tests only",
+        "item_id": "coverage-core-benchmarks"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "coverage-core-benchmarks",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "coverage-core-benchmarks",
+        "kind": "do_not_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "coverage-core-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/benchmarks/"
+      },
+      {
+        "item_id": "coverage-core-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      },
+      {
+        "item_id": "coverage-core-benchmarks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/ -v --tb=short -m fast",
+        "description": "All new tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "coverage-core-benchmarks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make coverage-per-file && for f in benchbox/core/ssb/benchmark.py benchbox/core/nyctaxi/benchmark.py benchbox/core/metadata_primitives/benchmark.py; do jq -r --arg f \"$f\" '.files[$f].summary.percent_covered_display' coverage.json; done",
+        "description": "Coverage for each targeted module reaches ≥50%",
+        "expected": "each printed value is >=50",
+        "item_id": "coverage-core-benchmarks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/tpch/reporting.py (0% → 50%)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/clickbench/benchmark.py (25.8% → 50%)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/amplab/benchmark.py (18.4% → 50%)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/amplab/generator.py (29.1% → 50%)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/nyctaxi/benchmark.py (49% → 50%)",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/nyctaxi/downloader.py (20.5% → 50%)",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/h2odb/benchmark.py (28.8% → 50%)",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/read_primitives/dataframe_queries.py (16.5% → 50%)",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/transaction_primitives/generator.py (12.9% → 50%)",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/transaction_primitives/benchmark.py (24.5% → 50%)",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/metadata_primitives/generator.py (8.0% → 50%)",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/tpch/maintenance_test.py (12.8% → 50%)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/metadata_primitives/benchmark.py (47% → 50%)",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/datavault/dataframe_queries/queries.py (6.7% → 50%)",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/joinorder/generator.py (20.1% → 50%)",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/tpch/parameter_extractor.py (23.9% → 50%)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/tpcds/reporting.py (0% → 50%)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/tpcds/maintenance_test.py (20.6% → 50%)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/tpcds/throughput_test.py (23.8% → 50%)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/tpcds/benchmark/runner.py (32.7% → 50%)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/ssb/benchmark.py (48% → 50%)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-core-benchmarks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for core/ssb/generator.py (45.0% → 50%)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "description": "Consolidates 3 deferred items from dataframe-performance-optimization-and-analysis\n(completed 2025-01-07). These represent the next tier of DataFrame performance\nwork beyond the initial profiling infrastructure.\n\nOriginally deferred 13+ months ago. The landscape has evolved - existing\nadapters (Polars, Pandas, DataFusion, PySpark) now provide enough coverage\nto start the cross-platform comparison without waiting for Modin/cuDF/Dask.\n\nDeferred items:\n1. Cross-platform benchmark suite - start with existing adapters (Polars,\n   Pandas, DataFusion, PySpark), expand to Modin/cuDF/Dask later\n2. SQL vs DataFrame comparison benchmark (DuckDB SQL vs DataFrame API;\n   DataFusion SQL vs DataFrame) - both platforms support dual execution modes\n3. Performance comparison report generation",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "deferred-dataframe-performance-analysis",
+        "id": 143,
+        "reason": "Adapters for these platforms don't exist yet. Add to the comparison suite incrementally as adapters are implemented.",
+        "resolution": "promoted",
+        "resolved_item": "modin-cudf-and-dask-adapter-integration-into-cross-platform",
+        "resolved_reason": null,
+        "summary": "Modin, cuDF, and Dask adapter integration into cross-platform suite"
+      }
+    ],
+    "item_meta": {
+      "category": "Performance Analysis",
+      "completed_at": "2026-02-18T00:00:00Z",
+      "created_at": "2026-02-18T00:00:00Z",
+      "worktree": "main"
+    },
+    "work_needs": [
+      {
+        "item_id": "deferred-dataframe-performance-analysis",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "deferred-dataframe-performance-analysis",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "deferred-dataframe-performance-analysis",
+        "notes": "Start with existing adapters. Define: which TPC-H queries, which scale\nfactors, which metrics (wall time, memory, CPU). Design output format\nfor comparison tables.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design cross-platform DataFrame benchmark matrix - Polars vs Pandas vs DataFusion vs PySpark on TPC-H queries",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "deferred-dataframe-performance-analysis",
+        "notes": "Both DuckDB and DataFusion support dual execution modes. Compare per-query\ntiming to quantify the overhead/advantage of each execution path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement SQL vs DataFrame comparison mode - run identical TPC-H queries via SQL and DataFrame on DuckDB and DataFusion",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "deferred-dataframe-performance-analysis",
+        "notes": "Generate comparison tables, highlight fastest/slowest per query, compute\ngeometric means. Integrate with existing ASCII chart system.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build performance comparison report generator - aggregate multi-platform results into structured comparison output",
+        "wid": "w3"
+      }
+    ]
+  }
+}

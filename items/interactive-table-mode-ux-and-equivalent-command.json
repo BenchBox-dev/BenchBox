@@ -1,0 +1,276 @@
+{
+  "context": "Follow existing interactive prompt patterns in benchbox/cli/benchmarks.py\n(`prompt_data_format`, `prompt_output_location`) to add `prompt_table_mode`\nwith a simple numbered choice and normalized return value.\n\nIn benchbox/cli/commands/run.py, wire prompt invocation only in interactive\nwizard flow and only when table mode was not explicitly supplied on the CLI.\nKeep explicit user flags authoritative by checking Click parameter source\nbefore applying wizard-selected value.\n\nIn benchbox/cli/dryrun.py, extend `generate_cli_command` and\n`display_interactive_preview` so the generated command always includes\n`--table-mode` for reproducibility, and preview table shows a \"Table Mode\"\nrow.\n\nIn benchbox/cli/preferences.py and run quick-restart save/load callsites,\npersist `table_mode` and surface a concise mode hint in quick restart summary\nfor non-default mode to avoid hidden configuration reuse.\n",
+  "description": "Interactive benchmark setup currently does not explicitly surface table mode\n(`native` vs `external`) even though `--table-mode` exists in CLI options.\nThis creates ambiguity in wizard-driven runs and in the generated\n\"Equivalent CLI command\" preview.\n\nThis TODO adds table mode to interactive UX and command rendering so users can:\n1) select or confirm table mode in wizard flow,\n2) see selected mode in preview output, and\n3) copy an equivalent command that includes `--table-mode`.\n\nThe implementation must preserve existing non-interactive semantics and keep\nexplicit CLI flags authoritative when provided.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "leak interactive-only prompt behavior into --non-interactive paths",
+        "instead": "keep prompt logic gated by TTY interactive flow",
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "why": "CI workflows rely on deterministic flag-only behavior"
+      },
+      {
+        "dont": "override a user-provided --table-mode with interactive prompt output",
+        "instead": "skip prompting when table_mode came from CLI",
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "why": "explicit CLI intent must win"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-03-04T00:00:00Z",
+      "created_at": "2026-03-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Interactive preview continues to render existing Data Format/Compression/Phase fields without regressions",
+        "item_id": "interactive-table-mode-ux-and-equivalent-command"
+      },
+      {
+        "behavior": "Non-interactive and explicit CLI invocation behavior for --table-mode remains unchanged, including --table-mode external incompatibility with --tuning tuned",
+        "item_id": "interactive-table-mode-ux-and-equivalent-command"
+      },
+      {
+        "behavior": "Run announcement continues to include [external] only when table_mode is external",
+        "item_id": "interactive-table-mode-ux-and-equivalent-command"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/benchmarks.py"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/dryrun.py"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/preferences.py"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_data_load_modes.py"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_interactive_dry_run.py"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_preferences_coverage.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_interactive_dry_run.py -q",
+        "description": "Interactive dryrun command and preview include table mode and remain stable",
+        "expected": "all tests pass",
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_interactive_dry_run.py -q -k table_mode",
+        "description": "Equivalent command rendering explicitly includes --table-mode for both native and external interactive flows",
+        "expected": "all selected tests pass and assertions confirm '--table-mode native' and '--table-mode external' rendering",
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_cli_data_load_modes.py -q",
+        "description": "Run-mode forwarding and table-mode compatibility checks still pass",
+        "expected": "all tests pass",
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_cli_data_load_modes.py -q -k table_mode",
+        "description": "Explicit CLI --table-mode value remains authoritative and is not overridden by interactive prompt selection",
+        "expected": "all selected tests pass and assertions confirm explicit flag precedence",
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_preferences_coverage.py -q",
+        "description": "Preferences save/load/summary behavior remains valid with table_mode persistence",
+        "expected": "all tests pass",
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox/cli/benchmarks.py benchbox/cli/commands/run.py benchbox/cli/dryrun.py benchbox/cli/preferences.py tests/unit/cli/test_interactive_dry_run.py tests/unit/cli/test_cli_data_load_modes.py tests/unit/cli/test_preferences_coverage.py",
+        "description": "Touched files satisfy lint rules",
+        "expected": "All checks passed",
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add interactive prompt helper for table mode selection in benchbox/cli/benchmarks.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate table mode prompt into interactive run flow with explicit-CLI precedence",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend dryrun.generate_cli_command signature and rendering to include --table-mode",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update interactive preview table to show selected table mode and pass value into equivalent command generation",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Persist table_mode in quick-restart save/load path and include mode hint in last-run summary when non-default",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add/adjust tests for prompt behavior and generated command output in test_interactive_dry_run.py, including explicit --table-mode rendering expectations",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add/adjust tests for run flow and preferences persistence in test_cli_data_load_modes.py and test_preferences_coverage.py, including explicit CLI precedence for --table-mode",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "interactive-table-mode-ux-and-equivalent-command",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run targeted CLI test suite and ruff checks to verify behavior and formatting",
+        "wid": "w8"
+      }
+    ]
+  }
+}

@@ -1,0 +1,235 @@
+{
+  "context": "Zero-cost trial sequencing verified 2026-08-17: BigQuery first (permanent free tier, 1 TiB scanned/month + 10 GB storage, plus $300/90-day new-customer credit - a full TPC-H SF100 sweep fits inside the free monthly TiB). Databricks Free Edition (free forever, serverless 2X-Small SQL warehouse, per-account daily quotas, LinkedIn verification raises limits) for SF1-SF10; use the paid trial only if quotas block SF100. Snowflake 30-day trial, $400 credits, no credit card - an X-Small warehouse is 1 credit/hour so a full SF100 load plus 22 queries costs a few credits; $400 covers SF100 and SF1000 many times over. Redshift Serverless $300 / 90 days (~800 RPU-hours). ClickHouse Cloud $300 / 30 days. Do NOT start the time-boxed trials (Snowflake, ClickHouse Cloud) until the harness is proven green on BigQuery and Databricks Free Edition, so no trial clock burns on debugging.",
+  "description": "REVALIDATED 2026-08-20. Public corpus still has zero warehouse platforms. No snowflake/databricks/bigquery files under ~/Developer/benchmark_runs/results.\n\nLowest-cost signups as of 2026-08-20 (email; no paid plan required to start):\n- Databricks Free Edition (free): https://www.databricks.com/learn/free-edition\n- Snowflake 30-day trial, \\$400 credits, email only: https://signup.snowflake.com/\n- Google Cloud trial \\$300 / 90 days plus BigQuery free tier 1 TiB queries/month: https://cloud.google.com/free\n\nAfter credentials exist, run one TPC-H per warehouse and submit. Do not add PLATFORM_GROUPS or a cloud release-gate before a published result. This is independent of Explorer curated-preview launch.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Fix adapter configuration defects inline during the run",
+        "instead": "INSTEAD capture them in w8 and route them to the cloud-config item",
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "why": "the run is the evidence-gathering exercise and inline fixes lose the friction record"
+      },
+      {
+        "dont": "Publish a cloud result without recording warehouse size, region and instance class",
+        "instead": "INSTEAD populate the deployment fields or do not publish",
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "why": "a cloud number without its deployment metadata is not comparable and invites the vendor-benchmark criticism this project exists to avoid"
+      },
+      {
+        "dont": "Treat a green unit-test suite as evidence a cloud adapter works",
+        "instead": "INSTEAD require a real bundle",
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "why": "Snowflake, Databricks and BigQuery already have 351/458/349 unit tests and have never executed against a real endpoint"
+      },
+      {
+        "dont": "add PLATFORM_GROUPS or a cloud release-gate before any published warehouse result",
+        "instead": "INSTEAD publish one TPC-H bundle per warehouse first",
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "why": "that is internal machinery, not the missing comparison page"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Human-only cloud vendor signup (Databricks Free Edition, Snowflake trial, Google Cloud/BigQuery). Agent sessions must not invent credentials or create vendor accounts. After a human records that those accounts exist, unblock and resume w1-w5. Independent of corpus recency/restore work.",
+      "category": "platform",
+      "created_at": "2026-08-17T23:28:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cost control: a run is stopped at the recorded stop condition rather than allowed to overrun a trial credit",
+        "item_id": "first-live-cloud-benchmark-run-and-publish"
+      },
+      {
+        "behavior": "No credential ever reaches Git, a result bundle, a log, or a tracker note; cloud runs use environment variables or benchbox setup only",
+        "item_id": "first-live-cloud-benchmark-run-and-publish"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "kind": "only_modify",
+        "path_glob": "results-data/corpus-inventory.json"
+      },
+      {
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/matrix.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "ls results-data/bundles/ | grep -icE 'snowflake|databricks|bigquery'",
+        "description": "Cloud bundles present in the public corpus",
+        "expected": "greater than 0",
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import duckdb;c=duckdb.connect('results-explorer/public/data/results.duckdb',read_only=True);print(c.execute('select deployment_class, count(*) from results group by 1').fetchall())\"",
+        "description": "Published cloud results carry real deployment metadata",
+        "expected": "a non-local deployment_class appears; today all 207 rows are deployment_class=local",
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python results-data/validate_corpus.py",
+        "description": "Cloud bundles validate and rank like any other",
+        "expected": "pass, with the cloud bundles ranking-eligible",
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "2026-08-20: corpus platforms still DuckDB/DataFusion/Polars/Spark/SQLite/LakeSail/ClickHouse Local only; rg of ~/Developer/benchmark_runs/results found zero snowflake/databricks/bigquery files",
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "notes": null,
+        "started_at": "2026-08-20T14:52:12Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Revalidate",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Sign up for Google Cloud trial ($300/90d + BigQuery 1 TiB/month free tier) at https://cloud.google.com/free and record that a BigQuery project exists",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run one TPC-H on BigQuery and keep the result bundle",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Sign up for Databricks Free Edition at https://www.databricks.com/learn/free-edition and run one TPC-H",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Sign up for Snowflake 30-day trial ($400 credits) at https://signup.snowflake.com/ and run one TPC-H",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Submit all cloud bundles through benchbox submit and merge to published-results",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Optional after published results: add a cloud group to PLATFORM_GROUPS. Does not block w5 or v0.4.0",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "DECISION GATE - before any paid signup, decide the per-warehouse scale and stop condition (scale factor, max spend, max wall clock) and record it; abort a run that exceeds it rather than continuing",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "first-live-cloud-benchmark-run-and-publish",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record every configuration failure hit on the way to a first successful connection, and file them against cloud-config-error-messages-give-broken-instructions rather than fixing them inline",
+        "wid": "w8"
+      }
+    ]
+  }
+}

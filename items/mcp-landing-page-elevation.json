@@ -1,0 +1,10 @@
+{
+  "description": "The MCP (Model Context Protocol) feature is a competitive differentiator for BenchBox,\nenabling AI assistants like Claude Code to run benchmarks via natural language. However,\nMCP is currently invisible on the landing page and buried in documentation navigation.\n\nThis TODO addresses promoting MCP to first-class visibility alongside CLI and Library\ninterfaces, including landing page hero updates, a dedicated section, and improved\ndocumentation navigation.\n\nFindings from docs-review:\n- Landing page has ZERO MCP mentions (nav, hero, features, or sections)\n- MCP docs exist and are complete (reference: 375 lines, guide: 186 lines)\n- MCP buried in docs/guides/index.md line 68 under \"Integration\"\n- MCP buried in docs/reference/index.md line 28 under \"Integrations\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2026-01-18T00:00:00Z",
+      "worktree": "docs-experience"
+    }
+  }
+}

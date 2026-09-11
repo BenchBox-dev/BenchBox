@@ -1,0 +1,11 @@
+{
+  "description": "Implement a unified Firebolt platform adapter supporting both Firebolt Core (free, self-hosted)\nand Firebolt Cloud (managed service). Firebolt is a PostgreSQL-compatible cloud data warehouse\nwith a vectorized query engine optimized for analytical workloads.\n\n**Key Discovery: Firebolt Core**\nFirebolt provides a genuinely free, self-hosted version called \"Firebolt Core\" that runs locally\nvia Docker with the same distributed, vectorized query engine as the cloud version. This enables\ncost-free development, testing, and benchmarking without cloud dependencies.\n\n**Unified Adapter Strategy**\nA single adapter can support both deployment modes with minimal conditional logic:\n- Local (Core): `connect(database='firebolt', url='http://localhost:3473')`\n- Cloud: `connect(auth=ClientCredentials(...), engine_name=..., account_name=...)`\n\nThis approach mirrors DataFusion's lesson of handling local vs cloud seamlessly.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2025-11-29T00:00:00Z",
+      "created_at": "2025-11-29T00:00:00Z",
+      "worktree": "platform-expansion-firebolt"
+    }
+  }
+}

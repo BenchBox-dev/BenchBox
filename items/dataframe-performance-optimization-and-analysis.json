@@ -1,0 +1,10 @@
+{
+  "description": "Optimize DataFrame query performance and create comparison benchmarks across platforms and vs SQL mode.",
+  "legacy": {
+    "item_meta": {
+      "category": "Performance and Efficiency",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "dataframe-performance"
+    }
+  }
+}

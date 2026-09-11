@@ -1,0 +1,524 @@
+{
+  "context": "Follow a research-first but opinionated cutover, not an additive\ncompatibility migration.\n\nFirst, inventory every runtime metric fetch and every pipeline artifact that\ncurrently feeds it. Then define the DuckDB schema and materializations that\nreplace those paths. After the research gate, wire the explorer pipeline\ndirectly from committed JSON objects into DuckDB, move all metric surfaces\nonto typed DuckDB queries, and remove metric-bearing JSON outputs and\nloaders.\n\nTemporary parity checks are allowed as verification scaffolding, but JSON is\nnot a second product contract. If a surface shows metrics to the user, those\nmetrics must exist in DuckDB first.\n",
+  "description": "Rework the results explorer so benchmark landing pages stay matrix-first\nwhile DuckDB-WASM becomes the single runtime store for every user-visible\nmetric. Today the implementation is split-brain: `Query.tsx` already runs\nagainst DuckDB, but `Home.tsx`, `PlatformIndex.tsx`, `BenchmarkIndex.tsx`,\n`Compare.tsx`, and `ResultDetail.tsx` still fetch metric-bearing JSON\nthrough `results-explorer/src/manifest.ts`.\n\nThe target contract is stricter than \"prefer DuckDB when convenient\":\ncommitted JSON result objects are immutable source inputs; the explorer\npipeline projects them directly into `results.duckdb`; and every\nuser-visible metric, aggregate, rank, compare cell, detail timing, and\ncohort summary is read from DuckDB. Any JSON that survives after this work\nis bootstrap-only navigation metadata and must not carry user-visible\nmetrics.\n\nThis item still needs a research gate before implementation, but that gate\nis for schema and cutover precision, not to re-open whether JSON remains a\nfirst-class metric surface. The end state is DuckDB-only for explorer\nmetrics.\n\nVerified current-state anchors:\n  - `results-explorer/src/db.ts` attaches `/results/data/results.duckdb`\n    with `ATTACH ... AS bench (READ_ONLY)`.\n  - `results-explorer/src/pages/Query.tsx` already queries `bench.results`\n    but still bootstraps schema from `results_schema.json`.\n  - `results-explorer/src/manifest.ts` fetches `manifest.json`,\n    `benchmarks/*.json.gz`, `details/*.json`, `compare/*.json`,\n    `meta_leaderboard.json`, and `short_ids.json`, making JSON the\n    dominant runtime read path today.\n  - `benchbox/core/explorer_pipeline/duckdb_builder.py` currently emits only\n    a thin `results` table plus `results_schema.json`, so DuckDB cannot yet\n    serve Home, platform, benchmark, compare, and detail surfaces alone.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add new reduction code under `benchbox/core/results/`",
+        "instead": "add new reductions under `benchbox/core/explorer_pipeline/` and import existing utilities read-only from `benchbox/core/results/` as needed",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "this TODO's scope_limit keeps that tree read-only"
+      },
+      {
+        "dont": "allow Home, PlatformIndex, BenchmarkIndex, Compare, or ResultDetail to keep metric reads outside DuckDB",
+        "instead": "migrate every metric-bearing surface",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "that violates the core architecture goal"
+      },
+      {
+        "dont": "dedupe `cohort_metadata` rows by `(cohort_key, platform_id)` or hide publishable variants of the same platform in any canonical table",
+        "instead": "key `cohort_metadata` on `(cohort_key, result_id)`, carry `tuning_mode`/`trust_label`/`short_id` alongside, and let the UI decide any display-time collapsing",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "users must be able to compare across tuning levels and trust levels from the DuckDB store, and the pipeline is the wrong layer to decide which variant 'represents' a platform"
+      },
+      {
+        "dont": "delete metric-JSON emitters in W2",
+        "instead": "W2 is additive, W4 deletes each emitter in the same slice as its last consumer, W7 does the final sweep",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "Home/PlatformIndex/BenchmarkIndex/Compare/ResultDetail still read from them until W4"
+      },
+      {
+        "dont": "keep separate canonical logic in JSON loaders and DuckDB helpers",
+        "instead": "move all interactive metric reads behind one DuckDB contract",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "that recreates the current drift risk"
+      },
+      {
+        "dont": "let `public/data/bundles/*.json` drift into a rendered metric path",
+        "instead": "enforce via the G-8 second assertion that no `src/pages/` or `src/components/` file fetches `/results/data/bundles/`",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "bundles are committed JSON source inputs and a download-only affordance, not a runtime read source"
+      },
+      {
+        "dont": "let bootstrap convenience justify metric-bearing `manifest.json` or `results_schema.json` sidecars",
+        "instead": "keep any surviving JSON bootstrap-only and enforce via a key-whitelist contract test",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "that silently recreates split-brain storage"
+      },
+      {
+        "dont": "preserve beta-era JSON metric contracts just because they already exist",
+        "instead": "optimize for the correct canonical model, not compatibility theater",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "the explorer has not shipped and the current contract is wrong"
+      },
+      {
+        "dont": "recompute display reductions, rankings, compliance classes, speedup ratios, or fastest/slowest spreads in TypeScript",
+        "instead": "persist canonical values in DuckDB and read them directly",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "the canonical Python reference computation in `benchbox/core/explorer_pipeline/` owns those semantics"
+      },
+      {
+        "dont": "rely on dict last-write-wins inside `_build_meta_leaderboard` `platform_agg` when the same `platform_id` ranks more than once in the same cohort",
+        "instead": "compare ranks on write and keep the best (or rely on best-first iteration order with `setdefault`)",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "the second write clobbers the better rank with a worse one and poisons `avg_rank` for the Home meta-leaderboard"
+      },
+      {
+        "dont": "require derived user-visible metrics to equal verbatim JSON source fields",
+        "instead": "prove final-value parity against the canonical Python reference computation instead",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "many visible values are canonical reductions or rollups"
+      },
+      {
+        "dont": "start implementation before the research gate closes the schema and cutover details",
+        "instead": "lock the rules first and record them",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "this is a contract refactor across pipeline and UI"
+      },
+      {
+        "dont": "tighten `db.ts` to reject on attach failure until the last manifest.ts consumer migrates",
+        "instead": "W3 keeps the fallback in place; W4 lands the hardening in the same slice that deletes `manifest.ts`",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "pages still on the JSON path rely on the soft failure path"
+      },
+      {
+        "dont": "treat pre-calculated CLI JSON artifacts, current TS reduction libs, or any bridge artifact as the parity oracle",
+        "instead": "define parity as `DuckDB read-path value == canonical Python reference computation in `benchbox/core/explorer_pipeline/` (with read-only imports from `benchbox/core/results/`)`, within the per-metric tolerance declared in `visible_metrics.yaml`",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "doing so freezes today's drift into tomorrow's contract"
+      },
+      {
+        "dont": "widen scope into CLI, hosted API, or submission-path changes",
+        "instead": "leave write-path contracts untouched",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "why": "this TODO is about the static explorer read model only"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-canonical-browser-duckdb-read-model",
+        "id": 403,
+        "reason": "This TODO is static-first only; the read path remains browser-side and read-only.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicit scope decision: explorer stays static/browser-side; introducing a hosted/authenticated API is a declined direction, not deferred work.",
+        "summary": "Introduce any hosted API, authenticated query service, or server-side execution path"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-canonical-browser-duckdb-read-model",
+        "id": 404,
+        "reason": "The adopted product strategy keeps benchmark landing pages matrix-first and the query workbench secondary.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Adopted product strategy explicitly keeps matrix-first landing pages; making /results/query the default landing page was rejected.",
+        "summary": "Make `/results/query` the default landing page for the explorer"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-18T00:00:00Z",
+      "created_at": "2026-04-18T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Any temporary bridge artifact used during W2-W4 page-by-page migration is regenerated from the same pipeline pass that writes DuckDB, never hand-patched, and cannot define, override, or outlive user-visible metrics",
+        "item_id": "explorer-canonical-browser-duckdb-read-model"
+      },
+      {
+        "behavior": "Benchmark landing pages remain matrix-first default routes; `/results/query` stays a secondary analysis surface rather than the primary explorer entrypoint",
+        "item_id": "explorer-canonical-browser-duckdb-read-model"
+      },
+      {
+        "behavior": "Committed JSON result objects remain immutable source inputs; the browser does not fetch them directly for metric rendering",
+        "item_id": "explorer-canonical-browser-duckdb-read-model"
+      },
+      {
+        "behavior": "DuckDB is always attached read-only in the browser; no implementation step may weaken `ATTACH ... (READ_ONLY)` or permit persistent mutation from the SQL workbench",
+        "item_id": "explorer-canonical-browser-duckdb-read-model"
+      },
+      {
+        "behavior": "Every result trusted enough to publish appears in the DuckDB published-results dataset with its identity preserved (`result_id`, `tuning_mode`, `trust_label`); the pipeline never silently collapses, dedupes, or hides publishable variants - users must be able to compare across tuning levels AND trust levels from the same store",
+        "item_id": "explorer-canonical-browser-duckdb-read-model"
+      },
+      {
+        "behavior": "Every user-visible metric, rank, aggregate, and detail timing shown in the explorer originates from DuckDB rather than JSON sidecars or TypeScript-only recomputation",
+        "item_id": "explorer-canonical-browser-duckdb-read-model"
+      },
+      {
+        "behavior": "Final-value parity for derived metrics is defined against the canonical Python reference computation in `benchbox/core/explorer_pipeline/` (with read-only imports from `benchbox/core/results/`), NOT against pre-calculated CLI JSON, current TS reduction libs, or bridge artifacts",
+        "item_id": "explorer-canonical-browser-duckdb-read-model"
+      },
+      {
+        "behavior": "Raw JSON bundles under `public/data/bundles/` are a download-only affordance; no `src/pages/` or `src/components/` file fetches from `/results/data/bundles/` at runtime",
+        "item_id": "explorer-canonical-browser-duckdb-read-model"
+      },
+      {
+        "behavior": "Shareable compare flows remain available after cutover, but route convenience is subordinate to the DuckDB-only metric contract",
+        "item_id": "explorer-canonical-browser-duckdb-read-model"
+      },
+      {
+        "behavior": "The explorer remains static-hosted and browser-executed; no server API, auth dependency, or hosted query runtime is introduced by this TODO",
+        "item_id": "explorer-canonical-browser-duckdb-read-model"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "do_not_modify",
+        "path_glob": "docs/reference/hosted-results-contract.md"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "_project/planning/visible_metrics.yaml"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "docs/development/benchbox-results-platform-strategy.md"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/playwright.config.ts"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/manifest.ts"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/types.ts"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n \"DuckDB-only metric contract|direct ingest contract|bootstrap-only|metric-bearing JSON\" _project/TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml docs/development || true",
+        "description": "Research gate records the DuckDB-only metric contract before code work begins",
+        "expected": "The contract and cutover rules are recorded before implementation starts",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO metadata and graph validate cleanly",
+        "expected": "TODO file validates; dependency graph check passes",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ -q",
+        "description": "Explorer pipeline tests remain green after DuckDB schema expansion",
+        "expected": "all tests pass",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test && npm run build",
+        "description": "Explorer frontend typecheck, tests, and production build remain green",
+        "expected": "all green",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import duckdb; con=duckdb.connect('results-explorer/public/data/results.duckdb', read_only=True); names={r[0] for r in con.execute('PRAGMA show_tables').fetchall()}; required={'results','query_display_timings','query_executions','result_detail_metrics','benchmark_matrix_cells','benchmark_rankings','platform_index_rows','cohort_metadata','meta_leaderboard','short_ids'}; missing=required-names; assert not missing, missing\"",
+        "description": "Canonical DuckDB base tables exist for the browser metric contract",
+        "expected": "no assertion failure",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "if rg -n \"/results/data/(benchmarks/|details/|compare/|meta_leaderboard\\.json|results_schema\\.json|short_ids\\.json)\" results-explorer/src; then exit 1; else echo CLEAN; fi",
+        "description": "No runtime metric JSON fetches remain in the explorer source tree",
+        "expected": "CLEAN",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "if rg -n \"/results/data/bundles/\" results-explorer/src/pages results-explorer/src/components; then exit 1; else echo CLEAN; fi",
+        "description": "No page or component fetches the raw-bundle download path",
+        "expected": "CLEAN",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "bash -c 'for f in meta_leaderboard.json short_ids.json results_schema.json; do if [ -e \"results-explorer/public/data/$f\" ]; then echo FAIL_$f; exit 1; fi; done; for d in details compare benchmarks; do if [ -d \"results-explorer/public/data/$d\" ]; then echo FAIL_$d; exit 1; fi; done; echo CLEAN'",
+        "description": "Pipeline output contains no legacy metric-bearing artifacts (bundles/ is allowed as download-only)",
+        "expected": "CLEAN",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "bash -c 'f=results-explorer/public/data/manifest.json; if [ ! -e \"$f\" ]; then echo ABSENT; exit 0; fi; uv run -- python -c \"import json,sys; keys=set(json.load(open(\\\"$f\\\")).keys()); allowed={\\\"routes\\\",\\\"navigation\\\",\\\"build_meta\\\",\\\"schema_version\\\"}; extra=keys-allowed; sys.exit(0 if not extra else (print(\\\"EXTRA_KEYS:\\\",sorted(extra)) or 1))\"'",
+        "description": "Surviving manifest.json (if any) carries only whitelisted non-metric keys",
+        "expected": "ABSENT or no extra keys",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --name-only main...HEAD -- benchbox/core/results/ | wc -l | tr -d ' '",
+        "description": "No reduction code was added under `benchbox/core/results/` by this TODO",
+        "expected": "0",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 10,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- duckdbMetricParity",
+        "description": "Cross-surface parity holds for canonical display values",
+        "expected": "home, benchmark, compare, detail, and query parity tests pass",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 11,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- Query",
+        "description": "Read-only SQL enforcement still holds",
+        "expected": "DDL/DML attempts fail; read-only SELECT flows still pass",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 12,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast Python suite stays green after the migration",
+        "expected": "all tests pass",
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 13,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "needs_wid": "w8",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "needs_wid": "w2",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "notes": "Deliverables:\n  1. A concrete call-site inventory for Home, PlatformIndex,\n     BenchmarkIndex, Compare, ResultDetail, and Query showing the\n     current data source and the target DuckDB table/view for each\n     user-visible metric.\n  2. A schema decision record mapping every user-visible explorer metric\n     to DuckDB tables/views, plus the minimal bootstrap JSON that may\n     remain and proof that it carries no metrics.\n  3. A direct ingest contract documenting `committed JSON -> explorer\n     pipeline -> DuckDB` and explicitly rejecting metric-bearing JSON as\n     a steady-state runtime contract.\n  4. A cutover/deletion order showing which JSON readers and JSON\n     artifacts are removed or demoted once DuckDB parity is proven.\n  5. A committed `visible_metrics.yaml` fixture enumerating every\n     user-visible metric column across the ten canonical tables and\n     classifying each as `raw_copy` (source-fidelity contract against\n     the committed bundle field) or `derived` (final-value parity\n     contract against the canonical Python reference computation).\n     This file is the registry G-2 consumes and is required before W2\n     starts.\n  6. A definition-of-terms block pinning the meaning of the parity\n     vocabulary used across this TODO:\n       - \"canonical Python reference computation\" = the pipeline's own\n         Python implementation inside\n         `benchbox/core/explorer_pipeline/` (plus read-only imports\n         from `benchbox/core/results/`). TypeScript is never a\n         reference oracle.\n       - \"final-value parity\" = the rendered user-visible value\n         produced by the DuckDB-backed read path equals the canonical\n         Python reference computation for the same inputs, within a\n         documented tolerance per metric. Parity is NOT defined\n         against whatever the CLI, a pre-calculated JSON artifact, or\n         the current TS reduction libraries happen to emit today.\n       - \"source-fidelity parity\" = raw fields copied into DuckDB\n         equal the corresponding field in the committed JSON bundle\n         verbatim.\n  7. A compute-ownership note answering: for every derived metric in\n     `visible_metrics.yaml`, does the canonical Python reference\n     computation already exist under\n     `benchbox/core/explorer_pipeline/` or `benchbox/core/results/`,\n     or must a new module be added under\n     `benchbox/core/explorer_pipeline/` (the only write-legal home for\n     new reduction code under this TODO's scope_limit)? If a derived\n     metric is TS-only today (e.g. currently lives in\n     `queryReduction.ts`, `chartMath.ts`, `ranking.ts`, or\n     `compliance.ts`), record it here and plan to port the logic into\n     `benchbox/core/explorer_pipeline/` during W2.\n\nQuantified research gates (each must be green or explicitly risk-accepted\nbefore w2 starts; record findings in the schema decision record above):\n\n  - RG-1 Cold-start init budget: measure time from page load to first\n    successful SQL result against `results.duckdb` (cold cache, mid-tier\n    laptop, Safari/Chrome/Firefox). Pass: p50 <1500ms, p95 <3500ms at\n    current corpus; p95 <5000ms at 10x corpus.\n  - RG-2 HTTP range-reads: verify `DuckDBDataProtocol.HTTP` with\n    READ_ONLY ATTACH issues range requests and that benchbox.dev /\n    GH Pages returns `Accept-Ranges: bytes` with 206 responses for a\n    single-row `WHERE result_id = ?` query. Pass: the sum of HTTP\n    Content-Length bytes transferred for a cold single-row lookup is\n    ≤10% of the total `results.duckdb` file size, measured on the\n    current corpus.\n  - RG-3 DB size budget: build DB at 1x, 5x, 20x, 100x synthetic corpus\n    (duplicated bundles with mutated ids). Record the `results.duckdb`\n    file size on disk at each scale and publish the 1x baseline in the\n    schema decision record. Pass: on-disk `results.duckdb` size grows\n    sub-linearly in bundle count AND stays ≤20 MB at 100x. If the\n    measured 1x baseline makes 20 MB at 100x structurally impossible\n    (e.g. baseline already >1 MB per bundle), record a revised numeric\n    ceiling in the decision record and escalate to RG-5 evaluation.\n  - RG-4 COEP/COOP hosting: confirm either the `mvp` single-threaded\n    DuckDB-WASM bundle meets RG-1 budgets, OR COEP/COOP headers can be\n    served by the deploy target. Pass: a chosen WASM bundle works with\n    the current hosting configuration.\n  - RG-5 Single DB vs partitioned: only if RG-3 fails. Prototype\n    multi-DB `ATTACH` from WASM. Default is single DB per the \"one and\n    only\" rule; partitioning is a fallback, not a preference.\n  - RG-6 View materialization budget: benchmark each canonical surface\n     query cold against 100x corpus. Pass: <250ms p95 as a plain VIEW,\n     otherwise promote to materialized `CREATE TABLE AS`.\n  - RG-7 Attach-failure UX: every page renders a diagnostic ErrorMessage\n    when the DB fails to attach (0-byte, 404, CORS). Pass: unit-tested\n    per page, no silent JSON fallback.\n  - RG-8 toJSON fidelity: round-trip every column type through\n    `queryRows` in a Vitest matrix. Pass: no precision loss on DOUBLE /\n    BIGINT / DECIMAL; date handling is explicit.\n  - RG-9 Read-only fuzz: adversarial SQL (CREATE TABLE, ATTACH, COPY TO,\n    INSTALL, LOAD, HTTPFS) against the READ_ONLY attached DB in WASM.\n    Pass: all fail harmlessly with no side effects.\n\nResearch gate exit criterion: all RGs green or documented accepted-risk\nnote reviewed with the user, and a frozen `schema.sql` fixture committed\nalongside the decision record.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research gate: inventory every metric-bearing JSON read, define the DuckDB-only contract, and lock the cutover rules before implementation",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "notes": "Minimum DuckDB-resident contracts (tables or materialized views):\n  - `results`\n  - `query_display_timings`\n  - `query_executions`\n  - `result_detail_metrics`\n  - `benchmark_matrix_cells`\n  - `benchmark_rankings`\n  - `platform_index_rows`\n  - `cohort_metadata`\n  - `meta_leaderboard`\n  - `short_ids`\nFinal names can change in w1, but every surface above must have an\nexplicit DuckDB contract before frontend migration begins.\n\nPipeline implementation rules:\n  - `duckdb_builder.py` rewrites the 19-column stub (currently lines\n    25-131) into a full-schema builder. Uses `CREATE OR REPLACE` on each\n    build; the corpus is the only source of truth, so there are no\n    migrations.\n  - `pipeline.py` `run()` becomes: enumerate `bundles/*.json`, validate\n    via `SchemaV2Validator`, compute derived values in memory (display\n    timings, short_id, is_ranking_eligible, compliance_class, matrix\n    cells, rankings, meta-leaderboard rows, cohort metadata), bulk\n    insert in one transaction, copy raw bundles to\n    `public/data/bundles/` for the raw-bundle download affordance ONLY.\n  - All derived-value reductions consumed by the pipeline live under\n    `benchbox/core/explorer_pipeline/` or are imported read-only from\n    `benchbox/core/results/`. This is the canonical Python reference\n    computation for G-2 parity. If a reduction is currently TS-only\n    (e.g. in `queryReduction.ts`, `chartMath.ts`, `ranking.ts`,\n    `compliance.ts`), port the algorithm into\n    `benchbox/core/explorer_pipeline/` in this work item; the TS copy\n    becomes dead code to be deleted in W4 once no page imports it.\n  - W2 is ADDITIVE on the pipeline side. The pipeline starts emitting\n    the ten canonical tables and keeps all existing metric-bearing\n    JSON emitters running as bridge artifacts until the consuming\n    page migrates in W4. No metric-JSON emitter is deleted at W2\n    exit. This is the only reading that is consistent with \"do not\n    remove the artifact still backing a live page until that page\n    migrates\" - W4 removes each emitter in the same slice as its\n    last consumer, and W7 does the final sweep.\n  - Bridge artifacts are scaffolding, never a second accepted metric\n    contract. During W2-W4, if a bridge artifact and DuckDB disagree,\n    DuckDB is canonical by rule and the bridge artifact must be\n    regenerated from the same pipeline pass, not hand-patched.\n  - If `manifest.json` survives past W7, it is strictly non-metric\n    route/navigation bootstrap derived from DuckDB-owned identities\n    only. A key-whitelist contract test (see G-8) enforces this.\n  - No TypeScript-side recomputation of display reductions, geomean,\n    rank, compliance class, speedup ratios, or any other user-visible\n    metric is permitted downstream. TS is allowed to do presentation\n    formatting (locale formatting, unit suffixes, truncation) on\n    values already produced by the canonical Python reference\n    computation and read from DuckDB.\n\nExit:\n  - All ten canonical tables/materializations exist with their W1-\n    defined schemas (G-1).\n  - Source-fidelity tests pass for every `raw_copy` metric in\n    `visible_metrics.yaml` (raw bundle field == DuckDB column, byte/\n    value exact).\n  - Final-value parity tests pass for every `derived` metric in\n    `visible_metrics.yaml`: for the same inputs, the DuckDB-backed\n    read path and the canonical Python reference computation produce\n    the same user-visible value within the per-metric tolerance\n    declared in the fixture. Parity is NOT defined against\n    pre-calculated CLI JSON artifacts or current TS reductions.\n  - Schema contract test passes; short-id uniqueness test passes;\n    no-computed-metric-view contract test passes.\n  - All existing metric-bearing JSON emitters still run as bridge\n    artifacts; `public/data/` still contains the current shape.\n    Removal is deliberately deferred to W4/W7.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor the explorer pipeline so DuckDB is built directly from committed JSON artifacts and materializes every user-visible metric surface",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "notes": "Consolidate TS-side data access around `results-explorer/src/db.ts`\nplus typed query helpers. Retire `results-explorer/src/manifest.ts` as\na metric source. If manifest/bootstrap JSON survives, it is route and\nnavigation metadata only. `Query.tsx` is fully migrated in this work\nitem (it already queries DuckDB - W3 removes its last JSON\ndependency, `results_schema.json`) and is NOT reopened in W4. W4\nhandles Home, PlatformIndex, BenchmarkIndex, ResultDetail, and\nCompare. Query's schema discovery uses DuckDB introspection\n(`duckdb_tables`, `duckdb_columns`, `DESCRIBE`) or a DuckDB-resident\n`schema_metadata` table if introspection lands in the RG-1 hot path.\nThe `db.ts:1-17` header comment (which still calls DuckDB a \"Phase 2\"\nfeature) is rewritten in this work item to match the new contract.\n\nNew modules:\n  - `results-explorer/src/lib/duckdbQueries.ts` - typed helpers per\n    canonical surface: `getMetaLeaderboard`, `getBenchmarkMatrixCells`,\n    `getBenchmarkRanking`, `getPlatformIndexRows`,\n    `getResultDetailMetrics`, `getQueryDisplayTimings`, `getCohort`,\n    `resolveShortId`, `listResults`.\n  - `results-explorer/src/lib/duckdbSchema.ts` - introspection-based\n    schema discovery for the Query workbench column picker.\n\n`db.ts` hardening sequencing:\n  - In W3 the silent JSON fallback at `db.ts:86-89` STAYS in place.\n    Removing it while Home/PlatformIndex/BenchmarkIndex/ResultDetail/\n    Compare still import from `manifest.ts` would turn an attach\n    failure into a hard error for pages that don't yet use DuckDB.\n  - What W3 adds now: a `DbProvider` context exposing `{ db, schema,\n    state }` and a `useQuery<T>(sql, params, deps)` hook with\n    `{ loading, error, data }` so pages do not each guard on init.\n    These are opt-in; manifest-backed pages continue to work.\n  - The attach-failure hardening - reject `getDb()` on attach\n    failure, delete the silent JSON fallback, and wire per-page\n    ErrorMessage UI (RG-7) - moves into W4 and lands in the SAME\n    slice as the final manifest.ts consumer's migration. This\n    guarantees no mid-migration tab state where some pages still\n    depend on a soft attach failure.\n\nExit:\n  - Vitest coverage on the data-layer helpers.\n  - In-browser cold-start measurement confirms RG-1 budgets.\n  - `Query.tsx` no longer depends on `results_schema.json`.\n  - `duckdbQueries.ts` + `duckdbSchema.ts` land with typed tests.\n  - The shared DuckDB data layer is ready for page-by-page migration\n    in W4.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build the shared frontend DuckDB access layer and cut `Query.tsx` off from `results_schema.json`; defer `db.ts` attach-failure hardening until W4",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "notes": "Every user-visible number on these surfaces must originate from DuckDB\nqueries or DuckDB-backed helpers. Benchmark landing pages remain the\ndefault graph surface. `/results/query` remains secondary in product\npositioning, but the same DuckDB contract must back both flows. Query\nwas fully migrated in W3 and is not reopened here.\n\nSuggested migration order (one page per slice, commit per page):\nHome -> PlatformIndex -> BenchmarkIndex -> ResultDetail -> Compare.\n\nPer-slice rule: when a page migrates to DuckDB, the SAME commit\n  (a) deletes that page's imports from `manifest.ts`,\n  (b) deletes the metric-JSON emitter in the pipeline that backed\n      that page (e.g. `meta_leaderboard.json` with Home,\n      `benchmarks/*.json.gz` with BenchmarkIndex, `details/*.json`\n      with ResultDetail, `compare/*.json` + `short_ids.json` with\n      Compare),\n  (c) deletes the TS reduction module(s) whose last caller\n      disappeared (typically `queryReduction.ts`, `chartMath.ts`,\n      `ranking.ts`, `compliance.ts` on various slices), since the\n      canonical Python reference computation was ported into\n      `benchbox/core/explorer_pipeline/` in W2.\n\nPer-page rule: never recompute a user-visible metric in TypeScript\n(display_ms, geomean_ms, rank, speedup, compliance class, speedup\nratios, fastest/slowest spreads). Read materialized columns from the\ncanonical tables. Presentation formatting (locale, unit suffixes,\ntruncation) remains TS-side.\n\nDelete `results-explorer/src/manifest.ts` in the final slice once the\nlast consumer is gone. In that same final slice, land the `db.ts`\nattach-failure hardening deferred from W3:\n  - Reject `getDb()` on attach failure instead of swallowing the\n    error.\n  - Delete the silent JSON fallback at `db.ts:86-89` and the stale\n    `db.ts:1-17` header comment's \"Phase 2 / fallback\" framing.\n  - Wire the per-page ErrorMessage UI required by RG-7.\nThis co-scheduling is intentional: the fallback must not outlive the\nlast page that relied on it, and must not be removed before then.\n\nPrune transport-only JSON artifact interfaces from\n`results-explorer/src/types.ts` once their last caller disappears. Do\nnot delete render-layer domain types solely because the transport\nchanged; keep, move, or rename them only when DuckDB row models make\nthe old shape redundant.\n\nExit: chart-parity and accessibility tests green on every migrated\npage; no page imports `manifest.ts`; `db.ts` rejects on attach\nfailure with no JSON fallback; TS reduction libs whose callers are\ngone are deleted (not just dead-coded); any removed TS types are\nconfirmed unused rather than deleted by naming policy alone.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate remaining pages to DuckDB, delete each bridge artifact in the same slice, and land `db.ts` hardening with the last manifest consumer",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "notes": "Starter queries must cover common analyst questions across results,\nper-query timings, cohort comparisons, trust/tuning breakdowns, and\ndetail-level drill-down. Keep the SQL surface read-only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Expand the query workbench into the canonical analyst surface with starter queries, cohort-aware templates, and downloads against the same DuckDB contract",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "notes": "Required assertions:\n  - home stats and leaderboard rows == DuckDB query results\n  - benchmark matrix cell == compare cell == detail timing == SQL query\n    result where applicable\n  - no runtime metric fetches remain for `benchmarks/*.json.gz`,\n    `details/*.json`, `compare/*.json`, `meta_leaderboard.json`,\n    `short_ids.json`, or `results_schema.json`\n  - read-only DuckDB enforcement still blocks DDL/DML from the\n    workbench\n\nExit-gate inventory (all runnable locally - CI wiring is out of scope\nper `do_not_modify: [\".github/workflows/\"]` and is filed as a\nfollow-up TODO):\n\n  - G-1 Schema contract:\n    `tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py`\n    asserts all ten canonical tables exist with expected columns.\n  - G-2 Metric parity (driven by `visible_metrics.yaml` from W1):\n    for every metric row in the fixture, the test dispatches on the\n    `kind` field and compares the DuckDB read-path value against the\n    contract for that kind:\n      - `raw_copy`: assert `DuckDB column == committed bundle field`\n        verbatim for a sampled corpus.\n      - `derived`: assert `DuckDB-backed read path value ==\n        canonical Python reference computation` for the same\n        inputs, within the `tolerance` declared per metric. The\n        canonical Python reference computation lives under\n        `benchbox/core/explorer_pipeline/` (or is imported read-only\n        from `benchbox/core/results/`); it is NOT the CLI's\n        pre-calculated JSON, NOT the current TS reduction libraries,\n        and NOT any bridge artifact. Final-rendered-value parity is\n        the contract.\n  - G-3 Cross-surface parity:\n    `results-explorer/src/__tests__/duckdbMetricParity.test.ts` asserts\n    Home stats == `meta_leaderboard`, benchmark matrix cell ==\n    compare cell == detail timing == direct SQL result.\n  - G-4 Chart parity (React): extend existing parity harness to feed\n    DuckDB-shaped rows through every component; DOM must match the\n    ASCII baseline.\n  - G-5 Performance budgets (local): Node + `@duckdb/duckdb-wasm`\n    harness loads a 100x synthetic fixture; asserts init p95 <3500ms,\n    per-query p95 <250ms (or RG-6 budget), DB file size ≤ RG-3 ceiling.\n  - G-6 Accessibility: existing axe-core suite re-run against\n    DuckDB-fed pages.\n  - G-7 Headless E2E: Playwright (added under this TODO as new\n    tooling; listed in `files_affected.added`) loads `/results/`,\n    waits for DB ready, navigates, asserts a DuckDB-sourced row\n    renders, opens the workbench, runs `SELECT COUNT(*) FROM\n    results`, and asserts attach-failure UX by loading a broken\n    fixture.\n  - G-8 Legacy-artifact guard: post-build assertion fails if any of\n    `details/`, `compare/`, `meta_leaderboard.json`, `short_ids.json`,\n    `results_schema.json`, or `benchmarks/*.gz` appear under\n    `public/data/`. Bundles handling: `public/data/bundles/` MAY\n    remain as the raw-bundle download affordance, but a second\n    assertion greps the explorer source tree and fails if any\n    `.tsx`/`.ts` file under `results-explorer/src/pages/` or\n    `results-explorer/src/components/` fetches from\n    `/results/data/bundles/` - bundles are download-only and must\n    never back a rendered metric. If `manifest.json` survives, a\n    dedicated contract test loads it and asserts its top-level keys\n    are a subset of an explicit whitelist recorded in the schema\n    decision record (W1 deliverable 2), such as `{routes,\n    navigation, build_meta}`. Any metric-looking key\n    (`benchmark_summary`, `result_count`, `platform_version`,\n    `power_score`, `geomean_ms`, etc.) appearing in that file fails\n    the gate.\n  - G-9 Read-only fuzz: Vitest runs ~50 adversarial SQL strings\n    (CREATE TABLE, ATTACH, COPY TO, INSTALL, LOAD, HTTPFS) against the\n    READ_ONLY-attached DB; all fail harmlessly. The test is agnostic\n    about HOW each fails - whether because the extension is compiled\n    out of the chosen DuckDB-WASM bundle or because READ_ONLY attach\n    rejects it at runtime. Open question #6 is resolved by whichever\n    mechanism satisfies G-9 in the bundle chosen under RG-4.\n  - G-10 Short-ID uniqueness: Python test rebuilds DB against a 100x\n    corpus and asserts `SELECT short_id, count(*) FROM short_ids\n    GROUP BY 1 HAVING count(*) > 1` is empty.\n  - G-11 No-computed-metric views: contract test enumerates every\n    view in `main` via `information_schema.views` /\n    `duckdb_columns`, parses each view's SQL with\n    `sqlglot.parse_one(..., read='duckdb')`, and asserts that every\n    projected column in the outermost SELECT is either a bare\n    `Column` reference, a `Column` aliased via `AS`, or a\n    whitelisted passthrough (`CAST`, `COALESCE(col, literal)`).\n    Views may NOT introduce arithmetic, aggregation, CASE\n    expressions, `IIF`, window functions, or function calls beyond\n    the whitelist - any such projection means a user-visible metric\n    is being produced by the view rather than persisted in a base\n    table and fails the gate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add exit gates proving no metric-bearing JSON runtime reads remain and all explorer surfaces agree on DuckDB values",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "notes": "Remove benchmark/detail/compare/meta-leaderboard JSON outputs once the\nDuckDB-backed contract passes parity tests. If `manifest.json` or any\nroute helper remains, strip it to non-metric navigation or identity\ndata only and document that rule explicitly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete metric-bearing JSON artifacts and stale compatibility framing once DuckDB-backed parity is proven",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-canonical-browser-duckdb-read-model",
+        "notes": "Surfaced during W2 contract tests: the same platform can legitimately\nappear in a cohort more than once (different `tuning_mode`, different\n`trust_label`, different run). The originating schema pinned\n`cohort_metadata` PRIMARY KEY to `(cohort_key, platform_id)` and the\nW2 builder silently deduplicated by keeping only the best-ranked row,\ndropping the other publishable variant from the DuckDB store.\n\nThat violates the project principle: ALL results we trust enough to\npublish must be available in the DuckDB published-results dataset so\nusers can compare across tuning levels AND trust levels from the same\nstore. The table is the per-cohort published-result set; the UI\ndecides any display-time grouping.\n\nEmpirical evidence recorded with this TODO (`/tmp/reproduce_cohort_duplicates.py`-style\ntwo-bundle reproducer, same platform `duckdb`, tuning_mode\n`tuned` vs `notuning`, both in `tpch-sf0.1-power`):\n  - `meta_leaderboard.json` `cohorts[0].platforms` kept BOTH variants\n    (tuned rank 1, notuning rank 2) - JSON artifact is correct.\n  - DuckDB `cohort_metadata` after W2 dedup kept only the tuned row -\n    silently discards the notuning variant.\n  - `platform_agg` at `pipeline.py:240` overwrites the better rank\n    (rank 1) with the worse rank (rank 2) via last-write-wins, so the\n    JSON artifact `platforms[]` entry AND the DuckDB `meta_leaderboard`\n    row BOTH report `avg_rank = 2.0` when the correct answer is 1.0.\n    This is a pre-existing correctness bug in the meta-leaderboard\n    that already affects today's Home surface, independent of the PK\n    decision.\n\nImplementation (Option B + bug fix):\n\nSchema (`docs/development/browser-duckdb-schema.sql`):\n  - `cohort_metadata` PRIMARY KEY changes from\n    `(cohort_key, platform_id)` to `(cohort_key, result_id)`.\n  - Add columns: `tuning_mode VARCHAR`, `trust_label VARCHAR NOT NULL`,\n    `short_id VARCHAR NOT NULL`. These give Home the data it needs to\n    label, group, or collapse variants without a secondary join.\n  - Keep `idx_cohort_metadata_key (cohort_key)`; add\n    `idx_cohort_metadata_platform (cohort_key, platform_id)` so\n    platform-grouped queries stay cheap.\n\nPython (`benchbox/core/explorer_pipeline/duckdb_builder.py`):\n  - `_create_schema` mirrors the new DDL (PK + 3 columns + index).\n  - `_populate_cohort_metadata` deletes the `best` dedup dict and\n    `_RANK_IDX` logic; inserts every row from\n    `meta[\"cohorts\"][*][\"platforms\"]`. Widens the insert tuple to\n    include `tuning_mode`, `trust_label`, `short_id`.\n\nPython (`benchbox/core/explorer_pipeline/pipeline.py`):\n  - `_build_meta_leaderboard` emits `tuning_mode`, `trust_label`,\n    `short_id` on each entry in `cohort_platforms` so the builder has\n    what it needs without re-joining. Thread `full_to_short` into\n    the function, or resolve in the builder by looking up\n    `short_id_map`.\n  - Fix `platform_agg` last-write-wins at `pipeline.py:240`: when the\n    same `platform_id` ranks in the same `cohort_key` more than once,\n    KEEP THE BEST RANK (lowest integer). Correct for the Home\n    meta-leaderboard semantics (one row per platform across cohorts\n    - best variant represents the platform). Equivalent minimal\n    edit: replace the blind dict assignment with a guarded update,\n    or rely on `setdefault` since `sorted_rows` is already best-first.\n\nRegistry (`_project/planning/visible_metrics.yaml`):\n  - Update `cohort_metadata` `rank` / `metric_value` / `speedup_vs_best`\n    notes to clarify they are PER RESULT_ID, not per platform_id.\n  - Add new rows: `cohort_metadata.tuning_mode`,\n    `cohort_metadata.trust_label`, `cohort_metadata.short_id` with\n    `kind: raw_copy` and appropriate `canonical_ref` pointers.\n\nTests:\n  - Extend `test_distinct_tuning_modes_produce_distinct_rows` in\n    `tests/unit/core/explorer_pipeline/test_benchmark_summary.py` with\n    a DuckDB assertion: after the pipeline run, the cohort contains\n    BOTH `result_id`s in `cohort_metadata` with distinct ranks.\n  - Add a regression test in\n    `tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py`\n    (or a peer file) against the two-bundle same-platform-same-cohort\n    fixture: assert `meta_leaderboard.avg_rank` equals the BEST rank\n    (1.0, not 2.0), and `n_cohorts` equals the number of distinct\n    cohort_keys (not the number of cohort-variants).\n  - Add a `visible_metrics` drift test asserting the\n    `cohort_metadata` PRIMARY KEY columns declared in the schema\n    YAML match the frozen `browser-duckdb-schema.sql`.\n\nExit:\n  - `cohort_metadata` PK is `(cohort_key, result_id)` in schema,\n    builder, and visible_metrics.\n  - Running the pipeline on a two-variant corpus lands BOTH rows in\n    `cohort_metadata`; no silent deduplication anywhere in the\n    pipeline.\n  - `_build_meta_leaderboard` keeps the BEST rank per\n    `(platform_id, cohort_key)`; regression test pinning\n    `avg_rank == 1.0` on the two-variant reproducer is green.\n  - All 217 pre-existing explorer pipeline tests remain green; the\n    two new tests are green.\n  - W3 does not start until this item is done, because the\n    `duckdbQueries.getCohort` helper it builds must match the final\n    key shape.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Preserve all publishable result variants in `cohort_metadata` and fix the `_build_meta_leaderboard` `platform_agg` last-write-wins bug before the frontend migration",
+        "wid": "w8"
+      }
+    ]
+  }
+}

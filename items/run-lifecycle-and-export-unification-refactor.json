@@ -1,0 +1,241 @@
+{
+  "context": "Standardize on the currently used orchestration path (`BenchmarkOrchestrator`\ndelegating to `run_benchmark_lifecycle`) as the canonical execution engine.\nMove metadata enrichment and export decisions into shared helpers invoked by\nthat canonical path, then collapse run-command branches to use one shared\nexecute-and-export routine.\n\nFor alpha, prioritize simplification over compatibility shims: make\n`ExecutionPipeline` explicitly non-runtime (or remove runtime-facing usage),\nand move all behavior-critical logic to the canonical path. Do not preserve\ndual-runtime behavior just for backward compatibility.\n",
+  "description": "The benchmark run entrypoint currently has multiple execution branches in\n`benchbox/cli/commands/run.py` and two orchestration architectures in the CLI\nlayer (`BenchmarkOrchestrator` + `run_benchmark_lifecycle` vs `ExecutionPipeline`).\n\nIn current real CLI execution, `run.py` routes through `BenchmarkOrchestrator`\nand `run_benchmark_lifecycle`, not `ExecutionPipeline`. This means behavior and\nmetadata added only in `benchbox/cli/execution_pipeline.py` can be absent in\nreal exported artifacts.\n\nThis TODO converts architecture review findings into a concrete refactor plan\nthat reduces accidental complexity by:\n- Selecting and enforcing one canonical benchmark execution path\n- Unifying export behavior across direct, load/data-only, and interactive flows\n- Relocating metadata enrichment to the canonical path so artifacts are consistent\n- Removing or deprecating dead/legacy branches and compatibility shims\n- Adding parity tests to prevent branch drift regressions",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate export blocks in each `run.py` branch",
+        "instead": "centralize export path selection, filename assignment, and format handling in one helper.",
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "why": "drift already exists"
+      },
+      {
+        "dont": "introduce a third orchestration abstraction",
+        "instead": "consolidate around one runtime path and reduce adapters/wrappers.",
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "why": "complexity is already excessive"
+      },
+      {
+        "dont": "keep dead legacy shims (`quick`, `no_regenerate`-style branch logic) solely for compatibility",
+        "instead": "remove or hard-fail obsolete paths with clear release notes.",
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "why": "this is alpha and complexity cost is higher"
+      },
+      {
+        "dont": "keep metadata enrichment only in `benchbox/cli/execution_pipeline.py`",
+        "instead": "move metadata wiring into shared canonical execution/export code.",
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "why": "that path is not the default runtime"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-20T00:00:00Z",
+      "created_at": "2026-02-20T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Data-only and load-only flows remain supported with correct phase semantics.",
+        "item_id": "run-lifecycle-and-export-unification-refactor"
+      },
+      {
+        "behavior": "Default CLI behavior and UX remain stable for existing `benchbox run` usage.",
+        "item_id": "run-lifecycle-and-export-unification-refactor"
+      },
+      {
+        "behavior": "Dry-run behavior remains fully functional and separate from live execution.",
+        "item_id": "run-lifecycle-and-export-unification-refactor"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/run-lifecycle-and-export-unification-refactor.yaml",
+        "description": "TODO entry validates against schema",
+        "expected": "Validation passes with no schema errors",
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run _project/scripts/todo_cli.py check-graph",
+        "description": "TODO dependency graph remains valid",
+        "expected": "No dangling references or cycles",
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_cli_orchestrator.py tests/unit/cli/commands/test_run_official_coverage.py -v --tb=short",
+        "description": "Run-command regression suite for orchestrator and run branches passes",
+        "expected": "All selected tests pass",
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_execution_pipeline_driver_metadata.py tests/unit/cli/test_run_metadata_contract.py -v --tb=short",
+        "description": "Metadata wiring parity tests pass",
+        "expected": "All selected tests pass and metadata fields present in canonical artifacts",
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_runner_lifecycle.py tests/unit/test_results_exporter.py tests/unit/cli/test_run_export_consistency.py -v --tb=short",
+        "description": "Core lifecycle and exporter contract tests pass",
+        "expected": "All selected tests pass",
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "notes": "Produce a concrete branch matrix from `run.py` for direct execution,\ndata-only/load-only, interactive, and dry-run. Document exact call chains,\nexport path rules, and metadata insertion points.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Trace and codify all run.py execution branches and artifact/export paths into a single lifecycle map",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "notes": "Confirm canonical path is `BenchmarkOrchestrator` -> `run_benchmark_lifecycle`.\nRemove ambiguity: `ExecutionPipeline` must not remain a parallel source of\nruntime behavior. It can be deleted, or reduced to a non-authoritative shim.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enforce canonical runtime path and retire ExecutionPipeline as a behavior-bearing runtime path",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "notes": "Move driver/runtime metadata wiring out of `execution_pipeline.py`-only flow.\nEnsure metadata contract is applied regardless of direct/load-only/interactive\nbranch and regardless of adapter family.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract metadata enrichment into shared canonical post-processing invoked by orchestrator/lifecycle",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "notes": "Unify filename generation, output directory selection, export formats, and\nstatus rendering. Remove per-branch exporter setup differences.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Centralize result export policy into one helper used by all non-dry-run run.py branches",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "notes": "Preserve mode-specific validation/prompting but route all benchmark execution\nand export through one internal function to remove drift.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor run.py branches to share one execute-and-export function while keeping mode-specific input validation",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "notes": "Prioritize deletion of dead or low-value compatibility logic. Where flags\nremain user-visible, prefer deterministic fail-fast or explicit remapping to\ncanonical behavior over maintaining hidden branch variants.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove legacy quick/no_regenerate branch shims and simplify control flow for alpha",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add branch-parity tests that assert identical export/metadata contracts across direct, load-only, and interactive-equivalent non-interactive runs",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "run-lifecycle-and-export-unification-refactor",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add architecture docs and alpha release notes describing removed branches and the single execution architecture",
+        "wid": "w8"
+      }
+    ]
+  }
+}

@@ -1,0 +1,139 @@
+{
+  "description": "Same class as check-scope-reports-ok-when-no-scope-rules-exist (done), which added --strict for 'the item has no scope rules'. That guard does not cover the other way check-scope can pass without checking anything: an empty or wrong diff.\n\nBoth hit for real while landing PRs #1633 and #1635:\n\n(1) Wrong tree. _project/scripts/todo deliberately resolves the tree that owns the shim, not cwd's git toplevel. Running the main clone's shim while the branch lives in a worktree diffs main's HEAD (develop) instead, so it reported 'scope OK (1 changed file(s))' -- one unrelated stray file -- for a 4-file change that actually contained a violation. Re-run from the branch's own worktree it correctly reported the file as outside the only_modify allowlist.\n\n(2) No commits yet. check-scope diffs commits, not the index or working tree. On a fresh branch with staged-but-uncommitted work it reported 'scope OK (0 changed file(s))'.\n\nIn both cases the operator sees the word OK and a plausible exit 0. The file count is the only tell, and it is easy to miss. Suggested fix: treat a zero-file diff as a --strict failure (nothing was checked, same argument as the no-rules case), and consider warning when the resolved branch has no commits ahead of --base, or when the shim's tree is not the tree containing HEAD's branch. Wording should say what was compared, e.g. 'scope OK (4 files vs origin/develop)'.\n\nPrior art: check-scope-reports-ok-when-no-scope-rules-exist (done) -- extend that guard rather than adding a parallel one; keep its preserved behaviour for items WITH rules and a non-empty diff.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-09T12:43:59Z",
+        "from_item": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "id": 708,
+        "reason": "w0 (zero-file fail-closed) landed in #1646; w1 detecting wrong shim/branch needs CWD vs shim-owner divergence check and is deferred as follow-up.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Covered by w1 done in #1646 - warning logic deferred but zero-file case fixed",
+        "summary": "Warn when resolved tree/branch cannot contain item's work"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-09T12:49:46Z",
+      "completed_pr": 1646,
+      "created_at": "2026-08-06T21:32:27Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "An item with scope rules and a non-empty diff keeps its current pass/fail behaviour and exit codes",
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806"
+      },
+      {
+        "behavior": "The existing no-scope-rules --strict guard keeps working",
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/green_unmerged_sweep.py"
+      },
+      {
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/required_lane.py"
+      },
+      {
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/soundness_drain_report.py"
+      },
+      {
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -k 'todo and scope' -q",
+        "description": "A zero-file diff no longer reports OK under --strict",
+        "expected": "exit 0",
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "last_result": "pass",
+        "last_run": "2026-08-09T12:46:21Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -k todo -q",
+        "description": "Tracker unit tests pass",
+        "expected": "exit 0",
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "last_result": "pass",
+        "last_run": "2026-08-09T12:47:11Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1646 todo_db.py _cmd_check_scope: zero-file diff now SCOPE_UNCHECKED under --strict, reports vs base",
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "notes": null,
+        "started_at": "2026-08-09T12:42:52Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Fail --strict on a zero-file diff and report what was compared",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1646 handles zero-file case; deferred tree/branch mismatch warning to deferral #708 for follow-up",
+        "item_id": "check-scope-reports-ok-when-nothing-was-diffed-20260806",
+        "notes": null,
+        "started_at": "2026-08-09T12:44:18Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Warn when the resolved tree/branch cannot contain the item's work",
+        "wid": "w1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,419 @@
+{
+  "description": "Implement Starburst platform adapter as a distinct managed Trino service.\nStarburst is the commercial enterprise distribution of Trino with enhanced\nfeatures and managed cloud offerings.\n\nThis adapter inherits Trino's SQL dialect and benchmark compatibility while\nimplementing Starburst-specific authentication and catalog handling.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add trino-python-client as a new dependency",
+        "instead": "reuse the existing installation",
+        "item_id": "starburst-platform-adapter",
+        "why": "it is already an existing dependency"
+      },
+      {
+        "dont": "duplicate Trino query logic",
+        "instead": "inherit and only override authentication and catalog handling",
+        "item_id": "starburst-platform-adapter",
+        "why": "Starburst IS Trino with managed features"
+      },
+      {
+        "dont": "modify existing adapter files",
+        "instead": "create a new starburst.py file",
+        "item_id": "starburst-platform-adapter",
+        "why": "Starburst is additive"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "starburst-platform-adapter",
+        "id": 598,
+        "reason": "Requires Starburst Galaxy account and running cluster - not available in local dev",
+        "resolution": "promoted",
+        "resolved_item": "live-integration-tests-with-starburst-galaxy-w22-w24",
+        "resolved_reason": null,
+        "summary": "Live integration tests with Starburst Galaxy (w22-w24)"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-16T00:00:00Z",
+      "created_at": "2026-01-14T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "starburst-platform-adapter"
+      },
+      {
+        "behavior": "Existing Trino adapter unchanged",
+        "item_id": "starburst-platform-adapter"
+      },
+      {
+        "behavior": "Platform registry autodiscovery continues working for all existing platforms",
+        "item_id": "starburst-platform-adapter"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "starburst-platform-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "starburst-platform-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "starburst-platform-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/trino.py"
+      },
+      {
+        "item_id": "starburst-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/credentials/starburst.py"
+      },
+      {
+        "item_id": "starburst-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/starburst.py"
+      },
+      {
+        "item_id": "starburst-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_starburst.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.starburst import StarburstAdapter; print('import OK')\"",
+        "description": "New adapter imports correctly",
+        "expected": "import OK",
+        "item_id": "starburst-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_starburst.py -v --tb=short",
+        "description": "Unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "starburst-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "Existing platform tests unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "starburst-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_trino_adapter.py -v --tb=short",
+        "description": "Trino adapter unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "starburst-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "starburst-platform-adapter",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "starburst-platform-adapter",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "starburst-platform-adapter",
+        "needs_wid": "w13",
+        "wid": "w15"
+      },
+      {
+        "item_id": "starburst-platform-adapter",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create benchbox/platforms/starburst.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "STARBURST_TOKEN or STARBURST_PASSWORD",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Galaxy connection handling",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement catalog selection/creation",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle data loading via connectors",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "S3 connector for data files",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Hive metastore integration",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure query execution settings",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inherit query execution from Trino adapter",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle Starburst-specific query features",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement performance metrics collection",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement StarburstAdapter class extending PlatformAdapter",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle cloud-specific error scenarios",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit tests for adapter (mocked connection)",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Integration tests with Starburst Galaxy (requires account)",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Test TPC-H benchmark at scale 1",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Compare results with vanilla Trino",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set up inheritance from Trino (dialect, capabilities)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register platform in registry with deployment metadata",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement OAuth authentication for Galaxy",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement basic auth for Enterprise",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add credential setup wizard for Starburst",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support environment variables",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "starburst-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "STARBURST_HOST",
+        "wid": "w9"
+      }
+    ]
+  }
+}

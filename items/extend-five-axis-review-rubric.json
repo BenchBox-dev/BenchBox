@@ -1,0 +1,232 @@
+{
+  "description": "Six blind-spot findings between 2026-05-03 and 2026-05-05 each flagged a\nclass of review the current five-axis rubric (Correctness, Readability,\nArchitecture, Security, Performance) does not catch:\n\n- Matrix/audit docs whose deliverable is tables of numbers\n  (`2026-05-03-085238`).\n- Mixed tooling+data PRs where reversibility differs by component\n  (`2026-05-03-090105`).\n- Repo-shape ADRs (branch-shape, CI moves, cross-branch vendoring) that\n  need a day-1 executability dry-run (`2026-05-03-092657`).\n- Multi-work-unit specs whose vertical slicing is unreachable in\n  practice (`2026-05-04-120000`).\n- Defect-follow-up reviews that miss stale artifact reuse in\n  orchestration code (`2026-05-05-090216`).\n- Verification-only commits that cite transient evidence in commit\n  messages with no committed artifact (`2026-05-04-083819`).\n\nThe fix is concentrated: extend\n`.claude/skills/code/references/five-axis-review.md` with six branches,\neach gated by the kind of change under review. The rubric stays\nfive-axis-shaped; the branches add review-targeted prompts.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a sixth top-level axis",
+        "instead": "(not specified)",
+        "item_id": "extend-five-axis-review-rubric",
+        "why": "the rubric's five-axis shape is the brand. Add branches gated on the kind of change under review."
+      },
+      {
+        "dont": "couple the new branches to BenchBox-specific paths. The reference is shared across projects via skill-sync; keep prompts framework-shaped.",
+        "instead": "(not specified)",
+        "item_id": "extend-five-axis-review-rubric",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "introduce review steps that require running the project's full test suite for every review. Branches must be cheap textual checks, not gates that block reviewer flow.",
+        "instead": "(not specified)",
+        "item_id": "extend-five-axis-review-rubric",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "extend-five-axis-review-rubric",
+        "id": 174,
+        "reason": "Owned by `catalog-empirical-claim-durability:w5`; that TODO already\ndepends on this one, and consolidating the work there avoids a\ndouble-edit of the same file. Cross-reference is recorded in both.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Owning item catalog-empirical-claim-durability:w5 is DONE; the durability sub-axis work was consolidated there as intended.",
+        "summary": "Add 'durability of empirical claims' sub-axis to five-axis-review.md"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "extend-five-axis-review-rubric",
+        "id": 175,
+        "reason": "Recommended by blind-spot `2026-05-03-085238` but distinct from the\nrubric extension this TODO ships. File a separate small TODO once\nthe matrix/audit-doc branch is in place; doing both in this TODO\nwould expand scope past \"rubric edits only.\"\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Vague review-hygiene sweep of _project/handoffs/ for un-regenerate-diffed audit tables, contingent on an unclear 'matrix/audit-doc branch' prerequisite; meta-recommendation with low value, not concrete deferred work.",
+        "summary": "Sweep `_project/handoffs/` for prior audit docs whose tables were never regenerate-diffed"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "extend-five-axis-review-rubric",
+        "id": 176,
+        "reason": "Recommended by blind-spot `2026-05-03-092657`. Same rationale as\nabove: the rubric extension is the right deliverable for this TODO;\nretroactive ADR audits are a separable work item.\n",
+        "resolution": "promoted",
+        "resolved_item": "sweep-docs-development-adr-for-prior-repo-shape-adrs-against",
+        "resolved_reason": null,
+        "summary": "Sweep `docs/development/adr/` for prior repo-shape ADRs against the day-1 dry-run"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "extend-five-axis-review-rubric",
+        "id": 177,
+        "reason": "Recommended by blind-spot `2026-05-05-090216`. The new branch\nmakes the pattern catchable on future PRs; the prior-art sweep\nbelongs to `uat-framework-review-followups` which already owns the\nphase-wrappers area.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Owning TODO uat-framework-review-followups is fully DONE (19/19 work units incl. extensive phases/ cleanup); sweep largely subsumed.",
+        "summary": "Sweep `tests/uat/phases/` wrappers for stale-file reuse patterns"
+      }
+    ],
+    "item_meta": {
+      "category": "Tooling and Workflow",
+      "completed_at": "2026-05-06T00:00:00Z",
+      "created_at": "2026-05-05T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing 'What's Done Well' rule and change-sizing guidance remain.",
+        "item_id": "extend-five-axis-review-rubric"
+      },
+      {
+        "behavior": "Severity classification table (Critical/Required/Nit/Consider) is unchanged.",
+        "item_id": "extend-five-axis-review-rubric"
+      },
+      {
+        "behavior": "The five top-level axes (Correctness, Readability & Simplicity, Architecture, Security, Performance) remain the primary frame; new content is review-shape-specific branches, not new top-level axes.",
+        "item_id": "extend-five-axis-review-rubric"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "extend-five-axis-review-rubric",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/code/SKILL.md"
+      },
+      {
+        "item_id": "extend-five-axis-review-rubric",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/code/references/five-axis-review.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make skill-sync >/dev/null && grep -cE '^### (Matrix/audit-doc|Mixed tooling\\+data|Repo-shape ADR|Multi-W spec|Defect follow-up|Verification-only) branch' .claude/skills/code/references/five-axis-review.md",
+        "description": "Each new branch heading is present in the reference",
+        "expected": ">= 6",
+        "item_id": "extend-five-axis-review-rubric",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make lint",
+        "description": "Reference still passes basic lint",
+        "expected": "exit 0",
+        "item_id": "extend-five-axis-review-rubric",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "extend-five-axis-review-rubric",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "extend-five-axis-review-rubric",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "extend-five-axis-review-rubric",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "extend-five-axis-review-rubric",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "extend-five-axis-review-rubric",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "extend-five-axis-review-rubric",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "extend-five-axis-review-rubric",
+        "notes": "Trigger: deliverable is a markdown doc whose payload is tables of\nnumbers (audit/curation/inventory docs). Prompts:\n  1. For every numeric claim, regenerate from source and diff.\n  2. If the doc's recommendation depends on a policy gate, require\n     an \"Alternatives considered\" section quantifying the\n     alternative paths.\nAdd as `### Matrix/audit-doc branch` in five-axis-review.md.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'matrix/audit doc' branch with regenerate-from-source + alternatives-considered prompts",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "extend-five-axis-review-rubric",
+        "notes": "Trigger: PR diff bundles tooling artifacts (CI configs, pre-commit,\nlint configs) AND data artifacts (JSON, fixtures, result bundles).\nPrompts:\n  1. Reversibility/blast-radius assessed PER component, not\n     aggregate.\n  2. If the tooling change is a band-aid for a data-side issue,\n     require a follow-up TODO id capturing the upstream fix.\nAdd as `### Mixed tooling+data branch`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'mixed tooling+data PR' branch with per-component reversibility analysis",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "extend-five-axis-review-rubric",
+        "notes": "Trigger: ADR proposes a branch-shape change, CI workflow move,\ncross-branch vendoring, or any operational repo state change.\nPrompts:\n  1. Enumerate consumers of the affected branch (CI, contributor\n     flows, automation, downstream branches).\n  2. For each consumer, confirm it works against the proposed end\n     state using only the ADR's stated allowlist/exclusions.\nAdd as `### Repo-shape ADR branch`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'repo-shape ADR' branch with day-1 executability dry-run",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "extend-five-axis-review-rubric",
+        "notes": "Trigger: spec proposes a multi-work-unit decomposition (W1..Wn).\nPrompts:\n  1. Estimate LOC per W from the spec's module/responsibility\n     breakdown.\n  2. Flag any W estimated >300 LOC pre-approval; require split or\n     rationale before sign-off rather than mid-implementation.\nAdd as `### Multi-W spec implementation-reachability branch`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'multi-W spec implementation reachability' sub-axis (LOC-per-W flag)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "extend-five-axis-review-rubric",
+        "notes": "Trigger: PR is a follow-up fix for orchestration / phase-output\ncode that writes artifacts later parsed by another phase or retry.\nPrompts:\n  1. For each phase that parses output files, confirm the file was\n     produced by the current invocation (not an earlier\n     failed/aborted run).\n  2. Sweep the diff for stale-file reuse patterns (`os.path.exists`\n     + skip rather than re-emit).\nAdd as `### Defect follow-up artifact-freshness branch`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'defect follow-up artifact freshness' branch for orchestration code",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "extend-five-axis-review-rubric",
+        "notes": "Trigger: PR's deliverable is verification-only (no functional code\nchange), or a commit message asserts evidence (\"re-validated X\nagainst version Y\") without a committed artifact. Prompts:\n  1. Require a committed transcript or pin file that a reviewer\n     landing the PR days later can replay.\n  2. Reject \"trust me, I ran it\" evidence -- the\n     `_project/verification-logs/` convention from\n     `todo-skill-evidence-durability-conventions` is the binding.\nAdd as `### Verification-only / evidence-durability branch`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'verification-only commit / evidence durability' branch",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "extend-five-axis-review-rubric",
+        "notes": "Grep `.claude/skills/code/SKILL.md` and the BenchBox `CLAUDE.md`\nreview-protocol bindings for these specific phrases that conflict\nwith the new branches: `code diffs only`, `narrative review`,\n`single-axis`, `code-centric review`. Rephrase any matches so the\nreview wrapper acknowledges the new branches.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Sweep skill bindings for cross-cutting impact",
+        "wid": "w7"
+      }
+    ]
+  }
+}

@@ -1,0 +1,284 @@
+{
+  "context": "Pick one solution shape, implement it minimally, verify with a destructive\nsmoke (rm + npm run dev). Avoid adding configurability that this TODO\ncannot motivate — if (ii) is chosen, do NOT also implement (i) \"just in\ncase\".\n",
+  "description": "A fresh-clone or returning developer runs `cd results-explorer && npm run\ndev` and is met with a full-screen error wall:\n\n  DuckDB snapshot 'bench.results' is missing required columns: ...\n  Regenerate the snapshot via 'benchbox explorer build' or check the\n  deployed results.duckdb file.\n\nRoot cause is not a code bug — it is an architectural papercut:\n  - `*.duckdb` is gitignored, so the snapshot is never tracked.\n  - CI rebuilds it on every docs deploy\n    (`.github/workflows/docs.yml:103`); local devs never do unless they\n    know to.\n  - `npm run dev` has no predev step that detects staleness.\n  - The runtime guard in `results-explorer/src/db.ts:184-199` correctly\n    refuses to render against a snapshot whose schema doesn't match the\n    frontend's required-column set — so the user sees a 9-column-diff\n    wall the first time the read-model contract bumps.\n\nBecause the read-model contract is changing actively (PRs #344, #354,\n#380 added eligibility columns in the last 30 days), this wall recurs\nevery few weeks for every developer.\n\nThis TODO closes the recurring DX wall. It is separable from the CLI\nsurface relocation (TODO `explorer-cli-surface-migration`) and the\nschema versioning work (TODO `explorer-read-model-schema-versioning`).\n\nThree solution shapes to evaluate:\n\n  (i)  **`predev` npm script** in `results-explorer/package.json` that\n       checks whether `public/data/results.duckdb` is older than the\n       most-recent file under `results-data/bundles/`, and rebuilds via\n       the canonical entry point if so. Pros: zero new files; works with\n       the existing build step. Cons: every `npm run dev` runs an mtime\n       check; spawns the Python entry point when rebuilding (3-5s on\n       the 528-bundle corpus).\n\n  (ii) **Tiny in-tree dev snapshot** under\n       `results-explorer/dev-data/results.duckdb` (5-10 cohorts,\n       deterministic), NOT gitignored, that the explorer falls back to\n       when `public/data/results.duckdb` is missing. Pros: `git clone\n       && npm run dev` works instantly with no Python. Cons: adds a\n       tracked binary (~500KB-2MB depending on corpus) that needs\n       periodic refresh — but only when the schema bumps, not the data.\n\n  (iii) **`make explorer-dev` wrapper target** that runs rebuild then\n       vite. Pros: explicit, documented in Makefile. Cons: requires\n       developer to know about and use the make target; doesn't help\n       someone who runs `npm run dev` from inside `results-explorer/`.\n\nThe right choice depends on how often the schema bumps vs. how often\nthe data bumps; (ii) optimizes for \"schema-stable, data-shifting\" and\n(i) optimizes for \"schema-shifting, data-stable\". (iii) is the most\nconservative and explicit but doesn't fix the default `npm run dev`\npath.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "couple this work to the schema-versioning refactor in TODO `explorer-read-model-schema-versioning`. That work changes the error shape; this TODO changes when the error fires. Both can land in either order.",
+        "instead": "(not specified)",
+        "item_id": "explorer-dev-snapshot-dx",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "remove the runtime guard in `db.ts` that detects schema mismatch",
+        "instead": "(not specified)",
+        "item_id": "explorer-dev-snapshot-dx",
+        "why": "the schema mismatch is real and should still produce an actionable error, just not as the *default* dev experience."
+      },
+      {
+        "dont": "track the full-corpus `results-explorer/public/data/results.duckdb` in git. The whole point of (ii) is a tiny dev-only snapshot, not the production artifact.",
+        "instead": "(not specified)",
+        "item_id": "explorer-dev-snapshot-dx",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-dev-snapshot-dx",
+        "id": 164,
+        "reason": "Owned by TODO `explorer-read-model-schema-versioning`.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Owning TODO explorer-read-model-schema-versioning is now in _project/DONE; this note's fate was resolved there, not left open.",
+        "summary": "Make the error message itself humane (version-diff vs column-diff)."
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-dev-snapshot-dx",
+        "id": 165,
+        "reason": "Owned by TODO `explorer-cli-surface-migration`.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Owning TODO explorer-cli-surface-migration is DONE and its w2 'Relocate the CLI entry point per ADR' work unit is status:done; the rename already happened.",
+        "summary": "Rename the CLI entry that the docs reference."
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Experience",
+      "completed_at": "2026-05-14T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "explorer-dev-snapshot-dx"
+    },
+    "preserves": [
+      {
+        "behavior": "Browser-fixture generation (`generate-browser-fixtures.mjs`) is unaffected — it has its own snapshot regen.",
+        "item_id": "explorer-dev-snapshot-dx"
+      },
+      {
+        "behavior": "Production builds (CI docs deploy) continue to use the full corpus, not the dev snapshot or fallback.",
+        "item_id": "explorer-dev-snapshot-dx"
+      },
+      {
+        "behavior": "`results-explorer/public/data/results.duckdb` semantics are unchanged when present.",
+        "item_id": "explorer-dev-snapshot-dx"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Makefile — existing target conventions like `uat-explorer-smoke`; pattern for a possible `explorer-dev` target.",
+        "decision": "reuse",
+        "item_id": "explorer-dev-snapshot-dx",
+        "path": "Makefile"
+      },
+      {
+        "concept": "results-data/bundles/ — source-of-truth bundle dir whose mtime can drive a staleness check.",
+        "decision": "reuse",
+        "item_id": "explorer-dev-snapshot-dx",
+        "path": "results-data/bundles/"
+      },
+      {
+        "concept": "results-explorer/package.json — npm scripts site; reuse existing `dev` / `build` patterns for any new predev hook.",
+        "decision": "reuse",
+        "item_id": "explorer-dev-snapshot-dx",
+        "path": "results-explorer/package.json"
+      },
+      {
+        "concept": "results-explorer/public/data/results.duckdb — current deployed snapshot (gitignored); a dev-data fallback would mirror this layout.",
+        "decision": "reuse",
+        "item_id": "explorer-dev-snapshot-dx",
+        "path": "results-explorer/public/data/results.duckdb"
+      },
+      {
+        "concept": "results-explorer/scripts/generate-browser-fixtures.mjs — existing pattern for spawning the Python publish toolchain from Node.",
+        "decision": "reuse",
+        "item_id": "explorer-dev-snapshot-dx",
+        "path": "results-explorer/scripts/generate-browser-fixtures.mjs"
+      },
+      {
+        "concept": "results-explorer/scripts/serve-browser-tests.mjs — existing Node-side wrapper around the browser fixture flow; pattern for a Node helper that orchestrates Python + Vite.",
+        "decision": "reuse",
+        "item_id": "explorer-dev-snapshot-dx",
+        "path": "results-explorer/scripts/serve-browser-tests.mjs"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-dev-snapshot-dx",
+        "kind": "only_modify",
+        "path_glob": ".gitignore"
+      },
+      {
+        "item_id": "explorer-dev-snapshot-dx",
+        "kind": "only_modify",
+        "path_glob": "CONTRIBUTING.md"
+      },
+      {
+        "item_id": "explorer-dev-snapshot-dx",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "explorer-dev-snapshot-dx",
+        "kind": "only_modify",
+        "path_glob": "docs/development/browser-test-architecture.md"
+      },
+      {
+        "item_id": "explorer-dev-snapshot-dx",
+        "kind": "only_modify",
+        "path_glob": "results-data/dev-corpus/**"
+      },
+      {
+        "item_id": "explorer-dev-snapshot-dx",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/README.md"
+      },
+      {
+        "item_id": "explorer-dev-snapshot-dx",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/dev-data/**"
+      },
+      {
+        "item_id": "explorer-dev-snapshot-dx",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package.json"
+      },
+      {
+        "item_id": "explorer-dev-snapshot-dx",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rm -f results-explorer/public/data/results.duckdb && cd results-explorer && (timeout 30 npm run dev >/tmp/explorer-dev-smoke.log 2>&1 &) && sleep 8 && curl -fsS -o /dev/null -w '%{http_code}\\n' http://localhost:5173/results/",
+        "description": "Fresh-clone simulation: dev server starts when the public snapshot is missing.",
+        "expected": "200",
+        "item_id": "explorer-dev-snapshot-dx",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "curl -fsS -o /dev/null -w '%{http_code}\\n' http://localhost:5173/results/data/results.duckdb",
+        "description": "The snapshot URL the app fetches returns 200 after the predev/fallback resolves.",
+        "expected": "200",
+        "item_id": "explorer-dev-snapshot-dx",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Manual smoke (recorded in PR body): the rendered page shows leaderboard rows, not the column-diff Error wall.",
+        "expected": "PR description records the screenshot or the absence of the error string in the HTML body.",
+        "item_id": "explorer-dev-snapshot-dx",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test",
+        "description": "Frontend tests still pass.",
+        "expected": "exit 0",
+        "item_id": "explorer-dev-snapshot-dx",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Production build is unaffected.",
+        "expected": "exit 0, dist/ produced",
+        "item_id": "explorer-dev-snapshot-dx",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-dev-snapshot-dx",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-dev-snapshot-dx",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-dev-snapshot-dx",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-dev-snapshot-dx",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-dev-snapshot-dx",
+        "notes": "The description cites PRs #344 / #354 / #380 as recent schema bumps.\nBefore implementation, capture a compact pinned snapshot so future\nreaders can re-run the check:\n\n  - `gh pr view 344 --json title,mergedAt`\n  - `gh pr view 354 --json title,mergedAt`\n  - `gh pr view 380 --json title,mergedAt`\n  - `git log --oneline --since=60.days -- results-explorer/src/db.ts benchbox/core/explorer_pipeline/duckdb_builder.py`\n\nRecord one line per PR (title + merge date) and the schema-bump count\nover the last 60 days in the PR description that lands this TODO's\nwork. Do NOT commit raw stdout to `_project/verification-logs/`;\npinned summary is enough.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pin the schema-bump cadence evidence cited in the description",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-dev-snapshot-dx",
+        "notes": "Capture decision and rationale in the PR description. No separate ADR\nneeded — this is a DX choice, not an architectural one. Use the\ncadence numbers from w0. Touch on:\n  - Schema-change cadence (from w0).\n  - Data-change cadence: `git log --oneline --since=60.days -- results-data/bundles/ | wc -l`.\n  - Latency budget for `npm run dev` start time.\n  - Onboarding signal: do we want git clone -> npm run dev -> working\n    UI as a baseline?\n\nThe recommendation absent overriding signal is (ii) — a tiny tracked\ndev snapshot — because:\n  - It makes git clone -> npm run dev work with no Python toolchain.\n  - It survives schema bumps because the developer rebuilding the\n    snapshot is part of the same PR that bumps the schema.\n  - The binary is small and changes rarely (only when schema bumps).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pick one of (i), (ii), (iii) with a brief decision note",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-dev-snapshot-dx",
+        "notes": "For (ii) specifically:\n  - Define a \"dev corpus\" subset under `results-data/dev-corpus/`\n    (e.g., 1-2 cohorts of bundles) that produces a small snapshot.\n  - Add a `make explorer-dev-snapshot` target that rebuilds it.\n  - Track `results-explorer/dev-data/results.duckdb` (with a README\n    explaining when to regen).\n  - Modify `results-explorer/src/db.ts` snapshot URL resolution to\n    try `data/results.duckdb` first, then fall back to\n    `dev-data/results.duckdb` (or a build-time constant chosen by\n    Vite mode).\n\nFor (i):\n  - Add `predev` and `prebuild` npm scripts that check mtime and\n    invoke the publish entry point if needed. Make the check\n    skippable via `EXPLORER_SKIP_PREDEV=1` env var for CI / offline.\n\nFor (iii):\n  - Add the make target and document it in\n    `docs/development/browser-test-architecture.md` and\n    `results-explorer/README.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the chosen approach",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-dev-snapshot-dx",
+        "notes": "`results-explorer/src/db.ts:196` currently advises running\n`benchbox explorer build`. After this TODO, the recommended remediation\nfor a local dev should be the new workflow (predev / make target /\nfallback note). Update the string accordingly.\n\nNote: this message will also be touched by TODO\n`explorer-cli-surface-migration` (to point at the relocated entry).\nCoordinate via the merge order; whichever lands second resolves the\nfinal text. If `explorer-cli-surface-migration` lands first, this\nTODO updates the dev-workflow phrasing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update the error-wall remediation message",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-dev-snapshot-dx",
+        "notes": "Smoke commands:\n  - `rm -rf results-explorer/public/data && cd results-explorer && npm run dev`\n    → UI loads on first attempt, no error wall.\n  - For (i): touch results-data/bundles/<any>.json and re-run\n    `npm run dev` → rebuild fires.\n  - For (ii): no rebuild needed; fallback snapshot is served.\n\nDocs:\n  - Update `results-explorer/README.md` (if present) with the new\n    dev workflow.\n  - Add a one-liner to `CONTRIBUTING.md` or\n    `docs/development/browser-test-architecture.md` explaining the\n    snapshot lifecycle.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Smoke verification + docs update",
+        "wid": "w4"
+      }
+    ]
+  }
+}

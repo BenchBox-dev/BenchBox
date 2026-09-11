@@ -1,0 +1,376 @@
+{
+  "context": "Treat the YAML + validator as the contract surface and the JS builder\nas a consumer. Land the additive YAML keys (w1-w2), tighten the\nvalidator to pin them (w3), and only then update the builder (w4).\nThis ordering means the validator catches any builder-vs-data drift\nintroduced by w4. Use the existing flag-shape pins at\nscripts/generate_landing_quickstarts.py:470-483 as a literal template\nfor the new pins — copy the branch, change the substring.\n\nFor w4, prefer string concatenation into the existing `lines` array\nin buildAgentPrompt at prompts.js:352-378 over introducing helpers.\nThe function is small and the project rejects abstraction churn.\n",
+  "description": "The /prompts/ landing route already renders correct flag shapes\n(check-deps --platform, --dry-run <dir>, two --platform flags in\ncompare; pinned by validate() in\nscripts/generate_landing_quickstarts.py:468). But the rendered agent\nprompt is missing several operational guardrails that show up\nrepeatedly in real CLI sessions reviewed in\n~/.claude/projects/-Users-joe-Developer-BenchBox/*.jsonl (~18\nsessions sampled):\n\n- No `--non-interactive` flag — agents hang on hidden setup prompts.\n- No output discipline — sessions pipe to `tail -20` and lose context;\n  CLAUDE.md mandates `/tmp/<slug>.log` + tail summary.\n- No long-run announce — AGENTS.md mandates \"Runs >10min: announce\n  command/runtime/log/stop first.\"\n- Step 6 says \"Summarise\" but doesn't say how — no\n  `benchbox results --paths` / `benchbox results show-cli`\n  guidance for finding and inspecting the result JSON.\n- No `--force datagen` recovery hint for partial loads (a recurring\n  sticking point — see QuestDB sessions e47108b5, 2fd35b2d).\n\nThis TODO closes that gap with additive, data-driven changes: new\nCLI template keys in catalog.yaml, tightened validator, augmented\nprompts.js builder. Pure landing/scripts change; no platform-core\ntouch.\n\nDecision gates:\n- D0 (before w1): re-validate the sampled session evidence and\n  commit a compact summary, or remove the session-ID claims from this\n  TODO before implementation.\n- D1 (before w2): confirm `runtime_hints` map structure with owner —\n  flat keys (`log_dir`, `log_slug_template`, `long_run_threshold_scale`)\n  vs a sub-map per surface. Default to flat keys unless a second\n  surface needs distinct hints.\n- D2 (before w3): confirm whether the announce/smoke gating threshold\n  is scale-based, deployment-based, or both. Default plan: gate on\n  `scale > 0.01 OR deployment != \"local\"`.\n- D3 (before w5): if any of the 30+ existing tests in\n  tests/unit/landing/ break, stop and re-scope rather than weakening\n  pins.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add new dropdowns or form controls for the new behaviors",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "why": "gate them on existing selection state (scale, deployment). Adding controls explodes the dropdown-smoke matrix."
+      },
+      {
+        "dont": "fetch any external data at page load",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "why": "landing/ is a static deploy; recipes.json is forbidden (FORBIDDEN_JSON pin at generate_landing_quickstarts.py:35)."
+      },
+      {
+        "dont": "hardcode /tmp/ paths inside prompts.js",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "why": "read from runtime_hints in catalog.generated.js so future tuning is YAML-only."
+      },
+      {
+        "dont": "introduce a templating engine (Mustache, EJS, etc.)",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "why": "the existing renderTemplate() at prompts.js:250 is sufficient; project is intentionally framework-free."
+      },
+      {
+        "dont": "use snapshot/golden-string tests on the full rendered prompt",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "why": "pin only labels via indexOf; full snapshots will rot on every prompt-text tweak."
+      },
+      {
+        "dont": "weaken existing validator pins (e.g., the short-flag rejections at lines 476-479) to fit a new template",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "why": "extend the validator, not the templates."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase1-cli-hygiene",
+        "id": 449,
+        "reason": "Tracked separately in prompts-landing-phase5-mcp-parity",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Referenced tracking item prompts-landing-phase5-mcp-parity is itself DONE -- MCP-surface parity was completed there.",
+        "summary": "MCP-surface parity"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase1-cli-hygiene",
+        "id": 450,
+        "reason": "Tracked separately in prompts-landing-phase2-cost-aware-gating (needs a PlatformRegistry capability change)",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Tracking item prompts-landing-phase2-cost-aware-gating is now in _project/DONE; the cost-gate work was completed there.",
+        "summary": "Cost-acknowledgment gate + smoke-at-0.01 step"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase1-cli-hygiene",
+        "id": 451,
+        "reason": "Tracked separately in prompts-landing-phase3-platform-footgun-hints",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Explicitly tracked in prompts-landing-phase3-platform-footgun-hints, which is now DONE (_project/DONE/main/planning/).",
+        "summary": "Platform-option hints + TPC-DS SF<1 warning"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase1-cli-hygiene",
+        "id": 452,
+        "reason": "Tracked separately in prompts-landing-phase4-provenance",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Spot-checked: provenance snapshot + --capture-plans footnote shipped via prompts-landing-phase4-provenance (status: Completed).",
+        "summary": "Provenance snapshot block + --capture-plans footnote"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "AUTO-GENERATED banner in catalog.generated.js — keep generator as the only writer.",
+        "item_id": "prompts-landing-phase1-cli-hygiene"
+      },
+      {
+        "behavior": "Default rendered prompt (DuckDB + TPC-H + 0.01 + local + sql) remains short — adding new steps must be gated so this default doesn't grow beyond 7 steps.",
+        "item_id": "prompts-landing-phase1-cli-hygiene"
+      },
+      {
+        "behavior": "Existing flag pins in scripts/generate_landing_quickstarts.py validate() (lines 468-484) — do not weaken; only add new pins.",
+        "item_id": "prompts-landing-phase1-cli-hygiene"
+      },
+      {
+        "behavior": "URL query-parameter state contract in prompts.js:31-51 — no new selectors in this phase.",
+        "item_id": "prompts-landing-phase1-cli-hygiene"
+      },
+      {
+        "behavior": "test_static_generated_payload_supports_dropdown_smoke at line 368 — extend, do not replace.",
+        "item_id": "prompts-landing-phase1-cli-hygiene"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "AGENTS.md / CLAUDE.md Output Discipline + Long-Running UAT sections — reuse the /tmp/<slug>.log + tail summary convention",
+        "decision": "reuse",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "path": "AGENTS.md"
+      },
+      {
+        "concept": "benchbox/cli/commands/results.py:86 results group and show-cli subcommand — use existing result discovery/repro commands; do not invent `results show`",
+        "decision": "reuse",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "path": "benchbox/cli/commands/results.py:86"
+      },
+      {
+        "concept": "landing/prompts/catalog.yaml:74-79 templates.cli — extend with results_paths, show_cli, runtime_hints (do not rename existing keys)",
+        "decision": "extend",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "path": "landing/prompts/catalog.yaml:74-79"
+      },
+      {
+        "concept": "landing/prompts/prompts.js:352-378 buildAgentPrompt — extend the same step-list builder; do not introduce a new template engine",
+        "decision": "extend",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "path": "landing/prompts/prompts.js:352-378"
+      },
+      {
+        "concept": "scripts/generate_landing_quickstarts.py:468-484 validate() flag-shape pins — extend pattern, add --non-interactive presence check the same way",
+        "decision": "extend",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "path": "scripts/generate_landing_quickstarts.py:468-484"
+      },
+      {
+        "concept": "tests/unit/landing/test_landing_quickstarts.py:368 test_static_generated_payload_supports_dropdown_smoke — extend rather than duplicate",
+        "decision": "extend",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "path": "tests/unit/landing/test_landing_quickstarts.py:368"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/report.py"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/results.py"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/index.html"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/prompts.css"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/prompts-landing-phase1-cli-hygiene-evidence.md"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/a11y-checklist.md"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.generated.js"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.yaml"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/prompts.js"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_landing_quickstarts.py"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/landing/test_landing_quickstarts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/generate_landing_quickstarts.py --validate-only",
+        "description": "Validator passes against new shape",
+        "expected": "validate-only: OK",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make prompts-landing-check",
+        "description": "Make check target green",
+        "expected": "check: OK",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/landing/ -v",
+        "description": "Landing tests all pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-fast",
+        "description": "Fast suite green (regression guard)",
+        "expected": "0 failures",
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "notes": "Re-run the evidence search behind the description's local-session\nclaims before editing the prompt surface:\n  - command(s) used to inspect ~/.claude/projects/-Users-joe-Developer-BenchBox/*.jsonl\n  - checked repo SHA and current date\n  - count of sampled sessions and count per observed issue\n  - key anonymized snippets or filenames sufficient to audit the claim\nCommit the compact summary to\n`_project/analysis/prompts-landing-phase1-cli-hygiene-evidence.md`.\nRaw JSONL/stdout stays in /tmp or another ignored local path. If the\nsession logs are unavailable, record that fact and remove or soften\nthe session-ID-specific evidence claims before continuing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate sampled CLI-session evidence and commit compact summary",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "notes": "In landing/prompts/catalog.yaml lines 75-77, append\n` --non-interactive` to both `test_one` and `compare` templates.\nLeave `dependency_check` and `dry_run` untouched.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend catalog.yaml CLI templates with --non-interactive on test_one and compare",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "notes": "Add at top-level of catalog.yaml:\n  runtime_hints:\n    log_dir: \"/tmp\"\n    log_slug_template: \"bench_{platform}_{benchmark}_{scale}\"\n    long_run_threshold_scale: \"0.1\"\nAdd under templates.cli:\n  results_paths: \"uv run benchbox results --paths --limit 1\"\n  show_cli: \"uv run benchbox results show-cli <result-json>\"\n  force_datagen_footer: \"If the load phase fails partway, re-run with `--force datagen` appended.\"\nKeep keys snake_case to match existing convention.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add runtime_hints map + new template keys (results_paths, show_cli, force_datagen_footer) to catalog.yaml",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "notes": "Extend validate() at line 439:\n- test_one and compare templates MUST contain ' --non-interactive'.\n- results_paths must contain 'benchbox results --paths'.\n- show_cli must contain 'benchbox results show-cli'.\n- runtime_hints.long_run_threshold_scale must be a string that appears\n  in scales[].\n- runtime_hints.log_dir must start with '/tmp' (be strict; agents\n  treating other dirs as ephemeral is a known footgun).\nEach rule is a single appended branch; mirror the existing\ncompare-template pin at line 470.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tighten scripts/generate_landing_quickstarts.py validate() to pin new shape",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "notes": "In landing/prompts/prompts.js:352-378, insert four behavior changes\nAFTER step 3 (dry-run) and BEFORE the existing live-run step:\n(a) New step \"Announce\" — emit exact command + log path\n    (`/tmp/{slug}.log` using runtime_hints.log_slug_template) +\n    interrupt instructions. Gated on\n    `parseFloat(state.scale) >= parseFloat(runtime_hints.long_run_threshold_scale)\n    || state.deployment !== \"local\"`.\n(b) Modify the rendered live-run command to append\n    ` 2>&1 | tee /tmp/<slug>.log` (build slug from\n    log_slug_template substituted with platform/benchmark/scale).\n    Preserve the run's failure status, e.g. render the command under\n    `set -o pipefail` or otherwise instruct the agent not to treat a\n    successful `tee` as a successful benchmark.\n(c) New step \"Discover & summarize\" using results_paths and show_cli\n    template keys, plus a short instruction to summarize total runtime,\n    per-query timings, and failures from the result JSON (replaces —\n    not duplicates — the existing \"Summarise the result\" prose).\n(d) Append force_datagen_footer as the last line.\nDo NOT add new form controls — all behavior is selection-derived.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Augment prompts.js buildAgentPrompt with announce, output-discipline tee, summary, and footer",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "notes": "Extend tests/unit/landing/test_landing_quickstarts.py:\n- test_test_one_template_uses_non_interactive\n- test_compare_template_uses_non_interactive\n- test_results_paths_template_present\n- test_show_cli_template_present\n- test_runtime_hints_well_formed (keys present + types)\n- test_runtime_hints_log_dir_under_tmp\n- extend test_static_generated_payload_supports_dropdown_smoke at\n  line 368 to assert the new template keys are emitted in\n  catalog.generated.js for the default selection.\nNo snapshot string equality on the rendered agent prompt — test\nvia indexOf-style label presence to avoid brittleness.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests covering the new pins and rendered prompt shape",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase1-cli-hygiene",
+        "notes": "uv run -- python scripts/generate_landing_quickstarts.py --write\nmake prompts-landing-check   # MUST pass\nVisit /prompts/ locally in a browser and copy the default\n(DuckDB + TPC-H + 0.01) prompt — confirm output is a clean 6-step\nprompt, NOT bloated. Then switch to MotherDuck + TPC-H + 1.0 and\nconfirm announce + tee + summary + force-datagen footer all\nrender. Capture both rendered prompts in the PR body for\nreviewer audit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate catalog.generated.js + verify Make targets are green",
+        "wid": "w6"
+      }
+    ]
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "description": "Canonical TPC-H Q11 renders its value threshold as 0.0001 / SF (qgen does\nthis, and PR #770 made the SQL run path scale-faithful for both TPC-H and\nTPC-Havoc). The DataFrame surface only gets the scale-correct fraction when a\nqgen seed is provided: dataframe_runner._setup_parameter_overrides extracts\nparameters from rendered qgen SQL and injects them via\nset_parameter_overrides. Without a seed, every Q11 DataFrame implementation\n(canonical TPC-H and all TPC-Havoc variants) reads\nTPCH_DEFAULT_PARAMS[11][\"fraction\"] = 0.0001 - the SF=1 value - regardless of\nthe benchmark's actual scale factor. At SF=0.1 the executed Q11 threshold is\n10x too small (wrong row count and timing); at SF=10 it is 10x too large.\n\nThe TPC-Havoc DataFrame equivalence gate\n(benchbox/core/tpchavoc/dataframe_equivalence.py, see\ntpchavoc-dataframe-variant-equivalence-gate) works around this inside the\ngate by injecting {11: {\"fraction\": 0.0001 / SF}} through the same public\nset_parameter_overrides seam that seeded runs use. That keeps the gate\nhonest but does not fix the unseeded product run path.\n\nFix at the seam where scale is known: the DataFrame runner (or the\nparameter-override setup it calls) should derive the unseeded Q11 fraction\nfrom the run's scale factor, exactly as the SQL side derives {q11_fraction}\nduring query rendering. Then drop the gate-local injection in\ndataframe_equivalence.find_dataframe_divergences (the gate should pass with\nno override once defaults are scale-aware).\n",
+  "legacy": {
+    "item_meta": {
+      "category": "Bug Fixes",
+      "completed_at": "2026-08-12T12:28:51Z",
+      "completed_pr": 799,
+      "created_at": "2026-06-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Seeded runs keep using qgen-extracted parameters unchanged.",
+        "item_id": "tpch-dataframe-unseeded-q11-scale-fraction"
+      },
+      {
+        "behavior": "The TPC-Havoc DataFrame equivalence gate stays green throughout.",
+        "item_id": "tpch-dataframe-unseeded-q11-scale-fraction"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/runner/dataframe_runner.py:_setup_parameter_overrides - the seeded injection path; the unseeded path returns early when seed is None",
+        "decision": "reuse",
+        "item_id": "tpch-dataframe-unseeded-q11-scale-fraction",
+        "path": "benchbox/core/runner/dataframe_runner.py:_setup_parameter_overrides"
+      },
+      {
+        "concept": "benchbox/core/tpch/dataframe_queries.py:TPCH_DEFAULT_PARAMS / get_tpch_parameters / set_parameter_overrides - the parameter seam; defaults are static and scale-blind",
+        "decision": "reuse",
+        "item_id": "tpch-dataframe-unseeded-q11-scale-fraction",
+        "path": "benchbox/core/tpch/dataframe_queries.py:TPCH_DEFAULT_PARAMS"
+      },
+      {
+        "concept": "benchbox/core/tpch/queries.py Q11 {q11_fraction} rendering (PR #770) - the SQL-side scale-faithfulness fix to mirror",
+        "decision": "reuse",
+        "item_id": "tpch-dataframe-unseeded-q11-scale-fraction",
+        "path": "benchbox/core/tpch/queries.py"
+      },
+      {
+        "concept": "benchbox/core/tpchavoc/dataframe_equivalence.py:find_dataframe_divergences - the gate-local workaround to remove once defaults are scale-aware",
+        "decision": "reuse",
+        "item_id": "tpch-dataframe-unseeded-q11-scale-fraction",
+        "path": "benchbox/core/tpchavoc/dataframe_equivalence.py:find_dataframe_divergences"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "run TPC-H Q11 in DataFrame mode at SF=0.1 without a seed and compare to canonical SQL",
+        "description": "Unseeded SF=0.1 DataFrame Q11 uses fraction 0.001",
+        "expected": "row set matches canonical TPC-H Q11 at SF=0.1",
+        "item_id": "tpch-dataframe-unseeded-q11-scale-fraction",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tpch-dataframe-unseeded-q11-scale-fraction",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tpch-dataframe-unseeded-q11-scale-fraction",
+        "notes": "When seed is None and benchmark_id is tpch (or a TPC-H-derived benchmark\nsuch as tpchavoc), inject {11: {\"fraction\": 0.0001 / scale_factor}} via\nset_parameter_overrides, or thread the scale factor into\nget_tpch_parameters defaults. Keep seeded extraction authoritative when a\nseed is present.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make the unseeded DataFrame Q11 fraction scale-aware at the runner seam",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpch-dataframe-unseeded-q11-scale-fraction",
+        "notes": "Drop the set_parameter_overrides injection in\nfind_dataframe_divergences; make tpchavoc-dataframe-equivalence-report\nmust still report 0 divergent cells at SF=0.1, proving the product path\nis scale-faithful on its own.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove the gate-local Q11 override and re-verify the DataFrame gate",
+        "wid": "w1"
+      }
+    ]
+  }
+}

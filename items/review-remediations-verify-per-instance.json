@@ -1,0 +1,162 @@
+{
+  "context": "Extend the repository-specific review binding and existing regression suites. For each cohesive correction, enumerate affected instances and downstream consumers before editing, verify concurrent heads, reproduce the negative example and the intended successful behavior, and add the smallest integration fixture that covers the seam. Batch related comments into one coherent update; do not repeatedly patch a single layer while leaving known consumers unverified. Do not edit generated skill mirrors; use repo bindings that existing skills already consult.\n\nFor the original SCD2 case, reuse TestWritePrimitivesSCD2DuckDB integration fixtures in tests/integration/test_write_primitives_duckdb.py: enumerate basic, no_change and new_keys_only individually. Run successful/idempotent behavior plus test_no_change_noop_against_missing_keys_fails_validation. In an isolated fixture, remove only the positive no_change companion validation to reproduce the prior vacuous success after deleting unchanged keys; demonstrate the corrected assertion rejects this prior behavior and current behavior reports VALIDATION_FAILED. Record exact test node IDs and control outcomes in remediation-contract-evidence.md. Extend only this existing integration test if the historical control is absent; no product SQL or benchmark behavior changes are authorized by this process item.",
+  "description": "Origin: L2 blind-spot from the SCD2 adversarial audit (_project/blind-spots/2026-07-11-152233-remediation-verified-by-claim-not-evidence.md). Three review passes and a status:Completed TODO (scd2-validation-soundness-hardening) accepted the claim 'each op already backstops the existence side with a positive companion check' without checking it per op. It was true for 2 of the 3 SCD2 ops and FALSE for merge_scd_type2_no_change (zero positive assertions), which the audit's N2 finding later caught. The gap: remediation verification was done at the level of the *claim* rather than the *evidence* - a one-line per-op query would have caught it. Lesson (framework-gap, not instance defect): a collective claim ('each X has property P') is only as strong as its weakest instance, but a reviewer reading the claim text inherits the author's framing and checks the aggregate. Any review closing on a 'for each / collectively' premise must re-derive it instance-by-instance from the source of truth, preferring a mechanical enumeration (one query/grep per member) over rereading the claim.\n\nExtend this existing process item using session 01a07292: the #2051 query-set fix passed focused tests while a partial fixture emptied the downstream read model. Publication receipt/journal/executor fixes also recurred across branches. Require per-instance evidence plus a bounded producer-to-persistence-to-consumer trace for each accepted defect class. Do not equate a high test count, static wording check, or zero current threads with an integrated outcome.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "review-remediations-verify-per-instance",
+        "needs_item": "ci-baseline-representative-remeasure-sample"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-07-22T13:04:59Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Blind-spot capture stays a valid separate mechanism; this registers the actionable process follow-up per the user directive to track all follow-ups as TODOs.",
+        "item_id": "review-remediations-verify-per-instance"
+      },
+      {
+        "behavior": "Leave unrelated completed tracker evidence untouched; new defects need explicit owned work rather than a blanket completion claim.",
+        "item_id": "review-remediations-verify-per-instance"
+      },
+      {
+        "behavior": "No automatic acceptance of review claims; no forcing a rebuttal quota; no generic framework extraction.",
+        "item_id": "review-remediations-verify-per-instance"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "review-remediations-verify-per-instance",
+        "kind": "do_not_modify",
+        "path_glob": ".agents/skills/**"
+      },
+      {
+        "item_id": "review-remediations-verify-per-instance",
+        "kind": "do_not_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "review-remediations-verify-per-instance",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "review-remediations-verify-per-instance",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/remediation-contract-evidence.md"
+      },
+      {
+        "item_id": "review-remediations-verify-per-instance",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/pr-review-evidence.md"
+      },
+      {
+        "item_id": "review-remediations-verify-per-instance",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/review-protocol.md"
+      },
+      {
+        "item_id": "review-remediations-verify-per-instance",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_write_primitives_duckdb.py"
+      },
+      {
+        "item_id": "review-remediations-verify-per-instance",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/test_pipeline.py"
+      },
+      {
+        "item_id": "review-remediations-verify-per-instance",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/publication/test_journal.py"
+      },
+      {
+        "item_id": "review-remediations-verify-per-instance",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/publication/test_transaction.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/explorer_pipeline/test_pipeline.py tests/unit/scripts/publication/test_transaction.py tests/unit/scripts/publication/test_journal.py -q",
+        "description": "Existing pipeline and publication seam regressions prove successful and rejected cases",
+        "expected": "exit 0; fixtures include negative controls",
+        "item_id": "review-remediations-verify-per-instance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'from pathlib import Path; p=Path(\"docs/agent/review-protocol.md\"); assert \"pr-review-evidence.md\" in p.read_text(); assert Path(\"docs/agent/pr-review-evidence.md\").is_file()'",
+        "description": "Repository review binding links the evidence contract",
+        "expected": "exit 0; behavioral proof remains in the regression rung, not this link check",
+        "item_id": "review-remediations-verify-per-instance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/integration/test_write_primitives_duckdb.py -q -k 'scd2 or no_change_noop_against_missing_keys or no_change_prior_behavior'",
+        "description": "SCD2 per-operation evidence includes no_change missing-key and prior-behavior controls",
+        "expected": "exit 0; all three operations have successful and rejected-case evidence; missing unchanged keys reports VALIDATION_FAILED; isolated removal of the positive companion reproduces old vacuous success and fails the corrected invariant",
+        "item_id": "review-remediations-verify-per-instance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "review-remediations-verify-per-instance",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "review-remediations-verify-per-instance",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "review-remediations-verify-per-instance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document per-instance and downstream contract evidence in the repository review binding",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "review-remediations-verify-per-instance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replay the recorded SCD2, cohort-ranking and publication-receipt failure classes",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "review-remediations-verify-per-instance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Prove corrected behavior through persistence and consumers before review closeout",
+        "wid": "w3"
+      }
+    ]
+  }
+}

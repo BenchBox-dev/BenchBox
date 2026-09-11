@@ -1,0 +1,210 @@
+{
+  "context": "Add a fail-closed ancestry check to Makefile pr-open. Cover it with a unit or make-recipe test that a behind HEAD is refused and a current HEAD proceeds to the existing push/create path. Update the pr-open help text and repo-admin runbook. Do not change auto-merge arming, GitHub settings, or refresh-shadow.",
+  "description": "Stop opening develop PRs from a stale worktree. After git fetch origin develop, pr-open must fail unless origin/develop is an ancestor of HEAD. The escape hatch is make pr-refresh (already one-at-a-time) or an explicit STALE=1. This would have absorbed #1749 before #1751 existed. It does not keep a PR current for the whole required-gate window and must not silently merge develop inside pr-open or pr-fanout.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Arm auto-merge from this item",
+        "instead": "leave arming to make pr-ready",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "why": "READY=1-at-open reintroduces merge-before-follow-up (#1503/#1521/#1531)"
+      },
+      {
+        "dont": "Flip allow_update_branch or enable a GitHub auto-updater",
+        "instead": "keep currency enforcement local and one PR at a time",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "why": "that field is not an updater, and bulk update is self-defeating"
+      },
+      {
+        "dont": "Silently git merge origin/develop inside pr-open",
+        "instead": "fail closed and tell the caller to run make pr-refresh",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "why": "pr-fanout would then refresh many PRs at once and recreate the refresh storm"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "needs_item": "behind-pr-occurrence-00-policy"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-17T01:04:53Z",
+      "completed_pr": 1755,
+      "created_at": "2026-08-17T00:38:18Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "pr-fanout must not refresh every worktree as a side effect of this gate",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency"
+      },
+      {
+        "behavior": "pr-open still withholds auto-merge unless READY=1",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency"
+      },
+      {
+        "behavior": "pr-refresh remains the only default absorb of origin/develop",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "pr-open already fetches origin/develop then ignores ancestry",
+        "decision": "extend",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "path": "Makefile"
+      },
+      {
+        "concept": "pr-refresh exact merge and one-at-a-time warning",
+        "decision": "reuse",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "path": "Makefile"
+      },
+      {
+        "concept": "Makefile target contract tests",
+        "decision": "extend",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "path": "tests/unit/test_release_infrastructure.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "kind": "do_not_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/pr_refresh_certification.py"
+      },
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "kind": "only_modify",
+        "path_glob": "make/**"
+      },
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "kind": "only_modify",
+        "path_glob": "make/help.mk"
+      },
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'merge-base --is-ancestor origin/develop HEAD|STALE' Makefile",
+        "description": "pr-open recipe tests origin/develop ancestry before push",
+        "expected": "ancestry gate and escape hatch present",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "last_result": "pass",
+        "last_run": "2026-08-17T01:04:43Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_release_infrastructure.py -q --tb=short -k 'pr_open or pr-open or pr_refresh'",
+        "description": "Focused Makefile contract tests pass",
+        "expected": "exit 0",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "last_result": "pass",
+        "last_run": "2026-08-17T01:04:50Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Read Makefile pr-open/pr-refresh/pr-fanout and tests/unit/test_release_infrastructure.py _make_target_recipe",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "notes": null,
+        "started_at": "2026-08-17T00:51:15Z",
+        "started_branch": "fix/pr-open-require-current-base",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-behind-pr-01",
+        "status": "done",
+        "summary": "Re-read pr-open, pr-refresh, pr-fanout, and existing Makefile tests before editing",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Makefile pr-open ancestry gate + STALE=1; no merge of develop",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "notes": null,
+        "started_at": "2026-08-17T00:51:53Z",
+        "started_branch": "fix/pr-open-require-current-base",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-behind-pr-01",
+        "status": "done",
+        "summary": "Add the origin/develop ancestry gate and STALE=1 escape to pr-open",
+        "wid": "w1"
+      },
+      {
+        "evidence": "test_pr_open_refuses_behind_origin_develop passed",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "notes": null,
+        "started_at": "2026-08-17T00:52:26Z",
+        "started_branch": "fix/pr-open-require-current-base",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-behind-pr-01",
+        "status": "done",
+        "summary": "Add regression coverage that behind HEADs are refused and current HEADs are not",
+        "wid": "w2"
+      },
+      {
+        "evidence": "help.mk and repo-admin-settings.md document the gate and STALE=1",
+        "item_id": "behind-pr-occurrence-01-pr-open-currency",
+        "notes": null,
+        "started_at": "2026-08-17T00:52:31Z",
+        "started_branch": "fix/pr-open-require-current-base",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-behind-pr-01",
+        "status": "done",
+        "summary": "Document the gate in help text and the repo-admin runbook",
+        "wid": "w3"
+      }
+    ]
+  }
+}

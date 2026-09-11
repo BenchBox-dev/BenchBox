@@ -1,0 +1,182 @@
+{
+  "context": "Land this only after break-root-import-cycle and\nrelocate-cli-hook-registries merge, so the layers contract can start\nclean (or near-clean) instead of needing a large allowlist from day one.\nStart every contract in permissive/allowlisted form (w2, w3), verify it\npasses on current `develop`, then wire it into CI (w4) so it locks in the\ncurrent state rather than blocking on a large simultaneous cleanup.\nRatchet the allowlist down in follow-up PRs as remove-or-integrate-legacy-\ncudf-platform-module and any newly discovered violations are resolved.\n",
+  "description": "Architecture review (Work Area E, structural remediation) found no import\nlayering/architecture-boundary enforcement tooling exists anywhere in the\nrepo: no `import-linter`, no `tach`, no equivalent config in\n`pyproject.toml`, `Makefile`, or `.github/workflows/*.yml` (confirmed by\nsearch - zero hits). The intended layering is currently only a convention:\n`utils < core < platforms < cli` (lower layers must not import higher\nlayers), with `benchbox.experimental` and `benchbox.mcp` expected to stay\nisolated (not imported by the core dependency chain). Nothing today\ndetects a violation of that convention before it ships, which is how the\ninversions fixed by `break-root-import-cycle` and\n`relocate-cli-hook-registries` were able to accumulate unnoticed.\n\nThis TODO adds `import-linter` with contracts encoding that layering, run\nin CI, so future violations fail fast instead of silently growing into\nanother SCC or layering inversion.\n\nKnown existing violation to handle explicitly rather than ignore:\n`benchbox/platforms/cudf.py:16` imports `benchbox.experimental.gpu` at\nmodule top level, which breaks an `experimental isolated` contract. The\nplanning entry `remove-or-integrate-legacy-cudf-platform-module.yaml`\nalready owns deciding whether that module is removed, quarantined, or\nintegrated - do not duplicate that decision here; this TODO either (a)\nallowlists the violation as a named exception until that TODO resolves it,\nor (b) is sequenced after it if it lands first. See deps.needs.\n\nThis is a tooling/enforcement addition, not a shrink-campaign item -\n`_project/goal-shrink-core-code.md` scopes structural/architecture work\nlike this out of the autonomous shrink loop.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate the cudf.py experimental-import decision here",
+        "instead": "(not specified)",
+        "item_id": "import-layering-enforcement",
+        "why": "remove-or-integrate-legacy-cudf-platform-module owns it; just reference it as the allowlist's resolution path."
+      },
+      {
+        "dont": "invent a new CI job for this",
+        "instead": "(not specified)",
+        "item_id": "import-layering-enforcement",
+        "why": "extend the existing lint job pattern (make lint-markers -> pr.yml) rather than adding a separate workflow."
+      },
+      {
+        "dont": "write contracts with zero exceptions before verifying they pass",
+        "instead": "(not specified)",
+        "item_id": "import-layering-enforcement",
+        "why": "lint-imports failing on day one blocks unrelated PRs; start allowlisted, ratchet down."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "import-layering-enforcement",
+        "needs_item": "break-root-import-cycle"
+      },
+      {
+        "item_id": "import-layering-enforcement",
+        "needs_item": "relocate-cli-hook-registries"
+      },
+      {
+        "item_id": "import-layering-enforcement",
+        "needs_item": "remove-or-integrate-legacy-cudf-platform-module"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-04T00:00:00Z",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The contract does not require moving any code beyond what break-root-import-cycle, relocate-cli-hook-registries, and remove-or-integrate-legacy-cudf-platform-module already do - this TODO adds detection, not further remediation.",
+        "item_id": "import-layering-enforcement"
+      },
+      {
+        "behavior": "make lint and the pr.yml lint job continue to pass for all currently-green code once residual known violations are explicitly allowlisted.",
+        "item_id": "import-layering-enforcement"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Makefile:lint-markers target and .github/workflows/pr.yml:288 ('Validate test marker annotations' step calling make lint-markers) - the existing pattern of a narrow, purpose-built Makefile lint target wired into the pr.yml lint job; extend this pattern for import-linter rather than inventing a new CI-wiring convention.",
+        "decision": "extend",
+        "item_id": "import-layering-enforcement",
+        "path": "Makefile:lint-markers"
+      },
+      {
+        "concept": "remove-or-integrate-legacy-cudf-platform-module.yaml - owns the decision on benchbox/platforms/cudf.py's benchbox.experimental.gpu import; this TODO's experimental-isolation contract must reference, not duplicate, that decision.",
+        "decision": "reuse",
+        "item_id": "import-layering-enforcement",
+        "path": "remove-or-integrate-legacy-cudf-platform-module.yaml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "import-layering-enforcement",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "import-layering-enforcement",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "import-layering-enforcement",
+        "kind": "only_modify",
+        "path_glob": ".importlinter"
+      },
+      {
+        "item_id": "import-layering-enforcement",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "import-layering-enforcement",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- lint-imports",
+        "description": "import-linter runs and reports the configured contracts",
+        "expected": "contracts checked; only explicitly allowlisted violations (if any) are reported, no unexpected failures",
+        "item_id": "import-layering-enforcement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make lint",
+        "description": "New CI step is present and passes in the lint job",
+        "expected": "import-linter step runs as part of make lint with the same pass/fail semantics as lint-markers",
+        "item_id": "import-layering-enforcement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "import-layering-enforcement",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "import-layering-enforcement",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "import-layering-enforcement",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "import-layering-enforcement",
+        "notes": "Added `import-linter>=2.13` to `[dependency-groups].dev` in\npyproject.toml via `uv add --group dev import-linter` (pulls in\n`grimp` transitively). Added `.importlinter` (v2.13 uses the classic\nINI-style config file, not `[tool.importlinter]` in pyproject.toml)\nwith `root_package = benchbox` and zero contracts first - confirmed\n`uv run -- lint-imports` runs clean (963 files, 2840 dependencies, 0\ncontracts) before adding any contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add import-linter dependency and base config",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "import-layering-enforcement",
+        "notes": "Added the `layers` contract. Reality did not match the \"few to none\nleft\" expectation: running `lint-imports` with a zero-exception\nlayers contract surfaced ~46 real current violations (not just the\nillustrative cudf/path_utils/format_selection/core-registry examples\ncited when this TODO was filed) - see the parent TODO/session report\nfor the full enumerated list now encoded as named `ignore_imports`\nentries in `.importlinter`, grouped into: utils->core (3 modules doing\na lazy `import benchbox` root-import fallback, cascading through\nbenchbox/__init__.py, plus one direct `path_utils -> core.runtime_paths`\nedge), utils->cli (1 direct edge, `config_interface -> cli.config`),\nutils->platforms (1 direct edge, `format_selection ->\nplatforms.base.format_capabilities`), and core->platforms (8 modules\nwith the same lazy root-import pattern + ~26 direct edges from the\nplatform-registry/factory/dispatch/equivalence-comparison call sites\nin core.dryrun, core.runner.runner, core.platform_registry,\ncore.tpchavoc.equivalence, core.dataframe.maintenance_interface,\netc). Each entry has a one-line justification comment; none are\nloosened via wildcards on the layer/package level. `lint-imports`\nis GREEN with these allowlisted.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add the layers contract: utils < core < platforms < cli",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "import-layering-enforcement",
+        "notes": "Deviated from the literal `type = \"independence\"` instruction after\nactually running it: independence forces ALL listed modules to be\nmutually exclusive in both directions, so listing\ncore/platforms/cli/utils/experimental together immediately broke on\nthe legitimate cli->core, platforms->core, core->utils, etc. edges\nthat the layers contract above explicitly allows (core/platforms/\ncli/utils are not independent of each other, only of experimental).\nUsed `type = \"forbidden\"` instead (source_modules =\ncore/platforms/cli/utils, forbidden_modules = experimental), which is\nthe correct one-directional primitive; kept the single named\nallowlist exception for `benchbox/platforms/cudf.py ->\nbenchbox.experimental.gpu` citing\nremove-or-integrate-legacy-cudf-platform-module (still not landed,\nconfirmed via `grep -rn \"experimental\" benchbox/platforms/cudf.py`).\nFor mcp: ran\n`grep -rn \"benchbox.mcp\" benchbox/core benchbox/platforms benchbox/cli benchbox/utils`\n(zero hits - nothing in the lower layers imports mcp) and\n`grep -rn \"^from benchbox\\|^import benchbox\" benchbox/mcp/**/*.py`\n(mcp extensively and legitimately imports core/utils to expose\nbenchmark data and execution via MCP tools, resolving this TODO's own\nopen_questions entry). A bidirectional independence contract would\nhave required re-allowlisting every one of those core/utils imports,\ndefeating the point, so mcp also uses `type = \"forbidden\"`\n(source_modules = core/platforms/cli/utils, forbidden_modules = mcp)\nwith zero exceptions needed - it passes cleanly today.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add independence/isolation contracts for experimental and mcp",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "import-layering-enforcement",
+        "notes": "Added a standalone `lint-imports:` Makefile target (mirrors the\n`lint-markers` pattern exactly - a narrow, separately-invoked target,\nnot folded into `make lint`) running `uv run -- lint-imports`, added\nit to `.PHONY` and the `make help` listing, and added a \"Validate\nimport layering\" step calling `make lint-imports` in\n`.github/workflows/pr.yml`'s `code-lint` job immediately after the\nexisting \"Validate test marker annotations\" (`make lint-markers`)\nstep (pr.yml:288 area), per the cited prior art. `tests/unit/workflows/`\n(21 tests, incl. `test_pr_workflow_path_classifier.py` which parses\npr.yml) still pass unmodified - no pin updates were needed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire import-linter into make lint and pr.yml",
+        "wid": "w4"
+      }
+    ]
+  }
+}

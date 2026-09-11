@@ -1,0 +1,61 @@
+{
+  "context": "Re-run TPC-H SF>=1 on all four modes on an otherwise idle machine, n>=5 per mode, and replace the table in the ADR Status block. If the local bimodality disappears, say so explicitly; if it does not, that is a real finding about the local path and deserves its own item.",
+  "description": "The maturity ADR's Status block publishes Power@Size means and CVs for the four DuckLake deployment modes and explicitly says 'Re-measure on a quiet host before treating these CVs as authoritative'. Nothing tracks that. The numbers were taken on a laptop running several concurrent agent sessions, and the local mode's series is bimodal (~98k on the first run, ~77k on repeats) - a systematic first-run-versus-later split rather than random variance, i.e. host contention. They are sound enough to support the conclusion they were used for (remote-backed runs are NOT materially less reproducible than local, confirming ADR decision w12) and not sound enough to quote as reproducibility characteristics of the platform.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-01T12:50:45Z",
+        "from_item": "ducklake-remeasure-cv-on-quiet-host",
+        "id": 675,
+        "reason": "Load averages 3.9/4.8/5.2 with a concurrent session's pytest at 99% CPU and Codex at 82% during the follow-up sweep; the item's own rule says a contended-host measurement is worse than none. Left pending for a genuinely quiet window.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Attempted 2026-08-01: host not idle"
+      }
+    ],
+    "item_meta": {
+      "category": "validation",
+      "created_at": "2026-07-30T23:37:14Z",
+      "worktree": "ducklake-platform"
+    },
+    "preserves": [
+      {
+        "behavior": "ADR decision w12 stays confirmed unless the new numbers actually contradict it",
+        "item_id": "ducklake-remeasure-cv-on-quiet-host"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ducklake-remeasure-cv-on-quiet-host",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/adr-ducklake-maturity-and-publishability.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -q 'Re-measure on a quiet host' docs/development/adr/adr-ducklake-maturity-and-publishability.md",
+        "description": "The ADR no longer carries the provisional-measurement caveat",
+        "expected": "caveat removed once the table is re-measured",
+        "item_id": "ducklake-remeasure-cv-on-quiet-host",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ducklake-remeasure-cv-on-quiet-host",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-run all four modes n>=5 on an idle host and update the ADR table",
+        "wid": "w1"
+      }
+    ]
+  }
+}

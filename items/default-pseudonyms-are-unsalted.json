@@ -1,0 +1,81 @@
+{
+  "context": "Two separable decisions. (1) Wording, cheap: qualify the docs so 'salted' is stated only when machine_id_salt is configured, and say plainly that the default is deterministic and confirmable. (2) Substance, needs a call: whether the project should mint and persist a real default salt. A per-installation random salt breaks cross-installation correlation but also breaks cross-submitter grouping, which is the feature the Explorer wants; a single project-wide secret salt preserves grouping and resists offline confirmation but must be held somewhere and rotating it requires re-deriving the corpus. Record whichever is chosen as an ADR rather than leaving it implicit.",
+  "description": "Codex P2 on PR #1528, but the privacy consequence is larger than the doc wording. AnonymizationConfig.machine_id_salt defaults to None and _hash_public_identifier coerces that to the empty string, so with the default ResultExporter every public pseudonym is sha256('|prefix|value')[:12] with NO secret input. That is globally deterministic and offline-computable: anyone can confirm a guessed value - a hostname, a username-bearing path, a database or bucket name - by hashing it, and can dictionary-attack the small space of common values. It does not permit enumeration, but it does permit CONFIRMATION, which is exactly what a pseudonym is supposed to prevent for a targeted subject. The entire curated corpus (207 bundles, now public on published-results) was produced with the default empty salt. Documentation added in #1528 describes the scheme as 'salted SHA-256' without the condition, which overclaims resistance to cross-installation correlation. Related: the #1512 pass-through is checked before the salt is applied, so already-anonymized values are salt-independent - see the Salt rotation section of docs/reference/result-formats.md and [[rederive-corpus-to-single-pass]].",
+  "legacy": {
+    "item_meta": {
+      "category": "privacy",
+      "created_at": "2026-08-04T17:16:50Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Idempotence and the publication fixed point from #1512",
+        "item_id": "default-pseudonyms-are-unsalted"
+      },
+      {
+        "behavior": "Pseudonym stability for grouping, unless the recorded decision deliberately trades it away",
+        "item_id": "default-pseudonyms-are-unsalted"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "default-pseudonyms-are-unsalted",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "default-pseudonyms-are-unsalted",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "default-pseudonyms-are-unsalted",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -q 'machine_id_salt' docs/reference/result-formats.md",
+        "description": "docs no longer call the default scheme salted without qualification",
+        "expected": "Manual read required; the rung only pins that the section still discusses the salt",
+        "item_id": "default-pseudonyms-are-unsalted",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "default-pseudonyms-are-unsalted",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "default-pseudonyms-are-unsalted",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Qualify the salted claim in the docs so the default is described honestly",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "default-pseudonyms-are-unsalted",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide and record whether a real default salt should be minted",
+        "wid": "w1"
+      }
+    ]
+  }
+}

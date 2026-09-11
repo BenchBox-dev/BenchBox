@@ -1,0 +1,230 @@
+{
+  "context": "Amend rather than erase the slim published-results decision. State that published-results is accepted production input, not literal proof of live deployment. Only an attested live receipt proves production. Model untrusted contributor data, trusted controller code, GitHub tokens, artifact provenance, rollback, takedown floors, and external settings.",
+  "description": "Write the governing architecture decision that separates package releases, prose/site content, versioned API documentation, Explorer application artifacts, accepted corpus input, publication desired state, and observed live state. Define accepted, promotion_pending, live, promotion_failed, withdrawn, visibility, trust, ranking eligibility, and deployment state as orthogonal concepts.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Call a published-results merge live",
+        "instead": "require an attested live receipt",
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "why": "acceptance and deployment are different states"
+      },
+      {
+        "dont": "Collapse visibility, trust, ranking, and deployment into one status",
+        "instead": "model them as orthogonal fields and transitions",
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "why": "these states change independently"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "needs_item": "independent-publication-a0-baseline-and-freeze"
+      }
+    ],
+    "item_meta": {
+      "category": "Publication Architecture",
+      "completed_at": "2026-08-31T22:35:40Z",
+      "completed_pr": 1987,
+      "created_at": "2026-08-31T20:36:58Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Package release validation remains as strong as the current release process.",
+        "item_id": "independent-publication-a1-authority-and-threat-contract"
+      },
+      {
+        "behavior": "The slim published-results branch remains the accepted corpus authority unless a later explicit ADR changes it.",
+        "item_id": "independent-publication-a1-authority-and-threat-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Amend only the publication-source clauses without discarding the slim-branch decision",
+        "decision": "extend",
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "path": "_project/decisions/single-repo-migration.md"
+      },
+      {
+        "concept": "Reuse accepted-results lifecycle terminology",
+        "decision": "extend",
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "path": "docs/operations/results-phase-2-runbook.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "kind": "only_modify",
+        "path_glob": ".github/CODEOWNERS"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/auto_merge_soundness_paths.py"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/hosted-results-contract.md"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/threat-model.md"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "kind": "only_modify",
+        "path_glob": "scripts/check_decision_records.py"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/docs/test_publication_architecture.py"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_auto_merge_soundness_paths.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run python scripts/check_decision_records.py",
+        "description": "ADR names every authority and distinguishes accepted from live",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "last_result": "pass",
+        "last_run": "2026-08-31T23:23:05Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run pytest tests/unit/docs/test_publication_architecture.py -q",
+        "description": "Threat model covers PR code execution, token recursion, promotion races, rollback, and takedown",
+        "expected": "all tests pass",
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "last_result": "pass",
+        "last_run": "2026-08-31T23:23:12Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "docs/development/adr/adr-independent-publication-authorities.md; uv run pytest -n 0 tests/unit/docs/test_publication_architecture.py -q (5 passed)",
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "notes": null,
+        "started_at": "2026-08-31T22:07:48Z",
+        "started_branch": "docs/publication-a1-authority-contract",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a1-authority",
+        "status": "done",
+        "summary": "Define the seven authority surfaces and ownership boundaries",
+        "wid": "w1"
+      },
+      {
+        "evidence": "ADR desired/built/deployed/observed transition contract; focused architecture tests 5 passed",
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "notes": null,
+        "started_at": "2026-08-31T22:12:27Z",
+        "started_branch": "docs/publication-a1-authority-contract",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a1-authority",
+        "status": "done",
+        "summary": "Define desired-built-deployed-observed state transitions",
+        "wid": "w2"
+      },
+      {
+        "evidence": "docs/development/independent-publication-threat-model.md; focused architecture tests 5 passed",
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "notes": null,
+        "started_at": "2026-08-31T22:12:33Z",
+        "started_branch": "docs/publication-a1-authority-contract",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a1-authority",
+        "status": "done",
+        "summary": "Document trust boundaries and attacker-controlled input rules",
+        "wid": "w3"
+      },
+      {
+        "evidence": "docs/operations/independent-publication-contract.md rollback/takedown/retention/audit invariants; focused architecture tests 5 passed",
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "notes": null,
+        "started_at": "2026-08-31T22:12:38Z",
+        "started_branch": "docs/publication-a1-authority-contract",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a1-authority",
+        "status": "done",
+        "summary": "Define rollback, takedown, retention, and audit invariants",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Maintainer-approved decisions in 2026-08-31 task authority; ADR status Accepted; focused architecture tests 5 passed",
+        "item_id": "independent-publication-a1-authority-and-threat-contract",
+        "notes": null,
+        "started_at": "2026-08-31T22:12:43Z",
+        "started_branch": "docs/publication-a1-authority-contract",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a1-authority",
+        "status": "done",
+        "summary": "Obtain maintainer decision on the ADR before control-plane code begins",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,330 @@
+{
+  "context": "Rename or parameterize for intent first, then remove the broad constructor\nfallback. Keep compatibility aliases only where external callers may already\nimport the old name. The key design rule is that function names and exception\nhandling should describe the contract instead of relying on caller memory.\n",
+  "description": "Independent verification at checked SHA e60986923 confirmed that two functions\nnamed `get_benchmark_class` intentionally return different surfaces:\n\n  benchbox.core.benchmark_registry.get_benchmark_class(\"tpch\")\n    -> benchbox.tpch.TPCH\n  benchbox.core.benchmark_loader.get_benchmark_class(\"tpch\")\n    -> benchbox.core.tpch.benchmark.TPCHBenchmark\n\nThe same split was confirmed for `vector_search` and `datavault`. Both\nreturns are callable benchmark classes, so importing the wrong function can\nsilently select the public wrapper surface where a core implementation was\nexpected, or vice versa. Existing tests already alias these functions to keep\nthem straight, which is evidence that the ambiguity is real.\n\nIndependent verification also confirmed the constructor fallback concern in\n`benchbox/core/benchmark_loader.py`: a class whose constructor accepts\n`parallel` but raises `TypeError` internally is retried without `parallel`,\nreturning successfully in the mocked harness after constructor calls\n`[1, None]`. This means \"constructor does not accept `parallel`\" and\n\"constructor accepted `parallel` but had an internal TypeError\" are currently\nindistinguishable.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "catch every constructor TypeError to detect missing `parallel`",
+        "instead": "(not specified)",
+        "item_id": "benchmark-class-loading-surface-contract",
+        "why": "internal constructor bugs must surface directly."
+      },
+      {
+        "dont": "keep two same-named functions with different return surfaces without an explicit compatibility story.",
+        "instead": "(not specified)",
+        "item_id": "benchmark-class-loading-surface-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "remove a public alias without checking docs/tests for import expectations.",
+        "instead": "(not specified)",
+        "item_id": "benchmark-class-loading-surface-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "switch CLI preview code to wrapper classes by accident",
+        "instead": "(not specified)",
+        "item_id": "benchmark-class-loading-surface-contract",
+        "why": "sample query preview currently needs core implementation internals."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "needs_item": "canonical-benchmark-id-resolution"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-05-22T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Benchmarks that genuinely lack a `parallel` constructor argument still instantiate successfully.",
+        "item_id": "benchmark-class-loading-surface-contract"
+      },
+      {
+        "behavior": "Core loader lookup remains available for internal runtime construction.",
+        "item_id": "benchmark-class-loading-surface-contract"
+      },
+      {
+        "behavior": "Import errors and unknown benchmark IDs continue to include available benchmark IDs.",
+        "item_id": "benchmark-class-loading-surface-contract"
+      },
+      {
+        "behavior": "Public wrapper lookup remains available for documented public surfaces.",
+        "item_id": "benchmark-class-loading-surface-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/benchmarks.py: _show_sample_queries imports loader class lookup - preserve the core implementation requirement.",
+        "decision": "reuse",
+        "item_id": "benchmark-class-loading-surface-contract",
+        "path": "benchbox/cli/benchmarks.py"
+      },
+      {
+        "concept": "benchbox/core/benchmark_loader.py: get_benchmark_class and get_benchmark_instance - currently resolves core classes and retries broad TypeError.",
+        "decision": "reuse",
+        "item_id": "benchmark-class-loading-surface-contract",
+        "path": "benchbox/core/benchmark_loader.py"
+      },
+      {
+        "concept": "benchbox/core/benchmark_registry.py: get_benchmark_class - currently resolves the top-level wrapper surface.",
+        "decision": "reuse",
+        "item_id": "benchmark-class-loading-surface-contract",
+        "path": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "concept": "tests/unit/core/test_loader_registry_parity.py: existing aliases for registry_get_benchmark_class and loader_get_benchmark_class - use as the initial contract location.",
+        "decision": "reuse",
+        "item_id": "benchmark-class-loading-surface-contract",
+        "path": "tests/unit/core/test_loader_registry_parity.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/benchmarks.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/convert.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/help.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_loader.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/execution.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/resources/registry.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/discovery.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_no_cli_surface_drift.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_benchmark_manager_behavioral.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_benchmark_selection.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_orchestrator.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_convert_command.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_benchmark_api_contract.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_loader_registry_parity.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_mcp_benchmark_stdout_suppression.py"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_mcp_tool_handlers.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_loader_registry_parity.py tests/unit/core/test_benchmark_api_contract.py -q",
+        "description": "Class lookup parity and API contract tests pass.",
+        "expected": "All selected class lookup tests pass.",
+        "item_id": "benchmark-class-loading-surface-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_loader_registry_parity.py -q",
+        "description": "Benchmark loader constructor fallback tests pass.",
+        "expected": "Constructor signature/failure mode tests pass.",
+        "item_id": "benchmark-class-loading-surface-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite remains green after loader changes.",
+        "expected": "Fast tests pass.",
+        "item_id": "benchmark-class-loading-surface-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "benchmark-class-loading-surface-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchmark-class-loading-surface-contract",
+        "notes": "Run a compact read-only check for at least `tpch`, `vector_search`, and\n`datavault`, printing registry-returned class and loader-returned class.\nReproduce the constructor fallback with a mock benchmark class that raises\n`TypeError` only when `parallel` is provided. Keep raw output in `/tmp`\nand summarize the behavior in the PR.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate the public/core class surface split and constructor fallback behavior",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-class-loading-surface-contract",
+        "notes": "Evaluate two options:\n  1. Rename functions to `get_public_benchmark_class` and\n     `get_core_benchmark_class`, preserving compatibility aliases with\n     deprecation notes.\n  2. Collapse lookup into one registry-owned function with\n     `surface=\\\"public\\\"|\\\"core\\\"`.\nPrefer the option with the smallest public API churn and clearest import\nsites. Document which call sites intentionally need wrappers versus core\nimplementations.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose an explicit naming or API strategy for class lookup",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-class-loading-surface-contract",
+        "notes": "Update internal imports in CLI, MCP, tests, and loader code so the call\nsite name communicates public/core intent. Keep backward-compatible\naliases only if they are part of the public or semi-public surface, and\nadd comments where alias retention is intentional.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor call sites to use intent-revealing class lookup",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-class-loading-surface-contract",
+        "notes": "Use `inspect.signature()` or a benchmark capability marker to determine\nwhether `parallel` is accepted before instantiation. Ensure a `TypeError`\nraised from inside `__init__` is not swallowed and retried as if it were a\nsignature mismatch. Keep compatibility for benchmarks that genuinely do\nnot accept `parallel`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace broad constructor `TypeError` fallback with signature-aware or declared capability handling",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-class-loading-surface-contract",
+        "notes": "Add or extend tests so public lookup returns wrappers, core lookup returns\ncore classes, unknown benchmark IDs still fail clearly, and a constructor\nthat raises an internal `TypeError` is surfaced without a misleading\nfallback attempt.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests that distinguish class surface and constructor failure modes",
+        "wid": "w4"
+      }
+    ]
+  }
+}

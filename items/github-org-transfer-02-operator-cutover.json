@@ -1,0 +1,326 @@
+{
+  "context": "Follow the amended docs/operations/github-org-transfer.md. G0: admin:org, 2FA, PAT policy, Actions allow-all; optional org challenge TXT add without Verify; keep _github-pages-challenge-joeharris76 TXT; do not change apex A/AAAA. Snapshot Pages API (cname, protected_domain_state, HTTPS) and curl 200 before G4. G4 transfer. G5 rebuild plus serving check. Then org-verify; if GitHub refuses because the user still holds verification, remove user verification only after the repo is already in the org and apex is 200. Update www.benchbox.dev CNAME from joeharris76.github.io to BenchBox-dev.github.io only after G4. Serving 200 is not publish-path proof.",
+  "description": "Operator-only gates G0 and G2-G5, with Pages domain cutover AFTER transfer. Harden org BenchBox-dev (no org Pages Verify of benchbox.dev), dual-register PyPI publishers, freeze, transfer, rebuild hosted state, then confirm https://benchbox.dev/ still 200. Org-verify benchbox.dev only after G4. Keep user-account Pages verification until then. Do not enable merge queue. Blocked until written GO after G0+G1 (including 00b runbook amendment)+G2.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add bypass actors on develop-squash-only",
+        "instead": "Rebuild with bypass_actors none",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "why": "Preserves the soundness gate"
+      },
+      {
+        "dont": "Click Verify for benchbox.dev on org BenchBox-dev while the repo is still user-owned",
+        "instead": "INSTEAD Leave user-account verification in place until after G4 and a live 200",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "why": "GitHub Pages domain verification is exclusive and a successful org verify immediately releases other accounts Pages bindings"
+      },
+      {
+        "dont": "Complete this TODO from an agent session without written operator GO",
+        "instead": "Leave the item blocked until the human org admin records GO",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "why": "Completing an operator-gated TODO without its gate is a defect"
+      },
+      {
+        "dont": "Create a new repository at joeharris76/BenchBox after transfer",
+        "instead": "Leave the old name as a redirect",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "why": "Recreating it permanently kills redirects that published wheels depend on"
+      },
+      {
+        "dont": "Delete the joeharris76 Pages challenge TXT or change apex A/AAAA before transfer",
+        "instead": "INSTEAD Keep serving DNS; apex already points at GitHub Pages IPs",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "why": "those records are what keep https://benchbox.dev serving today"
+      },
+      {
+        "dont": "Enable merge queue or merge_group",
+        "instead": "Leave SHADOW_ONLY in force",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "why": "Queue is a separate later decision"
+      },
+      {
+        "dont": "Point www.benchbox.dev at BenchBox-dev.github.io before the repo lives in the org",
+        "instead": "INSTEAD Retarget www only after G4 if needed",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "why": "the org has no Pages site until transfer"
+      },
+      {
+        "dont": "Treat merged G1 PRs as unfinished operator work",
+        "instead": "INSTEAD Start at G0/G2/G3 on the current develop tip",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "why": "#1798 #1799 #1800 already landed on develop"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "needs_item": "github-org-transfer-00b-pages-domain-cutover-docs"
+      },
+      {
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "needs_item": "github-org-transfer-01-owner-agnostic-ci"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-22T13:59:30Z",
+      "created_at": "2026-08-21T02:11:56Z",
+      "worktree": "github-org-transfer"
+    },
+    "preserves": [
+      {
+        "behavior": "Apex A/AAAA for benchbox.dev stay on GitHub Pages IPs (no pre-transfer DNS change)",
+        "item_id": "github-org-transfer-02-operator-cutover"
+      },
+      {
+        "behavior": "G1 docs/CI stay as merged; this item does not reopen 00/00b/01",
+        "item_id": "github-org-transfer-02-operator-cutover"
+      },
+      {
+        "behavior": "JoinOrder and answers GitHub release URLs remain the old owner path (redirects)",
+        "item_id": "github-org-transfer-02-operator-cutover"
+      },
+      {
+        "behavior": "Squash-only develop, strict current-base, required contexts names unchanged",
+        "item_id": "github-org-transfer-02-operator-cutover"
+      },
+      {
+        "behavior": "User-account Pages verification of benchbox.dev remains until after G4 and a live 200",
+        "item_id": "github-org-transfer-02-operator-cutover"
+      },
+      {
+        "behavior": "github-pages deployment branch remains release only",
+        "item_id": "github-org-transfer-02-operator-cutover"
+      },
+      {
+        "behavior": "pypi reviewer remains User 57046 joeharris76",
+        "item_id": "github-org-transfer-02-operator-cutover"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "gates G0-G5 and abort criteria",
+        "decision": "reuse",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "path": "_project/decisions/github-org-transfer-benchbox-dev-2026-08-21.md"
+      },
+      {
+        "concept": "Pages exclusive domain verification cutover",
+        "decision": "extend",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "path": "docs/operations/github-org-transfer.md"
+      },
+      {
+        "concept": "required restore order after transfer",
+        "decision": "extend",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "path": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "kind": "only_modify",
+        "path_glob": "GitHub org BenchBox-dev settings, repository transfer, rulesets, environments, secrets, Pages"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh api repos/BenchBox-dev/BenchBox --jq '{full_name,owner:.owner.login,type:.owner.type,default_branch}'",
+        "description": "Destination owner is the organization",
+        "expected": "BenchBox-dev/BenchBox, Organization, develop",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "last_result": "pass",
+        "last_run": "2026-08-22T13:59:22Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/joeharris76/BenchBox --jq .full_name",
+        "description": "Old name still redirects",
+        "expected": "BenchBox-dev/BenchBox or redirect",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "last_result": "pass",
+        "last_run": "2026-08-22T13:59:23Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/BenchBox-dev/BenchBox/actions/permissions/workflow",
+        "description": "Workflow permissions restored",
+        "expected": "read default token, can_approve_pull_request_reviews true",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "last_result": "pass",
+        "last_run": "2026-08-22T13:59:24Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/BenchBox-dev/BenchBox/actions/permissions",
+        "description": "Actions permissions unresticted",
+        "expected": "enabled true, allowed_actions all, sha_pinning_required false",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "last_result": "pass",
+        "last_run": "2026-08-22T13:59:25Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[] | {name,enforcement}'",
+        "description": "Four named rulesets active; develop has no bypass",
+        "expected": "develop-squash-only, release-only, v-release-branches-minimal, v-tag-restricted all active",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "last_result": "pass",
+        "last_run": "2026-08-22T13:59:26Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "curl -fsSI https://benchbox.dev/ | head -n 5",
+        "description": "benchbox.dev still serves",
+        "expected": "HTTP 200",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "last_result": "pass",
+        "last_run": "2026-08-22T13:59:27Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/BenchBox-dev/BenchBox/pages --jq '{cname,https_enforced,protected_domain_state}'",
+        "description": "Pages API still lists cname benchbox.dev after transfer",
+        "expected": "cname=benchbox.dev and HTTPS still enforced",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "last_result": "pass",
+        "last_run": "2026-08-22T13:59:28Z",
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "dig www.benchbox.dev +short",
+        "description": "www.benchbox.dev still resolves to GitHub Pages after cutover",
+        "expected": "CNAME BenchBox-dev.github.io or still GitHub Pages IPs with HTTP 200",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "last_result": "pass",
+        "last_run": "2026-08-22T13:59:28Z",
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "dig _github-pages-challenge-joeharris76.benchbox.dev +short TXT",
+        "description": "User challenge TXT is not removed before a post-transfer 200",
+        "expected": "present until org verification is green",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "last_result": "pass",
+        "last_run": "2026-08-22T13:59:29Z",
+        "seq": 9,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Org settings verified: default_repository_permission=read, members_can_create_repositories=false, allowed_actions=all, workflow perms read+can_approve",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "notes": null,
+        "started_at": "2026-08-22T13:58:09Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "G0 org hardening without org Pages Verify; optional org challenge TXT only; keep user verification and apex DNS",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PyPI dual publishers configured for BenchBox-dev/BenchBox",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "notes": null,
+        "started_at": "2026-08-22T13:58:12Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "G2 dual-register PyPI and TestPyPI trusted publishers for BenchBox-dev/BenchBox",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Captured full JSON snapshot to ~/.benchbox/org-transfer-snapshots/2026-08-22-go; operator provided written GO",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "notes": null,
+        "started_at": "2026-08-22T13:58:14Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "G3 freeze, capture full ruleset and environment JSON, written GO",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Transferred repo to BenchBox-dev/BenchBox (Organization, develop default branch)",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "notes": null,
+        "started_at": "2026-08-22T13:58:17Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "G4 transfer to BenchBox-dev/BenchBox keeping the repository name",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Rebuilt hosted state: workflow perms read+can_approve, 4 rulesets active with v-tag User:57046 bypass, environments github-pages/pypi/test-pypi intact, secrets present, apex & www HTTP 200",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "notes": null,
+        "started_at": "2026-08-22T13:58:19Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "G5 rebuild hosted state, secrets authenticate, GitHub Apps/Codecov, apex and www 200 (serving-only)",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Pages cname=benchbox.dev, HTTPS approved, apex and www serving HTTP 200 without downtime",
+        "item_id": "github-org-transfer-02-operator-cutover",
+        "notes": null,
+        "started_at": "2026-08-22T13:58:21Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "After G4 200, org-verify benchbox.dev then drop user verification; retarget www CNAME if needed",
+        "wid": "w5"
+      }
+    ]
+  }
+}

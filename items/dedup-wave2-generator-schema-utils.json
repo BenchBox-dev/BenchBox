@@ -1,0 +1,293 @@
+{
+  "context": "1. G1 - TPC-DI dimension SQL pattern:\n   Extract a `_build_dimension_insert_sql(table_name, num_records,\n   column_specs, lookup_join_specs)` helper in sql.py that constructs\n   the INSERT SELECT with CROSS JOINs. Each generate_* method reduces\n   to: compute count, call _build_dimension_insert_sql, pass result\n   to _generate_table.\n\n2. G3 - Manifest writing:\n   Extract `write_generator_manifest(output_dir, benchmark_name,\n   scale_factor, table_paths, compression_metadata, ...)` into\n   benchbox/core/manifest_utils.py (new file). Each generator's\n   _write_manifest becomes a one-liner calling this utility.\n\n3. G4 - Schema SQL collection:\n   Extract `collect_create_table_sql(get_single_table_fn, table_order,\n   dialect, enable_pks, enable_fks)` into benchbox/core/schema_utils.py\n   (new file). Each benchmark's get_all_create_table_sql becomes a\n   thin wrapper passing its table order and per-table function.\n\n4. G20 - TPC-DI source data generation:\n   Extract a `_generate_source_data(self, gen_method_name, **kwargs)`\n   base method in the SourceDataFormat ABC. Each subclass reduces to\n   `return self._generate_source_data('_generate_oltp_data', **kwargs)`.\n",
+  "description": "Wave-2 duplicate-check triage (2026-03-12) identifies 4 consolidation-worthy\ngroups in the benchmark generator and schema layers. These are parallel\nimplementations that can be centralized into shared core utilities.\n\nTargets (report rank → dup lines):\n\nG1 (108 dup lines): TPC-DI dimension generators in core/tpcdi/generator/sql.py\n    4 methods (generate_company_dimension, generate_customer_dimension,\n    generate_security_dimension, generate_account_dimension) at lines 266, 303,\n    332, 410. All share identical structure: compute scaled row count → build\n    parameterized INSERT SELECT with CROSS JOINs → call _generate_table().\n    Only column lists and join specs differ.\n    NOTE: Prior TODO dedup-tpcdi-dimension-generator (completed 2026-02-21)\n    already extracted _generate_table(). These 4 methods still share the\n    inner SQL construction pattern that was NOT part of that extraction.\n\nG3 (60 dup lines): _write_manifest across 4 generators\n    amplab/generator.py:390, clickbench/generator.py:383,\n    h2odb/generator.py:299, joinorder/generator.py:635.\n    All follow identical logic: check empty table_paths → create\n    DataGenerationManifest → iterate table_paths adding entries → manifest.write().\n    Only the benchmark_name string differs.\n\nG4 (60 dup lines): get_all_create_table_sql in 3 schema modules\n    amplab/schema.py:107, read_primitives/schema.py:117, ssb/schema.py:175.\n    All iterate a table_order list, call get_create_table_sql per table,\n    collect and join SQL. Differs only in table ordering and the\n    per-table SQL function called.\n\nG20 (52 dup lines): generate_data in 3 TPC-DI source format classes\n    core/tpcdi/etl/sources.py:67, :128, :189 (CSVSourceFormat,\n    XMLSourceFormat, FixedWidthSourceFormat). All extract scale_factor\n    and output_dir from kwargs, init TPCDISourceDataGenerator, call\n    format-specific _generate_*_data method.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the _generate_table helper from the prior dedup",
+        "instead": "(not specified)",
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "why": "the new work targets the SQL construction step above it"
+      },
+      {
+        "dont": "create a deep inheritance hierarchy for source formats",
+        "instead": "(not specified)",
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "why": "a simple base method with a method_name parameter is sufficient"
+      },
+      {
+        "dont": "over-generalize the manifest writer",
+        "instead": "(not specified)",
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "why": "it should accept the same parameters the current implementations use, not invent new abstractions"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "needs_item": "dedup-wave2-ignore-rules"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-03-12T00:00:00Z",
+      "created_at": "2026-03-12T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "DataGenerationManifest format and content identical after refactor",
+        "item_id": "dedup-wave2-generator-schema-utils"
+      },
+      {
+        "behavior": "Generated SQL for TPC-DI dimensions byte-for-byte identical",
+        "item_id": "dedup-wave2-generator-schema-utils"
+      },
+      {
+        "behavior": "TPC-DI source data generation produces same files and content",
+        "item_id": "dedup-wave2-generator-schema-utils"
+      },
+      {
+        "behavior": "get_all_create_table_sql output identical across all 3 schema modules",
+        "item_id": "dedup-wave2-generator-schema-utils"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/amplab/"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/clickbench/"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/h2odb/"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/manifest_utils.py"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/schema.py"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/schema_utils.py"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/ssb/schema.py"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k tpcdi",
+        "description": "TPC-DI dimension generation tests pass",
+        "expected": "all tests pass",
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'amplab or clickbench or h2odb or joinorder'",
+        "description": "Generator manifest tests pass",
+        "expected": "all tests pass",
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'schema or create_table'",
+        "description": "Schema SQL generation tests pass",
+        "expected": "all tests pass",
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make duplicate-check-verbose 2>&1 | head -5",
+        "description": "Duplicate check shows reduction",
+        "expected": "duplicated lines lower than 9326",
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "needs_wid": "w2",
+        "wid": "w9"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "needs_wid": "w7",
+        "wid": "w9"
+      },
+      {
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _build_dimension_insert_sql helper and refactor 4 TPC-DI dimension generators",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run TPC-DI tests to verify dimension generation unchanged",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract write_generator_manifest utility into benchbox/core/manifest_utils.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor amplab, clickbench, h2odb, joinorder generators to use shared manifest writer",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run generator tests: pytest -k 'amplab or clickbench or h2odb or joinorder'",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract collect_create_table_sql into benchbox/core/schema_utils.py",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor amplab, read_primitives, ssb schema modules to use shared helper",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _generate_source_data base method in TPC-DI SourceDataFormat ABC",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-generator-schema-utils",
+        "notes": "1442 tests pass. Duplicate lines: 8614→8464 (-150).",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full test suite to verify no regressions: make test-all",
+        "wid": "w9"
+      }
+    ]
+  }
+}

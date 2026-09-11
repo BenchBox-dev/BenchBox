@@ -1,0 +1,208 @@
+{
+  "context": "1. Research pass: read Databricks APPLY CHANGES INTO / AUTO CDC docs; capture\n   exact syntax, SCD Type 2 semantics, SEQUENCE BY, APPLY AS DELETE, and the\n   pipeline-context requirement. Log each verified fact (dated) in the\n   research file.\n2. Reconstruct the equivalent standard MERGE (reuse the SCD2 op from\n   write-primitives-scd-type2-coverage) and do an honest line/edge-case count\n   vs the declarative form.\n3. Measure the MERGE form via BenchBox across engines; if a Databricks\n   workspace is available, run the APPLY CHANGES INTO pipeline on the same\n   data and record it as a clearly-labeled external observation.\n4. Outline -> draft following the platform-deep-dive structure. Land the\n   convenience-vs-portability trade-off with the side-by-side code and the\n   numbers we actually have.\n",
+  "description": "Write a platform-deep-dive blog post that explicitly evaluates Databricks'\ndeclarative APPLY CHANGES INTO (DLT / Lakeflow Declarative Pipelines) against\nhand-written standard SQL MERGE for Slowly Changing Dimension (SCD) Type 2\nmaintenance.\n\nThe hook (from a widely shared Databricks/Delta Lake infographic): APPLY\nCHANGES INTO replaces \"~200 lines of MERGE logic\" with a few declarative lines\nthat handle inserts/updates/deletes, history management, and record\nopen/close automatically. The post should test that marketing claim with a\nfair, reproducible, BenchBox-grounded evaluation rather than restating it.\n\nThe post must cover BOTH axes honestly:\n  - Ergonomics / maintainability: lines of code, edge cases handled for you\n    (out-of-order events via SEQUENCE BY, schema evolution, deletes), and\n    where the abstraction leaks.\n  - Portability / lock-in: APPLY CHANGES INTO only runs inside a Databricks\n    declarative pipeline (not a plain SQL warehouse, not any other engine),\n    whereas the MERGE form runs unchanged across DuckDB, PostgreSQL,\n    Snowflake, BigQuery, and ClickHouse.\n  - Performance / cost: where measurable, compare the two on the same SCD2\n    workload (see dependency below) - net new versions written, runtime, and\n    $ where a cost model exists - and clearly label what is NOT measurable\n    inside BenchBox today (the DLT pipeline path) versus what is.\n\nThis is a companion to the write-primitives-scd-type2-coverage TODO: that TODO\nadds the portable MERGE-based SCD2 operation to the benchmark; this post uses\nit (plus a Databricks pipeline run, if feasible) to produce the evaluation.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "present APPLY CHANGES INTO timings as BenchBox harness results",
+        "instead": "label them explicitly as external manual observations.",
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "why": "they come from a Databricks pipeline run the harness cannot drive"
+      },
+      {
+        "dont": "publish without the research/verification file",
+        "instead": "log dated checks first.",
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "why": "the blog evidence standard requires every claim to be replayable"
+      },
+      {
+        "dont": "repeat the '200 lines' claim uncritically",
+        "instead": "reconstruct and count it.",
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "why": "the real equivalent MERGE for a basic Type 2 is far shorter"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "blog-apply-changes-into-vs-standard-sql",
+        "id": 303,
+        "reason": "Requires a pipeline-execution adapter the harness does not have; the post treats Databricks pipeline timings as external observations instead. Tied to the same constraint in write-primitives-scd-type2-coverage.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Blocked on a pipeline-execution adapter BenchBox does not have; the blog post already works around it via external observations.",
+        "summary": "Benchmarking the DLT pipeline path inside the BenchBox harness"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "needs_item": "write-primitives-scd-type2-coverage"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-06-30T00:00:00Z",
+      "created_at": "2026-06-27T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "BenchBox harness results and manually-run Databricks pipeline observations are never conflated",
+        "item_id": "blog-apply-changes-into-vs-standard-sql"
+      },
+      {
+        "behavior": "Every performance / behavior claim is backed by a dated entry in the research/verification file (house evidence standard)",
+        "item_id": "blog-apply-changes-into-vs-standard-sql"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_blog/STYLE_GUIDE.md and _blog/VOICE_REFERENCE.md — match house voice and evidence standards",
+        "decision": "reuse",
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "path": "_blog/STYLE_GUIDE.md"
+      },
+      {
+        "concept": "_blog/platform-deep-dives/drafts/duckdb-architecture.md — reuse the platform-deep-dive structure and depth",
+        "decision": "reuse",
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "path": "_blog/platform-deep-dives/drafts/duckdb-architecture.md"
+      },
+      {
+        "concept": "_blog/platform-deep-dives/research/duckdb-architecture-verification-2026-02-20.md — reuse the research/verification-log convention (every claim backed by a dated, replayable check)",
+        "decision": "reuse",
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "path": "_blog/platform-deep-dives/research/duckdb-architecture-verification-2026-02-20.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "kind": "only_modify",
+        "path_glob": "_blog/platform-deep-dives/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_todo_executable_docs.py -q",
+        "description": "Research/verification file exists with dated, sourced claims",
+        "expected": "all tests pass (no broken doc references introduced)",
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox import WritePrimitives; print(any(k.startswith('merge_scd_type2') for k in WritePrimitives(0.01).get_all_operations()))\"",
+        "description": "Draft references a real, runnable BenchBox SCD2 operation",
+        "expected": "True",
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "notes": "Databricks docs: APPLY CHANGES INTO / AUTO CDC, SCD TYPE 2, SEQUENCE BY,\nAPPLY AS DELETE, COLUMNS/EXCEPT, the DLT/Lakeflow pipeline requirement.\nLog each verified fact (dated) in the research file.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research APPLY CHANGES INTO semantics and pipeline-context constraint",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "notes": "Reuse the merge_scd_type2 op. Count real lines and enumerate which edge\ncases (ordering, deletes, schema evolution) each form handles.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reconstruct equivalent standard MERGE and do honest LOC/edge-case count",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "notes": "MERGE form across engines via BenchBox (runtime, rows versioned, $ where\na cost model exists). APPLY CHANGES INTO only if a Databricks workspace is\navailable; record as a clearly-labeled external observation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Gather measurements - MERGE via BenchBox; APPLY CHANGES INTO externally if feasible",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write outline",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "blog-apply-changes-into-vs-standard-sql",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write draft with side-by-side code and the measurements we have",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,110 @@
+{
+  "context": "Either fold into the next corpus re-derive (rederive-corpus-to-single-pass) or a narrow strip of empty optional maps at re-export. Preserve fixed point for already-public-shaped retained pseudonyms. Re-mirror after tip changes.",
+  "description": "After #1587, public anonymize omits client_host when this pass empties it (identifier-only). Already-stored client_host:{} in results-data is left for publication fixed point. Inventory after #1578/#1587 still has hollow client_host objects on many bundles. A one-time re-derive (or targeted strip) would remove them so stored bytes match the fresh public shape; coordinate with rederive-corpus-to-single-pass / mirror tip hygiene.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "rederive-prune-empty-client-host-objects",
+        "needs_item": "rederive-corpus-to-single-pass"
+      }
+    ],
+    "item_meta": {
+      "category": "privacy",
+      "completed_at": "2026-08-06T00:10:07Z",
+      "completed_pr": 1614,
+      "created_at": "2026-08-05T22:21:53Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Non-empty client_host profiles still export",
+        "item_id": "rederive-prune-empty-client-host-objects"
+      },
+      {
+        "behavior": "Publication fixed point for already-public-shaped retained pseudonyms unless ADR documents a one-time migration",
+        "item_id": "rederive-prune-empty-client-host-objects"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rederive-prune-empty-client-host-objects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/**"
+      },
+      {
+        "item_id": "rederive-prune-empty-client-host-objects",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "rederive-prune-empty-client-host-objects",
+        "kind": "only_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "rederive-prune-empty-client-host-objects",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import json; from pathlib import Path; bad=[];\n[bad.append(p.name) for p in Path('results-data/bundles').glob('*.json') if not p.name.endswith(('.manifest.json','.plans.json','.tuning.json','.applied.json')) and (json.loads(p.read_text()).get('environment') or {}).get('client_host')=={}];\nassert not bad, bad[:5]\"",
+        "description": "No empty client_host objects remain in primary bundles",
+        "expected": null,
+        "item_id": "rederive-prune-empty-client-host-objects",
+        "last_result": "pass",
+        "last_run": "2026-08-06T00:09:40Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rederive-prune-empty-client-host-objects",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "rederive-prune-empty-client-host-objects",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "105 empty client_host:{} on tip before rewrite",
+        "item_id": "rederive-prune-empty-client-host-objects",
+        "notes": null,
+        "started_at": "2026-08-06T00:09:21Z",
+        "started_branch": "fix/strip-empty-client-host-corpus",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Inventory empty client_host occurrences on develop tip",
+        "wid": "w0"
+      },
+      {
+        "evidence": "omit always-empty optional maps; rewrote 105 primaries; inventory regen",
+        "item_id": "rederive-prune-empty-client-host-objects",
+        "notes": null,
+        "started_at": "2026-08-06T00:09:28Z",
+        "started_branch": "fix/strip-empty-client-host-corpus",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Strip via re-derive or export prune policy with tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Mirror after merge via post-merge sync; defer live mirror to CI once on develop",
+        "item_id": "rederive-prune-empty-client-host-objects",
+        "notes": null,
+        "started_at": "2026-08-06T00:09:34Z",
+        "started_branch": "fix/strip-empty-client-host-corpus",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Re-mirror published-results after tip change",
+        "wid": "w2"
+      }
+    ]
+  }
+}

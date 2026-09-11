@@ -1,0 +1,187 @@
+{
+  "context": "Update .github/workflows/pr.yml, .github/workflows/_paths.yml, .github/workflows/results-explorer-browser.yml, and .github/workflows/develop-ruleset-drift.yml to include merge_group in on: triggers. Adapt github.event expressions to inspect github.event.merge_group.base_sha and head_sha when event_name is merge_group. Add unit tests for workflow schema and mock event parsing.",
+  "description": "Phase 2 / Gate MQ-2. Adapt the three required status check workflows (ci-required-result in pr.yml, Results Explorer browser gate, and ruleset-drift) and path filtering (_paths.yml) to trigger on and properly handle merge_group: checks_requested events. Ensure base/head SHA resolution handles merge group synthetic refs, trusted checkout is preserved for ruleset drift, and non-exploring paths post the required browser gate result.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Execute untrusted PR code in develop-ruleset-drift on merge_group",
+        "instead": "Use merge_group.base_sha for trusted checkout",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "why": "Ruleset drift check must run strictly from the trusted base to prevent privilege escalation"
+      },
+      {
+        "dont": "Rename or alias required status check names",
+        "instead": "Retain exact check names across all event types",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "why": "Ruleset enforcement matches exact string names and any mismatch blocks all merges"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "needs_item": "merge-queue-01-decision-and-governance-spec"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-22T16:34:52Z",
+      "created_at": "2026-08-22T15:31:15Z",
+      "worktree": "merge-queue"
+    },
+    "preserves": [
+      {
+        "behavior": "Exact status check names ci-required-result, Results Explorer browser gate, ruleset-drift unchanged",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers"
+      },
+      {
+        "behavior": "Existing pull_request and push CI behavior completely unchanged",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers"
+      },
+      {
+        "behavior": "Fail-closed behavior on unhandled or malformed merge group events",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "trusted base checkout pattern",
+        "decision": "reuse",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "path": ".github/workflows/develop-ruleset-drift.yml"
+      },
+      {
+        "concept": "ci-required-result aggregator",
+        "decision": "extend",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "path": ".github/workflows/pr.yml"
+      },
+      {
+        "concept": "browser gate always-reporting contract",
+        "decision": "extend",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "path": ".github/workflows/results-explorer-browser.yml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub rulesets or hosted admin settings"
+      },
+      {
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/_paths.yml"
+      },
+      {
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-ruleset-drift.yml"
+      },
+      {
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr-base-guard.yml"
+      },
+      {
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "python -c \"import yaml; [yaml.safe_load(open(f)) for f in ['.github/workflows/pr.yml', '.github/workflows/results-explorer-browser.yml', '.github/workflows/develop-ruleset-drift.yml']]\"",
+        "description": "Workflow files pass YAML syntax check and contain merge_group triggers",
+        "expected": "pass",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "last_result": "pass",
+        "last_run": "2026-08-22T16:34:42Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'ci-required-result|Results Explorer browser gate|ruleset-drift' .github/workflows/",
+        "description": "Required status check names match ruleset contract",
+        "expected": "pass",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "last_result": "pass",
+        "last_run": "2026-08-22T16:34:42Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest tests/unit/workflows/ -q",
+        "description": "Workflow unit tests pass",
+        "expected": "pass",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "last_result": "pass",
+        "last_run": "2026-08-22T16:34:50Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added merge_group trigger, concurrency group, and merge_group fallback base/head SHA resolution to pr.yml",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "notes": null,
+        "started_at": "2026-08-22T16:30:23Z",
+        "started_branch": "fix/merge-queue-02-workflow-merge-group-triggers",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-02",
+        "status": "done",
+        "summary": "Add merge_group triggers and SHA adaptation to pr.yml and _paths.yml",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added merge_group triggers to results-explorer-browser.yml and develop-ruleset-drift.yml with trusted base SHA checkout and concurrency grouping",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "notes": null,
+        "started_at": "2026-08-22T16:31:18Z",
+        "started_branch": "fix/merge-queue-02-workflow-merge-group-triggers",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-02",
+        "status": "done",
+        "summary": "Add merge_group triggers to results-explorer-browser.yml and develop-ruleset-drift.yml",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Created test_merge_group_triggers.py and verified all 234 workflow unit tests pass",
+        "item_id": "merge-queue-02-workflow-merge-group-triggers",
+        "notes": null,
+        "started_at": "2026-08-22T16:34:32Z",
+        "started_branch": "fix/merge-queue-02-workflow-merge-group-triggers",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-02",
+        "status": "done",
+        "summary": "Add unit tests verifying workflow event triggers and required-context reporting",
+        "wid": "w2"
+      }
+    ]
+  }
+}

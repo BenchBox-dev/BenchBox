@@ -1,0 +1,396 @@
+{
+  "context": "Split the work into two small centers of gravity: one query-resolution helper\nand one execution-mode predicate. Route production mixin, dry-run, CLI, and\ndeprecated compatibility helpers through those centers. Keep compatibility\nwrappers until deletion is separately authorized.\n",
+  "description": "Independent verification confirmed that DataFrame execution has two related\nsources of drift.\n\nThe deprecated internal compatibility module\n`benchbox/core/runner/dataframe_runner.py` is still load-bearing for CLI and\ndry-run helpers. Production DataFrame execution uses\n`adapter.run_benchmark()` through\n`benchbox/platforms/dataframe/benchmark_mixin.py`, but dry-run imports\n`get_execution_mode()` and `_get_queries_for_benchmark()` from the deprecated\nmodule. Both the deprecated runner and the production mixin duplicate TPC-H\nstream ordering, TPC-DS stream/variant fallback, and bidirectional query\nsubset filters.\n\nDataFrame-vs-SQL routing is also detected two ways. The lifecycle runner\ndecides DataFrame execution from adapter `family in (\"expression\", \"pandas\")`,\nwhile adapter factory, capabilities, CLI/dry-run helpers, and the deprecated\nrunner use platform suffix/default-mode logic. A new DataFrame family or\nregistry default can therefore disagree with the lifecycle branch.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "decide DataFrame mode in runner.py by hard-coding family names again",
+        "instead": "(not specified)",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "why": "future families must not require runner edits."
+      },
+      {
+        "dont": "delete `dataframe_runner.py` just because it is deprecated",
+        "instead": "(not specified)",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "why": "dry-run and tests still import it."
+      },
+      {
+        "dont": "import optional DataFrame libraries in mode-detection helpers.",
+        "instead": "(not specified)",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "let dry-run call a different TPC-DS variant fallback implementation than real execution.",
+        "instead": "(not specified)",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "replace bidirectional Q-prefix filters with canonical stripping unless tests prove all caller contracts still work.",
+        "instead": "(not specified)",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "execution-results-dataframe-routing-and-query-resolution",
+        "id": 394,
+        "reason": "The current public/backward-compat registry describes it as a deprecated internal compatibility runner; deletion needs a separate removal-window decision after helper imports migrate.",
+        "resolution": "promoted",
+        "resolved_item": "delete-benchbox-core-runner-dataframe-runner-py-completely",
+        "resolved_reason": null,
+        "summary": "Delete `benchbox/core/runner/dataframe_runner.py` completely"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "execution-results-dataframe-routing-and-query-resolution",
+        "id": 395,
+        "reason": "This TODO centralizes existing routing/query-resolution behavior; broader registry redesign should wait until drift is removed.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Broader DataFrame registry redesign explicitly deferred until routing/query-resolution drift is removed; no evidence of that, no open item tracks it.",
+        "summary": "Redesign DataFrame query registries for all benchmark families"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "execution-results-dataframe-routing-and-query-resolution",
+        "id": 396,
+        "reason": "Can be done after the shared helper lands and tests stop requiring MagicMock internals.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: dataframe_runner.py/benchmark_mixin.py housing the MagicMock-aware hook detection are marked deprecated-internal-compatibility-runner in favor of adapter.run_benchmark+BenchmarkExecutionMixin; cleanup moot once removed.",
+        "summary": "Remove MagicMock-aware hook handling from production modules"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      }
+    ],
+    "item_meta": {
+      "category": "DataFrame Architecture",
+      "completed_at": "2026-05-21T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Dry-run DataFrame query previews remain available for supported DataFrame benchmarks.",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution"
+      },
+      {
+        "behavior": "Existing `dataframe_runner.py` compatibility imports keep working unless the public-contract map explicitly approves removal.",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution"
+      },
+      {
+        "behavior": "No new DataFrame platform dependency is imported eagerly.",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution"
+      },
+      {
+        "behavior": "Production DataFrame execution remains `adapter.run_benchmark()` plus `BenchmarkExecutionMixin`.",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution"
+      },
+      {
+        "behavior": "TPC-H stream permutation and TPC-DS stream/variant fallback behavior does not change.",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/results/query_normalizer.py: existing one-way query ID normalization - reuse only if extended to support bidirectional filter sets.",
+        "decision": "reuse",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "path": "benchbox/core/results/query_normalizer.py"
+      },
+      {
+        "concept": "benchbox/core/runner/dataframe_runner.py: deprecated compatibility runner and current dry-run helper source - delegate rather than deleting first.",
+        "decision": "reuse",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "path": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "concept": "benchbox/platforms/__init__.py: current `is_dataframe_platform` helper - reconcile with broader predicate rather than adding another list.",
+        "decision": "reuse",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "path": "benchbox/platforms/__init__.py"
+      },
+      {
+        "concept": "benchbox/platforms/adapter_factory.py: platform string normalization and default-mode logic - reuse for config/platform predicate.",
+        "decision": "reuse",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "path": "benchbox/platforms/adapter_factory.py"
+      },
+      {
+        "concept": "benchbox/platforms/dataframe/benchmark_mixin.py: production DataFrame adapter execution path - preserve behavior while extracting helpers.",
+        "decision": "reuse",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "path": "benchbox/platforms/dataframe/benchmark_mixin.py"
+      },
+      {
+        "concept": "docs/reference/backward-compatibility.md: deprecated dataframe_runner lifecycle row - preserve or update explicitly.",
+        "decision": "reuse",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "path": "docs/reference/backward-compatibility.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dryrun.py"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/query_normalizer.py"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/adapter_factory.py"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/benchmark_mixin.py"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/backward-compatibility.md"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_dryrun.py"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/runner/"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_dryrun.py"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_dryrun_behavioral.py"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_dataframe_factory.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/runner/test_dataframe_runner.py tests/unit/core/runner/test_dataframe_runner_lifecycle.py tests/unit/platforms/dataframe/test_benchmark_mixin.py tests/unit/platforms/test_dataframe_factory.py -q",
+        "description": "Focused DataFrame routing and compatibility tests pass.",
+        "expected": "Focused DataFrame runner, mixin, and factory tests pass.",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_dryrun.py tests/unit/core/test_dryrun_behavioral.py tests/unit/cli/test_cli_dryrun.py --tb=short",
+        "description": "Dry-run tests pass after moving query extraction off deprecated helpers.",
+        "expected": "Dry-run DataFrame query extraction tests pass.",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite catches execution-mode routing regressions.",
+        "expected": "Fast tests pass.",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph remains valid after implementation.",
+        "expected": "TODO validation and graph checks pass.",
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "notes": "Re-run current-tree checks before editing and record checked SHA plus a\ncompact evidence summary in the implementation PR body or TODO notes.\n\nRequired checks:\n  - `rg -n \"from benchbox\\\\.core\\\\.runner\\\\.dataframe_runner import|benchbox\\\\.core\\\\.runner\\\\.dataframe_runner|run_dataframe_benchmark\\\\(|is_dataframe_execution\\\\(|get_execution_mode\\\\(|_get_queries_for_benchmark\\\\(\" benchbox tests --glob '!build/**' --glob '!docs/_build/**' --glob '!.venv/**'`.\n  - `rg -n \"adapter\\\\.family|is_dataframe_mode|is_dataframe_platform|endswith\\\\(\\\\\\\"-df\\\\\\\"\\\\)|endswith\\\\('-df'\\\\)\" benchbox tests --glob '!build/**' --glob '!docs/_build/**' --glob '!.venv/**'`.\n  - Compare `benchbox/core/runner/dataframe_runner.py` TPC-H/TPC-DS query resolution against `benchbox/platforms/dataframe/benchmark_mixin.py`.\n  - Check docs/reference/backward-compatibility.md and docs/reference/public-contracts.md for the current deprecated compatibility promise.\n\nDecision gate: do not delete `dataframe_runner.py` in this TODO unless\nthe compatibility registry and tests are updated under an explicit\nremoval decision. The expected path is shared helper extraction first.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate DataFrame execution-mode predicates, deprecated helper imports, and duplicated query resolution",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "notes": "Extract DataFrame benchmark query resolution into a single internal helper\nmodule. The helper should own:\n  - benchmark ID normalization;\n  - TPC-H stream permutation ordering;\n  - TPC-DS standard stream generation;\n  - TPC-DS variant lookup and fallback behavior;\n  - ClickBench DataFrame query registry retrieval;\n  - benchmark-instance `get_dataframe_queries()` fallback;\n  - MagicMock/synthetic hook rejection if still needed.\n\nCandidate destination: `benchbox/core/dataframe/query_resolution.py` or a\nsimilarly focused core DataFrame module. Keep it internal unless the\npublic-contract map is updated.\n\nThe production mixin and dry-run query extraction must call the helper.\nThe deprecated runner may call the helper while remaining as a thin\ncompatibility wrapper.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create a shared DataFrame query-resolution helper used by mixin and dry-run compatibility paths",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "notes": "Add one predicate that can answer \"does this adapter/config/platform mean\nDataFrame execution?\" without relying on two unrelated sources of truth.\n\nThe predicate must account for:\n  - explicit execution mode in database config;\n  - `-df` suffix and deployment suffix handling;\n  - PlatformRegistry default mode;\n  - actual adapter DataFrame capability;\n  - existing family values `expression` and `pandas`;\n  - future DataFrame family values without modifying runner.py.\n\nCandidate shape: adapter property/protocol `is_dataframe` plus a factory\nresolver for config/platform strings. If a property is added to adapters,\ninclude compatibility fallback for older adapters during the migration.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unify DataFrame execution-mode detection behind one predicate",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "notes": "Extract the exact bidirectional query filter behavior currently duplicated\nin `BenchmarkExecutionMixin._build_query_filter()` and\n`dataframe_runner._execute_dataframe_queries()`:\n  - input `Q1` matches both `Q1` and `1`;\n  - input `1` matches both `1` and `Q1`;\n  - case-insensitive input;\n  - variant IDs such as `Q14a` remain usable.\n\nDo not accidentally replace this with the existing one-way\n`normalize_query_id()` helper unless the helper is extended to preserve\nthe bidirectional filter-set contract.\n\nReconcile, but do not necessarily replace, SQL adapter\n`_apply_query_subset()`: it resolves against actual query dict keys and\nis related rather than identical.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace duplicated bidirectional Q-prefix filter normalization with one helper",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "notes": "Update `benchbox/cli/orchestrator.py` and `benchbox/core/dryrun.py` to use\nthe shared execution-mode and query-resolution helpers rather than\nimporting from `benchbox.core.runner.dataframe_runner`.\n\nLeave `dataframe_runner.py` as a deprecated internal compatibility module\nif tests or public-contract docs require it. Its helper functions should\ndelegate to the new shared helpers so behavior cannot drift.\n\nUpdate docs/reference/backward-compatibility.md only if the lifecycle\nstatus or removal timing changes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove production-path dependency on deprecated dataframe_runner helpers while preserving compatibility imports",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-dataframe-routing-and-query-resolution",
+        "notes": "Tests must prove:\n  - lifecycle runner, adapter factory, CLI/orchestrator, and dry-run agree\n    on DataFrame-vs-SQL mode for representative platforms including\n    `polars`, `polars-df`, `pandas-df`, `datafusion-df`, `duckdb`, and a\n    deployment-suffixed DataFrame platform;\n  - dry-run query extraction and production mixin query resolution return\n    the same ordered query IDs for TPC-H and TPC-DS at representative\n    stream IDs;\n  - TPC-DS variant fallback strict/allow modes remain unchanged;\n  - Q-prefix query subset filtering still accepts both prefixed and bare\n    inputs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add parity tests for DataFrame routing, dry-run query extraction, and production mixin query resolution",
+        "wid": "w5"
+      }
+    ]
+  }
+}

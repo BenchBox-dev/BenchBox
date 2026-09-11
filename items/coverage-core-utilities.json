@@ -1,0 +1,60 @@
+{
+  "context": "Start with zero-coverage modules since any test at all is progress.\ncore/tpc_metrics.py likely has pure functions for metric calculation - test\nwith known inputs/outputs. core/comparison/ is a self-contained comparison\nengine - test the comparison logic with mock result objects. For release/sync.py,\nmock filesystem and git operations. utils/lazy_loader.py is a module-level\nlazy import utility - test import mechanics.\n",
+  "description": "Several standalone core modules and utility files have zero or low test\ncoverage. These are smaller, self-contained modules that should be\nstraightforward to test.\n\nZero-coverage modules (quick wins):\n  - core/tpc_metrics.py: 0% (402 missing)\n  - core/comparison/ (suite, types, plotter): 0% (346 missing)\n  - core/platform_config_utils.py: 0% (102 missing)\n  - core/reports.py: 0% (26 missing)\n  - release/sync.py: 0% (259 missing)\n  - utils/lazy_loader.py: 0% (70 missing)\n\nLow-coverage modules:\n  - core/dryrun.py: 49.3% (265 missing) - nearly there\n  - utils/cloud_storage.py: 37.5% (185 missing)\n  - utils/config_helpers.py: 37.8% (69 missing)\n  - examples/dryrun_utils.py: 15.9% (53 missing)\n  - mcp/resources/registry.py: 27.0% (65 missing)\n  - mcp/prompts/registry.py: 40.4% (34 missing)\n  - mcp/__init__.py: 39.1% (14 missing)\n\nPriority: zero-coverage modules first (biggest bang-for-buck), then\nmodules near 50%.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add tests that depend on filesystem state or network",
+        "instead": "mock I/O using unittest.mock or pytest tmp_path fixture",
+        "item_id": "coverage-core-utilities",
+        "why": "CI environments vary and network tests are flaky"
+      },
+      {
+        "dont": "test private implementation details",
+        "instead": "test via public methods and documented interfaces only",
+        "item_id": "coverage-core-utilities",
+        "why": "private APIs can change without notice, breaking tests"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-02-07T00:00:00Z",
+      "created_at": "2026-02-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing tests continue to pass",
+        "item_id": "coverage-core-utilities"
+      },
+      {
+        "behavior": "No changes to production code",
+        "item_id": "coverage-core-utilities"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "coverage-core-utilities",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "coverage-core-utilities",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/ -k 'tpc_metrics or comparison or platform_config or reports or sync or lazy_loader' -v",
+        "description": "New tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "coverage-core-utilities",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

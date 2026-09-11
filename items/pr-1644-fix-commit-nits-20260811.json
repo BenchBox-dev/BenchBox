@@ -1,0 +1,224 @@
+{
+  "context": "At w0, revalidate all three observations against the claim-time develop baseline and add the smallest failing regression or contract tests. For live concurrency, mirror _saved_concurrency's explicit None handling, integer conversion error handling, and rejection below one. Hoist the comparison predicate verbatim to one module-level helper with no filtering change. For execution_order, document one persisted-column policy and pin it across multiple throughput streams and the standard path; retain current behavior if the decision supports it, or change only the order mapping if unification is required. Preserve the completed precise-duration producer fix and all comparison/export duration semantics.",
+  "description": "Three bounded follow-ups remain on current develop after PR #1644. First, benchbox/cli/run_resolution.py builds the live RunRequest with concurrency=int(getattr(state, \"concurrency\", None) or 1), so explicit concurrency=0 is silently promoted to 1; the same file's _saved_concurrency already uses the required explicit-None, int-conversion, and less-than-one validation. Second, benchbox/core/analysis/comparison.py defines the identical is_comparable closure three times; one module-level helper can preserve behavior verbatim. Third, throughput capture maps each stream-local position into QueryExecution.execution_order, so different streams can persist overlapping values, while standard capture keeps an explicit global execution_order or supplies a flattened 1-based index and ignores producer position. Existing comments and path-local tests deliberately pin those conversions independently, but they do not record whether the persisted INTEGER NOT NULL execution_order column may mix stream-local and global semantics or pin the cross-stream persistence contract. This third point is a latent semantic inconsistency, not a crash or wrong-result defect; its required outcome is a recorded decision and a persistence-focused test, with a behavior change only if that decision requires one.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assume the existing path-local comments and tests settle the persisted-column contract.",
+        "instead": "Add a persistence-focused or equivalent cross-path contract test that makes the chosen semantics falsifiable.",
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "why": "They verify each conversion independently but do not test overlapping stream positions against the flattened standard ordering contract."
+      },
+      {
+        "dont": "Change status filtering or duration selection while hoisting is_comparable.",
+        "instead": "Move the predicate verbatim to one module-level helper and redirect the three call sites.",
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "why": "The three closures are identical and this refactor has a zero-behavior-change contract."
+      },
+      {
+        "dont": "Describe the execution_order inconsistency as a crash or wrong-result defect.",
+        "instead": "Record the semantic decision and pin cross-stream plus standard persistence behavior.",
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "why": "Both paths currently satisfy the NOT NULL schema; the problem is mixed persisted semantics."
+      },
+      {
+        "dont": "Replace one falsy coalescing expression with another truthiness-based default.",
+        "instead": "Mirror _saved_concurrency: default only None, convert with explicit error handling, and reject values below one.",
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "why": "Zero is invalid input that must be rejected, not treated as an absent value."
+      },
+      {
+        "dont": "Touch or regress the precise throughput-duration expression adjacent to execution_order mapping.",
+        "instead": "Limit result_capture changes to execution_order documentation or mapping and its focused tests.",
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "why": "The completed stop-manufactured-zero-durations item owns producer fidelity, and missing/sub-millisecond duration behavior is now pinned."
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness and Consistency Cleanup",
+      "created_at": "2026-08-14T01:04:06Z",
+      "worktree": "run-lifecycle"
+    },
+    "preserves": [
+      {
+        "behavior": "An omitted or None live CLI concurrency still resolves to the single-stream default of 1.",
+        "item_id": "pr-1644-fix-commit-nits-20260811"
+      },
+      {
+        "behavior": "Comparison filtering and schema/export duration rounding remain unchanged.",
+        "item_id": "pr-1644-fix-commit-nits-20260811"
+      },
+      {
+        "behavior": "Comparison includes SUCCESS and UNKNOWN executions and excludes explicitly failed or skipped executions exactly as before.",
+        "item_id": "pr-1644-fix-commit-nits-20260811"
+      },
+      {
+        "behavior": "The is_comparable hoist changes no query-id, timing, averaging, or status-filter behavior.",
+        "item_id": "pr-1644-fix-commit-nits-20260811"
+      },
+      {
+        "behavior": "The persisted queries.execution_order column remains INTEGER NOT NULL; any local-versus-global semantic choice is explicit and tested rather than accidental.",
+        "item_id": "pr-1644-fix-commit-nits-20260811"
+      },
+      {
+        "behavior": "Throughput capture continues to preserve missing duration as None, explicit zero as 0.0 ms, and sub-millisecond precision.",
+        "item_id": "pr-1644-fix-commit-nits-20260811"
+      },
+      {
+        "behavior": "Valid positive concurrency values retain their exact value, and live and saved quick-restart paths reject the same invalid field shapes.",
+        "item_id": "pr-1644-fix-commit-nits-20260811"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Canonical validation for the same concurrency field",
+        "decision": "reuse",
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "path": "benchbox/cli/run_resolution.py::_saved_concurrency"
+      },
+      {
+        "concept": "Three identical is_comparable closures",
+        "decision": "reuse",
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "path": "benchbox/core/analysis/comparison.py"
+      },
+      {
+        "concept": "Existing stream-local versus flattened execution-order conversions and comments",
+        "decision": "extend",
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "path": "benchbox/platforms/base/result_capture.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/run_resolution.py"
+      },
+      {
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/comparison.py"
+      },
+      {
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_run_resolution.py"
+      },
+      {
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/analysis/test_analysis_comparison.py"
+      },
+      {
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_base_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -q 'None) or 1' benchbox/cli/run_resolution.py",
+        "description": "Live run resolution no longer uses falsy concurrency coalescing",
+        "expected": "Fails on the current unfixed tree; exits zero after live concurrency mirrors the saved-path validation.",
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test \"$(grep -c 'def is_comparable' benchbox/core/analysis/comparison.py)\" -le 1",
+        "description": "Comparison has at most one is_comparable definition",
+        "expected": "Fails with a count of 3 on the current tree; exits zero after the verbatim module-level hoist.",
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_run_resolution.py -q",
+        "description": "Focused live and saved run-resolution contracts pass",
+        "expected": "The w0 concurrency=0 rejection case fails on an otherwise unfixed source tree; the full focused file passes after the repair.",
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/analysis/test_analysis_comparison.py tests/unit/platforms/test_base_adapter.py -q",
+        "description": "Comparison behavior and execution-order persistence contract pass",
+        "expected": "All focused tests pass, including the new persistence-focused execution_order decision test and unchanged comparison behavior.",
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/cli/run_resolution.py benchbox/core/analysis/comparison.py benchbox/platforms/base/result_capture.py tests/unit/cli/test_run_resolution.py tests/unit/core/analysis/test_analysis_comparison.py tests/unit/platforms/test_base_adapter.py",
+        "description": "All touched source and tests satisfy Ruff",
+        "expected": "Ruff exits zero.",
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate the three defects on claim-time develop and add failing regression or persistence-contract tests",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Align live concurrency validation, hoist the comparison predicate verbatim, and record and pin the execution_order persistence decision",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-1644-fix-commit-nits-20260811",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Restore each repaired defect independently as a negative control, prove its targeted rung fails, then restore the fix",
+        "wid": "w2"
+      }
+    ]
+  }
+}

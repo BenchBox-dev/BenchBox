@@ -1,0 +1,16 @@
+{
+  "description": "Implement DDL generation for DuckDB with support for its physical tuning\ncapabilities, particularly sorting which was added in v0.10.\n\n## DuckDB Physical Tuning Features\n\n### Sorting (v0.10+)\nDuckDB supports row ordering in table definitions:\n```sql\nCREATE TABLE t (a INT, b INT) ORDER BY a, b;\n```\n\nBenefits:\n- Improved compression for sorted columns\n- Faster range scans on sorted columns\n- Better locality for related rows\n\n### Partitioning (Hive-style)\nDuckDB can read/write Hive-partitioned Parquet:\n```sql\nCOPY (SELECT * FROM t) TO 'path' (FORMAT PARQUET, PARTITION_BY (col1, col2));\n```\n\nThis is more for external data organization than table-level tuning.\n\n### No Distribution\nDuckDB is a single-node database - distribution tuning is not applicable.\n\n## Current Gap\n\nDuckDB adapter (`benchbox/platforms/duckdb.py`) has:\n- `generate_tuning_clause()` method (line ~683)\n- Reads partitioning columns but only logs them\n- Does NOT add ORDER BY to CREATE TABLE statements",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pt-04-duckdb-ddl",
+        "needs_item": "pt-01-ddl-generator-protocol"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-01-03T00:00:00Z",
+      "worktree": "physical-tuning"
+    }
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "context": "GUARDRAILS: never bash as PID1 in a detached container (exits immediately without TTY - upstream --detach exits by design for this reason); never PasswordAuthentication; never bind-mount host SSH_AUTH_SOCK (unix sockets do not cross virtiofs - use ssh -A); never mount host ~/.ssh wholesale - only the generated per-project authorized_keys; --gc must never touch running containers; setup-ssh.sh idempotent (re-runs edit nothing already correct).",
+  "description": "Persistent workspace mode for Desktop/SSH use. Ingress per GATE 0 Spike A verdict (publish 127.0.0.1:<port>:2222 or ProxyCommand container exec -i NAME nc 127.0.0.1 2222). sshd runs UNPRIVILEGED as user agent on 2222 with our config/sshd_config (PasswordAuthentication no, PermitUserEnvironment yes, AllowUsers agent) and per-project host keys generated ON THE HOST by setup-ssh.sh into ~/.agent-container/state/<project>/ssh/ and bind-mounted - image rebuilds never break known_hosts. Env propagation: sshd sessions do NOT inherit container --env, so the entrypoint writes declared AGENT_AUTH_ENVS to ~/.ssh/environment (mode 600) before sshd starts. OAuth state (Claude Max, Codex device auth) persists via AGENT_STATE_DIRS bind mounts under state/<project>/home-state/. Persistent PID1 is exec sshd -D. Deterministic port allocation with collision probe recorded in ~/.agent-container/ports.tsv. Add agent-run.sh --list/--stop/--gc lifecycle subcommands (gc reaps stopped persistent containers only).",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "needs_item": "agentbox-phase2-fat-image-agent-dispatch"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-07T05:52:33Z",
+      "created_at": "2026-08-07T00:01:53Z",
+      "worktree": "agent-container"
+    },
+    "preserves": [
+      {
+        "behavior": "Ephemeral CLI mode behavior unchanged by persistent-mode additions",
+        "item_id": "agentbox-phase3-persistent-ssh"
+      },
+      {
+        "behavior": "No root process in persistent containers; sandbox egress rules identical in persistent and ephemeral modes",
+        "item_id": "agentbox-phase3-persistent-ssh"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "kind": "do_not_modify",
+        "path_glob": "LICENSE"
+      },
+      {
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/gradle-warmup.sh"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd ~/Developer/agent-container && ssh -o BatchMode=yes -o ConnectTimeout=5 agentbox-testproj codex --version",
+        "description": "BatchMode ssh round-trip",
+        "expected": null,
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "last_result": "pass",
+        "last_run": "2026-08-07T05:52:02Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Container survives launcher exit and host-key stability across container recreate (manual, transcript in docs/spikes.md)",
+        "expected": null,
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Interactive claude over ssh -t in same container works - fat-image agent switching (manual, transcript)",
+        "expected": null,
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd ~/Developer/agent-container && ssh -o BatchMode=yes agentbox-testproj printenv ANTHROPIC_API_KEY | grep -q .",
+        "description": "Auth env visible in ssh session",
+        "expected": null,
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "last_result": "pass",
+        "last_run": "2026-08-07T05:51:51Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "lib/ssh.sh + setup-ssh.sh; Include-based ~/.ssh/config design after REWORK; per-project keys+fragments; commits 2977586..c42006e",
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "notes": null,
+        "started_at": "2026-08-07T05:51:39Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "lib/ssh.sh plus setup-ssh.sh - keypairs, host keys, port allocation, idempotent ssh config Host block",
+        "wid": "w1"
+      },
+      {
+        "evidence": "config/sshd_config + SESSION_MODE=sshd branch; exec sshd -D as PID1 uid1000; PermitUserEnvironment no + PermitUserRC no; env via SetEnv",
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "notes": null,
+        "started_at": "2026-08-07T05:51:42Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "config/sshd_config and entrypoint persistent branch - env writer then exec sshd -D",
+        "wid": "w2"
+      },
+      {
+        "evidence": "--persistent wiring, no --rm, state mounts, publish ingress per GATE0 #5; config written only after successful launch",
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "notes": null,
+        "started_at": "2026-08-07T05:51:45Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "--persistent wiring in agent-run.sh - no --rm, state-dir mounts, ingress per GATE 0",
+        "wid": "w3"
+      },
+      {
+        "evidence": "--list/--stop/--gc incl fragment removal and orphan reaping; port lock held through container run",
+        "item_id": "agentbox-phase3-persistent-ssh",
+        "notes": null,
+        "started_at": "2026-08-07T05:51:47Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Lifecycle subcommands --list --stop --gc",
+        "wid": "w4"
+      }
+    ]
+  }
+}

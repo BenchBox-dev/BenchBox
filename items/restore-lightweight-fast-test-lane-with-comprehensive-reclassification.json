@@ -1,0 +1,354 @@
+{
+  "context": "Start from measurement, not intuition. Use the existing marker census and\n`scripts/analyze_test_timings.py` to capture the current fast-lane contents,\nslowest selected tests, and startup-heavy files. Then tighten the default\npolicy in `tests/conftest.py` so unclassified tests land in `medium` unless\nthere is a specific reason they belong in `fast`.\n\nAfter the default policy changes, audit every explicit `@pytest.mark.fast`\nusage across `tests/unit` and `tests/integration`. Reclassify tests based on\nactual behavior: subprocess/CLI startup, benchmark data generation, heavy\nimports, table-format dependencies, cloud-adjacent fixtures, and expensive\nfile or database setup should move out of `fast`. Keep `fast` for true smoke\nand lightweight developer-loop coverage.\n\nFinish by updating command expectations and adding an automated guardrail that\nchecks both composition and runtime budget so future test additions cannot\nsilently re-inflate the fast lane.\n",
+  "description": "The current pytest fast lane no longer behaves like a lightweight developer\nsuite. On 2026-03-07, `uv run -- python -m pytest -m \"fast\" --tb=short`\nselects 13,256 of 15,051 collected tests and produces a visible 10-30 second\nsystem lock-up during startup under the default parallel settings.\n\nThe root cause is classification drift, not a single broken test. The marker\npolicy in tests/conftest.py currently defaults most unclassified unit tests to\n`fast`, so recent testing improvements silently expanded the fast lane far\nbeyond its intended scope. This interacts badly with pytest-xdist startup and\nheavy import/setup work, but parallel execution itself is not the problem and\nmust be preserved for the curated fast lane.\n\nThis TODO restores the original intent of the fast suite by performing a\ncomprehensive reclassification of tests, tightening default marker policy,\npreserving parallel fast execution, and adding guardrails so the lane cannot\nquietly bloat again. The outcome target is a truly lightweight parallel fast\nsuite aligned with the prior expectation that fast runs stay under roughly\n80 seconds.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make `test-fast` single-process with `-n 0`",
+        "instead": "keep parallel execution and reduce the lane size.",
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "why": "that hides the classification regression instead of fixing it"
+      },
+      {
+        "dont": "move expensive tests out of fast without preserving another routine lane that still covers them",
+        "instead": "keep them reachable through `medium`, `slow`, `stress`, or `resource_heavy` workflows.",
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "why": "that creates hidden coverage gaps"
+      },
+      {
+        "dont": "rely on a small hand-maintained exception list alone",
+        "instead": "add a maintained inventory and validation guardrails.",
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "why": "new tests will keep drifting into `fast`"
+      },
+      {
+        "dont": "treat `unit` as equivalent to `fast`",
+        "instead": "classify by observed behavior instead.",
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "why": "many unit tests have heavy startup, subprocess, import, or data-generation costs"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "id": 239,
+        "reason": "Worker tuning is secondary. The primary fix is to shrink and curate the fast lane without removing parallelism.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: xdist worker-count tuning explicitly called secondary to the primary fast-lane curation fix; no standalone need signal.",
+        "summary": "Tune xdist worker counts or pytest startup internals after reclassification"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "id": 240,
+        "reason": "This item is focused on restoring the fast suite and adding guardrails, not a full marker-system redesign.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Full test-taxonomy redesign beyond fast/medium/slow/stress/resource_heavy was explicitly out of scope for the parent restoration effort; no driver to revisit now.",
+        "summary": "Redesign the entire test taxonomy beyond fast/medium/slow/stress/resource_heavy"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-03-07T00:00:00Z",
+      "created_at": "2026-03-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Broad unit coverage remains available through existing non-fast commands such as `test-unit`; reclassification must not hide tests from routine quality workflows.",
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification"
+      },
+      {
+        "behavior": "Existing explicit slow, stress, and resource_heavy coverage remains runnable after reclassification.",
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification"
+      },
+      {
+        "behavior": "The resource-heavy/stress split in `test-all` continues to protect machines from known heavyweight suites.",
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification"
+      },
+      {
+        "behavior": "`uv run -- python -m pytest -m \"fast\" --tb=short` remains a parallel run; do not force `-n 0` as the primary fix.",
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "kind": "do_not_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "kind": "do_not_modify",
+        "path_glob": "examples/"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "kind": "only_modify",
+        "path_glob": "_project/config/"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/timing_policy_check.py"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "kind": "only_modify",
+        "path_glob": "pytest.ini"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "kind": "only_modify",
+        "path_glob": "scripts/analyze_test_timings.py"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "kind": "only_modify",
+        "path_glob": "tests/conftest.py"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_marker_strategy.py"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_standardized_test_commands.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 -m \"fast\" --collect-only -q",
+        "description": "Record current marker counts before edits",
+        "expected": "Shows the pre-fix fast selection count for before/after comparison.",
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/restore-lightweight-fast-test-lane-with-comprehensive-reclassification.yaml && uv run _project/scripts/todo_cli.py check-graph",
+        "description": "Validate TODO structure and dependency graph after authoring this item",
+        "expected": "Validation passes and the TODO dependency graph reports no errors.",
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m \"fast\" --tb=short",
+        "description": "Confirm the curated fast lane remains parallel and completes within budget after implementation",
+        "expected": "Fast suite runs in parallel without the prior startup lock-up and returns to an acceptably lightweight runtime, targeting the historical sub-80-second budget.",
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m \"unit\" --tb=short --collect-only -q",
+        "description": "Confirm broad unit coverage is still available outside the fast lane",
+        "expected": "Unit tests remain broadly selectable even after fast-lane pruning.",
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/timing_policy_check.py --strict",
+        "description": "Confirm the new guardrail fails when fast-lane membership or composition exceeds the defined budget",
+        "expected": "The guardrail check passes in the fixed state and is implemented tightly enough that an over-budget or forbidden fast-lane composition would fail the command.",
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture the current fast-lane baseline, marker census, and startup hot spots",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Change default marker policy so unclassified tests no longer auto-enter the fast lane",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reclassify explicit fast-marked tests in tests/unit using measured runtime and startup behavior",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reclassify explicit fast-marked tests in tests/integration and any remaining non-unit fast coverage",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace drifting path exceptions with a maintained classification inventory for medium, slow, stress, and resource-heavy coverage",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update developer commands and marker-validation tests to match the curated fast-lane contract while keeping parallel execution",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression guardrails that fail when fast-lane size, composition, or runtime exceed budget",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "restore-lightweight-fast-test-lane-with-comprehensive-reclassification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify the final fast lane against the historical runtime target and document the new classification boundaries",
+        "wid": "w8"
+      }
+    ]
+  }
+}

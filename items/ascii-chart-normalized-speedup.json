@@ -1,0 +1,184 @@
+{
+  "context": "Follow the pattern in benchbox/core/visualization/ascii/diverging_bar.py for the\ncentered-zero layout with bars extending left and right from a reference line:\n\n1. Create SpeedupData dataclass (name, ratio, is_baseline).\n2. Create ASCIINormalizedSpeedup(ASCIIChartBase) with a render() method.\n3. Draw a vertical baseline reference line at 1.0x in the center.\n4. Ratios > 1.0 extend right (faster, green), ratios < 1.0 extend left (slower, red).\n5. Add from_normalized_results() factory that computes ratios given results + baseline name.\n6. Use logarithmic scaling for the bar width to handle large ratio ranges (e.g., 0.1x to 50x).\n\nThe baseline platform selection should accept either a platform name or \"slowest\"/\"fastest\"\nas convenience aliases.\n",
+  "description": "Add a new ASCII chart type that shows platform performance as a ratio relative to a\nuser-selected baseline platform (e.g., \"DuckDB is 3.2x faster than SQLite\"). The\nbaseline is rendered at 1.0x with a vertical reference line. Platforms faster than\nbaseline extend right, slower ones extend left.\n\nThis is the standard way TPC and SPEC results are formally reported. When comparing\nplatforms that span orders of magnitude (50ms to 50,000ms), absolute bar charts make\nfast platforms invisible slivers. Normalized ratios make relative performance\nimmediately clear regardless of absolute magnitude.\n\nExample output:\n```\nNormalized Performance (baseline: SQLite = 1.0x)\n────────────────────────────────────────────────────────\n         Slower          │         Faster\nSQLite                   │█  1.0x\nPandas             ██████│   0.4x\nDuckDB                   │████████████████████  8.2x\nPolars                   │██████████████████  7.5x\nClickHouse               │██████████████████████████  12.1x\n────────────────────────────────────────────────────────\n```\n\nThis is distinct from the existing bar chart (absolute values) and the diverging bar\nchart (percentage change between two runs of the same platform). The normalized speedup\nchart shows cross-platform comparison ratios with a centered baseline reference.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify ASCIIBarChart or ASCIIDivergingBar",
+        "instead": "implement as a new class",
+        "item_id": "ascii-chart-normalized-speedup",
+        "why": "they serve different purposes (absolute values, pct change)"
+      },
+      {
+        "dont": "use linear scaling for bar widths",
+        "instead": "use log2 scaling so 2x and 0.5x are symmetric around the baseline",
+        "item_id": "ascii-chart-normalized-speedup",
+        "why": "ratios can span 0.01x to 100x"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-15T00:00:00Z",
+      "created_at": "2026-02-14T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "ASCIIBarChart behavior unchanged (this is a new chart type, not a modification)",
+        "item_id": "ascii-chart-normalized-speedup"
+      },
+      {
+        "behavior": "All 9 existing chart types continue to render identically",
+        "item_id": "ascii-chart-normalized-speedup"
+      },
+      {
+        "behavior": "render_ascii_chart() in exporters.py handles all existing chart_type strings",
+        "item_id": "ascii-chart-normalized-speedup"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ascii-chart-normalized-speedup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/"
+      },
+      {
+        "item_id": "ascii-chart-normalized-speedup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/exporters.py"
+      },
+      {
+        "item_id": "ascii-chart-normalized-speedup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/templates.py"
+      },
+      {
+        "item_id": "ascii-chart-normalized-speedup",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/ascii/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.visualization.ascii.normalized_speedup import ASCIINormalizedSpeedup, SpeedupData; data = [SpeedupData('SQLite', 1.0, True), SpeedupData('DuckDB', 8.2, False), SpeedupData('Pandas', 0.4, False)]; chart = ASCIINormalizedSpeedup(data=data); print(chart.render())\"",
+        "description": "New chart class renders without error",
+        "expected": "Rendered chart with baseline at center and bars extending left/right",
+        "item_id": "ascii-chart-normalized-speedup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v",
+        "description": "Existing chart tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "ascii-chart-normalized-speedup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ascii-chart-normalized-speedup",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ascii-chart-normalized-speedup",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ascii-chart-normalized-speedup",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ascii-chart-normalized-speedup",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "ascii-chart-normalized-speedup",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "ascii-chart-normalized-speedup",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-normalized-speedup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create SpeedupData dataclass and ASCIINormalizedSpeedup class with render() using log2-scaled bars",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-normalized-speedup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement centered baseline reference line with left (slower) / right (faster) bar layout",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-normalized-speedup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add from_normalized_results() factory that computes ratios from NormalizedResult data and baseline name",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-normalized-speedup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register chart in __init__.py and add 'normalized_speedup' case to render_ascii_chart() in exporters.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-normalized-speedup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests (symmetry of log scaling, edge cases, single platform, many platforms)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-normalized-speedup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add normalized_speedup to flagship and head_to_head templates in templates.py",
+        "wid": "w6"
+      }
+    ]
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "context": "Add a data-provenance / bounded-scale dimension to the sweep: detect a generator vs a downloader/manifest source, and detect a benchmark that rejects scales other than 1.0, then report those as not-cheaply-gateable with the reason rather than gateable. Regenerate the committed report so the campaign dispatch matches reality.",
+  "description": "_project/scripts/cross_surface_applicability_sweep.py decides gateability from DataFrame/SQL query-id overlap ALONE. It does not model how a benchmark acquires data or whether it supports a bounded scale, so it reports joinorder as 'gateable' when JoinOrderBenchmark.__init__ raises for any scale_factor != 1.0 ('joinorder now uses canonical IMDb 2013 data and accepts only scale_factor=1.0; use joinorder_synthetic for scaled synthetic smoke-test data') and fetches its data via data_manifest.toml. Wiring it as the report directs would drag a full canonical dataset fetch into routine PRs, violating the gate campaign's own anti-pattern that each gate be one cheap bounded cell. joinorder_synthetic is that benchmark's scaled stand-in and is ALREADY CI-enforced, so joinorder is not really an uncovered gap. flightdata is unaffected: its downloader synthesizes below SF=0.1. The report is the campaign's dispatch document, so an over-optimistic 'gateable' count sends the next session to build something that cannot land.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "created_at": "2026-08-01T20:40:09Z",
+      "worktree": "dataframe-benchmarks"
+    },
+    "preserves": [
+      {
+        "behavior": "flightdata stays classified gateable: it synthesizes offline below SF=0.1",
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/cross-surface-applicability.md"
+      },
+      {
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/cross_surface_applicability_sweep.py"
+      },
+      {
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -E '^. joinorder .*gateable' _project/analysis/cross-surface-applicability.md",
+        "description": "joinorder is no longer reported as gateable",
+        "expected": "exit 0 once corrected; on an unfixed tree the row says gateable and this exits 1",
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_cross_surface_applicability.py -q",
+        "description": "Focused applicability classification tests",
+        "expected": "all tests pass",
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/cross_surface_applicability_sweep.py --check",
+        "description": "Committed report is current",
+        "expected": "exit 0 and joinorder is not classified as a cheap gateable gap",
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Represent bounded/offline data-acquisition eligibility separately from SQL/DataFrame query-id overlap",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Classify canonical joinorder as not routinely gateable while preserving joinorder_synthetic as its already-enforced bounded stand-in",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add negative controls for fixed-scale remote/canonical datasets and positive controls for sub-SF synthetic generators",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "applicability-sweep-ignores-data-acquisition-cost",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Regenerate the committed applicability report and assert it no longer dispatches joinorder as an uncovered cheap gate",
+        "wid": "w4"
+      }
+    ]
+  }
+}

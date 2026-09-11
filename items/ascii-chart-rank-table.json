@@ -1,0 +1,205 @@
+{
+  "context": "Build as a table renderer (similar approach to ASCIIHeatmap) with ranking logic:\n\n1. Create RankTableData (queries list[str], platforms list[str],\n   times dict[tuple[platform, query], float]) dataclass.\n2. Create ASCIIRankTable(ASCIIChartBase) with render().\n3. For each query, rank platforms by execution time (lower is better). Handle ties\n   by assigning the same rank (1st, 1st, 3rd, 4th for a two-way tie).\n4. Color 1st place green (#1b9e77), last place red (#d95f02), middle ranks dim.\n5. Footer: count 1st-place wins per platform, compute geometric mean of ranks.\n6. Add from_heatmap_data() factory that reuses the same matrix data as ASCIIHeatmap.\n7. Auto-split into multiple charts when queries exceed terminal height (similar to\n   histogram chunking pattern).\n\nUse natural query sort order (Q1, Q2, Q10 not Q1, Q10, Q2) matching\nASCIIQueryHistogram._natural_sort_key().\n",
+  "description": "Add a new ASCII chart type that shows a ranked leaderboard table with each platform's\nrank position per query, plus aggregate win/loss/tie counts and an overall geometric\nmean rank. Each cell shows a compact rank indicator (1st, 2nd, 3rd...) with color\ncoding. The footer summarizes total wins, losses, and the overall ranking.\n\nThis is how ClickBench presents its results. When comparing 4+ platforms across 22+\nqueries, it is hard to determine an overall winner from raw timing data. A rank table\nimmediately shows: \"DuckDB wins 18 of 22 queries, Polars wins 3, SQLite wins 1.\"\n\nExample output:\n```\nQuery Rankings (1st = fastest)\n──────────────────────────────────────────────\nQuery    DuckDB  Polars  SQLite  Pandas\nQ1        1st     2nd     3rd     4th\nQ2        2nd     1st     3rd     4th\nQ3        1st     1st     3rd     4th\nQ4        1st     2nd     4th     3rd\n...\nQ22       1st     3rd     2nd     4th\n──────────────────────────────────────────────\n1st wins    15      5       2       0\nGeoRank    1.2    1.8     2.8     3.9\n──────────────────────────────────────────────\n```\n\nThis is distinct from the Heatmap (shows absolute times color-coded by magnitude,\nnot relative rankings), the Comparison Bar (handles only two platforms), and the\nBar Chart (one aggregate metric, not per-query ranking). Rank tables answer\n\"which platform wins the most queries?\" rather than \"how fast is each platform?\"",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify ASCIIHeatmap",
+        "instead": "implement as a new class that can accept the same input data",
+        "item_id": "ascii-chart-rank-table",
+        "why": "the heatmap shows absolute values with intensity encoding, while the rank table shows ordinal positions"
+      },
+      {
+        "dont": "use floating-point rank display",
+        "instead": "show '1st', '2nd', '3rd' text, not '1.0', '2.0'",
+        "item_id": "ascii-chart-rank-table",
+        "why": "ranks are ordinal"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-15T00:00:00Z",
+      "created_at": "2026-02-14T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "ASCIIHeatmap behavior unchanged (heatmap shows absolute values, rank table shows ordinal positions)",
+        "item_id": "ascii-chart-rank-table"
+      },
+      {
+        "behavior": "All 9 existing chart types continue to render identically",
+        "item_id": "ascii-chart-rank-table"
+      },
+      {
+        "behavior": "render_ascii_chart() in exporters.py handles all existing chart_type strings",
+        "item_id": "ascii-chart-rank-table"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ascii-chart-rank-table",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/"
+      },
+      {
+        "item_id": "ascii-chart-rank-table",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/exporters.py"
+      },
+      {
+        "item_id": "ascii-chart-rank-table",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/templates.py"
+      },
+      {
+        "item_id": "ascii-chart-rank-table",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/ascii/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.visualization.ascii.rank_table import ASCIIRankTable, RankTableData; data = RankTableData(['Q1','Q2'], ['DuckDB','Polars'], {('DuckDB','Q1'): 10, ('Polars','Q1'): 20, ('DuckDB','Q2'): 30, ('Polars','Q2'): 15}); chart = ASCIIRankTable(data=data); print(chart.render())\"",
+        "description": "New chart class renders without error",
+        "expected": "Rendered table with rank positions and win/loss tally",
+        "item_id": "ascii-chart-rank-table",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v",
+        "description": "Existing chart tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "ascii-chart-rank-table",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ascii-chart-rank-table",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ascii-chart-rank-table",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ascii-chart-rank-table",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ascii-chart-rank-table",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "ascii-chart-rank-table",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ascii-chart-rank-table",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ascii-chart-rank-table",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "ascii-chart-rank-table",
+        "needs_wid": "w5",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-rank-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create RankTableData dataclass and ASCIIRankTable class with render()",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-rank-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement per-query ranking with tie handling (1st, 1st, 3rd) and color coding",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-rank-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement footer with win tallies and geometric mean rank computation",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-rank-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add from_heatmap_data() factory that accepts the same matrix format as ASCIIHeatmap",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-rank-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register chart in __init__.py and add 'rank_table' case to render_ascii_chart() in exporters.py",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-rank-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests (ties, single platform, many platforms, auto-split for many queries)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "ascii-chart-rank-table",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add rank_table to head_to_head and flagship templates in templates.py",
+        "wid": "w7"
+      }
+    ]
+  }
+}

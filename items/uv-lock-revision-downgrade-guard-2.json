@@ -1,0 +1,120 @@
+{
+  "context": "Small stdlib-only script under _project/scripts; wire into .pre-commit-config.yaml and/or the Makefile lint aggregate that CI runs. Reject only a revision DECREASE; unchanged and increased revisions pass so legitimate lock updates need no ceremony.",
+  "description": "Successor of uv-lock-revision-downgrade-guard (dropped 2026-07-31: its single rung was the prose placeholder '<new guard invocation>' - not a runnable command; it fails the shell parse with exit 2 on ANY tree, so it could never distinguish unfixed from fixed, and it is exactly the rung class todo-lint-unrunnable-verification-commands-2 exists to catch). Premise (re-validated 2026-07-31): uv.lock on develop is at `revision = 3`; an older local uv rewrites it to revision 2 as a silent side effect alongside a real dependency change, and nothing rejects that diff. Add a concrete guard: `_project/scripts/check_uv_lock_revision.py`, with a testable interface `--old N --new N` (used by the rung below) and a default mode that compares HEAD:uv.lock against the working tree for pre-commit/CI wiring. The rung fixes the guard's invocation contract at create time so it stays falsifiable: absent script = exit 1 (unmet), present-and-correct = exit 0.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "completed_at": "2026-07-31T23:59:49Z",
+      "completed_pr": 1382,
+      "created_at": "2026-07-31T23:34:12Z",
+      "worktree": "ci-infrastructure"
+    },
+    "preserves": [
+      {
+        "behavior": "Legitimate uv.lock updates still work without special ceremony",
+        "item_id": "uv-lock-revision-downgrade-guard-2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uv-lock-revision-downgrade-guard-2",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "uv-lock-revision-downgrade-guard-2",
+        "kind": "only_modify",
+        "path_glob": ".pre-commit-config.yaml"
+      },
+      {
+        "item_id": "uv-lock-revision-downgrade-guard-2",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "uv-lock-revision-downgrade-guard-2",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "uv-lock-revision-downgrade-guard-2",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      },
+      {
+        "item_id": "uv-lock-revision-downgrade-guard-2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "f=_project/scripts/check_uv_lock_revision.py; test -f \"$f\" && ! uv run --project _project/scripts -- python \"$f\" --old 3 --new 2 && uv run --project _project/scripts -- python \"$f\" --old 3 --new 3",
+        "description": "the guard exists, rejects a 3->2 downgrade, and accepts an unchanged revision",
+        "expected": "exits 1 on the unfixed tree (guard script absent = criterion unmet; verified 2026-07-31); exits 0 once the guard exists with the --old/--new test interface and the right accept/reject behavior",
+        "item_id": "uv-lock-revision-downgrade-guard-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -q 'check_uv_lock_revision' .pre-commit-config.yaml Makefile",
+        "description": "guard is wired into a gate that actually runs (pre-commit or the CI make lint aggregate)",
+        "expected": "exits 1 on the unfixed tree (verified 2026-07-31: no references exist); exits 0 once wired",
+        "item_id": "uv-lock-revision-downgrade-guard-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uv-lock-revision-downgrade-guard-2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uv-lock-revision-downgrade-guard-2",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "check_uv_lock_revision.py added (stdlib-only, --old/--new test interface + HEAD-vs-working default); wired as pre-commit hook gated on uv.lock and make uv-lock-revision-check",
+        "item_id": "uv-lock-revision-downgrade-guard-2",
+        "notes": null,
+        "started_at": "2026-07-31T23:59:12Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-uvlock-guard",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Add check_uv_lock_revision.py rejecting a uv.lock revision decrease, and wire it into pre-commit and/or the CI-run make lint aggregate",
+        "wid": "w1"
+      },
+      {
+        "evidence": "docs/development/development.md prerequisites now name uv >= 0.8, the revision-3 lock, the guard, and the recovery path",
+        "item_id": "uv-lock-revision-downgrade-guard-2",
+        "notes": null,
+        "started_at": "2026-07-31T23:59:14Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-uvlock-guard",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Document the minimum uv version for contributors (docs/development)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "test_check_uv_lock_revision.py: downgrade rejected, unchanged/upgrade accepted, arg pairing enforced, malformed lock reported, repo lock parseable; 7 passed",
+        "item_id": "uv-lock-revision-downgrade-guard-2",
+        "notes": null,
+        "started_at": "2026-07-31T23:59:17Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-uvlock-guard",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Unit tests: downgrade rejected, unchanged accepted, upgrade accepted, malformed lock reported",
+        "wid": "w3"
+      }
+    ]
+  }
+}

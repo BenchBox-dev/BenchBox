@@ -1,0 +1,114 @@
+{
+  "context": "Re-run the severity judgement with reversibility on the table, and record the outcome in the ADR either way. The point is that the record should show reversibility was weighed, not that the answer must change.",
+  "description": "adr-published-results-history-retention.md, accepted in #1538, chose to retain published-results history rather than rewrite it, on the grounds that the exposed material was private absolute paths of low severity, and explicitly scoped itself not to extend to a higher severity class such as credentials or customer data. That decision was taken without knowing that the pseudonyms which replaced those paths are themselves recoverable by dictionary. Re-mirroring corrects only the branch tip; retained history keeps every superseded value reachable permanently, and a git grep against origin/published-results confirms a token that a candidate value reproduces under the documented transform (measured). The premise needs re-examination - the conclusion may well survive it, but it should survive it explicitly.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "published-history-retention-premise-predates-oracle",
+        "needs_item": "published-pseudonym-oracle-and-field-set"
+      }
+    ],
+    "item_meta": {
+      "category": "privacy",
+      "completed_at": "2026-08-05T21:32:22Z",
+      "completed_pr": 1586,
+      "created_at": "2026-08-04T23:46:52Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No recovered plaintext value is written into the ADR, the tracker, or a PR body",
+        "item_id": "published-history-retention-premise-predates-oracle"
+      },
+      {
+        "behavior": "Rewriting history on a public branch is never a side effect of another change",
+        "item_id": "published-history-retention-premise-predates-oracle"
+      },
+      {
+        "behavior": "The ADR keeps recording what was known at decision time; a re-examination is an amendment with its own date, not a retrofitted rationale",
+        "item_id": "published-history-retention-premise-predates-oracle"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "published-history-retention-premise-predates-oracle",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/**"
+      },
+      {
+        "item_id": "published-history-retention-premise-predates-oracle",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -qiE 'reversib|recover' docs/development/adr/adr-published-results-history-retention.md",
+        "description": "the ADR records whether pseudonym reversibility was weighed",
+        "expected": "Fails on the unfixed tree today (measured exit 1 - the ADR does not mention it)",
+        "item_id": "published-history-retention-premise-predates-oracle",
+        "last_result": "pass",
+        "last_run": "2026-08-05T21:29:48Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -q 'severity' docs/development/adr/adr-published-results-history-retention.md",
+        "description": "the ADR still states the severity class it scopes itself to",
+        "expected": "Passes today and must stay passing - this is the regression rung, not the falsifying one",
+        "item_id": "published-history-retention-premise-predates-oracle",
+        "last_result": "pass",
+        "last_run": "2026-08-05T21:29:51Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "published-history-retention-premise-predates-oracle",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "published-history-retention-premise-predates-oracle",
+        "needs_wid": "w0",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-examined: retention still holds; rewrite still fails retractability; residual oracle raises risk but not severity class to rewrite threshold",
+        "item_id": "published-history-retention-premise-predates-oracle",
+        "notes": null,
+        "started_at": "2026-08-05T21:29:25Z",
+        "started_branch": "docs/published-history-retention-oracle",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Re-examine the retention decision against the confirmation-oracle finding and record the outcome",
+        "wid": "w0"
+      },
+      {
+        "evidence": "ADR Amendment 2026-08-05 records reversibility/recovery weighed; original 2026-08-04 rationale preserved",
+        "item_id": "published-history-retention-premise-predates-oracle",
+        "notes": null,
+        "started_at": "2026-08-05T21:29:34Z",
+        "started_branch": "docs/published-history-retention-oracle",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "If retention still holds, amend the ADR to state that pseudonym reversibility was considered",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Rewrite path documented as separate change with own blast radius if severity escalates; not activated",
+        "item_id": "published-history-retention-premise-predates-oracle",
+        "notes": null,
+        "started_at": "2026-08-05T21:29:41Z",
+        "started_branch": "docs/published-history-retention-oracle",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "If it does not hold, plan the rewrite as its own change with its own blast radius",
+        "wid": "w2"
+      }
+    ]
+  }
+}

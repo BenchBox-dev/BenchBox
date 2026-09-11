@@ -1,0 +1,118 @@
+{
+  "context": "Add CHANGED_PLANS and CHANGED_TUNING back-mapping blocks mirroring the existing manifest and applied handling, so a companion-only PR still validates its paired primary bundle, and cover it in the existing changed-bundles workflow test. Write the failing case first.",
+  "description": "validate-submission.yml filters .plans.json and .tuning.json out of CHANGED, and sets has_bundles=false when no primary bundle changed. Unlike .manifest.json and .applied.json, which each have an explicit back-mapping block that re-adds the paired primary bundle, plans and tuning companions have none. A PR touching only those companions therefore skips bundle validation, public path scanning, companion hash validation, and corpus inventory validation. This matters because the privacy scanner explicitly targets those suffixes and commit ef0df3685 shows tuning files carry sensitive material. Reachability checked 2026-08-03: the corpus currently contains zero .plans.json and zero .tuning.json files, so the hole is latent and unexercised rather than actively exploited.",
+  "legacy": {
+    "item_meta": {
+      "category": "Submission integrity",
+      "completed_at": "2026-08-04T00:23:15Z",
+      "completed_pr": 1498,
+      "created_at": "2026-08-03T23:45:01Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A PR touching no bundle or companion still short-circuits without running validation",
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3"
+      },
+      {
+        "behavior": "Companion deletions still trip validation while the paired bundle exists",
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3"
+      },
+      {
+        "behavior": "Manifest and applied back-mapping behaviour is unchanged",
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/**"
+      },
+      {
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_validate_submission_changed_bundles.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows/test_validate_submission_changed_bundles.py -q",
+        "description": "Changed-bundles workflow tests cover plans-only and tuning-only PRs",
+        "expected": "Exits 1 on the unfixed tree once the w0 plans-only and tuning-only cases are added, because the workflow does not back-map those companions, and exits 0 after the back-mapping blocks land.",
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T00:16:26Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py -q",
+        "description": "Submission validator unit contracts still pass",
+        "expected": "No regression in validator behaviour",
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T00:16:32Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added parametrized test_plans_or_tuning_only_change_discovers_paired_primary_bundle covering .plans.json and .tuning.json. Both cases FAIL on develop with CHANGED empty ([] vs expected ['results-data/bundles/result.json']), empirically confirming the bypass rather than assuming it.",
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3",
+        "notes": null,
+        "started_at": "2026-08-04T00:12:30Z",
+        "started_branch": "fix/submission-validator-plans-tuning-backmap-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Add a failing test for a plans-only and a tuning-only PR",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added a CHANGED_COMPANIONS back-mapping block to validate-submission.yml mirroring the manifest and applied handling, covering .plans.json (strip 11) and .tuning.json (strip 12) with case-insensitive suffix detection and diff-filter ACMRD so deletions still trip validation. Both parametrized tests flipped FAIL to PASS.",
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3",
+        "notes": null,
+        "started_at": "2026-08-04T00:13:39Z",
+        "started_branch": "fix/submission-validator-plans-tuning-backmap-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Add CHANGED_PLANS and CHANGED_TUNING back-mapping blocks",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Manifest and applied paths unaffected: all 7 tests in test_validate_submission_changed_bundles.py pass, 115 tests across tests/unit/workflows/ pass, and 86 validator unit contracts in test_validate_submission.py pass. Workflow YAML still parses. Fast-lane collect 26556 of 27050 cap, 0 policy violations.",
+        "item_id": "submission-validator-plans-tuning-backmap-20260803-v3",
+        "notes": null,
+        "started_at": "2026-08-04T00:16:16Z",
+        "started_branch": "fix/submission-validator-plans-tuning-backmap-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Confirm manifest and applied paths are unaffected",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,176 @@
+{
+  "context": "Treat this as an evidence-integrity incident, not a cleanup task. First inventory precisely what survives in committed derived data versus what is permanently lost, so the packets can state an honest verification status instead of implying reproducibility they no longer have. Then fix the durability defect at the source so no future generation depends on a purgeable path, preferring committed normalized responses (they are small) or a checksummed backup manifest outside /tmp. Only then decide, with Joe, whether restoring an auditable chain justifies re-running a generation.",
+  "description": "Verified 2026-08-03 on main at 0661311. The runner wrote every raw and normalized response only under /tmp/memory-behavioral-vN-raw, and each committed result record pins an absolute /tmp path plus a response_sha256 that the scorer and auditor re-read on every invocation. macOS purged /tmp after the 2026-07-29 runs, so all three generations of raw evidence are gone (v3 144 runs, v4 45 runs, v5 180 runs). Only v2-era backups survive under ~/Developer/memory-governance-artifacts. Consequences reproduced directly: score now raises FileNotFoundError on the first record, and audit reports raw response unavailable for every run, so no committed packet can be revalidated and the recorded report SHAs can never be re-derived. Committed derived data retains decision labels, metric components, safety flags, and extra authority or verification, but NOT answer text, dispositions, authority lists, or verification_status.",
+  "legacy": {
+    "item_meta": {
+      "category": "evidence",
+      "completed_at": "2026-08-04T12:17:03Z",
+      "created_at": "2026-08-04T00:07:51Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Committed result records, scored reports, and isolation manifests keep their original values; loss is documented, never papered over",
+        "item_id": "memory-governance-evidence-durability-loss"
+      },
+      {
+        "behavior": "Live Codex and Claude memory and settings remain byte-unchanged",
+        "item_id": "memory-governance-evidence-durability-loss"
+      },
+      {
+        "behavior": "No packet is edited to claim a reproducibility it no longer has",
+        "item_id": "memory-governance-evidence-durability-loss"
+      },
+      {
+        "behavior": "Re-running any generation requires explicit human quota authorization",
+        "item_id": "memory-governance-evidence-durability-loss"
+      },
+      {
+        "behavior": "The surviving v2-era raw backups under memory-governance-artifacts are never modified or deleted",
+        "item_id": "memory-governance-evidence-durability-loss"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-governance-evidence-durability-loss",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-governance-evidence-durability-loss",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-governance-evidence-durability-loss",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-governance-evidence-durability-loss",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-governance-evidence-durability-loss",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/memory-governance-artifacts/**"
+      },
+      {
+        "item_id": "memory-governance-evidence-durability-loss",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-governance-evidence-durability-loss",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-governance-evidence-durability-loss",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-governance-evidence-durability-loss",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m memory_tooling.score --report /tmp/durability-probe.json",
+        "description": "Scoring completes without reading a purgeable path",
+        "expected": "Score runs to completion instead of raising FileNotFoundError",
+        "item_id": "memory-governance-evidence-durability-loss",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && ! rg -q '\"raw_response_path\": \"/tmp/' evaluation_runs/behavioral/results-v5",
+        "description": "No committed result record points at a purgeable location",
+        "expected": "Records reference a durable path or committed content",
+        "item_id": "memory-governance-evidence-durability-loss",
+        "last_result": "fail",
+        "last_run": "2026-08-04T01:13:46Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -q 'raw revalidation' /Users/joe/Developer/memory-governance/reports/promotion-decision-v5-codex.md",
+        "description": "Packets record the honest verification status",
+        "expected": "Each affected packet states what can and cannot be revalidated",
+        "item_id": "memory-governance-evidence-durability-loss",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-governance-evidence-durability-loss",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-governance-evidence-durability-loss",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-governance-evidence-durability-loss",
+        "needs_wid": "w0",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "reports/evidence-inventory.md: measured per-generation status. v2 is FULLY RECOVERABLE - all 72 committed records resolve against behavioral-v2-final-codex-20260728/raw at the same relative path and 72/72 match their recorded response_sha256 (0 missing, 0 mismatched), so for v2 the purge is a resolution defect not data loss. v3 (144), v4 (45), v5 (180) have no archive and are permanently lost. Surviving: result-record metadata plus scored-report decision labels, metrics, safety flags. Lost: the response object - answer text, memory_dispositions, authority, verification_used, completion_stage, verification_status. Rules out re-scoring and the offline taxonomy re-adjudication; leaves aggregate reporting intact",
+        "item_id": "memory-governance-evidence-durability-loss",
+        "notes": null,
+        "started_at": "2026-08-04T01:06:57Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Inventory exactly what survives in committed derived data and what is permanently lost for v3, v4, and v5",
+        "wid": "w0"
+      },
+      {
+        "evidence": "commit 12abc48. New evidence.py resolver plus schema 6 records that embed the normalized response, so future generations verify with no external directory; raw root default moved off /tmp to a durable state dir with env override. Proven: all 72 committed v2 records now resolve via archive fallback and verify their recorded sha256 with zero record edits. Resolution is asymmetric by design - mismatch at the recorded path raises (corruption), mismatch on an archive guess continues the search because run ids repeat across generations (caught a real cross-generation collision during implementation). score now reports unresolvable runs and adds a gate blocker instead of raising FileNotFoundError. 63 scorer tests pass incl. 9 new evidence tests",
+        "item_id": "memory-governance-evidence-durability-loss",
+        "notes": null,
+        "started_at": "2026-08-04T01:07:47Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Make raw and normalized responses durable so no result record points at a purgeable path",
+        "wid": "w1"
+      },
+      {
+        "evidence": "commit 96ba571. Added a Verification status section to promotion-decision-v3.md, codex-v4-pilot-decision.md, and promotion-decision-v5-codex.md: each states the responses were purged, that raw revalidation is no longer possible, that no figure was recomputed or softened, and precisely what cannot be re-derived (answer text, dispositions, authority, verification fields). The v5 note additionally flags that its central claim - 20 flags being label mismatches on behaviorally safe answers - was verified by reading answers that now survive only as quotes. Ladder rung 3 passes",
+        "item_id": "memory-governance-evidence-durability-loss",
+        "notes": null,
+        "started_at": "2026-08-04T01:12:33Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Amend the v3, v4, and v5 packets with an honest verification-status note recording that raw revalidation is no longer possible",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Ruled by Joe 2026-08-04 (queue D9): ACCEPT THE LOSS. No generation is re-run to restore the v3/v4/v5 chain; the packets keep the honest cannot-be-revalidated notes added in commit 96ba571 and carry their derived data forward. Reinforced by a constraint measured the same day: v5 can no longer be re-run as v5 because the durability and validity fixes changed runner/scorer/corpus/prompt hashes, all pinned in the preflight identity, so any re-run is a new generation that would not restore v5's chain regardless. Durability is fixed going forward (schema-6 embedded responses + archive resolver + non-purgeable raw root).",
+        "item_id": "memory-governance-evidence-durability-loss",
+        "notes": null,
+        "started_at": "2026-08-04T12:16:58Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Record Joe's ruling on whether a generation is re-run to restore an auditable evidence chain",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,281 @@
+{
+  "context": "Prefer shared table helpers only where existing table structures are\nalready compatible. Use CSS sticky with explicit measured widths or stable\nCSS variables, and keep layout stable during horizontal scroll. Treat\nfilters as table controls, not separate navigation.\n",
+  "description": "Fix broken sticky/frozen table behavior, add missing filters to large\ntables, and reduce row-height inflation from overloaded cells. Defects\nthis item addresses were flagged in the 2026-05-08 Results Explorer\nfollow-up review (chat-only artifact, not committed to _project/audits/).\nw0 rebinds the review evidence against develop tip and captures it to\n_project/verification-logs/results-explorer-table-sticky-density-and-semantics/w0.log\nbefore any other work unit runs; that log replaces the previous \"review row\n#8/#10/#11/#24/#31/#33\" citations as the durable reference.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add filters that reset the user to another route.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hide provenance entirely to gain density.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "introduce nested cards or large explanatory text blocks around table controls.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend UX",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing sort behavior and default ordering.",
+        "item_id": "results-explorer-table-sticky-density-and-semantics"
+      },
+      {
+        "behavior": "Readable frozen columns at desktop width.",
+        "item_id": "results-explorer-table-sticky-density-and-semantics"
+      },
+      {
+        "behavior": "Receipt/provenance access for every row.",
+        "item_id": "results-explorer-table-sticky-density-and-semantics"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "kind": "do_not_modify",
+        "path_glob": "Generated benchmark data files unless a missing filter field is proven to be absent from the export."
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/components/__tests__/QueryHeatmap.test.tsx src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/MetaLeaderboard.a11y.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/Home.test.tsx",
+        "description": "Targeted dense table tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: browser-check /results/tpch/, /results/p/polars/, /results/query, and /results/ with horizontal and vertical scrolling'",
+        "description": "Manual dense table browser check is complete",
+        "expected": "manual evidence captured in PR notes or audit artifact",
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "needs_wid": "w0",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "needs_wid": "w0",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "notes": "Walk QueryHeatmap (Benchmark detail, horizontal and vertical scroll),\nMetaLeaderboard (Home), PlatformIndex (>= 25 rows), and Query results\nagainst the current develop tip with the compare checkbox column both\nvisible and hidden. Capture frozen-column offset drift, header\ntransparency over scrolled cells, overloaded provenance cells, missing\nPlatform-page filters, and Query header semantics/keyboard\naccessibility to\n_project/verification-logs/results-explorer-table-sticky-density-and-semantics/w0.log.\nOutput is the rebind reference for w1-w7 acceptance.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rebind dense-table review evidence against develop tip",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "notes": "Audit QueryHeatmap, MetaLeaderboard, PlatformIndex, Query results, and\nany table with horizontal scroll or frozen columns. Document frozen\ncolumns, sticky offsets, header behavior, row heights, and cells that\nstack platform, version, trust badges, validation badges, and receipt\nlinks.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit dense scrollable tables and overloaded cells",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "notes": "`QueryHeatmap.tsx` grew a `STICKY_COL_REM` width table and a\n`cumulativeStickyLeft({ hasSelection, showGeomeanCol }, col)` helper\nthat walks the frozen-column prefix and returns the rem offset for\na given column. Every sticky column (checkbox, platform, trust,\nprimary score, geomean) now reads its `left` value from this helper\nvia inline `style`. The previous hardcoded `left-44` Tailwind class\non Trust desynced when the optional compare-checkbox column was\nvisible; the new offset table accounts for it. Score and Geomean\nare also sticky now so they stay aligned with horizontally scrolled\nquery cells. Verification log:\n_project/verification-logs/results-explorer-table-sticky-density-and-semantics/w23.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix Benchmark heatmap sticky-left offsets",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "notes": "The header `<tr>` is now `sticky top-0 z-20` with a solid muted\nbackground so query column numbers stay visible while scrolling\ndown. Frozen-corner header cells (sticky-top + sticky-left) carry\n`z-30` so they paint above body sticky cells (`z-10`) and above\nnon-frozen header cells (`z-20`). Tests in\n`src/components/__tests__/QueryHeatmap.test.tsx` assert the\nvertically sticky class set and the corner z-index. Verification\nlog:\n_project/verification-logs/results-explorer-table-sticky-density-and-semantics/w23.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make Benchmark heatmap headers vertically sticky",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "notes": "`QueryHeatmap.tsx` Platform cell is now identity-only: the\nplatform name, an optional `*` compliance marker (with `title`\nand `aria-label` exposing the full label, e.g. \"Compliance:\nsubscale\"), and the platform_version on a second line. The\nReceipt → link moved to the Trust column where it sits below\nthe trust + validation badges; the Trust column already\nrepresents provenance, so the action is contextually adjacent\nand the `must_preserve: Receipt/provenance access for every\nrow` rule is honored. The same compaction applies to the mobile\ncards branch (`md:hidden`) so the small-screen layout stays in\nsync. Tests in `src/components/__tests__/QueryHeatmap.test.tsx`\nassert the Receipt link's new home and the compliance marker's\ntooltip contract. Verification log:\n_project/verification-logs/results-explorer-table-sticky-density-and-semantics/w4.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Compact provenance and trust/status table cells",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "notes": "`PlatformIndex.tsx` renders a \"Platform result filters\" section\n(`data-testid=\"platform-detail-filters\"`) above the compare-guidance\nstrip whenever `allPlatformResults.length >= 25`. Six selects map\nto the FacetKeys already plumbed through `useFacetState` /\n`matchesFacetRow`: benchmark, scale_factor, phase, trust_tier,\nvalidation_status, and date_window. Option lists for the first five\ncome from the unfiltered cohort (so the user always sees every\navailable value). Date window uses the canonical four-bucket\nDateWindowFacet set. A Reset button (only when at least one of the\nsix facets is active) clears them all in one action. The existing\n\"Showing X of Y results\" line is unchanged structurally — it\nalready reads from `platformResults` (filtered length), so it\nflips from \"30 of 30\" to the filtered count as soon as a select\nfires. `metric_contract` is intentionally omitted (no single\nfacet for it; a follow-up if/when the corpus needs it).\nVerification log:\n_project/verification-logs/results-explorer-table-sticky-density-and-semantics/w5.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add filters to large Platform detail tables",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "notes": "Replace clickable Query table `<th>` headers with keyboard-accessible\nsort buttons. Add `aria-sort` state, visible focus treatment, and\ntests asserting ascending/descending sort state changes are announced\nand reflected in row order.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make Query Workbench sort headers semantic and keyboard accessible",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-table-sticky-density-and-semantics",
+        "notes": "Add tests and browser screenshot checks for horizontal heatmap\nscroll, vertical header stickiness, compact cell height, platform\nfiltering, and Query sort accessibility. Use at least one fixture\nwith the compare checkbox column visible and one without it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover sticky, density, filter, and sort behavior",
+        "wid": "w7"
+      }
+    ]
+  }
+}

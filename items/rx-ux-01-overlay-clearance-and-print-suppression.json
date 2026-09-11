@@ -1,0 +1,238 @@
+{
+  "context": "Extract the duplicated tray markup into one component consumed by both pages, then add: (1) padding-bottom: max(12px, env(safe-area-inset-bottom)) via a --bb-inset-bottom token; (2) a trailing spacer or scroll-padding-bottom on the table container sized to the tray's MEASURED height, since expanded and collapsed heights differ; (3) a minimal @media print rule hiding the tray. Full print support is rx-ux-20; this item only stops the tray printing over content.",
+  "description": "Two near-identical fixed selection trays already ship: BenchmarkIndex.tsx:781 and PlatformIndex.tsx:793, both `fixed bottom-0 left-0 right-0 z-50 border-t ... shadow-lg`. Neither has a bottom inset nor last-row clearance, so the final table row sits under the tray. There is no @media print rule anywhere in the Explorer, so both trays print over content on every page.\n\nThis is a CURRENT defect on shipped UI, not preparation for future work. It is scheduled in Phase 1 for that reason.\n\nNote on safe-area: index.html:23 does not set `viewport-fit=cover`, so env(safe-area-inset-bottom) resolves to 0 today. Home-indicator overlap is therefore NOT established. Introduce the inset as a token seam (--bb-inset-bottom) with a documented default of 0; adopting viewport-fit=cover is a separate global layout decision and is out of scope here.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "adopt viewport-fit=cover as a side effect",
+        "instead": "leave the inset seam inert and raise viewport-fit as its own decision",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "why": "it changes layout globally for every route"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "make the tray a sticky child of a table's overflow-x-auto container",
+        "instead": "keep it fixed at desktop and give it its own containing block",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "why": "those containers are horizontal scrollers and the app uses document scrolling (Layout.tsx:19); a sticky child would track horizontal offset"
+      },
+      {
+        "dont": "regenerate the public-site visual baseline inside the PR",
+        "instead": "name which e2e/captures specs the change invalidates and update those deliberately",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "why": "the baseline is an external CI artifact tied to a base SHA, not a checked-in snapshot"
+      },
+      {
+        "dont": "rely on scroll-padding-bottom alone for clearance",
+        "instead": "add real trailing space sized to the measured tray height",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "why": "scroll-padding only affects scroll-target alignment, not resting content overlap"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T17:05:49Z",
+      "completed_pr": 1810,
+      "created_at": "2026-08-22T14:48:38Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Disabled reasons are exposed via aria-describedby (PlatformIndex.tsx:961, Query.tsx:900), not an accessible-name suffix. Follow the shipped pattern.",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression"
+      },
+      {
+        "behavior": "Existing tray behaviour and copy on both pages; this is a layout and de-duplication change only",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression"
+      },
+      {
+        "behavior": "Sticky first columns already exist: MetaLeaderboard.tsx:273-280 (Platform) and QueryHeatmap.tsx:669-732 (four frozen columns). Do not re-add them.",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/index.html"
+      },
+      {
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/**"
+      },
+      {
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:00:14Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium",
+        "description": "Chromium browser suite passes against a fresh build",
+        "expected": "fixtures verified, build succeeds, chromium suite green",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:05:22Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'tray clearance'",
+        "description": "Last table row is reachable and not overlapped at mobile width",
+        "expected": "last-row bounding box does not intersect the tray at 390x844 or 1440x1000",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:05:47Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -l 'fixed bottom-0' results-explorer/src | rg -v '/components/' | wc -l | tr -d ' '",
+        "description": "Only one fixed-tray implementation remains",
+        "expected": "0",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:05:47Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "results-explorer/src/components/CompareTray.tsx shared by BenchmarkIndex.tsx and PlatformIndex.tsx; npm run typecheck and npm run test passed (871 tests)",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "notes": null,
+        "started_at": "2026-08-22T15:57:44Z",
+        "started_branch": "fix/rx-ux-01-overlay-clearance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-01-overlay-clearance",
+        "status": "done",
+        "summary": "Extract the duplicated tray markup into one shared component",
+        "wid": "w1"
+      },
+      {
+        "evidence": "results-explorer/src/index.css defines inert --bb-inset-bottom and CompareTray applies max(0.75rem, var(--bb-inset-bottom)); typecheck/build passed",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "notes": null,
+        "started_at": "2026-08-22T16:05:04Z",
+        "started_branch": "fix/rx-ux-01-overlay-clearance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-01-overlay-clearance",
+        "status": "done",
+        "summary": "Add --bb-inset-bottom token and apply it to the tray",
+        "wid": "w2"
+      },
+      {
+        "evidence": "CompareTray ResizeObserver measures fixed tray into in-flow compare-tray-spacer; Playwright tray clearance checks passed at 1440x1000 and 390x844 on both routes",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "notes": null,
+        "started_at": "2026-08-22T16:05:09Z",
+        "started_branch": "fix/rx-ux-01-overlay-clearance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-01-overlay-clearance",
+        "status": "done",
+        "summary": "Add measured last-row clearance for collapsed and expanded tray",
+        "wid": "w3"
+      },
+      {
+        "evidence": "results-explorer/src/index.css @media print hides bb-compare-tray and spacer; Playwright print emulation passed on both routes",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "notes": null,
+        "started_at": "2026-08-22T16:05:15Z",
+        "started_branch": "fix/rx-ux-01-overlay-clearance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-01-overlay-clearance",
+        "status": "done",
+        "summary": "Add @media print rule suppressing the tray",
+        "wid": "w4"
+      },
+      {
+        "evidence": "npx playwright test --project=chromium --grep 'tray clearance': 6 passed including both routes at 1440x1000 and 390x844",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "notes": null,
+        "started_at": "2026-08-22T16:05:21Z",
+        "started_branch": "fix/rx-ux-01-overlay-clearance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-01-overlay-clearance",
+        "status": "done",
+        "summary": "e2e: last row not intersecting tray at 1440x1000 and 390x844",
+        "wid": "w5"
+      },
+      {
+        "evidence": "compare-tray.spec.ts emulateMedia print checks: BenchmarkIndex and PlatformIndex trays absent; targeted suite 6 passed",
+        "item_id": "rx-ux-01-overlay-clearance-and-print-suppression",
+        "notes": null,
+        "started_at": "2026-08-22T16:05:28Z",
+        "started_branch": "fix/rx-ux-01-overlay-clearance",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-01-overlay-clearance",
+        "status": "done",
+        "summary": "e2e: tray absent under emulateMedia print",
+        "wid": "w6"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #195 of harmonize-scale-factor-baselines.\nDeferred: Measure actual uncompressed sizes at SF=1 for all benchmarks\nReason deferred: Current uncompressed estimates are calculated from row_count * bytes_per_row. Running each benchmark at SF=1 with --compression none would give exact measurements. Deferred because SF=1 generation takes significant time and disk space.\n",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:35Z",
+      "worktree": "main"
+    }
+  }
+}

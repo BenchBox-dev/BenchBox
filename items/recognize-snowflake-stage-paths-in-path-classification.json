@@ -1,0 +1,262 @@
+{
+  "context": "Introduce explicit Snowflake stage-path recognition in benchbox/utils/cloud_storage.py rather than widening the scheme list — stage paths are a distinct namespace, not a URI. Add is_snowflake_stage_path() covering the three forms: user stage (@~/...), table stage (@%table/...) and named stage (@stage/... and @db.schema.stage/...). Treat a stage path as NON-local everywhere is_cloud_path currently gates, and give get_cloud_path_info a stage branch that reports a stage provider with the stage name and sub-path instead of falling through to the local shape. In orchestrator._resolve_custom_output_root, route stage paths through CloudStagingPath exactly as s3:// is routed, so datagen lands in the managed local cache under the resolved runs root AND platform_cfg['staging_root'] is populated for the adapter. Mirror the same gate in _resolve_construction_output_dir so the pre-construction path returns None (deferred resolution) rather than the raw string. Add '@~/' to .gitignore as defence in depth. This item deliberately does NOT change what Snowflake does with the stage at load time — it only stops the path from being mistaken for a local directory; adapter-side stage upload is out of scope.",
+  "description": "benchbox/utils/cloud_storage.py::is_cloud_path classifies purely by URI scheme (urlparse().scheme in s3/gs/gcs/az/abfss/azure/dbfs). Snowflake INTERNAL stage paths carry no scheme, so `@~/benchbox` classifies as local. Verified on 2026-07-24 @ 14b0271c1 by direct probe: is_cloud_path('@~/benchbox') is False and create_path_handler('@~/benchbox') returns PosixPath('@~/benchbox') — a RELATIVE path. The full chain: benchbox/cli/orchestrator.py::_apply_default_cloud_output_dir reads default_output_location from stored Snowflake credentials (the maintainer's is literally '@~/benchbox') into self.custom_output_dir; benchbox/cli/orchestrator.py::_resolve_construction_output_dir returns it verbatim as a LOCAL output_dir because the is_cloud_path gate says False; BaseBenchmark.__init__ passes it to create_path_handler and datagen writes to <cwd>/@~/benchbox/. Observed impact: 319 MB of TPC-H SF1 .tbl.zst plus a _datagen_manifest.json landed in a literal '@~' directory inside the repo checkout on 2026-07-24 at 08:42. Second-order defect on the same gate: benchbox/cli/orchestrator.py::_resolve_custom_output_root early-returns on the not-is_cloud_path branch BEFORE setting platform_cfg['staging_root'], so the Snowflake adapter never learns a stage was configured and silently falls back to internal-stage loading; had staging_root been set, benchbox/platforms/snowflake.py would have logged the nonsense 'local://None' from get_cloud_path_info. The '@~' directory is also not gitignored (benchmark_runs/ is, at .gitignore:68), which is why the 319 MB showed as untracked while the larger in-tree spill did not.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add '@~' or a bare '@' to the urlparse scheme list in is_cloud_path",
+        "instead": "Match the stage namespace with a dedicated predicate and call it alongside the scheme check",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "why": "A stage path has no URI scheme at all, so urlparse never produces one; matching on the scheme list cannot express this and would silently misfire on other schemeless input"
+      },
+      {
+        "dont": "Classify any path merely containing '@' as a stage",
+        "instead": "Anchor the match to a leading '@' and validate the stage-name grammar that follows",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "why": "abfss://container@account.dfs.core.windows.net/... contains '@' and is already handled as a cloud URI; a blanket match would reroute Azure paths"
+      },
+      {
+        "dont": "Fix this by editing the stored credential to an s3:// URL",
+        "instead": "Fix the classification so any stage path is structurally incapable of becoming a local directory",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "why": "It hides the defect for one machine while every future user who accepts the credential prompt's advertised @~/benchbox default hits the same 319 MB spill"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Support",
+      "created_at": "2026-07-24T18:59:35Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "An explicit --output on the command line keeps priority over the credential-derived default",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification"
+      },
+      {
+        "behavior": "Genuine local paths — absolute, relative, and ~-prefixed — continue to classify as local",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification"
+      },
+      {
+        "behavior": "Snowflake's existing internal-stage load path is unchanged; this item only fixes path classification, not adapter upload behaviour",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification"
+      },
+      {
+        "behavior": "cloudpathlib stays lazily imported and is not required for stage paths",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification"
+      },
+      {
+        "behavior": "s3://, gs://, gcs://, az://, abfss://, azure:// and dbfs:/Volumes/ continue to classify exactly as today, including the DatabricksPath temp-dir behaviour",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_resolve_custom_output_root already branches cloud vs local and sets platform_cfg['staging_root']",
+        "decision": "extend",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "path": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "concept": "CloudStagingPath / DatabricksPath — persistent local cache plus remote target, the established wrapper for 'generate locally, upload later'",
+        "decision": "reuse",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "path": "benchbox/utils/cloud_storage.py"
+      },
+      {
+        "concept": "is_databricks_path() — an existing non-cloudpathlib special case bolted onto the same classification gate",
+        "decision": "extend",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "path": "benchbox/utils/cloud_storage.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runtime_paths.py"
+      },
+      {
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      },
+      {
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/utils/path_utils.py"
+      },
+      {
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "kind": "only_modify",
+        "path_glob": ".gitignore"
+      },
+      {
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/cloud_storage.py"
+      },
+      {
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/utils/ -k 'cloud or path or stage' -q",
+        "description": "Cloud-storage path classification unit tests pass, including the new stage cases",
+        "expected": "exit 0",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from pathlib import Path; from benchbox.utils.cloud_storage import is_cloud_path, create_path_handler; p='@~/benchbox'; assert is_cloud_path(p), 'stage still classified local'; h=create_path_handler(p); assert not (isinstance(h, Path) and not h.is_absolute()), h; print('ok', h)\"",
+        "description": "A stage path no longer resolves to a relative local directory",
+        "expected": "prints ok with a non-relative handler, exit 0",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/ -k 'output_root or staging' -q",
+        "description": "Orchestrator routes a stage path to a local cache and sets staging_root",
+        "expected": "exit 0",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import pathlib; assert not pathlib.Path('@~').exists(), 'stray @~ directory present'; print('clean')\"",
+        "description": "No stray @~ directory is created by a dry-run against the stage default",
+        "expected": "prints clean, exit 0",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast lane stays green",
+        "expected": "exit 0",
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "needs_wid": "w0",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "notes": "Confirm: is_cloud_path('@~/benchbox') is False; create_path_handler returns a relative PosixPath; and orchestrator._resolve_custom_output_root early-returns for that input without ever setting platform_cfg['staging_root'].",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-validate on develop that a Snowflake stage path still classifies as local and silently becomes a relative directory",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "notes": "Forms to accept: @~/... (user stage), @%table/... (table stage), @stage/... (named stage), @db.schema.stage/... (qualified named stage). Negative cases to pin: a local path that merely contains '@', an abfss:// URI whose netloc contains '@', and a bare '@' with nothing after it.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add is_snowflake_stage_path() to benchbox/utils/cloud_storage.py covering user, table, named and qualified-named stage forms, with negative cases",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "notes": "This is what stops benchbox/platforms/snowflake.py logging the nonsense 'local://None' when staging_root is a stage path.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make is_cloud_path treat stage paths as non-local, and give get_cloud_path_info a stage branch reporting a snowflake_stage provider with stage name and sub-path",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "notes": "The local cache must land under the resolved runs root and platform_cfg['staging_root'] must be populated, exactly as the s3:// branch already does. _resolve_construction_output_dir must return None (deferred resolution) instead of handing back the raw stage string.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Route stage paths through CloudStagingPath in orchestrator._resolve_custom_output_root, and mirror the gate in _resolve_construction_output_dir",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "notes": "Parametrise over @~/benchbox, @%lineitem/x, @my_stage/data, s3://b/k, gs://b/k and dbfs:/Volumes/a/b/c so the cloud forms are pinned alongside the new stage forms.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a regression test that no credential-shaped default_output_location can resolve to a relative local path, plus a test that a stage path populates staging_root",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "recognize-snowflake-stage-paths-in-path-classification",
+        "notes": "benchmark_runs/ is already ignored at .gitignore:68, which is why the 1.9 GB in-tree spill was invisible to git status while the 319 MB @~/ directory showed as untracked.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add '@~/' to .gitignore as defence in depth, and confirm git status is clean in a checkout that still holds the stray directory",
+        "wid": "w5"
+      }
+    ]
+  }
+}

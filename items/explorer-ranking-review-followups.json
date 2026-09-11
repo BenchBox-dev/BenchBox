@@ -1,0 +1,86 @@
+{
+  "description": "Non-required nits and improvements surfaced by the code review of\nexplorer-align-ranking-metric-with-tpc-standards.  No Required issues\nwere found in that review; this item tracks the three nit/consider findings.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the sort logic in w1",
+        "instead": "(not specified)",
+        "item_id": "explorer-ranking-review-followups",
+        "why": "only the aria attribute changes"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "QueryHeatmap sort behavior - only the aria-sort attribute changes in w1",
+        "item_id": "explorer-ranking-review-followups"
+      },
+      {
+        "behavior": "showGeomeanCol behavior for all current benchmarks - equivalent semantics, just a less fragile guard",
+        "item_id": "explorer-ranking-review-followups"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- BenchmarkIndex",
+        "description": "QueryHeatmap axe test passes with correct aria-sort",
+        "expected": "no axe violations, all tests pass",
+        "item_id": "explorer-ranking-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Full test suite green",
+        "expected": "all green",
+        "item_id": "explorer-ranking-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-ranking-review-followups",
+        "notes": "QueryHeatmap.tsx:197 - `aria-sort=\"none\"` is used on the primary metric\ncolumn header, but the table IS sorted by that column (lines 94-103 sort\n`sorted` by primary metric).  Screen readers announce \"sort: none\" which\nis incorrect.\n\nFix: set `aria-sort` dynamically based on sort direction:\n  aria-sort={higherIsBetter ? \"descending\" : \"ascending\"}\n\nThe query-timing columns (Q1, Q2, …) correctly retain aria-sort=\"none\"\nsince those columns are not sorted.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix aria-sort on primary metric column in QueryHeatmap",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-ranking-review-followups",
+        "notes": "QueryHeatmap.tsx:164 -\n  const showGeomeanCol = primaryMetric === \"power_score\";\n\nThis hardcodes the assumption that the secondary column is always\ndisplay_geomean_ms when primary is power_score.  The artifact already\ncarries `ranking?.secondary_metric`.  A more robust guard:\n  const showGeomeanCol = primaryMetric !== \"display_geomean_ms\";\nor use `ranking?.secondary_metric === \"display_geomean_ms\"`.\n\nFunctionally equivalent for all current benchmark families, but less\nfragile if a future family uses a different metric pair.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Use ranking?.secondary_metric to gate the secondary geomean column",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-ranking-review-followups",
+        "notes": "ranking.test.ts pins all 9 known benchmark→metric mappings explicitly.\nLike chartRegistry.meta.test.ts, it protects against TS-side drift but\nnot Python-side drift - if a 10th family is added to models.py without\nupdating the test, no CI failure occurs.\n\nThe existing comment already says \"When you add a new benchmark to the\nPython registry, add a case here too.\"  This work item is to add a note\nexplaining WHY (the test cannot parse Python source) so maintainers\nunderstand the limitation rather than assuming the test is comprehensive.\nIf w4 from explorer-chart-coverage-review-followups adopts a dynamic\nparse approach for chartRegistry, mirror that approach here.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add comment to ranking.test.ts clarifying triple-write limitation",
+        "wid": "w3"
+      }
+    ]
+  }
+}

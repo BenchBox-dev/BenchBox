@@ -1,0 +1,237 @@
+{
+  "description": "Current state: 17 platform adapters have only stub-based smoke tests that verify\nadapter wiring (method call order, SQL patterns) but cannot catch real issues like\nSQL dialect incompatibility, auth failures, data type mismatches, or query execution\nbugs. Only 3 platforms (Snowflake, BigQuery, Databricks) have live integration tests,\nand those never run in CI. LakeSail has zero CI coverage (no stub, only live tests\nthat skip without a running server).\n\nGoal: Every platform adapter has real integration tests that execute actual queries\nagainst a real database engine. Two tiers:\n\nTier 1 - Docker-local (8 platforms): ClickHouse (server mode), Trino, Presto,\nPostgreSQL, StarRocks, Doris, Databend, InfluxDB. These can run locally via Docker\ncompose with no cloud credentials. Tests should be runnable with a single\n`make test-docker-<platform>` command.\n\nTier 2 - Cloud-live (2 platforms): Redshift, Athena SQL. These require cloud\ncredentials and follow the existing Snowflake/BigQuery/Databricks live test\npattern with env-var gating.\n\nAdditionally: LakeSail needs a stub for CI coverage (matching all other platforms),\nand existing Docker compose files (Doris, Databend) should be leveraged.\n\nNote on PySpark: PySpark runs locally without Docker (JVM-based, no server needed).\nIt already has integration tests in tests/integration/test_dask_dataframe_integration.py\nand the pyspark CI job. No additional Docker infrastructure required.\n\nNote on LakeSail Docker: LakeSail requires the proprietary Sail server binary\n(`sail serve`). There is no public Docker image. The stub (w3) provides CI coverage;\nlive testing requires manual setup with a Sail server license.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate adapter testing logic",
+        "instead": "live tests should focus on real query execution, data loading, and result correctness, not re-test adapter wiring",
+        "item_id": "platform-live-integration-tests",
+        "why": "each adapter already has unit + stub tests"
+      },
+      {
+        "dont": "make Docker a hard requirement for running the test suite",
+        "instead": "Docker tests are opt-in via `make test-docker-*`",
+        "item_id": "platform-live-integration-tests",
+        "why": "developers must be able to run `make test-fast` without Docker"
+      },
+      {
+        "dont": "store credentials or secrets in docker-compose files",
+        "instead": "use environment variables with documented defaults for local dev",
+        "item_id": "platform-live-integration-tests",
+        "why": "compose files are committed to git"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "platform-live-integration-tests",
+        "id": 223,
+        "reason": "Requires GitHub Actions with Docker compose support (services or docker compose in workflow). Design after local Docker tests are proven stable. Could use scheduled runs (nightly) rather than per-PR.",
+        "resolution": "promoted",
+        "resolved_item": "ci-pipeline-for-docker-based-integration-tests",
+        "resolved_reason": null,
+        "summary": "CI pipeline for Docker-based integration tests"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "platform-live-integration-tests",
+        "id": 224,
+        "reason": "These Spark-on-cloud platforms require significant cloud infrastructure (clusters, IAM roles, S3/GCS staging). Lower priority - the Spark execution path is partially covered by PySpark/LakeSail local tests.",
+        "resolution": "promoted",
+        "resolved_item": "athena-spark-emr-serverless-gcp-dataproc-live-tests",
+        "resolved_reason": null,
+        "summary": "Athena Spark, EMR Serverless, GCP Dataproc live tests"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "platform-live-integration-tests",
+        "id": 225,
+        "reason": "ClickHouse server mode covers the query execution path. Cloud mode adds HTTPS transport + auth but the SQL layer is identical. Add when ClickHouse Cloud credentials are available.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: ClickHouse Cloud live tests explicitly gated on cloud credentials becoming available; no open item indicates credentials are now provisioned.",
+        "summary": "ClickHouse Cloud live tests"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "platform-live-integration-tests",
+        "id": 226,
+        "reason": "LakeSail requires the proprietary Sail server binary. No public Docker image exists. Live testing requires manual setup with a Sail server license. The stub (w3) provides CI coverage for adapter wiring.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: LakeSail live Docker test requires a proprietary licensed Sail server binary BenchBox doesn't have; the CI stub already covers adapter wiring.",
+        "summary": "LakeSail Docker-based live test"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-03-23T00:00:00Z",
+      "created_at": "2026-03-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All live tests must skip gracefully when their service is unreachable - no hard failures in CI",
+        "item_id": "platform-live-integration-tests"
+      },
+      {
+        "behavior": "Docker compose files must not require persistent state - use volumes that are cleaned up on down -v",
+        "item_id": "platform-live-integration-tests"
+      },
+      {
+        "behavior": "Existing live tests (Snowflake, BigQuery, Databricks) must not be modified",
+        "item_id": "platform-live-integration-tests"
+      },
+      {
+        "behavior": "Existing stub-based smoke tests must continue to pass - live tests are additive, not replacement",
+        "item_id": "platform-live-integration-tests"
+      },
+      {
+        "behavior": "run_smoke_benchmark() helper in common.py must remain backward compatible",
+        "item_id": "platform-live-integration-tests"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-live-integration-tests",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "platform-live-integration-tests",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "platform-live-integration-tests",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "platform-live-integration-tests",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "platform-live-integration-tests",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "platform-live-integration-tests",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "platform-live-integration-tests",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "platform-live-integration-tests",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-live-integration-tests",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-live-integration-tests",
+        "needs_wid": "w2",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "platform-live-integration-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Docker compose files for 6 missing platforms",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-live-integration-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Makefile targets + pytest marker for Docker integration testing",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-live-integration-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create LakeSail stub in common.py for CI coverage",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-live-integration-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Docker live tests: ClickHouse server + PostgreSQL",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-live-integration-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Docker live tests: Trino + Presto",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-live-integration-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Docker live tests: StarRocks + Doris",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-live-integration-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Docker live tests: Databend + InfluxDB",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-live-integration-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cloud live tests: Redshift + Athena SQL",
+        "wid": "w8"
+      }
+    ]
+  }
+}

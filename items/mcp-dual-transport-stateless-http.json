@@ -1,0 +1,255 @@
+{
+  "context": "Add explicit transport configuration to benchbox/mcp/cli.py and the server lifecycle: --transport {stdio,streamable-http}, --host, --port, --streamable-http-path, and a documented legacy-client policy. Default to stdio. For HTTP, default host to loopback and delegate discovery, version negotiation, request metadata, and validation to SDK 2. Enable stateless_http for the legacy protocol leg only after documenting the loss of legacy sampling, elicitation, roots, and resumability, none of which current handlers use. Keep JSON-response mode off unless a separate streaming/progress decision approves it.",
+  "description": "BenchBox currently invokes server.run() without a transport argument and therefore exposes only stdio. Add an explicit dual-transport CLI and modern Streamable HTTP endpoint using MCP 2026-07-28 sessionless requests. This is a new deployment surface, not removal of a problematic existing HTTP session design. Keep stdio compatible and keep HTTP loopback-only until the separate authentication and tenancy gate is complete.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "enable json_response by default",
+        "instead": "retain the SDK streaming-capable default pending a separate decision",
+        "item_id": "mcp-dual-transport-stateless-http",
+        "why": "it can preclude future progress notifications and streamed behavior"
+      },
+      {
+        "dont": "implement MCP protocol headers, discovery, or version negotiation by hand",
+        "instead": "exercise SDK behavior through protocol-level tests",
+        "item_id": "mcp-dual-transport-stateless-http",
+        "why": "the SDK already owns these version-sensitive rules"
+      },
+      {
+        "dont": "replace stdio with HTTP",
+        "instead": "add HTTP as an explicit opt-in transport",
+        "item_id": "mcp-dual-transport-stateless-http",
+        "why": "existing Claude Code, Codex, and desktop integrations depend on local stdio"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "needs_item": "mcp-sdk-v2-server-migration"
+      }
+    ],
+    "item_meta": {
+      "category": "feature",
+      "created_at": "2026-08-01T15:44:21Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing stdio startup remains the default with no required new flags",
+        "item_id": "mcp-dual-transport-stateless-http"
+      },
+      {
+        "behavior": "HTTP binds only to a loopback interface until the remote-security TODO is complete",
+        "item_id": "mcp-dual-transport-stateless-http"
+      },
+      {
+        "behavior": "stdio and HTTP publish equivalent tool, resource, prompt, and input-schema contracts",
+        "item_id": "mcp-dual-transport-stateless-http"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "current server.run lifecycle",
+        "decision": "extend",
+        "item_id": "mcp-dual-transport-stateless-http",
+        "path": "benchbox/mcp/__init__.py"
+      },
+      {
+        "concept": "current MCP CLI entry point",
+        "decision": "extend",
+        "item_id": "mcp-dual-transport-stateless-http",
+        "path": "benchbox/mcp/cli.py"
+      },
+      {
+        "concept": "official Streamable HTTP and stateless_http behavior",
+        "decision": "reuse",
+        "item_id": "mcp-dual-transport-stateless-http",
+        "path": "https://py.sdk.modelcontextprotocol.io/run/deploy/"
+      },
+      {
+        "concept": "existing stdio server contract",
+        "decision": "extend",
+        "item_id": "mcp-dual-transport-stateless-http",
+        "path": "tests/unit/mcp/test_mcp_server.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/benchmarks/**"
+      },
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp*.md"
+      },
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/**"
+      },
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      },
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox-mcp --help | rg -q 'stdio.*streamable-http|streamable-http.*stdio'",
+        "description": "The CLI advertises both stdio and Streamable HTTP transports",
+        "expected": "help names both supported transport choices",
+        "item_id": "mcp-dual-transport-stateless-http",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -q",
+        "description": "Focused stdio compatibility coverage remains green",
+        "expected": "existing and migrated MCP unit tests pass",
+        "item_id": "mcp-dual-transport-stateless-http",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_stateless_http.py -q",
+        "description": "Modern HTTP requests complete without protocol session IDs",
+        "expected": "discovery and tool calls succeed without Mcp-Session-Id",
+        "item_id": "mcp-dual-transport-stateless-http",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_transport_contract_parity.py -q",
+        "description": "Transport inventories and schemas are equivalent",
+        "expected": "stdio and HTTP contract snapshots match",
+        "item_id": "mcp-dual-transport-stateless-http",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_cli.py -q -k 'transport or host or loopback'",
+        "description": "Default HTTP configuration cannot bind publicly",
+        "expected": "loopback defaults and unsafe-bind rejection pass",
+        "item_id": "mcp-dual-transport-stateless-http",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "mcp-dual-transport-stateless-http",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mcp-dual-transport-stateless-http",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Define typed transport settings, loopback-safe defaults, and the supported legacy-client policy",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-dual-transport-stateless-http",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add CLI flags and route stdio and Streamable HTTP through explicit SDK-v2 transport APIs",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-dual-transport-stateless-http",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add modern HTTP discovery and tool-call tests that do not use Mcp-Session-Id",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-dual-transport-stateless-http",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Prove stdio and HTTP expose equivalent tool, resource, prompt, and JSON-schema inventories",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-dual-transport-stateless-http",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document localhost startup, client configuration, protocol compatibility, and the prohibition on public binding",
+        "wid": "w5"
+      }
+    ]
+  }
+}

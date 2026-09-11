@@ -1,0 +1,11 @@
+{
+  "description": "create_path_handler() passes through DatabricksPath explicitly to avoid double-wrapping, but has no equivalent guard for CloudStagingPath. Re-wrapping one falls through to the local branch and returns a plain Path of the local staging dir, silently dropping cloud_target. Verified pre-existing and identical for s3:// and Snowflake stage inputs (both yield PosixPath of the local cache), so it is not a regression from classify-snowflake-stage-paths-as-non-local; the orchestrator compensates by carrying the remote target in platform_cfg['staging_root']. Fixing it changes the handler type returned for s3:// flows, which that item's must-preserve list forbade, so it needs its own item that audits every CloudStagingPath producer and consumer (benchbox/base.py output_dir setters, core/runner/runner.py, core/results/exporter.py) before changing the contract.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-25T15:14:25Z",
+      "completed_pr": 1304,
+      "created_at": "2026-07-25T02:29:26Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

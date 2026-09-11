@@ -1,0 +1,250 @@
+{
+  "context": "Three independent sub-moves, each landable alone. For (1), pick the tools-side impl as canonical (it is test-covered), have resources call it, and diff the field sets explicitly -- any field dropped or gained in resource payloads is listed in the PR. For (2), extend PlatformRegistry metadata with required-credential fields; setup.py derives its display from it; CredentialManager behavior unchanged. For (3), relocate the interface consumed by benchbox.utils.config_interface so the edge points downward, then remove the ignore_imports entry so lint-imports enforces it forever.",
+  "description": "Three review findings not covered by the other one-engine items. (1) benchbox/mcp/resources/registry.py duplicates the shaping logic of tools/discovery.py with slightly different field sets (_build_benchmark_detail at registry.py:69-103 vs _get_benchmark_info_impl; _build_platforms_list vs _list_platforms_impl) -- two parallel serializations of the same registry data; extract one shared serializer (core-side or a single mcp-internal module) consumed by both tools and resources. (2) benchbox/cli/commands/setup.py:126-193 hardcodes a per-platform table of descriptions and required credential field names, duplicating knowledge the platform adapters/registry own; move required-credential metadata into the platform registry and derive the table. (3) .importlinter:43 carries a live, ignored layering violation: benchbox.utils.config_interface -> benchbox.cli.config; invert the dependency (move the needed config seam into core or utils) and delete the ignore entry -- the .importlinter header (lines 9-12) states every ignore entry is a real violation that must not grow.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "merge tool and resource serializers by adding a fields= parameter with per-caller branches",
+        "instead": "one canonical payload shape; resources are a projection of it",
+        "item_id": "one-engine-residual-dedup",
+        "why": "per-caller branching is the same duplication with extra indirection"
+      },
+      {
+        "dont": "resolve the utils->cli violation by widening the ignore list or reshuffling module names",
+        "instead": "invert the dependency so the edge points from cli down, then delete the ignore entry",
+        "item_id": "one-engine-residual-dedup",
+        "why": "the layering contract is the enforcement backbone of one-engine; papering over it defeats the program"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-04T18:57:36Z",
+        "from_item": "one-engine-residual-dedup",
+        "id": 689,
+        "reason": "Phase 1 adversarial review (2026-08-04) of merged PRs #1548-#1551. Deferred here rather than on one-engine-unify-statistics because that item is terminal and deferrals on done items are invisible; this item is the program's home for review findings the other items do not cover. The statistics unification is incomplete and its rung overclaims: rung 1 greps only benchbox/mcp and benchbox/cli, but its expected text asserts 'Statistics helpers exist only in benchbox/core'. Three implementations survive. (1) benchbox/platforms/base/result_capture.py::_build_latency_stats and _build_numeric_stats compute p90/p95/p99 by linear interpolation and stdev via statistics.pstdev (POPULATION, not sample), and this path feeds result bundles -- so a single bundle can carry two different definitions of the same field name. Measured on the 22 TPC-H fixture timings: core p95 200.0ms vs result_capture p95 199.0ms; core sample stdev 76.74 vs capture population stdev 74.97. (2) benchbox/core/vector_search/metrics.py::_percentile, linear interpolation. (3) benchbox/experimental/load_testing/analyzer.py::_percentile, floor-index. All three were out of scope for one-engine-unify-statistics, which sets do_not_modify benchbox/platforms/ and whose only_modify globs cover benchbox/core/results/ only. Follow-up must decide per site whether the field is the same statistic (migrate onto percentile_ms/sample_stdev_ms) or a deliberately different one (rename the field and document why), and must widen the verification grep beyond mcp+cli so it stops certifying a claim it does not check.",
+        "resolution": "promoted",
+        "resolved_item": "one-engine-unify-remaining-statistics",
+        "resolved_reason": null,
+        "summary": "Unify the three percentile/stdev implementations that survived one-engine-unify-statistics"
+      }
+    ],
+    "item_meta": {
+      "category": "core",
+      "completed_at": "2026-08-04T21:08:58Z",
+      "completed_pr": 1556,
+      "created_at": "2026-08-04T17:17:51Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "MCP resource URIs and response field names are unchanged unless a field-set diff is explicitly listed in the PR.",
+        "item_id": "one-engine-residual-dedup"
+      },
+      {
+        "behavior": "No new ignore_imports entries are added anywhere in .importlinter.",
+        "item_id": "one-engine-residual-dedup"
+      },
+      {
+        "behavior": "setup.py user-facing prompts and CredentialManager storage behavior are unchanged; only the metadata source moves.",
+        "item_id": "one-engine-residual-dedup"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Header contract: ignore entries are real violations, never to be added -- this item deletes one",
+        "decision": "extend",
+        "item_id": "one-engine-residual-dedup",
+        "path": ".importlinter"
+      },
+      {
+        "concept": "Registry that should own required-credential metadata ('cannot drift apart again', platform_registry.py:105)",
+        "decision": "extend",
+        "item_id": "one-engine-residual-dedup",
+        "path": "benchbox/core/platform_registry.py"
+      },
+      {
+        "concept": "Canonical, test-covered serialization the resources should reuse",
+        "decision": "reuse",
+        "item_id": "one-engine-residual-dedup",
+        "path": "benchbox/mcp/tools/discovery.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/security.py"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/security/credentials.py"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "only_modify",
+        "path_glob": ".importlinter"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/app.py"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/setup.py"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/config.py"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/resources/"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/discovery.py"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -q 'benchbox.utils.config_interface -> benchbox.cli.config' .importlinter",
+        "description": "utils->cli ignore entry is gone from .importlinter",
+        "expected": "Exits 1 on the unfixed tree (the ignore entry exists today at .importlinter:43); exits 0 only once the violation is removed and the entry deleted.",
+        "item_id": "one-engine-residual-dedup",
+        "last_result": "pass",
+        "last_run": "2026-08-04T20:40:00Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- lint-imports",
+        "description": "Layering contracts pass without the ignore",
+        "expected": "utils no longer imports cli; all contracts green.",
+        "item_id": "one-engine-residual-dedup",
+        "last_result": "pass",
+        "last_run": "2026-08-04T20:40:03Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -k 'resource and (serializ or shared or parity)' -q",
+        "description": "Resource and tool payloads share one serializer",
+        "expected": "Test asserts resources and discovery tools derive from the same payload builder.",
+        "item_id": "one-engine-residual-dedup",
+        "last_result": "pass",
+        "last_run": "2026-08-04T20:40:11Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp tests/unit/cli -m fast -q",
+        "description": "MCP + CLI fast suites green",
+        "expected": "No behavior regressions.",
+        "item_id": "one-engine-residual-dedup",
+        "last_result": "pass",
+        "last_run": "2026-08-04T20:40:25Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-residual-dedup",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "one-engine-residual-dedup",
+        "needs_wid": "w0",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-verified all three at HEAD. (1) registry.py _build_benchmark_detail/_build_platforms_list duplicate discovery.py's shaping with different field sets. (2) setup.py:126-193 hardcodes 7 platforms' names/descriptions/required fields. (3) .importlinter:43 carries benchbox.utils.config_interface -> benchbox.cli.config; the edge is create_cli_config_adapter(), reached only from three config_manager-is-None fallbacks that no production code exercises.",
+        "item_id": "one-engine-residual-dedup",
+        "notes": null,
+        "started_at": "2026-08-04T21:08:46Z",
+        "started_branch": "refactor/one-engine-residual-dedup",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Re-verify the three duplications at HEAD",
+        "wid": "w0"
+      },
+      {
+        "evidence": "discovery.py owns build_benchmark_payload/build_platform_payloads; resources are explicit projections, no fields= switch. Payload diff captured before/after: field NAMES unchanged; query_ids goes from [] (every benchmark -- the old helper probed attribute names no benchmark class has) to real ids; resource platform list gains the canonical adoption-then-name ordering; resource reads now cost real work (tpcds ~2s).",
+        "item_id": "one-engine-residual-dedup",
+        "notes": null,
+        "started_at": "2026-08-04T21:08:49Z",
+        "started_branch": "refactor/one-engine-residual-dedup",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Unify MCP resource/tool serialization on the tools-side impl",
+        "wid": "w1"
+      },
+      {
+        "evidence": "required_credentials added to 7 platform_registry entries; setup.py derives the table from platforms declaring it. Required-field lists byte-identical (asserted); row order now alphabetical for determinism. Display blurbs stay local as presentation copy. CredentialManager untouched.",
+        "item_id": "one-engine-residual-dedup",
+        "notes": null,
+        "started_at": "2026-08-04T21:08:52Z",
+        "started_branch": "refactor/one-engine-residual-dedup",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Credential metadata into PlatformRegistry; setup.py derives its table",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Dependency inverted: utils exposes set_config_provider/get_config_provider, CLIConfigProvider moved to benchbox/cli/config.py, and the CLI group callback installs it. .importlinter ignore entry deleted; lint-imports 3/3 green. An AST test asserts config_interface imports nothing from benchbox.cli.",
+        "item_id": "one-engine-residual-dedup",
+        "notes": null,
+        "started_at": "2026-08-04T21:08:55Z",
+        "started_branch": "refactor/one-engine-residual-dedup",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Invert utils->cli config dependency; delete the .importlinter ignore entry",
+        "wid": "w3"
+      }
+    ]
+  }
+}

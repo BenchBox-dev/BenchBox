@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #351 of benchmark-option-cli-support.\nDeferred: Add benchmark-option shell completion\nReason deferred: Tab-completion for --benchmark-option keys and choices would improve DX but requires Click shell completion integration. Not needed for initial release.\n",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:39Z",
+      "worktree": "main"
+    }
+  }
+}

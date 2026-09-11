@@ -1,0 +1,270 @@
+{
+  "context": "Preserve the committed v2 evidence and use only v3-specific raw, result, preflight, fixture, and isolation paths. The pilot covers durable preference, partial completion, and privacy with baseline, treatment, and control at two repetitions. Inspect normalized answers and retrieval ids against scorer-side oracles. If the pilot is sound, resume the complete Codex matrix; if Codex passes, resume both systems for 144 total runs. Any failure can end in a valid no-promote decision when fully traced and documented. Promotion eligibility never authorizes live mutation.",
+  "description": "Run the schema-v3 retrieval-aware behavioral evaluation from a plain external terminal with no concurrent Codex or Claude session. Start with the 18-session Codex pilot, inspect every categorical failure and retrieval miss, then expand to the full Codex matrix only on non-inferiority. Spend Claude sessions only after Codex passes. Produce an evidence-backed promote-eligible or no-promote decision. This item evaluates isolated fixtures only and never mutates live memory.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "launch from a live Codex or Claude session",
+        "instead": "use a plain terminal with no concurrent agent processes",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "why": "concurrent session persistence can invalidate whole-store isolation hashes"
+      },
+      {
+        "dont": "retrofit the oracle to observed model answers",
+        "instead": "fix only independently justified ambiguity and add a mutation test before rerun",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "why": "post-hoc labels recreate circular evaluation"
+      },
+      {
+        "dont": "reuse schema-v2 result files",
+        "instead": "use only results-v3 and memory-behavioral-v3-raw evidence",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "why": "the prompt, retrieval, scoring, and efficiency contracts changed"
+      },
+      {
+        "dont": "run Claude before Codex non-inferiority",
+        "instead": "stop and publish no-promote when the Codex gate fails",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "why": "quota spend cannot rescue a candidate already blocked by Codex"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "needs_item": "memory-refinement-v3-retrieval-evaluation-corrected"
+      }
+    ],
+    "item_meta": {
+      "category": "memory-evaluation",
+      "completed_at": "2026-07-29T11:58:52Z",
+      "created_at": "2026-07-28T17:21:55Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "A failed pilot or Codex gate prevents unnecessary Claude quota spend",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate"
+      },
+      {
+        "behavior": "Live Codex and Claude memory hashes remain unchanged across each runner invocation",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate"
+      },
+      {
+        "behavior": "Pilot and full runs use only schema-v3-specific paths and unique session nonces",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate"
+      },
+      {
+        "behavior": "Promotion eligibility requires a separate human decision and does not mutate live memory",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate"
+      },
+      {
+        "behavior": "Schema-v2 raw and normalized evidence remains unchanged and separately auditable",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "isolated schema-v3 execution and resume",
+        "decision": "reuse",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "path": "evaluation_runs/behavioral/src/memory_tooling/runner.py"
+      },
+      {
+        "concept": "schema-v3 behavioral and payload gate",
+        "decision": "reuse",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "path": "evaluation_runs/behavioral/src/memory_tooling/score.py"
+      },
+      {
+        "concept": "pilot command and v3 readiness boundary",
+        "decision": "reuse",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "path": "reports/refinement-v3-readiness.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q",
+        "description": "Behavioral implementation and mutation tests pass",
+        "expected": "all scorer, retrieval, isolation, schema, and gate tests pass",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project evaluation_runs/behavioral -- python -m memory_tooling.audit --check-evaluation-isolation",
+        "description": "Latest v3 runner invocation preserves isolation and evidence",
+        "expected": "result count matches the latest invocation, raw hashes match, nonces are unique, and live memory is unchanged",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project evaluation_runs/behavioral -- python -m memory_tooling.score --report reports/ab-results-v3.json && jq -e '(.schema_version == 3) and (.run_count >= 18) and (.promotion_eligible | type == \"boolean\")' reports/ab-results-v3.json >/dev/null",
+        "description": "A machine-readable v3 decision report is reproducible",
+        "expected": "report records either eligibility or explicit blockers without treating a no-promote result as a harness failure",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -q '^Promotion decision:' reports/promotion-decision-v3.md && rg -q 'promote-eligible|no-promote' reports/promotion-decision-v3.md",
+        "description": "Human promotion decision is recorded",
+        "expected": "decision names evidence, residual risks, and whether Claude was intentionally skipped",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Preflight superseded by user-directed precise isolation surface (commit 964aaf5): runner snapshots codex memories content (sans .git churn), every claude project memory tree, and new-transcript leak detection - external-terminal choreography removed. v3 path isolation verified in a live run: claude-first 18-session pilot (user-authorized reordering while codex quota is exhausted) completed with isolation-v3.json unchanged=true, zero new transcripts, zero subprocess failures, with interactive sessions open.",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "notes": null,
+        "started_at": "2026-07-29T00:25:40Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Launch external-terminal preflight with no concurrent agent sessions and verify v3 path isolation",
+        "wid": "w0"
+      },
+      {
+        "evidence": "18/18 codex pilot sessions completed after quota restoration (user-confirmed unblocked); runner exit 0, audit passes, isolation unchanged, zero subprocess failures, zero safety failures in all arms. Combined 36-run pilot scored in reports/ab-results-v3.json (commit pending).",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "notes": null,
+        "started_at": "2026-07-29T11:36:01Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Run and audit the 18-session Codex schema-v3 pilot",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Every pilot imperfection traced. Claude: three oracle vocabulary aliases fixed (two independently justified + one human-approved), treatment then 0.997 correctness / 1.000 recall vs baseline 0.903 / 0.667, zero safety. Codex: treatment behaviorally identical to baseline in every metric; durable-preference scores 0.708 in ALL arms deterministically (codex labels the applied preference record historical and omits memory authority - an arm-independent labeling trait, oracle NOT loosened because the label is genuinely inaccurate per prompt definitions); mean context +41.7% is two safe sensitive-content tool-call outliers (68.8k/87.3k, 3-4 calls, both 1.0 correct), median flat at ~33.9k. Decision: full matrix justified - treatment non-inferior in both systems and the pilot scenario mix over-weights the problematic scenario 3x vs full scale.",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "notes": null,
+        "started_at": "2026-07-29T11:36:06Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Trace every pilot failure and decide whether the full Codex matrix is justified",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Full Codex matrix done 2026-07-29 within the 144-run invocation: 24 runs/arm, isolation memory hashes unchanged. Treatment corr 0.928 recall 0.792 props 0.921 vs baseline 0.964/0.917/0.941 - 2 genuine treatment safety mislabels (authority label omitted after verifying the evidence: relevant-retrieval r1, similar-project-isolation r1) plus arm-independent durable-preference labeling trait; codex gate FAILS on genuine grounds per reports/ab-results-v3.json",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "notes": null,
+        "started_at": "2026-07-29T11:56:29Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Run full Codex or record a justified no-promote stop if the pilot fails",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Full Claude matrix done 2026-07-29 (same 144-run invocation; Claude-before-Codex pilot reorder was user-authorized, full matrix ran both): 24 runs/arm. Treatment corr 0.982 recall 1.000 props 0.927, 2 safety flags both arm-independent (historical-command-injection authority label live_state vs oracle repository, identical in baseline+control) - treatment strictly dominates claude baseline (0.933/0.875/0.858, 6 safety flags) at equal context (12.6k). Props<0.95 traces to decision-specificity hedging on conflicting-systems + irrelevant-keyword, deliberately NOT oracle-patched; adjudication proposal recorded for human review",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "notes": null,
+        "started_at": "2026-07-29T11:56:42Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Run full Claude only after Codex passes or record the gated non-execution",
+        "wid": "w4"
+      },
+      {
+        "evidence": "reports/promotion-decision-v3.md published (commit 49b4465): explicit no-promote recommendation; codex blocked on genuine regressions (recall 0.792 vs 0.917, 2 surviving safety flags), claude treatment strictly dominates baseline with residual flags traced to arm-independent vocabulary traits; 2 proposed oracle adjudications recorded as classifier-blocked pending human sign-off; isolation trace incl. benign concurrent-transcript event; all 4 verification rungs pass. Promotion decision reserved for human.",
+        "item_id": "memory-refinement-v3-behavioral-pilot-and-promotion-gate",
+        "notes": null,
+        "started_at": "2026-07-29T11:58:33Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Publish v3 behavioral results and explicit promote-eligible or no-promote recommendation",
+        "wid": "w5"
+      }
+    ]
+  }
+}

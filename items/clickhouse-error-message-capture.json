@@ -1,0 +1,95 @@
+{
+  "context": "Search the ClickHouse adapter for try/except blocks in query execution methods.\nLook for patterns where the exception is caught to set status=FAILED but the\nerror message is not stored. Ensure the error field in QueryResult is populated.\n",
+  "description": "The ClickHouse adapter captures failure status but swallows the exception message.\nread_primitives and tpcdi result JSONs show \"status\": \"FAILED\" with no error string,\nmaking diagnosis of query failures much harder.\n\nThe adapter's query execution error handler should always capture str(exception)\ninto the result object. This is Pattern G from the SF1 failure analysis.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "catch exceptions without storing str(e) in the result error field",
+        "instead": "always capture the message",
+        "item_id": "clickhouse-error-message-capture",
+        "why": "swallowed errors force manual re-runs for diagnosis"
+      },
+      {
+        "dont": "change query execution flow or retry logic",
+        "instead": "only add error message capture to existing except blocks",
+        "item_id": "clickhouse-error-message-capture",
+        "why": "this is a diagnostics-only fix"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-12T00:00:00Z",
+      "created_at": "2026-04-08T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Query execution flow and retry logic unchanged",
+        "item_id": "clickhouse-error-message-capture"
+      },
+      {
+        "behavior": "Successful queries unaffected",
+        "item_id": "clickhouse-error-message-capture"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'clickhouse and (error_capture or error_message)'",
+        "description": "Error messages appear in query results when queries fail",
+        "expected": "Tests pass confirming str(exception) is stored in result.error for failed queries",
+        "item_id": "clickhouse-error-message-capture",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-error-message-capture",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "clickhouse-error-message-capture",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "clickhouse-error-message-capture",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Find the ClickHouse adapter's query execution error handler - locate where exceptions are caught but messages discarded",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-error-message-capture",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Ensure str(exception) is always written to the result error field",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-error-message-capture",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit test verifying error messages are captured in query results",
+        "wid": "w3"
+      }
+    ]
+  }
+}

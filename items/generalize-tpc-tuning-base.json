@@ -1,0 +1,438 @@
+{
+  "context": "Build the generalization in three layers:\n\n1. Logical profile: canonical workload-level TPC candidates and evidence.\n2. Capability mapping: platform-specific translation or explicit waiver.\n3. Validation/reporting: checked templates and result metadata show coverage\n   of the logical profile.\n\nKeep generation optional until validation is stable. A strict checker with a\nreviewable diff is safer than silently rewriting platform YAML.\n",
+  "description": "Follow-up to validate-and-integrate-tpc-tuning-json. That task intentionally\nretained a narrow Databricks integration of recovered TPC-H/TPC-DS tuning\ncolumns, but review identified a larger product risk: BenchBox currently\nresolves `--tuning tuned` by locating platform-specific example YAML files,\nso tuned-mode comparability depends on hand-maintained template coverage\nrather than a reusable workload-level tuning contract.\n\nAt a high level, convert the Databricks TPC tuning column base into a\ngeneralized, platform-neutral TPC tuning profile that can be reused across\nSQL platforms, validated against platform capabilities, and reported in\nbenchmark results. Databricks should become one consumer of that profile, not\nthe source of truth.\n\nCurrent facts to preserve and rebind at implementation time:\n- Runtime `--tuning tuned` discovery searches\n  `examples/tunings/{platform}/{benchmark}_tuned.yaml` and falls back to\n  basic constraints when no template exists.\n- Existing tuned-template coverage records template presence/fallback, not\n  semantic parity of the logical tuning candidates across platforms.\n- `TableTuning` supports partitioning, clustering, distribution, and sorting;\n  Databricks Z-ORDER columns are built from clustering plus distribution, not\n  from per-table `z_ordering_columns`.\n- DuckDB uses sort-oriented physical layout, not Databricks Z-ordering, so\n  parity means a platform-appropriate mapping decision, not identical YAML.\n\nThe implementation must answer the comparison question explicitly: when two\nresults are labeled `tuned`, what logical workload profile was requested,\nwhich physical mechanisms did each platform apply, which candidates were\nunsupported or intentionally dropped, and how should a user interpret the\ntuned-vs-tuned comparison?",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add speculative columns to platform templates without query-template evidence or a profile-level rationale.",
+        "instead": "(not specified)",
+        "item_id": "generalize-tpc-tuning-base",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "call a tuned-vs-tuned comparison fair unless result metadata shows which logical candidates were mapped, waived, or unsupported.",
+        "instead": "(not specified)",
+        "item_id": "generalize-tpc-tuning-base",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hide fallback/basic-constraints cells behind `tuning_mode == tuned` without a coverage grade or waiver reason.",
+        "instead": "(not specified)",
+        "item_id": "generalize-tpc-tuning-base",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make the profile validator depend on live cloud credentials; use checked-in YAML and dry-run/unit-level assertions.",
+        "instead": "(not specified)",
+        "item_id": "generalize-tpc-tuning-base",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "require identical physical mechanisms across platforms",
+        "instead": "(not specified)",
+        "item_id": "generalize-tpc-tuning-base",
+        "why": "Z-ORDER, ORDER BY, CLUSTER BY, distribution keys, and sorted ingestion have different semantics and costs."
+      },
+      {
+        "dont": "treat Databricks as the source of truth",
+        "instead": "(not specified)",
+        "item_id": "generalize-tpc-tuning-base",
+        "why": "that preserves the original blind spot and makes other platforms second-class consumers."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "generalize-tpc-tuning-base",
+        "id": 187,
+        "reason": "This TODO creates reusable semantics and validation, not live cloud benchmark evidence.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Measured performance ranking of candidate columns on live Databricks, BigQuery, Snowflake, or Redshift"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "generalize-tpc-tuning-base",
+        "id": 188,
+        "reason": "First land validation and explicit mapping decisions; generation can follow after the checker is stable.",
+        "resolution": "promoted",
+        "resolved_item": "automatic-rewriting-of-every-platform-s-tuned-template",
+        "resolved_reason": null,
+        "summary": "Automatic rewriting of every platform's tuned template"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "generalize-tpc-tuning-base",
+        "id": 189,
+        "reason": "Keep the first generalized profile scoped to the recovered TPC tuning evidence.",
+        "resolution": "promoted",
+        "resolved_item": "extending-the-logical-profile-beyond-tpc-h-and-tpc-ds",
+        "resolved_reason": null,
+        "summary": "Extending the logical profile beyond TPC-H and TPC-DS"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-05-26T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Databricks accepted columns added by validate-and-integrate-tpc-tuning-json remain represented unless a newer evidence audit documents a removal.",
+        "item_id": "generalize-tpc-tuning-base"
+      },
+      {
+        "behavior": "DuckDB tuned templates are not modified to imitate Databricks Z-ordering; use DuckDB-appropriate sorting/layout semantics.",
+        "item_id": "generalize-tpc-tuning-base"
+      },
+      {
+        "behavior": "Existing `--tuning notuning` baseline semantics: constraints disabled, no platform physical tuning.",
+        "item_id": "generalize-tpc-tuning-base"
+      },
+      {
+        "behavior": "Existing `--tuning tuned` template discovery behavior unless this TODO explicitly introduces a backward-compatible profile resolution layer.",
+        "item_id": "generalize-tpc-tuning-base"
+      },
+      {
+        "behavior": "No raw UAT logs, scratchpad files, or large generated reports are committed.",
+        "item_id": "generalize-tpc-tuning-base"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/tuning_resolver.py:get_tuning_template_paths and _resolve_tuned - reuse current tuned-template discovery/fallback contract as the behavior being made auditable.",
+        "decision": "reuse",
+        "item_id": "generalize-tpc-tuning-base",
+        "path": "benchbox/cli/tuning_resolver.py:get_tuning_template_paths"
+      },
+      {
+        "concept": "benchbox/core/tuning/coverage.py and tests/uat/data/tuning_coverage.tsv - extend existing coverage semantics from template presence to logical-profile parity.",
+        "decision": "extend",
+        "item_id": "generalize-tpc-tuning-base",
+        "path": "benchbox/core/tuning/coverage.py"
+      },
+      {
+        "concept": "benchbox/core/tuning/interface.py:TableTuning - reuse existing partitioning/clustering/distribution/sorting fields instead of adding per-platform ad hoc table keys.",
+        "decision": "reuse",
+        "item_id": "generalize-tpc-tuning-base",
+        "path": "benchbox/core/tuning/interface.py:TableTuning"
+      },
+      {
+        "concept": "benchbox/platforms/base/sorted_ingestion.py - reuse capability-matrix and resolved-strategy pattern for platform-specific physical mechanisms.",
+        "decision": "reuse",
+        "item_id": "generalize-tpc-tuning-base",
+        "path": "benchbox/platforms/base/sorted_ingestion.py"
+      },
+      {
+        "concept": "benchbox/platforms/databricks/adapter.py:_build_zorder_columns - reuse Databricks mapping from clustering/distribution to Z-ORDER/liquid behavior.",
+        "decision": "reuse",
+        "item_id": "generalize-tpc-tuning-base",
+        "path": "benchbox/platforms/databricks/adapter.py:_build_zorder_columns"
+      },
+      {
+        "concept": "docs/reference/result-schema-v1.md and benchbox/core/tuning/metadata.py - reuse result/tuning metadata patterns before adding new schema fields.",
+        "decision": "reuse",
+        "item_id": "generalize-tpc-tuning-base",
+        "path": "docs/reference/result-schema-v1.md"
+      },
+      {
+        "concept": "docs/usage/cloud-sorted-ingestion.md - reuse comparison language around native tuning, sorted ingestion, and result metadata.",
+        "decision": "reuse",
+        "item_id": "generalize-tpc-tuning-base",
+        "path": "docs/usage/cloud-sorted-ingestion.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/tuning_profile_check.py"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "docs/development/"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "docs/usage/"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "examples/tunings/README.md"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "examples/tunings/databricks/tpcds_tuned.yaml"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "examples/tunings/databricks/tpch_tuned.yaml"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "examples/tunings/duckdb/tpcds_tuned.yaml"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "examples/tunings/duckdb/tpch_tuned.yaml"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/data/tuning_coverage.tsv"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_tuning_coverage.py"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_databricks_tuning_examples.py"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning/test_tpc_workload_profiles.py tests/unit/core/tuning/test_tpc_tuning_template_parity.py -q",
+        "description": "New profile and template parity tests pass",
+        "expected": "all tests pass",
+        "item_id": "generalize-tpc-tuning-base",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_databricks_tuning_examples.py -q",
+        "description": "Existing Databricks tuning example coverage is generalized or remains green during migration",
+        "expected": "all tests pass, or test is intentionally removed/replaced by the generalized parity suite",
+        "item_id": "generalize-tpc-tuning-base",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/tuning_profile_check.py --benchmarks tpch,tpcds --platforms databricks,duckdb --strict",
+        "description": "TPC profile checker reports no unmapped required candidates for Databricks and DuckDB",
+        "expected": "no unmapped accepted candidates without explicit unsupported/waiver decisions",
+        "item_id": "generalize-tpc-tuning-base",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.cli.config import ConfigManager; cm=ConfigManager(); paths=('examples/tunings/databricks/tpch_tuned.yaml','examples/tunings/databricks/tpcds_tuned.yaml','examples/tunings/duckdb/tpch_tuned.yaml','examples/tunings/duckdb/tpcds_tuned.yaml'); [cm.load_unified_tuning_config(p, p.split('/')[2]) for p in paths]; print('ok')\"\n",
+        "description": "Unified tuning examples still load through the real loader",
+        "expected": "ok",
+        "item_id": "generalize-tpc-tuning-base",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_tuning_coverage.py -m fast -q",
+        "description": "Tuned-template coverage matrix tests stay green",
+        "expected": "all tests pass",
+        "item_id": "generalize-tpc-tuning-base",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Broad PR gate",
+        "expected": "exit 0",
+        "item_id": "generalize-tpc-tuning-base",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "generalize-tpc-tuning-base",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "generalize-tpc-tuning-base",
+        "notes": "Start by re-validating the current facts against the branch tip, because\nthis TODO is about turning a local Databricks patch into a generalized\ncontract.\n\nRead and summarize, in DONE notes or PR body:\n  - `benchbox/cli/tuning_resolver.py:get_tuning_template_paths` and\n    `_resolve_tuned` - template discovery/fallback semantics.\n  - `benchbox/core/tuning/coverage.py` and\n    `tests/uat/data/tuning_coverage.tsv` - coverage status semantics.\n  - `benchbox/core/tuning/interface.py:TableTuning` - supported logical\n    table-tuning fields.\n  - `benchbox/platforms/databricks/adapter.py:_build_zorder_columns` -\n    Databricks physical mapping.\n  - `benchbox/platforms/base/sorted_ingestion.py` and\n    `docs/usage/cloud-sorted-ingestion.md` - existing strategy/capability\n    pattern for physical layout comparison.\n\nProduce a compact matrix for current TPC-H/TPC-DS tuned templates:\n  platform | benchmark | template path | partitioning fields | clustering fields | sorting fields | distribution fields\n\nInclude at least Databricks and DuckDB for TPC-H/TPC-DS. Do not commit raw\nstdout logs; commit only the durable summary if it belongs in code/docs, or\nplace raw evidence under `/tmp`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rebind current tuning architecture, Databricks integration, and comparison-risk evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-tpc-tuning-base",
+        "notes": "Add a canonical logical profile for TPC-H and TPC-DS that is independent of\nany one database engine. Recommended shape:\n  - `benchbox/core/tuning/profiles/tpc.yaml` for data.\n  - `benchbox/core/tuning/workload_profiles.py` for typed loading,\n    validation, and lookup helpers.\n\nThe profile must model logical intent, not Databricks features:\n  - benchmark id: `tpch`, `tpcds`\n  - table name and column name in canonical ALL-CAPS form\n  - SQL type\n  - logical roles, using a bounded vocabulary such as:\n      temporal_partition\n      high_selectivity_filter\n      join_locality\n      fact_dimension_join\n      group_order_locality\n      distribution_candidate\n  - query evidence:\n      query_count\n      query_ids\n      evidence_source path glob\n      acceptance status: accepted | existing_baseline | dropped_low_evidence\n      rationale\n\nSeed the profile from the current Databricks TPC audit, including both\naccepted and rejected candidates so future agents cannot re-add rejected\nscratchpad guesses without new evidence.\n\nMinimum TPC-H accepted candidates from the audit:\n  - LINEITEM.L_SUPPKEY: count 7, queries 5, 7, 8, 9, 15, 20, 21\n  - ORDERS.O_CUSTKEY: count 8, queries 3, 5, 7, 8, 10, 13, 18, 22\n  - CUSTOMER.C_NATIONKEY: count 4, queries 5, 7, 8, 10\n  - SUPPLIER.S_NATIONKEY: count 8, queries 2, 5, 7, 8, 9, 11, 20, 21\n  - PART.P_TYPE: count 4, queries 2, 8, 14, 16\n  - PART.P_SIZE: count 3, queries 2, 16, 19\n\nMinimum TPC-DS accepted candidates from the audit:\n  - CUSTOMER.C_CURRENT_ADDR_SK: count 19\n  - CUSTOMER.C_CURRENT_CDEMO_SK: count 7\n  - DATE_DIM.D_YEAR: count 58\n  - DATE_DIM.D_MOY: count 28\n  - ITEM.I_CATEGORY: count 21\n  - ITEM.I_CLASS: count 11\n  - STORE_SALES.SS_STORE_SK: count 34\n  - STORE_SALES.SS_PROMO_SK: count 6\n  - STORE_SALES.SS_TICKET_NUMBER: count 16\n  - STORE_RETURNS.SR_CUSTOMER_SK: count 5\n  - STORE_RETURNS.SR_STORE_SK: count 3\n  - STORE_RETURNS.SR_TICKET_NUMBER: count 11\n  - WEB_SALES.WS_WEB_PAGE_SK: count 4\n  - WEB_SALES.WS_WEB_SITE_SK: count 6\n  - WEB_SALES.WS_SHIP_MODE_SK: count 3\n  - CATALOG_SALES.CS_SHIP_MODE_SK: count 3\n\nMinimum rejected candidates to encode:\n  - WEB_RETURNS.WR_WEB_PAGE_SK: dropped_low_evidence, count 1\n  - CATALOG_RETURNS.CR_SHIP_MODE_SK: dropped_low_evidence, count 0\n\nThe profile must also account for existing baseline columns that were\nalready present before the Databricks follow-up, such as date partition\ncolumns and key columns. Do not silently omit existing baseline columns\njust because they were not part of the restored scratchpad.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the platform-neutral TPC logical tuning profile schema and data",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-tpc-tuning-base",
+        "notes": "Add an explicit mapping layer that answers: for this platform and logical\nrole, should the candidate be represented as partitioning, clustering,\ndistribution, sorting, sorted ingestion, a platform optimization, or an\nunsupported/waived decision?\n\nRecommended code path:\n  - `benchbox/core/tuning/platform_capabilities.py` or an equivalent\n    module under `benchbox/core/tuning/`.\n  - Keep the mapping data-driven enough that tests can enumerate it.\n\nRequired platform coverage in the first slice:\n  - Databricks: temporal partitioning where already used; logical locality\n    and filter candidates map to `clustering` / Z-ORDER or liquid\n    clustering path through existing adapter behavior. Do not add\n    per-table `z_ordering_columns`.\n  - DuckDB: logical locality candidates map to `sorting` / sorted layout\n    where DuckDB supports it; no Z-ordering vocabulary.\n  - BigQuery: temporal candidates map to partitioning when type/shape is\n    supported; locality candidates map to clustering with the four-column\n    limit made explicit.\n  - Redshift: distribution candidates map to dist key decisions and\n    locality candidates to sort key decisions, with single-key limitations\n    made explicit.\n  - Snowflake: locality candidates map to clustering keys where useful;\n    distribution is unsupported.\n  - Platforms without a meaningful physical tuning mechanism must return a\n    structured waiver reason rather than pretending parity exists.\n\nThis layer must not claim performance equivalence across platforms. It\nshould expose semantic coverage and physical mechanism differences so\ncomparison UIs and result consumers can see them.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add platform capability mapping from logical profile roles to physical tuning mechanisms",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-tpc-tuning-base",
+        "notes": "Add validation that checks checked-in example templates against the logical\nprofile and platform capability mapping. This may be implemented as a\nlibrary helper plus a small project script, for example:\n  - `benchbox/core/tuning/profile_validation.py`\n  - `_project/scripts/tuning_profile_check.py`\n\nRequired behavior:\n  - Load `examples/tunings/databricks/tpch_tuned.yaml`\n  - Load `examples/tunings/databricks/tpcds_tuned.yaml`\n  - Load `examples/tunings/duckdb/tpch_tuned.yaml`\n  - Load `examples/tunings/duckdb/tpcds_tuned.yaml`\n  - For every accepted logical candidate in the profile, require one of:\n      mapped_to_template\n      explicitly_unsupported_by_platform\n      explicitly_waived_with_reason\n  - For every dropped_low_evidence candidate, fail if it appears in a\n    template without a newer evidence override.\n  - Report mapping coverage by platform and benchmark.\n\nThe first implementation may be validation-only. Do not introduce automatic\ntemplate rewriting unless the generator has stable golden tests and a clear\nreviewable diff mode.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate existing Databricks and DuckDB TPC templates against the logical profile",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-tpc-tuning-base",
+        "notes": "Supersede the narrow Databricks-only test shape with generalized tests that\nprotect tuned-mode comparability.\n\nExpected tests:\n  - `tests/unit/core/tuning/test_tpc_workload_profiles.py`\n      validates profile schema, bounded role vocabulary, duplicate\n      detection, evidence fields, and dropped-candidate rationale.\n  - `tests/unit/core/tuning/test_tpc_tuning_template_parity.py`\n      validates Databricks and DuckDB TPC-H/TPC-DS templates against the\n      logical profile and platform capability mapping.\n  - Update or replace `tests/unit/cli/test_databricks_tuning_examples.py`\n      so it no longer encodes Databricks as the only regression surface.\n\nTests should fail when:\n  - a Databricks logical candidate is added without a DuckDB mapping,\n    unsupported decision, or waiver;\n  - a dropped scratchpad candidate appears in any checked template;\n  - a platform template silently loses a previously mapped logical column;\n  - `platform_optimizations.z_ordering_columns` is expanded as a substitute\n    for per-table `TableTuning` mappings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace Databricks-only regression coverage with cross-platform TPC tuning parity tests",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-tpc-tuning-base",
+        "notes": "Add result metadata that lets downstream comparison answer what `tuned`\nactually meant for each run. Use existing result/tuning metadata patterns\nrather than inventing an unrelated artifact.\n\nMinimum metadata fields to evaluate and add where appropriate:\n  - logical_tuning_profile_id, e.g. `tpc-v1`\n  - logical_tuning_profile_version\n  - tuning_template_hash\n  - platform_physical_tuning_mechanisms, e.g. partitioning, clustering,\n    sorting, distribution, sorted_ingestion, z_order, liquid_clustering\n  - logical_profile_coverage summary:\n      accepted_count\n      mapped_count\n      unsupported_count\n      waived_count\n      dropped_low_evidence_count\n  - unmapped_logical_candidates with reasons, capped to a compact list\n\nPreserve existing result schema compatibility. If a schema bump is required,\ndocument it and add loader/backward-compat tests. If the existing\n`platform.tunings` / execution metadata path can hold the information\nwithout a schema bump, prefer that.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Expose tuning profile coverage and physical mechanisms in result metadata",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-tpc-tuning-base",
+        "notes": "Update docs so users understand that tuned-vs-tuned is a logical profile\ncomparison with platform-specific physical implementations, not proof that\nevery platform used identical storage/layout mechanisms.\n\nRequired documentation updates:\n  - `examples/tunings/README.md` must describe the logical TPC profile and\n    how platform templates consume it.\n  - Add or update a docs page under `docs/usage/` or `docs/development/`\n    describing:\n      - logical tuning profiles\n      - platform capability mapping\n      - unsupported/waived candidate handling\n      - result metadata fields\n      - how to interpret Databricks vs DuckDB vs other platforms when\n        `tuning_mode == \"tuned\"`\n  - Include a short warning against comparing a fully mapped tuned template\n    to a basic-constraints fallback as if they were equivalent.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document comparison semantics for tuned-vs-tuned results",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "generalize-tpc-tuning-base",
+        "notes": "Run the narrow verification listed below before broad preflight. Capture a\nconcise summary of mapping coverage and comparison impact in DONE notes or\nPR body. Do not commit raw command transcripts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run profile, template, result-metadata, and coverage verification",
+        "wid": "w7"
+      }
+    ]
+  }
+}

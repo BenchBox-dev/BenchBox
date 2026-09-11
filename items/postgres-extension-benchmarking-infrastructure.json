@@ -1,0 +1,206 @@
+{
+  "context": "1. Docker Compose templates: one per extension, each with PostgreSQL + extension\n   pre-installed, health checks, and volume mounts for data persistence.\n   Follow pattern: docker/postgres-extensions/docker-compose.{extension}.yaml\n\n2. Shared test fixtures (tests/unit/platforms/conftest_pg_extensions.py):\n   - mock_pg_connection: psycopg2 connection mock with cursor\n   - mock_extension_check: simulates CREATE EXTENSION / SELECT extversion\n   - mock_guc_setting: captures SET parameter calls for verification\n   - Reusable across TimescaleDB, pg_duckdb, pg_mooncake test files\n\n3. Extension conflict detection in platform_registry.py:\n   - Add \"conflicts_with\" field to platform metadata\n   - Warn (not error) when user benchmarks conflicting extensions\n   - Document that separate PostgreSQL instances are required\n\n4. Comparison report template: standardized output for comparing\n   PostgreSQL baseline vs extension performance, including:\n   - Query-by-query speedup ratios\n   - Storage size comparison (heap vs columnstore vs hypertable)\n   - Load time comparison\n\n5. Documentation (docs/guides/postgresql-extensions.md):\n   - Overview of supported PostgreSQL extensions\n   - Docker setup instructions per extension\n   - Compatibility matrix (which extensions work together)\n   - Benchmarking guide with recommended comparisons\n",
+  "description": "Create shared infrastructure, documentation, and testing patterns for\nbenchmarking PostgreSQL extensions as first-class platforms. BenchBox already\nsupports TimescaleDB (the first PostgreSQL extension), and two more are\nplanned: pg_duckdb and pg_mooncake. This item establishes the common patterns,\ncomparison framework, and Docker-based test infrastructure needed to support\na growing family of PostgreSQL extensions efficiently.\n\nThis is NOT about creating a new abstract base class - PostgreSQLAdapter\nalready serves that role well. Instead, this is about:\n\n1. Docker Compose templates for spinning up PostgreSQL with specific extensions\n2. A comparison report template for PostgreSQL vs extension benchmarks\n3. Shared test fixtures and mocks for PostgreSQL extension adapters\n4. Documentation of the \"PostgreSQL extension adapter\" pattern\n5. Extension conflict detection (pg_duckdb vs pg_mooncake share libduckdb.so)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add extension-specific logic to the PostgreSQL base adapter",
+        "instead": "each extension adapter handles its own setup",
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "why": "that couples unrelated extensions"
+      },
+      {
+        "dont": "create a new PostgreSQLExtensionAdapter abstract class",
+        "instead": "each extension adapts at its own override points",
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "why": "PostgreSQLAdapter already provides the right abstraction"
+      },
+      {
+        "dont": "merge Docker Compose files into a single file",
+        "instead": "keep separate compose files per extension",
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "why": "extensions conflict with each other"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "postgres-extension-benchmarking-infrastructure",
+        "id": 590,
+        "reason": "Requires orchestration layer beyond current benchbox run - design separately",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Automated multi-extension comparison orchestration is exactly the specialized benchmarking-infrastructure idea the open Future Ideas Backlog exists to capture. (tracked by future-ideas-backlog)",
+        "summary": "Automated multi-extension comparison pipeline (run baseline + all extensions sequentially)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "postgres-extension-benchmarking-infrastructure",
+        "id": 591,
+        "reason": "Requires Docker-in-Docker or dedicated CI runners - handle with CI infrastructure",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "CI/CD integration tests with Docker-based PostgreSQL extensions"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "postgres-extension-benchmarking-infrastructure",
+        "id": 592,
+        "reason": "Lower priority than pg_duckdb and pg_mooncake - plan after initial extensions are stable",
+        "resolution": "promoted",
+        "resolved_item": "pg-analytics-paradedb-and-citus-extension-support",
+        "resolved_reason": null,
+        "summary": "pg_analytics (ParadeDB) and Citus extension support"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-15T00:00:00Z",
+      "created_at": "2026-02-14T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing TimescaleDB adapter and tests unchanged",
+        "item_id": "postgres-extension-benchmarking-infrastructure"
+      },
+      {
+        "behavior": "Platform registry behavior for all existing platforms unchanged",
+        "item_id": "postgres-extension-benchmarking-infrastructure"
+      },
+      {
+        "behavior": "PostgreSQLAdapter base class unchanged - no new abstract methods",
+        "item_id": "postgres-extension-benchmarking-infrastructure"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/postgresql.py"
+      },
+      {
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/timescaledb.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "docker compose -f docker/postgres-extensions/docker-compose.pg-duckdb.yaml config --quiet 2>&1 && echo 'valid'",
+        "description": "Docker Compose files are valid",
+        "expected": "valid",
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import tests.unit.platforms.conftest_pg_extensions; print('import OK')\"",
+        "description": "Test fixtures importable",
+        "expected": "import OK",
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "All existing platform tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create Docker Compose templates for pg_duckdb, pg_mooncake, and TimescaleDB with health checks and volume mounts",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create shared pytest fixtures for PostgreSQL extension adapter testing (mock connection, extension check, GUC capture)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add extension conflict metadata to platform_registry.py (conflicts_with field in platform metadata, warning on conflicting benchmarks)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write PostgreSQL extensions guide (docs/guides/postgresql-extensions.md) covering setup, Docker usage, compatibility matrix, and benchmarking recommendations",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "postgres-extension-benchmarking-infrastructure",
+        "notes": "Template format only - actual comparison implementation is in individual adapter items",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create comparison report template for PostgreSQL baseline vs extension performance (speedup ratios, storage size, load time)",
+        "wid": "w5"
+      }
+    ]
+  }
+}

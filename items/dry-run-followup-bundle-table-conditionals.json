@@ -1,0 +1,80 @@
+{
+  "description": "**Completion note:** plans/tuning sidecars are community-submittable\ncompanion files when they sit next to the primary result JSON. The\ncontributor-facing doc now explains the opt-in flags and labels both rows\nas optional.\n\n`docs/contributing-results.md` Step 2 lists `<result>.plans.json` and\n`<result>.tuning.json` as bundle outputs gated on `(if captured)` /\n`(if used)`. Neither phrase is defined anywhere in the doc; nothing\nexplains how a contributor opts into plan capture or applies tuning\nbefore running. First-time contributors see the rows and wonder if\ntheir bundle is incomplete because those files don't appear.\n\nDecision needed: are plans/tuning files community-submittable, or\nmaintainer-only? Either explain the opt-in or drop the rows from\nthe contributor-facing doc and surface them in advanced docs only.\n\nSurfaced by the agent-proxy dry-run on 2026-04-28\n(see `_project/handoffs/external-dry-run-retrospective-2026-04-28.md`).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "leave the rows in with vague qualifiers",
+        "instead": "pick a path and apply it",
+        "item_id": "dry-run-followup-bundle-table-conditionals",
+        "why": "that is the failure mode this TODO exists to fix"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-05-01T00:00:00Z",
+      "created_at": "2026-04-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "If plans/tuning files ARE community-submittable, the validate-submission CI continues to accept them",
+        "item_id": "dry-run-followup-bundle-table-conditionals"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dry-run-followup-bundle-table-conditionals",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "dry-run-followup-bundle-table-conditionals",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -cE '\\(if captured\\)|\\(if used\\)' docs/contributing-results.md",
+        "description": "Bundle table no longer contains undefined `(if captured)` / `(if used)` qualifiers",
+        "expected": "0",
+        "item_id": "dry-run-followup-bundle-table-conditionals",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dry-run-followup-bundle-table-conditionals",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-bundle-table-conditionals",
+        "notes": "Decision: plans.json / tuning.json sidecars are community-submittable\nwhen present next to the primary result JSON. Evidence:\n\n- `benchbox submit` discovers `.plans.json` and `.tuning.json`\n  companions beside the source result, copies them into `bundle/`,\n  and records per-file hashes in `manifest.companion_hashes`.\n- `scripts/validate_submission.py` treats those suffixes as companion\n  files rather than primary bundles and verifies their hashes when\n  declared in the manifest.\n- Unit coverage in `tests/unit/cli/commands/test_submit.py` and\n  `tests/unit/scripts/test_validate_submission.py` exercises companion\n  copy and hash validation behavior.\n\n`/code review W1`: no required issues. The decision is backed by the\ncurrent submission/validation contract; W2 should document the opt-in\nflags rather than removing the rows.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide whether plans/tuning files are community-submittable",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-bundle-table-conditionals",
+        "notes": "Documented the accepted opt-in path in `docs/contributing-results.md`:\nuse `--capture-plans` on supported platforms for `<result>.plans.json`,\nand use `--tuning tuned`, `--tuning auto`, or a YAML path for\nintentionally tuned submissions that may emit `<result>.tuning.json`.\nThe Step 2 bundle table now labels both rows as optional and no longer\nuses undefined `(if captured)` / `(if used)` qualifiers.\n\n`/code review W2`: no required issues. The text preserves the\ncommunity-submittable sidecar contract from W1 while making absence of\nsidecars explicitly non-blocking for default submissions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the chosen change to docs/contributing-results.md",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "context": "Keep StreamRunner product behavior unchanged. Change only the test worker: wait on config._stream_cancel_events[stream_id] with a generous bounded timeout, then return. Repeat the exact test enough times to demonstrate deterministic cancellation under scheduling pressure.",
+  "description": "Nightly run 30717140915 macOS job 91414534073 failed test_cooperative_cancel_with_real_set_event_still_cancels. The test uses sleep(0.1) against a 0.05s timeout; on a loaded runner the future can finish before TimeoutError handling checks future.done(), so production correctly processes it as completed and never sets cancellation. Replace the scheduler race with an event-driven worker that blocks on its real per-stream cancellation event.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Change StreamRunner to satisfy the test",
+        "instead": "Remove the test-only timing race",
+        "item_id": "nightly-macos-throughput-cooperative-cancel-flake-v2",
+        "why": "The observed completed-future branch is correct production behavior"
+      },
+      {
+        "dont": "Increase fixed sleeps until the race becomes rarer",
+        "instead": "Synchronize the worker on the actual cancellation event",
+        "item_id": "nightly-macos-throughput-cooperative-cancel-flake-v2",
+        "why": "Scheduler delay can still invert completion and timeout handling"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-01T21:32:03Z",
+      "completed_pr": 1445,
+      "created_at": "2026-08-01T20:48:05Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Production throughput cancellation and accounting code remains unchanged",
+        "item_id": "nightly-macos-throughput-cooperative-cancel-flake-v2"
+      },
+      {
+        "behavior": "The test still exercises a real threading.Event set by StreamRunner timeout handling",
+        "item_id": "nightly-macos-throughput-cooperative-cancel-flake-v2"
+      },
+      {
+        "behavior": "The worker wait remains bounded so a regression cannot hang the suite",
+        "item_id": "nightly-macos-throughput-cooperative-cancel-flake-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "nightly-macos-throughput-cooperative-cancel-flake-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/throughput/test_runner.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "for i in $(seq 1 20); do uv run -- python -m pytest -n 0 'tests/unit/core/throughput/test_runner.py::TestStreamRunnerNonBlockingShutdown::test_cooperative_cancel_with_real_set_event_still_cancels' -q || exit 1; done",
+        "description": "Cooperative-cancel regression repeated under real threading",
+        "expected": "passes after the fix and fails intermittently on the unfixed tree under delayed timeout classification",
+        "item_id": "nightly-macos-throughput-cooperative-cancel-flake-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:51:44Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/core/throughput/test_runner.py -q",
+        "description": "Complete throughput runner unit module",
+        "expected": "passes after the fix and exposes any accounting or timeout regression on the unfixed tree",
+        "item_id": "nightly-macos-throughput-cooperative-cancel-flake-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T20:51:52Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "nightly-macos-throughput-cooperative-cancel-flake-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "nightly-macos-throughput-cooperative-cancel-flake-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Nightly run 30717140915 macOS job 91414534073 failed exactly one test: cooperative cancel asserted an unset Event. Code inspection confirms the 0.1s worker can complete before delayed TimeoutError classification checks future.done(), correctly bypassing cancellation.",
+        "item_id": "nightly-macos-throughput-cooperative-cancel-flake-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:49:24Z",
+        "started_branch": "fix/macos-throughput-cancel-flake",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-macos-cancel",
+        "status": "done",
+        "summary": "Revalidate the Nightly failure and race premise",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Replaced sleep(0.1) with a bounded wait on cfg._stream_cancel_events[stream_id]. The worker cannot complete before timeout classification, while the test still observes the real Event set by StreamRunner.",
+        "item_id": "nightly-macos-throughput-cooperative-cancel-flake-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:49:30Z",
+        "started_branch": "fix/macos-throughput-cancel-flake",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-macos-cancel",
+        "status": "done",
+        "summary": "Replace the fixed sleep with a bounded wait on the real cancellation event",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Recorded ladder passed: exact cooperative-cancel test passed 20 consecutive real-thread runs; complete throughput runner module passed 25 tests; Ruff and scope checks passed. Five-axis review found no further defect: test-only, bounded, and preserves product semantics.",
+        "item_id": "nightly-macos-throughput-cooperative-cancel-flake-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:50:06Z",
+        "started_branch": "fix/macos-throughput-cancel-flake",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-macos-cancel",
+        "status": "done",
+        "summary": "Run the focused test repeatedly and the throughput runner module",
+        "wid": "w2"
+      }
+    ]
+  }
+}

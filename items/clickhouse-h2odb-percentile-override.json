@@ -1,0 +1,73 @@
+{
+  "context": "Follow existing ClickHouse override patterns in other benchmarks. Check how\nquery overrides are loaded (likely a clickhouse_sql/ subdirectory convention).\nThe SQL change is straightforward: replace PERCENTILE_CONT(p) WITHIN GROUP\n(ORDER BY col) with quantile(p)(col).\n",
+  "description": "h2odb Q9 fails on ClickHouse with SYNTAX_ERROR because it uses standard SQL\nPERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY fare_amount). ClickHouse doesn't\nimplement ordered-set aggregate syntax.\n\nFix: Add a ClickHouse-specific Q9 override using quantile(0.5)(fare_amount) and\nquantile(0.9)(fare_amount). This is a 3-line SQL change.\n\nPart of Pattern C (PERCENTILE_CONT rewrite) which also affects read_primitives.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify base queries.py or default SQL files",
+        "instead": "create clickhouse_sql/ override instead",
+        "item_id": "clickhouse-h2odb-percentile-override",
+        "why": "other platforms depend on standard SQL PERCENTILE_CONT"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-04-08T00:00:00Z",
+      "created_at": "2026-04-08T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Base h2odb Q9 query unchanged - other platforms use standard PERCENTILE_CONT syntax",
+        "item_id": "clickhouse-h2odb-percentile-override"
+      },
+      {
+        "behavior": "ClickHouse override returns identical column names and semantics as the base query",
+        "item_id": "clickhouse-h2odb-percentile-override"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'h2odb and clickhouse'",
+        "description": "ClickHouse h2odb override loads and uses quantile() syntax",
+        "expected": "Tests pass confirming quantile() override for Q9",
+        "item_id": "clickhouse-h2odb-percentile-override",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-h2odb-percentile-override",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "clickhouse-h2odb-percentile-override",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create ClickHouse-specific Q9 override file using quantile(0.5)(fare_amount) / quantile(0.9)(fare_amount)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-h2odb-percentile-override",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit test that loads h2odb Q9 for ClickHouse and asserts SQL contains 'quantile(' not 'PERCENTILE_CONT'",
+        "wid": "w2"
+      }
+    ]
+  }
+}

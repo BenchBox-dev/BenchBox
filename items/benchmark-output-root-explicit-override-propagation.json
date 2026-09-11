@@ -1,0 +1,194 @@
+{
+  "context": "Prefer reusing GeneratorOutputDirMixin where the generator is a plain instance\nattribute (tpcds). For tpcdi, whose layout is config-driven and richer than a\nsingle generator, add a focused property setter that re-derives the ETL\ndirectories rather than shoehorning it into the mixin. Land tests first that\nfail on the current tree.\n",
+  "description": "PR #759 made benchmark datagen roots honor BENCHBOX_OUTPUT_DIR at construction\nand added GeneratorOutputDirMixin so a post-construction output_dir\nreassignment propagates to nested generators. Several generator-backed\nbenchmarks (h2odb, ssb, tpch, nyctaxi, etc.) opted into the mixin; a few did\nnot because their generators are lazy or intentionally point elsewhere.\n\nTwo benchmarks build a generator (or derive directories) in __init__ but have\nno synchronizing output_dir setter, so an explicit CLI --output root that\ndiffers from the construction default does NOT reach them:\n\n- tpcds: builds its data_generator in __init__ and has no output_dir setter, so\n  a post-construction reassignment (runner _resolve_output_dir_handler) leaves\n  the generator pointed at the construction-time path.\n- tpcdi: derives source_dir/staging_dir/warehouse_dir and builds its\n  data_generator in __init__ from self.config.output_dir; a later output_dir\n  reassignment updates neither the ETL subdirs nor the generator.\n\nThis is a pre-existing residual gap, NOT a regression. The reported failure\nmode (BENCHBOX_OUTPUT_DIR ignored) is already fixed for both: their\nconstruction-time defaults resolve via the env-aware helper (tpcds via its\ndefault path, tpcdi via TPCDIConfig.get_benchmark_runs_datagen_path), and in\nthe managed/env flow the runner's reassignment target equals the construction\ndefault, so nothing diverges. Only an explicit `--output /custom` that differs\nfrom the default exposes the gap.\n\nClose it so an explicit override propagates correctly for these two\nbenchmarks, matching the contract the mixin already provides elsewhere. NOTE:\nbenchmark-output-root-resolve-at-construction-boundary proposes a deeper fix\n(resolve the root before construction) that would subsume this item; this is\nthe tactical fix if that refactor is deferred.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "blanket-sync every generator attribute",
+        "instead": "only sync generators that should follow the OBT/primary output root.",
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "why": "tpcds_obt/datavault intentionally diverge"
+      },
+      {
+        "dont": "duplicate ETL path math in the tpcdi setter",
+        "instead": "delegate to the config helpers.",
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "why": "TPCDIConfig already owns it"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "needs_item": "benchmark-runs-output-root-propagation"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-06-11T00:00:00Z",
+      "created_at": "2026-06-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Env/managed-flow behavior for tpcds and tpcdi remains unchanged (construction default already env-aware).",
+        "item_id": "benchmark-output-root-explicit-override-propagation"
+      },
+      {
+        "behavior": "tpcdi data reuse: existing source/staging/warehouse layout names remain compatible.",
+        "item_id": "benchmark-output-root-explicit-override-propagation"
+      },
+      {
+        "behavior": "tpcds_obt and datavault lazy generators that intentionally write to a separate source dir are NOT force-synced.",
+        "item_id": "benchmark-output-root-explicit-override-propagation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/base.py:GeneratorOutputDirMixin — reuse/extend; tpcds can adopt it directly (its data_generator is a plain instance attribute)",
+        "decision": "extend",
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "path": "benchbox/base.py:GeneratorOutputDirMixin"
+      },
+      {
+        "concept": "benchbox/core/read_primitives/benchmark.py + benchbox/core/transactional/benchmark_base.py — reuse the existing output_dir setter pattern that re-derives nested state",
+        "decision": "reuse",
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "path": "benchbox/core/read_primitives/benchmark.py"
+      },
+      {
+        "concept": "benchbox/core/runner/runner.py:_resolve_output_dir_handler — the post-construction assignment site this fix must satisfy",
+        "decision": "reuse",
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "path": "benchbox/core/runner/runner.py:_resolve_output_dir_handler"
+      },
+      {
+        "concept": "benchbox/core/tpcdi/config.py:TPCDIConfig (output_dir + create_directories) — reuse for re-deriving source/staging/warehouse on reassignment instead of duplicating path math",
+        "decision": "reuse",
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "path": "benchbox/core/tpcdi/config.py:TPCDIConfig"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/datavault/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds_obt/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/"
+      },
+      {
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_benchmark_output_root_propagation.py -q",
+        "description": "Explicit override now propagates for tpcds and tpcdi",
+        "expected": "tpcds and tpcdi override cases pass (previously xfail)",
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpcds tests/unit/core/tpcdi -q",
+        "description": "tpcds and tpcdi unit suites still pass",
+        "expected": "all tests pass",
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "notes": "Construct each, then assign a distinct explicit output_dir and assert the\nnested generator / ETL subdirs do NOT follow today. Capture the probe to\n/tmp/override-gap-w0.log (do not commit) and record results in the PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm the override gap reproduces for tpcds and tpcdi on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "notes": "tpcds builds data_generator as a plain attribute in __init__, so the mixin\napplies cleanly. Verify the tpcds_obt source-dir behavior is unaffected\n(its generator is lazy and intentionally writes to a separate dir).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Adopt GeneratorOutputDirMixin for tpcds so its data_generator tracks output_dir",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "notes": "On reassignment, update source_dir/staging_dir/warehouse_dir and\ndata_generator.output_dir, keeping self.config.output_dir consistent. Guard\nagainst running before config exists during __init__.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a tpcdi output_dir setter that re-derives ETL subdirs and syncs the generator",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-output-root-explicit-override-propagation",
+        "notes": "Coordinate with benchmark-output-root-regression-guard, which marks these\ntwo xfail; this work removes the xfail once propagation is fixed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Flip the tpcds/tpcdi xfail markers in the regression guard to passing",
+        "wid": "w3"
+      }
+    ]
+  }
+}

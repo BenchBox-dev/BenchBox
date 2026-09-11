@@ -1,0 +1,341 @@
+{
+  "context": "Use the shared frontend eligibility helper rather than checking individual\nfields in each page. Start with benchmark route gating, then compare\nselection, then Compare summary language. Treat AMPLab as the main regression\nroute because it exercises every gate.\n",
+  "description": "Benchmark rank tabs and Compare winner claims currently appear even when the\nunderlying cohort is not rankable or the selected runs have too little\ncomparable query evidence. The AMPLab SF0.01 power example shows both issues:\nevery row is unrankable, several rows have no timings, and Compare makes a\nwinner claim from only one comparable query.\n\nThis TODO applies the shared eligibility contract to user-facing benchmark\nand Compare workflows. It should land after frontend eligibility\nnormalization so page behavior depends on one shared helper.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "leave disabled rows without a reason",
+        "instead": "show the exclusion reason.",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "why": "users need to understand whether data is missing, invalid, or merely unrankable"
+      },
+      {
+        "dont": "make warning badges visually look clickable unless they are actual links/buttons",
+        "instead": "use semantic controls.",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "why": "this was one of the observed usability failures"
+      },
+      {
+        "dont": "make winner copy conditional only on primary metric presence",
+        "instead": "apply the evidence threshold.",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "why": "query coverage can be too weak even when geomean exists"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "needs_item": "results-explorer-frontend-eligibility-normalization"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Comparable rows still support the existing end-to-end Compare flow.",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates"
+      },
+      {
+        "behavior": "Compare URLs with valid IDs remain shareable.",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates"
+      },
+      {
+        "behavior": "Raw query evidence remains visible even when winner claims are suppressed.",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates"
+      },
+      {
+        "behavior": "Receipt links remain available for excluded rows.",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/src/components/ComparabilityReceipt.tsx:warning details — link to this from summary badges.",
+        "decision": "reuse",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "path": "results-explorer/src/components/ComparabilityReceipt.tsx:warning"
+      },
+      {
+        "concept": "results-explorer/src/components/QueryHeatmap.tsx:selection checkboxes — disable based on comparability.",
+        "decision": "reuse",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "path": "results-explorer/src/components/QueryHeatmap.tsx:selection"
+      },
+      {
+        "concept": "results-explorer/src/lib/compareSummary.ts:winner query record — use policy threshold before headline generation.",
+        "decision": "reuse",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "path": "results-explorer/src/lib/compareSummary.ts:winner"
+      },
+      {
+        "concept": "results-explorer/src/pages/BenchmarkIndex.tsx:view mode and compare selection — extend with eligibility gates.",
+        "decision": "extend",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "path": "results-explorer/src/pages/BenchmarkIndex.tsx:view"
+      },
+      {
+        "concept": "results-explorer/src/pages/Compare.tsx:CompareGuardrailSummary and baseline controls — extend with actionable warnings.",
+        "decision": "extend",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "path": "results-explorer/src/pages/Compare.tsx:CompareGuardrailSummary"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "do_not_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-rank-and-compare-evidence-gates.yaml"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-rank-and-compare-evidence-gates/"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ComparabilityReceipt.tsx"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CompareSummary.tsx"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/ComparabilityReceipt.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/CompareSummary.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/compareSummary.ts"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayEligibility.ts"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Query.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/Compare.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx",
+        "description": "Benchmark and Compare tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build && cd .. && test -s _project/verification-logs/results-explorer-rank-and-compare-evidence-gates/browser-smoke.md && rg -n \"/results/amplab/|view=ranks|compare|Insufficient comparable query evidence|Excluded runs|PASS|FAIL\" _project/verification-logs/results-explorer-rank-and-compare-evidence-gates/browser-smoke.md",
+        "description": "Browser smoke covers AMPLab rank and compare gates",
+        "expected": "build exits 0 and browser-smoke.md records rank and compare PASS/FAIL evidence",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "notes": "On benchmark detail pages, if the summary reports `total_ranked = 0` or\nequivalent cohort exclusion state, do not present `Ranks` as an authoritative\nleaderboard. Either hide the tab or relabel it as a non-leaderboard timing\nview with explicit copy. Direct navigation to a rank view must show the same\nexplanation, not an empty or misleading table.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Suppress or relabel rank tabs for all-unrankable cohorts",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "notes": "Public rows with no valid timing data should not appear as normal matrix,\nrank, sparkline, distribution, or compare rows. Keep provenance accessible\nin a disclosure titled like \"Excluded runs\" with per-row reasons and receipt\nlinks. The default analysis view should contain only display-safe rows.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move no-timing benchmark rows into an excluded-runs disclosure",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "notes": "Benchmark pages, platform pages, and Query Workbench must disable or omit\ncompare selection controls for rows with `comparison_exclusion_reason`.\nThe user should see why the row cannot be compared, and keyboard/screen\nreader users must not be able to select it accidentally.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Disable compare selection for non-comparable rows everywhere",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "notes": "Compare must apply the policy threshold from\n`results-explorer-display-contract-policy-gate`. If selected runs do not\nmeet the comparable-query threshold, show a decision summary state such as\n\"Insufficient comparable query evidence\" and move raw differences into the\nquery diff table without winner language.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Suppress Compare winner claims when evidence threshold is not met",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "notes": "Change static warning count badges into real links or buttons that jump to\nthe Comparability Receipt. The guardrail summary should name the first few\nwarning classes, for example date window, platform version, cost, or query\ncoverage, so the user knows what to inspect.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make compare warnings actionable and locally visible",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-rank-and-compare-evidence-gates",
+        "notes": "Add tests for:\n  - all-unrankable benchmark cohort;\n  - no-timing rows excluded from default analysis view;\n  - disabled compare selection for excluded rows;\n  - Compare winner suppression at 1/8 comparable queries;\n  - warning-count link scrolls or anchors to the receipt;\n  - direct URL navigation to rank/compare states preserves the gate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add rank and compare route-level tests",
+        "wid": "w6"
+      }
+    ]
+  }
+}

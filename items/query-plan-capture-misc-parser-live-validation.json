@@ -1,0 +1,183 @@
+{
+  "context": "Honest bookkeeping for the misc-platform plan-capture rollout: mark what is\nsynthetic (w1), capture-and-diff against a real engine when one is available\n(w2), and add the opt-in live hooks so the item can be closed later (w3).\nCoordinate the provenance convention and, ideally, the integration-test harness\nwith the sibling query-plan-capture-parser-live-validation item.\n",
+  "description": "query-plan-capture-misc-platforms (PR #802) implemented and wired four new\nplan parsers, but no live instance was available, so their fixtures under\ntests/fixtures/query_plans/ were SYNTHESIZED from each engine's documented\nEXPLAIN format rather than captured from a running server:\n  - DatabendQueryPlanParser   ← databend_explain_sample.txt   (box-drawing tree)\n  - QuestDBQueryPlanParser     ← questdb_explain_sample.txt     (indented text tree)\n  - DorisQueryPlanParser       ← doris_shape_plan_sample.txt    (EXPLAIN SHAPE PLAN)\n  - SingleStoreQueryPlanParser ← singlestore_explain_sample.txt (\"|---\" chain-tree)\n\nEach parser and its fixture encode the SAME assumptions about output shape, so\nthe green unit tests in tests/unit/platforms/test_misc_plan_capture.py prove\nself-consistency, NOT correctness against a real engine. Likely drift points to\nre-check against live output:\n  - Databend: exact box-drawing property keys (\"join type:\", \"table:\") and\n    whether the connector prefix is a clean 4-char-per-level run.\n  - QuestDB: scan sub-operator names (PageFrame/DataFrame, \"Frame forward scan\n    on: <table>\", \"Row forward scan\") and the non-uniform indentation step.\n  - Doris: that the deployed version's Nereids planner supports\n    `EXPLAIN SHAPE PLAN` and emits the dash-indented Physical* tree this parser\n    expects (older/fragment EXPLAIN output would not parse).\n  - SingleStore: the \"|---\" connector spacing and whether the base pipeline is\n    really a parent->child chain in the deployed version.\n\nThis is the same class of gap as query-plan-capture-parser-live-validation\n(Presto/Trino, ClickHouse, Spark) — kept as a SEPARATE item so the misc-platform\nrollout's validation stays traceable. Consider folding the two together if a\nsingle live-validation harness ends up covering both sets.\n\nThis TODO does NOT require provisioning clusters now. It makes the gap explicit\nand trackable and adds the validation hooks so it can be closed when\ncredentials/instances exist.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete the synthetic fixtures when live ones arrive",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "why": "they provide fast no-credential coverage; keep both and mark provenance."
+      },
+      {
+        "dont": "hard-fail CI when an engine is unavailable",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "why": "these are opt-in live tests; gate every one on an explicit credential/host env var."
+      },
+      {
+        "dont": "mark this Completed on green synthetic-only tests",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "why": "completion requires at least one real EXPLAIN diffed per platform (w2)."
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-06-15T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing synthetic-fixture unit tests remain as fast, no-credential coverage.",
+        "item_id": "query-plan-capture-misc-parser-live-validation"
+      },
+      {
+        "behavior": "Live integration tests must skip gracefully (not fail) when credentials/instances are absent.",
+        "item_id": "query-plan-capture-misc-parser-live-validation"
+      },
+      {
+        "behavior": "The error-sentinel guard behavior (a failed/garbage EXPLAIN never yields a bogus plan) must not regress.",
+        "item_id": "query-plan-capture-misc-parser-live-validation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/platform-expansion/planning/query-plan-capture-misc-platforms.yaml — the merged work whose deferred item this tracks",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "path": "_project/DONE/platform-expansion/planning/query-plan-capture-misc-platforms.yaml"
+      },
+      {
+        "concept": "benchbox/core/query_plans/parsers/{databend,questdb,doris,singlestore}.py — the synthetic-fixture parsers",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "path": "benchbox/core/query_plans/parsers/{databend,questdb,doris,singlestore}.py"
+      },
+      {
+        "concept": "query-plan-capture-parser-live-validation.yaml — sibling item for Presto/Trino, ClickHouse, Spark; mirror its provenance + live-skipif approach",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "path": "query-plan-capture-parser-live-validation.yaml"
+      },
+      {
+        "concept": "tests/fixtures/query_plans/{databend_explain_sample.txt,questdb_explain_sample.txt,doris_shape_plan_sample.txt,singlestore_explain_sample.txt} — synthetic samples to diff against real output",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "path": "tests/fixtures/query_plans/{databend_explain_sample.txt,questdb_explain_sample.txt,doris_shape_plan_sample.txt,singlestore_explain_sample.txt}"
+      },
+      {
+        "concept": "tests/integration/test_postgresql_plan_capture_integration.py (#768) — skipif(HOST) live-integration pattern to replicate",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "path": "tests/integration/test_postgresql_plan_capture_integration.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/databend.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/doris.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/questdb.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/singlestore.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/query_plans/"
+      },
+      {
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration -k 'plan_capture and (databend or questdb or doris or singlestore)' -v",
+        "description": "Live integration tests skip cleanly without credentials",
+        "expected": "Tests skipped with a clear 'live <engine> not available' message",
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_misc_plan_capture.py -q",
+        "description": "Synthetic-fixture unit tests still pass (no-credential coverage retained)",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "notes": "Annotate databend_explain_sample.txt, questdb_explain_sample.txt,\ndoris_shape_plan_sample.txt, and singlestore_explain_sample.txt with\nprovenance (synthetic vs captured-from <engine> <version>), consistent with\nwhatever marker query-plan-capture-parser-live-validation w1 chooses (sibling\n.meta.json or header comment) so the two efforts share one convention.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Mark the four misc fixtures as synthetic with the engine/version they model",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "notes": "With a live instance per platform, run the representative queries and capture\nreal output:\n  - Databend:    EXPLAIN <query>\n  - QuestDB:     EXPLAIN <query>\n  - Doris:       EXPLAIN SHAPE PLAN <query>  (and confirm Nereids is active)\n  - SingleStore: EXPLAIN <query>\nDiff against tests/fixtures/query_plans/. Where the real output differs,\nupdate the fixture AND the parser's operator-name map / indentation handling.\nKeep the synthetic fixture as fast no-credential coverage; add the captured\none alongside (do not delete the synthetic one).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Capture real EXPLAIN and diff against the synthetic fixtures",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-misc-parser-live-validation",
+        "notes": "Mirror tests/integration/test_postgresql_plan_capture_integration.py: one\nfile (or parametrized module) per engine, module-level skipif on the relevant\n*_HOST/credentials env var. Each runs a real EXPLAIN over a live instance and\nasserts the adapter's get_query_plan_parser() yields a non-None QueryPlanDAG\nwith a fingerprint and the expected root/scan operators. Skipped by default;\nrunnable in a UAT/CI job that provisions the engine.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add CI-gated live integration tests for Databend, QuestDB, Doris, SingleStore",
+        "wid": "w3"
+      }
+    ]
+  }
+}

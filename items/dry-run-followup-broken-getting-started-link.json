@@ -1,0 +1,160 @@
+{
+  "description": "The agent-proxy dry-run on 2026-04-28 found that\n`docs/contributing-results.md` Prerequisites #1 linked to\n`getting-started.rst` at the wrong relative path (the file lives at\n`docs/usage/getting-started.md`, not `docs/getting-started.rst`). The\nlink itself is patched in the same PR as the retrospective. The repo\nnow has Sphinx linkcheck coverage in `.github/workflows/docs.yml` and\n`make docs-linkcheck`; this TODO exists to explain why that existing\ncoverage did not prevent the source-relative link regression, then\npatch the smallest gap in the existing docs validation surface.\n\nSee `_project/handoffs/external-dry-run-retrospective-2026-04-28.md`\nfor the originating finding.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a second generic link checker before explaining why the existing Sphinx linkcheck missed the regression",
+        "instead": "(not specified)",
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "why": "duplicated docs gates create noise without proving this failure mode is covered"
+      },
+      {
+        "dont": "whitelist the originally-broken path to make linkcheck pass",
+        "instead": "(not specified)",
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "why": "that defeats the purpose of adding the check"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-05-26T00:00:00Z",
+      "created_at": "2026-04-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Docs CI total wall-clock stays within the existing budget (linkcheck added as a parallel job, not serialized after the slow build)",
+        "item_id": "dry-run-followup-broken-getting-started-link"
+      },
+      {
+        "behavior": "Existing relative links in `docs/` that currently resolve continue to resolve (no false positives from a poorly-tuned linkcheck config)",
+        "item_id": "dry-run-followup-broken-getting-started-link"
+      },
+      {
+        "behavior": "External-link 404s remain advisory, not blocking -- a third-party link rotting should not block a docs PR",
+        "item_id": "dry-run-followup-broken-getting-started-link"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/docs.yml — existing blocking Sphinx linkcheck job; EXTEND before adding a separate checker",
+        "decision": "extend",
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "path": ".github/workflows/docs.yml"
+      },
+      {
+        "concept": "Makefile — existing `ci-linkcheck`, `docs-linkcheck`, and `docs-check` wrappers; REUSE for local verification",
+        "decision": "reuse",
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "path": "Makefile"
+      },
+      {
+        "concept": "docs/conf.py — existing `linkcheck_ignore` configuration; EXTEND only for flaky external URLs, not local relative-link misses",
+        "decision": "extend",
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "path": "docs/conf.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "kind": "only_modify",
+        "path_glob": "scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'sphinx-build -b linkcheck' .github/workflows/docs.yml Makefile",
+        "description": "Existing Sphinx linkcheck remains wired into docs CI",
+        "expected": "docs.yml and Makefile both contain linkcheck wiring",
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n 'getting-started\\.rst|\\]\\(getting-started\\.rst\\)' docs/contributing-results.md",
+        "description": "The originally-broken source-relative path no longer appears",
+        "expected": "no matches",
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make docs-linkcheck",
+        "description": "Docs linkcheck passes after the coverage-gap fix",
+        "expected": "exit 0",
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "notes": "Current prior art:\n  - `.github/workflows/docs.yml` has a blocking `linkcheck` job.\n  - `Makefile` has `ci-linkcheck`, `docs-linkcheck`, and\n    `docs-check` wrappers.\n  - `docs/index.rst` includes `contributing-results.md` in the\n    toctree.\nReconstruct the failure mode from the 2026-04-28 dry-run context:\nwas the link fixed before linkcheck ran, was linkcheck absent from\nthe relevant PR gate at the time, did MyST/Sphinx not validate the\nsource-relative target shape, or did the path only break in the\nGitHub-rendered markdown view?\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce why existing Sphinx linkcheck missed the original source-relative link",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "notes": "Prefer extending the existing Sphinx/docs validation path over\nadding a second link checker. Examples:\n  - If `docs/contributing-results.md` was not in the checked source\n    set at the time, add an explicit regression assertion to\n    `docs-validate` or the docs CI job.\n  - If Sphinx validates built links but not GitHub-rendered markdown\n    source links, add a small markdown relative-link check scoped to\n    repo-local targets.\n  - Add `markdown-link-check` only if the Sphinx path cannot cover\n    this exact failure mode.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Patch the existing docs validation surface at the narrowest failing layer",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-broken-getting-started-link",
+        "notes": "Run the existing docs linkcheck and the new/extended local-link\nassertion. Fix local relative-link failures in the same PR if they\nare under `docs/`; file separate follow-ups for unrelated generated\ndocs or broad external-link cleanup.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the docs link checks and fix any other latent local-link breakage",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,258 @@
+{
+  "context": "Begin with w0: inspect current ClickHouse adapter/factory aliases, remote auth and tenancy policy, and the deployed configuration contract. Choose and record whether port/secure are removed from MCP entirely or resolved from an approved server-side profile. Implement the smallest policy-preserving change across synchronous and durable paths. Add tests that reject arbitrary port and secure overrides, prove the configured host/port/TLS tuple is unchanged, ensure validation errors do not echo secrets or raw endpoint details, and cover every accepted ClickHouse platform alias. Update the MCP reference and remote-security documentation to make the server-owned boundary explicit. Do not broaden host or credential handling.",
+  "description": "Fix the PR #1465 security defect where MCP callers can set ClickHouse port and secure values even though the contract says callers cannot change destinations or tenant-owned connection state. The ClickHouse adapter uses port directly for the connection target and secure directly for transport, so arbitrary values can probe another listener on the configured host or downgrade a server-owned TLS policy. Revalidate the threat model for clickhouse, clickhouse-server, and legacy selectors before choosing the fix. The default must be fail-closed for remote authenticated tenants; a nonstandard server port may be supported only through a server-owned profile or an explicitly approved immutable value, never an arbitrary request field.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Keep arbitrary port and secure fields merely because they are bounded or non-secret strings",
+        "instead": "Resolve both from server-owned configuration or reject them at the MCP boundary.",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "why": "A port is part of a destination and secure is transport policy; numeric/string validation does not enforce tenant isolation."
+      },
+      {
+        "dont": "Test only the schema error for one platform spelling",
+        "instead": "Exercise every supported alias and both normal and durable execution paths.",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "why": "ClickHouse has canonical names and compatibility aliases that can reach different factory paths."
+      },
+      {
+        "dont": "Use live credentials or scan real internal ports in tests",
+        "instead": "Use fake adapter clients and assert the exact server-owned connection tuple.",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "why": "That would make a security regression suite unsafe and nondeterministic."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "needs_item": "mcp-v2-platform-option-contract-matrix-v3"
+      }
+    ],
+    "item_meta": {
+      "category": "security",
+      "completed_at": "2026-08-04T11:43:02Z",
+      "completed_pr": 1510,
+      "created_at": "2026-08-02T16:37:46Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "All error responses and telemetry remain free of passwords, tokens, raw endpoint values, and caller-controlled secrets.",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3"
+      },
+      {
+        "behavior": "ClickHouse local mode remains in-process and does not gain a network path as a side effect of the fix.",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3"
+      },
+      {
+        "behavior": "Credentials, hostnames, DSNs, filesystem paths, and transport policy remain server-owned and are never accepted from MCP request arguments.",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3"
+      },
+      {
+        "behavior": "Durable retries cannot reintroduce rejected raw request mappings.",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "remote MCP authentication and tenancy boundary",
+        "decision": "extend",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "path": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "concept": "MCP options reject destinations and tenant-owned connection state",
+        "decision": "extend",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "path": "docs/reference/mcp.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/security.py"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/server.py"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/clickhouse/client.py"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/clickhouse_cloud.py"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/metadata.py"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/setup.py"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/development/mcp-platform-option-contract.md"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/test_durable_jobs.py"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_benchmark_tools.py"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_schemas.py"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_schemas.py tests/unit/mcp/test_benchmark_tools.py -q",
+        "description": "A regression test fails before the boundary fix because an MCP request can alter port or secure",
+        "expected": "exits 1 on the unfixed tree when the negative security assertions are added; exits 0 only after arbitrary overrides are rejected",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T11:37:49Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms tests/integration/mcp/test_durable_jobs.py -q",
+        "description": "ClickHouse aliases and durable jobs preserve the server-owned connection tuple",
+        "expected": "exits 1 on the unfixed tree if any alias or retry path permits a changed port/TLS tuple; exits 0 after the guard is complete",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T11:38:38Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/mcp/schemas.py benchbox/mcp/tools/benchmark.py benchbox/mcp/jobs.py benchbox/platforms/clickhouse tests/unit/mcp tests/unit/platforms tests/integration/mcp",
+        "description": "The scoped security implementation passes Ruff",
+        "expected": "exits 1 on the unfixed tree if the security remediation has lint defects; exits 0 after scoped checks are clean",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T11:36:42Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "w0 probe: validate_platform_options('clickhouse',{'port':9001,'secure':False}) accepted; ClickHouseAdapter.from_config -> adapter.port=9001 secure=False. Live factory paths accepting port/secure: 'clickhouse' (ClickHouseAdapter) and 'clickhouse-server' (ClickHouseServerAdapter, forces deployment_mode=server); both via ClickHouseMetadataMixin.from_config. Aliases clickhouse-local/clickhouse-cloud/chdb/clickhouse_server have no allowlist entry so every option is already rejected. Remediation selected: reject port/secure at the MCP boundary + server-owned connection_profile resolved from BENCHBOX_MCP_CLICKHOUSE_PROFILES.",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:29:16Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Revalidate the ClickHouse threat model, aliases, and server-owned connection policy before selecting the remediation",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Removed port/secure from MCP_PLATFORM_OPTION_ALLOWLIST + CONTRACT for clickhouse and clickhouse-server. Added server-owned connection_profile: BENCHBOX_MCP_CLICKHOUSE_PROFILES JSON registry, _load_clickhouse_connection_profiles (fail-closed on malformed/extra keys), resolve_clickhouse_connection_profile, _validate_cross_field_policy hook in validate_platform_options (covers sync + durable admission + worker replay). Name-only persistence; port/secure resolved at execution in _prepare_adapter_platform_options. Local mode rejects connection_profile so chDB gains no network path.",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:31:38Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Remove arbitrary port/TLS overrides or implement approved server-side profile resolution with fail-closed validation",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/mcp/test_schemas.py: TestClickHouseConnectionBoundary (port/secure rejected across both spellings x3 option shapes; other clickhouse spellings expose no options; unknown profile rejected without echoing the name; name-only admission; local-mode network-path refusal; 10 malformed/over-broad registry shapes fail closed; profile name shape bounds; server-owned tuple resolution; secure defaults False only when operator omits it). tests/unit/mcp/test_benchmark_tools.py: port override refused before _get_platform_adapter is called (both spellings), profile resolves to exact server tuple via fake adapter, withdrawn profile fails closed without echoing the name. tests/integration/mcp/test_durable_jobs.py: persisted request carries only the profile name (no port/secure), durable admission refuses overrides. 131 tests pass.",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:34:56Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add alias, synchronous, durable, redaction, and connection-tuple regression tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": "docs/operations/mcp-remote-security.md: new 'Server-owned ClickHouse connection profiles' section (env format, name/entry validation, local-mode restriction, name-only persistence, no probe oracle). docs/reference/mcp.md: platform_options behavior bullet for ClickHouse. docs/development/mcp-platform-option-contract.md: port/secure row replaced by connection_profile (scope-update amended, reason recorded). Ladder: rung1 121 passed; rung2 8099 passed; rung3 ruff clean. CI-only gates also green locally: lint-imports 3 kept/0 broken, test_marker_strategy 10 passed, timing_policy_check --strict 0 violations (26662/27050 fast cap).",
+        "item_id": "mcp-v2-clickhouse-option-security-boundary-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:40:37Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Update MCP security documentation and run focused security plus adapter checks",
+        "wid": "w3"
+      }
+    ]
+  }
+}

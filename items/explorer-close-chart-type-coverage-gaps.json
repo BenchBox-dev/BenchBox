@@ -1,0 +1,518 @@
+{
+  "context": "Tier-by-tier (w1 → w4) so user-visible value lands in priority order.\nTier 1 (percentile_ladder, cdf_chart) ships first because that's the\nhighest-impact gap for benchmark credibility.\n\nPer-chart workflow (apply uniformly):\n  1. Read the CLI implementation (find the textcharts call site,\n     identify input shape and reduction).\n  2. Decide where the math lives. Default: in\n     `transformer.py`, emitted via the appropriate artifact\n     (BenchmarkSummary for cross-platform; DetailResult for\n     single-result). Avoid TS-side computation.\n  3. Generate parity fixtures.\n  4. Build the SVG component using `chartTheme.ts` constants and\n     `useElementSize` for responsiveness.\n  5. Wire into the appropriate page (Compare, ResultDetail,\n     BenchmarkIndex, PlatformIndex).\n  6. Vitest unit + parity test.\n  7. Manual smoke at 3 viewport widths.\n\nThis item is sequenced AFTER the foundational items\n(`explorer-establish-cli-explorer-parity-tests`,\n`explorer-emit-comparison-artifact-from-pipeline`,\n`explorer-unify-visualization-foundations`) because each new chart\nneeds the parity fixtures, theme constants, and pipeline-emitted\ndata structures those items deliver.\n",
+  "description": "The 2026-04-15 review found that the CLI registers **16 canonical\nchart types** in `benchbox/core/visualization/chart_types.py:17-45`,\nbut the explorer implements only **6 visualization components**\n(QueryHeatmap, QueryTimingChart, GroupedQueryChart,\nNormalizedSpeedupChart, DivergingBarChart, MetaLeaderboard) -\nand only 3-4 of those have CLI counterparts that compute the same\nvalues. **10 CLI chart types have no explorer equivalent.**\n\nMissing chart types and their importance for benchmark credibility:\n\n  | Chart                | Why it matters                                                   |\n  |----------------------|------------------------------------------------------------------|\n  | `percentile_ladder`  | Tail-latency P50/P90/P95/P99 - central to fair benchmark claims  |\n  | `cdf_chart`          | Distribution shape - exposes \"fast median, slow tail\" patterns   |\n  | `rank_table`         | Compact per-query ranking - denser than heatmap for many queries |\n  | `distribution_box`   | Box-plot of per-query latencies - shows variance/outliers        |\n  | `query_histogram`    | Per-query latency distribution                                   |\n  | `time_series`        | Trend over runs - regression detection                           |\n  | `cost_scatter`       | Cost vs performance - central to cloud-warehouse comparisons     |\n  | `power_bar`          | Dedicated TPC Power@Size visual                                  |\n  | `sparkline_table`    | Compact metrics summary with embedded micro-charts               |\n  | `stacked_phase`      | Phase breakdown (load/warmup/power/throughput)                   |\n\nThis item ports each missing chart type to the explorer in priority\norder. Every new chart consumes pipeline-emitted data\n(per `explorer-emit-comparison-artifact-from-pipeline` - extending\nthe artifact emission as needed) and ships with a parity fixture\n(per `explorer-establish-cli-explorer-parity-tests`) so the math\nis verified against the canonical Python implementation from day one.\n\nOut of scope: building entirely NEW chart types that don't exist in\nthe CLI either. Those should be evaluated and added to both sides\nthrough the canonical chart_types.py registry first.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a new chart in the explorer without a corresponding entry in chart_types.py",
+        "instead": "extend the registry first if a new type is genuinely warranted",
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "why": "that recreates the divergence we're trying to eliminate"
+      },
+      {
+        "dont": "compute percentiles in TS using `array.sort()[Math.floor(n*p)]`",
+        "instead": "read the CLI's exact percentile method and either match it in TS or pre-compute in Python and ship in artifact",
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "why": "Python's numpy.percentile uses linear interpolation by default and the numbers will differ"
+      },
+      {
+        "dont": "render cost_scatter when cost_usd is null for all results",
+        "instead": "hide the section entirely with a small note about cost data availability",
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "why": "an empty scatter plot looks broken"
+      },
+      {
+        "dont": "replace the existing QueryHeatmap with rank_table on TPC-DS just because the heatmap is wide",
+        "instead": "add rank_table as an alternate view, let users switch",
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "why": "users have built mental models around the heatmap"
+      },
+      {
+        "dont": "reuse PALETTE colors for time_series lines without a contrast check",
+        "instead": "extend chartTheme.ts with a dedicated TIME_SERIES_PALETTE if the 4-color palette is insufficient",
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "why": "4 line colors must be distinguishable when overlapping"
+      },
+      {
+        "dont": "skip parity fixtures for 'simple' charts like rank_table",
+        "instead": "every chart gets a fixture",
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "why": "rank ties are exactly the kind of edge case where Python and JS sort algorithms can differ silently"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-close-chart-type-coverage-gaps",
+        "id": 160,
+        "reason": "Out of scope for this item. Those should be added to chart_types.py registry first via a separate planning round.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Vague 'build entirely new chart types' with no specific types defined; reason says it needs its own planning round first.",
+        "summary": "Build entirely NEW chart types that don't exist in CLI either"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-close-chart-type-coverage-gaps",
+        "id": 161,
+        "reason": "Premature optimization - SVG handles realistic data sizes; revisit if profiling shows pain points.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly premature optimization pending profiling evidence of pain points; no such evidence cited or found.",
+        "summary": "WebGL/Canvas rendering for high-density visualizations (e.g. histogram with thousands of points)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-close-chart-type-coverage-gaps",
+        "id": 162,
+        "reason": "Product feature, not a coverage gap. Address after the chart catalog is complete.",
+        "resolution": "promoted",
+        "resolved_item": "user-saveable-chart-configurations-dashboards",
+        "resolved_reason": null,
+        "summary": "User-saveable chart configurations / dashboards"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-close-chart-type-coverage-gaps",
+        "id": 163,
+        "reason": "Cross-cutting UX work; better tackled as a focused interactivity item once all charts exist.",
+        "resolution": "promoted",
+        "resolved_item": "interactive-drilldowns-click-chart-bar-to-filter-table",
+        "resolved_reason": null,
+        "summary": "Interactive drilldowns (click chart bar to filter table)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_item": "explorer-emit-comparison-artifact-from-pipeline"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_item": "explorer-establish-cli-explorer-parity-tests"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_item": "explorer-unify-visualization-foundations"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-16T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "BenchmarkSummary and DetailResult artifact backward compatibility - extensions add new fields, do not rename or remove existing ones",
+        "item_id": "explorer-close-chart-type-coverage-gaps"
+      },
+      {
+        "behavior": "CLI chart_types.py registry as the single canonical source - explorer mirrors it, never the other way around",
+        "item_id": "explorer-close-chart-type-coverage-gaps"
+      },
+      {
+        "behavior": "Existing 6 explorer chart components must continue to work - new charts add tabs/sections, do not replace existing visualizations",
+        "item_id": "explorer-close-chart-type-coverage-gaps"
+      },
+      {
+        "behavior": "ResultDetail / BenchmarkIndex / PlatformIndex existing layouts and navigation patterns - additions are introduced as tabs or new sections, not page rewrites",
+        "item_id": "explorer-close-chart-type-coverage-gaps"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/**"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/**"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/manifest.ts"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/types.ts"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/models.py"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/transformer.py"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/**"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/**"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartRegistry.ts"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "only_modify",
+        "path_glob": "tests/parity/fixtures/**"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "ls results-explorer/src/components/{PercentileLadder,CDFChart,RankTable,DistributionBox,QueryHistogram,PowerBar,StackedPhase,TimeSeries,CostScatter,SparklineTable}.tsx",
+        "description": "All 10 missing chart components exist as files",
+        "expected": "all 10 files present",
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "ls tests/parity/fixtures/{percentile_ladder,cdf,rank_table,distribution_box,query_histogram,power_bar,stacked_phase,time_series,cost_scatter,sparkline_table}.json",
+        "description": "Every new chart has a corresponding parity fixture",
+        "expected": "all 10 fixtures present",
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- chartMath.parity",
+        "description": "Parity suite passes for all new charts",
+        "expected": "all 10 chart fixtures pass equivalence assertions",
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- chartRegistry",
+        "description": "Explorer chartRegistry mirrors CLI chart_types",
+        "expected": "registry-parity test passes - 16 entries on both sides, no divergence",
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- 'PercentileLadder|CDFChart|RankTable|DistributionBox|QueryHistogram|PowerBar|StackedPhase|TimeSeries|CostScatter|SparklineTable'",
+        "description": "Each new chart has Vitest unit coverage",
+        "expected": "tests cover empty data, single result, missing fields, and at least one realistic data shape per chart",
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ -v",
+        "description": "Pipeline emits the new derived data fields",
+        "expected": "tests cover percentile arrays, distribution stats, etc. as added to BenchmarkSummary / DetailResult",
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test && cd .. && uv run -- python -m pytest -m fast -q",
+        "description": "TypeScript compiles, full test suite green",
+        "expected": "all green",
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w5",
+        "wid": "w10"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w6",
+        "wid": "w10"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w8",
+        "wid": "w11"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w9",
+        "wid": "w11"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "notes": "Tier 1 - highest-impact missing chart for tail-latency credibility.\nPlacement: ResultDetail.tsx side panel + Compare.tsx tab alongside\nSpeedup/Diverging/Grouped.\n\nPercentile method MUST match the Python reference exactly\n(numpy.percentile linear interpolation) - pre-compute in the\npipeline and ship in the artifact, do not recompute in TS.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Port `percentile_ladder`: emit p50/p90/p95/p99 arrays + ladder SVG component",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "notes": "Tier 4 - compact alternative to the heatmap for the home page or\nplatform overview. Each row carries a per-query trend mini-chart.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Port `sparkline_table`: compact metrics table with embedded micro-charts",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "notes": "Final integration step:\n  - Create `results-explorer/src/lib/chartRegistry.ts` mirroring\n    the canonical 16-entry list from\n    benchbox/core/visualization/chart_types.py.\n  - Each registry entry: `{ id, title, description, requires:\n    DataRequirements, component: ComponentRef, cli_equivalent: str }`.\n  - Meta-test fails if the explorer registry diverges from the\n    CLI registry (new chart type added on one side without the other).\n  - Update `docs/visualization-parity.md` (created by\n    `explorer-establish-cli-explorer-parity-tests`) with the\n    full chart-type matrix and the policy: \"New chart types are\n    added to chart_types.py first; explorer follows.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `chartRegistry.ts` mirroring chart_types.py + meta-test enforcing registry parity",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "notes": "Tier 1 - distribution-shape companion to percentile_ladder.\nPlacement: Compare.tsx tab + per-result detail page.\nSame pre-compute discipline: CDF samples emitted by Python.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Port `cdf_chart`: emit CDF samples + SVG component",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "notes": "Tier 2 - per-query ranks (1..N) across platforms with optional\n↑↓ rank-change arrows. Useful for TPC-DS (99 queries) where the\nheatmap becomes unwieldy. Add as alternate view alongside the\nheatmap; the heatmap stays the default.\n\nRank ties are a known divergence risk (Python and JS sort\nalgorithms differ silently) - fixture MUST cover ties.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Port `rank_table`: emit per-query rank matrix + table component",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "notes": "Tier 2 - reveals platforms with high run-to-run variance even\nwhen median looks good. Consumes raw per-sample timings already\nin DetailResult.queries; reduction helper in transformer.py emits\nthe five-number summary.\nPlacement: alternate Compare view + ResultDetail\n\"Per-query distribution\" section.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Port `distribution_box`: emit min/Q1/median/Q3/max per query + box-plot component",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "notes": "Tier 3 - match the CLI auto-split behavior (when query count > 33\nthe CLI splits into multiple panels). Bin edges decided in Python\nand shipped in the artifact so explorer cannot diverge.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Port `query_histogram`: emit binned histogram + SVG component (auto-split when query_count > 33)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "notes": "Tier 3 - currently buried in Compare summary cards as a small dl\nrow. Promote to a first-class chart on BenchmarkIndex when\npower_score is the primary metric for the benchmark family\n(consult lib/ranking.ts from explorer-unify-visualization-foundations).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Port `power_bar`: dedicated TPC Power@Size visualization (first-class on BenchmarkIndex)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "notes": "Tier 3 - useful for TPC-H/TPC-DS where load and throughput phases\nmatter for comparison fairness. Phase totals already in\nBenchmarkSummary; new component renders them as stacked bars\nper platform.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Port `stacked_phase`: phase breakdown (load/warmup/power/throughput) stacked bars",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "notes": "Tier 4 - surfaces regressions across releases.\nPlacement: PlatformIndex.tsx (per-platform history) + new\nBenchmarkIndex \"Trends\" tab.\n\n4-color PALETTE may be insufficient for many overlapping lines -\nextend chartTheme.ts with a dedicated TIME_SERIES_PALETTE if a\ncontrast check fails.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Port `time_series`: trend chart of geomean_ms / power_score over run_date, per platform",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-close-chart-type-coverage-gaps",
+        "notes": "Tier 4 - central for cloud DW comparisons\n(Snowflake/BigQuery/Athena/Databricks).\nPlacement: BenchmarkIndex when cost_usd is populated for >0\nresults. Hide section entirely when no cost data exists\n(an empty scatter looks broken).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Port `cost_scatter`: cost_usd vs power_score (or geomean_ms) scatter",
+        "wid": "w9"
+      }
+    ]
+  }
+}

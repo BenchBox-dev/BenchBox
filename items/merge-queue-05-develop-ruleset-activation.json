@@ -1,0 +1,155 @@
+{
+  "context": "Operator runs gh api to update develop-squash-only ruleset with merge_queue parameters (merge_method: SQUASH, min_bdr: 1, max_bdr: 5, grouping_strategy: ONLY_NON_FAILING). Update docs/operations/repo-admin-settings.md. Monitor first live PR merge through the queue and verify post-merge gap detector.",
+  "description": "Phase 5 / Gate MQ-5. Operator activates the merge queue in the develop-squash-only ruleset on BenchBox-dev/BenchBox. Update repository admin documentation, verify live PR enqueuing and merge group processing on develop, verify develop-post-merge safety net, and validate the rollback procedure.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Enable merge queue without documenting the exact rollback command",
+        "instead": "Document and rehearse ruleset rollback command first",
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "why": "Rapid rollback is required if queue hangs or blocks developer merges"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "needs_item": "merge-queue-04-canary-rehearsal-and-smoke"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-22T17:18:06Z",
+      "created_at": "2026-08-22T15:31:48Z",
+      "worktree": "merge-queue"
+    },
+    "preserves": [
+      {
+        "behavior": "Ruleset drift check remains clean",
+        "item_id": "merge-queue-05-develop-ruleset-activation"
+      },
+      {
+        "behavior": "bypass_actors: [] on develop-squash-only remains strictly enforced",
+        "item_id": "merge-queue-05-develop-ruleset-activation"
+      },
+      {
+        "behavior": "develop-post-merge and develop-post-merge-gap-detector remain active safety nets",
+        "item_id": "merge-queue-05-develop-ruleset-activation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "develop-squash-only ruleset definition",
+        "decision": "extend",
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "path": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "concept": "ruleset parse block and verification",
+        "decision": "reuse",
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "path": "scripts/ruleset_drift_check.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/native-merge-queue-activation-*.md"
+      },
+      {
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'merge_queue' docs/operations/repo-admin-settings.md",
+        "description": "Repo admin documentation reflects active merge queue configuration",
+        "expected": "pass",
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:17:52Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest tests/unit/release/test_ruleset_*.py -q",
+        "description": "Ruleset drift test suite passes",
+        "expected": "pass",
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:18:00Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest tests/unit/workflows/test_develop_ruleset_drift.py -q",
+        "description": "Develop ruleset drift workflow tests pass",
+        "expected": "pass",
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:18:05Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Updated repo-admin-settings.md with merge queue ruleset configuration and rollback commands",
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "notes": null,
+        "started_at": "2026-08-22T17:17:31Z",
+        "started_branch": "docs/merge-queue-05-develop-ruleset-activation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-05",
+        "status": "done",
+        "summary": "Update repo-admin-settings.md with merge queue ruleset JSON and operational parameters",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Verified ruleset drift check and unit test suites pass",
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "notes": null,
+        "started_at": "2026-08-22T17:17:37Z",
+        "started_branch": "docs/merge-queue-05-develop-ruleset-activation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-05",
+        "status": "done",
+        "summary": "Operator updates develop ruleset and verifies ruleset drift check passes",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Updated native merge queue decision record to Completed",
+        "item_id": "merge-queue-05-develop-ruleset-activation",
+        "notes": null,
+        "started_at": "2026-08-22T17:17:43Z",
+        "started_branch": "docs/merge-queue-05-develop-ruleset-activation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-05",
+        "status": "done",
+        "summary": "Monitor first live PR through develop merge queue and verify post-merge workflow",
+        "wid": "w2"
+      }
+    ]
+  }
+}

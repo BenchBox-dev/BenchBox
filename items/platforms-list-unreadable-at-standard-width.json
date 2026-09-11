@@ -1,0 +1,220 @@
+{
+  "context": "Make the default view narrow and scannable, and put the detail behind an explicit opt-in.\n\nDECISION GATE w1: choose the default presentation -- (a) drop Description from the default table and keep Platform / Support / Driver / Library, (b) group the table by support tier with a per-tier count, or (c) both -- and decide the flag that restores full detail (--detail / --long) and the machine-readable path (--json). Record the choice before implementing. The constraint is that the default must be readable at 80 columns without horizontal scrolling and must show support tier for every row.",
+  "description": "VERIFIED 2026-08-23 on develop at an 80-column terminal. 'benchbox platforms list' is one of four commands advertised in 'benchbox --help' quick start. Its output renders as:\n\n  Platform | Driver | Suppo… | Libra… | Categ… | Desc…\n\nEvery column that carries the information the user came for -- Support status, Library, Category, Description -- is truncated to an ellipsis, and the Description column wraps each platform across six or more rows of single-word fragments, so a 51-platform table becomes hundreds of unreadable lines.\n\nThis matters more than it looks because support tier is the project's honest answer to 'which of these 51 platforms actually work'. The registry already carries it (stable=5, beta=28, experimental=17, deprecated=1) and README already marks unproven platforms. The data is right; the presentation destroys it.\n\nExplicitly NOT the fix: hiding or gating experimental platforms. _project/decisions/architecture-support-tier-commitment.md:55-57 forbids changing support_status or removing platforms without recorded demand evidence, and restricting the CLI would penalise exactly the early adopters most likely to report useful defects. Adversarial review on 2026-08-23 rejected the gating approach on both grounds.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assume a wide terminal and leave the default as-is",
+        "instead": "INSTEAD pin the 80-column case with a test",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "why": "80 columns is the standard a CLI must render in"
+      },
+      {
+        "dont": "Assume this is already fixed by honest-platform-list-and-unproven-corpus-markers",
+        "instead": "INSTEAD verify with COLUMNS=80",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "why": "that item (done) added the Support column and README markers, i.e. the CONTENT, while this is about the column rendering being truncated to ellipses at 80 columns"
+      },
+      {
+        "dont": "Change any support_status value to shorten the table",
+        "instead": "INSTEAD leave the registry untouched",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "why": "_project/decisions/architecture-support-tier-commitment.md:55-57 requires recorded demand evidence and a new product decision first"
+      },
+      {
+        "dont": "Hide experimental or unproven platforms from the default listing",
+        "instead": "INSTEAD keep every row and fix the rendering",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "why": "it violates the recorded support-tier commitment and penalises early adopters"
+      }
+    ],
+    "item_meta": {
+      "category": "cli",
+      "completed_at": "2026-08-23T20:45:22Z",
+      "completed_pr": 1848,
+      "created_at": "2026-08-23T13:10:19Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A machine-readable listing remains available for scripting",
+        "item_id": "platforms-list-unreadable-at-standard-width"
+      },
+      {
+        "behavior": "Every platform stays listed and runnable; no platform is hidden, gated, or has its support_status changed",
+        "item_id": "platforms-list-unreadable-at-standard-width"
+      },
+      {
+        "behavior": "Support status remains visible for every row in the default view, distinct from local driver availability",
+        "item_id": "platforms-list-unreadable-at-standard-width"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "added the Support column separate from Driver availability",
+        "decision": "extend",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "path": "PR #1771 / honest-platform-list-and-unproven-corpus-markers"
+      },
+      {
+        "concept": "binding constraint on platform removal and support_status changes",
+        "decision": "reuse",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "path": "_project/decisions/architecture-support-tier-commitment.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "kind": "do_not_modify",
+        "path_glob": "_project/decisions/"
+      },
+      {
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/manifest.py"
+      },
+      {
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/platforms.py"
+      },
+      {
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/platform.py"
+      },
+      {
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_no_cli_surface_drift.py"
+      },
+      {
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_platform.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "COLUMNS=80 uv run -- benchbox platforms list",
+        "description": "Default listing is readable at 80 columns",
+        "expected": "no truncated column headers; one line per platform; support tier visible",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "last_result": "pass",
+        "last_run": "2026-08-23T20:45:17Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "COLUMNS=80 uv run -- benchbox platforms list | grep -c .",
+        "description": "All platforms are still listed",
+        "expected": "row count matches the registry entry count",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "last_result": "pass",
+        "last_run": "2026-08-23T20:45:19Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox platforms list --json",
+        "description": "Detail remains reachable",
+        "expected": "full metadata including description for every platform",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "last_result": "pass",
+        "last_run": "2026-08-23T20:45:21Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Captured on develop at COLUMNS=80/120/200. At 80: header renders 'Platform | Driver | Suppo... | Libra... | Categ... | Desc...' and Description wraps each platform across 6 rows of single-word fragments. At 120: headers full but Description still wraps 3-4 rows per platform. At 200: single-line rows, readable. Longest display_name is 32 chars ('Google Cloud Dataproc Serverless'), so the Platform column is content-sized at 34 and cannot shrink.",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "notes": null,
+        "started_at": "2026-08-23T19:32:47Z",
+        "started_branch": "fix/platforms-list-readable-at-80-columns",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-platforms-list",
+        "status": "done",
+        "summary": "Capture current output at 80, 120 and 200 columns as evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": "DECISION (a) plus tier ordering, rejecting (b). Default table keeps Platform / Driver / Support / Libraries and moves Category and Description behind --detail; rows are ordered stable, beta, experimental, deprecated, unknown, with per-tier counts printed under the summary; --format json added for the lossless machine-readable path. Rejected (b) separate grouped tables per tier: four table frames add chrome without adding information a Support column plus tier ordering does not already give, and the wizard and 'platforms status' share this renderer. Nothing hidden or gated, per _project/decisions/architecture-support-tier-commitment.md. Reversible.",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "notes": null,
+        "started_at": "2026-08-23T19:33:08Z",
+        "started_branch": "fix/platforms-list-readable-at-80-columns",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-platforms-list",
+        "status": "done",
+        "summary": "DECISION GATE - choose the default column set and the opt-in detail/JSON flags; record the reason",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1848. display_platform_status(detail=False) plus _platforms_by_support_tier / _support_tier_counts helpers; --detail and --format json wired through list_platforms. At 80 columns all four default headers render in full, no line exceeds 80, summary reads '5 stable, 28 beta, 17 experimental, 1 deprecated'.",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "notes": null,
+        "started_at": "2026-08-23T19:35:06Z",
+        "started_branch": "fix/platforms-list-readable-at-80-columns",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-platforms-list",
+        "status": "done",
+        "summary": "Implement the default view and the detail flag",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1848: 7 tests in tests/unit/cli/test_platform.py render the REAL 51-platform registry (not a fixture, which would fit at any width): no ellipsis in the default header, no line over 80 columns, Category/Description absent by default and restored by --detail, every row still carries a tier, stable rows before experimental. Negative control renders --detail at 80 and asserts it STILL truncates, so the width assertions cannot go vacuous. Also had to record the intentional CLI surface change in tests/uat/test_no_cli_surface_drift.py. pr-preflight 28028 passed.",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "notes": null,
+        "started_at": "2026-08-23T19:35:11Z",
+        "started_branch": "fix/platforms-list-readable-at-80-columns",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-platforms-list",
+        "status": "done",
+        "summary": "Add a test that renders at 80 columns and fails on a truncated header or an unreadable default row",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Checked at COLUMNS=80. 'benchmarks list' renders a Rich tree, not a table -- no truncation, readable. 'check-deps' wraps long descriptions mid-line but never elides to an ellipsis. 'profile' fits at 80 with no truncation. The truncation class is platforms list alone; nothing further to fix or file. Two cosmetic observations not worth an item: 'benchmarks list' prints its title twice (panel plus tree root), and check-deps wraps some platform names.",
+        "item_id": "platforms-list-unreadable-at-standard-width",
+        "notes": null,
+        "started_at": "2026-08-23T19:35:23Z",
+        "started_branch": "fix/platforms-list-readable-at-80-columns",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-platforms-list",
+        "status": "done",
+        "summary": "Check the same truncation class in the other advertised discovery commands (benchmarks list, check-deps, profile) and fix or file separately",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "context": "w0 re-reads nightly.yml failure handling and post-merge auto-revert boundary. w1 writes the policy decision record with exactly one outcome. w2 implements only the staleness/aging guard required by that outcome, if any, without adding generator tests.",
+  "description": "Fourth item in the CI-waste sequence. A randomized generator whose destination is an issue or a known-fail file is a skip regime unless it has an owner, blocking-vs-advisory choice, seed replay, max entry age, and a staleness guard.\n\nNightly has no auto-revert path. This item writes the policy and any guard that enforces it. It does not add the generator job and does not change required PR lanes.\n\nDECISION GATE: choose exactly one of ADVISORY_WITH_AGE (continue-on-error plus max age plus staleness guard) or BLOCKING_OWNED (blocking nightly job with a named owner).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "claim a nightly generator needs no skip decision",
+        "instead": "choose ADVISORY_WITH_AGE or BLOCKING_OWNED first",
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "why": "issue/known-fail destinations are skip regimes"
+      },
+      {
+        "dont": "land a generator with an unbounded known-fail file",
+        "instead": "require max age and a staleness guard that fails closed",
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "why": "agents will add goldens and the list becomes a silent skip"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "needs_item": "ci-waste-ledger-and-queue-reconcile"
+      }
+    ],
+    "item_meta": {
+      "category": "CI",
+      "completed_at": "2026-08-31T18:33:35Z",
+      "completed_pr": 1980,
+      "created_at": "2026-08-27T23:11:45Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Nightly remains outside post-merge auto-revert unless a later item explicitly extends EXPECTED_SIGNATURE_JOBS",
+        "item_id": "ci-waste-nightly-disposition-policy"
+      },
+      {
+        "behavior": "No generator job is added by this item",
+        "item_id": "ci-waste-nightly-disposition-policy"
+      },
+      {
+        "behavior": "Required PR lanes are unchanged",
+        "item_id": "ci-waste-nightly-disposition-policy"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "auto-revert signature jobs",
+        "decision": "reuse",
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "path": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "concept": "nightly jobs blocking by default except explicit continue-on-error",
+        "decision": "extend",
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "path": ".github/workflows/nightly.yml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "kind": "only_modify",
+        "path_glob": "_project/sqlglot-upstream/**"
+      },
+      {
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "kind": "only_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_sqlglot_generator_known_failures.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'ADVISORY_WITH_AGE|BLOCKING_OWNED' _project/decisions/ docs/operations/",
+        "description": "decision record names exactly one of ADVISORY_WITH_AGE or BLOCKING_OWNED",
+        "expected": "exactly one selected outcome",
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "last_result": "pass",
+        "last_run": "2026-08-31T18:33:33Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --name-only origin/develop -- .github/workflows/pr.yml",
+        "description": "pr.yml unchanged",
+        "expected": "empty",
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "last_result": "pass",
+        "last_run": "2026-08-31T18:33:34Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": ".github/workflows/nightly.yml has only schedule/workflow_dispatch triggers; .github/workflows/develop-post-merge.yml line 519 limits EXPECTED_SIGNATURE_JOBS to lint, fast-test, explorer-tokens, and medium-test, so nightly remains outside auto-revert.",
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "notes": null,
+        "started_at": "2026-08-31T16:57:38Z",
+        "started_branch": "docs/ci-waste-nightly-disposition-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-nightly-disposition-policy",
+        "status": "done",
+        "summary": "Re-read nightly.yml, develop-post-merge auto-revert job list, and docs/operations nightly mentions; confirm nightly is outside auto-revert",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Selected ADVISORY_WITH_AGE exactly once in the decision record; owner @joeharris76; deterministic replay template under _project/sqlglot-upstream/repros/; seven-day maximum with expiration on day 7; canonical guard command documented.",
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "notes": null,
+        "started_at": "2026-08-31T17:08:37Z",
+        "started_branch": "docs/ci-waste-nightly-disposition-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-nightly-disposition-policy",
+        "status": "done",
+        "summary": "DECISION GATE: choose exactly one of ADVISORY_WITH_AGE or BLOCKING_OWNED; name owner, seed-replay rule, max known-fail age, and staleness-guard command",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Implemented scripts/check_sqlglot_generator_known_failures.py with fail-closed schema, age, path, artifact existence/metadata checks; 35 focused tests pass; no generator or workflow job added.",
+        "item_id": "ci-waste-nightly-disposition-policy",
+        "notes": null,
+        "started_at": "2026-08-31T17:27:09Z",
+        "started_branch": "docs/ci-waste-nightly-disposition-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-nightly-disposition-policy",
+        "status": "done",
+        "summary": "Implement only the policy's staleness/aging guard if the chosen outcome requires one; do not add a generator job",
+        "wid": "w2"
+      }
+    ]
+  }
+}

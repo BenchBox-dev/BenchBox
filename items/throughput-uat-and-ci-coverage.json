@@ -1,0 +1,171 @@
+{
+  "description": "Concurrency has no acceptance or CI coverage at all.\n\n- UAT: no config under tests/uat/configs/*.yaml runs a `throughput` or\n  concurrent phase. Every config's phases are preflight -> execute -> validate\n  -> package -> report, and `execute` runs single-stream power-style\n  workloads. `make uat-stress` sweeps the PLATFORM MATRIX, not concurrent\n  query streams. `release-gate-03-docker-oltp.yaml` sounds concurrency-related\n  but runs single-stream.\n- CI: no workflow runs the throughput phase or a concurrency test selection.\n  The `concurrency:` keys in .github/workflows/test.yml and nightly.yml are\n  GitHub Actions cancel-in-progress groups, not test concurrency. The `stress`\n  pytest marker marks EXPENSIVE tests generically, not concurrency load tests,\n  and default suites exclude it.\n\nSo a regression that breaks multi-stream execution (or silently drops to 2\nstreams, per throughput-stream-count-wiring-defect) would ship green. Add real\nacceptance + CI coverage on top of the new real-DB tests.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "throughput-uat-and-ci-coverage",
+        "id": 497,
+        "reason": "Time/scope: a materially larger lift than w1-w3, deserves its own pass.\n",
+        "resolution": "promoted",
+        "resolved_item": "w4-docker-postgres-throughput-uat-cell-see-work-w4-notes",
+        "resolved_reason": null,
+        "summary": "w4 (Docker Postgres throughput UAT cell) -- see work[].w4 notes.\n"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "throughput-uat-and-ci-coverage",
+        "id": 498,
+        "reason": "benchbox/core/ is not in this TODO's scope_limit.only_modify\n(tests/uat/, .github/workflows/, Makefile only). This is exactly the\nkind of silent-regression risk this TODO's coverage is meant to\nsurface -- it surfaced one, just not the one this TODO's deps already\nfixed.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Root cause (Q11/16/18/20 seed derivation falling outside RANGE-mode tolerance) matches open items tpch-throughput-rowcount-validation-range-mode and tpch-throughput-parameter-aware-rowcounts.",
+        "summary": "NEW DEFECT DISCOVERED DURING THIS TODO'S VERIFICATION (out of this\nTODO's scope_limit to fix -- benchbox/core/ is not in\nscope_limit.only_modify): TPC-H throughput mode fails row-count\nvalidation for queries 11, 16, 18, and 20 on EVERY stream, at SF=1 on\nDuckDB, regardless of --seed choice (reproduced with seed=42, seed=7,\nand no seed at all). Confirmed independent of concurrency: the\nidentical 4 queries fail identically in single-stream POWER mode with\na non-reference seed; POWER mode with no seed (qgen-defaults, exact\nvalidation against the official answer files) passes cleanly. Root\ncause hypothesis: benchbox/core/tpch/throughput_test.py derives each\nstream's per-query seed as `seed + stream_id * 1000 + position`, so no\nthroughput stream (beyond possibly the first query of stream 0) can\never land on the reference-seed exact-match path; every throughput\nquery therefore falls back to LOOSE (+-50%) tolerance\n(benchbox/core/expected_results/tpch_results.py), which is not wide\nenough for these 4 TPC-H-spec-sanctioned non-deterministic queries.\ntpch_results.py's own docstring flags RANGE mode as \"reserved for\nfuture use\" and not yet wired up for TPC-H -- likely the intended fix.\nPreviously invisible because the throughput driver was only ever\ntested against Mock connections before throughput-real-db-integration-tests,\nand that TODO's new SF=0.01 tests don't hit this SF=1-scale manifestation.\nFlagged as a background task (task_c4fffdd0) for a follow-up session\nwith full repro details and a docstring typo also noticed in passing\n(tpch_results.py misstates the reference seed's decimal value).\n"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "throughput-uat-and-ci-coverage",
+        "needs_item": "throughput-real-db-integration-tests"
+      },
+      {
+        "item_id": "throughput-uat-and-ci-coverage",
+        "needs_item": "throughput-stream-count-wiring-defect"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-09T00:00:00Z",
+      "created_at": "2026-07-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing UAT configs and phases keep working; new coverage is additive.",
+        "item_id": "throughput-uat-and-ci-coverage"
+      },
+      {
+        "behavior": "pr fast-lane runtime is not inflated — heavy throughput coverage runs nightly.",
+        "item_id": "throughput-uat-and-ci-coverage"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/nightly.yml — the right place for a slow real-DB throughput job.",
+        "decision": "reuse",
+        "item_id": "throughput-uat-and-ci-coverage",
+        "path": ".github/workflows/nightly.yml"
+      },
+      {
+        "concept": "tests/uat/_cli.py:476 — default cell phases (load,power); a throughput phase option is the extension point.",
+        "decision": "reuse",
+        "item_id": "throughput-uat-and-ci-coverage",
+        "path": "tests/uat/_cli.py:476"
+      },
+      {
+        "concept": "tests/uat/configs/release-gate-03-docker-oltp.yaml — closest existing gate; add a throughput phase or a sibling config.",
+        "decision": "reuse",
+        "item_id": "throughput-uat-and-ci-coverage",
+        "path": "tests/uat/configs/release-gate-03-docker-oltp.yaml"
+      },
+      {
+        "concept": "tests/uat/phases/execute.py — the phase runner to teach about a concurrent/throughput execution mode.",
+        "decision": "reuse",
+        "item_id": "throughput-uat-and-ci-coverage",
+        "path": "tests/uat/phases/execute.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "throughput-uat-and-ci-coverage",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "throughput-uat-and-ci-coverage",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "throughput-uat-and-ci-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=1",
+        "description": "Throughput UAT cell passes on DuckDB",
+        "expected": "throughput phase runs N streams and validates",
+        "item_id": "throughput-uat-and-ci-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "throughput-uat-and-ci-coverage",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "throughput-uat-and-ci-coverage",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "throughput-uat-and-ci-coverage",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "throughput-uat-and-ci-coverage",
+        "notes": "Added tests/uat/configs/uat-throughput-duckdb-nightly.yaml: DuckDB,\nTPC-H, SF=1 (the smallest TPC-compliant rung -- `run-official`, the\nonly CLI surface with a real --streams option, hard-rejects\nnon-TPC-compliant scale factors), phases_arg \"load,throughput\",\nstreams=3 (intentionally above the driver's 2-stream floor -- see w2 --\nso the cell actually exercises \"was my N-stream request honored?\"\nrather than \"did the floor's default of 2 happen to match?\"). Loads\ncleanly via tests.uat.config.load_config (verified live).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a UAT config that runs a real throughput phase on DuckDB (small SF, N streams)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-uat-and-ci-coverage",
+        "notes": "Resumed and verified an interrupted prior attempt's changes (all kept,\nnone discarded -- see the completion-session's PARTIAL_WORK_DISPOSITION\nfor the full audit): tests/uat/config.py (execute.official/streams/seed\n+ TPC-compliant-scale validation), tests/uat/matrix.py\n(benchbox_run_official_argv, since `benchbox run` has no --streams\noption at all -- only the deprecated `run-official --streams N`\nreaches BenchmarkConfig.concurrency, via\nrun_official.py::_forward_requested_streams), tests/uat/runner.py\n(run_cell(official=, streams=, seed=) routes through run-official and\nresolves its result JSON by filename+mtime, since it has no --quiet\nflag), tests/uat/phases/execute.py (threads config.execute.official/\nstreams/seed into the runner call), and tests/uat/throughput.py (new\nmodule: resolve_official_result_path,\nvalidate_stream_count/validate_throughput_metric/validate_throughput_result).\n\nSplit validate_throughput_result into two independently callable checks\n(validate_stream_count, validate_throughput_metric) during this\ncompletion pass: this TODO's own live verification surfaced a genuine,\npre-existing, orthogonal TPC-H throughput correctness defect (see\n`deferred` below) that blocks a clean Throughput@Size on DuckDB at SF=1\nregardless of seed. Splitting lets a caller (the nightly job, see w3)\nhard-gate on the concurrency-wiring signal this TODO actually protects\n(validate_stream_count) independent of that separately-tracked defect.\n\nAdded tests/uat/test_throughput.py (18 new fast unit tests: result-path\nresolution incl. platform/benchmark/mtime filtering, both split\nvalidators, the composed validator, and a drift guard against\nrun_official.py's TPC_ALLOWED_SCALE_FACTORS constant).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Teach the UAT execute phase / matrix to run a throughput mode and validate Throughput@Size > 0 and stream count == requested",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-uat-and-ci-coverage",
+        "notes": ".github/workflows/nightly.yml: new `throughput-uat` job. Step 1 (hard\ngate, no continue-on-error): `pytest tests/integration -k \"throughput\nand duckdb\" -m integration` -- 5/5 pass today, exercises the real\nproduction driver directly against a real DuckDB connection. Step 2:\n`make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml`\n(continue-on-error: true, with an inline comment explaining the tracked\ndefect this defers to -- see `deferred`). Step 3 (hard gate, no\ncontinue-on-error): a short inline script calling\ntests.uat.throughput.resolve_official_result_path +\nvalidate_stream_count directly against the exported result JSON, so a\nFUTURE regression that drops the requested stream count still fails\nthe job outright, independent of step 2's known-defect leniency.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a nightly CI job that runs the real-DB throughput integration tests and the DuckDB throughput UAT cell",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-uat-and-ci-coverage",
+        "notes": "DEFERRED, not attempted this pass (see top-level `deferred:` section):\nw1-w3 already consumed the full\nverification budget (see below), and a Docker Postgres throughput cell\nis a materially larger lift (compose stack bring-up, port/credential\nwiring, its own concurrency-under-real-sessions failure modes to\ncharacterize) that deserves its own focused pass rather than being\nsqueezed in. No code was added for it; nothing to roll back.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Optionally add one docker server-engine (Postgres) throughput UAT cell to cover independent-session concurrency",
+        "wid": "w4"
+      }
+    ]
+  }
+}

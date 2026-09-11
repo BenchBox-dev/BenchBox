@@ -1,0 +1,135 @@
+{
+  "context": "Follow the existing RowCountStrategy subclass pattern (TPCH/TPCDS/SSB). The\njoinorder strategy sources its expected counts from the parsed manifest, so it\nis data-driven, not hardcoded. Wire it into the same benchmark-name dispatch\nthat already routes the other three, then add tests exercising both the\nmatching and the drifted case.\n",
+  "description": "Adversarial review finding (2026-07-02, joinorder Track-2 review), Medium.\n\nThe runtime post-load validator routes the canonical JoinOrder benchmark to\n`GenericRowCountStrategy`, which only checks that each table is non-empty --\neven though `benchbox/core/joinorder/data_manifest.toml` already carries the\nexact per-table `row_count` for all 21 IMDb tables. A load into the SUT that\nsilently drops or duplicates rows (e.g. a partial COPY, a type-coercion drop)\nleaves a non-empty but wrong-count table, which yields wrong join cardinalities\nand a meaningless optimizer benchmark, undetected.\n\nEvidence (re-runnable against the current tree):\n  - benchbox/platforms/base/validation.py:428 -- benchmark-name routing falls\n    through to `GenericRowCountStrategy` for anything not tpch/tpcds/ssb;\n    joinorder hits the `else`.\n  - benchbox/platforms/base/validation.py:351-356 --\n    `GenericRowCountStrategy.get_expected_range` returns None.\n  - benchbox/platforms/base/validation.py:456-458 -- with no expected range\n    the validator errors only when `actual_rows == 0`.\n  - benchbox/core/joinorder/benchmark.py:291-303 -- `get_table_row_count`\n    already surfaces the manifest's exact `row_count`, unused by the validator.\n\nSeverity is bounded because the source Parquet files are SHA256-verified at\nfetch (benchbox/core/data_fetch/manager.py), so this gap is specifically about\nload-into-SUT fidelity, not source corruption. But the exact counts are already\non hand, so closing it is cheap. This also retires finding #6 (the manifest\n`row_count` field being decorative) for the joinorder path.\n\nSOUNDNESS PATH: this touches the shared row-count validator used by other\nbenchmarks. Preserve tpch/tpcds/ssb behavior exactly and keep the non-empty\nfallback for genuinely-unknown benchmarks.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the GenericRowCountStrategy fallback",
+        "instead": "(not specified)",
+        "item_id": "joinorder-runtime-row-count-validation",
+        "why": "other benchmarks legitimately depend on non-empty-only."
+      },
+      {
+        "dont": "hardcode the 21 row counts in validation.py",
+        "instead": "(not specified)",
+        "item_id": "joinorder-runtime-row-count-validation",
+        "why": "read them from the loaded manifest so a manifest bump stays authoritative."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "joinorder-runtime-row-count-validation",
+        "needs_item": "joinorder-canonical-cutover"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-07-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "GenericRowCountStrategy non-empty fallback still applies to benchmarks with no manifest counts.",
+        "item_id": "joinorder-runtime-row-count-validation"
+      },
+      {
+        "behavior": "No change to the joinorder fetch/SHA256 path in benchbox/core/data_fetch/.",
+        "item_id": "joinorder-runtime-row-count-validation"
+      },
+      {
+        "behavior": "TPCH/TPCDS/SSB RowCountStrategy selection and expected ranges are unchanged (benchbox/platforms/base/validation.py:423-427).",
+        "item_id": "joinorder-runtime-row-count-validation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/joinorder/benchmark.py:get_table_row_count -- reuse to source exact per-table counts from the manifest rather than hardcoding.",
+        "decision": "reuse",
+        "item_id": "joinorder-runtime-row-count-validation",
+        "path": "benchbox/core/joinorder/benchmark.py:get_table_row_count"
+      },
+      {
+        "concept": "benchbox/platforms/base/validation.py:TPCHRowCountStrategy -- reuse the per-benchmark strategy subclass pattern for a JoinOrder strategy.",
+        "decision": "reuse",
+        "item_id": "joinorder-runtime-row-count-validation",
+        "path": "benchbox/platforms/base/validation.py:TPCHRowCountStrategy"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-runtime-row-count-validation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/data_fetch/"
+      },
+      {
+        "item_id": "joinorder-runtime-row-count-validation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/validation.py"
+      },
+      {
+        "item_id": "joinorder-runtime-row-count-validation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_platform_validation.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_platform_validation.py -q",
+        "description": "Platform validation unit tests pass (incl. new joinorder count test)",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "joinorder-runtime-row-count-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-runtime-row-count-validation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-runtime-row-count-validation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-runtime-row-count-validation",
+        "notes": "Add a JoinOrder row-count strategy following the existing per-benchmark\nRowCountStrategy pattern. It reads the 21 exact per-table counts from the\nloaded data_manifest.toml (via ParsedManifest / get_table_row_count) and\nasserts equality (tolerance 0). Do not hardcode counts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a manifest-driven exact row-count strategy for joinorder",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-runtime-row-count-validation",
+        "notes": "Extend the benchmark-name dispatch at validation.py:~420-429 to select the\nnew strategy for joinorder. Leave the tpch/tpcds/ssb branches and the\nGenericRowCountStrategy fallback untouched.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Route the joinorder benchmark to the exact strategy in validation.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-runtime-row-count-validation",
+        "notes": "In tests/unit/platforms/test_platform_validation.py assert a matching count\npasses and a table short by N rows fails with a count-specific error (not\nmerely the empty-table error). Mirror the tpch/tpcds/ssb strategy tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit-test exact and drifted row counts for joinorder validation",
+        "wid": "w3"
+      }
+    ]
+  }
+}

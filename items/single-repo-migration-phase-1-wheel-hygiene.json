@@ -1,0 +1,190 @@
+{
+  "description": "Make the wheel and sdist correct under a single-repo model: maintainer\nscaffolding (release scripts, _project/, _blog/, drafts, dev-tooling root\nfiles) is excluded from the published artefacts even when those files are\npresent in the repo on main. This is reversible, internal-only, and safe\nto land before the dev locus migration.\n\nGoal: pip install benchbox produces the same package contents whether\ninstalled from a curated public mirror (today) or from the future\nsingle-repo source (post-Phase 4).\n\nThis phase's PR is built from the private clone (current dev locus) and\nsyncs to public via the existing curated-mirror flow as one of its last\nuses, OR is bundled into the Phase 4 final sync. Either is fine.\n\nPlan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 1).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the build backend (e.g., setuptools to hatch) as part of this phase",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "why": "that is a separate decision and would mask whether the exclude changes are working correctly."
+      },
+      {
+        "dont": "delete any source files in this phase",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "why": "file deletion is Phase 6; this phase only adjusts what gets packaged."
+      },
+      {
+        "dont": "skip the smoke test (w5)",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "why": "exclude config errors can produce wheels that build but fail to import (e.g., excluding a package __init__.py); only an actual install proves correctness."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "needs_item": "single-repo-migration-phase-0-audit"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-04-27T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing release-time CI (automate_release.py) continues to work unchanged - this phase does not touch the release flow.",
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene"
+      },
+      {
+        "behavior": "Existing tests continue to pass unchanged.",
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene"
+      },
+      {
+        "behavior": "The actual benchbox package contents inside the wheel (everything under benchbox/) is unchanged. Only what is alongside it (release scripts, _project, etc.) is now excluded.",
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "kind": "only_modify",
+        "path_glob": "MANIFEST.in"
+      },
+      {
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "unzip -l dist/benchbox-*.whl | grep -E '_project|_blog|automate_release|benchbox/release/' | wc -l",
+        "description": "Wheel does not contain maintainer scaffolding",
+        "expected": "0",
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "tar tzf dist/benchbox-*.tar.gz | grep -E '_project|_blog|automate_release|benchbox/release/' | wc -l",
+        "description": "Sdist does not contain maintainer scaffolding",
+        "expected": "0",
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "python -m venv /tmp/wt && /tmp/wt/bin/pip install dist/benchbox-*.whl && /tmp/wt/bin/python -c 'import benchbox'",
+        "description": "Wheel installs and imports cleanly",
+        "expected": "exit 0",
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "notes": "pyproject.toml lines 57-68 already exclude benchbox.release in the\nsetuptools config. MANIFEST.in already prunes benchbox/release, tests,\ndocs, examples (per workflow.py exploration earlier).\nIdentify the gap: the maintainer scaffolding paths in HOLD_BACK_PATHS\n(workflow.py:18-43) that are NOT yet in either file.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Read current pyproject.toml and MANIFEST.in to see what is already excluded",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "notes": "Edit pyproject.toml. Add to [tool.hatch.build.targets.wheel] (or\nsetuptools equivalent depending on what build backend is in use):\n  exclude = [ \"benchbox/release/**\" ]\nAdd to [tool.hatch.build.targets.sdist] exclude:\n  \"_project\", \"_blog\", \".claude\", \".codex\", \".gemini\", \"_chart_data\",\n  \"release\", \"scripts/automate_release.py\", \"scripts/prepare_release.py\",\n  \"scripts/finalize_release.py\", \"scripts/verify_release.py\",\n  \"scripts/build_release.py\", \"scripts/sync_repos.py\",\n  \"tests/unit/release/**\", \"tests/unit/test_release_*.py\",\n  \"todo.config.yaml\", \"skill-sync.yaml\", \"skill-sync.lock\",\n  \"_benchbox_pytest_xdist_safety.py\", \".pre-commit-config.yaml\",\n  \".coveragerc_core\", \".dockerignore\", \".env.example\", \".mcp.json\",\n  \"AGENTS.md\", \"CLAUDE.md\", \"GEMINI.md\",\n  \".mypy_cache\", \".ruff_cache\", \"htmlcov\"\nThese dev-tooling root files (.pre-commit-config.yaml etc.) are\nproject-level infrastructure that lives on main but should not ship\nin published wheels. They land on public in Phase 4 (final sync) but\nare excluded from the wheel by this phase's config.\nAdapt list based on what actually exists in repo root today.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add hatch wheel/sdist excludes for HOLD_BACK_PATHS content not already covered",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "notes": "Use prune and recursive-exclude directives. Result must match the\npyproject.toml sdist exclude list (sdist contents are determined\nby both, intersection-style with setuptools, MANIFEST.in-only with\nhatch - check which is in use).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update MANIFEST.in to mirror the sdist excludes",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "notes": "uv run python -m build\nunzip -l dist/benchbox-*.whl    # inspect wheel\ntar tzf dist/benchbox-*.tar.gz   # inspect sdist\nConfirm: no _project/, no _blog/, no scripts/automate_release.py,\nno benchbox/release/, no test files for release tooling.\nCommit a script or one-line check that fails if any of these reappear.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build wheel and sdist locally, inspect contents",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "notes": "python -m venv /tmp/wheel-test\n/tmp/wheel-test/bin/pip install dist/benchbox-*.whl\n/tmp/wheel-test/bin/benchbox --help\n/tmp/wheel-test/bin/python -c \"import benchbox; print(benchbox.__version__)\"\nConfirm exit 0 on all three.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Smoke test: install the wheel in a clean venv and import",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-1-wheel-hygiene",
+        "notes": "uv run -- python -m pytest tests/unit/test_release_size_check.py \\\n  tests/unit/test_release_exclusion_invariants.py\nThese tests will be deleted in Phase 6, but for now they should pass\nagainst the new exclude config. If they fail, the failure points to\na missing exclude line; iterate w2-w4 until green.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run existing wheel-content tests",
+        "wid": "w6"
+      }
+    ]
+  }
+}

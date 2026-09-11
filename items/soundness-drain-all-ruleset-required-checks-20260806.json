@@ -1,0 +1,133 @@
+{
+  "description": "_project/scripts/soundness_drain_report.py carries its own copy of the single-context required-lane logic that green_unmerged_sweep.py shed in PR #1633: REQUIRED_CHECK_NAME = 'ci-required-result', required_lane_check_run() matching that one name, and is_required_lane_green() returning True from that single run. develop-squash-only has had TWO required status contexts since 2026-08-03 (ci-required-result and 'Results Explorer browser gate', per docs/operations/repo-admin-settings.md), so the drain report can classify a PR required-lane green while its second required context is red or has never reported.\n\nSecond, subtler defect found while scoping: park_time_hours() anchors 'when did this PR go green' on the single check run's completed_at. Under two contexts the PR goes green when the LAST required context completes, so anchoring on ci-required-result overstates park time whenever the browser gate finishes later -- tripping the >24h drain gate early. Fixing the classifier without fixing the anchor leaves a live off-by-one-context bug.\n\nDeliberately NOT extracting a shared helper module in this item: green_unmerged_sweep.py is in flight in unmerged PR #1633, so editing it here would either conflict or require a stacked PR (zero CI in this repo). Convergence is tracked separately once #1633 lands.",
+  "legacy": {
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-06T14:37:04Z",
+      "completed_pr": 1635,
+      "created_at": "2026-08-06T14:29:10Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Report stays observation-only: it labels and files a digest, it never enables auto-merge",
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806"
+      },
+      {
+        "behavior": "Soundness-gated PRs remain the population the report is ABOUT -- never invert the soundness exclusion borrowed from the sweep",
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/green_unmerged_sweep.py"
+      },
+      {
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/fixtures/soundness_drain_fixture.json"
+      },
+      {
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/soundness_drain_report.py"
+      },
+      {
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/soundness_drain_report.py --self-test",
+        "description": "Self-test passes offline against the bundled fixture",
+        "expected": "exit 0",
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -q 'REQUIRED_CHECK_NAME = ' _project/scripts/soundness_drain_report.py",
+        "description": "Report no longer keys on a single hardcoded context",
+        "expected": "exit 0",
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q -n 0",
+        "description": "Scripts unit tests pass",
+        "expected": "exit 0",
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR https://github.com/joeharris76/BenchBox/pull/1635, commit c598da1. REQUIRED_CHECK_NAMES tuple + latest_check_run/is_check_run_success; is_required_lane_green requires every context latest-success, missing runs fail closed. Ladder rung 2 (! rg -q 'REQUIRED_CHECK_NAME = ') exits 0.",
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "notes": null,
+        "started_at": "2026-08-06T14:36:55Z",
+        "started_branch": "fix/soundness-drain-all-required-checks",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/soundness-drain-required-checks",
+        "status": "done",
+        "summary": "Require every ruleset context in is_required_lane_green (fail closed on missing runs)",
+        "wid": "w0"
+      },
+      {
+        "evidence": "required_lane_green_at() anchors park time on max(completed_at) across required contexts, falling back to updated_at when any stamp is missing. Fixture 9110: umbrella -52h, gate -10h => park 10.0h (too_young); old umbrella-only anchor read 52.0h and wrongly qualified. Negative-tested by reverting only the anchor: self-test and test_park_time_anchors_on_the_last_required_context both fail.",
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "notes": null,
+        "started_at": "2026-08-06T14:36:58Z",
+        "started_branch": "fix/soundness-drain-all-required-checks",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/soundness-drain-required-checks",
+        "status": "done",
+        "summary": "Anchor park_time_hours on the last required context to complete",
+        "wid": "w1"
+      },
+      {
+        "evidence": "New tests/unit/scripts/test_soundness_drain_report.py (32 tests; script previously had none). Fixture PRs 9108 (gate absent) / 9109 (gate red) as not_green, 9110 for the anchor; existing PRs gained a gate completing before their umbrella so prior expectations are unchanged (verified additive-only). Ladder: self-test 10 PRs/3 qualifying exit 0; tests/unit/scripts/ 1628 passed.",
+        "item_id": "soundness-drain-all-ruleset-required-checks-20260806",
+        "notes": null,
+        "started_at": "2026-08-06T14:37:01Z",
+        "started_branch": "fix/soundness-drain-all-required-checks",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/soundness-drain-required-checks",
+        "status": "done",
+        "summary": "Fixture + unit tests for partial-green and park-time anchoring",
+        "wid": "w2"
+      }
+    ]
+  }
+}

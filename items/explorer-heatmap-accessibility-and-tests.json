@@ -1,0 +1,215 @@
+{
+  "context": "Accessibility work is most reliably driven by the tests themselves.\nAdd axe-core first, watch the existing tests fail, then fix\nviolations in priority order (keyboard → aria-label → contrast →\nfocus visibility).\n\nFor the reduced-color mode: do not build a separate component tree.\nFlip a CSS class on the grid root; cell colors read from CSS custom\nproperties that switch value based on the class. This keeps the\nrender path single and the switch cost zero.\n\nKeyboard nav is the trickiest part. Use a roving tabindex pattern\n(only one cell has tabindex=0 at a time; arrow keys move it).\nReference pattern: WAI-ARIA Authoring Practices grid pattern.\n",
+  "description": "The 2026-04-15 review flagged that the matrix leaderboard relies heavily\non color to convey information - a known accessibility hazard. Color is\ninvisible to screen readers and insufficient for users with color vision\ndeficiencies. The heatmap must remain readable without color.\n\nThis TODO:\n\n1. Ensures each heat cell carries a descriptive `aria-label` with the\n   numeric timing and the relative ratio (\"18ms, 1.6× fastest\").\n\n2. Adds a \"reduced color\" visual mode that falls back to monochrome\n   lightness steps, controlled by the user's\n   `prefers-contrast: more` media query and an explicit toggle.\n\n3. Adds keyboard navigation: tab reaches platform checkboxes,\n   arrow keys navigate cells with an `aria-live` announcement.\n\n4. Backfills snapshot tests for the filter bar, empty states, and the\n   integration between BenchmarkIndex and QueryHeatmap - the prior TODO\n   only specified QueryHeatmap itself.\n\n5. Runs axe-core against the rendered matrix in the test suite and\n   fails the build on any serious or critical violations.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate the component for high-contrast mode",
+        "instead": "use CSS custom properties that switch on a class",
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "why": "two components drift out of sync"
+      },
+      {
+        "dont": "fail the build on minor axe violations",
+        "instead": "fail only on serious/critical",
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "why": "minor issues include color-contrast edge cases we may accept"
+      },
+      {
+        "dont": "rely on color alone",
+        "instead": "include text and aria-label on every data-bearing element",
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "why": "4% of users have color vision deficiencies and screen readers ignore color entirely"
+      },
+      {
+        "dont": "use tabindex=0 on every cell",
+        "instead": "use roving tabindex so tab exits the grid quickly",
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "why": "that makes keyboard nav painful (tab through 22×8 cells)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "needs_item": "explorer-matrix-leaderboard-view"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Current default color mode - high-contrast is an opt-in, not a default swap",
+        "item_id": "explorer-heatmap-accessibility-and-tests"
+      },
+      {
+        "behavior": "Existing behavior of the matrix - accessibility is additive layering, not a rewrite",
+        "item_id": "explorer-heatmap-accessibility-and-tests"
+      },
+      {
+        "behavior": "Snapshot tests from explorer-matrix-leaderboard-view - this TODO extends, does not replace them",
+        "item_id": "explorer-heatmap-accessibility-and-tests"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package.json"
+      },
+      {
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      },
+      {
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/testing/axe-helper.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --testPathPattern='(QueryHeatmap|BenchmarkIndex|Compare|Home)'",
+        "description": "axe-core runs clean on the matrix page (no serious/critical violations)",
+        "expected": "all tests pass",
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'aria-label' results-explorer/src/components/QueryHeatmap.tsx",
+        "description": "Heat cells have aria-label with numeric content",
+        "expected": "aria-label present on cell",
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -nE 'high-contrast|reduced-color' results-explorer/src/components/QueryHeatmap.tsx",
+        "description": "Reduced-color mode is CSS-class driven, not a separate component",
+        "expected": "mode is a class modifier",
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "TypeScript compiles",
+        "expected": "no errors",
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "notes": "Cell: aria-label='${ms}ms, ${ratio}× fastest in column' (or\n'no data' for null cells). Column headers: aria-sort='none'.\nRow checkboxes: aria-label='Select ${platform} for comparison'.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enhance QueryHeatmap cells, headers, and checkboxes with descriptive aria labels",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "notes": "Activates when prefers-contrast: more matches OR the user toggles\n'High contrast' in the filter bar. Cells use grayscale lightness\n(0-100%) instead of hsl hue. Numeric text remains primary signal.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement reduced-color mode via CSS class + custom properties",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "notes": "Arrow keys within the matrix move focus between cells; focused\ncell announces itself via aria-live. Tab exits the grid to the\nnext filter control. Focus outline is visible (not just color).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add keyboard navigation (roving tabindex) and visible focus outlines",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "notes": "Cases: (a) filter changes re-fetch correct artifact URL;\n(b) empty state renders when artifact has no platforms;\n(c) list-view toggle switches rendered component;\n(d) trust filter removes rows without refetch.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write integration snapshot tests at src/pages/__tests__/BenchmarkIndex.test.tsx",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-heatmap-accessibility-and-tests",
+        "notes": "Add helper `expectNoAxeViolations(container)` and call it in\nQueryHeatmap, BenchmarkIndex, Compare, and Home page tests.\nWarn on minor; fail only on serious/critical.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate axe-core into the test suite; fail on serious/critical violations",
+        "wid": "w5"
+      }
+    ]
+  }
+}

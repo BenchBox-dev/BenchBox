@@ -1,0 +1,275 @@
+{
+  "context": "Introduce `benchbox/utils/clock.py` with explicit separation of concerns:\nmonotonic elapsed timing (`mono_time`, `elapsed_seconds`, stopwatch/context)\nand wall-clock event timestamps (`utc_now`).\n\nUpdate correctness hotspots first, with targeted tests:\n- Replace perf_counter-to-datetime conversion bug in core results timing.\n- Replace timeout arithmetic in lock/poll loops with monotonic elapsed checks.\n- Keep persisted event timestamps in UTC wall clock where semantically required.\n",
+  "description": "Build the timing foundation for BenchBox runtime code by introducing a shared\nclock utility and fixing correctness-critical timing bugs discovered during\nadversarial review.\n\nThis item covers the first implementation phase:\n1) Create centralized monotonic/wall-clock helpers in a reusable module.\n2) Fix the monotonic-to-wall-clock timestamp bug in core timing collection.\n3) Convert high-risk timeout/retry loops to monotonic elapsed logic.\n4) Migrate MCP benchmark elapsed calculations to monotonic timing.\n5) Stabilize resource-rate elapsed calculations with monotonic deltas.\n\nThis phase is intentionally scoped to correctness and foundation APIs so later\ntiming migrations can proceed with low ambiguity and low regression risk.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "derive datetime from perf_counter values",
+        "instead": "capture wall-clock timestamps separately",
+        "item_id": "timing-clock-foundation-and-correctness",
+        "why": "perf_counter is process-relative"
+      },
+      {
+        "dont": "refactor broad runtime modules in this item",
+        "instead": "defer wider migration to follow-up TODOs",
+        "item_id": "timing-clock-foundation-and-correctness",
+        "why": "this phase is correctness-first"
+      },
+      {
+        "dont": "replace audit timestamps with monotonic values",
+        "instead": "keep utc wall-clock for event logs",
+        "item_id": "timing-clock-foundation-and-correctness",
+        "why": "they are not globally meaningful"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-02-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing benchmark result schemas and export formats remain backward compatible",
+        "item_id": "timing-clock-foundation-and-correctness"
+      },
+      {
+        "behavior": "DataFusion and write-primitives lock behavior remains owner-safe and reentrant",
+        "item_id": "timing-clock-foundation-and-correctness"
+      },
+      {
+        "behavior": "Resource profiler timeline timestamps remain human-readable wall-clock values",
+        "item_id": "timing-clock-foundation-and-correctness"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/timing.py"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/monitoring/profiler.py"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/onehouse/onehouse_client.py"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/clock.py"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_timing_collector.py"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_benchmark_tools.py"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_datafusion_adapter.py"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/test_clock.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/utils/test_clock.py -v",
+        "description": "New timing utility unit tests pass",
+        "expected": "All tests pass",
+        "item_id": "timing-clock-foundation-and-correctness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_timing_collector.py -v",
+        "description": "Core timing collector regression test validates timestamp correctness",
+        "expected": "All tests pass and no monotonic-derived wall-clock timestamps",
+        "item_id": "timing-clock-foundation-and-correctness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_datafusion_adapter.py -k working_dir_lock -q",
+        "description": "DataFusion adapter lock tests remain green after timeout clock migration",
+        "expected": "Selected tests pass",
+        "item_id": "timing-clock-foundation-and-correctness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_benchmark_tools.py -k execution_time -q",
+        "description": "MCP benchmark tool timing tests pass after monotonic elapsed migration",
+        "expected": "Selected tests pass",
+        "item_id": "timing-clock-foundation-and-correctness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "timing-clock-foundation-and-correctness",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "timing-clock-foundation-and-correctness",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add centralized clock utility module with monotonic and UTC helper APIs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-clock-foundation-and-correctness",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add stopwatch/context manager helpers and unit tests for elapsed semantics",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-clock-foundation-and-correctness",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix QueryTiming timestamp bug by separating wall-clock start from monotonic elapsed",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-clock-foundation-and-correctness",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate high-risk timeout loops to monotonic elapsed logic",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-clock-foundation-and-correctness",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate resource profiler rate elapsed calculations to monotonic deltas",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-clock-foundation-and-correctness",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate MCP benchmark elapsed calculations from wall-clock deltas to monotonic helpers",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-clock-foundation-and-correctness",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run targeted regression tests for timing and lock behavior",
+        "wid": "w7"
+      }
+    ]
+  }
+}

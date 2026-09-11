@@ -1,0 +1,11 @@
+{
+  "description": "The CLI currently has two separate tuning command structures that should be unified:\n\nCurrent (inconsistent):\n- `benchbox create-sample-tuning --platform duckdb` (top-level, 20 chars)\n- `benchbox df-tuning create-sample --platform polars` (nested group)\n- `benchbox df-tuning validate config.yaml`\n- `benchbox df-tuning show-defaults --platform polars`\n\nProposed (unified):\n- `benchbox tuning init --platform duckdb` (SQL platforms)\n- `benchbox tuning init --platform polars --mode dataframe` (DataFrame platforms)\n- `benchbox tuning validate config.yaml --platform polars`\n- `benchbox tuning defaults --platform polars`\n\nThis consolidation improves discoverability, reduces cognitive load, and provides\na consistent interface for all tuning-related operations.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2025-12-14T00:00:00Z",
+      "created_at": "2025-12-14T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

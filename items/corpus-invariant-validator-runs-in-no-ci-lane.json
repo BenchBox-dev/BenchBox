@@ -1,0 +1,121 @@
+{
+  "context": "Put the existing script in a lane that a corpus PR cannot avoid. Prefer a unit test in the whole-corpus lane -- beside tests/unit/scripts/test_corpus_privacy_invariant.py, which already closed exactly this class of hole for path leaks and for sidecar hashes -- over adding a bespoke CI job: it then runs in pr-preflight and in the required ci-required-result lane for free, and needs no workflow change. Import the script rather than re-implementing the rule, so the test and the contributor-facing tool can never disagree. Include a synthetic negative control that plants a one-platform cohort.",
+  "description": "MEASURED 2026-08-24. results-data/SEED_CORPUS_SPEC.md:19-20 states: 'The hard requirement today is still the validator gate in results-data/validate_corpus.py: every committed cohort must have at least 3 platforms.' The script enforces it and exits 1 on violation.\n\nNothing runs it. All four references to it in .github/workflows are PATH LISTS for mirroring (corpus-drift-check.yml:81, sync-results-data-to-published.yml:55/111/245), not executions. It is absent from pr-preflight, from ci-lint, and from every pre-commit hook.\n\nPROVEN by a real regression, not hypothetically: PR #1854 added a TPC-DS SF10 cohort with DuckDB alone. Its pr-preflight was green (28,043 passed) and it merged. develop then carried a violated invariant -- validate_corpus.py exit 1, 'WARN: 1 cohort(s) have <3 platforms' -- for several hours until someone happened to run the validator by hand during closeout. PR #1859 repaired the corpus; this item closes the gap that let it land.\n\nImpact is not limited to cohort size. The same script is the only check on any invariant it grows in future, so every one of them is currently advisory. A documented hard requirement that no lane enforces is indistinguishable from a suggestion.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-29T13:06:00Z",
+      "completed_pr": 1865,
+      "created_at": "2026-08-24T11:26:10Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "corpus-invariant-validator-runs-in-no-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "results-data/validate_corpus.py"
+      },
+      {
+        "item_id": "corpus-invariant-validator-runs-in-no-ci-lane",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "add a one-platform cohort, run make pr-preflight",
+        "description": "A violating corpus fails pr-preflight",
+        "expected": "non-zero exit naming the cohort",
+        "item_id": "corpus-invariant-validator-runs-in-no-ci-lane",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python results-data/validate_corpus.py",
+        "description": "The real corpus passes",
+        "expected": "exit 0",
+        "item_id": "corpus-invariant-validator-runs-in-no-ci-lane",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "corpus-invariant-validator-runs-in-no-ci-lane",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "corpus-invariant-validator-runs-in-no-ci-lane",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "corpus-invariant-validator-runs-in-no-ci-lane",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Confirmed on develop f28ce2394. grep across .github/, Makefile, make/ and .pre-commit-config.yaml finds only PATH LIST entries for validate_corpus.py (sync-results-data-to-published.yml:55/111/245, corpus-drift-check.yml:81) plus tests/unit/scripts/test_corpus_drift_canary.py:38, which asserts the path is in the mirror list. Nothing executes it. Proven by the real regression rather than by inspection alone: PR #1854 merged a one-platform TPC-DS SF10 cohort with pr-preflight green at 28,043 tests.",
+        "item_id": "corpus-invariant-validator-runs-in-no-ci-lane",
+        "notes": null,
+        "started_at": "2026-08-24T11:36:34Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm no lane executes the script today, and that a violating corpus passes pr-preflight",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1865. Restructured results-data/validate_corpus.py into discover_bundles / cohort_platforms / shallow_cohorts / main and imported it from tests/unit/scripts/test_corpus_cohort_depth.py. Importing rather than restating keeps the gate and the contributor tool from drifting. Placed in the whole-corpus unit lane beside test_corpus_privacy_invariant.py so it runs in pr-preflight and the required CI lane with no new workflow job. Script stays stdlib-only and benchbox-free because it is vendored to published-results. Behaviour parity checked: byte-identical stdout and identical exit code before and after.",
+        "item_id": "corpus-invariant-validator-runs-in-no-ci-lane",
+        "notes": null,
+        "started_at": "2026-08-24T11:36:36Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Guard the cohort invariant in the whole-corpus test lane by importing the script",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Synthetic negative control plus a positive control, and the decisive end-to-end proof: planting results-data/bundles/zz_synthetic_probe_sf99_duckdb.json (one platform) made the real command fail -- PREFLIGHT EXIT=2, 'AssertionError: 1 cohort(s) below 3 platforms ... probe_benchmark SF=99.0: [DuckDB]'. Probe removed; clean tree preflight 28,118 passed exit 0. Two other whole-corpus guards (byte-identity and execution-mode) also caught the synthetic bundle, confirming those lanes work.",
+        "item_id": "corpus-invariant-validator-runs-in-no-ci-lane",
+        "notes": null,
+        "started_at": "2026-08-24T11:36:39Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add a synthetic negative control that plants a one-platform cohort",
+        "wid": "w2"
+      },
+      {
+        "evidence": "The script carries exactly one other invariant: a bundle that cannot be read or lacks benchmark.id / benchmark.scale_factor / platform.name is fatal (it used to sys.exit(1) inline; now raises CorpusReadError and main returns 1). Covered by test_an_unreadable_bundle_fails_closed. A third behaviour worth pinning turned out to be companion exclusion -- counting x.manifest.json beside x.json would let a one-platform cohort look deeper than it is -- so test_companion_files_are_not_counted_as_bundles pins it. No further invariants in the script.",
+        "item_id": "corpus-invariant-validator-runs-in-no-ci-lane",
+        "notes": null,
+        "started_at": "2026-08-24T11:36:41Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Check whether the script carries other invariants that also need the guard",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #1865 merged at commit 36460233a",
+        "item_id": "corpus-invariant-validator-runs-in-no-ci-lane",
+        "notes": null,
+        "started_at": "2026-08-29T13:05:55Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Land PR #1865",
+        "wid": "w4"
+      }
+    ]
+  }
+}

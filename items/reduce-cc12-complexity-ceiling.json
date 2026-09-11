@@ -1,0 +1,386 @@
+{
+  "context": "w1: Read each CC=12 function, classify per guidelines established in prior waves.\nRecord in classification-matrix format. Batch-add confirmed inherent entries to\npyproject.toml under new section header. (DONE: 12 inherent, 8 refactorable)\n\nw2-w9: For each refactoring:\n1. Read the function and its callers/tests\n2. Extract private helper methods or define data-driven config in the same module\n3. Run focused tests + lint after each extraction\n4. Verify CC reduced via: uv run -- python scripts/check_complexity.py 2>&1 | grep function_name\n5. Commit per work unit\n\nw10: Update warn_complexity threshold and verify.\n",
+  "description": "Completed on 2026-03-12.\n\nWave 4 started with the original top-20 CC=12 sample:\n- 12 inherent functions excluded in pyproject.toml\n- 8 accidental-complexity functions refactored below the ceiling\n\nA follow-up wave (4b) was then required because the original `--top 20` scan\nmissed 30 additional non-excluded CC=12 functions.\n\nOutcome:\n- Refactored 6 additional helper/dispatch functions below CC=12\n- Classified the remaining 24 additional CC=12 functions as inherent\n  platform/spec/runtime/conversion complexity\n- Added narrow function-level exclusions in `pyproject.toml` with matching\n  rows in `quality/complexity/classification-matrix.yaml`\n- Lowered `warn_complexity` from 13 to 12\n\nFinal state:\n- Worst non-excluded function complexity: CC=11\n- `make complexity-check`: 0 warnings, 0 failures",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add new abstractions (base classes, protocols)",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "why": "extraction and dict dispatch alone achieve the CC target"
+      },
+      {
+        "dont": "change public API signatures",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "why": "all targets are internal or private functions"
+      },
+      {
+        "dont": "create new test files for extracted helpers",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "why": "they are private and tested through existing call paths"
+      },
+      {
+        "dont": "lower max_complexity (currently 20)",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "why": "the exclude list handles inherent complexity above the warn threshold; only warn_complexity should decrease"
+      },
+      {
+        "dont": "move code to new files",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "why": "helpers share private state with the parent function"
+      },
+      {
+        "dont": "refactor functions classified as inherent",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "why": "their complexity reflects domain reality; use exclude_functions instead"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-03-12T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All refactored functions must produce identical behavior - no semantic changes",
+        "item_id": "reduce-cc12-complexity-ceiling"
+      },
+      {
+        "behavior": "Excluded functions from prior complexity waves (CC>=20, CC=14, CC=13) remain untouched",
+        "item_id": "reduce-cc12-complexity-ceiling"
+      },
+      {
+        "behavior": "Existing tests must continue to pass without modification",
+        "item_id": "reduce-cc12-complexity-ceiling"
+      },
+      {
+        "behavior": "exclude_functions entries must include CC score and rationale comment",
+        "item_id": "reduce-cc12-complexity-ceiling"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/compare_plans.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/config.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/dryrun.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/preferences.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/insights.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/statistics.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/benchmark_suite.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpc_metrics.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/etl/sql_backend.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/etl/transformations.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds_obt/query_conversion.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii_runtime.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/analytics.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databricks/adapter.py"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "quality/complexity/classification-matrix.yaml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make complexity-check",
+        "description": "Complexity check passes with no functions at CC>=12",
+        "expected": "0 warnings, 0 failures",
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/check_complexity.py --warn-complexity 12 --top 50",
+        "description": "No non-excluded CC>=12 functions remain",
+        "expected": "Warnings (>12): 0",
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "No regressions in fast suite",
+        "expected": "All fast tests pass",
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check .",
+        "description": "Lint passes",
+        "expected": "All checks passed",
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w2",
+        "wid": "w10"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w3",
+        "wid": "w10"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w4",
+        "wid": "w10"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w5",
+        "wid": "w10"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w6",
+        "wid": "w10"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "needs_wid": "w1",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Classify all 20 CC=12 functions and exclude inherent complexity",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Lower warn threshold from 13 to 12 in pyproject.toml",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _output_summary_text (CC 12->~6) - extract Rich rendering path",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor validate_config (CC 12->~5) - data-driven validation rules",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor generate_cli_command (CC 12->~6) - extend data-driven param pattern",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor format_last_run_summary (CC 12->~6) - extract field loop and time formatter",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor calculate_confidence_interval (CC 12->~5) - t-critical lookup table",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _generate_query_highlights (CC 12->~6) - extract gap and surprise helpers",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor get_summary (CC 12->~7) - extract speedup matrix and winner helpers",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc12-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor validate_power_test_results (CC 12->~6) - table-driven validation rules",
+        "wid": "w9"
+      }
+    ]
+  }
+}

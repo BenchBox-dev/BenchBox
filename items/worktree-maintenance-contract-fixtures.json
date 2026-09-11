@@ -1,0 +1,240 @@
+{
+  "context": "Specify a schema-versioned evidence model, fail-closed states, exact repository and PR identity, a controller-provider boundary, and fixture repositories. Consume Bossmode only through a future public JSON contract; never parse control.db. This item creates no deletion path.",
+  "description": "Define the non-destructive contract for durable worktree lifecycle evidence before adding cleanup behavior. Preserve disposable linked worktrees; classify ownership and uncertainty explicitly; define structural branches and exact merged-PR evidence for develop, release, and published-results; and keep reports as timestamped snapshots rather than deletion authority. Bossmode owns task and run evidence while BenchBox owns repository policy and Git mutation.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Design a bulk reaper",
+        "instead": "Keep reporting and later mutation single-target and operator-driven",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "why": "Broad inference magnifies ownership mistakes"
+      },
+      {
+        "dont": "Treat clean, old, gone-upstream, or lease-expired state as abandonment",
+        "instead": "Classify uncertainty and require explicit ownership and integration evidence",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "why": "Each signal can occur while valuable work is active"
+      },
+      {
+        "dont": "Use source-tip ancestry to prove a squash merge",
+        "instead": "Match exact PR head, base, merged state, and reachable merge commit",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "why": "Squash merge does not retain source-tip ancestry"
+      }
+    ],
+    "item_meta": {
+      "category": "Repository Maintenance",
+      "completed_at": "2026-08-29T13:07:15Z",
+      "completed_pr": 1918,
+      "created_at": "2026-08-26T01:49:00Z",
+      "worktree": "worktree-maintenance"
+    },
+    "preserves": [
+      {
+        "behavior": "Dirty, locked, detached, missing, foreign, and ambiguous worktrees remain preserved.",
+        "item_id": "worktree-maintenance-contract-fixtures"
+      },
+      {
+        "behavior": "No force removal, automatic unlock, prune, gc, remote deletion, PR mutation, or scheduled deletion.",
+        "item_id": "worktree-maintenance-contract-fixtures"
+      },
+      {
+        "behavior": "The primary clone remains read-only for agent changes.",
+        "item_id": "worktree-maintenance-contract-fixtures"
+      },
+      {
+        "behavior": "worktree-remove remains exact-path, clean-only removal that keeps the branch.",
+        "item_id": "worktree-maintenance-contract-fixtures"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "GitHub PR evidence",
+        "decision": "reuse",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "path": "_project/scripts/detect_orphaned_commits.py"
+      },
+      {
+        "concept": "operator-driven closeout",
+        "decision": "extend",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "path": "docs/operations/dev-loop-worktrees.md"
+      },
+      {
+        "concept": "exact-path disposable lifecycle",
+        "decision": "extend",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "path": "scripts/worktree_lifecycle.sh"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "kind": "do_not_modify",
+        "path_glob": ".github/**"
+      },
+      {
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "kind": "do_not_modify",
+        "path_glob": "make/**"
+      },
+      {
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/worktree_lifecycle.sh"
+      },
+      {
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/worktree-lifecycle-evidence.md"
+      },
+      {
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/worktree/**"
+      },
+      {
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/worktree/**"
+      },
+      {
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_detect_orphaned_commits.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/workflows/test_detect_orphaned_commits.py tests/integration/worktree/test_worktree_release_dirty_guard.py -q",
+        "description": "Existing orphan and lifecycle baseline",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/integration/worktree -q",
+        "description": "Contract fixture suite",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --check",
+        "description": "No whitespace errors",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1918 defined non-destructive worktree evidence contract",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "notes": null,
+        "started_at": "2026-08-29T13:06:54Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Reconcile lifecycle code, documentation, tests, tracker decisions, and Bossmode ownership plans",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1918 defined evidence schema and fail-closed classifications",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "notes": null,
+        "started_at": "2026-08-29T13:06:57Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Define the evidence schema, classifications, explicit errors, and bounded output contract",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1918 defined structural branches and exact git evidence",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "notes": null,
+        "started_at": "2026-08-29T13:07:01Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Define structural branches and exact repository, PR head, base, merge commit, and remote identity evidence",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1918 defined provider boundaries and failure outcomes",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "notes": null,
+        "started_at": "2026-08-29T13:07:04Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Define the Bossmode provider boundary and unavailable, stale, foreign, and legacy outcomes",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #1918 built 16-row fixture matrix, tests/integration/worktree passed 29/29",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "notes": null,
+        "started_at": "2026-08-29T13:07:07Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Build fixtures for supported bases, PR outcomes, dirty states, locks, detached heads, missing objects, and path ambiguity",
+        "wid": "w4"
+      },
+      {
+        "evidence": "PR #1918 independent review completed and merged",
+        "item_id": "worktree-maintenance-contract-fixtures",
+        "notes": null,
+        "started_at": "2026-08-29T13:07:10Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Decision gate: independently review the contract before destructive implementation starts",
+        "wid": "w5"
+      }
+    ]
+  }
+}

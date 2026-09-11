@@ -1,0 +1,245 @@
+{
+  "context": "In w0 reproduce the no-op on current origin/develop using the real factory path without running a benchmark. Decide whether MCP threads should map to thread_limit internally or whether the public contract should rename the field; preserve the documented MCP name if possible. Implement the smallest mapping at the adapter boundary, ensure it is applied in normal and durable execution, and add a regression that asserts the effective field and emitted SET threads statement. Update docs only if the accepted public name or behavior changes. Do not alter unrelated DuckDB tuning or CLI semantics.",
+  "description": "Fix the PR #1465 correctness defect where the MCP allowlist and docs expose duckdb.threads but DuckDBAdapter consumes thread_limit. The request currently passes through a forwarding test yet leaves adapter.thread_limit unset, so the benchmark silently runs with the default thread setting. Revalidate the public name against the CLI and adapter contracts, choose one canonical mapping or a deliberate compatibility alias, and make the applied setting observable in the adapter receipt or testable connection statement.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assert only get_adapter.call_args.kwargs",
+        "instead": "Assert the constructed adapter state and the connection setting path.",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "why": "That reproduces the existing false-green test and does not prove DuckDB applies the value."
+      },
+      {
+        "dont": "Rename the MCP option silently to thread_limit",
+        "instead": "Keep threads as the public name and map it explicitly, or version/document a deliberate breaking change.",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "why": "Existing clients and the published MCP schema use threads."
+      },
+      {
+        "dont": "Use a real benchmark database or mutate user benchmark artifacts for the regression",
+        "instead": "Use an isolated adapter and deterministic connection spy.",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "why": "The defect is adapter plumbing and can be proven with a fake connection."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-04T12:01:52Z",
+        "from_item": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "id": 686,
+        "reason": "Same drop bug, different keys: both are read by __init__ (duckdb.py:661,664) and applied as SET statements (duckdb.py:797,807) but are absent from every from_config pass-through list, so a CLI/API caller supplying them is silently ignored. Not fixed here because neither is an MCP option and enabling them would change existing CLI behavior outside this item's verification ladder and its 'CLI behavior remains compatible' must-preserve. Needs its own item with CLI-facing tests.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Tracked as a separate concern rather than promoted: neither key is an MCP option, so it does not gate the MCP v2 remediation release, and fixing it changes existing CLI behavior that needs its own CLI-facing verification ladder. Recorded in the PR body so it is not lost.",
+        "summary": "DuckDBAdapter.from_config also drops max_temp_directory_size and progress_bar"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "needs_item": "mcp-v2-platform-option-contract-matrix-v3"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-04T12:04:39Z",
+      "completed_pr": 1514,
+      "created_at": "2026-08-02T16:38:06Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI thread_limit behavior and existing adapter defaults remain compatible.",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3"
+      },
+      {
+        "behavior": "Dry-run and validate-only behavior remains explicit about whether execution options are applied.",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3"
+      },
+      {
+        "behavior": "The applied setting is visible only as safe numeric metadata or a deterministic SET statement, never as credentials or paths.",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3"
+      },
+      {
+        "behavior": "The public MCP option remains bounded to the existing maximum and cannot set arbitrary DuckDB SQL or filesystem controls.",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "thread_limit adapter setting and SET threads application",
+        "decision": "extend",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "path": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "concept": "existing forwarding test that needs effective behavior coverage",
+        "decision": "supersede",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "path": "tests/unit/mcp/test_benchmark_tools.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/security.py"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/**"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/test_durable_jobs.py"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_benchmark_tools.py"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_schemas.py"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms tests/unit/mcp/test_benchmark_tools.py -q",
+        "description": "The real adapter regression fails before the mapping because thread_limit remains unset",
+        "expected": "exits 1 on the unfixed tree when effective thread assertions are present; exits 0 after MCP threads changes DuckDB execution",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:02:40Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_durable_jobs.py -q",
+        "description": "Durable replay preserves the corrected option",
+        "expected": "exits 1 on the unfixed tree if durable execution drops the mapping; exits 0 after retry and worker coverage pass",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:02:46Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/platforms/duckdb.py benchbox/mcp tests/unit/mcp tests/unit/platforms tests/integration/mcp",
+        "description": "Scoped DuckDB and MCP checks are clean",
+        "expected": "exits 1 on the unfixed tree if the mapping patch has lint defects; exits 0 after scoped checks pass",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:02:48Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Real-factory no-op reproduced: _prepare_adapter_platform_options('duckdb', {'threads':7}) -> {'thread_limit':7}, but DuckDBAdapter.from_config({'benchmark':'tpch','scale_factor':0.01,'thread_limit':7}).thread_limit is None. from_config (duckdb.py:539) builds adapter_config from explicit key lists covering database_path, memory_limit, force_recreate, tuning_*, verbose_*, and driver_* -- thread_limit is in none of them, so __init__'s config.get('thread_limit') (duckdb.py:663) always sees nothing and the SET threads TO statement at duckdb.py:795 never fires. The existing test asserts get_adapter.call_args.kwargs['thread_limit'] with a MOCKED factory, which is the false-green the item names. Canonical mapping locked: public MCP name stays 'threads' (published schema + existing clients); adapter name stays 'thread_limit'; the translation stays in _prepare_adapter_platform_options and the contract already records thread_limit as the alias.",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:59:39Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Reproduce the real-factory no-op and lock the canonical public-to-adapter mapping",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added thread_limit to DuckDBAdapter.from_config's pass-through key list. Public MCP name 'threads' unchanged; the threads->thread_limit mapping stays in _prepare_adapter_platform_options and the contract already records thread_limit as the alias. Verified: from_config({'benchmark':'tpch','scale_factor':0.01,'thread_limit':7}).thread_limit == 7 and platform_info reports 7.",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "notes": null,
+        "started_at": "2026-08-04T12:03:04Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement the threads-to-thread_limit mapping or explicit compatibility alias",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/platforms/test_duckdb_adapter.py TestMCPThreadsReachTheEffectiveSetting: (a) from_config preserves the translated thread_limit and reports it in platform_info; (b) deterministic connection spy asserts call('SET threads TO 7') is issued; (c) a real isolated tmp_path connection reports current_setting('threads')==3; (d) omitting the option leaves thread_limit None and emits no SET threads. tests/integration/mcp/test_durable_jobs.py: persisted request round-trips as {'threads':5} and replaying it through the real from_config yields adapter.thread_limit==5. Negative control: reverting only benchbox/platforms/duckdb.py fails 3 of the 4 (the real-connection one fails 'assert 2 == 3', proving DuckDB was using its own default).",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "notes": null,
+        "started_at": "2026-08-04T12:03:27Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add effective-state and emitted-setting tests for normal and durable execution",
+        "wid": "w2"
+      },
+      {
+        "evidence": "docs/reference/mcp.md records that public 'threads' maps to adapter thread_limit and becomes a SET threads statement, with the public name unchanged. Ladder: rung1 8143 passed, rung2 13 passed, rung3 ruff clean. check-scope OK. Deferral #686 raised for the same from_config drop affecting max_temp_directory_size and progress_bar.",
+        "item_id": "mcp-v2-duckdb-threads-effective-setting-v3",
+        "notes": null,
+        "started_at": "2026-08-04T12:03:33Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run focused DuckDB/MCP checks and reconcile the reference contract",
+        "wid": "w3"
+      }
+    ]
+  }
+}

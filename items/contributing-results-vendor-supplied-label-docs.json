@@ -1,0 +1,51 @@
+{
+  "context": "Add a short trust-label section to contributing-results.md sourced from the SOURCE_TO_TRUST_LABEL table, and state explicitly that vendor-supplied is maintainer-applied and never self-declared on a submission.",
+  "description": "PR #1021 landed the canonical provenance vocabulary (benchbox/core/results/provenance.py) and propagated vendor-supplied through bundle_publisher.py, hosted-results-contract.md and generate_corpus_inventory.py. docs/contributing-results.md was in that item's only_modify scope but has zero occurrences of vendor-supplied, so the contributor-facing doc never explains the label, who it applies to, or that it is maintainer-applied rather than self-declared.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-09-06T20:39:45Z",
+      "completed_pr": 2044,
+      "created_at": "2026-07-29T11:48:49Z",
+      "worktree": "/Users/joe/Developer/BenchBox.wt-publication-release-batch"
+    },
+    "preserves": [
+      {
+        "behavior": "Label strings are described, not redefined - the vocabulary of record stays benchbox/core/results/provenance.py",
+        "item_id": "contributing-results-vendor-supplied-label-docs"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "contributing-results-vendor-supplied-label-docs",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -c 'vendor-supplied' docs/contributing-results.md",
+        "description": "contributing-results.md documents the vendor-supplied label",
+        "expected": "at least 1 occurrence",
+        "item_id": "contributing-results-vendor-supplied-label-docs",
+        "last_result": "pass",
+        "last_run": "2026-09-06T20:39:43Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Implemented in PR #2044 (commit 58dda68c4e666ea62068ed8c88e86d4288ce100a). docs/contributing-results.md:158-188 semantically documents the complete vendor-supplied trust label semantics aligned with benchbox/core/results/provenance.py: SOURCE_TO_TRUST_LABEL mapping, maintainer-applied constraint, vendor path protection under results-data/bundles/vendor/, distinct badge, and ranking eligibility.",
+        "item_id": "contributing-results-vendor-supplied-label-docs",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add the trust-label section covering vendor-supplied and its maintainer-applied rule",
+        "wid": "w1"
+      }
+    ]
+  }
+}

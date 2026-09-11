@@ -1,0 +1,129 @@
+{
+  "context": "Two mechanical cleanups, one PR. For (2), keep the adapter-side function (platforms/motherduck.py) as the canonical one and import it in the credentials module, or hoist to a small shared helper - avoid an import cycle (credentials/motherduck.py already imports the adapter lazily inside validate).",
+  "description": "Found 2026-07-31 during the credential-egress review. (1) benchbox/utils/input_validation.py:585 sanitize_error_message has ZERO production call sites (only its own unit tests reference it) and despite its security-suggestive name it redacts table/column/database/schema identifiers, NOT credentials - it inflates any inventory of 'redaction implementations' and invites false confidence. Remove it and its tests (wiring it up is the wrong direction: real credential scrubbing lives in the anonymization/platform_options layer). (2) _redact_motherduck_token (benchbox/platforms/motherduck.py:53) and _redact_token (benchbox/platforms/credentials/motherduck.py:147) are copy-paste duplicates of the same regex+replace logic - the exact single-source-of-truth failure mode that let the secret-key lists diverge. Keep one implementation and import it from the other site.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "completed_at": "2026-08-01T13:34:53Z",
+      "completed_pr": 1391,
+      "created_at": "2026-07-31T23:35:01Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Motherduck token redaction behavior is byte-identical on both call paths",
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor"
+      },
+      {
+        "behavior": "input_validation's identifier/SQL validation functions are untouched",
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/credentials/motherduck.py"
+      },
+      {
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/motherduck.py"
+      },
+      {
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/input_validation.py"
+      },
+      {
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/credentials/**"
+      },
+      {
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_motherduck.py"
+      },
+      {
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/test_input_validation.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -q 'def _redact_token' benchbox/platforms/credentials/motherduck.py",
+        "description": "the duplicate redactor definition is gone from the credentials module",
+        "expected": "exits 1 on an unfixed tree (verified 2026-07-31), 0 once deduplicated",
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import benchbox.utils.input_validation as m;assert not hasattr(m,'sanitize_error_message')\"",
+        "description": "sanitize_error_message is removed",
+        "expected": "exits 1 on an unfixed tree (verified 2026-07-31), 0 once removed",
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_motherduck.py tests/unit/utils/test_input_validation.py -q",
+        "description": "motherduck + input_validation suites still green",
+        "expected": "all pass before and after - regression guard",
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "sanitize_error_message removed from input_validation.py with its TestSanitizeErrorMessage class and import; zero remaining references (grep)",
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor",
+        "notes": null,
+        "started_at": "2026-08-01T12:58:27Z",
+        "started_branch": "fix/dead-sanitize-and-dup-redactor",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Remove sanitize_error_message and its tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": "credentials/motherduck.py now lazily imports _redact_motherduck_token from the adapter module (same lazy pattern as the existing MotherDuckAdapter import); local duplicate deleted; unused re import dropped",
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor",
+        "notes": null,
+        "started_at": "2026-08-01T12:58:33Z",
+        "started_branch": "fix/dead-sanitize-and-dup-redactor",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Deduplicate the motherduck token redactor to a single implementation",
+        "wid": "w2"
+      },
+      {
+        "evidence": "test_motherduck.py + test_input_validation.py + credentials suites: 339 passed; rungs 1-2 exit 0",
+        "item_id": "dead-sanitize-error-message-and-duplicate-motherduck-redactor",
+        "notes": null,
+        "started_at": "2026-08-01T12:58:39Z",
+        "started_branch": "fix/dead-sanitize-and-dup-redactor",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Both motherduck redaction call paths still covered by existing tests",
+        "wid": "w3"
+      }
+    ]
+  }
+}

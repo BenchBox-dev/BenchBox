@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #269 of table-mode-external.\nDeferred: External table mode for Spark-based cloud platforms (Athena Spark, EMR Serverless, Dataproc, Glue)\nReason deferred: Spark adapters use DataFrame-style loading with different adapter base class; handle after SQL platform support is stable",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:15Z",
+      "worktree": "main"
+    }
+  }
+}

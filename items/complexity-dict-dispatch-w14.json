@@ -1,0 +1,230 @@
+{
+  "context": "Pattern: identify the if/elif chain, extract the mapping as a module-level dict constant\n(UPPER_SNAKE_CASE), replace the chain with a single dict.get() or dict[] lookup.\nRaise the same exception on KeyError that the original raised on else/fallthrough.\n\nReference: benchbox/core/tpcds_obt/query_conversion.py already uses this pattern in\nother functions (_post_process dispatch) - follow that style.\n",
+  "description": "8 functions have high cyclomatic complexity caused purely by if/elif chains performing\ndata lookups. These are the simplest category to fix: replace the chain with a module-level\ndict constant and a single lookup. No logic changes, no API changes, just data vs code\nseparation.\n\nTarget functions:\n  benchbox/core/tpcds_obt/query_conversion.py:_update_role_map        (19)\n  benchbox/core/tpcds_obt/query_conversion.py:_table_from_prefix      (18)\n  benchbox/core/tpcds/maintenance_test.py:_map_to_maintenance_operation_type (15)\n  benchbox/cli/exceptions.py:_handle_cli_error                        (15)\n  benchbox/release/content_validation.py:_is_example_line             (15)\n  benchbox/utils/database_naming.py:_get_optimizations_suffix         (15)\n  benchbox/core/metadata_primitives/generator.py:_find_objects_with_prefix (16)\n  benchbox/cli/composite_params.py:parse                              (18, partial)\n\nExpected outcome: all 8 functions drop below warn threshold (15).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change function signatures or return types",
+        "instead": "(not specified)",
+        "item_id": "complexity-dict-dispatch-w14",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "merge separate dict constants into a single mega-dict",
+        "instead": "(not specified)",
+        "item_id": "complexity-dict-dispatch-w14",
+        "why": "one dict per function"
+      },
+      {
+        "dont": "refactor surrounding functions beyond the target chain",
+        "instead": "(not specified)",
+        "item_id": "complexity-dict-dispatch-w14",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use lambdas in dict values when the original used inline expressions; keep readable",
+        "instead": "(not specified)",
+        "item_id": "complexity-dict-dispatch-w14",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-22T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "_handle_cli_error: all existing error types must still trigger the same help output",
+        "item_id": "complexity-dict-dispatch-w14"
+      },
+      {
+        "behavior": "_map_to_maintenance_operation_type: mapping must be exact (drives TPC-DS maintenance spec)",
+        "item_id": "complexity-dict-dispatch-w14"
+      },
+      {
+        "behavior": "_table_from_prefix: column prefix → table mapping must be 100% accurate (drives OBT SQL)",
+        "item_id": "complexity-dict-dispatch-w14"
+      },
+      {
+        "behavior": "_update_role_map: role map output must be identical for all TPC-DS OBT queries",
+        "item_id": "complexity-dict-dispatch-w14"
+      },
+      {
+        "behavior": "parse: CLI parameter parsing output must be byte-for-byte identical for all current inputs",
+        "item_id": "complexity-dict-dispatch-w14"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "complexity-dict-dispatch-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/composite_params.py"
+      },
+      {
+        "item_id": "complexity-dict-dispatch-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/exceptions.py"
+      },
+      {
+        "item_id": "complexity-dict-dispatch-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/metadata_primitives/generator.py"
+      },
+      {
+        "item_id": "complexity-dict-dispatch-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/maintenance_test.py"
+      },
+      {
+        "item_id": "complexity-dict-dispatch-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds_obt/query_conversion.py"
+      },
+      {
+        "item_id": "complexity-dict-dispatch-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/release/content_validation.py"
+      },
+      {
+        "item_id": "complexity-dict-dispatch-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/database_naming.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Smoke tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "complexity-dict-dispatch-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/check_complexity.py --top 150 2>&1 | grep -E '(query_conversion|maintenance_test|exceptions|content_validation|database_naming|generator|composite_params)'",
+        "description": "All 8 target functions drop below warn threshold",
+        "expected": "No WARN entries for the 8 target functions",
+        "item_id": "complexity-dict-dispatch-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "complexity-dict-dispatch-w14",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-dict-dispatch-w14",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-dict-dispatch-w14",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-dict-dispatch-w14",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-dict-dispatch-w14",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-dict-dispatch-w14",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "complexity-dict-dispatch-w14",
+        "notes": "Both are in query_conversion.py. _table_from_prefix has ~15-way if/elif → dict.\n_update_role_map maps table names → role prefixes → dict constant TABLE_TO_ROLE_PREFIX.\nThe role inference calls after the lookup can stay; only the lookup changes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace _update_role_map and _table_from_prefix with dict constants",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-dict-dispatch-w14",
+        "notes": "benchbox/core/tpcds/maintenance_test.py - maps (operation, table) tuples to\nMaintenanceOperationType. Simple dict: OPERATION_TABLE_TO_TYPE = {(\"INSERT\", \"t\"): ...}\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace _map_to_maintenance_operation_type with dict mapping",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-dict-dispatch-w14",
+        "notes": "benchbox/cli/exceptions.py - 6+ isinstance() checks mapping error types to\nhelp methods. Dict: ERROR_HANDLERS = {PlatformNotFoundError: ..., ...}\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace _handle_cli_error isinstance chain with dispatch dict",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-dict-dispatch-w14",
+        "notes": "benchbox/release/content_validation.py - multiple if-checks for different\nexample patterns. Compile all patterns into EXAMPLE_PATTERNS = [re.compile(...), ...]\nand use any(p.match(line) for p in EXAMPLE_PATTERNS).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace _is_example_line multi-pattern checks with compiled regex list",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-dict-dispatch-w14",
+        "notes": "_get_optimizations_suffix (database_naming.py): dict mapping (platform, opts) → suffix.\n_find_objects_with_prefix (metadata_primitives/generator.py): SQL template dict keyed\nby (object_type, dialect).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace _get_optimizations_suffix and _find_objects_with_prefix with dicts",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-dict-dispatch-w14",
+        "notes": "benchbox/cli/composite_params.py - key dispatch for sample/first/queries uses\nif/elif; replace with TYPE_CONVERTERS = {\"sample\": float, \"first\": int, ...}.\nQuery special-case parsing (edge case) stays inline but extract to helper.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Simplify composite_params.py:parse query/key dispatch with dict mapper",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-dict-dispatch-w14",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run smoke tests and complexity check; verify all 8 functions below warn threshold",
+        "wid": "w7"
+      }
+    ]
+  }
+}

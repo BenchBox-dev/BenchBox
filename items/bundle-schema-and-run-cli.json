@@ -1,0 +1,237 @@
+{
+  "context": "Follow the exact pattern schema.py already uses for optional sections\n('environment', 'tables', 'errors' are only added when non-empty). Gate the\nprovenance block on `if funding or source:`. Normalize funding through the\nitem-1 helper so an unknown CLI value can never reach the bundle (Click Choice\nalready constrains it, but normalize defends the python-API path). Keep\nresult_source purely advisory in the bundle; label resolution is item 4's job.\n",
+  "description": "Make funding a declared property of a run, captured where the run happens.\nToday the schema-v2 bundle (benchbox/core/results/schema.py, CANONICAL_KEY_ORDER\n~lines 40-58, payload build ~lines 311-353) has no provenance/funding/source\nfields, and BenchmarkResults (benchbox/core/results/models.py:268-383) carries\nno funding attribute. The run command (benchbox/cli/commands/run.py) has no way\nto declare who paid for the run.\n\nThis item adds an OPTIONAL top-level \"provenance\" block to the bundle\n({ \"funding\": <enum>, \"source\": <declared source or omitted> }), threads a\nfunding field through BenchmarkResults, and adds `benchbox run --funding\n<value>` (plus a maintainer-only `--result-source` that only annotates intent;\nthe authoritative vendor label is still applied at merge in item 3). Absent\nprovenance block == today's behavior, so every existing bundle and test stays\nvalid.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add provenance to REQUIRED keys or emit an empty provenance:{} block",
+        "instead": "(not specified)",
+        "item_id": "bundle-schema-and-run-cli",
+        "why": "that would change canonical bytes for every existing run."
+      },
+      {
+        "dont": "bump SCHEMA_VERSION for a purely additive optional block unless the schema policy requires it; if it does, update the accepted-prefix set and note it.",
+        "instead": "(not specified)",
+        "item_id": "bundle-schema-and-run-cli",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hardcode funding strings in run.py",
+        "instead": "(not specified)",
+        "item_id": "bundle-schema-and-run-cli",
+        "why": "use FUNDING_SOURCES from item 1."
+      },
+      {
+        "dont": "trust provenance.source as the trust label anywhere in this item (see G-source-on-producer).",
+        "instead": "(not specified)",
+        "item_id": "bundle-schema-and-run-cli",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "bundle-schema-and-run-cli",
+        "needs_item": "provenance-vocabulary-and-labels"
+      }
+    ],
+    "item_meta": {
+      "category": "Feature",
+      "completed_at": "2026-08-09T02:03:38Z",
+      "created_at": "2026-07-06T00:00:00Z",
+      "worktree": "results-labels-funding"
+    },
+    "preserves": [
+      {
+        "behavior": "Canonical JSON bytes for a run without --funding are identical to pre-change output (no empty provenance block emitted).",
+        "item_id": "bundle-schema-and-run-cli"
+      },
+      {
+        "behavior": "MINIMAL_BUNDLE and all existing schema-v2 fixtures validate unchanged (no provenance block required).",
+        "item_id": "bundle-schema-and-run-cli"
+      },
+      {
+        "behavior": "SchemaV2Validator required-key set is unchanged; provenance is optional.",
+        "item_id": "bundle-schema-and-run-cli"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/commands/run.py:2655-2666 --publish-target/--publish-label options — reference (mirror option style; --funding lives next to these run-scoped options)",
+        "decision": "reuse",
+        "item_id": "bundle-schema-and-run-cli",
+        "path": "benchbox/cli/commands/run.py:2655-2666"
+      },
+      {
+        "concept": "benchbox/cli/commands/run.py:2721 --publish-label help string — extend (already stale: omits unofficial-research, now also vendor-supplied; refresh while adding --funding here). Found by item-1 code review.",
+        "decision": "extend",
+        "item_id": "bundle-schema-and-run-cli",
+        "path": "benchbox/cli/commands/run.py:2721"
+      },
+      {
+        "concept": "benchbox/core/results/models.py:268-383 BenchmarkResults — extend (add funding + optional result_source fields, defaulted so no call site breaks)",
+        "decision": "extend",
+        "item_id": "bundle-schema-and-run-cli",
+        "path": "benchbox/core/results/models.py:268-383"
+      },
+      {
+        "concept": "benchbox/core/results/provenance.py (item 1) — reference (funding enum + normalize; the ONLY source of valid values)",
+        "decision": "reuse",
+        "item_id": "bundle-schema-and-run-cli",
+        "path": "benchbox/core/results/provenance.py"
+      },
+      {
+        "concept": "benchbox/core/results/schema.py:40-58 CANONICAL_KEY_ORDER + :311-353 payload build — extend (add 'provenance' as an optional, canonically-ordered section like 'environment')",
+        "decision": "extend",
+        "item_id": "bundle-schema-and-run-cli",
+        "path": "benchbox/core/results/schema.py:40-58"
+      },
+      {
+        "concept": "tests/unit/core/explorer_pipeline/conftest.py:15-84 MINIMAL_BUNDLE — reference (must still validate with no provenance block)",
+        "decision": "reuse",
+        "item_id": "bundle-schema-and-run-cli",
+        "path": "tests/unit/core/explorer_pipeline/conftest.py:15-84"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "bundle-schema-and-run-cli",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "bundle-schema-and-run-cli",
+        "kind": "do_not_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "bundle-schema-and-run-cli",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/generate_corpus_inventory.py"
+      },
+      {
+        "item_id": "bundle-schema-and-run-cli",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "bundle-schema-and-run-cli",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "bundle-schema-and-run-cli",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/models.py"
+      },
+      {
+        "item_id": "bundle-schema-and-run-cli",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/result_factory.py"
+      },
+      {
+        "item_id": "bundle-schema-and-run-cli",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "bundle-schema-and-run-cli",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases power && uv run -- python -c \"import json,glob; b=json.load(open(sorted(glob.glob('benchmark_runs/results/*duckdb*.json'))[-1])); assert 'provenance' not in b, b.get('provenance')\"",
+        "description": "Run without --funding produces a bundle with no provenance block",
+        "expected": "no assertion error",
+        "item_id": "bundle-schema-and-run-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases power --funding personal && uv run -- python -c \"import json,glob; b=json.load(open(sorted(glob.glob('benchmark_runs/results/*duckdb*.json'))[-1])); assert b['provenance']['funding']=='personal'\"",
+        "description": "Run WITH --funding personal emits a valid provenance block",
+        "expected": "no assertion error",
+        "item_id": "bundle-schema-and-run-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/ tests/unit/core/explorer_pipeline/test_transformer.py -q",
+        "description": "Existing schema + explorer fixtures still validate",
+        "expected": "all pass",
+        "item_id": "bundle-schema-and-run-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --help | grep -- --funding",
+        "description": "run --help lists --funding",
+        "expected": "--funding option shown with the enum values",
+        "item_id": "bundle-schema-and-run-cli",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "bundle-schema-and-run-cli",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "bundle-schema-and-run-cli",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "bundle-schema-and-run-cli",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "bundle-schema-and-run-cli",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add funding: str | None (default None) and result_source: str | None to BenchmarkResults; ensure result_factory/aggregation paths pass them through without requiring them.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "bundle-schema-and-run-cli",
+        "notes": "Normalize funding via provenance.normalize_funding(); add 'provenance' to CANONICAL_KEY_ORDER.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "In schema.py, emit an optional 'provenance' section only when funding or source is present; keep the bundle byte-identical when absent.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "bundle-schema-and-run-cli",
+        "notes": "Default 'unspecified' -> emitted only if explicitly set; plumb into the result.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `benchbox run --funding` (Choice from FUNDING_SOURCES) and a maintainer-only `--result-source` advisory hint; update run --help.",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Implement the foundational abstractions for DataFrame benchmarking including\nDataFrameQuery protocol, DataFrameContext, and DataFrameOps protocol that\nwill enable 95%+ code reuse across 8 dataframe platforms using a family-based\narchitecture.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2025-12-02T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "dataframe-core"
+    }
+  }
+}

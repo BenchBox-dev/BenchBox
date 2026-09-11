@@ -1,0 +1,230 @@
+{
+  "context": "Interface first on SSB only. Keep top-level benchbox.SSB facade. Measure, then implement, then remasure. No other family in this item.",
+  "description": "BLOCKED on arch-composition-boundary-adr (seam gate 3: core API files free of concrete adapter imports depends on the composition decision).\n\nDo NOT pilot JoinOrder. Canonical JoinOrder is pinned to scale 1.0, 30-90 minutes, ~5 GB, 1.2 GB download, unresolved IMDb/Dataverse licensing (DATA-LICENSE.md), and has no cheap end-to-end CI path. It cannot produce the before/after extension-cost measurement this item exists to take.\n\nDo NOT pilot TPC-DS (streams + compliance). TPC-H is runnable at 0.01 but has supports_streams: true — the complexity the seam README used to reject TPC-DS.\n\nPilot SSB:\n- support_status: stable\n- scale_options include 0.01; estimated 1-5 minutes; data_source: null (synthetic)\n- supports_streams: false\n- supports_dataframe: true with dataframe_queries/ package\n- already CI-gated via make ssb-cross-surface-equivalence-report\n\nExtension-cost metric (not file count): semantic decisions, repeated code, new tests, UAT/CI minutes, elapsed contributor time. Measure before (current cost to add a hypothetical SSB-like family) and after the seam.\n\nNon-goals from the seam README: no third base class; no making benchmark_loader public; no moving all of benchbox/core/<benchmark>/; no result-bundle shape change.\n\nStop condition: SSB implements the small registry-backed family interface; before/after cost table is in the PR; wrapper facade tests still green; make ssb-cross-surface-equivalence-report still PASS.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create a third BaseBenchmark",
+        "instead": "registry-backed family interface",
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "why": "increases base-class ambiguity"
+      },
+      {
+        "dont": "move all of benchbox/core into family packages",
+        "instead": "SSB only",
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "why": "seam README forbids a mechanical core split"
+      },
+      {
+        "dont": "pilot JoinOrder or TPC-DS",
+        "instead": "SSB at 0.01",
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "why": "JoinOrder cannot be measured cheaply; TPC-DS streams obscure the seam"
+      },
+      {
+        "dont": "use file count as the success metric",
+        "instead": "decisions, repeated code, tests, time",
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "why": "fewer files can hide a monolith"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "needs_item": "arch-composition-boundary-adr"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture",
+      "completed_at": "2026-08-14T16:19:06Z",
+      "completed_pr": 1737,
+      "created_at": "2026-08-14T01:18:59Z",
+      "worktree": "arch-simplification"
+    },
+    "preserves": [
+      {
+        "behavior": "No other benchmark family is moved onto the seam in this item",
+        "item_id": "arch-ssb-family-plugin-seam-pilot"
+      },
+      {
+        "behavior": "SSB at scale 0.01 still runs on DuckDB SQL and DataFrame",
+        "item_id": "arch-ssb-family-plugin-seam-pilot"
+      },
+      {
+        "behavior": "benchbox.SSB public facade remains",
+        "item_id": "arch-ssb-family-plugin-seam-pilot"
+      },
+      {
+        "behavior": "ssb-cross-surface-equivalence-report stays green",
+        "item_id": "arch-ssb-family-plugin-seam-pilot"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "ssb-cross-surface-equivalence-report",
+        "decision": "reuse",
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "path": "Makefile"
+      },
+      {
+        "concept": "pilot family",
+        "decision": "extend",
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "path": "benchbox/core/ssb/"
+      },
+      {
+        "concept": "target seam and migration gates",
+        "decision": "extend",
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "path": "docs/design/future-state/benchmark-family-plugin-seam/README.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/"
+      },
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_loader.py"
+      },
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.yaml"
+      },
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/ssb/"
+      },
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "kind": "only_modify",
+        "path_glob": "benchbox/ssb.py"
+      },
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/benchmark-family-plugin-seam/README.md"
+      },
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/contract-index.md"
+      },
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/ssb/"
+      },
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_wrapper_facades_fast.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make ssb-cross-surface-equivalence-report",
+        "description": "SSB cross-surface equivalence still passes",
+        "expected": "PASS",
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_wrapper_facades_fast.py tests/unit/core/test_benchmark_api_contract.py -q",
+        "description": "Public wrapper facades unchanged in count/behavior",
+        "expected": "PASS",
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "origin/develop b3837108a: ssb support_status=stable, default_scale=0.01, scale_options include 0.01, estimated_time_range 1-5, data_source=null, supports_streams=false, supports_dataframe=true. README still named TPC-H/JoinOrder as better pilots; updated to SSB.",
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "notes": null,
+        "started_at": "2026-08-14T16:05:39Z",
+        "started_branch": "fix/arch-ssb-family-plugin-seam-pilot",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-ssb-family-plugin-seam-pilot",
+        "status": "done",
+        "summary": "Re-validate SSB registry fields and the seam README pilot sentence on current origin/develop.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Before-seam extension-cost table landed in docs/design/future-state/benchmark-family-plugin-seam/README.md (decisions, repeated code, tests, time; not file count).",
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "notes": null,
+        "started_at": "2026-08-14T16:08:28Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Write the before-seam extension-cost table for adding an SSB-like family (decisions, files, tests, time).",
+        "wid": "w1"
+      },
+      {
+        "evidence": "SSBFamily implements BenchmarkFamilyPlugin; family_plugins.ssb registered; loader create/core_class go through the plugin; benchbox.SSB facade unchanged.",
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "notes": null,
+        "started_at": "2026-08-14T16:08:39Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Land the small family interface on SSB only; keep the public wrapper facade.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "After-cost table in seam README. pytest plugin+wrapper+contract 38 passed. make ssb-cross-surface-equivalence-report: 26/26 equivalent, 0 divergent.",
+        "item_id": "arch-ssb-family-plugin-seam-pilot",
+        "notes": null,
+        "started_at": "2026-08-14T16:11:38Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Remeasure extension cost; run SSB cross-surface gate and wrapper tests.",
+        "wid": "w3"
+      }
+    ]
+  }
+}

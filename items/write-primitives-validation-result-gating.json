@@ -1,0 +1,216 @@
+{
+  "context": "Single semantic change threaded through two layers. In each benchmark.py,\ncompute status/success from validation_passed at the OperationResult return.\nIn execution.py, thread the resulting status into the result dict and the two\nlogging helpers. Prefer reusing the existing status field over inventing new\nplumbing; only add VALIDATION_FAILED if w1 chooses it. Keep the change\nmechanical and symmetric across write + transaction primitives.\n",
+  "description": "SCD2 adversarial audit finding N1 (keystone). An operation whose validation\nqueries FAIL still reports success. OperationResult is built with a hardcoded\nsuccess=True / status=\"SUCCESS\" regardless of validation_passed\n(benchbox/core/write_primitives/benchmark.py:1211-1224), and the same shape\nexists in benchbox/core/transaction_primitives/benchmark.py:809-816. The\nadapter copies validation_passed into the result dict at\nbenchbox/platforms/base/execution.py:1087, but NOTHING in benchbox/ ever reads\nit: _log_query_result (execution.py:1103-1126) keys its console line off\nrow_count_validation_status, which _execute_operation_query never sets, so a\nSUCCESS op with validation_passed=False renders a green check; and\n_log_execution_summary (execution.py:1128-1140) counts only\nSUCCESS/SKIPPED/FAILED. Net effect: a SCD2 op that corrupts the dimension\n(e.g. after a swallowed cleanup on the next warmup/measurement iteration, which\nnever resets between runs - execution.py:213-225) prints a passing result.\n\nReproduced (scratchpad repro4.py): seed the dirty state a swallowed cleanup\nleaves, re-run merge_scd_type2_basic -> success=True, status=SUCCESS,\nvalidation_passed=False, at_most_one_current_per_business_key returns 40\noffending rows. The blog's \"validation | passed\" column happens to be correct\nonly because it reads the operation API directly, not the runner.\n\nThis is the keystone: hardening the SCD2 validations (sibling TODOs) is\nunobservable until a failing validation actually fails the run.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change what counts as SKIPPED",
+        "instead": "only SUCCESS-with-failed-validation changes.",
+        "item_id": "write-primitives-validation-result-gating",
+        "why": "skip is not failure"
+      },
+      {
+        "dont": "gate only write_primitives",
+        "instead": "fix both.",
+        "item_id": "write-primitives-validation-result-gating",
+        "why": "transaction_primitives shares the identical hardcoded success=True (benchmark.py:809-816)"
+      },
+      {
+        "dont": "resurrect row_count_validation_status as a second source of truth",
+        "instead": "drive the console off validation_passed / status instead.",
+        "item_id": "write-primitives-validation-result-gating",
+        "why": "it is unset dead plumbing"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-11T00:00:00Z",
+      "created_at": "2026-07-10T00:00:00Z",
+      "worktree": "scd2-audit-followup"
+    },
+    "preserves": [
+      {
+        "behavior": "All 56 currently-passing write_primitives ops on DuckDB SF0.01 keep reporting success (w0 confirms zero rely on ignored validation failure).",
+        "item_id": "write-primitives-validation-result-gating"
+      },
+      {
+        "behavior": "SKIPPED semantics unchanged: a skipped op still reports success with status=SKIPPED (skip means not-applicable, not failure).",
+        "item_id": "write-primitives-validation-result-gating"
+      },
+      {
+        "behavior": "transaction_primitives operation reporting stays behaviorally consistent with write_primitives after the change.",
+        "item_id": "write-primitives-validation-result-gating"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/transaction_primitives/benchmark.py:809-816 identical construction in sibling benchmark",
+        "decision": "reuse",
+        "item_id": "write-primitives-validation-result-gating",
+        "path": "benchbox/core/transaction_primitives/benchmark.py:809-816"
+      },
+      {
+        "concept": "benchbox/core/write_primitives/benchmark.py:1211-1224 OperationResult construction (hardcoded success=True)",
+        "decision": "reuse",
+        "item_id": "write-primitives-validation-result-gating",
+        "path": "benchbox/core/write_primitives/benchmark.py:1211-1224"
+      },
+      {
+        "concept": "benchbox/core/write_primitives/benchmark.py:126-130 OperationResult.status field already exists (SUCCESS/SKIPPED/FAILED) - reuse",
+        "decision": "reuse",
+        "item_id": "write-primitives-validation-result-gating",
+        "path": "benchbox/core/write_primitives/benchmark.py:126-130"
+      },
+      {
+        "concept": "benchbox/platforms/base/execution.py:1080-1094 _execute_operation_query result dict (writes validation_passed, read by nothing)",
+        "decision": "reuse",
+        "item_id": "write-primitives-validation-result-gating",
+        "path": "benchbox/platforms/base/execution.py:1080-1094"
+      },
+      {
+        "concept": "benchbox/platforms/base/execution.py:1103-1126 _log_query_result (keys off unset row_count_validation_status) - extend / supersede",
+        "decision": "supersede",
+        "item_id": "write-primitives-validation-result-gating",
+        "path": "benchbox/platforms/base/execution.py:1103-1126"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-validation-result-gating",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "write-primitives-validation-result-gating",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transaction_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-validation-result-gating",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-validation-result-gating",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "write-primitives-validation-result-gating",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_write_primitives_duckdb.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py tests/integration/test_write_primitives_duckdb.py -k scd2 -n 0 -q",
+        "description": "SCD2 unit + DuckDB integration still green (single-threaded to respect the shared test lock).",
+        "expected": "all pass",
+        "item_id": "write-primitives-validation-result-gating",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -n 0 -q -k validation_fail",
+        "description": "New regression: a failing validation flips status away from SUCCESS/green.",
+        "expected": "new test passes; op reports validation failure, not SUCCESS",
+        "item_id": "write-primitives-validation-result-gating",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/transaction_primitives -n 0 -q",
+        "description": "transaction_primitives operation tests still green.",
+        "expected": "all pass",
+        "item_id": "write-primitives-validation-result-gating",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-primitives-validation-result-gating",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "write-primitives-validation-result-gating",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "write-primitives-validation-result-gating",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "write-primitives-validation-result-gating",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-validation-result-gating",
+        "notes": "Measured on DuckDB SF0.01 (scratchpad blast.py): write_primitives\nSUCCESS=56 SKIPPED=56 FAILED=0, with ZERO ops SUCCESS-but-validation_failed.\nSo no op currently relies on validation failure being ignored -> the flip is\nnon-breaking today. Re-run for transaction_primitives and one non-DuckDB\nengine (sqlite is local, no container). Capture stdout to /tmp, summarize\ncounts here. If any op legitimately returns validation_passed=False on the\nhappy path, STOP and reclassify - that op has a bad validation, not a\ngating gap.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate blast radius on write + transaction primitives and a second engine before flipping status.",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-validation-result-gating",
+        "notes": "Recommend a distinct VALIDATION_FAILED: it separates 'the SQL raised' from\n'the SQL ran and the post-condition is wrong', which matters for a\nbenchmarking tool's reporting and for not conflating infra errors with\ncorrectness errors. Record the decision before touching call sites.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decision gate: reuse status=FAILED vs add a distinct VALIDATION_FAILED status.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-validation-result-gating",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Derive success/status from validation_passed in both benchmark.py OperationResult constructions.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-validation-result-gating",
+        "notes": "_log_query_result currently reads result['row_count_validation_status'],\nnever set for operations. Either populate it from validation_passed in\n_execute_operation_query, or branch on validation_passed directly. Ensure\nthe summary line counts a validation failure as not-passed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Propagate status through _execute_operation_query; make _log_query_result and _log_execution_summary reflect validation failure.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-validation-result-gating",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regression test: an op with a deliberately failing validation must not report SUCCESS/green.",
+        "wid": "w4"
+      }
+    ]
+  }
+}

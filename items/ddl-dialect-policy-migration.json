@@ -1,0 +1,115 @@
+{
+  "description": "The sql_compat capability engine has largely replaced ddl.py's dialect if/elif\nchains (type dispatch is now table-driven via get_type_mapping(), down from ~13\nbranches to ~2). But residual literal-dialect policy remains inside DDL RENDERING\nfunctions:\n  - ddl.py:296  if dialect.lower() not in (\"snowflake\", \"bigquery\")  (map column)\n  - ddl.py:351  if pk_columns and dialect.lower() not in (\"clickhouse\", \"doris\")\n  - ddl.py:390  if dialect.lower() == \"bigquery\" / elif \"clickhouse\"  (view syntax)\nThese hardcode dialect names in the rendering path rather than resolving through a\ncapability table. They are the residual tail of the sql_compat migration.\n\nMove this policy into the existing sql_compat capability predicates/data\n(supports_complex_types, supports_foreign_keys, supports_views already exist) so\nthe DDL rendering functions carry no literal dialect names.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "enforce a module-wide grep->0 ratchet that would forbid legitimate capability-table dialect keys.",
+        "instead": "(not specified)",
+        "item_id": "ddl-dialect-policy-migration",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "re-add dialect if/elif to the rendering functions",
+        "instead": "(not specified)",
+        "item_id": "ddl-dialect-policy-migration",
+        "why": "the whole point is to retire them into capability data."
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-06-28T00:00:00Z",
+      "created_at": "2026-06-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Rendered DDL is byte-identical for every currently-supported dialect (snapshot before/after).",
+        "item_id": "ddl-dialect-policy-migration"
+      },
+      {
+        "behavior": "sql_compat capability semantics are reused/extended, not duplicated.",
+        "item_id": "ddl-dialect-policy-migration"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': 'benchbox/core/metadata_primitives/ddl.py:173', 'note': 'get_type_mapping() - the data-driven pattern the residual branches should follow.'}",
+        "decision": "reuse",
+        "item_id": "ddl-dialect-policy-migration",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/core/metadata_primitives/ddl.py:522, :535, :550', 'note': 'supports_complex_types / supports_views / supports_foreign_keys predicates - extend these (or the sql_compat table behind them) to cover map-column, PK, and view-syntax policy.'}",
+        "decision": "extend",
+        "item_id": "ddl-dialect-policy-migration",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/sql_compat/ (registry.py, decision.py, resolver.py, inventory.py)', 'note': 'The capability engine that owns dialect-specific data; add the map/PK/view-syntax policy here, do not re-add if/elif to ddl.py.'}",
+        "decision": "reuse",
+        "item_id": "ddl-dialect-policy-migration",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ddl-dialect-policy-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/metadata_primitives/ddl.py"
+      },
+      {
+        "item_id": "ddl-dialect-policy-migration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "ddl-dialect-policy-migration",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/metadata_primitives/test_ddl.py -q",
+        "description": "DDL unchanged per dialect; rendering carries no literal dialect policy",
+        "expected": "rendered DDL byte-identical per dialect (snapshot); rendering-scoped no-literal-dialect test passes",
+        "item_id": "ddl-dialect-policy-migration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ddl-dialect-policy-migration",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ddl-dialect-policy-migration",
+        "notes": "Replace the three literal-dialect branches (ddl.py:296/351/390) with capability\nlookups: map-column support, primary-key-clause support, and view-syntax\nvariant resolved from one sql_compat table/registry. Keep the rendered DDL\nbyte-identical for every current dialect (this is a refactor, not a behavior\nchange).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve map-column, PK, and view-syntax policy via capability data, not literal dialect names",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ddl-dialect-policy-migration",
+        "notes": "Add a test scoped to the DDL RENDERING functions asserting they contain no\nliteral dialect-name policy (assert behavior via capability data and a snapshot\nof rendered DDL per dialect). Do NOT use a blunt module-wide\ngrep 'dialect.lower()' -> 0 ratchet: capability-table internals may legitimately\nreference dialect keys; the smell is literal dialect policy in the RENDERING\npath, not anywhere in the module.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a rendering-scoped no-literal-dialect-names test",
+        "wid": "w2"
+      }
+    ]
+  }
+}

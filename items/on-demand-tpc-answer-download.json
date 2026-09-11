@@ -1,0 +1,225 @@
+{
+  "description": "Currently, TPC-H and TPC-DS answer files (~4.2 MB total) are only available in\nsource distributions, not in wheels. When running from an installed wheel,\nvalidation is gracefully skipped with an INFO message.\n\nThis TODO implements Option C from the wheel packaging analysis: download\nanswer files on-demand from a CDN or GitHub releases, caching them locally\nfor subsequent runs.\n\nBenefits:\n- Zero wheel size impact (currently 7.1 MB, would be 11.3 MB with answers)\n- Validation available for all installation methods\n- Lazy loading - only downloads when validation is actually needed\n- Cache invalidation possible for answer file updates\n\nCurrent state (acceptable workaround):\n- Commit be3843c9 caches FileNotFoundError to prevent repeated warnings\n- Users see single INFO message: \"Validation will be skipped\"\n- This TODO is enhancement, not critical fix",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make downloads mandatory",
+        "instead": "always fall back to current skip behavior when download fails",
+        "item_id": "on-demand-tpc-answer-download",
+        "why": "corporate firewalls and air-gapped environments exist"
+      },
+      {
+        "dont": "store downloaded answers in the package directory",
+        "instead": "use a user-writable cache directory (XDG_CACHE_HOME or ~/.cache/benchbox/)",
+        "item_id": "on-demand-tpc-answer-download",
+        "why": "it may be read-only"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-03-27T00:00:00Z",
+      "created_at": "2025-01-26T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing FileNotFoundError caching for answer sets (commit be3843c9) continues working for offline/no-download scenarios",
+        "item_id": "on-demand-tpc-answer-download"
+      },
+      {
+        "behavior": "sdist installations continue working without network access",
+        "item_id": "on-demand-tpc-answer-download"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -k validation -v --tb=short",
+        "description": "Validation tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "on-demand-tpc-answer-download",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.expected_results.loader import AnswerLoader; print('OK')\"",
+        "description": "Offline mode works (no network required)",
+        "expected": "OK",
+        "item_id": "on-demand-tpc-answer-download",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "on-demand-tpc-answer-download",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "on-demand-tpc-answer-download",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design cache directory structure (~/.cache/benchbox/answers/)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add checksum verification for downloaded files",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document download behavior in user guide",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit tests for download manager",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integration test: fresh install → validation triggers download",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test offline mode (cache hit, no network)",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement download manager with retry logic and checksums",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add configuration for answer file source URL (GitHub releases or CDN)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update loader.py to check cache before raising FileNotFoundError",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Check ~/.cache/benchbox/answers/tpch/ for TPC-H answers",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Check ~/.cache/benchbox/answers/tpcds/ for TPC-DS answers",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Trigger download when cache miss and validation enabled",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add CLI option to pre-download answers (benchbox download-answers)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "on-demand-tpc-answer-download",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Package answer files as GitHub release asset",
+        "wid": "w9"
+      }
+    ]
+  }
+}

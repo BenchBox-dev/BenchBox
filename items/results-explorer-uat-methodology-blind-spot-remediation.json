@@ -1,0 +1,247 @@
+{
+  "context": "Treat this as a spec-before-code task. The plan IS the deliverable;\nimplementation goes in separate, narrower TODOs filed in w5. Lean on\nexisting project infrastructure (`_project/TODO_ENTRY_TEMPLATE.yaml`,\n`_project/blind-spots/README.md`, `sweep_blind_spots.py`) rather than\nproposing new tooling. Retrofit existing UATs only where the cost is\nvisibly less than the catch — bias toward \"apply to next UAT, leave\nCompleted ones alone.\"\n\nUse `_project/specs/` as the spec home (consistent with other\nspec-style design docs). The /spec workflow under the todo skill\ndescribes the structure; we are using it for a process change rather\nthan a feature, but the assumption-surfacing and human-review-gate\npatterns apply.\n",
+  "description": "The 2026-05-03 code review of `results-explorer-uat-multi-scale-corpus-sweep`\nproduced a Blind-Spot Audit (L2) with three methodology findings,\ncaptured under `_project/blind-spots/`:\n\n  1. `2026-05-03-081920-uat-cross-scale-deliverable-not-guarded.md`\n     — UAT framework declared a headline deliverable (cross-scale\n     comparison UX) but had no enforcement; the agent's W6 findings\n     drifted to easier surfaces.\n  2. `2026-05-03-081921-uat-invalid-bundle-rate-not-tracked.md`\n     — Triage classified failures per-cluster but never tracked the\n     overall \"passed-but-validator-rejected\" rate (~45% in this sweep)\n     as a methodology metric.\n  3. `2026-05-03-081922-uat-submit-success-metric-ambiguity.md`\n     — \"Submitted via the BenchBox submission flow\" conflated local\n     staging, draft PR, and merged-to-`published-results`; Open Question\n     Q3 sat in the deferred-resolution position when it actually gated\n     the W5 deliverable.\n\nThis TODO produces a **plan**, not the implementation. The deliverable\nis a single design document covering each finding's root cause,\nproposed template/process change, and verification mechanism, plus a\nset of follow-up implementation TODOs filed once the plan is approved.\n\nProducing the plan now (rather than implementing inline) follows the\nprecedent set by the parent UAT TODO itself, which observed and reported\nbut explicitly deferred fixes. The findings are about how UAT TODOs are\nauthored and verified — touching that surface without an explicit plan\nrisks scattershot template edits that don't actually close the gaps.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "auto-promote findings without user approval",
+        "instead": "route through w4.",
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "why": "two of the three are policy-flavored (terminal state, gating questions) and need explicit human sign-off"
+      },
+      {
+        "dont": "collapse the three findings into a single homogeneous remediation",
+        "instead": "preserve the per-finding structure through to w5.",
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "why": "they have different shapes (deliverable enforcement / metric definition / policy resolution)"
+      },
+      {
+        "dont": "implement template edits during this TODO",
+        "instead": "file separate implementation TODOs in w5.",
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "why": "the deliverable is the plan, and inline implementation muddies the user-review gate"
+      },
+      {
+        "dont": "propose new tooling unless the existing scripts genuinely cannot express the change",
+        "instead": "prefer additive YAML conventions.",
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "why": "the project already has working blind-spot triage and TODO indexing"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-uat-methodology-blind-spot-remediation",
+        "id": 255,
+        "reason": "Each accepted remediation gets its own narrow TODO in w5. Mixing planning and implementation here repeats the exact mistake the parent UAT avoided (and which the open dry-run TODOs document as a hard-won lesson).",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Reason states each accepted remediation gets its own narrow TODO filed separately (w5); this generic 'implement the remediations' note is superseded by those filed items.",
+        "summary": "Implementing the accepted remediations"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-uat-methodology-blind-spot-remediation",
+        "id": 256,
+        "reason": "Default plan is to apply changes to the next UAT and to currently-active UAT-style TODOs only. Completed ones are historical record; rewriting them buys nothing and risks audit confusion.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicit decision: retrofitting completed/historical UAT TODOs with new conventions buys nothing and risks audit confusion.",
+        "summary": "Retrofitting Completed UAT TODOs with the new conventions"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-uat-methodology-blind-spot-remediation",
+        "id": 257,
+        "reason": "Out of scope until the UAT-specific changes have shipped and proved their cost/benefit. Premature generalisation is itself one of the patterns the blind-spots flag.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly labeled premature generalization, deferred until UAT-specific changes prove cost/benefit; no open item tracks it.",
+        "summary": "Generalising the conventions beyond UAT TODOs (e.g., to all dry-run / observation TODOs)"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Backwards compatibility of `_project/TODO_ENTRY_TEMPLATE.yaml` — any new fields are additive, optional, and ignored by older TODOs.",
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation"
+      },
+      {
+        "behavior": "Existing UAT TODO format used by other in-flight items (`external-contributor-submission-dry-run`, etc.) continues to validate unchanged unless explicitly retrofitted.",
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation"
+      },
+      {
+        "behavior": "The blind-spot directory protocol (`_project/blind-spots/README.md`) — triage uses the existing sweep script, not new tooling.",
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "_project/TODO_ENTRY_TEMPLATE.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "_project/blind-spots/README.md"
+      },
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-uat-methodology-blind-spot-remediation.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/uat-template-*.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-05-03-08192*.md"
+      },
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/uat-methodology-*.md"
+      },
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-methodology-blind-spot-remediation.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/specs/uat-methodology-blind-spot-remediation.md",
+        "description": "Design document exists at the agreed location with all six required sections.",
+        "expected": "file exists",
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py list --status open | grep -E '081920|081921|081922' || echo 'all triaged'",
+        "description": "All three blind-spot files have status `merged-to-todo` (or `dismissed` for explicitly rejected ones).",
+        "expected": "all triaged",
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "ls _project/TODO/main/planning/uat-template-*.yaml 2>/dev/null",
+        "description": "Implementation TODOs exist for each accepted remediation.",
+        "expected": "one yaml per accepted remediation",
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "notes": "Inputs:\n  - `_project/blind-spots/2026-05-03-08192{0,1,2}-*.md`\n  - `_project/handoffs/results-explorer-uat-retrospective-20260502.md`\n  - `_project/DONE/main/active/results-explorer-uat-multi-scale-corpus-sweep.yaml`\n  - `_project/TODO_ENTRY_TEMPLATE.yaml` (the surface most edits will\n    touch)\n  - `_project/TODO/main/planning/external-contributor-submission-dry-run.yaml`\n    (parallel UAT-style TODO that may share the success-metric\n    ambiguity)\nNote any other in-flight UAT/dry-run TODOs that exhibit the same\npatterns; they may need to be retrofitted by the implementation\nTODOs filed in w5.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Read the three blind-spot files and the parent UAT retrospective",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "notes": "For each finding, produce:\n  a. Root cause: what specifically in the UAT TODO format failed.\n  b. Proposed template change: concrete additions or restructurings to\n     `_project/TODO_ENTRY_TEMPLATE.yaml` or a new\n     `_project/UAT_TEMPLATE.yaml` subtemplate. Include exact YAML\n     snippets, not prose.\n  c. Verification mechanism: what the W7 final report or a new\n     pre-completion check must demonstrate. For finding 1, an\n     enumerated coverage checklist; for finding 2, a numeric\n     validator-clean-rate floor in success_metrics; for finding 3,\n     an explicit terminal-state declaration plus a `gating: true`\n     marker on open_questions that change success_metrics.\n  d. Migration plan: which existing TODOs are retrofitted vs left\n     as-is. Default to \"retrofit only the active UAT/dry-run TODOs;\n     leave Completed ones alone.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Draft remediation proposals for each of the three findings",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "notes": "For each proposal, replay against:\n  - the 2026-04-28 Cowork agent-proxy dry-run\n    (`_project/handoffs/external-dry-run-retrospective-2026-04-28.md`),\n  - the 2026-04-29 Codex agent-proxy dry-run\n    (`_project/handoffs/external-dry-run-retrospective-2026-04-29.md`),\n  - the 2026-05-02 sweep retrospective.\nFor each historical UAT, ask: would the proposed change have caught\nthe failure mode? Would it have generated false positives? Would the\ntemplate have been onerous to author? Document the answers — if any\nproposal looks expensive vs prior UATs without a corresponding\nbenefit, drop it or simplify before w4.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Stress-test the proposals against historical UATs",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "notes": "Output file:\n  `_project/specs/uat-methodology-blind-spot-remediation.md`\nSections:\n  1. Executive summary (recommendation + main tradeoff).\n  2. Per-finding remediation (one section each, structured per w2).\n  3. Template diff preview (before/after of\n     `_project/TODO_ENTRY_TEMPLATE.yaml` if that's the surface\n     touched).\n  4. Migration plan + retrofit list.\n  5. Open questions for the user.\n  6. Implementation TODO list (titles only — files in w5).\nSurface in chat for user review. Do not proceed to w5 until the user\nexplicitly approves; the plan is itself the deliverable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Compile the design document and route to user for approval",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-methodology-blind-spot-remediation",
+        "notes": "File one TODO per accepted remediation under\n`_project/TODO/main/planning/`. Slug each so the link to the\noriginating finding is obvious (e.g.,\n`uat-template-cross-scale-coverage-checklist`,\n`uat-template-validator-clean-rate-metric`,\n`uat-template-success-metric-terminal-state`).\n\nThen update each blind-spot file via:\n  `uv run --project _project/scripts -- python\n   _project/scripts/sweep_blind_spots.py triage <id>\n   --action promote --todo-id <implementation-todo-slug>`\n\nIf the user rejects a remediation outright, mark that finding\n`--action dismiss --reason \"...\"` instead.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "After approval, file implementation TODOs and triage the blind-spot files",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "context": "Create a `_rolling_average_impl(ctx, sales_table, date_sk_col, item_sk_col,\nsales_price_col, channel_table, channel_join_key_left, channel_join_key_right,\nchannel_cols, year)` helper function. Q47 and Q57 each become a ~5-line\ncall site passing their channel-specific parameters.\n",
+  "description": "Group 19 from the duplicate-check report identifies that q47_pandas_impl and\nq57_pandas_impl in benchbox/core/tpcds/dataframe_queries/queries.py (~87 lines\neach) implement the same rolling average algorithm. The differences are:\n- Sales table: store_sales vs catalog_sales\n- Column prefixes: ss_ vs cs_\n- Channel dimension: store (s_store_sk/s_store_name/s_company_name)\n  vs call_center (cc_call_center_sk/cc_name)\n- Groupby keys: 4-key with company_name vs 3-key without\n\nThe TPC-DS specification intentionally mirrors Q47 and Q57 with the\nstore/catalog channel substitution. A parameterized helper is appropriate\nsince the algorithm is identical.\n\nNote: Lower priority because this is within TPC-DS spec-conforming query code\nwhere readability and auditability against the spec matters. The expression\nimplementations (Q33/Q60) are left as boilerplate for spec compliance reasons.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Q47 and Q57 produce identical query results to current implementations",
+        "item_id": "dedup-tpcds-rolling-average-queries"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dedup-tpcds-rolling-average-queries",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/dataframe_queries/queries.py"
+      },
+      {
+        "item_id": "dedup-tpcds-rolling-average-queries",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k tpcds",
+        "description": "TPC-DS tests pass",
+        "expected": "all tests pass",
+        "item_id": "dedup-tpcds-rolling-average-queries",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dedup-tpcds-rolling-average-queries",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dedup-tpcds-rolling-average-queries",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dedup-tpcds-rolling-average-queries",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create _rolling_average_pandas_impl parameterized helper",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-tpcds-rolling-average-queries",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor q47_pandas_impl and q57_pandas_impl to use helper",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-tpcds-rolling-average-queries",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run TPC-DS dataframe query tests",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "description": "For reviews of CI savings, skip-lane, or path-filter plans, list every workflow that fires on the same pull_request/synchronize head SHA, split runner and wall minutes by workflow, and require the plan either to change those siblings or to lower its target. Treat an unmentioned same-event workflow that exceeds the claimed p50 as a plan defect. Do not implement a new skip-lane in this item; this is the review-protocol and acceptance-arithmetic change only.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-17T14:46:00Z",
+      "completed_pr": 1762,
+      "created_at": "2026-08-17T13:16:28Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "scope_rules": [
+      {
+        "item_id": "ci-plan-review-synchronize-fanout",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "ci-plan-review-synchronize-fanout",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "ci-plan-review-synchronize-fanout",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/review-protocol.md"
+      },
+      {
+        "item_id": "ci-plan-review-synchronize-fanout",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'synchronize fan-out|same-event' docs/agent/review-protocol.md",
+        "description": "Protocol requires enumerating same-event sibling workflows",
+        "expected": "match",
+        "item_id": "ci-plan-review-synchronize-fanout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-plan-review-synchronize-fanout",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Documented same-event fan-out: Documentation, Results Explorer browser, PR base guard, auto-merge revocation, ruleset-drift, plus path-filtered siblings.",
+        "item_id": "ci-plan-review-synchronize-fanout",
+        "notes": null,
+        "started_at": "2026-08-17T14:35:46Z",
+        "started_branch": "docs/review-protocol-axes-20260817",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-review-protocol-axes-20260817",
+        "status": "done",
+        "summary": "Document the current pull_request/synchronize fan-out and how to split runner vs wall minutes",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added CI synchronize fan-out axis to docs/agent/review-protocol.md and same-event note to docs/operations/repo-admin-settings.md.",
+        "item_id": "ci-plan-review-synchronize-fanout",
+        "notes": null,
+        "started_at": "2026-08-17T14:36:20Z",
+        "started_branch": "docs/review-protocol-axes-20260817",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-review-protocol-axes-20260817",
+        "status": "done",
+        "summary": "Add the same-event fan-out check to CI plan-review guidance",
+        "wid": "w1"
+      }
+    ]
+  }
+}

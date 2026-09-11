@@ -1,0 +1,190 @@
+{
+  "context": "Pure operations.yaml work. Mirror the theta and KLL op families one\nfor one. All non-DuckDB platform_overrides are `null` (no cloud\nsurface today). Validation tolerances are empirically observed\nduring w1/w2 against DuckDB SF=0.01.\n\nIf `write-primitives-sketch-clickhouse-and-storage-metrics` has\nlanded first, reuse its octet_length storage-size validation pattern\nfor the CPC vs Theta comparison story in w3 docs.\n",
+  "description": "## Unblocked by `write-primitives-architecture-fixes` (2026-05-04)\n\nvalidation_query.platform_overrides shipped, removing the catalog-side\nblocker. The DuckDB community datasketches extension drift recorded in\n`_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`\nremains an open dependency-management risk — w1 and w2 must smoke-test\n`datasketch_cpc` / `datasketch_req` against the exact installed extension\nbuild before relying on the function families.\n\nImplementation order is unchanged: this TODO depends on\n`write-primitives-sketch-clickhouse-and-storage-metrics` so the\nstorage-size validation methodology lands first and CPC vs Theta\nstorage comparisons in w3 docs can reuse it.\n\n## Original description\n\nThe DuckDB `datasketches` community extension exposes additional\nsketch families beyond the Theta / KLL / Frequent-Items trio that\nthe merged write_primitives sketch category covers:\n\n- **CPC** (Compressed Probabilistic Counting): an HLL-family\n  alternative with **smaller serialized size** at the cost of\n  slower update/merge. Functions: `datasketch_cpc(x)`,\n  `datasketch_cpc_estimate(sk)`, `datasketch_cpc_union(s1, s2)`,\n  `datasketch_cpc_lower_bound`, `datasketch_cpc_upper_bound`.\n- **REQ** (Relative Error Quantile): an alternative quantile sketch\n  with **relative-error guarantees** (vs KLL's normalised-rank\n  error). Functions: `datasketch_req(k, x)`, `datasketch_req_quantile`,\n  `datasketch_req_rank`, `datasketch_req_cdf`, etc.\n\nBoth are DuckDB-only at the SQL surface today — no other engine in\nBenchBox's matrix exposes them. This TODO adds DuckDB-scoped sketch\nops for each family so users can compare CPC vs Theta storage cost\nand REQ vs KLL accuracy/latency in a single benchmark run.\n\nCaptured as a deferred item from the post-merge expansion review\n(sibling to `write-primitives-sketch-clickhouse-and-storage-metrics`).\nLower priority because it's single-engine — does not extend the\ncross-vendor matrix.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "mix CPC ops into the existing theta-op family (e.g. as variants of the same op id)",
+        "instead": "separate `sketch_cpc_*` op family.",
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "why": "they have different storage / merge characteristics and benchmarking them as the same op would obscure the comparison"
+      },
+      {
+        "dont": "write Snowflake / BigQuery / Databricks overrides for CPC or REQ",
+        "instead": "leave as `null` and document the gap.",
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "why": "no cloud engine surfaces these families today"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "write-primitives-sketch-duckdb-cpc-req-families",
+        "id": 530,
+        "reason": "Databricks-native + Snowflake DataSketches UDAFs only. Same portability calculus as the merged TODO's deferred Tuple item — no DuckDB-extension support today.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Tuple sketch family support is blocked on DuckDB extension support that doesn't exist today, same portability calculus as the already-deferred merged item.",
+        "summary": "Tuple sketches (distinct + metric aggregation)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "needs_item": "write-primitives-architecture-fixes"
+      },
+      {
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "needs_item": "write-primitives-sketch-clickhouse-and-storage-metrics"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-04T00:00:00Z",
+      "created_at": "2026-05-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing 117 write_primitives operations (including the 8 sketch ops) execute identically — no behavior changes to existing entries.",
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families"
+      },
+      {
+        "behavior": "New CPC / REQ ops are additive; their validation contracts use the same expected_value_min/max shape introduced in PR #112.",
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/"
+      },
+      {
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/schema.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/write-primitives-sketch-functions.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/write_primitives -q",
+        "description": "All write_primitives unit tests pass with new ops",
+        "expected": "all tests pass",
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark write_primitives --scale 0.01 --queries sketch_cpc_create_persistent_table,sketch_cpc_insert_per_partition,sketch_cpc_query_union_merge,sketch_cpc_drop_persistent_table",
+        "description": "DuckDB end-to-end: new CPC ops execute",
+        "expected": "4/4 pass; merge query value within tuned bounds",
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark write_primitives --scale 0.01 --queries sketch_req_create_persistent_table,sketch_req_insert_per_partition,sketch_req_query_quantile_merge,sketch_req_drop_persistent_table",
+        "description": "DuckDB end-to-end: new REQ ops execute",
+        "expected": "4/4 pass; merge quantile value within tuned bounds",
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "notes": "Mirror the structure of the theta op family:\n  sketch_cpc_create_persistent_table  (BLOB column, like the\n                                       theta DDL but a separate\n                                       table to avoid mixing)\n  sketch_cpc_insert_per_partition     (datasketch_cpc(x) per partition)\n  sketch_cpc_query_union_merge        (datasketch_cpc_estimate(\n                                       datasketch_cpc(sk))) — but\n                                       note datasketch_cpc_union is\n                                       scalar, not aggregate; verify\n                                       whether a fold-aggregate exists\n                                       or use the same trick that\n                                       worked for theta (passing\n                                       sketch column to the build agg)\n  sketch_cpc_drop_persistent_table\n\nAll other engines: `clickhouse: null`, `datafusion: null`, etc.\nSnowflake / BigQuery / Databricks have no native CPC surface.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 4 sketch_cpc_* ops (DDL, insert, query merge, drop) following the existing theta-op pattern",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "notes": "Mirror the structure of the KLL op family:\n  sketch_req_create_persistent_table\n  sketch_req_insert_per_partition     (datasketch_req(k, x))\n  sketch_req_query_quantile_merge     (datasketch_req_quantile)\n  sketch_req_drop_persistent_table\n\nVerify the merge pattern works the same way as KLL — the\n`datasketch_req` aggregate may or may not accept its own sketch\ntype as input for fold-merge. If not, document the limitation\nand emit a comment in the op explaining the workaround.\n\nValidation bounds on the merge ★ op should be empirically\nobserved at SF=0.01 (same methodology as the existing KLL op).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 4 sketch_req_* ops following the KLL-op pattern",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "notes": "Extend `docs/benchmarks/write-primitives-sketch-functions.md`:\n  - Add CPC and REQ rows to the family × engine support matrix.\n    All cloud engines and ClickHouse / DataFusion / Redshift\n    show \"—\" for these — only DuckDB ext supports.\n  - Add a side-by-side storage-size row comparing Theta vs CPC\n    (both HLL-family) and KLL vs REQ (both quantile-family) on\n    DuckDB SF=0.01.\n  - Note explicitly that CPC and REQ are part of Apache\n    DataSketches — they're \"binary-portable in principle\" but\n    no cloud engine surfaces them today.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update cross-platform sketch docs with CPC and REQ family rows",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-duckdb-cpc-req-families",
+        "notes": "Terse user-facing bullet:\n\"write_primitives sketch: add DuckDB-only CPC (alternative HLL,\nsmaller serialized size) and REQ (relative-error quantile)\nsketch families. Other engines skip — see docs.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add changelog entry under unreleased",
+        "wid": "w4"
+      }
+    ]
+  }
+}

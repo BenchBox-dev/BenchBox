@@ -1,0 +1,122 @@
+{
+  "context": "Merge #1599 when checks green on current tip (refresh base if needed). Observe Actions: one schedule develop-post-merge (gates only) and one gap-detector run. Record URLs. If gap detector red for aged intermediate SHAs, confirm that is age-out signal not a broken sweep.",
+  "description": "PR #1599 adds hourly slim tip re-gate for develop-post-merge (schedule, no medium/auto-revert on schedule) plus develop-post-merge-gap-detector with unique-headSha pagination. Adversarial Criticals fixed; re-review APPROVED. Tracker develop-post-merge-silently-skips-pushes completed at PR open.\n\nUntil merge, develop remains push-only for post-merge gates — silent tip exposure after push-drops continues. After land: wait for first hourly schedule run and first gap-detector run; confirm mutators did not fire on schedule; document any expected red gap signal from intermediate historical drops (by design).",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "land-and-observe-develop-post-merge-sweep-pr-1599-20260805",
+        "needs_item": "develop-post-merge-silently-skips-pushes"
+      }
+    ],
+    "item_meta": {
+      "category": "ci-integrity",
+      "completed_at": "2026-08-06T01:03:18Z",
+      "completed_pr": 1599,
+      "created_at": "2026-08-05T23:39:26Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not disable gap detector to force green; tip re-gate is the safety property",
+        "item_id": "land-and-observe-develop-post-merge-sweep-pr-1599-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "land-and-observe-develop-post-merge-sweep-pr-1599-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "land-and-observe-develop-post-merge-sweep-pr-1599-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh pr view 1599 --repo joeharris76/BenchBox --json state --jq .state | grep -qx MERGED",
+        "description": "PR 1599 is merged",
+        "expected": null,
+        "item_id": "land-and-observe-develop-post-merge-sweep-pr-1599-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-06T01:03:11Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git show origin/develop:.github/workflows/develop-post-merge.yml | rg -q \"schedule:\"",
+        "description": "develop-post-merge.yml on develop has schedule trigger",
+        "expected": null,
+        "item_id": "land-and-observe-develop-post-merge-sweep-pr-1599-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-06T01:03:14Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "land-and-observe-develop-post-merge-sweep-pr-1599-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "land-and-observe-develop-post-merge-sweep-pr-1599-20260805",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "land-and-observe-develop-post-merge-sweep-pr-1599-20260805",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1599 MERGED 2026-08-05T23:43:15Z sha c34c332b8d608a2d48f8d8318efce4f2dadd5667",
+        "item_id": "land-and-observe-develop-post-merge-sweep-pr-1599-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T01:02:39Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Ensure #1599 green on current develop tip; merge (auto-merge or human)",
+        "wid": "w0"
+      },
+      {
+        "evidence": "workflow_dispatch develop-post-merge run 31060741403 https://github.com/joeharris76/BenchBox/actions/runs/31060741403; push runs on tip also firing; schedule cron 17 * * * * on develop; mutators gated event_name != schedule (verified on origin/develop)",
+        "item_id": "land-and-observe-develop-post-merge-sweep-pr-1599-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T01:02:47Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Observe first schedule develop-post-merge (no mutators, slim gates)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "gap-detector workflow_dispatch run 31060742211 conclusion=failure (Detect missing develop-post-merge runs) — expected signal for intermediate push-drops in lookback, not tip-sweep failure. URL https://github.com/joeharris76/BenchBox/actions/runs/31060742211",
+        "item_id": "land-and-observe-develop-post-merge-sweep-pr-1599-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T01:02:55Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Observe first gap-detector run; interpret red vs green honestly",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Observation recorded in tracker evidence; develop-post-merge-gaps.md already documents tip vs intermediate and expected red gap signal — no doc edit required for first cycle",
+        "item_id": "land-and-observe-develop-post-merge-sweep-pr-1599-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T01:03:03Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Append dated observation to docs/operations/develop-post-merge-gaps.md if needed",
+        "wid": "w3"
+      }
+    ]
+  }
+}

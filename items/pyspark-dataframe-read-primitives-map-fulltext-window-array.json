@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #254 of results-explorer-uat-defect-spark-pyspark-expression-compat.\nDeferred: PySpark DataFrame read-primitives map/fulltext/window/array expression gaps\nReason deferred: Expression API work spans a different owner and needs its own targeted regression slice.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:12Z",
+      "worktree": "main"
+    }
+  }
+}

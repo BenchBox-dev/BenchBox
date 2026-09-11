@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #509 of uat-resume-shard-config-sprawl.\nDeferred: Auto-expire or auto-archive generated rerun shards\nReason deferred: Tooling automation is a follow-up; the lifecycle policy + relocation is the fix.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:41Z",
+      "worktree": "main"
+    }
+  }
+}

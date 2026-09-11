@@ -1,0 +1,11 @@
+{
+  "description": "Create a clean version of this project for first-time public release",
+  "legacy": {
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "completed_at": "2025-11-27T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "release-readiness"
+    }
+  }
+}

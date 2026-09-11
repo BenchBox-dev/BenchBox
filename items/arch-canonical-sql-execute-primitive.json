@@ -1,0 +1,214 @@
+{
+  "context": "One adapter per PR after the ADR. Prefer a DB-API adapter (Firebolt already uses the mixin; next is a cloud adapter only if hooks can express its deltas). Run duplicate-check-delta.",
+  "description": "BLOCKED on arch-composition-boundary-adr. Do not fold adapters until the ADR names the winning primitive and its home layer.\n\nIncumbents (must not silently merge):\n- CursorValidationQueryExecutionMixin (core): logs validation PASS/FAIL; always connection.cursor(); no rollback; no result digest.\n- execute_sql_query (platforms): rollback after error; result-digest oracle; pre-created cursor support; QueryValidator without PASS/FAIL logs.\n\nConfirmed duplication: redshift.py:2078-2112 and databricks/adapter.py:1978-2012 are byte-identical validate+log+build blocks. QueryValidator() appears in 16 benchbox files. Firebolt and Presto/Trino already use the mixin.\n\nPer-adapter, enumerate these behaviors BEFORE the fold: query tags, statistics APIs, plan capture, rollback, result digest, cursor ownership, query rewrite, job APIs.\n\nIrreducible stop conditions (stop after the first adapter if any cannot be a hook without behavior change):\n- BigQuery in-memory QueryJob plan\n- Athena pre-close cursor reads\n- Redshift pg_last_query_id() ordering\n- Snowflake QUERY_TAG pre/post coupling\n\nDo not add a third mixin. Do not fold all four cloud adapters in one PR.\n\nStop condition: first adapter folded with enumerated deltas, or a recorded stop because an irreducible behavior cannot be a hook.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add CursorValidationQueryExecutionMixin AND keep execute_sql_query as a second path for the same adapter",
+        "instead": "one primitive per adapter after the ADR",
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "why": "that creates a third observable mix"
+      },
+      {
+        "dont": "fold Redshift, Snowflake, Databricks, and BigQuery in one PR",
+        "instead": "one adapter, then stop or continue",
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "why": "irreducible behaviors are per-engine"
+      },
+      {
+        "dont": "start this item before the ADR names a home layer",
+        "instead": "wait for arch-composition-boundary-adr",
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "why": "the two incumbents already disagree"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "needs_item": "arch-composition-boundary-adr"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture",
+      "completed_at": "2026-08-14T16:11:15Z",
+      "completed_pr": 1736,
+      "created_at": "2026-08-14T01:18:46Z",
+      "worktree": "arch-simplification"
+    },
+    "preserves": [
+      {
+        "behavior": "No change to AppliedTuningLedger",
+        "item_id": "arch-canonical-sql-execute-primitive"
+      },
+      {
+        "behavior": "Plan capture and cost resource_usage fields remain populated where they are today",
+        "item_id": "arch-canonical-sql-execute-primitive"
+      },
+      {
+        "behavior": "Result bundle validation fields stay schema-compatible",
+        "item_id": "arch-canonical-sql-execute-primitive"
+      },
+      {
+        "behavior": "duplicate-check-delta does not rise",
+        "item_id": "arch-canonical-sql-execute-primitive"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "injected execute helper",
+        "decision": "extend",
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "path": "benchbox/platforms/base/sql_execution.py"
+      },
+      {
+        "concept": "existing mixin consumer",
+        "decision": "reuse",
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "path": "benchbox/platforms/firebolt.py"
+      },
+      {
+        "concept": "R-02 deferred cloud validate+log",
+        "decision": "extend",
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "path": "docs/development/duplication-residuals.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_mixins.py"
+      },
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/sql_execution.py"
+      },
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databricks/adapter.py"
+      },
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/firebolt.py"
+      },
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/redshift.py"
+      },
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      },
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make duplicate-check-delta",
+        "description": "Duplicate-code delta vs merge-base",
+        "expected": "non-positive duplicated-line delta",
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -q -k '<folded-adapter>'",
+        "description": "Focused adapter unit tests for the one folded adapter",
+        "expected": "PASS; replace the -k filter with the actual adapter name",
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "On origin/develop b3837108a: mixin execute_query is benchbox/core/benchmark_mixins.py:206; execute_sql_query is platforms/base/sql_execution.py:49; Redshift execute_query was redshift.py:2046 and Databricks adapter.py:1948 with the same validate+log+build block.",
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "notes": null,
+        "started_at": "2026-08-14T15:55:28Z",
+        "started_branch": "fix/arch-canonical-sql-execute-primitive",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-canonical-sql-execute-primitive",
+        "status": "done",
+        "summary": "Re-validate the two primitive line numbers and first-adapter duplicate blocks on current origin/develop.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Chose Redshift as first fold. Deltas vs mixin: stats via pg_last_query_id (hook _build_query_stats, still before EXPLAIN), plan capture post-execute, no rollback, no digest, mixin cursor ownership, base rewrite, no job API. Snowflake QUERY_TAG and BigQuery QueryJob remain irreducible; not folded.",
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "notes": null,
+        "started_at": "2026-08-14T15:55:35Z",
+        "started_branch": "fix/arch-canonical-sql-execute-primitive",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-canonical-sql-execute-primitive",
+        "status": "done",
+        "summary": "Enumerate the eight divergent behaviors for the first candidate adapter against the winning primitive.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "RedshiftAdapter now inherits CursorValidationQueryExecutionMixin; execute_query delegates to super() then plan capture; _build_query_stats calls _get_query_statistics; mixin _format_query_error preserves empty-message fallback.",
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "notes": null,
+        "started_at": "2026-08-14T15:58:20Z",
+        "started_branch": "fix/arch-canonical-sql-execute-primitive",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-canonical-sql-execute-primitive",
+        "status": "done",
+        "summary": "Fold that one adapter behind explicit hooks, or record a stop if a behavior is irreducible.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "uv pytest redshift+mixin+composition prototypes: 429 passed. make duplicate-check-delta next.",
+        "item_id": "arch-canonical-sql-execute-primitive",
+        "notes": null,
+        "started_at": "2026-08-14T15:58:25Z",
+        "started_branch": "fix/arch-canonical-sql-execute-primitive",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-canonical-sql-execute-primitive",
+        "status": "done",
+        "summary": "Run adapter unit tests and make duplicate-check-delta; do not start a second adapter in this item.",
+        "wid": "w3"
+      }
+    ]
+  }
+}

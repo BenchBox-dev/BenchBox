@@ -1,0 +1,166 @@
+{
+  "context": "Confirm the offenders empirically (w1) rather than assuming only DuckDB. Move the raw\nestimate text out of the hashed path (w2) using a single shared strip helper. Lock it with\na registry-wide invariant test (w3) so the stats-independence promise becomes enforceable\nrather than aspirational, and update the query_plan_models.py contract docstring to drop the\n\"verify per engine\" caveat once the invariant holds.\n",
+  "description": "The plan fingerprint is documented (query_plan_models.py, added in #768) as a LOGICAL,\nstats-INDEPENDENT structural hash: a VACUUM/ANALYZE or row-count change must NOT change it.\nThat contract is violated by at least one parser today.\n\nThe DuckDB parser (benchbox/core/query_plans/parsers/duckdb.py) folds an operator's raw\nEXPLAIN `extra_info` — which includes an \"Estimated Cardinality\" — into signature-bearing\nfields (join_conditions for JOIN, aggregation_functions for AGGREGATE, filter_expressions\nfor FILTER, sort_keys for SORT). Because get_structural_signature() hashes those fields,\na DuckDB JOIN/AGGREGATE/FILTER/SORT fingerprint CHANGES when the cardinality estimate\nchanges. This was confirmed empirically during #768: a GROUP BY fingerprint differed at\n500 rows vs 5000 rows. The #768 contract was softened to \"verify per engine\" instead of\nfixing the leak — this TODO fixes it and prevents regressions for the other six parsers.\n\nTwo-part fix:\n  1. Strip estimate/cost text (e.g. \"Estimated Cardinality=...\", \"EC:\", \"rows=\", \"cost=\")\n     from extra_info before storing it into signature-bearing fields, OR store the raw\n     extra_info only in physical_operator.platform_metadata (which is NOT hashed) and\n     extract only the structural predicate into the logical field.\n  2. Add a cross-parser invariant test asserting NO parser places cost/cardinality/estimate\n     text into any signature-bearing logical field, for every registered parser, driven by\n     fixtures that differ ONLY in row count / estimates.\n\nThis is distinct from query-plan-capture-fingerprint-literal-normalization: that TODO makes\nFILTER LITERAL values opt-in-normalizable (a feature for cross-run seed differences); this\nTODO removes ESTIMATE values that should never have been in the signature (a parser bug).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "conflate this with literal normalization",
+        "instead": "keep the two TODOs separate.",
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "why": "estimates are an accidental bug while literals are an intentional design choice"
+      },
+      {
+        "dont": "solve this by removing the fields from get_structural_signature entirely",
+        "instead": "only strip the estimate/cost tokens.",
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "why": "join keys / group keys / predicates ARE structural and must stay in the hash"
+      },
+      {
+        "dont": "special-case DuckDB",
+        "instead": "enforce the rule with a registry-wide invariant test.",
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "why": "the leak can recur in any parser that folds extra_info"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-06-11T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing parser unit tests must pass with at most fixture-value updates.",
+        "item_id": "query-plan-capture-fingerprint-estimate-leak"
+      },
+      {
+        "behavior": "Genuine logical-shape changes (join order/type, added aggregation, different predicate columns) must still change the fingerprint.",
+        "item_id": "query-plan-capture-fingerprint-estimate-leak"
+      },
+      {
+        "behavior": "physical_operator.platform_metadata may keep the raw EXPLAIN detail including estimates for display/debugging.",
+        "item_id": "query-plan-capture-fingerprint-estimate-leak"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/query_plans/parsers/duckdb.py — folds extra_info incl. Estimated Cardinality into join_conditions/aggregation_functions/filter_expressions/sort_keys",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "path": "benchbox/core/query_plans/parsers/duckdb.py"
+      },
+      {
+        "concept": "benchbox/core/results/query_plan_models.py — get_structural_signature() and the stability contract docstring (#768)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "path": "benchbox/core/results/query_plan_models.py"
+      },
+      {
+        "concept": "tests/unit/platforms/test_duckdb_plan_capture.py — index-stability tests added in #768 that the new invariant generalizes",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "path": "tests/unit/platforms/test_duckdb_plan_capture.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/"
+      },
+      {
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/query_plan_models.py"
+      },
+      {
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_duckdb_plan_capture.py"
+      },
+      {
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/query_plans/test_fingerprint_hygiene.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_duckdb_plan_capture.py -k fingerprint -v",
+        "description": "DuckDB fingerprint is stable across row-count change",
+        "expected": "GROUP BY/JOIN fingerprint identical at small vs large row counts",
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/query_plans/test_fingerprint_hygiene.py -v",
+        "description": "Cross-parser signature-hygiene invariant passes",
+        "expected": "No registered parser leaks estimate/cost text into the signature",
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/query_plans/ tests/unit/query_plans/ -q",
+        "description": "Full query_plans suite green",
+        "expected": "0 failures, 0 errors",
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "notes": "For each registered parser (duckdb, postgresql, redshift, datafusion, sqlite, presto,\ntrino, clickhouse, spark) capture two fixtures of the same query that differ only in\ntable size / estimates, and record which produce different fingerprints. DuckDB is the\nknown offender; confirm the full list before editing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Quantify the leak: which parsers fold estimate/cost text into signature fields",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "notes": "In each offending parser, keep the raw EXPLAIN detail in physical_operator.platform_metadata\n(not hashed) and place only the structural part (join keys, group keys, filter predicate\nWITHOUT the cardinality) into the logical field. Prefer a shared helper, e.g.\nstrip_estimates(text), in the parsers base module so the rule lives in one place.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Strip estimate/cost tokens from signature-bearing fields in offending parsers",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-fingerprint-estimate-leak",
+        "notes": "Create tests/unit/query_plans/test_fingerprint_hygiene.py. For every parser in the\nregistry, parse two estimate-only-different fixtures and assert identical plan_fingerprint.\nAlso assert get_structural_signature() contains no digit-bearing 'cardinality'/'cost'/\n'rows='/'EC:' token. This locks the contract for current and future parsers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a cross-parser signature-hygiene invariant test",
+        "wid": "w3"
+      }
+    ]
+  }
+}

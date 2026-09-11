@@ -1,0 +1,240 @@
+{
+  "context": "Five independent sub-moves, each a landable PR. For (2), core gains a publish_admission(result, label) -> allow/refuse+reason function; CLI translates refusals to messages/exit codes. For (4), delete run_official's monkeypatch after the service accepts streams; keep its TPC scale/stream validation rules but move them to core beside the service. Characterize before each move.",
+  "description": "Relocate CLI-layer business logic per the review. (1) benchbox/cli/commands/metrics.py:120-217: Power@Size/Throughput@Size derivation and the QphH sqrt(power x throughput) computation move into core/results/metrics.py TPCMetricsCalculator; the CLI keeps parsing/emission only. (2) publish gate (benchbox/cli/commands/publish.py:96-121: compliance_class refusal + result_non_clean_reason policy) and submit compliance/clean-pass policy (submit.py:641-663) move into core/publishing / validation so any future MCP publish tool inherits identical policy. (3) tuning profile->settings mappings (tuning_group.py:207-249 _create_profile_config: optimized/streaming/memory-constrained/gpu) and the hardcoded DataFrame capability table (:562-573) move into core/tuning beside PLATFORM_TUNING_CAPABILITIES. (4) run_official's class-level monkeypatch of BenchmarkOrchestrator.execute_benchmark (run_official.py:19-63 _forward_requested_streams) is removed by making stream count a first-class run-service parameter. (5) datagen's dummy --platform duckdb injection and argv round-trip re-parse (datagen.py:79-139) are replaced by a direct run-service data_only call. (6) aggregate.py CSV assembly stays CLI but consumes core statistics (already done by one-engine-unify-statistics).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "keep the run_official monkeypatch alongside the new streams parameter as belt-and-braces",
+        "instead": "delete it in the same PR that adds the parameter",
+        "item_id": "one-engine-sink-cli-logic",
+        "why": "a class-level monkeypatch on the orchestrator is fragile and will silently misfire when the orchestrator thins out"
+      },
+      {
+        "dont": "move CLI display/formatting into core while relocating policy",
+        "instead": "core returns structured decisions; CLI renders them",
+        "item_id": "one-engine-sink-cli-logic",
+        "why": "presentation is interaction-scoped under the contract"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "one-engine-sink-cli-logic",
+        "needs_item": "one-engine-core-run-service"
+      }
+    ],
+    "item_meta": {
+      "category": "cli",
+      "completed_at": "2026-08-09T15:04:16Z",
+      "completed_pr": 1653,
+      "created_at": "2026-08-04T17:15:24Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI flags, exit codes, and user-facing messages unchanged for metrics/publish/submit/run-official/datagen.",
+        "item_id": "one-engine-sink-cli-logic"
+      },
+      {
+        "behavior": "Tuning YAML files produced by tuning init remain byte-compatible for the same inputs.",
+        "item_id": "one-engine-sink-cli-logic"
+      },
+      {
+        "behavior": "publish refusal semantics identical: same inputs refuse with the same reasons.",
+        "item_id": "one-engine-sink-cli-logic"
+      },
+      {
+        "behavior": "run-official's validation rules (TPC scale allowlist, streams >= 2 floor rationale) keep their behavior, relocated.",
+        "item_id": "one-engine-sink-cli-logic"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Core publishing seam that should own admission policy",
+        "decision": "extend",
+        "item_id": "one-engine-sink-cli-logic",
+        "path": "benchbox/core/publishing/bundle_publisher.py"
+      },
+      {
+        "concept": "TPCMetricsCalculator absorbs QphH derivation",
+        "decision": "extend",
+        "item_id": "one-engine-sink-cli-logic",
+        "path": "benchbox/core/results/metrics.py"
+      },
+      {
+        "concept": "Streams parameter home replacing the monkeypatch",
+        "decision": "extend",
+        "item_id": "one-engine-sink-cli-logic",
+        "path": "benchbox/core/run_service.py"
+      },
+      {
+        "concept": "PLATFORM_TUNING_CAPABILITIES already core; profiles join it",
+        "decision": "extend",
+        "item_id": "one-engine-sink-cli-logic",
+        "path": "benchbox/core/tuning/capability_registry.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-sink-cli-logic",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "one-engine-sink-cli-logic",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "one-engine-sink-cli-logic",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "one-engine-sink-cli-logic",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/"
+      },
+      {
+        "item_id": "one-engine-sink-cli-logic",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "one-engine-sink-cli-logic",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "one-engine-sink-cli-logic",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "one-engine-sink-cli-logic",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -n 'sqrt' benchbox/cli/commands/metrics.py && grep -qn 'qphh\\|QphH' benchbox/core/results/metrics.py",
+        "description": "QphH computation lives in core",
+        "expected": "CLI metrics command no longer computes the composite metric.",
+        "item_id": "one-engine-sink-cli-logic",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -n '_forward_requested_streams\\|execute_benchmark = ' benchbox/cli/commands/run_official.py",
+        "description": "The orchestrator monkeypatch is gone",
+        "expected": "run-official passes streams through the run service.",
+        "item_id": "one-engine-sink-cli-logic",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'publish and (admission or gate or policy)' -q",
+        "description": "Publish/submit policy parity test",
+        "expected": "Core admission function enforces the same refusals the CLI enforced.",
+        "item_id": "one-engine-sink-cli-logic",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli -m fast -q",
+        "description": "CLI fast suite green",
+        "expected": "No CLI behavior regressions.",
+        "item_id": "one-engine-sink-cli-logic",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-sink-cli-logic",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-sink-cli-logic",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "one-engine-sink-cli-logic",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "one-engine-sink-cli-logic",
+        "needs_wid": "w0",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1653 a1de5a252e: QphH->core/results/metrics, publish/admission->core/publishing, tuning->core/dataframe, run_official streams via run_service, grep rungs PASS",
+        "item_id": "one-engine-sink-cli-logic",
+        "notes": null,
+        "started_at": "2026-08-09T15:04:02Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-verify the five logic bodies at HEAD",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1653 a1de5a252e: QphH->core/results/metrics, publish/admission->core/publishing, tuning->core/dataframe, run_official streams via run_service, grep rungs PASS",
+        "item_id": "one-engine-sink-cli-logic",
+        "notes": null,
+        "started_at": "2026-08-09T15:04:05Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "QphH/Power/Throughput derivation -> core TPCMetricsCalculator",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1653 a1de5a252e: QphH->core/results/metrics, publish/admission->core/publishing, tuning->core/dataframe, run_official streams via run_service, grep rungs PASS",
+        "item_id": "one-engine-sink-cli-logic",
+        "notes": null,
+        "started_at": "2026-08-09T15:04:07Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Publish/submit admission policy -> core publishing/validation",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1653 a1de5a252e: QphH->core/results/metrics, publish/admission->core/publishing, tuning->core/dataframe, run_official streams via run_service, grep rungs PASS",
+        "item_id": "one-engine-sink-cli-logic",
+        "notes": null,
+        "started_at": "2026-08-09T15:04:10Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Tuning profiles + DF capability table -> core/tuning",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #1653 a1de5a252e: QphH->core/results/metrics, publish/admission->core/publishing, tuning->core/dataframe, run_official streams via run_service, grep rungs PASS",
+        "item_id": "one-engine-sink-cli-logic",
+        "notes": null,
+        "started_at": "2026-08-09T15:04:13Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Streams as run-service parameter; delete run_official monkeypatch; datagen -> direct service call",
+        "wid": "w4"
+      }
+    ]
+  }
+}

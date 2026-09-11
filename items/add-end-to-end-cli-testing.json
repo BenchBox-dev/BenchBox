@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: High\"\n- \"**Status**: Completed ✅\"\n- \"**Description**: Added subprocess-driven smoke coverage to verify the CLI works when invoked as an actual module, complementing the existing Click runner unit tests.\"\n- \"**Highlights**:\"\n- \"**Files Affected**:\"\n- \"**Tests**:\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

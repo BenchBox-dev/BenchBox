@@ -1,0 +1,10 @@
+{
+  "description": "Unified CLI and core exporters on schema v1.0, added canonical validation helpers, and documented the contract for downstream consumers.",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (Should-Fix Before Release)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

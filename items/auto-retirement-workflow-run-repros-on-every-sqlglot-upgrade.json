@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #487 of retire-sqlglot-duckdb-all-workaround.\nDeferred: Auto-retirement workflow (run repros on every sqlglot upgrade)\nReason deferred: Worth considering as a separate process improvement. Out of scope\nfor this cleanup.\n",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:28Z",
+      "worktree": "main"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #89 of implement-dataframe-benchmarks.\nDeferred: TPC-DS-OBT DataFrame implementation (17 queries)\nReason deferred: 89 SQL queries (not 17 as originally estimated) need significant adaptation from multi-table TPC-DS to single-table OBT schema. The queries reference a fully denormalized table that doesn't map cleanly to existing TPC-DS DataFrame implementations. Needs separate TODO.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:33:35Z",
+      "worktree": "dataframe-benchmarks"
+    }
+  }
+}

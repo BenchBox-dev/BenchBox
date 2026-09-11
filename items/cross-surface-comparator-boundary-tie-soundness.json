@@ -1,0 +1,56 @@
+{
+  "description": "Follow-up spun out of PR #878 (review-sweep pass 3) and the order-aware\ncomparator landed in #872. It records a known, accepted limitation in the\nshared cross-surface SQL<->DataFrame validator so it is tracked rather than\nforgotten.\n\n`ResultValidator.validate_results_exact(order_aware=True, tie_aware=True)`\n(benchbox/core/tpchavoc/validation.py, `_validate_order_aware`) partitions the\nreturned rows into consecutive same-order-key groups and, for the FINAL group\nunder a trailing `LIMIT`, tolerates a membership difference as an\nequally-valid tie pick across the LIMIT cutoff. #878 tightened that acceptance\nto require a genuine tie of `len(orig_rows) >= 2` rows sharing the final key,\nso a deterministic single-row final-group difference is CAUGHT instead of\nmasked.\n\nCodex review on #878 (discussion r3462372977) correctly observed the residual\nedge: when a `LIMIT` cuts mid-tie, a legitimate boundary tie can leave exactly\nONE of the tied rows visible (keys `10, 5a, 5b` with `LIMIT 2` -> `[10, 5]`).\nTwo surfaces picking different `5` rows is valid SQL, but the `>= 2` guard now\nflags it as a mismatch.\n\nThe root cause is fundamental: from the TRUNCATED result alone, a one-visible-\nrow boundary tie and a genuine unique-final-key value change (e.g.\n`(2,\"good\")` vs `(2,\"bad\")`) are structurally identical - same final order\nkey, differing non-key column, a single row in the group. The comparator\ncannot distinguish them without signal from outside the LIMIT.\n\nAccepted tradeoff (decided on #878): land the `>= 2` guard as-is. Its failure\nmode is a LOUD false positive (a gate fails when it should not), which is\nrecoverable and safer than the prior behavior (#872 accepted ALL final-group\ndifferences, silently MASKING real single-row value bugs). All five enforced\ncross-surface gates currently pass (0 unclassified divergent), so the false\npositive is latent and data-dependent, not an active breakage.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "cross-surface-comparator-boundary-tie-soundness",
+        "id": 366,
+        "reason": "Out of scope - changing query shape (dropping LIMITs) would change what the cross-surface gate measures; the probe in w1 is the targeted, additive fix.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicitly rejected: reworking the gate to drop LIMITs would change what the cross-surface gate measures. Not a deferred task, a declined approach.",
+        "summary": "Reworking the gate to compare untruncated result sets generally"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-06-24T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "prior_art": [
+      {
+        "concept": "{'ref': 'PR #872', 'note': 'Introduced the order-aware/tie-aware comparator; original final-group accept was unconditional (masked single-row value bugs).'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-comparator-boundary-tie-soundness",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'PR #878 + Codex discussion r3462372977', 'note': 'Tightened the final-group accept to len(orig_rows) >= 2; surfaced the one-visible-row boundary-tie false-positive edge documented here.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-comparator-boundary-tie-soundness",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/core/tpchavoc/validation.py:_validate_order_aware', 'note': 'The guard site (`if i == last_index and tie_aware and len(orig_rows) >= 2`).'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-comparator-boundary-tie-soundness",
+        "path": "{'ref'"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cross-surface-comparator-boundary-tie-soundness",
+        "notes": "The comparator needs signal it does not have today to tell a truncated\nboundary tie from a genuine deterministic last row. Candidate approaches,\nto be evaluated for cost vs. value:\n  - Have the cross-surface gate run each trailing-LIMIT query at `LIMIT N+1`\n    (or unbounded) to learn whether the final order key is genuinely tied\n    beyond the cutoff, and pass that fact into validate_results_exact so a\n    single-visible-row final group can be accepted ONLY when the key is\n    actually tied past the LIMIT.\n  - Or thread the resolved `ORDER BY` / `LIMIT` structure plus a\n    tie-multiplicity hint from the SQL surface into the comparator.\nKeep the change ADDITIVE: the TPC-Havoc strict path (no order_aware/\ntie_aware) must stay byte-identical, and the default must remain catching\nsingle-row value bugs. Add a regression test for the keys `10,5,5`\n`LIMIT 2` boundary-tie case (currently a false positive) alongside the\nexisting `(2,\"good\")` vs `(2,\"bad\")` true-positive case.\n\nRESOLVED: took the first approach (LIMIT N+1 probe). The cross-surface gate\nnow re-runs each trailing-LIMIT order-aware query one row wider\n(`cross_surface._bump_trailing_limit` / `_final_key_tied_beyond_limit`) and\nthreads `final_key_tied_beyond_limit` into\n`ResultValidator.validate_results_exact`. `_validate_order_aware` accepts a\nsingle-visible-row final tie group ONLY when that probe confirms the final\norder key recurs past the cutoff; otherwise the lone row is treated as a\ndeterministic last row and a value change there is still CAUGHT. The same\nchange also lands #878's `len(orig_rows) >= 2` tightening of the order-aware\nfinal-group accept (#878 was still open against develop), so a >= 2-row\nvisible tie remains an accepted boundary swap. ADDITIVE: callers that pass\nneither `order_aware` nor `tie_aware` (the TPC-Havoc strict path) are\nuntouched - verified 220/220 variant and 440/440 DataFrame equivalence, and\nall five enforced cross-surface gates green (0 unclassified divergent). The\nprobe runs once per query (memoized across backends). Regression tests:\ntests/integration/test_validator_order_aware.py (one-visible-row tie accepted\nwith the probe, caught without; the `(2,\"good\")` vs `(2,\"bad\")` unique-key\nbug still raises) and tests/unit/core/equivalence/test_cross_surface.py\n(`_bump_trailing_limit`, `_final_key_tied_beyond_limit`, and the end-to-end\ngate accept/catch cases).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Give the comparator a boundary-tie probe so a one-visible-row final tie is not a false positive",
+        "wid": "w1"
+      }
+    ]
+  }
+}

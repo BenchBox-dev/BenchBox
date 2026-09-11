@@ -1,0 +1,122 @@
+{
+  "context": "Decide which side is right per case. The shipped behaviour looks intentional and better, so the expected outcome is a doc correction rather than a code change - but state that explicitly per case rather than assuming. Any case where the code is judged wrong becomes a separate item, not a silent fix here.",
+  "description": "docs/operations/results-explorer-qa.md S6.5 specifies: empty `?ids=` produces a friendly error, and a single id either redirects to ResultDetail or shows a 'need 2+' message. Neither matches the code: empty `?ids=` shows the builder (Compare.tsx:176-181) and a single id resolves and pins the builder (Compare.tsx:184+).\n\nThis matters beyond tidiness: the remediation sequence treats this document as a contract, and rx-ux-19's parity gate is written against it. A drifted contract cannot gate anything.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change Compare's behaviour to match the stale doc",
+        "instead": "correct the doc, or raise a separate item if the code is genuinely wrong",
+        "item_id": "rx-ux-08-qa-contract-reconciliation",
+        "why": "the single-ID builder pin is a live contract with e2e coverage"
+      },
+      {
+        "dont": "rewrite S6.5 without checking each of its four cases against the code",
+        "instead": "adjudicate case by case with a file:line citation",
+        "item_id": "rx-ux-08-qa-contract-reconciliation",
+        "why": "this item exists because the doc drifted once already"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-08-22T17:46:35Z",
+      "completed_pr": 1818,
+      "created_at": "2026-08-22T14:49:07Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "/results/compare?ids=<one> pins that run and opens the builder (Compare.tsx:184+); ?ids=<a,b> renders a comparison. Both are live contracts (ResultDetail.tsx:266, e2e/routes/compare.spec.ts:58, compare-entrypoints.spec.ts:76).",
+        "item_id": "rx-ux-08-qa-contract-reconciliation"
+      },
+      {
+        "behavior": "Compare's builder entry behaviour, unless a case is explicitly judged a code defect",
+        "item_id": "rx-ux-08-qa-contract-reconciliation"
+      },
+      {
+        "behavior": "Compare's recovery rule that a multi-selection URL stays multi after a one-result recovery, so it does not collapse into the single-result builder (Compare.tsx:331-350).",
+        "item_id": "rx-ux-08-qa-contract-reconciliation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-08-qa-contract-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "rx-ux-08-qa-contract-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n -A 12 'S6.5' docs/operations/results-explorer-qa.md",
+        "description": "Every S6.5 case cites the code path implementing it",
+        "expected": "each case names the Compare.tsx behaviour it expects",
+        "item_id": "rx-ux-08-qa-contract-reconciliation",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:46:29Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git -C /Users/joe/Developer/BenchBox status --short results-explorer/src",
+        "description": "No source changed under this documentation item",
+        "expected": "empty output",
+        "item_id": "rx-ux-08-qa-contract-reconciliation",
+        "last_result": "pass",
+        "last_run": "2026-08-22T17:46:30Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-08-qa-contract-reconciliation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-08-qa-contract-reconciliation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "All four cases adjudicated against Compare.tsx:176-315 and 339-348, with unit/E2E coverage confirming builder, error, and partial-recovery behavior.",
+        "item_id": "rx-ux-08-qa-contract-reconciliation",
+        "notes": null,
+        "started_at": "2026-08-22T17:43:14Z",
+        "started_branch": "docs/rx-ux-08-qa-contract-reconciliation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-08-qa-contract-reconciliation",
+        "status": "done",
+        "summary": "Adjudicate all four S6.5 cases against Compare.tsx with citations",
+        "wid": "w1"
+      },
+      {
+        "evidence": "S6.5 now states the shipped expectation for each case and cites the implementing Compare.tsx ranges.",
+        "item_id": "rx-ux-08-qa-contract-reconciliation",
+        "notes": null,
+        "started_at": "2026-08-22T17:43:20Z",
+        "started_branch": "docs/rx-ux-08-qa-contract-reconciliation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-08-qa-contract-reconciliation",
+        "status": "done",
+        "summary": "Correct the doc for cases where shipped behaviour is right",
+        "wid": "w2"
+      },
+      {
+        "evidence": "No code case was judged defective; no separate tracker item is needed.",
+        "item_id": "rx-ux-08-qa-contract-reconciliation",
+        "notes": null,
+        "started_at": "2026-08-22T17:43:43Z",
+        "started_branch": "docs/rx-ux-08-qa-contract-reconciliation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-08-qa-contract-reconciliation",
+        "status": "done",
+        "summary": "Raise separate items for any case where code is judged wrong",
+        "wid": "w3"
+      }
+    ]
+  }
+}

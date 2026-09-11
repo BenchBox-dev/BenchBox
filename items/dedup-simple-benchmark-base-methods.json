@@ -1,0 +1,100 @@
+{
+  "description": "AMPLab, ClickBench, and SSB benchmarks had near-identical implementations of\nrun_benchmark (AMPLab/ClickBench) and _load_data/_load_table_data (AMPLab/SSB).\n\nCreated SimpleBenchmarkMixin in benchbox/core/simple_benchmark_mixin.py that\nextracts the shared logic, parameterized by _benchmark_label and _table_load_order\nclass attributes.\n\nSSB's run_benchmark was NOT extracted because it uses a different return format\n(query_results list vs queries dict).",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-21T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "core-functionality"
+    },
+    "work_needs": [
+      {
+        "item_id": "dedup-simple-benchmark-base-methods",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dedup-simple-benchmark-base-methods",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dedup-simple-benchmark-base-methods",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dedup-simple-benchmark-base-methods",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dedup-simple-benchmark-base-methods",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dedup-simple-benchmark-base-methods",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dedup-simple-benchmark-base-methods",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create SimpleBenchmarkMixin with shared run_benchmark and _load_data",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-simple-benchmark-base-methods",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update AMPLab to use SimpleBenchmarkMixin (run_benchmark + _load_data)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-simple-benchmark-base-methods",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update ClickBench to use SimpleBenchmarkMixin (run_benchmark only)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-simple-benchmark-base-methods",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update SSB to use SimpleBenchmarkMixin (_load_data only, keep run_benchmark)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-simple-benchmark-base-methods",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run tests to verify no regressions",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "context": "Patch the optional-dependency boundary while preserving the real from_config/deployment path; do not weaken the production error when a user selects local mode without chDB.",
+  "description": "Run 30434746317 has nine local-mode ClickHouse introspection/plan-capture tests fail in PlatformAdapter.from_config because chDB is unavailable on Windows. The tests intend to exercise tuning and plan logic with mocked clients, not optional-driver installation.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-30T12:07:04Z",
+        "from_item": "windows-clickhouse-local-tests-without-chdb",
+        "id": 666,
+        "reason": "Two notes from independent triage of Nightly run 30473819253. (1) The support decision is already made in-tree: pyproject.toml declares chdb>=0.10.0; sys_platform != 'win32' in three places with the comment 'not available on Windows', so a platform skip with a recorded reason is the sanctioned outcome here rather than loosened assertions. (2) Implementation detail that matters: key the skipif on importlib.util.find_spec('chdb') is None rather than on sys.platform, so the guard stays honest if chdb ever ships Windows wheels AND provably does not over-skip on Linux, where chdb IS installed and these tests must continue to run. (3) Count: the 'test (windows-latest, 3.12)' job shows 17 'requires chDB' failures, so the title's 9 appears to undercount - worth confirming before closing on a count-based rung.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Merged fix is probe-based rather than sys.platform-based and current Nightly no longer contains the 17 chDB-family failures; the undercount is historical metadata, not open code work.",
+        "summary": "Key the skip on chdb availability, not sys.platform; title's '9 failures' undercounts"
+      }
+    ],
+    "item_meta": {
+      "completed_at": "2026-08-01T14:21:54Z",
+      "completed_pr": 1352,
+      "created_at": "2026-07-29T13:05:04Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "real local ClickHouse configuration still raises an actionable missing-chDB error",
+        "item_id": "windows-clickhouse-local-tests-without-chdb"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-clickhouse-local-tests-without-chdb",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_clickhouse_introspection.py"
+      },
+      {
+        "item_id": "windows-clickhouse-local-tests-without-chdb",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_clickhouse_plan_capture.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/platforms/test_clickhouse_introspection.py tests/unit/platforms/test_clickhouse_plan_capture.py -q",
+        "description": "ClickHouse introspection and plan-capture tests pass",
+        "expected": "exit 0",
+        "item_id": "windows-clickhouse-local-tests-without-chdb",
+        "last_result": "pass",
+        "last_run": "2026-08-01T14:21:51Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Merged PR #1352 adds a non-autouse chDB probe fixture explicitly requested by the two mocked local-mode modules; current focused tests passed and latest Nightly has no chDB family failures.",
+        "item_id": "windows-clickhouse-local-tests-without-chdb",
+        "notes": null,
+        "started_at": "2026-08-01T14:21:27Z",
+        "started_branch": "fix/windows-canonical-newlines",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Isolate the nine mocked local-mode tests from chDB availability",
+        "wid": "w1"
+      }
+    ]
+  }
+}

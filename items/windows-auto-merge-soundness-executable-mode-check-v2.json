@@ -1,0 +1,100 @@
+{
+  "context": "Change the test only. Parse exact stage output, assert one indexed entry and mode 100755, and prove a temporary index mode mutation is detected without changing the working tree.",
+  "description": "Windows worktrees do not expose POSIX execute bits, so os.stat cannot verify the repository contract. Query git ls-files --stage for _project/scripts/auto_merge_soundness_paths.py and require mode 100755, retaining a mutation test that fails if the index mode is 100644.",
+  "legacy": {
+    "item_meta": {
+      "category": "CI soundness",
+      "completed_at": "2026-08-01T14:45:14Z",
+      "completed_pr": 1399,
+      "created_at": "2026-08-01T14:06:21Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The guard still fails when the script is committed without executable mode.",
+        "item_id": "windows-auto-merge-soundness-executable-mode-check-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-auto-merge-soundness-executable-mode-check-v2",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/auto_merge_soundness_paths.py"
+      },
+      {
+        "item_id": "windows-auto-merge-soundness-executable-mode-check-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_auto_merge_soundness_paths.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/test_auto_merge_soundness_paths.py -q",
+        "description": "Soundness path tests",
+        "expected": "fails on the unfixed Windows tree; exit 0 after Git-index assertion",
+        "item_id": "windows-auto-merge-soundness-executable-mode-check-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T14:34:43Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test \"$(git ls-files --stage _project/scripts/auto_merge_soundness_paths.py | awk '{print $1}')\" = 100755",
+        "description": "Indexed script mode is executable",
+        "expected": "exit 0",
+        "item_id": "windows-auto-merge-soundness-executable-mode-check-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T14:34:45Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-auto-merge-soundness-executable-mode-check-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-auto-merge-soundness-executable-mode-check-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added _assert_git_index_executable, which reads the tracked stage record via git ls-files --stage and requires mode 100755.",
+        "item_id": "windows-auto-merge-soundness-executable-mode-check-v2",
+        "notes": null,
+        "started_at": "2026-08-01T14:32:33Z",
+        "started_branch": "fix/windows-indexed-executable-mode",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Add a helper that reads exact Git-index mode",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Replaced host stat assertion and added a copied GIT_INDEX_FILE mutation to 100644; the guard raises with the exact wrong mode while the real index stays untouched.",
+        "item_id": "windows-auto-merge-soundness-executable-mode-check-v2",
+        "notes": null,
+        "started_at": "2026-08-01T14:34:28Z",
+        "started_branch": "fix/windows-indexed-executable-mode",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Replace host stat assertion and add non-vacuity mutation coverage",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Focused soundness tests: 32 passed; ruff check, ruff format --check, ty check, and git diff --check all passed.",
+        "item_id": "windows-auto-merge-soundness-executable-mode-check-v2",
+        "notes": null,
+        "started_at": "2026-08-01T14:34:34Z",
+        "started_branch": "fix/windows-indexed-executable-mode",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Run soundness path tests and inspect index mode",
+        "wid": "w2"
+      }
+    ]
+  }
+}

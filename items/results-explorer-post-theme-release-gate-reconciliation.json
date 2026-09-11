@@ -1,0 +1,295 @@
+{
+  "context": "Treat the failing e2e as a contract drift symptom, not just a one-line test\nedit. First choose the intended user-facing copy, then update the component,\nunit tests, e2e tests, and stale evidence together. Add a small guard so\nthe old mixed-theme contract cannot re-enter active source or test names.\n",
+  "description": "The post-theme Results Explorer implementation is mostly functional, but the\ncomprehensive route gate is not clean: `results-explorer/e2e/routes/home.spec.ts`\nstill expects the old Corpus Summary label `leaderboard cohorts` while the\nHome page and unit tests now render `leaderboard rankings`. The visible page\nalso renders `1 leaderboard rankings`, which is grammatically wrong and\nreveals that corpus-summary labels are static strings rather than count-aware\nUI copy.\n\nThe same drift exists in durable project evidence. Older analysis files and\nat least one test name still describe the retired \"dark BenchBox shell +\nlight analytical data panels\" contract even though the current product\ncontract is user-selectable light/dark theming. These stale artifacts are a\nroot cause for repeated retheme regressions: implementers can follow an old\n\"final decision\" and reintroduce mixed-theme assumptions.\n\nThis TODO is a release-gate cleanup and evidence-hardening pass. It should\nnot redesign Home, the theme system, or the corpus model. It should make the\ncurrent intended contract explicit, update assertions to match it, add\ncount-aware corpus summary labels, and add a compact stale-contract scan so\nfuture PRs cannot silently revive the old contract.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a broad grep gate that blocks legitimate historical analysis without a path to annotate it.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "change corpus fixture contents to make the grammar problem disappear.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "reintroduce `leaderboard cohorts` unless the Home metric is actually redefined as cohorts.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "rewrite DONE history wholesale; add supersession notes where needed.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "simply change the e2e string without fixing the visible `1 leaderboard rankings` copy.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-post-theme-release-gate-reconciliation",
+        "id": 484,
+        "reason": "This TODO only reconciles copy/tests for the current corpus metrics; changing the metric definition needs a separate data-contract decision.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: 'Change what the Corpus Summary measures' is hypothetical - the item only reconciled copy/tests for current metrics and there is no committed intent to redefine the metric. Not a pending action.",
+        "summary": "Change what the Corpus Summary measures"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-post-theme-release-gate-reconciliation",
+        "id": 485,
+        "reason": "The comprehensive functional pass did not find a new blocking layout defect here beyond count-aware copy and stale gates.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Comprehensive functional pass found no blocking layout defect here beyond items already fixed; redesign explicitly not warranted.",
+        "summary": "Redesign Home filter layout or leaderboard density"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-15T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Historical DONE items are not rewritten to pretend earlier decisions were never made.",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation"
+      },
+      {
+        "behavior": "The Results Explorer Home page remains leaderboard-first and keeps existing benchmark/scale/phase filter behavior.",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation"
+      },
+      {
+        "behavior": "The current user-selectable light/dark theme contract remains the source of truth.",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation"
+      },
+      {
+        "behavior": "The route test remains a user-visible regression test, not a brittle implementation snapshot.",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/planning/benchbox-light-dark-theme-system.yaml:w8 — completed work item requiring stale mixed-theme artifacts to be retired or superseded",
+        "decision": "reuse",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "path": "_project/DONE/main/planning/benchbox-light-dark-theme-system.yaml:w8"
+      },
+      {
+        "concept": "_project/analysis/benchbox-theme-contract.md — current cross-surface theme contract",
+        "decision": "reuse",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "path": "_project/analysis/benchbox-theme-contract.md"
+      },
+      {
+        "concept": "_project/analysis/results-explorer-theme-inventory-2026-05-07.md — historical mixed-theme inventory that needs explicit supersession",
+        "decision": "reuse",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "path": "_project/analysis/results-explorer-theme-inventory-2026-05-07.md"
+      },
+      {
+        "concept": "results-explorer/e2e/routes/home.spec.ts:20 — stale e2e expectation for `leaderboard cohorts`",
+        "decision": "reuse",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "path": "results-explorer/e2e/routes/home.spec.ts:20"
+      },
+      {
+        "concept": "results-explorer/src/pages/Home.tsx:501 — current Corpus Summary `leaderboard rankings` label",
+        "decision": "reuse",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "path": "results-explorer/src/pages/Home.tsx:501"
+      },
+      {
+        "concept": "results-explorer/src/pages/__tests__/Home.test.tsx — unit tests already expect the new Home copy",
+        "decision": "reuse",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "path": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/home.spec.ts"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/Home.test.tsx",
+        "description": "Home unit coverage proves count-aware Corpus Summary labels",
+        "expected": "Home tests pass and cover singular/plural Corpus Summary labels",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --workers=1 e2e/routes/header.spec.ts e2e/routes/home.spec.ts e2e/routes/benchmark-index.spec.ts e2e/routes/platform-index.spec.ts e2e/routes/result-detail.spec.ts e2e/routes/compare.spec.ts e2e/routes/query.spec.ts",
+        "description": "Targeted Results Explorer route gate is green",
+        "expected": "All targeted route tests pass; the prior `leaderboard cohorts` failure is gone",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"dark BenchBox shell [+] light analytical data panels|mixed dark/light|light data surface contract|light analytical data\" results-explorer _project/analysis",
+        "description": "No unsuperseded active mixed-theme contract language remains",
+        "expected": "only explicitly superseded analysis references remain",
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "notes": "Re-run the targeted route tests and capture a compact summary in the PR:\n- checked SHA;\n- exact failing assertion if it still fails;\n- current rendered Corpus Summary text from `/results/`;\n- current unit-test expectation in `src/pages/__tests__/Home.test.tsx`.\n\nDecision gate: before editing the e2e, decide whether the intended user\ncopy is `leaderboard ranking(s)`, `ranked leaderboard(s)`, or `leaderboard\ncohort(s)`. The chosen copy must be used consistently in Home, unit tests,\nand e2e tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate the failing Home e2e assertion against current UI and unit-test contracts",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "notes": "Replace static Corpus Summary labels that can produce mismatched singular\nand plural copy, including the visible `1 leaderboard rankings` case.\nPrefer a small local formatter such as `formatCountLabel(count, singular,\nplural)` or an existing equivalent if one exists.\n\nUpdate Home unit tests to cover at least:\n- singular leaderboard ranking;\n- plural public result bundles;\n- zero/no ranked leaderboard state if the fixture can express it cheaply.\n\nKeep copy factual; do not rename the metric in a way that implies more\npublic ranked cohorts than the current corpus actually exposes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make Corpus Summary labels count-aware and update Home tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "notes": "Update `results-explorer/e2e/routes/home.spec.ts` so it asserts the chosen\nCorpus Summary wording and no longer expects the stale `leaderboard cohorts`\nstring. Keep the assertion user-visible, not implementation-specific.\n\nRun the same targeted e2e command that previously failed:\n`npx playwright test --project=chromium --workers=1 e2e/routes/header.spec.ts e2e/routes/home.spec.ts e2e/routes/benchmark-index.spec.ts e2e/routes/platform-index.spec.ts e2e/routes/result-detail.spec.ts e2e/routes/compare.spec.ts e2e/routes/query.spec.ts`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update stale e2e expectations and add a route-gate assertion for the chosen copy",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "notes": "Grep for phrases that encode the retired mixed-theme contract, including:\n- `dark BenchBox shell + light analytical data panels`;\n- `mixed dark/light`;\n- `light data surface contract`;\n- `light analytical data`.\n\nFor active source and tests, rename or rewrite the stale language so it\ndescribes the current light/dark product contract. For historical\n`_project/DONE` artifacts, do not rewrite completed work; add concise\nsupersession notes only where the file still reads like the current source\nof truth. For `_project/analysis/results-explorer-theme-inventory-2026-05-07.md`,\nadd a top-level supersession note pointing to the current theme contract\nif one is not already present.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Supersede stale mixed-theme evidence and rename stale tests without rewriting history",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-theme-release-gate-reconciliation",
+        "notes": "Add or extend a low-cost check that fails on new active-source references\nto the retired mixed-theme contract, while allowing historical artifacts\nonly when they include an explicit supersession note. The check can live\nin an existing Results Explorer token/contract scan or a small project\nscript if that is the established pattern.\n\nDecision gate: keep the allowlist narrow and file-specific. Do not create\na broad grep that blocks legitimate historical discussion in DONE items\nor forces unrelated documentation churn.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a compact stale-contract scan to the Results Explorer release gate",
+        "wid": "w4"
+      }
+    ]
+  }
+}

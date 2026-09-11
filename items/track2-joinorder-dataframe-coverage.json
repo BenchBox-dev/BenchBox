@@ -1,0 +1,126 @@
+{
+  "description": "Cutover registered all 113 canonical JoinOrder SQL query IDs in the\nDataFrame registry, but only the original 13 had expression-family and\npandas-family translations. The remaining 100 raised NotImplementedError\nand pointed here.\n\nCompleted by preserving the original 13 hand-written translations and adding\na restricted canonical JOB SQL-to-DataFrame translator for the remaining\ncanonical query shape: comma-join tables, WHERE predicates, equality joins,\nand top-level MIN(...) projections. The generated pandas-family and\nexpression-family paths are validated against DuckDB on the canonical tiny\nfixture for all 100 formerly untranslated query IDs.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-13T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Generated translations stay restricted to the canonical JOB query shape.",
+        "item_id": "track2-joinorder-dataframe-coverage"
+      },
+      {
+        "behavior": "Original 13 hand-written JoinOrder DataFrame translations remain available.",
+        "item_id": "track2-joinorder-dataframe-coverage"
+      },
+      {
+        "behavior": "SQL-mode JoinOrder query text and execution path remain unchanged.",
+        "item_id": "track2-joinorder-dataframe-coverage"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "track2-joinorder-dataframe-coverage",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/planning/track2-joinorder-dataframe-coverage.yaml"
+      },
+      {
+        "item_id": "track2-joinorder-dataframe-coverage",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/joinorder-canonical-corpus-uat-backfill.yaml"
+      },
+      {
+        "item_id": "track2-joinorder-dataframe-coverage",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/benchmark.py"
+      },
+      {
+        "item_id": "track2-joinorder-dataframe-coverage",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/dataframe_queries.py"
+      },
+      {
+        "item_id": "track2-joinorder-dataframe-coverage",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/join-order.md"
+      },
+      {
+        "item_id": "track2-joinorder-dataframe-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/joinorder/test_dataframe_query_capabilities.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/joinorder/test_dataframe_query_capabilities.py -q",
+        "description": "JoinOrder DataFrame capability tests pass",
+        "expected": "3 tests passed",
+        "item_id": "track2-joinorder-dataframe-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/core/joinorder/dataframe_queries.py tests/unit/core/joinorder/test_dataframe_query_capabilities.py",
+        "description": "JoinOrder DataFrame query module lint passes",
+        "expected": "All checks passed",
+        "item_id": "track2-joinorder-dataframe-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "track2-joinorder-dataframe-coverage",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "track2-joinorder-dataframe-coverage",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "track2-joinorder-dataframe-coverage",
+        "notes": "Added generated expression-family and pandas-family implementations for\nthe 100 query IDs that previously raised NotImplementedError. The\noriginal 13 hand-written translations remain in place.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Translate remaining canonical JoinOrder query IDs for DataFrame mode",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "track2-joinorder-dataframe-coverage",
+        "notes": "`tests/unit/core/joinorder/test_dataframe_query_capabilities.py` now\ncompares every generated pandas-family and Polars expression-family query\nagainst the canonical DuckDB SQL result on\n`tests/fixtures/joinorder_canonical_tiny`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate generated DataFrame translations against DuckDB",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "track2-joinorder-dataframe-coverage",
+        "notes": "`get_untranslated_dataframe_query_ids()` now returns an empty list, so\ndefault DataFrame selection includes all 113 canonical query IDs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove DataFrame skip policy for canonical JoinOrder",
+        "wid": "w3"
+      }
+    ]
+  }
+}

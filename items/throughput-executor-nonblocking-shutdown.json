@@ -1,0 +1,171 @@
+{
+  "description": "throughput-timeout-leak-and-success-gates (#1106) fixed the real timeout bug\n(the per-stream timeout was dead code because `as_completed()` only yields\nalready-done futures) and added opt-in cooperative cancellation. But a residual\nremains, explicitly accepted by that item as out of scope:\n`StreamRunner.execute()` runs its streams inside a `with ThreadPoolExecutor(...)`\nblock (benchbox/core/throughput/runner.py), and the context manager's `__exit__`\ncalls `shutdown(wait=True)`. So even though a timed-out stream is now correctly\nsurfaced (logged + recorded in `result.errors`), `execute()` still cannot\nRETURN until every worker thread finishes. With cooperative cancellation OFF\n(the default), a genuinely hung stream blocks `execute()` -- and therefore the\nwhole throughput phase, and any subsequent phase (e.g. maintenance) -- for as\nlong as the stream keeps running against the DB.\n\nGoal: allow the executor to return promptly once its timeout/accounting window\ncloses, without waiting on a zombie stream, while still never hard-killing a\nthread (Python cannot do so safely). The likely mechanism is to manage the\npool manually (`ThreadPoolExecutor(...)` without the `with` block, or\n`shutdown(wait=False)`) so the leaked thread is abandoned to run out in the\nbackground -- with its connection ownership and resource accounting clearly\ndocumented -- rather than blocking the main thread. This must compose with the\nalready-shipped leak surfacing and cooperative-cancel opt-in.\n\nNote the subtlety: abandoning a thread that still holds a DB connection has its\nown hazards (connection not closed until the thread ends; a later phase running\nwhile the zombie hammers the DB). The design must decide and document what\nhappens to the leaked stream's connection and how TTT/accounting treat the\noverlap -- this is why #1106 deferred it rather than squeezing it in.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change default timeout behavior for healthy runs",
+        "instead": "(not specified)",
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "why": "only the hung-stream shutdown path changes."
+      },
+      {
+        "dont": "hard-kill or forcibly interrupt threads",
+        "instead": "abandon the thread to run out and surface it instead.",
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "why": "Python cannot do so safely"
+      },
+      {
+        "dont": "silently leak the connection",
+        "instead": "decide and document ownership explicitly.",
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "why": "a zombie stream holding a session can starve a later phase"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-11T00:00:00Z",
+      "created_at": "2026-07-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Opt-in cooperative cancellation (config.cancel_on_timeout default False) keeps working and still bounds a stream to ~one more query.",
+        "item_id": "throughput-executor-nonblocking-shutdown"
+      },
+      {
+        "behavior": "The already-shipped leak surfacing: a timed-out/leaked stream is still logged (logger.warning) and recorded in result.errors.",
+        "item_id": "throughput-executor-nonblocking-shutdown"
+      },
+      {
+        "behavior": "The robust cancel-event guard (honor only a real set threading.Event) added in #1106 stays intact.",
+        "item_id": "throughput-executor-nonblocking-shutdown"
+      },
+      {
+        "behavior": "as_completed accounting semantics (streams_executed / successful / errors) for the normal, non-hung path.",
+        "item_id": "throughput-executor-nonblocking-shutdown"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/throughput/runner.py:StreamRunner.execute — the `with ThreadPoolExecutor` block whose implicit shutdown(wait=True) at __exit__ blocks return; the as_completed(timeout=...) classification loop and leaked-stream surfacing already landed here.",
+        "decision": "reuse",
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "path": "benchbox/core/throughput/runner.py:StreamRunner.execute"
+      },
+      {
+        "concept": "benchbox/core/tpch/throughput_test.py / benchbox/core/tpcds/throughput_test.py — the cooperative-cancel poll (config.cancel_on_timeout, per-stream threading.Event) this must compose with.",
+        "decision": "reuse",
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "path": "benchbox/core/tpch/throughput_test.py"
+      },
+      {
+        "concept": "docs/development/throughput-result-alignment.md — documents the timed-out-stream leak behavior; update alongside any change to shutdown semantics.",
+        "decision": "reuse",
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "path": "docs/development/throughput-result-alignment.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/throughput/runner.py"
+      },
+      {
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "kind": "only_modify",
+        "path_glob": "docs/development/throughput-result-alignment.md"
+      },
+      {
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/throughput/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/throughput/ tests/integration/test_throughput_corrections.py -n 0 -v",
+        "description": "execute() returns near the timeout even with a hung stream, and the stream is still surfaced",
+        "expected": "execute() wall-clock bounded by timeout not the hung stream; leaked stream in result.errors; cancel tests still pass",
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "notes": "Standalone repro script (fake config/stream_fn, no real DB) with a\n2.0s hung stream and a 0.1s stream_timeout, cancel_on_timeout=False.\nBefore the fix: execute() wall-clock was 2.011s -- bounded by the\nhung stream, not the timeout -- while result.errors already correctly\nrecorded the leak (confirming #1106's detection fix was intact and\nthis was purely a shutdown-blocking problem). Captured to\n/tmp/throughput-shutdown-w0.log (before/after sections).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce the block: a hung stream (sleep past a tiny stream_timeout, cancellation off) keeps execute() from returning until the sleep ends",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "notes": "Replaced the `with ThreadPoolExecutor(...) as executor:` block with\nmanual lifecycle management: `executor = ThreadPoolExecutor(...)`\nfollowed by `try/finally: executor.shutdown(wait=False)`. All\nexisting submission/as_completed/fallback-classification logic is\nunchanged inside the try block -- only the block's entry/exit\nmechanism changed. shutdown(wait=False) only stops new submissions;\nit never touches, joins, or kills a still-running thread. On the\nhealthy path every future is already done() by the time shutdown()\nruns, so this is a no-op there (verified via the w0 repro re-run:\n0.107s post-fix vs 2.011s pre-fix, with the leak still surfaced\nidentically).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Manage the pool so execute() returns once the timeout/accounting window closes, abandoning (not killing) a still-running leaked thread",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "notes": "Documented in docs/development/throughput-result-alignment.md under\n\"Non-Blocking Executor Shutdown\": the leaked stream's DB connection\nis owned by that stream's own _execute_stream implementation (both\nTPC-H's and TPC-DS's throughput_test.py open/close per-stream\nconnections themselves); StreamRunner.execute() never touched it\ndirectly before or after this change, so ownership/closure semantics\nare unchanged -- only how long execute() waits before returning\nchanges. TTT/accounting: unaffected -- a leaked stream was already\nexcluded from result.stream_results (and therefore TTT and\nstreams_successful) under the old blocking behavior, since\n_record_completed_future() only runs for done() futures; it only\never contributed to streams_executed and errors, which is unchanged.\nDocumented the residual hazard honestly: execute() returning early\nmeans a subsequent phase can now genuinely overlap with a still-\nrunning zombie (the old blocking shutdown accidentally provided an\nunbounded, unreliable de facto serialization that is now gone by\ndesign); cancel_on_timeout=True is the recommended mitigation since\nit bounds the zombie to ~one more query.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide and document the leaked stream's connection ownership and how TTT/accounting treat a zombie that outlives execute()",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-executor-nonblocking-shutdown",
+        "notes": "Added TestStreamRunnerNonBlockingShutdown to\ntests/unit/core/throughput/test_runner.py (6 new tests, generous\n20x+ sleep/timeout margins to avoid CI flake):\ntest_execute_returns_near_timeout_not_after_full_hang (wall-clock\nbound), test_leaked_stream_from_non_blocking_path_still_surfaced_in_errors\n(leak surfacing unchanged), test_healthy_all_streams_complete_path_unaffected\n(no-op on healthy path), test_cooperative_cancel_with_real_set_event_still_cancels\n(a real timeout-set threading.Event still signals cancellation),\ntest_cooperative_cancel_disabled_by_default_never_cancels (default\noff never attaches cancel machinery), and\ntest_mock_truthy_config_healthy_path_unaffected (a Mock config's\ntruthy-by-default cancel_on_timeout attribute doesn't disturb a\nhealthy run's accounting; the stricter is-True identity guard\nagainst spurious cancellation lives in each spec's\n_resolve_cancel_event, out of this module's scope, and is exercised\nby tests/unit/tpch/test_tpch_compliance.py and\ntests/integration/test_throughput_corrections.py). All 24 unit\ntests, all 10 slow integration tests in\ntest_throughput_corrections.py, all 7 real-DuckDB oracle tests in\ntest_throughput_real_duckdb.py, and all 9 tests in\ntest_tpch_compliance.py pass.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test: execute() returns within ~timeout even with a hung stream; leaked stream still surfaced in result.errors; cooperative-cancel path unaffected",
+        "wid": "w3"
+      }
+    ]
+  }
+}

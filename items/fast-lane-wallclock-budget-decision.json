@@ -1,0 +1,148 @@
+{
+  "description": "Promoted from fast-lane-decouple-ceiling-contention-2 w6 (WS1.4 of _project/planning/ci-failure-reduction-plan.md). The test-count ceiling is a proxy for lane wall-time. dev_loop_pr_metrics.py (merged #1282) records the fast-test job wall time per run; after ~4 weeks of data (first WS9 re-measure cadence is documented in _project/analysis/ci-failure-baseline-2026-07-23.md), decide: (a) add a wall-clock budget assertion to the PR test job (e.g. fail >15min) and demote count checks to advisory, or (b) keep the count regime (quantum ceiling + delta guard, merged #1296). Inputs: the re-measure snapshot; medium-test-timeout-headroom's trend data (same wall-clock class). If the decision is (b), close with the rationale recorded. docs/operations/fast-lane-budget.md's closing section describes this gate.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-15T18:16:20Z",
+      "completed_pr": 1744,
+      "created_at": "2026-07-24T02:33:56Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "scope_rules": [
+      {
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/dev_loop_pr_metrics.py"
+      },
+      {
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/fast-lane-budget.md"
+      },
+      {
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_dev_loop_pr_metrics.py"
+      },
+      {
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_timing_policy_modes.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/timing_policy_check.py --strict",
+        "description": "Current timing policy is evaluated fail-closed",
+        "expected": "exits 0",
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "last_result": "pass",
+        "last_run": "2026-08-15T18:16:05Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_timing_policy_modes.py -q",
+        "description": "Timing and metrics unit tests pass",
+        "expected": "exits 0",
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "last_result": "pass",
+        "last_run": "2026-08-15T18:16:11Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -s docs/operations/fast-lane-budget.md && rg -q \"wall-clock|test-count\" docs/operations/fast-lane-budget.md",
+        "description": "Fast-lane decision documentation remains valid",
+        "expected": "decision terms are present",
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "last_result": "pass",
+        "last_run": "2026-08-15T18:16:13Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/dev_loop_pr_metrics.py --days 28 --json",
+        "description": "Read-only 28-day fast-lane timing collection completes",
+        "expected": "exits 0 with complete metrics or an explicit SKIPPED reason",
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "last_result": "pass",
+        "last_run": "2026-08-15T18:16:18Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Complete non-event-fanout 28-day metrics JSON: 491 merged develop PRs, 395 fast-job timing samples, 2026-07-18..2026-08-14, fast p95 752s; collector now retries gh and uses direct authenticated GETs",
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "notes": null,
+        "started_at": "2026-08-15T14:52:49Z",
+        "started_branch": "docs/fast-lane-wallclock-decision",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fast-lane-decision",
+        "status": "done",
+        "summary": "Collect the trailing 28-day fast-lane and required-job timing sample and prove whether the four-week WS9 data condition is met",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Complete 28-day evidence calculation: median 675s, p95 752s, p99 778s, max 797s; 96 of 491 PRs lack a completed-success duration and remain censored",
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "notes": null,
+        "started_at": "2026-08-15T18:02:06Z",
+        "started_branch": "docs/fast-lane-wallclock-decision",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fast-lane-decision",
+        "status": "done",
+        "summary": "Compute sample size, median, p95, cancellations, censoring caveats, and an explicit candidate budget from the collected evidence",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Retained the count ceiling and delta guard; recorded the 28-day wall-clock decision in docs/operations/fast-lane-budget.md and hardened API collection with retries/direct authenticated GETs",
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "notes": null,
+        "started_at": "2026-08-15T18:02:37Z",
+        "started_branch": "docs/fast-lane-wallclock-decision",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fast-lane-decision",
+        "status": "done",
+        "summary": "Choose wall-clock enforcement or retain the count regime, record the rationale and rollback, and implement only the chosen bounded contract",
+        "wid": "w2"
+      },
+      {
+        "evidence": "check-scope passed; verification seq 2-5 passed; direct complete 28-day metrics JSON and make pr-preflight passed",
+        "item_id": "fast-lane-wallclock-budget-decision",
+        "notes": null,
+        "started_at": "2026-08-15T18:04:06Z",
+        "started_branch": "docs/fast-lane-wallclock-decision",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fast-lane-decision",
+        "status": "done",
+        "summary": "Run timing-policy, metrics, workflow, and documentation verification and capture the final decision evidence",
+        "wid": "w3"
+      }
+    ]
+  }
+}

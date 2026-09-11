@@ -1,0 +1,46 @@
+{
+  "description": "Inconsistency surfaced during review of commit 495efcaa8 (psycopg3 migration\ncompletion) and follow-up commit 1786150ec. The pg-family `_build_*_config`\nbuilders disagree three ways on the fallback value used for `driver_package`\nwhen `info` is None:\n\n  - postgresql.py, timescaledb.py, pg_duckdb.py, pg_mooncake.py\n    fall back to `\"psycopg\"` (bare distribution/import name).\n  - cedardb.py:194 falls back to `\"psycopg2-binary\"` (psycopg2 pip extras\n    variant - leftover from pre-psycopg3 migration; the registry metadata\n    at platform_registry.py:616 already advertises `\"psycopg\"`, so this\n    fallback string is stale).\n  - questdb.py:1415 falls back to `\"psycopg[binary]\"` (psycopg3 with pip\n    extras marker - the bracketed form is a pip-install requirement, not\n    an import name).\n\nIn practice the fallback is rarely hit because PlatformRegistry.get_platform_info()\nreturns a populated `info` for every registered platform (all pg-family\nentries in platform_registry.py advertise `driver_package: \"psycopg\"`), so\n`info.driver_package` wins. But the divergence is a latent footgun: if\nanything ever consumes driver_package as a pip-style requirement string vs.\nan import-name string, the three forms behave differently. The bare name\n`\"psycopg\"` is correct for `importlib.import_module()`; the bracketed form\nis only valid for pip/uv install commands; and `\"psycopg2-binary\"` points\nat an entirely different (legacy) distribution.\n\nAction: pick one form (recommend bare `\"psycopg\"` since `driver_package` is\nused elsewhere as an import target) and normalize cedardb.py and questdb.py\nto match. Audit any consumer of `DatabaseConfig.driver_package` to confirm\nimport-name vs requirement-string usage before changing.",
+  "legacy": {
+    "item_meta": {
+      "category": "Code Quality",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "normalize-pg-family-driver-package-fallback",
+        "notes": "grep for `driver_package` references across benchbox/. Determine whether\nconsumers expect a pip requirement (`psycopg[binary]>=3.1`) or an import\nname (`psycopg`). Known consumer: `ensure_driver_version` in\nbenchbox/cli/database.py passes `package_name=driver_package` through to\ndriver resolution; _sync_driver_options also reads it. The DatabaseConfig\nfield is Optional[str] with no docstring distinguishing the two.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit consumers of DatabaseConfig.driver_package to determine intended semantics",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "normalize-pg-family-driver-package-fallback",
+        "notes": "Fixed in commit following 96ad49356. Changed\n  driver_package = info.driver_package if info else \"psycopg[binary]\"\nto\n  driver_package = info.driver_package if info else \"psycopg\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize questdb.py fallback to match pg-family convention",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "normalize-pg-family-driver-package-fallback",
+        "notes": "Fixed in commit following 96ad49356. Changed\n  driver_package = info.driver_package if info else \"psycopg2-binary\"\nto\n  driver_package = info.driver_package if info else \"psycopg\"\nAlso tightened builder signature from `info: Any` / `-> Any` to\n`info: PlatformInfo | None` / `-> DatabaseConfig` (via TYPE_CHECKING\nimports) and dropped `merged_options or {}` dead code.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize cedardb.py fallback to match pg-family convention",
+        "wid": "w3"
+      }
+    ]
+  }
+}

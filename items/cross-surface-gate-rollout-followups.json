@@ -1,0 +1,116 @@
+{
+  "description": "Breadth-only follow-up to the cross-surface SQL<->DataFrame equivalence gate.\nIt tracks ONE thing: extending the gate to the dual-surface benchmarks that do\nnot yet have one, plus a fallback oracle for the benchmarks that ship no\nDataFrame query surface at all.\n\nSTATE OF THE CAMPAIGN (so this file is not misread as still-open hardening\nwork). The enforced GATES are now ssb, amplab, coffeeshop, clickbench, and\njoinorder_synthetic; STAGED_GATES is empty. The oracle's correctness and\ntrustworthiness - schema-type-faithful loading, the order/tie-aware comparator,\ngate-boundary determinism, the vacuous-empty-vs-empty guard, and\nmutation-testing the oracle's SENSITIVITY - was the cross-surface-oracle-\nremediation campaign (w1-w10), which is COMPLETE. This file does not revisit any\nof that; it only adds gate COVERAGE for more benchmarks, assuming that hardened\nloader/comparator is in place.\n\nAuthoritative inventory: _project/analysis/cross-surface-applicability.md\n(registry-detection sweep). Of the dual-surface unguarded candidates, 9 ship a\nDataFrame query registry and are not yet gated (4 with ids that overlap as-is, 5\nneeding id normalization), and 4 ship no DataFrame query surface and need a\nfallback oracle. Those three groups are w0, w1, w2 below.\n",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "cross-surface-gate-rollout-followups",
+        "id": 16,
+        "reason": "DuckDB-backed SF=0.1 cells are sufficient as the reference oracle for now; a second engine is extra coverage, not a correctness gap.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly concludes a second engine is not a correctness gap; DuckDB SF=0.1 oracle deemed sufficient for now.",
+        "summary": "Cross-surface equivalence on a second engine (beyond DuckDB-backed cells)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "cross-surface-gate-rollout-followups",
+        "id": 17,
+        "reason": "Per-benchmark id mapping is small and explicit; auto-derivation is a convenience optimization deferred until the mappings prove burdensome.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Deferral's own parent item is still open/planning; auto-derivation is a documented optimization within that item's existing scope. (tracked by cross-surface-gate-rollout-followups)",
+        "summary": "Auto-deriving the SQL<->DataFrame id correspondence instead of per-benchmark mapping"
+      },
+      {
+        "created_at": "2026-08-01T20:40:52Z",
+        "from_item": "cross-surface-gate-rollout-followups",
+        "id": 680,
+        "reason": "Investigated end to end. Of the 11 dual-surface UNGUARDED candidates only flightdata is genuinely gateable: 20/20 verbatim id overlap AND an offline synthetic cell below SF=0.1. joinorder's gateable status in the applicability report is WRONG - it rejects any scale_factor != 1.0 and fetches canonical IMDb data; its scaled stand-in joinorder_synthetic is already CI-enforced. A flightdata builder + STAGED registration was prototyped and run (40/40 cells compared) but is NOT landed: the gate is red for two product defects it uncovered - the CSV-header loader bug (fixed, PR #1441) and a DataFrame date window matching zero rows. Landing a red STAGED gate would flip flightdata to guarded in the coverage map and overstate coverage. Promoted to wire-the-flightdata-cross-surface-gate, flightdata-dataframe-date-params-miss-the-generated-data, and applicability-sweep-ignores-data-acquisition-cost.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Content already carried in full by three real items created in the same session, so promoting would duplicate them: wire-the-flightdata-cross-surface-gate (the w0 continuation, dependency-linked), flightdata-dataframe-date-params-miss-the-generated-data (the blocking product defect), and applicability-sweep-ignores-data-acquisition-cost (the wrong joinorder dispatch). The loader half already landed as PR #1441.",
+        "summary": "w0 rollout: only flightdata is genuinely gateable, and it is blocked on two product defects it uncovered"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Concrete remaining prerequisites: (1) flightdata-cross-surface-output-contract-burn-down then wire-the-flightdata-cross-surface-gate; (2) datavault-cross-surface-query-execution-burn-down must fix 28 divergences before a staged Data Vault gate; (3) applicability-sweep-ignores-data-acquisition-cost must correct joinorder's false gateable classification; (4) independent SQL↔DataFrame mappings remain for nyctaxi/tpcds_obt/tpch_skew/tsbs_devops; (5) fallback-oracle designs remain for metadata_primitives/tpcdi/transaction_primitives/write_primitives. Do not guess mappings or baseline defects.",
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/active/benchmark-cross-surface-equivalence-gate.yaml - the parent campaign (harness + the first enforced gates); its w4 also lists remaining benchmarks, which this file makes concrete.",
+        "decision": "reuse",
+        "item_id": "cross-surface-gate-rollout-followups",
+        "path": "_project/TODO/main/active/benchmark-cross-surface-equivalence-gate.yaml"
+      },
+      {
+        "concept": "_project/TODO/main/active/cross-surface-oracle-remediation.yaml - the COMPLETED oracle correctness/trust campaign (w1-w10: loader types, tie-aware comparator, determinism, vacuous-cell guard, mutation testing). This breadth rollout assumes its fixes, and does not duplicate them.",
+        "decision": "reuse",
+        "item_id": "cross-surface-gate-rollout-followups",
+        "path": "_project/TODO/main/active/cross-surface-oracle-remediation.yaml"
+      },
+      {
+        "concept": "_project/analysis/cross-surface-applicability.md - the authoritative gateable / needs-id-normalization / no-DataFrame-registry classification used below.",
+        "decision": "reuse",
+        "item_id": "cross-surface-gate-rollout-followups",
+        "path": "_project/analysis/cross-surface-applicability.md"
+      },
+      {
+        "concept": "_project/analysis/gateable-generator-seeding-audit.md - a gate is flaky unless its generator is seeded/stable; check each benchmark here before wiring.",
+        "decision": "reuse",
+        "item_id": "cross-surface-gate-rollout-followups",
+        "path": "_project/analysis/gateable-generator-seeding-audit.md"
+      },
+      {
+        "concept": "benchbox/core/equivalence/cross_surface.py - build_<bench>_duckdb + the GATES registry; copy an existing builder (build_ssb_duckdb / build_amplab_duckdb) per new benchmark, and map ids in the builder where the sweep flags normalization.",
+        "decision": "reuse",
+        "item_id": "cross-surface-gate-rollout-followups",
+        "path": "benchbox/core/equivalence/cross_surface.py"
+      },
+      {
+        "concept": "tests/integration/test_amplab_cross_surface_equivalence.py - the medium-marker fast-lane regression to mirror per newly-gated benchmark.",
+        "decision": "reuse",
+        "item_id": "cross-surface-gate-rollout-followups",
+        "path": "tests/integration/test_amplab_cross_surface_equivalence.py"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cross-surface-gate-rollout-followups",
+        "notes": "Per cross-surface-applicability.md, ids overlap as-is (no normalization):\nflightdata (20), h2odb (10), joinorder (113), read_primitives (157 SQL vs\n152 DF - gate the overlapping 152). One focused gate PR each, copying the\nbuild_<bench>_duckdb + GATES pattern and adding a medium-marker fast-lane\ntest. CAVEATS to resolve per benchmark before gating:\n  - flightdata and joinorder use real/downloaded data (no synthetic\n    generator) - pin a bounded, stable data source so the gate is\n    deterministic; joinorder may be SF=1.0-only, so confirm a cheap bounded\n    cell is even feasible before committing to gate it.\n  - read_primitives: gate only the 152 ids present on both surfaces; record\n    the 5 SQL-only ids as intentionally out of cross-surface scope.\nIf a new gate surfaces a NEW oracle-correctness bug (not a benchmark logic\nbug), reopen cross-surface-oracle-remediation rather than patching here.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wire cross-surface gates for the benchmarks whose SQL and DataFrame ids already overlap",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-gate-rollout-followups",
+        "notes": "Per cross-surface-applicability.md, a DataFrame query registry exists but its\nids differ from the SQL ids by a naming convention (e.g. `1` vs `Q1`):\ndatavault (22), nyctaxi (25), tsbs_devops (18). Plus two partial/low-value\ncases: tpcds_obt (only 3 DF queries vs 89 SQL - gate the 3, mark the rest\nout of scope) and tpch_skew (22; low value, TPC-H-derived - gate only if the\nid mapping is cheap). Normalize the id mapping inside the builder (as\nbuild_amplab_duckdb maps `1`->`Q1`), then proceed exactly as w0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wire cross-surface gates for the benchmarks that need SQL<->DataFrame id normalization first",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-gate-rollout-followups",
+        "notes": "Four benchmarks load into DataFrames but ship NO DataFrame query registry,\nso cross-surface equivalence cannot reach them: metadata_primitives, tpcdi,\ntransaction_primitives, write_primitives. They have NO correctness oracle of\nany kind today. Give each a maintenance-light oracle - a differential\nsecond-engine comparison or a curated bounded expected-results subset - so\nthe coverage map does not silently leave them UNGUARDED. Lowest priority of\nthis file.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Provide a fallback oracle for the dual-loadable benchmarks that ship no DataFrame query surface",
+        "wid": "w2"
+      }
+    ]
+  }
+}

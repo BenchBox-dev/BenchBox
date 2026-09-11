@@ -1,0 +1,122 @@
+{
+  "context": "Prefer deletion. Confirm zero production callers, delete sanitize_path / anonymize_execution_metadata / anonymize_system_profile plus the config flags that only feed them, and delete or rewrite TestSanitizePath, TestAnonymizeExecutionMetadata and TestAnonymizeSystemProfile. If any caller is found, route it through _hash_public_identifier instead so the salted SHA-256 scheme is the only one in the module.",
+  "description": "benchbox/core/results/anonymization.py carries a SECOND, much weaker anonymization scheme beside the public boundary hardened in PR #1512. Verified on develop at d8afb2fa9a. (1) sanitize_path('/Users/alice/bench') returns '/Users/alice/bench' UNCHANGED - the username survives because short digit-free components are kept - and the repo's own find_public_path_leaks flags that output as a leak. Same for '/home/bob/data'. (2) anonymize_system_profile emits host_{md5(hostname)[:8]} and user_{md5(username)[:8]} - UNSALTED MD5 truncated to 8 hex, trivially reversible for common hostnames and usernames - while the public boundary deliberately uses salted SHA-256 at 12 hex. (3) sanitize_path emits dir_{md5(part)[:8]} with the same weakness. Reachability: NOT currently a live leak. anonymize_execution_metadata has no caller outside itself (only self-recursion at anonymization.py:877) and nothing outside tests calls any of the three. That is why this is not critical. It is filed because it is a loaded gun in a privacy-critical module - a future caller could reasonably believe sanitize_path sanitizes - and no existing test catches the username leak (TestSanitizePath asserts only caching and long/numeric-component hashing). Not an idempotence regression either: the 8-hex tokens are not recognized by _is_public_pseudonym (12-hex), so they would be hashed once by the public boundary and then stay stable. Decide: delete the three legacy methods outright (preferred if truly unused), or make them delegate to _hash_public_identifier so one salted scheme remains.",
+  "legacy": {
+    "item_meta": {
+      "category": "privacy",
+      "completed_at": "2026-08-04T15:56:03Z",
+      "completed_pr": 1528,
+      "created_at": "2026-08-04T12:21:15Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No published byte changes - these methods have no production caller, so removing them must be inert for the corpus",
+        "item_id": "legacy-anonymization-api-weak-scheme"
+      },
+      {
+        "behavior": "The public boundary's salted SHA-256 12-hex pseudonym scheme and its fixed point from PR #1512 are unchanged",
+        "item_id": "legacy-anonymization-api-weak-scheme"
+      },
+      {
+        "behavior": "find_public_path_leaks stays the single canonical detector for the submission and Explorer boundaries",
+        "item_id": "legacy-anonymization-api-weak-scheme"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "legacy-anonymization-api-weak-scheme",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "legacy-anonymization-api-weak-scheme",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/result-formats.md"
+      },
+      {
+        "item_id": "legacy-anonymization-api-weak-scheme",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_output.py"
+      },
+      {
+        "item_id": "legacy-anonymization-api-weak-scheme",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py -q -k legacy_anonymization",
+        "description": "No path the module exposes returns a private path verbatim",
+        "expected": "Write the test in w1 so this rung becomes runnable. Must fail on the unfixed tree where sanitize_path returns /Users/alice/bench unchanged.",
+        "item_id": "legacy-anonymization-api-weak-scheme",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -qE 'md5\\(' benchbox/core/results/anonymization.py",
+        "description": "No unsalted MD5 remains in the anonymizer",
+        "expected": "Exits 0 only once every md5 call is gone",
+        "item_id": "legacy-anonymization-api-weak-scheme",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py -q",
+        "description": "Anonymization module contract still passes",
+        "expected": "No regression in the public boundary",
+        "item_id": "legacy-anonymization-api-weak-scheme",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_corpus_privacy_invariant.py -q",
+        "description": "Corpus privacy and fixed-point invariants still pass",
+        "expected": "PR #1512 gates stay green",
+        "item_id": "legacy-anonymization-api-weak-scheme",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "legacy-anonymization-api-weak-scheme",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Commit bfeb26f79a. Confirmed zero production callers first: anonymize_execution_metadata only recursed into itself (anonymization.py:877), validate_anonymization had no caller at all, and nothing outside tests reached sanitize_path / anonymize_query_metadata / anonymize_system_profile. Deleted all five methods plus the config flags that fed only them (anonymize_paths, allowed_path_prefixes, include_system_profile, anonymize_hostnames, anonymize_usernames) and the now-dead _path_mapping/_hostname_mapping caches. Also removed include_machine_id: it gated nothing except validate_anonymization, so it was a privacy control that controlled nothing on the publication path. AnonymizationConfig keeps machine_id_salt, pii_patterns, custom_sanitizers - all of which reach published output. Public surface is now exactly get_anonymous_machine_id, anonymize_result_payload, anonymize_tuning_payload, remove_pii, all salted SHA-256.",
+        "item_id": "legacy-anonymization-api-weak-scheme",
+        "notes": null,
+        "started_at": "2026-08-04T12:46:05Z",
+        "started_branch": "fix/legacy-anonymization-api",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Confirm zero production callers, then delete or re-route the three legacy methods",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Commit bfeb26f79a. TestLegacyAnonymizationSchemeIsGone in tests/unit/core/results/test_anonymization.py pins five properties: (1) each of the five legacy methods stays absent from AnonymizationManager; (2) no 'md5' appears anywhere in the module source; (3) exactly TWO hexdigest truncations exist in the module - this is the real anti-drift rung, because the defect was two schemes rather than md5 specifically, so a new f-string emitter that reaches for sha256 instead would still be caught; (4) the public surface is exactly the four salted-boundary methods; (5) no public method returns a private path verbatim - find_public_path_leaks returns [] and 'alice' never appears for /Users/alice/bench under working_dir, database_path or a generic key. Plus TestAnonymizationConfig::test_no_flag_promises_privacy_it_does_not_deliver asserts the six retired flags cannot reappear as fields. 96 tests pass in the module; full fast lane 26642 passed after fixing the one collateral failure.",
+        "item_id": "legacy-anonymization-api-weak-scheme",
+        "notes": null,
+        "started_at": "2026-08-04T12:46:20Z",
+        "started_branch": "fix/legacy-anonymization-api",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Pin that no unsalted MD5 pseudonym scheme remains in the module",
+        "wid": "w1"
+      }
+    ]
+  }
+}

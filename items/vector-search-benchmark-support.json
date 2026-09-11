@@ -1,0 +1,482 @@
+{
+  "context": "Follow the pattern established by h2odb and amplab benchmarks (small, focused\nbenchmarks with synthetic data). Use benchbox/core/h2odb/ as a template for\ndirectory structure. Generate synthetic embedding vectors using numpy random\nwith controlled seeds for reproducibility. Use cosine similarity as the\ndefault distance function (most common in RAG applications).\n",
+  "description": "Implement vector search benchmarking for OLAP databases with vector/embedding\nsupport. Test similarity search performance across platforms that support\nvector operations: BigQuery, Snowflake, Databricks, ClickHouse, PostgreSQL\n(pgvector), and DuckDB (vss extension).\n\nFocus on the core vector search operations used in RAG applications:\n- k-Nearest Neighbor (kNN) exact search\n- Approximate Nearest Neighbor (ANN) search with HNSW/IVF indexes\n- Filtered vector search (metadata + vector similarity)\n- Batch vector operations\n\nUse the ANN-Benchmarks methodology as a reference standard for measuring\nrecall@k vs queries-per-second tradeoffs.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "benchmark index build time in the power run",
+        "instead": "measure it separately in the load phase",
+        "item_id": "vector-search-benchmark-support",
+        "why": "index creation is a one-time cost"
+      },
+      {
+        "dont": "require vector database extensions to be pre-installed",
+        "instead": "detect availability and skip gracefully with actionable error messages",
+        "item_id": "vector-search-benchmark-support",
+        "why": "platforms may not have them"
+      },
+      {
+        "dont": "use real ML model embeddings for benchmark data",
+        "instead": "use synthetic vectors with known statistical properties",
+        "item_id": "vector-search-benchmark-support",
+        "why": "model inference adds uncontrolled variability"
+      }
+    ],
+    "item_meta": {
+      "category": "AI/ML Capabilities",
+      "created_at": "2026-02-07T00:00:00Z",
+      "worktree": "ai-ml-vector-search"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing benchmark modules unaffected",
+        "item_id": "vector-search-benchmark-support"
+      },
+      {
+        "behavior": "BaseBenchmark interface contract unchanged",
+        "item_id": "vector-search-benchmark-support"
+      },
+      {
+        "behavior": "Platform registry backward compatible",
+        "item_id": "vector-search-benchmark-support"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "vector-search-benchmark-support",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/h2odb/"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/registry.py"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/vector_search/"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/vector_search/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.vector_search import VectorSearchBenchmark; print('OK')\"",
+        "description": "Vector benchmark module imports",
+        "expected": "OK",
+        "item_id": "vector-search-benchmark-support",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/vector_search/ -v --tb=short",
+        "description": "Unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "vector-search-benchmark-support",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core import get_benchmark; print(get_benchmark('vector_search'))\"",
+        "description": "Benchmark appears in registry",
+        "expected": "VectorSearchBenchmark instance",
+        "item_id": "vector-search-benchmark-support",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w6",
+        "wid": "w11"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w8",
+        "wid": "w11"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w10",
+        "wid": "w12"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w9",
+        "wid": "w12"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w10",
+        "wid": "w13"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w9",
+        "wid": "w13"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w10",
+        "wid": "w14"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w9",
+        "wid": "w14"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w10",
+        "wid": "w15"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w9",
+        "wid": "w15"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w5",
+        "wid": "w16"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w8",
+        "wid": "w16"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w4",
+        "wid": "w17"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w8",
+        "wid": "w17"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w13",
+        "wid": "w18"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w16",
+        "wid": "w18"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w11",
+        "wid": "w19"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w18",
+        "wid": "w19"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "vector-search-benchmark-support",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Survey existing vector benchmarks (ANN-Benchmarks, VectorDBBench)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement filtered vector search (WHERE metadata + ORDER BY distance)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement recall@k measurement against exact search ground truth",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "PostgreSQL pgvector: CREATE INDEX USING hnsw, <=> operator",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "DuckDB vss: LOAD vss, array_distance functions",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "ClickHouse: annoy/usearch indexes, cosineDistance",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Snowflake: VECTOR type, VECTOR_COSINE_SIMILARITY",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register benchmark in platform registry, CLI choices, and MCP tool lists",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit tests for vector data generation and query construction",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integration test with DuckDB vss at SF=0.01",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate recall@k measurement against known ANN-Benchmarks results",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit platform vector support (index types, distance functions per platform)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve design decisions: embedding dimensions (128/768/1536), dataset strategy (synthetic-only vs optional real datasets), graceful handling for platforms without ANN index support",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement vector data generator (synthetic embeddings at configurable dimensions with seeded RNG)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define schema: vectors table + metadata table for filtered search",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement metrics framework: recall@k, QPS, latency p50/p95/p99, index build time",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support scale factors: SF=0.01 (10K vectors) to SF=100 (10M vectors)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement kNN exact search queries per platform dialect",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "vector-search-benchmark-support",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement ANN search with platform-specific index syntax",
+        "wid": "w9"
+      }
+    ]
+  }
+}

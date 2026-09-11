@@ -1,0 +1,130 @@
+{
+  "context": "The change is entirely in _validate_performance_thresholds. The data collection loop\nalready captures start_memory and peak_memory and computes the delta - no changes\nneeded there. Only the assertion and the threshold formula change.\n\nCalibrate threshold conservatively: observed_max_growth * 2 rounded up to nearest\n50 MB, with a minimum floor of 100 MB to prevent spurious failures on very fast\nmachines with aggressive GC.\n",
+  "description": "The TPC-DI scalability test's memory assertion checks absolute process RSS:\n\n  max_memory_mb = 1000 * scale_factor + 2000\n  assert metrics[\"peak_memory_mb\"] <= max_memory_mb\n\nThis was raised from 600 MB to 2000 MB base in commit 8c0ddcb46 because observed\nabsolute RSS at SF 0.01 was 1943 MB - xdist workers, loaded modules, and pandas\ninternals dominate the measurement, not the benchmark itself.\n\nThe problem: absolute RSS is immune to memory leaks. A 300 MB regression at SF 0.01\nwould push actual usage to ~2243 MB, which still passes the 2010 MB ceiling (since\nceiling is 1000*0.01 + 2000 = 2010 MB). The test no longer catches regressions.\n\nThe fix is already 90% done: `memory_growth_mb = peak_memory - start_memory` is\nalready computed and stored in performance_results[scale_factor] at line 144 of\ntest_multi_scale_factor_performance_analysis. The validation method at line 301\njust ignores it, checking peak_memory_mb instead.\n\nSwitching to delta restores regression sensitivity: the baseline process RSS\n(1800-2000 MB of OS/Python/xdist overhead) is subtracted out, leaving only the\nmemory actually allocated by the benchmark. A tight ceiling on growth catches leaks\nwithout being affected by CI environment variability.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "merge the calibration print into production code",
+        "instead": "remove the temporary print before committing w2",
+        "item_id": "tpcdi-memory-test-delta-refactor",
+        "why": "debug prints in test output are noise"
+      },
+      {
+        "dont": "pick a threshold without a calibration run first",
+        "instead": "always observe before asserting",
+        "item_id": "tpcdi-memory-test-delta-refactor",
+        "why": "guessing will either re-create the loose-threshold problem or cause spurious CI failures"
+      },
+      {
+        "dont": "remove peak_memory_mb from performance_results",
+        "instead": "only change the assertion",
+        "item_id": "tpcdi-memory-test-delta-refactor",
+        "why": "_save_performance_baseline may use it and callers outside this method may depend on it"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-03-27T00:00:00Z",
+      "created_at": "2026-03-27T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All four scale factors (0.01, 0.1, 0.5, 1.0) continue to be tested",
+        "item_id": "tpcdi-memory-test-delta-refactor"
+      },
+      {
+        "behavior": "No changes to data collection logic in test_multi_scale_factor_performance_analysis - only _validate_performance_thresholds changes",
+        "item_id": "tpcdi-memory-test-delta-refactor"
+      },
+      {
+        "behavior": "memory_growth_mb key continues to exist in performance_results dict (used by _save_performance_baseline)",
+        "item_id": "tpcdi-memory-test-delta-refactor"
+      },
+      {
+        "behavior": "peak_memory_mb key remains in performance_results (other methods may reference it)",
+        "item_id": "tpcdi-memory-test-delta-refactor"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tpcdi-memory-test-delta-refactor",
+        "kind": "only_modify",
+        "path_glob": "tests/performance/test_tpcdi_scalability.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -c 'assert.*peak_memory_mb' tests/performance/test_tpcdi_scalability.py",
+        "description": "No assert still references peak_memory_mb",
+        "expected": "0",
+        "item_id": "tpcdi-memory-test-delta-refactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'assert.*memory_growth_mb' tests/performance/test_tpcdi_scalability.py",
+        "description": "Exactly one assert now references memory_growth_mb",
+        "expected": "1",
+        "item_id": "tpcdi-memory-test-delta-refactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/performance/test_tpcdi_scalability.py::TestTPCDIScalabilityPerformance::test_multi_scale_factor_performance_analysis -n 0 -v",
+        "description": "Test passes at all scale factors without flakiness",
+        "expected": "1 passed",
+        "item_id": "tpcdi-memory-test-delta-refactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/performance/test_tpcdi_scalability.py -n 0 -q",
+        "description": "No regression in broader performance test suite",
+        "expected": "All tests pass",
+        "item_id": "tpcdi-memory-test-delta-refactor",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tpcdi-memory-test-delta-refactor",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tpcdi-memory-test-delta-refactor",
+        "notes": "Add a temporary print to _validate_performance_thresholds to emit memory_growth_mb\nfor each scale factor, then run the test:\n  uv run -- python -m pytest tests/performance/test_tpcdi_scalability.py::TestTPCDIScalabilityPerformance::test_multi_scale_factor_performance_analysis -n 0 -s -v\nRecord actual delta values at SF 0.01, 0.1, 0.5, 1.0 to inform threshold selection.\nExpected: growth should be O(10s of MB) for data generation + ETL, much less than\nthe 1943 MB absolute RSS that forced the current ceiling.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run a calibration pass to observe actual memory_growth_mb values across scale factors",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpcdi-memory-test-delta-refactor",
+        "notes": "In _validate_performance_thresholds (line ~301), change:\n  max_memory_mb = 1000 * scale_factor + 2000\n  assert metrics[\"peak_memory_mb\"] <= max_memory_mb\nto:\n  max_growth_mb = 1000 * scale_factor + {calibrated_base}\n  assert metrics[\"memory_growth_mb\"] <= max_growth_mb\nSet {calibrated_base} to observed maximum growth + 2x headroom from w1 results.\nAlso update the print statement on line 312:\n  print(f\"  Memory: {metrics['peak_memory_mb']:.1f}MB ✅\")\nto report growth_mb instead of peak_mb, for clearer test output.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace peak_memory_mb assertion with memory_growth_mb and calibrated threshold",
+        "wid": "w2"
+      }
+    ]
+  }
+}

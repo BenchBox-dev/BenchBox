@@ -1,0 +1,217 @@
+{
+  "context": "Thin adapter strategy: keep the public API surface (`generate_ascii_chart`, `ResourceChart`)\nunchanged and replace only the internal rendering pipeline.\n\n1. Add textcharts imports and a private adapter function `_series_to_line_chart()`\n2. Rewire `generate_ascii_chart()` to delegate to the adapter\n3. Delete dead helper functions (_resample_to_width, _build_chart_grid)\n4. Update test assertions that relied on custom rendering characters\n5. Add color/unicode passthrough as a follow-on enhancement\n",
+  "description": "The textcharts extraction (extract-ascii-charting-into-standalone-library) successfully\nmigrated all 16 visualization chart types. However, two modules still contain custom\nASCII rendering that predates textcharts and was not part of the original extraction scope:\n\n1. **benchbox/monitoring/report.py** - `generate_ascii_chart()` + helpers render resource\n   utilization time series (CPU, Memory, Disk I/O, Network) using a custom `*`-grid\n   renderer (~80 lines). This maps directly to textcharts `LineChart`.\n\n2. **benchbox/core/query_plans/visualization.py** - `QueryPlanVisualizer` renders operator\n   trees using box-drawing characters (`└──`, `├──`, `│`). This is tree-structured\n   domain visualization, NOT a chart type. textcharts has no tree renderer and adding\n   one would be over-scoped. **Deferred.**\n\nConverting monitoring charts to textcharts:\n- Eliminates the last custom ASCII chart renderer in BenchBox\n- Gives monitoring charts color, unicode, and theme support for free\n- Aligns all chart rendering behind a single library\n\nKey API mapping:\n- `generate_ascii_chart(series: list[float], width, height, title, unit)`\n  → `LineChart(points: list[LinePoint], title, y_label, options: ChartOptions)`\n- `_resample_to_width()` → handled internally by textcharts\n- `_build_chart_grid()` → handled internally by textcharts\n- `ResourceChart` dataclass → simplified wrapper or replaced",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "attempt to convert query plan tree rendering",
+        "instead": "defer it.",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "why": "textcharts has no tree chart type and the operator tree is domain-specific DAG visualization"
+      },
+      {
+        "dont": "change the `generate_ascii_chart()` return type",
+        "instead": "keep the adapter internal.",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "why": "`ResourceReporter` and `ResourceReport` depend on `ResourceChart`"
+      },
+      {
+        "dont": "use `use_color=True` by default",
+        "instead": "default to False with opt-in.",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "why": "monitoring output often goes to log files and CI output"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "migrate-remaining-ascii-charts-to-textcharts",
+        "id": 211,
+        "reason": "`QueryPlanVisualizer` in `benchbox/core/query_plans/visualization.py` renders\noperator trees using box-drawing characters (└──, ├──, │). This is hierarchical\ntree rendering, NOT a chart type. textcharts has no tree renderer and adding one\nwould require a new chart type with fundamentally different data models (recursive\nDAG vs flat data points). Defer until textcharts adds a tree/hierarchy visualization\ntype, if ever.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Contingent on textcharts gaining a tree/hierarchy renderer, which it lacks and may never get ('if ever' per the item's own text).",
+        "summary": "Migrate query plan tree visualization to textcharts"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "migrate-remaining-ascii-charts-to-textcharts",
+        "id": 212,
+        "reason": "The monitoring charts are internal (shown in text reports, not exposed via CLI/MCP\nchart commands). Golden snapshots are lower priority than the visualization chart\ntypes which have user-facing contracts. Consider adding after the conversion is stable.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Golden snapshots deferred pending chart-conversion stability; no open item tracks monitoring-chart snapshot tests.",
+        "summary": "Golden snapshot tests for monitoring charts"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-03-12T00:00:00Z",
+      "created_at": "2026-03-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Empty series returns `(no data)` chart",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts"
+      },
+      {
+        "behavior": "`ResourceChart` dataclass public interface (render(), resource_type, width, height, min_value, max_value)",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts"
+      },
+      {
+        "behavior": "`ResourceReport.generate_text_report()` output structure (sections: SUMMARY, UTILIZATION, BOTTLENECK, CHARTS)",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts"
+      },
+      {
+        "behavior": "`ResourceReporter.generate_report()` behavior - charts dict keyed by ResourceType",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts"
+      },
+      {
+        "behavior": "`generate_ascii_chart()` function signature and return type (ResourceChart)",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/query_plans/"
+      },
+      {
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/"
+      },
+      {
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/monitoring/bottleneck.py"
+      },
+      {
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/monitoring/profiler.py"
+      },
+      {
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/monitoring/report.py"
+      },
+      {
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/monitoring/test_monitoring_report.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/monitoring/test_monitoring_report.py -v",
+        "description": "Monitoring unit tests pass after conversion",
+        "expected": "All tests pass",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg '_build_chart_grid|_resample_to_width' benchbox/monitoring/report.py",
+        "description": "No remaining custom chart rendering in report.py (no _build_chart_grid calls)",
+        "expected": "No matches - helper functions removed",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg 'from textcharts' benchbox/monitoring/report.py",
+        "description": "textcharts import present in report.py",
+        "expected": "At least one import from textcharts.line_chart",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox/monitoring/report.py tests/unit/monitoring/test_monitoring_report.py",
+        "description": "Lint passes on modified files",
+        "expected": "No lint errors",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/monitoring/ -v",
+        "description": "Full monitoring integration test passes",
+        "expected": "All tests pass",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.monitoring.report import generate_ascii_chart; c = generate_ascii_chart([10,50,90], title='T', unit='%'); r = c.render(); assert 'T' in r and len(r) > 50, f'Bad render: {r[:100]}'\"",
+        "description": "Rendered chart is structurally valid (has title, axes, data, reasonable size)",
+        "expected": "No assertion error - chart contains title and has substantial content",
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "notes": "Two changes in `benchbox/monitoring/report.py`, committed together:\n\n**A. Add adapter function** `_series_to_line_chart()`:\n```python\ndef _series_to_line_chart(\n    series: list[float],\n    width: int,\n    height: int,\n    title: str,\n    unit: str,\n) -> str:\n```\nConversion logic:\n1. Convert `list[float]` → `list[LinePoint]` with series=\"value\", x=index, y=value\n2. Create `ChartOptions(width=width, height=height, use_color=False, use_unicode=True)`\n3. Construct `LineChart(points, title=title, y_label=unit, options=options)`\n4. Return `chart.render()`\n\nImports to add:\n- `from textcharts.line_chart import LineChart, LinePoint`\n- `from textcharts.base import ChartOptions`\n\n**B. Rewire `generate_ascii_chart()`** (report.py:75-121):\n1. Handle empty series edge case (return \"(no data)\" chart - unchanged)\n2. Call `_series_to_line_chart()` for actual rendering\n3. Split rendered string via `.split('\\n')` to populate `chart_lines: list[str]`\n4. Preserve `min_value` / `max_value` on the returned `ResourceChart`\n\nKeep the `ResourceChart` dataclass and `generate_ascii_chart()` signature UNCHANGED\nto avoid breaking `ResourceReporter.generate_report()` and downstream callers.\n\n**C. Delete dead helpers:**\n- `_resample_to_width()` (lines 42-48)\n- `_build_chart_grid()` (lines 51-72)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace generate_ascii_chart() internals with textcharts LineChart via adapter",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "notes": "File: `tests/unit/monitoring/test_monitoring_report.py`\n\nTests to update (class `TestGenerateAsciiChart`, lines 108-172):\n- `test_single_value` (l.116): assert rendered output is non-empty instead of `*`\n- `test_increasing_series` (l.122): textcharts uses box-drawing chars, not `*`;\n  assert chart contains data markers; remove `\"time\"` axis assertion\n- `test_constant_series` (l.132): same - update char assertion\n- `test_with_title_and_unit` (l.139): title and unit assertions should still pass\n  (textcharts renders both)\n- `test_chart_dimensions` (l.147): width/height on ResourceChart should still match\n- `test_min_max_values` (l.154): unchanged (computed before rendering)\n- `test_resampling_long_series` (l.161): remove `*` assertion, check non-empty render\n- `test_stretching_short_series` (l.168): same\n\nTests that should pass WITHOUT changes:\n- `TestResourceChart` (l.73-105): tests ResourceChart dataclass directly\n- `TestResourceReporter` (l.175-260): tests higher-level report generation\n- `TestResourceReport` (l.263-335): tests text/JSON report output\n- `TestResourceReporterEdgeCases` (l.338-372): edge cases\n- `TestReportIntegration` (l.375-431): integration test\n\n**Post-edit verification** - confirm rendered output is structurally valid:\n```python\nfrom benchbox.monitoring.report import generate_ascii_chart\nchart = generate_ascii_chart(\n    [30, 50, 70, 90, 85, 60, 40, 30, 50, 80],\n    title=\"CPU Utilization\", unit=\"%\", width=60, height=10\n)\nr = chart.render()\nassert \"CPU Utilization\" in r and len(r) > 50\n```\nConfirm: title present, y-axis labels present, line connects data points,\nunit label present, reasonable dimensions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update monitoring tests for textcharts LineChart output format",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-ascii-charts-to-textcharts",
+        "notes": "Now that monitoring uses textcharts, expose color/unicode options:\n\n1. Add optional params to `ResourceReporter.__init__()`:\n   - `use_color: bool = False` (default False - monitoring output often goes to log files)\n   - `use_unicode: bool = True`\n\n2. Pass through to `ChartOptions` in the adapter function\n\n3. Update `ResourceReporter.generate_report()` chart generation loop (lines 284-295)\n   to pass options through\n\nThis is a low-effort enhancement that comes \"for free\" with textcharts adoption.\nNo test changes needed beyond adding a simple test for color=True rendering.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add color/unicode/theme passthrough to ResourceReporter chart generation",
+        "wid": "w3"
+      }
+    ]
+  }
+}

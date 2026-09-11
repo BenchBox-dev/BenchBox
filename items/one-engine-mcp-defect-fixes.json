@@ -1,0 +1,203 @@
+{
+  "context": "Five small, separately testable fixes in one PR. Each gets a regression test. For (4), decide exposure via the existing surface field (get_benchmark_surface) rather than a new mechanism. For (5), default stays anonymize=False for local stdio; remote-authenticated mode flips it on. Watch the fast-lane max_fast_tests cap (_project/config/fast_test_lane_policy.json) when adding tests.",
+  "description": "Independent defect batch from the 2026-08-04 CLI/MCP review; no dependency on the ADR. (1) benchbox/mcp/tools/analytics.py:195 mis-binds make_not_found_error(result_file, configured_results_dir) -- signature is (resource_type, resource_id, available), producing messages like \"Use list_myrun.jsons()...\"; pass a literal resource type first as every other call site does (benchmark.py:295, analytics.py:339). (2) validate_platform_options runs twice on the sync run path (benchbox/mcp/tools/benchmark.py:237 and :409); validate once. (3) generate_chart forces ChartOptions(use_color=False) at benchbox/mcp/tools/visualization.py:120 while its docstring at :383 claims ANSI colors are included; keep no-color (protocol-clean) and fix the docstring. (4) get_query_details uses get_all_benchmarks() (benchmark.py:292) so non-public benchmarks are reachable while list_available/get_benchmark_info/resources filter to public -- align with the benchmark visibility matrix (docs/reference/public-contracts.md:88-92). (5) ResultExporter(anonymize=False) at benchmark.py:357 and analytics.py:376 rests on a 'local same-trust-boundary' premise that fails in remote/tenant mode -- anonymize when remote_security is active (thread the server mode through to the exporter call sites).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix the color mismatch by enabling ANSI color in MCP chart output",
+        "instead": "correct the docstring",
+        "item_id": "one-engine-mcp-defect-fixes",
+        "why": "inline protocol payloads with ANSI escapes break non-terminal MCP clients"
+      },
+      {
+        "dont": "widen get_query_details by making the other discovery tools also expose non-public benchmarks",
+        "instead": "narrow get_query_details to the visibility matrix",
+        "item_id": "one-engine-mcp-defect-fixes",
+        "why": "the matrix (public-contracts.md:88-92) is the ratified contract; the leak is the bug"
+      }
+    ],
+    "item_meta": {
+      "category": "MCP",
+      "completed_at": "2026-08-04T18:46:20Z",
+      "completed_pr": 1550,
+      "created_at": "2026-08-04T17:14:03Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "Error responses keep secret scrubbing (errors.py scrub_secret_material).",
+        "item_id": "one-engine-mcp-defect-fixes"
+      },
+      {
+        "behavior": "Local stdio behavior unchanged for anonymization; only remote-authenticated mode gains anonymize=True.",
+        "item_id": "one-engine-mcp-defect-fixes"
+      },
+      {
+        "behavior": "generate_chart output stays ASCII-only and inline-only (contract at visualization.py:395-406).",
+        "item_id": "one-engine-mcp-defect-fixes"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "get_benchmark_surface public/non-public gating used by list_available",
+        "decision": "reuse",
+        "item_id": "one-engine-mcp-defect-fixes",
+        "path": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "concept": "make_not_found_error signature (resource_type, resource_id, available) at :320",
+        "decision": "reuse",
+        "item_id": "one-engine-mcp-defect-fixes",
+        "path": "benchbox/mcp/errors.py"
+      },
+      {
+        "concept": "remote_security presence already gates sync execution and tool registration",
+        "decision": "reuse",
+        "item_id": "one-engine-mcp-defect-fixes",
+        "path": "benchbox/mcp/security.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-mcp-defect-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "one-engine-mcp-defect-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "one-engine-mcp-defect-fixes",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "one-engine-mcp-defect-fixes",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "one-engine-mcp-defect-fixes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "one-engine-mcp-defect-fixes",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "one-engine-mcp-defect-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -k 'not_found or validate_results' -q",
+        "description": "Not-found errors from validate_results name a resource type, not a filename",
+        "expected": "Regression test asserts resource_type/resource_id ordering.",
+        "item_id": "one-engine-mcp-defect-fixes",
+        "last_result": "pass",
+        "last_run": "2026-08-04T18:03:22Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -k 'query_details and (surface or visibility or public)' -q",
+        "description": "get_query_details respects the benchmark visibility matrix",
+        "expected": "Non-public benchmark IDs are rejected by get_query_details.",
+        "item_id": "one-engine-mcp-defect-fixes",
+        "last_result": "pass",
+        "last_run": "2026-08-04T18:03:30Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -k 'anonymize' -q",
+        "description": "Remote-authenticated mode anonymizes exported results",
+        "expected": "Exporter is constructed with anonymize=True when remote security is configured.",
+        "item_id": "one-engine-mcp-defect-fixes",
+        "last_result": "pass",
+        "last_run": "2026-08-04T18:03:37Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -m fast -q",
+        "description": "MCP fast suite green",
+        "expected": "No regressions in the MCP unit suite.",
+        "item_id": "one-engine-mcp-defect-fixes",
+        "last_result": "pass",
+        "last_run": "2026-08-04T18:03:46Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-mcp-defect-fixes",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-mcp-defect-fixes",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "one-engine-mcp-defect-fixes",
+        "needs_wid": "w0",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-verified all five at HEAD. (1)(3)(5) confirmed. (4) already correct since #506 -- _build_query_details_benchmark_info gates support_status on get_benchmark_surface; the item's rung text contradicts the ratified visibility matrix. (2) refuted: removing the inner validate_platform_options fails test_oversized_dask_request_never_builds_a_cluster (Dask builds LocalCluster in __init__); removing the outer one stops validating dry_run/validate_only.",
+        "item_id": "one-engine-mcp-defect-fixes",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:32Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Re-verify all five defects still exist at HEAD (concurrent sessions may have fixed some)",
+        "wid": "w0"
+      },
+      {
+        "evidence": "(1) make_not_found_error re-bound to (resource_type, resource_id) plus an explicit suggestion naming a real tool; (3) generate_chart docstring corrected to the no-color contract. (2) refuted with evidence, no change. PR #1550.",
+        "item_id": "one-engine-mcp-defect-fixes",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:36Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Fix (1) error misbinding + (2) double validation + (3) docstring, with regression tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": "No behavior change needed -- already conformant. Added 4 matrix-driven tests incl. a registry-wide one deriving expectations from surface. Rung 2 passes. PR #1550.",
+        "item_id": "one-engine-mcp-defect-fixes",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:40Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Fix (4) visibility-matrix leak in get_query_details, with matrix-driven test",
+        "wid": "w2"
+      },
+      {
+        "evidence": "anonymize_results threaded from remote_security through register_benchmark_tools/register_analytics_tools to both exporters; durable job worker always anonymizes. 5 tests incl. local-vs-remote. Rung 3 passes. PR #1550.",
+        "item_id": "one-engine-mcp-defect-fixes",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:43Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Fix (5) remote-mode anonymization, with a remote-config test",
+        "wid": "w3"
+      }
+    ]
+  }
+}

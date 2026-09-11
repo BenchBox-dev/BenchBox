@@ -1,0 +1,11 @@
+{
+  "description": "GitHub evaluates jobs.<id>.if BEFORE the matrix expands, so the matrix context is unavailable there. Referencing it is invalid and GitHub fails the whole workflow at startup: a run with zero jobs and conclusion=failure, on EVERY push to any branch. seed-corpus.yml did exactly this and produced a permanently red check nobody attributed to a workflow bug (fixed under seed-corpus-workflow-fails-on-every-push). Nothing catches the class: the file is valid YAML so check-yaml passes, and the repo has no actionlint in any lane. A scan of all .github/workflows/*.yml found seed-corpus.yml as the only job-level offender at fix time -- nightly.yml:67 references matrix in a STEP-level if, which is legal -- so this is about preventing recurrence, not clearing a backlog. APPROACH: try actionlint against .github/workflows/ first (it catches this plus a wide family of Actions expression/context errors); wire into the lint job if the baseline is clean or baselineable. Cheap fallback: a parser-level test in tests/unit/workflows/ enumerating jobs.<id>.if across all workflow files and asserting no matrix/strategy reference. SCOPE: .github/workflows/, tests/unit/workflows/, Makefile. PRESERVE: existing workflows keep their triggers and job graphs. VERIFY: uv run -- python -c \"import yaml,glob; bad=[(f,j) for f in glob.glob('.github/workflows/*.yml') for j,c in ((yaml.safe_load(open(f)) or {}).get('jobs') or {}).items() if isinstance(c,dict) and 'matrix' in str(c.get('if',''))]; assert not bad, bad; print('ok')\" -- prints ok, exit 0. NOTE: guardrail fields are prose here because promote() accepts only title/priority/worktree/description -- see todo-tracker-create-time-only-fields-cannot-be-repaired.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-29T00:20:43Z",
+      "completed_pr": 1324,
+      "created_at": "2026-07-26T13:12:55Z",
+      "worktree": "ci-failure-reduction"
+    }
+  }
+}

@@ -1,0 +1,209 @@
+{
+  "context": "Blocked until query-plan-capture-cloud-saas lands the Snowflake parser (w2)\nand BigQuery job-statistics capture (w3). Once unblocked, w2 and w3 here are\nindependent; w4 lands last. Secret configuration (w1) is a repo-admin action\nthat can happen any time — the job degrades to all-skip until secrets exist.\n",
+  "description": "REVALIDATED 2026-08-17. Sequencing correction: this item adds nightly CI plan-capture verification for Snowflake and BigQuery, but neither platform has ever executed a single benchmark run in this project. Prove a live run first under first-live-cloud-benchmark-run-and-publish, then wire plan capture and the nightly job on top of a path that is known to work. Cost is not the obstacle: BigQuery has a permanent free tier of 1 TiB scanned per month, and Snowflake's 30-day trial carries $400 in credits. The real prerequisite is credentials existing in CI at all - .github/workflows/ currently contains zero references to Snowflake or Databricks, so no cloud secret is wired anywhere.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add these tests to pr.yml",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "why": "PR-triggered cloud queries from arbitrary branches incur uncontrolled billing; nightly-only."
+      },
+      {
+        "dont": "call capture_query_plan() directly for BigQuery",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "why": "plans come from the completed QueryJob, not a pre-execution EXPLAIN; test through execute_query()."
+      },
+      {
+        "dont": "query real tables in BigQuery live tests",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "why": "SELECT 1 is free; table scans bill per byte."
+      },
+      {
+        "dont": "store the GCP service account JSON in the repo or write it to a tracked path",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "why": "write to a runner temp file only."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "needs_item": "query-plan-capture-cloud-saas"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-06-11T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "BigQuery test queries must process 0 bytes (SELECT 1, no table references) — plan capture must not incur scan billing.",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery"
+      },
+      {
+        "behavior": "Existing tests in test_snowflake_live.py and test_bigquery_live.py must be untouched.",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery"
+      },
+      {
+        "behavior": "Live tests must skip (not fail) when credentials are absent — forks and contributors without secrets must stay green.",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery"
+      },
+      {
+        "behavior": "No secret values may appear in workflow logs; the GCP key file must not be echoed or uploaded as an artifact.",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery"
+      },
+      {
+        "behavior": "Snowflake tests must not require a dedicated warehouse size — XS with auto-suspend is the assumed floor.",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/platform-expansion/planning/query-plan-capture-cloud-saas.yaml — parser implementation this TODO verifies",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "path": "_project/TODO/platform-expansion/planning/query-plan-capture-cloud-saas.yaml"
+      },
+      {
+        "concept": "tests/integration/platforms/conftest.py — snowflake_credentials / bigquery_credentials fixtures with env-var skip",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "path": "tests/integration/platforms/conftest.py"
+      },
+      {
+        "concept": "tests/integration/platforms/test_bigquery_live.py — existing live test file with live_bigquery marker",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "path": "tests/integration/platforms/test_bigquery_live.py"
+      },
+      {
+        "concept": "tests/integration/platforms/test_postgresql_live.py — TestLivePostgreSQLQueryPlanCapture test class shape (PR #777)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "path": "tests/integration/platforms/test_postgresql_live.py"
+      },
+      {
+        "concept": "tests/integration/platforms/test_snowflake_live.py — existing live test file with live_snowflake marker",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "path": "tests/integration/platforms/test_snowflake_live.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/platform-expansion/planning/query-plan-capture-cloud-live-snowflake-bigquery.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/test_bigquery_live.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/test_snowflake_live.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/platforms/test_snowflake_live.py tests/integration/platforms/test_bigquery_live.py -m 'live_snowflake or live_bigquery' --collect-only -q --override-ini='addopts='",
+        "description": "New live test classes collect under their markers",
+        "expected": "New plan capture tests listed for both files",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/platforms/test_snowflake_live.py -m live_snowflake --tb=short -q",
+        "description": "Tests skip cleanly without credentials",
+        "expected": "All tests skipped, 0 failures (when no credentials configured)",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- pre-commit run check-yaml --files .github/workflows/nightly.yml",
+        "description": "Workflow YAML is valid",
+        "expected": "check yaml...Passed",
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "notes": "Secrets to add (names match the env vars the conftest fixtures read):\n  SNOWFLAKE_ACCOUNT, SNOWFLAKE_USERNAME, SNOWFLAKE_PASSWORD,\n  SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE, SNOWFLAKE_SCHEMA,\n  BIGQUERY_PROJECT, BIGQUERY_DATASET,\n  GCP_SERVICE_ACCOUNT_KEY (the JSON key content)\nBigQuery needs a file-based credential: add a workflow step that writes\nGCP_SERVICE_ACCOUNT_KEY to a temp file and exports\nGOOGLE_APPLICATION_CREDENTIALS pointing at it. Write the file with\nrestrictive permissions and never cat/echo it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document and configure GitHub Actions secrets for Snowflake and BigQuery",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "notes": "Four-test shape from the PostgreSQL precedent. Snowflake plans come from\n`EXPLAIN USING JSON <query>` (per cloud-saas w2), so\ntest_get_query_plan_returns_json can assert json.loads succeeds.\nFixture variant passes capture_plans=True via snowflake_credentials.\nKeep queries trivial (SELECT 1) — warehouse compute bills per second\nand auto-resume on first query is expected; use an XS warehouse.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add TestLiveSnowflakeQueryPlanCapture to test_snowflake_live.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "notes": "BigQuery cannot follow the capture_query_plan(connection, query, id)\ndirect-call shape — plans come from the completed QueryJob (cloud-saas\nw3 implements _capture_bq_plan). Instead:\n  - test_execute_query_with_capture_returns_plan: run\n    execute_query(..., capture_plans=True) on SELECT 1 and assert the\n    result dict contains query_plan and a 64-char plan_fingerprint.\n  - test_plan_fingerprint_stable: run the same query twice, compare\n    fingerprints from the result dicts.\nSELECT 1 processes 0 bytes in BigQuery (no table scan), so the test\nis free; do not query real tables.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add TestLiveBigQueryQueryPlanCapture to test_bigquery_live.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-live-snowflake-bigquery",
+        "notes": "Add the new secrets as job-level env vars, add the\nGOOGLE_APPLICATION_CREDENTIALS file-write step from w1, and extend the\npytest invocation by appending ONLY the plan-capture classes from w2/w3 as\nnode ids — NOT the whole live modules. Selecting the modules with\n-m \"... or live_snowflake or live_bigquery\" would also run the heavy\nTPC-H load / warehouse-cost live tests in those files and violate the\nSELECT-1 / 0-byte billing guardrails below. Append:\n  \"tests/integration/platforms/test_snowflake_live.py::TestLiveSnowflakeQueryPlanCapture\"\n  \"tests/integration/platforms/test_bigquery_live.py::TestLiveBigQueryQueryPlanCapture\"\nkeeping -m \"live_snowflake or live_bigquery\" as a secondary safety filter\nso the classes still skip cleanly when credentials are absent. If the\nRedshift/MotherDuck job does not exist yet (TODOs landed out of order),\ncreate the job following the postgres-integration pattern in nightly.yml\nwith only the Snowflake/BigQuery plan-capture classes. Nightly-only;\nnever pr.yml.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Extend the nightly cloud-live-verification job with Snowflake and BigQuery",
+        "wid": "w4"
+      }
+    ]
+  }
+}

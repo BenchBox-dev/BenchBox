@@ -1,0 +1,227 @@
+{
+  "context": "Inventory every retained Makefile and make/ recipe referencing _project on a curated tree, classify each as relocate or explicit-unsupported, implement, extend the curated-release test to execute retained quality targets rather than only collecting them, then remove scripts/check_complexity.py.",
+  "description": "From the 2026-08-09 adversarial review of PR #1644, deferred at merge without a tracker record. scripts/check_complexity.py (526 lines) is tracked with zero callers after the live checker moved to _project/scripts/check_complexity.py, and it still parses the exclude_functions/exclude_modules pyproject keys that PR #1644 deleted, forming a divergent second authority over the same policy table. Separately, release curation removes _project entirely while retained targets still reference it: complexity-check, complexity-report, and quality-governance-typecheck (Makefile 375-385) run or type-check _project/scripts/check_complexity.py, and release-retained make/ fragments reference _project scripts too (make/documentation.mk platform-manifest targets, make/platform-tests.mk mocker parity, make/worktree-maintenance.mk blind-spot tooling). All of these break on a curated release tree; PR #1644's curation reproduction only exercised help and inventory so it did not catch broken recipes. Decide the release posture per target: relocate needed tooling into release-retained make/ (precedent: make/check_makefile_inventory.py) or make the target fail with an explicit development-tree-only message, then delete the dead duplicate.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Keep two checker implementations to satisfy both trees.",
+        "instead": "One implementation in one release-decided location; every other surface is derived or removed.",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "why": "Divergent authorities over the same policy caused this defect."
+      },
+      {
+        "dont": "Resurrect the deleted exclude_functions/exclude_modules keys for compatibility.",
+        "instead": "Delete the stale-key consumer together with the duplicate.",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "why": "The measured no-exception policy is the current authority."
+      },
+      {
+        "dont": "Verify curated releases by collecting targets without executing them.",
+        "instead": "Execute each retained quality target in the curated-release reproduction test.",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "why": "PR #1644's curation proof ran help and inventory only and missed broken recipes."
+      }
+    ],
+    "item_meta": {
+      "category": "Quality Governance and Release Integrity",
+      "completed_at": "2026-08-13T15:32:07Z",
+      "completed_pr": 1709,
+      "created_at": "2026-08-11T12:39:46Z",
+      "worktree": "quality-governance"
+    },
+    "preserves": [
+      {
+        "behavior": "Development-tree behavior of complexity-check, complexity-report, and quality-governance-typecheck is unchanged.",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811"
+      },
+      {
+        "behavior": "Public make target names remain available under the same names.",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811"
+      },
+      {
+        "behavior": "Release curation continues to remove development-only _project content.",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811"
+      },
+      {
+        "behavior": "The complexity hard ceiling and measured no-exception policy are not weakened.",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Completed measured complexity policy this item keeps authoritative.",
+        "decision": "extend",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "path": "align-quality-gates-with-actual-policy-20260808"
+      },
+      {
+        "concept": "Release-retained tooling relocated out of _project.",
+        "decision": "extend",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "path": "make/check_makefile_inventory.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      },
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "kind": "only_modify",
+        "path_glob": "make/**"
+      },
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "kind": "only_modify",
+        "path_glob": "scripts/check_complexity.py"
+      },
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "kind": "only_modify",
+        "path_glob": "scripts/check_release_curation.py"
+      },
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test ! -f scripts/check_complexity.py && printf \"duplicate checker removed\\\\n\"",
+        "description": "Dead duplicate checker is gone",
+        "expected": "duplicate checker removed",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:31:51Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_makefile_inventory.py -q -n 0 && printf \"curated runtime tests passed\\\\n\"",
+        "description": "Curated-release runtime and inventory tests",
+        "expected": "curated runtime tests passed",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:32:00Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make complexity-check && printf \"complexity gate passed\\\\n\"",
+        "description": "Development complexity gate unchanged",
+        "expected": "complexity gate passed",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:32:02Z",
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check .",
+        "description": "Configured lint contract remains green",
+        "expected": "All checks passed",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:32:04Z",
+        "seq": 8,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventory found 36 executable retained targets across Makefile and make/*.mk that reference _project. All are development-governance, repository-maintenance, release-cut, PR-administration, or generated-evidence targets; none provides package runtime behavior. Classified all explicit-unsupported on curated releases. help prose and passive spellcheck pathspecs are not executable dependencies.",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "notes": null,
+        "started_at": "2026-08-13T14:15:50Z",
+        "started_branch": "fix/curated-release-quality-targets",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-curated-release-quality-targets",
+        "status": "done",
+        "summary": "Inventory every retained Makefile and make/ recipe that references _project on a curated tree and classify relocate versus explicit-unsupported with rationale",
+        "wid": "w0"
+      },
+      {
+        "evidence": "A single DEVELOPMENT_TREE_ONLY_TARGETS policy adds a retained prerequisite that succeeds without changing development behavior and fails curated targets with an explicit _project intentionally absent message. Inventory tooling expands the governed target variable and regenerated make/inventory.json reports 188 targets, 184 public, default=test.",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "notes": null,
+        "started_at": "2026-08-13T14:16:02Z",
+        "started_branch": "fix/curated-release-quality-targets",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-curated-release-quality-targets",
+        "status": "done",
+        "summary": "Implement relocations and explicit-unsupported messages per the w0 classification without changing development-tree behavior",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Deleted the 257-line scripts/check_complexity.py duplicate. Make complexity-check still executes authoritative _project/scripts/check_complexity.py and passes with zero hard failures.",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "notes": null,
+        "started_at": "2026-08-13T14:16:14Z",
+        "started_branch": "fix/curated-release-quality-targets",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-curated-release-quality-targets",
+        "status": "done",
+        "summary": "Delete scripts/check_complexity.py and prove nothing references it",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Curated runtime tests execute complexity-check, platform-manifest-check, and blind-spots-list and assert the explicit policy error. Static inventory test covers every executable _project recipe; appending an undeclared broken target is the negative control and produces the exact missing-declaration finding. 42 combined focused tests pass.",
+        "item_id": "retire-dead-checker-and-fix-curated-release-targets-20260811",
+        "notes": null,
+        "started_at": "2026-08-13T14:16:28Z",
+        "started_branch": "fix/curated-release-quality-targets",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-curated-release-quality-targets",
+        "status": "done",
+        "summary": "Extend the curated-release test to execute retained quality targets, then restore one broken reference as a negative control and prove the test fails",
+        "wid": "w3"
+      }
+    ]
+  }
+}

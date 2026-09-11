@@ -1,0 +1,66 @@
+{
+  "context": "Delete the hardcoded empty tuple, the dead branch, and _describe_platform_options if it has no other caller. Confirm no test asserts the branch exists before removing it.",
+  "description": "Found 2026-08-17 during the documentation audit. benchbox/cli/commands/run.py:591 hardcodes describe_platforms = (), so the _describe_platform_options branch below it can never execute. The option was removed from the user-facing surface but its implementation was left behind. README.md instructed users to run it in three places (lines 759, 854, 903) until that was corrected on branch docs/audit-v0-4-0; the dead code itself is still present on develop. Low priority because it is invisible to users now that the docs no longer advertise it, but it is misleading to anyone reading run.py and it will keep showing up in audits.",
+  "legacy": {
+    "item_meta": {
+      "category": "cli",
+      "created_at": "2026-08-18T21:33:23Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "remove-describe-platform-options-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "remove-describe-platform-options-dead-code",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -c 'describe_platform_options' benchbox/",
+        "description": "No dead describe path",
+        "expected": "0 matches",
+        "item_id": "remove-describe-platform-options-dead-code",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remove-describe-platform-options-dead-code",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remove-describe-platform-options-dead-code",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-describe-platform-options-dead-code",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Delete the dead branch and helper, checking for other callers and tests first",
+        "wid": "w1"
+      }
+    ]
+  }
+}

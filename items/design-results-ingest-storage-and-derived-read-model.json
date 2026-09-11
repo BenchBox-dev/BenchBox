@@ -1,0 +1,257 @@
+{
+  "context": "Use a split write/read architecture. Store raw bundles once, normalize into\ndurable metadata, and publish rebuildable read models for the explorer.\nPrefer static-friendly public reads and keep authenticated mutations behind\nthe hosted service boundary.\n",
+  "description": "Once BenchBox decides what a hosted result means, it still needs an\narchitecture that separates the mutable write path from the public read path.\nThe write path must ingest immutable raw bundles reliably; the read path must\nserve fast public exploration without forcing the browser to query arbitrary\nuploads directly.\n\nThis item defines the service boundary, storage tiers, async ingest model,\nrebuild strategy, and the derived public read models consumed by the results\nexplorer.\n\n**Phase assignment:** This TODO covers the full hosted ingest architecture\n(Phase 3). The Phase 1 static build pipeline (bundles → manifests → DuckDB\nsnapshot) is simpler and is tracked by dedicated Phase 1 implementation TODOs.\nThis item remains relevant for Phase 3 API design but is NOT a blocker for\nPhase 1 or Phase 2.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "collapse object storage keys, submission IDs, and public result URLs into one identifier",
+        "instead": "separate them explicitly",
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "why": "retries, rebuilds, and public permalinks have different lifecycles"
+      },
+      {
+        "dont": "make the explorer query arbitrary raw uploads as its primary data source",
+        "instead": "serve derived read models",
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "why": "that couples UX latency and safety to uncurated artifacts"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_item": "define-hosted-results-contract-and-governance-model"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_item": "define-results-platform-product-and-launch-strategy"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-27T00:00:00Z",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Raw schema-v2 bundles and companion files remain immutable source artifacts",
+        "item_id": "design-results-ingest-storage-and-derived-read-model"
+      },
+      {
+        "behavior": "The public explorer can be rebuilt from stored source artifacts plus durable metadata",
+        "item_id": "design-results-ingest-storage-and-derived-read-model"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/analysis/ingest-architecture-design.md && echo PRESENT",
+        "description": "Architecture design doc committed to _project/analysis/",
+        "expected": "PRESENT",
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'submission API\\|storage model\\|metadata schema\\|read model\\|deployment\\|backfill\\|failure' _project/analysis/ingest-architecture-design.md",
+        "description": "Design doc addresses all required topic areas",
+        "expected": "7",
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "notes": "Output: 1-page reference matrix documenting each platform's bundle format,\nstorage tier, idempotency model, and public read surface. Use as a\ngrounding input for w2 and w3 design choices.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Catalog 3 reference ingest architectures - survey Geekbench, OpenBenchmarking, and CloudSpecs submission → storage → projection pipelines",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "notes": "Define the hosted submission interface: what the CLI POSTs, how the service\nacknowledges receipt, and what guarantees are given on idempotent re-submit.\nOutput: submission-api.md with endpoint sketch and idempotency rules.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write submission API surface proposal: endpoints, idempotency rules, and bundle upload contract",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "notes": "Define where and how raw schema-v2 bundles are stored after receipt. Key\ndecisions: key naming (must survive rename/rebrand), retention policy,\nintegrity verification (hash check on ingest), and access control\nboundaries. Output: storage-model.md with object key scheme and retention\nrules.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write raw bundle storage model: object key scheme, retention tiers, and integrity properties",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "notes": "Capture the normalized data layer that separates the write path from the\npublic read path. Include submission-level fields (actor, timestamp, trust\ntier, visibility) and how they map to cohort membership and compare views.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define durable metadata schema for runs, submissions, actors, trust, and cohorts",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "notes": "Include static manifests, leaderboard projections, and whether a Parquet or\nDuckDB snapshot is worth shipping for browser-side analysis. Document the\nrebuild trigger and incremental update strategy.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define derived public read models: manifests, projections, and DuckDB-vs-Parquet tradeoffs",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "notes": "Document what runs as a long-lived service vs. a triggered worker vs. a\nstatic asset. Include deployment topology (e.g., Fly.io + R2 or equivalent)\nand cost model at low submission volume.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose deployment boundaries: API service, async workers, object storage, and static explorer assets",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "notes": "How does the platform recover from a corrupted read model, a failed\nsubmission, or a schema migration? Define rebuild triggers, retention\nwindows, and failure escalation paths.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define backfill, rebuild, retention, and failure-recovery procedures",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "design-results-ingest-storage-and-derived-read-model",
+        "notes": "Consolidate w1-w7 outputs into a single DESIGN.md under _project/analysis/.\nThis doc is the authoritative input for implementation TODOs that follow.\nPhase 3 cannot start without this review passing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write architecture design doc and get peer review before Phase 3 begins",
+        "wid": "w8"
+      }
+    ]
+  }
+}

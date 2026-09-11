@@ -1,0 +1,200 @@
+{
+  "description": "The capture timeout does not bound wall-clock time: capture_query_plan\nwraps get_query_plan in `with ThreadPoolExecutor(...)`, and after\nfuture.result(timeout=...) raises, the context exit calls\nshutdown(wait=True) which blocks until the hung EXPLAIN finishes.\nReproduced: timeout=1s, EXPLAIN sleeping 5s, call returned after 5.0s.\nA hung EXPLAIN stalls the whole benchmark; recorded capture_time_ms\n(~timeout) understates the real stall.\n\nSeparately, DuckDB capture defaults to EXPLAIN (ANALYZE, FORMAT JSON)\n(analyze_plans=True at adapter.py:128) which re-executes every measured\nquery: ~2x wall-clock and perturbed cache state, with no CLI-level notice.\nFingerprints are structure-only, so estimated plans lose nothing downstream.\n\nFindings: F4.1, F5.2.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "cancel via daemon-thread tricks that hide the hung EXPLAIN; record it as a capture failure with reason=timeout and the real elapsed time.",
+        "instead": "(not specified)",
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "keep using the abandoned connection after a timeout",
+        "instead": "(not specified)",
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "why": "the worker thread may still be executing on it."
+      }
+    ],
+    "item_meta": {
+      "category": "Reliability / Performance",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "Per-query timing continues to exclude capture time on SQL platforms (capture after measurement)",
+        "item_id": "qpc-04-capture-timeout-and-analyze-default"
+      },
+      {
+        "behavior": "analyze_plans=True still available and functional for users who want actual cardinalities",
+        "item_id": "qpc-04-capture-timeout-and-analyze-default"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/base/adapter.py:128-130 analyze_plans / plan_capture_timeout_seconds defaults",
+        "decision": "reuse",
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "path": "benchbox/platforms/base/adapter.py:128-130"
+      },
+      {
+        "concept": "benchbox/platforms/base/result_capture.py:601-633 capture_query_plan timeout block",
+        "decision": "reuse",
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "path": "benchbox/platforms/base/result_capture.py:601-633"
+      },
+      {
+        "concept": "benchbox/platforms/duckdb.py:1038-1067 get_query_plan EXPLAIN options",
+        "decision": "reuse",
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "path": "benchbox/platforms/duckdb.py:1038-1067"
+      },
+      {
+        "concept": "scratchpad repro repro_timeout_parsers.py — 1s-timeout/5s-hang repro",
+        "decision": "reuse",
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "path": "scratchpad"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_plan_capture_errors.py -q -k timeout",
+        "description": "Timeout bounds wall-clock",
+        "expected": "all pass, including new wall-clock bound test",
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_duckdb_plan_capture.py -q",
+        "description": "Default capture issues plain EXPLAIN (FORMAT JSON)",
+        "expected": "all pass",
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "notes": "Already landed on develop prior to this PR: capture_query_plan uses run_with_timeout (daemon thread + join(timeout)), which returns promptly on timeout instead of blocking in shutdown(wait=True); connection recycling after a timeout is handled in the isolated capture phase (benchbox/core/plan_capture_phase.py). Verified via test_capture_timeout_returns_promptly and test_capture_phase_replaces_owned_connection_after_timeout.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: make the capture timeout bound wall-clock — non-blocking executor shutdown, connection recycling, server-side bounds where supported.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "notes": "Notice wording: plan capture re-executes each query; timings are not comparable to non-capture runs. Implemented in adapter.py (default flip) and result_capture.py capture_query_plan (one-time per-run notice via quiet_console, guarded by _analyze_plans_notice_printed, reset in _reset_plan_capture_stats). CLI help text in cli/commands/run.py still describes the old default and is a documented follow-up outside this item's scope_limit.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: flip analyze_plans default to False; print a run-level notice when ANALYZE capture is explicitly enabled.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: tests — timeout actually bounds capture_query_plan wall-clock (hang 5s, timeout 1s, assert return < 2s); default EXPLAIN options contain no ANALYZE; notice printed when enabled.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Review: adversarial code review (connection-recycle path per platform, orphan-thread lifecycle, strict-mode interaction).",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix: address review findings; re-run verification.",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-04-capture-timeout-and-analyze-default",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Submit PR referencing qpc-04; document the analyze_plans default change in release notes.",
+        "wid": "w6"
+      }
+    ]
+  }
+}

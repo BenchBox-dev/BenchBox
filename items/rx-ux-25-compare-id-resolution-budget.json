@@ -1,0 +1,174 @@
+{
+  "context": "Delete the dead preliminary notice branch. Then bound resolution WORK rather than the first unique-ID slice - resolve in bounded batches until MAX_COMPARE_SELECTIONS canonical IDs are found, and describe any IDs never processed as unprocessed rather than as proven overflow.",
+  "description": "lib/compareRecovery.ts:70 and pages/Compare.tsx:140 call planCompareIds(rawIds, rawIds.length). Because the limit equals the input length, overflow is always empty and the notice branch at Compare.tsx:145-149 is unreachable dead code. The uncapped list is then fully resolved - one resolveShortId round trip per raw ID - before being sliced to MAX_COMPARE_SELECTIONS, so a crafted ?ids= with fifty entries fires fifty DuckDB round trips to discard forty-six. IMPORTANT CONSTRAINT found in review: the obvious fix of bounding that first call to four is WRONG. Alias deduplication happens after resolution at compareRecovery.ts:84-96, so capping the raw slice would discard a later unique ID whenever earlier entries resolve to the same run, breaking the documented alias-before-limit contract and its tests at compareRecovery.test.ts:38 and Compare.test.tsx:300. The post-alias overflow path is live and correct; only the preliminary branch is dead. Verified at HEAD 39ead3a41.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Bound the first planCompareIds call to MAX_COMPARE_SELECTIONS",
+        "instead": "INSTEAD budget resolution work in batches until four canonical ids are found",
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "why": "alias deduplication runs after resolution, so this discards a valid later ID when earlier ones are aliases and breaks the tested alias-before-limit contract"
+      },
+      {
+        "dont": "Label unprocessed ids as overflow",
+        "instead": "INSTEAD word them as unprocessed",
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "why": "they were never resolved so it is unknown whether they were aliases"
+      }
+    ],
+    "item_meta": {
+      "category": "bug",
+      "created_at": "2026-08-24T12:31:41Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Alias resolution continues to happen before the limit is applied",
+        "item_id": "rx-ux-25-compare-id-resolution-budget"
+      },
+      {
+        "behavior": "The post-alias overflow notice keeps its current wording and reachability",
+        "item_id": "rx-ux-25-compare-id-resolution-budget"
+      },
+      {
+        "behavior": "compareRecovery.test.ts:38 and Compare.test.tsx:300 keep passing unchanged",
+        "item_id": "rx-ux-25-compare-id-resolution-budget"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "live post-alias overflow path that must keep working",
+        "decision": "reuse",
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "path": "results-explorer/src/lib/compareRecovery.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/compareRecovery.test.ts"
+      },
+      {
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/compareRecovery.ts"
+      },
+      {
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npx vitest run src/lib/__tests__/compareRecovery.test.ts src/pages/__tests__/Compare.test.tsx",
+        "description": "Alias-before-limit contract intact",
+        "expected": "pass unchanged",
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/lib/__tests__/compareRecovery.test.ts",
+        "description": "Resolution work is bounded",
+        "expected": "fifty ids issue a bounded call count",
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run",
+        "description": "Explorer unit suite green",
+        "expected": "all pass",
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Delete the unreachable preliminary overflow notice branch and prove no user-visible notice changes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "GATE - specify the resolution budget and the wording distinction between unprocessed and overflow before implementing",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement batched resolution honouring alias-before-limit per the w2 specification",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "rx-ux-25-compare-id-resolution-budget",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Test that fifty ids issue a bounded number of resolveShortId calls and that alias-heavy inputs still retain the correct four",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "context": "Run a tuned ClickHouse benchmark against a real server (see uat-clickhouse-server-* items for stack setup), then read the .applied.json companion: check receipt.entries kinds/verdicts and the executed-statement order behind applied_ledger_hash. Compare against system.tables sorting_key/partition_key directly.",
+  "description": "PR #1331 (merged 2026-07-29) changed when a ClickHouse run may reach applied_verified, but every claim rests on a FAKE system.tables connection — no live ClickHouse was available. Ladder step 2 of clickhouse-tuning-ledger-soundness-1275-followups-20260724 was never run, and that item was completed without it. Four behaviours need live proof: (1) a combined PARTITION BY/ORDER BY table does NOT reach applied_verified unless the catalog partition_key corroborates; (2) a date-partitioned table (generator renders toYYYYMM(col)) DOES corroborate — the clause regex now captures the full expression, and getting this wrong silently blocks every date-partitioned run from ever verifying; (3) a partition-only tuned table is recorded and its unapplied partition blocks the run; (4) applied_ledger_hash orders CREATE TABLE before OPTIMIZE TABLE. Note (2) is the regression most likely to bite: it fails CLOSED (never verifies), so it is invisible unless explicitly checked.",
+  "legacy": {
+    "item_meta": {
+      "category": "verification",
+      "completed_at": "2026-07-30T20:00:13Z",
+      "completed_pr": 1369,
+      "created_at": "2026-07-30T18:52:55Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Findings correct the code, never the assertions — do not relax corroboration to make a live run pass",
+        "item_id": "clickhouse-applied-ledger-live-verification-20260730"
+      },
+      {
+        "behavior": "applied_verified stays earned: only ever record LESS, never over-certify",
+        "item_id": "clickhouse-applied-ledger-live-verification-20260730"
+      }
+    ],
+    "verifications": [
+      {
+        "command": null,
+        "description": "Live run: combined PARTITION BY/ORDER BY table does not reach applied_verified unless partition_key is corroborated",
+        "expected": null,
+        "item_id": "clickhouse-applied-ledger-live-verification-20260730",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_introspection.py -q",
+        "description": "ClickHouse ledger unit regressions still pass",
+        "expected": "pass",
+        "item_id": "clickhouse-applied-ledger-live-verification-20260730",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-applied-ledger-live-verification-20260730",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "clickhouse-applied-ledger-live-verification-20260730",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "clickhouse-applied-ledger-live-verification-20260730",
+        "needs_wid": "w0",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Used chDB (ClickHouse embedded in-process) via BenchBox's own ClickHouseLocalClient — a real ClickHouse engine and the same system.tables catalog a server exposes, so no container was needed. Drove the real adapter path: _optimize_table_definition -> connection.execute -> _record_tuned_sort_key_op -> ClickHouseTuningIntrospector -> corroborate. Live catalog confirmed: sorting_key='l_orderkey, l_linenumber', partition_key='toYYYYMM(l_shipdate)'",
+        "item_id": "clickhouse-applied-ledger-live-verification-20260730",
+        "notes": null,
+        "started_at": "2026-07-30T19:59:08Z",
+        "started_branch": "chore/clickhouse-applied-ledger-live-verification",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Stand up a live ClickHouse and run a tuned benchmark that renders both a PARTITION BY and an ORDER BY",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Live: executing the tuned CREATE TABLE WITHOUT the PARTITION BY while the ledger records the tuned intent leaves catalog partition_key='' -> verdict 'absent' -> status applied_unverified, even though sort_key corroborated. Over-certification on the sort key alone is blocked against a real engine",
+        "item_id": "clickhouse-applied-ledger-live-verification-20260730",
+        "notes": null,
+        "started_at": "2026-07-30T19:59:12Z",
+        "started_branch": "chore/clickhouse-applied-ledger-live-verification",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Confirm an uncorroborated partition_key blocks applied_verified",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Live: a date-partitioned table DOES reach applied_verified — both sort_key and partition_key corroborated against the real catalog value 'toYYYYMM(l_shipdate)'. Proved the test catches the fail-closed regression by reverting _KEY_CLAUSE_COLUMNS to the pre-#1331 '[^)]*' form: test_date_partitioned_table_earns_verification then fails (applied_unverified). This was the invisible risk — nothing errors, runs just never verify",
+        "item_id": "clickhouse-applied-ledger-live-verification-20260730",
+        "notes": null,
+        "started_at": "2026-07-30T19:59:16Z",
+        "started_branch": "chore/clickhouse-applied-ledger-live-verification",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Confirm a date-partitioned table (toYYYYMM) DOES corroborate — guards the regex fix failing closed",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Live: CREATE TABLE recorded at execute time then a real OPTIMIZE TABLE lineitem FINAL executed and recorded; ledger executed_statements order is ['CREATE','OPTIMIZE'], so applied_ledger_hash attests true chronology",
+        "item_id": "clickhouse-applied-ledger-live-verification-20260730",
+        "notes": null,
+        "started_at": "2026-07-30T19:59:20Z",
+        "started_branch": "chore/clickhouse-applied-ledger-live-verification",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Confirm applied_ledger_hash orders CREATE TABLE before OPTIMIZE TABLE",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Improve Athena adapter configuration validation with actionable error messages.\n\nCurrent gaps:\n- No validation for required S3 bucket/output location\n- Generic errors when AWS credentials are missing\n- No workgroup existence check before connection\n- Unclear errors for permission issues\n\nGoal: When configuration is incomplete, users get specific guidance\non what's missing and how to fix it.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Polish",
+      "created_at": "2025-12-13T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

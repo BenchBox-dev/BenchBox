@@ -1,0 +1,207 @@
+{
+  "context": "Follow complexity batches 3-7 pattern. For _run_sql_query, the DuckDB and SQLite\nbranches are nearly identical - factor out shared logic (load tables loop, warmup loop,\nbenchmark loop with row count capture) into a common pattern or extract per-platform\nhelpers that share a _time_query_iterations() utility.\n",
+  "description": "Five core functions at CC=14 have clear decomposition opportunities.\n\nTarget functions:\n1. validate (comparison.py:196) - extract _detect_outliers() and _validate_query_overlap()\n2. _rank_by_composite (ranking.py:361) - extract _compute_raw_scores() and _normalize_scores()\n3. _run_sql_query (benchmark_suite.py:1081) - extract _run_on_duckdb() and _run_on_sqlite()\n   (most clear-cut: two 90%-identical platform branches)\n4. convert_csv_to_parquet (data_loader.py:255) - extract _build_write_kwargs() and _resolve_arrow_types()\n5. execute_dry_run (dryrun.py:110) - extract _resolve_execution_mode() and _init_platform_adapter()",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the scoring formula in _rank_by_composite",
+        "instead": "only restructure the code",
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "why": "results must remain comparable with prior runs"
+      },
+      {
+        "dont": "create an ABC or strategy pattern for the DuckDB/SQLite dispatch",
+        "instead": "simple if/else with extracted helpers is sufficient",
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "why": "only 2 platforms exist"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-21T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "_rank_by_composite() composite scoring formula and weight handling unchanged",
+        "item_id": "complexity-core-analysis-dataframe-w15"
+      },
+      {
+        "behavior": "_run_sql_query() returns identical (mean_time, row_count) tuple for both DuckDB and SQLite",
+        "item_id": "complexity-core-analysis-dataframe-w15"
+      },
+      {
+        "behavior": "convert_csv_to_parquet() handles both CSV and TBL files with trailing delimiters",
+        "item_id": "complexity-core-analysis-dataframe-w15"
+      },
+      {
+        "behavior": "execute_dry_run() DryRunResult construction and error handling paths unchanged",
+        "item_id": "complexity-core-analysis-dataframe-w15"
+      },
+      {
+        "behavior": "validate() error/warning accumulation behavior and return type unchanged",
+        "item_id": "complexity-core-analysis-dataframe-w15"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/comparison.py"
+      },
+      {
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/ranking.py"
+      },
+      {
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/benchmark_suite.py"
+      },
+      {
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/data_loader.py"
+      },
+      {
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dryrun.py"
+      },
+      {
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/ -v",
+        "description": "Core analysis tests pass",
+        "expected": "all tests pass",
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/dataframe/ -v -k 'not integration'",
+        "description": "Dataframe tests pass",
+        "expected": "all tests pass",
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make complexity-check",
+        "description": "Complexity check passes",
+        "expected": "PASSED; these functions no longer in top-20",
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "notes": "Most impactful - near-duplicate platform branches are the primary code smell",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _run_on_duckdb() and _run_on_sqlite() from _run_sql_query in benchmark_suite.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _compute_raw_scores() and _normalize_scores() from _rank_by_composite in ranking.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _detect_outliers() and _validate_query_overlap() from validate in comparison.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _build_write_kwargs() and _resolve_arrow_types() from convert_csv_to_parquet in data_loader.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _resolve_execution_mode() and _init_platform_adapter() from execute_dry_run in dryrun.py",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-core-analysis-dataframe-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run complexity check and full test suite to verify no regressions",
+        "wid": "w6"
+      }
+    ]
+  }
+}

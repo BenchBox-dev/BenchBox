@@ -1,0 +1,165 @@
+{
+  "description": "WS5 of _project/planning/ci-failure-reduction-plan.md. The allowlist/drift guard class (dependency inventory DRIFT, oracle coverage map, parity fixtures, UAT LOC table, release curation list, skill-sync lock, module-size allowlist, DDL governance aliases, CLI-surface allowlist) produces a steady trickle of one-full-CI-round-trip failures, each fixed by a known mechanical action that agents currently rediscover from a hand-carried triage prompt.\n\nThree parts: (1) `make guards-fix` runs every regenerable-artifact fixer (dependency_audit/parse_deps.py, oracle coverage map regen, parity fixtures, uat_loc_table, curation list, skill-sync) then prints git status; (2) remediation-message audit: every drift guard's failure output prints the exact command or ready-to-paste line (DDL check names _DDL_GOVERNANCE_TRANSFORMER_ALIASES; module-size guard prints the allowlist entry with current line count per its re-baseline convention), pinned by asserting the message in each guard's unit test; (3) worktree-claim ensures pre-commit hooks (incl. codespell) are installed in pool worktrees, so spelling never reaches CI.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Auto-run guards-fix in CI to self-heal drift",
+        "instead": "CI fails with the message; the author runs guards-fix locally and commits the diff",
+        "item_id": "guards-fix-regen-target",
+        "why": "Drift signals a decision (a dependency added, a surface changed); silent regen hides it from review"
+      },
+      {
+        "dont": "Free-text the remediation messages without tests",
+        "instead": "Assert the remediation text in each guard's unit test",
+        "item_id": "guards-fix-regen-target",
+        "why": "Messages rot as scripts move (the disease this item treats)"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "created_at": "2026-07-23T12:29:39Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Each guard still fails CI on drift; guards-fix is remediation, not suppression",
+        "item_id": "guards-fix-regen-target"
+      },
+      {
+        "behavior": "guards-fix only regenerates artifacts - it never edits allowlists/ceilings (those stay deliberate human/agent edits with rationale)",
+        "item_id": "guards-fix-regen-target"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "guards-fix-regen-target",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "guards-fix-regen-target",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/**"
+      },
+      {
+        "item_id": "guards-fix-regen-target",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/decision.py"
+      },
+      {
+        "item_id": "guards-fix-regen-target",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/resolver.py"
+      },
+      {
+        "item_id": "guards-fix-regen-target",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/rules/_registration.py"
+      },
+      {
+        "item_id": "guards-fix-regen-target",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/pr/**"
+      },
+      {
+        "item_id": "guards-fix-regen-target",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "guards-fix-regen-target",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "guards-fix-regen-target",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/inventory.py"
+      },
+      {
+        "item_id": "guards-fix-regen-target",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "guards-fix-regen-target",
+        "kind": "only_modify",
+        "path_glob": "tests/system/**"
+      },
+      {
+        "item_id": "guards-fix-regen-target",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_no_cli_surface_drift.py"
+      },
+      {
+        "item_id": "guards-fix-regen-target",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make guards-fix && git status --porcelain",
+        "description": "guards-fix runs clean on develop and is a no-op",
+        "expected": "exit 0, empty status",
+        "item_id": "guards-fix-regen-target",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rln 'guards-fix\\|remediation' tests/system/ tests/unit/ | head",
+        "description": "Remediation-message assertions exist",
+        "expected": ">= 1 test file asserting guard failure messages",
+        "item_id": "guards-fix-regen-target",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "guards-fix-regen-target",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "guards-fix-regen-target",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Inventory regenerable guards + regen commands; wire `make guards-fix`; mention it in the pr skill and failure messages",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "guards-fix-regen-target",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Remediation-message audit across all drift guards; add message assertions to their unit tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "guards-fix-regen-target",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "worktree-claim installs pre-commit hooks in pool worktrees (codespell coverage at commit time)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

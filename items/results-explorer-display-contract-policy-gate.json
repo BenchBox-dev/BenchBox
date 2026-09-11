@@ -1,0 +1,252 @@
+{
+  "context": "Treat this item as architecture and policy. Gather durable evidence first,\nthen decide the vocabulary and thresholds. Use the decision artifact as the\ncontract for all dependent implementation TODOs. Prefer a stricter\nsuppress-and-explain policy where evidence is ambiguous; users can inspect\nprovenance, but the product must not make unsupported winner or rank claims.\n",
+  "description": "The 2026-05-10 Results Explorer follow-up review found that the frontend\nrenders rows that are public but not meaningfully rankable or comparable.\nAMPLab cohorts show the failure mode clearly: some rows have no non-null\nquery timings, some rows have `display_ms = 0.0`, every AMPLab row is\n`is_ranking_eligible=false`, and Compare still emits winner language from\na single comparable query.\n\nThis TODO is the decision gate for the whole remediation sequence. It must\ndefine the contract before implementation begins: what \"published\",\n\"displayable\", \"has timing data\", \"rankable\", \"comparable\", \"passed\",\n\"No run\", and \"sub-millisecond\" mean in the Results Explorer. Later TODOs\nmust consume this contract rather than inventing per-component exceptions.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix individual screenshots before defining eligibility semantics",
+        "instead": "define the shared contract first.",
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "why": "each component currently applies a different local rule"
+      },
+      {
+        "dont": "hide excluded rows without a provenance path",
+        "instead": "quarantine them with reasons instead.",
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "why": "users still need to audit submitted results"
+      },
+      {
+        "dont": "replace zero timings with arbitrary epsilon values",
+        "instead": "preserve true values and mark invalid/excluded where needed.",
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "why": "that corrupts benchmark metrics"
+      },
+      {
+        "dont": "treat `validation_status=passed` as proof of timing quality",
+        "instead": "add separate timing/ranking/comparison states.",
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "why": "AMPLab has passed rows with no display timings"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-11T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing result detail URLs and receipt anchors remain stable.",
+        "item_id": "results-explorer-display-contract-policy-gate"
+      },
+      {
+        "behavior": "No timing values are fabricated to make charts or rankings look cleaner.",
+        "item_id": "results-explorer-display-contract-policy-gate"
+      },
+      {
+        "behavior": "Public result provenance remains accessible from receipt/detail pages.",
+        "item_id": "results-explorer-display-contract-policy-gate"
+      },
+      {
+        "behavior": "Validation status continues to mean validation status only; it must not be redefined as ranking/comparison eligibility.",
+        "item_id": "results-explorer-display-contract-policy-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/planning/visible_metrics.yaml:visible metric catalog — extend with eligibility and exclusion fields.",
+        "decision": "extend",
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "path": "_project/planning/visible_metrics.yaml:visible"
+      },
+      {
+        "concept": "benchbox/core/explorer_pipeline/ranking.py:rank_platforms — extend for rankability semantics rather than ranking in the frontend.",
+        "decision": "extend",
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "path": "benchbox/core/explorer_pipeline/ranking.py:rank_platforms"
+      },
+      {
+        "concept": "benchbox/core/explorer_pipeline/transformer.py:_query_display_ms — reuse as the canonical per-query display reduction entry point.",
+        "decision": "reuse",
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "path": "benchbox/core/explorer_pipeline/transformer.py:_query_display_ms"
+      },
+      {
+        "concept": "benchbox/core/results/status.py:validation status helpers — reuse for validation/pass semantics but do not overload them as rankability.",
+        "decision": "reuse",
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "path": "benchbox/core/results/status.py:validation"
+      },
+      {
+        "concept": "docs/development/browser-duckdb-schema.sql:read-model schema — extend as the contract surface consumed by the frontend.",
+        "decision": "extend",
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "path": "docs/development/browser-duckdb-schema.sql:read-model"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/results.duckdb"
+      },
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-display-contract-policy-gate.yaml"
+      },
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      },
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-display-contract-policy-gate/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -s _project/verification-logs/results-explorer-display-contract-policy-gate/w0.log && rg -n \"HEAD|/results/|/results/amplab/|/results/compare\\?ids=61ba4644,e16ac6db,07650b37|no_geomean|eligible|PASS|FAIL\" _project/verification-logs/results-explorer-display-contract-policy-gate/w0.log",
+        "description": "Evidence log captures current broken state and browser routes",
+        "expected": "w0.log includes checked SHA, SQL counts, and route-level browser PASS/FAIL notes",
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate",
+        "description": "TODO graph validates after creating this policy gate",
+        "expected": "validation passes",
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "notes": "Capture the current evidence before any code changes. Store command output\nunder `_project/verification-logs/results-explorer-display-contract-policy-gate/w0.log`.\nInclude:\n  - `git rev-parse HEAD`;\n  - SQL counts for no-geomean rows by benchmark/scale/phase;\n  - AMPLab SF0.01 power rows from `benchmark_rankings`;\n  - per-result non-null timing counts from `benchmark_matrix_cells`;\n  - zero-valued rows from `query_display_timings`;\n  - browser observations for `/results/`, `/results/amplab/`, and the\n    AMPLab Compare URL.\nThe log must include the checked SHA plus route-level PASS/FAIL notes.\nIf screenshots or browser traces are captured separately, store them under\nthe same verification-log directory and reference their paths from `w0.log`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-capture the current broken-state SQL and browser evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "notes": "Create a short decision artifact under `_project/analysis/` that defines\neach state and its source of truth:\n  - publishable;\n  - displayable;\n  - has_display_timing;\n  - valid_query_count;\n  - rankable;\n  - comparable;\n  - validation passed;\n  - trusted / trust tier;\n  - missing run;\n  - missing timing;\n  - sub-millisecond timing.\nThe table must explicitly say which states may be inferred by the frontend\nand which must be emitted by the pipeline/read model.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write the Results Explorer eligibility vocabulary and state table",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "notes": "Decide whether `display_ms = 0.0` means invalid data, measured\nsub-millisecond data, or a legacy rounding artifact. Document the rule and\nthe migration behavior. The safe default is: positive fractional timings\nmay display as `<1 ms`; exact zero timings are invalid for ranking and\ncomparison until the pipeline can prove they were measured positive values.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make a decision on zero and sub-millisecond timing semantics",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "notes": "Define the minimum comparable query coverage required before Compare may\nemit winner language such as \"X is faster\". The rule must include both an\nabsolute floor and a percentage floor, for example: at least 2 comparable\nqueries and at least 50% of the cohort query set. If the threshold is not\nmet, Compare must show insufficient-evidence copy and suppress winner\nclaims.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define evidence thresholds for Compare winner language",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "notes": "Specify how each page treats rows that are public but not display-safe:\n  - Home meta leaderboard;\n  - benchmark matrix/rank/list pages;\n  - chart panels;\n  - platform detail tables;\n  - Compare selection;\n  - Query Workbench result rows.\nThe rule must distinguish hiding from default-visible exclusion disclosure.\nProvenance should remain accessible, but no-timing rows must not look like\nvalid ranked/comparable evidence.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define page-level behavior for excluded rows and unrankable cohorts",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-display-contract-policy-gate",
+        "notes": "Before starting dependent implementation TODOs, update their guardrails if\nthe decisions in w1-w4 change the proposed scope. This is the decision gate:\ndo not implement spot fixes in `results-explorer/src/` until this policy\nitem is complete.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Review the policy with the current TODO sequence before implementation",
+        "wid": "w5"
+      }
+    ]
+  }
+}

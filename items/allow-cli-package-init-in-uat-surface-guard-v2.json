@@ -1,0 +1,50 @@
+{
+  "context": "Add benchbox/cli/__init__.py to ALLOWED_INTERNAL_CLI_FILES with a rationale tied to cli-package-shadows-main-submodule-with-function; add a focused guard test for allowlist membership and body-only __getattr__ change classification.",
+  "description": "The cli-package-shadows-main-submodule-with-function production fix must modify benchbox/cli/__init__.py, but the fast UAT surface guard rejects that path before applying its AST surface check. Add the path as an explicitly reviewed internal CLI file and a non-vacuity test proving body-only __getattr__ changes are allowed while the existing decorator/signature guards remain active.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-29T12:54:03Z",
+      "completed_pr": 1335,
+      "created_at": "2026-07-29T12:47:18Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "the guard still rejects unreviewed benchbox/cli paths and detects Click decorator or signature changes",
+        "item_id": "allow-cli-package-init-in-uat-surface-guard-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "allow-cli-package-init-in-uat-surface-guard-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_no_cli_surface_drift.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/uat/test_no_cli_surface_drift.py -q",
+        "description": "The allowlist and non-vacuity guard tests pass",
+        "expected": "exit 0",
+        "item_id": "allow-cli-package-init-in-uat-surface-guard-v2",
+        "last_result": "pass",
+        "last_run": "2026-07-29T12:47:58Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "6 targeted UAT surface-guard tests passed; new non-vacuity case proves package-init body changes remain non-surface; Ruff check/format passed",
+        "item_id": "allow-cli-package-init-in-uat-surface-guard-v2",
+        "notes": null,
+        "started_at": "2026-07-29T12:47:24Z",
+        "started_branch": "fix/allow-cli-init-uat-guard",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Allow benchbox/cli/__init__.py through the internal-file gate with a root-cause rationale and non-vacuity test",
+        "wid": "w1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,189 @@
+{
+  "description": "The TPC-H and TPC-DS throughput tests generate each query INSIDE the timed,\nconcurrent per-stream loop, and query generation shells out to a subprocess.\n\n- TPC-H: `TPCHThroughputTest._execute_stream` (benchbox/core/tpch/throughput_test.py:207-228)\n  captures `query_start = mono_time()` (line 208) and THEN calls\n  `self.benchmark.get_query(...)` (line 223). `get_query` -> `QGen.generate`\n  (benchbox/core/tpch/queries.py:28-78) spawns a `qgen` subprocess, creates a\n  `TemporaryDirectory`, and `shutil.copy2` copies `dists.dss` on EVERY call.\n- TPC-DS: `TPCDSThroughputTest._execute_single_query`\n  (benchbox/core/tpcds/throughput_test.py:333-346) captures `query_start`\n  then calls `_get_stream_query_text` -> `get_query` -> `dsqgen`\n  (benchbox/core/tpcds/c_tools.py:933) subprocess.\n\nTwo distinct second-order problems, both of which distort the throughput\nmeasurement the test exists to produce:\n\n1. MEASUREMENT CONTAMINATION: subprocess spawn + temp-dir + file-copy time is\n   counted inside `execution_time_seconds`, so per-query timings and the\n   derived `query_throughput` include query-generation cost, not just DB\n   execution. TTT itself (first-stream-start -> last-stream-end) is also\n   inflated by generation done during the concurrent window.\n2. ARTIFICIAL BOTTLENECK UNDER CONCURRENCY: with N streams, N threads each\n   fork a `qgen`/`dsqgen` process, create a temp dir, and copy a dists file\n   concurrently. Process creation, the GIL around subprocess management, and\n   filesystem contention serialize what is supposed to be parallel DB work.\n   The more streams you add (the whole point of a throughput test), the worse\n   the generation contention becomes -- so the harness can mask real platform\n   scaling behind its own driver overhead.\n\nFix: generate the full per-stream query text (the ordered list of SQL strings\nfor each stream) BEFORE `StreamRunner.execute` starts the concurrent window,\nand have `_execute_stream` iterate over pre-materialized SQL. The timed region\nmust contain only connection use and DB execution. This mirrors how a real\nTPC driver submits a prepared query set per session.\n\nUSE THE NATIVE BATCH STREAM MODE, don't reassemble by hand. Both binaries can\nemit a whole stream in ONE subprocess call:\n- TPC-H: qgen's `-p <stream>` flag generates all 22 queries in the official\n  permuted order for a stream in a single invocation. BenchBox ALREADY wraps\n  this in TPCHStreamManager._generate_stream_queries_qgen\n  (benchbox/core/tpch/streams.py) -- but the throughput test bypasses it and\n  calls the per-query QGen.generate (queries.py:28) inside the timed loop\n  instead. Route throughput generation through the existing native `-p` path\n  (or an equivalent single-call batch) so one qgen call replaces 22, per\n  stream, before the timed window.\n- TPC-DS: the analogous fix is `dsqgen -STREAMS N`, owned by\n  tpcds-throughput-permutation-compliance (which also restores official\n  ordering + per-stream parameters). This item and that one share the same\n  \"batch-generate all streams up front\" mechanism; coordinate so TPC-H and\n  TPC-DS converge on the same pre-generated-workload shape.\n\nSo the per-query subprocess churn is not just moved out of the timed loop --\nit is collapsed from O(streams x queries) subprocess spawns to O(streams) (or\neven one), using each binary's native stream capability that BenchBox already\nhas a wrapper for (TPC-H) or should adopt (TPC-DS).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "cache qgen output globally across seeds",
+        "instead": "key any cache by (stream_id, position, seed).",
+        "item_id": "throughput-pregenerate-query-streams",
+        "why": "throughput streams use per-stream seeds"
+      },
+      {
+        "dont": "keep calling per-query QGen.generate for throughput",
+        "instead": "route through _generate_stream_queries_qgen instead of reinventing it.",
+        "item_id": "throughput-pregenerate-query-streams",
+        "why": "a native batch path (qgen -p) already exists"
+      },
+      {
+        "dont": "move DB execution out of the timed region",
+        "instead": "(not specified)",
+        "item_id": "throughput-pregenerate-query-streams",
+        "why": "only generation moves out."
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-09T00:00:00Z",
+      "created_at": "2026-07-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Per-stream, per-position seeds remain `seed + stream_id*1000 + position` so generated SQL is byte-identical to today (only WHEN it is generated changes).",
+        "item_id": "throughput-pregenerate-query-streams"
+      },
+      {
+        "behavior": "TPC-H PERMUTATION_MATRIX stream ordering and TPC-DS StreamQuery ordering are unchanged.",
+        "item_id": "throughput-pregenerate-query-streams"
+      },
+      {
+        "behavior": "dry-run captured_items still records the labeled SQL for every stream/position.",
+        "item_id": "throughput-pregenerate-query-streams"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/planning/tpcds-throughput-permutation-compliance.yaml — owns the TPC-DS `dsqgen -STREAMS N` batch path; converge both benchmarks on the same pre-generated-workload shape.",
+        "decision": "reuse",
+        "item_id": "throughput-pregenerate-query-streams",
+        "path": "_project/TODO/main/planning/tpcds-throughput-permutation-compliance.yaml"
+      },
+      {
+        "concept": "benchbox/core/throughput/runner.py:StreamRunner.execute — the concurrent window whose body must contain only DB execution; generation must happen before it.",
+        "decision": "reuse",
+        "item_id": "throughput-pregenerate-query-streams",
+        "path": "benchbox/core/throughput/runner.py:StreamRunner.execute"
+      },
+      {
+        "concept": "benchbox/core/tpcds/streams.py:create_standard_streams — builds the StreamQuery ordering used per stream.",
+        "decision": "reuse",
+        "item_id": "throughput-pregenerate-query-streams",
+        "path": "benchbox/core/tpcds/streams.py:create_standard_streams"
+      },
+      {
+        "concept": "benchbox/core/tpcds/throughput_test.py:_preflight_validate_generation — already generates all queries up front (outside TTT); extend this idea to CAPTURE and reuse the generated SQL instead of regenerating inside the loop.",
+        "decision": "extend",
+        "item_id": "throughput-pregenerate-query-streams",
+        "path": "benchbox/core/tpcds/throughput_test.py:_preflight_validate_generation"
+      },
+      {
+        "concept": "benchbox/core/tpch/queries.py:QGen.generate — the per-query path the throughput test currently uses inside the timed loop (temp-dir + dists.dss copy per call); the thing being replaced for throughput.",
+        "decision": "reuse",
+        "item_id": "throughput-pregenerate-query-streams",
+        "path": "benchbox/core/tpch/queries.py:QGen.generate"
+      },
+      {
+        "concept": "benchbox/core/tpch/streams.py:_generate_stream_queries_qgen — the EXISTING native `qgen -p <stream>` batch path (whole stream, one subprocess, official permutation); route throughput generation through this instead of per-query QGen.generate.",
+        "decision": "reuse",
+        "item_id": "throughput-pregenerate-query-streams",
+        "path": "benchbox/core/tpch/streams.py:_generate_stream_queries_qgen"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "throughput-pregenerate-query-streams",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/throughput_test.py"
+      },
+      {
+        "item_id": "throughput-pregenerate-query-streams",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/queries.py"
+      },
+      {
+        "item_id": "throughput-pregenerate-query-streams",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/streams.py"
+      },
+      {
+        "item_id": "throughput-pregenerate-query-streams",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/throughput_test.py"
+      },
+      {
+        "item_id": "throughput-pregenerate-query-streams",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_throughput_corrections.py"
+      },
+      {
+        "item_id": "throughput-pregenerate-query-streams",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_tpcds_throughput_test.py"
+      },
+      {
+        "item_id": "throughput-pregenerate-query-streams",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_tpch_throughput_test.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_tpch_throughput_test.py tests/integration/test_tpcds_throughput_test.py tests/unit/core/throughput/ -v",
+        "description": "Throughput unit/integration tests still pass",
+        "expected": "all pass",
+        "item_id": "throughput-pregenerate-query-streams",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_throughput_corrections.py -v",
+        "description": "Generation cost is excluded from measured execution time",
+        "expected": "timing tests pass; generation sleep not counted",
+        "item_id": "throughput-pregenerate-query-streams",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "throughput-pregenerate-query-streams",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "throughput-pregenerate-query-streams",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "throughput-pregenerate-query-streams",
+        "notes": "In TPCHThroughputTest.run, before StreamRunner.execute, build a\n{stream_id: [sql, ...]} map. Route generation through the EXISTING native\n`qgen -p <stream>` path (TPCHStreamManager._generate_stream_queries_qgen)\nso one subprocess emits a stream's 22 queries in official permuted order,\ninstead of 22 QGen.generate calls with per-call temp-dir + dists.dss copy.\n_execute_stream then consumes pre-built SQL; the qgen call leaves the timed\nloop entirely. Preserve the per-position seed (`seed + stream_id*1000 +\nposition`) so generated SQL is byte-identical to today.\n\nIMPLEMENTED WITH A DEVIATION from \"route through the native qgen -p\npath\": did not use _generate_stream_queries_qgen. Verified by reading\n_sources/tpc-h/dbgen/qgen.c main() and rnd.c that the -p path seeds a\nSINGLE subprocess invocation with `rng_seed + stream_id` and derives\nall 22 per-query seeds internally from that one Park-Miller LCG chain\n(Seed[0]=rndm; for i=1..22: Seed[0]=NextRand(Seed[0]); Seed[i]=Seed[0];\nqsub indexes Seed[qnum] by query NUMBER, not position). This throughput\ntest's seed formula (`seed + stream_id*1000 + position`) instead starts\na FRESH LCG chain per query, keyed by position -- a different scheme\nthat produces different SQL for the same nominal seed. Confirmed no\naccidental convergence anywhere in the codebase (TPCHStreams is never\ninstantiated by TPCHThroughputTest). Routing through the batch path\nwould have silently changed every query's substitution parameters,\nviolating must_preserve. Instead: added TPCHThroughputTest.\n_pregenerate_stream_queries() (benchbox/core/tpch/throughput_test.py),\nwhich calls the EXISTING self.benchmark.get_query() path (same seed\nformula, same call signature) for all streams via a ThreadPoolExecutor,\nentirely before StreamRunner.execute; _execute_stream reads the result\nfrom an instance-attribute cache (self._pregenerated_queries) so its\nsignature/call-site stayed untouched (required -- out-of-scope tests\ntests/unit/core/test_tpc_reporting_execution.py and\ntests/unit/tpch/test_tpch_compliance.py call/monkeypatch _execute_stream\nwith the historical 3-arg signature). Complementary fix in\nbenchbox/core/tpch/queries.py: QGenBinary now lazily creates and reuses\nONE working directory across all generate() calls (thread-safe via a\nlock) instead of a fresh tempfile.TemporaryDirectory() + dists.dss copy\nper call -- qgen only reads dists.dss and writes to stdout in this\nmode, so sharing one dir concurrently is safe. This addresses the\nTODO's stated overhead complaint (per-call temp-dir + copy churn) even\nthough subprocess count remains O(streams x queries) rather than\ncollapsing to O(streams). Byte-identity verified empirically: script\ngenerated the same 2 streams x 22 queries via the pre-change inline\nformula and the new _pregenerate_stream_queries() path at SF 0.01,\nzero mismatches (not committed -- ad hoc verification script).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pre-generate ordered SQL per stream for TPC-H via the native qgen -p batch path, before the concurrent window",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-pregenerate-query-streams",
+        "notes": "_preflight_validate_generation already generates every query; capture its\noutput keyed by (stream_id, position) and feed _execute_single_query from\nthat cache. Keep preflight's fail-fast behavior.\n\nIMPLEMENTED AS A NEW METHOD rather than repurposing\n_preflight_validate_generation in place: that method is called\ndirectly by out-of-scope tests (tests/unit/core/\ntest_tpc_reporting_execution.py, tests/unit/core/tpcds/\ntest_throughput_test_coverage.py) and had to keep its exact behavior\n(including a latent quirk -- it iterates query IDs 1..99 in natural\norder with `stream_seed = config.base_seed + stream_id*1000 +\nposition`, missing the `+ stream_id` seed offset real execution\napplies via `seed = config.base_seed + stream_id`, and never resolves\nvariants/permutation -- so it was already only an approximate\npre-check, not a faithful capture of what a stream actually runs).\nAdded TPCDSThroughputTest._pregenerate_stream_queries()\n(benchbox/core/tpcds/throughput_test.py), which for each stream calls\nthe existing _build_stream_queries() (untouched -- TPC-DS stream/\npermutation logic in streams.py is out of scope and unmodified) to\nresolve the real per-stream ordering/variant subset, then generates\neach entry's SQL via the existing _get_stream_query_text() using the\nEXACT per-position seed formula _execute_single_query already used\n(`seed + stream_id*1000 + position`, seed = base_seed + stream_id).\nRaises immediately on any failure (fail-fast, matching the historical\npreflight contract) and is only invoked when config.enable_preflight\nis True -- when False, self._pregenerated_queries stays None and\n_execute_stream/_execute_single_query fall back to on-the-fly\ngeneration exactly as before (required for back-compat: several\nout-of-scope tests pass benchmark doubles without a real\nquery_manager and rely on enable_preflight=False to avoid touching\ngeneration at all during run()). _execute_stream also reuses the\npregenerated StreamQuery ordering instead of calling\n_build_stream_queries() again inside the timed region, which\nincidentally removes a latent race: create_standard_streams's\npermutation generator calls Python's global random.seed() per stream,\nwhich the OLD code invoked concurrently (once per thread) inside\nStreamRunner.execute's ThreadPoolExecutor; pre-generation now resolves\nevery stream's ordering sequentially, single-threaded, before any\nconcurrency starts. Byte-identity verified empirically the same way as\nw1 (old-formula vs new-path SQL for 2 streams x 10 queries at SF 1.0,\nzero mismatches).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Do the same for TPC-DS: reuse/capture the preflight-generated SQL instead of regenerating in _execute_single_query",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "throughput-pregenerate-query-streams",
+        "notes": "Test with an instrumented get_query that sleeps; confirm per-query\nexecution_time_seconds and TTT do not include the sleep.\n\nAdded TestGenerationExcludedFromTiming in\ntests/integration/test_throughput_corrections.py with one test per\nbenchmark: get_query sleeps 0.3s per call (22 calls for TPC-H, 3 for\nTPC-DS with queries_per_stream=3 + enable_preflight=True), then\nasserts result.total_time (TTT) is under the total sleep budget and\nevery query_results[i][\"execution_time_seconds\"] is under a single\nsleep. Verified the tests are not vacuous by stashing the w1/w2\nsource changes (keeping only this test file) and re-running: both\nfailed against pre-change code (TTT included the full 6.6s/0.9s of\ngeneration sleep), confirming they exercise the actual fix.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Assert the timed region excludes generation; add a regression test that generation time is not in execution_time_seconds",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,153 @@
+{
+  "context": "Look-before-you-leap: read the test first, decide port vs keep based on\nwhat lxml feature it actually uses. Don't blindly remove and break.\n",
+  "description": "`lxml>=5.0.0` is declared in `[dependency-groups] dev`. The only import\nsite in the entire repo is `tests/unit/core/tpcdi/test_etl_sources.py:22`.\nTPC-DI ETL itself uses stdlib `xml.etree`, not lxml.\n\nTwo options:\n  A. Port the single test to `xml.etree.ElementTree` and remove the dep.\n  B. Keep the dep and add an inline comment in pyproject.toml explaining\n     why this single test needs lxml-specific behavior.\n\nOption A is preferred unless the test relies on lxml-specific XPath /\nvalidation features that stdlib cannot replicate.\n\nSource for this finding: `docs/development/dependency-inventory.md` (F3),\nproduced by `audit-imported-dependencies-for-elimination`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "remove lxml without porting the test",
+        "instead": "port first, remove second",
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "why": "`pytest tests/unit/core/tpcdi/test_etl_sources.py` would break"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "id": 152,
+        "reason": "Out of scope; covered by the parent audit.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Explicitly marked out of scope and covered by the parent dependency audit, which is done.",
+        "summary": "Audit other dev deps with single-test usage"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-15T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Fast suite green",
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib"
+      },
+      {
+        "behavior": "`benchbox/core/tpcdi/etl/` continues to use stdlib xml.etree (no lxml import added)",
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib"
+      },
+      {
+        "behavior": "`tests/unit/core/tpcdi/test_etl_sources.py` continues to pass",
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpcdi/test_etl_sources.py"
+      },
+      {
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpcdi/test_etl_sources.py -v",
+        "description": "Test still passes",
+        "expected": "1 or more passed",
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import tomllib, pathlib; d = tomllib.loads(pathlib.Path('pyproject.toml').read_text()); all_specs = d['project']['dependencies'] + sum(d['project'].get('optional-dependencies', {}).values(), []) + sum((g for g in d.get('dependency-groups', {}).values()), []); has_lxml = any(isinstance(s, str) and 'lxml' in s for s in all_specs); print('LXML_PRESENT' if has_lxml else 'OK: lxml fully removed')\"",
+        "description": "If removal path was taken, lxml not declared anywhere",
+        "expected": "OK: lxml fully removed (or LXML_PRESENT if keep-with-rationale was chosen)",
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Read `tests/unit/core/tpcdi/test_etl_sources.py` and identify which lxml API surface (XPath / validation / parser) the test actually uses.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide port-vs-keep based on w1 findings: stdlib-only API → port to xml.etree; lxml-specific features → keep dep with inline rationale.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "If ported: remove `lxml>=5.0.0` from `[dependency-groups] dev` and refresh uv.lock.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-lxml-dev-dep-or-port-test-to-stdlib",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the affected test to confirm it still passes: `uv run -- python -m pytest tests/unit/core/tpcdi/test_etl_sources.py -v`.",
+        "wid": "w4"
+      }
+    ]
+  }
+}

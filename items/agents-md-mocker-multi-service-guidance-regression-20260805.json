@@ -1,0 +1,158 @@
+{
+  "context": "Restore the specific guidance with the per-platform service counts stated\nexplicitly, and add a machine-checkable assertion so the claim cannot drift from\nthe compose files it describes.\n",
+  "description": "Supersedes agents-md-mocker-multi-service-guidance-regression, dropped the same day: verification ladders are\ncreate-time-only in this tracker, so a lint finding on a rung can only be\nfixed by recreating the item.\n\nCommit fd29aa77c0 compressed a specific, actionable mocker caveat into vague\ntext. The original read, in substance: multi-service stacks are NOT validated --\ndatabend stays healthy on docker but its minio service exits on mocker, so use\ndocker for multi-service; doris and starrocks are all-in-one single containers\nand are fine.\n\nAGENTS.md now says only that mocker is local-only and unsuitable for certain\ncases. On 2026-08-04 that wording caused an agent to assert that doris and\nstarrocks were the known-bad multi-service case and to plan around a constraint\nthat does not exist. The user corrected it three times before the original text\nwas recovered by git archaeology. Verified against the compose files: databend\nhas 3 services, doris 1, starrocks 1.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "compress this again in a future canonicalization pass without checking what the specifics were",
+        "instead": "keep the detail in the operator guide, which canonicalization does not compress",
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "why": "fd29aa77c0 lost operational detail that cost a session to recover"
+      },
+      {
+        "dont": "generalize to 'mocker cannot do multi-service'",
+        "instead": "name the platform and the service that fails",
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "why": "that is the false claim the compression produced; the validated failure is specific to databend's minio service"
+      },
+      {
+        "dont": "restore the guidance as prose only",
+        "instead": "state the counts and add a test asserting them",
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "why": "prose is exactly what drifted; the service counts it asserts are checkable from the compose files"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-08-13T14:03:31Z",
+      "completed_pr": 1619,
+      "created_at": "2026-08-05T15:12:55Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "AGENTS.md remains the active authority and stays concise; the detail lives in the operator guide with AGENTS.md pointing at it.",
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805"
+      },
+      {
+        "behavior": "No change to container engine resolution behavior.",
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "line 147 currently carries the compressed wording; restore specificity in place rather than adding a second mocker section elsewhere",
+        "decision": "extend",
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "path": "AGENTS.md"
+      },
+      {
+        "concept": "operator guide already documents container engine resolution; the detailed mocker caveats belong here with AGENTS.md pointing at it",
+        "decision": "extend",
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "path": "docs/operations/uat-framework.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "docker/"
+      },
+      {
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md"
+      },
+      {
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_docker_assets.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -q databend AGENTS.md && printf \"databend guidance present\\\\n\"",
+        "description": "AGENTS.md names the specific platform",
+        "expected": "databend guidance present",
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-13T14:04:12Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_docker_assets.py -q -k multi_service && printf \"service-count tests passed\\\\n\"",
+        "description": "Compose service-count contract",
+        "expected": "service-count tests passed",
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-13T14:04:21Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "needs_wid": "w0",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Landed PR #1619 commit 178bc19e3; AGENTS.md names databend minio as the mocker failure and doris/starrocks as single-container.",
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "notes": null,
+        "started_at": "2026-08-13T14:02:30Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Restore the specific mocker guidance naming databend and its minio service",
+        "wid": "w0"
+      },
+      {
+        "evidence": "docs/operations/uat-framework.md Mocker validation status records the three databend services, observed minio failure, single-service doris/starrocks boundary, lifecycle, and caveats.",
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "notes": null,
+        "started_at": "2026-08-13T14:02:42Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Move the detailed caveats into the operator guide and point AGENTS.md at them",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/uat/test_docker_assets.py compose-backed service-name matrix is present; current focused run passes 3 tests.",
+        "item_id": "agents-md-mocker-multi-service-guidance-regression-20260805",
+        "notes": null,
+        "started_at": "2026-08-13T14:02:57Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add a test asserting the documented service counts match the compose files",
+        "wid": "w2"
+      }
+    ]
+  }
+}

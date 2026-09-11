@@ -1,0 +1,277 @@
+{
+  "context": "Add narrow contract tests around the exact regressions before patching copy.\nThen route result-detail scan values through the shared formatter and make\nleaderboard scope copy consume named count fields instead of overloaded totals.\n",
+  "description": "The latest review found two remaining trust problems in metric and scope\ncommunication. Result detail pages can show raw exact power-score precision in\nhero values, for example `11,636.652993864305`, while adjacent explorer\nsurfaces show rounded scan values. The leaderboard home can also say\n`5 ranked, 2 published unranked` and then `Full leaderboard scope has 7 ranked\nplatform IDs`, which contradicts its own count semantics.\n\nThis TODO closes the gap between raw audit precision, scan-readable display\nprecision, and corpus/ranking scope copy. It must preserve exact values for\nreceipts, exports, sorting, and audit trails while using readable formatting\nand truthful count labels in the UI.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "patch one sentence without adding count invariants for other filter states.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "remove exact values entirely just to simplify display.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "rename a mixed total as `ranked`.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "round raw data before computing ranks, ratios, or comparisons.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "results-explorer-contract-followup"
+    },
+    "preserves": [
+      {
+        "behavior": "Exact precision must remain available in receipt/audit contexts when it was previously available.",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy"
+      },
+      {
+        "behavior": "Leaderboard copy must match the filtered data actually rendered.",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy"
+      },
+      {
+        "behavior": "Raw metric values must remain unchanged in data, sorting, comparison math, and exports.",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy"
+      },
+      {
+        "behavior": "Scope count changes must not hide unranked or unpublished states.",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/results-explorer-followup-todo-review/planning/results-explorer-leaderboard-scope-filter-contract.yaml established earlier leaderboard scope semantics.",
+        "decision": "reuse",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "path": "_project/DONE/results-explorer-followup-todo-review/planning/results-explorer-leaderboard-scope-filter-contract.yaml"
+      },
+      {
+        "concept": "_project/DONE/results-explorer-followup-todo-review/planning/results-explorer-metric-formatting-contract.yaml established the broader metric formatting contract.",
+        "decision": "reuse",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "path": "_project/DONE/results-explorer-followup-todo-review/planning/results-explorer-metric-formatting-contract.yaml"
+      },
+      {
+        "concept": "results-explorer/src/lib/metricFormatters.ts centralizes semantic metric formatting.",
+        "decision": "reuse",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "path": "results-explorer/src/lib/metricFormatters.ts"
+      },
+      {
+        "concept": "results-explorer/src/pages/Home.tsx computes and renders leaderboard ranked, unranked, and coverage copy.",
+        "decision": "reuse",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "path": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "concept": "results-explorer/src/pages/ResultDetail.tsx currently uses exact score formatting for the primary metric.",
+        "decision": "reuse",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "path": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "concept": "results-explorer/src/utils.ts exposes `fmtScore`, `fmtScoreCompact`, and `fmtScoreExact`.",
+        "decision": "reuse",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "path": "results-explorer/src/utils.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-metric-display-precision-and-scope-copy/"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/utils.test.ts"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/metricFormatters.test.ts"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/metricFormatters.ts"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/utils.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/__tests__/utils.test.ts src/lib/__tests__/metricFormatters.test.ts src/pages/__tests__/ResultDetail.test.tsx",
+        "description": "Metric formatting tests pass",
+        "expected": "result-detail scan and exact precision tests pass",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/Home.test.tsx src/components/__tests__/MetaLeaderboard.test.tsx",
+        "description": "Home scope tests pass",
+        "expected": "leaderboard scope count and copy tests pass",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"PASS|FAIL|power score|exact|ranked|unranked|coverage\" _project/verification-logs/results-explorer-metric-display-precision-and-scope-copy/",
+        "description": "Browser evidence confirms precision and scope copy",
+        "expected": "verification log includes result-detail and home route evidence",
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "notes": "Capture evidence from:\n  - a result-detail page whose primary metric is a large power score;\n  - `/results/` in the current default filter state;\n  - `/results/` after changing benchmark, scale, phase, trust, tuning, and\n    date filters;\n  - any tooltips or exact-value affordances for power score cells.\nRecord the raw value, visible value, title/aria text, sort behavior, and\nscope copy in\n`_project/verification-logs/results-explorer-metric-display-precision-and-scope-copy/w0.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate precision and scope-copy examples",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "notes": "Define explicit formatting rules:\n  - scan contexts such as hero cards, leaderboard cells, chart labels, and\n    compare cards use compact rounded values with meaningful significant\n    digits;\n  - comparison contexts keep enough precision for ratios and deltas without\n    showing raw binary/float noise;\n  - audit contexts such as receipts, exports, exact-value titles, and raw\n    JSON retain exact source values.\nDecision gate: do not use `fmtScoreExact` in scan contexts unless the UI\nlabels the value as exact and provides a reason for the precision.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define display precision tiers for scan, comparison, and audit contexts",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "notes": "Update result-detail primary metric display so large power scores use the\nsame scan-readable formatting as other explorer surfaces. Provide exact\nprecision in a title, receipt row, details disclosure, or audit section if\nneeded. Keep sorting/comparison/export values raw.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the precision contract to result detail without changing raw data",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "notes": "Define separate names for:\n  - ranked platform count;\n  - published unranked platform count;\n  - total published platform count;\n  - full corpus platform count;\n  - public coverage count under current filters.\nUpdate home copy so it never describes a total that includes unranked items\nas `ranked`. Add invariant tests that compute the displayed counts from the\nsame source rows and fail on contradictory wording.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define and test leaderboard scope count semantics",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-metric-display-precision-and-scope-copy",
+        "notes": "Add unit/component tests for:\n  - result-detail power-score hero values do not show long exact decimals;\n  - exact values remain available in an explicit audit context;\n  - leaderboard scope text uses ranked/unranked/total terms correctly;\n  - count grammar handles singular, plural, zero, and filtered states.\nBrowser-check the result detail and home routes at desktop width.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests and browser evidence for precision and scope copy",
+        "wid": "w4"
+      }
+    ]
+  }
+}

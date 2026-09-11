@@ -1,0 +1,177 @@
+{
+  "context": "Work on the still-monolithic run.sh; the big lib extraction is Phase 2. GUARDRAILS: package-registry domains (npm, pypi, github) are opt-in via --allow-packages, never default - defaulting them silently widens the boundary; exactly one trap EXIT registration point after the fix; egress image built and pinned locally, no third-party digest dependency. Anti-patterns: no allowlist wildcards; no git add -A; do not touch Gradle machinery.",
+  "description": "Replace single-purpose egress-proxy with a locally built egress image (Containerfile.egress: alpine + socat + tinyproxy). Port 8080 = socat raw forward to inference server (pi path, byte-identical). Port 8888 = tinyproxy, FilterDefaultDeny, rendered allowlist from Spike B seeds. Egress container named egress-<shorthash(config)> so config changes (allowlist, inference target) start a fresh container - fixes the silent-stale-target reuse in upstream ensure_egress_proxy (run.sh:279). Health = listener probe plus end-to-end request through the proxy (warn-only). Pass EGRESS_PROXY_IP and EGRESS_PROXY_HTTP_PORT into ALL run modes (today only --shell gets it, run.sh:574). Also: fix the EXIT-trap overwrite bug (run.sh:467 vs :552 - openrouter runs leak RENDERED_CONFIG_DIR) via a composed add_cleanup in lib/common.sh, and add x11-utils so the Xvfb readiness loop stops being a no-op.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "needs_item": "agentbox-gate0-go-no-go-decision"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-07T02:50:16Z",
+      "created_at": "2026-08-07T00:01:02Z",
+      "worktree": "agent-container"
+    },
+    "preserves": [
+      {
+        "behavior": "Parallel sessions still share one egress container per config hash",
+        "item_id": "agentbox-phase1-egress-tinyproxy"
+      },
+      {
+        "behavior": "Sandboxed pi run against local inference works exactly as upstream (README 3-curl verification: google fails, direct host fails, proxy 8080 succeeds)",
+        "item_id": "agentbox-phase1-egress-tinyproxy"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "kind": "do_not_modify",
+        "path_glob": "LICENSE"
+      },
+      {
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "kind": "do_not_modify",
+        "path_glob": "pi-config/models.json.template"
+      },
+      {
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/gradle-warmup.sh"
+      }
+    ],
+    "verifications": [
+      {
+        "command": null,
+        "description": "README sandbox verification passes in --shell (manual, record transcript in docs/spikes.md)",
+        "expected": null,
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Sandboxed claude round-trip now works through run.sh --shell with zero manual proxy setup (manual, transcript in docs/spikes.md)",
+        "expected": null,
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd ~/Developer/agent-container && [ \"$(grep -c \"trap .* EXIT\" scripts/run.sh lib/common.sh 2>/dev/null | awk -F: \"{s+=\\$2} END {print s}\")\" -le 1 ]",
+        "description": "Single trap registration point",
+        "expected": null,
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "last_result": "pass",
+        "last_run": "2026-08-07T02:50:04Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd ~/Developer/agent-container && grep -q \"x11-utils\" Containerfile",
+        "description": "x11-utils present in image apt list",
+        "expected": null,
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "last_result": "pass",
+        "last_run": "2026-08-07T02:50:06Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "re-validated all 3 cited upstream defects on fork: stale reuse run.sh:279-296, dual EXIT traps :467/:552, EGRESS_PROXY_IP shell-only :574",
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "notes": null,
+        "started_at": "2026-08-07T02:49:48Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-validate cited upstream behaviors on the forked tree - proxy blind reuse, EXIT trap overwrite, shell-only EGRESS_PROXY_IP env",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Containerfile.egress + scripts/egress-entrypoint.sh (socat 8080 + tinyproxy 8888 CONNECT, deny-by-default ERE filter); commit b1286d9",
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "notes": null,
+        "started_at": "2026-08-07T02:49:51Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Write Containerfile.egress and egress-entrypoint.sh (socat 8080 + tinyproxy 8888); extend build.sh to build it",
+        "wid": "w1"
+      },
+      {
+        "evidence": "config-hash egress lifecycle incl image digest, mkdir mutex for concurrent sessions, reaping, functional dual health probes; commits 7936a81/6fa5a9c",
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "notes": null,
+        "started_at": "2026-08-07T02:49:53Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Replace ensure_egress_proxy with config-hash-named egress lifecycle plus dual health probes",
+        "wid": "w2"
+      },
+      {
+        "evidence": "per-agent allowlist with validation hard-fail on metacharacters; --allow-domain/--allow-packages opt-in only; commit 6fa5a9c",
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "notes": null,
+        "started_at": "2026-08-07T02:49:56Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Render per-agent allowlist into tinyproxy filter; add --allow-domain and --allow-packages flags",
+        "wid": "w3"
+      },
+      {
+        "evidence": "lib/common.sh composed EXIT trap, both traps ported, x11-utils added; commits ef6d8d6/fe91c88; harness-verified order+exit status",
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "notes": null,
+        "started_at": "2026-08-07T02:49:59Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "lib/common.sh composed EXIT trap; port both existing traps; add x11-utils to apt list",
+        "wid": "w4"
+      },
+      {
+        "evidence": "proxy env in all run modes, NO_PROXY excludes local inference, README updated; commits 19cd723/6ddfce3",
+        "item_id": "agentbox-phase1-egress-tinyproxy",
+        "notes": null,
+        "started_at": "2026-08-07T02:50:01Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Pass egress env vars into all run modes and update README sandbox-verification section",
+        "wid": "w5"
+      }
+    ]
+  }
+}

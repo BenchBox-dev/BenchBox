@@ -1,0 +1,209 @@
+{
+  "context": "Characterization first: capture current ledger payloads from the three direct tests. Delete only the unreachable mixin method. Do not call super() and do not move the recording wrapper back into the mixin.",
+  "description": "CONSOLIDATION DIRECTION IS MANDATORY. Do not start without reading this.\n\nPlatformAdapter inherits ResultCaptureMixin (benchbox/platforms/base/adapter.py:105). The only production resolution of _setup_fresh_database_phases is adapter.py:1210. The mixin copy at result_capture.py:1792 is unreachable (mro[4], no other production subclass).\n\nThe copies have diverged in a soundness-relevant way:\n- adapter.py:1245-1258 wraps create_schema in recording_connection(..., is_schema_tuning_statement) so schema-phase tuning DDL enters AppliedTuningLedger.\n- mixin calls create_schema(benchmark, connection) with no recording.\n\nThe ledger contract (benchbox/core/tuning/applied_ledger.py) is: produced by the execution path, never reconstructed from config; capture must not break a run. Consolidating onto the mixin silently drops schema-DDL capture.\n\nKEEP adapter.py:1210. DELETE the mixin method. FIX the docstring at adapter.py:1213 which currently says the mixin owns the historical implementation — that sentence is the harm path.\n\nClickHouse/StarRocks already record rendered schema clauses at platform render points; the adapter wrapper skips a second recording_connection for those (see the existing any(_record_tuned_sort_key_op / _record_starrocks_tuning_to_ledger) guard). Do not remove that guard.\n\nresult_capture.py is a CODEOWNERS soundness path; expect auto-merge withheld.\n\nIndependent of the composition ADR. Start now.\n\nStop condition: mixin method gone; adapter wrapper retained; schema-phase tuning DDL still in the ledger; ledger contents byte-identical on the existing capture tests.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change AppliedTuningLedger semantics",
+        "instead": "prove byte-identical ledger contents",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "why": "soundness artifact; capture must not break a run"
+      },
+      {
+        "dont": "delete adapter.py:1210 or replace it with super()",
+        "instead": "delete the mixin method only",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "why": "that is the only copy that records schema-phase tuning DDL"
+      },
+      {
+        "dont": "fold cloud execute_query in this item",
+        "instead": "stop after the setup-lifecycle fork is gone",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "why": "that is arch-canonical-sql-execute-primitive and needs the ADR"
+      },
+      {
+        "dont": "move recording_connection into the mixin and have the adapter call through",
+        "instead": "keep the adapter-level guard as written",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "why": "ClickHouse/StarRocks would double-record and change the order-sensitive ledger hash"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture",
+      "completed_at": "2026-08-14T01:39:59Z",
+      "completed_pr": 1725,
+      "created_at": "2026-08-14T01:18:11Z",
+      "worktree": "arch-simplification"
+    },
+    "preserves": [
+      {
+        "behavior": "AppliedTuningLedger still records schema-phase tuning DDL for adapters that use the recording_connection wrapper",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork"
+      },
+      {
+        "behavior": "ClickHouse and StarRocks do not double-record schema DDL",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork"
+      },
+      {
+        "behavior": "External table mode still skips native schema/tuning",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork"
+      },
+      {
+        "behavior": "create_schema / load_data / apply_unified_tuning signatures unchanged",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "result_capture.py is a soundness path",
+        "decision": "reuse",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "path": ".github/CODEOWNERS"
+      },
+      {
+        "concept": "execution-path ledger invariant",
+        "decision": "reuse",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "path": "benchbox/core/tuning/applied_ledger.py"
+      },
+      {
+        "concept": "adapter override with recording_connection",
+        "decision": "reuse",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "path": "benchbox/platforms/base/adapter.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/**"
+      },
+      {
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tuning/applied_ledger.py"
+      },
+      {
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/test_requested_vs_applied_capture.py"
+      },
+      {
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_clickhouse_introspection.py"
+      },
+      {
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_sqlite_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning/test_requested_vs_applied_capture.py tests/unit/platforms/test_clickhouse_introspection.py tests/unit/platforms/test_sqlite_adapter.py -q",
+        "description": "Direct setup-lifecycle tests",
+        "expected": "PASS",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "last_result": "pass",
+        "last_run": "2026-08-14T01:39:53Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'recording_connection' benchbox/platforms/base/adapter.py",
+        "description": "Adapter wrapper still records schema DDL",
+        "expected": "still present in _setup_fresh_database_phases",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "last_result": "pass",
+        "last_run": "2026-08-14T01:39:56Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -q \"def _setup_fresh_database_phases\" benchbox/platforms/base/result_capture.py",
+        "description": "Removed setup lifecycle method stays absent",
+        "expected": "exit 0 only while the removed method is absent",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "git rev-parse HEAD=40554b9fd6cddee26a501b60430944aaaffc5155; rg confirmed PlatformAdapter MRO and adapter wrapper at benchbox/platforms/base/adapter.py:1210",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "notes": null,
+        "started_at": "2026-08-14T01:27:12Z",
+        "started_branch": "fix/arch-delete-dead-setup-lifecycle-fork",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-delete-dead-setup-lifecycle-fork",
+        "status": "done",
+        "summary": "Re-validate adapter.py",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Focused characterization: three direct setup tests passed (65 total); baseline ledger payloads/hashes captured for core, ClickHouse, and SQLite by the inline uv run script",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "notes": null,
+        "started_at": "2026-08-14T01:27:18Z",
+        "started_branch": "fix/arch-delete-dead-setup-lifecycle-fork",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-delete-dead-setup-lifecycle-fork",
+        "status": "done",
+        "summary": "Characterize current ledger payloads from the three tests that call the method directly.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Deleted only ResultCaptureMixin._setup_fresh_database_phases; adapter.py:1210 retained; adapter docstring corrected; no ledger or lifecycle signature changes",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "notes": null,
+        "started_at": "2026-08-14T01:29:32Z",
+        "started_branch": "fix/arch-delete-dead-setup-lifecycle-fork",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-delete-dead-setup-lifecycle-fork",
+        "status": "done",
+        "summary": "Delete mixin _setup_fresh_database_phases; keep adapter.py:1210; fix :1213 docstring.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "uv focused pytest: 65 passed; inline ledger identity assertion PASS for core/ClickHouse/SQLite; rg confirms no mixin method or super() replacement and adapter recording_connection remains",
+        "item_id": "arch-delete-dead-setup-lifecycle-fork",
+        "notes": null,
+        "started_at": "2026-08-14T01:31:15Z",
+        "started_branch": "fix/arch-delete-dead-setup-lifecycle-fork",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-delete-dead-setup-lifecycle-fork",
+        "status": "done",
+        "summary": "Re-run the three tests plus a ledger-identity assertion; confirm no super() path remains.",
+        "wid": "w3"
+      }
+    ]
+  }
+}

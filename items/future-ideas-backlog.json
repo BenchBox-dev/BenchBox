@@ -1,0 +1,191 @@
+{
+  "description": "Collection of aspirational future work items that are not yet ready for\nimplementation. Each entry needs significant research and design work\nbefore it becomes an actionable TODO. These items were consolidated from\nstub TODOs that lacked tasks, phases, or technical detail.\n\nWhen any item below is ready for implementation, create a dedicated TODO\nfile with full tasks, phases, guardrails, and files_affected.\n\nNote: Geospatial benchmark support was removed from this backlog -\nit is tracked by the dedicated TODO:\nTODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml\n",
+  "legacy": {
+    "item_meta": {
+      "category": "Supporting Infrastructure",
+      "created_at": "2026-02-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "work_needs": [
+      {
+        "item_id": "future-ideas-backlog",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "future-ideas-backlog",
+        "needs_wid": "w9",
+        "wid": "w11"
+      },
+      {
+        "item_id": "future-ideas-backlog",
+        "needs_wid": "w9",
+        "wid": "w12"
+      },
+      {
+        "item_id": "future-ideas-backlog",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "future-ideas-backlog",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "future-ideas-backlog",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "future-ideas-backlog",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "future-ideas-backlog",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "future-ideas-backlog",
+        "needs_wid": "w5",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "future-ideas-backlog",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Graph Query Benchmark Support - Neo4j, Neptune",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "future-ideas-backlog",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Research Nexmark benchmark (streaming standard)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "future-ideas-backlog",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Evaluate overlap with existing TSBS DevOps benchmark",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "future-ideas-backlog",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Separate concerns: Kafka (message broker) vs Flink/Spark (processing)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "future-ideas-backlog",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Research LDBC Social Network Benchmark (industry standard)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "future-ideas-backlog",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Evaluate Cypher vs Gremlin vs GQL query language strategy",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "future-ideas-backlog",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Define graph traversal workload and dataset",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "future-ideas-backlog",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Interactive Benchmark Explorer - Web UI",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "future-ideas-backlog",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Define target users and use cases (why CLI + charts aren't sufficient)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "future-ideas-backlog",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Choose technology stack (React vs Vue, Flask vs FastAPI)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "future-ideas-backlog",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Design API for serving benchmark results",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "future-ideas-backlog",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Streaming Benchmark Support - Kafka, Flink, Spark Streaming",
+        "wid": "w9"
+      }
+    ]
+  }
+}

@@ -1,0 +1,501 @@
+{
+  "context": "Sequence: w1+w2+w3 (Make target work) → w4 (cleanup) →\nw5+w6+w7 (parallel: workflow trims / rulesets / curation guard) →\nw10+w11+w12 (CI churn reductions; w10 and w12 sequence after w5\nto avoid same-file conflicts on lint.yml / test.yml) →\nw8 (docs catch up to final names) →\nw9 (dry-run validates everything including the CI opts).\n\nReuse strategy:\n  - release-cut reuses scripts/update_version.py and\n    scripts/generate_changelog_entry.py wholesale; they are\n    already correct.\n  - release-finalize is mostly `gh pr merge --squash` + `git tag`\n    + `git push`; no scripting needed.\n  - The curation list in release-cut is copied verbatim from\n    release-prepare (Makefile:665–666); do not invent new entries.\n  - The ruleset edit (w6) uses jq + gh api PUT, the standard\n    idempotent pattern for partial ruleset updates.\n\nSequencing reasoning:\n  - w1 before w2 because release-finalize references the PR opened\n    by release-cut.\n  - w4 (delete obsolete) after w1+w2 so we never have a window\n    where neither flow is callable.\n  - w8 (docs) after w4 so the names referenced are final.\n  - w9 (dry-run) last; it exercises every prior unit.\n",
+  "description": "Replace the current 4-target release flow (bump / changelog-draft /\nrelease-prepare / release-rebase-develop) with a 2-target flow\n(release-cut / release-finalize), and fix a latent bug in the\ncurrent rebase-develop step that would lose dev-only paths\n(_project/, _blog/, AGENTS.md, .pre-commit-config.yaml, etc.) from\ndevelop on the first real release.\n\nRoot cause: develop and main carry DIFFERENT trees by design (per\n_project/decisions/single-repo-migration.md A3 — develop has\nmaintainer scaffolding; main is release-only). The current\nrelease-rebase-develop and the originally-proposed \"reset develop to\nmain\" both assume symmetric trees and would delete dev-only paths\nfrom develop. Fix: develop is intentionally NOT modified\npost-release; main's release squash adds nothing to develop's\ncontent surface that isn't already there.\n\nLocked-in decisions (from 2026-04-27 conversation with user):\n  1. Curation stays — dev-only paths dropped from main via git rm.\n  2. Develop never resets (verified: zero pre-2026 commits on develop).\n  3. Keep all 6 version sources of truth (pyproject.toml,\n     benchbox/__init__.py, landing/index.html, README.md,\n     docs/README.md, benchbox/utils/VERSION_MANAGEMENT.md).\n     update_version.py unchanged.\n  4. Drop check-ci-passed JS poller from release.yml (rulesets\n     already gate the version-branch PR on lint + test).\n  5. Tighten ruleset allowed_merge_methods to [\"squash\"] on main\n     and develop (currently allows merge/squash/rebase even though\n     repo-wide setting is squash-only).\n  6. Widen pr-preflight to mirror full ci-lint surface (ty check,\n     lint-markers, codex-skills-check, timing-policy,\n     compat-docs-check, audit-deps).\n  7. Option-c version-branch lifecycle: keep vX.Y.Z until next\n     release-cut runs, then auto-delete previous on origin.\n\nThis TODO subsumes single-repo-migration-phase-4 w7/w8 (which were\ndeferred). After this completes, phase-4 can be marked complete\nand phase-8 (first post-migration release) can proceed using the\nnew flow.\n\nBundled in the same PR (per user direction 2026-04-27, Option A):\nthree CI churn reductions (w10/w11/w12). Net effect of the\nsimplification + opts: ~−110 CI-min per release cycle and ~−60\nCI-min per merged feature PR vs status quo, while preserving all\nrequired check signals.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add `merge` or `rebase` back to allowed_merge_methods on the rulesets",
+        "instead": "(not specified)",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "why": "the repo-wide setting is squash-only and the rulesets should match; w6 deliberately tightens, not relaxes."
+      },
+      {
+        "dont": "consolidate the 6 version sources of truth",
+        "instead": "(not specified)",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "why": "user explicitly chose status quo on 2026-04-27 (decision #3); reducing the source list would silently break benchbox --version's cross-source consistency check."
+      },
+      {
+        "dont": "delete the previous v* branch manually",
+        "instead": "(not specified)",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "why": "release-cut handles option-c deletion automatically; the make target is the single place that runs the deletion to keep the policy consistent."
+      },
+      {
+        "dont": "mark single-repo-migration-phase-4 complete until this TODO's w9 passes",
+        "instead": "(not specified)",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "why": "phase-4 w7/w8 are subsumed here; closing phase-4 prematurely would lose the dependency edge that this TODO must precede phase-8 (first real post-migration release)."
+      },
+      {
+        "dont": "modify scripts/update_version.py or scripts/generate_changelog_entry.py",
+        "instead": "(not specified)",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "why": "they are already correct and outside the locked-in scope of this change; release-cut just invokes them."
+      },
+      {
+        "dont": "remove `'v*'` from release.yml's tag trigger when doing w5",
+        "instead": "(not specified)",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "why": "release.yml fires on tag push (v*), not branch push; only the branch-push trigger in lint.yml/test.yml is being trimmed."
+      },
+      {
+        "dont": "reset develop to main in release-finalize",
+        "instead": "(not specified)",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "why": "develop carries dev-only paths (_project/, _blog/, agent configs) that don't exist on main; resetting would delete them on every release. The whole reason this TODO exists is to fix that latent bug."
+      },
+      {
+        "dont": "skip the rc dry-run in w9",
+        "instead": "(not specified)",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "why": "the latent rebase-develop bug only surfaces on a real release; w9 is the only validation gate before a real version goes out."
+      },
+      {
+        "dont": "squash-merge the version branch to main without curation first",
+        "instead": "(not specified)",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "why": "dev-only paths would land on main, polluting the canonical default-branch view and the released wheel. Curation is the `git rm` step inside release-cut."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "simplify-dev-loop-and-release-flow",
+        "id": 263,
+        "reason": "User decision 2026-04-27 #3: keep at 6. Status quo.\nRevisit only if version-bump friction becomes a maintenance\nbottleneck.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicit user decision (2026-04-27) to keep 6 version sources as status quo; revisit only if bump friction becomes a bottleneck, not evidenced.",
+        "summary": "Consolidate version sources from 6 to 2 (pyproject.toml + __init__.py)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "simplify-dev-loop-and-release-flow",
+        "id": 264,
+        "reason": "Lower priority than the release flow itself. w8 trims to ~20\nlines as a reasonable middle. Further compression can wait.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: 'Further compression can wait' with no concrete trigger or scope; PR template was already trimmed to ~20 lines as the accepted middle ground.",
+        "summary": "Slim PULL_REQUEST_TEMPLATE.md aggressively"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "needs_item": "single-repo-migration-phase-4-test-release-with-new-flow"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-04-28T00:00:00Z",
+      "created_at": "2026-04-27T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All 50+ test/coverage/docker/lint Make targets unchanged.",
+        "item_id": "simplify-dev-loop-and-release-flow"
+      },
+      {
+        "behavior": "All 6 version sources stay in sync — `benchbox --version` consistency check continues to pass after every release.",
+        "item_id": "simplify-dev-loop-and-release-flow"
+      },
+      {
+        "behavior": "Orthogonal workflows untouched — cross-platform-validation.yml, perf-smoke.yml, results-explorer-browser.yml, seed-corpus.yml, upload-answers.yml, docs.yml.",
+        "item_id": "simplify-dev-loop-and-release-flow"
+      },
+      {
+        "behavior": "Pre-commit surface unchanged — 13 hooks across pre-commit/pre-push/manual stages still install via `pre-commit install`.",
+        "item_id": "simplify-dev-loop-and-release-flow"
+      },
+      {
+        "behavior": "Released wheel still excludes _project/, _blog/, etc. (already enforced by pyproject.toml + MANIFEST.in; this TODO does not modify those exclusions).",
+        "item_id": "simplify-dev-loop-and-release-flow"
+      },
+      {
+        "behavior": "Ruleset v-release-branches-minimal (15611787) stays at \"non_fast_forward only\"; w6 only tightens main and develop rulesets.",
+        "item_id": "simplify-dev-loop-and-release-flow"
+      },
+      {
+        "behavior": "The 9 pre-existing release commits on main (v0.1.0 through v0.2.1 tags) are not rewritten — no force-push to main.",
+        "item_id": "simplify-dev-loop-and-release-flow"
+      },
+      {
+        "behavior": "Workflow file `published-results` flow (validate-submission.yml) untouched.",
+        "item_id": "simplify-dev-loop-and-release-flow"
+      },
+      {
+        "behavior": "Worktree convention works unchanged (worktree-add/list/prune Make targets and the conventional ../BenchBox.<branch>/ path).",
+        "item_id": "simplify-dev-loop-and-release-flow"
+      },
+      {
+        "behavior": "pr-open's auto-merge flow vs develop continues to work end-to-end (the /pr command and make pr-open are unchanged).",
+        "item_id": "simplify-dev-loop-and-release-flow"
+      },
+      {
+        "behavior": "scripts/update_version.py and scripts/generate_changelog_entry.py untouched in their public surface; release-cut just calls them.",
+        "item_id": "simplify-dev-loop-and-release-flow"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/cross-platform-validation.yml"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/seed-corpus.yml"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/upload-answers.yml"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": ".pre-commit-config.yaml"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/__init__.py"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/utils/VERSION_MANAGEMENT.md"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": "docs/README.md"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": "landing/index.html"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/generate_changelog_entry.py"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/update_version.py"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "only_modify",
+        "path_glob": ".github/PULL_REQUEST_TEMPLATE.md"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "only_modify",
+        "path_glob": ".github/RELEASE_PR_TEMPLATE.md"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/lint.yml"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/perf-smoke.yml"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/single-repo-migration.md"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/release-guide.md"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "kind": "only_modify",
+        "path_glob": "scripts/check_release_curation.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git diff origin/develop develop",
+        "description": "After dry-run release-finalize, develop tree is unchanged from origin/develop",
+        "expected": "empty diff",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -d _project && test -d _blog && test -f AGENTS.md && test -f CLAUDE.md && test -f GEMINI.md && echo OK",
+        "description": "Dev-only paths still present on develop after release",
+        "expected": "OK",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git ls-tree -d --name-only origin/main | grep -E '^(_project|_blog|\\.claude|\\.codex|\\.gemini)$' | wc -l",
+        "description": "Main tree is curated (no dev-only paths) after release",
+        "expected": "0",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh run list --workflow=release.yml --limit 1 --json conclusion --jq '.[0].conclusion'",
+        "description": "release.yml succeeded after the dry-run",
+        "expected": "success",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "pip index versions benchbox 2>&1 | grep -cE '0\\.3\\.0(rc1|-rc\\.1)'",
+        "description": "0.3.0-rc.1 published to PyPI (PyPI normalizes to 0.3.0rc1 per PEP 440)",
+        "expected": "at least 1",
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "needs_wid": "w5",
+        "wid": "w10"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "needs_wid": "w5",
+        "wid": "w12"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "needs_wid": "w4",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "notes": "Replace the existing release-prepare target. Differences from\nrelease-prepare:\n  - Folds `make bump` and `make changelog-draft` into a single command\n    (still calls scripts/update_version.py and\n    scripts/generate_changelog_entry.py — those scripts unchanged).\n  - Opens $EDITOR on CHANGELOG.md after generation for hand-curation.\n  - Drops the pre-release-vX.Y.Z anchor tag (no longer needed\n    without rebase-develop).\n  - Adds option-c lifecycle: after pushing the new vX.Y.Z, list all\n    v* branches on origin except the new one and `git push origin\n    --delete` each (loop, not `tail -1`). The just-released tag\n    remains on main. Looping rather than taking the highest sweeps\n    any stale v* branches a hotfix path may have left behind.\n\nCuration list stays identical (Makefile lines 665–666):\n  git rm -rf _project _blog .claude .codex .gemini\n  git rm -f .pre-commit-config.yaml _benchbox_pytest_xdist_safety.py \\\n            todo.config.yaml skill-sync.yaml skill-sync.lock \\\n            .coveragerc_core .dockerignore .env.example .mcp.json \\\n            AGENTS.md CLAUDE.md GEMINI.md\n\nPre-conditions: on develop, clean tree, fetched.\nPost: `gh pr create --base main --head v$(VERSION) --title \"Release v$(VERSION)\" --body-file .github/RELEASE_PR_TEMPLATE.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `release-cut VERSION=X.Y.Z` Make target (cut + curate + bump + changelog + open PR + delete prev v*)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "notes": "After a feature PR squash-merges, GitHub creates a new SHA on\ndevelop and re-fires lint.yml + test.yml on identical content\nthat the PR-CI just proved green. Pure churn.\n\nEdits:\n  .github/workflows/lint.yml `on.push.branches`:\n    Remove 'develop' (w5 already removes 'v*'; result is [main]).\n  .github/workflows/test.yml `on.push.branches`:\n    Same removal.\n\nKeep `main` in push triggers — provides the \"main is always\nCI-green\" signal that humans rely on as a badge / sanity check\n(the deleted check-ci-passed poller no longer reads it, but\nhumans do).\n\nSequence after w5 to avoid editing the same `on.push.branches`\nblock twice in different commits.\n\nEstimated savings: ~50 CI-min per merged feature PR (one full\nlint+test cycle eliminated). At ~10 PRs/week, ~500 CI-min/week.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Drop redundant push-CI on develop (lint.yml + test.yml)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "notes": "Pattern already in use on perf-smoke.yml and\nresults-explorer-browser.yml. When a PR is force-pushed during\nCI (common during iteration), the in-flight run is superseded.\n\nAdd a top-level `concurrency:` block (NOT inside `on:` or\n`jobs:`) to both:\n  .github/workflows/lint.yml:\n    concurrency:\n      group: lint-${{ github.ref }}\n      cancel-in-progress: true\n  .github/workflows/test.yml:\n    concurrency:\n      group: test-${{ github.ref }}\n      cancel-in-progress: true\n\nNo conflict with w5/w10 (different top-level key).\n\nEstimated savings: bounded by force-push frequency; ~10–20%\nof test.yml minutes during active iteration.\n\nRisk note: if a required check is cancelled mid-flight on the\nPR's last commit (no superseding push), GitHub may show the\nPR as \"checks pending\" until the next push. Standard pattern;\nthe cancelled run only happens when a NEWER push exists.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add concurrency cancel-in-progress to lint.yml + test.yml",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "notes": "Release PRs (title starts with `Release v`) touch only curation\nremovals + version bumps + changelog. Nothing perf-affecting\n(perf-smoke); nothing fixture-affecting (parity job in\ntest.yml).\n\nEdits:\n  .github/workflows/perf-smoke.yml — extend the existing `if:`\n  on the `perf-smoke` job (currently checks skip-perf-smoke\n  label):\n    if: |\n      !contains(github.event.pull_request.labels.*.name, 'skip-perf-smoke')\n      && !startsWith(github.event.pull_request.title, 'Release v')\n\n  .github/workflows/test.yml `parity` job — add `if:`:\n    if: ${{ !startsWith(github.event.pull_request.title, 'Release v') }}\n\nThe `Release v` title prefix is set by `release-cut` (see w1).\nDon't depend on a label — release-cut doesn't apply one.\n\nSequence after w5 because both edit test.yml (different keys\nbut same file; serialize to avoid merge conflicts).\n\nEstimated savings: ~25 CI-min per release PR (one perf-smoke\nleg + one parity leg).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Skip perf-smoke and parity on release PRs",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "notes": "Replace release-rebase-develop. Steps:\n  1. gh pr list --base main --head v$(VERSION) → number → gh pr merge --squash\n  2. git fetch origin --tags\n  3. git checkout main && git pull --ff-only\n  4. git tag v$(VERSION) && git push origin v$(VERSION)  # fires release.yml\n  5. echo \"develop is intentionally unchanged\"\n\nCritical: do NOT touch develop. Step 5 of the previous flow\n(rebase or reset) deletes dev-only paths and is removed by this\nTODO.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `release-finalize VERSION=X.Y.Z` Make target (squash-merge PR + tag + push + leave develop alone)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "notes": "Current pr-preflight (Makefile:707–713) runs only:\n  ruff check, ruff format --check, fast tests\nBut lint.yml additionally runs:\n  ty check, lint-markers, codex-skills-check, timing-policy,\n  compat-docs-check, audit-deps\nThese can fail CI even when local pr-preflight passes.\n\nNew body:\n  pr-preflight:\n    @$(MAKE) ci-lint\n    @echo \"==> fast tests\"\n    @uv run -- python -m pytest -m fast -q\n\nci-lint already exists (Makefile:410–417) and runs the full lint\nsurface. Adds ~10s to local preflight; eliminates a class of\nsurprise CI failures.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Widen `pr-preflight` to mirror full `ci-lint` surface",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "notes": "Remove from Makefile:\n  - bump (line ~634)\n  - changelog-draft (line ~641)\n  - release-prepare (line ~651)\n  - release-rebase-develop (line ~681)\nUpdate .PHONY at top of file (line 4) and the .PHONY at line 630.\nUpdate `make help` (line 768+) Release Workflow section to show\nonly release-cut and release-finalize.\n\nKeep underlying scripts unchanged:\n  scripts/update_version.py\n  scripts/generate_changelog_entry.py\nThey are called inside release-cut.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete obsolete release Make targets and update help text",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "notes": ".github/workflows/release.yml:\n  - Delete entire `check-ci-passed` job (lines 16–80, the JS poller).\n  - In `dependency-bounds`, change `needs: check-ci-passed` to\n    remove that needs entry (or set `needs: []`).\n  - In `build`, change `needs: [check-ci-passed, dependency-bounds]`\n    to `needs: dependency-bounds`.\n  Rationale: ruleset main-release-only already gates the\n  version-branch PR on lint + test. Poller is redundant.\n\n.github/workflows/lint.yml:\n  - Remove `'v*'` from `on.push.branches` (line 8).\n.github/workflows/test.yml:\n  - Same removal (line 8).\n  Rationale: release branches now exercise CI via their PR vs\n  main, not via push.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Workflow trims: drop check-ci-passed from release.yml; remove v* push trigger from lint.yml + test.yml",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "notes": "Current state (from `gh api repos/joeharris76/BenchBox/rulesets`):\n  - 15611783 main-release-only: allowed_merge_methods=[merge,squash,rebase]\n  - 15611785 develop-squash-only: allowed_merge_methods=[merge,squash,rebase]\n  - 15611787 v-release-branches-minimal: only blocks force-push (LEAVE ALONE)\n\nRepo-wide setting is already squash-only\n(squashMergeAllowed:true, mergeCommitAllowed:false,\nrebaseMergeAllowed:false). Tighten the rulesets to match for\ndefense-in-depth.\n\nBackup-then-update flow (idempotent):\n  gh api repos/joeharris76/BenchBox/rulesets/15611783 > /tmp/main-ruleset.json\n  gh api repos/joeharris76/BenchBox/rulesets/15611785 > /tmp/develop-ruleset.json\n  jq '.rules[0].parameters.allowed_merge_methods = [\"squash\"]' /tmp/main-ruleset.json \\\n    | gh api repos/joeharris76/BenchBox/rulesets/15611783 --method PUT --input -\n  jq '.rules[0].parameters.allowed_merge_methods = [\"squash\"]' /tmp/develop-ruleset.json \\\n    | gh api repos/joeharris76/BenchBox/rulesets/15611785 --method PUT --input -\n\nVerify after with:\n  gh api repos/joeharris76/BenchBox/rulesets/15611783 \\\n    --jq '.rules[0].parameters.allowed_merge_methods'\n  # → [\"squash\"]\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tighten ruleset allowed_merge_methods to ['squash'] on main + develop rulesets",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "notes": "Risk: dev-only path list (5 dirs + 13 files) drifts as new\ndev-only files are added to develop without being added to the\nrelease-cut curation list. This would silently leak maintainer\nscaffolding onto main on the next release.\n\nScript (~40 lines):\n  1. Parse the `git rm` lines from the `release-cut` target in\n     Makefile to extract the curation list.\n  2. Parse the A3 main-only allowlist from\n     _project/decisions/single-repo-migration.md.\n  3. For every top-level path in the working tree on develop,\n     assert it is EITHER in the A3 main-only allowlist OR in the\n     curation list.\n  4. Fail with a clear message naming any unaccounted-for path\n     and recommending which list to add it to.\n\nWire into .github/workflows/lint.yml as one more step after the\nexisting `audit-deps` step:\n  - name: Release curation list drift check\n    run: uv run python scripts/check_release_curation.py\n\nSequencing safety: implement the script and run it locally against\nthe current develop tree FIRST. Confirm it exits 0 against the\nreal tree AND fails (exits non-zero) against a synthetic stray\nfile (touch a throwaway file at repo root not in the curation\nlist, re-run, confirm it fails). THEN add the lint.yml step in\nthe SAME commit. `lint` is a required status check; a buggy\nscript would block every PR repo-wide.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add curation-drift CI guard: scripts/check_release_curation.py wired into lint.yml",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "simplify-dev-loop-and-release-flow",
+        "notes": "Edits:\n  - .github/RELEASE_PR_TEMPLATE.md: replace `make\n    release-rebase-develop` with `make release-finalize`. Drop\n    the \"rebase develop onto release-shaped main\" sentence. Note\n    develop is intentionally unchanged post-release.\n  - .github/PULL_REQUEST_TEMPLATE.md: slim from 86 lines to ~20\n    (Description / Type / Testing / Notes).\n  - docs/operations/release-guide.md: rewrite around 2 commands.\n    Drop bump / changelog-draft / release-prepare /\n    release-rebase-develop references. Add option-c\n    auto-deletion behavior in release-cut.\n  - AGENTS.md (project file at repo root): line 69 release paragraph rewrite.\n  - CLAUDE.md (project file at repo root, NOT the user-global\n    ~/.claude/CLAUDE.md): \"Git workflow\" section release paragraph rewrite.\n  - _project/decisions/single-repo-migration.md: append an\n    \"Amendment 2026-04-27\" section. Note: A4 step 6 (rebase\n    develop) is replaced with \"develop is not modified\n    post-release; dev-only paths persist on develop\". A5\n    option-c deletion moves from manual to automatic in\n    release-cut. Do NOT rewrite history of the original\n    document.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docs and templates to the new 2-command flow",
+        "wid": "w8"
+      }
+    ]
+  }
+}

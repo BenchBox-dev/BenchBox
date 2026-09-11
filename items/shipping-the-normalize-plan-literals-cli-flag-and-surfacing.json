@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #319 of harden-normalized-plan-fingerprint.\nDeferred: Shipping the --normalize-plan-literals CLI flag and surfacing the normalized fingerprint in the bundle\nReason deferred: Separate feature work; this TODO only hardens the underlying API so the flag is safe to ship.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:32Z",
+      "worktree": "main"
+    }
+  }
+}

@@ -1,0 +1,275 @@
+{
+  "context": "Work only in fixture copies until the canary phase. Compare each current-state statement against current repository instructions/code or reclassify it as a dated observation. Replace imperative historical prose with typed observation/recommendation/history fields. Keep startup MEMORY.md files concise and project-specific. Sensitive operations may retain only a redacted pointer to a protected runbook.",
+  "description": "Create a candidate Claude Code auto-memory treatment without mutating live memory. Remove the unconditional auto-commit/push mandate from automatic context; sanitize or remove private service endpoints, credential-minting instructions, credential-file locations, and private-repository operational details; correct or expire stale BenchBox version, lint-gate, YAML-index, release, test-count, and MCP-surface claims; make every MEMORY.md description derive from topic metadata so the index cannot say todo-db v0.2.0 while its topic says v0.3.0; move todo-db and skill-sync facts out of the over-broad /Users/joe memory root into their exact repository identities or delete them when current docs already own the fact; resolve the orphan QuestDB topic; add provenance, authority, freshness, sensitivity, supersession, and completion metadata. Preserve Claude's useful per-Git-repository startup index and on-demand topic loading.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix an index description without fixing or expiring its linked topic",
+        "instead": "derive the index from validated topic metadata",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "why": "the contradiction will recur on the next update"
+      },
+      {
+        "dont": "retain 'always', 'never', commit, push, publish, delete, or force commands as untyped auto-memory mandates",
+        "instead": "move approved policy to CLAUDE.md/AGENTS.md or label it as dated evidence",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "why": "historical feedback can override current authorization boundaries"
+      },
+      {
+        "dont": "store endpoints, token commands, credential locations, or secret-bearing examples in memory",
+        "instead": "use a redacted pointer to a protected operational runbook",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "why": "auto-memory is routinely injected and inspectable"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "needs_item": "memory-evaluation-harness-and-scenario-corpus"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "needs_item": "memory-governance-authority-retention-decisions"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-07-27T18:28:29Z",
+      "created_at": "2026-07-27T17:33:29Z",
+      "worktree": "claude-memory"
+    },
+    "preserves": [
+      {
+        "behavior": "Claude memory remains Git-repository scoped and shared across worktrees of the same repository",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment"
+      },
+      {
+        "behavior": "No sensitive value is copied into reports, fixtures, logs, or test snapshots",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment"
+      },
+      {
+        "behavior": "Topic files remain on-demand rather than bloating every startup context",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment"
+      },
+      {
+        "behavior": "Useful durable debugging insights such as bounded optional-driver isolation remain available with provenance",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "concise project startup index with topic links",
+        "decision": "extend",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "path": "/Users/joe/.claude/projects/-Users-joe-Developer-BenchBox/memory/MEMORY.md"
+      },
+      {
+        "concept": "unconditional auto-commit and push instruction",
+        "decision": "supersede",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "path": "/Users/joe/.claude/projects/-Users-joe-Developer-BenchBox/memory/feedback_auto_commit.md"
+      },
+      {
+        "concept": "home-directory scope containing unrelated project facts",
+        "decision": "supersede",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "path": "/Users/joe/.claude/projects/-Users-joe/memory/MEMORY.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/history.jsonl"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "kind": "only_modify",
+        "path_glob": "docs/claude-memory/**"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "kind": "only_modify",
+        "path_glob": "fixtures/claude-treatment/**"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/claude/**"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "kind": "only_modify",
+        "path_glob": "tests/claude/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && uv run --project \"$MEMORY_TOOLING_ROOT\" -- python -m memory_tooling.audit --system claude --root \"$MEMORY_TOOLING_ROOT/fixtures/claude-treatment\" --strict",
+        "description": "Claude treatment passes deterministic audit",
+        "expected": "zero privacy, stale-index, orphan, identity, authority, or budget violations",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "last_result": "pass",
+        "last_run": "2026-07-27T18:26:32Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && uv run --project \"$MEMORY_TOOLING_ROOT\" -- python -m pytest -q tests/claude/test_privacy_mutations.py tests/claude/test_authority_mutations.py",
+        "description": "Sensitive and unsafe instruction mutations are rejected",
+        "expected": "all mutation tests pass",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "last_result": "pass",
+        "last_run": "2026-07-27T18:27:53Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && uv run --project \"$MEMORY_TOOLING_ROOT\" -- python -m memory_tooling.audit --system claude --check-index-topic-consistency",
+        "description": "Every Claude index matches topic metadata",
+        "expected": "exit 0",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "last_result": "pass",
+        "last_run": "2026-07-27T18:26:36Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated 5 roots, 34 topics, 5 indexes, 0 broken links, 1 orphan, 39 files without modified freshness metadata, 1 unsafe auto-push directive, and operational sensitivity classes",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:25:39Z",
+        "started_branch": "chore/claude-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Revalidate all five Claude memory roots, 34 topic files, startup links, repository identities, stale claims, and sensitive-content classifications",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Exactly feedback_auto_commit.md is excluded_unsafe; current AGENTS.md/CLAUDE.md remains write/publication authority; incidental workflow prose retained",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:25:43Z",
+        "started_branch": "chore/claude-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Remove the unsafe auto-commit/push mandate from the treatment and classify durable write policy under current repository instructions",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Credential operations/locations are converted to content-free protected-runbook envelopes; fixture scan finds no token shapes, raw home paths, endpoints, or credential locations",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:25:48Z",
+        "started_branch": "chore/claude-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Sanitize private endpoints, credential operations/locations, and private repository details; retain only protected-runbook pointers",
+        "wid": "w2"
+      },
+      {
+        "evidence": "All drift-prone topics are expired historical observations and candidate indexes are regenerated only from validated record metadata",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:25:52Z",
+        "started_branch": "chore/claude-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Correct or expire stale BenchBox and skill-sync claims and regenerate index descriptions from topic metadata",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Home topics re-scope to git:skill-sync and git:todo-db; QuestDB orphan is archived historically and excluded from startup without deletion",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:25:57Z",
+        "started_branch": "chore/claude-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Re-scope /Users/joe topics to exact Git repositories and resolve the orphan QuestDB topic by index/archive/delete decision",
+        "wid": "w4"
+      },
+      {
+        "evidence": "34 records include provenance, authority, project identity, freshness, sensitivity, supersession, completion stage, and automatic_current_context=false; 32 linked, 1 archived, 1 excluded",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:26:01Z",
+        "started_branch": "chore/claude-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add provenance, authority, freshness, sensitivity, supersession, and completion-stage metadata and enforce non-imperative historical records",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Strict structural/privacy/authority/index/budget audit and 5 mutation tests pass; 5 generated project indexes all under 120 lines and 12KB",
+        "item_id": "claude-memory-scoping-privacy-and-index-treatment",
+        "notes": null,
+        "started_at": "2026-07-27T18:26:05Z",
+        "started_branch": "chore/claude-memory-treatment",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Run structural, privacy, index/topic, project-isolation, token-budget, mutation, and scenario-corpus checks on the Claude treatment fixture",
+        "wid": "w6"
+      }
+    ]
+  }
+}

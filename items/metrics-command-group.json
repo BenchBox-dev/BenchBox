@@ -1,0 +1,10 @@
+{
+  "description": "Create a `benchbox metrics` command group for TPC and benchmark metric\ncalculations, consolidating `calculate-qphh` as the first subcommand.\n\nThis provides a natural home for additional metrics like TPC-DS QphDS@Size,\nprice-performance ratios, and cloud cost analysis.",
+  "legacy": {
+    "item_meta": {
+      "category": "ux-improvements",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

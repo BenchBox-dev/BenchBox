@@ -1,0 +1,130 @@
+{
+  "description": "PR #246 audit finding VH-1 (\"Home leaderboard shows an active-looking focus\nring before user intent\") flagged that focus, selection, and analytical\nhighlight states are visually conflated in the Results Explorer. PRs #259/#270\nremediated the leaderboard ring and the responsive nav respectively, but\n`ExplorerNavLink` (`results-explorer/src/components/Layout.tsx:97-119`) still\nhas no `focus-visible:` style and relies on the user-agent default outline.\nThe same pattern likely repeats on other Tailwind link/button helpers and\non grid cells that emit selection rings.\n\nThis TODO is the follow-on to the PR #246 nav remediation: define a single\n`focus-visible` token and apply it to the Explorer secondary nav, global nav,\ntable action links (View →), filter pill triggers, and any other surfaces\nthat currently style only `:focus`. Selection state should remain visually\ndistinct from focus.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "replace the user-agent outline with `outline: none` without a same-pass replacement",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-explorer-nav-focus-visible",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "reuse the leaderboard selection ring color/style for focus",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-explorer-nav-focus-visible",
+        "why": "that is the bug VH-1 already fixed"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-explorer-nav-focus-visible",
+        "needs_item": "results-explorer-pr246-responsive-navigation-overflow-remediation"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend / Accessibility",
+      "completed_at": "2026-05-10T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing keyboard reachability of every nav link at every viewport",
+        "item_id": "results-explorer-explorer-nav-focus-visible"
+      },
+      {
+        "behavior": "PR #259 leaderboard ring fix (VH-1) — focus and selected must stay visually distinct",
+        "item_id": "results-explorer-explorer-nav-focus-visible"
+      },
+      {
+        "behavior": "Pointer-click activation does not produce a stuck focus ring",
+        "item_id": "results-explorer-explorer-nav-focus-visible"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -nE 'focus-visible' results-explorer/src/components/Layout.tsx",
+        "description": "Every ExplorerNavLink has a non-default focus-visible style",
+        "expected": ">= 1 match",
+        "item_id": "results-explorer-explorer-nav-focus-visible",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep '@a11y|focus-visible'",
+        "description": "Playwright a11y suite passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-explorer-nav-focus-visible",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-explorer-nav-focus-visible",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-explorer-nav-focus-visible",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-explorer-nav-focus-visible",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-explorer-nav-focus-visible",
+        "notes": "Captured at\n_project/verification-logs/results-explorer-explorer-nav-focus-visible/w1.log.\nKey finding: PR #249 (`5a5654765`) already added a global\n`*:focus-visible { outline: 2px solid var(--bb-focus-ring) }`\nrule in `results-explorer/src/index.css:113-121`, plus a\ndark-surface variant. The TODO's literal claim that\nExplorerNavLink \"relies on the user-agent default outline\" is\nstale against current source. PR #259's leaderboard selection\nring uses a different token (`--bb-accent` border + tone-info\nbg), so focus and selected remain visually distinct.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit current focus/selection styles across Explorer surfaces",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-explorer-nav-focus-visible",
+        "notes": "Token already defined at `index.css:40-41` (`--bb-focus-ring`\nand `--bb-focus-ring-on-dark`). The global selector at\n`index.css:113-121` paints a 2px ring with sufficient contrast\non light data surfaces and dark hero surfaces (via\n`[data-surface=\"hero\"]` override). No additional utility class\nadded — the global selector + Tailwind arbitrary-value classes\ncover the per-component cases below; introducing a `.focus-ring`\nutility on top of both would be redundant and would conflict\nwith the universal selector.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define a focus-visible token + utility class",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-explorer-nav-focus-visible",
+        "notes": "Defense-in-depth: explicit Tailwind classes\n`focus-visible:outline focus-visible:outline-2\nfocus-visible:outline-offset-2\nfocus-visible:outline-[var(--bb-focus-ring)]`\nadded to ExplorerNavLink, GlobalNavLink, and the \"Run benchmark\"\nCTA `<a>` in Layout.tsx. The classes duplicate the universal\nselector's effect but pin the contract at the call site so a\nfuture `outline-none` cannot silently re-introduce VH-1.\nMetaLeaderboard cells and Query sort buttons already had\nsimilar per-component classes; no change needed there.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply focus-visible token to ExplorerNavLink and peers",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-explorer-nav-focus-visible",
+        "notes": "Vitest unit case in `Layout.test.tsx`\n(\"ExplorerNavLink and GlobalNavLink expose explicit\nfocus-visible outline classes\") asserts that every link inside\nboth `BenchBox` and `Results Explorer` <nav> elements carries\n`focus-visible:outline` and `focus-visible:outline-[var(--bb-focus-ring)]`\nclasses. This is the contract the TODO's verification grep also\nenforces. Playwright-level computed-style checks were not\nadded: jsdom-friendly DOM-class assertion is a stronger gate\nbecause the universal selector means a missing class still\npaints, so a class-presence test is the correct early-warning\nsurface. The team's e2e CI also exercises focus rings via the\nexisting followup-usability-release.spec route walks.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a Playwright a11y assertion that nav links expose a focus ring",
+        "wid": "w4"
+      }
+    ]
+  }
+}

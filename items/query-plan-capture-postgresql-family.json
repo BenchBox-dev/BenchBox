@@ -1,0 +1,331 @@
+{
+  "context": "Start with PostgreSQL (w1+w2+w3) since it is the reference SQL parser and\nrequires no cloud credentials for unit testing. Use DuckDB's execute_query()\nas a line-by-line reference for the integration pattern. Then replicate for\nRedshift (w4+w5+w6), noting that Redshift's EXPLAIN does not support ANALYZE.\nAfter both parents are wired, run w7 to confirm the three derived adapters\ninherit without change. Finish with a live PostgreSQL UAT cell (w8) if a\nPostgreSQL instance is available; otherwise record as deferred.\n",
+  "description": "PostgreSQL and Redshift both have fully-functional parsers in\n`benchbox/core/query_plans/parsers/postgresql.py` and\n`benchbox/core/query_plans/parsers/redshift.py`, and both adapters already\nimplement `get_query_plan()` that issues EXPLAIN ANALYZE. However, neither\nadapter overrides `get_query_plan_parser()`, so the base class returns None\nand `capture_query_plan()` is never reached. Three derived adapters —\nTimescaleDB, CedarDB, and pg_mooncake — inherit `PostgreSQLAdapter` and will\nreceive plan capture for free once the parent is wired.\n\nGap summary per adapter (as of commit d06fe3e3):\n  - PostgreSQLAdapter (benchbox/platforms/postgresql.py:693)\n      • get_query_plan(): ✅ issues EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)\n      • get_query_plan_parser(): ✅ WIRED — returns PostgreSQLQueryPlanParser\n      • execute_query(): ✅ WIRED — calls capture_query_plan() when capture_plans=True\n      • DML guard: ❌ MISSING — EXPLAIN ANALYZE re-executes DML (see query-plan-capture-postgresql-dml-guard)\n  - RedshiftAdapter (benchbox/platforms/redshift.py)\n      • get_query_plan(): ✅ issues plain EXPLAIN (no ANALYZE — correct for Redshift)\n      • get_query_plan_parser(): ✅ WIRED — returns RedshiftQueryPlanParser\n      • execute_query(): ✅ WIRED — calls capture_query_plan() when capture_plans=True\n  - TimescaleDBAdapter, CedarDBAdapter, PgMooncakeAdapter\n      • All subclass PostgreSQLAdapter; will inherit fixed behavior once\n        PostgreSQLAdapter is patched.\n\nThe DuckDB adapter (benchbox/platforms/duckdb.py:969) is the reference\nimplementation. The pattern is: after the timed execute block, call\n`capture_query_plan(connection, query, query_id)` guarded by\n`self.capture_plans`, then set `plan_fingerprint` from the returned DAG.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add EXPLAIN ANALYZE to RedshiftAdapter.get_query_plan()",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-postgresql-family",
+        "why": "Redshift does not support EXPLAIN ANALYZE and will raise a syntax error."
+      },
+      {
+        "dont": "add plan capture to the shared psycopg2 cursor helpers in benchbox/platforms/base/psycopg2_mixin.py",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-postgresql-family",
+        "why": "the capture call belongs in each adapter's own execute_query()."
+      },
+      {
+        "dont": "change TimescaleDBAdapter, CedarDBAdapter, or PgMooncakeAdapter",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-postgresql-family",
+        "why": "inheritance should carry the fix automatically; any explicit override is an anti-pattern here."
+      },
+      {
+        "dont": "eagerly import PostgreSQLQueryPlanParser at module level",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-postgresql-family",
+        "why": "keep the import inside get_query_plan_parser() to match the lazy import pattern used by DuckDB."
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-06-11T00:00:00Z",
+      "created_at": "2026-06-02T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Plan capture failures must never raise an exception when strict_plan_capture is False (the default).",
+        "item_id": "query-plan-capture-postgresql-family"
+      },
+      {
+        "behavior": "PostgreSQLAdapter.execute_query() continues to return the same result dict keys for callers that do not use plan capture.",
+        "item_id": "query-plan-capture-postgresql-family"
+      },
+      {
+        "behavior": "Redshift EXPLAIN must not use ANALYZE mode — Redshift does not support EXPLAIN ANALYZE syntax.",
+        "item_id": "query-plan-capture-postgresql-family"
+      },
+      {
+        "behavior": "TimescaleDB, CedarDB, and pg_mooncake adapters must not require any code changes — plan capture should be inherited automatically.",
+        "item_id": "query-plan-capture-postgresql-family"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/query_plans/parsers/postgresql.py — existing parser, not yet called by any adapter",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-postgresql-family",
+        "path": "benchbox/core/query_plans/parsers/postgresql.py"
+      },
+      {
+        "concept": "benchbox/core/query_plans/parsers/redshift.py — existing parser, not yet called by any adapter",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-postgresql-family",
+        "path": "benchbox/core/query_plans/parsers/redshift.py"
+      },
+      {
+        "concept": "benchbox/platforms/base/result_capture.py:515 — base get_query_plan_parser() returns None",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-postgresql-family",
+        "path": "benchbox/platforms/base/result_capture.py:515"
+      },
+      {
+        "concept": "benchbox/platforms/base/result_capture.py:561 — capture_query_plan() implementation",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-postgresql-family",
+        "path": "benchbox/platforms/base/result_capture.py:561"
+      },
+      {
+        "concept": "benchbox/platforms/duckdb.py:1069 — get_query_plan_parser() override pattern",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-postgresql-family",
+        "path": "benchbox/platforms/duckdb.py:1069"
+      },
+      {
+        "concept": "benchbox/platforms/duckdb.py:969 — canonical execute_query plan-capture integration pattern to replicate",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-postgresql-family",
+        "path": "benchbox/platforms/duckdb.py:969"
+      },
+      {
+        "concept": "tests/unit/platforms/test_duckdb_plan_capture.py — test pattern to replicate for postgres family",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-postgresql-family",
+        "path": "tests/unit/platforms/test_duckdb_plan_capture.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/postgresql.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/redshift.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/psycopg2_mixin.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/cedardb.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/pg_mooncake.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/timescaledb.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/platform-expansion/planning/query-plan-capture-postgresql-family.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/postgresql.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/redshift.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_postgresql_adapter.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_postgresql_plan_capture.py"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_redshift_plan_capture.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_postgresql_plan_capture.py tests/unit/platforms/test_postgresql_adapter.py -v",
+        "description": "All new and existing PostgreSQL adapter unit tests pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "query-plan-capture-postgresql-family",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_redshift_plan_capture.py -v",
+        "description": "All new Redshift adapter unit tests pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "query-plan-capture-postgresql-family",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -k 'timescale or cedardb or mooncake' -v",
+        "description": "Subclass adapters inherit get_query_plan_parser() without overriding",
+        "expected": "Parametrized inheritance tests pass for all three adapters",
+        "item_id": "query-plan-capture-postgresql-family",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -q",
+        "description": "Full unit suite still green after changes",
+        "expected": "0 failures, 0 errors",
+        "item_id": "query-plan-capture-postgresql-family",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "query-plan-capture-postgresql-family",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-postgresql-family",
+        "notes": "COMPLETED in commit d06fe3e3. PostgreSQLAdapter.get_query_plan_parser() now\nreturns PostgreSQLQueryPlanParser with a lazy import.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add get_query_plan_parser() override to PostgreSQLAdapter returning PostgreSQLQueryPlanParser",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-postgresql-family",
+        "notes": "COMPLETED in commit d06fe3e3. PostgreSQLAdapter.execute_query() calls\ncapture_query_plan() guarded by capture_plans. plan_fingerprint propagated\ninto the result dict.\nOPEN ISSUE: No DML guard — EXPLAIN ANALYZE re-executes DML. Tracked in\nquery-plan-capture-postgresql-dml-guard.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate capture_query_plan() call into PostgreSQLAdapter.execute_query()",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-postgresql-family",
+        "notes": "COMPLETED in commit d06fe3e3. tests/unit/platforms/test_postgresql_plan_capture.py\ncovers get_query_plan_parser(), capture_plans guard, plan_fingerprint in result.\nDML guard tests pending (see query-plan-capture-postgresql-dml-guard w3).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for PostgreSQL plan capture wiring",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-postgresql-family",
+        "notes": "COMPLETED in commit d06fe3e3. RedshiftAdapter.get_query_plan_parser() returns\nRedshiftQueryPlanParser. Redshift uses plain EXPLAIN (no ANALYZE) — confirmed correct.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add get_query_plan_parser() override to RedshiftAdapter returning RedshiftQueryPlanParser",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-postgresql-family",
+        "notes": "COMPLETED in commit d06fe3e3. RedshiftAdapter.execute_query() calls\ncapture_query_plan() guarded by capture_plans. Plain EXPLAIN (no ANALYZE) confirmed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate capture_query_plan() call into RedshiftAdapter.execute_query()",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-postgresql-family",
+        "notes": "COMPLETED in commit d06fe3e3. tests/unit/platforms/test_redshift_plan_capture.py\nadded with RedshiftQueryPlanParser and mocked cursors.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for Redshift plan capture wiring",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-postgresql-family",
+        "notes": "COMPLETED in PR #748. tests/unit/platforms/test_postgresql_plan_capture.py\nadded TestPostgreSQLSubclassInheritance, a parametrized test asserting that\nTimescaleDBAdapter, CedarDBAdapter, and PgMooncakeAdapter all return a\nPostgreSQLQueryPlanParser via the inherited get_query_plan_parser() with no\nper-subclass override.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify TimescaleDB, CedarDB, and pg_mooncake inherit plan capture without changes",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-postgresql-family",
+        "notes": "COMPLETED in PR #777. Live PostgreSQL plan capture is now exercised in CI via\na postgres:17 service container (postgres-integration jobs in\n.github/workflows/pr.yml and nightly.yml). tests/integration/platforms/\ntest_postgresql_live.py added TestLivePostgreSQLQueryPlanCapture, which\nasserts get_query_plan() returns parseable JSON and capture_query_plan()\nyields a QueryPlanDAG with a stable 64-char SHA256 fingerprint against a live\ninstance. The DML guard gap noted in w2 is intentionally out of scope here and\nremains tracked in query-plan-capture-postgresql-dml-guard.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "UAT cell smoke for PostgreSQL plan capture",
+        "wid": "w8"
+      }
+    ]
+  }
+}

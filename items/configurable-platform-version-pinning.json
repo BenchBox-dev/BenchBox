@@ -1,0 +1,10 @@
+{
+  "description": "Added driver version fields to configs/results, created a runtime version manager with optional auto-install, and updated CLI/reporting pipelines to record both requested and resolved driver builds.",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (Should-Fix Before Release)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

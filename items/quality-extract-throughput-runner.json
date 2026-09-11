@@ -1,0 +1,208 @@
+{
+  "context": "Result-model alignment first, then runner extraction. Reverse order\nfails because the runner can't be shared until the result type is\nunified.\n\nFor w1, walk both result dataclasses field-by-field; for each field,\nclassify as (shared / TPC-H-only / TPC-DS-only). Shared fields land on\nthe base ThroughputResult; spec-specific fields stay on subclasses.\nThis is the documented approach in R-06.\n\nExtract runner only after w2 lands and is verified - the runner\nsignature is `StreamRunner.run(...) -> ThroughputResult`, which\npresumes the unified type exists.\n\nSequence migrations one spec at a time. Don't bundle.\n",
+  "description": "Quality plan supplement - duplication workstream follow-up. Tracks\nresidual R-06 from\n`quality-consolidate-duplicate-code-clusters` (see\ndocs/development/duplication-residuals.md).\n\nTPC-DS and TPC-H ship near-identical throughput-test harnesses: shared\nconcurrent-stream executor + metrics calculation + smaller exception +\nconnection-close blocks (~77 lines of duplication). The dedup TODO\ndeliberately deferred this because clean extraction needs:\n  - Aligning `TPCHThroughputTestResult` and `TPCDSThroughputTestResult`\n    shapes (near-identical fields with different spec-naming comments)\n  - Unifying success-rate gates (TPC-H uses configurable\n    `config.min_success_rate`; TPC-DS hard-codes 70%)\n  - Introducing a shared `StreamRunner` protocol\n\nThis TODO does the alignment and extraction. Result is a\n`core.throughput.runner` module that both benchmarks consume; spec-\nspecific success criteria stay surfaced via config, not buried in\nper-benchmark forks.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "collapse spec-specific result fields into the base type",
+        "instead": "base for shared, subclass for spec-specific",
+        "item_id": "quality-extract-throughput-runner",
+        "why": "that loses spec naming the reports rely on"
+      },
+      {
+        "dont": "introduce abstraction beyond what the two specs share",
+        "instead": "the StreamRunner protocol covers two callers, not N",
+        "item_id": "quality-extract-throughput-runner",
+        "why": "YAGNI"
+      },
+      {
+        "dont": "migrate both specs in one commit",
+        "instead": "one commit per spec",
+        "item_id": "quality-extract-throughput-runner",
+        "why": "the bundle risk is exactly why R-06 was deferred from the parent TODO"
+      },
+      {
+        "dont": "silently weaken the TPC-DS 70% success-rate gate",
+        "instead": "keep 70% as the default, only make it config-overridable",
+        "item_id": "quality-extract-throughput-runner",
+        "why": "that hides regressions"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "quality-extract-throughput-runner",
+        "needs_item": "quality-consolidate-duplicate-code-clusters"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-14T00:00:00Z",
+      "created_at": "2026-04-13T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All TPC-H + TPC-DS throughput tests pass at scale 0.01 on DuckDB",
+        "item_id": "quality-extract-throughput-runner"
+      },
+      {
+        "behavior": "Concurrent-stream count semantics unchanged for both specs",
+        "item_id": "quality-extract-throughput-runner"
+      },
+      {
+        "behavior": "TPC-DS throughput test 70% success-rate gate - must remain the default; only become overridable, not weaker",
+        "item_id": "quality-extract-throughput-runner"
+      },
+      {
+        "behavior": "TPC-H configurable min_success_rate behavior - same config knob, same default",
+        "item_id": "quality-extract-throughput-runner"
+      },
+      {
+        "behavior": "TPC-H throughput test result shapes - public field names unchanged on the result surface that report templates and visualizations consume",
+        "item_id": "quality-extract-throughput-runner"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --with pylint --with pandas --with polars pylint --disable=all --enable=duplicate-code --min-similarity-lines=15 benchbox/core/tpch/throughput_test.py benchbox/core/tpcds/throughput_test.py 2>&1 | grep -c 'R0801'",
+        "description": "Pylint R-06 cluster (~77 lines) drops out",
+        "expected": "0",
+        "item_id": "quality-extract-throughput-runner",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpch/ -q -k throughput",
+        "description": "TPC-H throughput tests pass",
+        "expected": "all tests pass",
+        "item_id": "quality-extract-throughput-runner",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpcds/ -q -k throughput",
+        "description": "TPC-DS throughput tests pass",
+        "expected": "all tests pass",
+        "item_id": "quality-extract-throughput-runner",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox run --platform duckdb --benchmark tpcds --scale 0.01 --phases throughput --dry-run /tmp/preview",
+        "description": "TPC-DS throughput dry run on DuckDB",
+        "expected": "preview generated, no error",
+        "item_id": "quality-extract-throughput-runner",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-extract-throughput-runner",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "quality-extract-throughput-runner",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quality-extract-throughput-runner",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "quality-extract-throughput-runner",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "quality-extract-throughput-runner",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "quality-extract-throughput-runner",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-extract-throughput-runner",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Diff TPCHThroughputTestResult ↔ TPCDSThroughputTestResult; map each field to unified ThroughputResult or per-spec subclass. Output: docs/development/throughput-result-alignment.md.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-extract-throughput-runner",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Introduce benchbox/core/throughput/result.py with the unified ThroughputResult dataclass. TPC-H and TPC-DS specific fields land on a thin per-spec subclass. No callers migrated yet.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-extract-throughput-runner",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Introduce benchbox/core/throughput/runner.py with StreamRunner protocol, concurrent-stream executor, metrics calc. Success-rate via config (TPC-DS default 70%, overridable). One commit.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-extract-throughput-runner",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate TPC-H throughput_test.py to use core.throughput.runner.StreamRunner; preserve config.min_success_rate behavior. One commit.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-extract-throughput-runner",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate TPC-DS throughput_test.py to use core.throughput.runner.StreamRunner; preserve hard-coded 70% gate as the config default. One commit.",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-extract-throughput-runner",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-run pylint duplicate-code at 15-line threshold over both throughput modules; confirm R-06 cluster drops out. Update docs/development/duplication-residuals.md.",
+        "wid": "w6"
+      }
+    ]
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "context": "Decide whether to detect or to prevent. Detection: a cheap workflow on pull_request with no branch filter that fails when base is neither develop nor release, so the PR carries one honest red check instead of an empty list. Prevention: have make pr-open refuse a non-develop base unless explicitly overridden. Consider also whether the parent PR should surface that it carries unvalidated stacked content. Note the repo already discourages stacking - develop squash-merges, so a stacked chain needs a rebase and force-push after every parent merge - which argues for prevention plus a clear error over building support for it.",
+  "description": "Every PR workflow filters on 'branches: [develop]' (plus release), so a PR whose base is another feature branch triggers NOTHING - not pr.yml, not ci-required-result, not the browser lane. The PR page looks calm rather than alarming: there are no failing checks because there are no checks. Two are live right now: #1520 targets claude/mcp-v2-modin-engine and #1515 targets claude/mcp-v2-duckdb-threads, both authored 2026-08-04 and both with zero workflow runs. Their content reaches develop when the parent merges, at which point it has never been validated in isolation and is attributed to the parent's PR. Found while auditing which open PRs would be stranded by the browser-gate ruleset flip: I had assumed their missing gate check meant they predated the workflow, when in fact they receive no CI at all. The develop ruleset does not gate them either, so nothing at the repo layer catches this.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-04T23:39:55Z",
+      "completed_pr": 1563,
+      "created_at": "2026-08-04T17:32:47Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "PRs targeting develop and release keep their existing check set unchanged",
+        "item_id": "stacked-prs-receive-zero-ci-20260804"
+      },
+      {
+        "behavior": "The guard cannot itself become a required context that never reports - the failure mode it exists to fix",
+        "item_id": "stacked-prs-receive-zero-ci-20260804"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "stacked-prs-receive-zero-ci-20260804",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "stacked-prs-receive-zero-ci-20260804",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "stacked-prs-receive-zero-ci-20260804",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "stacked-prs-receive-zero-ci-20260804",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "stacked-prs-receive-zero-ci-20260804",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "stacked-prs-receive-zero-ci-20260804",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q -k stacked_pr_base",
+        "description": "A PR based on a non-develop branch cannot present an empty check list",
+        "expected": "Exits 1 on the unfixed tree, where every PR workflow filters on branches [develop, release] so a feature-branch base triggers nothing at all, and exits 0 once such a PR reports at least one check. Write the test in w2 so this rung becomes runnable.",
+        "item_id": "stacked-prs-receive-zero-ci-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-04T23:38:37Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q",
+        "description": "Existing PR workflow trigger contracts still pass",
+        "expected": "No regression in path classification or gate wiring",
+        "item_id": "stacked-prs-receive-zero-ci-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-04T23:38:44Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "stacked-prs-receive-zero-ci-20260804",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "stacked-prs-receive-zero-ci-20260804",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Trigger gap confirmed by enumerating every workflow with a pull_request trigger: auto-merge-on-open, extension-smoke, gitignore-lint, pr.yml -> [develop]; docs, results-explorer-browser -> [release, develop]; lint, perf-smoke, test, validate-release-pr -> [release]; validate-submission -> [published-results]. A feature-branch base matches none, so the PR triggers nothing and shows an empty check list. DECIDED: detect, not prevent. A make pr-open refusal only covers PRs opened through that path - the web UI, gh pr create and other tooling bypass it - whereas a workflow with no branch filter is authoritative for every PR however created. Prevention in pr-open remains a possible addition, not a substitute.",
+        "item_id": "stacked-prs-receive-zero-ci-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T23:38:15Z",
+        "started_branch": "fix/stacked-prs-receive-zero-ci-20260804",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm the trigger gap and decide detect vs prevent",
+        "wid": "w0"
+      },
+      {
+        "evidence": ".github/workflows/pr-base-guard.yml: no branches filter and no paths filter, so it runs on every PR whatever its base and therefore always reports - it cannot become the never-reporting required context it exists to prevent. Passes in seconds on develop/release/published-results; on any other base it fails with an explanation of why the PR has no CI and what to do. Includes 'edited' in types so retargeting an open PR re-evaluates instead of keeping a stale green.",
+        "item_id": "stacked-prs-receive-zero-ci-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T23:38:21Z",
+        "started_branch": "fix/stacked-prs-receive-zero-ci-20260804",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement the chosen guard",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/workflows/test_stacked_pr_base_guard.py: 5 tests - the guard exists, carries no branch or path filter, re-evaluates on retarget, names every integration branch and can actually fail, and a fifth that pins the PREMISE (every other PR workflow still filters to integration branches) so the guard becoming redundant is noticed deliberately rather than discovered later. Falsified two ways: deleting the workflow fails 4 of 5; adding 'branches: [develop]' fails the no-filter test with 'the stacked PRs it exists to catch would not trigger it'. tests/unit/workflows 140 passed.",
+        "item_id": "stacked-prs-receive-zero-ci-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T23:38:27Z",
+        "started_branch": "fix/stacked-prs-receive-zero-ci-20260804",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Cover it with a test that a non-develop-base PR cannot present an empty check list",
+        "wid": "w2"
+      }
+    ]
+  }
+}

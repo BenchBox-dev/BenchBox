@@ -1,0 +1,108 @@
+{
+  "context": "Have the orchestrator delegate to a single shared builder rather than assembling its own kwargs, keeping its genuinely CLI-specific concerns (verbosity, resolved output_dir, benchmark-option bridging) as explicit inputs to that builder. Preserve the existing test seam that lets tests patch class resolution. Consider whether constructor_accepts_argument should stop treating a bare **kwargs as universal acceptance, since that is what makes a misrouted kwarg silent.",
+  "description": "Discovered 2026-08-18 while fixing tpcds-can-never-be-published-official-flag-not-wired, where this duplication directly caused a wrong fix. Benchmark instances are built in two independent places: benchbox/core/benchmark_loader.py get_benchmark_instance() (used by benchbox/core/runner/runner.py:1266) and benchbox/cli/orchestrator.py _get_benchmark_instance() at line 102, which assembles its own kwargs and calls instantiate_benchmark_class() directly at line 159. The CLI uses the second. Each path builds its own optional_kwargs, so any constructor argument must be remembered twice. During the TPC-DS fix, threading the official flag through benchmark_loader alone left every CLI run still emitting compliance_class=unofficial_nonstandard while the unit tests passed - the defect was only caught by running the real CLI and inspecting the bundle. A compliance_mode_kwargs() helper now bridges the two for that one flag, and a test asserts both modules reference it, but the structural duplication remains and the next added kwarg will diverge the same way. Note also that instantiate_benchmark_class() treats a bare **kwargs as accepting any argument (constructor_accepts_argument checks VAR_KEYWORD), so a kwarg sent to the wrong benchmark is silently swallowed rather than raising.",
+  "legacy": {
+    "item_meta": {
+      "category": "core",
+      "created_at": "2026-08-18T21:32:47Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "unify-duplicate-benchmark-construction-paths",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "unify-duplicate-benchmark-construction-paths",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_loader.py"
+      },
+      {
+        "item_id": "unify-duplicate-benchmark-construction-paths",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "unify-duplicate-benchmark-construction-paths",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -c 'instantiate_benchmark_class' benchbox/",
+        "description": "One construction path",
+        "expected": "only benchmark_loader assembles kwargs",
+        "item_id": "unify-duplicate-benchmark-construction-paths",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "unify-duplicate-benchmark-construction-paths",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "unify-duplicate-benchmark-construction-paths",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "unify-duplicate-benchmark-construction-paths",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "unify-duplicate-benchmark-construction-paths",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-duplicate-benchmark-construction-paths",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Design a single builder that covers both call sites without losing the CLI-specific inputs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-duplicate-benchmark-construction-paths",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Migrate the orchestrator to it and delete the duplicated kwarg assembly",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "unify-duplicate-benchmark-construction-paths",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a test asserting a newly added constructor kwarg reaches instances built via both entry points",
+        "wid": "w3"
+      }
+    ]
+  }
+}

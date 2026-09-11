@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: Medium\"\n- \"**Status**: ✅ Completed\"\n- \"**Description**: Add CLI options for selective data generation and database loading phases without running queries, providing fine-grained control over benchmark preparation workflows\"\n- \"**Context**: Users need separate control over data generation and database loading phases for data preparation, storage testing, file format validation, and multi-stage benchmark workflows\"\n- \"**Flag Definitions**:\"\n- \"**Implementation Completed**:\"\n- \"**Files Modified**: `benchbox/cli/main.py`, `benchbox/cli/orchestrator.py`, `benchbox/cli/dryrun.py`, `benchbox/core/ssb/benchmark.py`, `tests/unit/cli/test_cli_data_load_modes.py`\"\n- \"**Impact**: Enables efficient data preparation workflows, supports file-based data generation for external tools, reduces execution time for data generation testing, and provides granular control over benchmark phases\"\n- \"**Manual Testing Verified**: All modes working correctly with proper validation and result reporting\"",
+  "legacy": {
+    "item_meta": {
+      "category": "\"Technical Debt & Refactoring\"",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

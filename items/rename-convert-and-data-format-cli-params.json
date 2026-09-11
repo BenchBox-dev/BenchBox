@@ -1,0 +1,440 @@
+{
+  "description": "Two CLI parameter names on `benchbox run` don't clearly express user intent:\n\n1. `--convert` is a verb describing the implementation action (converting files),\n   not the user's intent (choosing a table format). Users think \"I want to\n   benchmark with Delta Lake\", not \"I want to convert my data.\"\n\n2. `--data-format` coexists ambiguously with the new `--table-format`. It controls\n   pre-sorted data generation (parquet-sorted, delta-sorted, iceberg-sorted) and\n   pairs with `--sorted-ingestion-mode`/`--sorted-ingestion-method`.\n\nRenaming to `--table-format` aligns with industry terminology (\"open table formats\"),\nthe BenchBox blog series title, and pairs naturally with `--table-mode`.\n\nRenaming to `--presort` removes the \"format\" confusion and aligns with the\nsorted-ingestion parameter family.\n\nAlpha status: no backward compatibility needed.\n\nDesign decisions:\n- `benchbox convert` subcommand: KEEP as-is (verb appropriate for subcommand)\n- `FormatConversionOrchestrator`: KEEP as-is (internal; it IS a conversion orchestrator)\n- Post-run summary label: \"Convert\" → \"Table Format\"\n- `prompt_data_format()` → `prompt_table_format()` (feeds into --table-format, not --data-format)\n- JSON output keys: clean break (convert_format → table_format, etc.)\n\nFull plan: .claude/plans/lazy-hugging-unicorn.md",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add backward compatibility aliases",
+        "instead": "just rename directly",
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "why": "we are in Alpha status"
+      },
+      {
+        "dont": "rename data_format variables in unrelated modules (TPC-DI, InfluxDB, DataFusion)",
+        "instead": "only rename the CLI parameter and its direct usage path",
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "why": "those refer to different concepts"
+      },
+      {
+        "dont": "rename the `benchbox convert` subcommand",
+        "instead": "only rename the --convert parameter on `benchbox run`",
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "why": "verbs are appropriate for subcommand names"
+      }
+    ],
+    "item_meta": {
+      "category": "CLI UX",
+      "completed_at": "2026-03-04T00:00:00Z",
+      "created_at": "2026-03-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing CLI functionality continues working (just under new parameter names)",
+        "item_id": "rename-convert-and-data-format-cli-params"
+      },
+      {
+        "behavior": "FormatConversionOrchestrator class name in benchbox/core/runner/conversion.py stays as-is",
+        "item_id": "rename-convert-and-data-format-cli-params"
+      },
+      {
+        "behavior": "Standalone `benchbox convert` subcommand and its test file test_convert_command.py remain unchanged",
+        "item_id": "rename-convert-and-data-format-cli-params"
+      },
+      {
+        "behavior": "Unrelated data_format variables in TPC-DI, InfluxDB, DataFusion modules must NOT be renamed",
+        "item_id": "rename-convert-and-data-format-cli-params"
+      },
+      {
+        "behavior": "_project/DONE/ files are historical records and must not be updated",
+        "item_id": "rename-convert-and-data-format-cli-params"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "do_not_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/convert.py"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/conversion.py"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcdi/"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/influxdb/"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/schemas.py"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/post_run_summary.py"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run ruff format --check .",
+        "description": "Ruff format passes",
+        "expected": "no files would be reformatted",
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check .",
+        "description": "Ruff lint passes",
+        "expected": "no errors",
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_composite_params_coverage.py tests/unit/cli/test_cli_dryrun.py tests/unit/cli/test_interactive_dry_run.py tests/unit/core/test_runner_lifecycle.py tests/unit/platforms/test_base_adapter.py tests/unit/core/results/test_builder.py tests/unit/core/visualization/test_post_run_summary.py tests/unit/cli/test_run_data_organization.py -v",
+        "description": "All affected tests pass",
+        "expected": "all tests pass",
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast test suite passes",
+        "expected": "all tests pass",
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rn 'convert_format\\|ConvertConfig\\|\"--convert\"' --include='*.py' . | grep -v _project/DONE | grep -v commands/convert.py | grep -v test_convert_command.py | head -5",
+        "description": "No stale --convert references in source (excluding standalone convert command)",
+        "expected": "no output (no stale references)",
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rn '\"--data-format\"\\|\"data_format\"' --include='*.py' benchbox/cli/ tests/unit/cli/ | head -5",
+        "description": "No stale --data-format references in CLI layer",
+        "expected": "no output (no stale references)",
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w7",
+        "wid": "w11"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w8",
+        "wid": "w12"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w7",
+        "wid": "w13"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w8",
+        "wid": "w13"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w11",
+        "wid": "w14"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w12",
+        "wid": "w14"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename ConvertConfig → TableFormatConfig, ConvertParamType → TableFormatParamType, CONVERT → TABLE_FORMAT in composite_params.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename prompt_data_format() → prompt_table_format() in cli/benchmarks.py",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update all test files for Part A (--convert → --table-format): imports, assertions, dict keys, method names",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update test_run_data_organization.py for Part B (--data-format → --presort)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update documentation: CLAUDE.md, docs/guides/table-formats/*.md, _project/specs/cli/*.md",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run verification suite: ruff, tests, stale reference grep checks",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename convert_format → table_format, conversion_compression → table_format_compression, conversion_partition_cols → table_format_partition_cols in core/schemas.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename fields and dict keys in core/results/ (builder.py, schema.py, result_factory.py)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename convert_format variables and dict key accesses throughout core/runner/runner.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename dict keys in platforms/base/adapter.py run config metadata",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename variables and update display label in core/visualization/post_run_summary.py",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename --convert → --table-format CLI option, imports, function params, and all options dict assignments in cli/commands/run.py",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename --data-format → --presort CLI option, function param, _resolve_data_organization_payload param, and options dict keys in cli/commands/run.py",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-convert-and-data-format-cli-params",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename convert_format → table_format and flag string in cli/dryrun.py",
+        "wid": "w9"
+      }
+    ]
+  }
+}

@@ -1,0 +1,317 @@
+{
+  "context": "Start with a formatter and tests, then replace component-level ad hoc label\nassembly. Use cohort context to decide when a platform name is sufficient.\n",
+  "description": "Run identity disambiguation improved, but chart labels still duplicate or\nbecome unreadably long. Per-query legends can repeat platform names, and box\nplot/rank labels can truncate different runs to indistinguishable prefixes.\nThis TODO introduces one label contract for charts: labels are compact when\nunique, disambiguated when needed, and never collapse two result IDs into the\nsame visible label.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hard-code special handling for DataFusion or Polars; duplicates can happen for any platform.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make each chart invent a different label format.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "solve duplicate labels by showing every metadata field all the time.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "truncate from the end when the short ID or date is the only distinguishing token.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-11T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "results-explorer-followup-todo-review"
+    },
+    "preserves": [
+      {
+        "behavior": "Chart dimensions do not expand unpredictably because of long labels.",
+        "item_id": "results-explorer-chart-run-identity-label-contract"
+      },
+      {
+        "behavior": "Existing color assignments remain stable after label changes.",
+        "item_id": "results-explorer-chart-run-identity-label-contract"
+      },
+      {
+        "behavior": "Full identity remains available without making every row or legend overly long.",
+        "item_id": "results-explorer-chart-run-identity-label-contract"
+      },
+      {
+        "behavior": "Labels stay compact when there is only one run per platform.",
+        "item_id": "results-explorer-chart-run-identity-label-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/planning/results-explorer-run-identity-disambiguation.yaml is the prior label contract; extend its formatter and tests instead of starting a second identity system.",
+        "decision": "extend",
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "path": "_project/DONE/main/planning/results-explorer-run-identity-disambiguation.yaml"
+      },
+      {
+        "concept": "results-explorer/src/components/ChartPanel.tsx, RankTable.tsx, DistributionBox.tsx, CDFChart.tsx, PercentileLadder.tsx, PowerBar.tsx, StackedPhase.tsx, SparklineTable.tsx, TimeSeries.tsx, NormalizedSpeedupChart.tsx, and QueryDiffTable.tsx contain per-chart labels and legends.",
+        "decision": "reuse",
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "path": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "concept": "results-explorer/src/components/RunIdentity.tsx if present should be reused rather than reimplemented.",
+        "decision": "reuse",
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "path": "results-explorer/src/components/RunIdentity.tsx"
+      },
+      {
+        "concept": "results-explorer/src/lib/runIdentity.ts or equivalent helper from prior run-identity work.",
+        "decision": "reuse",
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "path": "results-explorer/src/lib/runIdentity.ts"
+      },
+      {
+        "concept": "results-explorer/src/pages/BenchmarkIndex.tsx and Compare.tsx render matrix/chart headers.",
+        "decision": "reuse",
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "path": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-chart-run-identity-label-contract/"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CDFChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/DistributionBox.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/PercentileLadder.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/PowerBar.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryDiffTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RankTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RunIdentity.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/SparklineTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/StackedPhase.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TimeSeries.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/runIdentity.test.ts"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/runIdentity.ts"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/lib/__tests__/runIdentity.test.ts src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/charts.smoke.test.tsx",
+        "description": "Run identity formatter and chart tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"Per-query|Box Plot|Rank|Sparklines|duplicate label|PASS|FAIL\" _project/verification-logs/results-explorer-chart-run-identity-label-contract/",
+        "description": "Browser evidence confirms no duplicate chart labels",
+        "expected": "logs include pass/fail evidence for chart label uniqueness",
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "notes": "Inspect benchmark matrix headers, chart legends, rank chart headers, box\nplot axis labels, trend labels, compare cards, and platform detail rows\nagainst the checked git SHA and current browser snapshot. Capture the route,\ncohort/result IDs, viewport, visible label text, and expected\ndisambiguating token for each duplicate or overlong label in\n`_project/verification-logs/results-explorer-chart-run-identity-label-contract/w0.log`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory every chart and table label that identifies a run",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "notes": "Create a contract for:\n  - `compact`: platform only when unique in the current cohort;\n  - `disambiguated`: platform + version/date or platform + date + short ID\n    when duplicates exist;\n  - `full`: platform, version, run date, scale, trust/source, and short ID\n    for tooltip, aria-label, or details view.\nDecision gate: two different result IDs in the same rendered chart must\nnever have the same compact/disambiguated visible label.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define compact, full, and accessible run identity formats",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "notes": "Add or extend a single helper used by all Results Explorer labels. It must\nhandle missing version/date/id, preserve meaningful suffixes under\ntruncation, and expose both visible and accessible strings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement a shared run identity formatter",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "notes": "Update per-query legends, rank chart headers, distribution/box plot labels,\nsparklines, trend charts, compare charts, and benchmark matrix headers to\nuse the shared formatter. Avoid independently truncating labels inside\nchart components unless the helper controls the truncation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the formatter to all chart labels",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "notes": "Add tests with repeated DataFusion, Polars, PySpark, and Spark runs. Assert:\n  - no duplicate visible chart labels for different result IDs;\n  - long labels preserve the distinguishing suffix or short ID;\n  - aria/title text exposes full identity;\n  - labels stay within chart bounds at standard desktop width.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for duplicate and long label cohorts",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-run-identity-label-contract",
+        "notes": "In a browser, verify labels on benchmark Per-query, Distribution/Box Plot,\nRank, Overview/Sparklines, and Compare charts. Decision gate: do not\ncomplete this TODO if any chart still displays duplicate labels for\ndifferent run IDs or truncates away the only disambiguating token.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Browser-check chart labels at benchmark and compare routes",
+        "wid": "w5"
+      }
+    ]
+  }
+}

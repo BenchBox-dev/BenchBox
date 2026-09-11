@@ -1,0 +1,82 @@
+{
+  "context": "Documentation and decision only. Anti-pattern: do not begin Phase 1 code in this item; the gate exists so a failed spike cannot be quietly absorbed.",
+  "description": "DECISION GATEWAY - no build phase starts until this item is complete. Consolidate Spike A/B/C verdicts into docs/spikes.md with a single \"GATE 0:\" section that locks: (1) GO or NO-GO on the Apple-container approach (NO-GO = Spike B failed or Mini on macOS 15 -> escalate Lima/Docker pivot to Joe, drop Phases 1-5 with reason); (2) the Phase 3 SSH ingress design (publish vs exec per Spike A); (3) X11 disposition per Spike C; (4) initial per-agent allowlists from Spike B deny logs. GUARDRAIL: this gate is honest-broker - if evidence is mixed, the gate records the caveat rather than rounding up to GO. Locked upstream decisions restated here so implementers do not relitigate: single fat image with AGENT dispatch (no per-agent images in v1); tinyproxy allowlist in v1 (not deferred); unprivileged sshd on 2222 as user agent (no root entrypoint, no su); sshd -D as persistent PID1 (never bash); bind mounts default (named volumes gated to Phase 5).",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "agentbox-gate0-go-no-go-decision",
+        "needs_item": "agentbox-spike-a-ssh-ingress-decision"
+      },
+      {
+        "item_id": "agentbox-gate0-go-no-go-decision",
+        "needs_item": "agentbox-spike-b-sandboxed-cloud-agent-gate"
+      },
+      {
+        "item_id": "agentbox-gate0-go-no-go-decision",
+        "needs_item": "agentbox-spike-c-x11-socket-verdict"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-07T01:45:51Z",
+      "created_at": "2026-08-07T00:00:58Z",
+      "worktree": "agent-container"
+    },
+    "preserves": [
+      {
+        "behavior": "No production code changes at the gate",
+        "item_id": "agentbox-gate0-go-no-go-decision"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agentbox-gate0-go-no-go-decision",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd ~/Developer/agent-container && grep -qE \"^GATE 0: (GO|NO-GO)\" docs/spikes.md",
+        "description": "Gate section exists with explicit verdict",
+        "expected": null,
+        "item_id": "agentbox-gate0-go-no-go-decision",
+        "last_result": "pass",
+        "last_run": "2026-08-07T01:45:49Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agentbox-gate0-go-no-go-decision",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "GATE 0 section at docs/spikes.md:581, 8 locked decisions + 4 blocking conditions; commit 940356b",
+        "item_id": "agentbox-gate0-go-no-go-decision",
+        "notes": null,
+        "started_at": "2026-08-07T01:45:44Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Write GATE 0 section in docs/spikes.md consolidating all three verdicts and locked decisions",
+        "wid": "w1"
+      },
+      {
+        "evidence": "GO: phases 1,3,4,5 proceed; phase2 blocked at claude-credential decision (owner's call). No drops.",
+        "item_id": "agentbox-gate0-go-no-go-decision",
+        "notes": null,
+        "started_at": "2026-08-07T01:45:46Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "If NO-GO - drop Phases 1-5 items with reason and write docs/alternatives.md pivot recommendation; if GO - confirm downstream items unblocked",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,293 @@
+{
+  "context": "Follow the established pattern used for table_mode: attribute on adapter\nbase class, set in runner, read in DataLoader/DataSourceResolver.\n\nThe key insight is that PLATFORM_FORMAT_PREFERENCES is already correctly\nconfigured for all platforms. The fix is making it the actual default instead\nof a fallback behind manifest format_preference.\n",
+  "description": "The manifest's format_preference field (persisted by previous --table-format\nconversion runs) takes priority over platform default preferences. This means\nif a user previously ran --table-format delta, ALL subsequent runs silently\nuse delta format even without --table-format.\n\nConcrete failure: TPC-H SF1 on DuckDB fails because the existing manifest has\nformat_preference: [\"delta\", \"parquet\", \"iceberg\", \"tbl\"] from a prior\nconversion. Delta entries are directories (is_directory: True), which the shard\nloader can't handle via the generic file path. Same root cause for\nread_primitives, write_primitives, and transaction_primitives (all share\nTPC-H SF1 data).\n\nPrinciple: BenchBox users should NEVER be surprised by the data format used\nfor loading. Platform preferences should always drive default format selection.\nPLATFORM_FORMAT_PREFERENCES is already correctly configured (tbl first for\nSQL platforms, delta first for lakehouse platforms) - it's just not being used\nas the default.\n\nTwo orthogonal changes:\n1. Always prefer platform defaults in native mode (one-line change)\n2. Thread explicit --table-format to DataSourceResolver so explicit user\n   requests still override platform defaults for that run",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add directory-globbing hacks to the shard loader",
+        "instead": "(not specified)",
+        "item_id": "fix-platform-format-preference-defaults",
+        "why": "yesterday's failed approach tried to load delta parquet parts without delta metadata, which is semantically wrong"
+      },
+      {
+        "dont": "change manifest format_preference to always be ['tbl', ...]",
+        "instead": "(not specified)",
+        "item_id": "fix-platform-format-preference-defaults",
+        "why": "lakehouse platforms (Databricks, Trino) legitimately default to delta/iceberg via their platform preferences"
+      },
+      {
+        "dont": "modify the conversion pipeline's manifest update logic",
+        "instead": "(not specified)",
+        "item_id": "fix-platform-format-preference-defaults",
+        "why": "it correctly records what was converted, it just shouldn't drive default selection"
+      },
+      {
+        "dont": "remove delta/iceberg/parquet from DuckDB's supported formats",
+        "instead": "(not specified)",
+        "item_id": "fix-platform-format-preference-defaults",
+        "why": "the platform genuinely supports them when explicitly requested"
+      }
+    ],
+    "item_meta": {
+      "category": "Bug Fix",
+      "completed_at": "2026-04-07T00:00:00Z",
+      "created_at": "2026-04-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "--table-format CLI flag still works: explicit format requests override platform defaults for that run",
+        "item_id": "fix-platform-format-preference-defaults"
+      },
+      {
+        "behavior": "All 15 benchmarks that currently pass at SF1 on DuckDB continue to pass",
+        "item_id": "fix-platform-format-preference-defaults"
+      },
+      {
+        "behavior": "Conversion pipeline still updates manifest format_preference (conversion.py:236-239) - it just no longer drives default selection",
+        "item_id": "fix-platform-format-preference-defaults"
+      },
+      {
+        "behavior": "External table mode (table_mode='external') still uses manifest preference order (not platform defaults)",
+        "item_id": "fix-platform-format-preference-defaults"
+      },
+      {
+        "behavior": "PLATFORM_FORMAT_PREFERENCES table in format_capabilities.py - this is the source of truth for default format ordering per platform",
+        "item_id": "fix-platform-format-preference-defaults"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/athena.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/azure_synapse.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/format_capabilities.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/spark_execution_mixin.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse_cloud.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/cudf.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend/adapter.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databricks/adapter.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/shared_loading.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/fabric_warehouse.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/firebolt.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/polars_platform.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/presto.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/redshift.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/trino.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run benchbox run --platform duckdb --benchmark tpch --scale 1 --compression zstd:3 --quiet",
+        "description": "DuckDB TPC-H SF1 passes (the primary failure)",
+        "expected": "Produces result JSON file, no DataLoadingError",
+        "item_id": "fix-platform-format-preference-defaults",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox run --platform duckdb --benchmark read_primitives --scale 1 --compression zstd:3 --quiet && uv run benchbox run --platform duckdb --benchmark write_primitives --scale 1 --compression zstd:3 --quiet && uv run benchbox run --platform duckdb --benchmark transaction_primitives --scale 1 --compression zstd:3 --quiet",
+        "description": "DuckDB primitives benchmarks pass",
+        "expected": "All three produce result JSON files",
+        "item_id": "fix-platform-format-preference-defaults",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox run --platform duckdb --benchmark tpch --scale 0.01 --table-format parquet --quiet",
+        "description": "Explicit --table-format still works",
+        "expected": "Produces result JSON using parquet format",
+        "item_id": "fix-platform-format-preference-defaults",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Unit tests pass",
+        "expected": "All tests pass",
+        "item_id": "fix-platform-format-preference-defaults",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fix-platform-format-preference-defaults",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-platform-format-preference-defaults",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make _prefer_platform_defaults() return True for all native-mode platforms",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-platform-format-preference-defaults",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add requested_table_format attribute to PlatformAdapter base class",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-platform-format-preference-defaults",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set requested_table_format on adapter in the runner",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-platform-format-preference-defaults",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add requested_format parameter to ManifestFileSource and DataSourceResolver",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-platform-format-preference-defaults",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pass requested_format from DataLoader and all DataSourceResolver call sites",
+        "wid": "w5"
+      }
+    ]
+  }
+}

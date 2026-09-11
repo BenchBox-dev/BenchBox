@@ -1,0 +1,199 @@
+{
+  "context": "Treat the top-level module as a cleanup decision. Revalidate imports first,\nthen either delete dead code with coverage or quarantine/document it if there\nis a real consumer.\n",
+  "description": "The platform support-status inventory found `benchbox/platforms/cudf.py`, a\nlegacy top-level GPU adapter module that imports `benchbox.experimental.gpu`.\nCurrent registry metadata classifies `cudf` as experimental DataFrame support,\nand DataFrame execution routes through the DataFrame platform family instead\nof this top-level module.\n\nDecide whether the legacy module should be removed, moved behind a repo-only\nexperimental boundary, or integrated into the supported DataFrame path.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete the module based only on filename inventory",
+        "instead": "(not specified)",
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "why": "prove import reachability first."
+      },
+      {
+        "dont": "make GPU helper imports run during base benchbox import.",
+        "instead": "(not specified)",
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "remove-or-integrate-legacy-cudf-platform-module",
+        "id": 31,
+        "reason": "GPU helper promotion needs a separate product/API decision.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Promoting cuDF GPU-metrics helpers to a stable public API is contingent on and subsumed by the open module-fate item (which has an 'integrate into supported path' option). Premature while cudf.py is experimental/under-review. (tracked by remove-or-integrate-legacy-cudf-platform-module)",
+        "summary": "Promote GPU metrics helpers to a stable public platform API"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "needs_item": "platform-support-status-and-extension-health"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Architecture",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not promote benchbox.experimental.gpu to public support without an explicit contract decision.",
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module"
+      },
+      {
+        "behavior": "Do not remove working DataFrame cuDF support while handling the legacy top-level module.",
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/cudf.py: legacy top-level module importing benchbox.experimental.gpu.",
+        "decision": "reuse",
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "path": "benchbox/platforms/cudf.py"
+      },
+      {
+        "concept": "benchbox/platforms/dataframe/cudf_df.py: current DataFrame-family cuDF adapter path.",
+        "decision": "reuse",
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "path": "benchbox/platforms/dataframe/cudf_df.py"
+      },
+      {
+        "concept": "docs/platforms/support-status.md: platform inventory classified the legacy cuDF module as a removal candidate.",
+        "decision": "reuse",
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "path": "docs/platforms/support-status.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/rules/"
+      },
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/cudf.py"
+      },
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/"
+      },
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/cudf.md"
+      },
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/support-status.md"
+      },
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k 'cudf or dataframe_factory or optional import' --tb=short",
+        "description": "Run cuDF/DataFrame routing tests after the decision.",
+        "expected": "cuDF DataFrame routing and optional import behavior pass.",
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'import benchbox; print(\"ok\")'",
+        "description": "Verify base import remains optional.",
+        "expected": "ok",
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "notes": "Search CLI, adapter factory, registry, tests, docs, and examples for the\ntop-level module. Distinguish direct imports from narrative docs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate whether any runtime path imports benchbox.platforms.cudf",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "notes": "If it is dead, remove it with tests proving DataFrame cuDF still routes\nthrough `benchbox.platforms.dataframe`. If it is retained, document why it\nimports experimental GPU helpers and what support_status applies.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Choose removal, repo-only quarantine, or integration",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-or-integrate-legacy-cudf-platform-module",
+        "notes": "Keep public cuDF docs aligned with the registry support status and avoid\nmaking `benchbox.experimental` part of the supported platform surface by\naccident.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update docs/tests and compatibility notes for the chosen path",
+        "wid": "w2"
+      }
+    ]
+  }
+}

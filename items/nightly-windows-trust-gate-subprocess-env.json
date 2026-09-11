@@ -1,0 +1,144 @@
+{
+  "context": "Change only the two test helpers. Preserve the host process environment and override only the trust-policy variables needed by each case. Do not weaken or rewrite the production workflow policy.",
+  "description": "MEASURED 2026-08-25 from scheduled Nightly run 32816732087. Eight test cases fail in both Windows test jobs because test helpers launch bash -c with a replacement environment. Linux passes. The workflow trust policy itself is not implicated; this is a Windows test-harness portability defect.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-29T13:06:46Z",
+      "completed_pr": 1910,
+      "created_at": "2026-08-25T16:32:00Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "Fork detection and exact github-actions[bot], auto/results-mirror-*, and published-results bindings",
+        "item_id": "nightly-windows-trust-gate-subprocess-env"
+      },
+      {
+        "behavior": "Strict community validation and fail-closed handling for missing or untrusted signals",
+        "item_id": "nightly-windows-trust-gate-subprocess-env"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "kind": "do_not_modify",
+        "path_glob": "_project/release-evidence/**"
+      },
+      {
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/validation/**"
+      },
+      {
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/**"
+      },
+      {
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_mirror_partial_validation_policy.py"
+      },
+      {
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_validate_submission_vendor_gate.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -q -n 0 tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/workflows/test_validate_submission_vendor_gate.py",
+        "description": "Focused trust-gate tests",
+        "expected": "all focused tests pass",
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "last_result": "pass",
+        "last_run": "2026-08-25T18:47:56Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Repository preflight",
+        "expected": "exit 0",
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "last_result": "pass",
+        "last_run": "2026-08-25T18:50:29Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh run list --branch develop --workflow 'Nightly Validation' --limit 1",
+        "description": "Fresh scheduled Nightly proves Windows trust-gate tests",
+        "expected": "latest scheduled run is success with Windows 3.10 and 3.12 green",
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Scheduled Nightly run 32816732087 failed the same eight tests on Windows 3.10 and 3.12 with subprocess.CalledProcessError from bash -c because each helper replaced the complete process environment; Linux passed.",
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "notes": null,
+        "started_at": "2026-08-25T17:45:09Z",
+        "started_branch": "fix/nightly-windows-trust-env",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-nightly-windows-trust-env",
+        "status": "done",
+        "summary": "Pin the Windows subprocess environment failure with focused tests",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1910 head c89b9178baf86035aa79ad9af7eb80516200c725 copies os.environ in both helpers, overrides only trust inputs, removes BASE_REF for the missing-base case, and leaves workflow and production trust policy unchanged; 20 focused tests and full preflight passed.",
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "notes": null,
+        "started_at": "2026-08-25T17:45:11Z",
+        "started_branch": "fix/nightly-windows-trust-env",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-nightly-windows-trust-env",
+        "status": "done",
+        "summary": "Repair both test helpers without changing trust-policy semantics",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1910 merged at commit c89b9178b, trust-gate tests passed",
+        "item_id": "nightly-windows-trust-gate-subprocess-env",
+        "notes": null,
+        "started_at": "2026-08-25T20:11:15Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Obtain exact-head Windows CI and post-merge Nightly proof",
+        "wid": "w2"
+      }
+    ]
+  }
+}

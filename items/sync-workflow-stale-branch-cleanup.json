@@ -1,0 +1,173 @@
+{
+  "context": "Defer the implementation until production cadence is known. The\nworkflow's draft-only design means stale PRs are visible but\nnon-blocking; cleanup is a quality-of-life improvement, not a\ncorrectness requirement.\n",
+  "description": "The `sync-results-data-to-published.yml` workflow that landed in W4 of\n`published-results-slim-down-and-corpus-mirror` opens a fresh draft PR\nnamed `auto/results-mirror-<develop-SHA8>` for every develop push that\nchanges corpus paths. Old auto-mirror PRs and branches accumulate over\ntime — the workflow has no cleanup mechanism today.\n\nWait for the workflow to run in production for one or two months, then\ndecide what cleanup looks like based on actual cadence and PR volume.\nAs of the 2026-05-26 TODO review, live GitHub state showed the first\nmatching auto-mirror PR was opened on 2026-05-06, so the earliest\none-month review point is 2026-06-06. Keep this TODO Blocked until\nthat date, then run W0/W1 against current GitHub state before designing\ncleanup.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "auto-close auto-mirror PRs that have been opened for less than the configured staleness window",
+        "instead": "gate cleanup on age + draft status + presence of a newer mirror PR for the same series.",
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "why": "the maintainer may be in the middle of reviewing"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "sync-workflow-stale-branch-cleanup",
+        "id": 33,
+        "reason": "Pre-W4 there were no auto-mirror branches to clean up; this TODO scope is bounded to branches the workflow itself creates.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason states scope is explicitly bounded to branches the workflow itself creates; pre-W4 there was nothing of this kind to clean up.",
+        "summary": "Cleanup of pre-W4 manual mirror branches"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "needs_item": "published-results-slim-down-and-corpus-mirror"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "imported from YAML status: Blocked",
+      "category": "Operations",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Auto-mirror PRs labelled by a maintainer (e.g. `keep`, `needs-review`) must NOT be auto-closed.",
+        "item_id": "sync-workflow-stale-branch-cleanup"
+      },
+      {
+        "behavior": "Auto-mirror PRs that a maintainer has flipped from draft to ready-for-review must NOT be auto-closed.",
+        "item_id": "sync-workflow-stale-branch-cleanup"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/nightly.yml, .github/workflows/release-canary.yml — existing `schedule:`-triggered workflows; REUSE their cron + gh-cli idiom if a sibling cleanup workflow is added instead of extending the W4 workflow",
+        "decision": "reuse",
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "path": ".github/workflows/nightly.yml"
+      },
+      {
+        "concept": ".github/workflows/sync-results-data-to-published.yml — the W4 workflow that opens the auto-mirror draft PRs; EXTEND it with a cleanup step (preferred) rather than introducing a new module",
+        "decision": "extend",
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "path": ".github/workflows/sync-results-data-to-published.yml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/generate_corpus_inventory.py"
+      },
+      {
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/sync-results-data-to-published.yml"
+      },
+      {
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/sync-stale-mirror-cleanup.yml"
+      },
+      {
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/sync-workflow-stale-branch-cleanup.yaml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from datetime import datetime, timezone; raise SystemExit(0 if datetime.now(timezone.utc).date().isoformat() >= '2026-06-06' else 1)\"",
+        "description": "One-month production window has elapsed before cleanup design begins",
+        "expected": "exit 0 on or after 2026-06-06",
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh pr list --base published-results --state open --search 'head:auto/results-mirror- draft:true' --json createdAt --jq '[.[] | select((now - (.createdAt|fromdateiso8601)) > 2592000)] | length'",
+        "description": "No superseded auto-mirror draft PR older than the 30-day staleness window remains open",
+        "expected": "0 after cleanup runs — older superseded auto-mirror drafts are closed; the newest mirror per series may remain open",
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git ls-remote origin 'refs/heads/auto/results-mirror-*' | wc -l",
+        "description": "Auto-mirror branches on origin do not grow unbounded",
+        "expected": "<= the configured retention count chosen in w2 (bounded; not monotonically increasing across runs)",
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "notes": "Earliest start is 2026-06-06 based on the first observed\nauto/results-mirror PR date from the 2026-05-26 TODO review. On or\nafter that date, re-run the GitHub PR/branch queries and record the\nfirst observed auto-mirror PR date in the PR body. If the first date\nhas changed, keep at least one full month of production runtime before\nproceeding to W1.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate the 2026-06-06 production-window gate",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "notes": "Do not start before 2026-06-06 unless the first auto-mirror PR date\nis rechecked and proves an earlier full-month window. Run:\n`gh pr list --base published-results --state all --search \"head:auto/results-mirror-\"`\nand `gh api repos/joeharris76/BenchBox/git/matching-refs/heads/auto/results-mirror`.\nCount PRs by status (open/draft, open ready-for-review, merged,\nclosed-without-merge) and count matching branches. Decide whether\ncleanup is needed based on observed cadence.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate the calendar gate and audit auto-mirror PR/branch accumulation",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "sync-workflow-stale-branch-cleanup",
+        "notes": "If audit surfaces meaningful accumulation, extend the sync workflow\n(or add a sibling scheduled workflow) to:\n  - Close stale auto-mirror draft PRs older than N days where a newer\n    auto-mirror PR exists for the same series.\n  - Delete the corresponding auto-named branch.\nSkip merged or human-edited (label `needs-review` or non-draft) PRs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement cleanup if needed",
+        "wid": "w2"
+      }
+    ]
+  }
+}

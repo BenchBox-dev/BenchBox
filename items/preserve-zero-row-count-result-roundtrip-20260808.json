@@ -1,0 +1,271 @@
+{
+  "context": "Replace truthiness coalescing with explicit non-None resolution while preserving alias precedence. Add table-driven and round-trip tests for canonical and legacy aliases. Audit adjacent compact numeric/boolean fields for the same defect pattern, but record any distinct defect separately rather than widening this implementation. Preserve the v2 external shape unless evidence proves that a versioned migration is required.",
+  "description": "A confirmed canonical-result defect in benchbox/core/results/schema.py uses truthiness-based alias selection for rows_returned, rows, and result_count. A successful query with rows_returned=0 therefore exports without the compact rows key, and benchbox/core/results/loader.py reconstructs None on reload. Repair the defect and establish an explicit missing/null/zero contract across all compatibility aliases. This is a narrow correctness fix; it does not authorize a broader result-schema redesign or schema-version migration.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Bump the result schema version preemptively.",
+        "instead": "Version only if a separately reviewed external-contract change is unavoidable.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "why": "The change restores information already representable in v2."
+      },
+      {
+        "dont": "Regenerate broad golden-result corpora.",
+        "instead": "Add focused fixtures and explain every changed artifact byte.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "why": "That can hide unrelated artifact drift."
+      },
+      {
+        "dont": "Use a or b to select numeric or boolean result fields.",
+        "instead": "Use explicit presence or non-None checks with tested precedence.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "why": "Zero and false are valid domain values and would be discarded."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-08T21:43:41Z",
+        "from_item": "preserve-zero-row-count-result-roundtrip-20260808",
+        "id": 704,
+        "reason": "Confirmed at query_normalizer.py:159 during W4 audit; outside this item's only_modify scope and owned by canonical-query-execution-result-contract-20260808.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Captured and already owned by in-batch TODO canonical-query-execution-result-contract-20260808 W0-W5; no duplicate item needed.",
+        "summary": "Canonical zero row count can be replaced by a truthy compatibility alias in query_normalizer"
+      },
+      {
+        "created_at": "2026-08-08T21:43:43Z",
+        "from_item": "preserve-zero-row-count-result-roundtrip-20260808",
+        "id": 705,
+        "reason": "Confirmed truthiness handling for qphh_at_size and geometric_mean_ms in loader.py; distinct semantic fields, owned by canonical-query-execution-result-contract-20260808.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Captured and already owned by in-batch TODO canonical-query-execution-result-contract-20260808 semantic edge-case contract; no duplicate item needed.",
+        "summary": "TPC metric zero values are dropped or replaced during loader reconstruction"
+      },
+      {
+        "created_at": "2026-08-08T21:43:45Z",
+        "from_item": "preserve-zero-row-count-result-roundtrip-20260808",
+        "id": 706,
+        "reason": "Reproduced digest abc to None to None; outside the row-count fix and owned by canonical-query-execution-result-contract-20260808.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Captured and already owned by in-batch TODO canonical-query-execution-result-contract-20260808 digest round-trip contract; no duplicate item needed.",
+        "summary": "Compact result digest is lost during load and re-export"
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness and Result Integrity",
+      "completed_at": "2026-08-08T22:50:26Z",
+      "created_at": "2026-08-08T19:49:11Z",
+      "worktree": "result-integrity"
+    },
+    "preserves": [
+      {
+        "behavior": "Canonical v2 result JSON key names and units remain unchanged.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808"
+      },
+      {
+        "behavior": "Existing digest and plan-capture preservation behavior remains unchanged.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808"
+      },
+      {
+        "behavior": "Missing and explicit null values are not silently converted to zero.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808"
+      },
+      {
+        "behavior": "Positive row counts and legacy rows/result_count aliases retain documented precedence.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Digest export uses explicit non-None checks to avoid falsy-value loss.",
+        "decision": "reuse",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "path": "benchbox/core/results/schema.py"
+      },
+      {
+        "concept": "Completed tracker item establishing canonical schema direction.",
+        "decision": "extend",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "path": "canonicalize-result-schema"
+      },
+      {
+        "concept": "Loader compatibility and round-trip coverage.",
+        "decision": "extend",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "path": "tests/unit/core/results/test_loader.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/loader.py"
+      },
+      {
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_loader.py tests/unit/core/results/test_query_result_schema_contract.py -q",
+        "description": "Focused schema and loader tests pass",
+        "expected": "Selected tests pass including zero/null/missing round trips.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T21:45:59Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results -q",
+        "description": "All core result tests pass",
+        "expected": "Core result tests pass serially.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T21:46:06Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/core/results tests/unit/core/results",
+        "description": "Touched result paths satisfy Ruff",
+        "expected": "Ruff exits zero.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T21:46:08Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_query_result_schema_contract.py -q",
+        "description": "Zero-row regression is falsifiable on the unfixed tree",
+        "expected": "This command exits nonzero on the unfixed tree when rows_returned zero is omitted and exits zero after the repair.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "last_result": "pass",
+        "last_run": "2026-08-08T21:46:12Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Runtime reproduction: rows_returned=0 exported without rows, loaded as None, and re-exported without rows on d8954be3. Regression test added.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T21:45:08Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Reproduce the zero-row loss at current origin/develop and pin the exact export/load behavior in a focused regression test.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Parameterized contract pins first non-None precedence rows_returned > rows > result_count for zero, positive, null, and conflicting aliases.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T21:45:13Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Define and test alias precedence for non-None canonical and legacy row-count fields, including conflicting aliases.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "schema.py _resolve_row_count implements explicit non-None selection; no v2 key/unit or unrelated compact-field change.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T21:45:19Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Implement explicit non-None row-count resolution without changing unrelated compact fields or artifact keys.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "24 parametrized export/load/re-export cases cover zero, positive, null, missing, aliases, and conflicts; focused suite 67 passed.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T21:45:24Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add export-load-re-export cases for zero, positive, null, missing, and legacy aliases.",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Adjacent audit reproduced query_normalizer zero-alias, TPC metric zero, and digest round-trip defects; deferrals 704-706 recorded then dismissed as owned by canonical-query-execution-result-contract-20260808.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T21:45:29Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Run an adjacent-field falsy-value audit and record out-of-scope defects separately.",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Negative control restored faulty truthiness chain; canonical-zero test failed with KeyError rows; fix restored. Final focused 67 passed, result suite 1022 passed/13 skipped, Ruff and ty passed.",
+        "item_id": "preserve-zero-row-count-result-roundtrip-20260808",
+        "notes": null,
+        "started_at": "2026-08-08T21:45:35Z",
+        "started_branch": "codex/architecture-review-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Restore truthiness coalescing as a negative control, prove the regression test fails, then restore the fix.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

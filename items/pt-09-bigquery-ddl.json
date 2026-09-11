@@ -1,0 +1,16 @@
+{
+  "description": "Enhance BigQuery DDL generation to fully utilize the tuning configuration\nsystem with support for partitioning, clustering, and BigQuery-specific features.\n\n## BigQuery Physical Tuning Features\n\n### Time-based Partitioning\n```sql\nCREATE TABLE t (...) PARTITION BY DATE(timestamp_col);\nCREATE TABLE t (...) PARTITION BY DATETIME_TRUNC(datetime_col, DAY);\nCREATE TABLE t (...) PARTITION BY DATE_TRUNC(date_col, MONTH);\n```\n\n### Integer Range Partitioning\n```sql\nCREATE TABLE t (...)\nPARTITION BY RANGE_BUCKET(int_col, GENERATE_ARRAY(0, 100, 10));\n```\n\n### Clustering (up to 4 columns)\n```sql\nCREATE TABLE t (...) CLUSTER BY col1, col2, col3, col4;\n```\n\n### Require Partition Filter\nPrevents expensive full-table scans:\n```sql\nCREATE TABLE t (...)\nPARTITION BY DATE(ts)\nOPTIONS (require_partition_filter = true);\n```\n\n## Current State\n\nBigQuery adapter (`benchbox/platforms/bigquery.py`) has:\n- Inline PARTITION BY in `_create_table_statement()` (line ~1292)\n- Inline CLUSTER BY (line ~1295)\n- `generate_tuning_clause()` method (line ~1473)\n- Uses adapter config (partitioning_field), not tuning YAML",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pt-09-bigquery-ddl",
+        "needs_item": "pt-01-ddl-generator-protocol"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-01-03T00:00:00Z",
+      "worktree": "physical-tuning"
+    }
+  }
+}

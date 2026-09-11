@@ -1,0 +1,56 @@
+{
+  "context": "Update the capture spec's heading assertion to the canonical copy and confirm it still captures the mode/width matrix.",
+  "description": "e2e/captures/pr246-home-remediation.spec.ts asserts the retired 'BenchBox Database Leaderboards' headline, which no longer exists in src after explorer-home-skeleton-h1-parity-20260803-v2. The spec is skipped by default and only runs with PR246_HOME_CAPTURE=1, so CI is unaffected, but it fails for anyone who opts in. No other item covers this file.",
+  "legacy": {
+    "item_meta": {
+      "category": "Explorer test integrity",
+      "completed_at": "2026-08-04T12:15:59Z",
+      "completed_pr": 1518,
+      "created_at": "2026-08-04T00:10:36Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The spec stays opt-in behind PR246_HOME_CAPTURE and does not join the default run",
+        "item_id": "explorer-pr246-capture-headline-refresh-20260803"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-pr246-capture-headline-refresh-20260803",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "explorer-pr246-capture-headline-refresh-20260803",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/captures/pr246-home-remediation.spec.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! rg -q -F \"BenchBox Database Leaderboards\" results-explorer/e2e/captures/pr246-home-remediation.spec.ts",
+        "description": "Capture spec no longer pins the retired headline",
+        "expected": "Exits 1 on the unfixed tree where the retired string is still asserted; exits 0 after the refresh.",
+        "item_id": "explorer-pr246-capture-headline-refresh-20260803",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:15:33Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Capture spec heading updated to 'BenchBox Curated Results Preview'. Also moved the heading assertion AFTER the data-bound leaderboard-grid assertion: post-#1496 the skeleton and loaded hero share one headline, so asserting it first resolves against the skeleton and would let the screenshot capture the loading state - the same ordering trap fixed in e2e/routes/home.spec.ts. In scope (the item owns this whole file). Opt-in preserved by construction: the test.skip(process.env.PR246_HOME_CAPTURE !== '1') guard on line 41 is untouched, verified still present; I did not spin up the webServer to observe the runtime skip. tsc --noEmit clean.",
+        "item_id": "explorer-pr246-capture-headline-refresh-20260803",
+        "notes": null,
+        "started_at": "2026-08-04T12:15:24Z",
+        "started_branch": "fix/explorer-pr246-capture-headline-refresh-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/upbeat-knuth-7adfae",
+        "status": "done",
+        "summary": "Update the capture spec heading assertion to the canonical copy",
+        "wid": "w0"
+      }
+    ]
+  }
+}

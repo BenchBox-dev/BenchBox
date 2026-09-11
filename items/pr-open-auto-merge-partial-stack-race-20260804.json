@@ -1,0 +1,134 @@
+{
+  "context": "Decide where the guard belongs. Candidates: have make pr-open withhold auto-merge until the branch is confirmed fully pushed and no further commits are pending; have auto-merge-on-open.yml revoke auto-merge on a push that arrives after enablement, mirroring the existing soundness-path revocation it already performs; or emit a post-merge check that compares the merged squash against the branch head and reports orphaned commits. Prefer reusing the existing revoke-on-push path in auto-merge-on-open.yml over inventing a second mechanism.",
+  "description": "make pr-open enables squash auto-merge at PR creation. When work continues on the branch afterwards, the PR can satisfy its checks and merge while a later commit is still local or still running CI, so develop receives a partial change and the remaining commit is silently orphaned - the branch is merged, the PR is closed, and nothing reports that part of the work never landed. Observed on PR #1503 on 2026-08-03: it merged carrying only its first commit (develop push trigger plus contract tests) while commit b5c56ea998, which added the Results Explorer browser gate job the PR body described, never landed. The gap was found only by manually grepping develop for the job name; recovery needed a fresh branch, a cherry-pick, and a second PR (#1504). The same hazard was flagged one batch earlier against the four stacked auto-merge PRs #1497/#1499/#1500, where a child merging before its parent would leave the parent empty. Twice in two batches is a pattern, not an accident.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-04T12:23:21Z",
+      "completed_pr": 1521,
+      "created_at": "2026-08-04T11:35:03Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A fully-pushed ordinary PR still merges hands-free - the guard must not turn auto-merge off in the common case",
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804"
+      },
+      {
+        "behavior": "Soundness-path PRs continue to have auto-merge withheld and revoked exactly as they are today",
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/orphaned-commit-detector.yml"
+      },
+      {
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/known-stranded-commits.txt"
+      },
+      {
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q -k auto_merge_partial_stack",
+        "description": "A commit pushed after auto-merge is enabled cannot be outrun by the merge",
+        "expected": "Exits 1 on the unfixed tree, where auto-merge can complete while a later branch commit is unmerged and nothing reports the orphan, and exits 0 once the guard holds. Write the test in w2 so this rung becomes runnable.",
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:22:34Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit -q -k auto_merge",
+        "description": "Existing auto-merge predicate tests still pass",
+        "expected": "No regression in soundness-path withholding or revocation",
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Race reproduced against live state: detect_orphaned_commits.py flags 5 orphans across 3 branches, including my own b5c56ea9 from PR #1503. GUARD POINT DECIDED: detection, not prevention. auto-merge-on-open.yml already re-evaluates on synchronize and revokes for soundness paths, but it cannot prevent this race - there is no later push to react to until after the merge has already happened. A detector for exactly this class already exists (orphaned-commit-detector.yml, whose header records three earlier occurrences); the gap is cadence, not absence. It ran weekly, so up to seven days of develop silently missing a change. Withholding auto-merge was rejected: the item's must-preserve requires an ordinary fully-pushed PR to keep merging hands-free.",
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T12:21:27Z",
+        "started_branch": "fix/pr-open-auto-merge-partial-stack-race-20260804",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/upbeat-knuth-7adfae",
+        "status": "done",
+        "summary": "Reproduce the race deterministically and pick the guard point",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Removed the paths filter from the detector's develop push trigger so it runs on EVERY develop push - the moment a squash merge can strand a commit - keeping the weekly schedule as a backstop for branches pushed long after their PR closed. Allowlisted b5c56ea9 (my own #1503 orphan, content re-landed verbatim via #1504).",
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T12:21:33Z",
+        "started_branch": "fix/pr-open-auto-merge-partial-stack-race-20260804",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/upbeat-knuth-7adfae",
+        "status": "done",
+        "summary": "Implement the guard",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/workflows/test_auto_merge_partial_stack_race.py: 4 tests - detector runs on every develop push with no paths filter, keeps its scheduled backstop, retains the allowlist escape hatch so one acknowledged orphan cannot decay the signal, and (must-preserve regression guard) auto-merge still re-evaluates on synchronize, still revokes for soundness paths, and still enables --auto --squash for ordinary PRs. Falsified by restoring the paths filter: fails with 'detector's develop push trigger is path-filtered'. Rung 2 (pytest -k auto_merge): 36 passed.",
+        "item_id": "pr-open-auto-merge-partial-stack-race-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T12:21:39Z",
+        "started_branch": "fix/pr-open-auto-merge-partial-stack-race-20260804",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/upbeat-knuth-7adfae",
+        "status": "done",
+        "summary": "Cover it with a workflow or unit test that a post-enablement push cannot be outrun",
+        "wid": "w2"
+      }
+    ]
+  }
+}

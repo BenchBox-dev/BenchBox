@@ -1,0 +1,214 @@
+{
+  "context": "Change the canonical source at /Users/joe/.skill-sync/skills, not generated project mirrors. Introduce stable policy identifiers and an authority-provenance vocabulary, add an explicit identity-preservation rule to the shared commit path, establish a mechanically checkable parity contract for compressed protocols, and extend permission auditing to conflicting executable policy.",
+  "description": "Canonical shared skills do not explicitly require agents to preserve Git author and committer identity unless an authorized task names an override, and they do not consistently label whether a requirement comes from the current task, repository policy, a mechanical gate, or a recommendation. The compressed review protocol is also maintained in manual lockstep with a fuller BenchBox protocol, creating semantic-drift risk. These gaps contributed to ambiguous language such as required Claude author even when the actual authority was a one-off task step.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Patch .claude/skills, .codex/skills, or .gemini/skills directly",
+        "instead": "Edit the canonical skill source and materialize through skill-sync",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "why": "They are generated mirrors and will drift or be overwritten"
+      },
+      {
+        "dont": "Turn task-local identity instructions into a global Claude author rule",
+        "instead": "Preserve configured identity unless the current authorized task explicitly overrides it",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "why": "That would silently misattribute unrelated commits"
+      }
+    ],
+    "item_meta": {
+      "category": "Agent infrastructure",
+      "completed_at": "2026-07-27T16:21:32Z",
+      "completed_pr": 4,
+      "created_at": "2026-07-27T15:47:46Z",
+      "worktree": "skill-sync-canonical"
+    },
+    "preserves": [
+      {
+        "behavior": "Canonical skills contain no BenchBox-only remote names or workflow details",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy"
+      },
+      {
+        "behavior": "Existing high-level skill names, action names, and trigger phrases remain stable",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy"
+      },
+      {
+        "behavior": "Generated project mirrors are not edited directly",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy"
+      },
+      {
+        "behavior": "Review-shaped actions remain read-only unless implementation is explicitly authorized",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Explicit staging and commit verification",
+        "decision": "extend",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "path": "/Users/joe/.skill-sync/skills/SHARED/commit-framework"
+      },
+      {
+        "concept": "Shared review authorization boundary",
+        "decision": "extend",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "path": "/Users/joe/.skill-sync/skills/review-protocol"
+      },
+      {
+        "concept": "Cross-agent executable permission audit",
+        "decision": "extend",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "path": "/Users/joe/.skill-sync/skills/tidy-perms"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.skill-sync/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git -C /Users/joe/.skill-sync diff --check",
+        "description": "Canonical skill repository has no whitespace errors",
+        "expected": "exit 0",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "last_result": "pass",
+        "last_run": "2026-07-27T16:21:25Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "node /Users/joe/Developer/skill-sync/dist/cli/index.js --project /Users/joe/.skill-sync validate --exit-code",
+        "description": "Canonical source passes skill-sync validation",
+        "expected": "exit 0",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "last_result": "pass",
+        "last_run": "2026-07-27T16:21:28Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "node /Users/joe/Developer/skill-sync/dist/cli/index.js --project /Users/joe/.skill-sync verify",
+        "description": "Canonical source and lock remain internally consistent",
+        "expected": "exit 0",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "last_result": "pass",
+        "last_run": "2026-07-27T16:21:30Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Compared canonical commit/context/review/tidy-perms skills with BenchBox docs/development/review-protocol.md; gaps: identity override safety, authority provenance, stable semantic parity IDs, executable hook precedence/staleness/failure audit.",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "notes": null,
+        "started_at": "2026-07-27T16:05:37Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Compare canonical commit, review, context, and tidy-perms skills with BenchBox full protocols and record semantic gaps",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added COMMIT-IDENTITY-001 preserve-configured-identity rule and post-commit identity verification guidance.",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "notes": null,
+        "started_at": "2026-07-27T16:05:44Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add a preserve-Git-identity-by-default rule with explicit task-authorized override semantics",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added AUTH-PROVENANCE-001 taxonomy for task, repository, mechanical, and recommendation authorities with source-labeling/conflict rules.",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "notes": null,
+        "started_at": "2026-07-27T16:05:47Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add requirement provenance labels for task, repository, mechanical gate, and recommendation authority",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added REVIEW-AUTH/DEFECT/L2/CAPTURE/PARITY stable IDs and semantic parity contract to canonical review protocol.",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "notes": null,
+        "started_at": "2026-07-27T16:05:51Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Define stable policy identifiers and a parity contract for compressed and full review protocols",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Extended tidy-perms to audit effective scope, stale/duplicate hooks, destructive permissions, swallowed failures, bare tooling, and cross-project MCP coupling.",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "notes": null,
+        "started_at": "2026-07-27T16:05:56Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Extend tidy-perms guidance to find stale hooks and conflicting executable policy across scopes",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Canonical validate passes with only expected global-instruction warnings using isolated materialized targets; changed-skill lock paths/hashes/sizes match source; propagation doc requires canonical-first push, stable-ID parity, and generated downstream mirrors.",
+        "item_id": "align-canonical-agent-skills-with-authority-and-identity-policy",
+        "notes": null,
+        "started_at": "2026-07-27T16:19:30Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Run canonical validation and document downstream materialization requirements",
+        "wid": "w5"
+      }
+    ]
+  }
+}

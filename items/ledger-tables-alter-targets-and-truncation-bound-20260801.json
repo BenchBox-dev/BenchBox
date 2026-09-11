@@ -1,0 +1,178 @@
+{
+  "context": "Add an ALTER TABLE branch to _statement_table (reuse the existing _ALTER_TABLE_RE), and add a regression test simulating the mixed Snowflake ledger (ALTER + OPTIMIZE on different tables) that fails today. For the truncation bound: either scope the catalog query by the ledger tables (preferred where the platform allows an IN list - both queries already filter in Python) or compute truncated only when the bound plausibly clipped relevant rows; keep the conservative refuse-on-real-truncation behavior.",
+  "description": "From the 2026-07-31 adversarial review.\n\nDefect (A10, latent fail-closed): _statement_table (benchbox/core/tuning/introspection.py:308-322) recognizes CREATE INDEX / OPTIMIZE / CREATE TABLE only - no ALTER branch - and the generic RecordingConnection records with table=None. #1371 made ALTER TABLE ... CLUSTER BY the entire Snowflake tuning footprint, so a Snowflake ledger's tables set is EMPTY and the introspector's 'if tables and name not in tables' filter (snowflake_introspection.py:108) degrades to unfiltered - correct today only by accident, and it contradicts the design note's bounding promise (tuning-introspection-receipts.md:77-80). The moment any table-bearing statement (an OPTIMIZE, a CREATE INDEX) joins a Snowflake ledger, the filter activates WITHOUT the ALTER'd table, its catalog fact is filtered out, and the cluster intent verdicts ABSENT - permanent, invisible never-verify.\n\nNit folded in (C4c): both introspectors compute truncated from the UNFILTERED row count (clickhouse/introspection.py:80: rows fetched for the whole database; snowflake_introspection.py:101), so any database/schema with >=1000 tables sets truncated=True and permanently refuses the upgrade even when every ledger table was fetched and matched. Honest, invisible.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not build the IN list by string-interpolating raw table names",
+        "instead": "parameterize or strictly validate identifiers before embedding",
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "why": "ledger-derived names are parsed from SQL text and must not become an injection surface"
+      },
+      {
+        "dont": "Do not derive ALTER targets from the statement.table metadata field alone",
+        "instead": "parse the table from the ALTER statement text like the other branches",
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "why": "the generic RecordingConnection records table=None, so metadata-only extraction leaves the same hole"
+      },
+      {
+        "dont": "Do not drop the truncation refusal to 'fix' large-catalog runs",
+        "instead": "narrow the query or the truncation predicate so the bound measures relevant rows",
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "why": "certifying against a knowingly incomplete snapshot is the over-certification failure class"
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness",
+      "completed_at": "2026-08-01T16:38:14Z",
+      "completed_pr": 1412,
+      "created_at": "2026-08-01T12:29:26Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A genuinely clipped catalog snapshot still refuses the upgrade (truncated => no applied_verified).",
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801"
+      },
+      {
+        "behavior": "Introspection stays bounded: hard row caps remain; scoping by ledger tables may narrow reads but never widen them.",
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801"
+      },
+      {
+        "behavior": "Introspectors never raise; degraded reads keep returning IntrospectedState(error=...).",
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801"
+      },
+      {
+        "behavior": "RECLUSTER/maintenance ALTER classification is unchanged - only table EXTRACTION learns about ALTER, not verdict classes.",
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/introspection.py"
+      },
+      {
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/introspection.py"
+      },
+      {
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/duckdb_introspection.py"
+      },
+      {
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/snowflake_introspection.py"
+      },
+      {
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/development/tuning-introspection-receipts.md"
+      },
+      {
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_clickhouse_applied_ledger_live.py"
+      },
+      {
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/**"
+      },
+      {
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.tuning.applied_ledger import PHASE_POST_LOAD, AppliedTuningLedger; from benchbox.core.tuning.introspection import ledger_tables; led=AppliedTuningLedger(); led.record('ALTER TABLE lineitem CLUSTER BY (a)', PHASE_POST_LOAD); led.record('OPTIMIZE TABLE other', PHASE_POST_LOAD); assert ledger_tables(led) == {'lineitem','other'}, ledger_tables(led)\"",
+        "description": "ALTER targets enter ledger_tables (post-fix probe)",
+        "expected": "exit 0",
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T16:22:22Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning tests/unit/platforms/test_snowflake_introspection.py tests/unit/platforms/test_clickhouse_introspection.py tests/integration/test_clickhouse_applied_ledger_live.py -q",
+        "description": "Introspection unit + live suites green",
+        "expected": "all pass",
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T16:22:30Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Tests-first proof: ledger ALTER+OPTIMIZE returned only orders, and Snowflake mixed-ledger introspection filtered out LINEITEM entirely. Both intended regressions failed; log /tmp/item6-red.log.",
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "notes": "Add failing regression test: ledger with executed 'ALTER TABLE lineitem CLUSTER BY (a)' plus 'OPTIMIZE TABLE other' must yield ledger_tables() containing BOTH lineitem and other; introspector fake asserting the lineitem fact is not filtered out.",
+        "started_at": "2026-08-01T16:19:33Z",
+        "started_branch": "fix/ledger-tables-alter-targets-truncation-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Failing test: ledger with ALTER + OPTIMIZE on different tables must include both in ledger_tables(); introspector must not filter out the ALTER'd table",
+        "wid": "w1"
+      },
+      {
+        "evidence": "_statement_table now parses ALTER TABLE with the existing _ALTER_TABLE_RE and normalize_identifier; mixed ALTER+OPTIMIZE regressions pass.",
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "notes": "Add the ALTER TABLE branch to _statement_table using _ALTER_TABLE_RE; keep normalize_identifier semantics consistent with the other branches.",
+        "started_at": "2026-08-01T16:20:29Z",
+        "started_branch": "fix/ledger-tables-alter-targets-truncation-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Add the ALTER TABLE branch to _statement_table using _ALTER_TABLE_RE with consistent normalize_identifier semantics",
+        "wid": "w2"
+      },
+      {
+        "evidence": "ClickHouse and Snowflake retain hard LIMIT 1000 reads but compute truncated from ledger-relevant rows after normalized filtering. At-cap tests with 999 unrelated rows plus the target stay untruncated; genuinely relevant at-cap remains truncated by construction. 84 focused tests passed.",
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "notes": "Truncation bound: scope catalog reads to ledger tables where feasible (parameterized/validated) or compute truncated from relevant-row counts; unit tests for the >=cap-tables-but-all-ledger-tables-fetched case on both ClickHouse and Snowflake introspectors.",
+        "started_at": "2026-08-01T16:22:00Z",
+        "started_branch": "fix/ledger-tables-alter-targets-truncation-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Truncation: scope catalog reads to ledger tables or compute truncated from relevant rows; tests for the at-cap case on both introspectors",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Receipts design note now documents ALTER-aware table extraction, hard catalog caps, relevant-row truncation, and absent fail-closed behavior when a target is clipped.",
+        "item_id": "ledger-tables-alter-targets-and-truncation-bound-20260801",
+        "notes": "Update the bounding paragraph in the receipts design note to describe the actual mechanism after the change.",
+        "started_at": "2026-08-01T16:22:06Z",
+        "started_branch": "fix/ledger-tables-alter-targets-truncation-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Update the receipts design-note bounding paragraph to the actual mechanism",
+        "wid": "w4"
+      }
+    ]
+  }
+}

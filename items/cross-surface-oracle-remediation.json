@@ -1,0 +1,337 @@
+{
+  "description": "An adversarial review of the cross-surface SQL<->DataFrame equivalence campaign\n(PRs #826-#848 on develop) reproduced every finding by running the gates and\nfound the oracle is real but narrow, oversold, and partly vacuous. This TODO\naddresses ALL of those findings. The committed evidence the review draws on\nlives in _project/analysis/clickbench-cross-surface-divergences.md,\n_project/analysis/joinorder-synthetic-cross-surface-divergences.md, and\n_project/analysis/oracle-coverage-map.md; reproduce any cell with\n`make <benchmark>-cross-surface-equivalence-report`.\n\nThe headline problem: PR #848 concluded \"ClickBench has ~no genuine DataFrame\nlogic bugs\" and triaged 27 divergences as \"tie-ambiguous top-N.\" That is false.\nRe-running the gate shows at least three REAL, deterministic DataFrame bugs that\n#848 rationalized away as ties:\n  - Q6_pandas: wrong COUNT(DISTINCT SearchPhrase) (18 SQL vs 17 pandas), a\n    scalar with NO ORDER BY and NO LIMIT - a tie is impossible. Root cause: the\n    DataFrame loader maps empty-string -> None and pandas .nunique() drops the\n    null. SearchPhrase has 74,724 empty strings / 0 nulls.\n  - Q17_pandas / Q18_pandas: wrong GROUP BY - pandas default groupby(dropna=True)\n    silently drops ~74k null-key rows, so the query runs over ~25% of the data.\n    The count multiset differs, which a boundary tie cannot cause.\n  - Q24 / Q17 col-1 \"\" vs None: the SAME root cause #848 deferred as a cosmetic\n    \"dtype\" issue. It is not cosmetic - it changes COUNT(DISTINCT) and GROUP BY\n    membership.\n\nCompounding issues the review proved by reproduction:\n  - NON-DETERMINISM: the ClickBench gate returned 27 -> 25 -> 26 divergent cells\n    across three identical runs, with per-query values changing run to run. The\n    generated DATA is byte-identical across runs (verified by md5), so the wobble\n    is ENGINE tie-ordering (DuckDB/Polars thread parallelism under\n    LIMIT-without-total-ORDER), NOT data. random.seed(42) cannot fix it, and a\n    known_divergences baseline is therefore un-pinnable.\n  - ORDER-BY BLINDNESS: ResultValidator.validate_results_exact sorts FULL ROWS\n    before comparing (tpchavoc/validation.py:54-79), so ORDER BY is never checked\n    except via which rows survive LIMIT. A reversed ORDER BY passes silently;\n    equally-valid tie picks are flagged as false divergences; a column mixing\n    None and non-None crashes Python sorted() and is mislabeled \"error:\".\n  - VACUOUS CELLS: at SF=0.1, 6 of 13 SSB queries (Q2.1-2.3, Q3.3, Q3.4, Q4.3)\n    return ZERO rows on both surfaces, so 12 of 26 SSB cells pass empty-vs-empty\n    while the report counts them as \"compared\". The build guards empty TABLES\n    (cross_surface.py:261) but not empty RESULTS.\n  - FALSE INDEPENDENCE: SSB and ~40/43 ClickBench DataFrame queries are GENERATED\n    from a compact DSL spec, and BOTH \"independent backends\" are emitted from the\n    SAME spec row - so a spec-level logic error appears identically on both, and\n    the docs' \"two independent implementations\" claim (cross_surface.py:3-6,\n    dataframe_surface.py:48-50) is false for them. CoffeeShop (hand-written) is\n    the genuine exception.\n  - LOADER BYPASS: the gate materializes contexts straight from typed DuckDB\n    Arrow (dataframe_surface.py:74-125), never through DataFrameDataLoader, so a\n    green gate proves NOTHING about the production CSV->parquet loader's dtype\n    fidelity (leading-zero VARCHAR->int, empty->null). #847 \"deferred dtype\" is\n    docs-only and the bug is still live; the #846 DDL parser is a naive\n    whitespace tokenizer that breaks on DECIMAL(p, s), quoted names, and\n    multi-word types.\n  - GOVERNANCE: STAGED gates are not run in CI and have no promotion forcing\n    function; \"guarded\" in the coverage map means \"registered in the GATES dict\",\n    not \"verified green\"; the \"12 gateable\" applicability headline counts 6\n    benchmarks whose SQL<->DF id mapping was never verified (the team's own TODO\n    says \"do NOT guess\").",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "count an empty-vs-empty or unverified-id-mapping cell as coverage",
+        "instead": "(not specified)",
+        "item_id": "cross-surface-oracle-remediation",
+        "why": "that is the exact 'theater' the review flagged."
+      },
+      {
+        "dont": "fix the null bug only in the gate path or only in the generated factories",
+        "instead": "fix the loader contract (w1) and verify on the real run path.",
+        "item_id": "cross-surface-oracle-remediation",
+        "why": "production and hand-written impls would stay broken"
+      },
+      {
+        "dont": "fork ResultValidator for cross-surface",
+        "instead": "extend it with an opt-in order/tie-aware mode.",
+        "item_id": "cross-surface-oracle-remediation",
+        "why": "TPC-Havoc depends on it"
+      },
+      {
+        "dont": "promote a staged gate to GATES while it is nondeterministic or has a non-empty baseline",
+        "instead": "green+empty+deterministic first.",
+        "item_id": "cross-surface-oracle-remediation",
+        "why": "GATES membership is the coverage signal"
+      },
+      {
+        "dont": "silence a divergence by adding it to known_divergences",
+        "instead": "fix the wrong surface (this is exactly how #848 went wrong).",
+        "item_id": "cross-surface-oracle-remediation",
+        "why": "the baseline is for intentional presentational differences only"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "cross-surface-oracle-remediation",
+        "id": 136,
+        "reason": "Large; cross-surface proves agreement not correctness. Tracked as a deeper question in the review, not required to close these findings.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Independent SQL oracle for non-tpch/tpcds benchmarks is owned by active benchmark-correctness-oracle-coverage-map ('small curated expected-results subset') and cross-surface-gate-rollout-followups w2 fallback oracle.",
+        "summary": "A truly independent SQL-side oracle for non-tpch/tpcds benchmarks (e.g. upstream published answer sets)."
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "cross-surface-oracle-remediation",
+        "id": 137,
+        "reason": "Additive enhancement beyond w6's acceptance and M4's core concern (which is resolved: the gate drives the real production loader and already caught the TEXT->null / TIMESTAMP->string dtype bugs via value comparison). Designing an acceptable cross-engine dtype-equivalence map is a separable piece.",
+        "resolution": "promoted",
+        "resolved_item": "a-dedicated-dtype-asserting-cross-surface-gate-cell-compare",
+        "resolved_reason": null,
+        "summary": "A dedicated DTYPE-asserting cross-surface gate cell (compare each loaded column's dtype, not just its values, against the SQL reference)."
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "cross-surface-oracle-remediation",
+        "id": 138,
+        "reason": "A separate SSB data-generation bug, not a cross-surface oracle defect; the vacuous cells are honestly classified in the ssb gate's allowlist. Tracked in #870.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Fixed: benchbox/core/ssb/generator.py:567 emits canonical 2-digit MFGR#12; DONE item ssb-generator-p-category-bug.yaml (Completed) + test_ssb_cross_surface_equivalence.py:89-98 pins the six queries non-empty. Allowlist removed.",
+        "summary": "SSB generator emits a 3-digit p_category ('MFGR#212') so the standard SSB Q2.x predicates ('MFGR#12') match no rows at any scale (Q2.1-2.3/Q3.3/Q3.4/Q4.3 empty to SF=1.0)."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All TPC-Havoc SQL and DataFrame equivalence gates stay green with empty baselines and byte-identical output - the comparator change (w2) is additive, never a fork.",
+        "item_id": "cross-surface-oracle-remediation"
+      },
+      {
+        "behavior": "SSB and CoffeeShop enforced gates stay green throughout (CoffeeShop is the reference 'good' gate).",
+        "item_id": "cross-surface-oracle-remediation"
+      },
+      {
+        "behavior": "The bounded one-cell-per-benchmark cost model is preserved; no full platform matrix in routine PRs.",
+        "item_id": "cross-surface-oracle-remediation"
+      },
+      {
+        "behavior": "benchbox run default (execution-only) behavior is unchanged for every benchmark; gate and loader changes must keep the real DataFrame run path working (re-verify a DataFrame benchmark run after w1/w6).",
+        "item_id": "cross-surface-oracle-remediation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/active/benchmark-cross-surface-equivalence-gate.yaml - the original campaign TODO; w2/w3/w4 there are still 'in_progress' and overlap this remediation.",
+        "decision": "reuse",
+        "item_id": "cross-surface-oracle-remediation",
+        "path": "_project/TODO/main/active/benchmark-cross-surface-equivalence-gate.yaml"
+      },
+      {
+        "concept": "_project/analysis/clickbench-cross-surface-divergences.md - committed ClickBench divergence evidence (the Q6/Q17/Q18/Q24 cases this TODO remediates); reproduce with `make clickbench-cross-surface-equivalence-report`.",
+        "decision": "reuse",
+        "item_id": "cross-surface-oracle-remediation",
+        "path": "_project/analysis/clickbench-cross-surface-divergences.md"
+      },
+      {
+        "concept": "_project/analysis/joinorder-synthetic-cross-surface-divergences.md - committed joinorder_synthetic divergence evidence (the deferred-dtype cases); reproduce with `make joinorder_synthetic-cross-surface-equivalence-report`.",
+        "decision": "reuse",
+        "item_id": "cross-surface-oracle-remediation",
+        "path": "_project/analysis/joinorder-synthetic-cross-surface-divergences.md"
+      },
+      {
+        "concept": "_project/analysis/oracle-coverage-map.md - the coverage/applicability map (guarded == GATES membership, the 12-gateable headline) the M1/M2 honesty fixes target.",
+        "decision": "reuse",
+        "item_id": "cross-surface-oracle-remediation",
+        "path": "_project/analysis/oracle-coverage-map.md"
+      },
+      {
+        "concept": "_project/scripts/generate_oracle_coverage_map.py (guarded := GATES membership, 85/111) and cross_surface_applicability_sweep.py (registry presence + id overlap); the honesty fixes for M1/M2.",
+        "decision": "reuse",
+        "item_id": "cross-surface-oracle-remediation",
+        "path": "_project/scripts/generate_oracle_coverage_map.py"
+      },
+      {
+        "concept": "benchbox/core/clickbench/dataframe_queries/queries.py - _make_group_pandas (groupby as_index=False, line 291), nunique op (206/285), _SCALAR_ROWS/_GROUP_ROWS/_SELECT_ROWS spec tables (394/404/433); the dropna/nunique null bugs are systemic to these factories.",
+        "decision": "reuse",
+        "item_id": "cross-surface-oracle-remediation",
+        "path": "benchbox/core/clickbench/dataframe_queries/queries.py"
+      },
+      {
+        "concept": "benchbox/core/dataframe/data_loader.py - PYARROW_TYPE_MAP (191-199), _extract_arrow_types (1373-1382), convert_csv_to_parquet strings_can_be_null=True (329), cache version (74); the production load path the gate bypasses.",
+        "decision": "reuse",
+        "item_id": "cross-surface-oracle-remediation",
+        "path": "benchbox/core/dataframe/data_loader.py"
+      },
+      {
+        "concept": "benchbox/core/dataframe/schema_utils.py - column_name (29-43) / column_sql_type (46-51) naive column.split() DDL parser (#846).",
+        "decision": "reuse",
+        "item_id": "cross-surface-oracle-remediation",
+        "path": "benchbox/core/dataframe/schema_utils.py"
+      },
+      {
+        "concept": "benchbox/core/equivalence/cross_surface.py - GATES vs STAGED_GATES, build_*_duckdb, find_cross_surface_divergences, count_executed_cells, run_gate, _report; the empty-RESULT guard belongs here.",
+        "decision": "reuse",
+        "item_id": "cross-surface-oracle-remediation",
+        "path": "benchbox/core/equivalence/cross_surface.py"
+      },
+      {
+        "concept": "benchbox/core/equivalence/dataframe_surface.py - materialize_rows, fetch_reference_rows, find_surface_divergences, _normalize_value (lines 239-263), build_dataframe_contexts_from_specs (74-125); the loader-bypass and the None/NaN coercion live here.",
+        "decision": "reuse",
+        "item_id": "cross-surface-oracle-remediation",
+        "path": "benchbox/core/equivalence/dataframe_surface.py"
+      },
+      {
+        "concept": "benchbox/core/ssb/dataframe_queries/queries.py - _QUERY_SPECS (158) and _make_expression_impl/_make_pandas_impl; both backends from one spec; SSB parameters that yield 6 empty results at SF=0.1.",
+        "decision": "reuse",
+        "item_id": "cross-surface-oracle-remediation",
+        "path": "benchbox/core/ssb/dataframe_queries/queries.py"
+      },
+      {
+        "concept": "benchbox/core/tpchavoc/validation.py - ResultValidator.validate_results_exact (54-79) full-row sort; the order/tie-awareness change must not regress the TPC-Havoc gates that rely on it.",
+        "decision": "reuse",
+        "item_id": "cross-surface-oracle-remediation",
+        "path": "benchbox/core/tpchavoc/validation.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "python -m benchbox.core.equivalence.cross_surface --benchmark clickbench  (x3, expect identical deterministic output)",
+        "description": "Re-run the full review reproduction appendix and confirm each finding is resolved.",
+        "expected": null,
+        "item_id": "cross-surface-oracle-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "pytest tests for cross-surface mutation sensitivity (w10)",
+        "description": "Mutation tests prove the gate catches seeded filter/group/sort/join bugs.",
+        "expected": null,
+        "item_id": "cross-surface-oracle-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make tpchavoc-equivalence-report && make tpchavoc-dataframe-equivalence-report",
+        "description": "TPC-Havoc gates unchanged.",
+        "expected": null,
+        "item_id": "cross-surface-oracle-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cross-surface-oracle-remediation",
+        "needs_wid": "w2",
+        "wid": "w10"
+      },
+      {
+        "item_id": "cross-surface-oracle-remediation",
+        "needs_wid": "w4",
+        "wid": "w10"
+      },
+      {
+        "item_id": "cross-surface-oracle-remediation",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "cross-surface-oracle-remediation",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "cross-surface-oracle-remediation",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cross-surface-oracle-remediation",
+        "notes": "The DataFrame surface conflates SQL '' with None, which changes results, not\njust presentation. Two layers must be decided and fixed:\n\nROOT FIX (preferred) - loader fidelity: a CSV empty field in a declared\nstring/VARCHAR/TEXT column must materialize as '' (matching DuckDB/SQL), not\nArrow null. Today convert_csv_to_parquet passes strings_can_be_null=True\n(data_loader.py:329) and pandas read_csv uses default na_values, so empties\nbecome null on the production path; the gate path (DuckDB->Arrow) keeps ''.\nDecide the canonical contract (recommend: declared-string empties stay '',\nmatching the SQL reference and the upstream ClickBench data) and enforce it on\nBOTH load paths. This is the true fix and also resolves Q24/Q17-col1.\n\nSYMPTOM FIX (only if the loader contract cannot be '' for a real reason):\nmake the generated factories null-correct - groupby(..., dropna=False) in\n_make_group_pandas (clickbench queries.py:291; mirror in ssb) and a\nnull-aware distinct count instead of bare pandas .nunique() (queries.py:206/\n285). But note this only patches generated factories; hand-written impls and\nfuture benchmarks would still be exposed - which is why the loader fix is\npreferred.\n\nWhichever path: verify against the REAL DataFrame run (dataframe_runner /\nbenchmark_mixin), not the gate only - the gate bypasses the loader (see w6),\nso a gate-only fix would be invisible to production.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix the empty-string/null conflation in the DataFrame load path (C1: Q6, Q17, Q18, Q24 are REAL bugs)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-oracle-remediation",
+        "notes": "The campaign measured only that the gates PASS (specificity); it never measured\nwhether they CATCH a seeded bug (sensitivity). Add a mutation-test harness that,\nper gated benchmark, injects a known DataFrame error and asserts the gate goes\nRED:\n  - flip a filter comparator (< -> <=),\n  - drop a GROUP BY key,\n  - reverse a sort direction (this is the BS2 regression guard),\n  - drop a join.\nFor each mutation that the gate does NOT catch, document why (e.g. an empty-\nresult query from BS3, or an order-only change the comparator ignores) and feed\nit back into w2/w4. This closes the central unanswered question: is the oracle\nstrong enough to find logic bugs, or did it find \"no bugs\" because it is too\nweak/vacuous?\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Mutation-test the oracle to measure SENSITIVITY, not just specificity (C2 - the central question)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-oracle-remediation",
+        "notes": "validate_results_exact (validation.py:54-79) sorts full rows then compares\npositionally, so it is simultaneously BLIND to real ORDER BY bugs (a reversed\norder passes - DEMO1) and NOISY on legitimate ties (two equally-valid tie\npicks fail - DEMO2), and it crashes on a column mixing None with non-None\nbecause Python sorted() cannot order None vs int (DEMO3), which\nfind_surface_divergences (dataframe_surface.py:234) then mislabels as\n\"error:\" instead of a clean result.\n\nAdd an ORDER-AWARE comparison mode for queries that declare an ORDER BY:\n  - compare the ordered prefix up to the first tie group exactly (this\n    restores ORDER BY signal), then\n  - treat the rows sharing the boundary order-key as a MULTISET (this removes\n    the tie noise that #848 mistook for the whole story).\nFor queries with no ORDER BY, keep multiset/set comparison.\nFix the sort key to place None deterministically (e.g. sort on a (is_none,\nvalue) surrogate) so a NULL-bearing column never raises, and so a genuine\nNone-vs-value difference is reported as a MISMATCH, not an \"error:\".\n\nCRITICAL CONSTRAINT: this comparator is shared with the TPC-Havoc SQL and\nDataFrame gates, which rely on its current semantics and run with empty\nbaselines. The order/tie-awareness must be additive (opt-in per query/gate)\nand MUST keep all TPC-Havoc gates byte-identical-green. Do NOT fork the\nvalidator for cross-surface only; extend it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make the comparator order-aware and tie-aware; fix the None/NaN sort crash (BS2)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-oracle-remediation",
+        "notes": "The wobble is engine tie-ordering, not data. Pin it at the gate:\n  - run the gate's DuckDB connection and the Polars/pandas execution\n    single-threaded (PRAGMA threads=1; pl.Config / POLARS_MAX_THREADS=1), AND\n  - have both surfaces apply a deterministic TOTAL-ORDER tie-breaker before any\n    LIMIT (append all remaining columns / a stable key to ORDER BY on the SQL\n    reference and the DataFrame impls), so LIMIT truncation is reproducible.\nDocument explicitly (in cross_surface.py and the review's \"determinism\" claim)\nthat random.seed(42) makes the DATA reproducible but does NOT make the GATE\ndeterministic; the tie-breaker + single-thread is what does.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Eliminate engine nondeterminism at the gate boundary (H1)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-oracle-remediation",
+        "notes": "6/13 SSB queries return 0 rows at SF=0.1, so 12/26 cells pass empty-vs-empty.\nTwo parts:\n  1. Gate hygiene: track per-query reference row count in\n     find_cross_surface_divergences; in _report, count a both-empty cell as\n     NON-discriminating. The gate should FAIL (or require an explicit\n     classified \"legitimately-empty\" entry) if any gated query's reference is\n     empty, and the \"compared N of M cells\" line must exclude vacuous cells\n     from the discriminating count.\n  2. Data discrimination: for SSB, choose query parameters (or a per-benchmark\n     SF) so Q2.1-2.3/Q3.3/Q3.4/Q4.3 return rows at the bounded cell. Prefer\n     parameterization over raising SF globally (keep PRs cheap).\nApply the same empty-result audit to coffeeshop (currently 0/11 empty - good),\nclickbench, and joinorder_synthetic before promotion.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fail (not silently pass) on vacuous empty-vs-empty cells; make every gated query discriminating (BS3)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-oracle-remediation",
+        "notes": "After w1 (null fix), w2 (tie-aware), w3 (determinism): re-run the ClickBench\ngate. Expectation: the genuine ties (Q9, Q15, Q16, Q31, Q32, Q33, Q38) become\nclean (tie-aware comparison), and the real bugs (Q6, Q17, Q18, Q24) are fixed\nby w1. ANY residual divergence is a real bug to fix, verified by checking the\nORDER-BY-key multiset, not extrapolated.\nCorrect _project/analysis/clickbench-cross-surface-divergences.md: the \"~no\ngenuine DataFrame logic bugs\" conclusion was wrong; record that Q6/Q17/Q18\nwere real null-handling bugs sharing root cause with the deferred '' vs None\nissue. Promote clickbench from STAGED_GATES to GATES only once it is green with\nan empty baseline AND deterministic.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-triage ClickBench with the fixed loader+comparator and correct the #848 record (C1 closeout)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-oracle-remediation",
+        "notes": "The gate's loader bypass (dataframe_surface.py:74-125 materializes from typed\nDuckDB Arrow) means it cannot see production CSV->parquet dtype corruption.\n  - Add a gate cell/mode that loads each gated benchmark through the REAL\n    DataFrameDataLoader (CSV->parquet->read_parquet) and compares both dtypes\n    and values to the SQL reference, so loader corruption is observable.\n  - Carry the w1 empty-string->'' contract to the remaining raw-CSV adapters.\n    w1 fixed the Parquet path (strings_can_be_null=False) and the pandas CSV\n    path; Polars scan_csv / modin / dask / cudf still map an empty string\n    field to null on their raw-CSV read, so prefer_parquet=False (or a\n    CSV-recommending adapter) reintroduces the Q6/Q17/Q18 divergence on those\n    surfaces. Thread declared column types into each adapter's read_csv and\n    preserve '' for string columns, mirroring pandas_df.read_csv.\n  - Harden schema_utils.column_name/column_sql_type (schema_utils.py:29-51):\n    replace the naive column.split() with a paren-aware, quote-aware DDL\n    column parser that handles DECIMAL(10, 2) (space after comma), quoted/\n    spaced names, and multi-word types (DOUBLE PRECISION, TIMESTAMP WITH TIME\n    ZONE, NOT NULL DEFAULT ...). Add unit tests for each shape.\n  - Extend PYARROW_TYPE_MAP and the polars/pandas maps (data_loader.py:191-199)\n    to cover TEXT, BIGINT, REAL, DOUBLE PRECISION, NUMERIC, BOOLEAN so declared\n    string/numeric types are applied at conversion instead of inferred.\n  - Apply declared STRING dtypes on the production load path (not just date-\n    name suppression) so a leading-zero VARCHAR is not inferred as int.\nRe-verify the real DataFrame benchmark run still works (this is a loader fix,\nnot gate-only special-casing).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a production-loader-path gate cell + harden the DDL parser and type maps (M4, L1, L2)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-oracle-remediation",
+        "notes": "Correct the docstrings that assert \"two independent implementations\"\n(cross_surface.py:3-6) and \"independent ... can diverge independently\"\n(dataframe_surface.py:48-50). For SSB and ~40/43 ClickBench queries BOTH\nbackends are generated from one DSL spec row, so they cannot diverge on logic\n- only on engine semantics; the only real independence is SQL-text vs DSL-spec\n(same author, same understanding). State plainly that the oracle catches\nTRANSCRIPTION errors, not CONCEPTUAL ones, for DSL-generated benchmarks.\nRecord per gated benchmark whether its DataFrame surface is hand-written\n(coffeeshop) or generated (ssb, clickbench). Optional but recommended: for at\nleast the enforced gates, ensure one surface is independently authored, or add\na second independent reference (e.g. the upstream published ClickBench answer\nset) so the oracle is not just self-consistency.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Stop overclaiming independence; document what the oracle actually proves (BS1)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-oracle-remediation",
+        "notes": "STAGED_GATES (clickbench, joinorder_synthetic) are not run in CI (pr.yml runs\nonly ssb + coffeeshop) and nothing fails when a staged gate is parked\nindefinitely; test_clickbench_is_staged_not_enforced only BLESSES parking.\n  - Add the staged cross-surface reports to a non-blocking CI job so their\n    divergence snapshots cannot silently rot (promote to blocking once green\n    via w5).\n  - Add a governance test: a benchmark may sit in STAGED_GATES only with a\n    dated rationale and an owner; fail if a staged gate has been parked past a\n    declared review-by date. Delete a staged gate that no one will burn down\n    rather than leave a permanent red parking lot.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run staged gates in CI and add a promotion forcing-function (M3)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-oracle-remediation",
+        "notes": "- generate_oracle_coverage_map.py derives 'guarded' from GATES dict membership\n  (85/111) and never checks the gate is green. Either run each gate (or read\n  its CI result) and add a distinct 'verified-green' signal, or rename\n  'guarded' -> 'gate-registered' so a registered-but-unverified gate is not\n  reported as coverage.\n- cross_surface_applicability_sweep.py counts 6 'needs-id-mapping' benchmarks\n  (amplab, datavault, nyctaxi, tpcds_obt, tpch_skew, tsbs_devops) as 'gateable'\n  on ZERO verified id overlap; the campaign's own TODO warns 'do NOT guess'\n  the nyctaxi/tsbs mappings and tpcds_obt is 3 DF queries vs 89 SQL. Downgrade\n  these from 'gateable' to 'candidate-unverified' until an independent\n  SQL<->DF id mapping is confirmed per benchmark.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tighten coverage-map / applicability honesty (M1, M2)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

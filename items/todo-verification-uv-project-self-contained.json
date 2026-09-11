@@ -1,0 +1,117 @@
+{
+  "description": "A promoted verification rung used 'uv run --project _project/scripts -- python -m pytest ...', but that isolated project does not declare pytest, so the command fails before collection on every tree. Make todo-db lint detect verification commands that invoke pytest through a selected uv project without declaring or injecting pytest. The check must resolve the selected pyproject from the current repository, accept root/default dev dependencies and explicit '--with pytest' or selected extras, and remain conservative for shell constructs it cannot prove. This makes the recorded ladder replayable without ambient environment mutation while leaving valid isolated-tool commands unchanged.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-13T15:36:14Z",
+      "completed_pr": 7,
+      "created_at": "2026-07-21T12:24:55Z",
+      "worktree": "todo-db"
+    },
+    "scope_rules": [
+      {
+        "item_id": "todo-verification-uv-project-self-contained",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "todo-verification-uv-project-self-contained",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "todo-verification-uv-project-self-contained",
+        "kind": "only_modify",
+        "path_glob": "src/todo_db/tracker.py"
+      },
+      {
+        "item_id": "todo-verification-uv-project-self-contained",
+        "kind": "only_modify",
+        "path_glob": "tests/test_tracker.py"
+      },
+      {
+        "item_id": "todo-verification-uv-project-self-contained",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --frozen pytest tests/test_tracker.py -q -k uv_project",
+        "description": "UV-project verification lint",
+        "expected": "exits 5 on the unfixed tree because no matching test is collected; exits 0 after the rule and controls land",
+        "item_id": "todo-verification-uv-project-self-contained",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:36:00Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --frozen ruff check .",
+        "description": "Canonical package lint",
+        "expected": "exit 0",
+        "item_id": "todo-verification-uv-project-self-contained",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:36:02Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --frozen pytest -q",
+        "description": "Canonical full suite",
+        "expected": "exit 0",
+        "item_id": "todo-verification-uv-project-self-contained",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:36:09Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-verification-uv-project-self-contained",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-verification-uv-project-self-contained",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Reproduced in a clean BenchBox worktree: uv run --project _project/scripts --frozen -- python -m pytest --version exits 1 with No module named pytest; root uv run --frozen -- python -m pytest --version exits 0 with pytest 9.1.1. Contract accepts selected-project declarations, default groups/extras, or explicit --with injection and skips ambiguous forms.",
+        "item_id": "todo-verification-uv-project-self-contained",
+        "notes": null,
+        "started_at": "2026-08-13T13:18:09Z",
+        "started_branch": "fix/uv-project-verification-lint",
+        "started_worktree": "/Users/joe/Developer/todo-db.wt-uv-project-verification-lint",
+        "status": "done",
+        "summary": "Reproduce the cross-project pytest failure and define conservative accepted and rejected uv command forms",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Canonical todo-db lint statically resolves uv --project manifests and enabled base/default-group/extra dependencies, flags the live todo-cli-local-fallback-guard seq2 rung, honors --no-dev/--only-group, and accepts explicit --with or requirements injection without executing commands.",
+        "item_id": "todo-verification-uv-project-self-contained",
+        "notes": null,
+        "started_at": "2026-08-13T13:19:37Z",
+        "started_branch": "fix/uv-project-verification-lint",
+        "started_worktree": "/Users/joe/Developer/todo-db.wt-uv-project-verification-lint",
+        "status": "done",
+        "summary": "Implement todo-db lint detection for pytest missing from the selected uv project environment",
+        "wid": "w1"
+      },
+      {
+        "evidence": "CHANGELOG documents the static replayability contract; 13 uv-project positive/negative controls pass, the live historical bad rung is detected, Ruff passes, and the full canonical suite passes 124 tests.",
+        "item_id": "todo-verification-uv-project-self-contained",
+        "notes": null,
+        "started_at": "2026-08-13T13:23:54Z",
+        "started_branch": "fix/uv-project-verification-lint",
+        "started_worktree": "/Users/joe/Developer/todo-db.wt-uv-project-verification-lint",
+        "status": "done",
+        "summary": "Add positive and negative controls, document the contract, and run focused plus full package gates",
+        "wid": "w2"
+      }
+    ]
+  }
+}

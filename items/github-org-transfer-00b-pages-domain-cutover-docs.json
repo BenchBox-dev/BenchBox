@@ -1,0 +1,152 @@
+{
+  "context": "Patch _project/decisions/github-org-transfer-benchbox-dev-2026-08-21.md and docs/operations/github-org-transfer.md (and the transfer pointer in repo-admin-settings.md if it still says org-verify before G4). Record live evidence: apex A/AAAA are GitHub Pages IPs; www.benchbox.dev CNAME is joeharris76.github.io; user challenge TXT exists; org challenge TXT is absent. Sequence: optional org TXT add (no Verify) -> transfer -> confirm 200 on apex and www -> update www CNAME to BenchBox-dev.github.io if needed -> org-verify -> only then remove user verification. Cite GitHub docs: verified domains are account-exclusive; verifying a domain in use elsewhere immediately releases it; already-verified domains refuse a second verification.",
+  "description": "The landed 2026-08-21 decision and docs/operations/github-org-transfer.md put org-level GitHub Pages verification of benchbox.dev in G0, before transfer. GitHub Pages domain verification is exclusive: verifying on BenchBox-dev while the site is still published from joeharris76/BenchBox would either fail (domain already verified by the user) or immediately unbind the live site. Amend the decision record and transfer runbook so G0 may add the org challenge TXT only, must keep user verification and apex DNS unchanged, and org Verify plus www CNAME retarget happen after G4 once https://benchbox.dev/ is still 200. This is in-repo docs only. Do not transfer, do not click org Verify, do not change live DNS A/AAAA records.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Change apex A/AAAA records or delete the joeharris76 challenge TXT before transfer",
+        "instead": "Keep current serving DNS; the apex already points at GitHub Pages IPs",
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "why": "Those records are what keep https://benchbox.dev/ working today"
+      },
+      {
+        "dont": "Click Verify for benchbox.dev on org BenchBox-dev while the repo is still user-owned",
+        "instead": "Leave user-account Pages verification in place until after G4 and a live 200",
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "why": "GitHub Pages domain verification is exclusive; a successful org verify immediately releases other accounts' Pages bindings"
+      },
+      {
+        "dont": "Point www.benchbox.dev at BenchBox-dev.github.io before the repo lives in the org",
+        "instead": "Retarget www only after G4 if www 200 fails or as a planned post-transfer DNS step",
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "why": "The org has no Pages site until the repo is transferred"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "needs_item": "github-org-transfer-00-decision-and-runbook"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-22T01:02:11Z",
+      "completed_pr": 1800,
+      "created_at": "2026-08-22T00:54:46Z",
+      "worktree": "github-org-transfer"
+    },
+    "preserves": [
+      {
+        "behavior": "JoinOrder manifest URL and answers default URL unchanged",
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs"
+      },
+      {
+        "behavior": "No repository transfer or org Pages Verify in this TODO",
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs"
+      },
+      {
+        "behavior": "SHADOW_ONLY and no merge queue",
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "G0 org domain verification before transfer",
+        "decision": "supersede",
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "path": "_project/decisions/github-org-transfer-benchbox-dev-2026-08-21.md"
+      },
+      {
+        "concept": "Pages serving vs publish and G0 domain TXT",
+        "decision": "extend",
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "path": "docs/operations/github-org-transfer.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub Pages settings, DNS A/AAAA, org Verify click"
+      },
+      {
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/github-org-transfer-benchbox-dev-2026-08-21.md"
+      },
+      {
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/github-org-transfer.md"
+      },
+      {
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'exclusive|do not click Verify|joeharris76.github.io|_github-pages-challenge-joeharris76|after G4' docs/operations/github-org-transfer.md _project/decisions/github-org-transfer-benchbox-dev-2026-08-21.md",
+        "description": "Runbook forbids org Pages Verify before G4 and keeps user challenge TXT until after a live 200",
+        "expected": "those tokens present",
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "last_result": "pass",
+        "last_run": "2026-08-22T01:02:10Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "python -c \"from pathlib import Path; texts=[Path(p).read_text() for p in ('docs/operations/github-org-transfer.md','_project/decisions/github-org-transfer-benchbox-dev-2026-08-21.md')]; blob='\\n'.join(texts).lower(); assert 'org-verify benchbox.dev before' not in blob\"",
+        "description": "G0 no longer requires org-level Pages verification of benchbox.dev before transfer",
+        "expected": "assertion holds",
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "last_result": "pass",
+        "last_run": "2026-08-22T01:02:10Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "rewrote G0/G5 Pages sequence; org Verify after G4",
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "notes": null,
+        "started_at": "2026-08-22T00:56:57Z",
+        "started_branch": "docs/github-org-transfer-00b-pages-cutover",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-docs-github-org-transfer-00b",
+        "status": "done",
+        "summary": "Rewrite G0/G5 Pages steps in the decision record and transfer runbook",
+        "wid": "w0"
+      },
+      {
+        "evidence": "apex vs www DNS, exclusive lock, post-G4 verify documented",
+        "item_id": "github-org-transfer-00b-pages-domain-cutover-docs",
+        "notes": null,
+        "started_at": "2026-08-22T00:58:01Z",
+        "started_branch": "docs/github-org-transfer-00b-pages-cutover",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-docs-github-org-transfer-00b",
+        "status": "done",
+        "summary": "Record apex-vs-www DNS, exclusive verification lock, and post-G4 verify sequence",
+        "wid": "w1"
+      }
+    ]
+  }
+}

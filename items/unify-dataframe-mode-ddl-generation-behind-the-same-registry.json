@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #113 of centralize-ddl-translation-phase.\nDeferred: Unify DataFrame-mode DDL generation behind the same registry-owned path\nReason deferred: Keep this item focused on SQL DDL ownership first",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:33:50Z",
+      "worktree": "main"
+    }
+  }
+}

@@ -1,0 +1,295 @@
+{
+  "context": "Treat provenance as a fixed template (multi-line YAML literal block)\nrendered verbatim. The renderer does not need to compose individual\ncommands — the value is in the agent doing all three steps in the\nright place, not in dynamic substitution.\n\n--capture-plans intentionally ships as a one-line passive footnote\nin this phase. A future phase MAY add a checkbox; this phase does\nnot justify the UI matrix expansion.\n",
+  "description": "Reproducibility of a benchmark run depends on capturing the\nBenchBox version, system profile, and the exact command line\nalongside the result bundle. None of the rendered prompts currently\ntell the agent to do this, so result-bundle archaeology becomes\nguesswork weeks later (which version of BenchBox? what platform\ndriver? what hardware?).\n\nThis TODO adds a final \"Save provenance\" step to the CLI rendered\nprompt using `benchbox --version-json` and `benchbox profile`.\nMCP-surface provenance is intentionally deferred to Phase 5 after\nthe CLI contract settles. As a passive bonus, append a single-line\nfootnote telling agents how to opt into `--capture-plans` and\ninspect with `benchbox show-plan`, without adding any new form\ncontrol.\n\nDecision gates:\n- D1 (before w1): provenance is a single multi-line template\n  rendered verbatim vs three separate template keys composed by\n  the builder. Default: a multi-line YAML literal block under\n  templates.cli.provenance_snapshot — keeps the validator simple\n  and the renderer dumb.\n- D2 (before w2): where to write the provenance snapshot? Default:\n  next to the result bundle (in the directory benchbox printed at\n  end of run). Agent extracts the bundle path from the run output\n  or `benchbox results --paths --limit 1`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a 'capture plans' checkbox in this phase",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase4-provenance",
+        "why": "it inflates the dropdown-smoke matrix and the value isn't proven yet."
+      },
+      {
+        "dont": "introduce a benchbox provenance subcommand",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase4-provenance",
+        "why": "composition of existing commands is sufficient and avoids API growth."
+      },
+      {
+        "dont": "skip provenance for local DuckDB runs",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase4-provenance",
+        "why": "even local runs need a version pin for reproducibility weeks later."
+      },
+      {
+        "dont": "use `benchbox show-plan --result` or `--query`",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase4-provenance",
+        "why": "the command surface is `--run` and `--query-id`."
+      },
+      {
+        "dont": "write provenance into a fixed path like /tmp/",
+        "instead": "(not specified)",
+        "item_id": "prompts-landing-phase4-provenance",
+        "why": "the bundle directory is the correct co-location for reproducibility."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase4-provenance",
+        "id": 458,
+        "reason": "Footnote-only in this phase; promote to a control only if user feedback says it's confusing as a footnote.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Promoting --capture-plans footnote to a dropdown control explicitly conditioned on user feedback that it's confusing; no such feedback recorded.",
+        "summary": "--capture-plans dropdown control"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase4-provenance",
+        "id": 459,
+        "reason": "Tracked in prompts-landing-phase5-mcp-parity.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: _project/DONE/main/planning/prompts-landing-phase5-mcp-parity.yaml is already DONE, resolving this deferral's stated tracking target.",
+        "summary": "MCP-surface provenance via system_profile MCP tool"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "prompts-landing-phase4-provenance",
+        "id": 460,
+        "reason": "Requires generator-side coupling between provenance template and run template; defer until provenance churn justifies it.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Auto-derivation of command.txt explicitly deferred until provenance churn justifies the coupling; no such churn evidenced.",
+        "summary": "Auto-derive command.txt content from the rendered prompt's live-run command"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "needs_item": "prompts-landing-phase1-cli-hygiene"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Default prompt brevity — provenance is one step (4 short shell lines), not a paragraph.",
+        "item_id": "prompts-landing-phase4-provenance"
+      },
+      {
+        "behavior": "No new dropdowns or form controls.",
+        "item_id": "prompts-landing-phase4-provenance"
+      },
+      {
+        "behavior": "Phase 1's announce/tee/summary step ordering — provenance lands AFTER summary, BEFORE force-datagen footer.",
+        "item_id": "prompts-landing-phase4-provenance"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "AGENTS.md provenance/reproducibility guidance — surface via the rendered prompt rather than relying on agent recall",
+        "decision": "reuse",
+        "item_id": "prompts-landing-phase4-provenance",
+        "path": "AGENTS.md"
+      },
+      {
+        "concept": "Phase 1 templates.cli.results_paths and show_cli — reuse the same key-then-substring validator pattern",
+        "decision": "reuse",
+        "item_id": "prompts-landing-phase4-provenance",
+        "path": "Phase"
+      },
+      {
+        "concept": "benchbox --version-json and benchbox profile — existing first-class commands; do not invent new ones",
+        "decision": "reuse",
+        "item_id": "prompts-landing-phase4-provenance",
+        "path": "benchbox"
+      },
+      {
+        "concept": "benchbox/cli/commands/show_plan.py:20 show-plan requires --run and --query-id; do not use non-existent --result/--query flags",
+        "decision": "reuse",
+        "item_id": "prompts-landing-phase4-provenance",
+        "path": "benchbox/cli/commands/show_plan.py:20"
+      },
+      {
+        "concept": "landing/prompts/catalog.yaml:74-79 templates.cli — extend with provenance_snapshot (YAML literal block)",
+        "decision": "extend",
+        "item_id": "prompts-landing-phase4-provenance",
+        "path": "landing/prompts/catalog.yaml:74-79"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/index.html"
+      },
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "kind": "do_not_modify",
+        "path_glob": "landing/prompts/prompts.css"
+      },
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.generated.js"
+      },
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/catalog.yaml"
+      },
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/prompts.js"
+      },
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_landing_quickstarts.py"
+      },
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/landing/test_landing_quickstarts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/generate_landing_quickstarts.py --validate-only",
+        "description": "Validator passes",
+        "expected": "validate-only: OK",
+        "item_id": "prompts-landing-phase4-provenance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make prompts-landing-check",
+        "description": "Make check green",
+        "expected": "check: OK",
+        "item_id": "prompts-landing-phase4-provenance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/landing/ -v",
+        "description": "Landing tests pass",
+        "expected": "0 failures",
+        "item_id": "prompts-landing-phase4-provenance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox --version-json >/dev/null && uv run benchbox profile --help >/dev/null && uv run benchbox show-plan --help >/dev/null",
+        "description": "Provenance and plan-inspection commands are real BenchBox subcommands",
+        "expected": "exit 0",
+        "item_id": "prompts-landing-phase4-provenance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "prompts-landing-phase4-provenance",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase4-provenance",
+        "notes": "In catalog.yaml templates.cli, add:\n  provenance_snapshot: |\n    mkdir -p <bundle-dir>/_provenance\n    uv run benchbox --version-json > <bundle-dir>/_provenance/version.json\n    uv run benchbox profile > <bundle-dir>/_provenance/system.txt\n    echo \"<exact command line used>\" > <bundle-dir>/_provenance/command.txt\nIn validate(): require the key to contain 'benchbox --version-json'\nAND 'benchbox profile'. Reject otherwise.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add provenance_snapshot template key and validator pin",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase4-provenance",
+        "notes": "After Phase 1's summary step but before the force-datagen\nfooter, insert a \"Save provenance\" step that emits the template\nverbatim with <bundle-dir> substituted from the agent's earlier\ncapture of the result bundle path. Render unconditionally for\nCLI — provenance is cheap and universally useful.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Render provenance step at end of buildAgentPrompt",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase4-provenance",
+        "notes": "Append a single line to the rendered prompt, after the\nforce-datagen footer:\n  \"To capture EXPLAIN plans, add --capture-plans to the live\n   command and inspect with `benchbox show-plan --run\n   <result-json> --query-id Q1`.\"\nNo form control; advanced users edit the copied prompt.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add --capture-plans footnote (no UI control)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase4-provenance",
+        "notes": "- test_provenance_snapshot_present_in_templates\n- test_provenance_snapshot_includes_version_and_profile_commands\n- extend dropdown-smoke test to assert \"Save provenance\" label\n  appears in the rendered payload for the default state.\n- test_capture_plans_footnote_present (label, not full string)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tests",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "prompts-landing-phase4-provenance",
+        "notes": "uv run -- python scripts/generate_landing_quickstarts.py --write\nmake prompts-landing-check\nuv run -- python -m pytest tests/unit/landing/ -v\nManually render the default and Snowflake+1.0 prompts; paste\nboth in the PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate + verify",
+        "wid": "w5"
+      }
+    ]
+  }
+}

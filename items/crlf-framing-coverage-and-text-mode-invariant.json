@@ -1,0 +1,124 @@
+{
+  "context": "1. Add a direct unit test for has_trailing_delimiter in tests/unit/utils/ asserting all four cells: CRLF+trailing -> True, CRLF+clean -> False, LF+trailing -> True, LF+clean -> False, with column_names supplied AND with column_names=None to cover the fallback checker. Write fixtures as explicit bytes so CRLF is exercised on every platform, not just a Windows runner. 2. Add the missing clean-CRLF case to tests/unit/core/data_organization/test_sorting.py by giving _write_tbl_crlf a trailing_delimiter flag, so the writer's end-to-end path covers it too. 3. Pin the invariant where it lives: assert the read path is text mode, or state it in the helper's docstring as a requirement rather than an incidental property, so a future binary-read optimization has to confront it. Check the fast-lane cap headroom before adding tests (max_fast_tests in _project/config/fast_test_lane_policy.json).",
+  "description": "PR #1332 fixed Windows CRLF trailing-delimiter misdetection by routing benchbox/core/data_organization/sorting.py::_source_has_trailing_delimiter through the shared helper benchbox/utils/file_format.py::has_trailing_delimiter. The fix is correct, but it is correct for an IMPLICIT reason: has_trailing_delimiter reads via _check_first_nonempty_line, which opens 'rt' (and mode='rt' for the compressed branch), so Python universal-newlines translates \\r\\n to \\n before either checker runs. Both checkers then rstrip('\\n') only. Nothing pins that. If any read path is ever switched to binary for throughput - plausible for multi-GB TBL files - CRLF stops being normalized, the field count or the ends-with check shifts, and the original Windows bug returns silently. Second, narrower point: the merged CRLF tests only feed trailing-delimiter input. _write_tbl_crlf() has no clean variant, so of the four cells in (LF|CRLF) x (clean|trailing-delimiter), only clean-CRLF is unexercised end-to-end. Note the LF clean case IS covered by test_reads_normalized_tbl_with_no_trailing_delimiter, so a checker hardcoded to True would already be caught - this is coverage symmetry and invariant pinning, not a live defect. Also note has_trailing_delimiter's column_names=None fallback (ends-with check) is reachable but unused by all 10 platform callers, which all pass column names; it deserves the same CRLF assertion.",
+  "legacy": {
+    "item_meta": {
+      "category": "test-coverage",
+      "completed_at": "2026-07-30T15:49:38Z",
+      "completed_pr": 1355,
+      "created_at": "2026-07-29T23:09:16Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "has_trailing_delimiter's current classification for every framing already relied on by the 10 platform callers",
+        "item_id": "crlf-framing-coverage-and-text-mode-invariant"
+      },
+      {
+        "behavior": "macOS/Linux fast lane stays green and the fast-lane test cap is not exceeded",
+        "item_id": "crlf-framing-coverage-and-text-mode-invariant"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "crlf-framing-coverage-and-text-mode-invariant",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/file_format.py"
+      },
+      {
+        "item_id": "crlf-framing-coverage-and-text-mode-invariant",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/data_organization/**"
+      },
+      {
+        "item_id": "crlf-framing-coverage-and-text-mode-invariant",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import tempfile,pathlib; from benchbox.utils.file_format import has_trailing_delimiter as h; d=pathlib.Path(tempfile.mkdtemp()); cols=['a','b']; cases=[(b'1|x|\\r\\n',True),(b'1|x\\r\\n',False),(b'1|x|\\n',True),(b'1|x\\n',False)]; [ (lambda p: (p.write_bytes(raw), (h(p,'|',cols)==want) or (_ for _ in ()).throw(AssertionError(f'{raw!r} -> {h(p,chr(124),cols)} want {want}'))))(d/f'f{i}.tbl') for i,(raw,want) in enumerate(cases) ]\"",
+        "description": "has_trailing_delimiter classifies all four framing/terminator cells correctly with column names",
+        "expected": "exit 0",
+        "item_id": "crlf-framing-coverage-and-text-mode-invariant",
+        "last_result": "pass",
+        "last_run": "2026-07-30T15:47:49Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import tempfile,pathlib; from benchbox.utils.file_format import has_trailing_delimiter as h; d=pathlib.Path(tempfile.mkdtemp()); t=d/'t.tbl'; t.write_bytes(b'1|x|\\r\\n'); c=d/'c.tbl'; c.write_bytes(b'1|x\\r\\n'); assert h(t,'|') is True; assert h(c,'|') is False\"",
+        "description": "The None-column fallback checker is also CRLF-correct",
+        "expected": "exit 0",
+        "item_id": "crlf-framing-coverage-and-text-mode-invariant",
+        "last_result": "pass",
+        "last_run": "2026-07-30T15:47:51Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -nE 'open\\(.*\\\"rb\\\"|mode=\\\"rb\\\"' benchbox/utils/file_format.py",
+        "description": "No binary read has crept into the helper's read path",
+        "expected": "exit 0",
+        "item_id": "crlf-framing-coverage-and-text-mode-invariant",
+        "last_result": "pass",
+        "last_run": "2026-07-30T15:47:53Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/data_organization/ tests/unit/utils/ -q",
+        "description": "Sorting and file-format suites pass",
+        "expected": "exit 0",
+        "item_id": "crlf-framing-coverage-and-text-mode-invariant",
+        "last_result": "pass",
+        "last_run": "2026-07-30T15:48:06Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "crlf-framing-coverage-and-text-mode-invariant",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added TestHasTrailingDelimiterFraming to tests/unit/utils/test_file_format.py - has_trailing_delimiter had NO direct unit test before this; the only coverage was indirect, via three platform test files. Pins all four framing/terminator cells (CRLF+trailing True, CRLF+clean False, LF+trailing True, LF+clean False) against BOTH checkers: the column_names field-count path that all ten platform callers use, and the column_names=None ends-with fallback, which is reachable but taken by no current caller. Plus a realistic multi-row CRLF file and a file with leading blank CRLF lines. Fixtures are explicit bytes so CRLF is exercised on every platform, not only the Windows nightly leg. 10 tests, all passing.",
+        "item_id": "crlf-framing-coverage-and-text-mode-invariant",
+        "notes": null,
+        "started_at": "2026-07-30T15:42:52Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add the four-cell has_trailing_delimiter unit test, including the column_names=None fallback",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Gave _write_tbl_crlf a trailing_delimiter flag (default True, so the two existing callers are unchanged) and added test_reads_clean_tbl_with_crlf_line_endings - the fourth cell of the writer's matrix. It asserts the output schema is exactly ['id','l_shipdate'], i.e. no synthetic trailing column survives on input that has none. Honest note on what this case does and does not catch: under a simulated binary-read regression it PASSES, because a failed probe returns False and clean input needs no synthetic column. It guards the opposite direction - a probe that wrongly reports a trailing delimiter would add a column to an N-field file and fail here. The trailing-delimiter cases catch false negatives; this catches false positives. Together they pin both.",
+        "item_id": "crlf-framing-coverage-and-text-mode-invariant",
+        "notes": null,
+        "started_at": "2026-07-30T15:48:38Z",
+        "started_branch": "fix/crlf-framing-invariant",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Give _write_tbl_crlf a trailing_delimiter flag and cover clean-CRLF end to end in the writer",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Stated the requirement where it lives, in _check_first_nonempty_line's docstring: TEXT MODE IS REQUIRED, NOT INCIDENTAL, with the causal chain spelled out - both reads open 'rt', universal newlines translate CRLF to LF before the checker, and every checker strips only backslash-n, so a binary read leaves a stray CR that adds a phantom field, breaks the ends-with match, and on bytes makes rstrip raise, which the blanket except turns into a confident 'no trailing delimiter'. Points at the test that enforces it. The enforcement is behavioural, not a source grep: simulating the regression by switching the uncompressed read to 'rb' fails 6 of the 10 framing tests and 2 of the 3 writer CRLF tests. Verified and reverted; file restored byte-for-byte.",
+        "item_id": "crlf-framing-coverage-and-text-mode-invariant",
+        "notes": null,
+        "started_at": "2026-07-30T15:49:01Z",
+        "started_branch": "fix/crlf-framing-invariant",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Pin the text-mode requirement in the helper so a binary-read change has to confront it",
+        "wid": "w3"
+      }
+    ]
+  }
+}

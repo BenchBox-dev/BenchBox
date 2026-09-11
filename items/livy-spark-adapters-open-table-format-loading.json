@@ -1,0 +1,160 @@
+{
+  "description": "Synapse Spark and Fabric Spark use their own Livy/session-driven data-loading flows\nrather than SparkDataLoadMixin, so they remain outside the scope of the shared Spark\nloader item.\n\nThis item tracks the adapter-specific work required to make open table formats\nuser-selectable and executable end-to-end for:\n- synapse-spark\n- fabric-spark",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "needs_item": "spark-mixin-open-table-format-loading"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-03-23T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Current parquet loading paths for synapse-spark and fabric-spark",
+        "item_id": "livy-spark-adapters-open-table-format-loading"
+      },
+      {
+        "behavior": "No capability-table re-registration before runtime support is verified",
+        "item_id": "livy-spark-adapters-open-table-format-loading"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/azure/fabric_spark_adapter.py"
+      },
+      {
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/azure/synapse_spark_adapter.py"
+      },
+      {
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/format_capabilities.py"
+      },
+      {
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v -k 'synapse or fabric' --no-header -q",
+        "description": "Synapse/Fabric Spark adapter tests pass",
+        "expected": "All tests pass",
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base/test_format_capabilities.py -v --no-header -q",
+        "description": "Format capability tests pass after any re-registration",
+        "expected": "All tests pass",
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit Synapse Spark and Fabric Spark load_data implementations and remote table DDL capabilities",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Delta loading for synapse-spark if the current staging/session model supports it",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Delta loading for fabric-spark if the current OneLake/Livy model supports it",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-register only adapters with verified end-to-end support in format_capabilities.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "livy-spark-adapters-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add mock-based tests for generated table DDL and remote execution flow",
+        "wid": "w5"
+      }
+    ]
+  }
+}

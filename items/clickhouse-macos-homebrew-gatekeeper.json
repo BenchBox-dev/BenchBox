@@ -1,0 +1,58 @@
+{
+  "context": "Research current upstream artifact signing and Homebrew status; compare clickhousectl, official direct binary installation, and Docker against reproducibility, Gatekeeper compatibility, version pinning, Apple Silicon support, and BenchBox test/CI needs; then implement the narrowest supported documentation or automation change.",
+  "description": "Future concern: Homebrew deprecated the clickhouse cask because the upstream macOS binary fails the macOS Gatekeeper check; the cask is scheduled to be disabled on 2026-09-01. The current cask downloads ClickHouse release binaries and the upgrade to 26.7.1.1315-stable completed successfully, so this is not an immediate outage. Findings: ClickHouse Inc. is the commercial company and also maintains the Apache-2.0 ClickHouse OSS project; clickhouse.com is therefore an official OSS distribution channel, not only ClickHouse Cloud. The historical Altinity/homebrew-clickhouse tap redirects to ClickHouse/homebrew-clickhouse, is explicitly deprecated/unused, says no future fixes will be made, and its latest release is 23.5.3.24 from 2023-06-30. A tap-only change cannot make an upstream executable pass Gatekeeper; a community rebuild/signing pipeline would be a separate distribution with release and trust obligations. Proposed actions: before the disable date, verify whether ClickHouse publishes signed/notarized macOS artifacts; choose and document a supported BenchBox developer/CI path, likely clickhousectl or the official installer for local development and Docker for reproducible server testing; assess version pinning, Apple Silicon behavior, upgrade/data compatibility, and test coverage; update BenchBox setup documentation and automation if needed. Do not adopt the stale Altinity tap as the default replacement.",
+  "legacy": {
+    "item_meta": {
+      "category": "maintenance",
+      "created_at": "2026-07-27T15:33:24Z",
+      "worktree": "BenchBox"
+    },
+    "verifications": [
+      {
+        "command": null,
+        "description": "Re-check current Homebrew cask metadata, ClickHouse install guidance, and Altinity tap status before implementation",
+        "expected": null,
+        "item_id": "clickhouse-macos-homebrew-gatekeeper",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "clickhouse-macos-homebrew-gatekeeper",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify current ClickHouse macOS release signing/notarization status and Homebrew cask trajectory",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-macos-homebrew-gatekeeper",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Evaluate clickhousectl, official direct binaries, and Docker for BenchBox local and CI use",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-macos-homebrew-gatekeeper",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document and implement the selected supported path, including version and compatibility checks",
+        "wid": "w3"
+      }
+    ]
+  }
+}

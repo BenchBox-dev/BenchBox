@@ -1,0 +1,50 @@
+{
+  "context": "Open one failing run's raw workflow-run annotations (the startup-failure reason is not in job logs, since there are no jobs) to get the parser's complaint, then fix the offending expression. Confirm afterwards that a push to develop creates NO Seed Corpus run at all, since the workflow is dispatch-only.",
+  "description": "Every push to develop produces a red 'Seed Corpus' run. Sampled the last 8 runs of .github/workflows/seed-corpus.yml: 8 of 8 conclusion=failure, spanning 2026-07-25T18:44 to 2026-07-26T10:41, most recently on 'chore(todo-db): weekly tracker export snapshot (#1313)'. Each failing run reports event=push, head_branch=develop, and jobs total_count=0 -- no job ever starts, which is the signature of a workflow startup failure rather than a failing step. That is doubly odd because the file on develop declares ONLY 'on: workflow_dispatch' (verified via git show origin/develop:.github/workflows/seed-corpus.yml), so a push should not create a run at all. The YAML parses cleanly with yaml.safe_load, so the defect is in something GitHub's workflow parser rejects rather than plain syntax -- candidates include the job-level 'continue-on-error: ${{ matrix.optional == true }}' expression and the matrix/name interpolation. Cost: develop shows a permanently red check that is unrelated to any change, which trains reviewers to ignore red and can mask a real failure. Noticed in passing while auditing CI during the 2026-07-25 follow-up batch; not caused by any PR in it.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-26T13:11:51Z",
+        "from_item": "seed-corpus-workflow-fails-on-every-push",
+        "id": 652,
+        "reason": "The defect was a job-level 'if: github.event.inputs.benchmark == matrix.benchmark'. The matrix context is unavailable in jobs.<id>.if (it is evaluated before matrix expansion), so the expression is invalid and GitHub failed the whole workflow at startup -- a failed run with zero jobs on EVERY push, to any branch. Nothing catches this class statically: it is valid YAML, and the repo has no actionlint. I scanned all .github/workflows/*.yml and seed-corpus.yml was the only job-level offender (nightly.yml's matrix reference is a STEP-level if, which is legal), so no other file needs fixing today -- but the next one will not be caught either. A guard belongs in tests/unit/workflows/ (assert no jobs.<id>.if references matrix/strategy) or as actionlint in the lint lane; both are outside this item's only_modify allowlist of the single workflow file. Also noting rung 1 is post-merge-only by construction: it counts failures among the last 5 HISTORICAL runs, so it necessarily reports fail until the fix has merged and five further pushes have occurred.",
+        "resolution": "promoted",
+        "resolved_item": "workflow-lint-guard-for-invalid-context-references",
+        "resolved_reason": null,
+        "summary": "No automated guard stops a job-level 'if' from referencing the matrix context again"
+      }
+    ],
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-07-28T22:53:19Z",
+      "completed_pr": 1320,
+      "created_at": "2026-07-26T12:49:32Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "The workflow remains manually dispatchable with its benchmark input",
+        "item_id": "seed-corpus-workflow-fails-on-every-push"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "seed-corpus-workflow-fails-on-every-push",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/seed-corpus.yml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh run list --workflow=seed-corpus.yml --limit 5 --json conclusion -q '[.[]|select(.conclusion==\"failure\")]|length' | grep -qx 0",
+        "description": "A push to develop creates no Seed Corpus run, or a green one",
+        "expected": "exit 0 (no failures in the last 5 runs)",
+        "item_id": "seed-corpus-workflow-fails-on-every-push",
+        "last_result": "fail",
+        "last_run": "2026-07-26T13:11:33Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "description": "Deferred from tuning-applied-ledger-and-validation-status-20260712 (review\nfinding N10): DataFrame runs record df_tuning_config as a config blob with no\napplied/validated/hash concept. Extend the applied-ledger model to the DF\nrunner: record the runtime settings actually applied (threads, memory limits,\nchunk sizes, write_config partition/sort/row-group at write time) as ledger\nentries with an applied_ledger_hash, and emit the same validation-status\nvocabulary in DF bundles. A heavily thread/memory-tuned polars run becomes\ndistinguishable from a default run in the bundle and explorer.\n",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-22T21:49:54Z",
+        "from_item": "tuning-df-ledger-parity-20260716",
+        "id": 640,
+        "reason": "Pre-existing plumbing gap in benchbox/cli/** (OUT of this item's scope: core/dataframe, platforms/dataframe, core/runner/dataframe_runner, core/results, explorer_pipeline, tests). run.py:1151 resolves df_tuning_config but non-interactive path pops it (run.py:2446) instead of putting it in benchmark_config.options (only interactive does, run.py:2444) -> plain CLI DF run builds an UNTUNED adapter, no ledger. The ledger impl is correct (populates via interactive CLI / runner+adapter API / direct run - all verified). Needs a cli/** fix.",
+        "resolution": "promoted",
+        "resolved_item": "cli-dataframe-tuning-config-propagation-20260722",
+        "resolved_reason": null,
+        "summary": "Non-interactive 'benchbox run --tuning <file>' does not propagate DataFrame tuning config into the adapter"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-22T21:50:40Z",
+      "completed_pr": 1269,
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "SQL-side ledger semantics unchanged; shared vocabulary reused, not forked",
+        "item_id": "tuning-df-ledger-parity-20260716"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/dataframe/tuning/write_config.py: the physical write-layout surface to record",
+        "decision": "reuse",
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "path": "benchbox/core/dataframe/tuning/write_config.py"
+      },
+      {
+        "concept": "benchbox/core/tuning/applied_ledger.py: the ledger model - reuse, do not fork",
+        "decision": "reuse",
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "path": "benchbox/core/tuning/applied_ledger.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/**"
+      },
+      {
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/**"
+      },
+      {
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/**"
+      },
+      {
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/dataframe tests/unit/platforms -q -k 'dataframe or df_'",
+        "description": "DF suites green; DF bundle carries ledger fields",
+        "expected": "All passing",
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Mapped DF apply points: polars_df._apply_tuning (POLARS_MAX_THREADS/streaming/rechunk, polars_df.py:124) + pandas_df._apply_tuning (dtype_backend/auto_categorize, pandas_df.py:287) -> SESSION/dataframe_runtime; write-layout via DataFrameWriteConfiguration in data_loader prepare_benchmark_data (438/447) -> POST_LOAD/dataframe_write_layout. Prod path: benchmark_mixin.run_benchmark->ResultBuilder.",
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T21:49:37Z",
+        "started_branch": "feat/tuning-df-ledger-parity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Start gate: applied-ledger PR merged; map DF runtime application points (tuning_mixin, dataframe_runner, write_config consumers)",
+        "wid": "w0"
+      },
+      {
+        "evidence": "platforms/dataframe/tuning_mixin.py REUSES benchbox.core.tuning.applied_ledger (AppliedTuningLedger/PHASE_SESSION/PHASE_POST_LOAD; not forked - zero core/tuning changes). _record_runtime_tuning + _fold_write_layout + _derive_applied_tuning_status(overall_status) + _write_applied_tuning_ledger->builder.set_tuning_info (same SQL seam). polars/pandas record applied settings; benchmark_mixin attaches at all 3 return points, guarded. Default->noop; tuned->applied_unverified.",
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T21:49:47Z",
+        "started_branch": "feat/tuning-df-ledger-parity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Instrument DF apply points; ledger + hash + status in DF result path",
+        "wid": "w1"
+      },
+      {
+        "evidence": "DF bundle carries ledger via existing set_tuning_info->build_applied_ledger_payload/summary (no parallel export). data_loader applied_write_layout signal (set only when data physically carries non-default layout). explorer_pipeline test_transformer +1: DF bundle ledger fields ingest via #1264's existing platform.tuning path.",
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T21:49:49Z",
+        "started_branch": "feat/tuning-df-ledger-parity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Bundle/companion export parity; explorer ingest reads DF ledger fields",
+        "wid": "w2"
+      },
+      {
+        "evidence": "test_tuning_ledger_parity.py (12): polars/pandas record runtime settings; default->noop; write-config layout recorded. test_dataframe_applied_ledger_export.py (4): companion export. test_data_loader.py +3 applied_write_layout. Verify: 2118 passed (df) + 1041 passed (results/pipeline); ruff/ty clean. Real e2e: polars streaming tpch sf0.01 -> applied_unverified + 4 SESSION dataframe_runtime statements in .applied.json, hash matches summary.",
+        "item_id": "tuning-df-ledger-parity-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T21:49:52Z",
+        "started_branch": "feat/tuning-df-ledger-parity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Tests: polars/pandas stub runs produce ledgers; default run yields noop; write-config physical layout recorded",
+        "wid": "w3"
+      }
+    ]
+  }
+}

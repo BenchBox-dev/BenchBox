@@ -1,0 +1,286 @@
+{
+  "context": "Make fallback behavior mode-aware instead of globally fatal. Add metadata so\ndownstream consumers can distinguish successful translation from fallback,\nand make strict mode available to CI, publishing, and governance paths.\n",
+  "description": "BenchBox intentionally fails open in some interactive paths: SQL translation\ncan return original SQL when SQLGlot is unavailable or translation fails, and\nvalidation defaults can leave checks disabled. That resilience is useful for\nlocal experimentation, but publishing, CI, compatibility governance, and\nresult comparison need explicit uncertainty or fail-closed behavior.\n\nThis item defines mode-specific policy and adds strict translation metadata\nwithout globally making graceful fallback fatal.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bury translation failure in logs only",
+        "instead": "record outcome explicitly.",
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "why": "result bundles and gates need structured metadata"
+      },
+      {
+        "dont": "globally raise on every translation failure",
+        "instead": "add strict mode for gates instead.",
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "why": "tests and local workflows rely on graceful fallback"
+      },
+      {
+        "dont": "treat validation disabled as validation passed",
+        "instead": "use NOT_RUN or UNCERTAIN.",
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "why": "that is a public correctness claim"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "fail-open-policy-and-translation-strictness",
+        "id": 405,
+        "reason": "Potentially expensive and behavior-changing; decide after mode policy and result labeling are correct.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Make validation enabled by default for every benchmark"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "fail-open-policy-and-translation-strictness",
+        "id": 406,
+        "reason": "This TODO starts with representative risky paths and strict-mode wiring.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Golden-filing every SQL dialect translation is an open-ended expansion beyond the item's representative-risky-path/strict-mode scope, with no defined trigger and no open item tracking it.",
+        "summary": "Golden-file every SQL dialect translation"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "needs_item": "result-schema-policy-and-explorer-input-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not break tests that intentionally assert graceful fallback in interactive/local paths.",
+        "item_id": "fail-open-policy-and-translation-strictness"
+      },
+      {
+        "behavior": "Do not change public result schema fields without coordinating with result-schema-policy-and-explorer-input-gate.",
+        "item_id": "fail-open-policy-and-translation-strictness"
+      },
+      {
+        "behavior": "Do not label unchecked validation as PASSED.",
+        "item_id": "fail-open-policy-and-translation-strictness"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/results/schema.py: public result field definitions -- coordinate schema changes through central result policy.",
+        "decision": "reuse",
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "path": "benchbox/core/results/schema.py"
+      },
+      {
+        "concept": "benchbox/utils/dialect_utils.py: existing fail-open translator -- preserve interactive resilience behind policy.",
+        "decision": "reuse",
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "path": "benchbox/utils/dialect_utils.py"
+      },
+      {
+        "concept": "docs/development/result-integrity-validation.md: existing validation contract docs -- update rather than introduce a competing validation guide.",
+        "decision": "reuse",
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "path": "docs/development/result-integrity-validation.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/dialect_translation.py"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/dialect_utils.py"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "only_modify",
+        "path_glob": "docs/development/result-integrity-validation.md"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_tpcds_duckdb_dialect.py"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/validation/"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k 'dialect or translation' --tb=short",
+        "description": "Run focused dialect translation tests.",
+        "expected": "Graceful and strict translation tests pass.",
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests -k 'validation_status or result_integrity' --tb=short",
+        "description": "Run focused result validation tests.",
+        "expected": "Validation status semantics are enforced.",
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "needs_wid": "w1",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "notes": "Checked SHA before edits: f255be364a7913864c308579ebef85f4cbff2707.\nRevalidated fail-open sites:\n  - benchbox/utils/dialect_utils.py returned source SQL on SQLGlot import\n    or translation failure.\n  - benchbox/platforms/base/dialect_translation.py returned source SQL\n    for adapter/multi-statement translation failures.\n  - benchbox/core/runner/runner.py converted only UNKNOWN/blank\n    validation to NOT_RUN, leaving default PASSED placeholders intact.\n  - tests/integration/test_tpcds_duckdb_dialect.py asserts malformed SQL\n    translation stays graceful in local/default mode.\n  - result bundles already had execution and summary.validation surfaces\n    suitable for additive translation metadata and uncertainty labels.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate current fail-open paths and tests that require graceful fallback",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "notes": "Recorded policy in docs/reference/public-contracts.md:\n  - interactive/local remains fail-open with warnings and bundle metadata,\n  - CI/compat governance can fail closed through strict translation mode,\n  - publishing/explorer consumers must reject or label non-clean\n    NOT_RUN/NOT_VALIDATED/UNKNOWN/UNCERTAIN statuses,\n  - validation_status PASSED is reserved for runs with validation evidence.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decision gate: define mode policy for interactive, CI, publishing, and governance",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "notes": "Added additive execution.translation metadata without a schema-version\nbump: aggregate status, strict_mode, attempt/success/fallback/failed\ncounts, translators, source/target dialects, warning/error categories,\nand compact grouped outcomes. Loader reconstruction preserves it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add translation outcome metadata to result bundles",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "notes": "Added sql_translation_context(strict=True) plus lifecycle-runner wiring.\nRunner reads strict_translation, translation_strict, or\nsql_translation_strict from runtime options, benchmark_options, or\nplatform_options. CLI users request fail-closed behavior with\n--strict-translation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add strict translation mode for CI, publishing, and compat tests",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "notes": "Added unit tests for successful outcome metadata, graceful fallback\nmetadata, strict-mode failure, compact summary grouping, bundle export\nmetadata, and non-clean status policy. Added a TPC-DS integration test\nasserting strict translation fails closed while the existing graceful\nfallback integration test remains intact.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add golden or representative translation tests for risky dialect paths",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fail-open-policy-and-translation-strictness",
+        "notes": "Lifecycle finalization now converts default PASSED placeholders with no\nvalidation records/details to NOT_RUN. Translation fallback on otherwise\nclean results marks validation_status UNCERTAIN. Shared result status\npolicy treats not_run, not_validated, unknown, and uncertain as non-clean.\nUpdated result-integrity docs with explicit status semantics.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix contradictory validation documentation and result status semantics",
+        "wid": "w5"
+      }
+    ]
+  }
+}

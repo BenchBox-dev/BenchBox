@@ -1,0 +1,160 @@
+{
+  "description": "Follow-up captured from the statistics-as-a-phase work (PR #980,\ntrack2-joinorder-stats-phase). That change added an opt-in statistics phase\n(load -> statistics -> query) reachable from the CLI via\n`--phases ...,statistics`, which threads through\n`LifecyclePhases.statistics` -> `RunConfig.gather_statistics` and is gated\nper benchmark by the `supports_statistics_phase` registry flag\n(joinorder/tpch/tpcds opt in).\n\nThe MCP `run_benchmark` tool does NOT yet expose this opt-in. Its phase\nhandling collapses the requested phases to a single `test_execution_type`\nvia `_map_phases_to_test_execution_type`\n(benchbox/mcp/tools/benchmark.py:124) and then calls\n`benchmark_instance.run_with_platform(adapter, ...,\ntest_execution_type=test_execution_type, capture_plans=...)`\n(benchbox/mcp/tools/benchmark.py:~387) without passing a\n`gather_statistics` flag. So an MCP caller that lists `statistics` in\n`phases` gets it silently dropped: the token routes correctly for\nexecution-type purposes (`load,statistics` -> `load_only`, verified) but\nthe statistics phase never runs.\n\nThis is a feature gap, not a regression: the statistics phase is CLI-first\nby design and MCP exposure was explicitly deferred in PR #980. This seed\nmakes that deferral durable and actionable rather than leaving it only in\nthe merged PR's description.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "drop the per-benchmark registry gate for MCP callers.",
+        "instead": "(not specified)",
+        "item_id": "mcp-statistics-phase-opt-in",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "re-implement the analyze logic in the MCP layer",
+        "instead": "(not specified)",
+        "item_id": "mcp-statistics-phase-opt-in",
+        "why": "reuse the base-adapter run_statistics_phase via run_with_platform's run_config."
+      },
+      {
+        "dont": "route the statistics opt-in through `test_execution_type`",
+        "instead": "(not specified)",
+        "item_id": "mcp-statistics-phase-opt-in",
+        "why": "statistics is a lifecycle phase orthogonal to power/throughput/maintenance; overloading the execution type would misclassify runs."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-statistics-phase-opt-in",
+        "needs_item": "track2-joinorder-stats-phase"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-05T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "MCP callers that do NOT request the statistics phase get byte-identical responses to today (no statistics block).",
+        "item_id": "mcp-statistics-phase-opt-in"
+      },
+      {
+        "behavior": "The per-benchmark `supports_statistics_phase` registry gate still governs whether the phase runs; MCP does not bypass it.",
+        "item_id": "mcp-statistics-phase-opt-in"
+      },
+      {
+        "behavior": "`_map_phases_to_test_execution_type` continues to ignore `statistics` for execution-type derivation (statistics is not a query phase).",
+        "item_id": "mcp-statistics-phase-opt-in"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/orchestrator.py + benchbox/core/runner/runner.py (PR #980) -- the CLI precedent: LifecyclePhases.statistics -> RunConfig.gather_statistics; mirror the same flag threading for MCP.",
+        "decision": "reuse",
+        "item_id": "mcp-statistics-phase-opt-in",
+        "path": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "concept": "benchbox/mcp/tools/benchmark.py:124 _map_phases_to_test_execution_type, and the run_with_platform call that omits gather_statistics -- the exact edit site.",
+        "decision": "reuse",
+        "item_id": "mcp-statistics-phase-opt-in",
+        "path": "benchbox/mcp/tools/benchmark.py:124"
+      },
+      {
+        "concept": "benchbox/platforms/base/adapter.py:run_statistics_phase (PR #980) -- the registry-gated phase runner MCP will reuse unchanged via run_with_platform.",
+        "decision": "reuse",
+        "item_id": "mcp-statistics-phase-opt-in",
+        "path": "benchbox/platforms/base/adapter.py:run_statistics_phase"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-statistics-phase-opt-in",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/benchmark_registry.yaml"
+      },
+      {
+        "item_id": "mcp-statistics-phase-opt-in",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "mcp-statistics-phase-opt-in",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "mcp-statistics-phase-opt-in",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "mcp-statistics-phase-opt-in",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/mcp-statistics-phase-opt-in.yaml"
+      },
+      {
+        "item_id": "mcp-statistics-phase-opt-in",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "mcp-statistics-phase-opt-in",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/ -k statistics -q",
+        "description": "MCP run_benchmark with statistics phase on an opted-in benchmark emits phases.statistics",
+        "expected": "tests pass; phases.statistics present with a stats_mode",
+        "item_id": "mcp-statistics-phase-opt-in",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.mcp.tools.benchmark import _map_phases_to_test_execution_type as m; assert m(['load','statistics'])=='load_only'; assert m(['generate','load','statistics','power'])=='power'; print('ok')\"",
+        "description": "Statistics token still routes correctly through the MCP execution-type mapper",
+        "expected": "ok",
+        "item_id": "mcp-statistics-phase-opt-in",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-statistics-phase-opt-in",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mcp-statistics-phase-opt-in",
+        "notes": "Detect `statistics` in the tool's `phases` argument (independently of\n`_map_phases_to_test_execution_type`, which intentionally ignores it)\nand pass `gather_statistics=True` into\n`benchmark_instance.run_with_platform(...)`. run_with_platform forwards\n**run_config into run_enhanced_benchmark, whose statistics call site\nalready reads `run_config.get(\"gather_statistics\")` (added in PR #980),\nso no adapter change is needed. Preserve the existing per-benchmark\nregistry gate (`supports_statistics_phase`) so non-opted-in benchmarks\nstill skip the phase and the response is unchanged for them.\n\nImplementation note (found while implementing, not in the original\nnotes): `run_statistics_phase(benchmark, connection, benchmark_name=...)`\nlooks up the registry gate via `get_benchmark_metadata(run_config.get\n(\"benchmark_name\", \"\"))`. Since MCP never populated `benchmark_name` in\nrun_config, the slug was always empty and the gate would treat every\nbenchmark as \"not opted in\" -- gather_statistics=True alone is\ninsufficient. Fixed by also forwarding `benchmark_name=benchmark_lower`\nin the same conditional block (only when `statistics` is requested, so\nmust_preserve #1 -- byte-identical responses when it isn't -- still\nholds). Verified against a real duckdb TPC-H SF=0.01 run: phases.\nstatistics only appears with this pairing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Thread a gather_statistics flag from MCP run_benchmark into run_with_platform",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-statistics-phase-opt-in",
+        "notes": "The MCP result payload is built from the same exporter path as the CLI\n(`_export_and_build_payload`), so phases.statistics should already\nappear once w1 runs the phase. Add a test asserting an MCP\n`run_benchmark` call with `phases` including `statistics` on an\nopted-in benchmark yields `phases.statistics` with a `stats_mode`, and\nthat a non-opted-in benchmark omits the block.\n\nImplemented in tests/unit/mcp/test_mcp_statistics_phase.py using the\nexisting mocked run_with_platform pattern (real duckdb runs take\n~3-12s each -- too slow for the \"fast\" lane, which `make test-fast`\ndocuments as sub-second per test). Covers: gather_statistics/\nbenchmark_name forwarded when `statistics` is requested and omitted\notherwise (call_kwargs-level), test_execution_type unaffected, and\nphases.statistics pass-through in the response for both the\npresent and gate-skipped (absent) cases. The registry gate itself\n(supports_statistics_phase true/false) is exercised at the adapter\nlevel in tests/unit/platforms/test_base_adapter.py (PR #980); this\nfile only locks down that MCP doesn't bypass it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm phases.statistics surfaces in the MCP response payload",
+        "wid": "w2"
+      }
+    ]
+  }
+}

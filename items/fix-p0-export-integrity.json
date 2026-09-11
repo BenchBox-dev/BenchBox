@@ -1,0 +1,67 @@
+{
+  "context": "Do not begin until the authorization and worktree gates pass. Preserve unrelated changes, use temporary outputs for tests, fail closed on uncertainty, and stop on any data-loss or false-success signal.",
+  "description": "Propagate schema and per-format failures, return nonzero for incomplete artifacts, use atomic writes, and cover invalid schema, partial formats, overwrite, and successful exports.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "fix-p0-export-integrity",
+        "needs_item": "fix-gate-1-baseline"
+      }
+    ],
+    "item_meta": {
+      "category": "architecture-remediation",
+      "completed_at": "2026-08-26T20:58:20Z",
+      "completed_pr": 1925,
+      "created_at": "2026-08-26T17:08:16Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing user files, existing result artifacts, backward compatibility, rollback evidence",
+        "item_id": "fix-p0-export-integrity"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-p0-export-integrity",
+        "kind": "do_not_modify",
+        "path_glob": ".bossmode/**"
+      },
+      {
+        "item_id": "fix-p0-export-integrity",
+        "kind": "do_not_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "fix-p0-export-integrity",
+        "kind": "do_not_modify",
+        "path_glob": "test-results/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- pytest -q --override-ini=addopts= tests/unit/test_results_exporter.py tests/unit/cli/commands/test_export_coverage.py tests/unit/cli/test_cli_output.py tests/integration/test_export_cli.py",
+        "description": "Exporter and CLI failure tests pass",
+        "expected": "all tests pass",
+        "item_id": "fix-p0-export-integrity",
+        "last_result": "pass",
+        "last_run": "2026-08-26T20:58:18Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Commit b99aa8e1: export failures and schema failures raise ResultExportError, CLI returns nonzero, and local writes are atomic. Export tests: 70 passed. Full preflight: 28,381 passed, 19 skipped.",
+        "item_id": "fix-p0-export-integrity",
+        "notes": null,
+        "started_at": "2026-08-26T20:23:42Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement fail-closed atomic exports and artifact-status tests",
+        "wid": "w1"
+      }
+    ]
+  }
+}

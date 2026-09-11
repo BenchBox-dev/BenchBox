@@ -1,0 +1,205 @@
+{
+  "context": "This benchmark already has substantial DataFrame operations code (1290 lines).\nThe work is primarily audit + integration, not greenfield implementation.\n\nFollow the write_primitives pattern: the benchmark class exposes\nget_dataframe_operations() returning an operations manager, not\nget_dataframe_queries() returning a QueryRegistry. The dataframe_runner\nalready handles this via the operations manager path.\n\nStart with the audit (w1) to understand what's implemented vs stub. The\nexisting code uses DataFrameMaintenanceCapabilities and TransactionIsolation\nfrom benchbox/core/dataframe/maintenance_interface.py - verify these are\ncorrectly integrated.\n\nOnly PySpark+Delta/Iceberg supports DataFrame transactions. Polars, Pandas,\nand other platforms should be explicitly skipped with clear messaging.\n",
+  "description": "Complete and integrate the existing DataFrame operations module for the Transaction\nPrimitives benchmark, enabling execution on PySpark + Delta Lake/Iceberg platforms.\n\nTransaction Primitives tests ACID transaction semantics: commit, rollback, savepoints,\nisolation levels, and multi-statement transactions using 23 SQL operations on TPC-H\nstaging tables (txn_orders, txn_lineitem, txn_customer).\n\nA substantial dataframe_operations.py already exists (1290 lines) with:\n- TransactionOperationType enum (10 operation types: ATOMIC_INSERT, ROLLBACK_TO_VERSION,\n  TIME_TRAVEL_QUERY, CONCURRENT_WRITE, etc.)\n- DataFrameTransactionCapabilities dataclass (per-platform capability tracking)\n- Integration with DataFrameMaintenanceCapabilities and TransactionIsolation\n- Platform-specific support declarations (PySpark+Delta, PySpark+Iceberg)\n\nKey constraint: DataFrame transaction semantics are fundamentally different from SQL.\nSQL uses BEGIN/COMMIT/ROLLBACK; Delta Lake uses atomic writes with RESTORE for\nrollback; Iceberg uses snapshot-based isolation. Polars/Pandas have NO transaction\nsupport. This benchmark is PySpark-only in DataFrame mode.\n\nThe work is primarily integration - wiring the existing operations module into the\nbenchmark class, runner, and registry - plus filling in any incomplete operation\nimplementations and adding tests.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "attempt to implement transactions on Polars/Pandas",
+        "instead": "skip cleanly with informative messages",
+        "item_id": "df-support-transaction-primitives",
+        "why": "they have no ACID semantics"
+      },
+      {
+        "dont": "map SQL BEGIN/COMMIT/ROLLBACK directly",
+        "instead": "use the Delta Lake/Iceberg native patterns documented in dataframe_operations.py",
+        "item_id": "df-support-transaction-primitives",
+        "why": "Delta Lake uses atomic writes, not explicit transaction blocks"
+      },
+      {
+        "dont": "rewrite the existing 1290-line module from scratch",
+        "instead": "audit and complete what exists",
+        "item_id": "df-support-transaction-primitives",
+        "why": "significant work is already done"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "df-support-transaction-primitives",
+        "id": 390,
+        "reason": "Requires PySpark + Delta Lake runtime. Add to live_integration test suite with @pytest.mark.live_integration.",
+        "resolution": "promoted",
+        "resolved_item": "integration-tests-with-real-pyspark-delta-lake",
+        "resolved_reason": null,
+        "summary": "Integration tests with real PySpark + Delta Lake"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "df-support-transaction-primitives",
+        "id": 391,
+        "reason": "Iceberg support depends on PySpark + Iceberg catalog setup. Defer until Delta Lake path is validated.",
+        "resolution": "promoted",
+        "resolved_item": "iceberg-table-format-support-testing",
+        "resolved_reason": null,
+        "summary": "Iceberg table format support testing"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "df-support-transaction-primitives",
+        "id": 392,
+        "reason": "Some SQL operations (savepoints, explicit isolation levels) have no DataFrame equivalent. Document the parity gap rather than attempting impossible translations.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly rejects the deferred action: 'document the parity gap rather than attempting impossible translations.'",
+        "summary": "Map all 23 SQL operations to DataFrame equivalents with full parity"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-10T00:00:00Z",
+      "created_at": "2026-04-10T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Platform overrides for SQL mode (e.g., DuckDB savepoint skips) still work",
+        "item_id": "df-support-transaction-primitives"
+      },
+      {
+        "behavior": "TPC-H staging table schema (txn_orders, txn_lineitem, txn_customer) unchanged",
+        "item_id": "df-support-transaction-primitives"
+      },
+      {
+        "behavior": "TransactionPrimitivesBenchmark SQL execution path unchanged - all 23 SQL operations still work via OperationExecutor interface",
+        "item_id": "df-support-transaction-primitives"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "df-support-transaction-primitives",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/"
+      },
+      {
+        "item_id": "df-support-transaction-primitives",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "df-support-transaction-primitives",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "df-support-transaction-primitives",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "df-support-transaction-primitives",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transaction_primitives/"
+      },
+      {
+        "item_id": "df-support-transaction-primitives",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/transaction_primitives/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.benchmark_registry import BENCHMARK_REGISTRY; print(BENCHMARK_REGISTRY['transaction_primitives']['supports_dataframe'])\"",
+        "description": "Transaction Primitives reports supports_dataframe=True",
+        "expected": "True",
+        "item_id": "df-support-transaction-primitives",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.transaction_primitives.dataframe_operations import TransactionOperationType; print(f'{len(TransactionOperationType)} operation types')\"",
+        "description": "Operations manager loads without error",
+        "expected": "10 operation types",
+        "item_id": "df-support-transaction-primitives",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/transaction_primitives/ -v",
+        "description": "Unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "df-support-transaction-primitives",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "df-support-transaction-primitives",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "df-support-transaction-primitives",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "df-support-transaction-primitives",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "df-support-transaction-primitives",
+        "notes": "Read benchbox/core/transaction_primitives/dataframe_operations.py (1290 lines) thoroughly.\nCompare against the 23 SQL operations defined in catalog/operations.yaml.\n\nCreate a mapping table:\n- Which SQL operations have DataFrame equivalents already implemented?\n- Which operations are impossible in DataFrame mode (e.g., SQL-level savepoints)?\n- Which operations need new implementations?\n- Which DataFrameTransactionCapabilities are fully implemented vs stubs?\n\nCheck integration points:\n- Does the module use get_maintenance_operations_for_platform() correctly?\n- Does it handle DataFrameMaintenanceCapabilities properly?\n- Are the TransactionIsolation levels correctly mapped?\n\nDocument findings in a comment block at the top of the file or in a separate\naudit notes file to guide w2.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit existing dataframe_operations.py - map operations to benchmark operations, identify gaps",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-transaction-primitives",
+        "notes": "Based on the w1 audit:\n\n1. Complete any stub implementations in dataframe_operations.py\n2. Define SKIP_FOR_DATAFRAME list for operations that have no DataFrame equivalent:\n   - SQL-level savepoints (SAVEPOINT/ROLLBACK TO) - no Delta Lake/Iceberg equivalent\n   - Explicit isolation level setting (SET TRANSACTION ISOLATION LEVEL)\n   - Operations requiring explicit BEGIN/COMMIT blocks\n3. Define SKIP_FOR_POLARS and SKIP_FOR_PANDAS as complete skip lists (all operations)\n   since transaction primitives only work on PySpark+Delta/Iceberg\n4. Ensure error handling for unsupported platforms returns clear skip messages\n\nThe operations manager pattern (not QueryRegistry pattern) is correct for this\nbenchmark - transaction operations are stateful and sequential, not independent\nqueries.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Complete missing operation implementations and add skip lists for unsupported operations",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-transaction-primitives",
+        "notes": "Integration steps:\n1. Add get_dataframe_operations() method to TransactionPrimitivesBenchmark in\n   benchmark.py - similar to write_primitives pattern:\n   ```python\n   def get_dataframe_operations(self, platform_name):\n       from .dataframe_operations import get_transaction_manager\n       return get_transaction_manager(platform_name)\n   ```\n2. Set supports_dataframe: True in benchmark_registry.py for transaction_primitives\n3. Verify the dataframe_runner.py handles operations-based benchmarks correctly\n   (it should fall through to get_dataframe_operations if no get_dataframe_queries)\n4. Add platform capability checks - only PySpark with Delta Lake or Iceberg\n   should attempt this benchmark in DataFrame mode\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire up TransactionPrimitivesBenchmark class and registry for DataFrame dispatch",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "df-support-transaction-primitives",
+        "notes": "Create tests/unit/core/transaction_primitives/test_dataframe_operations.py:\n- Test TransactionOperationType enum values match expected operations\n- Test DataFrameTransactionCapabilities for PySpark reports correct support\n- Test Polars/Pandas capabilities report all operations as unsupported\n- Test skip list generation for non-PySpark platforms\n- Test operation manager instantiation with mock platform\n- Mock-based tests (real PySpark+Delta tests belong in integration suite)\n- Mark all tests @pytest.mark.fast\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for Transaction Primitives DataFrame operations",
+        "wid": "w4"
+      }
+    ]
+  }
+}

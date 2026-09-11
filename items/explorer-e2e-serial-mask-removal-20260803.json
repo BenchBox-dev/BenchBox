@@ -1,0 +1,107 @@
+{
+  "context": "Remove blanket serial mode from the responsive block so an early failure cannot suppress unrelated viewport coverage, keeping serial only where a test genuinely depends on a previous test's state.",
+  "description": "e2e/responsive.spec.ts sets test.describe.configure serial mode on line 35, so the first failure aborts every remaining test in the block. On develop 3af42e29b the single stale-headline failure suppressed 23 downstream tests, and both CI and a local run reported that only as '1 failed ... 23 did not run'. Behind the mask sat two genuine desktop and wide above-the-fold regressions that nobody could see. Verified 2026-08-03: switching the block to parallel mode locally ran all 25 tests and surfaced both real failures, so serial mode is not required for these tests to pass.",
+  "legacy": {
+    "item_meta": {
+      "category": "Explorer test integrity",
+      "created_at": "2026-08-03T23:37:54Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Any test that genuinely depends on prior state keeps an explicit narrow serial scope",
+        "item_id": "explorer-e2e-serial-mask-removal-20260803"
+      },
+      {
+        "behavior": "Every existing responsive assertion is retained, none deleted to make the block pass",
+        "item_id": "explorer-e2e-serial-mask-removal-20260803"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-e2e-serial-mask-removal-20260803",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-e2e-serial-mask-removal-20260803",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "explorer-e2e-serial-mask-removal-20260803",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/responsive.spec.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! rg -q -F \"test.describe.configure({ mode: \\\"serial\\\" })\" results-explorer/e2e/responsive.spec.ts",
+        "description": "Blanket serial mode is gone from the responsive block",
+        "expected": "Exit 0 when the whole-file serial abort is removed",
+        "item_id": "explorer-e2e-serial-mask-removal-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --workers=1 --retries=0 e2e/responsive.spec.ts",
+        "description": "Every responsive test executes and passes",
+        "expected": "All responsive tests run with zero did-not-run entries",
+        "item_id": "explorer-e2e-serial-mask-removal-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-e2e-serial-mask-removal-20260803",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-e2e-serial-mask-removal-20260803",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-e2e-serial-mask-removal-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Identify which responsive tests genuinely need shared state",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-e2e-serial-mask-removal-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Remove blanket serial mode and scope it narrowly if still needed",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-e2e-serial-mask-removal-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm the full block executes with no suppressed tests",
+        "wid": "w2"
+      }
+    ]
+  }
+}

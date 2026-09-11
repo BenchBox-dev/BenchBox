@@ -1,0 +1,67 @@
+{
+  "context": "Do not begin until the authorization and worktree gates pass. Preserve unrelated changes, use temporary outputs for tests, fail closed on uncertainty, and stop on any data-loss or false-success signal.",
+  "description": "Validate manifest identity, scale, paths, formats, existence, and metadata even when tables are populated. Regenerate or fail under no_regenerate.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "fix-p1-data-reuse-validation",
+        "needs_item": "fix-gate-2-p0-review"
+      }
+    ],
+    "item_meta": {
+      "category": "architecture-remediation",
+      "completed_at": "2026-08-26T21:16:40Z",
+      "completed_pr": 1925,
+      "created_at": "2026-08-26T17:08:24Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing user files, existing result artifacts, backward compatibility, rollback evidence",
+        "item_id": "fix-p1-data-reuse-validation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-p1-data-reuse-validation",
+        "kind": "do_not_modify",
+        "path_glob": ".bossmode/**"
+      },
+      {
+        "item_id": "fix-p1-data-reuse-validation",
+        "kind": "do_not_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "fix-p1-data-reuse-validation",
+        "kind": "do_not_modify",
+        "path_glob": "test-results/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- pytest -q --override-ini=addopts= tests/unit/core/test_runner_manifest_reuse.py",
+        "description": "Manifest reuse safety tests pass",
+        "expected": "all tests pass",
+        "item_id": "fix-p1-data-reuse-validation",
+        "last_result": "pass",
+        "last_run": "2026-08-26T21:16:39Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Commit 101772015: populated table mappings are validated for paths and manifest identity before reuse, with no_regenerate fail-closed behavior. Manifest reuse tests: 19 passed. Full preflight: 28,381 passed, 19 skipped.",
+        "item_id": "fix-p1-data-reuse-validation",
+        "notes": null,
+        "started_at": "2026-08-26T20:32:50Z",
+        "started_branch": "fix/architecture-integrity-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-architecture-integrity-batch",
+        "status": "done",
+        "summary": "Implement manifest and artifact validation before table reuse",
+        "wid": "w1"
+      }
+    ]
+  }
+}

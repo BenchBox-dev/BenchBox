@@ -1,0 +1,299 @@
+{
+  "context": "Start from the already-correct canonical surface in\n`benchbox/cli/platform_defaults.py` and the current ClickHouse platform option\nregistration, then push that contract outward to older compatibility layers.\nAdd one normalizer in the ClickHouse package, reuse it at the adapter and\nmetadata boundary, and migrate helper outputs to canonical `deployment_mode`\nwrites.\n\nTreat docs and tests as part of the contract, not cleanup afterthoughts. The\nCLI currently uses global `--mode` for execution mode, so ClickHouse docs must\nstop teaching deployment selection through that flag. Update tests to lock in\nboth the canonical path and the temporary compatibility shims.\n",
+  "description": "ClickHouse deployment selection still has split vocabulary and behavior across\nthe repo. The canonical path is already `deployment_mode` with `local` and\n`server` in `benchbox/cli/platform_defaults.py`, ClickHouse platform option\nregistration, and adapter-factory wiring. But several older surfaces still\nemit or teach a different contract:\n\n- `benchbox/cli/config.py` still exposes `--mode` with `server|embedded`\n- `benchbox/core/config_utils.py` still writes `mode` instead of `deployment_mode`\n- `benchbox/platforms/clickhouse/adapter.py` and `metadata.py` only read\n  `deployment_mode`, so old callers sending `mode=\"server\"` can silently\n  fall back to local behavior\n- `benchbox/platforms/clickhouse/diagnostics.py` emits `metadata[\"mode\"]`\n- docs and examples still teach `--mode=local`, \"embedded mode\", or\n  `clickhouse:cloud`\n\nThis drift is no longer cosmetic. The global `benchbox run --mode` flag now\nmeans SQL-vs-DataFrame execution mode, so docs telling users to pass\n`--mode=local` for ClickHouse deployment are actively wrong. Meanwhile legacy\nhelper paths can still build config using `mode`, which the adapter boundary\nmay ignore. The result is an ambiguous and partially broken contract for\nlocal/server selection.\n\nThis TODO standardizes on `deployment_mode` as the only canonical ClickHouse\nselector, keeps `mode` and `embedded` as compatibility-only inputs during a\ntransition window, and removes stale docs/examples that still present\nClickHouse Cloud as a deployment mode of the base `clickhouse` platform.\n\nThis item is complete only as compatibility groundwork. Its remaining\ndocs/help/test cleanup is intentionally absorbed by\n`first-class-clickhouse-local-server-cloud-platforms`, which replaces the\nlong-term public contract with first-class `clickhouse-local`,\n`clickhouse-server`, and `clickhouse-cloud` platform names.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "globally rename `DeploymentCapability.mode` in `benchbox/core/platform_registry.py`",
+        "instead": "only fix ClickHouse-specific selectors, examples, and docs",
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "why": "that field represents a generic deployment category, not the ClickHouse adapter config key"
+      },
+      {
+        "dont": "keep teaching `--mode=local` or `embedded mode` in ClickHouse docs/help text",
+        "instead": "use `deployment_mode` or `clickhouse:local/server` guidance instead",
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "why": "the global `--mode` flag now means execution mode and the old wording is actively misleading"
+      },
+      {
+        "dont": "reintroduce `cloud` as a deployment mode on the base ClickHouse adapter",
+        "instead": "keep cloud guidance separate",
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "why": "the dedicated `clickhouse-cloud` platform is already the canonical managed-service entry point"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "standardize-clickhouse-deployment-mode-contract",
+        "id": 575,
+        "reason": "Current callers and old config files may still depend on these spellings; this TODO should normalize reads and canonicalize writes first",
+        "resolution": "promoted",
+        "resolved_item": "remove-the-legacy-mode-alias-and-embedded-synonym-entirely-a",
+        "resolved_reason": null,
+        "summary": "Remove the legacy `mode` alias and `embedded` synonym entirely after one deprecation window"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "needs_item": "migrate-clickhouse-firebolt-deployment"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-11T00:00:00Z",
+      "created_at": "2026-04-08T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Canonical ClickHouse deployment selection via `deployment_mode=local|server` continues working through the modern adapter-factory and platform-defaults path",
+        "item_id": "standardize-clickhouse-deployment-mode-contract"
+      },
+      {
+        "behavior": "ClickHouse Cloud remains a separate platform family entry via `clickhouse-cloud`; this cleanup must not reintroduce cloud as a base ClickHouse deployment mode",
+        "item_id": "standardize-clickhouse-deployment-mode-contract"
+      },
+      {
+        "behavior": "Legacy config inputs such as `mode=server` and `mode=embedded` remain readable during the transition, but are normalized to canonical values internally",
+        "item_id": "standardize-clickhouse-deployment-mode-contract"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/config.py"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/platform.py"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/config_utils.py"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_config_utils.py"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_config_utils.py tests/unit/cli/test_example_argument_parser.py tests/unit/cli/test_platform.py tests/unit/platforms/test_adapter_factory_deployment.py -q",
+        "description": "Config and CLI tests cover canonical `deployment_mode` behavior plus legacy compatibility shims",
+        "expected": "All targeted config and CLI tests pass",
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/test_clickhouse_diagnostics.py tests/unit/platforms/test_clickhouse_local.py tests/unit/platforms/test_platform_info.py -q",
+        "description": "ClickHouse adapter, diagnostics, metadata, and local-mode tests pass with standardized deployment naming",
+        "expected": "All targeted ClickHouse unit tests pass",
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n -- '--mode=local|--mode=server' docs/platforms/clickhouse-local-mode.md docs/platforms/deployment-modes.md docs/platforms/index.md",
+        "description": "Stale ClickHouse docs no longer teach deployment selection via the global `--mode` flag",
+        "expected": "No matches",
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n -- 'clickhouse:cloud' benchbox/cli/commands/run.py benchbox/cli/platform.py benchbox/core/platform_registry.py",
+        "description": "Base-platform examples no longer present `clickhouse:cloud` as the ClickHouse deployment selector",
+        "expected": "No matches",
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "notes": "Treat `cloud` as an error that points users to the dedicated\n`clickhouse-cloud` platform. Centralize the normalization logic so adapter,\nmetadata, diagnostics, and config helpers cannot drift again.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a shared ClickHouse deployment normalizer that accepts `deployment_mode`, legacy `mode`, and legacy `embedded`, and returns only canonical `local` or `server` values",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "notes": "Update `benchbox/platforms/clickhouse/adapter.py` and\n`benchbox/platforms/clickhouse/metadata.py` to read `deployment_mode`\nfirst, then legacy `mode`, then normalize before validation and branching.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Use the normalizer at the ClickHouse adapter and metadata boundary so legacy callers cannot silently default to local mode",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "notes": "This includes `benchbox/core/config_utils.py` and the legacy ClickHouse\nCLI config parser in `benchbox/cli/config.py`, which still advertises\n`embedded` terminology and stale flag help.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Convert legacy config helpers and old argparse surfaces to emit and document `deployment_mode`, keeping `mode` only as a compatibility alias",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "notes": "Keep the compatibility question explicit instead of silently changing output\nshapes. Tests should make the transition behavior obvious.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize emitted ClickHouse diagnostics and platform metadata to `deployment_mode`, deciding whether `mode` is duplicated temporarily for compatibility",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "notes": "Align `docs/platforms/clickhouse-local-mode.md`,\n`docs/platforms/deployment-modes.md`, `docs/platforms/index.md`, and\nhelp/example text in the CLI with the actual supported contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Rewrite stale ClickHouse docs and examples so deployment selection no longer uses global `--mode`, `embedded` terminology, or base-platform `clickhouse:cloud` guidance",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "notes": "Cover adapter construction, metadata normalization, diagnostics payloads,\nconfig extraction, legacy CLI parsing, and platform help/examples.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update unit tests to assert canonical `deployment_mode` behavior, legacy input compatibility, and separation of `clickhouse-cloud` from base ClickHouse deployment modes",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "standardize-clickhouse-deployment-mode-contract",
+        "notes": "Finish with targeted searches plus the unit-test slices referenced in\nverification. This work is only done when the canonical contract is\nconsistent across code, tests, docs, and help text.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run targeted regression checks and remove any remaining stale mode-naming references from the touched ClickHouse surfaces",
+        "wid": "w7"
+      }
+    ]
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "description": "Documentation/metadata-only cleanup of truth defects the adversarial holistic\nreview found in already-merged DONE items. No source-code behavior changes. Each\nis an honesty fix so a reader of \"Completed\" is not misled:\n\n  - #909 (plan-capture-robustness-hardening) DONE YAML scope_limit.only_modify\n    omits benchbox/core/plan_capture_phase.py, which the diff legitimately touched\n    and which the item's own prior_art names as a w3 target. Scope-list narrower\n    than the task's intent.\n  - #914 (structural-debt) DONE YAML w1 success_metric overstates \"no literal TPC\n    names in execution.py dispatch\" (true only for the power path). Reword to the\n    accurate power-path-only claim and cross-link the refactor follow-up\n    (execution-harness-extraction-throughput-maintenance-combined) that will\n    restore the full claim.\n  - #906 (gate-target-ci-ratchet) Makefile:222-237 comments still call clickbench\n    and joinorder-synthetic \"Report-mode (STAGED gate)... not a blocking CI gate\n    yet\", but both are in GATES, STAGED_GATES is empty, and both run in the\n    blocking correctness-gate (pr.yml). Stale comments contradict enforcement.\n  - #906 close-out discipline: the guard's required-CI wiring (pr.yml:398) landed\n    in #908, not #906 — #906 merged a non-load-bearing guard. Add a one-line house\n    rule so a guard and its CI wiring land together, and verify no unpinned-gate\n    window existed between the two merges.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "reopen or re-run the merged items; this only corrects their recorded metadata.",
+        "instead": "(not specified)",
+        "item_id": "holistic-review-followup-metadata-truth",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "touch executable Makefile recipe lines",
+        "instead": "(not specified)",
+        "item_id": "holistic-review-followup-metadata-truth",
+        "why": "comment text only for w3."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "holistic-review-followup-metadata-truth",
+        "id": 410,
+        "reason": "Scope to the holistic-review effort; a full DONE-corpus audit is separate.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Exact match: open item done-item-metric-truthfulness-audit already tracks a full DONE-corpus metric-truthfulness audit.",
+        "summary": "Broader audit of metric truthfulness across all historical DONE items."
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-06-30T00:00:00Z",
+      "created_at": "2026-06-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No source-code behavior change — YAML, Makefile comments, and AGENTS.md text only.",
+        "item_id": "holistic-review-followup-metadata-truth"
+      },
+      {
+        "behavior": "Validator and graph stay green after the DONE-YAML edits.",
+        "item_id": "holistic-review-followup-metadata-truth"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': 'AGENTS.md', 'note': 'Close-out / review-protocol guidance section — add the one-line guard+wiring rule here in the existing terse bullet style.'}",
+        "decision": "reuse",
+        "item_id": "holistic-review-followup-metadata-truth",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': '_project/DONE/main/active/', 'note': 'The DONE YAMLs to amend (cross-surface-mutation-harness-scale-fidelity, plan-capture-robustness-hardening, structural-debt-base-layer-tpc-and-module-split, cross-surface-gate-target-ci-ratchet).'}",
+        "decision": "reuse",
+        "item_id": "holistic-review-followup-metadata-truth",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "holistic-review-followup-metadata-truth",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "holistic-review-followup-metadata-truth",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "holistic-review-followup-metadata-truth",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/active/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo audit verify",
+        "description": "Tracker event history remains intact after terminal-item amendments",
+        "expected": "exit 0 with a valid event hash chain",
+        "item_id": "holistic-review-followup-metadata-truth",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "holistic-review-followup-metadata-truth",
+        "notes": "#909: add benchbox/core/plan_capture_phase.py to scope_limit.only_modify (the\ndiff legitimately touched it; the item's own prior_art names it as a w3\ntarget). Re-run validate_todo.py on the amended file.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix the #909 scope_limit omission in its DONE YAML",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "holistic-review-followup-metadata-truth",
+        "notes": "Reword #914 w1 success_metric to \"the power-dispatch path carries no literal\nTPC names\" and reference execution-harness-extraction-throughput-maintenance-combined\nas the item that restores the full-dispatch claim.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reword the #914 power-path metric and cross-link the refactor follow-up",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "holistic-review-followup-metadata-truth",
+        "notes": "Makefile:222-237 — drop the \"STAGED gate / not a blocking CI gate yet\" wording\nfor clickbench and joinorder-synthetic, which are enforced GATES in the\nblocking correctness-gate. Comment-only edit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refresh the #906 Makefile STAGED/not-blocking comments to match actual enforcement",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "holistic-review-followup-metadata-truth",
+        "notes": "Add to AGENTS.md: a drift/pinning guard and its required-CI wiring must land in\nthe same PR; an unwired guard is non-load-bearing. Also inspect git history\nbetween #906 and #908 (git log -p over cross_surface.py GATES + Makefile) to\nconfirm no GATES entry was added unpinned in that window; record the result in\nthe PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add the guard+wiring close-out rule and verify no unpinned-gate window for #906",
+        "wid": "w4"
+      }
+    ]
+  }
+}

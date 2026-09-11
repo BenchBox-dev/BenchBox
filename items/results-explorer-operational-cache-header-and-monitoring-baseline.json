@@ -1,0 +1,278 @@
+{
+  "context": "Measure the real Pages response and cache behavior first, then run a controlled N-to-N+1 redeploy/cache transition, evaluate meta versus response-header CSP against GitHub Pages constraints, define a privacy-preserving first-party synthetic check and error budget, and inspect print/200-percent-zoom/reduced-motion behavior. Record conscious acceptances with owner and review date; implement only controls justified by measured failure or an approved operational requirement.",
+  "description": "The adversarial review did not reproduce a CSP exploit, mixed-version cache failure, print/zoom defect, or observability outage. It did establish that the Explorer is not deployed, uses a fixed results.duckdb URL, relies on a meta CSP because Pages exposes limited response-header control, and has no client telemetry or production synthetic monitor. Preserve those as explicit post-launch validation/decision work rather than either inventing defects or letting the dimensions disappear.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add Sentry, analytics, or session replay merely because no telemetry exists",
+        "instead": "start with first-party synthetic route/snapshot checks and make any client telemetry a separate approved decision",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "why": "the static app's privacy posture may be more valuable than detailed client traces"
+      },
+      {
+        "dont": "append a random cache-busting query on every page load",
+        "instead": "test content-addressed or deployment-versioned URLs with bounded retention and rollback",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "why": "that defeats browser/CDN caching and range-read performance"
+      },
+      {
+        "dont": "claim CSP failure solely because GitHub Pages lacks a response header",
+        "instead": "test effective directives, document Pages constraints, and tighten only with a compatible delivery mechanism",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "why": "the application already carries an enforceable meta policy and no exploit was reproduced"
+      },
+      {
+        "dont": "treat a screenshot at one viewport as print or zoom validation",
+        "instead": "exercise print media plus 200-percent zoom with measurable overflow and content-reachability assertions",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "why": "pagination, clipping, focus, and horizontal overflow differ across media and scale"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "needs_item": "results-explorer-pages-environment-and-curated-preview-launch"
+      }
+    ],
+    "item_meta": {
+      "category": "validation",
+      "created_at": "2026-08-02T04:32:37Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A newer/older read-model mismatch continues to use the explicit remediation path rather than rendering partial data.",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline"
+      },
+      {
+        "behavior": "Cache changes preserve HTTP range-read efficiency and do not force full 34 MB-class WASM/database refetches on every navigation.",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline"
+      },
+      {
+        "behavior": "Meta CSP remains active unless an equal-or-stronger enforceable response policy replaces it.",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline"
+      },
+      {
+        "behavior": "No third-party analytics, session replay, or remote error payload is introduced without a separate privacy and data-retention decision.",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline"
+      },
+      {
+        "behavior": "Print, zoom, reduced-motion, and high-contrast checks report observed behavior without claiming full assistive-technology certification.",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline"
+      },
+      {
+        "behavior": "Synthetic monitoring records route/status/version/timing only and never bundle content, query text, comparison IDs, or user navigation.",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Place any first-party post-deploy synthetic check beside the single authoritative Pages deployment.",
+        "decision": "extend",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "path": ".github/workflows/docs.yml"
+      },
+      {
+        "concept": "Measure and document the existing meta CSP before choosing any replacement or tightening.",
+        "decision": "reuse",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "path": "results-explorer/index.html"
+      },
+      {
+        "concept": "Extend the existing fixed snapshot URL and read-model mismatch handling only if the redeploy drill proves a cache/version hazard.",
+        "decision": "extend",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "path": "results-explorer/src/db.ts"
+      },
+      {
+        "concept": "Reuse existing reduced-motion and high-contrast media queries for operational visual checks.",
+        "decision": "reuse",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "path": "results-explorer/src/index.css"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/**"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-phase-2-runbook.md"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/capability/**"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/index.html"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "curl -fsSI https://benchbox.dev/results/ && curl -fsSI -H 'Range: bytes=0-1023' https://benchbox.dev/results/data/results.duckdb",
+        "description": "Live route and snapshot headers can be inspected",
+        "expected": "Both live requests succeed after launch and expose the headers needed for a cache/range policy decision.",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --workers=1 e2e/capability",
+        "description": "Capability tests cover cache transition and non-default media",
+        "expected": "Cache/version, range, print, zoom, reduced-motion, and high-contrast capability checks pass or produce separately owned concrete defects.",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q",
+        "description": "Workflow and operational-policy tests pass",
+        "expected": "Post-deploy synthetic monitoring, privacy boundaries, and deployment ordering are mechanically guarded where implemented.",
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "notes": "Capture HTML, JS, WASM, DuckDB, bundle, and 404 response status/headers; cache-control/age/etag; range support; effective CSP; service-worker absence/presence; read-model version; console errors; and current monitoring. Distinguish browser cache, CDN cache, and application state.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Measure live response headers, cache keys, range behavior, CSP, and error surfaces",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "notes": "Load deployment N, retain HTML/JS/DB cache combinations, deploy a compatible test N+1, and exercise old HTML/new DB and new HTML/old DB combinations under cache-disabled and normal-cache modes. Verify fail-closed remediation, rollback, range budget, and eventual convergence before selecting versioned URLs or accepting current max-age.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run a controlled mixed-cache N-to-N+1 redeploy drill",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "notes": "Test effective meta CSP including inline and wasm requirements, document which response headers Pages can control, and threat-model script/data exfiltration. Define a first-party synthetic check for /results, direct route, DB range, model version, and privacy gate with alert owner/SLO. Any client telemetry proposal requires a separate privacy decision.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide CSP and privacy-preserving observability controls",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "notes": "Inspect Home, benchmark/platform, detail, compare, and query routes. Assert primary content remains reachable, no page-level horizontal overflow at 200 percent, interactive controls retain names/focus, nonessential animation stops, and print does not expose clipped or misleading rankings. File concrete defects separately.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Exercise print, 200-percent zoom, reduced motion, and high contrast",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-operational-cache-header-and-monitoring-baseline",
+        "notes": "Update the QA/runbook with measured headers/cache behavior, effective CSP, synthetic monitor and alert owner, accepted risks with expiry/review date, redeploy/rollback drill evidence, and print/zoom outcomes. No defect-free claim is inferred from missing telemetry.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record the operational baseline, decisions, owners, and review dates",
+        "wid": "w4"
+      }
+    ]
+  }
+}

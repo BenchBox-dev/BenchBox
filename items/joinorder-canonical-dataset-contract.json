@@ -1,0 +1,349 @@
+{
+  "context": "Treat the canonical dataset as a first-class versioned artifact, not as a\nhelper file downloaded by the generator. Start with a written contract and\nreference oracle, then implement the loader/archive path in a later TODO or\nwork item. Reuse the TPC-DS compliance-class pattern for methodology labeling,\nbut use JOB-specific labels such as canonical_imdb and synthetic_schema rather\nthan overloading TPC's official/unofficial vocabulary.\n",
+  "description": "Issue #289 identified that BenchBox's current Join Order Benchmark data is\nsynthetic and independently random, while canonical JOB derives its optimizer\nsignal from the frozen real IMDB dataset and its cross-table correlations.\n\nThis item defines the reusable canonical dataset contract that must exist\nbefore any scaled JOB-derived benchmark is credible. It covers legal and\nredistribution constraints, the hosted archive format or user-supplied data\npath, reference validation oracle, encoding and NULL-preservation checks,\nresult-bundle dataset versioning, CI routing, and central scale-factor\nenforcement.\n\nThis TODO does not implement derived scale-up. It creates the foundation that\nlater scale-stress work must depend on.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "coerce empty strings and NULLs through generic CSV/Parquet defaults",
+        "instead": "add explicit round-trip and null-count checks.",
+        "item_id": "joinorder-canonical-dataset-contract",
+        "why": "JOB predicates depend on note and string columns"
+      },
+      {
+        "dont": "publish or cache IMDb-derived archives before the licensing decision is written",
+        "instead": "ship scripts/manifests/data_path docs instead when redistribution is not approved.",
+        "item_id": "joinorder-canonical-dataset-contract",
+        "why": "non-commercial local use is not the same as redistributing a transformed benchmark dataset"
+      },
+      {
+        "dont": "put full canonical JOB in fast tests",
+        "instead": "use a tiny predicate-satisfying fixture for unit coverage and full data only in UAT/nightly/manual gates.",
+        "item_id": "joinorder-canonical-dataset-contract",
+        "why": "the dataset is gigabyte-scale"
+      },
+      {
+        "dont": "rely on registry scale_options alone",
+        "instead": "implement a central validation hook used by CLI and benchmark construction paths.",
+        "item_id": "joinorder-canonical-dataset-contract",
+        "why": "current runner paths may bypass it"
+      },
+      {
+        "dont": "validate canonical JOB with only non-empty query checks",
+        "instead": "use reference outputs/cardinalities from a chosen reference engine instead.",
+        "item_id": "joinorder-canonical-dataset-contract",
+        "why": "that would miss wrong answers and predicate-domain corruption"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-canonical-dataset-contract",
+        "id": 420,
+        "reason": "Scale-up requires the canonical dataset contract and oracle defined here first.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: JOB derived scale-up implementation is exactly what the open track2-joinorder-scaling-strategy item (select/implement JOB scaling strategy) covers.",
+        "summary": "Implement derived scale-up modes"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-canonical-dataset-contract",
+        "id": 421,
+        "reason": "This may be a substantial independent task; w7 decides whether it is in scope.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Already done: benchbox/core/joinorder/dataframe_queries.py 'Implements all 113 canonical JoinOrder query IDs' (IMPLEMENTED_DATAFRAME_QUERY_IDS = CANONICAL_JOINORDER_QUERIES). The DataFrame translation shipped.",
+        "summary": "Translate all 113 JOB queries to DataFrame APIs"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-09T00:00:00Z",
+      "created_at": "2026-05-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Air-gapped users must have a documented data_path path, not only a hosted-download path.",
+        "item_id": "joinorder-canonical-dataset-contract"
+      },
+      {
+        "behavior": "Canonical JOB means frozen real IMDB-derived JOB data at SF=1 only; synthetic data must not be mislabeled canonical.",
+        "item_id": "joinorder-canonical-dataset-contract"
+      },
+      {
+        "behavior": "Existing result bundles must remain interpretable after future dataset archive revisions.",
+        "item_id": "joinorder-canonical-dataset-contract"
+      },
+      {
+        "behavior": "No hosted canonical or derived IMDb archive may ship unless the licensing decision explicitly approves that distribution mode.",
+        "item_id": "joinorder-canonical-dataset-contract"
+      },
+      {
+        "behavior": "Predicate-bearing string and note columns must preserve exact values and NULL semantics through conversion.",
+        "item_id": "joinorder-canonical-dataset-contract"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/joinorder-canonical-dataset-contract.yaml"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/joinorder-canonical-dataset-contract-*.md"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/joinorder-imdb-data-licensing-*.md"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/join-order.md"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/usage/data-generation.md"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/joinorder/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n \"hosted archive|derived archive|CI cache|user-supplied data_path|distribution mode\" _project/decisions/joinorder-imdb-data-licensing-*.md",
+        "description": "Licensing decision exists and declares allowed distribution modes",
+        "expected": "decision covers hosting, derived archives, CI caching, and fallback data_path",
+        "item_id": "joinorder-canonical-dataset-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"reference engine|PostgreSQL|reference cardinalities|normalized result sets|non-empty\" _project/decisions/joinorder-canonical-dataset-contract-*.md",
+        "description": "Oracle decision names reference engine and stored artifacts",
+        "expected": "decision names the oracle and rejects non-empty-only validation",
+        "item_id": "joinorder-canonical-dataset-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"dataset_version|manifest hash|source checksum|null counts|conversion pipeline|file format version\" _project/decisions/joinorder-canonical-dataset-contract-*.md",
+        "description": "Manifest contract covers provenance, checksums, nulls, and dataset versioning",
+        "expected": "manifest contract includes all required provenance and integrity fields",
+        "item_id": "joinorder-canonical-dataset-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"central validation|scale factor|SF=1|CLI|benchmark construction\" _project/decisions/joinorder-canonical-dataset-contract-*.md",
+        "description": "Scale-factor enforcement design covers CLI and benchmark construction paths",
+        "expected": "decision covers central SF=1 enforcement",
+        "item_id": "joinorder-canonical-dataset-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph remains valid after this planning item is added",
+        "expected": "Graph validation passed",
+        "item_id": "joinorder-canonical-dataset-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/TODO/main/planning/joinorder-canonical-dataset-contract.yaml",
+        "description": "This item validates individually",
+        "expected": "is valid",
+        "item_id": "joinorder-canonical-dataset-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "joinorder-canonical-dataset-contract",
+        "needs_wid": "w1",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-dataset-contract",
+        "notes": "Write `_project/decisions/joinorder-imdb-data-licensing-<date>.md`\nbefore designing the hosted archive. The decision must state:\n  - whether BenchBox may host a canonical Parquet archive;\n  - whether BenchBox may host derived replicated or expanded IMDb archives;\n  - whether CI runners may cache canonical or derived data;\n  - what attribution, terms-acceptance, and non-commercial-use language is\n    required;\n  - the fallback path if hosted redistribution is not approved.\nApproved fallback shapes include user-supplied `data_path`, a reproducible\nlocal conversion script, checksums/manifests, and documentation that points\nusers to their own accepted download path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Resolve the IMDb/JOB data licensing and redistribution gate",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-dataset-contract",
+        "notes": "Decide the validation oracle for canonical JOB. The preferred shape is:\n  - PostgreSQL as the reference engine for a one-time canonical run.\n  - Normalized result sets for all 113 queries when practical.\n  - Reference cardinalities and pre-aggregate match counts for all 113\n    queries even when full result sets are large.\nRecord the decision in a short design note under `_project/decisions/`.\nThe note must state why non-empty-result checks alone are insufficient.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Choose and document the canonical reference oracle",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-dataset-contract",
+        "notes": "Define the downloadable archive layout and user-supplied data contract.\nRequired fields:\n  - dataset_id and dataset_version.\n  - source archive checksum.\n  - per-table file checksums and row counts.\n  - per-column null counts for predicate-bearing columns.\n  - schema version and file format version.\n  - conversion pipeline provenance.\nThe format must support hosted download and `--benchmark-option\ndata_path=/path/to/job_dataset` for air-gapped users.\nIf w0 does not approve hosted redistribution, specify only the local\nconversion and user-supplied data-path contract; do not leave \"hosted\narchive\" language ambiguous.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Specify the canonical archive and manifest format",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-dataset-contract",
+        "notes": "Specify tests for CSV to Parquet round trips, UTF-8 quirks, normalization,\nBOM handling, empty-string vs NULL handling, and exact string predicate\npreservation. The gate must include note columns and other fields that\nare predicate-bearing in JOB:\n  - movie_companies.note\n  - cast_info.note\n  - person_info.note\n  - movie_info.info\n  - movie_info_idx.info\n  - company_name.name and country_code\n  - keyword.keyword\n  - name.name\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add encoding and NULL-preservation gates to the data-build spec",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-dataset-contract",
+        "notes": "Require every JOB result bundle to record dataset_id, dataset_version,\nmanifest hash, source checksum, conversion script SHA, archive format, and\nscale mode. The explorer must surface dataset-version mismatches when\ncomparing JOB results so a future archive fix does not make old and new\nresults ambiguous.\nInclude license/distribution mode in the manifest and result bundle so\nhosted, user-built, and derived archives cannot be compared as if they were\nthe same artifact.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Define dataset versioning requirements for result bundles and explorer comparison",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-dataset-contract",
+        "notes": "Registry scale_options alone is not enough. Design a central validation\nhook that lets benchmarks enforce scale and mode constraints at run time.\nCanonical JOB must accept only SF=1 and the canonical dataset mode.\nLater derived modes must be explicit, such as replicated_imdb or\njob_scale_stress, and must never be silently selected by passing a larger\nscale factor to canonical joinorder.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Design central benchmark scale-factor and mode validation",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-dataset-contract",
+        "notes": "Full canonical JOB is too large for fast tests. Define three tiers:\n  - unit tests use a tiny predicate-satisfying fixture.\n  - UAT/nightly tests use cached canonical Parquet data.\n  - manual benchmark runs can use hosted download or data_path.\nThe fixture must satisfy representative predicates and NULL handling, but\nmust not be labeled canonical.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Define CI routing for canonical JOB",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-dataset-contract",
+        "notes": "Current DataFrame coverage is 13 queries while canonical JOB has 113.\nDecide whether canonical JOB initially supports SQL only, or whether the\n113-query DataFrame translation becomes a separate dependency. Do not let\npartial DataFrame support block SQL canonical correctness unless the\nproject explicitly chooses that scope.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide DataFrame parity scope for canonical JOB",
+        "wid": "w7"
+      }
+    ]
+  }
+}

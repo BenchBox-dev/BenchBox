@@ -1,0 +1,336 @@
+{
+  "context": "First fix scope language and counts so users understand the data subset.\nThen align theme surfaces and formatting. Finally tune run identity density\nusing the existing formatter, with tests to prove labels remain unique.\n",
+  "description": "The Results Explorer home page and benchmark chart labels still contain\nmisleading scope and density problems after the earlier follow-up PRs. The\nhome page presents meta-leaderboard filters as \"All benchmarks\" even though\nthe dropdown only contains ranked cohorts, shows only a small platform subset\nwithout clear scope copy, mixes dark and light page sections, and renders\nlarge power scores with noisy decimals. AMPLab chart labels also over-expand\nrun identity by repeating cohort-invariant qualifiers.\n\nThis TODO handles scope, copy, theme, formatting, and identity density after\neligibility semantics are normalized. It must not hide the deeper eligibility\nfixes behind superficial retheme changes.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make a one-off power-score formatter inside MetaLeaderboard",
+        "instead": "use shared metric formatting.",
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "why": "score formatting appears on multiple surfaces"
+      },
+      {
+        "dont": "relabel sparse meta-leaderboard data as the whole corpus",
+        "instead": "use explicit cohort scope copy.",
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "why": "that caused the misleading home dropdowns"
+      },
+      {
+        "dont": "retheme by adding local hard-coded colors",
+        "instead": "use existing tokens or extend them deliberately.",
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "why": "the previous half-theme came from inconsistent surface ownership"
+      },
+      {
+        "dont": "solve long labels by truncating away the only distinguishing token",
+        "instead": "preserve date or short-id disambiguators.",
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "why": "duplicate platforms become ambiguous"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "needs_item": "results-explorer-frontend-eligibility-normalization"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Exact values remain available in detail/tooltip even when display formatting is compact.",
+        "item_id": "results-explorer-home-scope-theme-and-identity"
+      },
+      {
+        "behavior": "Existing `/results/?mode=...` URL behavior remains stable.",
+        "item_id": "results-explorer-home-scope-theme-and-identity"
+      },
+      {
+        "behavior": "Home meta leaderboard remains keyboard-accessible.",
+        "item_id": "results-explorer-home-scope-theme-and-identity"
+      },
+      {
+        "behavior": "Run labels remain unique when duplicate platform names appear.",
+        "item_id": "results-explorer-home-scope-theme-and-identity"
+      },
+      {
+        "behavior": "Visual changes do not alter read-model eligibility semantics.",
+        "item_id": "results-explorer-home-scope-theme-and-identity"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/src/components/DistributionBox.tsx:label truncation handling — preserve unique labels after shortening.",
+        "decision": "reuse",
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "path": "results-explorer/src/components/DistributionBox.tsx:label"
+      },
+      {
+        "concept": "results-explorer/src/components/MetaLeaderboard.tsx:meta leaderboard controls and cells — update scope copy and formatting.",
+        "decision": "reuse",
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "path": "results-explorer/src/components/MetaLeaderboard.tsx:meta"
+      },
+      {
+        "concept": "results-explorer/src/lib/runIdentity.ts:cohort-aware formatter — refine qualifier selection rather than adding another formatter.",
+        "decision": "reuse",
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "path": "results-explorer/src/lib/runIdentity.ts:cohort-aware"
+      },
+      {
+        "concept": "results-explorer/src/pages/Home.tsx:home filters and browse sections — extend copy and scope labels.",
+        "decision": "extend",
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "path": "results-explorer/src/pages/Home.tsx:home"
+      },
+      {
+        "concept": "results-explorer/src/utils.ts:fmtScore/fmtMs — extend metric-aware formatting policy.",
+        "decision": "extend",
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "path": "results-explorer/src/utils.ts:fmtScore/fmtMs"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "do_not_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/results.duckdb"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-home-scope-theme-and-identity.yaml"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-home-scope-theme-and-identity/"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/chartTheme.test.ts"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/utils.test.ts"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CDFChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/DistributionBox.tsx"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/DistributionBox.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/runIdentity.test.ts"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/runIdentity.ts"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/utils.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/Home.test.tsx src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/DistributionBox.test.tsx",
+        "description": "Home and identity tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build && cd .. && test -s _project/verification-logs/results-explorer-home-scope-theme-and-identity/browser-smoke.md && rg -n \"/results/|/results/amplab/|scope|theme|identity|PASS|FAIL\" _project/verification-logs/results-explorer-home-scope-theme-and-identity/browser-smoke.md",
+        "description": "Browser spot check captures home and AMPLab chart labels",
+        "expected": "build exits 0 and browser-smoke.md records route-level PASS/FAIL evidence for /results/ and /results/amplab/",
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "notes": "Update the home page so filters derived from `meta_leaderboard.cohorts`\nare labeled as leaderboard/cohort filters, not corpus-wide filters. Add\nvisible scope copy such as \"Showing N ranked platforms across M leaderboard\ncohorts\" and ensure counts match the rendered table.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Clarify home leaderboard scope and filter labels",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "notes": "The page may show both all public benchmarks and leaderboard cohorts, but\nthe UI must not imply they are the same set. If a benchmark appears in\nBrowse by Benchmark but not in the leaderboard filter, show why it is not\ncurrently a ranked cohort or keep the two sections visually and textually\nseparate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Separate public corpus browse counts from leaderboard cohort counts",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "notes": "Decide whether the home results page should be fully dark-themed or use a\ndeliberate light data surface below a dark hero/filter band. Apply the\nchosen rule consistently to the meta leaderboard, controls, table, browse\nsections, and empty/excluded states. Do not leave an accidental half-theme.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve home theme ownership for dark and data surfaces",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "notes": "Format large power scores for scanning, for example zero decimals above\n1,000 and exact value in tooltip/detail. Keep latency formatting consistent\nwith the valid timing policy from the frontend eligibility TODO.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply metric-specific formatting for power scores and timing values",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "notes": "Update run identity rendering so chart/table labels include only qualifiers\nneeded to distinguish runs in the current context. On a single benchmark\nand scale page, do not repeat benchmark or scale in every row. Prefer\ncompact labels like `DataFusion 2026-05-02 (a276dae0)` with full identity\navailable via tooltip or receipt link.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reduce run identity labels by removing cohort-invariant qualifiers",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-home-scope-theme-and-identity",
+        "notes": "Add tests for:\n  - home filter options are clearly labeled as leaderboard cohorts;\n  - visible scope counts match rendered rows/columns;\n  - power score formatting removes noisy decimals on large values;\n  - run identity labels omit invariant qualifiers while remaining unique;\n  - theme classes/tokens are consistent across home sections.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression coverage for home scope, theme, formatting, and identity",
+        "wid": "w6"
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: Medium\"\n- \"**Status**: ✅ Completed\"\n- \"**Description**: Implement Coffee Shop benchmark based on the data generator from https://github.com/JosueBogran/coffeeshopdatageneratorv2 and performance analysis described in https://www.linkedin.com/pulse/databricks-vs-snowflake-sql-performance-test-day-1-721m-bogran-lsboe/\"\n- \"**Business Context**: Real-world retail/hospitality data model with transactions, customers, products, and stores - provides practical business intelligence benchmark scenarios\"\n- \"**Tasks**:\"\n- \"**Technical Requirements**:\"\n- \"**Business Value**: Provides realistic business intelligence benchmark for retail/hospitality industry, enables performance testing of common analytics workloads, demonstrates real-world data patterns and query complexity\"\n- \"**Files Affected**:\"\n- \"**Impact**: Adds practical business intelligence benchmark that complements existing TPC benchmarks, provides real-world retail analytics scenarios, enables performance testing of common BI workloads, and offers realistic data patterns for database evaluation in commercial contexts\"\n- \"**✅ Results Achieved**:\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

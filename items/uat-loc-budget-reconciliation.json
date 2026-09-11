@@ -1,0 +1,160 @@
+{
+  "context": "Measure and bucket first, settle the charter decision (it sets the target),\nthen either cut or revise. Trimming should favor the \"consume canonical\nsurfaces\" principle so it compounds with the classifier and registry items.\n",
+  "description": "Outcome of a 4-round adversarial architecture review of the UAT layer. The\nspec budgeted ~1,500 LOC across 13 modules (_project/specs/uat-framework.md:132).\nActual UAT is ~6,476 production LOC (~4.3x) + ~5,730 test LOC + 1,729 YAML\nacross 20+ modules + 31 configs.\n\nBoth sides agree the production concern is valid (the rebuttal's \"test LOC !=\nproduction complexity\" is fair, but prod alone is still 4.3x). Even after\nexcluding explorer-prep (356 LOC) and legitimate evidence artifacts (746 LOC),\n~5,300 prod LOC remains in the plumbing/core/preflight/docker machinery the\nORIGINAL 1,500-LOC spec was meant to cover. Release-gate orchestration\nexplains the audit trail; it does not explain a 3.6x remaining core.\n\nThis item is the deliberate reconciliation: do not leave a 4x gap between\ncharter and reality unexplained. It depends on the charter decision in\n[[uat-certification-wording-charter-decision]] because the chartered scope\ndetermines what the budget should be. The decision work produces one\nreconciliation path; the unchosen path is recorded as deferred rather than as\na pending work unit that blocks TODO completion.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "cut evidence/audit artifacts that ARE chartered (lines 31,35-38,268,688) to hit a number",
+        "instead": "(not specified)",
+        "item_id": "uat-loc-budget-reconciliation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "revise the budget number without a per-bucket rationale",
+        "instead": "(not specified)",
+        "item_id": "uat-loc-budget-reconciliation",
+        "why": "that just blesses the bloat"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-loc-budget-reconciliation",
+        "id": 507,
+        "reason": "A budget guard only makes sense after the budget is reconciled; now that it is, a guard at ~6,500 is a reasonable follow-up.",
+        "resolution": "promoted",
+        "resolved_item": "set-a-ci-loc-budget-guard-that-fails-when-uat-exceeds-the-ag",
+        "resolved_reason": null,
+        "summary": "Set a CI LOC-budget guard that fails when UAT exceeds the agreed budget"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-loc-budget-reconciliation",
+        "id": 508,
+        "reason": "Path B was chosen; the cut-vs-revise decision is intentionally exclusive, so Path A must not remain pending work. Evidence showed the buckets are chartered, not bloat.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Reason explicitly states Path B was chosen and Path A 'must not remain pending work' — the alternative was deliberately rejected, not left open.",
+        "summary": "Execute the reconciliation path not selected in w1 (Path A: cut code toward the budget)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-loc-budget-reconciliation",
+        "needs_item": "uat-certification-wording-charter-decision"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-06-01T00:00:00Z",
+      "created_at": "2026-05-31T00:00:00Z",
+      "worktree": "main"
+    },
+    "prior_art": [
+      {
+        "concept": "_project/specs/uat-framework.md:132 — reuse as the budget source of truth; revise only with rationale",
+        "decision": "reuse",
+        "item_id": "uat-loc-budget-reconciliation",
+        "path": "_project/specs/uat-framework.md:132"
+      },
+      {
+        "concept": "tests/uat/README.md layout section — reuse for module inventory when bucketing production LOC",
+        "decision": "reuse",
+        "item_id": "uat-loc-budget-reconciliation",
+        "path": "tests/uat/README.md"
+      },
+      {
+        "concept": "tests/uat/phases/report.py and tests/uat/orchestrator.py — treat source-SHA/report artifacts as chartered evidence before considering cuts",
+        "decision": "reuse",
+        "item_id": "uat-loc-budget-reconciliation",
+        "path": "tests/uat/phases/report.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-loc-budget-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/ (this item is about the UAT layer's size, not core)"
+      },
+      {
+        "item_id": "uat-loc-budget-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md (budget line + rationale)"
+      },
+      {
+        "item_id": "uat-loc-budget-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/ (only if path A trimming is chosen)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "find tests/uat -name '*.py' ! -name 'test_*' ! -name 'conftest*' | xargs wc -l | tail -1",
+        "description": "Per-module LOC breakdown exists and buckets sum to the measured total",
+        "expected": "prod LOC total matches the breakdown in w0",
+        "item_id": "uat-loc-budget-reconciliation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n '1,500\\|1500\\|LOC' _project/specs/uat-framework.md",
+        "description": "Spec budget and reality reconciled",
+        "expected": "budget line reflects the decision (revised number with rationale, or unchanged with code trimmed toward it)",
+        "item_id": "uat-loc-budget-reconciliation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-loc-budget-reconciliation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-loc-budget-reconciliation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-loc-budget-reconciliation",
+        "notes": "Re-measure the prod LOC figure with a per-module breakdown. Bucket:\ncore-exercise (execute, matrix, runner, enumerate, ladder, cleanup),\nevidence-artifacts (report rollups, packaging, resume, source-SHA),\nexplorer-prep, docker lifecycle (721 LOC, default-OFF), plumbing\n(orchestrator/config/cli ~1,783 LOC). Record a compact summary.\nMEASURED 2026-06-01 (on merged develop, prod = tests/uat/*.py minus test_*/conftest):\n  prod ~6,476 across 21 modules; test ~5,730; yaml ~1,729.\n  Buckets: plumbing (orchestrator 649/config 578/_cli 556)=1,783;\n  core-exercise (execute 751/matrix 384/runner 265/enumerate 137/cleanup 121/ladder 83)=1,741;\n  preflight+compat+timeouts (preflight 407/preflight_budget 216/compatibility 198/timeouts 130)=951;\n  docker lifecycle default-OFF (docker_assets 504/docker_cleanup 372)=876;\n  evidence artifacts (validate 303/report 273/package 170)=746; explorer-prep 356; package init markers 23.\n  ROOT CAUSE of the 4.3x: (a) the spec table OMITTED 4 modules entirely\n  (_cli 556/docker_cleanup 372/preflight_budget 216/compatibility 198 = 1,342 LOC),\n  and (b) phases/plumbing were under-estimated. No discretionary bloat in load-bearing buckets.\n  NOTE: docker_assets 504 includes ~140 LOC added by uat-single-connection-registry (this batch).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-measure prod/test/YAML LOC per module and bucket each (core / evidence-artifacts / explorer-prep / plumbing)",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-loc-budget-reconciliation",
+        "notes": "Gated by [[uat-certification-wording-charter-decision]] — chartered scope\nsets the target budget. Candidate cut areas (path A): orchestrator/config/cli\nplumbing (1,783 LOC) and the default-OFF docker lifecycle (721 LOC, where\ndocker_manage_platforms defaults false).\nDECIDED 2026-05-31 (user): Path B — revise the budget with per-bucket\nrationale. Evidence (w0) shows the gap is undercounting of chartered\nsurface (4 unlisted modules + under-estimated phases), not bloat; a forced\ncut would damage load-bearing capability. Charter dep satisfied: #4 (Path A,\n\"release-gate orchestration\") merged in PR #729. Path A recorded as deferred.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide path A (cut code toward intent) vs path B (revise budget with rationale)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-loc-budget-reconciliation",
+        "notes": "If w1 chooses path A, reduce plumbing/discretionary subsystems and defer\npath B. If w1 chooses path B, update _project/specs/uat-framework.md:132\nto a realistic budget with per-bucket rationale and defer path A. Favor\nthe \"consume canonical surfaces\" principle in either path.\nDONE (Path B): replaced the §\"Responsibility split\" estimate table with an\nadded Actual (2026-06-01) column + the 4 previously-unlisted modules, and the\n\"~1,500 LOC\" total with a \"Budget reconciliation\" note revising it to\n~6,500 prod LOC / ~21 modules with the per-bucket breakdown and root cause.\nPath A (cut code) recorded as deferred.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the selected reconciliation path and record the unchosen path as deferred",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,369 @@
+{
+  "context": "w1 first - it contains the only runtime-impacting bug. Read each file before\nediting. For transformations.py, grep the __init__ method to confirm\ntable_dependencies isn't already set before adding the assignment.\nFor w2, prefer `_param` rename over noqa comments; use noqa only when the\nparam is required by a base class override signature. For w3, read each\nimport site before deleting.\n",
+  "description": "A vulture analysis (80% confidence) identified 25 dead-code findings across\n3 categories. One of the unreachable-code findings is an active bug:\n`transformations.py._get_worker_pool_config` has `self.table_dependencies`\ninitialization stranded after a `return` statement, making it unreachable -\nbut the dict is read by `_get_topological_sort_order` at lines 2126/2130,\nwhich will raise AttributeError at runtime.\n\nFindings by category:\n- Unreachable code (3): duplicate returns/stranded init after return\n- Unused function parameters (12): 100%-confidence, params never read in body\n- Unused platform imports (10): 90%-confidence, need TYPE_CHECKING inspection",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add blanket noqa: F401 to suppress all platform imports",
+        "instead": "(not specified)",
+        "item_id": "remove-vulture-dead-code",
+        "why": "inspect each individually."
+      },
+      {
+        "dont": "batch all 3 work units into a single commit",
+        "instead": "(not specified)",
+        "item_id": "remove-vulture-dead-code",
+        "why": "commit each work unit separately so regressions are bisectable."
+      },
+      {
+        "dont": "remove function parameters from public methods",
+        "instead": "(not specified)",
+        "item_id": "remove-vulture-dead-code",
+        "why": "only rename to _ prefix. Removing breaks callers."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-03-27T00:00:00Z",
+      "created_at": "2026-03-27T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No change to any public method signatures (rename params to _ only, never remove)",
+        "item_id": "remove-vulture-dead-code"
+      },
+      {
+        "behavior": "Optional-dependency platform adapters still importable when dep is absent",
+        "item_id": "remove-vulture-dead-code"
+      },
+      {
+        "behavior": "TPC-DI ETL smoke test passes: uv run -- python -m pytest tests/unit/core/tpcdi/ -q",
+        "item_id": "remove-vulture-dead-code"
+      },
+      {
+        "behavior": "transformations._get_topological_sort_order must be callable without AttributeError after w1",
+        "item_id": "remove-vulture-dead-code"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/output.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/protocols.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/ssb/generator.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpc_compliance.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpc_metrics.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/etl/transformations.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/source_generators.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/benchmark/runner.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds_obt/query_conversion.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/maintenance_test.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/athena.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/cudf.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databricks/adapter.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/delta_lake_maintenance.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/iceberg_maintenance.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/fabric_warehouse.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/lakesail.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/spark.py"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/cloud_storage.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpcdi/ tests/unit/core/ssb/ tests/unit/platforms/databricks/ -q",
+        "description": "All unit tests pass after w1 (latent bug fix)",
+        "expected": "All tests pass, 0 errors",
+        "item_id": "remove-vulture-dead-code",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-fast",
+        "description": "Full fast test suite passes after each work unit",
+        "expected": "All tests pass",
+        "item_id": "remove-vulture-dead-code",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --with vulture vulture benchbox --min-confidence 80 --ignore-names issue_rate",
+        "description": "vulture confirms dead code removed",
+        "expected": "Zero findings (issue_rate whitelisted: public kwarg used by tests)",
+        "item_id": "remove-vulture-dead-code",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox",
+        "description": "Lint clean after all changes",
+        "expected": "All checks passed",
+        "item_id": "remove-vulture-dead-code",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remove-vulture-dead-code",
+        "needs_wid": "w2",
+        "wid": "w10"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "needs_wid": "w2",
+        "wid": "w11"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "remove-vulture-dead-code",
+        "needs_wid": "w2",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remove-vulture-dead-code",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix unreachable code - 3 instances including latent bug in transformations.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-vulture-dead-code",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit unused imports: spark.py:39 DateType, DecimalType",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-vulture-dead-code",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit unused import: cloud_storage.py:23 CloudPathNotExistsError",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-vulture-dead-code",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix unused function parameters - prefix with _ or implement (12 instances)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-vulture-dead-code",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit unused import: athena.py:47 AthenaCursor",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-vulture-dead-code",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit unused import: cudf.py:39 dask_cudf",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-vulture-dead-code",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit unused import: databricks/adapter.py:42 DatabricksConnection",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-vulture-dead-code",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit unused import: delta_lake_maintenance.py:30 deltalake",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-vulture-dead-code",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit unused import: iceberg_maintenance.py:35 pyiceberg",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-vulture-dead-code",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit unused imports: lakesail.py:47 DateType, DecimalType",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "remove-vulture-dead-code",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit unused import: snowflake.py:37 SnowflakeError",
+        "wid": "w9"
+      }
+    ]
+  }
+}

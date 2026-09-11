@@ -1,0 +1,223 @@
+{
+  "context": "Land as a single consumer of the already-scaffolded db.ts - no\nrefactor of db.ts itself. Note the out-of-date docstring reference\nto \"bench.manifest\" in db.ts; the actual attached name from\nduckdb_builder.py is `bench.results` (benign to leave for now, but\nworth a drive-by comment fix). Facet counts via a single GROUP BY\nprobe per load keeps the cold-start snappy - do not push counts to\nserver-side aggregation. All user input in the SQL path is\nuntrusted: use parameterised queries for the filter→SQL path, and\nrely on READ_ONLY for the textarea path.\n",
+  "description": "Phase C of the Results Explorer strategy revision\n(plans/purring-jingling-petal-ultraplan).\n\nAdd a new `/results/query` page: faceted filter panel + flat sortable\ntable + optional SQL textarea, backed by `results.duckdb` via\nDuckDB-WASM. Models the CloudSpecs (cloudspecs.fyi) pattern of very\nfast filter + pivot over a canonical result set.\n\nThe pipeline already emits `results.duckdb`, and `src/db.ts` already\ninitialises DuckDB-WASM in the frontend - no consumer exists yet.\nThis item is the consumer.\n\nDepends on explorer-pipeline-meta-leaderboard-widening for the\n`results_schema.json` sidecar so the column picker doesn't hardcode\nthe list.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate _COLUMNS on the frontend",
+        "instead": "fetch it at load",
+        "item_id": "explorer-query-workbench",
+        "why": "results_schema.json is emitted by the pipeline specifically to avoid this"
+      },
+      {
+        "dont": "introduce CodeMirror or a SQL syntax highlighter",
+        "instead": "plain textarea is sufficient",
+        "item_id": "explorer-query-workbench",
+        "why": "scope says 'parity with benchbox results --sql, no new deps'"
+      },
+      {
+        "dont": "register the /results/query route AFTER /results/:benchmark",
+        "instead": "register it first",
+        "item_id": "explorer-query-workbench",
+        "why": "the wildcard will capture it"
+      },
+      {
+        "dont": "string-concat filter values into SQL",
+        "instead": "parameterise every user value",
+        "item_id": "explorer-query-workbench",
+        "why": "DuckDB-WASM supports parameters"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-query-workbench",
+        "needs_item": "explorer-pipeline-meta-leaderboard-widening"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-17T00:00:00Z",
+      "created_at": "2026-04-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing routes remain reachable - /results/query must be registered before /results/:benchmark so it isn't shadowed",
+        "item_id": "explorer-query-workbench"
+      },
+      {
+        "behavior": "queryRows<T>() helper at db.ts:78 continues to be the sole query entry point from this page - no parallel DuckDB client",
+        "item_id": "explorer-query-workbench"
+      },
+      {
+        "behavior": "src/db.ts initialises DuckDB-WASM with ATTACH READ_ONLY - do not weaken this; SQL textarea relies on it for safety",
+        "item_id": "explorer-query-workbench"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-query-workbench",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/App.tsx"
+      },
+      {
+        "item_id": "explorer-query-workbench",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/queryFilters.ts"
+      },
+      {
+        "item_id": "explorer-query-workbench",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "explorer-query-workbench",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Query.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Explorer typecheck + Vitest green (including Query.test.tsx)",
+        "expected": "all green",
+        "item_id": "explorer-query-workbench",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run dev",
+        "description": "End-to-end smoke",
+        "expected": "/results/query loads; applying platform=DuckDB filter narrows rows; sort by geomean_ms works; CSV export row count matches corpus-inventory filter count; SQL textarea runs SELECTs; DDL/DML errors out",
+        "item_id": "explorer-query-workbench",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-query-workbench",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-query-workbench",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-query-workbench",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-query-workbench",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-query-workbench",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-query-workbench",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-query-workbench",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-query-workbench",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-query-workbench",
+        "notes": "results-explorer/src/App.tsx - register\n`<Query path=\"/results/query\" />` BEFORE the benchmark-wildcard\nroute so it isn't captured by /results/:benchmark.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add /results/query route in App.tsx",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-query-workbench",
+        "notes": "New file: results-explorer/src/lib/queryFilters.ts. Given a\nFilterState object, produce a safe SQL string (or prepared\nstatement args) against `bench.results`. All user-provided\nvalues parameterised - never string-concatenated. This module\nis also what the SQL textarea's \"build from current facets\"\nbutton emits.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build queryFilters.ts: filter state → parameterised DuckDB SQL",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-query-workbench",
+        "notes": "Left sticky panel. Facets: benchmark, platform, SF, tuning\nmode, trust tier, date range, has_cost, validation_status.\nOn load, run one DuckDB GROUP BY probe per facet (or a single\nmulti-column CUBE) and display counts next to each option.\nEach facet is a checkbox group backed by useUrlState so the\nfull filter is shareable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Facet panel with counts (single GROUP BY probe on load)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-query-workbench",
+        "notes": "Center column. One row per bundle from bench.results. Column\npicker reads results_schema.json (emitted by the pipeline -\nsee explorer-pipeline-meta-leaderboard-widening w3) so the\nfrontend never hardcodes _COLUMNS. Default visible columns:\nbenchmark, platform, SF, date, power_score, geomean_ms,\ntrust. Sort by any column, ascending/descending.\nRow → /results/r/{result_id}.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Flat sortable results table + column picker (reads results_schema.json)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-query-workbench",
+        "notes": "Button: \"Download CSV\". Exports the currently-filtered set\n(not the full table). Uses the DuckDB-WASM Blob path already\nscaffolded in db.ts - no new deps.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "CSV export via DuckDBDataProtocol.BROWSER_FILEREADER → Blob",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-query-workbench",
+        "notes": "Collapsed <details> under the table. Plain textarea (no\nCodeMirror - parity with `benchbox results --sql`, no new\ndeps). Runs via `queryRows<T>()` (db.ts line 78). Read-only\nguarantee comes from DuckDB's existing\n`ATTACH ... (READ_ONLY)` at db.ts:57.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Advanced mode: plain <textarea> SQL editor, read-only enforced by ATTACH READ_ONLY",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-query-workbench",
+        "notes": "src/pages/__tests__/Query.test.tsx. Smoke tests:\n  - facet GROUP BY probe produces expected counts for a fixture\n    results.duckdb\n  - filter → table row set matches a reference SQL\n  - sort toggle reverses order\n  - CSV export round-trip (parse exported CSV, assert row count\n    matches visible rows)\n  - SQL textarea runs and renders a result table; DDL/DML\n    statements error out (ATTACH READ_ONLY)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Vitest coverage: facet counts, sort order, CSV round-trip, SQL textarea",
+        "wid": "w7"
+      }
+    ]
+  }
+}

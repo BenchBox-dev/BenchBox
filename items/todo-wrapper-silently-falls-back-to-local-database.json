@@ -1,0 +1,228 @@
+{
+  "context": "Commit .todo-db/config.json binding the hosted database, and narrow the\n.gitignore rule so the config is tracked while the databases and replica stay\nignored. Make an unselected backend a hard error for every mutating subcommand\nrather than a warning, so a write can never land in the wrong database. Keep the\nlocal path available for tests via an explicit flag or env var.\n",
+  "description": "Running `_project/scripts/todo` with no TODO_DB_URL selects a local fallback at\n.todo-db/todo.sqlite. `doctor` warns, but every other subcommand proceeds. That\nlocal database sits at schema v3 while the CLI expects v5, so commands fail with\n'database schema_version=3, CLI expects 5; run `todo migrate`'.\n\nThe failure mode is the dangerous part: the message points at a migration, which\ninvites an operator to run `todo migrate` -- or worse `todo init` -- against a\ndatabase that is NOT the tracker. On 2026-07-29 and 2026-07-31 this presented as\n'the tracker is down' and two findings were written to out-of-tree drafts\ninstead of being filed. The hosted tracker was healthy the whole time (v5, 2045\nitems).\n\nContributing cause: .gitignore line 196 has a bare `.todo-db/` rule, which is\nexactly what the todo-db bootstrap guide warns against because it hides the\ncommitted .todo-db/config.json that would otherwise bind the hosted backend. No\nconfig.json exists in this repo, so every session must supply TODO_DB_URL by hand.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "commit a token or a DSN containing credentials into config.json",
+        "instead": "commit the URL only; mint tokens inline per session with an expiration",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "why": "the repo is public and _project/todo-db-export/ is committed"
+      },
+      {
+        "dont": "keep the bare `.todo-db/` gitignore rule and work around it with a symlink or an env var in a dotfile",
+        "instead": "narrow the ignore rule to the databases and replica, and track config.json",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "why": "it hides the committed config the tool is designed to discover, which is the root cause of the manual binding every session"
+      },
+      {
+        "dont": "leave the local fallback as a warning for mutating subcommands",
+        "instead": "hard-error unless a backend was selected explicitly",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "why": "a warning on stderr during a batch run is invisible and the write lands in the wrong database"
+      },
+      {
+        "dont": "run `todo migrate` or `todo init` against the hosted tracker to resolve a schema message",
+        "instead": "select the hosted backend explicitly and confirm with doctor first",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "why": "the schema mismatch is on the local fallback; a guess-based migration against the production tracker risks 2045 live items"
+      }
+    ],
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "created_at": "2026-08-05T15:02:08Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Backend selection precedence is unchanged: explicit flag, then TODO_DB_PATH, then TODO_DB_URL, then discovered config.",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database"
+      },
+      {
+        "behavior": "Credentials are never stored in the repo or echoed: config.json carries the database URL only, tokens stay in the environment and are minted per session.",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database"
+      },
+      {
+        "behavior": "Local file databases remain usable for tests via an explicit --db or TODO_DB_PATH.",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database"
+      },
+      {
+        "behavior": "The committed _project/todo-db-export/ contract is unchanged; tracker item text remains public, so no secrets in item prose.",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "records the verified hosted round-trip and the inline token-minting procedure; also records the open provisioning item this change closes",
+        "decision": "reuse",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "path": "_project/audits/todo-db-hosted-acceptance-2026-07-18.md"
+      },
+      {
+        "concept": "thin wrapper already pins TODO_SCHEMA_VERSION for the merge gate; backend binding belongs in the committed config, not in wrapper flags",
+        "decision": "extend",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "path": "_project/scripts/todo"
+      },
+      {
+        "concept": "documents the backend selection precedence (--db, then TODO_DB_PATH, then TODO_DB_URL, then default local) and the never-echo credential rule; the fix must keep that precedence",
+        "decision": "reuse",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "path": "_project/specs/todo-db-tracker.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "kind": "do_not_modify",
+        "path_glob": "_project/todo-db-export/"
+      },
+      {
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "kind": "only_modify",
+        "path_glob": ".gitignore"
+      },
+      {
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "kind": "only_modify",
+        "path_glob": ".todo-db/config.json"
+      },
+      {
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo"
+      },
+      {
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/todo-db-tracker.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f .todo-db/config.json && ! git check-ignore -q .todo-db/config.json",
+        "description": "The committed tracker config exists and is not git-ignored",
+        "expected": "exit 0; config.json is tracked while databases and replica stay ignored",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python -c \"import json;d=json.load(open('.todo-db/config.json'));s=json.dumps(d).lower();assert 'token' not in s and 'eyj' not in s\"",
+        "description": "The committed config contains no credential material",
+        "expected": "exit 0; URL only",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git check-ignore -q .todo-db/replica.db && git check-ignore -q .todo-db/todo.sqlite",
+        "description": "The local databases and replica remain git-ignored",
+        "expected": "exit 0",
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Narrow the gitignore rule so config.json is tracked and databases stay ignored",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Commit a credential-free config.json binding the hosted tracker",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Hard-error mutating subcommands when no backend was selected explicitly",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document the session binding and inline token minting in the tracker spec",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-wrapper-silently-falls-back-to-local-database",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "File the two out-of-tree finding drafts into the tracker and remove them",
+        "wid": "w4"
+      }
+    ]
+  }
+}

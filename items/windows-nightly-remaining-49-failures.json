@@ -1,0 +1,93 @@
+{
+  "context": "Do not fix 49 tests in one pass. Triage first: pull the failed-job log for the newest nightly, group by exception signature rather than by file, and confirm how many distinct root causes there are - the YAML-escaping cluster alone looks like one bug behind at least 8 files. Then file one item per root cause with its own scope, and fix in order of blast radius. The double-quoted-scalar failures are the obvious first candidate: a Windows path is being interpolated into YAML without quoting/escaping, which is a real serialization defect and not a test artifact.",
+  "description": "The 2026-07-29 Nightly Validation run 30434746317 fails 62 distinct tests on windows-latest/3.10. Three items were filed against it and cover only 13: nightly-windows-sorting-trailing-pipe-csv-failures (8, test_sorting.py), nightly-windows-worktree-claim-path-assertions (3), nightly-py310-dataframe-options-mock-target (1, which also fails on Windows) - plus 1 more in the sorting family. The remaining 49 span 20 files and no item covers them, so closing the three filed items will leave Windows red and looking 'addressed'. Known clusters: a YAML quoting fault where Windows temp paths are emitted into uat.yaml unescaped and reparsed - 6 occurrences of 'expected escape sequence of 8 hexadecimal numbers, but found s', i.e. a backslash path like C:\\Users\\... written inside a double-quoted scalar (tests/uat/test_cli_dispatch.py, test_orchestrator.py, test_phases.py, test_preflight_budget.py, test_runner.py, test_timeouts.py, test_docker_assets.py, test_no_cli_surface_drift.py); and a plan/parser cluster (test_clickhouse_introspection.py, test_clickhouse_plan_capture.py, test_misc_plan_capture.py, test_cross_engine_conformance.py, test_dsqgen_streams.py). Also affected: test_auto_merge_soundness_paths.py, test_cloud_storage_gate_deployment_aware.py, test_cloud_storage_snowflake_stage.py, test_pr_review_followups.py, test_pr_workflow_path_classifier.py, test_release_infrastructure.py, test_results_exporter.py. Note windows-latest/3.12 and ubuntu-latest/3.10 also fail, so this is not 3.10-specific. Related root cause already tracked separately: cli-package-shadows-main-submodule-with-function.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "created_at": "2026-07-29T12:13:14Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "macOS/Linux fast and medium lanes stay green",
+        "item_id": "windows-nightly-remaining-49-failures"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-nightly-remaining-49-failures",
+        "kind": "only_modify",
+        "path_glob": "_project/**"
+      },
+      {
+        "item_id": "windows-nightly-remaining-49-failures",
+        "kind": "only_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "windows-nightly-remaining-49-failures",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test \"$(gh run list --repo joeharris76/BenchBox --workflow 'Nightly Validation' --limit 1 --json databaseId --jq '.[0].databaseId' | xargs -I{} gh run view {} --repo joeharris76/BenchBox --log-failed --job $(gh run view {} --repo joeharris76/BenchBox --json jobs --jq '.jobs[]|select(.name==\"test (windows-latest, 3.10)\")|.databaseId') 2>/dev/null | grep -o 'FAILED tests/[^ ]*' | sort -u | wc -l)\" -lt 62",
+        "description": "Windows nightly failure count is below the 62 recorded on 2026-07-29",
+        "expected": "exit 0",
+        "item_id": "windows-nightly-remaining-49-failures",
+        "last_result": "pass",
+        "last_run": "2026-07-29T13:08:59Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-nightly-remaining-49-failures",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "windows-nightly-remaining-49-failures",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Run 30434746317 job 90519756802 fetched in full; 62 summary failures grouped into 12 remaining root causes after excluding 13 owned by PRs #1329/#1330/#1332; exact 49-test accounting recorded",
+        "item_id": "windows-nightly-remaining-49-failures",
+        "notes": null,
+        "started_at": "2026-07-29T13:00:37Z",
+        "started_branch": "fix/windows-nightly-yaml-path-escaping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Triage the newest Windows nightly by exception signature and count distinct root causes",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Created and linted 11 scoped follow-up items; current item owns the twelfth YAML-fixture serialization root cause; all 49 failures assigned exactly once",
+        "item_id": "windows-nightly-remaining-49-failures",
+        "notes": null,
+        "started_at": "2026-07-29T13:05:56Z",
+        "started_branch": "fix/windows-nightly-yaml-path-escaping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "File one item per root cause with its own scope",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Replaced four hand-built UAT YAML fixture writers with yaml.safe_dump; Windows PureWindowsPath round-trip regression added; 130 focused dispatch/config tests passed; fast selection 26002 below cap 26050",
+        "item_id": "windows-nightly-remaining-49-failures",
+        "notes": null,
+        "started_at": "2026-07-29T13:06:00Z",
+        "started_branch": "fix/windows-nightly-yaml-path-escaping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Fix the YAML double-quoted-scalar path-escaping cluster (largest, ~8 files)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

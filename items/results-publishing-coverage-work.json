@@ -1,0 +1,9 @@
+{
+  "description": "REVALIDATED 2026-08-17: this item is a bare stub with a placeholder title and no work units, approach, scope rules or verification. Its intent is now covered concretely by raise-public-corpus-scale-ceiling (scale rungs), add-third-benchmark-cohort-to-corpus (TPC-DS), and first-live-cloud-benchmark-run-and-publish (cloud platforms). Give it real content or drop it; it should not sit in the queue as an unactionable placeholder.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:00Z",
+      "worktree": "main"
+    }
+  }
+}

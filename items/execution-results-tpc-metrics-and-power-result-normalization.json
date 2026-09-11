@@ -1,0 +1,307 @@
+{
+  "context": "Treat the legacy TPC metrics module as a retirement candidate, not as already\nsafe to delete. First prove the import graph and unique behavior. Then either\ndelete it or fold the useful surface into the canonical results helpers. In\nparallel, extract the small repeated power-result dict construction logic in\nthe base execution adapter without changing the surrounding TPC driver flow.\n",
+  "description": "Independent verification of the execution/results architecture review found\ntwo adjacent duplication risks in the TPC metrics and power-test result path.\n\nFirst, `benchbox/core/tpc_metrics.py` is an 877-line legacy module with no\nproduction importers in the current tree. Production code imports\n`benchbox.core.results.metrics.TPCMetricsCalculator`, which is re-exported\nfrom `benchbox.core.results`. Only `tests/unit/core/test_tpc_metrics.py`\nimports the legacy module. The module is therefore a deletion candidate, but\nit contains richer validation/reporting classes that should be audited before\nremoval so useful behavior is not silently lost.\n\nSecond, `benchbox/platforms/base/execution.py` repeats TPC-H and TPC-DS\npower-test result-dict conversion in four blocks, plus four\n`power_test_error` sentinels. The duplication is smaller than the original\ncritic claimed, but it is still enough to make failure/result schema drift\nlikely when one TPC driver changes.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change exported result keys such as `summary.tpc_metrics` or query result `test_type` while cleaning up internals.",
+        "instead": "(not specified)",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "delete `benchbox/core/tpc_metrics.py` solely because static import grep is clean",
+        "instead": "(not specified)",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "why": "first audit whether its validation/reporting behavior is needed elsewhere."
+      },
+      {
+        "dont": "introduce a new generic TPC execution framework in this TODO",
+        "instead": "(not specified)",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "why": "the confirmed duplication is result conversion, not the entire driver lifecycle."
+      },
+      {
+        "dont": "replace explicit failure sentinels with empty query lists",
+        "instead": "(not specified)",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "why": "that can make failed power-test setup look like a successful run with zero queries."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "execution-results-tpc-metrics-and-power-result-normalization",
+        "id": 401,
+        "reason": "This TODO removes confirmed duplication in the power conversion path only; a broader driver rewrite needs separate perf and compliance risk review.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: The confirmed power-conversion duplication was already removed by this item. A full rewrite of ALL TPC-H/DS power+throughput drivers around a shared adapter is speculative on a compliance-critical path (the item flags it needs separate perf/compliance risk review); no remaining defect demonstrated.",
+        "summary": "Rewrite all TPC-H/TPC-DS power and throughput execution drivers around one shared result adapter"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "execution-results-tpc-metrics-and-power-result-normalization",
+        "id": 402,
+        "reason": "Only do this if w1 proves the legacy reporter has product value; otherwise it is dead internal surface.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Conditional on w1 proving legacy reporter has product value; otherwise explicitly 'dead internal surface' — no evidence condition met.",
+        "summary": "Promote rich metrics reporting to a user-facing CLI command"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      }
+    ],
+    "item_meta": {
+      "category": "Results",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not weaken TPC compliance or row-count validation behavior as part of cleanup.",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization"
+      },
+      {
+        "behavior": "No result JSON schema change from metrics-module retirement or conversion-helper extraction.",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization"
+      },
+      {
+        "behavior": "Power-test failure sentinels still make all-query factory failures visible as FAILED runs.",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization"
+      },
+      {
+        "behavior": "TPC-H and TPC-DS Power@Size calculations continue using the canonical `results.metrics.TPCMetricsCalculator` formulas.",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/results/builder.py: result-builder metric population - preserve as the production metric source.",
+        "decision": "reuse",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "path": "benchbox/core/results/builder.py"
+      },
+      {
+        "concept": "benchbox/core/results/metrics.py: canonical lightweight TPC metric formulas - extend this rather than keeping a second calculator.",
+        "decision": "extend",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "path": "benchbox/core/results/metrics.py"
+      },
+      {
+        "concept": "benchbox/platforms/base/execution.py: current TPC-H/TPC-DS power conversion blocks - consolidate locally first.",
+        "decision": "reuse",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "path": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "concept": "docs/reference/public-contracts.md: contract tier map - consult before deleting any import path that may be public.",
+        "decision": "reuse",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "path": "docs/reference/public-contracts.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/builder.py"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/metrics.py"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpc_metrics.py"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/backward-compatibility.md"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_metrics.py"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_tpc_metrics.py"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_base_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_metrics.py tests/unit/platforms/test_base_adapter.py -q",
+        "description": "Focused TPC metrics and base adapter tests pass.",
+        "expected": "All focused metrics and base-adapter tests pass.",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"^from benchbox\\.core\\.tpc_metrics import|^import benchbox\\.core\\.tpc_metrics|from benchbox\\.core import tpc_metrics|benchbox\\.core\\.tpc_metrics\" benchbox tests pyproject.toml --glob '!build/**' --glob '!docs/_build/**' --glob '!.venv/**'",
+        "description": "Legacy TPC metrics import graph has an explicit terminal state.",
+        "expected": "No matches if deletion path is chosen; otherwise only documented compatibility imports remain and the PR explains why deletion was rejected.",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite catches result-shape regressions.",
+        "expected": "Fast tests pass.",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph remains valid after implementation.",
+        "expected": "TODO validation and graph checks pass.",
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "notes": "Revalidated against checked SHA\n`7a4262f8f6457e97b334e6132c9e58b2640c785f`. `wc -l` reported\n`benchbox/core/tpc_metrics.py` at 877 lines and\n`benchbox/core/results/metrics.py` at 211 lines. The legacy import grep\nfound only `tests/unit/core/test_tpc_metrics.py`; no production importer\nexists in the current tree. The canonical results metrics grep found\nproduction and test use of `benchbox.core.results.metrics` /\n`TPCMetricsCalculator`. The power conversion grep found the duplicated\nTPC-H/TPC-DS normal result blocks and `power_test_error` sentinels in\n`benchbox/platforms/base/execution.py`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate TPC metrics import graph, unique legacy surface, and power-result conversion count",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "notes": "Audit decision table:\n  - Power@Size, Throughput@Size, and composite Qph formulas are covered\n    by `benchbox/core/results/metrics.py`; focused tests now pin the\n    legacy formula expectations on the canonical calculator.\n  - `PowerMetrics`, `ThroughputMetrics`, `CompositeMetrics`,\n    `MetricsValidator`, and `calculate_full_metrics()` are unimported\n    legacy object/reporting surfaces, not part of current schema-v2\n    result construction.\n  - `StatisticalAnalyzer` and `MetricsReporter` may be useful product\n    ideas, but they are uncalled internal reporting helpers and should be\n    promoted only through a separate CLI/reporting TODO.\nNo unique production-useful behavior required migration before deleting\nthe legacy module.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit legacy tpc_metrics.py for behavior not present in results.metrics",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "notes": "Deleted `benchbox/core/tpc_metrics.py` and\n`tests/unit/core/test_tpc_metrics.py`. No public/backward-compat docs\nwere changed because the revalidated import graph did not show an\nintentionally supported import path. Removed the stale mutation-tool\nexclusion for the deleted module from `pyproject.toml` as a narrow scope\nexception found during self-review.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retire or fold the legacy TPC metrics module through an explicit compatibility decision",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "notes": "Added `_power_query_result()` and `_power_test_error_result()` in\n`benchbox/platforms/base/execution.py` and replaced the duplicated\nTPC-H/TPC-DS power conversion blocks and sentinels. Throughput,\nmaintenance, and generic power conversion paths were left unchanged.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract power-test result conversion and sentinel construction helpers",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-tpc-metrics-and-power-result-normalization",
+        "notes": "Added canonical formula coverage in\n`tests/unit/core/results/test_metrics.py` and conversion-helper coverage\nin `tests/unit/platforms/test_base_adapter.py`. The final import grep is\nexpected to terminate with no matches for `benchbox.core.tpc_metrics`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add focused regression tests for canonical TPC metrics and power-result conversion",
+        "wid": "w4"
+      }
+    ]
+  }
+}

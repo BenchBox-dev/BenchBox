@@ -1,0 +1,173 @@
+{
+  "context": "Redshift Delta: Register Delta table in AWS Glue catalog, then create Redshift\nSpectrum external table referencing the Glue table.  Requires IAM role with Glue\nand S3 permissions.\n\nBigQuery Delta: Create BigLake external table with Delta format.  Requires BigLake\nconnection resource and GCS bucket access.\n\nBoth implementations are cloud-specific and require careful credential/permission\nhandling.\n",
+  "description": "Redshift and BigQuery both support Delta Lake on the platform but their BenchBox\nadapters only load parquet/CSV.  These platforms were removed from DELTA_CAPABILITY\nin format_capabilities.py (commit 9be7d5b70) to prevent the fail-fast check from\npassing when loading would fail.\n\nPlatform mechanisms:\n- Redshift: Delta via Redshift Spectrum + AWS Lake Formation.  Requires Glue catalog\n  integration to register Delta tables as external tables.\n- BigQuery: Delta via BigLake external tables (GA since mid-2024).  Requires BigLake\n  connection + external table definition pointing to GCS Delta directory.\n\nCompleted closure:\n- BenchBox now uses mode-aware format selection so native/default flows remain\n  conservative.\n- BigQuery Delta is only advertised when the run includes the required BigLake\n  connection configuration.\n- Redshift Delta is only advertised when the run includes the required Spectrum/IAM\n  configuration.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hardcode cloud credentials or ARNs",
+        "instead": "use adapter config/credentials pattern",
+        "item_id": "cloud-sql-open-table-format-loading",
+        "why": "these vary per deployment"
+      },
+      {
+        "dont": "register platforms in format_capabilities.py before loading code is tested",
+        "instead": "implement and test first",
+        "item_id": "cloud-sql-open-table-format-loading",
+        "why": "the fail-fast check will pass but load will fail at runtime"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "cloud-sql-open-table-format-loading",
+        "id": 566,
+        "reason": "Requires cloud credentials and running instances",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Blocked on cloud credentials/live Redshift+BigQuery instances not currently available; no open item tracks this specific integration test.",
+        "summary": "Integration tests with real Redshift/BigQuery instances"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "cloud-sql-open-table-format-loading",
+        "id": 567,
+        "reason": "Lower priority than Delta; both platforms have evolving Iceberg support",
+        "resolution": "promoted",
+        "resolved_item": "iceberg-support-for-redshift-via-spectrum-and-bigquery-via-b",
+        "resolved_reason": null,
+        "summary": "Iceberg support for Redshift (via Spectrum) and BigQuery (via BigLake)"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "BigQuery parquet GCS load job path must remain unchanged",
+        "item_id": "cloud-sql-open-table-format-loading"
+      },
+      {
+        "behavior": "Redshift parquet/CSV COPY loading path must remain unchanged",
+        "item_id": "cloud-sql-open-table-format-loading"
+      },
+      {
+        "behavior": "format_capabilities.py fail-fast check: only re-register after loading code works",
+        "item_id": "cloud-sql-open-table-format-loading"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cloud-sql-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/format_capabilities.py"
+      },
+      {
+        "item_id": "cloud-sql-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "cloud-sql-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/redshift.py"
+      },
+      {
+        "item_id": "cloud-sql-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v -k 'redshift or bigquery' --no-header -q",
+        "description": "Redshift and BigQuery adapter tests pass",
+        "expected": "All tests pass",
+        "item_id": "cloud-sql-open-table-format-loading",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base/test_format_capabilities.py -v --no-header -q",
+        "description": "Format capabilities tests pass with re-registered platforms",
+        "expected": "All tests pass",
+        "item_id": "cloud-sql-open-table-format-loading",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cloud-sql-open-table-format-loading",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "cloud-sql-open-table-format-loading",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "cloud-sql-open-table-format-loading",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "cloud-sql-open-table-format-loading",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cloud-sql-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Keep Redshift external Delta registration path and tests green",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-sql-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Keep BigQuery BigLake Delta registration path and tests green",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-sql-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add mode-aware format selection before re-registering Redshift and BigQuery",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-sql-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Expand tests to cover final closure criteria for format selection",
+        "wid": "w4"
+      }
+    ]
+  }
+}

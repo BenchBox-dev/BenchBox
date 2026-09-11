@@ -1,0 +1,121 @@
+{
+  "context": "Single-line change in benchbox/core/platform_registry.py:\n  line 212: \"driver_package\": None  →  \"driver_package\": \"polars\"\n\nThe PyPI package name is \"polars\" (confirmed: importlib.metadata.version(\"polars\") works).\nNo other files need changes - the announcement line in commands/run.py already handles\ndriver_version_actual from database_config.\n\nFor the unit test, follow the pattern in tests/unit/cli/test_run_driver_version_announcement.py.\nSpecifically, add a test where the mock DatabaseConfig has driver_version_actual=\"1.36.1\"\nand platform=\"polars\", and assert that the console output contains \"[driver 1.36.1]\".\n",
+  "description": "The Polars platform entry in platform_registry.py has driver_package=None (line 212),\nwhich causes ensure_driver_version() to skip version detection entirely. As a result,\nthe \"Running ...\" announcement line for polars runs never shows a driver version:\n\n  Running tpch on polars at scale 0.1          ← no [driver X.Y.Z] clause\n\nThe fix is a one-line change: set driver_package=\"polars\" in the platform registry.\nAfter that change, ensure_driver_version() will detect the installed polars version\nvia importlib.metadata and populate database_config.driver_version_actual, which\nthe announcement line already uses.\n\nContext: clickhouse-connect (line 306) and psycopg2-binary (line 485) already have\ndriver_package set correctly and already display their versions. This item closes\nthe remaining gap for the polars platform.\n\nNote: polars runs in DataFrame mode (supports_sql=False, default_mode=dataframe).\nThe driver_package field is used purely for version detection - it is independent\nof the execution mode.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify the DataFrame execution path",
+        "instead": "(not specified)",
+        "item_id": "surface-polars-driver-version-in-cli-output",
+        "why": "driver_package is only used by ensure_driver_version() for version detection, not execution routing"
+      },
+      {
+        "dont": "set driver_package for sqlite (line 200)",
+        "instead": "it should remain None",
+        "item_id": "surface-polars-driver-version-in-cli-output",
+        "why": "sqlite3 is a stdlib module with no PyPI package"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-23T00:00:00Z",
+      "created_at": "2026-02-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing fast unit tests pass after the change",
+        "item_id": "surface-polars-driver-version-in-cli-output"
+      },
+      {
+        "behavior": "SQLite platform keeps driver_package=None (line 200) - sqlite3 is stdlib, has no importlib.metadata entry",
+        "item_id": "surface-polars-driver-version-in-cli-output"
+      },
+      {
+        "behavior": "polars DataFrame execution path continues to work correctly (driver_package is only for version detection)",
+        "item_id": "surface-polars-driver-version-in-cli-output"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "surface-polars-driver-version-in-cli-output",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "surface-polars-driver-version-in-cli-output",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_run_driver_version_announcement.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run benchbox run --platform polars --benchmark tpch --scale 0.01 --phases power --non-interactive 2>&1 | grep 'Running tpch'",
+        "description": "Polars run announcement includes driver version",
+        "expected": "Running tpch on polars at scale 0.01 [driver X.Y.Z] (actual version number)",
+        "item_id": "surface-polars-driver-version-in-cli-output",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast unit tests still pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "surface-polars-driver-version-in-cli-output",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "surface-polars-driver-version-in-cli-output",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "surface-polars-driver-version-in-cli-output",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "surface-polars-driver-version-in-cli-output",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set driver_package=\"polars\" in platform_registry.py at the 'polars' platform entry (line 212); confirm it matches the importlib.metadata package name (it does: the PyPI package name is 'polars')",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "surface-polars-driver-version-in-cli-output",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run a quick polars benchmark smoke test and confirm the version appears in the announcement line: grep 'Running.*polars' from output",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "surface-polars-driver-version-in-cli-output",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a unit test to tests/unit/cli/ verifying that the driver version clause appears for polars runs (follow the pattern in test_run_driver_version_announcement.py)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

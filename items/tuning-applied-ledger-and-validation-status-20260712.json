@@ -1,0 +1,258 @@
+{
+  "context": "Thread a ledger object through the existing apply_* hook sequence rather than\nre-architecting adapters; session SETs hook at the connection.execute wrapper\nwhere one exists.\n",
+  "description": "From the 2026-07-12 tuning review, findings C1, C5 (capture side), R6\n(evidence pinned to commit acfb8992). GATED on ADR-1\n(tuning-adr-trust-and-hash-semantics-20260712).\n\nToday the bundle records intent as fact: tunings_applied is the requested\nconfig's to_dict() and validation_status \"APPLIED\" certifies only that a\nmetadata-table INSERT succeeded (platforms/base/adapter.py:743-747). The base\napply_unified_tuning is a silent no-op (platforms/base/tuning_config.py:45-66).\nSession-level SETs applied by configure_for_benchmark (ClickHouse OLAP pack,\nStarRocks query settings) are captured nowhere. Rerun drift-detection is blind\nto platform optimizations and unique/check constraints\n(core/tuning/metadata.py:247-256) and never feeds published bundles;\nFAILED_TO_SAVE surfaces for benign read-only/in-memory conditions.\n\nBuild, per ADR-1's decided semantics:\n- an applied-statement ledger: every tuning-relevant statement the adapter\n  actually executes (DDL clauses, post-load statements, session SETs) appended\n  during execution and exported alongside the requested config;\n- the applied-ledger hash (per ADR-1);\n- honest validation_status semantics (e.g. applied_verified /\n  applied_unverified / noop / failed) replacing the metadata-write proxy, with\n  FAILED_TO_SAVE downgraded to a non-alarming metadata-persistence note;\n- drift-validation results routed into the bundle where ADR-1 says they belong.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "No post-hoc reconstruction of the ledger from config",
+        "instead": "(not specified)",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "why": "it must be produced by the execution path"
+      },
+      {
+        "dont": "repurpose the old APPLIED string with new semantics silently; new status vocabulary, documented mapping",
+        "instead": "(not specified)",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "tuning-applied-ledger-and-validation-status-20260712",
+        "id": 35,
+        "reason": "Review finding N10; ledger shape must settle on SQL platforms first, then extend to the DF runner in a follow-up",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: DataFrame runtime-tuning ledger parity is exactly tracked by open item tuning-df-ledger-parity-20260716.",
+        "summary": "DataFrame runtime-tuning ledger parity (threads/memory/write-layout as applied observations, not just config blobs)"
+      },
+      {
+        "created_at": "2026-07-22T12:10:08Z",
+        "from_item": "tuning-applied-ledger-and-validation-status-20260712",
+        "id": 634,
+        "reason": "Out of w2 named-adapter scope (duckdb/clickhouse/starrocks/databricks/cloud_spark). Native spark.py/lakesail.py apply AQE/CBO via connection.conf.set(); snowpark_connect.py via self._session.sql() - both bypass the wrapped execute()/cursor().execute(), so the ledger stays empty and derives 'noop'. Under-reports only (never a false 'applied'); degrades safe. Flagged by adversarial review.",
+        "resolution": "promoted",
+        "resolved_item": "tuning-native-spark-snowpark-ledger-capture-20260722",
+        "resolved_reason": null,
+        "summary": "Capture native Spark (connection.conf.set) and Snowpark (session.sql) session-tuning into the applied ledger"
+      },
+      {
+        "created_at": "2026-07-22T12:10:10Z",
+        "from_item": "tuning-applied-ledger-and-validation-status-20260712",
+        "id": 635,
+        "reason": "w3 sub-item premised on 'where ADR-1 says they belong', but ADR-001 is silent on a drift-result bundle location (no design target). Orthogonal to the applied-ledger (rerun/reused-DB concern via platforms/base/validation.py:_validate_database_tunings), needs a schema-placement decision. Deferred to keep the soundness-critical ledger PR focused rather than half-bake an underspecified routing.",
+        "resolution": "promoted",
+        "resolved_item": "tuning-drift-validation-bundle-routing-20260722",
+        "resolved_reason": null,
+        "summary": "Route rerun drift-validation results (MetadataValidationResult) into the published bundle"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "needs_item": "tuning-adr-trust-and-hash-semantics-20260712"
+      },
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "needs_item": "tuning-bundle-provenance-and-config-export-20260712"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-22T12:18:05Z",
+      "completed_pr": 1261,
+      "created_at": "2026-07-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Benchmark execution must never fail because ledger capture fails (capture degrades, run continues, degradation recorded)",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712"
+      },
+      {
+        "behavior": "Requested-config export from tuning-bundle-provenance-and-config-export-20260712 (ledger is additive)",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/results/schema.py .plans.json companion: existing per-run observation companion pattern — reuse for ledger export",
+        "decision": "reuse",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "path": "benchbox/core/results/schema.py"
+      },
+      {
+        "concept": "benchbox/core/tuning/metadata.py TuningMetadataManager: existing in-DB record of applied tunings — supersede as the bundle-facing record (keep for rerun drift detection)",
+        "decision": "supersede",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "path": "benchbox/core/tuning/metadata.py"
+      },
+      {
+        "concept": "benchbox/platforms/clickhouse/tuning.py validate_session_cache_control: existing session-settings readback pattern — extend for capture",
+        "decision": "extend",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "path": "benchbox/platforms/clickhouse/tuning.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/**"
+      },
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/**"
+      },
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --non-interactive --output /tmp/ledger-check",
+        "description": "End-to-end tuned duckdb run: bundle contains requested config, applied ledger with the actual CREATE INDEX statements, matching status",
+        "expected": "Ledger lists executed statements; status reflects observation not intent",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning tests/unit/core/results tests/unit/platforms -q",
+        "description": "Unit suites green",
+        "expected": "All passing",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "last_result": "pass",
+        "last_run": "2026-07-22T12:14:39Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated pinned evidence (commit acfb8992) at HEAD 05c34d904 via structural map: APPLIED now adapter.py:800 (was 743-747); base no-op tuning_config.py:46-67; configure_for_benchmark call adapter.py:822; metadata constraints metadata.py:240-260; apply_unified_tuning runs in CODEOWNERS-locked result_capture.py:1753 (mutates self -> ledger accumulates off-file). Refs to note in PR.",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "notes": null,
+        "started_at": "2026-07-22T11:13:59Z",
+        "started_branch": "feat/tuning-applied-ledger",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Re-validate pinned evidence at current HEAD after upstream TODOs merge (call sites move); note refs in PR",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Built benchbox/core/tuning/applied_ledger.py: AppliedTuningLedger (record/record_dropped/overall_status/applied_ledger_hash/to_payload), all-lowercase vocab (not_applicable/noop/applied_unverified/applied_verified[reserved for introspection-receipts]/failed/not_validated), LEGACY_STATUS_MAP, transparent RecordingConnection+cursor for execution-path capture. Smoke-tested: applied_unverified/failed/noop/not_applicable derivations, 64-hex hash, transparent delegation. Aligns ADR-001 hash canonical form (sort_keys+compact, ordered list).",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "notes": null,
+        "started_at": "2026-07-22T11:14:52Z",
+        "started_branch": "feat/tuning-applied-ledger",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Design the ledger data model + capture hooks (adapter records statements at execution time; base no-op records 'noop'); align with ADR-1 record",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Instrumented apply/session paths: duckdb.apply_unified_tuning + base apply_standard_unified_tuning wrap the connection (RecordingConnection PHASE_DDL) capturing CREATE INDEX / OPTIMIZE / constraint hooks; session SETs captured by wrapping the configure_for_benchmark connection at adapter.py (clickhouse _apply_setting_with_validation + starrocks cursor.execute both drive the passed connection); databricks _applied_layout_operations folded PHASE_POST_LOAD before session SETs (chronology); cloud_spark _spark_config recorded PHASE_SESSION. Readback SELECTs filtered out (review F3). Native spark/snowpark deferred.",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "notes": null,
+        "started_at": "2026-07-22T12:10:12Z",
+        "started_branch": "feat/tuning-applied-ledger",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Instrument the SQL adapters with real tuning paths (duckdb, clickhouse, starrocks, databricks, cloud_spark) plus session SETs from configure_for_benchmark in every mode including baseline",
+        "wid": "w2"
+      },
+      {
+        "evidence": "applied_tuning_ledger + applied_ledger_hash on BenchmarkResults/builder/result_factory; build_applied_ledger_payload -> .applied.json companion (anonymized via _anonymize_applied_payload dropping statement/error/table for public exports, review F2); loader reconstruct + integrity_validator exclusion; applied_ledger_hash in build_tuning_payload + _build_tuning_summary next to requested_config_hash. New honest validation_status (not_applicable/noop/applied_unverified/applied_verified[reserved]/failed) replaces APPLIED/FAILED_TO_SAVE; FAILED_TO_SAVE downgraded to tuning_metadata_saved note. Drift-validation-routing sub-item deferred (ADR-1 silent on target).",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "notes": null,
+        "started_at": "2026-07-22T12:10:17Z",
+        "started_branch": "feat/tuning-applied-ledger",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Export ledger + applied hash into bundle/companion; implement new validation_status semantics; route drift-validation results per ADR-1",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Dropped/unmapped intents surfaced: duckdb apply_table_tunings records record_dropped for partitioning (load-time) + distribution (single-node N/A); adapter.py logs self.logger.warning per dropped intent at run time; dropped[] exported in the .applied.json payload.",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "notes": "The ledger knows what was requested but not rendered (capability filtering, unregistered generator, log-only path); warn the author at run time and export the dropped list with reasons.",
+        "started_at": "2026-07-22T12:10:22Z",
+        "started_branch": "feat/tuning-applied-ledger",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Surface dropped/unmapped tuning intents as run-time warnings (review finding R4)",
+        "wid": "w4"
+      },
+      {
+        "evidence": "tests/unit/core/tuning/test_applied_ledger.py: status derivations, hash determinism/order-sensitivity, dropped intents, recording-connection harness asserting ledger==executed, readback-not-recorded (F3), noop-not-applied, benign-metadata-failure-not-alarming. test_applied_ledger_export.py: factory->result->loader companion round-trip + anonymized redaction (F2). test_builder.py ledger-field survival. Rewrote test_validation_status_vocabulary/test_requested_vs_applied_capture; updated provenance+parity. Fast-lane cap 25350->25410.",
+        "item_id": "tuning-applied-ledger-and-validation-status-20260712",
+        "notes": "Also: a deliberately no-op platform yields status noop, never applied; benign persistence failure does not surface as an alarming status.",
+        "started_at": "2026-07-22T12:10:26Z",
+        "started_branch": "feat/tuning-applied-ledger",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Tests: recording-connection harness asserts ledger matches executed statements",
+        "wid": "w5"
+      }
+    ]
+  }
+}

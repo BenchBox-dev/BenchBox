@@ -1,0 +1,246 @@
+{
+  "context": "Implement structure/reference checks, provenance/freshness validation, source-cursor comparison, summary-to-rollout traceability, index-to-topic consistency, sensitivity scanning, duplicate detection, project/root normalization, stale-path detection, and token budgets. Add the twelve adversarial scenarios from the audit with expected retrieval, rejected memories, required live verification, answer properties, failure conditions, and a 0-2 rubric across recall, rejection, provenance, freshness, completion, isolation, privacy, and correctness. Add mutation tests for every guard.",
+  "description": "Build a deterministic, versioned evaluation harness in the repository selected by the phase-0 decision. Baseline from the 2026-07-27 audit: Codex 43 files / 6,444 lines / 534,897 bytes (~133,724 approximate tokens), globally injected summary 103 lines / 9,437 bytes (~2,359 tokens), 37 valid rollout and source-session references, four summaries with materially later source activity, at least 87 duplicated long lines / 100 extra occurrences, 75 pool-path lines and 13 temporary-path lines; Claude 39 files / 1,563 lines / 92,960 bytes (~23,240 tokens), BenchBox startup index ~2,001 tokens, one orphan topic, and five project-memory roots among eleven encoded project-state directories. Neither system had freshness/expiry fields. A targeted Markdown scan found zero high-confidence token/JWT/key/private-key strings but three files with private operational markers. Behavioral precision, recall, latency, and tool-call baselines were intentionally not run against live homes. The harness must operate on checksummed fixture copies and include baseline, treatment, and minimal/disabled-memory arms.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "log matched sensitive values",
+        "instead": "record rule IDs, file counts, and redacted locations only",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "why": "a privacy evaluator must not become a new disclosure surface"
+      },
+      {
+        "dont": "run baseline behavioral sessions against the live Codex or Claude homes",
+        "instead": "use isolated CODEX_HOME and Claude autoMemoryDirectory fixtures with generation disabled",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "why": "the evaluation would mutate the system being measured"
+      },
+      {
+        "dont": "treat exact duplicate-line counts as semantic duplicate detection",
+        "instead": "report exact and semantic similarity metrics separately",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "why": "paraphrased duplication and qualification loss are the higher-risk cases"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "needs_item": "memory-governance-authority-retention-decisions"
+      }
+    ],
+    "item_meta": {
+      "category": "quality",
+      "completed_at": "2026-07-27T18:11:04Z",
+      "created_at": "2026-07-27T17:33:08Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Baseline and treatment remain independently reproducible and checksummed",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus"
+      },
+      {
+        "behavior": "Evaluation does not contribute its own sessions to future memory",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus"
+      },
+      {
+        "behavior": "Fixture generation never copies or reports secret values or sensitive transcript text",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Git-repository-scoped auto-memory directories",
+        "decision": "reuse",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "path": "/Users/joe/.claude/projects"
+      },
+      {
+        "concept": "source-linked evidence summaries",
+        "decision": "reuse",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "path": "/Users/joe/.codex/memories/rollout_summaries"
+      },
+      {
+        "concept": "one-off audit inventory output",
+        "decision": "supersede",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "path": "/tmp/codex-memory-inventory.txt"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "kind": "only_modify",
+        "path_glob": "fixtures/**"
+      },
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/**"
+      },
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && uv run --project \"$MEMORY_TOOLING_ROOT\" -- python -m pytest -q",
+        "description": "Deterministic memory audit suite passes",
+        "expected": "all structural and mutation tests pass",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "last_result": "pass",
+        "last_run": "2026-07-27T18:08:22Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && test \"$(find \"$MEMORY_TOOLING_ROOT/scenarios\" -name '*.yaml' | wc -l | tr -d ' ')\" -ge 12",
+        "description": "Scenario corpus is complete",
+        "expected": "at least 12 versioned scenarios",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "last_result": "pass",
+        "last_run": "2026-07-27T18:08:23Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && uv run --project \"$MEMORY_TOOLING_ROOT\" -- python -m memory_tooling.audit --check-fixture-only",
+        "description": "Live memory paths remain untouched",
+        "expected": "exit 0",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "last_result": "pass",
+        "last_run": "2026-07-27T18:08:25Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "fixtures/baseline/manifest.json: content-free checksums for 43 Codex memory files, 37 source sessions, and 39 Claude memory files; transcript/cache regression test included",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "notes": null,
+        "started_at": "2026-07-27T18:04:47Z",
+        "started_branch": "chore/memory-evaluation-harness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Re-capture checksummed structural baselines from live stores into read-only fixtures and record counts without sensitive content",
+        "wid": "w0"
+      },
+      {
+        "evidence": "memory_tooling/checks.py and audit.py implement reference, cursor, provenance, freshness, identity, privacy, exact/semantic duplicate, orphan, stale-path, and budget checks",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "notes": null,
+        "started_at": "2026-07-27T18:04:52Z",
+        "started_branch": "chore/memory-evaluation-harness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Implement deterministic reference, cursor, provenance, freshness, project identity, privacy, duplicate, orphan, stale-path, and token-budget checks",
+        "wid": "w1"
+      },
+      {
+        "evidence": "12 versioned JSON-subset YAML scenarios in scenarios/ cover all required authority, drift, isolation, completion, conflict, retrieval, privacy, worktree, and injection cases",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "notes": null,
+        "started_at": "2026-07-27T18:04:56Z",
+        "started_branch": "chore/memory-evaluation-harness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Create the versioned 12-scenario corpus covering durable/task-local context, drift, project isolation, completion, conflicts, privacy, retrieval, worktrees, and historical commands",
+        "wid": "w2"
+      },
+      {
+        "evidence": "memory_tooling/scoring.py deterministically scores recall, rejection, live verification, response properties, safety, latency, tool calls, and context tokens",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "notes": null,
+        "started_at": "2026-07-27T18:05:01Z",
+        "started_branch": "chore/memory-evaluation-harness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Implement deterministic scorers for retrieval manifests, live-verification requirements, response properties, latency, tool calls, and context tokens",
+        "wid": "w3"
+      },
+      {
+        "evidence": "20 pytest tests include mutations for later events, prefix drift, provenance, project roots, false completion, missing refs, orphans, sensitive strings, imperatives, stale paths, index drift, and budget overflow",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "notes": null,
+        "started_at": "2026-07-27T18:05:05Z",
+        "started_branch": "chore/memory-evaluation-harness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Add mutation tests for later source events, stale versions, missing refs, orphans, wrong roots, index drift, sensitive strings, imperatives, false completion, and budget overflow",
+        "wid": "w4"
+      },
+      {
+        "evidence": "docs/baseline-2026-07-27.md publishes immutable structural metrics and docs/evaluation.md requires isolated homes with generation disabled",
+        "item_id": "memory-evaluation-harness-and-scenario-corpus",
+        "notes": null,
+        "started_at": "2026-07-27T18:05:09Z",
+        "started_branch": "chore/memory-evaluation-harness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Publish the immutable baseline report and document why behavioral sessions must use isolated homes with memory generation disabled",
+        "wid": "w5"
+      }
+    ]
+  }
+}

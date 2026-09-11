@@ -1,0 +1,164 @@
+{
+  "description": "Maintainer-only actions. REVALIDATED 2026-08-20: w1-w3 (branch rename / default_branch) are done.\n\nRemaining customer-value human actions, tracked on their own items (do not duplicate as extra gates):\n- Databricks Free Edition, Snowflake trial (\\$400), BigQuery trial (\\$300): first-live-cloud-benchmark-run-and-publish w1-w4\n- Approve the PyPI environment / publish step during cut-v0-4-0-release w3 (pypi environment already has joeharris76 as required reviewer)\n\nw4 (secondary GitHub account) is NOT a customer-value blocker. That path is deferred on external-contributor-submission-dry-run. w5 remains optional cleanup.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate each task's full design here",
+        "instead": "(not specified)",
+        "item_id": "human-action-required",
+        "why": "cross-reference the source TODO and give only the exact command + why, so this stays a scannable queue."
+      },
+      {
+        "dont": "have an agent attempt the GitHub-admin actions (default-branch change, branch rename, ruleset recreate)",
+        "instead": "(not specified)",
+        "item_id": "human-action-required",
+        "why": "the sandbox cannot, and they are hard-to-reverse maintainer decisions with ordering constraints."
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "created_at": "2026-07-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "This item never performs the actions — it only records them. Agents update status/notes; the human executes the GitHub-admin/review/recruit steps.",
+        "item_id": "human-action-required"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/analysis/known-stranded-commits.txt — the allowlist referenced by w5; the branches are safe to delete because their content is on develop.",
+        "decision": "reuse",
+        "item_id": "human-action-required",
+        "path": "_project/analysis/known-stranded-commits.txt"
+      },
+      {
+        "concept": "branch-default-switch-to-develop.yaml — authoritative source for w3 (its w1 admin + w2 verify).",
+        "decision": "reuse",
+        "item_id": "human-action-required",
+        "path": "branch-default-switch-to-develop.yaml"
+      },
+      {
+        "concept": "external-contributor-submission-dry-run.yaml — authoritative source for w4 (its w1 recruit + w6 §2.8 verification).",
+        "decision": "reuse",
+        "item_id": "human-action-required",
+        "path": "external-contributor-submission-dry-run.yaml"
+      },
+      {
+        "concept": "rename-release-branch-main-to-release.yaml — authoritative source for w1/w2; this item only indexes its human halves (Code-Owner review + w5/w6 admin).",
+        "decision": "reuse",
+        "item_id": "human-action-required",
+        "path": "rename-release-branch-main-to-release.yaml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "human-action-required",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "human-action-required",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/human-action-required.yaml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh pr view 1027 --repo joeharris76/BenchBox --json state,mergedAt --jq '.state + \" \" + (.mergedAt // \"unmerged\")'",
+        "description": "w1: PR #1027 is merged",
+        "expected": "MERGED <timestamp> (once you review + merge it)",
+        "item_id": "human-action-required",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/joeharris76/BenchBox/branches/release --jq .name 2>/dev/null || echo 'not renamed yet'",
+        "description": "w2: the release branch is renamed",
+        "expected": "release (once w2 is done)",
+        "item_id": "human-action-required",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/joeharris76/BenchBox --jq .default_branch",
+        "description": "w3: default branch is develop",
+        "expected": "develop (w3 is done)",
+        "item_id": "human-action-required",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "human-action-required",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Outcome achieved by another route; the recorded route is dead. PR #1027 is CLOSED, unmerged (gh pr view 1027 -> CLOSED unmerged). The in-repo rename nonetheless landed on develop: .github/workflows/validate-release-pr.yml targets branch 'release' (:6, :21-31), and no refs/heads/main references remain in .github/workflows. Verified 2026-07-29.",
+        "item_id": "human-action-required",
+        "notes": "Source: rename-release-branch-main-to-release (w1-w4, in-repo half).\nPR #1027 renames the release branch main->release across workflows/Makefile/\ndocs and adds docs/operations/branch-rename-runbook.md. It touches\nrelease.yml, so it is CODEOWNERS-gated (@joeharris76) and auto-merge is\nintentionally OFF — it needs your review. An Opus 4.8 review already\nverified the PyPI publish gate (tag-shaped-ref condition) is untouched and\nall six test.yml base_ref conditionals renamed consistently; re-confirm the\ntwo flagged maintainer notes in the PR body (pyproject blob/main URL;\nseed-corpus.yml --base main) are acceptable, then squash-merge.\nDo NOT merge until you are ready to run w2 right after (ordering matters).\n",
+        "started_at": "2026-07-29T11:50:09Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Code-Owner review + merge PR #1027 (in-repo main->release rename)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Admin rename + ruleset recreate are live. gh api repos/joeharris76/BenchBox/branches/release -> 'release' exists; ruleset 'release-only' (id 19149459) has conditions.ref_name.include=[refs/heads/release]; default_branch=develop. Verified 2026-07-29.",
+        "item_id": "human-action-required",
+        "notes": "Source: rename-release-branch-main-to-release (w5/w6, ADMIN half).\nw3 below (branch-default-switch-to-develop) is DONE, so this is now only\nblocked on w1. Run RIGHT AFTER w1 merges, per\ndocs/operations/branch-rename-runbook.md:\n  gh api -X POST repos/joeharris76/BenchBox/branches/main/rename -f new_name=release\nThen recreate the `main-release-only` ruleset as `release-only` targeting\nrefs/heads/release (same required checks/protections), and update the\nruleset-id reference in docs/operations/repo-admin-settings.md.\nNo real coverage gap exists because the release branch only receives pushes\nvia release-cut/release-finalize (both maintainer-controlled); if\n`make release-cut` is run before the rename it fails fast (base does not\nexist) rather than mis-cutting.\n",
+        "started_at": "2026-07-29T11:50:11Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "GitHub admin: rename branch main->release + recreate the ruleset (rename w5/w6)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "human-action-required",
+        "notes": "Source: branch-default-switch-to-develop (w1 ADMIN + w2 verify), archived\nto _project/DONE/main/branch-default-switch-to-develop.yaml.\nDONE 2026-07-08: maintainer ran\n  gh api -X PATCH repos/joeharris76/BenchBox -f default_branch=develop\ndefault_branch is now \"develop\" (was \"main\"; verified via\n`git ls-remote --symref origin HEAD` -> refs/heads/develop). This also\nactivated the §2.8 fork-PR comment companion and release-canary.yml's\ndaily cron, both previously inert on the non-default develop branch (see\nthe source TODO's w2 for the registration/liveness verification detail).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "GitHub admin: set default_branch=develop + verify scheduled workflows fire",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "human-action-required",
+        "notes": "Source: external-contributor-submission-dry-run (w1). A genuinely human\ntask — recruit one trusted external user (not a maintainer, not an agent)\nto attempt a real submission cold from docs/contributing-results.md. Its w6\n(verify the §2.8 fork-PR validation-comment path) is only meaningful AFTER\nw3 above lands (the companion is inert until develop is the default). Recruit\ncan begin anytime; run the §2.8 verification during the dry-run once w3 done.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "NOT a customer-value blocker; secondary GitHub account deferred with external-contributor-submission-dry-run. Real remaining human work is cloud signups and PyPI approval on their own items",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "human-action-required",
+        "notes": "The agent could not delete remote branches (the sandbox git remote rejects\ndeletion; no delete-branch MCP tool). Harmless to leave — they are\nallowlisted in _project/analysis/known-stranded-commits.txt so the\norphaned-commit detector ignores them — but if you want a tidy branch list:\n  git push origin --delete \\\n    remediate-submission-trust-label-enforcement \\\n    remediate-qa-and-browser-test-doc-accuracy \\\n    remediate-governance-and-doc-drift \\\n    fix/joinorder-trino-primary-key-ddl \\\n    fix/multistream-throughput-plan-attachment\nTheir SHAs are preserved in the allowlist if ever needed back.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "OPTIONAL cleanup: delete the 5 dead orphan branches",
+        "wid": "w5"
+      }
+    ]
+  }
+}

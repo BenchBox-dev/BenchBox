@@ -1,0 +1,109 @@
+{
+  "context": "Add 'pguser' -> user and 'tenantid' -> tenant (or account) mappings to identifier_keys in anonymization_specs.yaml; consider the other provider-prefixed username spellings visible in adapters (e.g. 'dbuser') while there, but keep the additions enumerated, not pattern-based.",
+  "description": "Found 2026-07-31 by sentinel sweep of anonymize_result_payload. The public export pseudonymizes usernames ('user'/'username'/'userid' -> user_<hash> via anonymization_specs.yaml identifier_keys) so published results never carry real usernames - but 'pg_user' compacts to 'pguser', which matches NOTHING in identifier_keys, so a real connection username is published verbatim. Same for 'tenant_id' ('tenantid' - an Azure AD tenant identifier). Driven proof: anonymize_result_payload({'platform_metadata':{'platform_raw_config':{'pg_user':'PGUSER-SENTINEL','tenant_id':'TENANT-SENTINEL'}}}) returns both sentinels verbatim. pg_user is DuckLake's postgres username key (ducklake.py:55 keeps it out of ducklake's own metadata, but any other payload path carrying pg_user is exposed). Related-but-distinct: internal-result-metadata-exports-connection-usernames covers the INTERNAL path's username handling; this item is the PUBLIC path's identifier-key coverage.",
+  "legacy": {
+    "item_meta": {
+      "category": "security",
+      "completed_at": "2026-08-01T13:28:37Z",
+      "completed_pr": 1389,
+      "created_at": "2026-07-31T23:34:28Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing identifier pseudonymization (user/username/account/...) unchanged",
+        "item_id": "public-export-pg-user-and-tenant-id-bypass-pseudonymization"
+      },
+      {
+        "behavior": "Secret-key redaction behavior unchanged",
+        "item_id": "public-export-pg-user-and-tenant-id-bypass-pseudonymization"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "public-export-pg-user-and-tenant-id-bypass-pseudonymization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "public-export-pg-user-and-tenant-id-bypass-pseudonymization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization_specs.yaml"
+      },
+      {
+        "item_id": "public-export-pg-user-and-tenant-id-bypass-pseudonymization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_anonymization.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import json;from benchbox.core.results.anonymization import AnonymizationManager,AnonymizationConfig as C;m=AnonymizationManager(C());out=json.dumps(m.anonymize_result_payload({'platform_metadata':{'platform_raw_config':{'pg_user':'PGUSER-SENTINEL','tenant_id':'TENANT-SENTINEL'}}}),default=str);assert 'PGUSER-SENTINEL' not in out and 'TENANT-SENTINEL' not in out\"",
+        "description": "pg_user and tenant_id sentinels no longer survive the public path",
+        "expected": "exits 1 on an unfixed tree (verified 2026-07-31), 0 once fixed",
+        "item_id": "public-export-pg-user-and-tenant-id-bypass-pseudonymization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py -q",
+        "description": "anonymization suite still green",
+        "expected": "all pass before and after - regression guard",
+        "item_id": "public-export-pg-user-and-tenant-id-bypass-pseudonymization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "public-export-pg-user-and-tenant-id-bypass-pseudonymization",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "public-export-pg-user-and-tenant-id-bypass-pseudonymization",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Driven on develop d5aa8f398 2026-08-01: both sentinels survive anonymize_result_payload (rung 1 exits 1)",
+        "item_id": "public-export-pg-user-and-tenant-id-bypass-pseudonymization",
+        "notes": null,
+        "started_at": "2026-08-01T12:54:15Z",
+        "started_branch": "fix/public-export-pg-user-tenant-id",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Re-validate both bypasses on current develop by driving anonymize_result_payload",
+        "wid": "w0"
+      },
+      {
+        "evidence": "anonymization_specs.yaml identifier_keys: pguser/dbuser -> user, tenant/tenantid -> tenant; rung 1 now exits 0",
+        "item_id": "public-export-pg-user-and-tenant-id-bypass-pseudonymization",
+        "notes": null,
+        "started_at": "2026-08-01T12:54:22Z",
+        "started_branch": "fix/public-export-pg-user-tenant-id",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Add the missing identifier_keys mappings so both keys pseudonymize",
+        "wid": "w1"
+      },
+      {
+        "evidence": "TestPublicPayloadPgUserAndTenantId: pg_user -> user_<hash>, tenant_id -> tenant_<hash>, existing identifiers unchanged; suite 73 passed",
+        "item_id": "public-export-pg-user-and-tenant-id-bypass-pseudonymization",
+        "notes": null,
+        "started_at": "2026-08-01T12:54:28Z",
+        "started_branch": "fix/public-export-pg-user-tenant-id",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Tests: pg_user pseudonymizes like username; tenant_id is hashed; existing identifier behavior unchanged",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,198 @@
+{
+  "context": "ADR in docs/development/adr/ citing and superseding mcp-product-surface-and-shared-run-service-decision. Keep its two durable preserves (schema-derived docs tests; no benchbox.cli imports from MCP). Retire only the 'smoke/control-plane' product-tier designation and the 'MCP must not imply CLI option parity' clause; replace with the three-tier ledger semantics. Do not change any runtime behavior in this item -- docs, ADR, and contract tests only.",
+  "description": "Governance gate for the one-engine program. The 2026-05-21 decision (mcp-product-surface-and-shared-run-service-decision) designated MCP a 'beta-public smoke/control-plane surface, not a CLI-equivalent execution surface'. That premise has been overtaken: MCP gained remote HTTP transport (#1447), auth (#1454), durable tenant jobs (#1458/#1459), readiness gates (#1460/#1461), and a platform-option contract matrix (#1490). Write a superseding ADR establishing 'one engine, scoped surfaces': ALL business logic lives in benchbox.core below both surfaces; surface asymmetry is deliberate and ledgered with exactly three ratified tier reasons per omission: security-scoped (credentials, publish, arbitrary paths -- never on remote MCP), interaction-scoped (wizards/shell/REPLs CLI-only; jobs/admission MCP-only), or not-yet-demanded (promotable without a new decision once the shared run service exists). Reclassify the 23-flag OMITTED_CLI_OPTIONS ledger (tests/unit/mcp/test_run_surface_contract.py:72-96, docs/reference/mcp.md:303-315) into those tiers. Update docs/reference/mcp.md and docs/reference/public-contracts.md row 42, and rewrite the pinned contract strings asserted by tests/unit/mcp/test_run_surface_contract.py:208 in the same change (the test asserts the current anti-parity wording verbatim, so docs and test move together).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change runtime code in this item",
+        "instead": "docs + ADR + contract-test strings only; runtime unification lands in the downstream one-engine items",
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "why": "governance must land reviewable and revertible on its own"
+      },
+      {
+        "dont": "delete the 23-flag ledger because parity is now the goal",
+        "instead": "retag each entry with one of the three tier reasons",
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "why": "ledgered drift is the mechanism that prevents silent drift"
+      },
+      {
+        "dont": "loosen or bypass MCP security allowlists as part of the new contract wording",
+        "instead": "classify those omissions as security-scoped and keep them permanent",
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "why": "the narrow surface is what makes remote/tenant mode safe; parity never applies to credential/destination controls"
+      }
+    ],
+    "item_meta": {
+      "category": "MCP",
+      "completed_at": "2026-08-04T18:46:12Z",
+      "completed_pr": 1548,
+      "created_at": "2026-08-04T17:13:55Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "MCP security allowlist semantics (MCP_PLATFORM_OPTION_ALLOWLIST, admission, tenancy) are untouched by this ADR.",
+        "item_id": "one-engine-adr-scoped-surfaces"
+      },
+      {
+        "behavior": "Schema-derived docs tests remain: MCP docs param tables must keep matching live tool schemas.",
+        "item_id": "one-engine-adr-scoped-surfaces"
+      },
+      {
+        "behavior": "The import boundary remains: benchbox.mcp never imports benchbox.cli (AST test at test_run_surface_contract.py:272).",
+        "item_id": "one-engine-adr-scoped-surfaces"
+      },
+      {
+        "behavior": "The omission ledger is reclassified, never deleted -- every currently omitted flag keeps an entry with a tier reason.",
+        "item_id": "one-engine-adr-scoped-surfaces"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Decision being superseded; its approach field itself names 'create a shared service below CLI and MCP' as the parity path and reserves benchbox/core/run_service.py in scope",
+        "decision": "supersede",
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "path": "_project/todo-db-export/items.jsonl"
+      },
+      {
+        "concept": "ADR house format",
+        "decision": "reuse",
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "path": "docs/development/adr/adr-textcharts-extraction.md"
+      },
+      {
+        "concept": "Current contract wording and omission ledger enforcement",
+        "decision": "extend",
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "path": "tests/unit/mcp/test_run_surface_contract.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/"
+      },
+      {
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/"
+      },
+      {
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_run_surface_contract.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_run_surface_contract.py -q",
+        "description": "Contract tests pass against the new wording",
+        "expected": "All run-surface contract tests green with new pinned strings and tier-tagged ledger.",
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "last_result": "pass",
+        "last_run": "2026-08-04T17:28:48Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -k 'omission or ledger or tier' -q",
+        "description": "Every ledgered omission carries a ratified tier tag",
+        "expected": "Ledger tier-tag assertions exist and pass.",
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "last_result": "pass",
+        "last_run": "2026-08-04T17:28:55Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_run_surface_contract.py -q -k docs_retire_the_superseded_anti_parity_framing",
+        "description": "Superseded anti-parity wording stays retired",
+        "expected": "focused contract test passes",
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-verified at HEAD 916d9533: pinned strings live at docs/reference/mcp.md:169 and public-contracts.md:42; test_run_surface_contract.py:212-215 pins four strings; 23-flag OMITTED_CLI_OPTIONS + --sorted-ingestion-* present; no concurrent PR had superseded the decision. Found rung 1 vacuous: the phrase wraps lines 169-170 so a line-oriented grep never matched it.",
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:11Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Re-verify current state: pinned strings, ledger contents, and that no concurrent PR already superseded the decision",
+        "wid": "w0"
+      },
+      {
+        "evidence": "docs/development/adr/adr-one-engine-scoped-surfaces.md; alternatives rejected: status quo, 100% parity, route MCP through CLI orchestrator, run-service-only extraction. PR #1548.",
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:15Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Write the superseding ADR (context, decision, three-tier ledger semantics, alternatives rejected incl. full 100% parity and status quo)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "mcp.md contract wording replaced; 24-row omission ledger split one-row-per-surface with security-scoped/interaction-scoped/not-yet-demanded tiers; public-contracts.md MCP row rewritten. PR #1548.",
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:18Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Update docs/reference/mcp.md + public-contracts.md and reclassify the omission ledger into the three tiers",
+        "wid": "w2"
+      },
+      {
+        "evidence": "test_run_surface_contract.py: pinned strings replaced, negative test for retired framing, 4 ledger tier tests, 2 ADR tests. 16 tests green; rungs 1-3 pass. PR #1548.",
+        "item_id": "one-engine-adr-scoped-surfaces",
+        "notes": null,
+        "started_at": "2026-08-04T18:45:22Z",
+        "started_branch": "phase1-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Rewrite test_run_surface_contract.py pinned strings and ledger assertions to enforce the new wording and tier tags",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,214 @@
+{
+  "context": "Compose with existing SchemaV2Validator (schema.py) as the first structural check.\nIf SchemaV2Validator raises, record FAIL and short-circuit structural checks.\nOtherwise run all three tiers in sequence.\n\nBenchmark specs are hardcoded from reference runs (not dynamically derived from\nbenchmark modules) - dynamic derivation creates transitive import issues and makes\nthe validator less self-contained.\n\nTwo-tier severity model:\n  FAIL = mathematical impossibility or known-bad value (corrupted result)\n  WARN = suspicious-but-plausible (degraded result, may still be valid)\n\nThe CLI script uses validate_file / validate_directory from the core module\ndirectly - no duplication of logic.\n",
+  "description": "The live integration test suite produces JSON result files after each benchmark\nrun but there is no systematic way to evaluate whether those files are\nstructurally sound, complete, and believable. A silent failure - missing queries,\nzero-time measurements, wrong row counts - can pass undetected.\n\nThis task implements a three-tier validator (structural → completeness →\nbelievability) using the 20 DuckDB SF1 reference runs as ground-truth baselines.\nThe validator serves three consumers:\n  1. CI/post-run scripts: batch-validate a results directory, non-zero exit on failure\n  2. Live integration tests: importable function called after running a benchmark\n  3. Interactive analysis: MCP tool for Claude-assisted review\n\nThree-tier check system:\n  STRUCTURAL  - schema version, required keys, cross-field math, non-negative\n                timings, percentile ordering, valid phase enums\n  COMPLETENESS - expected query IDs for known benchmarks, measurement iterations\n                 present, power phase completed, tables object when required\n  BELIEVABILITY - avg between min/max, geomean plausible, success rate above\n                  benchmark floor, SF1 row counts within 1%, no duplicate\n                  (id, iter, stream) combos\n\nReference DuckDB SF1 files live in benchmark_runs/results/ and match\nthe glob *_sf1_duckdb_*_2026*.json (55 files total). There are 20 current\nbenchmark IDs plus 8 legacy aliases (e.g., star_schema→ssb,\namplab_big_data→amplab, h2o_database→h2odb, tpc_di→tpcdi,\njoinorderbenchmark→joinorder, nyc_taxi_olap→nyctaxi,\nflight_data_olap→flightdata, data_vault→datavault).\nThe validator must handle both current and legacy benchmark IDs.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a 'validate' action to the existing analyze_results tool",
+        "instead": "(not specified)",
+        "item_id": "result-integrity-validator",
+        "why": "register a separate validate_results tool to keep tool responsibilities distinct"
+      },
+      {
+        "dont": "import benchmark modules (tpch, tpcds, etc.) from benchmark_specs.py",
+        "instead": "(not specified)",
+        "item_id": "result-integrity-validator",
+        "why": "hardcode the expected query ID sets to keep the validator self-contained and fast"
+      },
+      {
+        "dont": "raise exceptions on validation failures",
+        "instead": "(not specified)",
+        "item_id": "result-integrity-validator",
+        "why": "return IntegrityReport with FAIL status so callers can decide how to handle"
+      },
+      {
+        "dont": "reimplement SchemaV2Validator logic",
+        "instead": "(not specified)",
+        "item_id": "result-integrity-validator",
+        "why": "call schema_validator.validate(raw) as the first structural check"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-04-07T00:00:00Z",
+      "created_at": "2026-04-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All 20 DuckDB SF1 reference files produce overall_status != FAIL",
+        "item_id": "result-integrity-validator"
+      },
+      {
+        "behavior": "SchemaV2Validator in schema.py - compose with it, do not modify or duplicate",
+        "item_id": "result-integrity-validator"
+      },
+      {
+        "behavior": "load_result_file() and find_latest_result() in loader.py - no changes to these",
+        "item_id": "result-integrity-validator"
+      },
+      {
+        "behavior": "register_analytics_tools() signature in analytics.py - only ADD a new @mcp.tool() inside it",
+        "item_id": "result-integrity-validator"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "result-integrity-validator",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/validate_results.py (new)"
+      },
+      {
+        "item_id": "result-integrity-validator",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/benchmark_specs.py (new)"
+      },
+      {
+        "item_id": "result-integrity-validator",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/integrity_validator.py (new)"
+      },
+      {
+        "item_id": "result-integrity-validator",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/analytics.py (add one tool registration)"
+      },
+      {
+        "item_id": "result-integrity-validator",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_integrity_validator.py (new)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run ruff check benchbox/core/results/benchmark_specs.py benchbox/core/results/integrity_validator.py _project/scripts/validate_results.py && uv run ty check",
+        "description": "Lint and type check all new files",
+        "expected": "No errors",
+        "item_id": "result-integrity-validator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_integrity_validator.py -v",
+        "description": "Unit tests pass",
+        "expected": "All tests pass",
+        "item_id": "result-integrity-validator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run _project/scripts/validate_results.py benchmark_runs/results/ --benchmark duckdb",
+        "description": "All 20 DuckDB SF1 reference files pass validation",
+        "expected": "Exit code 0, all files PASS or WARN-only",
+        "item_id": "result-integrity-validator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run _project/scripts/validate_results.py \"$(ls -t benchmark_runs/results/tpch_sf1_duckdb_*.json | head -1)\" --verbose",
+        "description": "Single file smoke test (latest TPC-H SF1 file)",
+        "expected": "Status: PASS, sf1_row_counts check passes",
+        "item_id": "result-integrity-validator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast test suite still passes",
+        "expected": "All tests pass",
+        "item_id": "result-integrity-validator",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "result-integrity-validator",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "result-integrity-validator",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "result-integrity-validator",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "result-integrity-validator",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "result-integrity-validator",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "benchmark_specs.py - per-benchmark knowledge base",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "result-integrity-validator",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "integrity_validator.py - core three-tier validator",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "result-integrity-validator",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "_project/scripts/validate_results.py - CLI entry point",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "result-integrity-validator",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "analytics.py - add validate_results MCP tool",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "result-integrity-validator",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "test_integrity_validator.py - unit tests",
+        "wid": "w5"
+      }
+    ]
+  }
+}

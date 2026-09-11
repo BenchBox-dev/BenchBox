@@ -1,0 +1,105 @@
+{
+  "context": "Track derived ids in the publication loop and fail closed on a repeat, naming both source bundle paths. Prefer an explicit error over lengthening the prefix: a genuine collision means two distinct published payloads, which is a corpus problem to look at, not something to paper over. Consider whether the existing skipped_bundles counter should cover it or whether it warrants its own hard failure.",
+  "description": "The publication loop in _project/scripts/explorer_pipeline/pipeline.py has no collision guard. Two bundles that derive the same result_id both write to out_bundles_dir/<result_id>.json and both assign details_map[entry.result_id], so the second silently replaces the first: one result disappears from the published corpus and from the DuckDB read model with no warning, no error, and no count mismatch that any current check would notice. result_id is {benchmark}-{platform}-sf{sf}-{date}-{sha8} where sha8 is only 8 hex characters (32 bits) of a sha256 over the published bytes, so the birthday bound is far lower than the id's apparent specificity suggests. _build_short_ids already lengthens its prefix on collision; the result_id itself has no equivalent. This is latent today but the corpus only grows, and a silent drop of evidence is exactly the failure mode the trust labelling exists to prevent.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-04T12:11:28Z",
+        "from_item": "explorer-pipeline-duplicate-result-id-guard-20260804",
+        "id": 687,
+        "reason": "The publication loop's per-bundle 'except (JSONDecodeError, KeyError, ValueError, TypeError)' also catches the privacy ValueError raised by _public_bundle_data and _public_applied_receipt, so a bundle failing the fail-closed privacy check is dropped with a logger.warning while the build still succeeds. Safe in that the bundle is not published, but silent: the corpus quietly loses a result and only skipped_bundles moves. Decide whether a privacy rejection should abort the build like the duplicate guard now does, or at minimum be surfaced distinctly from ordinary parse errors. Out of scope for the duplicate-id guard.",
+        "resolution": "promoted",
+        "resolved_item": "explorer-privacy-rejection-fails-open-silently-20260804",
+        "resolved_reason": null,
+        "summary": "Privacy rejections are silently downgraded to skipped bundles"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-04T12:11:54Z",
+      "completed_pr": 1516,
+      "created_at": "2026-08-04T11:32:33Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The published bundle count continues to match the manifest entry count",
+        "item_id": "explorer-pipeline-duplicate-result-id-guard-20260804"
+      },
+      {
+        "behavior": "result_id keeps hashing the published bytes, not the raw source bundle",
+        "item_id": "explorer-pipeline-duplicate-result-id-guard-20260804"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-pipeline-duplicate-result-id-guard-20260804",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-pipeline-duplicate-result-id-guard-20260804",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "explorer-pipeline-duplicate-result-id-guard-20260804",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q -k duplicate_result_id",
+        "description": "A duplicate result_id is reported rather than silently overwriting",
+        "expected": "Exits 1 on the unfixed tree, where two bundles deriving the same result_id leave only one published result and no diagnostic, and exits 0 once the collision fails loudly. Write the test in w1 so this rung becomes runnable.",
+        "item_id": "explorer-pipeline-duplicate-result-id-guard-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:10:14Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q",
+        "description": "Explorer pipeline suite still passes",
+        "expected": "No regression in publication behaviour",
+        "item_id": "explorer-pipeline-duplicate-result-id-guard-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:10:21Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-pipeline-duplicate-result-id-guard-20260804",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Guard added to the publication loop, tracking result_id -> (source path, sha256 of published bytes). CORRECTION to this item's premise: the pre-fix behaviour was NOT a silent overwrite. The bundle file and details_map entry are clobbered, but the build then ABORTS in _build_short_ids with 'Could not build collision-free short IDs (sha256 limit reached)' - a message that blames sha256 for duplicate input and names neither offending bundle. Verified by disabling the guard: both behavioural tests fail with that RuntimeError. So the real defect is a confusing late failure plus output clobbering, not a green build. Guard distinguishes identical published bytes (redundant copy - skip with a warning, which today is fatal for no good reason) from differing bytes (genuine collision - fail closed naming both files). Raised as DuplicateResultIdError, deliberately NOT a ValueError, because the loop's own except tuple would downgrade a ValueError to skipped_bundles + a warning. Also corrected _build_short_ids' 'we never get here' comment, which the guard now actually makes true.",
+        "item_id": "explorer-pipeline-duplicate-result-id-guard-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T12:09:52Z",
+        "started_branch": "fix/explorer-duplicate-result-id-guard-20260804",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/upbeat-knuth-7adfae",
+        "status": "done",
+        "summary": "Add a duplicate result_id guard to the publication loop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "tests/unit/scripts/explorer_pipeline/test_duplicate_result_id.py: 4 tests. Differing content fails the build naming both sources; identical content publishes once; the normal two-distinct-id path still publishes both; and a type-level guard that DuplicateResultIdError is not a ValueError/KeyError/TypeError so the per-bundle handler cannot catch it. Behaviourally falsified by neutering the guard (if False): 2 of 4 fail. Full explorer_pipeline suite 323 passed.",
+        "item_id": "explorer-pipeline-duplicate-result-id-guard-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T12:09:57Z",
+        "started_branch": "fix/explorer-duplicate-result-id-guard-20260804",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/upbeat-knuth-7adfae",
+        "status": "done",
+        "summary": "Cover it with a test that two colliding bundles fail loudly instead of one vanishing",
+        "wid": "w1"
+      }
+    ]
+  }
+}

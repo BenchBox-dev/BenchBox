@@ -1,0 +1,182 @@
+{
+  "context": "Decide and record: (1) mint a non-empty default machine_id_salt for new captures of retained fields only, and/or (2) one-time re-derive of retained-field values that deliberately breaks fixed-point for empty-salt tokens only. Prefer documenting accepted residual risk if operators choose keep-empty-salt. Never write recovered plaintext into tracker/PR bodies — tokens only.",
+  "description": "ADR adr-published-identifier-field-set.md drops six unread fields but keeps publishing pseudonyms for endpoint, database_name, and submission_path, leaving the salt question open. After the field-drop re-derive (PR #1578), residual empty-salt tokens remain under retained keys (measured: database_5d7b725135a6 under database_name on sqlite corpus bundles). Dictionary confirmation against the public transform still works for those retained fields. The #1512 fixed point (already-public-shaped pseudonyms pass through) means minting a default salt alone does not rewrite stored corpus bytes; a deliberate re-hash policy for already-public tokens or a one-time migration of retained fields is required if stored tokens must change.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-05T21:20:28Z",
+        "from_item": "retained-published-pseudonym-salt-decision",
+        "id": 692,
+        "reason": "Chosen policy leaves published bytes and fixed point unchanged; w3 re-derive/re-mirror not applicable",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "w3 completed as explicit no-op under keep-empty policy; deferral was redundant",
+        "summary": "No corpus re-derive under keep-empty decision"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "needs_item": "published-pseudonym-oracle-and-field-set"
+      }
+    ],
+    "item_meta": {
+      "category": "privacy",
+      "completed_at": "2026-08-05T21:24:25Z",
+      "completed_pr": 1585,
+      "created_at": "2026-08-05T20:49:33Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No recovered plaintext value is written into the tracker, a commit message, or a PR body",
+        "item_id": "retained-published-pseudonym-salt-decision"
+      },
+      {
+        "behavior": "Pseudonym identity is never treated as a provenance or trust signal",
+        "item_id": "retained-published-pseudonym-salt-decision"
+      },
+      {
+        "behavior": "Publication fixed point for already-public-shaped retained pseudonyms is only broken by an explicit, documented one-time migration decision",
+        "item_id": "retained-published-pseudonym-salt-decision"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization_specs.yaml"
+      },
+      {
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/**"
+      },
+      {
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/**"
+      },
+      {
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "kind": "only_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/**"
+      },
+      {
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -qiE \"salt|retained\" docs/development/adr/adr-published-identifier-field-set.md",
+        "description": "ADR records the retained-field salt decision explicitly",
+        "expected": "mentions salt decision for retained fields",
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "last_result": "pass",
+        "last_run": "2026-08-05T21:20:45Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f tests/unit/scripts/test_corpus_pseudonym_recovery.py && uv run -- python -m pytest tests/unit/scripts/test_corpus_pseudonym_recovery.py -q",
+        "description": "Recovery gate exists for retained-field residual policy",
+        "expected": "passes under chosen policy",
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "last_result": "pass",
+        "last_run": "2026-08-05T21:20:52Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_corpus_privacy_invariant.py -q",
+        "description": "Existing privacy invariant stays green",
+        "expected": "exit 0",
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "last_result": "pass",
+        "last_run": "2026-08-05T21:21:01Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "ADR records keep-empty OSS default; reject baked-in salt and one-time rehash; recommend operator-configured secret salt for community-facing publishes",
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "notes": null,
+        "started_at": "2026-08-05T21:18:32Z",
+        "started_branch": "docs/retained-pseudonym-salt-decision",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Decide keep-empty-salt vs mint-default-salt vs one-time rehash of retained fields and record in ADR",
+        "wid": "w0"
+      },
+      {
+        "evidence": "AnonymizationConfig docstring + result-formats residual oracle section; no corpus byte change",
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "notes": null,
+        "started_at": "2026-08-05T21:20:17Z",
+        "started_branch": "docs/retained-pseudonym-salt-decision",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Implement chosen salt/migration policy at the publication boundary",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Recovery gate extended: residual policy tests + operator salt defeats dictionary for new raw values + fixed point under salt; 16 passed with privacy invariant",
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "notes": null,
+        "started_at": "2026-08-05T21:20:23Z",
+        "started_branch": "docs/retained-pseudonym-salt-decision",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Extend recovery gate to cover retained-field prefixes under the chosen policy",
+        "wid": "w2"
+      },
+      {
+        "evidence": "No re-derive: keep-empty-salt policy preserves publication fixed point and current corpus bytes (post-#1578)",
+        "item_id": "retained-published-pseudonym-salt-decision",
+        "notes": null,
+        "started_at": "2026-08-05T21:20:31Z",
+        "started_branch": "docs/retained-pseudonym-salt-decision",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Re-derive corpus and re-mirror if published bytes change",
+        "wid": "w3"
+      }
+    ]
+  }
+}

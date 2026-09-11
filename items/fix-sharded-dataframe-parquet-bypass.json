@@ -1,0 +1,241 @@
+{
+  "context": "Update the shared DataFrame mixin load path to always attempt\nprepare_benchmark_data() when prefer_parquet is enabled, regardless of\nsharded list paths. Remove the sharded-list bypass guard and normalize\nreturned paths before load_table calls.\n\nEnforce fail-fast behavior if Parquet prep fails in prefer_parquet mode to\nprevent silent CSV fallback. Introduce a cache version bump in data_loader so\nstale pre-fix conversion artifacts are not reused. Keep\ncore/runner/dataframe_runner.py semantics aligned with the mixin path.\n",
+  "description": "DataFrame benchmarks with sharded source paths (list-valued benchmark.tables)\nare bypassing DataFrameDataLoader.prepare_benchmark_data() in\nbenchmark_mixin.py. This causes adapters (notably Polars) to load raw\nCSV/TBL shards instead of converted Parquet and leaves date columns typed\nas strings.\n\nResulting failures include date comparison errors and year extraction errors\nin TPCH queries (e.g., Q6/Q9/Q14/Q20). The defect was introduced when\nsharded-path handling changed the Parquet prep guard to skip preparation\nwhenever benchmark.tables contains list values.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "invalidate caches via ad-hoc rm logic in runtime code",
+        "instead": "use explicit cache/manifest versioning",
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "why": "it is brittle and environment-dependent"
+      },
+      {
+        "dont": "keep list-path-specific bypass guards for Parquet prep",
+        "instead": "always route prefer_parquet flows through prepare_benchmark_data()",
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "why": "they reintroduce CSV scans on common sharded datasets"
+      },
+      {
+        "dont": "silently warn-and-fallback to CSV when Parquet prep raises",
+        "instead": "fail fast with DataLoadingError",
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "why": "this hides correctness defects and leads to date-type regressions"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-10T00:00:00Z",
+      "created_at": "2026-02-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DataFrame adapters keep load_table(ctx, table_name, file_paths, column_names) contract unchanged",
+        "item_id": "fix-sharded-dataframe-parquet-bypass"
+      },
+      {
+        "behavior": "Existing DataFrame benchmark result schema and phase reporting remain unchanged",
+        "item_id": "fix-sharded-dataframe-parquet-bypass"
+      },
+      {
+        "behavior": "prefer_parquet=false continues to load source CSV/TBL files without conversion",
+        "item_id": "fix-sharded-dataframe-parquet-bypass"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/data_loader.py"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/benchmark_mixin.py"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/dataframe/test_data_loader.py"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/runner/test_dataframe_runner.py"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_benchmark_mixin.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/test_benchmark_mixin.py tests/unit/core/dataframe/test_data_loader.py tests/unit/core/runner/test_dataframe_runner.py -v",
+        "description": "Unit coverage for mixin + loader + runner passes with new sharded-prep behavior",
+        "expected": "all selected tests pass with 0 failures",
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox run --platform polars --benchmark tpch --scale 1 --compression zstd:3 --mode dataframe --phases load --non-interactive -vv",
+        "description": "Polars load-only path uses prepared Parquet rather than tbl/csv source scans",
+        "expected": "Data loading logs indicate parquet-prepared paths; no fallback-only tbl/csv load path for sharded tables",
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor BenchmarkExecutionMixin load path to always run Parquet prep when prefer_parquet=true",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove sharded-list bypass guard and normalize prepared path outputs before load_table()",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement fail-fast DataLoadingError behavior for Parquet prep exceptions",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add DataFrame cache version bump/invalidation strategy in data_loader",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align core dataframe_runner load semantics with shared mixin behavior",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add/adjust unit tests for sharded prep, fail-fast behavior, and cache-version behavior",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-sharded-dataframe-parquet-bypass",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run verification commands and confirm Polars load path no longer defaults to CSV/TBL shards",
+        "wid": "w7"
+      }
+    ]
+  }
+}

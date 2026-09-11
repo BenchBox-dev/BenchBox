@@ -1,0 +1,700 @@
+{
+  "context": "Phase-first, not query-first. Rule engine plugs in BEHIND existing\nquery-storage managers (catalog, dict-based, QUERY_VARIANTS) - no\nstorage-format migration. Typed CompatibilityContext + CompatibilityDecision\nwith enumerated support_level and failure_mode. Eight-action vocabulary\ncovering AST, regex-with-issue-link, session policy, variant selection,\nDDL rewrite, benchmark gate, skip, and native passthrough. @compat_local\ndecorator + linter provides attribution so legitimate local rendering\n(type mapping, storage layout) is not swept into the refactor. Migration\nvia feature-flagged dual-run harness with divergence telemetry; flip to\nauthoritative only after divergence reaches zero per slice.\n",
+  "description": "BenchBox's SQL compatibility decisions are currently scattered across five\nstructurally different sites: two bare-sqlglot translation cores with divergent\npolicy (benchbox/utils/dialect_utils.py:108 vs\nbenchbox/platforms/base/dialect_translation.py:33), hardcoded dialect tuples\ninside primitives benchmarks (core/write_primitives/benchmark.py:171 and\ncore/transaction_primitives/benchmark.py:147), a _supports_primary_keys()\nhelper whose body contradicts the inline callers\n(core/write_primitives/schema.py:352), unconditional PRIMARY KEY emission in\nschema helpers (core/transaction_primitives/schema.py:130), regex-based\nadapter transformers disabled in production due to SQL corruption\n(platforms/clickhouse/query_transformer.py:47, routed around with a session\nsetting), benchmark get_queries() overrides patching in class-constant SQL\nvariants (core/h2odb/benchmark.py:106-141), plus scattered \"dialect ==\" checks\nin schema generators (core/tsbs_devops/schema.py, core/nyctaxi/schema.py).\n\nResult: the same capability (e.g., \"does this platform enforce PK\nuniqueness?\") has three answers depending on which site asks, and some of\nthose answers are silent-corruption failure modes - StarRocks, for instance,\naccepts PRIMARY KEY DDL but silently ignores PKs whose columns are not the\nfirst N columns of the table.\n\nThis TODO builds a phase-aware compatibility subsystem (benchbox/sql_compat/)\nthat centralizes decision ownership across every compatibility decision point\nsurfaced by the inventory in w2. The final phase taxonomy is NOT frozen here:\nw1 drafts the ADR with a provisional taxonomy, then w2 derives the final\ntaxonomy from the repo and the ADR is updated before engine work proceeds. Likely\ncandidates include benchmark_gate, query_source, query_compile,\nquery_adapter, schema_emit, ddl_optimize, execution_filter, and\ndataframe_filter. Session policy is intentionally treated as an action, not a\nphase, unless inventory proves a separate phase is required. Decisions are\nmade by a typed rule engine returning typed CompatibilityDecision objects\nwith explicit support_level, failure_mode, rule_id, and action payload.\nExisting query-storage shapes (catalog-backed, dict-based managers,\nQUERY_VARIANTS) remain in place - the engine plugs in behind each manager as\na resolver. Storage-format unification is an explicit non-goal of this\nworkstream and is deferred to a future ADR.\n\nThe migration lands in staged, reversible work units behind a\nBENCHBOX_COMPAT_REGISTRY feature flag with a dual-run harness\n(legacy + registry in parallel, divergences logged), cut over only after\ndivergence reaches zero. A\n@compat_local decorator provides an attribution mechanism so a linter can\ndistinguish legitimate platform-specific rendering (type mapping, storage\nlayout) from unregistered compatibility policy. The linter lands warn-only\nin the early inventory slice and is promoted to error during the\nschema-generation cleanup slice before cutover.\n\nSee the ADR deliverable in w1 for the full design: phase taxonomy derivation\nprotocol, action enum, CompatibilityContext / CompatibilityDecision\ndataclasses, rule_id format, baseline schema v1, dual-run harness spec,\nDataFrame pipeline head design, and the storage-unification non-goal.\n\nDDL FOLLOW-ON: Adapter-owned CREATE TABLE rewrites (ClickHouse, Databricks,\nDatabend, Firebolt, Redshift, Azure Synapse, Snowflake, Presto, Trino, Spark,\nLakesail, Velox) are tracked in `centralize-ddl-translation-phase`, which\nruns in parallel with remaining items here. Those shadow harnesses register\nREWRITE_DDL decisions while keeping the legacy _optimize_table_definition()\npath authoritative until this item's w16 cutover. Fabric Warehouse is\nexcluded - its DDL hook is operational (schema-prefix injection via\nself.schema), not a compat rewrite; see ADR section \"DDL Centralization\nFollow-On\" for the full decision record.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "claim slice w6 is 'zero behavior change'",
+        "instead": "gate with per-adapter snapshot diff sign-off",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "why": "dialect_utils.translate_sql_query applies identify-policy, SQLite fixups, and post-processors that the bare sqlglot.transpile in DialectTranslationMixin does not"
+      },
+      {
+        "dont": "decree the phase list upfront",
+        "instead": "derive the phase list from w2 inventory and freeze it in the ADR",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "why": "the reviewer proposed phases (dataframe_filter, session_policy as a phase, post_translate) mix phases with actions"
+      },
+      {
+        "dont": "leave vector_search/queries.py in files_affected without an owning work unit",
+        "instead": "onboard them explicitly in their own slice",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "why": "QUERY_VARIANTS plus platform-version gates are a distinct storage/decision shape"
+      },
+      {
+        "dont": "migrate without a reversible feature flag",
+        "instead": "ship behind BENCHBOX_COMPAT_REGISTRY with dual-run telemetry",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "why": "four slices touching ~15 sites across the codebase have no safe single-revert path"
+      },
+      {
+        "dont": "model capabilities as bare booleans (e.g., pk.uniqueness_enforced=True)",
+        "instead": "use structured enforcement + conditions + failure_mode",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "why": "StarRocks silently ignores PKs that violate the first-N-columns rule, which a boolean cannot express"
+      },
+      {
+        "dont": "revive the ClickHouse add_subquery_aliases regex rewrite",
+        "instead": "prefer AST; fall back to session policy if sqlglot cannot express the rewrite safely",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "why": "it corrupts Q23/Q87 parentheses and is disabled in production for that reason"
+      },
+      {
+        "dont": "ship 'no inline dialect == remains' as the acceptance criterion",
+        "instead": "gate on 'no unregistered-or-unexempted compatibility decision remains' instead",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "why": "legitimate type-mapping branches in nyctaxi/schema.py:253 and tsbs_devops/schema.py:174 are not compatibility policy"
+      },
+      {
+        "dont": "treat unsupported_benchmarks as dead metadata",
+        "instead": "the benchmark_gate phase must back it via registry view",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "why": "it is enforced in CLI preflight at cli/commands/run.py:804"
+      },
+      {
+        "dont": "trust the reviewer's tpcdi/benchmark.py:374 citation without verifying",
+        "instead": "find the real site in slice w11 before registering the rule",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "why": "that line is a get_queries accessor, not a post-translation override"
+      },
+      {
+        "dont": "unify query-storage formats in this workstream",
+        "instead": "the engine must sit BEHIND the existing managers",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "why": "it conflates decision centralization with data-model churn and the dict-based managers have no blocking semantics today"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-26T00:00:00Z",
+      "created_at": "2026-04-20T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI preflight in cli/commands/run.py:804 continues to fail-fast on unsupported (platform, benchmark) pairs",
+        "item_id": "build-sql-compat-phase-aware-pipeline"
+      },
+      {
+        "behavior": "ClickHouse Q23/Q87 continue to run successfully (do not revive the corrupting regex)",
+        "item_id": "build-sql-compat-phase-aware-pipeline"
+      },
+      {
+        "behavior": "DataFrame-mode skip decisions remain distinct from SQL-mode skip decisions (two pipeline heads share the registry, not the actions)",
+        "item_id": "build-sql-compat-phase-aware-pipeline"
+      },
+      {
+        "behavior": "H2O Q9 ClickHouse and StarRocks variants continue to produce identical results to the current class-constant SQL",
+        "item_id": "build-sql-compat-phase-aware-pipeline"
+      },
+      {
+        "behavior": "SQL/DataFrame engines that do not go through sqlglot (Polars, Pandas) retain their existing code paths",
+        "item_id": "build-sql-compat-phase-aware-pipeline"
+      },
+      {
+        "behavior": "StarRocks first-N-columns PK rule is expressed structurally and prevents silent data divergence",
+        "item_id": "build-sql-compat-phase-aware-pipeline"
+      },
+      {
+        "behavior": "Vector Search QUERY_VARIANTS and version-gated behavior continue to work without forcing sqlglot into the path",
+        "item_id": "build-sql-compat-phase-aware-pipeline"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "_project/compat/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/coffeeshop/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/h2odb/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_catalog_base.py"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transaction_primitives/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tsbs_devops/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/vector_search/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/dialect_translation.py"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/datafusion_query_transformer.py"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/starrocks/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/dialect_utils.py"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "docs/compat/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/adr-sql-compat-phase-aware-pipeline.md"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "scripts/compat_lint.py"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_compat_docs.py"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/sql_compat/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f docs/development/adr/adr-sql-compat-phase-aware-pipeline.md && echo PRESENT",
+        "description": "ADR committed before implementation slices begin",
+        "expected": "PRESENT",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -s _project/compat/inventory.jsonl && echo PRESENT",
+        "description": "Compatibility inventory artifact present",
+        "expected": "PRESENT",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -E 'cli/commands/run.py|core/vector_search/queries.py' _project/compat/inventory.jsonl | wc -l | tr -d ' '",
+        "description": "Inventory captures both benchmark_gate and QUERY_VARIANTS decision sites before the ADR is frozen",
+        "expected": "2",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -s _project/compat/baseline.v1.jsonl && echo PRESENT",
+        "description": "Baseline snapshot present and schema-versioned",
+        "expected": "PRESENT",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "for m in context.py decision.py actions.py registry.py resolver.py plan.py; do test -f benchbox/sql_compat/$m || exit 1; done && echo PRESENT",
+        "description": "sql_compat package exists with required modules",
+        "expected": "PRESENT",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_COMPAT_REGISTRY=on uv run -- python -m pytest -m fast -q",
+        "description": "Full fast test suite passes under registry-authoritative mode",
+        "expected": "passed",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_shadow_parity.py -q",
+        "description": "Shadow-mode parity smoke passes once the dual-run harness lands",
+        "expected": "passed",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_primary_key_capabilities.py -q",
+        "description": "Primary-key vertical parity tests pass before the PK cutover slice is enabled",
+        "expected": "passed",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_benchmark_rule_parity.py -q",
+        "description": "Benchmark-rule parity tests cover H2O, TPC-DI, and Vector Search onboarding",
+        "expected": "passed",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_adapter_rule_fixtures.py -q",
+        "description": "Adapter-rule fixtures cover ClickHouse, DataFusion, and StarRocks migrations",
+        "expected": "passed",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 10,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run scripts/compat_lint.py --strict && echo PASS",
+        "description": "Compatibility lint passes in error mode after slice w15",
+        "expected": "PASS",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 11,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -E 'dialect\\s+in\\s+\\(' benchbox/core/write_primitives/benchmark.py benchbox/core/transaction_primitives/benchmark.py | wc -l | tr -d ' '",
+        "description": "No hardcoded dialect tuples remain in primitives benchmarks after slice w9",
+        "expected": "0",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 12,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -E '_CLICKHOUSE_Q9|_STARROCKS_Q9' benchbox/core/h2odb/benchmark.py | wc -l | tr -d ' '",
+        "description": "H2O Q9 class constants removed after slice w10",
+        "expected": "0",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 13,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f scripts/generate_compat_docs.py && grep -l generate_compat_docs Makefile .github/workflows/*.yml 2>/dev/null | head -1 | grep -q . && echo PRESENT",
+        "description": "Doc generator script + CI drift check exist before docs are generated (w17)",
+        "expected": "PRESENT",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 14,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f docs/compat/capability-matrix.md && test -f docs/compat/skip-reference.md && echo PRESENT",
+        "description": "Generated capability matrix present after slice w18",
+        "expected": "PRESENT",
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 15,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w9",
+        "wid": "w13"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w14",
+        "wid": "w15"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w12",
+        "wid": "w16"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w14",
+        "wid": "w16"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w15",
+        "wid": "w16"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w7",
+        "wid": "w16"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w16",
+        "wid": "w17"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w17",
+        "wid": "w18"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Blocking step. Deliver docs/development/adr/adr-sql-compat-phase-aware-pipeline.md covering:\n(a) phase list derivation protocol (phases are derived from the inventory\nin w2 then frozen in the ADR - not decreed upfront); (b) the eight-action\nvocabulary (block_benchmark, skip_query, select_variant, rewrite_query,\nrewrite_ddl, set_session_policy, post_translate, native) with payloads;\n(c) CompatibilityContext and CompatibilityDecision dataclass shapes with\nenumerated support_level and failure_mode values; (d) rule_id format\n\"{phase}.{platform}.{scope}.{slug}\"; (e) @compat_local decorator\nsemantics and linter attribution; (f) baseline schema v1 with\nversion-bump and refresh protocol; (g) SQL and DataFrame pipeline head\nshapes and which actions apply to each; (h) explicit non-goal:\nquery-storage format unification stays out of scope; (i) specificity\nprecedence for rule resolution.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write ADR: phase taxonomy, action enum, typed contract, exemption policy, baseline schema v1, dual-run harness spec",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Register as select_variant rules behind each benchmark's existing\nquery manager (no storage-format migration):\n(a) H2O Q9 _CLICKHOUSE_Q9 / _STARROCKS_Q9 constants at\ncore/h2odb/benchmark.py:106-141 (delete constants, add rules);\n(b) CoffeeShop platform-specific overrides in core/coffeeshop/.\nDual-run divergence must be 0 for these benchmark-local rule_ids before\nthe slice is considered done.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Slice C1: Register H2O and CoffeeShop benchmark-local overrides behind existing managers",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Register NYC Taxi platform overrides and TPC-DI post-translation\noverrides behind the existing managers. VERIFY actual line before\nstarting - reviewer's cited tpcdi/benchmark.py:374 is a get_queries\naccessor, not a post-translation hook; find the real site first.\nDual-run divergence must be 0 for these benchmark-local rule_ids before\nthe slice is considered done.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Slice C2: Register NYC Taxi and TPC-DI benchmark-local overrides behind existing managers",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Explicitly migrate the non-catalog, non-sqlglot QUERY_VARIANTS path in\ncore/vector_search/queries.py into the registry-backed query_source\npipeline while preserving the existing manager shape. This unit owns the\nversion-gated StarRocks rule called out in the query comments, so the\nregistry proves it can represent platform-version-sensitive variants and\nskips instead of only static dialect decisions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Slice C3: Onboard Vector Search QUERY_VARIANTS and version-gated compatibility rules",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "(a) ClickHouse Q23/Q87 alias-injection: attempt AST-first rewrite; if\nsqlglot cannot express it safely, register as set_session_policy rule\n(joined_subquery_requires_alias=0) with issue link documenting the AST\ngap. The current regex in clickhouse/query_transformer.py is disabled\nfor corruption - do not revive it.\n(b) DataFusion query-id-dispatched rewrites in\nplatforms/datafusion_query_transformer.py → rewrite_query rules keyed\non query_id. Dual-run divergence must be 0 for ClickHouse/DataFusion\nrule_ids before the slice is considered done.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Slice D1: Adapter/runtime rules for ClickHouse session policy and DataFusion query rewrites",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "(c) StarRocks _inject_missing_subquery_aliases (workload.py:374,\ntoken-aware) → rewrite_query rule; _optimize_table_definition\n(workload.py:68+) → rewrite_ddl rule under the ddl_optimize phase.\n(d) SQL-mode skip path at platforms/base/execution.py:1162 and\nDataFrame-mode skip path at platforms/dataframe/benchmark_mixin.py:828\nboth consult the registry through their respective pipeline heads.\n(e) get_platform_skip_queries / get_df_platform_skip_queries become\nthin facades over the registry (kept for backwards compat until slice\nw16). Dual-run divergence must be 0 for StarRocks/runtime rule_ids before\nthe slice is considered done.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Slice D2: StarRocks query/DDL rules plus SQL/DataFrame pipeline-head integration",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Walk core/tsbs_devops/schema.py and core/nyctaxi/schema.py. Classify\neach dialect branch: compatibility policy (→ rewrite_ddl rule) vs.\ntype mapping / storage layout (→ @compat_local decorator). Use the\ninventory.jsonl classification from w2 as input. Promote the lint from\nwarn to error at the end of this slice.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Slice E: Schema-generation compatibility - absorb DDL-policy branches, mark type-mapping branches @compat_local",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Flip BENCHBOX_COMPAT_REGISTRY default from shadow to on. unsupported_\nbenchmarks field on PlatformCapability (platform_registry.py:77)\nbecomes a view computed from registry benchmark_gate rules;\ncli/commands/run.py:804 preflight reads the view.\nget_platform_skip_queries / get_df_platform_skip_queries deleted.\nDual-run harness code removed. Feature-flag plumbing removed.\nAcceptance: zero unregistered-or-unexempted dialect decisions remain\n(linter error-mode, CI green).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cutover: registry becomes authoritative, dual-run harness deleted, feature flag removed, legacy skip APIs become registry views",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Land scripts/generate_compat_docs.py and the CI/build hook that runs it\nand fails when the committed docs drift from regenerated output. This is\nintentionally separate from the generated docs commit so the generator\nitself does not hide inside a doc-refresh work unit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Docs plumbing: generator script plus CI drift check land before generated docs",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Run the generator, commit docs/compat/capability-matrix.md and\ndocs/compat/skip-reference.md, and update ADR status from Proposed to\nAccepted with a link to the shipped subsystem.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Docs: capability matrix and skip reference generated from registry; ADR marked accepted",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Deliver benchbox/sql_compat/inventory.py that walks benchbox/ and\nenumerates every dialect-branching decision point. Output:\n_project/compat/inventory.jsonl (one row per site: file, line, kind\n{skip | rewrite | ddl | type_mapping | session_setting | benchmark_gate},\nplatforms referenced, suggested phase). Use this to FREEZE the phase\ntaxonomy in the ADR (amend ADR if inventory surfaces phases that were\nmissed). Inventory acceptance is not \"tool runs\"; it must classify at\nleast the current benchmark_gate site in cli/commands/run.py and the\nQUERY_VARIANTS / version-gated site in core/vector_search/queries.py so\nthe registry proves it can see coarse benchmark gating and non-sqlglot\nquery-source variants.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build compatibility inventory tool and freeze the discovered decision-surface taxonomy",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Deliver benchbox/sql_compat/baseline_tool.py which, for each\n(platform, benchmark, query_id, phase, mode), emits\n{source_sql_hash, decision, rule_id_or_null, final_sql_hash,\nbenchmark_gate_outcome}. The artifact is checked in at\n_project/compat/baseline.v1.jsonl and is treated as the parity baseline\nfor shadow-mode divergence review. This work unit owns the baseline\nschema, refresh protocol, and schema-version bump rules.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Record baseline snapshot artifact and schema-version it",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Deliver benchbox/sql_compat/local_exemptions.py with the @compat_local\ndecorator (kind: Literal[\"type_mapping\",\"storage_layout\",\"rendering\"],\nplatform_specific: bool, reason: str). Decorate the legitimate\ntype-mapping sites surfaced by w2 (e.g., nyctaxi/schema.py:253,\ntsbs_devops/schema.py type mappings). Deliver\nscripts/compat_lint.py invoked from CI. Lint rule: any dialect-branch\ninside benchbox/core/ or benchbox/benchmarks/ that is not registered in\nthe rule registry AND not inside a @compat_local-decorated callable\nfails the lint. Ship as warn-only (exit 0, log warnings) for this\nslice.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Introduce @compat_local decorator and land the inventory linter in warn-only mode",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Deliver benchbox/sql_compat/{__init__.py, context.py, decision.py,\nactions.py, registry.py, resolver.py, plan.py}. Registry is import-time\npopulated (rule files under benchbox/sql_compat/rules/{phase}/). Resolver\nproduces a CompilationPlan per (platform, benchmark) at run start,\ncached in BenchmarkResults context so warmup/power/throughput phases do\nnot re-resolve. NATIVE/REPLACED/SKIPPED decisions short-circuit sqlglot.\nNo rules registered yet - just the engine.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Scaffold benchbox/sql_compat/ package: context, decision, action enum, registry, resolver, cache",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Env var BENCHBOX_COMPAT_REGISTRY={off|shadow|on}. shadow = both paths\nrun, only legacy decision is acted on, registry decision logged.\non = registry is authoritative, legacy disabled. Divergences write to\n_project/compat/divergence.log with {rule_id, platform, benchmark,\nquery_id, phase, legacy_outcome, registry_outcome}. CI runs in shadow\nmode after w6 lands.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build dual-run harness: legacy + registry run in parallel, log divergences, gated by BENCHBOX_COMPAT_REGISTRY flag",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Make benchbox/platforms/base/dialect_translation.py:33 delegate to\nbenchbox/utils/dialect_utils.py:108. Explicitly acknowledge this as a\nbehavior change (adapters gain identify-policy, SQLite fixups, GROUP\nBY ALL restoration, pre/post processors). One PR per adapter that\ncurrently uses DialectTranslationMixin. Each PR includes a snapshot\ndiff showing before/after translate() output across the adapter's\ncatalog queries. Merge only after snapshot sign-off.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Slice A: Unify translation entrypoints with per-adapter diff review PRs",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Introduce the structured PK capability model in the registry and use it\nto replace the hardcoded dialect tuple at\ncore/write_primitives/benchmark.py:171 → capability lookup;\nrewrite body of core/write_primitives/schema.py:352\n_supports_primary_keys() on top of the capability model; and land the\nfirst parity tests for PK semantics under shadow mode. This unit owns\npk.ddl_accepted, pk.uniqueness_enforced, pk.conditions, and\npk.failure_mode as typed data, not booleans.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Slice B1: Primary-key capability model plus write_primitives lock-path migration",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-sql-compat-phase-aware-pipeline",
+        "notes": "Remove the hardcoded dialect tuple at\ncore/transaction_primitives/benchmark.py:147 → capability lookup;\nunconditional PK emission at core/transaction_primitives/schema.py:130\nbehind the same capability; then wire CLI preflight at\ncli/commands/run.py:804 to consult benchmark_gate-phase rules for\nPK-requiring benchmarks. Dual-run divergence must be 0 for PK-tagged\nrule_ids across a full shadow-mode pass before this slice can be cut on.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Slice B2: Transaction-primitives PK/schema migration and CLI benchmark-gate integration",
+        "wid": "w9"
+      }
+    ]
+  }
+}

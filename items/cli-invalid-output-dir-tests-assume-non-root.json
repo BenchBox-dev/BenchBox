@@ -1,0 +1,83 @@
+{
+  "context": "Prefer making the invalid condition root-proof (point the output dir at an existing regular file) over skipif(root): it keeps coverage in root CI containers. Fall back to skipif with a reason where the assertion is inherently permission-based.",
+  "description": "Found 2026-07-31 while using tests/unit/cli as a regression guard in a root container. Three tests assert that writing to an invalid/unwritable output directory raises (ValidationError/error handling), but root bypasses permission checks so nothing raises and they fail with DID NOT RAISE: tests/unit/cli/test_exceptions.py::TestValidationRules::test_validate_output_directory_local_invalid, tests/unit/cli/test_cli_dryrun.py::TestDryRunErrorHandling::test_dry_run_with_missing_output_dir, tests/unit/cli/test_cli_output.py::TestResultExporterErrorHandling::test_export_with_invalid_output_dir. Verified 2026-07-31: 3 failed, 1604 passed as root; the failures are environment-conditional, not behavioral regressions. Make the tests root-aware (skip-if-root with reason, or construct genuinely unwritable conditions e.g. a read-only bind/chmod on a non-root-owned fs, or a path that is a FILE where a directory is required - the last works for root too).",
+  "legacy": {
+    "item_meta": {
+      "category": "flake",
+      "completed_at": "2026-08-01T17:39:37Z",
+      "completed_pr": 1416,
+      "created_at": "2026-07-31T23:35:07Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No production code changes - tests only",
+        "item_id": "cli-invalid-output-dir-tests-assume-non-root"
+      },
+      {
+        "behavior": "The three tests keep asserting invalid-output-dir handling for non-root runs",
+        "item_id": "cli-invalid-output-dir-tests-assume-non-root"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cli-invalid-output-dir-tests-assume-non-root",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_dryrun.py"
+      },
+      {
+        "item_id": "cli-invalid-output-dir-tests-assume-non-root",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_output.py"
+      },
+      {
+        "item_id": "cli-invalid-output-dir-tests-assume-non-root",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_exceptions.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_exceptions.py::TestValidationRules::test_validate_output_directory_local_invalid tests/unit/cli/test_cli_dryrun.py::TestDryRunErrorHandling::test_dry_run_with_missing_output_dir 'tests/unit/cli/test_cli_output.py::TestResultExporterErrorHandling::test_export_with_invalid_output_dir' -q",
+        "description": "the three tests pass under root",
+        "expected": "fails (3 failed) on the unfixed tree WHEN RUN AS ROOT (verified 2026-07-31 in a root container; passes as a normal user - the rung gates only in the environment that exhibits the defect); passes everywhere once fixed",
+        "item_id": "cli-invalid-output-dir-tests-assume-non-root",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cli-invalid-output-dir-tests-assume-non-root",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated 2026-08-01: the three tests pass as uid 501 locally; driven in a root container (python:3.12-slim via Apple container): uid 0 CAN mkdir /invalid (defect premise) while mkdir under a regular file raises NotADirectoryError even as root (fix mechanism)",
+        "item_id": "cli-invalid-output-dir-tests-assume-non-root",
+        "notes": null,
+        "started_at": "2026-08-01T17:12:31Z",
+        "started_branch": "fix/cli-invalid-output-dir-root-proof",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Re-validate the three failures under root and confirm they pass as a normal user",
+        "wid": "w0"
+      },
+      {
+        "evidence": "All three tests rewritten to a path under a regular FILE (tmp_path/self.temp_dir blocker) - uncreatable for every uid; same exception types preserved (ValidationError/FileNotFoundError/OSError); 3 passed as non-root. Rung 1's under-root gate was exercised at the MECHANISM level in a root container, not the full suite (recorded per the item's caution)",
+        "item_id": "cli-invalid-output-dir-tests-assume-non-root",
+        "notes": null,
+        "started_at": "2026-08-01T17:12:40Z",
+        "started_branch": "fix/cli-invalid-output-dir-root-proof",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Make the three tests root-proof or explicitly skipped-as-root with reasons",
+        "wid": "w1"
+      }
+    ]
+  }
+}

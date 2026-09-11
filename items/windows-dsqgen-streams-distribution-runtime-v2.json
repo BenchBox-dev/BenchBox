@@ -1,0 +1,115 @@
+{
+  "context": "Hash and inventory platform binary/data inputs, compare build flags and runtime cwd, reduce the command, then rebuild/package if wrong. If upstream cannot support Windows, use a capability probe and actionable product error.",
+  "description": "The bundled Windows dsqgen 4.0.0 parses 99 templates but fails real -STREAMS 2 generation with a cities distribution overrun on both Python jobs in run 30690807993. Compare the packaged Windows binary and distribution corpus against Linux/macOS sources, reproduce on Windows, and choose only between rebuilding a correct binary/corpus or an evidence-backed unsupported-platform gate. Do not skip merely because os.name is nt.",
+  "legacy": {
+    "item_meta": {
+      "category": "TPC-DS portability",
+      "completed_at": "2026-08-01T17:04:17Z",
+      "completed_pr": 1413,
+      "created_at": "2026-08-01T14:07:11Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Linux/macOS real-binary determinism and official substitution assertions remain unchanged.",
+        "item_id": "windows-dsqgen-streams-distribution-runtime-v2"
+      },
+      {
+        "behavior": "No blanket Windows skip or swallowed DSQGenStreamsError.",
+        "item_id": "windows-dsqgen-streams-distribution-runtime-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-dsqgen-streams-distribution-runtime-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/_binaries/**"
+      },
+      {
+        "item_id": "windows-dsqgen-streams-distribution-runtime-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/**"
+      },
+      {
+        "item_id": "windows-dsqgen-streams-distribution-runtime-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/tpcds/test_dsqgen_streams.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/tpcds/test_dsqgen_streams.py -q",
+        "description": "TPC-DS stream tests",
+        "expected": "fails with cities overrun on the unfixed Windows tree; exit 0 or capability-specific skip after repair",
+        "item_id": "windows-dsqgen-streams-distribution-runtime-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-dsqgen-streams-distribution-runtime-v2",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "windows-dsqgen-streams-distribution-runtime-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "windows-dsqgen-streams-distribution-runtime-v2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventoried all six bundled dsqgen artifacts and SHA-256 hashes; all bundles share tpcds.dst 7aeb147c... and tpcds.idx 19c11f3b.... Windows x86_64 dsqgen is PE32+ x86-64 hash 2b7dff20.... Build provenance is _sources/compilation/scripts/compile-all-platforms.sh; Wine regeneration of tpcds.idx reproduced the shipped hash exactly.",
+        "item_id": "windows-dsqgen-streams-distribution-runtime-v2",
+        "notes": null,
+        "started_at": "2026-08-01T16:05:55Z",
+        "started_branch": "fix/windows-dsqgen-distribution-runtime",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Inventory hashes build provenance cwd and distribution inputs across platforms",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Nightly run 30690807993 reproduced exact Windows cities index=-1 failure only on later real-binary invocations; ordering tests with identical binary/seed passed. The shipped x86_64 PE then passed 25 consecutive Wine -STREAMS runs with the same arguments. Evidence localizes the defect to the known non-seeded query46 city draw on native Windows, not missing files or a universally broken artifact.",
+        "item_id": "windows-dsqgen-streams-distribution-runtime-v2",
+        "notes": null,
+        "started_at": "2026-08-01T16:05:58Z",
+        "started_branch": "fix/windows-dsqgen-distribution-runtime",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Reproduce and localize the cities distribution overrun on Windows",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Implemented Windows-only bounded retry for the exact cities overrun signature in benchbox/core/tpcds/streams.py. Partial outputs are removed between attempts; unknown failures return immediately and persistent overruns still surface as DSQGenStreamsError after ten attempts. Added four unit regressions for retry, cleanup, fail-closed behavior, cap, and non-Windows preservation.",
+        "item_id": "windows-dsqgen-streams-distribution-runtime-v2",
+        "notes": null,
+        "started_at": "2026-08-01T16:06:10Z",
+        "started_branch": "fix/windows-dsqgen-distribution-runtime",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Rebuild/package the correct runtime or implement a probe-backed unsupported gate",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Focused real-binary suite passes on darwin-arm64: 16 passed. Existing pinned ordering, multi-part expansion, substitutions, and deterministic comparison remain unchanged. Ruff check/format and git diff checks pass.",
+        "item_id": "windows-dsqgen-streams-distribution-runtime-v2",
+        "notes": null,
+        "started_at": "2026-08-01T16:06:13Z",
+        "started_branch": "fix/windows-dsqgen-distribution-runtime",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Verify real-binary determinism and substitution parameters on supported platforms",
+        "wid": "w3"
+      }
+    ]
+  }
+}

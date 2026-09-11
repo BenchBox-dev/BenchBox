@@ -1,0 +1,11 @@
+{
+  "description": "Implement memory management strategy and per-platform scale factor limits\nto prevent OOM crashes. Different platforms have different memory constraints\n(Pandas loads all in RAM, cuDF limited by GPU VRAM, etc.).",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2025-12-02T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "dataframe-phase0-memory"
+    }
+  }
+}

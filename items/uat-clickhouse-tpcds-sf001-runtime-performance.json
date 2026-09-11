@@ -1,0 +1,138 @@
+{
+  "context": "Profile within the existing 600-second cell budget, isolate the slow query or phase, apply the narrowest ClickHouse/query-routing correction, and rerun the exact cell.",
+  "description": "Replacement for the lint-incomplete promotion shell uat-clickhouse-tpcds-sf001-runtime-cap. Merged loader/nullability fixes eliminate prior conversion failures, but the full TPC-DS SF=0.01 clickhouse-server cell reaches the 600-second harness cap (deferral #633, 2026-07-21 log). Identify the slow phase/query, preserve result correctness, and fix or add scoped diagnostics without raising the global timeout.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-23T14:39:56Z",
+        "from_item": "uat-clickhouse-tpcds-sf001-runtime-performance",
+        "id": 720,
+        "reason": "The required w1 profile needs a managed clickhouse-server UAT cell and its 600-second cap. No authoritative server SF0.01 trace is present in the current local artifacts, and substituting the completed ClickHouse Local SF0.01 run would not answer this TODO. Preserve the global cap and resume on an operator host with release-grade server evidence.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Low-cost focused tests pass; live ClickHouse-server SF0.01 profiling is deferred"
+      }
+    ],
+    "item_meta": {
+      "category": "uat-hardening",
+      "claim_token": "fbfb3004a9190eb159da2a33e58d3ec2",
+      "claimed_at": "2026-08-23T14:38:00Z",
+      "claimed_branch": "develop",
+      "claimed_by": "joe@joe-mac-mini.local",
+      "claimed_worktree": "/Users/joe/Developer/BenchBox",
+      "created_at": "2026-07-21T15:10:01Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "TPC-DS result correctness and validation semantics remain unchanged.",
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance"
+      },
+      {
+        "behavior": "The global UAT cell timeout remains 600 seconds; do not raise it to mask a slow query.",
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance"
+      },
+      {
+        "behavior": "The merged nullable-value and client-insert contracts for ClickHouse remain unchanged.",
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      },
+      {
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      },
+      {
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms -k 'clickhouse or tpcds' -q",
+        "description": "Focused ClickHouse and TPC-DS tests pass",
+        "expected": "exit 0",
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance",
+        "last_result": "pass",
+        "last_run": "2026-08-23T14:39:45Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpcds SCALE=0.01",
+        "description": "TPC-DS SF=0.01 completes under the existing cap",
+        "expected": "exit 0 before 600 seconds",
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Profile the capped run and identify the slow phase or query",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement the scoped runtime or query-routing correction",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-clickhouse-tpcds-sf001-runtime-performance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Prove the TPC-DS SF=0.01 cell completes under the existing cap",
+        "wid": "w3"
+      }
+    ]
+  }
+}

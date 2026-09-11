@@ -1,0 +1,108 @@
+{
+  "context": "Only after memory-claude-monitoring-window-close: Joe fills signature/supersede; agent may draft the filled document from evidence but must not invent signatures.",
+  "description": "reports/rollout/claude/live-mutation-authorization.md remains DRAFT UNSIGNED even though the Claude swap executed and is under monitoring. After window close disposition, either complete the signature block (retroactive record) or supersede the DRAFT with a pointer to final-acceptance.md so DRAFT is not false authority.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "agent-complete the signature block",
+        "instead": "leave signature fields for Joe",
+        "item_id": "memory-claude-auth-doc-closeout",
+        "why": "authorization is human"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-claude-auth-doc-closeout",
+        "needs_item": "memory-claude-monitoring-window-close"
+      }
+    ],
+    "item_meta": {
+      "category": "Operations",
+      "created_at": "2026-08-05T22:10:57Z",
+      "worktree": "memory-rollout"
+    },
+    "preserves": [
+      {
+        "behavior": "Codex is not authorized by this Claude document",
+        "item_id": "memory-claude-auth-doc-closeout"
+      },
+      {
+        "behavior": "Signature remains Joe-only",
+        "item_id": "memory-claude-auth-doc-closeout"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "DRAFT auth template",
+        "decision": "extend",
+        "item_id": "memory-claude-auth-doc-closeout",
+        "path": "/Users/joe/Developer/memory-governance/reports/rollout/claude/live-mutation-authorization.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-claude-auth-doc-closeout",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-claude-auth-doc-closeout",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/memory-rollout.md"
+      },
+      {
+        "item_id": "memory-claude-auth-doc-closeout",
+        "kind": "only_modify",
+        "path_glob": "reports/rollout/claude/final-acceptance.md"
+      },
+      {
+        "item_id": "memory-claude-auth-doc-closeout",
+        "kind": "only_modify",
+        "path_glob": "reports/rollout/claude/live-mutation-authorization.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && ! rg -q 'DRAFT, UNSIGNED' reports/rollout/claude/live-mutation-authorization.md || rg -q 'superseded|SIGNED|granted' reports/rollout/claude/live-mutation-authorization.md",
+        "description": "Auth doc is not left as operative DRAFT",
+        "expected": "Document is signed, refused, or explicitly superseded",
+        "item_id": "memory-claude-auth-doc-closeout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-claude-auth-doc-closeout",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "memory-claude-auth-doc-closeout",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Draft close-out text from swap report, monitoring log, and final acceptance",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-claude-auth-doc-closeout",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Joe signs or supersedes DRAFT; commit status change",
+        "wid": "w1"
+      }
+    ]
+  }
+}

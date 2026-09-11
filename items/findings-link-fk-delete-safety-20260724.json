@@ -1,0 +1,123 @@
+{
+  "context": "Either make the finding_links -> items edge ON DELETE SET NULL / CASCADE, or include finding-link cleanup in the replace path. Whichever is chosen, rehearse on a restored local snapshot first (todo_db_shadow.py + restore-legacy), then apply with an audit verify.",
+  "description": "chatgpt-codex-connector review finding on merged PR #1273 (P2, _project/scripts/todo_findings.py:87). Deferred from the PR-review sweep in PR #1292 because the fix implies a hosted-database migration, which is out of scope for a code-fix sweep; tracked in GitHub issue #1293.\n\nWhen a finding is linked/promoted to an item, the FK is stored in finding_links. Hosted bulk_transfer(..., replace=True) deletes only TRANSFER_TABLES in _project/scripts/todo_db.py, and that list intentionally EXCLUDES all findings tables. In a tracker that has any promoted/linked finding, a hosted YAML --replace reload will therefore either fail when DELETE FROM items hits the retained FK, or leave a stale link to an item that was replaced if the pipeline connection is not enforcing FKs.\nThread: https://github.com/joeharris76/BenchBox/pull/1273#discussion_r3640659592\n\nMIGRATION RISK: this touches the shared hosted (Turso) tracker. Rehearse against a restored snapshot before touching production, and confirm the restore drill in docs/operations/todo-db-benchbox-extraction.md still passes afterwards.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "apply the migration directly against the production hosted tracker before rehearsing",
+        "instead": "rehearse on a restored snapshot, then apply with audit verify",
+        "item_id": "findings-link-fk-delete-safety-20260724",
+        "why": "a bad FK migration on the shared tracker is hard to reverse"
+      },
+      {
+        "dont": "issue raw DELETE statements against the hosted DB",
+        "instead": "use the CLI/bulk transfer path",
+        "item_id": "findings-link-fk-delete-safety-20260724",
+        "why": "the tracker classifier blocks raw DELETEs and row-by-row bulk writes"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-30T00:31:17Z",
+      "completed_pr": 1347,
+      "created_at": "2026-07-24T16:23:16Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing promoted/linked findings survive the migration with their links intact",
+        "item_id": "findings-link-fk-delete-safety-20260724"
+      },
+      {
+        "behavior": "The documented restore + audit verify drill still passes after the change",
+        "item_id": "findings-link-fk-delete-safety-20260724"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-link-fk-delete-safety-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "findings-link-fk-delete-safety-20260724",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-link-fk-delete-safety-20260724",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_findings.py"
+      },
+      {
+        "item_id": "findings-link-fk-delete-safety-20260724",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "findings-link-fk-delete-safety-20260724",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q",
+        "description": "tracker script tests pass",
+        "expected": "all pass",
+        "item_id": "findings-link-fk-delete-safety-20260724",
+        "last_result": "pass",
+        "last_run": "2026-07-30T00:31:14Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-link-fk-delete-safety-20260724",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "findings-link-fk-delete-safety-20260724",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Reproduced on a seeded local v3 DB: with foreign_keys ON the --replace DELETE loop over reversed(TRANSFER_TABLES) aborts with 'FOREIGN KEY constraint failed'; with FK OFF (the SQLite/libSQL server default) it succeeds leaving 1 stale link and a finding still claiming disposition='promoted' against an unresolvable target.",
+        "item_id": "findings-link-fk-delete-safety-20260724",
+        "notes": null,
+        "started_at": "2026-07-30T00:31:00Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Reproduce on a restored local snapshot: promote a finding, then run a --replace reload and capture the failure/stale-link behaviour",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Implemented in the composed SCHEMA_VERSION 3->4 migration (PR #1347) as DEFERRABLE INITIALLY DEFERRED on finding_links.target_item, NOT the ON DELETE SET NULL this item's approach suggested: prototyping showed SET NULL nulls target_item even when the reload REINSERTS the item, destroying promote provenance on every reload. Deferring the check to COMMIT lets the legitimate delete-then-reinsert commit with the link intact while a genuine dangler is still refused.",
+        "item_id": "findings-link-fk-delete-safety-20260724",
+        "notes": null,
+        "started_at": "2026-07-30T00:31:03Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Implement delete-safety (FK ON DELETE change or replace-path link cleanup) with a schema migration",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Regression tests pin both directions (reload keeps the link; genuine dangler refused at COMMIT). Rehearsed on a scratch Turso DB: migration preserved all rows and the promote link, and the DEFERRABLE clause is present on the real primary. Production migrated and verified: finding_links carries 'target_item TEXT REFERENCES items(id) DEFERRABLE INITIALLY DEFERRED', 0 links and all other counts unchanged. 9 restore/transfer tests pass.",
+        "item_id": "findings-link-fk-delete-safety-20260724",
+        "notes": null,
+        "started_at": "2026-07-30T00:31:05Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Re-run the restore + audit verify drill on the snapshot and confirm no stale links remain",
+        "wid": "w3"
+      }
+    ]
+  }
+}

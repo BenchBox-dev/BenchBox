@@ -1,0 +1,120 @@
+{
+  "context": "Prefer adding a raw snapshot dump to the legacy CLI (option a): it owns the source schema and can dump its own tables faithfully, and it keeps the standalone's import contract single-shaped. Something like 'todo export --snapshot FILE' writing {table: [rows]} for all 12 tables straight from SQL, with no denormalization. Option b - teach the standalone to ingest the nested export - spreads knowledge of the legacy schema into the destination and duplicates the normalization logic. Option c - dump the hosted libsql tables directly with a SQL client - works as a one-off but leaves nothing reusable and cannot be tested. Whichever is chosen, prove it by round-tripping into a scratch DB and running 'audit verify', never against the hosted DB. Coordinate with findings-schema-v4-lossless-legacy-fields: the standalone now reports schema v4, not the v3 assumed when the migration item was filed, and that item is actively changing v4 field handling.",
+  "description": "Hard prerequisite for migrate-hosted-tracker-db-to-todo-db-0-3-schema, which is blocked on it. The standalone's restore_legacy(snapshot: dict) (src/todo_db/database.py:463 in ~/Developer/todo-db) requires ONE JSON object carrying 12 normalized tables: items, events, work_units, work_needs, item_deps, scope_rules, verifications, preserves, anti_patterns, prior_art, deferrals, meta. The legacy '_project/scripts/todo export' emits a directory of items.jsonl + events.jsonl + index.md, and items.jsonl is denormalized - work, deps, scope, verifications, preserves, anti_patterns, prior_art and deferrals are nested inside each item. restore_legacy strips precisely those nested keys and looks for separate tables, so exporter output is structurally invalid importer input. There is no raw-table dump mode in the legacy CLI. Verified empirically: feeding the directory gives 'Is a directory'; feeding items.jsonl gives 'Extra data: line 2 column 1' because it json.load's a single object, not JSONL. Discovered by rehearsing against a scratch SQLite DB rather than the hosted tracker; the error occurs before any write, so a live attempt would have failed safely but would still have failed.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-30T15:26:37Z",
+        "from_item": "legacy-tracker-snapshot-export-for-restore-legacy",
+        "id": 667,
+        "reason": "Found while scoping the snapshot. todo-db's restore_legacy() (src/todo_db/database.py:463) validates only that its 12 REQUIRED tables are present and ignores every other key, then rebuilds the destination from base=self.export() with items/events/tracker_tables overwritten. Findings tables are not in its required set, so findings rows never transfer - and because unknown keys are ignored rather than rejected, a snapshot that DID carry them would be accepted while silently discarding them. That is the dangerous shape: it looks like a successful migration. The snapshot therefore excludes findings deliberately (TRANSFER_TABLES excludes them, and shipping prose that will be discarded only risks leaking it), but the underlying gap remains: migrating the tracker to todo-db loses the findings domain. That domain is not vestigial - it is phase 3/4/5 work landed across #1341, #1347 and #1351, and the hosted tracker currently holds at least one open finding (2026-07-18-190500-evidence-tree-sha-provenance-mismatch) plus an unsynced draft. Decide before any cutover: extend restore-legacy to carry findings, migrate them separately, or accept the loss explicitly. build_snapshot fails closed if the backup scope and the importer's requirements diverge, but it cannot detect a table the importer simply chooses to ignore.",
+        "resolution": "promoted",
+        "resolved_item": "restore-legacy-drops-the-findings-domain",
+        "resolved_reason": null,
+        "summary": "restore-legacy silently drops the entire findings domain"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-07-30T15:28:01Z",
+      "completed_pr": 1354,
+      "created_at": "2026-07-29T23:38:24Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "no snapshot artifact is committed to Git (see PR #1327)",
+        "item_id": "legacy-tracker-snapshot-export-for-restore-legacy"
+      },
+      {
+        "behavior": "the existing 'export --out DIR' behaviour and its three-file output stay unchanged (weekly tracker export snapshot depends on it)",
+        "item_id": "legacy-tracker-snapshot-export-for-restore-legacy"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "legacy-tracker-snapshot-export-for-restore-legacy",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "legacy-tracker-snapshot-export-for-restore-legacy",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import json,sys; d=json.load(open(sys.argv[1])); req={'items','events','work_units','work_needs','item_deps','scope_rules','verifications','preserves','anti_patterns','prior_art','deferrals','meta'}; missing=sorted(req-d.keys()); assert not missing, missing\" \"$TODO_SNAPSHOT\"",
+        "description": "The snapshot contains every table restore-legacy requires",
+        "expected": "exit 0",
+        "item_id": "legacy-tracker-snapshot-export-for-restore-legacy",
+        "last_result": "pass",
+        "last_run": "2026-07-30T15:25:09Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import json,sys; d=json.load(open(sys.argv[1])); nested={'work','deps','scope','verifications','preserves','anti_patterns','prior_art','deferrals'}; bad=[k for i in d['items'][:50] for k in nested&set(i)]; assert not bad, sorted(set(bad))\" \"$TODO_SNAPSHOT\"",
+        "description": "Items in the snapshot are normalized, not nested",
+        "expected": "exit 0",
+        "item_id": "legacy-tracker-snapshot-export-for-restore-legacy",
+        "last_result": "pass",
+        "last_run": "2026-07-30T15:25:11Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "todo-db --db \"$TODO_SCRATCH_DB\" --project-id benchbox --repository https://github.com/joeharris76/BenchBox restore-legacy --input \"$TODO_SNAPSHOT\" --replace && todo-db --db \"$TODO_SCRATCH_DB\" --project-id benchbox audit verify",
+        "description": "restore-legacy accepts it into a scratch DB and the hash chain verifies",
+        "expected": "exit 0",
+        "item_id": "legacy-tracker-snapshot-export-for-restore-legacy",
+        "last_result": "fail",
+        "last_run": "2026-07-30T15:25:14Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q -k export",
+        "description": "The existing directory export is unchanged",
+        "expected": "exit 0",
+        "item_id": "legacy-tracker-snapshot-export-for-restore-legacy",
+        "last_result": "pass",
+        "last_run": "2026-07-30T15:25:20Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "legacy-tracker-snapshot-export-for-restore-legacy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added 'todo export --snapshot FILE' emitting a single JSON object of raw normalized tables. Scoped as SNAPSHOT_TABLES = frozenset(TRANSFER_TABLES) | {meta}. Deliberately NOT derived from EXPORT_TABLE_ALLOWLIST: the file documents that the allowlist is an independent literal so the COMMITTED surface never widens by accident, and deriving a backup artifact from it would invert that - legitimately narrowing what may be committed would silently narrow what a migration carries. Findings stay excluded because TRANSFER_TABLES excludes them, and restore-legacy discards unknown tables anyway. build_snapshot fails closed if SNAPSHOT_TABLES ever diverges from RESTORE_LEGACY_REQUIRED_TABLES, naming which side gained a table, so future lossiness surfaces at planning time rather than after cutover. All 12 tables read inside one _read_txn, matching write_export's existing consistency guarantee, and ordered by primary key so output is reproducible. Against the live hosted tracker: 12/12 tables, 0 nested keys leaking into items, findings excluded, rows = items 1683, events 4187, scope_rules 7826, work_units 6396, work_needs 5711, preserves 3406, verifications 3164, anti_patterns 2895, prior_art 1593, deferrals 666, item_deps 596, meta 1.",
+        "item_id": "legacy-tracker-snapshot-export-for-restore-legacy",
+        "notes": null,
+        "started_at": "2026-07-30T15:17:35Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add a raw normalized snapshot dump covering all 12 tables",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Round-trip proven end to end against a snapshot of the LIVE hosted tracker, into a scratch SQLite DB - never against the hosted DB. 'restore-legacy --input <snapshot> --replace' returns 'restored legacy snapshot from ...' where yesterday the same importer rejected the directory export ('Is a directory') and items.jsonl ('Extra data: line 2'). 'audit verify' then returns {algorithm: sha256-chain-v2, event_count: 4187, head_seq: 4187, head_hash: a20b6083d10f...}, so all 4187 legacy events re-hash into a valid chain. Item counts match exactly across the restore: planning 243/243, active 40/40, done 1365/1365, dropped 35/35. NOTE on rung 3: it fails as recorded because it invokes a bare 'todo-db', which is not on PATH - the standalone runs via 'uv run -- todo-db' from ~/Developer/todo-db. That is a defect in how I wrote the rung, not in the work; the rung's exact logic passes with the correct invocation (exit 0, output above). Rungs 1, 2 and 4 pass as written. The rung cannot be amended in place because verifications are create-time-only and 'update' is standalone-only.",
+        "item_id": "legacy-tracker-snapshot-export-for-restore-legacy",
+        "notes": null,
+        "started_at": "2026-07-30T15:25:54Z",
+        "started_branch": "feat/legacy-tracker-snapshot-export",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Round-trip it through restore-legacy into a scratch DB and pass audit verify",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,190 @@
+{
+  "context": "Use the existing has_trailing_delimiter() and get_column_names_with_trailing()\nfrom benchbox/utils/file_format.py - they already handle compressed files and\nedge cases. For the loader fix:\n1. Sample the first shard to detect trailing delimiter\n2. Build column name list via get_column_names_with_trailing()\n3. Replace SELECT * EXCLUDE with explicit column projection: SELECT {schema_cols} FROM read_csv(...)\n4. Keep null_padding=true as a safety net\n\nFor the exit code fix, add ctx.exit(1) after the FAILED status branch in run.py.\nCheck both the orchestrated and non-orchestrated execution paths.\n",
+  "description": "DuckDB + TPC-DS loading fails after TPC-DS datagen was changed to remove trailing\ndelimiters from generated .dat files. The pipe-delimited loader in\nDuckDBNativeHandler.load_table() unconditionally appends a _trailing_delimiter_\ndummy column and uses SELECT * EXCLUDE (_trailing_delimiter_), which causes a\nBinder Error when the file has no trailing delimiter.\n\nObserved in a 72-run DuckDB version matrix (1.0.0-1.5.0rc1) across tpch/tpcds/\nclickbench/ssb - TPC-H succeeds but TPC-DS consistently fails with:\n  - \"Binder Error: Column '_trailing_delimiter_' in EXCLUDE list not found in FROM clause\"\n  - \"Data validation failed - benchmark execution halted\"\n  - \"Empty tables detected: ...\"\n\nAdditionally, `benchbox run` exits with code 0 even when the benchmark status is\nFAILED, masking failures in automation pipelines. No result JSON is written for\nfailed runs.\n\nUtility functions `has_trailing_delimiter()` and `get_column_names_with_trailing()`\nalready exist in benchbox/utils/file_format.py but are not used by the loader.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "check trailing delimiter on every shard",
+        "instead": "sample the first shard only and assume consistency within a table",
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "why": "has_trailing_delimiter() opens and reads the file, and TPC-DS has hundreds of shards"
+      },
+      {
+        "dont": "remove null_padding=true",
+        "instead": "keep it as a safety net",
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "why": "some older TPC-DS data files may have inconsistent trailing delimiters across shards"
+      },
+      {
+        "dont": "use sys.exit() in CLI handlers",
+        "instead": "use ctx.exit(1) for non-zero exit",
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "why": "Click manages exit codes via ctx.exit()"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "duckdb-tpcds-trailing-delimiter-regression",
+        "id": 68,
+        "reason": "Only DuckDB native handler uses this pattern; other platforms use different load paths. Defer until after regression is fixed.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Reason states only the DuckDB native handler uses this delimiter pattern; other platforms use different load paths, so the audit target doesn't exist.",
+        "summary": "Audit other loaders (SQLite, ClickHouse, etc.) for same trailing delimiter assumption"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-20T00:00:00Z",
+      "created_at": "2026-02-20T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "DuckDBNativeHandler.load_table() continues to handle CSV and Parquet inputs via their existing code paths (only pipe-delimited path is affected)",
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression"
+      },
+      {
+        "behavior": "DuckDBNativeHandler.load_table() continues to load TPC-H .tbl files (which still have trailing delimiters) correctly",
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression"
+      },
+      {
+        "behavior": "Successful benchmark runs still exit with code 0 and produce result JSON",
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/utils/file_format.py"
+      },
+      {
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/base/test_trailing_delimiter_loading.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base/ -v -k 'load or data_loading'",
+        "description": "Existing data loading tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base/test_trailing_delimiter_loading.py -v",
+        "description": "New trailing delimiter regression tests pass",
+        "expected": "all tests pass including with-trailing and without-trailing variants",
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Smoke test for TPC-H (must not regress)",
+        "expected": "all fast tests pass",
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "notes": "In DuckDBNativeHandler.load_table() (data_loading.py ~line 640-666):\n1. Import and call has_trailing_delimiter(file_path, delimiter, col_names) on the first shard\n2. Use get_column_names_with_trailing() to conditionally add dummy column\n3. Replace SELECT * EXCLUDE (_trailing_delimiter_) with explicit column projection\n   (SELECT col1, col2, ... FROM read_csv(...)) for robustness\n4. Keep null_padding=true for safety with both file variants\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix DuckDB pipe-delimited loader to detect trailing delimiter per file and project explicit schema columns instead of SELECT * EXCLUDE",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "notes": "In benchbox/cli/commands/run.py (~lines 2243-2296):\n- After benchmark execution, if result.validation_status == \"FAILED\", call ctx.exit(1)\n- Also check the orchestrated run path (~lines 1512-1554)\n- Ensure consistent behavior: either write a failed result artifact OR exit non-zero with clear message\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix CLI exit code: benchbox run must return non-zero when benchmark status is FAILED",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "notes": "Unit tests:\n- Pipe-delimited load WITH trailing delimiter (existing behavior preserved)\n- Pipe-delimited load WITHOUT trailing delimiter (new behavior works)\n- TPC-DS load path with .dat.zst shards and no trailing delimiter\nIntegration/CLI test:\n- benchbox run exit code is non-zero on benchmark failure\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression tests for trailing delimiter handling and exit code propagation",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-tpcds-trailing-delimiter-regression",
+        "notes": "Run: benchbox run --platform duckdb --benchmark tpcds --scale 10 --phases load,power \\\n  --platform-option driver_version=1.0.0 --platform-option driver_auto_install=true --non-interactive\nConfirm:\n- No _trailing_delimiter_ binder errors in output\n- Tables load successfully, result JSON is produced\n- Non-zero exit on intentionally induced failure (e.g., bad data file)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify fix with live DuckDB TPC-DS run at scale 10",
+        "wid": "w4"
+      }
+    ]
+  }
+}

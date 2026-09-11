@@ -1,0 +1,10 @@
+{
+  "description": "Expand query plan parser coverage from 2 to 6+ platforms to enable the\ncross-platform comparison use case. Implement parsers for PostgreSQL, Redshift,\nDataFusion, and document platform support clearly.\n\n**Current State**: Only DuckDB (text) and SQLite parsers exist\n**Target State**: All major platforms supported with documented compatibility\n\n**Platforms to Add**:\n- PostgreSQL (JSON format from EXPLAIN (FORMAT JSON))\n- Redshift (XML/text format)\n- DataFusion (tree format)\n- Snowflake (JSON format) - stretch goal\n- ClickHouse (tree format) - stretch goal\n- BigQuery (custom format handling) - stretch goal",
+  "legacy": {
+    "item_meta": {
+      "category": "Feature Completion",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-remediation"
+    }
+  }
+}

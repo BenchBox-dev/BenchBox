@@ -1,0 +1,251 @@
+{
+  "context": "Write one decision record under _project/decisions that binds all later TODOs. Extend the live runbook and PR #1708 rationale; supersede the old queue-gate framing. The record must distinguish unavoidable final integration validation from avoidable re-execution of PR-authored tests. No workflow may skip jobs until the final activation gate produces an explicit GO decision.",
+  "description": "Create the durable authority for the strict-current-base refresh program before any workflow code changes. Revalidate ruleset 15611785, current required contexts, repository ownership, merge methods, auto-merge, synchronize fan-out, and the #1539/#1541 stale-green incident. Define two separate properties: repository-wide and static combined-tree invariants, and full behavioral equivalence to every current required test lane. Record that strict GitHub enforcement is the race lock and that refresh work is a latency optimization. Reconcile the overlapping planning item dev-loop-step-6-queue-decision-gate-3, whose native-queue-versus-steward framing and strict-base assumptions are stale; it must be superseded, updated, or blocked before this program proceeds.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Change hosted settings during this policy item",
+        "instead": "list later operator-only actions separately",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "why": "this is a repository decision gate"
+      },
+      {
+        "dont": "Claim lint proves every runtime interaction",
+        "instead": "state the exact property and residual risk",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "why": "static and repository-wide checks do not prove all behavioral compatibility"
+      },
+      {
+        "dont": "Leave dev-loop-step-6-queue-decision-gate-3 simultaneously actionable",
+        "instead": "reconcile it with an auditable tracker action",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "why": "two authorities can launch incompatible implementations"
+      },
+      {
+        "dont": "Treat reduced CI as the mechanism that closes the stale-green race",
+        "instead": "describe reduced refresh validation as an optimization inside the lock",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "why": "strict GitHub enforcement is already the race lock"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-14T12:48:20Z",
+      "completed_pr": 1731,
+      "created_at": "2026-08-14T12:09:12Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "A privileged merge steward remains rejected unless a later decision explicitly reopens it with a stronger trust model",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation"
+      },
+      {
+        "behavior": "No skip behavior is activated by this item",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation"
+      },
+      {
+        "behavior": "Required contexts are discovered live rather than copied from a dated snapshot",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation"
+      },
+      {
+        "behavior": "Ruleset 15611785 remains strict, squash-only, and without bypass during this item",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "pr-refresh exact merge workflow and one-at-a-time warning",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "path": "Makefile"
+      },
+      {
+        "concept": "trusted required-context drift enforcement",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "path": "_project/decisions/develop-ruleset-drift-required-2026-08-13.md"
+      },
+      {
+        "concept": "older native queue versus steward decision gate",
+        "decision": "supersede",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "path": "dev-loop-step-6-queue-decision-gate-3"
+      },
+      {
+        "concept": "live develop ruleset and current-base rationale",
+        "decision": "extend",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "path": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/strict-base-refresh-policy-*.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'repository-wide|behavioral|residual|race lock|no.*skip|operator' _project/decisions/strict-base-refresh-policy-*.md",
+        "description": "Decision record distinguishes both safety properties and no-activation boundary",
+        "expected": "All policy concepts are present",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "last_result": "pass",
+        "last_run": "2026-08-14T12:48:07Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo show dev-loop-step-6-queue-decision-gate-3 --json | jq -e '(.state == \"dropped\") or (.blocked_reason != null) or (.description | test(\"strict-base-refresh-00-policy-and-legacy-gate-reconciliation\"))'",
+        "description": "Legacy queue gate is no longer an unreconciled parallel authority",
+        "expected": "exit 0",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "last_result": "pass",
+        "last_run": "2026-08-14T12:48:11Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo lint strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "description": "This TODO passes tracker quality lint",
+        "expected": "0 findings",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "last_result": "pass",
+        "last_run": "2026-08-14T12:48:15Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/joeharris76/BenchBox/rulesets/15611785 --jq '[.rules[] | select(.type == \"required_status_checks\") | .parameters.strict_required_status_checks_policy, .parameters.required_status_checks[].context]'",
+        "description": "Live ruleset remains strict and exposes recorded required contexts",
+        "expected": "First value is true and every context in the decision record is present",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "last_result": "pass",
+        "last_run": "2026-08-14T12:48:17Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "live snapshot 2026-08-14T12:39:16Z origin/develop c78e17af25 ruleset 15611785 strict=true contexts=[Results Explorer browser gate, ci-required-result, ruleset-drift] owner=User allow_auto_merge=true allow_update_branch=false; 17 develop merges since 2026-08-13T14:30:01Z",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "notes": "Use live GitHub APIs and origin/develop. Record exact SHAs, ruleset updated_at, all required context names, and every workflow triggered by pull_request synchronize.",
+        "started_at": "2026-08-14T12:39:03Z",
+        "started_branch": "fix/strict-base-refresh-00-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-00",
+        "status": "done",
+        "summary": "Revalidate live ruleset, required checks, ownership, merge controls, auto-merge, refresh history, and workflow topology",
+        "wid": "w0"
+      },
+      {
+        "evidence": "_project/decisions/strict-base-refresh-policy-2026-08-14.md sections Decision and Unavoidable versus avoidable work distinguish repository-wide/static invariants from full behavioral integration and name residual runtime risk",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "notes": "State which property each proposed lane proves and identify residual runtime interaction risk.",
+        "started_at": "2026-08-14T12:40:41Z",
+        "started_branch": "fix/strict-base-refresh-00-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-00",
+        "status": "done",
+        "summary": "Define the narrow invariant property and the stronger full behavioral integration property without conflating them",
+        "wid": "w1"
+      },
+      {
+        "evidence": "todo update+block dev-loop-step-6-queue-decision-gate-3 citing _project/decisions/strict-base-refresh-policy-2026-08-14.md; jq reconciliation check exit 0",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "notes": "Update, block, or supersede it through _project/scripts/todo with an audit reason; do not leave two ready implementation paths.",
+        "started_at": "2026-08-14T12:41:02Z",
+        "started_branch": "fix/strict-base-refresh-00-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-00",
+        "status": "done",
+        "summary": "Reconcile dev-loop-step-6-queue-decision-gate-3 so only one current merge-policy authority remains",
+        "wid": "w2"
+      },
+      {
+        "evidence": "_project/decisions/strict-base-refresh-policy-2026-08-14.md written; settings ownership, activation gate, rollback, and operator-only GitHub mutations recorded",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "notes": "Include settings ownership, decision gates, rollback authority, and the rule that GitHub admin mutations are operator-only.",
+        "started_at": "2026-08-14T12:41:51Z",
+        "started_branch": "fix/strict-base-refresh-00-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-00",
+        "status": "done",
+        "summary": "Write the strict-base refresh policy decision record with repository and operator boundaries",
+        "wid": "w3"
+      },
+      {
+        "evidence": "policy review table covers #1539/#1541, cross-module residual risk, missing checks, and transfer; todo lint 0 findings; verify seq 2-5 pass; live ruleset [true, browser gate, ci-required-result, ruleset-drift]",
+        "item_id": "strict-base-refresh-00-policy-and-legacy-gate-reconciliation",
+        "notes": "Test the decision against #1539/#1541, a cross-module runtime interaction, missing checks, and a repository transfer.",
+        "started_at": "2026-08-14T12:42:02Z",
+        "started_branch": "fix/strict-base-refresh-00-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-fix-strict-base-refresh-00",
+        "status": "done",
+        "summary": "Run focused policy review and TODO lint before allowing classifier implementation",
+        "wid": "w4"
+      }
+    ]
+  }
+}

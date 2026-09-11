@@ -1,0 +1,17 @@
+{
+  "description": "With the fixed TPC-DS binaries supporting stdout output via -FILTER Y,\nupdate BenchBox data generation modules to leverage streaming output\nfor direct compression and open table format writing.\n\nNOTE: The streaming infrastructure already existed in benchbox/core/tpcds/generator/streaming.py\nbut was broken because it used the old \"-_filter y\" flag which didn't work with unfixed dsdgen.\nThis TODO was reduced to updating the flag to use \"-FILTER Y\" (the fixed version).",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "tpcds-stdout-fix-integrate-stdout-datagen",
+        "needs_item": "rebuild-tpcds-binaries"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-15T00:00:00Z",
+      "created_at": "2026-01-15T00:00:00Z",
+      "worktree": "tpcds-stdout-fix"
+    }
+  }
+}

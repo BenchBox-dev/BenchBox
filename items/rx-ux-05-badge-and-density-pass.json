@@ -1,0 +1,124 @@
+{
+  "context": "Render a status badge only when validation is NOT `passed`. Keep the per-result trust marker; compress it visually if it helps, but do not move it to the row label and do not aggregate it.",
+  "description": "Every populated cell in the cross-benchmark matrix carries a trust pill and a `passed` pill. On the observed corpus `passed` reads identically on every one of them, so it discriminates nothing while competing with the measurements for attention (40+ pills on one screen).\n\nTrust must stay: it varies per result and hosted-results-contract.md forbids aggregating it. Only the invariant status pill goes.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-05-badge-and-density-pass",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "hide the status badge unconditionally",
+        "instead": "show it when status is not `passed`",
+        "item_id": "rx-ux-05-badge-and-density-pass",
+        "why": "a failing result must still announce itself"
+      },
+      {
+        "dont": "move trust to the platform row label",
+        "instead": "keep a per-cell trust marker",
+        "item_id": "rx-ux-05-badge-and-density-pass",
+        "why": "trust varies per result and the hosted contract forbids an aggregate badge"
+      },
+      {
+        "dont": "regenerate the public-site visual baseline inside the PR",
+        "instead": "name which e2e/captures specs the change invalidates and update those deliberately",
+        "item_id": "rx-ux-05-badge-and-density-pass",
+        "why": "the baseline is an external CI artifact tied to a base SHA, not a checked-in snapshot"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T19:55:02Z",
+      "completed_pr": 1825,
+      "created_at": "2026-08-22T14:48:55Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Failure and exclusion states remain visible; this removes a badge that is always true, not the ability to show a bad one",
+        "item_id": "rx-ux-05-badge-and-density-pass"
+      },
+      {
+        "behavior": "Trust is per-result. hosted-results-contract.md:687-698 forbids an aggregate trust badge on a mixed-trust set.",
+        "item_id": "rx-ux-05-badge-and-density-pass"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-05-badge-and-density-pass",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/components/TrustBadge.tsx"
+      },
+      {
+        "item_id": "rx-ux-05-badge-and-density-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "rx-ux-05-badge-and-density-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/StatusBadge.tsx"
+      },
+      {
+        "item_id": "rx-ux-05-badge-and-density-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-05-badge-and-density-pass",
+        "last_result": "pass",
+        "last_run": "2026-08-22T19:54:44Z",
+        "seq": 1,
+        "workspace_fingerprint": "edfa67e0186c2925457e0febdad42a47af49b679a8dd546d850ebe3d41a5b744"
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium e2e/capability/accessibility-regressions.spec.ts",
+        "description": "Accessibility regression suite passes",
+        "expected": "fixtures generated, build succeeds, and no new axe violations",
+        "item_id": "rx-ux-05-badge-and-density-pass",
+        "last_result": "pass",
+        "last_run": "2026-08-22T19:54:59Z",
+        "seq": 3,
+        "workspace_fingerprint": "edfa67e0186c2925457e0febdad42a47af49b679a8dd546d850ebe3d41a5b744"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-05-badge-and-density-pass",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "MetaLeaderboard suppresses normalized passed status only; targeted test and typecheck pass",
+        "item_id": "rx-ux-05-badge-and-density-pass",
+        "notes": null,
+        "started_at": "2026-08-22T17:18:46Z",
+        "started_branch": "fix/rx-ux-05-badge-density",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-05-badge-density",
+        "status": "done",
+        "summary": "Render status badge only when status is not `passed`",
+        "wid": "w1"
+      },
+      {
+        "evidence": "MetaLeaderboard test proves failed badge remains danger-toned while passed badge is absent; 19 targeted tests pass",
+        "item_id": "rx-ux-05-badge-and-density-pass",
+        "notes": null,
+        "started_at": "2026-08-22T17:19:27Z",
+        "started_branch": "fix/rx-ux-05-badge-density",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-05-badge-density",
+        "status": "done",
+        "summary": "Unit test: failing status still renders a badge",
+        "wid": "w2"
+      }
+    ]
+  }
+}

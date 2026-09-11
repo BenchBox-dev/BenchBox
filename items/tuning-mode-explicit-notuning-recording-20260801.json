@@ -1,0 +1,157 @@
+{
+  "context": "Fix run.py to record the canonical 'notuning' mode when the user explicitly requested baseline, keeping genuinely-absent (user passed nothing) as the distinct not-recorded state. Trace one facet consumer end-to-end in a test so the distinction is pinned behaviorally, not just at the recording site. Update the schemas.py comment to the pinned vocabulary and confirm replay still round-trips both explicit notuning and absent.",
+  "description": "From the 2026-07-31 adversarial review (doc-vs-code sweep).\n\nDefect (A8/D2): benchbox/cli/commands/run.py:359 records tuning_mode=None for an explicit --tuning notuning run. ADR-002 (docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md, section 2, lines 55-66) requires absent-vs-notuning to stay distinct ('never coerced'); the None coercion makes explicit baseline runs land in the NOT_RECORDED facet downstream and stop exact-matching other notuning runs in comparison surfaces.\n\nResidue: benchbox/core/schemas.py:497 still carries the exact pre-decision comment ADR-002 quotes as the bug ('# \"tuned\", \"notuning\", \"auto\", or path'), documenting the outlawed vocabulary as current; schemas.py:550-551 replays tuning_mode verbatim as a --tuning argument (legitimate for path replay, but the comment must describe the pinned vocabulary from benchbox/core/tuning/modes.py).\n\nVerified consistent while reviewing (do not churn): the vocabulary pin itself (modes.py), fallback labeling (tuning_resolver.py:152), and the --official refusal (run.py:138-158).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not default tuning_mode to 'notuning' whenever tuning is disabled",
+        "instead": "record 'notuning' only on explicit user request; keep None for genuinely absent",
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "why": "that reverse-coerces the absent state ADR-002 protects and corrupts facets from the other direction"
+      },
+      {
+        "dont": "Do not fix only the comment and leave the None coercion",
+        "instead": "fix run.py:359 first, comment second",
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "why": "the comment is residue; the coercion is the facet-corrupting defect"
+      },
+      {
+        "dont": "Do not migrate historical stored results as part of this change",
+        "instead": "fix the recording path; note the historical seam in the PR description",
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "why": "back-population of facets is a separate data decision with its own blast radius"
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness",
+      "completed_at": "2026-08-01T19:57:25Z",
+      "completed_pr": 1437,
+      "created_at": "2026-08-01T12:29:34Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Absent (never specified) stays distinct from explicit notuning in every recorded artifact - the fix must not reverse-coerce absent into notuning.",
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801"
+      },
+      {
+        "behavior": "ExecutionContext replay (schemas.py:550-551) keeps round-tripping path-based --tuning values byte-for-byte.",
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801"
+      },
+      {
+        "behavior": "The --official gate behavior (run.py:138-158) is unchanged.",
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801"
+      },
+      {
+        "behavior": "The pinned mode vocabulary in benchbox/core/tuning/modes.py is the single source of truth; no new mode strings are invented.",
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tuning/modes.py"
+      },
+      {
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/schemas.py"
+      },
+      {
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/**"
+      },
+      {
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli tests/unit/core -q",
+        "description": "CLI + schema unit suites green",
+        "expected": "all pass including the new distinction tests",
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T19:52:41Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -n '\"tuned\", \"notuning\", \"auto\", or path' benchbox/core/schemas.py",
+        "description": "Outlawed vocabulary comment gone",
+        "expected": "exit 0: comment replaced with pinned-vocabulary reference",
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T19:51:51Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite green",
+        "expected": "no regressions",
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T19:54:18Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Tests authored first. Pytest execution waited on live shared-lock holder, so equivalent direct uv probe established red behavior: explicit notuning collapsed to None and replay omitted --tuning notuning; absent assertion remained distinct. Probe exited 1 at the first explicit-notuning assertion.",
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "notes": "Add failing test: an explicit notuning invocation records tuning_mode='notuning' in the execution context / result metadata, while an invocation that never specifies tuning records the absent state; assert the two land in different facet values downstream.",
+        "started_at": "2026-08-01T16:39:06Z",
+        "started_branch": "fix/tuning-mode-explicit-notuning-recording-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Failing test: explicit notuning records tuning_mode='notuning'; absent stays distinct; the two land in different facet values downstream",
+        "wid": "w1"
+      },
+      {
+        "evidence": "ExecutionContext recording now maps only the explicit canonical modes.NOTUNING request to notuning; absent remains None. Direct post-fix probe passed.",
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "notes": "Fix run.py:359 to record the canonical notuning mode on explicit request, sourcing the string from benchbox/core/tuning/modes.py.",
+        "started_at": "2026-08-01T16:40:10Z",
+        "started_branch": "fix/tuning-mode-explicit-notuning-recording-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Fix run.py:359 to record the canonical notuning mode on explicit request, sourced from modes.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Schemas comment now points to the pinned modes module. Replay emits explicit --tuning notuning, omits absent, and preserves path-like values byte-for-byte; tests and direct probe cover all three. Official gate untouched.",
+        "item_id": "tuning-mode-explicit-notuning-recording-20260801",
+        "notes": "Replace the outlawed vocabulary comment at schemas.py:497 with the pinned vocabulary reference and add a replay round-trip test covering explicit notuning and absent.",
+        "started_at": "2026-08-01T16:40:51Z",
+        "started_branch": "fix/tuning-mode-explicit-notuning-recording-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.tuning-review-20260801",
+        "status": "done",
+        "summary": "Replace the outlawed vocabulary comment at schemas.py:497; add replay round-trip test for explicit notuning and absent",
+        "wid": "w3"
+      }
+    ]
+  }
+}

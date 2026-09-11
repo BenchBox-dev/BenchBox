@@ -1,0 +1,254 @@
+{
+  "context": "Land w1 (the field plumbing) first — it is independently safe and makes any\nlater-merged plan observable. Then add the executed-SQL accessor (w2) and wire\nthe shared phase hook into the TPC-H driver (w3), reusing\n_capture_plans_post_measurement verbatim (it already reuses the measurement\nconnection, is structural-only, and honours sampling filters). Factor a single\nTPC helper before duplicating into TPC-DS (w4) so the two drivers cannot drift.\nCapture once over the final measurement iteration's results, not per iteration.\n",
+  "description": "`--capture-plans` is effectively a no-op for the two flagship benchmarks,\nTPC-H and TPC-DS. The generic query pipeline (`_execute_all_queries`) captures\nand persists plans (inline pre-#805, isolated post-measurement phase as of\n#805), but the TPC power drivers do not:\n\n1. `_power_query_result()` (benchbox/platforms/base/execution.py) — the adapter\n   that converts a `TPCHPowerTest` / `TPCDSPowerTest` per-query result into the\n   platform result shape — DROPS the plan fields. It copies query_id, timing,\n   status, rows, stream/position/iteration, but never `query_plan`,\n   `plan_fingerprint`, or `plan_capture_time_ms`. So even if a plan were\n   captured, it would not reach the result bundle.\n2. `TPCHPowerTest` / `TPCDSPowerTest` themselves do no plan capture, and the\n   post-measurement phase wired in #805 lives only in `_execute_all_queries`,\n   not in `_execute_tpch_power_test` / `_execute_tpcds_power_test`.\n\nNet effect: `benchbox run --platform duckdb --benchmark tpch --capture-plans`\nproduces a bundle with NO plans for any query. This TODO closes that gap by\n(a) plumbing the plan fields through `_power_query_result`, and (b) running the\nisolated post-measurement capture phase for the TPC power paths, reusing the\n`_capture_plans_post_measurement` machinery from #805.\n\nThe exact executed SQL (with TPC parameter substitution) is available from the\npower test: `TPCHPowerTest` builds `query_text` via `benchmark.get_query(...)`\nand records `(label, query_text)` in `self.captured_items` (and an equivalent\nlabel->SQL map). The capture phase must use that substituted SQL — not the raw\ntemplates — so the captured plan matches what actually ran.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add capture to the throughput concurrent-stream drivers",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "why": "that is explicitly out of scope (see query-plan-capture-isolation-phase-design anti_patterns)."
+      },
+      {
+        "dont": "capture from raw query templates",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "why": "use the power test's substituted query_text so the plan matches the executed SQL."
+      },
+      {
+        "dont": "capture per measurement iteration",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "why": "capture once after the loop; plans are structural and identical across iterations, so per-iteration capture is wasted EXPLAIN work."
+      },
+      {
+        "dont": "re-introduce inline capture inside the timed query loop",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "why": "keep EXPLAIN off the measurement path."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "needs_item": "query-plan-capture-isolation-phase-design"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-06-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Generic-path capture behavior from #805 (_execute_all_queries) is unchanged.",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence"
+      },
+      {
+        "behavior": "TPC-H/TPC-DS Power@Size and per-query timings must be unaffected — capture runs strictly after all measurement iterations, off the timed path.",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence"
+      },
+      {
+        "behavior": "Throughput (concurrent multi-stream) paths must NOT gain the phase — _execute_tpch_throughput_test / _execute_tpcds_throughput_test stay capture-free (stream isolation is out of scope, per the isolation-phase TODO anti-patterns).",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence"
+      },
+      {
+        "behavior": "Warmup iterations must not trigger capture.",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/plan_capture_phase.py:run_plan_capture_phase — the building block (connection reuse + respect_sampling_filters)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "path": "benchbox/core/plan_capture_phase.py:run_plan_capture_phase"
+      },
+      {
+        "concept": "benchbox/core/tpch/power_test.py:283 — query_text = benchmark.get_query(query_id, ...) and captured_items.append((label, query_text)); the substituted SQL source",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "path": "benchbox/core/tpch/power_test.py:283"
+      },
+      {
+        "concept": "benchbox/platforms/base/adapter.py:plan_capture_phase_eligible — opt-in flag already True for DuckDB/MotherDuck/SQLite/DataFusion/PostgreSQL/Redshift",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "path": "benchbox/platforms/base/adapter.py:plan_capture_phase_eligible"
+      },
+      {
+        "concept": "benchbox/platforms/base/execution.py:_capture_plans_post_measurement — the #805 post-measurement phase helper to reuse (reuses the measurement connection, structural-only, respects sampling filters)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "path": "benchbox/platforms/base/execution.py:_capture_plans_post_measurement"
+      },
+      {
+        "concept": "benchbox/platforms/base/execution.py:_execute_tpcds_power_test (~line 352) — same structure as TPC-H",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "path": "benchbox/platforms/base/execution.py:_execute_tpcds_power_test"
+      },
+      {
+        "concept": "benchbox/platforms/base/execution.py:_execute_tpch_power_test (~line 119) — measurement iterations end before `return all_results`; phase hook goes there",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "path": "benchbox/platforms/base/execution.py:_execute_tpch_power_test"
+      },
+      {
+        "concept": "benchbox/platforms/base/execution.py:_power_query_result — drops query_plan/plan_fingerprint/plan_capture_time_ms; must be extended to carry them",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "path": "benchbox/platforms/base/execution.py:_power_query_result"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/query-plan-capture-tpc-power-driver-persistence.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/power_test.py"
+      },
+      {
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/power_test.py"
+      },
+      {
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "kind": "only_modify",
+        "path_glob": "docs/features/query-plan-analysis.md"
+      },
+      {
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/ -k 'tpc and capture' -v",
+        "description": "TPC-H power run with DuckDB persists plan fingerprints",
+        "expected": "Every successful TPC-H/TPC-DS measurement query result has a plan_fingerprint",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_plan_capture_phase.py tests/integration/test_plan_capture_e2e.py -v",
+        "description": "Generic-path and existing plan-capture tests still pass",
+        "expected": "all pass",
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "notes": "Extend _power_query_result() to copy query_plan, plan_fingerprint, and\nplan_capture_time_ms from the source query_result dict when present (mirror\nhow _merge_plan_capture_into_result names them). No capture logic here —\njust stop dropping the fields so a later-merged plan survives to the bundle.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Plumb plan fields through _power_query_result",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "notes": "The phase needs {query_id: executed_sql}. Source it from the power test's\ncaptured_items / label->SQL map (TPCHPowerTest builds query_text via\nbenchmark.get_query with the run's seed/stream). Provide a small accessor or\nreuse captured_items rather than re-deriving templates, so the captured plan\nmatches the executed text. Resolve the gating open_question first (which\niteration's substitution to capture).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Expose the executed (substituted) SQL keyed by query_id from the TPC power tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "notes": "After all MEASUREMENT iterations complete (not warmup, not per-iteration),\nand only when capture_plans + plan_capture_phase_eligible, call\n_capture_plans_post_measurement(connection, {query_id: executed_sql},\nresults) over the measurement results. Reuse the measurement connection\nexactly as _execute_all_queries does. Do NOT run during warmup and do NOT\ncapture per iteration (capture once over the final measurement set).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run the post-measurement capture phase in _execute_tpch_power_test",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "notes": "Apply the same hook as w3 to the TPC-DS power driver. Factor the shared\nlogic (collect success query_ids -> executed SQL -> phase -> merge) into a\nsingle helper so TPC-H and TPC-DS do not drift.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run the post-measurement capture phase in _execute_tpcds_power_test",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "notes": "DuckDB, small scale (SF 0.01), benchmark=tpch then tpcds, capture_plans=True.\nAssert: every successful measurement query result carries a 64-char hex\nplan_fingerprint; capture happens once post-measurement (not per iteration);\npower metrics (Power@Size, timings) are unchanged vs a no-capture run within\ntolerance. Reuse the DuckDB file-based pattern from\ntests/integration/test_plan_capture_phase.py.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Integration tests: plans persist for TPC-H/TPC-DS power runs",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-tpc-power-driver-persistence",
+        "notes": "Update docs/features/query-plan-analysis.md \"Capture Isolation\n(post-measurement phase)\" section to state the phase now also covers the\nTPC-H/TPC-DS power drivers (previously generic-only).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Docs: note TPC-H/TPC-DS now persist plans via the post-measurement phase",
+        "wid": "w6"
+      }
+    ]
+  }
+}

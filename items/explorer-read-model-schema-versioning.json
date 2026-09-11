@@ -1,0 +1,280 @@
+{
+  "context": "One source of truth for the version constant lives in\n`benchbox/core/explorer_pipeline/contract.py`. Both the duckdb writer\nand the Node contract-fetch script consume it. The frontend imports it\nvia the existing contract-fetch path. The 51-column list goes away.\n\nSequence: emit + read the new field (w1, w2) before tests (w3),\nbecause the tests assert against the live code. Then CONTRIBUTING (w4).\n",
+  "description": "The frontend at `results-explorer/src/db.ts:53-106` hard-codes 51 required\ncolumn names against `bench.results` and validates the snapshot by\ncomputing a set difference. Any backend rename/add/remove silently\ninvalidates every existing snapshot — dev's local copy, downloaded\nproduction copies, CI fixture caches — until they regenerate. The error\nshape is a 9-name diff dump, which is hard to act on and embeds no\nupgrade hint.\n\nThere is already an `EXPLORER_BUILD_CONTRACT` mechanism (see\n`benchbox/core/explorer_pipeline/contract.py` and\n`results-explorer/scripts/explorer-build-contract.mjs`), but it versions\nthe *output file shape*, not the *read-model column set*. The frontend\nguard does not consult any version field.\n\nGoal: replace the column-set diff with a real schema version. The\nfrontend error becomes \"snapshot read-model v6; UI requires v7. Please\nrebuild or update.\" Backend PRs that bump the read-model column set are\nrequired to bump `read_model_version`.\n\nThis TODO is independent of CLI relocation (`explorer-cli-surface-\nmigration`) and dev-DX (`explorer-dev-snapshot-dx`), but lands cleaner\nafter the CLI relocation because the verification commands and\ncontract emitter point at the new entry.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "couple this to the dev-DX TODO. The dev-DX TODO is about *when* this error fires; this TODO is about *what shape* the error takes when it fires. Either order of landing is fine.",
+        "instead": "(not specified)",
+        "item_id": "explorer-read-model-schema-versioning",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "keep a fallback to the 51-column diff guard 'just in case'",
+        "instead": "(not specified)",
+        "item_id": "explorer-read-model-schema-versioning",
+        "why": "the version check is the contract; the column list is the old contract."
+      },
+      {
+        "dont": "silently auto-rebuild on version mismatch",
+        "instead": "(not specified)",
+        "item_id": "explorer-read-model-schema-versioning",
+        "why": "the user (or CI) must opt in to a rebuild. Auto-rebuild on an outdated snapshot risks long startup pauses and obscures real schema-drift bugs."
+      },
+      {
+        "dont": "version-stamp individual columns or use a semver string. A monotonically-increasing integer is sufficient and simple; semver invites premature bikeshedding.",
+        "instead": "(not specified)",
+        "item_id": "explorer-read-model-schema-versioning",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-read-model-schema-versioning",
+        "id": 170,
+        "reason": "Nice-to-have; the CONTRIBUTING note + PR-review discipline is the v1 gate. File a follow-up TODO only if column-bumps land without version-bumps in practice.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Pre-commit lint deferred pending evidence of column bumps landing without version bumps in practice; no such evidence cited.",
+        "summary": "Pre-commit lint enforcing version bump on column change."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-read-model-schema-versioning",
+        "needs_item": "explorer-cli-surface-migration"
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness",
+      "completed_at": "2026-05-14T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "explorer-read-model-schema-versioning"
+    },
+    "preserves": [
+      {
+        "behavior": "Browser-fixture generator continues to work — only the column-list guard goes away; readiness scans for individual tables stay.",
+        "item_id": "explorer-read-model-schema-versioning"
+      },
+      {
+        "behavior": "Existing snapshots produced before this TODO continue to fail informatively (as 'v0 missing or stale').",
+        "item_id": "explorer-read-model-schema-versioning"
+      },
+      {
+        "behavior": "Production CI rebuild does not change behavior — the new version is emitted by the same publish entry point.",
+        "item_id": "explorer-read-model-schema-versioning"
+      },
+      {
+        "behavior": "The build contract continues to validate via `EXPLORER_BUILD_CONTRACT`; this TODO extends it, does not replace it.",
+        "item_id": "explorer-read-model-schema-versioning"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/explorer_pipeline/contract.py — existing `EXPLORER_BUILD_CONTRACT` versioning the output shape; EXTEND with a `read_model_version` field rather than introducing a parallel mechanism.",
+        "decision": "extend",
+        "item_id": "explorer-read-model-schema-versioning",
+        "path": "benchbox/core/explorer_pipeline/contract.py"
+      },
+      {
+        "concept": "benchbox/core/explorer_pipeline/duckdb_builder.py — writes the duckdb snapshot; the place to emit a `schema_version` scalar/table.",
+        "decision": "reuse",
+        "item_id": "explorer-read-model-schema-versioning",
+        "path": "benchbox/core/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "concept": "results-explorer/scripts/explorer-build-contract.mjs:7 (REQUIRED_OUTPUTS) and the contract-fetching helper — established pattern for the Node side reading contract values; reuse.",
+        "decision": "reuse",
+        "item_id": "explorer-read-model-schema-versioning",
+        "path": "results-explorer/scripts/explorer-build-contract.mjs:7"
+      },
+      {
+        "concept": "results-explorer/src/components/__tests__/ — vitest convention for the frontend version-mismatch test.",
+        "decision": "reuse",
+        "item_id": "explorer-read-model-schema-versioning",
+        "path": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "concept": "results-explorer/src/db.ts:184-199 (verifyBenchResultsColumns) — the function to replace with a version check.",
+        "decision": "reuse",
+        "item_id": "explorer-read-model-schema-versioning",
+        "path": "results-explorer/src/db.ts:184-199"
+      },
+      {
+        "concept": "results-explorer/src/db.ts:53-106 (BENCH_RESULTS_REQUIRED_COLUMNS) — the 51-name list to remove.",
+        "decision": "reuse",
+        "item_id": "explorer-read-model-schema-versioning",
+        "path": "results-explorer/src/db.ts:53-106"
+      },
+      {
+        "concept": "tests/unit/cli/test_explorer_build_contract.py — existing contract test pattern to extend.",
+        "decision": "extend",
+        "item_id": "explorer-read-model-schema-versioning",
+        "path": "tests/unit/cli/test_explorer_build_contract.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-read-model-schema-versioning",
+        "kind": "only_modify",
+        "path_glob": "CONTRIBUTING.md"
+      },
+      {
+        "item_id": "explorer-read-model-schema-versioning",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/contract.py"
+      },
+      {
+        "item_id": "explorer-read-model-schema-versioning",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "item_id": "explorer-read-model-schema-versioning",
+        "kind": "only_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "explorer-read-model-schema-versioning",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/explorer-build-contract.mjs"
+      },
+      {
+        "item_id": "explorer-read-model-schema-versioning",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "explorer-read-model-schema-versioning",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/**"
+      },
+      {
+        "item_id": "explorer-read-model-schema-versioning",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_explorer_build_contract.py"
+      },
+      {
+        "item_id": "explorer-read-model-schema-versioning",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'from benchbox.core.explorer_pipeline.contract import EXPLORER_BUILD_CONTRACT; print(EXPLORER_BUILD_CONTRACT.read_model_version)'",
+        "description": "New `read_model_version` round-trips snapshot -> contract -> frontend.",
+        "expected": "integer >= 1",
+        "item_id": "explorer-read-model-schema-versioning",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline tests/unit/cli/test_explorer_build_contract.py -q",
+        "description": "Backend tests pass.",
+        "expected": "exit 0",
+        "item_id": "explorer-read-model-schema-versioning",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run read-model-version",
+        "description": "Frontend version-mismatch test passes.",
+        "expected": "exit 0",
+        "item_id": "explorer-read-model-schema-versioning",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run 'read-model-version-mismatch'",
+        "description": "Old (pre-version) snapshot raises the humane v0/v1 error, not a column diff.",
+        "expected": "test exits 0 and the asserted error string contains 'read-model v' and 'requires v', and does NOT contain the literal 'is missing required columns'",
+        "item_id": "explorer-read-model-schema-versioning",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'BENCH_RESULTS_REQUIRED_COLUMNS' results-explorer/src/db.ts",
+        "description": "The 51-column constant has been removed.",
+        "expected": "0",
+        "item_id": "explorer-read-model-schema-versioning",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-read-model-schema-versioning",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-read-model-schema-versioning",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-read-model-schema-versioning",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-read-model-schema-versioning",
+        "notes": "In `benchbox/core/explorer_pipeline/contract.py`, add a\n`read_model_version: int` field (start at 1 to represent the current\ncolumn set). Increment as a deliberate constant when the column set\nchanges.\n\nIn `benchbox/core/explorer_pipeline/duckdb_builder.py`, write the\nvalue as either:\n  (a) a one-row `bench.metadata` table:\n      `CREATE TABLE bench.metadata AS SELECT 1 AS read_model_version;`\n  (b) a DuckDB user-metadata pragma if portable.\n\n(a) is preferred for portability; the frontend already attaches the\n`bench` catalog.\n\nBackfill: existing snapshots have no version → treat as version 0,\nUI prompts for rebuild.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `read_model_version` to the build contract and the duckdb snapshot",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-read-model-schema-versioning",
+        "notes": "In `results-explorer/src/db.ts`:\n  - Add a `EXPECTED_READ_MODEL_VERSION` constant sourced from the\n    contract file (so the Node + browser sides share one source of\n    truth, the same way the Node `EXPECTED_COMMAND` is sourced).\n  - Replace `BENCH_RESULTS_REQUIRED_COLUMNS` and\n    `verifyBenchResultsColumns` with a single query:\n    `SELECT read_model_version FROM bench.metadata LIMIT 1`.\n  - On missing table or older version, throw a humane error:\n    \"Snapshot read-model v{found}, UI requires v{expected}.\n    Please regenerate via <invocation from\n    `explorer-cli-surface-migration`>, or refresh from the published\n    site.\"\n  - On version equal, proceed.\n  - On version *newer* than UI expects: log a console warning but\n    proceed (forward-compatible reads).\n\nRemove the 51-column constant entirely.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace the frontend column-diff guard with a version check",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-read-model-schema-versioning",
+        "notes": "Frontend vitest under `results-explorer/src/lib/__tests__/`:\n  - Build a tiny in-memory DuckDB with `bench.metadata.read_model_version = 0` → expect humane error containing \"v0\" and \"v1\".\n  - Same but with version = 1 → expect no error.\n  - Same but with `bench.metadata` table absent → expect rebuild\n    prompt.\n\nBackend test under `tests/unit/core/explorer_pipeline/`:\n  - Build snapshot, assert `read_model_version` is present and matches\n    the constant in `contract.py`.\n  - Extend `test_explorer_build_contract.py` to assert\n    `EXPLORER_BUILD_CONTRACT.read_model_version` is exported on the\n    contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tests: version-mismatch error path + same-version pass path",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-read-model-schema-versioning",
+        "notes": "In `CONTRIBUTING.md` (or `docs/development/browser-duckdb-schema.sql`\nheader if that's where backend schema lives): one-line note —\n\"If you change the column set of `bench.results`, bump\n`read_model_version` in `benchbox/core/explorer_pipeline/contract.py`.\"\n\nOptional: a fast linter / pre-commit check that diffs the column-emitting\nSQL against the last committed `read_model_version` and fails if the\ncolumns changed but the version did not. Defer if non-trivial; the\nCONTRIBUTING line is enough for v1.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a CONTRIBUTING line gating column-set bumps on version bumps",
+        "wid": "w4"
+      }
+    ]
+  }
+}

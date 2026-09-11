@@ -1,0 +1,11 @@
+{
+  "description": "Show the introspection-corroborated applied_verified state + receipt in the results-explorer receipt UI. Deferred from tuning-introspection-receipts-20260716 (was blocked by then-unmerged #1264, now merged).",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-23T20:26:10Z",
+      "completed_pr": 1287,
+      "created_at": "2026-07-22T21:07:23Z",
+      "worktree": "main"
+    }
+  }
+}

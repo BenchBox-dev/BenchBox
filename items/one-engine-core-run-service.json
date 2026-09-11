@@ -1,0 +1,318 @@
+{
+  "context": "Strangler sequence: (w1) characterization tests pinning current CLI run behavior for a representative matrix (duckdb tpch sql, a dataframe platform, phases variants, tuning modes, dry-run) -- these are the safety net for every later move; (w2) create the service with a typed RunRequest/RunPlan boundary (resolution only, no execution) and port config resolution; (w3) port execution orchestration around core/runner/runner.py with injected adapter factory; (w4) migrate CLI orchestrator onto the service, delete the moved CLI code; (w5) move presort defaults into benchmark registry metadata. Keep each work unit a separately landable PR. Interactive wizardry, display, and credential prompting stay in the CLI layer. Watch the fast-lane test cap when adding characterization tests; they may belong in the medium lane.",
+  "description": "Keystone of the one-engine program; the file path benchbox/core/run_service.py was already reserved in the superseded decision's scope. Today there are two live benchmark-run pipelines: CLI (benchbox/cli/orchestrator.py 601 lines + benchbox/cli/execution_pipeline.py 430 lines: hooks, credential setup, cloud staging, driver metadata, provenance) and MCP (_run_benchmark_impl in benchbox/mcp/tools/benchmark.py ~1000 lines: direct adapter + run_with_platform calls with its own mode/phase/option handling). Extract into a core run service the logic that must be identical: 14-step config resolution (run.py:1276-1301 _prepare_run_state), tuning/compression precedence (run.py:1199-1252), data-organization derivation (run.py:205-289 -- move the hardcoded TPC-H lineitem.l_shipdate / TPC-DS store_sales.ss_sold_date_sk presort defaults into benchmark registry metadata), platform-mode/deployment resolution (run.py:970-1032), phase parsing/validation + execution-type derivation (run.py:505-526, :838-916; MCP benchmark.py:165-186), and ExecutionContext/provenance construction (run.py:308-361). CLI orchestrator/execution_pipeline become thin consumers in this item; MCP adoption is the follow-up item. CRITICAL LAYERING CONSTRAINT: .importlinter enforces utils < core < platforms < cli, so core may NOT import benchbox.platforms -- the run service must receive adapters/adapter factories by injection from the calling layer, mirroring how core/runner/runner.py already stays below platforms.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "import benchbox.platforms from the run service to construct adapters",
+        "instead": "accept an adapter or adapter-factory parameter injected by the surface layer",
+        "item_id": "one-engine-core-run-service",
+        "why": ".importlinter layers contract: core < platforms; violating it breaks CI lint and the architecture"
+      },
+      {
+        "dont": "move the interactive wizard, credential prompting, or display code into core",
+        "instead": "leave interaction in the CLI layer; the service takes fully-resolved inputs",
+        "item_id": "one-engine-core-run-service",
+        "why": "interaction-scoped logic is legitimately surface-specific under the new contract"
+      },
+      {
+        "dont": "refactor/improve behavior while extracting",
+        "instead": "move code verbatim first; improvements are separate PRs after characterization holds",
+        "item_id": "one-engine-core-run-service",
+        "why": "extraction diffs must be reviewable as pure moves or every regression hides in the noise"
+      },
+      {
+        "dont": "route MCP through BenchmarkOrchestrator as a shortcut",
+        "instead": "MCP adopts the new core service in the follow-up item",
+        "item_id": "one-engine-core-run-service",
+        "why": "preserved guidance from the superseded decision; orchestrator is CLI-layer and carries interactive assumptions"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-06T00:45:50Z",
+        "from_item": "one-engine-core-run-service",
+        "id": 698,
+        "reason": "Read of benchbox/cli/orchestrator.py at develop f8713f2b37 shows the orchestrator half of w4 was already completed by w2 (#1561) and w3 (#1564): line 288 delegates to execute_run and line 459 to resolve_run_config. Everything remaining in that file is correctly surface-scoped under the scoped-surfaces ADR -- DirectoryManager and benchbox.cli.benchmark_hooks.BenchmarkHookRegistry are CLI-layer imports, plus console output, CredentialManager with interactive Confirm prompts, and get_platform_adapter/get_adapter which must stay above core per the .importlinter layering. There is no leftover moved code to delete there. The execution_pipeline half names a module with zero production importers, so migrating it onto the service would wire dead code into core; that disposition is split out to one-engine-delete-dead-execution-pipeline. w4's remaining real content is therefore the verification-ladder closure: the tuning.py presort fix (split to cli-tuning-wizard-presort-hint-divergence) and narrowing rung 4.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "w4 as written is unsatisfiable: orchestrator already delegates to run_service at HEAD 9b47e04de8 (orchestrator.py:288 execute_run, :459 resolve_run_config), remaining CLI-layer imports are correctly surface-scoped per ADR; execution_pipeline is dead code with zero prod importers, disposition split to one-engine-delete-dead-execution-pipeline; remaining presort fix split to cli-tuning-wizard-presort-hint-divergence. w4 closure is verification-ladder narrowing, not migration.",
+        "summary": "w4 unit text is unsatisfiable as written: orchestrator already migrated, execution_pipeline should not migrate"
+      },
+      {
+        "created_at": "2026-08-06T00:46:03Z",
+        "from_item": "one-engine-core-run-service",
+        "id": 699,
+        "reason": "Rung 4 is '! grep -rn l_shipdate|ss_sold_date_sk benchbox/cli/'. At develop f8713f2b37 it returns four hits, only two of which are defects. benchbox/cli/tuning.py:781 and :786 are a real hardcoded benchmark presort default (tracked as cli-tuning-wizard-presort-hint-divergence). benchbox/cli/commands/convert.py:166 and :170 are '--partition l_shipdate' usage examples inside a command docstring -- prose describing a user-supplied flag value, not a presort default, and l_shipdate is exactly the recognizable TPC-H column a reader would expect there. The rung as written can only go green by rewriting a good docs example to satisfy a grep that cannot distinguish code from prose. Narrow the rung to executable code (or exclude docstring/comment lines) rather than degrading the example.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Rung 4 greps prose as well as code: convert.py:166,170 are docstring examples of --partition l_shipdate, not hardcoded defaults; only tuning.py:781,786 are defects. Rung narrowed to executable code in follow-up; degrading docs example would be wrong. See deferral #699 reasoning.",
+        "summary": "Verification rung 4 greps prose as well as code, so it cannot pass without degrading a docs example"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "one-engine-core-run-service",
+        "needs_item": "one-engine-adr-scoped-surfaces"
+      }
+    ],
+    "item_meta": {
+      "category": "core",
+      "completed_at": "2026-08-08T18:13:54Z",
+      "created_at": "2026-08-04T17:14:45Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "BaseBenchmark.run_with_platform remains public API (beta-public contract row, public-contracts.md:34).",
+        "item_id": "one-engine-core-run-service"
+      },
+      {
+        "behavior": "CLI-observable behavior is unchanged: same results, same result-bundle fields, same provenance, same exit codes (characterization tests are the gate).",
+        "item_id": "one-engine-core-run-service"
+      },
+      {
+        "behavior": "PlatformHookRegistry and cloud staging semantics move intact -- no behavioral simplification during extraction.",
+        "item_id": "one-engine-core-run-service"
+      },
+      {
+        "behavior": "core never imports benchbox.platforms or benchbox.cli (lint-imports stays green).",
+        "item_id": "one-engine-core-run-service"
+      },
+      {
+        "behavior": "run_official's stream forwarding keeps working while it exists (its monkeypatch is removed in one-engine-sink-cli-logic, not here).",
+        "item_id": "one-engine-core-run-service"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Layering contracts that dictate the adapter-injection design",
+        "decision": "reuse",
+        "item_id": "one-engine-core-run-service",
+        "path": ".importlinter"
+      },
+      {
+        "concept": "BaseBenchmark.run_with_platform, the current public execution hook MCP uses; service subsumes its role for orchestrated runs while the hook remains public API",
+        "decision": "extend",
+        "item_id": "one-engine-core-run-service",
+        "path": "benchbox/base.py"
+      },
+      {
+        "concept": "The behavior source being extracted; compare-behavior reference per the superseded decision's prior_art",
+        "decision": "supersede",
+        "item_id": "one-engine-core-run-service",
+        "path": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "concept": "Existing core runner already below the platforms layer; the service composes it rather than replacing it",
+        "decision": "extend",
+        "item_id": "one-engine-core-run-service",
+        "path": "benchbox/core/runner/runner.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-core-run-service",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/execution_pipeline.py"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f benchbox/core/run_service.py && grep -q 'run_service' benchbox/cli/orchestrator.py",
+        "description": "Run service exists in core and CLI consumes it",
+        "expected": "Service module exists; CLI orchestrator delegates to it.",
+        "item_id": "one-engine-core-run-service",
+        "last_result": "pass",
+        "last_run": "2026-08-16T22:59:42Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- lint-imports",
+        "description": "Layering contracts hold",
+        "expected": "No new layering violations; core does not import platforms or cli.",
+        "item_id": "one-engine-core-run-service",
+        "last_result": "pass",
+        "last_run": "2026-08-16T22:59:48Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit -k 'run_service or characterization' -q",
+        "description": "Characterization suite green",
+        "expected": "Pinned CLI behavior unchanged through the extraction.",
+        "item_id": "one-engine-core-run-service",
+        "last_result": "pass",
+        "last_run": "2026-08-16T23:00:59Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Full fast lane green",
+        "expected": "No regressions across the suite.",
+        "item_id": "one-engine-core-run-service",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_presort_registry_defaults.py -q",
+        "description": "No hardcoded benchmark presort defaults remain in executable CLI resolution",
+        "expected": "The focused registry ownership tests pass while preserving recognizable convert command docstring examples.",
+        "item_id": "one-engine-core-run-service",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-core-run-service",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "one-engine-core-run-service",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Pipeline shapes mapped at develop 4836e3988d. BenchmarkOrchestrator (benchbox/cli/orchestrator.py, 601 lines) is the CLI entry: execute_benchmark:239 is the loop; _prepare_run_config:489 is pure config resolution except for two surface dependencies (self.directory_manager, a benchbox.cli.config.DirectoryManager, and self._verbosity); resolved_deployment_mode:49 and _build_failure_result:64 are already pure; _resolve_output_root:414 and _resolve_construction_output_dir:184 depend on a benchmark instance. STAYS in CLI per the interaction-scoped anti-pattern: _should_offer_credential_setup:535 and _offer_and_run_credential_setup:570. BECOMES the injected factory: _build_platform_adapter:450, the only user of the line-40 'from benchbox.platforms import get_adapter, get_platform_adapter' import that core must never carry. Second layering blocker is line 16 'from benchbox.cli.config import DirectoryManager'. execution_pipeline.py (430 lines) branches test_execution_type == 'data_only' to _execute_data_only:220, otherwise _execute_with_platform. Presort for w5: run.py:252-289 _resolve_data_organization_payload, consumed at run.py:1173 and 1435.",
+        "item_id": "one-engine-core-run-service",
+        "notes": null,
+        "started_at": "2026-08-04T22:43:28Z",
+        "started_branch": "test/one-engine-run-orchestration-characterization",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Re-verify pipeline shapes at HEAD; map every function slated to move with current line refs",
+        "wid": "w0"
+      },
+      {
+        "evidence": "tests/unit/test_run_orchestration_characterization.py (PR #1559) pins execution-type derivation on both surfaces and bounds the 48-of-127 two-query-phase divergence in both directions. tests/unit/cli/test_run_config_resolution_characterization.py (PR #1560) pins _prepare_run_config across the option matrix; it refuted two assumptions -- a bare-string or arbitrary-dict tuning config does NOT disambiguate the database path (only a recognized shape does), and VerbositySettings has no verbose= constructor arg.",
+        "item_id": "one-engine-core-run-service",
+        "notes": null,
+        "started_at": "2026-08-04T23:52:48Z",
+        "started_branch": "refactor/one-engine-run-service-execution-port-v2",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Characterization tests pinning CLI run behavior across the representative matrix",
+        "wid": "w1"
+      },
+      {
+        "evidence": "benchbox/core/run_service.py with RunRequest, RunPlan, VerbosityLike Protocol, SilentVerbosity, and resolve_run_config; BenchmarkOrchestrator._prepare_run_config delegates. DirectoryManager stays CLI-side and the computed path is passed as data. Pure move proven by the w1 suite passing unmodified through the delegation plus a model_dump equality assertion. PR #1561.",
+        "item_id": "one-engine-core-run-service",
+        "notes": null,
+        "started_at": "2026-08-04T23:52:51Z",
+        "started_branch": "refactor/one-engine-run-service-execution-port-v2",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "RunRequest/RunPlan types + config-resolution port (no execution yet)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "execute_run in core takes an AdapterFactory Protocol; the CLI passes a closure so benchbox.platforms stays surface-side. Moved: requested-phases stamp, LifecyclePhases mapping, ValidationOptions, execution-mode detection, lifecycle call, driver-metadata enrichment. Stayed: console output, credential retry, and the cloud load-phase warning (extracted as _warn_on_execute_without_load). Six test modules repointed their run_benchmark_lifecycle patch to core. PR #1564.",
+        "item_id": "one-engine-core-run-service",
+        "notes": null,
+        "started_at": "2026-08-04T23:53:03Z",
+        "started_branch": "refactor/one-engine-run-service-execution-port-v2",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Execution orchestration port with injected adapter factory",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Verified at HEAD 9b47e04de8: benchbox/core/run_service.py exists and orchestrator delegates; execution_pipeline zero prod importers, split to delete-dead pipeline; presort split to cli-tuning-wizard; verifications 1,2,3,5 green.",
+        "item_id": "one-engine-core-run-service",
+        "notes": null,
+        "started_at": "2026-08-08T18:13:49Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "CLI orchestrator/execution_pipeline migrate onto the service; delete moved code",
+        "wid": "w4"
+      },
+      {
+        "evidence": "presort_table_configs added to benchmark_registry.yaml for tpch/tpcds with a PresortColumn schema model (Literal asc/desc); CLI reads get_presort_table_configs / presort_capable_benchmarks. Rung 4's grep is broader than its expectation -- l_shipdate also appears in cli/tuning.py prompt hints and cli/commands/convert.py help examples, neither a presort default nor in scope. Disclosed in PR #1562.",
+        "item_id": "one-engine-core-run-service",
+        "notes": null,
+        "started_at": "2026-08-04T23:52:54Z",
+        "started_branch": "refactor/one-engine-run-service-execution-port-v2",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/cli-mcp-consistency-review-898132",
+        "status": "done",
+        "summary": "Presort defaults move from run.py:251-289 into benchmark registry metadata",
+        "wid": "w5"
+      }
+    ]
+  }
+}

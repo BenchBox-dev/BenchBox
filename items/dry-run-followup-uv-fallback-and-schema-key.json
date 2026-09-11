@@ -1,0 +1,88 @@
+{
+  "description": "Two small contributor-facing clarifications in\n`docs/contributing-results.md`, both surfaced by the agent-proxy\ndry-run on 2026-04-28\n(see `_project/handoffs/external-dry-run-retrospective-2026-04-28.md`).\n\n1. The \"Running Validation Locally\" block uses `uv run -- python …`\n   for every example. In environments where `uv` is not installed or\n   is slow to bootstrap a venv, plain `python scripts/validate_submission.py …`\n   works identically. Add a one-line \"no uv? use python directly\"\n   note. (Cowork's sandbox specifically hit a 45s `uv run` stall\n   and had to fall back to `python3` — a real-world contributor on\n   a constrained machine could hit the same.)\n\n2. The \"Quality Expectations\" section says \"Schema v2 format - only\n   the current schema version is accepted\". The actual JSON key is\n   `version` (string, currently `\"2.1\"`), not `schema_version`. Name\n   the key explicitly so contributors can grep their bundle to\n   verify compliance.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "name a different JSON key than the bundle actually emits",
+        "instead": "check a real bundle's top-level keys before naming one",
+        "item_id": "dry-run-followup-uv-fallback-and-schema-key",
+        "why": "a contributor grepping their bundle should find what the doc says is there"
+      },
+      {
+        "dont": "remove the `uv run` examples in favor of plain `python`",
+        "instead": "add the fallback as an alternative line",
+        "item_id": "dry-run-followup-uv-fallback-and-schema-key",
+        "why": "most contributors do have uv and removing it would break the canonical Python tooling pattern"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-04-28T00:00:00Z",
+      "created_at": "2026-04-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The Quality Expectations section still names schema v2 as the accepted format",
+        "item_id": "dry-run-followup-uv-fallback-and-schema-key"
+      },
+      {
+        "behavior": "The existing `uv run -- python` examples remain in the doc as the canonical invocation -- the fallback is added as an alternative, not a replacement",
+        "item_id": "dry-run-followup-uv-fallback-and-schema-key"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dry-run-followup-uv-fallback-and-schema-key",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -cE 'top-level `version`|JSON key `version`|`version` field' docs/contributing-results.md",
+        "description": "Doc names the top-level version JSON key explicitly",
+        "expected": ">= 1",
+        "item_id": "dry-run-followup-uv-fallback-and-schema-key",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -ciE 'without uv|no uv|don.t have uv' docs/contributing-results.md",
+        "description": "Doc mentions a non-uv fallback for the validation block",
+        "expected": ">= 1",
+        "item_id": "dry-run-followup-uv-fallback-and-schema-key",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-uv-fallback-and-schema-key",
+        "notes": "Add a sentence: \"If you don't have `uv`, replace `uv run -- python`\nwith `python` — the scripts have no uv-specific dependencies.\"\nPlace it once at the top of the local-validation block.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a non-uv fallback note to Running Validation Locally",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dry-run-followup-uv-fallback-and-schema-key",
+        "notes": "Change \"Schema v2 format - only the current schema version is\naccepted\" to \"Schema v2 format (top-level `version` field,\ncurrently `\\\"2.1\\\"`)\". Optionally add a one-line how-to:\n`python3 -c \"import json; print(json.load(open('bundle.json'))['version'])\"`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Name the version JSON key explicitly under Quality Expectations",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,687 @@
+{
+  "context": "Follow the existing capability pattern in PlatformAdapter (see DriverIsolationCapability\nfor precedent on class-level capability declarations).\n\nFor DuckDB: CREATE VIEW AS SELECT * FROM read_parquet('{path}/*.parquet'). Reuse data\nfile discovery logic from DataLoader for Parquet glob patterns and Delta detection.\n\nFor cloud platforms: reuse each platform's existing upload/staging infrastructure.\nThe key change is what happens AFTER upload - instead of COPY INTO / CTAS into native\ntables, create external table references pointing at the uploaded location. Each\nplatform has its own external table DDL:\n  - Snowflake: CREATE EXTERNAL TABLE ... WITH LOCATION = @stage/path\n  - Athena:    CREATE EXTERNAL TABLE ... LOCATION 's3://bucket/path/'\n  - BigQuery:  CREATE EXTERNAL TABLE ... OPTIONS(uris=['gs://...'])\n  - Redshift:  CREATE EXTERNAL TABLE via Spectrum external schema\n  - Databricks: CREATE TABLE ... USING PARQUET LOCATION '{path}'\n  - ClickHouse: CREATE TABLE ... ENGINE = S3('{url}', 'Parquet')\n  - Trino/Presto: CREATE TABLE ... WITH (external_location = '{path}')\n  - Synapse:   CREATE EXTERNAL TABLE via PolyBase external data source\n\nDataFusion and Polars already implement direct scanning - just declare the capability\nflag and wire through. No behavioral changes needed.\n\nThe runner.py routing change should be minimal: check the flag, validate the capability,\nand call the alternate method. Keep existing load paths completely untouched.\n\nImplementation order: foundation (w1-w3) -> local engines (w4-w5) -> easiest cloud\nplatform (w6 Athena, already external) -> remaining cloud platforms (w7-w13).\n",
+  "description": "BenchBox currently materializes all benchmark data into engine-managed (native) tables:\nSQL platforms use CREATE TABLE + INSERT/COPY, while DataFrame platforms (Polars,\nDataFusion) already scan source files directly. Cloud platforms upload data to object\nstorage and then COPY INTO native tables, discarding the staged format.\n\nAdding --table-mode gives explicit control over table creation strategy:\n  - native (default): current behavior - CREATE TABLE + INSERT/COPY INTO\n  - external: CREATE VIEW, CREATE EXTERNAL TABLE, or register external data source\n    pointing to source files (local Parquet) or uploaded object storage paths\n\nExternal mode unlocks three capabilities:\n  1. True apples-to-apples cross-engine comparisons - all engines read the same files\n  2. Faster iteration by skipping the materialization step\n  3. Benchmarking external table query performance - a real production data lake pattern\n\nFor cloud platforms, data is still uploaded to object storage (S3, GCS, Azure Blob)\nduring the load phase - but instead of COPY INTO native tables, the engine creates\nexternal table references pointing at the uploaded Parquet files.\n\nPlatform readiness:\n\n  Already external:  DataFusion (CREATE EXTERNAL TABLE), Polars (scan_parquet)\n  View-based:        DuckDB (CREATE VIEW over read_parquet), MotherDuck (inherits)\n  Cloud - trivial:   Athena (already external tables over S3 - skip CTAS step)\n  Cloud - moderate:  Snowflake (external stages), BigQuery (external tables over GCS),\n                     Redshift (Spectrum), Databricks (LOCATION-based tables),\n                     ClickHouse Cloud (S3 engine), Azure Synapse (PolyBase)\n  Cloud - federated: Trino + Presto (Hive connector external tables)\n  Unsupported:       SQLite, PostgreSQL (no external table mechanism)\n\nError if external is requested on a platform that doesn't support it.\nIncompatible with --tuning tuned (requires materialized tables).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bypass cloud upload for cloud platforms",
+        "instead": "reuse existing upload infrastructure, only skip the materialization step",
+        "item_id": "table-mode-external",
+        "why": "the engine needs data in object storage to create external tables"
+      },
+      {
+        "dont": "make external the default",
+        "instead": "keep native as default, external as opt-in",
+        "item_id": "table-mode-external",
+        "why": "tuning, sorted ingestion, and CTAS optimization all require materialized tables"
+      },
+      {
+        "dont": "modify existing load_data() paths",
+        "instead": "add a parallel create_external_tables() method instead",
+        "item_id": "table-mode-external",
+        "why": "native mode behavior must be preserved for all platforms"
+      },
+      {
+        "dont": "skip row count reporting",
+        "instead": "use SELECT COUNT(*) or metadata queries to get counts without materialization",
+        "item_id": "table-mode-external",
+        "why": "downstream result validation depends on table_stats"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "table-mode-external",
+        "id": 268,
+        "reason": "Start with explicit opt-in; consider making external the default for DataFusion/Polars after user feedback confirms stability",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly gated on user feedback confirming stability of explicit-opt-in mode; no evidence that feedback loop occurred.",
+        "summary": "Auto-detect external as default when platform already scans files directly"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "table-mode-external",
+        "id": 269,
+        "reason": "Spark adapters use DataFrame-style loading with different adapter base class; handle after SQL platform support is stable",
+        "resolution": "promoted",
+        "resolved_item": "external-table-mode-for-spark-based-cloud-platforms-athena-s",
+        "resolved_reason": null,
+        "summary": "External table mode for Spark-based cloud platforms (Athena Spark, EMR Serverless, Dataproc, Glue)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "table-mode-external",
+        "id": 270,
+        "reason": "Lower user demand; add platform-by-platform based on user requests",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly conditional on user demand for niche platforms (StarRocks, Doris, Databend, Firebolt, Fabric); add only 'based on user requests'.",
+        "summary": "External table mode for niche SQL platforms (StarRocks, Doris, Databend, Firebolt, Fabric)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-03-03T00:00:00Z",
+      "created_at": "2026-03-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing benchbox run invocations without --table-mode produce identical results",
+        "item_id": "table-mode-external"
+      },
+      {
+        "behavior": "Athena, Snowflake, BigQuery, Redshift load_data() paths unchanged in native mode",
+        "item_id": "table-mode-external"
+      },
+      {
+        "behavior": "Cloud platform upload/staging infrastructure remains intact - external mode reuses it",
+        "item_id": "table-mode-external"
+      },
+      {
+        "behavior": "DataFusion and Polars load paths remain unchanged - only adding capability flag",
+        "item_id": "table-mode-external"
+      },
+      {
+        "behavior": "DuckDBAdapter.load_data() continues to work unchanged when table_mode='native' (default)",
+        "item_id": "table-mode-external"
+      },
+      {
+        "behavior": "Trino/Presto INSERT-based load path unchanged when staging_root is not configured",
+        "item_id": "table-mode-external"
+      },
+      {
+        "behavior": "benchbox run --help output format and tier structure remain consistent",
+        "item_id": "table-mode-external"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "table-mode-external",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/conversion.py"
+      },
+      {
+        "item_id": "table-mode-external",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Existing fast tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "table-mode-external",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases power --non-interactive --table-mode external",
+        "description": "DuckDB external mode produces valid results",
+        "expected": "Benchmark completes successfully with query results",
+        "item_id": "table-mode-external",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases power --non-interactive --table-mode native",
+        "description": "DuckDB native mode still works (regression check)",
+        "expected": "Benchmark completes successfully with query results",
+        "item_id": "table-mode-external",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --platform sqlite --benchmark tpch --scale 0.01 --phases power --non-interactive --table-mode external",
+        "description": "Unsupported platform gives clear error",
+        "expected": "Error message indicating SQLite does not support external table mode",
+        "item_id": "table-mode-external",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases power --non-interactive --table-mode external --tuning tuned",
+        "description": "Incompatible flag combination gives clear error",
+        "expected": "Error message indicating external table mode is incompatible with tuning",
+        "item_id": "table-mode-external",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w1",
+        "wid": "w10"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w3",
+        "wid": "w10"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w1",
+        "wid": "w12"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w3",
+        "wid": "w12"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w12",
+        "wid": "w13"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w10",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w11",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w12",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w17",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w18",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w19",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w20",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w21",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w22",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w23",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w24",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w3",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w4",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w5",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w6",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w7",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w8",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w9",
+        "wid": "w14"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w14",
+        "wid": "w15"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w2",
+        "wid": "w16"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w1",
+        "wid": "w17"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w3",
+        "wid": "w17"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w17",
+        "wid": "w18"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w1",
+        "wid": "w19"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w3",
+        "wid": "w19"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w19",
+        "wid": "w20"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w1",
+        "wid": "w21"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w3",
+        "wid": "w21"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w21",
+        "wid": "w22"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w1",
+        "wid": "w23"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w3",
+        "wid": "w23"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w23",
+        "wid": "w24"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w16",
+        "wid": "w3"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "table-mode-external",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Add supports_external_tables: bool = False class attribute.\nAdd create_external_tables(benchmark, connection, data_dir) method with\ndefault raise NotImplementedError.\nFollow DriverIsolationCapability pattern for capability declaration.\nFile: benchbox/platforms/base/adapter.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add supports_external_tables capability and create_external_tables() to PlatformAdapter base class",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Current: upload Parquet to GCS bucket -> bq load into native tables.\nExternal mode: upload to GCS, then CREATE EXTERNAL TABLE with\nOPTIONS(format='PARQUET', uris=['gs://bucket/path/*.parquet']).\nReuse existing GCS upload infrastructure from load_data().\nSet supports_external_tables = True.\nFile: benchbox/platforms/bigquery.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement BigQuery external table mode DDL path (external table over GCS)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Assert GCS URI wiring, external table options, and native-path regression safety.\nFile: tests/unit/platforms/test_bigquery_adapter.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add BigQuery mocked unit tests for external table SQL/URI generation",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Current: upload to S3 -> COPY INTO native tables.\nExternal mode: upload to S3, create external schema via Redshift Spectrum,\nthen CREATE EXTERNAL TABLE referencing Parquet paths.\nPreserve current COPY behavior in native mode.\nSet supports_external_tables = True.\nFile: benchbox/platforms/redshift.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Redshift external table mode DDL path (Spectrum external schema + table)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Assert schema/table DDL generation and native-path regression safety.\nFile: tests/unit/platforms/test_redshift_adapter.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Redshift mocked unit tests for Spectrum external schema/table DDL",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Unit tests:\n  - DuckDB creates VIEWs (not TABLEs) when table_mode='external'\n  - DataFusion/Polars flag declaration works\n  - Runner routes to create_external_tables() only in external mode\nIntegration test:\n  - TPC-H SF 0.01 with --table-mode external on DuckDB, verify results match native\nError tests:\n  - SQLite + external raises clear error\n  - PostgreSQL + external raises clear error\n  - external + --tuning tuned raises error\n  - Cloud platform without staging_root + external raises guidance error\nCoverage note:\n  - Platform-specific mocked DDL tests are handled in w7, w9, w11, w13, w18, w20, w22, w24\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for --table-mode external across platform categories",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Update CLAUDE.md CLI options table with --table-mode.\nAdd --table-mode to benchbox/cli/help.py examples.\nUpdate docs/guides/platform-comparison.md 'Same Data, Different Engines' section.\nUpdate docs/tutorials/comparing-platforms.md 'Shared Parquet Data' section.\nDocument which platforms support external mode and the mechanism used.\nAdd cloud platform examples: --table-mode external on Snowflake, Athena, BigQuery.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docs and CLI help for --table-mode",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Resolve and document decision points before routing/platform rollout:\n  - Cloud external mode means upload + external registration, no materialization\n  - Validation split:\n    - CLI parse-time: incompatible flag combinations\n    - Runtime adapter checks: capability + staging_root / platform prerequisites\nAdd focused tests for both validation surfaces.\nFiles: benchbox/cli/commands/run.py, benchbox/core/runner/runner.py, tests/unit/\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Finalize cloud external-mode semantics and validation boundaries",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Current: COPY INTO from UC Volumes or cloud storage into managed tables.\nExternal mode: CREATE TABLE ... USING PARQUET LOCATION '{cloud_path}'.\nReuse existing cloud upload and location resolution logic.\nSet supports_external_tables = True.\nFile: benchbox/platforms/databricks/adapter.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Databricks external table mode DDL path (USING PARQUET LOCATION)",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Assert LOCATION SQL generation and native-path regression safety.\nFile: tests/unit/platforms/test_databricks_adapter.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Databricks mocked unit tests for LOCATION-based external tables",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Current: INSERT statements via client.\nExternal mode: CREATE TABLE ... ENGINE = S3('url', 'Parquet') or\nCREATE VIEW over s3()/url() functions.\nRequire staging_root/object path availability and emit clear guidance errors.\nSet supports_external_tables = True.\nFile: benchbox/platforms/clickhouse_cloud.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement ClickHouse Cloud external mode DDL path (S3 engine or view)",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Add as common option (Tier 2) with choices [native, external], default native.\nPass through to benchmark_config.options['table_mode'].\nValidation: error if external + --tuning tuned.\nFile: benchbox/cli/commands/run.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add --table-mode CLI option to benchbox run command",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Assert generated SQL for external mode and unchanged native INSERT path.\nFile: tests/unit/platforms/test_clickhouse_cloud_adapter.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ClickHouse mocked unit tests for S3-engine/view external mode",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Current: INSERT INTO statements with optional staging_root.\nExternal mode: CREATE TABLE ... WITH (\n  external_location = '{staging_root}/table/', format = 'PARQUET'\n). Validate staging_root at runtime with clear guidance.\nStarburst inherits from Trino; confirm compatibility.\nSet supports_external_tables = True on both adapters.\nFiles: benchbox/platforms/trino.py, benchbox/platforms/presto.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Trino + Presto external mode DDL path (Hive external_location)",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Assert external_location wiring, format options, and native-path regression safety.\nFiles: tests/unit/platforms/test_trino_adapter.py, tests/unit/platforms/test_presto_adapter.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Trino/Presto mocked unit tests for Hive external table DDL",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Current: COPY INTO from Azure Blob Storage (ADLS).\nExternal mode: create external data source + file format, then\nCREATE EXTERNAL TABLE pointing at ADLS/Azure Blob paths.\nPreserve current COPY workflow in native mode.\nSet supports_external_tables = True.\nFile: benchbox/platforms/azure_synapse.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Azure Synapse external mode DDL path (PolyBase external tables)",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Assert external data source/file format/table DDL and native-path regression safety.\nFile: tests/unit/platforms/test_azure_synapse_adapter.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Azure Synapse mocked unit tests for PolyBase external mode",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "In runner.py load path and _execute_load_only_mode():\nCheck options.get('table_mode') == 'external'.\nValidate adapter.supports_external_tables (error with clear message if False).\nCall adapter.create_external_tables() instead of create_schema() + load_data().\nFor cloud platforms: upload phase still runs, only materialization is skipped.\nFile: benchbox/core/runner/runner.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Route load phase through external table creation when --table-mode external",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Set supports_external_tables = True on DuckDB adapter.\nImplement create_external_tables(): for each table in benchmark schema, find\nParquet files in data_dir and execute:\n  CREATE VIEW {table} AS SELECT * FROM read_parquet('{glob}')\nReturn row counts via SELECT COUNT(*) FROM read_parquet(...).\nMotherDuck inherits from DuckDB - verify it works without additional changes.\nAlso support Delta tables via DuckDB's delta extension read path.\nFiles: benchbox/platforms/duckdb.py, benchbox/platforms/motherduck.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement DuckDB + MotherDuck external tables with CREATE VIEW over read_parquet()",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "DataFusion already uses CREATE EXTERNAL TABLE / register_parquet() - set flag\nand alias create_external_tables() to existing load path.\nPolars already uses pl.scan_parquet() - same treatment.\nFiles: benchbox/platforms/datafusion.py, benchbox/platforms/polars_platform.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire DataFusion and Polars to declare supports_external_tables = True",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Athena already creates external tables over S3 - it's the native model.\nCurrent load_data() uploads Parquet to S3 then runs CTAS to optimize/convert.\nExternal mode: upload to S3, create external table pointing at uploaded path,\nskip the CTAS conversion step. Data stays in uploaded Parquet format.\nExisting _convert_to_external_table() method is prior art for the DDL.\nSet supports_external_tables = True.\nFile: benchbox/platforms/athena.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Athena external table mode (bypass CTAS materialization)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Add focused mocked tests verifying:\n  - external mode skips CTAS conversion path\n  - native mode keeps current CTAS behavior\n  - capability flag is declared\nFile: tests/unit/platforms/test_athena_adapter.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Athena unit tests for external mode CTAS bypass behavior",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Current: PUT files to internal stage -> COPY INTO native tables.\nExternal mode: create named external stage pointing to cloud storage, then\nCREATE EXTERNAL TABLE referencing stage path with AUTO_REFRESH = FALSE\nfor benchmark isolation. Keep native load path unchanged.\nAlternative approach (defer): Snowflake Iceberg tables.\nSet supports_external_tables = True.\nFile: benchbox/platforms/snowflake.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Snowflake external table mode DDL path (external stage + external table)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "table-mode-external",
+        "notes": "Assert external stage creation, external table SQL, and native path isolation.\nFile: tests/unit/platforms/test_snowflake_adapter.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Snowflake mocked unit tests for external mode SQL generation",
+        "wid": "w9"
+      }
+    ]
+  }
+}

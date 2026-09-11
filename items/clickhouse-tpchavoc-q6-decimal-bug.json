@@ -1,0 +1,95 @@
+{
+  "context": "Search the ClickHouse adapter for QueryTransformer or query rewriting logic.\nThe bug likely involves a regex or string replacement that inadvertently strips\nleading zeros from decimal numbers like 0.06 → .06. Check query_transformer.py\nfirst, then adapter.py for any pre-execution SQL munging.\n",
+  "description": "tpchavoc Q6 fails on ClickHouse with syntax error on \".06 - 0.01\" - the source\nin benchbox/core/tpchavoc/variant_sets/q06.py contains \"0.06\" (with leading zero),\nbut a query transformation step strips the leading zero, producing \".06\" which is\ninvalid ClickHouse syntax.\n\nRoot cause: fix_type_casts Patterns 2/3/4 use (0\\.0*)\\b which backtracks to\nmatch \"0.\" from \"0.06\" via a word boundary between \".\" (non-word) and the next\ndigit. This leaves the trailing digit(s) dangling after the CAST replacement,\ne.g. \"col + 0.06\" → \"col + CAST(0 AS Decimal(15,2))6\".\n\nFix: replaced \\b(?!\\)) with (?![0-9\\)]) in Pattern 2, and \\b with (?![0-9]) in\nPatterns 3/4, to prevent matching when the zero literal is followed by a digit.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "apply numeric normalization that changes the string representation of valid SQL literals",
+        "instead": "only transform function names and syntax",
+        "item_id": "clickhouse-tpchavoc-q6-decimal-bug",
+        "why": "downstream engines may have strict parsing"
+      },
+      {
+        "dont": "strip leading zeros from decimal literals",
+        "instead": "preserve '0.06' form",
+        "item_id": "clickhouse-tpchavoc-q6-decimal-bug",
+        "why": "ClickHouse rejects bare '.06' as invalid syntax"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-08T00:00:00Z",
+      "created_at": "2026-04-08T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Other numeric literal transformations continue to work correctly",
+        "item_id": "clickhouse-tpchavoc-q6-decimal-bug"
+      },
+      {
+        "behavior": "Queries that don't use small decimals remain unaffected",
+        "item_id": "clickhouse-tpchavoc-q6-decimal-bug"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py::TestClickHouseQueryTransformerDecimalLiterals -v",
+        "description": "Decimal literal 0.06 preserved through transformation",
+        "expected": "6 passed",
+        "item_id": "clickhouse-tpchavoc-q6-decimal-bug",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-tpchavoc-q6-decimal-bug",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "clickhouse-tpchavoc-q6-decimal-bug",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "clickhouse-tpchavoc-q6-decimal-bug",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Find the ClickHouse QueryTransformer code that handles numeric literals - grep for decimal/numeric transformation logic",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-tpchavoc-q6-decimal-bug",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix the leading-zero stripping bug in the transformer",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-tpchavoc-q6-decimal-bug",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit test with decimal literals like 0.06 to prevent regression",
+        "wid": "w3"
+      }
+    ]
+  }
+}

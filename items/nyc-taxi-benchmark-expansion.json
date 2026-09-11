@@ -1,0 +1,336 @@
+{
+  "description": "Expand the existing NYC Taxi benchmark to support additional TLC data sources\nbeyond Yellow Taxi. The current implementation only covers Yellow Taxi trips,\nbut NYC TLC provides three additional data types that represent significant\nportions of modern NYC mobility patterns.\n\nThis expansion would:\n- Add Green Taxi (street hail livery) data support\n- Add For-Hire Vehicle (FHV) data support\n- Add High Volume For-Hire Vehicle (HVFHV) data for Uber/Lyft (since 2019)\n- Enable comparative analytics across taxi types\n- Provide more complete NYC mobility benchmarking\n\nCurrent implementation: benchbox/core/nyctaxi/\n- benchmark.py, schema.py, queries.py, downloader.py, spatial.py\n- 25 OLAP queries + 18 spatial queries\n- Scale factors: 0.01 to 100 (TPC-aligned: SF=1 ≈ 1GB)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the Yellow Taxi schema column names",
+        "instead": "add new taxi type tables/columns alongside existing ones",
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "why": "25 OLAP queries depend on current column names"
+      },
+      {
+        "dont": "download real TLC data in unit tests",
+        "instead": "use synthetic test fixtures",
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "why": "files are 50MB+ per month and TLC rate-limits"
+      },
+      {
+        "dont": "merge all taxi types into one table",
+        "instead": "use separate tables or a discriminated union",
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "why": "FHV has a fundamentally different schema (no fare breakdown)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "nyc-taxi-benchmark-expansion",
+        "id": 60,
+        "reason": "FHV has the simplest schema and lowest volume (~1M/month). Phased rollout\nprioritizes Green (similar to Yellow) and HVFHV (highest volume) first.\nFHV can be added as a follow-up once the multi-type framework is proven.\n",
+        "resolution": "promoted",
+        "resolved_item": "add-fhv-data-support-downloader-queries-tests",
+        "resolved_reason": null,
+        "summary": "Add FHV data support (downloader, queries, tests)"
+      }
+    ],
+    "item_meta": {
+      "category": "Benchmark Development",
+      "completed_at": "2026-04-04T00:00:00Z",
+      "created_at": "2026-01-12T00:00:00Z",
+      "worktree": "benchmark-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All 18 spatial queries continue passing unchanged",
+        "item_id": "nyc-taxi-benchmark-expansion"
+      },
+      {
+        "behavior": "All 25 existing OLAP queries continue passing unchanged",
+        "item_id": "nyc-taxi-benchmark-expansion"
+      },
+      {
+        "behavior": "Existing scale factors 0.01-100 work for Yellow Taxi data",
+        "item_id": "nyc-taxi-benchmark-expansion"
+      },
+      {
+        "behavior": "benchbox run --platform duckdb --benchmark nyctaxi --scale 0.01 completes with same results",
+        "item_id": "nyc-taxi-benchmark-expansion"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_nyctaxi_combined.py"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/nyctaxi/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -k nyctaxi -v --tb=short",
+        "description": "Existing NYC Taxi tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/ -k nyctaxi -v --tb=short",
+        "description": "Yellow Taxi benchmark unchanged",
+        "expected": "all existing tests pass",
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w4",
+        "wid": "w10"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w5",
+        "wid": "w10"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w8",
+        "wid": "w11"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w9",
+        "wid": "w11"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "notes": "Option B (single combined table) is ruled out by anti_pattern: FHV has a\nfundamentally different schema with no fare breakdown.\n\nRemaining options:\nA) Separate tables per type (yellow_trips, green_trips, hvfhv_trips)\n   + Simplest, no NULLable columns, each table matches source schema exactly\n   + Existing Yellow queries untouched\n   - Cross-type queries need UNION ALL\nC) Common core table + type-specific extension tables\n   + Cleaner cross-type queries (core table has shared columns)\n   + Normalizes common fields (pickup/dropoff time, location IDs)\n   - More complex schema, migration risk for existing Yellow data\n\nDeliverable: ADR in notes or context_sections documenting the decision\nand rationale, before any schema code is written.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide schema approach - separate tables (option A) vs core+extensions (option C)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for new taxi type schemas, enums, and downloaders",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add integration tests for multi-type queries on DuckDB",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update benchmark documentation",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update schema.py with new table definitions",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "notes": "- Add TaxiType enum (YELLOW, GREEN, HVFHV) to schema.py or benchmark.py\n- Update benchmark registration to accept taxi_type parameter\n- Ensure default behavior (no taxi_type specified) remains Yellow-only\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add TaxiType enum and type-aware loading in benchmark.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "notes": "Source: Same TLC site, different endpoint (green_tripdata_YYYY-MM.parquet)\nFormat: Parquet (same as Yellow)\nCoverage: 2014-present\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend downloader.py for Green Taxi data",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "notes": "Source: TLC HVFHV trip records (fhvhv_tripdata_YYYY-MM.parquet)\nSchema: Includes Uber/Lyft specific fields (shared_ride, congestion_surcharge)\nVolume: Highest volume (25M+ trips/month)\nAvailable: February 2019-present\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add HVFHV data downloader",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "notes": "- Borough-specific trip patterns (outer borough focus)\n- Airport pickups from outer boroughs\n- Comparison to Yellow in geographic overlap zones\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Green Taxi borough-focused queries",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "notes": "- Shared ride adoption rate\n- Surge pricing patterns (via fare analysis)\n- Congestion surcharge impact\n- Base dispatch patterns (Uber vs Lyft)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add HVFHV rideshare-specific queries",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "notes": "- Market share by taxi type over time\n- Geographic coverage comparison (Yellow=Manhattan, Green=boroughs, HVFHV=citywide)\n- Price comparison for same routes across types\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add cross-type comparison queries (market share, geography, pricing)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "nyc-taxi-benchmark-expansion",
+        "notes": "- Peak hour patterns by taxi type\n- Weekday vs weekend demand shifts by type\n- Year-over-year volume trends (Yellow decline vs HVFHV growth)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add cross-type comparison queries (temporal patterns, trends)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

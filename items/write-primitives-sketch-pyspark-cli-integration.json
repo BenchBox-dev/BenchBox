@@ -1,0 +1,142 @@
+{
+  "description": "## Background\n\nPR #181 (`write-primitives-sketch-pyspark-dataframe-surface`) shipped\nfactory helpers in\n`benchbox/core/write_primitives/dataframe_operations.py`\n(`make_pyspark_hll_persist_builder`,\n`make_pyspark_hll_merge_extract`,\n`make_pyspark_topk_persist_builder`,\n`make_pyspark_topk_merge_extract`,\n`pyspark_supports_approx_top_k`) plus tests using mocked PySpark.\n\nThe TODO it implemented (`write-primitives-sketch-pyspark-dataframe-\nsurface`) had a scope/verification contradiction recorded as a\nblind-spot\n(`_project/blind-spots/2026-05-04-011321-pyspark-sketch-todo-scope-vs-verification-mismatch.md`):\nthe `scope_limit.only_modify` block forbade editing\n`operations.yaml` and `benchmark.py`, but the verification command\nwas `benchbox run --queries sketch_df_hll_persist_merge` — which\ncannot pass without entries in `operations.yaml` and an\nengine-aware dispatch fork in `benchmark.py`.\n\nPR #181 honored the scope and left the CLI integration as a tracked\nfollow-up. This TODO closes that gap.\n\n## What this delivers\n\n1. Catalog entries for the persist+merge cycle, expressed as the new\n   `AGGREGATE_PERSIST` / `AGGREGATE_MERGE` op shapes:\n     - `sketch_df_hll_persist_merge`\n     - `sketch_df_topk_persist_merge` (Spark 4.1+ guarded)\n\n2. Engine-aware dispatch fork in\n   `_execute_dataframe_sql_parity_workload` (or its successor) that\n   routes `AGGREGATE_PERSIST` / `AGGREGATE_MERGE` ops to\n   `manager.execute_aggregate_persist` /\n   `manager.execute_aggregate_merge` rather than embedding the SQL\n   into the DuckDB parity path.\n\n3. Integration test that runs the full persist+merge cycle against\n   a real Spark 3.5+ session at least once. The factory tests today\n   are MagicMock-based and do NOT exercise the actual Spark APIs;\n   this is the first place that does.\n\n4. Documentation update in\n   `docs/benchmarks/write-primitives-sketch-functions.md` removing\n   the \"CLI integration gap\" notice and replacing it with the\n   working invocation example.\n\n5. Mark blind-spot file\n   `_project/blind-spots/2026-05-04-011321-pyspark-sketch-todo-scope-vs-verification-mismatch.md`\n   as resolved.\n\n## Verification\n\n```bash\nuv run -- benchbox run --platform pyspark --benchmark write_primitives \\\n  --scale 0.01 --queries sketch_df_hll_persist_merge\n```\n\nExpected: persist phase reports rows_affected = number of (date,\nregion) groups; merge phase reports `aggregate_value` ≈ 15000\n(true distinct l_orderkeys at SF=0.01) within ±5%.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-04T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/dataframe_operations.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-05-04-011321-pyspark-sketch-todo-scope-vs-verification-mismatch.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/2026-05-05-003901-pyspark-cli-integration-scope-excludes-loader.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/write-primitives-sketch-functions.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/core/write_primitives/"
+      },
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/write_primitives/"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "notes": "Two new entries with the AGGREGATE_PERSIST/MERGE op shape. The\nDataFrame ops live in operations.yaml alongside SQL ops; a\n`dispatch: aggregate_state` (or similar) marker distinguishes\nthem. Bonds, source paths, and group_cols are catalog inputs\nthat the dispatch passes to the factory helpers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add sketch_df_hll_persist_merge and sketch_df_topk_persist_merge ops to operations.yaml",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "notes": "`benchbox/core/write_primitives/benchmark.py` has the\nDataFrame workload runner; today every op routes through\nembedded DuckDB SQL (`_execute_dataframe_sql_parity_workload`).\nAdd an early branch: if the catalog entry is shaped as\nAGGREGATE_PERSIST/MERGE, instantiate the appropriate factory\n(HLL or top-K), call\n`manager.execute_aggregate_persist(...)` then\n`manager.execute_aggregate_merge(...)`, and roll the two\nDataFrameWriteResults into the operation envelope.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add aggregate-state dispatch fork in DataFrame workload runner",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "notes": "First real-Spark integration of these helpers. Expect at least\none type-shape bug to surface — debug, fix, document. If the\ntop-K nested expression\n`F.size(F.approx_top_k_estimate(F.approx_top_k_combine(col)))`\ndoesn't resolve cleanly inside `state.agg(...)`, restructure\nthe merge_extract to do agg-then-select rather than nesting\neverything.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the verification command against a real Spark 3.5+ session",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "notes": "Remove \"CLI integration gap\" subsection from\ndocs/benchmarks/write-primitives-sketch-functions.md; add the\nverified invocation example. Set blind-spot file's frontmatter\n`status:` to `resolved` and link this TODO from\n`todo_id:`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docs and mark blind-spot resolved",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-pyspark-cli-integration",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add changelog entry",
+        "wid": "w5"
+      }
+    ]
+  }
+}

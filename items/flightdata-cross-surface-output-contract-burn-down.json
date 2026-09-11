@@ -1,0 +1,132 @@
+{
+  "description": "The bounded offline SF=0.01 FlightData cross-surface probe compared all 40 query/backend cells and found 24 unclassified divergences across 12 queries, identical on expression and pandas where both ran: best-routes, cancellation-rate, carrier-ranking, cascade-delays, delay-by-hour, delay-causes, improvement-trend, ontime-by-carrier, route-reliability, seasonal-trends, time-of-day, and weather-impact. Fix SQL/DataFrame output-column ordering, hour bucketing (SQL currently groups by fractional crs_dep_time/100 while DataFrame floors), aggregate formula/order mismatches, and ORDER BY/top-N contracts. Re-run uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark flightdata via the prototype builder and require 40/40 clean. Do not add known-divergence baselines for product defects. Evidence from 2026-08-16: /tmp/flightdata-cross-surface-gate.log.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-08-17T01:26:01Z",
+      "worktree": "dataframe-benchmarks"
+    },
+    "scope_rules": [
+      {
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/equivalence/**"
+      },
+      {
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/**"
+      },
+      {
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/flightdata tests/unit/core/test_dataframe_execution.py -q",
+        "description": "Focused FlightData query regressions",
+        "expected": "all selected tests pass",
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark flightdata",
+        "description": "Full bounded cross-surface proof",
+        "expected": "40 of 40 cells compared with zero divergences",
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Align SQL, expression, and pandas output column order and aggregate formulas for all 12 divergent queries",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make delay-by-hour and time-of-day use identical integral crs_dep_time hour bucketing in SQL and DataFrame surfaces",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Correct deterministic ORDER BY and top-N contracts for best-routes, cancellation-rate, carrier-ranking, cascade-delays, ontime-by-carrier, and route-reliability",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add explicit reusable-load CSV dialect metadata for flights, airlines, and airports",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "flightdata-cross-surface-output-contract-burn-down",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Restore the bounded FlightData builder and require all 40 cells clean without baselines",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,199 @@
+{
+  "context": "Extract helper methods as private (prefixed _) on the same class or as module-level\nfunctions if they don't use self. Keep render() as the public entry point that\norchestrates helpers in order.\n\nReference existing decomposed charts: ascii/line_chart.py is well-structured -\nnote how it organizes helpers as private methods. Follow that pattern.\n\nTest approach: capture render() output before and after and compare with assertEqual.\n",
+  "description": "7 ASCII chart render() functions accumulate complexity by doing layout calculation,\ndata normalization, header rendering, bar/cell rendering, and legend rendering all in\none method. Each concern is independent and can be a private helper method. This\nreduces per-function complexity from 15-20 to well below the warn threshold without\nchanging behavior.\n\nTarget functions:\n  benchbox/core/visualization/ascii/heatmap.py:render               (20)\n  benchbox/core/visualization/ascii/histogram.py:_render_simple_chunk (20)\n  benchbox/core/visualization/ascii/histogram.py:_render_grouped_chunk (20)\n  benchbox/core/visualization/ascii/diverging_bar.py:render          (17)\n  benchbox/core/visualization/ascii/summary_box.py:render            (17)\n  benchbox/core/visualization/ascii/sparkline_table.py:render        (15)\n  benchbox/cli/commands/visualize.py:_render_ascii_charts            (16)\n\nNote: Several render() functions are already approved as required-complexity ignores\n(line_chart, box_plot, scatter_plot, bar_chart, rank_table, cdf_chart). The functions\nlisted above are NOT in that list - their complexity is reducible.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the public render() signature",
+        "instead": "(not specified)",
+        "item_id": "complexity-ascii-renderers-w14",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "create a base class or mixin for shared helpers",
+        "instead": "(not specified)",
+        "item_id": "complexity-ascii-renderers-w14",
+        "why": "module-level functions are fine"
+      },
+      {
+        "dont": "extract so many small helpers that reading render() requires jumping between 10 methods",
+        "instead": "(not specified)",
+        "item_id": "complexity-ascii-renderers-w14",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "optimize the rendering logic while refactoring",
+        "instead": "(not specified)",
+        "item_id": "complexity-ascii-renderers-w14",
+        "why": "behavior first, optimization later"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-22T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All chart output must be pixel-for-pixel identical - test with known data fixtures",
+        "item_id": "complexity-ascii-renderers-w14"
+      },
+      {
+        "behavior": "Color codes and ANSI escape sequences must be identical",
+        "item_id": "complexity-ascii-renderers-w14"
+      },
+      {
+        "behavior": "Column width calculations must produce the same values",
+        "item_id": "complexity-ascii-renderers-w14"
+      },
+      {
+        "behavior": "render() method signatures unchanged (callers pass same arguments)",
+        "item_id": "complexity-ascii-renderers-w14"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "complexity-ascii-renderers-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/visualize.py"
+      },
+      {
+        "item_id": "complexity-ascii-renderers-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/diverging_bar.py"
+      },
+      {
+        "item_id": "complexity-ascii-renderers-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/heatmap.py"
+      },
+      {
+        "item_id": "complexity-ascii-renderers-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/histogram.py"
+      },
+      {
+        "item_id": "complexity-ascii-renderers-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/sparkline_table.py"
+      },
+      {
+        "item_id": "complexity-ascii-renderers-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/summary_box.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Smoke tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "complexity-ascii-renderers-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'ascii or visual or chart or render' -q",
+        "description": "Visualization-specific tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "complexity-ascii-renderers-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/check_complexity.py --top 150 2>&1 | grep -E '(heatmap|histogram|diverging|summary_box|sparkline|visualize)'",
+        "description": "Target functions below warn threshold",
+        "expected": "No WARN entries for the 7 target functions",
+        "item_id": "complexity-ascii-renderers-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "complexity-ascii-renderers-w14",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "complexity-ascii-renderers-w14",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "complexity-ascii-renderers-w14",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "complexity-ascii-renderers-w14",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "complexity-ascii-renderers-w14",
+        "notes": "benchbox/core/visualization/ascii/heatmap.py:render (line 91)\nExtract to private methods on the class:\n- _compute_column_widths(data, headers) → list[int]\n- _render_title_header(title, total_width) → list[str]\n- _render_cell(value, normalized, width, colorize) → str\n- _render_legend(lines) → list[str]\nMain render() orchestrates via calls to these helpers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decompose heatmap render(): extract column-width calc, header, cell rendering, legend",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-ascii-renderers-w14",
+        "notes": "benchbox/core/visualization/ascii/histogram.py - both functions (lines 236, 369)\nBoth share bar-height calculation and y-axis label logic:\n- Extract _compute_bar_height(value, max_value, chart_height) → int\n- Extract _render_y_axis_label(row_idx, max_value, chart_height) → str\n- Extract _render_footer_legend(series_names, colors) → list[str]\n_render_grouped_chunk also: extract _get_series_lookup(data) → dict\nAfter extraction, _render_grouped_chunk should call _render_simple_chunk for\nshared rendering logic where possible (DRY).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decompose histogram _render_simple_chunk and _render_grouped_chunk",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-ascii-renderers-w14",
+        "notes": "diverging_bar.py:render (line 64):\n- Extract _partition_series(data) → (improvements, regressions)\n- Extract _compute_layout(improvements, regressions, width) → LayoutConfig\nsummary_box.py:render (line 88):\n- Extract _build_metric_rows(metrics) → list[str]\n- Extract _pad_to_equal_length(left, right) → tuple[list, list]\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decompose diverging_bar and summary_box render() functions",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-ascii-renderers-w14",
+        "notes": "sparkline_table.py:render (line 63):\n- Extract _normalize_column(col_data) → list[float]\n- Extract _render_sparkline(values, width) → str\nvisualize.py:_render_ascii_charts (line 20):\n- Extract _resolve_chart_type(template, chart_type) → str\n- Replace if/elif chain for chart type validation with dict lookup\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decompose sparkline_table render() and _render_ascii_charts dispatch",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-ascii-renderers-w14",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run smoke tests and complexity check; verify all 7 functions below warn threshold",
+        "wid": "w5"
+      }
+    ]
+  }
+}

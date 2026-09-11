@@ -1,0 +1,168 @@
+{
+  "context": "For W2, fix only the shared Spark-family schema retry cluster by accepting\nquoted simple Spark identifiers after unquoting them for validation and DROP\nretry SQL. Preserve rejection for schema-qualified names and unsafe identifier\nshapes. Do not mix in PySpark Parquet, TPCHavoc, TPC-DS, or read-primitives\nexpression fixes.\n\nDuring verification, clean only transient database/result artifacts generated\nby the work item. Preserve reusable datagen corpora such as tpch_sf*,\nread_primitives_sf*, tpcds_sf*, and tpchavoc_sf* because primitive benchmarks\nreuse their underlying source data across SQL and DataFrame runs.\n",
+  "description": "Spark SQL and PySpark DataFrame had multiple UAT failures: strict identifier\nretry issues, missing `dual`, illegal Parquet `TIME(MILLIS,false)`, unresolved\nTPCHavoc supplier columns, scalar-subquery grouping problems, and read\nprimitives expression failures.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix by weakening validation globally",
+        "instead": "keep changes scoped to the owning translator or loader path.",
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "why": "failures are engine/query-family specific"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "id": 252,
+        "reason": "Separate loader/cache conversion owner; do not mix with the shared Spark SQL schema retry fix.",
+        "resolution": "promoted",
+        "resolved_item": "pyspark-parquet-time-millis-false-cache-loader-compatibility",
+        "resolved_reason": null,
+        "summary": "PySpark Parquet TIME(MILLIS,false) cache/loader compatibility"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "id": 253,
+        "reason": "Query-family-specific SQL compatibility work, not the shared schema retry failure.",
+        "resolution": "promoted",
+        "resolved_item": "spark-sql-tpchavoc-scalar-subquery-and-dual-rewrites",
+        "resolved_reason": null,
+        "summary": "Spark SQL TPCHavoc scalar subquery and dual rewrites"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "id": 254,
+        "reason": "Expression API work spans a different owner and needs its own targeted regression slice.",
+        "resolution": "promoted",
+        "resolved_item": "pyspark-dataframe-read-primitives-map-fulltext-window-array",
+        "resolved_reason": null,
+        "summary": "PySpark DataFrame read-primitives map/fulltext/window/array expression gaps"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Optional Spark/PySpark dependencies remain lazy.",
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat"
+      },
+      {
+        "behavior": "Spark-specific fixes do not change SQL emitted for unrelated platforms.",
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/data_loader.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/dataframe_queries.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpchavoc/"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/pyspark_df.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/results-explorer-uat-defect-spark-pyspark-expression-compat.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/_spark_helpers.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_spark_helpers.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k 'spark or pyspark' -q",
+        "description": "Representative Spark/PySpark smoke for the fixed cluster passes.",
+        "expected": "targeted Spark/PySpark tests pass",
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast tests remain green.",
+        "expected": "all selected tests pass",
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "notes": "UAT log scan from /Users/joe/Developer/benchmark_runs/logs/uat_20260502\ngrouped failures into these owners:\n\n1. Shared Spark-family schema retry: read/write/transaction primitives fail\n   before load because run_spark_schema_creation_loop extracts a backtick\n   quoted simple identifier (`region`) and rejects it under strict identifier\n   validation. Evidence:\n   - spark_read_primitives_0.01_20260502_203844.log:18\n   - spark_write_primitives_0.01_20260502_203850.log:18\n   - spark_transaction_primitives_0.01_20260502_203859.log:18\n   Owner: benchbox/platforms/_spark_helpers.py and\n   tests/unit/platforms/test_spark_helpers.py. This is the W2 target because\n   it is shared, high-leverage, and narrowly scoped.\n\n2. PySpark DataFrame Parquet loader/cache conversion: TPC-DS and coffeeshop\n   fail while reading cached Parquet with INT32 TIME(MILLIS,false). Evidence:\n   - pyspark-df_tpcds_0.01_20260502_213449.log:17\n   - pyspark-df_coffeeshop_0.01_20260502_214615.log:11\n   Owner: benchbox/core/dataframe/data_loader.py and\n   benchbox/platforms/dataframe/pyspark_df.py.\n\n3. Spark SQL TPCHavoc query-family compatibility: scalar subquery grouping\n   and `dual` table references fail inside TPCHavoc variants. Evidence:\n   - spark_tpchavoc_0.01_20260502_205250.log:93\n   - spark_tpchavoc_0.1_20260502_205516.log:1358\n   Owner: benchbox/core/tpchavoc/variant_sets/.\n\n4. PySpark DataFrame read-primitives expression gaps: array aggregation,\n   array length ordering, map/fulltext type construction, and missing window\n   methods fail at query execution. Evidence:\n   - pyspark-df_read_primitives_0.01_20260502_213500.log:13\n   - pyspark-df_read_primitives_0.01_20260502_213500.log:28\n   - pyspark-df_read_primitives_0.01_20260502_213500.log:144\n   - pyspark-df_read_primitives_0.01_20260502_213500.log:167\n   Owner: benchbox/platforms/dataframe/pyspark_df.py,\n   benchbox/platforms/dataframe/expression_family.py, and\n   benchbox/core/read_primitives/dataframe_queries.py.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cluster Spark/PySpark failures by owning translator, loader, or query family",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix the highest-impact shared Spark/PySpark compatibility cluster",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-spark-pyspark-expression-compat",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression coverage for the fixed cluster",
+        "wid": "w3"
+      }
+    ]
+  }
+}

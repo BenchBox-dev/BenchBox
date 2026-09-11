@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #94 of ducklake-catalog-storage-backends.\nDeferred: GCS / Azure object storage backends for DATA_PATH\nReason deferred: S3 first; other object stores are a follow-on once the secret/httpfs path is proven",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:33:38Z",
+      "worktree": "ducklake-platform"
+    }
+  }
+}

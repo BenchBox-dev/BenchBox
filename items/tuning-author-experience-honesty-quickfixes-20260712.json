@@ -1,0 +1,119 @@
+{
+  "description": "From the 2026-07-12 tuning review, findings R3 (partial), N1, N2, N3\n(evidence pinned to commit acfb8992). Small, independent, decision-free fixes:\n\n1. Dry-run tuning preview is silently empty: _extract_ddl_preview\n   (benchbox/core/dryrun.py:1087) does exact-key lookup\n   table_tunings.get(table_name) with lowercase benchmark names vs uppercase\n   template keys (LINEITEM) - verified: tuned duckdb/tpch dry-run rendered 0\n   tuning clauses. Normalize case like profile_validation.extract_template_columns\n   already does (.upper()).\n2. Dry-run shows \"Databricks Clustering Strategy: z_order\" under Platform\n   Optimizations for non-Databricks runs (observed on duckdb) - suppress\n   platform-foreign default fields.\n3. --dry-run takes a required OUTPUT_DIR string and swallows a following flag:\n   `--dry-run --non-interactive` created a directory literally named\n   \"--non-interactive\" (run.py:2597-2602). Reject values starting with '-'.\n4. A local file/dir named \"tuned\" shadows the tuned keyword because path\n   existence is checked before keywords (tuning_resolver.py:200-207). Check\n   keywords first.\n5. Invalid-value error hint says \"--tuning list\", itself an invalid value\n   (tuning_resolver.py:316,326); the real command is `benchbox tuning list`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "rewrite the preview to use adapter mixins here",
+        "instead": "(not specified)",
+        "item_id": "tuning-author-experience-honesty-quickfixes-20260712",
+        "why": "renderer unification is gated on ADR-3"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Dry-run remains non-executing and side-effect free apart from its output dir",
+        "item_id": "tuning-author-experience-honesty-quickfixes-20260712"
+      },
+      {
+        "behavior": "Explicit file paths (including relative) keep working for --tuning",
+        "item_id": "tuning-author-experience-honesty-quickfixes-20260712"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-author-experience-honesty-quickfixes-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "tuning-author-experience-honesty-quickfixes-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/tuning_resolver.py"
+      },
+      {
+        "item_id": "tuning-author-experience-honesty-quickfixes-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dryrun.py"
+      },
+      {
+        "item_id": "tuning-author-experience-honesty-quickfixes-20260712",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --dry-run /tmp/dr-check --non-interactive 2>&1 | grep -c 'ORDER BY'",
+        "description": "Tuned duckdb dry-run now shows tuning clauses",
+        "expected": ">= 1 tuning clause rendered in preview",
+        "item_id": "tuning-author-experience-honesty-quickfixes-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --dry-run --non-interactive 2>&1 | tail -3",
+        "description": "Flag-swallow guard",
+        "expected": "Clear error about missing OUTPUT_DIR, no directory named '--non-interactive' created",
+        "item_id": "tuning-author-experience-honesty-quickfixes-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-author-experience-honesty-quickfixes-20260712",
+        "notes": "Also fixed two co-requisite bugs uncovered while making this fix land\nend-to-end (both in benchbox/core/dryrun.py, same scope):\n- _extract_ddl_preview gated on `hasattr(benchmark, \"get_tables\")`, a\n  method no benchmark class implements (only platform adapters do);\n  switched to `benchmark.get_schema()` (the method _generate_external_\n  schema_sql already uses for the same purpose).\n- _build_table_ddl_entry referenced TuningClauses.distribution_key /\n  distribution_style, fields that don't exist on the dataclass (it has\n  distribute_by instead), so it raised AttributeError as soon as the\n  lookup fix let it actually run. Now delegates to\n  TuningClauses.get_inline_clauses() (already used by\n  generate_create_table_ddl) instead of re-deriving clause text.\nWithout both fixes the case-insensitive lookup could never be observed\nto work: the DDL preview was empty for every platform, always, before\ntable_tunings was even consulted.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Case-normalize table-key lookup in _extract_ddl_preview (+ regression test using the shipped duckdb tpch template)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-author-experience-honesty-quickfixes-20260712",
+        "notes": "_display_platform_optimizations (benchbox/cli/dryrun.py) is out of\nscope_limit, so the fix is at the data source instead: threaded\nplatform through DryRunExecutor._extract_tuning_config ->\n_extract_unified_tuning (benchbox/core/dryrun.py) and gated\ndatabricks_clustering_strategy on platform == \"databricks\" via a\nsmall field->platform map, so the display code (which just renders\nwhatever is in the dict) no longer sees it for other platforms.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Suppress platform-foreign optimization rows in dry-run display; only show fields relevant to the target platform",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-author-experience-honesty-quickfixes-20260712",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reject option-like values for --dry-run OUTPUT_DIR (leading '-') with a clear error",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-author-experience-honesty-quickfixes-20260712",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolver: check keywords (tuned/notuning/auto) before path existence; fix the '--tuning list' hint to 'benchbox tuning list'",
+        "wid": "w4"
+      }
+    ]
+  }
+}

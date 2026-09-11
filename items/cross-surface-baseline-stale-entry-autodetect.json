@@ -1,0 +1,142 @@
+{
+  "description": "Follow-up to cross-surface-baseline-update-flag (#935), which shipped the manual\n`--update-baseline` maintenance affordance (a YAML baseline in\ncross_surface_baseline.yaml, pruned by known_divergences_baseline.py via the\n`make cross-surface-update-baseline` target). That item deferred the automation:\ndetection and pruning are still operator-initiated, so a resolved (no-longer-\nreproducing) known-divergence entry can linger between manual sweeps.\n\nAdd a scheduled job that runs the enforced cross-surface gates, detects resolved\nentries (the gate already reports \"previously-known divergences now equivalent\"),\nruns the existing `--update-baseline` writer, and opens a PR with the pruned\nbaseline. Removal stays explicit and reviewable (a PR), never a side effect of a\nblocking gate run.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "auto-merge the prune PR",
+        "instead": "(not specified)",
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "why": "soundness path, Code Owner review required."
+      },
+      {
+        "dont": "reimplement the pruning logic; invoke the #935 writer/target.",
+        "instead": "(not specified)",
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Tooling",
+      "completed_at": "2026-07-22T20:55:27Z",
+      "completed_pr": 1267,
+      "created_at": "2026-07-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A still-reproducing divergence is never removed; only resolved entries are dropped; idempotent.",
+        "item_id": "cross-surface-baseline-stale-entry-autodetect"
+      },
+      {
+        "behavior": "The blocking gate run never prunes; pruning happens only in the scheduled PR path (as #935 established).",
+        "item_id": "cross-surface-baseline-stale-entry-autodetect"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': '.github/workflows/release-canary.yml', 'note': 'Existing scheduled-workflow + RULESET_DRIFT_TOKEN pattern to model the cadence and bot-PR mechanics on.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/core/equivalence/cross_surface.py (run_gate resolved-key reporting)', 'note': 'The gate already computes resolved keys; the scheduler reads them rather than re-deriving.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/core/equivalence/known_divergences_baseline.py + Makefile cross-surface-update-baseline', 'note': 'The load/prune/dump writer and Make target shipped by #935; the scheduled job invokes these, does not reimplement pruning.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/equivalence/"
+      },
+      {
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "seed a resolved entry, run the detection step -> it identifies exactly that entry and the writer's diff drops only it",
+        "description": "Dry-run detects a seeded resolved entry and produces the expected prune diff",
+        "expected": "resolved entry surfaced and pruned; no live entry touched; no-op when none resolved",
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "last_result": "fail",
+        "last_run": "2026-07-22T20:39:19Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added _project/scripts/cross_surface_baseline_autodetect.py: phase 1 (detect_and_prune) calls run_gate(gate, update_baseline=False) - byte-identical to the blocking CI call - and parses (never recomputes) the printed 'GATE FAILURE - previously-known divergences now equivalent: [...]' line via regex+ast.literal_eval. run_autodetect() iterates sorted(cross_surface.GATES), the live enforced-gate registry. Verified against the real ssb gate (uv run -- python _project/scripts/cross_surface_baseline_autodetect.py --gates ssb): 31s, exit clean, no-op JSON output, baseline file untouched.",
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "notes": "A scheduled workflow (or an extension of an existing canary) that runs each\nenforced gate and captures the resolved-entry report. No-op when nothing\nresolved.\n",
+        "started_at": "2026-07-22T20:38:32Z",
+        "started_branch": "feat/cross-surface-baseline-autodetect",
+        "started_worktree": "/home/user/bb-wt/cross-surface",
+        "status": "done",
+        "summary": "Scheduled job runs the enforced gates and collects resolved baseline entries per gate",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Phase 2 of detect_and_prune (same script) runs ONLY when phase 1 named a resolved key, and invokes run_gate(gate, update_baseline=True) - the exact --update-baseline/'make cross-surface-update-baseline' code path from #935 (known_divergences_baseline.update_baseline_file); no pruning logic reimplemented. Added .github/workflows/cross-surface-baseline-autodetect.yml (weekly Sun 10:00 UTC + workflow_dispatch): runs the script, diffs cross_surface_baseline.yaml, and if changed opens/updates a PR against develop via a chore/cross-surface-baseline-autoprune branch (bot-PR mechanics modeled on seed-corpus.yml/todo-db-export.yml: benchbox-bot commit identity, optional CROSS_SURFACE_BASELINE_PR_TOKEN falling back to github.token so pr.yml can still fire for CI signal). NO-OP (no commit/PR) when nothing resolved, per the writer's own idempotent behavior. Added 'make cross-surface-baseline-autodetect' as the local dry-run entry point (Makefile ~line 260).",
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "notes": "Invoke `make cross-surface-update-baseline BENCHMARK=<gate>` for each affected\ngate, then open a bot-authored, labeled PR with the pruned cross_surface_\nbaseline.yaml. Idempotent: no PR when nothing changed.\n",
+        "started_at": "2026-07-22T20:38:48Z",
+        "started_branch": "feat/cross-surface-baseline-autodetect",
+        "started_worktree": "/home/user/bb-wt/cross-surface",
+        "status": "done",
+        "summary": "When resolved entries exist, run --update-baseline and open a PR with the pruned baseline",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Guardrails: (1) never-auto-merge - the workflow never calls gh pr merge --auto anywhere, and separately benchbox/core/equivalence/cross_surface_baseline.yaml is already a soundness path in _project/scripts/auto_merge_soundness_paths.py/.github/CODEOWNERS, so the repo-wide auto-merge-on-open.yml backstop independently refuses auto-merge for this PR's diff regardless of authoring token - defense in depth, documented in the workflow header. (2) blocking-gate-never-prunes - pr.yml's correctness-gate job and every 'make <gate>-cross-surface-equivalence-report' Make target are UNMODIFIED (only run_gate(update_baseline=False)); only the new scheduled workflow ever passes update_baseline=True. (3) idempotence - update_baseline_file only writes on an actual diff (verified by test_detect_and_prune_is_a_no_op_once_the_baseline_is_already_clean: byte-identical file, writer never invoked, when nothing is resolved). (4) still-reproducing entries never dropped - verified by test_detect_and_prune_surfaces_exactly_the_resolved_entry_and_prunes_only_it and test_still_reproducing_divergence_alone_is_never_treated_as_resolved.",
+        "item_id": "cross-surface-baseline-stale-entry-autodetect",
+        "notes": "cross_surface.py / the baseline are CODEOWNERS soundness paths, so the prune PR\nmust leave auto-merge OFF and route to Code Owner review (reuse\nauto_merge_soundness_paths.py).\n",
+        "started_at": "2026-07-22T20:38:57Z",
+        "started_branch": "feat/cross-surface-baseline-autodetect",
+        "started_worktree": "/home/user/bb-wt/cross-surface",
+        "status": "done",
+        "summary": "Guardrails: never auto-merge the prune PR; it touches a soundness path",
+        "wid": "w3"
+      }
+    ]
+  }
+}

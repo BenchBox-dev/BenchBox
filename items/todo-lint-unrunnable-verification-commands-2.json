@@ -1,0 +1,104 @@
+{
+  "context": "Lint-time only; do not block create. Parse each rung command with shlex; report parse failures and placeholder shapes (e.g. the whole command wrapped in <...>, or no token resolvable as a command word). Keep it heuristic and conservative: piped, multi-line, env-var-prefixed, and compound commands are legitimate and must not be flagged.",
+  "description": "Successor of todo-lint-unrunnable-verification-commands (dropped 2026-07-31). The predecessor had two of the defect classes it was itself meant to catch: (1) its rung invoked `uv run -- python _project/scripts/todo_db.py lint ...`, which runs in the ROOT project venv where libsql is not installed, so against the hosted backend it exits 1 with 'hosted tracker requires the libsql package' before AND after any fix - unrunnable, hence vacuously 'failing'; (2) its w2 promised tests but only_modify omitted tests/unit/scripts/test_todo_db_v2.py, so the work could not land in scope. Premise (re-validated 2026-07-31 against the hosted DB via the blessed wrapper): the done item ducklake-beta-scale-runs-four-modes carries the rung command '<record the four run ids and correctness-gate outcomes on this item>' - angle-bracket prose, not a runnable command - and `todo lint` reports 0 findings on it. lint must report verification commands that cannot execute: commands that fail a shell parse, or are prose placeholders (leading '<', no plausible executable token). This check is the brokenness-rejection that todo-lint-rung-falsifiability-and-scope-completeness-2 depends on: without it, 'rung must fail on the unfixed tree' is vacuously satisfiable by a rung that is merely broken.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "completed_at": "2026-07-31T23:42:25Z",
+      "completed_pr": 1378,
+      "created_at": "2026-07-31T23:33:51Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing lint findings keep firing unchanged",
+        "item_id": "todo-lint-unrunnable-verification-commands-2"
+      },
+      {
+        "behavior": "Legitimate multi-line or piped verification commands still pass",
+        "item_id": "todo-lint-unrunnable-verification-commands-2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-lint-unrunnable-verification-commands-2",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "todo-lint-unrunnable-verification-commands-2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_v2.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo lint ducklake-beta-scale-runs-four-modes | grep -qi 'record the four run ids'",
+        "description": "lint reports the known placeholder rung on a done item",
+        "expected": "exits 1 on the unfixed tree because lint prints '0 finding(s)' (verified 2026-07-31, hosted backend, wrapper invocation); exits 0 once lint reports the placeholder rung. Needs the hosted tracker env (TODO_DB_URL/TODO_DB_AUTH_TOKEN).",
+        "item_id": "todo-lint-unrunnable-verification-commands-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q -k lint",
+        "description": "todo_db lint suite still green",
+        "expected": "all pass before and after - regression guard, not a gate",
+        "item_id": "todo-lint-unrunnable-verification-commands-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-lint-unrunnable-verification-commands-2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-lint-unrunnable-verification-commands-2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated pre-fix: todo lint ducklake-beta-scale-runs-four-modes printed '0 finding(s)'; post-fix it reports the placeholder rung",
+        "item_id": "todo-lint-unrunnable-verification-commands-2",
+        "notes": null,
+        "started_at": "2026-07-31T23:41:17Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-lint-unrunnable",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Re-validate: the placeholder rung on ducklake-beta-scale-runs-four-modes still lints clean on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "_command_unrunnable_reason + _unrunnable_verifications in todo_db.py: whole-command <...> placeholder shape and shlex parse failure; finding includes the rung text",
+        "item_id": "todo-lint-unrunnable-verification-commands-2",
+        "notes": null,
+        "started_at": "2026-07-31T23:41:19Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-lint-unrunnable",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Report verification commands that fail a shell parse or are prose placeholders",
+        "wid": "w1"
+      },
+      {
+        "evidence": "TestLintUnrunnableCommands: placeholder, parse failure, runnable, piped, multi-line-negated, description-only; 51 passed in test_todo_db_v2.py",
+        "item_id": "todo-lint-unrunnable-verification-commands-2",
+        "notes": null,
+        "started_at": "2026-07-31T23:41:35Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-lint-unrunnable",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Tests: a runnable command, a placeholder, a parse failure, and a piped/multi-line command that must NOT be flagged",
+        "wid": "w2"
+      }
+    ]
+  }
+}

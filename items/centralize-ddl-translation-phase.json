@@ -1,0 +1,745 @@
+{
+  "context": "Work inside the existing sql_compat architecture, not around it.\n\n1. Amend the active ADR and TODO notes first so the contract is explicit:\n   DDL centralization is achieved with `schema_emit` plus `ddl_optimize`, not\n   a new phase or a new resolver model.\n2. Use benchbox/sql_compat/rules/ddl_optimize/starrocks_ddl_rewrites.py as\n   the implementation template for every remaining adapter-owned CREATE TABLE\n   rewrite. Each adapter migration should produce a rule module plus adapter\n   consumer cleanup in the same slice.\n3. Keep runtime-only behavior in adapters. Centralize only pure SQL rewrite\n   logic; do not move catalog creation, connection/session setup, permissions,\n   or other operational flow into the registry.\n4. After adapter parity is achieved, remove the base\n   `platform_transform_fn` hook and then clean up residual benchmark-level\n   policy branches. Do not begin with a speculative schema-IR migration:\n   BaseSchemaTable is not rich enough today to justify that refactor here.\n5. Finish by tightening the inventory/lint/docs so new benchmark-level DDL\n   monkey-patching becomes detectable and reviewable.\n",
+  "description": "Follow-on / amendment plan for `build-sql-compat-phase-aware-pipeline`. The ADR,\nphase enum, registry, resolver, `schema_emit` rules, and the first\n`ddl_optimize` rule already exist. The remaining DDL gap is narrower and more\nconcrete than the earlier draft assumed: many adapters still own late\n`CREATE TABLE` rewrites (`_optimize_table_definition()` or Databricks\n`_convert_to_delta_table()`), and base schema execution still exposes the\n`platform_transform_fn` callback.\n\nThis item does NOT introduce a new `ddl_compile` phase, a new\n`CompatibilityContext` shape, or a parallel `benchbox/sql_compat/transformers/`\ntree. The frozen phase model is sufficient:\n- `schema_emit` owns logical-to-dialect DDL policy\n- `ddl_optimize` owns post-generation statement rewrites\n- adapter `create_schema()` overrides keep only operational setup\n\nGoal: finish central DDL ownership inside the shipped sql_compat architecture,\nretire late adapter monkey-patching, and remove residual benchmark-level DDL\ncompatibility branches so benchmarks no longer need platform-specific\ncompatibility policy at schema generation time. If\n`build-sql-compat-phase-aware-pipeline` is still active when this work starts,\nfold overlapping slices into that TODO rather than landing a competing design.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a `ddl_compile` phase",
+        "instead": "route logical-to-dialect generation through `schema_emit` and post-generation surgery through `ddl_optimize`",
+        "item_id": "centralize-ddl-translation-phase",
+        "why": "`schema_emit` and `ddl_optimize` already cover DDL ownership and are frozen in the ADR"
+      },
+      {
+        "dont": "create a parallel `benchbox/sql_compat/transformers/` tree",
+        "instead": "add rule modules under the existing phase directories",
+        "item_id": "centralize-ddl-translation-phase",
+        "why": "the shipped convention is `benchbox/sql_compat/rules/{phase}/`"
+      },
+      {
+        "dont": "extend `CompatibilityContext` with object_name, statement_kind, source_dialect, or target_dialect in this item",
+        "instead": "if statement metadata is required, amend the existing DDL payload contract first",
+        "item_id": "centralize-ddl-translation-phase",
+        "why": "resolver specificity and plan caching are query-centric today"
+      },
+      {
+        "dont": "leave benchmark-local DDL compatibility branches in place once equivalent rules exist",
+        "instead": "delete them or reduce them to documented `@compat_local` rendering only",
+        "item_id": "centralize-ddl-translation-phase",
+        "why": "shadowed inline logic defeats centralized ownership"
+      },
+      {
+        "dont": "move adapter operational setup into the registry",
+        "instead": "centralize only pure DDL statement rewrites",
+        "item_id": "centralize-ddl-translation-phase",
+        "why": "catalog selection, search_path/session state, permissions, and pre-drop behavior are runtime concerns"
+      },
+      {
+        "dont": "promise a repo-wide schema-IR migration in this item",
+        "instead": "capture any proven IR gap as a separate follow-on TODO",
+        "item_id": "centralize-ddl-translation-phase",
+        "why": "the current schema primitives cannot yet express all benchmark semantics cleanly"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "centralize-ddl-translation-phase",
+        "id": 112,
+        "reason": "BaseSchemaTable does not currently encode vector, partition, or time-series semantics well enough to justify a repo-wide migration in this item",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Conditional on a w16 audit proving current models can't remove local renderers; no evidence that condition was met.",
+        "summary": "Expand schema primitives / IR only if the w16 audit proves current benchmark models cannot remove remaining local renderers"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "centralize-ddl-translation-phase",
+        "id": 113,
+        "reason": "Keep this item focused on SQL DDL ownership first",
+        "resolution": "promoted",
+        "resolved_item": "unify-dataframe-mode-ddl-generation-behind-the-same-registry",
+        "resolved_reason": null,
+        "summary": "Unify DataFrame-mode DDL generation behind the same registry-owned path"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "centralize-ddl-translation-phase",
+        "id": 114,
+        "reason": "First move ownership centrally; de-duplication is a separate cleanup pass",
+        "resolution": "promoted",
+        "resolved_item": "factor-shared-helper-libraries-across-presto-trino-spark-fam",
+        "resolved_reason": null,
+        "summary": "Factor shared helper libraries across Presto/Trino/Spark-family DDL optimizers after parity is established"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_item": "build-sql-compat-phase-aware-pipeline"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-22T00:00:00Z",
+      "created_at": "2026-04-22T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Adapter create_schema() methods keep operational responsibilities such as catalog/schema setup, search_path/session state, permissions, and pre-drop sequencing",
+        "item_id": "centralize-ddl-translation-phase"
+      },
+      {
+        "behavior": "Base data-loading code keeps tuning lookup, dry-run support, logging, and table-level error reporting",
+        "item_id": "centralize-ddl-translation-phase"
+      },
+      {
+        "behavior": "CompatibilityResolver.build_plan() and registry specificity remain query-centric in this item; no `CompatibilityContext` DDL-field expansion",
+        "item_id": "centralize-ddl-translation-phase"
+      },
+      {
+        "behavior": "Existing schema_emit rules for nyctaxi and tsbs_devops remain the source of truth for benchmark-level DDL compatibility policy",
+        "item_id": "centralize-ddl-translation-phase"
+      },
+      {
+        "behavior": "The Phase enum in benchbox/sql_compat/context.py remains the ADR-frozen set; do not add `ddl_compile`",
+        "item_id": "centralize-ddl-translation-phase"
+      },
+      {
+        "behavior": "The shipped StarRocks ddl_optimize rule remains authoritative and unchanged except for any shared helper extraction that preserves behavior",
+        "item_id": "centralize-ddl-translation-phase"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/schema_primitives.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/context.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/resolver.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/schema.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/schema.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tsbs_devops/schema.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/vector_search/schema.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/schema.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/azure_synapse.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/workload.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend/adapter.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databricks/adapter.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/fabric_warehouse.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/firebolt.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/lakesail.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/presto.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/redshift.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/spark.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/trino.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/velox.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/inventory.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/rules/ddl_optimize/"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/rules/schema_emit/"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/adr-sql-compat-phase-aware-pipeline.md"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "scripts/compat_lint.py"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/sql_compat/"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/sql_compat/test_harness.py tests/unit/core/sql_compat/test_schema_emit_rules.py tests/unit/core/sql_compat/test_starrocks_pipeline_rules.py -q",
+        "description": "sql_compat rule and harness tests still pass after DDL-optimize expansion",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "centralize-ddl-translation-phase",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/test_databricks_adapter.py tests/unit/platforms/test_databend_adapter.py tests/unit/platforms/test_firebolt_adapter.py tests/unit/platforms/test_redshift_adapter.py tests/unit/platforms/test_azure_synapse_adapter.py tests/unit/platforms/test_snowflake_adapter.py tests/unit/platforms/test_presto_adapter.py tests/unit/platforms/test_trino_adapter.py tests/unit/platforms/test_spark_adapter.py tests/unit/platforms/test_lakesail_adapter.py tests/unit/platforms/test_velox_adapter.py tests/unit/platforms/test_fabric_warehouse_coverage.py -q",
+        "description": "Platform adapter tests covering migrated CREATE TABLE rewrites still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "centralize-ddl-translation-phase",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base/test_data_loading_operations.py tests/unit/platforms/test_platform_adapter_init_and_loading.py -q",
+        "description": "Base schema execution remains correct after hook removal",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "centralize-ddl-translation-phase",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark nyctaxi --scale 0.01 --phases load --dry-run ./benchmark_runs/_tmp_nyctaxi_ddl --non-interactive && uv run -- benchbox run --platform duckdb --benchmark tsbs_devops --scale 0.01 --phases load --dry-run ./benchmark_runs/_tmp_tsbs_ddl --non-interactive",
+        "description": "Benchmarks with prior inline DDL policy branches still dry-run successfully",
+        "expected": "both dry-runs complete with valid CREATE TABLE output and no schema-generation exceptions",
+        "item_id": "centralize-ddl-translation-phase",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/compat_lint.py --strict",
+        "description": "Compatibility lint enforces zero unregistered benchmark-level DDL policy branches",
+        "expected": "0 unregistered dialect branch(es) found in the scanned roots",
+        "item_id": "centralize-ddl-translation-phase",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w1",
+        "wid": "w10"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w1",
+        "wid": "w11"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w1",
+        "wid": "w12"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w1",
+        "wid": "w13"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w1",
+        "wid": "w14"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w10",
+        "wid": "w15"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w11",
+        "wid": "w15"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w12",
+        "wid": "w15"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w13",
+        "wid": "w15"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w14",
+        "wid": "w15"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w2",
+        "wid": "w15"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w3",
+        "wid": "w15"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w4",
+        "wid": "w15"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w5",
+        "wid": "w15"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w6",
+        "wid": "w15"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w7",
+        "wid": "w15"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w8",
+        "wid": "w15"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w9",
+        "wid": "w15"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w15",
+        "wid": "w16"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w10",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w11",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w12",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w13",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w14",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w15",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w16",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w2",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w3",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w4",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w5",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w6",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w7",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w8",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w9",
+        "wid": "w17"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w17",
+        "wid": "w18"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "centralize-ddl-translation-phase",
+        "needs_wid": "w1",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Update docs/development/adr/adr-sql-compat-phase-aware-pipeline.md and, if\nneeded, the remaining notes in _project/TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml\nto record the real scope:\n- no new `ddl_compile` phase\n- no `CompatibilityContext` extension in this item\n- no parallel `sql_compat/transformers/` tree\n- remaining adapter-owned DDL hooks are the work to finish\n\nEnumerate the exact migration inventory here: ClickHouse, Databricks,\nDatabend, Firebolt, Redshift, Azure Synapse, Snowflake, Presto, Trino,\nSpark, Lakesail, Velox, and Fabric Warehouse. If a DDL rewrite needs\nstatement metadata beyond raw SQL (for example Fabric Warehouse's tuning-\naware path), amend the existing `RewriteDDLPayload` / pipeline plumbing in\nthe ADR first rather than overloading `CompatibilityContext`.\n\nREQUIRED before closing w1: explicitly resolve and document the Fabric\nWarehouse question from open_questions - \"is raw SQL sufficient or does\nRewriteDDLPayload need a richer execution contract?\" Record the decision\nand its rationale in the ADR amendment. This decision gates w14, which\nin turn gates the entire w15-w18 tail; leaving it open past w1 will stall\nthe work.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Amend the existing ADR and active sql_compat TODO with the correct DDL-centralization target",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Mirror the Presto migration for benchbox/platforms/trino.py, but keep the\nTrino-specific create_schema() flow and connector/runtime setup local.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Trino CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Centralize Spark's DDL rewrite logic and preserve adapter-local runtime\nsession/configuration behavior. Verify `USING`-clause handling continues to\nproduce exactly one storage clause after migration.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Spark CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Register the Lakesail DDL rewrite centrally and update\nbenchbox/platforms/lakesail.py to consume it. Preserve runtime-only cloud\nsetup and connection behavior in the adapter.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Lakesail CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Register the Velox DDL rewrite centrally and update\nbenchbox/platforms/velox.py to consume it. Keep non-DDL execution setup\nlocal to the adapter.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Velox CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Fabric Warehouse currently has a tuning-aware `_optimize_table_definition`\nsignature. Migrate only after w1 resolves whether raw SQL is sufficient or\nwhether `RewriteDDLPayload` needs a richer execution contract. Do not solve\nthis by adding DDL fields to `CompatibilityContext`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Fabric Warehouse CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Revisit benchbox/core/nyctaxi/schema.py and benchbox/core/tsbs_devops/schema.py.\nW15 of the active sql_compat item already registered central `schema_emit`\nrules for the compatibility-policy branches. This cleanup unit removes any\nnow-shadowed inline policy logic, leaving only true `@compat_local`\nrendering/type-mapping behavior. If a branch cannot be removed, document\nexactly why in the ADR amendment and inventory output.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete now-redundant inline DDL policy branches in nyctaxi and tsbs_devops",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Review benchbox/core/vector_search/schema.py,\nbenchbox/core/write_primitives/schema.py, and\nbenchbox/core/read_primitives/schema.py for benchmark-level DDL logic that\nstill encodes platform compatibility policy rather than pure rendering.\nMove compatibility-policy branches into existing `schema_emit` rules.\nDo NOT force a repo-wide schema-IR migration here; if true zero-local-\nrendering requires richer schema primitives than the current codebase can\nrepresent, capture that as a separate follow-on item with concrete\nevidence instead of reopening the architecture in this TODO.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit vector_search and primitive schema helpers for residual benchmark-level DDL compatibility policy",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Delete the `platform_transform_fn` parameter and all call sites in\nbenchbox/platforms/base/data_loading.py once every remaining CREATE TABLE\nrewrite flows through resolver-backed `ddl_optimize` rules. Preserve\nlogging, tuning lookup, statement execution, and error-reporting behavior.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove platform_transform_fn from base schema execution after all callers migrate",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Update benchbox/sql_compat/inventory.py and scripts/compat_lint.py so the\ntooling can catch residual benchmark-level DDL policy sites beyond simple\n`if dialect ...` branches where feasible, including the map-based cases\naudited in w16. Amend the existing ADR to document the final contract and\nexplicit disposition of any remaining `@compat_local` rendering-only sites.\nDo not add a second ADR for DDL compilation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tighten lint, inventory, tests, and ADR wording to lock in centralized DDL ownership",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Add a ClickHouse rule module under benchbox/sql_compat/rules/ddl_optimize/\nfollowing the shipped StarRocks precedent, then update\nbenchbox/platforms/clickhouse/workload.py so registry-backed DDL rewrite\nis authoritative for CREATE TABLE statements. Keep ClickHouse-specific\nruntime setup in the adapter; centralize only the SQL rewrite logic.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move ClickHouse CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Databricks is a separate shape from the `_optimize_table_definition()`\nadapters. Register `_convert_to_delta_table()` as a DDL rewrite rule and\nreplace the `platform_transform_fn` usage in\nbenchbox/platforms/databricks/adapter.py with the registry-owned path.\nKeep catalog/schema creation, permissions, and other runtime setup local.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Databricks Delta-table CREATE TABLE rewrite under Phase.DDL_OPTIMIZE",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Register the Databend DDL rewrite in benchbox/sql_compat/rules/ddl_optimize/\nand make benchbox/platforms/databend/adapter.py consume the central rule.\nDelete adapter-local rewrite logic once parity tests pass.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Databend CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Register the Firebolt DDL rewrite in benchbox/sql_compat/rules/ddl_optimize/\nand make benchbox/platforms/firebolt.py consume the central rule. Preserve\nnon-DDL operational behavior in create_schema().\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Firebolt CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Centralize the Redshift DDL rewrite while leaving adapter runtime concerns\nsuch as search_path/session setup and pre-drop behavior local to\nbenchbox/platforms/redshift.py. Do not mix operational setup into the rule.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Redshift CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Register the Azure Synapse table-definition rewrite centrally and update\nbenchbox/platforms/azure_synapse.py to consume it. External object setup\nand connection/session behavior remain adapter-local.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Azure Synapse CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Centralize Snowflake's CREATE TABLE rewrite and preserve the adapter's\nruntime-only responsibilities. Verify clustering/tuning-related SQL\nremains correct after moving the rewrite authority into the rule registry.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Snowflake CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-ddl-translation-phase",
+        "notes": "Register the Presto DDL rewrite in the existing rules layout and make\nbenchbox/platforms/presto.py consume it. Keep connector/catalog setup\noutside the rule path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Presto CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership",
+        "wid": "w9"
+      }
+    ]
+  }
+}

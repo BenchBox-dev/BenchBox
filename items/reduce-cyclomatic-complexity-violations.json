@@ -1,0 +1,194 @@
+{
+  "context": "w1: Add entries to pyproject.toml [tool.complexity] exclude_functions following\nthe existing format with CC score and rationale comment.\n\nw2-w6: For each refactoring:\n1. Read function and its callers/tests\n2. Extract helper methods (private, same module)\n3. Run focused tests + lint after each extraction\n4. Verify CC reduced via: uv run -- python scripts/check_complexity.py 2>&1 | grep function_name\n\nw7: Optional cleanup - only if w2-w6 are done and fast suite is green.\n",
+  "description": "`make complexity-check` reports 10 functions exceeding CC=20 and 1 warning at CC=18.\nAfter evaluating each function, 5 have inherent complexity (validation, parsing,\nregistration patterns) and should be added to exclude_functions with rationale.\nThe remaining 6 are refactorable with straightforward extraction patterns.\n\nGoal: reduce FAIL count from 10 to 0 so `make complexity-check` passes.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add new abstractions (base classes, protocols)",
+        "instead": "(not specified)",
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "why": "extraction alone achieves the CC target without introducing coupling between unrelated modules"
+      },
+      {
+        "dont": "change public API signatures",
+        "instead": "(not specified)",
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "why": "these are all internal functions and callers should not need updating"
+      },
+      {
+        "dont": "move code to new files",
+        "instead": "(not specified)",
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "why": "the helpers share private state with the parent function and moving them would require exposing internal details"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality",
+      "completed_at": "2026-03-12T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All refactored functions must produce identical behavior - no semantic changes",
+        "item_id": "reduce-cyclomatic-complexity-violations"
+      },
+      {
+        "behavior": "Existing tests must continue to pass without modification",
+        "item_id": "reduce-cyclomatic-complexity-violations"
+      },
+      {
+        "behavior": "exclude_functions entries must include CC score and rationale comment",
+        "item_id": "reduce-cyclomatic-complexity-violations"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/dryrun.py"
+      },
+      {
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/driver_metadata.py"
+      },
+      {
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/validation.py"
+      },
+      {
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/exporters.py"
+      },
+      {
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make complexity-check",
+        "description": "Complexity check passes",
+        "expected": "0 functions exceed max complexity of 20; no new warnings",
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "No regressions in fast suite",
+        "expected": "All fast tests pass",
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check .",
+        "description": "Lint passes",
+        "expected": "All checks passed",
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 5 inherent-complexity functions to exclude_functions in pyproject.toml",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor render_ascii_chart (CC=43) - replace elif chain with chart-type registry",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _build_duckdb_external_scan_expression (CC=23) - extract per-format handlers",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor display_interactive_preview (CC=22) - data-driven table row construction",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor validate_column_types (CC=22) - extract per-tuning-type validators",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor apply_driver_metadata (CC=21) - consolidate repeated getattr/setattr chains",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cyclomatic-complexity-violations",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _load_file_based_data (CC=18) - extract sharded loading to helper method",
+        "wid": "w7"
+      }
+    ]
+  }
+}

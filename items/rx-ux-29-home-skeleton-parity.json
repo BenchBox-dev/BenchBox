@@ -1,0 +1,197 @@
+{
+  "context": "Extract the geometry-bearing class strings into shared constants used by both the loaded and skeleton render paths, so parity is structural rather than asserted by a test comparing two literals. A test that compares only one pair of strings would certify an incomplete fix, and strict whole-subtree equality is wrong because the loaded hero renders ActiveLeaderboardSummary which the skeleton does not.",
+  "description": "Home.tsx carries comments stating that the skeleton hero mirrors the loaded hero exactly, because earlier drift caused visible reflow when data arrived. Below 640px they no longer match. Loaded hero wrapper :360 is 'px-4 py-4 sm:px-6 sm:py-7 lg:px-8 lg:py-4' against skeleton :607 'px-4 py-7 sm:px-6 lg:px-8 lg:py-4'. Loaded headline :362 is 'text-2xl font-bold sm:text-4xl' against skeleton :609 'text-3xl font-bold sm:text-4xl'. Loaded data surface :478 is 'py-4 sm:py-8' against skeleton :634 'py-8'. A third drift the first audit missed - loaded ranking selector :383 is 'mt-3 p-2 sm:mt-5 sm:p-3' with 'grid-cols-2 gap-2 sm:gap-3' against skeleton :620 'mt-5 p-3' with 'gap-3'. So at mobile widths the headline shrinks 30px to 24px and the hero loses padding the moment data lands. There is NO test asserting this parity, only prose comments - which is precisely why it regressed. Verified at HEAD 39ead3a41.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assert byte-equality of two extracted class strings",
+        "instead": "INSTEAD cover every geometry-bearing region or make parity structural",
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "why": "there are at least four geometry pairs, so a two-string test certifies an incomplete fix"
+      },
+      {
+        "dont": "Assert the skeleton and loaded subtrees are identical",
+        "instead": "INSTEAD compare only geometry-bearing classes",
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "why": "the loaded hero renders ActiveLeaderboardSummary and the skeleton deliberately does not"
+      }
+    ],
+    "item_meta": {
+      "category": "bug",
+      "completed_at": "2026-08-24T20:35:52Z",
+      "completed_pr": 1879,
+      "created_at": "2026-08-24T12:38:57Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Desktop and wide hero geometry is unchanged - the regression is mobile-only",
+        "item_id": "rx-ux-29-home-skeleton-parity"
+      },
+      {
+        "behavior": "The fold budgets the responsive spec already enforces stay satisfied",
+        "item_id": "rx-ux-29-home-skeleton-parity"
+      },
+      {
+        "behavior": "The skeleton keeps rendering fewer children than the loaded hero - parity is about geometry, not subtree equality",
+        "item_id": "rx-ux-29-home-skeleton-parity"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing fold-budget assertions this must not break",
+        "decision": "reuse",
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "path": "results-explorer/e2e/responsive.spec.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/responsive.spec.ts"
+      },
+      {
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/support/large-corpus.spec.ts"
+      },
+      {
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/Home.test.tsx",
+        "description": "All four geometry pairs match",
+        "expected": "pass - hero wrapper, headline, selector and data surface",
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "last_result": "pass",
+        "last_run": "2026-08-24T21:41:12Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/Home.test.tsx",
+        "description": "Regression test fails on reintroduced drift",
+        "expected": "fails when py-7 is restored on the skeleton",
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "last_result": "pass",
+        "last_run": "2026-08-24T21:41:16Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test e2e/responsive.spec.ts",
+        "description": "Responsive spec still green",
+        "expected": "pass",
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "last_result": "pass",
+        "last_run": "2026-08-24T21:41:45Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --workers=1 --retries=0 e2e/support/large-corpus.spec.ts",
+        "description": "Large-corpus fixture suite has enough CI budget and preserves paging behavior",
+        "expected": "2 passed",
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventoried and centralized hero surface, wrapper, intro, headline, subtitle, selector shell/grid, and data-surface geometry.",
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "notes": null,
+        "started_at": "2026-08-24T13:50:36Z",
+        "started_branch": "fix/rx-ux-29-home-skeleton-parity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-29-home-skeleton-parity",
+        "status": "done",
+        "summary": "Inventory every geometry-bearing class pair across the loaded and skeleton hero, selector and data surface",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Chose shared HOME_SHELL_GEOMETRY_CLASSES; loaded and skeleton paths consume one structural source while retaining different child content.",
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "notes": null,
+        "started_at": "2026-08-24T13:50:41Z",
+        "started_branch": "fix/rx-ux-29-home-skeleton-parity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-29-home-skeleton-parity",
+        "status": "done",
+        "summary": "GATE - choose shared class constants versus a source-level parity test, given that strict equality is wrong because the loaded hero renders extra children",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Applied shared classes across all inventoried loaded/skeleton regions with desktop and wide classes unchanged.",
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "notes": null,
+        "started_at": "2026-08-24T13:50:46Z",
+        "started_branch": "fix/rx-ux-29-home-skeleton-parity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-29-home-skeleton-parity",
+        "status": "done",
+        "summary": "Apply the w2 decision across hero wrapper headline selector and data surface",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Added 390x844 transition test covering eight shared geometry regions and proving loaded-only content remains absent from the skeleton.",
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "notes": null,
+        "started_at": "2026-08-24T13:50:51Z",
+        "started_branch": "fix/rx-ux-29-home-skeleton-parity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-29-home-skeleton-parity",
+        "status": "done",
+        "summary": "Add a regression test at 390px that fails if any geometry pair diverges again",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Replaced drift-prone prose with a pointer to HOME_SHELL_GEOMETRY_CLASSES.",
+        "item_id": "rx-ux-29-home-skeleton-parity",
+        "notes": null,
+        "started_at": "2026-08-24T13:50:57Z",
+        "started_branch": "fix/rx-ux-29-home-skeleton-parity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-29-home-skeleton-parity",
+        "status": "done",
+        "summary": "Replace the prose parity comments with a pointer to the enforcing mechanism",
+        "wid": "w5"
+      }
+    ]
+  }
+}

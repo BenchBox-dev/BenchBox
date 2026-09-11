@@ -1,0 +1,226 @@
+{
+  "description": "Adversarial review of the 14-TODO holistic-review remediation found a systemic\ngap: several PRs landed real regression reproducers but parked them in\nnon-required CI lanes (manual env var, `slow`, `integration`/`medium`), so the\ndevelop required gate `ci-required-result` does NOT execute them. The PR that\nintroduced each reproducer self-merged without ever running its own deepest\nguard; the reproducers only fire one ring out, at the main-release boundary\n(test.yml). Three concrete instances:\n\n  1. #900 (plan-capture-blocking-ci-gate): the \"gate catches a planted defect\"\n     proof is gated only by env var BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT\n     (tests/integration/test_plan_capture_gate.py:88), which NOTHING in CI sets.\n     w3's no-silent-green claim is satisfied only as a one-time manual demo;\n     there is no standing automated negative test.\n  2. #901 (cross-surface-mutation-harness-scale-fidelity): the substantive\n     mutation-catch assertions (test_mutation_sensitivity,\n     test_unmutated_target_is_green) are module `slow`-marked and excluded from\n     the required code-test lane; only the set-equality drift guard\n     (test_targets_cover_every_enforced_gate, -m slow -n 0) runs in required CI.\n  3. #909 (plan-capture-robustness-hardening): the w2 connection-fencing and w3\n     plan-identity reproducers live in tests/integration/test_plan_capture_phase.py\n     ([integration, medium]) and run only in test.yml; no required develop-PR\n     job collects them.\n\nDesign principle this item establishes: a regression reproducer that proves a\nfix MUST run in the required develop-PR gate, via an explicit-node step if its\nmarker excludes it from the fast lane. Cost is bounded by selecting only the\nload-bearing cells, not whole slow matrices.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a step without verifying it actually fails when the fix is reverted (w4).",
+        "instead": "(not specified)",
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "add the reproducers as a new non-required job or with continue-on-error",
+        "instead": "(not specified)",
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "why": "that recreates the gap this item closes."
+      },
+      {
+        "dont": "promote entire slow/integration suites",
+        "instead": "(not specified)",
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "why": "cost-blow-up; promote the specific cells that prove the fixes."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "required-ci-coverage-deepest-reproducers",
+        "id": 477,
+        "reason": "Scope this item to the three holistic-review instances; a full sweep is a separate hygiene pass.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Reason explicitly scopes the broader audit as separate hygiene work, which matches the open item promote-non-required-regression-reproducers-suite-audit.",
+        "summary": "Broader audit of every non-required reproducer across the suite."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-06-30T00:00:00Z",
+      "created_at": "2026-06-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Every added step lives in a job already in ci-required-result.needs and is not continue-on-error.",
+        "item_id": "required-ci-coverage-deepest-reproducers"
+      },
+      {
+        "behavior": "No new always-on slow matrix in required CI — select only the load-bearing cells; keep wall-clock bounded.",
+        "item_id": "required-ci-coverage-deepest-reproducers"
+      },
+      {
+        "behavior": "The existing positive-path gate behavior and the fast-lane test selection are unchanged.",
+        "item_id": "required-ci-coverage-deepest-reproducers"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': '.github/workflows/pr.yml:357', 'note': 'Existing explicit-node pattern: \\'Run cross-surface mutation target drift guard\\' invokes a single node with -m \"slow\" -n 0 so a marker-excluded test still runs in required code-test. Reuse this exact mechanism; do not add a new job.'}",
+        "decision": "reuse",
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': '.github/workflows/pr.yml:363', 'note': '\\'Run cross-surface GATES Make/CI pinning guard\\' invokes a node with -m \"medium\" -n 0 — the precedent for adding a medium-marked node to required CI.'}",
+        "decision": "reuse",
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': '.github/workflows/pr.yml:719', 'note': 'ci-required-result aggregator needs[] — every step added here must live in a job already in that needs list (code-test or plan-capture-gate), not continue-on-error.'}",
+        "decision": "reuse",
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'tests/integration/test_plan_capture_gate.py:88', 'note': 'BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT hook to drive the standing negative test for w1; reuse the existing planting switch, do not invent a parallel one.'}",
+        "decision": "reuse",
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_plan_capture_gate.py"
+      },
+      {
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_plan_capture_phase.py"
+      },
+      {
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/equivalence/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT=1 uv run -- python -m pytest tests/integration/test_plan_capture_gate.py -q",
+        "description": "Planted-defect negative test fails the gate",
+        "expected": "non-zero exit; gate reports the dropped fingerprint (catch capability proven)",
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_plan_capture_phase.py -m medium -n 0 -q",
+        "description": "Promoted mutation + plan-phase cells run under their explicit-node selectors",
+        "expected": "the w2/w3 reproducer cells are collected and pass",
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "notes": "From a fresh worktree off develop: grep BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT\nacross the repo (expect: only the test reads it, nothing sets it); confirm\ntest_cross_surface_mutation_sensitivity.py module pytestmark includes slow;\nconfirm test_plan_capture_phase.py module pytestmark is [integration, medium];\nconfirm pr.yml code-test (test (ubuntu-latest, 3.12)) and plan-capture-gate\nare in ci-required-result.needs. Record a compact summary (file:line, marker,\nlane) in the PR body. Line numbers in this TODO are from origin/develop at\nreview time and may have drifted. NOTE: cli-lean-import-guarantee's w7 also\nedits pr.yml's required lanes; if that item is in flight, coordinate/rebase to\navoid a conflict on the required-CI workflow (a merge-coordination concern, not\na logical dependency).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-confirm the three gaps on fresh develop before editing (markers, env-var usages, lane membership)",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "notes": "Add test (or CI step) that runs the plan-capture gate subprocess with\nBENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT=1 and asserts NON-ZERO exit (the gate\ncatches the dropped fingerprint). Wire it into the required plan-capture-gate\njob (Makefile plan-capture-gate target region) or as an explicit node in\ncode-test. The positive path must stay green with the env var unset. This\nregression-protects the catch capability itself, not just the happy path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a standing automated negative test that the plan-capture gate fails on a planted defect (#900 F3)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "notes": "Add an explicit-node step to code-test invoking the h2odb mutation-sensitivity\ncell plus test_unmutated_target_is_green[h2odb] with -m \"slow\" -n 0 (mirroring\npr.yml:357). h2odb is the gate whose scale-fidelity #901 fixed; its build now\nmatches production (gate.scale_factor=0.01). Leave the full slow matrix where\nit is. Confirm the exact parametrized node ids against the live test file.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Promote the load-bearing mutation-catch cells into required code-test (#901 F4)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "notes": "Add an explicit-node step to code-test:\n  uv run -- python -m pytest tests/integration/test_plan_capture_phase.py \\\n    -m \"medium\" -n 0 -k \"<identity/fencing/timeout selectors>\" --tb=short -q\ncovering the connection-fencing (w2) and plan-identity (w3) reproducers.\nConfirm the -k selectors against the actual test names before merge.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add the w2/w3 plan-capture-phase reproducers to a required develop-PR job (#909 F5)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "required-ci-coverage-deepest-reproducers",
+        "notes": "For each added step, locally break the underlying fix and confirm the required\nstep goes red; restore. Record the manual break/restore evidence (command +\nobserved failure) in the PR body. Do NOT commit the breakage. This guards\nagainst adding a vacuous required step that never fails.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prove each new required step is load-bearing (fails when its fix is reverted)",
+        "wid": "w4"
+      }
+    ]
+  }
+}

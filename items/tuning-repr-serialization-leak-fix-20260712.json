@@ -1,0 +1,105 @@
+{
+  "description": "From the 2026-07-12 tuning review, finding R9/C2-adjacent (evidence pinned to\ncommit acfb8992).\n\nsanitize_platform_options (benchbox/core/results/platform_options.py:68-80) is\nused for platform.raw_config (platforms/base/runtime_metadata.py:105) but does\nNOT filter _INTERNAL_OPTION_KEYS (only _iter_public_options does), and\n_sanitize_option_value falls back to str(value) (platform_options.py:138). Net\neffect: UnifiedTuningConfiguration objects are published as ~900-char Python\nrepr() strings at platform.raw_config.tuning_config - 468 of 528 seed-corpus\nbundles carry one, and the explorer's tuning hash ends up hashing repr text.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "silently drop values with no trace",
+        "instead": "(not specified)",
+        "item_id": "tuning-repr-serialization-leak-fix-20260712",
+        "why": "leave an explicit '<unserializable:TypeName>' marker so capture gaps stay visible"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-12T00:00:00Z",
+      "created_at": "2026-07-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Bundle emission must never raise because an option value is unserializable",
+        "item_id": "tuning-repr-serialization-leak-fix-20260712"
+      },
+      {
+        "behavior": "Secret redaction behavior (REDACTED_VALUE) exactly as-is",
+        "item_id": "tuning-repr-serialization-leak-fix-20260712"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-repr-serialization-leak-fix-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/platform_options.py"
+      },
+      {
+        "item_id": "tuning-repr-serialization-leak-fix-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/runtime_metadata.py"
+      },
+      {
+        "item_id": "tuning-repr-serialization-leak-fix-20260712",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results -q -k 'platform_options or raw_config'",
+        "description": "Sweep script over a fresh local run shows no repr strings",
+        "expected": "All passing incl. new no-repr assertions",
+        "item_id": "tuning-repr-serialization-leak-fix-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-repr-serialization-leak-fix-20260712",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-repr-serialization-leak-fix-20260712",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-repr-serialization-leak-fix-20260712",
+        "notes": "Added an opt-in exclude_internal keyword to sanitize_platform_options()\n(default False, preserving existing call sites' behavior). When True it\ndrops underscore-prefixed keys and _INTERNAL_OPTION_KEYS, matching\n_iter_public_options semantics, and propagates recursively through\nnested Mapping values. Set exclude_internal=True at every export-facing\ncall site: runtime_metadata.py:105 (platform_raw_config, the leak site\nnamed in the finding), runtime_metadata.py:450 (_raw_platform_metadata,\nalso published in bundles), and platform_options.py's\nbuild_platform_options_capture (defense-in-depth; it already filtered\nvia _iter_public_options before calling sanitize, but nested Mapping\nvalues weren't covered previously).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Exclude internal option keys from raw_config capture (align sanitize_platform_options call sites with _iter_public_options filtering, or filter at the runtime_metadata call site)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-repr-serialization-leak-fix-20260712",
+        "notes": "_sanitize_option_value no longer falls back to str(value)/repr() for\nany caller. If the value exposes a callable to_dict(), that result is\nused (recursively sanitized, including secret redaction and, when\nrequested, internal-key filtering); if to_dict() raises, or the value\nhas no to_dict, the key's value becomes the marker string\n\"<unserializable:TypeName>\" (key itself is preserved per the\nanti_patterns note - only the opaque value is replaced). This applies\nunconditionally (not just when exclude_internal=True) since there is no\nlegitimate reason to publish a raw Python repr from any call site.\nWrapped the to_dict() call in try/except so a broken to_dict()\nimplementation can't raise out of bundle emission.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace the str() fallback for non-JSON-able values on exported paths: use to_dict() when available, else drop the key with a captured warning marker",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-repr-serialization-leak-fix-20260712",
+        "notes": "tests/unit/core/results/test_platform_options_capture.py: added\ntest_sanitize_excludes_internal_keys_when_requested,\ntest_sanitize_without_exclude_internal_preserves_existing_behavior,\ntest_sanitize_uses_to_dict_for_objects_that_support_it,\ntest_sanitize_marks_unserializable_values_instead_of_using_repr,\ntest_sanitize_never_raises_when_to_dict_itself_fails, and\ntest_secret_redaction_unaffected_by_internal_key_filtering.\ntests/unit/platforms/test_runtime_metadata_helpers.py: added\ntest_platform_raw_config_excludes_internal_tuning_keys_and_reprs, which\nexercises build_default_normalized_result_metadata end-to-end with a\ntuning-config-shaped object with a deliberately repr-leaking\n__repr__ and asserts platform_raw_config has neither the internal keys\nnor any repr text.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tests: a config object placed in options never serializes as a repr string in any exported payload; warning marker asserted for unknown objects",
+        "wid": "w3"
+      }
+    ]
+  }
+}

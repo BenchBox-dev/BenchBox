@@ -1,0 +1,131 @@
+{
+  "context": "Change the skeleton headline to the canonical loaded copy so the h1 is stable across the loading and loaded states, then update the Vitest loading-state assertion that pins the retired string.",
+  "description": "PR #1482 renamed the loaded Home h1 to 'BenchBox Curated Results Preview' (Home.tsx ~line 352) but left HomeLoadingSkeleton's h1 as 'BenchBox Database Leaderboards' (~line 598, reached via the early return ~line 257). The retired string now exists ONLY in the loading skeleton, so every e2e heading assertion became timing-dependent: a test that asserts before data load silently matches the skeleton, and one that asserts after data load fails deterministically. Verified 2026-08-03 by local Playwright run against develop 3af42e29b.",
+  "legacy": {
+    "item_meta": {
+      "category": "Explorer UI contract",
+      "created_at": "2026-08-03T23:32:57Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The loaded page copy stays the narrower curated-preview claim, not the broader leaderboards claim",
+        "item_id": "explorer-home-skeleton-heading-parity-20260803"
+      },
+      {
+        "behavior": "The loading skeleton still renders and still exposes its aria-busy loading region",
+        "item_id": "explorer-home-skeleton-heading-parity-20260803"
+      },
+      {
+        "behavior": "Vitest loading-state coverage continues to assert a heading, not merely the spinner text",
+        "item_id": "explorer-home-skeleton-heading-parity-20260803"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-home-skeleton-heading-parity-20260803",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "explorer-home-skeleton-heading-parity-20260803",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-home-skeleton-heading-parity-20260803",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "explorer-home-skeleton-heading-parity-20260803",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "explorer-home-skeleton-heading-parity-20260803",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": null,
+        "description": "Canonical headline appears in both the loaded hero and the skeleton",
+        "expected": null,
+        "item_id": "explorer-home-skeleton-heading-parity-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Retired headline is absent from Home.tsx",
+        "expected": null,
+        "item_id": "explorer-home-skeleton-heading-parity-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Home Vitest suite passes with the updated loading-state assertion",
+        "expected": null,
+        "item_id": "explorer-home-skeleton-heading-parity-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-home-skeleton-heading-parity-20260803",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-home-skeleton-heading-parity-20260803",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-home-skeleton-heading-parity-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Change HomeLoadingSkeleton h1 to the canonical curated-preview copy",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-home-skeleton-heading-parity-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update the Vitest loading-state heading assertion",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-home-skeleton-heading-parity-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm no remaining source reference to the retired headline",
+        "wid": "w2"
+      }
+    ]
+  }
+}

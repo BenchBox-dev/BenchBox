@@ -1,0 +1,216 @@
+{
+  "context": "Review pyproject.toml lines 39-46 (core deps) and 59-116 (optional extras).\nThe minimal change: remove line 40 from [project.dependencies] and add a new stanza\nto [project.optional-dependencies]:\n  duckdb = [\"duckdb>=1.0.0\"]\nThen add \"duckdb\" (or the extras spec) to the `dev`, `all`, and `local` groups.\nRegenerate uv.lock with `uv lock` and verify the pin is gone from the core set.\n",
+  "description": "DuckDB is currently a core (required) dependency in pyproject.toml at line 40:\n  \"duckdb>=1.4.0\"\n\nBecause it's required, uv.lock pins it to an exact version (currently 1.4.3). When a\nuser runs `uv run benchbox run`, uv syncs the environment against uv.lock BEFORE Python\nstarts, silently reverting any manually installed version (e.g., duckdb==1.5.0.dev307)\nback to 1.4.3. The user has no visibility into this until they check the result JSON.\n\nMoving duckdb to an optional extras group removes it from the lock-enforced core set.\nuv would no longer revert it - whatever the user has installed survives. Users who want\nDuckDB can install it via `pip install benchbox[duckdb]` or the existing `all` extra.\n\nDesign decisions to resolve during implementation:\n  1. Minimum version for the optional duckdb extra - keep >=1.4.0 or relax to >=1.0.0?\n     Relaxing to >=1.0.0 gives users maximum flexibility (they can test any version),\n     though some BenchBox features may require newer APIs.\n  2. Backward compatibility - `pip install benchbox` currently installs duckdb; removing\n     it from core will break existing installs. Options:\n       a. Add duckdb to a \"local\" or \"embedded\" extras group and update install docs.\n       b. Add duckdb to the existing `all` meta-extra and mark it as the recommended install.\n       c. Keep a minimal >=1.0.0 pin in core (so something is installed) but remove the\n          tight lock on a specific version by using a pre-release-tolerant spec.\n  3. The `dev` extras group at line 66 also includes \"duckdb>=1.4.0\" - must be updated\n     to match whatever approach is chosen.\n  4. CI must still work - the CI install likely uses `pip install -e .[dev]` or similar.\n\nThe primary goal is: after `pip install benchbox` (or `uv add benchbox`), a user who\nthen runs `uv pip install \"duckdb==X.Y.Z\"` should have that version respected by\n`uv run benchbox run` without being silently reverted.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "remove duckdb from the 'dev' extras group without replacing it",
+        "instead": "update dev group at the same time as core",
+        "item_id": "move-duckdb-to-optional-extras",
+        "why": "CI tests import duckdb directly"
+      },
+      {
+        "dont": "set an upper bound on the optional duckdb extra (e.g., duckdb>=1.0.0,<2.0)",
+        "instead": "use only a lower bound",
+        "item_id": "move-duckdb-to-optional-extras",
+        "why": "that defeats the purpose of allowing dev/future versions"
+      },
+      {
+        "dont": "skip updating the install docs",
+        "instead": "update README and getting-started in the same PR",
+        "item_id": "move-duckdb-to-optional-extras",
+        "why": "users will get ImportError with no explanation"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "move-duckdb-to-optional-extras",
+        "id": 215,
+        "reason": "Out of scope for this item - focus only on duckdb, which is the platform with the most active version-testing use case",
+        "resolution": "promoted",
+        "resolved_item": "consider-whether-other-core-drivers-polars-clickhouse-connec",
+        "resolved_reason": null,
+        "summary": "Consider whether other core drivers (polars, clickhouse-connect, psycopg2-binary) should similarly be made optional"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-23T00:00:00Z",
+      "created_at": "2026-02-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapters continue to load correctly",
+        "item_id": "move-duckdb-to-optional-extras"
+      },
+      {
+        "behavior": "The 'all' extra still installs duckdb",
+        "item_id": "move-duckdb-to-optional-extras"
+      },
+      {
+        "behavior": "pip install benchbox still results in a working DuckDB benchmark after install (either via an auto-included extra or clear documentation)",
+        "item_id": "move-duckdb-to-optional-extras"
+      },
+      {
+        "behavior": "uv run -- python -m pytest -m fast -q continues to pass (no missing duckdb import)",
+        "item_id": "move-duckdb-to-optional-extras"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "move-duckdb-to-optional-extras",
+        "kind": "only_modify",
+        "path_glob": ".github/"
+      },
+      {
+        "item_id": "move-duckdb-to-optional-extras",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "move-duckdb-to-optional-extras",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "move-duckdb-to-optional-extras",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "move-duckdb-to-optional-extras",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -A3 '^name = \"duckdb\"' uv.lock",
+        "description": "After removing from core, uv.lock no longer enforces exact duckdb version",
+        "expected": "duckdb entry exists in lock but is no longer in the [package] required set",
+        "item_id": "move-duckdb-to-optional-extras",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv pip show duckdb",
+        "description": "Full dev install still includes duckdb",
+        "expected": "duckdb is installed (version may vary)",
+        "item_id": "move-duckdb-to-optional-extras",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast test suite passes after dependency change",
+        "expected": "All tests pass with 0 failures",
+        "item_id": "move-duckdb-to-optional-extras",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "move-duckdb-to-optional-extras",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "move-duckdb-to-optional-extras",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "move-duckdb-to-optional-extras",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "move-duckdb-to-optional-extras",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "move-duckdb-to-optional-extras",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "move-duckdb-to-optional-extras",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide min version and install-surface strategy (review pyproject.toml lines 39-116); record decision as comment above new duckdb stanza",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "move-duckdb-to-optional-extras",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove duckdb from core dependencies (pyproject.toml line 40), add to an optional extras group (e.g., 'duckdb' or 'local'), and update 'dev' and 'all' meta-extras accordingly",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "move-duckdb-to-optional-extras",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run uv lock to regenerate uv.lock and verify duckdb is no longer pinned in the core dependency set",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "move-duckdb-to-optional-extras",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update CI workflows and install commands to include the duckdb extra (e.g., pip install -e .[dev,duckdb] or equivalent)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "move-duckdb-to-optional-extras",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update README and getting-started docs to reflect new install instructions (pip install benchbox[duckdb] or benchbox[all])",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "move-duckdb-to-optional-extras",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run fast test suite to confirm no breakage from dependency change",
+        "wid": "w6"
+      }
+    ]
+  }
+}

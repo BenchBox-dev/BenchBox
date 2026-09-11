@@ -1,0 +1,346 @@
+{
+  "description": "Benchmark constructors accept parameters that are unreachable from the CLI. The orchestrator (_get_benchmark_instance) only forwards a fixed set of kwargs (scale_factor, compress_data, compression_type, compression_level, verbose, quiet, parallel). Benchmark-specific parameters like taxi_types, year, months, end_year, num_hosts, skew_preset, dimensions, hash_algorithm, seed, and force_regenerate never reach the constructor.\nThis affects 10 of 21 benchmarks. The fix is a --benchmark-option K=V mechanism mirroring the existing --platform-option K=V pattern. Each benchmark registers typed option specs; the orchestrator merges parsed options into constructor kwargs.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add individual CLI flags per benchmark parameter (--taxi-types, --year, --end-year)",
+        "instead": "use the generic --benchmark-option K=V mechanism instead",
+        "item_id": "benchmark-option-cli-support",
+        "why": "this creates N*M option explosion across 21 benchmarks and 30+ existing CLI options"
+      },
+      {
+        "dont": "merge benchmark-option parsing into PlatformHookRegistry",
+        "instead": "create a parallel BenchmarkHookRegistry",
+        "item_id": "benchmark-option-cli-support",
+        "why": "platform and benchmark options have different lifecycles (platform options go to DatabaseConfig, benchmark options go to constructor kwargs)"
+      },
+      {
+        "dont": "pass raw BenchmarkConfig.options dict as **kwargs to constructors",
+        "instead": "only forward keys that have registered BenchmarkOptionSpecs",
+        "item_id": "benchmark-option-cli-support",
+        "why": "options contains orchestrator-level settings (tuning_enabled, validation flags, estimated_time_range) that would cause TypeError on benchmark constructors"
+      },
+      {
+        "dont": "use Python inspect/reflection to auto-discover constructor params",
+        "instead": "use explicit spec registration per benchmark (same as platform-option)",
+        "item_id": "benchmark-option-cli-support",
+        "why": "it's fragile across **kwargs, defaults, and type annotations"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-option-cli-support",
+        "id": 351,
+        "reason": "Tab-completion for --benchmark-option keys and choices would improve DX but requires Click shell completion integration. Not needed for initial release.\n",
+        "resolution": "promoted",
+        "resolved_item": "add-benchmark-option-shell-completion",
+        "resolved_reason": null,
+        "summary": "Add benchmark-option shell completion"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-option-cli-support",
+        "id": 352,
+        "reason": "Could catch mismatches between registered spec names and actual constructor param names. Low risk since specs are co-located with benchmark code and tested. Adds import-time overhead.\n",
+        "resolution": "promoted",
+        "resolved_item": "validate-benchmark-options-against-constructor-signature-at",
+        "resolved_reason": null,
+        "summary": "Validate benchmark options against constructor signature at registration time"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-12T00:00:00Z",
+      "created_at": "2026-04-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "--platform-option continues working independently",
+        "item_id": "benchmark-option-cli-support"
+      },
+      {
+        "behavior": "All existing benchmark default behavior unchanged when no --benchmark-option provided",
+        "item_id": "benchmark-option-cli-support"
+      },
+      {
+        "behavior": "BenchmarkConfig.options continues serving its existing purposes (tuning config, validation flags, power run settings)",
+        "item_id": "benchmark-option-cli-support"
+      },
+      {
+        "behavior": "Benchmarks with only standard params (tpch, tpcds, ssb, clickbench, h2odb, etc.) unaffected",
+        "item_id": "benchmark-option-cli-support"
+      },
+      {
+        "behavior": "seed and force_regenerate continue working in their current RunConfig/orchestrator paths - benchmark-option adds a parallel path to the constructor",
+        "item_id": "benchmark-option-cli-support"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/*/downloader.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/*/queries.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/*/schema.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/benchmark_hooks.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/help.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/datavault/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds_obt/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch_skew/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tsbs_devops/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/vector_search/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_benchmark_hooks.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "benchbox run --platform duckdb --benchmark nyctaxi --scale 0.01 --benchmark-option taxi_types=yellow,green,hvfhv --dry-run\n",
+        "description": "NYC Taxi benchmark accepts taxi_types via CLI",
+        "expected": "dry run shows 3 taxi types, 39 queries",
+        "item_id": "benchmark-option-cli-support",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --platform duckdb --benchmark tpch --scale 0.01 --benchmark-option nonexistent=value --dry-run\n",
+        "description": "Unknown benchmark option rejected with clear error",
+        "expected": "error message listing available options (or none)",
+        "item_id": "benchmark-option-cli-support",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -m fast -q",
+        "description": "All existing tests pass (no regression)",
+        "expected": "all pass, 0 failures",
+        "item_id": "benchmark-option-cli-support",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_benchmark_hooks.py -v",
+        "description": "Benchmark hook registry unit tests pass",
+        "expected": "all pass",
+        "item_id": "benchmark-option-cli-support",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --help-topic benchmarks",
+        "description": "Help-topic shows registered benchmark options",
+        "expected": "output includes taxi_types, year, months for nyctaxi and skew_preset for tpch_skew",
+        "item_id": "benchmark-option-cli-support",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchmark-option-cli-support",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "benchmark-option-cli-support",
+        "needs_wid": "w5",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchmark-option-cli-support",
+        "notes": "Mirror platform_hooks.py structure: - BenchmarkOptionError (ValueError subclass) - BenchmarkOptionSpec dataclass (name, parser, default, help, choices, aliases) - List/enum parser functions: parse_int_list, parse_str_list, parse_enum_list factory - BenchmarkHookRegistry class: register_option_specs(benchmark, *specs),\n  parse_options(benchmark, provided), describe_options(benchmark), get_default_options(benchmark)\n- Reuse existing parse_bool and _identity from platform_hooks or extract to shared utils\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create BenchmarkHookRegistry and BenchmarkOptionSpec in benchbox/cli/benchmark_hooks.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-option-cli-support",
+        "notes": "In benchbox/cli/commands/run.py: - Add BenchmarkOptionParamType (same pattern as PlatformOptionParamType) - Add @click.option(\"--benchmark-option\", ..., type=BenchmarkOptionParamType(),\n  multiple=True, hidden=True) - parallel to --platform-option\n- Parse benchmark options via BenchmarkHookRegistry.parse_options(benchmark, pairs) - Store parsed options in BenchmarkConfig.options under a namespaced key\n  (e.g., options[\"benchmark_options\"] = {...}) to avoid collision with existing options\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add --benchmark-option Click option to run.py and wire parsing",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-option-cli-support",
+        "notes": "In benchbox/cli/orchestrator.py _get_benchmark_instance(): - Extract benchmark_options from config.options.get(\"benchmark_options\", {}) - Merge into kwargs dict before calling benchmark_class(**kwargs) - seed and force_regenerate: these already live in BenchmarkConfig.options\n  but are NOT forwarded to constructors today. The orchestrator should check\n  if the current benchmark has registered BenchmarkOptionSpecs for \"seed\" or\n  \"force_regenerate\" (via BenchmarkHookRegistry.list_option_specs(benchmark)),\n  and if so, include them in kwargs from config.options. Benchmarks that don't\n  register these specs simply never receive them (no change). This avoids a\n  dual-path where seed flows through both config.options and --benchmark-option.\n- Preserve existing try/except TypeError fallback for parallel param\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire orchestrator to forward benchmark options to constructor kwargs",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-option-cli-support",
+        "notes": "These benchmarks require the custom parser functions built in w1 (parse_enum_list, parse_int_list, parse_datetime). This is the highest-risk work unit - validate parser edge cases (empty lists, single values, whitespace) here before w5.\nNYC Taxi (benchbox/core/nyctaxi/benchmark.py): - taxi_types: parse_enum_list(TaxiType), default=None, choices description - year: int parser, default=2019, choices=range(2019,2026) - months: parse_int_list, default=None - seed: int parser, default=None\nTSBS DevOps (benchbox/core/tsbs_devops/benchmark.py): - num_hosts: int parser, default=None - duration_days: int parser, default=None - interval_seconds: int parser, default=10 - start_time: parse_datetime, default=None\nRegistration via module-level BenchmarkHookRegistry.register_option_specs() calls (same pattern as platform option registration in benchbox/platforms/__init__.py).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register option specs for high-complexity benchmarks (NYC Taxi, TSBS DevOps - enum lists, datetime, int lists)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-option-cli-support",
+        "notes": "These benchmarks use only str, int, parse_bool, parse_str_list, and choices-constrained str parsers - all straightforward. Lower risk than w4.\nFlightData: end_year (int, default=LAST_AVAILABLE_YEAR) DataVault: hash_algorithm (str, choices=[\"md5\",\"sha256\",...]), record_source (str) TPC-DS OBT: tpcds_source_dir (str), dimension_mode (str, choices), channels (parse_str_list), output_format (str, choices) TPC-H Skew: skew_preset (str, choices=[\"none\",\"light\",\"moderate\",\"heavy\",\"extreme\",\"realistic\"]) Vector Search: dimensions (int, default=128) Join Order: queries_dir (str) TPC-DI: enable_parallel (parse_bool, default=False), max_workers (int)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register option specs for simple-type benchmarks (FlightData, DataVault, TPC-DS OBT, TPC-H Skew, Vector Search, Join Order, TPC-DI)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-option-cli-support",
+        "notes": "tests/unit/cli/test_benchmark_hooks.py: - Registry: register, parse, describe, defaults, unknown key rejection, duplicate rejection - Parsers: parse_int_list, parse_str_list, parse_enum_list (TaxiType), parse_datetime - Integration: BenchmarkOptionParamType Click type, end-to-end from CLI string to constructor kwarg - Regression: benchmarks without registered specs still construct normally\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for BenchmarkHookRegistry, parsers, and end-to-end wiring",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-option-cli-support",
+        "notes": "Extend --help-topic system (benchbox/cli/help.py) to show available benchmark options per benchmark. Example output for --help-topic benchmarks or --help-topic nyctaxi:\n  nyctaxi:\n    taxi_types  - Taxi data types to load (yellow,green,hvfhv) [default: yellow]\n    year        - Year of TLC data (2019-2025) [default: 2019]\n    months      - Months to include, comma-separated (1-12) [default: all]\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add --help-topic documentation for benchmark options",
+        "wid": "w7"
+      }
+    ]
+  }
+}

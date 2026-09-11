@@ -1,0 +1,10 @@
+{
+  "description": "Added fast pytest-based smoke coverage for the unified runner example so CI can validate example entry points stay functional.",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

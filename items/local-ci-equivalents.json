@@ -1,0 +1,16 @@
+{
+  "description": "Every CI step in GitHub workflows should have a local equivalent that developers\ncan run before pushing code. This prevents CI failures and speeds up development\nby catching issues locally.\n\nCurrently, many CI steps can only be validated by pushing to GitHub and waiting\nfor the workflow to complete. This is slow and wasteful of CI resources.\n\nThis task audits all CI steps and ensures Makefile targets or scripts exist\nfor local validation.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "local-ci-equivalents",
+        "needs_item": "fix-ci-critical-issues"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-01-18T00:00:00Z",
+      "worktree": "ci-infrastructure"
+    }
+  }
+}

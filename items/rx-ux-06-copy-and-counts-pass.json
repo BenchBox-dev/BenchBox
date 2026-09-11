@@ -1,0 +1,261 @@
+{
+  "context": "Rewrite the two intro strings to describe what the reader gets. Delete the duplicated coverage sentence and the desktop `hidden sm:block` branch so the existing mobile disclosure is the single treatment at all widths. Replace the three counts with one statement plus a cap message shown only when the 10,000 cap is actually reached. Extend userFacingStringHygiene.test.ts with a deny-list covering results.duckdb, 'legacy slug' and 'edit the URL'.",
+  "description": "Four separate copy defects:\n\n1. Query introduces itself by naming a file: 'Query the results.duckdb snapshot in-browser ...' (Query.tsx:660).\n2. Compare reassures 'You never need to edit the URL' (Compare.tsx:976), which plants a worry the reader did not have.\n3. Home prints the same 'N public benchmarks have results but no ranked leaderboard' sentence twice within 150px (Home.tsx:397 and 826-849), listing every name both times. The desktop branch renders LeaderboardScopeSummary unconditionally inside `hidden sm:block` while mobile already has it behind a <details> (Home.tsx:422-433) - the disclosure that fixes this already exists at mobile width.\n4. Query shows three counts at once - 'N matching', 'Showing 200 of N returned rows', 'Query limit: 10,000' - with no explanation of 200.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete the coverage arithmetic outright",
+        "instead": "move it behind the existing disclosure",
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "why": "the detail is legitimate for auditors; only its placement is wrong"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "relabel or merge the SSB / star_schema facets",
+        "instead": "adjust wording so it reads as provenance, and leave the split alone",
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "why": "the canonical/raw split is a documented contract (hosted-results-contract.md:284-293)"
+      },
+      {
+        "dont": "remove the 200-row limit as part of this copy pass",
+        "instead": "leave paging to rx-ux-17",
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "why": "mixing copy with paging makes both harder to revert"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T20:43:14Z",
+      "completed_pr": 1827,
+      "created_at": "2026-08-22T14:48:59Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Coverage information itself remains reachable through the existing disclosure",
+        "item_id": "rx-ux-06-copy-and-counts-pass"
+      },
+      {
+        "behavior": "The 200-row render limit and 'Show more results' behaviour (Query.tsx:233-240,936-945) - this is a copy change, not a paging change",
+        "item_id": "rx-ux-06-copy-and-counts-pass"
+      },
+      {
+        "behavior": "The SSB canonical/raw split is a documented contract: canonical cohort identity is `ssb`, raw `star_schema` is retained for audit and never rewritten (hosted-results-contract.md:284-293). Label handling stays in displayLabels.ts.",
+        "item_id": "rx-ux-06-copy-and-counts-pass"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/compare-entrypoints.spec.ts"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/query.spec.ts"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/userFacingStringHygiene.test.ts"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/LoadingSpinner.tsx"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/LoadingSpinner.test.tsx"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/displayLabels.test.ts"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayLabels.ts"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/CorpusSectionIndex.tsx"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/CorpusSectionIndex.test.tsx"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Query.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "last_result": "pass",
+        "last_run": "2026-08-22T20:38:17Z",
+        "seq": 1,
+        "workspace_fingerprint": "456703e9d7f456980673d7d20dbfbc122d5c7129de7e53428d61b537dc457ad0"
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium",
+        "description": "Chromium browser suite passes against a fresh build",
+        "expected": "fixtures verified, build succeeds, chromium suite green",
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "last_result": "pass",
+        "last_run": "2026-08-22T20:43:06Z",
+        "seq": 2,
+        "workspace_fingerprint": "456703e9d7f456980673d7d20dbfbc122d5c7129de7e53428d61b537dc457ad0"
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run src/__tests__/userFacingStringHygiene.test.ts",
+        "description": "Internal identifiers absent from user-facing strings",
+        "expected": "deny-list assertions pass",
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "last_result": "pass",
+        "last_run": "2026-08-22T20:43:08Z",
+        "seq": 3,
+        "workspace_fingerprint": "456703e9d7f456980673d7d20dbfbc122d5c7129de7e53428d61b537dc457ad0"
+      },
+      {
+        "command": "rg -c 'no ranked leaderboard' results-explorer/src/pages/Home.tsx",
+        "description": "Coverage sentence appears once",
+        "expected": "1",
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "last_result": "pass",
+        "last_run": "2026-08-22T20:43:09Z",
+        "seq": 4,
+        "workspace_fingerprint": "456703e9d7f456980673d7d20dbfbc122d5c7129de7e53428d61b537dc457ad0"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Rewrote Query and Compare introductions with user-facing task language; typecheck and 871 Vitest tests pass.",
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rewrite Query and Compare intro copy",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Removed the duplicate desktop leaderboard scope branch and consolidated coverage disclosure; typecheck and 871 Vitest tests pass.",
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete duplicated coverage sentence and desktop hidden sm:block branch",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Consolidated Query result counts into one visible/total statement with a conditional 10,000-result cap message; typecheck and 871 Vitest tests pass.",
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace three Query counts with one statement plus conditional cap message",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Extended the string-hygiene deny list for results.duckdb, legacy slug, and edit-the-URL copy with exact internal-code allowlisting and synthetic negatives; full Vitest passes.",
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend userFacingStringHygiene deny-list",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Updated component, page, label, and browser assertions for the approved copy contract; full Vitest passes and isolated current-tree Chromium is running.",
+        "item_id": "rx-ux-06-copy-and-counts-pass",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update pinned label, loading, page, and browser copy assertions",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,529 @@
+{
+  "context": "Implementation strategy mirrors the prior sweep TODO\n(`codex-pr-review-followups-week-2026-05-01`):\n\n- **Each work unit is independently shippable.** Don't batch unless\n  units share a file. Already merged in this revision: w6 (PR #132,\n  one template file) and w10 (PR #147, one validator function). Soft\n  pairings expressed via `needs:` so they bundle in the same PR:\n  w16 → w3 (`platform_options.py`), w21 → w11 (platform readiness flow).\n- **Read the cited file before editing.** The \"Current evidence on\n  `origin/develop`\" section names the line range so you can confirm\n  the issue still exists at fix time; the codebase is moving fast and\n  a finding may already be irrelevant.\n- **Land tests with each fix.** Every work unit has a per-unit\n  `Verification:` block with a specific pytest/vitest command — run\n  it locally before pushing. Most regression tests are new fixtures;\n  a few are mutations of existing test files.\n- **Security findings (w3 + w16, w10) are P0-tier within the P1\n  batch.** Land them first or in parallel — PR #113's redaction gap\n  leaks credentials, PR #147's cwd path enables code execution.\n- **Workflow change (w22) needs CI verification.** It modifies a\n  GitHub Actions workflow that runs only on `develop`; review the\n  next sync-to-published run after merge to confirm the\n  deterministic SHA pin holds.\n- **w8 has an open question** about the precise local-envelope\n  predicate (scheduler_address only, or also cluster_mode). Resolve\n  against the original OOM repro before editing — see `open_questions`\n  below.\n",
+  "description": "Audit and fix the Codex web-agent review findings that were left on merged\nPRs during the 2026-04-26 through 2026-05-03 commit window — the second\nweekly Codex sweep, building on the prior sweep\n(`codex-pr-review-followups-week-2026-05-01`, merged via PRs #99/#104) and\nthe rescan audit at `_project/audits/codex-thread-rescan-week-2026-05-01.md`\nwhich closed out PRs #19–#94.\n\nSource scan:\n  - PR range: #95 through #170 merged to `develop` since 2026-04-26.\n  - API source: `gh api repos/joeharris76/BenchBox/pulls/<pr>/comments`.\n  - Author filter: `chatgpt-codex-connector[bot]`.\n  - Inline Codex findings found: 36 comments across 29 PRs.\n\nNot every unresolved GitHub thread still requires a code change. The\nfollowing groups of comments were filtered out at scan time and are\nintentionally NOT in the work breakdown below:\n\n  - **Already addressed by a follow-up fix-PR:**\n    - PR #99 (Makefile `test-unlock` `uv run` resolution) — fixed: the\n      current target uses pure shell `$HOME` expansion, no `uv run`.\n    - PR #112 (`expected_value_min/max` enforcement in `_check_validation_query`)\n      — fixed in PR #114 (`_check_validation_query` now branches on\n      `expected_value_min/max`).\n    - PR #154 (`benchbox results --paths` reparses files) — fixed in\n      PR #156, which restructured `results()` to use `if/elif/else` so\n      `--paths` no longer also calls `show_results_summary()`.\n\n  - **Already tracked in another open TODO:**\n    - PR #134 (Redshift theta-merge validation queries) — the underlying\n      per-platform validation-override gap is filed as blind-spot\n      `2026-05-02-155448-validation-query-no-per-platform-override`\n      (`merged-to-todo` → `write-primitives-architecture-fixes`). The\n      Redshift override is unsafe to ship until that architectural fix\n      lands; do not duplicate it here.\n\n  - **Comments on TODO YAML files now in DONE — verification commands\n    flagged as buggy but the work is closed:**\n    - PR #110 (`approx_*` / `sketch_*` wildcard `--queries` in\n      `read-primitives-approximate-aggregate-queries.yaml` and\n      `write-primitives-sketch-persistence-category.yaml`).\n    - PR #117 (DuckDB filename glob and `find -newer` arity in\n      `results-explorer-uat-multi-scale-corpus-sweep.yaml`).\n    - PR #121 (DataFusion smoke check uses SQL mode in\n      `read-primitives-approximate-aggregates-dataframe-coverage.yaml`).\n    - PR #122 (matrix-shaping checkpoint placement and `$(date)`\n      recomputation in\n      `results-explorer-uat-multi-scale-corpus-sweep.yaml`).\n    Each finding may indicate the historical verification step\n    false-positively reported success, but the items are closed and\n    the verification commands are no longer used. Treat as a\n    retrospective protocol-hygiene note for the weekly sweep template,\n    not as code work to schedule.\n\n  - **Comments on DONE items where the action is process / convention,\n    not code:**\n    - PR #161 (`results-explorer-uat-methodology-blind-spot-remediation`\n      triage `command:` was split across YAML lines, breaking shell\n      parsing). The TODO is now in DONE and the verification block is\n      not re-run.\n    - PR #163 (same TODO marked `Completed` while one linked blind-spot\n      ended in `actioned`, not the criteria-required `merged-to-todo`\n      or `dismissed`). Either widen the convention to allow `actioned`\n      for convention-only remediations or amend the historical record\n      — neither is a runtime defect.\n    Both are noted under `deferred` below.\n\nPolicy carry-over from the 2026-05-01 sweep: historical DONE-item\nverification commands stay executable. If a Codex finding identifies a\nportability or correctness defect in a DONE-item verification block, fix\nit in place. The current sweep has no DONE-block code-fix items because\nthe four DONE-state TODO comments above are limited to verification\ncommands that are no longer used — recording them in `description` is\nsufficient, no work unit is required.\n\nTwo consolidations from the original 36-comment scan:\n\n  - **w6 covers both PR #132 findings** (Axis 2 listing guidance + Axis 3\n    end-of-day bound) — same template file, same review thread.\n  - **w10 covers both PR #147 findings** (dry-run-when-validator-absent\n    P1 + cwd code-execution P1 security) — same `_load_submission_validator_module`\n    function; the security fix and the UX fix are the same refactor.\n\nEach work unit below cites:\n  - The source PR(s) and Codex review URL(s).\n  - A short restatement of the finding.\n  - Current evidence on `origin/develop` (file:line) so the fix can be\n    verified before editing.\n  - The recommended fix and a runnable verification command, with\n    enough specificity to make the change without re-reading the\n    original Codex comment.\n  - Per-unit `must_preserve:` invariants where the fix sits next to\n    load-bearing existing behavior.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add new helpers, abstractions, or refactors beyond what the work unit names",
+        "instead": "keep the diff minimal and add the regression test the work unit calls for.",
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "why": "the prior sweep ran into review churn from incidental refactors"
+      },
+      {
+        "dont": "batch unrelated work units into one PR",
+        "instead": "open one PR per work unit (or per `needs:`-linked pair).",
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "why": "each Codex finding lands a focused review thread and a multi-finding PR loses the fix↔thread mapping"
+      },
+      {
+        "dont": "skip writing the regression test 'because the fix is obvious'",
+        "instead": "the test is the primary protection against re-introduction.",
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "why": "every Codex finding here describes a class of regression that already shipped once"
+      },
+      {
+        "dont": "touch `_project/DONE/main/**` from any work unit",
+        "instead": "refile any DONE-related finding as a new TODO instead of editing in place.",
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "why": "completed items are the source-of-truth for prior sweeps and audits"
+      },
+      {
+        "dont": "widen the changes to also fix the items listed under `description:` as already-addressed (PR #99/#112/#134/#154)",
+        "instead": "(not specified)",
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "why": "they are intentionally out of scope; the relevant fixes already exist or are tracked elsewhere."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "codex-pr-review-followups-week-2026-05-03",
+        "id": 123,
+        "reason": "The TODOs (`read-primitives-approximate-aggregate-queries.yaml`,\n`write-primitives-sketch-persistence-category.yaml`,\n`read-primitives-approximate-aggregates-dataframe-coverage.yaml`,\n`results-explorer-uat-multi-scale-corpus-sweep.yaml`) are now in\n`_project/DONE/` and their verification commands are no longer\nexecuted. The findings (wildcard `--queries`, `find -newer` arity,\nDuckDB filename glob, `$(date)` recomputation across midnight,\nDataFusion default SQL mode) suggest the historical \"verified\"\nchecks may have false-positively reported success during\ncompletion, but no current code change is required. Capture the\ncommon patterns in a future revision of\n`_project/audits/codex-weekly-sweep-template.md` so the next\nsweep flags wildcard `--queries`, `find -newer` multi-arg, and\n`$(date)` reads inside verification blocks before TODOs land.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: The sweep process was redesigned into the automated pr-review-followups routine with its own living template (_project/audits/pr-review-sweep-template.md); original capture note superseded.",
+        "summary": "Audit the four DONE-state TODOs whose verification commands Codex flagged as buggy (PRs #110, #117, #121, #122)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "codex-pr-review-followups-week-2026-05-03",
+        "id": 124,
+        "reason": "`results-explorer-uat-methodology-blind-spot-remediation` is in\nDONE; its acceptance criteria required all linked blind-spots to\nend as `merged-to-todo` or `dismissed`, but\n`2026-05-03-081920-uat-cross-scale-deliverable-not-guarded` ended\nas `actioned`. This is a convention question, not a runtime\ndefect: either widen the criteria to allow `actioned` for\nconvention-only remediations, or amend the historical record.\nTrack the convention decision separately so future TODO\nacceptance criteria align with the broader blind-spot lifecycle.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: blind-spots/README.md lifecycle already lists 'actioned' as a legitimate terminal state ('a fix landed'), so acceptance criteria accommodate it; the historical mismatch is a one-off record question, not a standing tracked decision.",
+        "summary": "Decide convention for marking blind-spot remediation TODOs Completed when linked findings end in `actioned` instead of `merged-to-todo`/`dismissed` (PR #163)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "codex-pr-review-followups-week-2026-05-03",
+        "id": 125,
+        "reason": "`results-explorer-uat-methodology-blind-spot-remediation` is in\nDONE; the flagged YAML-level multi-line `command:` would have\nreported \"all triaged\" even when status was unknown. As a\nforward-looking control, extend\n`_project/scripts/validate_todo.py` (or the schema) to reject\n`verification.command` values that contain unescaped newlines,\nso the same shape can't ship in a future TODO.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: validate_todo.py already rejects verification.command values spanning multiple physical lines unless 'command: |' is used; control exists (line ~152-159).",
+        "summary": "Audit the multi-line shell `command:` parsing risk in TODO `verification:` blocks (PR #161)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "codex-pr-review-followups-week-2026-05-03",
+        "id": 126,
+        "reason": "The fix in w18 needs a live MotherDuck account to confirm runs\nland on the configured non-default database. Tracked as part of\nthe existing cloud verification TODOs; not blocking the local\nfix.\n",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Cloud verification of MotherDuck database propagation (w18)"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-04T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing CI gates (`make pr-preflight`, lint, ty, fast tests) must pass on every work-unit PR.",
+        "item_id": "codex-pr-review-followups-week-2026-05-03"
+      },
+      {
+        "behavior": "Existing TODO/blind-spot tooling (`make blind-spots-list`, `make worktree-pool-check`, `_project/scripts/validate_todo.py`) keeps its current invocation shape — w19 changes worktree-pool-check semantics, not its CLI.",
+        "item_id": "codex-pr-review-followups-week-2026-05-03"
+      },
+      {
+        "behavior": "Public CLI surfaces (`benchbox submit`, `benchbox results`, `benchbox platforms check`, `benchbox run`) keep their exit-code contracts for unrelated paths — the only changed exit codes are the ones each work unit explicitly names.",
+        "item_id": "codex-pr-review-followups-week-2026-05-03"
+      },
+      {
+        "behavior": "Public results-explorer URL/facet contracts (`bm`, `sf`, `instance_or_warehouse`, etc.) keep their existing serde shape — only the read/write merge logic changes.",
+        "item_id": "codex-pr-review-followups-week-2026-05-03"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "do_not_modify",
+        "path_glob": "_project/DONE/main/**"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/sync-results-data-to-published.yml"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/codex-weekly-sweep-template.md"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/platform.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/platform_readiness.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/cost/calculator.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/cost/integration.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/loader.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/platform_options.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/credentials/motherduck.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/dask_df.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/motherduck.py"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RunReceipt.tsx"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartMath.ts"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/facetModel.ts"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_hosted_submit_validator_contract.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "for pr in 99 102 103 105 107 110 111 112 113 114 115 117 119 121 122 127 129 131 132 134 141 144 145 147 151 154 161 163 167; do gh api repos/joeharris76/BenchBox/pulls/$pr/comments --jq '[.[] | select(.user.login == \"chatgpt-codex-connector[bot]\")] | length' | { read n; [ \"$n\" -gt 0 ] && echo \"PR #$pr: $n comments\"; }; done",
+        "description": "All 22 work units land on develop, individually or via `needs:`-linked pairs, with a corresponding follow-up commit referenced in this TODO's `commits:` field.",
+        "expected": "Same set of PRs returns matching counts; each work unit's PR is referenced from its corresponding commit in `commits:`.",
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Lint and fast-test gate is green after each work unit's fix",
+        "expected": "Preflight reports lint, type, and Python fast-test gates passing.",
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "# Re-run the same scan on PRs #95-#170 with the codex-thread-rescan template; expect every comment from this sweep to be marked Resolved or Already-Fixed.",
+        "description": "Next weekly Codex sweep (week ending 2026-05-10) reports zero unaddressed comments from this batch.",
+        "expected": "All 36 originally-scanned comments classify as Resolved (by w1-w22 commits) or Already-Fixed (per the description filtered set).",
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "needs_wid": "w3",
+        "wid": "w16"
+      },
+      {
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "needs_wid": "w11",
+        "wid": "w21"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #103, P1, `results-explorer/src/components/RunReceipt.tsx`\n  - https://github.com/joeharris76/BenchBox/pull/103#discussion_r3174480692\n\nFinding: `planDownloadUrl()` returns a `<bundle>.plans.json` URL\nwhenever `detail.has_plans` is truthy and `bundle_download_url` ends\nin `.json`, but `has_plans` only reflects source-side detection. The\nexplorer pipeline excludes `*.plans.json` from bundle discovery and\nonly copies the primary `result_id.json`, so the generated link 404s\nfor every published bundle.\n\nCurrent evidence on `origin/develop`:\n  - `results-explorer/src/components/RunReceipt.tsx:148-152` —\n    `planDownloadUrl()` only checks `has_plans` and the suffix; no\n    publication-status gate.\n  - `benchbox/core/explorer_pipeline/pipeline.py:439` — bundle scan\n    excludes `(\".plans.json\", \".tuning.json\", SUBMISSION_MANIFEST_SUFFIX)`,\n    so plan sidecars are never copied to `output_dir/bundles/`.\n\nRecommended fix: gate the link on a publication signal rather than\n`has_plans`. Either (a) extend `DetailResult` (and the pipeline's\ndetail emitter) with a `plans_published: bool` field set when the\npipeline copies a `*.plans.json`, then check it here; or (b) keep\nthe non-link \"Plans available\" fallback (line 140) and only render\na download link when a publication-status field is true.\n\nMust preserve:\n  - `has_plans=false` continues to render the \"Plans not published\"\n    string (do not collapse to empty).\n  - `renderPlansStatus()` still returns the non-link \"Plans\n    available\" fallback when a sidecar exists but isn't published —\n    tested by `RunReceipt.test.tsx` if present; add coverage if not.\n\nVerification:\n  - description: \"Vitest regression: `has_plans=true`,\n      `plans_published=false` → no `<a download>` link rendered.\"\n  - command: \"cd results-explorer && pnpm test -- RunReceipt\"\n  - expected_output: \"All RunReceipt tests pass; new case asserts\n      absence of plan download anchor.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Stop linking unpublished `.plans.json` sidecars from the run receipt",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comments (both PR #147, same `_load_submission_validator_module`):\n  - P1, dry-run unusable when validator absent:\n    https://github.com/joeharris76/BenchBox/pull/147#discussion_r3177754515\n  - P1 (security), cwd-relative validator code execution:\n    https://github.com/joeharris76/BenchBox/pull/147#discussion_r3177754516\n\nFinding 1 (UX): dry-run unconditionally calls\n`_validate_submission_bundle_for_dry_run()`, which exits non-zero\nwhen `scripts/validate_submission.py` cannot be found. The wheel\nonly packages `benchbox*` modules, so non-source installs cannot\nuse `--dry-run` at all.\n\nFinding 2 (security): `_load_submission_validator_module()` falls\nback to `Path.cwd() / \"scripts\" / \"validate_submission.py\"` and\n`spec.loader.exec_module(module)`. In the common case where a\npackaged install has no repo `scripts/` directory, any unrelated\nor malicious `scripts/validate_submission.py` in the user's\ncurrent directory is imported and run when they invoke\n`benchbox submit --dry-run`.\n\nCurrent evidence on `origin/develop`:\n  - `benchbox/cli/commands/submit.py:155-173` — `candidate_paths`\n    includes the cwd fallback; `_load_submission_validator_module`\n    raises `FileNotFoundError` when neither path resolves.\n  - `benchbox/cli/commands/submit.py:176-189` —\n    `_validate_submission_bundle_for_dry_run` catches that and\n    `ctx.exit(1)`.\n  - `benchbox/cli/commands/submit.py:627-628` — `if dry_run:` is\n    unconditional.\n\nRecommended fix (single refactor, both findings):\n  1. Drop the `Path.cwd() / \"scripts\" / \"validate_submission.py\"`\n     candidate. Only the source-checkout-relative path\n     (`Path(__file__).resolve().parents[3] / \"scripts\" /\n     \"validate_submission.py\"`) is acceptable.\n  2. When the source path doesn't resolve, downgrade\n     `_validate_submission_bundle_for_dry_run` to a soft warning\n     (\"dry-run preview without schema validation; run from a\n     source checkout for full validation\") and return cleanly.\n     Reserve `ctx.exit(1)` for the case where the validator is\n     found but errors during execution.\n\nMust preserve:\n  - Source-checkout dry-run continues to validate the bundle\n    (the original P1 from PR #147 — non-validated submissions\n    must still be impossible from a checkout).\n  - Service-mode dispatch (`_dispatch_service_mode`) still\n    receives the post-validation guarantees on the source path.\n  - All existing exit codes for fully-validated dry-run failure\n    modes (compliance-class refused, non-clean-pass refused) at\n    lines 600-619 are untouched.\n\nVerification:\n  - description: \"Pytest: source checkout → dry-run validates and\n      exits 0/1 based on bundle. Wheel install (mocked\n      `Path(__file__).parents[3]/scripts` missing) → dry-run\n      warns and emits preview, exits 0. Sentinel\n      `./scripts/validate_submission.py` raising in cwd → NOT\n      executed.\"\n  - command: \"uv run -- python -m pytest tests/unit/cli/commands/test_submit.py tests/integration/test_submit_dry_run.py -v -k 'dry_run or validator or cwd'\"\n  - expected_output: \"All three scenarios pass; the cwd-sentinel\n      test asserts the marker file was never opened/imported.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make `benchbox submit --dry-run` safe + drop cwd-validator path (security)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #151, P1, `benchbox/cli/platform.py`\n  - https://github.com/joeharris76/BenchBox/pull/151#discussion_r3177842037\n\nFinding: `benchbox platforms check` returns a failure for any\n*available but disabled* platform when its readiness probe fails,\nbecause the `info.available and readiness_failed` branch runs\nbefore the disabled-platform branch. This is inconsistent with\nthe prior behavior where disabled platforms are informational\n(\"Available but disabled\") and do not fail the command.\n\nCurrent evidence on `origin/develop`:\n  - `benchbox/cli/platform.py:881-891` — branches in order:\n    (1) `info.available and readiness_failed` → ⚠️, all_good=False;\n    (2) `info.enabled and info.available` → ✅;\n    (3) `info.available` (i.e. available-but-disabled) → ○;\n    (4) else → ❌, all_good=False.\n\nRecommended fix: reorder the branches so the\n\"available-but-disabled\" check runs before the readiness-failed\ncheck. Disabled platforms are always informational; readiness\nfailures only fail the command when the platform is also enabled.\n\nMust preserve:\n  - \"Missing dependencies\" (branch 4) still fails the command.\n  - \"Ready\" (branch 2) stays at ✅ exit 0.\n  - The ⚠️ \"Environment not ready\" status still fires for\n    *enabled* available platforms whose readiness probe fails —\n    do not silence that path.\n  - `_print_readiness_details(readiness_results)` continues to\n    print after every branch.\n\nVerification:\n  - description: \"Pytest: enabled+available+readiness-failed →\n      all_good=False, exit 1. Disabled+available+readiness-failed\n      → all_good=True, exit 0 (with informational ○ message).\n      Disabled+available+readiness-passed → unchanged (still ○).\"\n  - command: \"uv run -- python -m pytest tests/unit/cli/test_platform_check.py -v -k 'check or readiness or disabled'\"\n  - expected_output: \"All three matrix cells pass; the\n      disabled+failed-readiness case now exits 0 (was: exit 1).\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Stop failing `benchbox platforms check` for available-but-disabled platforms",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #102, P2, `results-explorer/src/pages/Home.tsx`\n  - https://github.com/joeharris76/BenchBox/pull/102#discussion_r3174367121\n\nFinding: the home leaderboard filter `onSelect` overwrites the\nfilter array with a single-element array (`[value]`), regressing\ntrue multi-select to single-select even though URL state still\nmodels `bm`/`sf` as arrays. Users opening\n`?bm=tpch,clickbench`-style links can no longer add or remove\nindividual selections from the UI; any change collapses the\nfilter to one value, so cross-benchmark / cross-scale\ncomparisons are no longer possible from the page controls.\n\nCurrent evidence on `origin/develop`:\n  - `results-explorer/src/pages/Home.tsx:330-340` — both the\n    benchmark and scale dropdowns use\n    `onSelect={(value) => setFacet(\"<key>\", value === \"all\" ? [] :\n    [value])}`.\n\nRecommended fix: switch the dropdown component to a multi-select\n(or wire a second control for adding values) that calls a toggle\nhandler — `setFacet(\"benchmark\", toggleInList(current, value))` —\ninstead of replacing. Preserve the \"all\" sentinel semantics\n(still clears to `[]`).\n\nMust preserve:\n  - Phase, tuning_mode, trust_tier, and date_window dropdowns at\n    lines 346-375 keep their existing single-select semantics\n    (they are intentionally single-valued).\n  - URL `arraySerde` encoding for `bm`/`sf` is unchanged.\n  - The \"All benchmarks\" / \"All scales\" sentinel entry continues\n    to clear the filter to `[]`.\n\nVerification:\n  - description: \"Vitest: navigate to `?bm=tpch,clickbench` then\n      toggle off `tpch` → URL contains only `bm=clickbench`.\"\n  - command: \"cd results-explorer && pnpm test -- Home\"\n  - expected_output: \"All Home page tests pass; new toggle-off\n      case asserts the remaining selection persists.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Preserve multi-select semantics for benchmark/scale cohort filters in Home",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #105, P2, `benchbox/core/cost/calculator.py`\n  - https://github.com/joeharris76/BenchBox/pull/105#discussion_r3174793239\n\nFinding: the local-platform allowlist omits established local\nDataFrame platform IDs such as `datafusion-df` and `pyspark-df`.\nThose runs are treated as cloud/unknown, producing\n`cost_status=\"unavailable\"` instead of `not_applicable_local`,\nmisclassifying local results and polluting cost facets and\nempty-state logic that depend on `cost_status`.\n\nCurrent evidence on `origin/develop`:\n  - `benchbox/core/cost/calculator.py:230-239` — local set\n    contains `datafusion`, `polars`, `polars-df`, `pandas-df`,\n    `cudf-df`, `modin-df`, `dask-df`, `pyspark`, `spark` but not\n    `datafusion-df` or `pyspark-df`.\n\nRecommended fix: add `datafusion-df` and `pyspark-df` to the set.\nAudit the registered platform IDs in\n`benchbox/platforms/__init__.py` and add any other DataFrame\nvariants whose primary execution is on the developer's machine.\n\nMust preserve:\n  - Cloud platforms (snowflake, bigquery, redshift, databricks,\n    motherduck, etc.) continue to return False from\n    `is_local_platform()`.\n  - The case-insensitive lookup behavior is unchanged.\n\nVerification:\n  - description: \"Pytest: every DataFrame-mode platform ID\n      registered with `PlatformManager` is local; representative\n      cloud platforms remain non-local.\"\n  - command: \"uv run -- python -m pytest tests/unit/core/cost/test_calculator.py -v -k 'local_platform'\"\n  - expected_output: \"All registered DataFrame platforms classify\n      as local; cloud-platform negative cases still pass.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add datafusion-df, pyspark-df (and any peer DataFrame engines) to the local-platform allowlist",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #107, P2, `results-explorer/src/lib/chartMath.ts`\n  - https://github.com/joeharris76/BenchBox/pull/107#discussion_r3176628095\n\nFinding: `latencyScaleTicks` returns only predefined powers of\nten when at least two match, omitting the actual `scale.max`\n(and sometimes `scale.min`) for common ranges like 0.2–2 ms or\n100k–50M ms. The right edge of the performance bar chart then\nhas no terminal tick label, so bar lengths are plotted against\nan unlabeled endpoint and the axis can be misread.\n\nCurrent evidence on `origin/develop`:\n  - `results-explorer/src/lib/chartMath.ts:92-101` — the log-mode\n    branch filters `LATENCY_LOG_TICKS_MS` to in-range values and\n    only falls back to `[scale.min, scale.max]` when fewer than\n    two match.\n\nRecommended fix: always include `scale.domainMin` and\n`scale.domainMax` as endpoint ticks, then dedupe against the\nfiltered powers-of-ten list. The full set should be\n`[domainMin, ...powersOfTenInRange, domainMax]` with duplicates\nand out-of-order values removed.\n\nMust preserve:\n  - Linear scale branch (lines 93-95) keeps its\n    `[0, 0.25, 0.5, 0.75, 1] * domainMax` ticks unchanged.\n  - The fallback `[scale.min, scale.max]` path (when no powers\n    of ten match) continues to work.\n  - Tick values stay sorted ascending (axis assumes ordering).\n\nVerification:\n  - description: \"Vitest: ranges 0.2–2 ms, 100k–50M ms, 1–1000 ms\n      each include both endpoints in the returned tick list.\"\n  - command: \"cd results-explorer && pnpm test -- chartMath\"\n  - expected_output: \"All chartMath tests pass; new endpoint-\n      inclusion cases assert presence of domainMin and domainMax.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Include log-scale endpoint ticks in the latency axis",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #111, P2, `results-explorer/src/lib/facetModel.ts`\n  - https://github.com/joeharris76/BenchBox/pull/111#discussion_r3176716507\n\nFinding: the alias migration for `instance_or_warehouse` is lossy\nwhen a URL contains both legacy query params (`instance_type` and\n`warehouse_size`), which the Query page still supports as\nseparate filters. `readFacetParam()` only keeps the first\nmatching alias, and `writeFacetParam()` then deletes all aliases,\nso mounting shared facet state silently drops one of the active\nfilters and changes subsequent query results after navigation.\n\nCurrent evidence on `origin/develop`:\n  - `results-explorer/src/lib/facetModel.ts:185` —\n    `findFirstParam(params, [FACET_URL_KEYS[key],\n    ...(FACET_URL_ALIASES[key] ?? [])])` keeps only the first hit.\n  - `results-explorer/src/lib/facetModel.ts:380-382` —\n    `writeFacetParam` deletes every alias before writing the\n    canonical key.\n\nRecommended fix: when the canonical URL key is absent and\nmultiple aliases are present, merge values across aliases\n(concatenate the arrays then dedupe) into the canonical\n`instance_or_warehouse` list.\n\nMust preserve:\n  - When the canonical key IS present, it still wins (no merge\n    with stale aliases).\n  - Single-alias URLs continue to map cleanly with no extra\n    values introduced.\n  - `writeFacetParam` continues to delete all aliases when\n    writing the canonical key (avoids URL bloat).\n\nVerification:\n  - description: \"Vitest: `?instance_type=foo&warehouse_size=bar`\n      → facet contains both; `?instance_or_warehouse=foo&instance_type=bar`\n      → facet is `[foo]` (canonical wins).\"\n  - command: \"cd results-explorer && pnpm test -- facetModel\"\n  - expected_output: \"All facetModel tests pass; new dual-alias\n      and canonical-wins cases assert the right precedence.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Preserve both legacy shape aliases when canonicalizing the URL facet model",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #113, P2, `benchbox/core/results/platform_options.py`\n  - https://github.com/joeharris76/BenchBox/pull/113#discussion_r3176769305\n\nFinding: when a saved config value and a registered default are\nequal, the merge path rewrites the source to `registered_default`\neven though the value already came from `database_options`. This\ncontradicts the function contract that defaults should not\noverride config-derived values and produces incorrect provenance\nin `platform_option_sources`, misleading debugging and audit\nflows that rely on origin tracking.\n\nCurrent evidence on `origin/develop`:\n  - `benchbox/core/results/platform_options.py:88-100` —\n    `build_platform_options_capture` overrides `sources[key]` to\n    `\"registered_default\"` whenever the requested source is\n    `registered_default` *and* the values are equal, even though\n    `key` is already in `values` from `database_options`.\n\nRecommended fix: when the requested source is\n`registered_default` and `key` is already populated from\n`database_options`, leave the source as `saved_config` and\n`continue` without modifying it. Only set\n`sources[key] = \"registered_default\"` when the key was not\npreviously populated.\n\nPairs with w3: both touch `platform_options.py`; land in the same\nPR with shared test refresh.\n\nMust preserve:\n  - CLI-provided options (any `requested_source` other than\n    `registered_default`) continue to override saved config —\n    contract documented in `build_platform_options_capture`\n    docstring.\n  - Sanitized output of `build_platform_options_capture` returns\n    only public keys (`_iter_public_options` filter intact).\n\nVerification:\n  - description: \"Pytest: database_options={'foo':'bar'} +\n      requested registered_default 'bar' → sources['foo'] ==\n      'saved_config'. CLI-provided 'baz' overrides saved 'bar' →\n      sources['foo'] == 'requested'.\"\n  - command: \"uv run -- python -m pytest tests/unit/core/results/test_platform_options.py -v -k 'provenance or registered_default or saved_config'\"\n  - expected_output: \"All provenance precedence tests pass; the\n      new equal-default-vs-saved test asserts saved_config wins.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Preserve `saved_config` provenance when the saved value happens to equal the registered default",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #115, P2, `results-explorer/src/pages/Compare.tsx`\n  - https://github.com/joeharris76/BenchBox/pull/115#discussion_r3176818720\n\nFinding: when a benchmark/scale mismatch is detected, the new\ndecision summary suppresses winner language, but the page still\nrenders `ChartPanel` in normal compare mode. `SummaryBoxPanel`\n(rendered inside ChartPanel) can still present a computed\n\"Best power / Best geomean\" platform, reintroducing the same\nwinner claim the guardrail is meant to suppress for incomparable\ncohorts.\n\nCurrent evidence on `origin/develop`:\n  - `results-explorer/src/pages/Compare.tsx:175-178` —\n    `decisionSummary` gets `suppressWinnerClaims`/`suppressionReason`.\n  - `results-explorer/src/pages/Compare.tsx:366-370` —\n    `<ChartPanel ... />` is rendered without suppression props.\n  - `results-explorer/src/components/ChartPanel.tsx:34-71` —\n    `ChartPanelProps` has no suppression field; line 353 renders\n    `SummaryBoxPanel` unconditionally.\n\nRecommended fix: extend `ChartPanelProps` with optional\n`suppressWinnerClaims?: boolean` and `suppressionReason?: string`,\nthread them into `SummaryBoxPanel`, and replace winner-language\n(\"Best power\", \"Best geomean\") with neutral phrasing\n(\"Highest power score in cohort (cohort mismatch — not\ncomparable)\") when suppression is on.\n\nMust preserve:\n  - Compare-page rendering with NO suppression (cohort matches)\n    shows the same \"Best power\" / \"Best geomean\" text as today.\n  - `decisionSummary` text already produced at the top of Compare\n    stays unchanged.\n  - ChartPanel callers other than Compare (detail pages) keep\n    working unchanged.\n\nVerification:\n  - description: \"Vitest: ChartPanel mounted with\n      `suppressWinnerClaims={true}` → `SummaryBoxPanel` text does\n      not contain 'Best'. Without suppression → 'Best power' /\n      'Best geomean' still appears.\"\n  - command: \"cd results-explorer && pnpm test -- ChartPanel Compare\"\n  - expected_output: \"All ChartPanel and Compare tests pass; new\n      suppression test asserts neutral wording.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Propagate winner-claim suppression into the chart-level summary on the Compare page",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #119, P2, `benchbox/platforms/credentials/motherduck.py`\n  - https://github.com/joeharris76/BenchBox/pull/119#discussion_r3176973035\n\nFinding: `setup_motherduck_credentials` persists the user-selected\n`database`, but no one consumes it at run time, so runs still\ndefault to `benchbox` regardless of what the wizard captured.\nMotherDuck has no platform-specific config builder registration,\nso `PlatformHookRegistry._default_builder` is used and does not\nmerge `CredentialManager` data; `MotherDuckAdapter` then falls\nback to its internal default database. The new wizard prompt is\neffectively ineffective and benchmarks may run against the wrong\ndatabase.\n\nCurrent evidence on `origin/develop`:\n  - `benchbox/platforms/credentials/motherduck.py:70-74` — saves\n    `{\"database\": database, \"token_env_var\": MOTHERDUCK_TOKEN_ENV}`.\n  - `benchbox/platforms/__init__.py` — has no\n    `PlatformHookRegistry.register_config_builder(\"motherduck\",\n    ...)` call (the surrounding modules do for databricks,\n    bigquery, trino, firebolt, presto, postgresql, etc.).\n\nRecommended fix: add a `_build_motherduck_config` builder in\n`benchbox/platforms/motherduck.py` that pulls the saved\n`database` from `CredentialManager` and merges it into the\nruntime `DatabaseConfig`. Register it from\n`benchbox/platforms/__init__.py` in the same pattern used for\nother adapters.\n\nMust preserve:\n  - `MOTHERDUCK_TOKEN` env var precedence stays exactly as today\n    (token resolution is unaffected).\n  - The existing default `database=\"benchbox\"` is the fallback\n    when no saved value exists.\n  - Other platforms' config builders (databricks, bigquery,\n    trino, firebolt, presto, postgresql, timescaledb,\n    pg-duckdb) are untouched.\n\nVerification:\n  - description: \"Pytest: CredentialManager with\n      `motherduck.database='alt'` → `_build_motherduck_config`\n      returns DatabaseConfig with `database='alt'`. No saved\n      value → falls back to 'benchbox'.\"\n  - command: \"uv run -- python -m pytest tests/unit/platforms/test_motherduck.py -v -k 'config_builder or wizard or database'\"\n  - expected_output: \"Both saved and fallback paths pass; live\n      cloud verification deferred (see deferred[]).\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Propagate the configured MotherDuck database into runtime config",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #129, P2, `Makefile`\n  - https://github.com/joeharris76/BenchBox/pull/129#discussion_r3177117127\n\nFinding: `worktree-pool-check` treats any\n`.benchbox/claim_in_progress` file as an aborted slot, but\n`worktree-claim-attempt` creates that marker at the start of a\nnormal claim and removes it only at the end. Because the check\nruns without the pool lock, invoking it during an active claim\ncan fail with a false positive even when the pool is healthy —\nespecially noisy for the documented periodic / cron use case.\n\nCurrent evidence on `origin/develop`:\n  - `Makefile:1219-1222` — `elif [ -f\n    \"$$wt/.benchbox/claim_in_progress\" ]; then` increments\n    `aborted_count` with no liveness check.\n  - `Makefile:1207` — `worktree-pool-check` does not acquire the\n    pool lock.\n\nRecommended fix: treat a marker as aborted only when it is\n\"stale\" — older than a configurable threshold (default 10\nminutes) computed from `mtime`. A fresh marker indicates an\nin-progress claim and should be reported as `claimed` (or\nsimply skipped) instead of `aborted`.\n\nMust preserve:\n  - Truly aborted markers (older than the threshold) still\n    surface as failures with the existing exit-1 behavior and\n    recovery hints.\n  - The \"missing worktree\" check at line 1216-1217 is unchanged.\n  - `extras` detection for slots beyond `POOL_SIZE` still fires.\n  - The non-locking design stays — keep the check fast and\n    cron-safe.\n\nVerification:\n  - description: \"Manual: run `make worktree-pool-check` while\n      `make worktree-claim BRANCH=...` is mid-flight. With the\n      fix, no aborted false positive.\"\n  - command: \"(make worktree-claim BRANCH=chore/test-pool-race &) && sleep 1 && make worktree-pool-check && wait\"\n  - expected_output: \"Pool invariant check OK with no aborted\n      counter increment; the concurrent claim completes normally.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Exclude in-flight claims from `worktree-pool-check` aborted-marker false positives",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #105, P1, `benchbox/core/cost/integration.py`\n  - https://github.com/joeharris76/BenchBox/pull/105#discussion_r3174793237\n\nFinding: `_extract_platform_config_from_info()` has explicit branches\nonly for `snowflake`, `bigquery`, `redshift`, `databricks`. Adapters\nthat emit `platform_type: \"athena\"` (and `\"azure_synapse\"`, future\n`\"clickhouse-cloud\"`, etc.) fall through with no `region`/`cloud`\nfields, so `calculate_normalized_benchmark_cost()` warns\n`pricing region metadata missing` and forces\n`cost_status=\"unavailable\"`, blocking public cost totals in\nsubmission validation even when the adapter populated `platform_info`.\n\nCurrent evidence on `origin/develop`:\n  - `benchbox/core/cost/integration.py:285-368` — only the four\n    listed `platform_type` branches set region/cloud. After the\n    last `elif` there is no generic fallback that reads\n    `platform_info[\"region\"]` / `platform_info[\"cloud_provider\"]`.\n\nRecommended fix: add a generic post-branch fallback that tries the\nsame `_value_or_default(platform_info, \"cloud_provider\", default,\ndefaulted_fields, alias=\"cloud\")` and `... \"region\", default, ...`\nlookups for any `platform_type` not covered above. Defaults should\nmirror what each cloud adapter already emits (Athena → `aws`,\nAzure Synapse → `azure`).\n\nMust preserve:\n  - The four explicit branches (snowflake/bigquery/redshift/\n    databricks) keep their current defaults and field names exactly\n    — submission validation depends on `cluster_size_dbu_per_hour`,\n    `warehouse_size`, `node_type`, etc. being populated by the\n    existing branches.\n  - `_defaulted_fields` annotation still reflects only fields that\n    actually defaulted (no spurious additions from the fallback).\n\nVerification:\n  - description: \"Pytest: athena and azure_synapse fixtures populate\n      cloud/region without warnings.\"\n  - command: \"uv run -- python -m pytest tests/unit/core/cost/ -v -k 'athena or synapse or extract_platform_config'\"\n  - expected_output: \"All cost-extraction tests pass; new athena\n      and azure_synapse fixtures assert non-default cloud/region.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Extract cloud/region metadata for non-DB cloud adapters (Athena, Synapse, …)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #131, P2, `tests/integration/test_hosted_submit_validator_contract.py`\n  - https://github.com/joeharris76/BenchBox/pull/131#discussion_r3177127856\n\nFinding: the parity check does not exercise the hosted or PR\nsubmit code paths it claims to protect. Both manifests are built\nby calling `_build_submission_manifest` directly with hard-coded\narguments. If `_dispatch_service_mode` or the PR packaging flow\nlater changes its call-site arguments — or mutates the manifest\nafter construction — the test will still pass and miss the\ncross-path drift its docstring describes.\n\nCurrent evidence on `origin/develop`:\n  - `tests/integration/test_hosted_submit_validator_contract.py:198-211` —\n    two direct `sub._build_submission_manifest(...)` calls with\n    identical inputs except `submission_path`.\n\nRecommended fix: drive each manifest through its corresponding\npath. For PR-flow, drive the same code that\n`benchbox submit --output ...` calls (or a path-level helper);\nfor hosted, drive the same code `_dispatch_service_mode` calls.\nAcceptable shortcut: extract a tiny\n`_build_submission_manifest_for_pr_flow()` /\n`_build_submission_manifest_for_hosted_flow()` helper that the\ntest calls without faking the rest of the dispatch.\n\nMust preserve:\n  - The other tests in this file (`_run_validator` happy path,\n    missing-required-keys negative case) continue to pass.\n  - The docstring's contract — \"if either path mutates the\n    manifest after construction, this test fails\" — is now\n    actually true.\n\nVerification:\n  - description: \"Pytest: introduce a deliberate manifest mutation\n      in one path locally, confirm this test fails. Revert,\n      confirm it passes.\"\n  - command: \"uv run -- python -m pytest tests/integration/test_hosted_submit_validator_contract.py -v\"\n  - expected_output: \"All hosted-submit contract tests pass;\n      local mutation experiment confirms the test catches drift\n      (then revert).\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make hosted-vs-PR submit manifest parity test exercise the actual call sites",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #151, P2, `benchbox/cli/platform_readiness.py`\n  - https://github.com/joeharris76/BenchBox/pull/151#discussion_r3177842040\n\nFinding: this readiness path always reports `environment_skip`\nwhen the endpoint is unreachable, even when `pysail` is\nimportable. For local SQL LakeSail, the adapter can auto-start\na local Sail server (`LakeSailAdapter._ensure_server_ready`),\nso `benchbox platforms check lakesail` is a false negative and\nexits non-zero even though runs would proceed.\n\nCurrent evidence on `origin/develop`:\n  - `benchbox/cli/platform_readiness.py:262-282` — when the\n    endpoint is unreachable, `pysail_available` only changes the\n    `detail` string; `status` is hardcoded to\n    `environment_skip` regardless.\n\nRecommended fix: when the endpoint is unreachable but\n`pysail_available is True` and the platform is the SQL adapter\n(the one that supports auto-start), set `status=\"ready\"` (with\na detail noting auto-start) and surface it as `ready` in the\n`platforms check` summary. Keep DataFrame-mode LakeSail as\n`environment_skip` because it requires an already-running\nendpoint.\n\nPairs with w11: both touch the platform-readiness reporting\nflow; land together so the \"ready\" status emitted here is\nactually exit-0 in `benchbox platforms check` after w11 reorder.\n\nMust preserve:\n  - DataFrame-mode LakeSail (no auto-start) still reports\n    `environment_skip` when the endpoint is unreachable.\n  - `pysail_available is False` keeps the current\n    `environment_skip` status with the existing remediation\n    string.\n  - `endpoint=` field in the result still reports the configured\n    endpoint, not a placeholder.\n\nVerification:\n  - description: \"Pytest: SQL adapter, endpoint unreachable,\n      pysail importable → status='ready'. DataFrame adapter, same\n      conditions → status='environment_skip'. SQL adapter, pysail\n      missing → status='environment_skip'.\"\n  - command: \"uv run -- python -m pytest tests/unit/cli/test_platform_readiness.py -v -k 'lakesail'\"\n  - expected_output: \"All three matrix cells pass; the SQL+pysail\n      case now returns ready (was: environment_skip).\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Mark LakeSail readiness as ready when local auto-start is feasible (`pysail` importable)",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #167, P2, `.github/workflows/sync-results-data-to-published.yml`\n  - https://github.com/joeharris76/BenchBox/pull/167#discussion_r3178675036\n\nFinding: using `ref: develop` makes the job read whatever\n`develop` points to when the runner starts, not the commit that\ntriggered the run. With `concurrency.cancel-in-progress: false`,\nolder queued runs can execute after newer pushes and then\nmirror newer corpus content while still naming the branch / PR\nwith the older `GITHUB_SHA`, creating misattributed or\nduplicate mirror PRs.\n\nCurrent evidence on `origin/develop`:\n  - `.github/workflows/sync-results-data-to-published.yml:34-47` —\n    `concurrency.cancel-in-progress: false` and\n    `actions/checkout@v4` with `ref: develop`.\n\nRecommended fix: pin the checkout to `${{ github.sha }}` (or\nhard-reset to it before diffing) so each run mirrors the exact\ntriggering push deterministically.\n\nMust preserve:\n  - `fetch-depth: 0` stays so subsequent steps can switch\n    branches and diff.\n  - The \"Configure git identity\" step (lines 49-52) is\n    unchanged.\n  - `concurrency.cancel-in-progress: false` is intentional and\n    stays — older runs must not be cancelled, just made\n    deterministic.\n\nVerification:\n  - description: \"Static (local): the diff replaces `ref: develop`\n      with `ref: ${{ github.sha }}` and adds no other ref-changing\n      logic. Behavioral verification requires CI: after merge,\n      replay sequence push A then push B on a test branch in\n      repo settings → workflow runs and confirm each run mirrors\n      its triggering tree (no cross-attribution).\"\n  - command: \"git diff origin/develop -- .github/workflows/sync-results-data-to-published.yml | grep -E '^\\\\+.*ref:'\"\n  - expected_output: \"`+ ref: ${{ github.sha }}` appears; no\n      other ref-line additions. Behavioral check is manual on\n      the next merge to develop (cannot be reproduced locally\n      because the workflow only runs in GitHub Actions).\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Pin the sync-results-data-to-published workflow checkout to the triggering SHA",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #113, P1 (security), `benchbox/core/results/platform_options.py`\n  - https://github.com/joeharris76/BenchBox/pull/113#discussion_r3176769303\n\nFinding (security): `is_secret_option_key()` only `.lower()`s the key,\nthen substring-matches against `_SECRET_KEY_PARTS` entries that all\nuse underscores (e.g. `session_token`, `access_key`,\n`connection_string`). camelCase / PascalCase keys like\n`sessionToken`, `accessKeyId`, `connectionString` never match, so\n`sanitize_platform_options()` writes the raw credential into\n`config.platform_options` of the result artifact.\n\nCurrent evidence on `origin/develop`:\n  - `benchbox/core/results/platform_options.py:10-19` — secret part\n    list uses `_`-separated tokens.\n  - `benchbox/core/results/platform_options.py:51-53` —\n    `is_secret_option_key` does `key.lower()` only.\n\nRecommended fix: strip non-alphanumeric characters before matching\n(e.g. `re.sub(r\"[^a-z0-9]\", \"\", key.lower())`) and update\n`_SECRET_KEY_PARTS` to the corresponding alphanumeric-only forms\n(`sessiontoken`, `accesskey`, `connectionstring`, …) so substring\nmatching still works after normalization.\n\nMust preserve:\n  - Underscore-cased keys (`session_token`, `access_key`,\n    `private_key`, `connection_string`) continue to match — current\n    coverage must not regress.\n  - Internal-option keys starting with `_` (`_explicit_platform_options`,\n    `_defaulted_fields`) are filtered out by `_iter_public_options`,\n    not redacted; this fix must not change that filter ordering.\n  - Non-secret legitimate keys with embedded uppercase like\n    `verboseLevel` or `tuningConfig` MUST NOT trigger redaction.\n\nVerification:\n  - description: \"Pytest: every entry in `_SECRET_KEY_PARTS` matches\n      its camelCase, PascalCase, kebab-case, and underscore form;\n      non-secret keys with mixed case do not match.\"\n  - command: \"uv run -- python -m pytest tests/unit/core/results/test_platform_options.py -v\"\n  - expected_output: \"All variant-case secret keys redact;\n      verboseLevel/tuningConfig fixtures pass through unredacted.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Normalize secret key names before redaction so camelCase keys are caught",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #114, P1, `benchbox/core/write_primitives/benchmark.py`\n  - https://github.com/joeharris76/BenchBox/pull/114#discussion_r3176765596\n\nFinding: `_check_validation_query()` only inspects `val_result[0][0]`,\nso any additional rows returned by the validation query are ignored.\nSeveral scalar-bound sketch validations query partition tables and\ncan return multiple rows; out-of-range values in non-first rows\nstill pass and produce false-positive benchmark validations.\n\nCurrent evidence on `origin/develop`:\n  - `benchbox/core/write_primitives/benchmark.py:126-136` — the\n    `expected_value_min/max` branch reads only `val_result[0][0]`.\n\nRecommended fix: iterate every row, coerce each `row[0]` to float,\nand fail on the first out-of-range row. (Iterating-all is preferred\nover single-row-strict because partition-aggregation validations\nlegitimately return multiple rows.) Empty result → fail (matches\ncurrent behavior at line 130-131).\n\nMust preserve:\n  - `expected_rows` and `expected_rows_min/max` branches keep their\n    current row-count semantics; this change is scoped to the\n    `expected_value_min/max` branch.\n  - Empty-result validation continues to fail (no silent pass).\n  - Non-numeric coercion still fails closed (`TypeError`/`ValueError`\n    → `False`).\n\nVerification:\n  - description: \"Pytest: cover single in-range, single out-of-range,\n      multi-row all-in, multi-row with bad row at index 0, multi-row\n      with bad row at index N>0, empty result.\"\n  - command: \"uv run -- python -m pytest tests/unit/core/write_primitives/test_benchmark.py -v -k 'check_validation_query or expected_value'\"\n  - expected_output: \"All six test cases pass; bad row at N>0 now\n      fails (previous behavior: passed).\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Validate every row, not just `[0][0]`, when checking `expected_value_min/max`",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #127, P1, `results-explorer/src/db.ts`\n  - https://github.com/joeharris76/BenchBox/pull/127#discussion_r3177095782\n\nFinding: `waitForSnapshotRows` treats every entry in\n`SNAPSHOT_READY_SCANS` as required-non-empty, so a valid snapshot\nwith empty optional tables (`bench.query_executions`,\n`bench.query_display_timings`, `bench.short_ids`) fails `getDb()`\nand blocks the entire explorer. Existing detail/query/short-id\npaths already handle missing data gracefully; readiness should\nverify attachment/queryability, not non-emptiness of every\nauxiliary table.\n\nCurrent evidence on `origin/develop`:\n  - `results-explorer/src/db.ts:44-77` — `SNAPSHOT_READY_SCANS`\n    lists 8 tables with no required/optional distinction.\n  - `results-explorer/src/db.ts:88-107` — `waitForSnapshotRows`\n    counts rows for each scan and rejects if any returns 0.\n\nRecommended fix: tag each scan with `required: true | false`.\nRequired: `results`, `platform_index_rows`, `benchmark_rankings`,\n`benchmark_matrix_cells`, `result_detail_metrics`. Optional:\n`query_executions`, `query_display_timings`, `short_ids`. For\noptional scans, only fail readiness if the *query itself* throws\n(table missing entirely / catalog corruption), not on empty rows.\n\nMust preserve:\n  - Empty results in any of the five required tables still fail\n    readiness with the current error message — the regression\n    surface is \"missing core data hides as 'transient init failure'.\"\n  - Transient DuckDB errors (`offset is out of bounds`,\n    `fieldsLength`) still trigger the retry loop.\n  - The `online` event listener resets `initFailures` and\n    `initError` exactly as today.\n\nVerification:\n  - description: \"Vitest: required-table empty → throws; optional-\n      table empty → resolves; optional-table missing entirely → throws.\"\n  - command: \"cd results-explorer && pnpm test -- db\"\n  - expected_output: \"All db.ts tests pass; new optional-empty\n      case resolves where it previously rejected.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Relax snapshot readiness so optional empty tables don't block the explorer",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comments (both PR #132, same file):\n  - P1, Axis 3 EOD bound:\n    https://github.com/joeharris76/BenchBox/pull/132#discussion_r3177129340\n  - P2, Axis 2 listing guidance:\n    https://github.com/joeharris76/BenchBox/pull/132#discussion_r3177129342\n\nFinding 1 (P1, Axis 3): the command uses\n`git log --since=\"$START_DATE\" --until=\"$END_DATE\"`, which makes\nthe upper bound midnight at the *start* of `END_DATE`. Test changes\nmerged later on the closing day are excluded — exactly the axis\nmeant to catch missed coverage downgrades silently misses them.\n\nFinding 2 (P2, Axis 2): the template says `make blind-spots-list`\nis a more *precise* way to get findings in the review window, but\nthat target maps to `sweep_blind_spots.py list`, which only filters\nby status/kind and does not support date-window filtering. In\npractice it can pull unrelated historical open findings and omit\nin-window non-open findings, so weekly sweep scope becomes\ninconsistent.\n\nCurrent evidence on `origin/develop`:\n  - `_project/audits/codex-weekly-sweep-template.md:55-62` — Axis 2\n    presents `make blind-spots-list` as the more-precise option.\n  - `_project/audits/codex-weekly-sweep-template.md:88-92` — Axis 3\n    uses bare `--since`/`--until` with no inclusive end-of-day.\n\nRecommended fix:\n  - Axis 3: align with Axis 1's inclusive end pattern (e.g.\n    `--until=\"$END_DATE 23:59:59\"` or\n    `--until=\"$(date -d \"$END_DATE + 1 day\" +%Y-%m-%d)\"` — match\n    whichever idiom Axis 1 already uses).\n  - Axis 2: replace the \"more precise\" guidance with an actual\n    date-bounded query. Option A: keep the `ls` glob with explicit\n    start/end dates. Option B: extend `sweep_blind_spots.py list`\n    with `--since`/`--until` and use that. Option A is lower-risk\n    and ship-now; Option B can be filed as a follow-up if the\n    team wants a CLI affordance.\n\nMust preserve:\n  - Axis 1 (the existing reference for the inclusive bound) keeps\n    its current command exactly.\n  - The cross-link to the cold-load-rowcount blind-spot example at\n    line 74-77 stays intact.\n\nVerification:\n  - description: \"Run the rewritten Axis 3 command against a known\n      commit merged at 23:30 on the closing day; confirm it appears.\"\n  - command: \"git log --since=2026-05-02 --until='2026-05-03 23:59:59' -p --diff-filter=M --pretty='format:%H %s' origin/develop -- '*.spec.ts' '*.spec.tsx' '*test*.py' 'tests/' | head -20\"\n  - expected_output: \"At least one commit from 2026-05-03 appears\n      in the output (previously cut off at midnight 2026-05-03 00:00).\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Fix Axis 2 (blind-spot listing) and Axis 3 (EOD bound) drift in the weekly sweep template",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #141, P1, `benchbox/core/results/schema.py`\n  - https://github.com/joeharris76/BenchBox/pull/141#discussion_r3177580644\n\nFinding: re-exporting previously saved results silently drops\n`cost.total_usd`. `reconstruct_benchmark_results()` calls\n`_extract_cost_summary()` which only rebuilds `total_cost` and\n`cost_model` and does not restore `normalized_cost`, so this\nguard rejects emitting totals for any legacy bundle. Comparison\nand reporting flows that depend on `cost.total_usd` break for\nanything written before normalized_cost existed.\n\nCurrent evidence on `origin/develop`:\n  - `benchbox/core/results/schema.py:578-589` — `_add_cost_section`\n    emits `cost.total_usd` only when\n    `_normalized_cost_allows_direct_total(normalized_cost)` is true.\n  - `benchbox/core/results/schema.py:592-598` — that helper returns\n    `False` whenever `normalized_cost` is not a dict.\n  - `benchbox/core/results/loader.py:394-401` —\n    `_extract_cost_summary` returns only\n    `{\"total_cost\": ..., \"cost_model\": ...}`. No `normalized_cost`\n    key is restored, so re-exports always hit the False branch.\n\nRecommended fix: restore `normalized_cost` during reconstruction so\nround-tripped bundles preserve the contract. Update\n`_extract_cost_summary` to also pull\n`cost_section.get(\"normalized_cost\")` (preserve the dict shape) and\nput it in `cost_summary[\"normalized_cost\"]`. As a defensive backstop,\ntreat \"no normalized block at all\" (legacy) as \"allow direct total\"\nin `_normalized_cost_allows_direct_total` so a missing-vs-rejected\nblock has different semantics.\n\nMust preserve:\n  - Bundles that have `normalized_cost` with `cost_status` outside\n    `{\"normalized\", \"not_applicable_local\"}` continue to suppress\n    `cost.total_usd` (this is the original P1 fix from PR #141).\n  - `cost.model` field continues to round-trip from `cost_model`.\n  - Empty `cost_summary` (no cost data at all) emits no `cost`\n    section — current behavior must hold.\n\nVerification:\n  - description: \"Pytest: legacy bundle (no `normalized_cost`) →\n      re-export → `cost.total_usd` survives. Modern bundle with\n      `cost_status='unavailable'` → re-export → no `cost.total_usd`.\"\n  - command: \"uv run -- python -m pytest tests/unit/core/results/ -v -k 'cost or round_trip or legacy'\"\n  - expected_output: \"Both the legacy round-trip and the modern\n      suppression cases pass; legacy bundle keeps its total_usd.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Round-trip `cost.total_usd` for legacy bundles that have no normalized_cost block",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #144, P1, `benchbox/platforms/dataframe/dask_df.py`\n  - https://github.com/joeharris76/BenchBox/pull/144#discussion_r3177676880\n\nFinding: the new skip logic unconditionally excludes Q10 for any\nbenchmark detected as TPC-H, regardless of whether the run is\nusing the constrained local envelope. Users who provide a remote\n`scheduler_address` or provision enough resources still lose Q10\ncoverage, producing incomplete TPC-H results and preventing valid\nfull-suite runs.\n\nCurrent evidence on `origin/develop`:\n  - `benchbox/platforms/dataframe/dask_df.py:447-455` —\n    `_collect_skip_query_ids` only checks `_is_tpch_benchmark`\n    before adding `_RESOURCE_ENVELOPE_SKIP_QUERY_IDS`.\n  - `benchbox/platforms/dataframe/dask_df.py:178,239,298` —\n    `self.scheduler_address` and `self.use_distributed` flags are\n    available; an external scheduler is treated as\n    \"not local cluster\".\n\nRecommended fix: gate the Q10 skip on a local-envelope predicate.\nInitial proposal: skip when `not self.scheduler_address and not\nself.use_distributed`. When the user provides an external\nscheduler, run Q10 normally. Update the diagnostic message to\nexplain *why* it skipped and how to opt out (provide a remote\nscheduler).\n\nMust preserve:\n  - The OOM exit-137 protection still applies for actual local-\n    cluster TPC-H runs (the original incident).\n  - `_build_skipped_results` continues to attach\n    `dask_resource_envelope_guarded=True` and the diagnostic\n    string for the queries it actually skipped.\n  - No change to skip lists for non-TPC-H benchmarks.\n\nOpen question (resolve before edit):\n  - Is the OOM gate `not scheduler_address` (covers user-supplied\n    remote schedulers) or also `cluster_mode != \"local\"` (covers\n    managed-Dask/Coiled distributed clusters)? Verify against\n    how the original OOM was reproduced; default to the broader\n    predicate if both are needed.\n\nVerification:\n  - description: \"Pytest: adapter constructed with\n      `scheduler_address='tcp://...'` and TPC-H benchmark → Q10 NOT\n      in skip list. Local-only TPC-H → Q10 IS in skip list.\"\n  - command: \"uv run -- python -m pytest tests/unit/platforms/dataframe/test_dask_df.py -v -k 'q10 or skip or envelope'\"\n  - expected_output: \"New remote-scheduler test passes; existing\n      local-envelope skip test continues to pass.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Restrict Q10 skip guard in dask-df to local-envelope runs",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-pr-review-followups-week-2026-05-03",
+        "notes": "Source review comment:\n  - PR #145, P1, `benchbox/platforms/datafusion.py`\n  - https://github.com/joeharris76/BenchBox/pull/145#discussion_r3177722807\n\nFinding: when `file_paths` contain multiple shard names that do\nnot share a leading substring (UUID- or hash-named parts),\n`os.path.commonprefix(...)` returns `\"\"`, so `location` becomes\n`\"<parent>/*\"`. DataFusion will then register every file in the\ndirectory, pulling in other tables' data and silently corrupting\nrow counts.\n\nCurrent evidence on `origin/develop`:\n  - `benchbox/platforms/datafusion.py:909-921` — multi-file branch\n    builds `location = str(parent_dir / f\"{common_prefix}*\")` with\n    no check that `common_prefix != \"\"`.\n\nRecommended fix: when `common_prefix == \"\"`, fall back to one of\n(a) registering each file by exact path and unioning, (b) using\nDataFusion's `LISTING_TABLE` with an explicit file list, or\n(c) the existing single-file fallback applied per shard. Pick the\nleast-disruptive option that preserves row counts (likely (a) — a\nunion view over explicit paths).\n\nMust preserve:\n  - Single-file branch (`len(file_paths) == 1`) keeps its current\n    behavior unchanged.\n  - Multi-directory fallback (line 916-921) keeps its current\n    \"first file with warning\" behavior.\n  - Schema-clause inference (lines 899-906) is independent of\n    this fix; do not touch.\n\nVerification:\n  - description: \"Pytest: multi-file with uuid-style names (no\n      common prefix) → registered location does not glob the\n      parent directory. Multi-file with shared prefix → glob still\n      works.\"\n  - command: \"uv run -- python -m pytest tests/unit/platforms/test_datafusion.py -v -k 'glob or common_prefix or external_table'\"\n  - expected_output: \"New no-common-prefix test passes; existing\n      shared-prefix glob test continues to pass.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Guard empty common prefix in DataFusion CSV multi-file glob",
+        "wid": "w9"
+      }
+    ]
+  }
+}

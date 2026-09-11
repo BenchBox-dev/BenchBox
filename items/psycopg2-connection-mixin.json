@@ -1,0 +1,228 @@
+{
+  "context": "1. Audit divergences (w1): confirm identifier limits, catalog query syntax, whether\n   execute_query can be unified via execute_sql_query() helper in both adapters.\n2. Create benchbox/platforms/base/psycopg2_mixin.py (w2):\n   - class Psycopg2ConnectionMixin\n   - _max_identifier_length: int = 63  (class constant, QuestDB overrides to 127)\n   - _validate_identifier() using the class constant\n   - close_connection() (identical in both)\n   - _get_existing_tables() using information_schema.tables cursor-based default\n3. Write mixin unit tests (w3) - mock psycopg2, no live DB.\n4. Refactor PostgreSQLAdapter (w4): inherit Psycopg2ConnectionMixin, delete duplicated methods.\n5. Refactor QuestDBAdapter (w5): inherit Psycopg2ConnectionMixin, set _max_identifier_length=127,\n   override _get_existing_tables() to use tables() function, make execute_query() delegate to\n   execute_sql_query() helper instead of inlining.\n",
+  "description": "Extract shared PostgreSQL wire protocol mechanics from PostgreSQLAdapter into a\nreusable Psycopg2ConnectionMixin. This refactor decouples connection management\nand query execution from database-specific management logic (like CREATE DATABASE),\nallowing QuestDB and other wire-compatible platforms to share code without\nincorrect inheritance.\n\nCurrently, QuestDBAdapter duplicates several methods from PostgreSQLAdapter\nbecause inheriting would pull in incompatible database management behaviors.\nThis mixin provides a clean path for shared functionality while adhering to\nthe Liskov Substitution Principle.\n\nQuestDB uses `pg_port` (not `port`), has a 127-char identifier limit (vs\nPostgreSQL's 63), and uses `tables()` for catalog queries rather than\n`information_schema.tables`. These divergences must be handled via class-level\nconstants and overrides, not inlined into the mixin.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "inherit QuestDBAdapter from PostgreSQLAdapter",
+        "instead": "use Psycopg2ConnectionMixin directly.",
+        "item_id": "psycopg2-connection-mixin",
+        "why": "they diverge fundamentally in database management, data loading, and catalog queries"
+      },
+      {
+        "dont": "move get_query_plan to the mixin",
+        "instead": "they must stay as adapter-specific overrides.",
+        "item_id": "psycopg2-connection-mixin",
+        "why": "PostgreSQL uses EXPLAIN ANALYZE and QuestDB uses plain EXPLAIN"
+      },
+      {
+        "dont": "unify _validate_identifier length limits to a single constant",
+        "instead": "use a class constant _max_identifier_length that each adapter sets.",
+        "item_id": "psycopg2-connection-mixin",
+        "why": "QuestDB (127) and PostgreSQL (63) have different limits and unifying silently applies the wrong limit"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-04-15T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "CedarDB, TimescaleDB, pg_duckdb, pg_mooncake continue to work unchanged via transitive PostgreSQLAdapter inheritance",
+        "item_id": "psycopg2-connection-mixin"
+      },
+      {
+        "behavior": "PostgreSQLAdapter continues to support TimescaleDB extensions via enable_timescale flag",
+        "item_id": "psycopg2-connection-mixin"
+      },
+      {
+        "behavior": "QuestDB _validate_identifier uses 127-char limit, PostgreSQL uses 63-char limit - do not unify to one value",
+        "item_id": "psycopg2-connection-mixin"
+      },
+      {
+        "behavior": "QuestDBAdapter continues to use REST API/ILP for its primary data loading path",
+        "item_id": "psycopg2-connection-mixin"
+      },
+      {
+        "behavior": "execute_sql_query() helper in base/sql_execution.py remains the canonical implementation for cursor-based query execution",
+        "item_id": "psycopg2-connection-mixin"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "psycopg2-connection-mixin",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/__init__.py"
+      },
+      {
+        "item_id": "psycopg2-connection-mixin",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/psycopg2_mixin.py"
+      },
+      {
+        "item_id": "psycopg2-connection-mixin",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/postgresql.py"
+      },
+      {
+        "item_id": "psycopg2-connection-mixin",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/questdb.py"
+      },
+      {
+        "item_id": "psycopg2-connection-mixin",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_psycopg2_mixin.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_postgresql_adapter.py -v",
+        "description": "Unit tests for PostgreSQL adapter still pass",
+        "expected": null,
+        "item_id": "psycopg2-connection-mixin",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_questdb_adapter.py tests/unit/platforms/test_questdb_coverage.py -v",
+        "description": "Unit tests for QuestDB adapter still pass",
+        "expected": null,
+        "item_id": "psycopg2-connection-mixin",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_psycopg2_mixin.py -v",
+        "description": "New mixin unit tests pass",
+        "expected": null,
+        "item_id": "psycopg2-connection-mixin",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'from benchbox.platforms.base.psycopg2_mixin import Psycopg2ConnectionMixin; print(\"OK\")'",
+        "description": "Mixin is importable from base package",
+        "expected": null,
+        "item_id": "psycopg2-connection-mixin",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite passes (catches transitive subclass regressions)",
+        "expected": null,
+        "item_id": "psycopg2-connection-mixin",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "psycopg2-connection-mixin",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "psycopg2-connection-mixin",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "psycopg2-connection-mixin",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "psycopg2-connection-mixin",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "psycopg2-connection-mixin",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "psycopg2-connection-mixin",
+        "notes": "Candidates: _validate_identifier (diverges on length limit - needs class constant),\nclose_connection (identical), _get_existing_tables (both now cursor-based),\nexecute_query (QuestDB should delegate to execute_sql_query() helper instead of inlining).\nNot in scope: get_query_plan (EXPLAIN ANALYZE vs plain EXPLAIN), _get_connection_params\n(port-naming differs), get_platform_info (adapter-specific version queries).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit methods shared by PostgreSQLAdapter and QuestDBAdapter; decide mixin boundary",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "psycopg2-connection-mixin",
+        "notes": "Include: close_connection, _validate_identifier (with _max_identifier_length = 63\nclass constant), _get_existing_tables (information_schema.tables default).\nDo NOT include: get_query_plan, get_platform_info, _get_connection_params.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create benchbox/platforms/base/psycopg2_mixin.py with extracted methods",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "psycopg2-connection-mixin",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write unit tests for Psycopg2ConnectionMixin in isolation (no live DB)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "psycopg2-connection-mixin",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor PostgreSQLAdapter to inherit from Psycopg2ConnectionMixin; remove duplicates",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "psycopg2-connection-mixin",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor QuestDBAdapter: inherit mixin, override _max_identifier_length=127, drop inline execute_query (delegate to execute_sql_query helper)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "psycopg2-connection-mixin",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run fast test suite; confirm PostgreSQL, QuestDB, and all subclass adapters pass",
+        "wid": "w6"
+      }
+    ]
+  }
+}

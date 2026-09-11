@@ -1,0 +1,78 @@
+{
+  "context": "Standalone python checker with no third-party deps so the Actions job is trivial; run it in CI on pull_request to main and document in README.",
+  "description": "skill-sync-skills invariant (c) (docs/propagation.md) requires skill-sync.lock to be regenerated in the same commit as any skill edit, but nothing enforces it: PRs #9 and #10 merged skill edits (SHARED/commit-framework, SHARED/review-protocol) with stale lock hashes, silently breaking lock integrity on main until PR #11 repaired the instances. The class remains unguarded — the repo has no CI and no pre-commit hook. Deliverable: scripts/verify_lock.py in the canonical repo that recomputes sha256/size for every lock entry against the tree, fails on any mismatch, and fails on skills listed in skill-sync.yaml but absent from the lock (the accidental-docs-drop class, instance-fixed in PR #11); wired as a required GitHub Actions check on PRs to main. Discovered 2026-07-29 during the docs-skill restoration.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-29T12:12:35Z",
+      "completed_pr": 13,
+      "created_at": "2026-07-29T11:42:02Z",
+      "worktree": "skill-sync-canonical"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing lock format and skill-sync CLI compatibility; Joe's identity on commits",
+        "item_id": "skill-sync-skills-lock-invariant-check"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "skill-sync-skills-lock-invariant-check",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.skill-sync/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "sh -c 'cd /Users/joe/.skill-sync && python3 scripts/verify_lock.py'",
+        "description": "checker exists and passes on the live checkout",
+        "expected": "exit 0 once the checker is written and main lock is consistent",
+        "item_id": "skill-sync-skills-lock-invariant-check",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "sh -c 'grep -rq verify_lock /Users/joe/.skill-sync/.github/workflows/'",
+        "description": "CI workflow wires the checker",
+        "expected": "a workflow on PRs to main invokes the checker",
+        "item_id": "skill-sync-skills-lock-invariant-check",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "skill-sync-skills-lock-invariant-check",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "scripts/verify_lock.py (PR #13 on skill-sync-skills). Fails on: declared-but-unlocked skill, locked-but-undeclared skill, locked file missing from tree, sha256/size mismatch, and a file present under a locked skill that the lock never recorded - the last being the case a hash comparison alone cannot catch, since adding a file leaves every recorded hash correct. Prior art examined before writing: skill-sync CLI 'verify' checks committed mirrors in consumer projects and reports 'No tracked targets to verify' here; 'status' compares installed targets under ~/.claude/skills, not this checkout, and reported 'clean' while real drift existed; 'validate' checks manifest portability. Reuse decision: genuinely new, documented in README alongside them. Proven to fail, not just to pass: exit 0 on the repaired tree (20 skills), exit 1 on a tampered file, exit 1 on a file added without regenerating. On first run it caught a live violation - main's tip a48d0c0 changed skills/todo-db/SKILL.md without touching the lock, last regenerated two commits earlier in 2a510a9.",
+        "item_id": "skill-sync-skills-lock-invariant-check",
+        "notes": null,
+        "started_at": "2026-07-29T12:11:13Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Write scripts/verify_lock.py (lock-vs-tree hashes + manifest-vs-lock coverage)",
+        "wid": "w1"
+      },
+      {
+        "evidence": ".github/workflows/verify-lock.yml runs the checker on pull_request and push to main; rung 2 satisfied (grep -rq verify_lock .github/workflows/ exits 0). README gained a 'Lock invariant' section stating the same-commit rule, the failure modes, the regenerate-and-commit-together remedy, and the distinction from the CLI's verify/status/validate. Promoting it to a REQUIRED status check is a branch-protection setting I cannot change from here - flagged in the PR for Joe. Must-preserve held: lock format untouched (only 6 wrong sha256/size values changed; key order and lockedAt intact), CLI compatibility unaffected, commits authored as Joe Harris <joeharris76@gmail.com>. All work done in an isolated git worktree, so the live ~/.skill-sync checkout - on an unrelated WIP branch and symlinked into ~/.claude/skills - was never switched or dirtied. Rung 1 runs against that live checkout and stays unsatisfiable until PR #13 merges AND the live checkout is on main.",
+        "item_id": "skill-sync-skills-lock-invariant-check",
+        "notes": null,
+        "started_at": "2026-07-29T12:12:31Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Wire it as a required GitHub Actions check on PRs to main and document in README",
+        "wid": "w2"
+      }
+    ]
+  }
+}

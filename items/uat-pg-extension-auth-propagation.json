@@ -1,0 +1,300 @@
+{
+  "context": "Reuse `PLATFORM_EXTRA_OPTS` and the `benchbox_run_argv()` command builder\nrather than special-casing PostgreSQL-family adapters. Keep the credential\nvalue aligned with the existing Docker compose files and usage comments.\n",
+  "description": "The corrected enabled-platform UAT run from 2026-05-12 failed every\n`pg-duckdb`, `pg-mooncake`, and `timescaledb` cell before benchmark-specific\nexecution with `fe_sendauth: no password supplied`.\n\nEvidence is in `/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512`:\n`command-status.json` returned 2 after 1036.4s; `matrix_summary.tsv` recorded\n22/22 failures for each PostgreSQL-extension platform; `cells.jsonl` shows the\nfirst error as a missing password; `uat_lifecycle.log` shows managed Docker\nstartup and teardown succeeded for those services.\n\nThe Docker compose files set `POSTGRES_PASSWORD=benchbox`, and adapter configs\naccept a password. The UAT matrix builder does not pass one for these local\nmanaged services, while `singlestore` already has an explicit local password\noption. Fix the UAT harness/config path so local managed PostgreSQL-family\ncells receive the credentials required by their compose stacks.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make the adapters silently default to `benchbox` passwords",
+        "instead": "(not specified)",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "why": "that would leak local test assumptions into user-managed deployments"
+      },
+      {
+        "dont": "mark PostgreSQL-extension benchmarks incompatible based on the 2026-05-12 run until the auth blocker is fixed",
+        "instead": "(not specified)",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "weaken Docker lifecycle checks",
+        "instead": "(not specified)",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "why": "`uat_lifecycle.log` already shows lifecycle success and the defect is runtime command construction"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-pg-extension-auth-propagation",
+        "id": 613,
+        "reason": "The observed failure is UAT harness auth propagation for managed Docker, not a proven adapter default defect.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly states this is unproven ('not a proven adapter default defect'); the confirmed problem is UAT harness auth-propagation, not adapter defaults.",
+        "summary": "Change adapter-level credential defaults"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-pg-extension-auth-propagation",
+        "id": 614,
+        "reason": "Rejected by 2026-05-12 implementation instruction: the goal was working runs, so downstream runtime blockers were fixed in the same slice.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: 'Stop at classification only' was explicitly rejected by a 2026-05-12 instruction; the fuller fix was already done in the same slice.",
+        "summary": "Stop at auth classification only"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "uat-enabled-platforms-remediation"
+    },
+    "preserves": [
+      {
+        "behavior": "Cloud/live platform credentials continue to come from credentials/env mechanisms, not UAT hard-coded local values",
+        "item_id": "uat-pg-extension-auth-propagation"
+      },
+      {
+        "behavior": "Managed Docker lifecycle remains sequential on localhost:5432 for PostgreSQL-extension platforms",
+        "item_id": "uat-pg-extension-auth-propagation"
+      },
+      {
+        "behavior": "No credential value is written into user-facing default adapter config outside local UAT managed execution",
+        "item_id": "uat-pg-extension-auth-propagation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/base/config_utils.py:7-18 -- PostgreSQL-family base options include host/user/database/schema but no password",
+        "decision": "reuse",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "path": "benchbox/platforms/base/config_utils.py:7-18"
+      },
+      {
+        "concept": "benchbox/platforms/pg_duckdb.py:448-481 -- adapter config accepts password via platform options or credentials",
+        "decision": "reuse",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "path": "benchbox/platforms/pg_duckdb.py:448-481"
+      },
+      {
+        "concept": "benchbox/platforms/pg_mooncake.py:419-445 -- adapter config accepts password via platform options or credentials",
+        "decision": "reuse",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "path": "benchbox/platforms/pg_mooncake.py:419-445"
+      },
+      {
+        "concept": "benchbox/platforms/timescaledb.py:631-674 -- adapter config accepts password via platform options or credentials",
+        "decision": "reuse",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "path": "benchbox/platforms/timescaledb.py:631-674"
+      },
+      {
+        "concept": "docker/postgres-extensions/docker-compose.pg-duckdb.yaml:19-22 -- local service sets `POSTGRES_PASSWORD=benchbox`",
+        "decision": "reuse",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "path": "docker/postgres-extensions/docker-compose.pg-duckdb.yaml:19-22"
+      },
+      {
+        "concept": "docker/postgres-extensions/docker-compose.pg-mooncake.yaml:23-26 -- local service sets `POSTGRES_PASSWORD=benchbox`",
+        "decision": "reuse",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "path": "docker/postgres-extensions/docker-compose.pg-mooncake.yaml:23-26"
+      },
+      {
+        "concept": "docker/postgres-extensions/docker-compose.timescaledb.yaml:22-25 -- local service sets `POSTGRES_PASSWORD=benchbox`",
+        "decision": "reuse",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "path": "docker/postgres-extensions/docker-compose.timescaledb.yaml:22-25"
+      },
+      {
+        "concept": "tests/uat/matrix.py:385-419 -- `benchbox_run_argv()` appends local managed Docker platform options only when explicitly requested",
+        "decision": "reuse",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "path": "tests/uat/matrix.py:385-419"
+      },
+      {
+        "concept": "tests/uat/matrix.py:45-73 -- existing `PLATFORM_EXTRA_OPTS`; Singlestore already passes `password=benchbox` for local UAT",
+        "decision": "reuse",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "path": "tests/uat/matrix.py:45-73"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/timescaledb.py"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "do_not_modify",
+        "path_glob": "docker/postgres-extensions/"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/pg_mooncake.py"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_mooncake.py"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/rules/ddl_optimize/pg_mooncake_ddl_rewrites.py"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "docs/compat/capability-matrix.md"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/adr-sqlglot-use-and-non-use.md"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "docs/guides/postgresql-extensions.md"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/pg_mooncake.md"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/matrix.py"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_docker_assets.py"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_matrix.py"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/generators/"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_matrix.py tests/uat/test_docker_assets.py -m fast -q",
+        "description": "UAT matrix and Docker asset unit coverage passes",
+        "expected": "passes and includes assertions for pg-duckdb, pg-mooncake, and timescaledb password propagation",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python - <<'PY'\nfrom tests.uat.matrix import benchbox_run_argv\nfor platform in ['pg-duckdb', 'pg-mooncake', 'timescaledb']:\n    argv = benchbox_run_argv(platform, 'tpch', 0.01, extra_args=[], local_managed_platform=True)\n    print(platform, 'password=benchbox' in argv)\nPY",
+        "description": "Generated UAT argv includes local password for PostgreSQL-extension platforms",
+        "expected": "Each platform prints True",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-sweep CONFIG=tests/uat/configs/uat-pg-extension-auth-smoke.yaml",
+        "description": "Managed smoke reaches past authentication",
+        "expected": "No cell for pg-duckdb, pg-mooncake, or timescaledb fails with `fe_sendauth: no password supplied`",
+        "item_id": "uat-pg-extension-auth-propagation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-pg-extension-auth-propagation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-pg-extension-auth-propagation",
+        "notes": "Capture a compact summary from the retained artifact directory and, if the\nlocal Docker stack is available, one targeted current-code repro for a\nsingle `pg-duckdb` cell. Record command, checked SHA, exit status, and the\nkey auth line in the implementation PR or TODO update. Do not commit raw\nstdout logs.\n\nCompleted on 2026-05-12 at git SHA checked by implementation branch:\nprior artifact command-status returned 2 after 1036.4s, and\n`matrix_summary.tsv` contained 22/22 failed rows for each of `pg-duckdb`,\n`pg-mooncake`, and `timescaledb`. Retained per-cell logs contained\n`fe_sendauth: no password supplied` for the PostgreSQL-extension cells.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate the auth failure on current code before editing",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-pg-extension-auth-propagation",
+        "notes": "Extend the existing platform-option mechanism used by `benchbox_run_argv`\nso `pg-duckdb`, `pg-mooncake`, `timescaledb`, and local `postgresql` cells\nuse `password=benchbox` when run against the project-managed Docker\ncompose services. Keep this scoped to UAT/local managed execution; do not\nchange adapter defaults for user-managed or cloud deployments.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add explicit local-UAT credentials for PostgreSQL-family platforms",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-pg-extension-auth-propagation",
+        "notes": "Add assertions that the generated UAT argv includes the required\n`--platform-option password=benchbox` for the PostgreSQL-extension\nplatforms and that the compose files still advertise the same password.\nExisting Singlestore coverage is the pattern to extend.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover generated argv and Docker asset expectations with tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-pg-extension-auth-propagation",
+        "notes": "With `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`, run a minimal\nmanaged UAT or single-cell smoke for `pg-duckdb`, `pg-mooncake`, and\n`timescaledb` that reaches benchmark setup past authentication. The\nsuccess criterion for this TODO is eliminating `fe_sendauth: no password\nsupplied`; benchmark-specific failures belong to downstream TODOs.\n\nCompleted with:\n`BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-sweep CONFIG=tests/uat/configs/uat-pg-extension-auth-smoke.yaml`.\nThe run directory was\n`/Users/joe/Developer/benchmark_runs/logs/uat_pg_extension_auth_smoke_20260512`.\nInitial attempts proved auth was no longer the blocker but exposed\ndownstream runtime failures in `pg-duckdb` and `pg-mooncake`. Per the\nimplementation instruction, investigation continued until the smoke\nproduced working runs rather than stopping at \"not auth\".\n\nFinal clean managed run completed with execute/report exit code 0:\n`matrix_summary.tsv` recorded 3/3 passed and 0 failed for `pg-duckdb`,\n`pg-mooncake`, and `timescaledb`. Result bundles were:\n`/Users/joe/Developer/benchmark_runs/results/tpch_sf001_pg_duckdb_sql_20260512_200944_817eb953.json`,\n`/Users/joe/Developer/benchmark_runs/results/tpch_sf001_pg_mooncake_sql_20260512_200958_b268ef93.json`,\nand\n`/Users/joe/Developer/benchmark_runs/results/tpch_sf001_timescaledb_sql_20260512_201138_c2122fd0.json`.\nNo cell log contained `fe_sendauth` or `no password supplied`, and\n`uat_lifecycle.log` showed managed Docker startup and teardown succeeded\nfor all three extension platforms.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run one managed-Docker smoke per PostgreSQL-extension platform",
+        "wid": "w3"
+      }
+    ]
+  }
+}

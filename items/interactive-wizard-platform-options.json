@@ -1,0 +1,10 @@
+{
+  "description": "The CLI supports `--platform-option key=value` for platform-specific configuration\n(connection strings, authentication, cluster settings, etc.). This is currently a\nhidden advanced option not exposed in the interactive wizard.\n\nPlatform options are used for:\n- Databricks: cluster_id, catalog, schema, http_path\n- Snowflake: warehouse, role, account\n- BigQuery: project_id, dataset, location\n- Redshift: cluster_identifier, database\n- ClickHouse: host, port, database\n\nExposing these interactively would require platform-specific prompts.",
+  "legacy": {
+    "item_meta": {
+      "category": "User Experience",
+      "created_at": "2025-12-21T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

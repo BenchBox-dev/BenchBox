@@ -1,0 +1,138 @@
+{
+  "context": "Treat the canonical schema-v2 bundle as input, not as the full hosted public\ncontract. Add hosted result identity, visibility, and trust semantics above\nit without mutating the raw bundle format into a service-shaped payload.\n",
+  "description": "A hosted results platform is not just an upload endpoint. BenchBox needs a\ndurable contract for what a hosted result is, how it relates to the canonical\nschema-v2 bundle, who can see it, how trustworthy it is, and which runs are\nvalid to compare or rank together.\n\nThis item defines the canonical hosted object model and the governance rules\naround visibility, trust promotion, compatibility cohorts, privacy, and\npublic claims. Without this layer, the API, UI, and ranking surfaces will\ndrift into misleading or contradictory behavior.\n\n**Phase assignment:** Phase 2-3 preparation. NOT required for Phase 1 (all\nresults are maintainer-curated, so trust labels and governance are trivial).\nThe cohort compatibility rules (w3) are partially relevant to Phase 1 compare\nviews but can be handled with simple same-benchmark/same-scale validation\nwithout a full governance model.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "allow ranking before compatibility cohorts are defined",
+        "instead": "define comparison eligibility first",
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "why": "mixed cohorts create false leaderboards"
+      },
+      {
+        "dont": "treat every public upload as equally trustworthy",
+        "instead": "make trust labels explicit in the contract",
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "why": "self-reported and curated results carry different weight"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "needs_item": "define-results-platform-product-and-launch-strategy"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-03-29T00:00:00Z",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "BenchBox does not imply TPC certification or equivalent official standing for ordinary hosted submissions",
+        "item_id": "define-hosted-results-contract-and-governance-model"
+      },
+      {
+        "behavior": "Canonical BenchBox result bundles remain downloadable and distinguishable from any derived hosted metadata",
+        "item_id": "define-hosted-results-contract-and-governance-model"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "notes": "Separate three distinct identifiers: (1) bundle hash - content-addressable,\nimmutable; (2) submission ID - generated on ingest, survives re-upload;\n(3) public result ID - stable permalink, may be minted after curation.\nDefine allowed ingest status transitions: pending → validated → published,\nplus rejected and withdrawn. Output: identity-model.md draft.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define hosted result identity, immutable bundle contract, and ingest status model",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "notes": "Cover private, unlisted, public self-reported, public curated, and public\nverified states or an explicitly revised equivalent.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define visibility states and trust labels for hosted results",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "notes": "Prevent incompatible runs from being mixed into misleading comparisons.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define cohort and ranking eligibility rules for comparison and leaderboards",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "notes": "Decide what system metadata may be public, redactable, or removable after submission.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define privacy, redaction, retention, and data-removal policy",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "define-hosted-results-contract-and-governance-model",
+        "notes": "Produce a single hosted-results-contract.md that specifies:\n- What fields the submission endpoint accepts and returns\n- Which visibility states and trust labels the explorer must render\n- Which cohort fields must match for a compare view to be valid\n- What privacy/redaction/removal operations are supported\nThis doc is the authoritative input for design-results-ingest (Phase 3\nAPI design) and the explorer frontend trust-label implementation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the contract for CLI, API, and frontend consumers",
+        "wid": "w5"
+      }
+    ]
+  }
+}

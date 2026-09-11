@@ -1,0 +1,141 @@
+{
+  "context": "This is primarily a tracking and documentation task -- no behavior\nchange unless the upstream issues are actually fixed before this\nTODO is worked. Start with w1 (file the chdb issue) since it's the\none with a clear external dependency. w2 and w3 can proceed in\neither order once w1 has an issue URL to link to.\n",
+  "description": "In the course of fixing clickhouse-local stress-test failures\n(PR fix/clickhouse-local-stress, commits 4b6598786 / 6e344bdec /\n451d228fc) we landed two correct-but-papering-over workarounds in the\nplatform layer:\n\n1. `benchbox/platforms/clickhouse/workload.py` -- the DDL pipeline asks\n   each benchmark for `dialect=\"duckdb\"` and rewrites known DuckDB-only\n   syntax in `_optimize_table_definition` (`Nullable() NOT NULL` strip,\n   `FLOAT[N]` -> `Array(Float32)`, `DOUBLE[N]` -> `Array(Float64)`,\n   ENGINE/ORDER BY injection). The cleaner shape would be for each\n   benchmark schema to honour a real `dialect=\"clickhouse\"` and emit\n   ClickHouse-native DDL directly. We didn't do that because\n   `transaction_primitives` and `write_primitives` drop their inline\n   PRIMARY KEY when `dialect=\"clickhouse\"` (per their pk_capability\n   rule) and that PK string is what `_extract_primary_key_columns`\n   reads to derive ORDER BY -- a global dialect swap would silently\n   regress those tables to `ORDER BY tuple()`.\n\n2. `benchbox/platforms/clickhouse/client.py` -- `ClickHouseLocalClient.execute()`\n   uses `format=\"ArrowStream\"` + pyarrow IPC decode instead of chDB's\n   built-in `format=\"DataFrame\"`, because the latter SIGABRTs\n   (uncatchable) when the result contains a Tuple-typed column (e.g.\n   `read_primitives.array_of_struct` returns `Array(Tuple(...))`). The\n   SIGABRT also corrupts the on-disk `.chdb` directory (`recursive_mutex\n   lock failed`), so subsequent benchmarks fail at session init with\n   Code 722 / Code 36 BAD_ARGUMENTS. A `TODO(chdb-tuple-dataframe)`\n   marker is in `_arrow_to_dataframe`.\n\nBoth workarounds are correct, but the underlying issues need upstream\nfixes. Without explicit tracking, these workarounds will silently\nlinger after the upstream issues are resolved -- continuing to pay the\nperf/clarity cost long after we could have reverted.\n\nThis TODO exists to:\n- File the chdb DataFrame/Tuple SIGABRT upstream and link the issue\n  from the `TODO(chdb-tuple-dataframe)` comment.\n- Decide on a long-term plan for the DuckDB-as-ClickHouse-DDL hack\n  (either fix the PK extraction to read schema metadata directly, or\n  audit each schema for a real `dialect=\"clickhouse\"` path).\n- Keep a single index of every \"papered over\" platform workaround so\n  future maintainers can sweep them when upstream catches up.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "revert the workarounds until the upstream issues are confirmed fixed in a chdb release that BenchBox actually pins",
+        "instead": "(not specified)",
+        "item_id": "track-upstream-platform-workarounds",
+        "why": "then BenchBox CI will start crashing again"
+      },
+      {
+        "dont": "silently rip out the FLOAT[N] regex rewrites before w2 reaches a decision",
+        "instead": "(not specified)",
+        "item_id": "track-upstream-platform-workarounds",
+        "why": "that breaks vector_search again"
+      }
+    ],
+    "item_meta": {
+      "category": "Technical Debt",
+      "created_at": "2026-04-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All benchmarks that currently land their inline PRIMARY KEY in the emitted DDL string (transaction_primitives, write_primitives) keep producing the same ORDER BY clause",
+        "item_id": "track-upstream-platform-workarounds"
+      },
+      {
+        "behavior": "ClickHouseLocalClient.execute() continues to handle SELECT, DDL, INSERT-no-params, and empty results correctly",
+        "item_id": "track-upstream-platform-workarounds"
+      },
+      {
+        "behavior": "Stress test (./scripts/local_stress_test.sh --scale 1 --platform clickhouse-local) still passes after any workaround replacement",
+        "item_id": "track-upstream-platform-workarounds"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "track-upstream-platform-workarounds",
+        "kind": "only_modify",
+        "path_glob": "CONTRIBUTING.md"
+      },
+      {
+        "item_id": "track-upstream-platform-workarounds",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/client.py"
+      },
+      {
+        "item_id": "track-upstream-platform-workarounds",
+        "kind": "only_modify",
+        "path_glob": "docs/development/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -E 'TODO.chdb-tuple-dataframe.*github\\.com/chdb-io' benchbox/platforms/clickhouse/client.py",
+        "description": "chdb upstream issue is filed and linked from client.py",
+        "expected": "matching line found",
+        "item_id": "track-upstream-platform-workarounds",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f docs/development/platform-workarounds.md && grep -E 'chdb|FLOAT\\[N\\]' docs/development/platform-workarounds.md",
+        "description": "Platform-workarounds doc exists with both current entries",
+        "expected": "exit 0; grep finds both entries",
+        "item_id": "track-upstream-platform-workarounds",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "track-upstream-platform-workarounds",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "track-upstream-platform-workarounds",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "track-upstream-platform-workarounds",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "track-upstream-platform-workarounds",
+        "notes": "Evidence-durability gate per\n_project/verification-logs/README.md. Before w1, confirm:\n  - `uv pip show chdb` matches the version pinned at TODO write\n    time (or the SIGABRT still reproduces against whatever is\n    pinned now).\n  - The `TODO(chdb-tuple-dataframe)` marker still exists in\n    benchbox/platforms/clickhouse/client.py:_arrow_to_dataframe\n    (i.e., upstream fix hasn't already landed in our pin).\nCapture raw stdout under `/tmp/track-upstream-platform-workarounds-w0.log`\nor a CI artifact, then commit only a compact summary with command,\nchecked version/SHA, PASS/FAIL, and key lines. If the SIGABRT no longer reproduces, the rest of\nthis TODO collapses to \"remove the workaround\" instead of \"file\nupstream.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-validate cited evidence (chdb SIGABRT still reproduces, chdb version still pinned)",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "track-upstream-platform-workarounds",
+        "notes": "Repro: `groupArray(tuple(Int32, Int32, Decimal, Decimal))` query\nvia `chdb.session.Session(...).query(sql, \"DataFrame\")` aborts\nwith SIGABRT (exit code 134, no stderr). `format=\"ArrowStream\"`\nreturns clean Arrow IPC bytes for the same query. File at\nhttps://github.com/chdb-io/chdb/issues with a minimal repro and\nthe chdb version (`uv pip show chdb` -- currently the bundled\nversion pinned by BenchBox). Update the\n`TODO(chdb-tuple-dataframe)` comment in\n`benchbox/platforms/clickhouse/client.py:_arrow_to_dataframe`\nwith the issue URL.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "File chdb DataFrame/Tuple SIGABRT upstream and link the issue",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "track-upstream-platform-workarounds",
+        "notes": "Two options to evaluate:\na) Teach `_extract_primary_key_columns` to read PKs from the\n   benchmark schema dict (`benchmark.get_schema()`) rather than\n   re-parsing the emitted DDL string. Then we can safely flip the\n   workload to `dialect=\"clickhouse\"` globally and drop the\n   FLOAT[N]/DOUBLE[N] regex rewrites.\nb) Audit every benchmark schema for a real `dialect=\"clickhouse\"`\n   path; ones that don't have one fall back to `\"duckdb\"` per the\n   current behavior.\nDocument the chosen path in an ADR (or comment in workload.py)\nand file follow-up TODOs for the implementation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide path for DuckDB-as-ClickHouse-DDL hack",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "track-upstream-platform-workarounds",
+        "notes": "Create `docs/development/platform-workarounds.md` (or similar)\nthat lists every known \"we worked around an upstream bug\" hack:\n  | File | Function | Upstream issue | Revert when |\n  |------|----------|----------------|-------------|\n  | clickhouse/client.py | _arrow_to_dataframe | chdb-io/chdb#NNN | Tuple SIGABRT fixed |\n  | clickhouse/workload.py | _optimize_table_definition | (architectural) | PK extraction reworked |\nAdd a CONTRIBUTING.md note: \"When you paper over an upstream bug,\nadd an entry here so we know when to revert.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a single registry of platform workarounds for future cleanup sweeps",
+        "wid": "w3"
+      }
+    ]
+  }
+}

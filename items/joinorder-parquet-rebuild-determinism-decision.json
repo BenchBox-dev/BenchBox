@@ -1,0 +1,204 @@
+{
+  "context": "Treat this as a release decision, not a silent hash refresh. Keep the\npublished archive's transport verification intact, reject byte-identical\nrebuild reproducibility as a requirement, and make maintainer rebuilds prove\nlogical CSV-vs-Parquet row-content equivalence before packaging.\n",
+  "description": "Follow-up to `_project/joinorder/provenance-attestation.md` from the\n`joinorder-canonical-data-assurance` TODO. The 2026-05-12 rebuild check\nrestored the canonical Dataverse pg_dump and rebuilt the Parquet archive\ntwice with `_project/scripts/build_joinorder_data.py rebuild-local`.\n\nResult: the rebuild did not reproduce the committed `archive_sha256`, and the\ntwo local rebuilds did not match each other. `cast_info.parquet` differed\nbetween run 1 and run 2; `title.parquet` differed from the committed table\nhash in both runs. The conversion-fidelity harness passed, so the observed\nfailure is byte-level rebuild determinism rather than a proven data-loss\ndefect.\n\nThe decision is now resolved: BenchBox does not claim byte-identical rebuild\nreproducibility for canonical `joinorder`. Published downloads remain\nprotected by archive/table byte hashes, and source recovery is validated as\nlogical table-content equivalence.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "drop the existing archive_sha256 transport verification; it still protects the published release asset",
+        "instead": "(not specified)",
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "keep saying the archive is byte-reproducible while `cast_info.parquet` is run-to-run nondeterministic",
+        "instead": "(not specified)",
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "update table sha256 or archive_sha256 values merely to match a fresh rebuild",
+        "instead": "(not specified)",
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-parquet-rebuild-determinism-decision",
+        "id": 423,
+        "reason": "Owned by the licensing remediation TODO if BenchBox stops re-hosting the archive.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Only relevant if BenchBox stops re-hosting the joinorder archive; current licensing ADR keeps it re-hosted under accepted risk — condition not triggered.",
+        "summary": "Changing the public `joinorder` data URL"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not change the 113 canonical query corpus to solve artifact determinism",
+        "item_id": "joinorder-parquet-rebuild-determinism-decision"
+      },
+      {
+        "behavior": "Do not rewrite committed reference cardinalities unless a separate data mismatch is proven",
+        "item_id": "joinorder-parquet-rebuild-determinism-decision"
+      },
+      {
+        "behavior": "Keep runtime download verification by `archive_sha256` for the current released archive until a replacement artifact is deliberately published",
+        "item_id": "joinorder-parquet-rebuild-determinism-decision"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/joinorder/provenance-attestation.md -- records the failed 2026-05-12 run1/run2 byte comparison",
+        "decision": "reuse",
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "path": "_project/joinorder/provenance-attestation.md"
+      },
+      {
+        "concept": "_project/scripts/build_joinorder_data.py:rebuild-local -- local-only rebuild command used for the failing check",
+        "decision": "reuse",
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "path": "_project/scripts/build_joinorder_data.py:rebuild-local"
+      },
+      {
+        "concept": "benchbox/core/data_fetch/manifest.py -- documents and verifies manifest_hash, data_archive_hash, and archive_sha256 semantics",
+        "decision": "reuse",
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "path": "benchbox/core/data_fetch/manifest.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "kind": "do_not_modify",
+        "path_glob": "_project/joinorder/reference_cardinalities.json"
+      },
+      {
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "kind": "do_not_modify",
+        "path_glob": "_project/joinorder/tiny_reference_cardinalities.json"
+      },
+      {
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/queries.py"
+      },
+      {
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "kind": "only_modify",
+        "path_glob": "_project/joinorder/provenance-attestation.md"
+      },
+      {
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "kind": "only_modify",
+        "path_glob": "_project/joinorder/release-notes.md"
+      },
+      {
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/build_joinorder_data.py"
+      },
+      {
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/data_fetch/"
+      },
+      {
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/data_manifest.toml"
+      },
+      {
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/join-order.md"
+      },
+      {
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/joinorder/"
+      },
+      {
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_build_joinorder_data.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -i 'byte-identical\\|logical\\|content-hash\\|deterministic' _project/joinorder/provenance-attestation.md docs/benchmarks/join-order.md",
+        "description": "The determinism decision is recorded and implemented",
+        "expected": "docs state the selected rebuild guarantee",
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_build_joinorder_data.py -q",
+        "description": "Logical content verifier behavior is covered",
+        "expected": "tests covering ordered extraction, CSV/Parquet logical hash parity, unsorted CSV rejection, and manifest recording pass",
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "notes": "Chose logical content equivalence. Byte-identical Parquet/archive rebuilds\nrequire pinning writer layout, row groups, metadata, compression frames,\ntar ordering, and timestamps without improving the benchmark guarantee.\nJoinOrder correctness depends on table content, schema, provenance, and\nquery results.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose the integrity model: byte-identical artifact rebuild or logical content-hash rebuild",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "notes": "Added a versioned logical-content hash path to\n`_project/scripts/build_joinorder_data.py`: PostgreSQL CSV extraction is\nordered by `id`, rebuilt Parquet is read ordered by `id`, typed row values\nare normalized and hashed, and `verify-logical-content`, `rebuild-local`,\nand `foundation` write/pass/fail the logical-content manifest section\nbefore packaging. User docs and provenance notes now distinguish transport\nartifact hashes from logical source-rebuild validation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the selected model in the build pipeline and manifest/docs",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-parquet-rebuild-determinism-decision",
+        "notes": "A fresh full restore/rebuild was intentionally not repeated for this\ndecision PR. Existing durable full-source evidence already proves the\nDataverse source checksum, restore row counts, and conversion fidelity; the\nold byte-level rebuild outputs were cleaned. The new logical verifier is\ncovered by targeted tests that compare CSV and Parquet content despite\ndifferent file order, reject unsorted CSV sources, and assert manifest\nrecording.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Bind the decision to existing full-source evidence and targeted verifier tests",
+        "wid": "w3"
+      }
+    ]
+  }
+}

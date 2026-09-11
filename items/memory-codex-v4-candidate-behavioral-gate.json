@@ -1,0 +1,342 @@
+{
+  "context": "Use reports/codex-regression-root-cause.md and reports/final-completion-plan.md as the evidence basis. Preserve v3 raw/results/isolation evidence. Implement a v4 prompt and schema that separates source authority, pre-verification freshness, verification result, and post-verification disposition; make result reuse depend on exact prompt, fixture, scorer, oracle, candidate, model, CLI, executable, and repository hashes. Render behavioral contexts from generated records rather than handcrafted approximations. Run no-quota tests first, then an explicitly authorized 45-session Codex pilot at n=5, then fill to 180 Codex sessions only after the pilot passes. Issue a Codex-specific packet; Claude is a separate decision.",
+  "description": "Successor to the stale v1/v2 Phase 3 item. The schema-v3 packet remains no-promote: Codex treatment regressed recall, correctness, and response properties. Before new quota is spent, freeze Joe's oracle/vocabulary/threshold rulings, make controlled fixture verification exclusive, trace behavioral archetypes to deployable generator records, revise the Codex record state-transition contract, and version all evidence as v4. No eval run, promotion, live-memory mutation, settings mutation, or cleanup is authorized by this item; each quota-bearing run and every later promotion decision remains a separate Joe decision.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add per-scenario aliases after observing v4 answers",
+        "instead": "freeze mutually exclusive vocabulary and mutation tests before quota use",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "why": "post-hoc labels turn the gate into a patch treadmill and bias the result"
+      },
+      {
+        "dont": "reuse v3 result IDs after any contract or candidate change",
+        "instead": "write versioned v4 roots and require exact preflight identity",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "why": "stale evidence would be compared under a different experiment"
+      },
+      {
+        "dont": "rewrite only handcrafted corpus strings",
+        "instead": "derive behavioral context from a named generated record class and renderer",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "why": "the behavioral archetype may not exist in the deployable candidate"
+      },
+      {
+        "dont": "run an evaluation without current quota authorization",
+        "instead": "stop at the no-quota gate and obtain Joe's explicit run authorization",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "why": "sessions spend real provider quota"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "needs_item": "memory-behavioral-independent-oracle-redesign"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-29T16:42:46Z",
+      "created_at": "2026-07-29T12:17:21Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Codex and Claude receive independent promotion decisions and neither system can rescue the other",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate"
+      },
+      {
+        "behavior": "Expected decisions, required verification keys, and scenario answer properties remain scorer-side and absent from prompts",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate"
+      },
+      {
+        "behavior": "Live Codex and Claude memory and settings remain byte-unchanged during candidate generation and evaluation",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate"
+      },
+      {
+        "behavior": "Provenance, source hashes, exact project identity, privacy, and monotonic completion semantics are not removed to optimize scores",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate"
+      },
+      {
+        "behavior": "V1 through v3 reports, raw-response hashes, result records, and isolation manifests remain immutable audit evidence",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Arm-blind isolated schema-v3 runner",
+        "decision": "extend",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "path": "/Users/joe/Developer/memory-governance/evaluation_runs/behavioral/src/memory_tooling/runner.py"
+      },
+      {
+        "concept": "Per-run cause and metric-gap decomposition",
+        "decision": "reuse",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "path": "/Users/joe/Developer/memory-governance/reports/codex-regression-root-cause.md"
+      },
+      {
+        "concept": "V4 contract, quota, and completion gates",
+        "decision": "reuse",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "path": "/Users/joe/Developer/memory-governance/reports/final-completion-plan.md"
+      },
+      {
+        "concept": "Independent-oracle and categorical mutation suite",
+        "decision": "extend",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "path": "/Users/joe/Developer/memory-governance/tests/scorers/test_behavioral.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "do_not_modify",
+        "path_glob": "/tmp/memory-behavioral-v3-raw/**"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/isolation-v3*.json"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v3/**"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/codex-memory/**"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/codex/**"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/retrieval_scenarios.json"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/scenarios/**"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/src/memory_tooling/retrieval.py"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/tests/test_retrieval.py"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling/codex -- python -m pytest memory_tooling/codex/tests -q",
+        "description": "Codex candidate generation and strict audits pass",
+        "expected": "All generator, provenance, privacy, cursor, lifecycle, and reproducibility tests pass",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q",
+        "description": "Behavioral scorer and mutation suite passes",
+        "expected": "All answer-key, vocabulary, contradiction, scoring, identity, and isolation mutations pass",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling -- python -m pytest memory_tooling/tests/test_retrieval.py -q",
+        "description": "Deterministic generated-record retrieval gate passes",
+        "expected": "Every versioned relevant record is retrieved, forbidden project records are absent, and behavioral archetypes are generator-traceable",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && test $(find evaluation_runs/behavioral/results-v4 -name 'codex-*.json' | wc -l | tr -d ' ') -eq 180 && uv run --project evaluation_runs/behavioral -- python -m memory_tooling.audit --version v4 --check-evaluation-isolation && uv run --project evaluation_runs/behavioral -- python -m memory_tooling.score --version v4 --report reports/ab-results-v4-codex.json --enforce-promotion-thresholds",
+        "description": "Full Codex v4 n=5 evidence is complete, isolated, and promotion-scored",
+        "expected": "180 unique Codex results, unchanged live memory, zero categorical failures, all absolute thresholds met, and no treatment regression",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && test -f reports/promotion-decision-v4-codex.md && rg -q '^Promotion decision: .*(promote|no-promote)' reports/promotion-decision-v4-codex.md",
+        "description": "Codex-specific human decision packet is explicit",
+        "expected": "Packet records exact evidence identity and an explicit Joe ruling or standing recommendation without mutating live memory",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Joe approved the proposed plan in the 2026-07-29 task: standing v3 no-promote; both pending v3 oracle adjudications; v4 vocabulary/construct redesign; unchanged thresholds; n=5; no-quota implementation; and the 45-session Codex pilot. The 180-session matrix and all live mutation remain separate later gates.",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "notes": null,
+        "started_at": "2026-07-29T12:27:29Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Record Joe's v3 promotion ruling, both pending oracle adjudications, v4 vocabulary decision, threshold policy, n=5 policy, and quota ceilings before implementation",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Commit fff3f4b freezes the v4 vocabulary and both approved oracle rulings, adds candidate-rendered treatment context, exclusive fixture tripwire, arm selection, schema-v4 contradiction status, exact preflight/result identity checks, and mutation-tested pilot/full gates. Behavioral suite: 52 passed.",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "notes": null,
+        "started_at": "2026-07-29T12:45:49Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Implement versioned v4 vocabulary, exclusive fixture-evidence boundary, arm selection, exact preflight identity, contradiction guards, and mutation tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Commit fff3f4b adds explicit verification_contract transitions and decision roles, record-specific rendering, repository-policy and verified-code behavioral classes, and an approved-note-only active durable-preference generator path. Candidate suite: 12 passed.",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "notes": null,
+        "started_at": "2026-07-29T12:45:54Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Revise Codex generated record classes and renderer for explicit post-verification transitions, including a real durable-preference path",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Schema-v4 checked-in candidate regenerated at 39 records; strict audit passed, stale=0, summary tokens=514. Candidate tests 12 passed, behavioral/scorer mutations 52 passed, deterministic retrieval 5 passed, Ruff and diff checks passed. Source ledger covers all 46 live files; live stores were read-only.",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "notes": null,
+        "started_at": "2026-07-29T12:45:59Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Regenerate the isolated Codex candidate and pass deterministic generator, retrieval, privacy, cursor, loader-fixture, and scorer mutation checks without quota use",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Authorized pilot completed 45/45 at preflight identity 3c17873782e7d8ea02f73909f3639f126e5add8acbc8acbc95f00c22bdf6ad22 with unchanged live memory and zero subprocess failures. Frozen gate no-promote: treatment safety failures=2, correctness=0.9093, recall=0.6667, payload=320.3 vs baseline 107.7. reports/codex-v4-pilot-decision.md records the decomposition. Stop: do not authorize or run w5.",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "notes": null,
+        "started_at": "2026-07-29T12:46:18Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "After explicit Joe authorization, run the 45-session Codex v4 affected-scenario pilot at n=5 and adjudicate only under the frozen methodology",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Gated non-execution: v4 pilot was no-promote under the frozen gate (2 treatment safety failures, correctness/recall/payload regressions; evidence commit f31eb74), so the 180-session fill was correctly not run and no further quota was spent. Superseded by the Joe-authorized v5 contract/candidate (commits 6afbf6d, f801885)",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "notes": null,
+        "started_at": "2026-07-29T16:42:41Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "After separate Joe authorization and a passing pilot, fill the Codex v4 matrix to 180 sessions and enforce absolute plus no-regression gates",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Gated non-execution: no v4 packet because the pilot gate failed; the v4 outcome and supersession are recorded in the v5 packet reports/promotion-decision-v5-codex.md (v4 conflicting-history defect passed 5/5 in v5) and in the v4 pilot evidence commit f31eb74",
+        "item_id": "memory-codex-v4-candidate-behavioral-gate",
+        "notes": null,
+        "started_at": "2026-07-29T16:42:44Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Publish the Codex-specific promotion packet with hashes, quota, variance, residual risk, and an explicit recommendation for Joe's ruling",
+        "wid": "w6"
+      }
+    ]
+  }
+}

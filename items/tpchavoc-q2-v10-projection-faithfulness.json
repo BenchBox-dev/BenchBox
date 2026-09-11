@@ -1,0 +1,140 @@
+{
+  "context": "Targeted, low-risk SQL edits to projection expressions only. Use the PR #756\nverification recipe (populate a DuckDB SF=1 cell, compare each variant to the\ncanonical TPC-H query for that id with set-equality after rounding, modulo the\nq2 family's intentional LIMIT omission). Start with the known q2_v10 case,\nthen generalize the check across all variants.\n",
+  "description": "While verifying PR #756 (correlated-subquery self-binding fixes), a SECOND,\ndifferent class of equivalence defect surfaced in the TPC-Havoc variant set.\n`q2_v10` (the \"CASE expressions\" variant) returns the correct 460-row key set\nat SF=1 but reformulates its output projection as\n`case when s_acctbal > 0 then s_acctbal else 0 end as s_acctbal`. The 38\nsuppliers in the result whose `s_acctbal` is negative are therefore reported\nas `0.00` instead of their real (negative) balance, so q2_v10 diverges from\ncanonical TPC-H Q2 and from its nine sibling variants on those rows.\n\nThis is NOT the self-binding pattern PR #756 addressed; it is\nprojection-faithfulness drift - an output reformulation (CASE / COALESCE /\nNULL-handling wrappers) that changes projected VALUES while leaving the\nfiltered row set correct. Like self-binding, it is silent today because\nTPC-Havoc validates execution, not result equivalence (see the companion\n`tpchavoc-variant-equivalence-gate` TODO).\n\nFix q2_v10 to project the true `s_acctbal`, then sweep every variant set for\nthe same class: projection expressions that can alter a value relative to the\ncanonical query (CASE wrappers that substitute defaults, COALESCE-to-0 on\nnullable measures, casts that round/truncate). Fix any found WITHOUT changing\na variant's structural identity.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "restructure q2_v10 away from CASE expressions",
+        "instead": "only fix the value-altering output substitution.",
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "why": "its identity IS the CASE shape"
+      },
+      {
+        "dont": "widen scope into filtering/correlation logic",
+        "instead": "stay on projection faithfulness.",
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "why": "that is the self-binding class handled elsewhere"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-06-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DuckDB tpchavoc remains 100% execution-green at SF 0.01 / 0.1 / 1.0.",
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness"
+      },
+      {
+        "behavior": "Each touched variant keeps its declared structural identity (q2_v10 stays the 'CASE expressions' variant).",
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness"
+      },
+      {
+        "behavior": "Row/key sets already correct are not changed - only value-faithfulness of projected columns.",
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "PR #756 / tests/integration/test_tpchavoc_duckdb.py - the canonical-vs-variant SF=1 comparison method that surfaced this; reuse it to confirm the fix",
+        "decision": "reuse",
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "path": "PR"
+      },
+      {
+        "concept": "_project/TODO/main/planning/tpchavoc-correlated-subquery-self-binding.yaml - sibling defect class; same 'fix the SQL, preserve the shape' discipline",
+        "decision": "reuse",
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "path": "_project/TODO/main/planning/tpchavoc-correlated-subquery-self-binding.yaml"
+      },
+      {
+        "concept": "benchbox/core/tpchavoc/variant_sets/q02.yaml:455 q2_v10 - the CASE-wrapped s_acctbal/s_name/n_name/... projections are the locus",
+        "decision": "reuse",
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "path": "benchbox/core/tpchavoc/variant_sets/q02.yaml:455"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpchavoc/variant_sets/"
+      },
+      {
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_tpchavoc_duckdb.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "populate DuckDB SF=1; compare norm(q2_v10) to norm(canonical Q2 without LIMIT)",
+        "description": "q2_v10 set-matches canonical Q2 (minus LIMIT) at SF=1, including negative-acctbal rows",
+        "expected": "identical 460-row sets; no zeroed negative balances",
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_tpchavoc_duckdb.py -q",
+        "description": "tpchavoc duckdb tests pass",
+        "expected": "all pass",
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "needs_wid": "w0",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "notes": "On a populated DuckDB SF=1 cell, confirm q2_v10 differs from canonical Q2\n(without its LIMIT 100) on exactly the negative-acctbal rows (38 at SF=1),\nand that all nine other q2 variants agree with canonical. Capture stdout\nto /tmp and record the count + sample rows.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce the q2_v10 divergence and quantify it against canonical Q2 at SF=1",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "notes": "Project the real s_acctbal (and any other CASE/COALESCE-wrapped output\ncolumns that substitute values) without altering the variant's\nCASE-expressions identity in its predicates/structure. Confirm q2_v10 then\nset-matches canonical Q2 minus LIMIT.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix q2_v10 projections to be value-faithful to canonical Q2",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpchavoc-q2-v10-projection-faithfulness",
+        "notes": "Audit every variant's SELECT list for value-altering wrappers (CASE\ndefault substitution, COALESCE-to-0 on nullable measures, rounding casts)\nand verify each against canonical at a scale where the affected values are\nnon-trivial. Fix in place; preserve shape.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Sweep all variant_sets for projection-faithfulness drift and fix any others",
+        "wid": "w2"
+      }
+    ]
+  }
+}

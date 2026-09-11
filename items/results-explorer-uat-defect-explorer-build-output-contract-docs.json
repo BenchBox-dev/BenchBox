@@ -1,0 +1,148 @@
+{
+  "description": "W6 showed that `benchbox explorer build --help` still documents\n`manifest.json`, but the current pipeline intentionally deletes legacy JSON\nmanifests and emits `results.duckdb` plus copied bundles. This creates a\nstale contract for anyone building a local Explorer snapshot.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "reintroduce manifest.json only to satisfy help text",
+        "instead": "update the contract/docs instead.",
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "why": "the app migrated to DuckDB"
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Experience",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing `results.duckdb` browser loading remains unchanged.",
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs"
+      },
+      {
+        "behavior": "The pipeline continues to delete stale legacy JSON artifacts.",
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/pipeline.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/active/results-explorer-uat-defect-explorer-build-output-contract-docs.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/results-explorer-uat-defect-explorer-build-output-contract-docs.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/explorer.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/contract.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/models.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "kind": "only_modify",
+        "path_glob": "docs/development/browser-test-architecture.md"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/threat-model.md"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/explorer-build-contract.mjs"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && node scripts/validate-explorer-build-contract.mjs",
+        "description": "Explorer build contract validation passes.",
+        "expected": "contract validator reports OK",
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox explorer build --help",
+        "description": "Explorer build help no longer promises removed manifest output.",
+        "expected": "help documents results.duckdb, results_schema.json, and copied bundles only",
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "notes": "W1 audit evidence:\n- `uv run -- benchbox explorer build --help` still says `--output` is for \"generated artifacts (manifest,\n  details, duckdb)\" and lists `manifest.json` as a navigation index.\n- `benchbox/core/explorer_pipeline/pipeline.py` is the source of truth for current behavior: it deletes legacy\n  `benchmarks/`, `details/`, `compare/`, `manifest.json`, `meta_leaderboard.json`, `short_ids.json`, and\n  `results_schema.json` before rebuilding. `benchbox/core/explorer_pipeline/duckdb_builder.py` then writes the\n  current outputs: `results.duckdb`, auxiliary `results_schema.json`, and copied bundles under\n  `bundles/{result_id}.json`.\n- `benchbox/core/explorer_pipeline/contract.py` and `results-explorer/scripts/explorer-build-contract.mjs`\n  validate only the command and required flags; they do not encode the expected outputs or removed legacy outputs.\n- `cd results-explorer && npm run test -- explorer-build-contract` currently fails with \"No test files found\";\n  the existing terminating contract validator is `cd results-explorer && node scripts/validate-explorer-build-contract.mjs`.\n- Stale docs found in `docs/development/browser-test-architecture.md` (`results.duckdb` + manifest artifacts) and\n  `docs/reference/threat-model.md` (public read models and tampering risks still name manifest/detail JSONs).\n  Older strategy prose in `docs/development/benchbox-results-platform-strategy.md` intentionally records the migration\n  history and should be left alone unless W2 needs an explicit historical note.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit explorer build help, contract metadata, and docs for stale JSON outputs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-explorer-build-output-contract-docs",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update help/docs/tests to match the DuckDB-only read model",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "description": "Decision by Joe 2026-07-16 (follow-up batch gate): DROP the tuned seed-corpus\nbundles until regenerated on live platforms.\n\nBackground: the 2026-07 tuning remediation (#1176 w0 discovery) proved the\ntuning config never reached platform adapters on the direct CLI path, so the\n325 corpus bundles claiming execution.tuning_mode=\"tuned\" were almost\ncertainly physically untuned. Cross-submission comparisons against them are\nunsound. The 203 bundles with no tuning_mode stay (they ingest honestly as\nnot-recorded).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "rewrite or edit bundle contents",
+        "instead": "(not specified)",
+        "item_id": "tuning-corpus-drop-pre-provenance-tuned-bundles-20260716",
+        "why": "removal only"
+      }
+    ],
+    "item_meta": {
+      "category": "Data Integrity",
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Explorer ingest must not fail on the reduced corpus",
+        "item_id": "tuning-corpus-drop-pre-provenance-tuned-bundles-20260716"
+      },
+      {
+        "behavior": "The 203 mode-absent bundles and all notuning-era bundles stay untouched",
+        "item_id": "tuning-corpus-drop-pre-provenance-tuned-bundles-20260716"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-corpus-drop-pre-provenance-tuned-bundles-20260716",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "tuning-corpus-drop-pre-provenance-tuned-bundles-20260716",
+        "kind": "only_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "tuning-corpus-drop-pre-provenance-tuned-bundles-20260716",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q",
+        "description": "Ingest count check after removal",
+        "expected": "All passing; dataset shows zero tuned rows from the seed corpus",
+        "item_id": "tuning-corpus-drop-pre-provenance-tuned-bundles-20260716",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-corpus-drop-pre-provenance-tuned-bundles-20260716",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-corpus-drop-pre-provenance-tuned-bundles-20260716",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-corpus-drop-pre-provenance-tuned-bundles-20260716",
+        "notes": "Reuse the sweep logic (execution.tuning_mode == 'tuned') to build the removal list; commit the deletion with the list in the commit body.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enumerate and remove the 325 tuned bundles + their .manifest.json companions",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-corpus-drop-pre-provenance-tuned-bundles-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-run explorer ingest over the remaining corpus; verify counts (expect 0 tuned, ~203 not-recorded)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-corpus-drop-pre-provenance-tuned-bundles-20260716",
+        "notes": "Note that tuned corpus cells should be regenerated post-#1176/#1180 on live platforms; list the affected platform/benchmark cells so regeneration has a checklist.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Record the decision + regeneration path in results-data docs/README",
+        "wid": "w3"
+      }
+    ]
+  }
+}

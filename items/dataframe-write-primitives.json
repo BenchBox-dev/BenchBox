@@ -1,0 +1,10 @@
+{
+  "description": "Implement DataFrame versions of Write Primitives benchmark operations. This benchmark\ntests fundamental write operations: INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL,\nand TRANSACTION operations.\n\nDataFrame platforms have extensive write capabilities that map to these operations:\n\n**PySpark + Delta Lake:**\n- INSERT → df.write.mode(\"append\").saveAsTable()\n- UPDATE → DeltaTable.update()\n- DELETE → DeltaTable.delete()\n- MERGE → DeltaTable.merge()\n- DDL → spark.sql() for schema operations\n\n**PySpark + Iceberg:**\n- INSERT → df.writeTo().append()\n- UPDATE → Row-level updates via MERGE\n- DELETE → Row-level deletes\n- MERGE → df.writeTo().overwritePartitions()\n\n**Polars:**\n- INSERT → write_parquet() with append\n- BULK_LOAD → scan_parquet() + write_parquet()\n- File-level operations (no row-level UPDATE/DELETE)\n\n**All DataFrame Platforms:**\n- BULK_LOAD → read + write with compression, partitioning, sorting\n- Physical layout tuning (row groups, dictionary encoding)",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-25T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

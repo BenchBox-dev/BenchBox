@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #84 of fix-read-primitives-datafusion-df.\nDeferred: Full string_to_array support (returning actual list expressions, not split_part proxy)\nReason deferred: DataFusion v50 Python bindings lack string_to_array. Current proxy handles .split().list.get(n) pattern. Full support needs upstream contribution or UDF.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:33:31Z",
+      "worktree": "dataframe-benchmarks"
+    }
+  }
+}

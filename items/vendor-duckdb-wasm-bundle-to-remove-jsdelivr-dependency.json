@@ -1,0 +1,172 @@
+{
+  "context": "Keep the change focused on bundle loading. Do not touch the DuckDB\nattach logic, the fixture generator, or the range-read test server -\nthose are separate concerns owned by other TODOs.\n",
+  "description": "The explorer no longer bootstraps DuckDB-WASM from jsDelivr. Instead,\n`results-explorer/src/lib/duckdbBundles.ts` imports the worker and WASM\nassets directly from the installed npm package via Vite `?url` imports,\nand `results-explorer/src/db.ts` now resolves the runtime bundle from\nthat same-origin descriptor.\n\nThis removed the external CDN dependency for both production explorer\nloads and the browser-functional harness without introducing a separate\ncommitted vendor directory. Because the browser now imports assets from\nthe installed package at build time, there is no duplicated byte copy to\ndesync from `package-lock.json`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "commit the WASM binaries into `results-explorer/public/vendor/duckdb-wasm/` without a desync guard",
+        "instead": "wire in the version check in the same PR that vendors the bundle.",
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "why": "`npm install` can silently drift the runtime version away from the shipped WASM bytes"
+      },
+      {
+        "dont": "remove the jsDelivr fallback without confirming the vendored path handles the MVP / EH / COI worker variants the way `selectBundle` does",
+        "instead": "exercise `selectBundle` against the vendored descriptor first, then drop jsDelivr only if every platform target still resolves to a local file.",
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "why": "picking the wrong variant silently degrades performance or breaks threading"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "needs_item": "implement-results-explorer-browser-functional-tests"
+      }
+    ],
+    "item_meta": {
+      "category": "Infrastructure",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-04-19T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cross-origin isolation (COEP/COOP) still enables SharedArrayBuffer in the browser.",
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency"
+      },
+      {
+        "behavior": "The Chromium blocking gate keeps passing throughout the change.",
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency"
+      },
+      {
+        "behavior": "`registerFileURL('results.duckdb', ...)` and `ATTACH ... AS bench (READ_ONLY)` continue to work unchanged - this TODO only moves bundle loading, not file registration.",
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/e2e/capability/"
+      },
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/e2e/failures/"
+      },
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/e2e/routes/"
+      },
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/smoke/"
+      },
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package-lock.json"
+      },
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package.json"
+      },
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/public/vendor/duckdb-wasm/"
+      },
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/serve-browser-tests.mjs"
+      },
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml",
+        "description": "The TODO item itself validates cleanly",
+        "expected": "Validation passes with no schema or DAG errors",
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium -- --grep @smoke",
+        "description": "Chromium e2e suite passes with jsDelivr network access blocked",
+        "expected": "Smoke suite passes with no jsDelivr requests observed in the network log",
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "notes": "Added `results-explorer/src/lib/duckdbBundles.ts` with MVP/EH/COI\nasset descriptors and switched `results-explorer/src/db.ts` to use\n`selectBundle(LOCAL_DUCKDB_BUNDLES)`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Load the duckdb-wasm bundle from same-origin Vite asset URLs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "notes": "Added a smoke assertion in\n`results-explorer/e2e/smoke/harness.spec.ts` that fails on any\nrequest to `cdn.jsdelivr.net`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Assert in smoke coverage that e2e no longer hits jsDelivr",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency",
+        "notes": "Vite now emits the worker/WASM assets directly from\n`node_modules/@duckdb/duckdb-wasm`, so there is no separate\nvendored directory to drift from the lockfile.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Keep bundle bytes in lockstep with the installed npm package",
+        "wid": "w3"
+      }
+    ]
+  }
+}

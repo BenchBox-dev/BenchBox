@@ -1,0 +1,163 @@
+{
+  "context": "Start by re-confirming the currently pinned DataFusion version still\nmatches the tested 43.0.0 format (w0) - if it has already drifted, treat\nthis as more urgent. Land the loud-failure guard (w1) first since it is\nsmall, safe, and immediately converts a silent risk into a visible one.\nOnly then investigate whether a structural, non-text-parsing alternative\nexists in the installed datafusion bindings (w2); if none exists, the loud\nguard plus regression test (w1+w3) is an acceptable durable mitigation on\nits own.\n",
+  "description": "Architecture review (Work Area E, structural remediation) found that\n`benchbox/platforms/dataframe/unified_frame.py:19-23`'s module docstring\nself-admits a fragile design: DataFusion support \"includes experimental\nAST parsing for handling aggregate arithmetic expressions... tested with\nDataFusion 43.0.0 and may not work with other versions if the error\nmessage format changes.\"\n\nThe actual mechanism, `_get_datafusion_ast_string()`\n(unified_frame.py:2313 onward), deliberately calls\n`expr.rex_call_operator()` expecting it to THROW, then parses the AST\nrepresentation back out of the exception's string text (comment at\nline ~2334: \"the error message contains the AST like: 'Catch all\ntriggered in get_operator_name: Alias(BinaryExpr...)'\"). It does a basic\nsanity check (`\"Alias\" in error_str or \"BinaryExpr\" in error_str or\n\"AggregateFunction\" in error_str`) before trusting the parsed text, and\nfalls back to passing expressions through unchanged if extraction fails\n(per the module docstring) - which can then surface as a downstream\nDataFusion error for unsupported aggregate-arithmetic patterns rather than\na clear, attributable failure at the point where the format assumption\nbroke.\n\nThis is a genuine upstream-coupling risk: a DataFusion release that\nchanges `rex_call_operator()`'s error text format would silently degrade\naggregate-arithmetic support without a clear signal pointing at this file.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "couple the fix to a specific DataFusion patch version",
+        "instead": "(not specified)",
+        "item_id": "unified-frame-error-parsing-hardening",
+        "why": "pin the check to the sanity-check keywords and the tested major version documented in the module docstring, so minor version bumps within the same AST-format generation don't spuriously fail."
+      },
+      {
+        "dont": "remove the fallback-to-unchanged-expression behavior entirely",
+        "instead": "(not specified)",
+        "item_id": "unified-frame-error-parsing-hardening",
+        "why": "it is the correct response for genuinely unsupported aggregate-arithmetic patterns (a DataFusion limitation, not a parsing failure); only the format-mismatch branch should become a hard failure."
+      },
+      {
+        "dont": "silently widen the sanity-check keyword list to accept more error formats speculatively",
+        "instead": "(not specified)",
+        "item_id": "unified-frame-error-parsing-hardening",
+        "why": "only change behavior in response to a confirmed installed-version format, verified by w0."
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-07-03T00:00:00Z",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Aggregate-arithmetic expressions that currently work correctly against the pinned DataFusion version continue to produce identical results after the hardening change.",
+        "item_id": "unified-frame-error-parsing-hardening"
+      },
+      {
+        "behavior": "The fallback-to-unchanged-expression behavior for genuinely unsupported patterns (not a format-parsing failure) is preserved for cases where DataFusion itself does not support the pattern - only the format-mismatch case should now raise loudly, not every extraction miss.",
+        "item_id": "unified-frame-error-parsing-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/dataframe/unified_frame.py:_get_datafusion_ast_string (2313) and its existing basic sanity check ('Alias'/'BinaryExpr'/'AggregateFunction' in error_str) - reuse and tighten this existing check into a hard assertion rather than adding a parallel validation path.",
+        "decision": "reuse",
+        "item_id": "unified-frame-error-parsing-hardening",
+        "path": "benchbox/platforms/dataframe/unified_frame.py:_get_datafusion_ast_string"
+      },
+      {
+        "concept": "datafusion-tbl-trailing-delimiter-load.yaml - a prior TODO in this same platform area that replaced ad hoc/fragile per-caller logic with a shared, version-aware helper; follow its pattern of pinning behavior to a documented, tested version and adding a regression test for the failure mode.",
+        "decision": "reuse",
+        "item_id": "unified-frame-error-parsing-hardening",
+        "path": "datafusion-tbl-trailing-delimiter-load.yaml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "unified-frame-error-parsing-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/expression_family.py"
+      },
+      {
+        "item_id": "unified-frame-error-parsing-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/protocol.py"
+      },
+      {
+        "item_id": "unified-frame-error-parsing-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/unified_frame.py"
+      },
+      {
+        "item_id": "unified-frame-error-parsing-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k 'datafusion and aggregate' --tb=short",
+        "description": "Existing DataFusion aggregate-arithmetic tests still pass",
+        "expected": "all DataFusion aggregate-arithmetic tests pass",
+        "item_id": "unified-frame-error-parsing-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/test_unified_frame_datafusion_ast.py -v",
+        "description": "New test proves a changed error format now fails loudly instead of silently degrading",
+        "expected": "test passes: simulated format change raises an attributable error naming the DataFusion version",
+        "item_id": "unified-frame-error-parsing-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "unified-frame-error-parsing-hardening",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "unified-frame-error-parsing-hardening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "unified-frame-error-parsing-hardening",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "unified-frame-error-parsing-hardening",
+        "notes": "Installed: DataFusion 53.0.0 (`uv run -- python -c \"import datafusion;\nprint(datafusion.__version__)\"`). pyproject.toml's constraint is\n`datafusion>=50.1.0` (main `datafusion` extra) with a separate\n`datafusion>=40.0.0` floor for an integration-test-only dependency\ngroup. So the version has already drifted well past the\ndocstring's \"tested with 43.0.0\" - confirming this is more urgent than\nthe original Medium priority suggested. Live-probed the actual\nrex_call_operator() error text against 53.0.0 for several expression\nshapes (plain Column, Literal, unaliased aggregate, aliased\nBinaryExpr(AggregateFunction)): the wrapper text\n\"Catch all triggered in get_operator_name: <ast>\" and the\nAlias/BinaryExpr/AggregateFunction sanity-check keywords are still\npresent and structurally unchanged at 53.0.0, so extraction still\nworks correctly today - but nothing was previously asserting that,\nwhich is exactly the risk w1 addresses.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate current DataFusion pinned/installed version against the tested format",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "unified-frame-error-parsing-hardening",
+        "notes": "Implemented in benchbox/platforms/dataframe/unified_frame.py. Added\n`DataFusionASTFormatError` and split the failure mode in two instead\nof one: (1) if the error text doesn't even contain the stable\n\"Catch all triggered in get_operator_name\" wrapper prefix DataFusion\nuses for ALL rex_call_operator() failures regardless of expression\nshape (confirmed via live probing in w0), raise\nDataFusionASTFormatError naming the installed DataFusion version and\nthe unrecognized text - this is the actual format-drift case; (2) if\nthe wrapper prefix IS present but the Alias/BinaryExpr/\nAggregateFunction sanity-check keywords are absent, return None as\nbefore - this is a genuinely different/inapplicable expression shape\n(e.g. plain Column, Literal, unaliased aggregate), not a format break,\nand must_preserve requires this fallback to keep working. Also added\nan explicit `hasattr(expr, \"rex_call_operator\")` guard returning None\nfor non-Expr objects (e.g. a plain column-name string mixed into the\nsame select()/agg() call as an aggregate expression) - discovered via\nan existing test\n(test_unified_lazyframe_datafusion_paths::_DFExpr(\"SUM(value)\")) that\nthis can legitimately happen and must not be treated as a format\nbreak either.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a version-pinned guard that fails loudly on an unrecognized error format",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "unified-frame-error-parsing-hardening",
+        "notes": "Investigated: the installed datafusion 53.0.0 Python Expr exposes\n`to_variant()` (returns a typed object like `datafusion.expr.Alias`\nwith structured `.alias`/`.expr` attributes, recursively walkable) and\n`rex_type()` - genuine structural, non-error-parsing alternatives DO\nexist for the currently pinned version. Decided NOT to do the full\nreplacement in this pass: rewriting\n_extract_datafusion_alias_name/_extract_datafusion_multiplier/\n_rebuild_datafusion_pure_aggregate/_extract_multi_agg_arithmetic\n(which also handles multi-aggregate NVL-wrapped patterns) to walk\nto_variant() recursively is a materially larger, higher-regression-risk\nrewrite than this TODO's \"1-2 days\" hardening scope, and the approach\nsection explicitly permits treating w1+w3 as an acceptable durable\nmitigation on their own when a structural replacement isn't done\nimmediately. Recorded as a follow-up candidate in open_questions\nbelow rather than attempted here.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Investigate a capability probe or structural API replacing text parsing",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "unified-frame-error-parsing-hardening",
+        "notes": "Added tests/unit/platforms/dataframe/test_unified_frame_datafusion_ast.py\nwith 6 tests: a changed-wrapper-format case and a\nwrapper-missing-entirely case both assert DataFusionASTFormatError\nnaming the installed datafusion.__version__; a genuinely-different\nexpression shape and a non-raising expression both assert None\n(fallback preserved); a non-Expr object (plain string) asserts None\nwithout raising; and a sanity check that the currently-valid format\nstill extracts successfully. Also had to fix two PRE-EXISTING tests in\ntests/unit/platforms/dataframe/test_unified_frame_coverage.py\n(test_get_datafusion_ast_string_success_and_unexpected_error,\ntest_extract_datafusion_agg_arithmetic_for_literal) whose fake\n`rex_call_operator()` messages omitted the real\n\"Catch all triggered in get_operator_name\" wrapper DataFusion actually\nuses - under the old code this was harmless (any unrecognized text\njust returned None), but under the hardened code it would have\nincorrectly raised DataFusionASTFormatError for what are actually\nvalid/recognized-shape fixtures. Updated the fakes to include the real\nwrapper text (matching live-probed DataFusion 53.0.0 behavior) so they\ncorrectly exercise the sanity-check branch rather than the new\nformat-drift branch. Also added a `rex_call_operator()` method to the\nshared `_DFExpr` test double (it previously didn't implement the\nmethod at all, which is why `test_unified_lazyframe_datafusion_paths`\nonly \"worked\" by accident under the old silently-permissive code).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a test simulating a changed DataFusion error-message format",
+        "wid": "w3"
+      }
+    ]
+  }
+}

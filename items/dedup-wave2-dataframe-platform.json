@@ -1,0 +1,219 @@
+{
+  "context": "1. G7 - Temporal extraction:\n   Add `_extract_date_part(self, part_name: str)` private method to\n   the relevant UnifiedExpr class that handles the platform dispatch.\n   Each public method (year, month, day, hour, minute) becomes:\n   `return self._extract_date_part(\"year\")`.\n\n2. G10 - Polars window functions:\n   Add `_polars_window_rank(self, method: str, order_by, partition_by)`\n   private method. Each public method becomes:\n   `return self._polars_window_rank(\"min\", order_by, partition_by)`.\n\n3. G16 - Aggregation dispatch:\n   Add `_apply_aggregation(self, pyspark_fn, datafusion_fn, polars_method)`\n   private method that handles the 3-platform dispatch.\n   Each aggregation method becomes a one-liner.\n\n4. G23 - Data loading:\n   Extract shared logic into a standalone function\n   `_load_tables_from_data_source_impl(ctx, data_dir, schema_info)`\n   in benchbox/platforms/dataframe/shared_loading.py or as a method\n   on a shared base. Both family classes call this implementation.\n",
+  "description": "Wave-2 duplicate-check triage (2026-03-12) identifies 4 consolidation-worthy\ngroups in the DataFrame platform layer (unified_frame.py, polars_df.py,\nexpression_family.py, pandas_family.py). These are identical dispatch patterns\nthat vary only by the underlying function name or method parameter.\n\nTargets (report rank → dup lines):\n\nG7 (60 dup lines): day/hour/minute/year/month temporal extraction in\n    unified_frame.py:585-649. 5 methods with identical multi-platform\n    dispatch (PySpark → DataFusion → Polars fallback), differing only\n    in the extraction function name (e.g., F.year vs F.month).\n\nG10 (58 dup lines): window_rank/window_row_number/window_dense_rank in\n    polars_df.py:532-591. 3 methods with identical pattern: unpack\n    order_by → create Polars expression → apply rank with different\n    method parameter (\"min\", \"ordinal\", \"dense\") → handle partition.\n\nG16 (55 dup lines): max/mean/min aggregation methods in\n    unified_frame.py:1018-1127. 6 copies with identical multi-platform\n    dispatch for aggregations, differing only by the function name\n    (F.sum, F.avg, F.min, F.max, etc.).\n\nG23 (52 dup lines): load_tables_from_data_source in\n    expression_family.py:1230 and pandas_family.py:1037. Identical\n    data loading logic (resolve source → iterate tables → normalize\n    paths → load) differing only by context type signature.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change public method signatures",
+        "instead": "(not specified)",
+        "item_id": "dedup-wave2-dataframe-platform",
+        "why": "only extract internal dispatch logic"
+      },
+      {
+        "dont": "merge expression_family and pandas_family into one class",
+        "instead": "(not specified)",
+        "item_id": "dedup-wave2-dataframe-platform",
+        "why": "only share the loading function"
+      },
+      {
+        "dont": "use getattr-based dynamic dispatch for the aggregation helper",
+        "instead": "(not specified)",
+        "item_id": "dedup-wave2-dataframe-platform",
+        "why": "pass explicit function references to maintain IDE navigability and type safety"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dedup-wave2-dataframe-platform",
+        "needs_item": "dedup-wave2-ignore-rules"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-03-12T00:00:00Z",
+      "created_at": "2026-03-12T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Aggregation methods dispatch correctly across PySpark, DataFusion, and Polars",
+        "item_id": "dedup-wave2-dataframe-platform"
+      },
+      {
+        "behavior": "All temporal extraction methods return identical UnifiedExpr types",
+        "item_id": "dedup-wave2-dataframe-platform"
+      },
+      {
+        "behavior": "Data loading produces identical table_stats and loaded data for both families",
+        "item_id": "dedup-wave2-dataframe-platform"
+      },
+      {
+        "behavior": "Polars window functions produce identical rank semantics (min/ordinal/dense)",
+        "item_id": "dedup-wave2-dataframe-platform"
+      },
+      {
+        "behavior": "Type signatures on public methods remain compatible for callers",
+        "item_id": "dedup-wave2-dataframe-platform"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dedup-wave2-dataframe-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/expression_family.py"
+      },
+      {
+        "item_id": "dedup-wave2-dataframe-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/pandas_family.py"
+      },
+      {
+        "item_id": "dedup-wave2-dataframe-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/polars_df.py"
+      },
+      {
+        "item_id": "dedup-wave2-dataframe-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/shared_loading.py"
+      },
+      {
+        "item_id": "dedup-wave2-dataframe-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/unified_frame.py"
+      },
+      {
+        "item_id": "dedup-wave2-dataframe-platform",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'dataframe or unified'",
+        "description": "DataFrame platform tests pass",
+        "expected": "all tests pass",
+        "item_id": "dedup-wave2-dataframe-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k polars",
+        "description": "Polars adapter tests pass",
+        "expected": "all tests pass",
+        "item_id": "dedup-wave2-dataframe-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make duplicate-check-verbose 2>&1 | grep -c 'day, hour, minute\\|window_dense_rank, window_rank\\|max, mean, min\\|load_tables_from_data'",
+        "description": "Duplicate check shows reduction for these groups",
+        "expected": "0 or reduced counts",
+        "item_id": "dedup-wave2-dataframe-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dedup-wave2-dataframe-platform",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dedup-wave2-dataframe-platform",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dedup-wave2-dataframe-platform",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dedup-wave2-dataframe-platform",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dedup-wave2-dataframe-platform",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-dataframe-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _extract_date_part helper in unified_frame.py, refactor 5 temporal methods",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-dataframe-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _polars_window_rank helper in polars_df.py, refactor 3 window methods",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-dataframe-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _apply_aggregation helper in unified_frame.py, refactor 6 aggregation methods",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-dataframe-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract shared load_tables_from_data_source into shared_loading.py, update both families",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-dataframe-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run DataFrame platform tests: pytest -k 'dataframe or unified_frame or polars'",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave2-dataframe-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full test suite to verify no regressions: make test-all",
+        "wid": "w6"
+      }
+    ]
+  }
+}

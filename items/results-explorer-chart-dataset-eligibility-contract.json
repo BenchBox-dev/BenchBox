@@ -1,0 +1,386 @@
+{
+  "context": "Build a chart-to-eligibility matrix, then route all chart datasets through the\nmatrix. The goal is not to hide bad data; it is to keep invalid evidence out\nof analytical charts while giving users a visible explanation of what was\nexcluded.\n",
+  "description": "Earlier TODOs cover comparison eligibility and rank-chart empty states, but\nthe UI review also found obviously broken AMPLab results included in\ndistribution and chart views. That needs a chart-wide dataset contract, not a\nrank-only fix. Every chart should declare whether it consumes display-safe,\nrank-safe, compare-safe, or provenance-only rows, and it should show an empty\nor excluded-data state when the required evidence is absent.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate eligibility predicates inside chart components.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "filter invalid rows silently without exposing exclusion counts.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "fix only the AMPLab screenshot path; all chart families need an eligibility class.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "render a one-pixel or all-dash chart as an empty state.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "needs_item": "results-explorer-chart-run-identity-label-contract"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "needs_item": "results-explorer-comparison-eligibility-contract-repair"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "needs_item": "results-explorer-leaderboard-rank-evidence-semantics"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "results-explorer-followup-todo-review"
+    },
+    "preserves": [
+      {
+        "behavior": "Chart filtering must use read-model eligibility fields, not inferred display strings.",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract"
+      },
+      {
+        "behavior": "Charts must not contradict table row eligibility for the same cohort.",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract"
+      },
+      {
+        "behavior": "Excluded submitted rows remain auditable through receipt/provenance paths.",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract"
+      },
+      {
+        "behavior": "Normal high-evidence cohorts should keep existing chart functionality and interactivity.",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/src/components/ChartPanel.tsx owns benchmark chart layout and tab switching.",
+        "decision": "reuse",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "path": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "concept": "results-explorer/src/components/QueryHeatmap.tsx, DistributionBox.tsx, PercentileLadder.tsx, CDFChart.tsx, CostScatter.tsx, TimeSeries.tsx, and RankTable.tsx render chart families that need class-specific empty states.",
+        "decision": "reuse",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "path": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "concept": "results-explorer/src/lib/chartRegistry.ts maps chart tabs and datasets.",
+        "decision": "reuse",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "path": "results-explorer/src/lib/chartRegistry.ts"
+      },
+      {
+        "concept": "results-explorer/src/lib/displayEligibility.ts or equivalent should supply shared eligibility predicates.",
+        "decision": "reuse",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "path": "results-explorer/src/lib/displayEligibility.ts"
+      },
+      {
+        "concept": "results-explorer/src/lib/duckdbQueries.ts provides chart rows and should apply eligibility filters.",
+        "decision": "reuse",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "path": "results-explorer/src/lib/duckdbQueries.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-chart-dataset-eligibility-contract/"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/chartRegistry.meta.test.ts"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/chartRegistry.parity.test.ts"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CDFChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CostScatter.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/DistributionBox.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/PercentileLadder.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/PowerBar.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryDiffTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHistogram.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryTimingChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RankTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/SparklineTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/StackedPhase.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TimeSeries.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/DistributionBox.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/NormalizedSpeedupChart.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryDiffTable.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/RankTable.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/charts.smoke.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartRegistry.ts"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayEligibility.ts"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/__tests__/chartRegistry.meta.test.ts src/__tests__/chartRegistry.parity.test.ts src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/charts.smoke.test.tsx",
+        "description": "Chart eligibility tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run build",
+        "description": "Frontend typecheck and build pass",
+        "expected": "both commands exit 0",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"Overview|Per-query|Distribution|Cost|Trend|Rank|excluded|empty state|PASS|FAIL\" _project/verification-logs/results-explorer-chart-dataset-eligibility-contract/",
+        "description": "Browser evidence covers every chart tab and subtab",
+        "expected": "logs include chart-tab evidence for normal and low-evidence cohorts",
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "notes": "For each chart/subtab, document the source query/table and current row\nfilters:\n  - benchmark Overview Performance, Power, Summary, Phases, Sparklines;\n  - Per-query Heatmap and Histogram;\n  - Distribution Box Plot, Percentiles, CDF;\n  - Cost;\n  - Trend;\n  - Rank;\n  - Compare Overview, Per-query, Distribution, and Rank.\nRecord whether invalid/no-timing/unranked/no-query rows currently enter\neach dataset. Store SQL, route, chart, and sample row evidence in\n`_project/verification-logs/results-explorer-chart-dataset-eligibility-contract/w0.log`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory chart data sources and eligibility assumptions",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "notes": "Define eligibility classes for charts:\n  - display-safe timing chart;\n  - rank-safe chart;\n  - compare-safe chart;\n  - cost-safe chart;\n  - trend-safe chart with stable time axis;\n  - provenance-only excluded-data disclosure.\nFor each chart, document its required class and empty-state behavior. The\nAMPLab broken-results case must be explicitly assigned to excluded-data or\nempty-state behavior for every affected chart. Decision gate: no chart code\nchanges until this matrix is documented.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define chart dataset eligibility classes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "notes": "Update chart query helpers and component inputs so each chart receives only\nrows matching its declared eligibility class. Preserve excluded rows in a\nseparate disclosure or receipt path when they have provenance value. Do not\nlet chart components silently drop rows without exposing dominant exclusion\nreasons somewhere on the page.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Filter chart queries through the required eligibility class",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "notes": "For every chart class, add an empty state that names the missing evidence,\nsuch as `No rankable rows for this cohort`, `No valid display timings`, or\n`No comparable query evidence`. Include counts by exclusion reason when the\ndataset has submitted rows that are excluded. Avoid rendering all-dash\nmatrices, one-pixel box plots, or misleading winner/tail summaries from\ninsufficient data.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add chart empty states and excluded-data summaries",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "notes": "Add tests using AMPLab-like data with missing timings, zero timings, and\nunranked submissions. Assert:\n  - distribution charts exclude invalid/no-timing rows;\n  - sparklines and per-query charts only include display-safe rows;\n  - rank charts require rank-safe rows;\n  - compare charts require compare-safe selected rows;\n  - empty states list exclusion reasons instead of rendering misleading\n    chart artifacts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add fixtures and tests for broken-result chart exclusion",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-chart-dataset-eligibility-contract",
+        "notes": "In a browser, inspect every benchmark chart tab/subtab and Compare chart\ntab using at least one normal cohort and one broken/low-evidence cohort.\nClick every chart subtab. Decision gate: do not complete if any chart\nincludes invalid evidence as a normal data point, renders an all-dash/empty\nartifact without explanation, or contradicts the eligibility state shown in\nthe table for the same rows.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Browser-check chart subtabs across benchmark and compare routes",
+        "wid": "w5"
+      }
+    ]
+  }
+}

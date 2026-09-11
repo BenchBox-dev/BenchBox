@@ -1,0 +1,101 @@
+{
+  "context": "Maintainer reviews and merges #1592 (squash). Agent/maintainer then re-reads origin/develop workflow + runs a cheap open-PR smoke or gh api check that non-draft open no longer gets auto_merge from the bot without ready_for_review.",
+  "description": "PR #1592 (fix/auto-merge-enablement-hold) implements the workflow half of the auto-merge hold: enable only on ready_for_review, never on opened/synchronize. It touches .github/workflows/auto-merge-on-open.yml so the soundness path withholds auto-merge; human merge is required.\n\nUntil it lands, develop still arms non-draft non-soundness PRs on open (live proof during the batch: bots auto-armed non-soundness PRs). Tracker item auto-merge-workflow-defeats-the-makefile-hold-20260805 was completed at PR open per batch skill, so production closeout is this land step.\n\nAfter merge: confirm develop workflow enable if: requires ready_for_review; smoke that a new non-draft open does not arm.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "land-auto-merge-hold-pr-1592-on-develop-20260805",
+        "needs_item": "auto-merge-workflow-defeats-the-makefile-hold-20260805"
+      }
+    ],
+    "item_meta": {
+      "category": "ci-integrity",
+      "completed_at": "2026-08-06T00:46:40Z",
+      "completed_pr": 1592,
+      "created_at": "2026-08-05T23:39:21Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not force-merge with failing required checks; do not disable soundness withholding to land",
+        "item_id": "land-auto-merge-hold-pr-1592-on-develop-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "land-auto-merge-hold-pr-1592-on-develop-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "land-auto-merge-hold-pr-1592-on-develop-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh pr view 1592 --repo joeharris76/BenchBox --json state --jq .state | grep -qx MERGED",
+        "description": "PR 1592 is merged",
+        "expected": null,
+        "item_id": "land-auto-merge-hold-pr-1592-on-develop-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-06T00:46:33Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git show origin/develop:.github/workflows/auto-merge-on-open.yml | rg -q \"github.event.action == .ready_for_review.\"",
+        "description": "develop workflow enable if requires ready_for_review",
+        "expected": null,
+        "item_id": "land-auto-merge-hold-pr-1592-on-develop-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-06T00:46:37Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "land-auto-merge-hold-pr-1592-on-develop-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1592 MERGED 2026-08-06T00:41:08Z sha 33e29d5efeb25892096091a7cc409c40f192c9ca",
+        "item_id": "land-auto-merge-hold-pr-1592-on-develop-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T00:46:13Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Maintainer",
+        "wid": "w0"
+      },
+      {
+        "evidence": "origin/develop auto-merge-on-open.yml Enable if: steps.soundness.outputs.soundness_path != 'true' && github.event.action == 'ready_for_review'",
+        "item_id": "land-auto-merge-hold-pr-1592-on-develop-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T00:46:19Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Verify develop workflow enable step requires ready_for_review only",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Verified via git show origin/develop + gh pr view 1592 state=MERGED",
+        "item_id": "land-auto-merge-hold-pr-1592-on-develop-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T00:46:26Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record evidence (merge SHA + enable if",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,400 @@
+{
+  "description": "Implement MotherDuck platform adapter as the first \"distinct service name\"\ndeployment variant. MotherDuck is DuckDB's managed cloud offering, providing\nserverless DuckDB with cloud storage integration.\n\nThis adapter inherits DuckDB's SQL dialect and benchmark compatibility while\nimplementing MotherDuck-specific authentication and connection handling.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify duckdb.py",
+        "instead": "keep all MotherDuck-specific code in motherduck.py",
+        "item_id": "motherduck-platform-adapter",
+        "why": "MotherDuck inherits from DuckDB but is a separate platform"
+      },
+      {
+        "dont": "require MotherDuck account for unit tests",
+        "instead": "mock the md: connection string in tests",
+        "item_id": "motherduck-platform-adapter",
+        "why": "CI has no cloud credentials"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "motherduck-platform-adapter",
+        "id": 568,
+        "reason": "Deferred - requires interactive credential setup",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Exact match: open item motherduck-cloud-features explicitly lists 'Credential Wizard' in its scope.",
+        "summary": "Add credential setup wizard for MotherDuck"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "motherduck-platform-adapter",
+        "id": 569,
+        "reason": "Deferred - requires cloud storage setup",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Cloud Upload is explicitly listed in the open motherduck-cloud-features item's scope (Credential Wizard, Cloud Upload, Cache Control).",
+        "summary": "Option 1: Upload via MotherDuck cloud storage"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "motherduck-platform-adapter",
+        "id": 570,
+        "reason": "Deferred - requires understanding of MotherDuck cache APIs",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Open item motherduck-cloud-features explicitly lists 'Cache Control' as in-scope, matching this deferral verbatim.",
+        "summary": "Implement result cache control"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "motherduck-platform-adapter",
+        "id": 571,
+        "reason": "Deferred - basic execution works",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Vague, non-specific note ('handle MotherDuck-specific query features'); basic execution already works and no concrete gap is named.",
+        "summary": "Handle MotherDuck-specific query features"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-14T00:00:00Z",
+      "created_at": "2026-01-14T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "DuckDB adapter (benchbox/platforms/duckdb.py) unchanged",
+        "item_id": "motherduck-platform-adapter"
+      },
+      {
+        "behavior": "No new required runtime dependencies beyond duckdb>=0.9.0",
+        "item_id": "motherduck-platform-adapter"
+      },
+      {
+        "behavior": "Platform registry backward compatible with existing platform names",
+        "item_id": "motherduck-platform-adapter"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "motherduck-platform-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "motherduck-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/motherduck.py"
+      },
+      {
+        "item_id": "motherduck-platform-adapter",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_motherduck.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.motherduck import MotherDuckAdapter; print('import OK')\"",
+        "description": "MotherDuck adapter imports correctly",
+        "expected": "import OK",
+        "item_id": "motherduck-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_motherduck.py -v --tb=short",
+        "description": "Unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "motherduck-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_duckdb*.py -v --tb=short",
+        "description": "DuckDB adapter unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "motherduck-platform-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "motherduck-platform-adapter",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "motherduck-platform-adapter",
+        "needs_wid": "w9",
+        "wid": "w11"
+      },
+      {
+        "item_id": "motherduck-platform-adapter",
+        "needs_wid": "w12",
+        "wid": "w13"
+      },
+      {
+        "item_id": "motherduck-platform-adapter",
+        "needs_wid": "w12",
+        "wid": "w14"
+      },
+      {
+        "item_id": "motherduck-platform-adapter",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "motherduck-platform-adapter",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "motherduck-platform-adapter",
+        "needs_wid": "w5",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create benchbox/platforms/motherduck.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support md:database_name syntax",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": "MotherDuck handles this automatically",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle database creation if not exists",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement data loading strategy",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": "Default strategy - load from local parquet files",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Option 2: Hybrid query from local files",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Determine default strategy",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": "Uses DuckDB connection with MotherDuck backend",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inherit query execution from DuckDB adapter",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": "Basic timing via execute_query",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement performance metrics collection",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": "Connection errors handled with helpful messages",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle cloud-specific error scenarios",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit tests for adapter (mocked connection)",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": "Requires MotherDuck account - manual testing",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integration tests with MotherDuck (requires account)",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement MotherDuckAdapter class extending PlatformAdapter",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": "Requires MotherDuck account",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test TPC-H benchmark at scale 0.01",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": "Requires MotherDuck account",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Compare results with local DuckDB",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set up inheritance from DuckDB (dialect, capabilities)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register platform in registry with deployment metadata",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement token-based authentication",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support MOTHERDUCK_TOKEN environment variable",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support token in config/credentials file",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement token validation on connect",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-platform-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement MotherDuck connection string handling",
+        "wid": "w9"
+      }
+    ]
+  }
+}

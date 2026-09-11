@@ -1,0 +1,239 @@
+{
+  "context": "Convert each waiver class in isolation (w1-w5), verifying\n`make read-primitives-cross-surface-equivalence-report` stays green after each\nconversion before moving to the next, then add the systematic mutation-probe\nregression (w6) once all conversions are in place. Reuse `ClassifiedDivergence`\nand the `_VALUE_MISMATCH_RE` / `_is_two_decimal_scale` helpers already proven by\nthe h2odb Q9 and clickbench Q18 conversions - do not build a second mechanism.\n",
+  "description": "SOUNDNESS-CRITICAL COMPARATOR SURFACE: this TODO's work lives in\nbenchbox/core/equivalence/cross_surface.py, which is covered by\n.github/CODEOWNERS (`benchbox/core/equivalence/** @joeharris76`). Its PR will\nrequire code-owner review before merge regardless of CI status - budget for\nthat review cycle, do not assume `make pr-open`'s normal auto-merge applies.\n\nVerified by reading cross_surface.py on this branch:\n`_READ_PRIMITIVES_KNOWN_DIVERGENCES` (lines 859-885) is a plain\n`dict[str, str]` with 17 keys built from `dict.fromkeys(...)` over six waiver\nclasses:\n  - approx_count_distinct_simple_expression/pandas,\n    approx_count_distinct_groupby_expression/pandas,\n    approx_quantile_groupby_expression/pandas (6 keys) -> `_READ_PRIMITIVES_APPROX`\n    (HyperLogLog / T-Digest sketch error)\n  - statistical_percentiles_expression/pandas (2 keys) ->\n    `_READ_PRIMITIVES_DECIMAL_PERCENTILE` (DECIMAL(15,2) vs float64 percentile scale)\n  - optimizer_common_subexpression_expression/pandas (2 keys) ->\n    `_READ_PRIMITIVES_DECIMAL_ROUND` (DECIMAL vs float64 ROUND half-cent boundary)\n  - min_by_complex_expression/pandas (2 keys) -> `_READ_PRIMITIVES_ARGMIN_TIE`\n    (ARG_MIN tie-break non-determinism)\n  - json_aggregates_expression/pandas (2 keys) -> `_READ_PRIMITIVES_JSON_TEXT`\n    (JSON text vs native container representation)\n  - map_access_expression, map_construction_expression,\n    map_keys_values_expression (3 keys) -> `_READ_PRIMITIVES_POLARS_MAP`\n    (Polars has no Map dtype)\n\nA bare `str` value in `known_divergences` is documented at\n`ClassifiedDivergence`'s own docstring (cross_surface.py:340-347) as tolerating\nANY divergence on that key - \"which masks a real regression that happens to\nland on the same query/backend\". So today, if `approx_count_distinct_simple_pandas`\nregressed from \"close to the true count\" to \"wildly wrong\" (e.g. a broken sketch\nmerge, an off-by-a-factor-of-1000 bug), the gate would stay green: the bare-string\nwaiver accepts the cell unconditionally.\n\nThe codebase already has the fix pattern, applied twice:\n  - h2odb Q9 (cross_surface.py:785-816): `_h2odb_q9_decimal_residue` parses the\n    value-mismatch detail, checks it is the p90 column, checks the SQL side is at\n    DECIMAL(8,2) scale, and bounds `abs(orig - variant) <= _H2ODB_Q9_RESIDUE_MAX`.\n  - clickbench Q18 (cross_surface.py:606-624+): `_is_clickbench_q18_arbitrary_topn`\n    matches the divergence class (\"Value mismatch\") for the order-less top-N tie case.\n\nBoth wrap a `reason` string and an `accepts: Callable[[SurfaceDivergence], bool]`\nin `ClassifiedDivergence` (cross_surface.py:338-357), which is a drop-in\nreplacement for a bare-string value in the same `known_divergences` dict - no\nnew plumbing is needed, only new predicate functions per waiver class.\n\nThis TODO converts all 17 Read Primitives keys to `ClassifiedDivergence` with a\nclass-appropriate bound, so an out-of-bounds divergence on any of these cells is\nreported as an unclassified gate failure instead of silently passing.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fork ResultValidator or find_cross_surface_divergences to add this",
+        "instead": "(not specified)",
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "why": "the existing known_divergences/ClassifiedDivergence mechanism already supports per-key predicates."
+      },
+      {
+        "dont": "loosen a predicate until the CURRENT gate passes without checking the accepted value is still the SAME documented residue",
+        "instead": "(not specified)",
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "why": "that reintroduces the exact vacuity this TODO fixes."
+      },
+      {
+        "dont": "remove a waiver instead of classifying it merely because the current divergence looks small",
+        "instead": "(not specified)",
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "why": "Read Primitives is a primitives benchmark that deliberately exercises engine features (sketches, approximate quantiles) with no exact DataFrame equivalent; some divergence is legitimate, it just needs a bound."
+      },
+      {
+        "dont": "write one generic 'accept any numeric difference under X' predicate shared across unrelated waiver classes",
+        "instead": "(not specified)",
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "why": "the sketch-error, DECIMAL-epsilon, and tie-membership bounds have different bases and conflating them hides which bound actually fired."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "read-primitives-waivers-classified-divergence",
+        "id": 546,
+        "reason": "Out of scope for this TODO, which targets the 17 read_primitives keys identified by this review; a future gate should adopt ClassifiedDivergence from the start per this pattern, not require a follow-up conversion.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason states future gates should adopt ClassifiedDivergence from the start rather than needing a retrofit; no other gated benchmark flagged as needing conversion now.",
+        "summary": "Apply the same ClassifiedDivergence conversion to any bare-string waivers in other gated benchmarks beyond read_primitives (e.g. future additions to GATES)."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-04T00:00:00Z",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No other gated benchmark's known_divergences or legitimately_empty entries are touched.",
+        "item_id": "read-primitives-waivers-classified-divergence"
+      },
+      {
+        "behavior": "The read_primitives GATE stays in the enforced `GATES` registry (cross_surface.py) throughout; do not move it to STAGED_GATES to work around a broken predicate.",
+        "item_id": "read-primitives-waivers-classified-divergence"
+      },
+      {
+        "behavior": "`make read-primitives-cross-surface-equivalence-report` stays green (currently: every compared cell matches or is classified) after every conversion - a converted waiver must still accept the CURRENT, legitimate divergence, only reject a wider one.",
+        "item_id": "read-primitives-waivers-classified-divergence"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/equivalence/cross_surface.py:338-357 ClassifiedDivergence - the dataclass to reuse for every converted waiver; do not invent a parallel mechanism.",
+        "decision": "reuse",
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "path": "benchbox/core/equivalence/cross_surface.py:338-357"
+      },
+      {
+        "concept": "benchbox/core/equivalence/cross_surface.py:606-624 _is_clickbench_q18_arbitrary_topn / _CLICKBENCH_TIE_AMBIGUOUS - the divergence-class-matching predicate pattern (useful for the JSON-text and Map-dtype classes, which cannot be numerically bounded).",
+        "decision": "reuse",
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "path": "benchbox/core/equivalence/cross_surface.py:606-624"
+      },
+      {
+        "concept": "benchbox/core/equivalence/cross_surface.py:785-816 _h2odb_q9_decimal_residue / _H2ODB_KNOWN_DIVERGENCES - the DECIMAL-scale-bounded predicate pattern to mirror for the percentile/round classes.",
+        "decision": "reuse",
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "path": "benchbox/core/equivalence/cross_surface.py:785-816"
+      },
+      {
+        "concept": "tests/integration/test_cross_surface_mutation_sensitivity.py - the existing mutation-probe harness (wraps a DataFrameQuery via dataclasses.replace, drives find_cross_surface_divergences + the real ResultValidator); extend its pattern per converted waiver class rather than building a new harness.",
+        "decision": "extend",
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "path": "tests/integration/test_cross_surface_mutation_sensitivity.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/"
+      },
+      {
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpchavoc/"
+      },
+      {
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/equivalence/cross_surface.py"
+      },
+      {
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_cross_surface_mutation_sensitivity.py"
+      },
+      {
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make read-primitives-cross-surface-equivalence-report",
+        "description": "Read Primitives cross-surface gate stays green after all 17 waivers are classified",
+        "expected": "exit 0; every previously-waived cell now reports under a named ClassifiedDivergence class, not a bare string",
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_cross_surface_mutation_sensitivity.py -k read_primitives -m slow -v",
+        "description": "Each converted waiver's mutation probe catches an out-of-bounds divergence",
+        "expected": "new probes for read_primitives waiver classes report the gate going RED on an out-of-bounds mutation and staying green on an in-bounds one",
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "notes": "HyperLogLog / T-Digest have documented error bounds (HLL: ~2% relative\nerror at BenchBox's precision; T-Digest: small relative error near the\nmedian, larger toward tails). Parse the value-mismatch detail (reuse the\n`_VALUE_MISMATCH_RE` pattern from the h2odb predicate) and bound the\nrelative difference between the DuckDB approx value and the DataFrame\nexact value to a documented multiple of the sketch's error bound - not an\narbitrary epsilon. Cite the bound's source (DuckDB HLL/T-Digest docs or a\nmeasured empirical bound at this benchmark's cardinality) in the reason\nstring.\n\nDONE. `_read_primitives_sketch_residue` (cross_surface.py) pins each of\nthe 3 sub-queries to its documented result column(s) via\n`_READ_PRIMITIVES_SKETCH_COLUMNS` (grouping-key columns excluded) and\nbounds relative error to `_READ_PRIMITIVES_SKETCH_RELATIVE_ERROR_MAX =\n0.15`, derived from measured residues at this cell: simple 4.2-4.6%,\ngroupby 10.0-10.6%, quantile 3.8% - bound is ~1.4x the largest observed,\ndocumented HLL (~2% nominal at 12-bit precision) as the theoretical basis\nwith the empirical measurement as the actual derivation (per-group\ncardinality pushes the residue above the textbook figure). Gate stays\ngreen; predicate rejects wrong-column and >15%-off values (unit-tested).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write and apply a sketch-error-bounded predicate for the approx_count_distinct_*/approx_quantile_* classes (6 keys)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "notes": "Reuse `_is_two_decimal_scale` (cross_surface.py:770-782) to confirm the SQL\nside is DECIMAL(15,2)-rounded, and bound `abs(orig - variant)` to a sub-cent\nepsilon (mirror `_H2ODB_Q9_RESIDUE_MAX`'s derivation - document the epsilon's\nbasis, do not copy the h2odb constant blind). Two waiver classes, same shape\nof predicate; write one helper parameterized by column index if the shapes\nallow it, or two small predicates if the value positions differ.\n\nDONE. One shared helper `_read_primitives_decimal_scale_residue(column,\nmax_residue)` parameterizes both: `_read_primitives_percentile_decimal_residue`\npins statistical_percentiles' p95 (column 6) to\n`_READ_PRIMITIVES_PERCENTILE_RESIDUE_MAX = 0.005 + 1e-6` (half-cent, same\nderivation as h2odb Q9 - measured residue 0.004);\n`_read_primitives_round_decimal_residue` pins\noptimizer_common_subexpression's rounded_revenue (also column 6) to\n`_READ_PRIMITIVES_ROUND_RESIDUE_MAX = 0.01 + 1e-6` (a full cent - DuckDB\nROUND() vs float rounding can flip a full unit at the boundary, measured\nresidue exactly 0.01, wider than the percentile class's sub-cent bound by\ndesign). Both re-derived independently, not copied from\n`_H2ODB_Q9_RESIDUE_MAX`, even where numerically identical.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write and apply a DECIMAL-scale epsilon predicate for statistical_percentiles_* and optimizer_common_subexpression_* (4 keys)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "notes": "ARG_MIN ties: the predicate must confirm the value column (the price/metric\nbeing minimized) matches exactly across surfaces and only the tie-broken\ncolumn (e.g. p_name) differs, AND that the differing value is genuinely a\nmember of the tied group (look up the tie set from the underlying data, or\nbound the predicate to asserting the metric values are equal while the\npicked names differ - never accept a divergence where the metric itself\ndiffers).\n\nDONE (bounded predicate variant, not full tie-set lookup). Projection is\n[p_brand(0), cheapest_part_name(1), cheapest_part_type(2), min_price(3)];\n`_read_primitives_argmin_tie` accepts a Value-mismatch ONLY on columns 1-2\n(the two ARG_MIN outputs), rejecting the p_brand grouping key (0) and\nmin_price (3) - so the metric itself must always match. Documented the\nSAME residual blind spot as h2odb Q9 (comparator reports only the first\npositional mismatch per row, so a simultaneous min_price bug behind an\naccepted name/type tie-break would not be visible) rather than silently\naccepting a wider guarantee than is actually enforced.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write and apply a tie-membership predicate for min_by_complex_* (2 keys)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "notes": "JSON_GROUP_ARRAY/OBJECT text vs native containers cannot be bounded\nnumerically. Write a predicate that parses both sides' JSON, confirms they\nrepresent the SAME set/mapping of key-value pairs (order-insensitive,\nnumber-format-insensitive), and rejects any divergence where the parsed\nstructures actually differ (a missing key, an added element, a wrong\nvalue) - i.e. convert this from \"match this label\" to \"match this\nstructural equality after parsing,\" not merely narrow the string.\n\nDONE, with a finding beyond the TODO's original framing: the two gated\ncells diverge in DIFFERENT shapes, verified via a diagnostic probe of the\nbuilt cell (both backends return the SAME 25 TPC-H p_brand values as the\nSQL reference - not a missing/extra group):\n  * json_aggregates_pandas is the anticipated \"Value mismatch\" (JSON text\n    vs native list/dict) - `_read_primitives_json_equivalent` parses both\n    sides (json.loads, falling back to ast.literal_eval) and compares\n    structurally (order-insensitive lists, number-format-insensitive\n    values via round(...,2)); a missing/added/wrong element compares\n    unequal and is rejected.\n  * json_aggregates_expression is instead an \"ORDER BY key mismatch\" -\n    the Polars expression aggregate does not sort its groups. Accepted\n    ONLY when both reported keys are members of TPC-H's fixed 25-value\n    p_brand domain (`_READ_PRIMITIVES_BRAND_DOMAIN`), so an out-of-domain\n    key (a genuinely wrong group) is still rejected. This is a narrower,\n    more defensible bound than \"any ORDER BY key mismatch on this key.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write and apply a text-shape predicate for json_aggregates_* (2 keys)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "notes": "The Map waivers are different in kind: `_READ_PRIMITIVES_POLARS_MAP`'s\nrationale is \"no expression-surface result to compare\" (the query is in\nthe benchmark's SKIP_FOR_POLARS set), not a numeric/textual near-match.\nConfirm whether these three keys ever reach `known_divergences` lookup at\nall when the query is skipped for Polars (i.e. check whether the SKIP set\nalready prevents the cell from being executed and compared). If the\ndivergence never actually fires for these keys today, downgrade this work\nunit to: assert (via a test) that these keys are dead/unreachable and\ndocument why they are still declared, rather than inventing a synthetic\npredicate for a class that cannot structurally diverge. If they DO fire\n(e.g. pandas side is compared even though Polars is skipped), write a\npredicate mirroring w4's structural-equality approach for the pandas cells.\n\nDONE (dtype-gap predicate variant). Confirmed: only the 3 \"_expression\"\nkeys ever appear in known_divergences (no \"_pandas\" counterparts are\ndeclared) and the live baseline output shows exactly 3 divergent cells,\neach an `error:` (execution failure), never a Value mismatch - pandas\nsupports dict natively and matches its SQL cleanly. Wrote\n`_read_primitives_polars_map_gap`, which accepts ONLY a detail matching\nthe documented \"not supported on Polars (no native Map dtype)\" signature\n(verified against both raise sites: expression_family.py's\nmap_from_entries and unified_frame.py's Map accessors) and rejects any\nother execution error or a Value mismatch (which would mean Polars\nstarted supporting Map but got it wrong).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write and apply a dtype-gap predicate (or confirm no-comparison classification) for map_* (3 keys)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "read-primitives-waivers-classified-divergence",
+        "notes": "Extend tests/integration/test_cross_surface_mutation_sensitivity.py's\npattern (dataclasses.replace on the DataFrameQuery, drive\nfind_cross_surface_divergences with the real ResultValidator) for\nread_primitives: for each converted class, wrap the DataFrame impl to\nreturn a value just OUTSIDE the classified bound (e.g. an approx count off\nby 10x the sketch error, a percentile off by more than the DECIMAL epsilon)\nand assert the gate reports it as UNCLASSIFIED (not silently absorbed by\nthe old bare-string waiver). Also assert a value just INSIDE the bound\nstill passes, so the predicate is not accidentally tightened into a new\nfalse-positive source.\n\nDONE via the synthetic-unit style this TODO explicitly permits as an\nalternative (cheaper than rebuilding read_primitives' SF=0.05 cell in the\nheavy integration harness). Added to\ntests/unit/core/equivalence/test_cross_surface.py: one predicate-level\ntest per converted class (sketch, percentile, round, argmin-tie,\njson-aggregates, polars-map-gap), each asserting the documented in-bounds\ndetail is ACCEPTED and a synthetic out-of-bounds/wrong-column/wrong-error\ndetail is REJECTED; plus one end-to-end `_report`-level test\n(`test_read_primitives_baseline_report_accepts_documented_cells_rejects_regressions`)\nthat replays the real 17-key baseline through `_report` (green) and then\nswaps one key's divergence for a 10x-off sketch value (red, unclassified).\nDid not additionally extend the integration mutation-sensitivity suite -\nsee deviations below.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a mutation probe per converted waiver class proving the gate goes red on an out-of-bounds divergence",
+        "wid": "w6"
+      }
+    ]
+  }
+}

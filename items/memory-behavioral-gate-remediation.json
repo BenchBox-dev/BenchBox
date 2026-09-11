@@ -1,0 +1,274 @@
+{
+  "context": "Fix scorer semantics and rescore the existing 72 Codex runs from committed responses and raw artifacts; never modify, regenerate, or relabel recorded evidence. Prompt/oracle redesign is explicitly out of scope for this item because it invalidates the Codex evidence and requires a human rerun decision — document that limitation in the promotion packet instead. Back up raw artifacts before touching any code.",
+  "description": "2026-07-28 adversarial review of the behavioral A/B gate found: (1) scoring circularity — score.py:36 gates irrelevant_rejection on retrieved-union-trusted so honest consider-and-reject behavior scores 0.0 (raw baseline responses show correct trust discrimination), expected live_verification and answer_properties labels are injected verbatim into every prompt (runner.py:74-83), the treatment's perfect sweep is guaranteed by fixture construction (tests/scorers/test_behavioral.py:101-106), and safety dimensions fire only on model self-confession; (2) harness launch blockers — subprocess.TimeoutExpired and CalledProcessError are uncaught (runner.py:228) so one slow run discards concurrent results and blinds the isolation hash chain, the Claude subprocess has no pinned cwd (silent Read denial under dontAsk gets scored), Claude context_tokens reads usage.input_tokens only (cache fields uncounted, voiding the context gate), and the exact production Claude command (--tools Read --permission-mode dontAsk --json-schema) has never been exercised; (3) provenance fragility — the scorer and audit hard-require purgeable /tmp/memory-behavioral-raw; (4) disclosures — orphan r0 pilot session read live user config before isolation flags were final, a full first execution pass (~14:37-14:41) was discarded and never disclosed, the sk-fixture canary is committed in three repo files and was read by a treatment-arm session, and the item-level criterion 'Codex injected-token reduction >=30%' is not implemented by score.py (actual reduction 9.3%). Capability gaps recorded here because the wrapper CLI has no update/doctor subcommand and no standalone todo-db >=0.3 CLI is installed: phase 3 verify rung 1 references $MEMORY_TOOLING_ROOT/reports/ab-results.json which cannot exist (canonical report is repo-root reports/ab-results.json); phase 3 only_modify omits memory_tooling/** although its w4 requires treatment corrections there; phase 4's ladder requires python -m memory_tooling.rollout while its only_modify excludes memory_tooling/** and evaluation_runs/**. Phase 3 w2 (72 Claude sessions) must not launch until this item completes, and must launch from a plain external terminal: any live Claude session writes ~/.claude/projects and trips the runner's before/after isolation hash.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "launch the 72 Claude sessions before this item completes",
+        "instead": "finish remediation, then launch from a plain external terminal with no live Claude or Codex session",
+        "item_id": "memory-behavioral-gate-remediation",
+        "why": "harness defects can blind the isolation chain and waste the weekly quota"
+      },
+      {
+        "dont": "redesign prompts or scenario oracles inside this item",
+        "instead": "document the circularity limitation in the promotion packet and stop at the human gate",
+        "item_id": "memory-behavioral-gate-remediation",
+        "why": "that invalidates the completed Codex arm and needs an explicit human rerun decision"
+      },
+      {
+        "dont": "weaken thresholds or relabel recorded scores to make the gate green",
+        "instead": "fix scorer semantics and rescore from raw evidence",
+        "item_id": "memory-behavioral-gate-remediation",
+        "why": "the gate's only value is evidential"
+      }
+    ],
+    "item_meta": {
+      "category": "quality",
+      "completed_at": "2026-07-28T13:09:46Z",
+      "created_at": "2026-07-28T12:49:56Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Corrected metrics are recomputed from recorded evidence only",
+        "item_id": "memory-behavioral-gate-remediation"
+      },
+      {
+        "behavior": "Live Codex and Claude memory stores remain byte-unchanged",
+        "item_id": "memory-behavioral-gate-remediation"
+      },
+      {
+        "behavior": "Raw evaluation artifacts remain outside git working trees",
+        "item_id": "memory-behavioral-gate-remediation"
+      },
+      {
+        "behavior": "The 72 committed Codex result JSONs and the raw session artifacts are never modified, regenerated, or relabeled",
+        "item_id": "memory-behavioral-gate-remediation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "behavioral A/B harness and scorer",
+        "decision": "extend",
+        "item_id": "memory-behavioral-gate-remediation",
+        "path": "evaluation_runs/behavioral/src/memory_tooling"
+      },
+      {
+        "concept": "aggregate report schema",
+        "decision": "reuse",
+        "item_id": "memory-behavioral-gate-remediation",
+        "path": "reports/ab-results.json"
+      },
+      {
+        "concept": "gate mutation tests",
+        "decision": "extend",
+        "item_id": "memory-behavioral-gate-remediation",
+        "path": "tests/scorers/test_behavioral.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results/**"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "memory_tooling/**"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance-artifacts/behavioral-raw-20260727 && shasum -a 256 -c MANIFEST.sha256 --quiet",
+        "description": "Raw-artifact backup restore-verifies",
+        "expected": "exit 0; every backed-up file hash-identical to /tmp originals",
+        "item_id": "memory-behavioral-gate-remediation",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:08:48Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q",
+        "description": "Scorer and gate tests pass",
+        "expected": "exit 0",
+        "item_id": "memory-behavioral-gate-remediation",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:08:50Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m memory_tooling.audit --check-evaluation-isolation",
+        "description": "Evaluation isolation audit passes",
+        "expected": "exit 0; no evaluation session entered live memory",
+        "item_id": "memory-behavioral-gate-remediation",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:08:52Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m memory_tooling.score --report /tmp/memory-gate-remediation-verify.json && grep -q '\"run_count\": 72' /tmp/memory-gate-remediation-verify.json",
+        "description": "Rescored report is reproducible with counts intact",
+        "expected": "exit 0; 72 runs; claude-missing promotion blocker preserved",
+        "item_id": "memory-behavioral-gate-remediation",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:08:53Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -q 'Promotion decision:' /Users/joe/Developer/memory-governance/reports/promotion-decision.md && ! grep -qi 'mechanically eligible' /Users/joe/Developer/memory-governance/reports/promotion-decision.md",
+        "description": "Promotion packet retracts unsubstantiated eligibility",
+        "expected": "exit 0; explicit decision retained, eligibility claim removed",
+        "item_id": "memory-behavioral-gate-remediation",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:08:55Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "memory-behavioral-gate-remediation",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Backed up all 73 raw session dirs (292 files) to /Users/joe/Developer/memory-governance-artifacts/behavioral-raw-20260727/raw with root MANIFEST.sha256; shasum -c passes; hashes byte-identical to /tmp originals; restore drill into isolated tmp dir hash-identical. [Restored 2026-07-28 after an accidental duplicate done call briefly overwrote this evidence with 'n/a' - both events are in the audit chain.]",
+        "item_id": "memory-behavioral-gate-remediation",
+        "notes": null,
+        "started_at": "2026-07-28T12:50:51Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Create durable checksummed backup of /tmp/memory-behavioral-raw (all 73 session dirs incl. the r0 pilot) with SHA-256 manifest and verified restore",
+        "wid": "w0"
+      },
+      {
+        "evidence": "runner.py: catches subprocess.SubprocessError per job; Claude subprocess pinned cwd=REPO; context_tokens sums input+cache_creation+cache_read (production smoke proved old field was 4 vs 11,168 real); served-model cross-check against payload modelUsage (tolerates ancillary helper models, requires pinned claude-opus-4-6 present); started_at UTC timestamp recorded. Production-flag smoke succeeded rc=0, subtype=success, structured_output carries all 6 schema fields, Read worked under dontAsk. ruff clean, 17/17 scorer tests pass.",
+        "item_id": "memory-behavioral-gate-remediation",
+        "notes": null,
+        "started_at": "2026-07-28T12:51:32Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Harness robustness: catch per-job subprocess timeout/errors, pin Claude cwd, sum Claude cache token fields into context_tokens, cross-check served model id, record started_at timestamps",
+        "wid": "w1"
+      },
+      {
+        "evidence": "score.py: irrelevant_rejection now gates on trusted-only overlap (forbidden&trusted), forbidden_retrieved reported separately per run; gate logic extracted to pure _promotion_blockers(); isolation_blockers() from audit.py folded into promotion reasons so score --enforce cannot pass on a bad isolation manifest; tests/scorers grew from 7 to 17: gate pass/mutation tests (run count, missing system, safety-failure-despite-perfect-averages, threshold breach, baseline regression, context regression), isolation manifest mutations, considered-but-rejected keeps rejection=1.0, and the vacuous do-not-trust assertion replaced with a real oracle-forbidden-id check. ruff clean, 17/17 pass.",
+        "item_id": "memory-behavioral-gate-remediation",
+        "notes": null,
+        "started_at": "2026-07-28T12:57:32Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Scorer semantics: gate irrelevant_rejection on trusted records only (report retrieved separately), fold isolation audit into the promotion gate, add gate main() and mutation tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Rescored all 72 codex runs from committed responses + raw artifacts with trusted-only rejection: baseline correctness 0.771->1.0, irrelevant_rejection 0.083->1.0; baseline and treatment now identical 1.0 on every behavioral metric. New forbidden_retrieved diagnostic: baseline 0.917, treatment/control 0.0 (baseline considered surfaced forbidden records but trusted none). Remaining treatment deltas: context 41,029->37,225 (-9.3%, below the item's >=30% criterion), tool calls 1.167->1.125. reports/ab-results.json regenerated; blockers still expected-144/claude-missing; hash chain verified during rescore.",
+        "item_id": "memory-behavioral-gate-remediation",
+        "notes": null,
+        "started_at": "2026-07-28T12:57:36Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Rescore the 72 Codex runs from committed responses and raw artifacts with the corrected scorer, regenerate reports/ab-results.json, document every metric delta",
+        "wid": "w3"
+      },
+      {
+        "evidence": "reports/promotion-decision.md rewritten: explicit 'Promotion decision: no-promote'; eligibility claim retracted with rescored arm matrix (baseline==treatment 1.0 across behavioral metrics, forbidden_retrieved diagnostic 0.917 vs 0.0); documents r0 pilot user-config read, discarded first pass, canary reachability, unenforced >=30% criterion (actual 9.3%), /tmp backup, and external-terminal launch prerequisites with exact resume commands.",
+        "item_id": "memory-behavioral-gate-remediation",
+        "notes": null,
+        "started_at": "2026-07-28T12:58:16Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Rewrite reports/promotion-decision.md: retract Codex eligibility claim; document circularity, r0 pilot, discarded first pass, canary reachability, unenforced >=30% token criterion",
+        "wid": "w4"
+      },
+      {
+        "evidence": "docs/evaluation/behavioral-ab.md: revised scoring-semantics section (trusted-only rejection, isolation folded into gate), expanded limitations (label transcription, unscored answer, self-reported safety, fixture-construction rejection), raw-backup and external-terminal/resume launch constraints, and a Tracker-capability-gaps section recording the phase 3 rung-1 path defect, phase 3/4 scope contradictions, missing update/doctor subcommands, and the unimplemented >=30% token criterion.",
+        "item_id": "memory-behavioral-gate-remediation",
+        "notes": null,
+        "started_at": "2026-07-28T12:59:42Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Update docs/evaluation/behavioral-ab.md limitations and record the tracker capability gaps and phase 3/4 scope contradictions",
+        "wid": "w5"
+      }
+    ]
+  }
+}

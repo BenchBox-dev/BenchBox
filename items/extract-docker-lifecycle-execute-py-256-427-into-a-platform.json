@@ -1,0 +1,15 @@
+{
+  "description": "Promoted from deferral #620 of uat-execute-path-unification.\nDeferred: Extract docker lifecycle (execute.py:256-427) into a platform_lifecycle module beside docker_assets\nReason deferred: uat-container-engine-routing rewrites that block for engine routing; extracting first then rewriting doubles the churn. Reassess after that TODO.",
+  "legacy": {
+    "item_meta": {
+      "blocked_reason": "Implementation committed at a20d68c83; publication gate blocked by unrelated existing fast-test failure tests/unit/scripts/explorer_pipeline/test_privacy_rejection.py::test_privacy_rejection_makes_the_publish_command_exit_non_zero (Rich wraps privacy check failed across a newline). Branch is also one develop commit behind and must refresh after the gate is repaired.",
+      "claim_token": "0af5c66cbfad9ecda83f70056086e35d",
+      "claimed_at": "2026-08-22T16:18:39Z",
+      "claimed_branch": "fix/uat-docker-lifecycle-extraction",
+      "claimed_by": "joe@joe-mac-mini.local",
+      "claimed_worktree": "/Users/joe/Developer/BenchBox.wt-uat-docker-lifecycle-extraction",
+      "created_at": "2026-07-19T12:37:18Z",
+      "worktree": "uat-hardening"
+    }
+  }
+}

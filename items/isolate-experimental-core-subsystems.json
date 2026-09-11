@@ -1,0 +1,213 @@
+{
+  "context": "This is a rename operation, not an extraction. Move directories, update\nimports, update tests. No new packages, no compatibility shims.\n",
+  "description": "Five subsystems live under `benchbox/core/` but are not in the supported\nbenchmark registry, have no CLI integration, and are not exported from the\nmain `benchbox` module:\n\n| Subsystem          | Path                          | External Consumers |\n|--------------------|-------------------------------|--------------------|\n| NL2SQL             | benchbox/core/nl2sql/         | Zero               |\n| AIML Functions     | benchbox/core/aiml_functions/ | Zero               |\n| Multi-Region       | benchbox/core/multiregion/    | Zero               |\n| GPU Infrastructure | benchbox/core/gpu/            | cudf.py (1)        |\n| Concurrency        | benchbox/core/concurrency/    | Zero               |\n\nTheir placement under `core/` makes them look productized. Move them under\n`benchbox/experimental/` so the namespace signals their status.\n\nGPU is the only coupling wrinkle: `benchbox/platforms/cudf.py` imports from\n`benchbox.core.gpu`, so that import must be updated to\n`benchbox.experimental.gpu`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add experimental modules to the public registry to avoid the move",
+        "instead": "(not specified)",
+        "item_id": "isolate-experimental-core-subsystems",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "create a separate benchbox-experimental package",
+        "instead": "(not specified)",
+        "item_id": "isolate-experimental-core-subsystems",
+        "why": "a namespace move within the repo is sufficient"
+      },
+      {
+        "dont": "delete experimental code without evaluation",
+        "instead": "(not specified)",
+        "item_id": "isolate-experimental-core-subsystems",
+        "why": "the goal is isolation, not removal"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture",
+      "completed_at": "2026-03-23T00:00:00Z",
+      "created_at": "2026-03-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All experimental subsystems remain importable via benchbox.experimental.*",
+        "item_id": "isolate-experimental-core-subsystems"
+      },
+      {
+        "behavior": "Supported benchmark registry and CLI behavior unchanged",
+        "item_id": "isolate-experimental-core-subsystems"
+      },
+      {
+        "behavior": "cudf.py platform adapter continues to work via updated import path",
+        "item_id": "isolate-experimental-core-subsystems"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/aiml_functions/"
+      },
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/concurrency/"
+      },
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/gpu/"
+      },
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/multiregion/"
+      },
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nl2sql/"
+      },
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "kind": "only_modify",
+        "path_glob": "benchbox/experimental/"
+      },
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/cudf.py"
+      },
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/aiml_functions/"
+      },
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/concurrency/"
+      },
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/gpu/"
+      },
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/multiregion/"
+      },
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/nl2sql/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_standardized_benchmark_apis.py tests/unit/tpch/test_api_compatibility.py tests/unit/cli/test_benchmark_selection.py -q",
+        "description": "Supported benchmark API and registry tests still pass",
+        "expected": "All tests pass",
+        "item_id": "isolate-experimental-core-subsystems",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_cli_package_exports.py tests/unit/test_cli_documentation.py -q",
+        "description": "Public exports reflect only supported surfaces",
+        "expected": "All tests pass",
+        "item_id": "isolate-experimental-core-subsystems",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -r 'from benchbox.core.\\(nl2sql\\|aiml_functions\\|multiregion\\|gpu\\|concurrency\\)' benchbox/ --include='*.py' | grep -v __pycache__",
+        "description": "No experimental subsystem imports remain under benchbox/core/",
+        "expected": "No output (zero matches)",
+        "item_id": "isolate-experimental-core-subsystems",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'from benchbox.experimental import nl2sql, aiml_functions, multiregion, gpu, concurrency'",
+        "description": "Experimental modules are importable from the new namespace",
+        "expected": "Exit code 0",
+        "item_id": "isolate-experimental-core-subsystems",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "isolate-experimental-core-subsystems",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "isolate-experimental-core-subsystems",
+        "notes": "mkdir -p benchbox/experimental/\ngit mv benchbox/core/{nl2sql,aiml_functions,multiregion,gpu,concurrency} benchbox/experimental/\nAdd benchbox/experimental/__init__.py with a docstring marking this as\nexperimental, unsupported code.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create benchbox/experimental/ and move the 5 subsystem directories",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "isolate-experimental-core-subsystems",
+        "notes": "Replace `from benchbox.core.{subsystem}` with\n`from benchbox.experimental.{subsystem}` in:\n- Each subsystem's internal imports\n- benchbox/platforms/cudf.py (the only external consumer)\nVerify with: grep -r 'from benchbox.core.\\(nl2sql\\|aiml_functions\\|multiregion\\|gpu\\|concurrency\\)' benchbox/\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update all internal imports across the 5 subsystems and cudf.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "isolate-experimental-core-subsystems",
+        "notes": "Update tests/unit/core/{nl2sql,aiml_functions,gpu,multiregion}/ imports\nto reference the new experimental paths.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update test imports and paths",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "isolate-experimental-core-subsystems",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a guard test preventing experimental modules from appearing in the public registry",
+        "wid": "w4"
+      }
+    ]
+  }
+}

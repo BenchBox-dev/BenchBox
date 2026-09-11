@@ -1,0 +1,10 @@
+{
+  "description": "Align all exporters, docs, and tests on a single benchmark result JSON schema version 1.0 and remove legacy version branching.",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (Should-Fix Before Release)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "release-readiness"
+    }
+  }
+}

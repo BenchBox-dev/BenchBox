@@ -1,0 +1,142 @@
+{
+  "context": "Change skill-sync.yaml to a git source at https://github.com/joeharris76/skill-sync-skills.git with ref c52db1dcfebc76283046c7eaa5794aaaca25cff2; restore docs in skills; run make skill-sync and verify; review that generated changes are limited to source provenance plus docs restoration; preserve the dirty ~/.skill-sync checkout byte-for-byte.",
+  "description": "PR #1318 still sources skills from the mutable local path ~/.skill-sync/skills while that checkout contains preserved uncommitted docs-skill deletions. The interrupted implementation removed docs from BenchBox's manifest based on that WIP even though skill-sync-skills main at c52db1dcfebc76283046c7eaa5794aaaca25cff2 still contains skills/docs. Replace the local source with the canonical Git repository pinned to that exact merged commit, restore docs to the manifest, and regenerate tracked mirrors. This closes the provenance gap and prevents user WIP from leaking into project governance.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Remove a configured skill because its local source is uncommitted-deleted",
+        "instead": "Use the merged canonical Git source and preserve local WIP",
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "why": "Local uncommitted state is not repository authority"
+      },
+      {
+        "dont": "Use a floating branch ref for this corrective regeneration",
+        "instead": "Pin the exact merged commit",
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "why": "A fresh regeneration must resolve the same bytes"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "needs_item": "land-canonical-todo-db-capability-boundary-on-main"
+      }
+    ],
+    "item_meta": {
+      "category": "Agent infrastructure",
+      "completed_at": "2026-07-28T16:20:12Z",
+      "completed_pr": 1318,
+      "created_at": "2026-07-28T14:17:54Z",
+      "worktree": "agent-instructions"
+    },
+    "preserves": [
+      {
+        "behavior": "Every materialized skill resolves from one immutable canonical Git commit",
+        "item_id": "pin-benchbox-skill-source-and-restore-docs"
+      },
+      {
+        "behavior": "The dirty /Users/joe/.skill-sync checkout is not modified",
+        "item_id": "pin-benchbox-skill-source-and-restore-docs"
+      },
+      {
+        "behavior": "The docs skill remains available until an explicit merged retirement decision exists",
+        "item_id": "pin-benchbox-skill-source-and-restore-docs"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "kind": "only_modify",
+        "path_glob": ".antigravity/skills/docs/**"
+      },
+      {
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/docs/**"
+      },
+      {
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "kind": "only_modify",
+        "path_glob": ".codex/skills/docs/**"
+      },
+      {
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "kind": "only_modify",
+        "path_glob": ".gemini/skills/docs/**"
+      },
+      {
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.lock"
+      },
+      {
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.yaml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "sh -c \"grep -q 'type: git' skill-sync.yaml && grep -q 'c52db1dcfebc76283046c7eaa5794aaaca25cff2' skill-sync.yaml && grep -q '^  - docs$' skill-sync.yaml\"",
+        "description": "Manifest uses immutable canonical Git source and includes docs",
+        "expected": "all three manifest assertions pass",
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "last_result": "pass",
+        "last_run": "2026-07-28T14:32:42Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make skill-sync-verify",
+        "description": "Tracked snapshot matches the lock",
+        "expected": "exit 0",
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "last_result": "pass",
+        "last_run": "2026-07-28T14:32:43Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f .claude/skills/docs/SKILL.md",
+        "description": "Docs skill exists in tracked Claude snapshot",
+        "expected": "exit 0",
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "last_result": "pass",
+        "last_run": "2026-07-28T14:32:45Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "skill-sync.yaml now uses canonical Git URL, exact ref c52db1dcfebc76283046c7eaa5794aaaca25cff2, subdir skills, and restores docs; mutable ~/.skill-sync WIP untouched",
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "notes": null,
+        "started_at": "2026-07-28T14:18:11Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Pin skill-sync.yaml to the exact canonical Git commit and restore docs",
+        "wid": "w1"
+      },
+      {
+        "evidence": "make skill-sync via merged skill-sync PRs #8/#9 restored docs and refreshed all 19 lock entries to type=git, revision=c52db1d, subdir=skills; doctor and verify pass",
+        "item_id": "pin-benchbox-skill-source-and-restore-docs",
+        "notes": null,
+        "started_at": "2026-07-28T14:32:38Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Regenerate and verify all configured mirrors from the immutable source",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,187 @@
+{
+  "context": "Implement in dependency order:\n1) Function signatures: add `duration_seconds: Optional[float] = None` before\n   `**kwargs` in `benchbox/core/base_benchmark.py` and wrapper fallback\n   implementation in `benchbox/base.py`.\n2) Builder wiring: when duration_seconds is provided, call\n   `builder.set_total_duration(duration_seconds)` in both code paths.\n3) Tests: update and extend unit tests in `tests/unit/core/test_base_benchmark.py`\n   and `tests/unit/core/test_runner_lifecycle.py` to verify non-zero duration\n   propagation for data-only/minimal cases and no regression for normal runs.\n4) Validate with focused tests then `-m fast`.\n",
+  "description": "Data-only benchmark lifecycle paths pass elapsed datagen time as\n`duration_seconds`, but that value is not consumed explicitly by the\nenhanced result construction flow in both `benchbox/core/base_benchmark.py`\nand wrapper fallback paths in `benchbox/base.py`.\n\nAs a result, total duration can fall back to query+loading aggregates, which\nare zero for data-only runs with no query executions. This produces misleading\nrun-level duration fields in exported results and blocks reliable metric\nexpansion work that depends on correct canonical duration semantics.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "convert the canonical duration channel to milliseconds in builder interfaces",
+        "instead": "convert only at presentation/export boundaries",
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "why": "BenchmarkResults stores canonical duration in seconds"
+      },
+      {
+        "dont": "repurpose `data_loading_time` to encode total run duration",
+        "instead": "use explicit duration_seconds only",
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "why": "loading duration and total elapsed duration are semantically distinct"
+      },
+      {
+        "dont": "special-case only one caller path",
+        "instead": "patch both implementations",
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "why": "both core and wrapper create_enhanced flows must remain behaviorally consistent"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-25T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not remove `**kwargs` from create_enhanced_benchmark_result in either implementation path; existing callers pass platform-specific overrides",
+        "item_id": "propagate-duration-seconds-in-enhanced-results"
+      },
+      {
+        "behavior": "ResultBuilder fallback duration behavior (start/end timestamps, then query+loading) remains unchanged when explicit duration is not provided",
+        "item_id": "propagate-duration-seconds-in-enhanced-results"
+      },
+      {
+        "behavior": "Standard benchmark result generation for load/power/throughput runs remains backward-compatible",
+        "item_id": "propagate-duration-seconds-in-enhanced-results"
+      },
+      {
+        "behavior": "create_minimal_benchmark_result continues returning fully valid BenchmarkResults with existing metadata structure",
+        "item_id": "propagate-duration-seconds-in-enhanced-results"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/base_benchmark.py"
+      },
+      {
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/builder.py"
+      },
+      {
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_builder.py"
+      },
+      {
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_base_benchmark.py"
+      },
+      {
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_runner_lifecycle.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_base_benchmark.py::test_create_minimal_benchmark_result_propagates_duration_seconds -v",
+        "description": "Base benchmark minimal-result path preserves explicit duration_seconds via targeted regression test",
+        "expected": "PASSED",
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_runner_lifecycle.py::test_data_only_mode_propagates_duration_seconds -v",
+        "description": "Lifecycle data-only path reports propagated duration via targeted regression test",
+        "expected": "PASSED",
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_builder.py -v",
+        "description": "Core result builder unit tests still pass",
+        "expected": "PASSED",
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite passes without regressions",
+        "expected": "All tests pass with 0 failures",
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add explicit duration_seconds kwarg to create_enhanced_benchmark_result in core and wrapper paths without breaking kwargs compatibility",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire explicit duration_seconds to ResultBuilder via set_total_duration() in both builder-population flows",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression tests proving data-only and minimal-result paths preserve non-zero duration_seconds",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "propagate-duration-seconds-in-enhanced-results",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run targeted and fast-suite verification; confirm no regressions in standard SQL/DataFrame benchmark flows",
+        "wid": "w4"
+      }
+    ]
+  }
+}

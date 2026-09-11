@@ -1,0 +1,688 @@
+{
+  "context": "Three-phase extraction strategy with clear gates between phases.\n\nPhase A - Internal API Separation (in-tree, no new package):\n1. Expand ascii/__init__.py to export all data models and factory functions (w1)\n2. Decouple the single `format_scale_factor` import via optional Callable on\n   ASCIIChartOptions - the only benchbox import inside ascii/ (w18)\n3. Create ascii_api.py facade module as single import point for external callers (w16)\n4. Migrate all external callers (CLI, MCP, exporters, post_run_summary,\n   chart_generator) to import from ascii_api only (w16)\n5. Enforce import boundary with automated gate check (w17)\n6. Create golden-output snapshot tests for all 15 chart types BEFORE extraction (w19)\nGate: zero direct ascii submodule imports outside visualization package.\n\nPhase B - Standalone Package Extraction:\n7. Scaffold textcharts package in packages/textcharts/ with src layout (w3)\n8. Define public API: drop ASCII prefix, add ChartOptions alias (w13)\n9. Copy code, rewrite internal imports, add custom palette support (w4-w6)\n10. Replace BenchBox ascii/ with compatibility shim re-exporting from textcharts (w7)\n11. Add textcharts as BenchBox path dependency (w8)\n12. Verify golden-output parity - must be byte-identical (w9-w10)\nGate: full test suite passes, zero benchbox imports in textcharts.\n\nPhase C - Packaging and Release:\n13. Complete packaging MVP with README, chart gallery, py.typed (w15)\n14. Publish to PyPI and switch BenchBox to versioned dependency (w11)\n15. Deprecate compatibility shims after one stable release cycle (w12)\n",
+  "description": "BenchBox currently owns a mature ASCII charting implementation (15 chart types,\n595-line base module, zero external dependencies) under\n`benchbox/core/visualization/ascii/` plus runtime dispatch and adapters in\nCLI/MCP/export paths. We want to extract this into a reusable standalone Python\nlibrary called `textcharts` (PyPI: `textcharts`, import: `textcharts`) without\nbreaking existing BenchBox workflows.\n\nKey architecture decisions:\n- Library name: `textcharts` - generic, memorable, no BenchBox branding\n- Dispatch layer (`ascii_runtime.py`): stays in BenchBox - it contains\n  domain-specific NormalizedResult→chart data conversion\n- Naming: standalone drops `ASCII` prefix (e.g. `BarChart` not `ASCIIBarChart`);\n  BenchBox shims re-export with `ASCII*` aliases for compatibility\n- Only ONE coupling point to sever: `base.py:481` imports `format_scale_factor`\n\nThe correct migration path is staged:\n1) Define and freeze charting API contracts first\n2) Decouple the single `format_scale_factor` import via optional Callable\n3) Complete BenchBox-internal API separation before extraction starts\n4) Extract charting primitives + renderers behind a compatibility shim\n5) Keep BenchBox-specific normalization/adaptation in BenchBox\n6) Validate text-output parity via golden snapshot tests before cutover\n7) Externalize packaging/release only after in-repo adoption is stable\n\nThis TODO captures the full execution DAG required to minimize risk and avoid\nregressions in CLI output, MCP responses, and tests.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change chart IDs or user-facing option names during extraction",
+        "instead": "preserve contracts until a separately versioned deprecation plan exists.",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "why": "downstream tools depend on them"
+      },
+      {
+        "dont": "import `benchbox.*` modules inside the standalone package",
+        "instead": "use typed adapter DTOs at the BenchBox boundary.",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "why": "that breaks encapsulation and reusability"
+      },
+      {
+        "dont": "move BenchBox result normalization models into the standalone library",
+        "instead": "keep them in BenchBox adapters.",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "why": "they encode domain semantics and compatibility obligations"
+      },
+      {
+        "dont": "optimize output formatting during initial extraction",
+        "instead": "prioritize strict parity first, then incremental improvements.",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "why": "it masks migration regressions"
+      },
+      {
+        "dont": "perform a big-bang directory move without shims",
+        "instead": "introduce delegation shims first.",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "why": "this will break imports across CLI/MCP/tests"
+      },
+      {
+        "dont": "start standalone package extraction before internal API-separation gates pass",
+        "instead": "complete in-tree facade migration first.",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "why": "unresolved internal coupling will leak BenchBox implementation details into the library boundary"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "extract-ascii-charting-into-standalone-library",
+        "id": 178,
+        "reason": "Out of scope for Python extraction and first stable release",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Speculative future scope (Rust/JS wrappers) explicitly out of scope for first stable Python release; no demand signal or tracking.",
+        "summary": "Cross-language wrappers (Rust/JS) around the standalone charting library"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "extract-ascii-charting-into-standalone-library",
+        "id": 179,
+        "reason": "Should only be designed after API stability and first downstream adopters",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Plugin ecosystem/extension API explicitly deferred until API stability and real downstream adopters exist; no signal that has happened.",
+        "summary": "Theme plugin ecosystem and custom renderer extension API"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-03-12T00:00:00Z",
+      "created_at": "2026-03-05T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing chart type IDs and chart-type selection semantics in `benchbox.core.visualization.chart_types`",
+        "item_id": "extract-ascii-charting-into-standalone-library"
+      },
+      {
+        "behavior": "Core visualization code does not depend on MCP tool modules (no reverse import from `benchbox.core.visualization` to `benchbox.mcp.tools`)",
+        "item_id": "extract-ascii-charting-into-standalone-library"
+      },
+      {
+        "behavior": "MCP visualization tool response schema and inline ASCII content behavior",
+        "item_id": "extract-ascii-charting-into-standalone-library"
+      },
+      {
+        "behavior": "No-color and ASCII-only fallback behavior validated in `tests/unit/visualization/test_nocolor_rendering.py`",
+        "item_id": "extract-ascii-charting-into-standalone-library"
+      },
+      {
+        "behavior": "Post-run summary output generation path and summary/histogram inclusion logic",
+        "item_id": "extract-ascii-charting-into-standalone-library"
+      },
+      {
+        "behavior": "`benchbox visualize --chart-type ...` behavior and flags (`--no-color`, `--no-unicode`, `--template`)",
+        "item_id": "extract-ascii-charting-into-standalone-library"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/benchmarks/"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/visualize.py"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/visualization.py"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "kind": "only_modify",
+        "path_glob": "packages/textcharts/"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "kind": "only_modify",
+        "path_glob": "tests/contracts/visualization/"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/golden/ascii/"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_visualization_tools.py"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'from benchbox' benchbox/core/visualization/ascii/ | rg -v '__init__'",
+        "description": "format_scale_factor decoupled: no benchbox imports inside ascii/",
+        "expected": "No matches (format_scale_factor import removed)",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -q",
+        "description": "ASCII renderer unit tests pass after API separation",
+        "expected": "All tests pass with 0 failures",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/test_nocolor_rendering.py -q",
+        "description": "No-color/unicode fallback semantics remain intact",
+        "expected": "All tests pass with expected structural markers and no ANSI leakage",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/test_visualize_cli.py -q",
+        "description": "CLI visualization behavior remains compatible",
+        "expected": "All tests pass including invalid type validation and pairwise constraints",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_visualization_tools.py -q",
+        "description": "MCP visualization contract remains stable",
+        "expected": "All tests pass with expected tool output schema",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"benchbox\\.core\\.visualization\\.ascii\" benchbox | rg -v \"^benchbox/core/visualization/(ascii/|ascii_runtime|ascii_api|exporters|post_run_summary|chart_generator)\"",
+        "description": "Pre-extraction gate: external callers use facade only",
+        "expected": "No matches - all external callers migrated to ascii_api facade",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -q",
+        "description": "Golden output snapshots created for all 15 chart types",
+        "expected": "15 snapshot tests pass",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox/core/visualization benchbox/cli/commands/visualize.py benchbox/mcp/tools/visualization.py",
+        "description": "Code quality checks pass on touched visualization code",
+        "expected": "No lint errors",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"(from|import)\\s+benchbox\" packages/textcharts/src/textcharts/",
+        "description": "Encapsulation boundary enforced: textcharts has zero BenchBox imports",
+        "expected": "No matches",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -q",
+        "description": "Golden output parity: extracted renderers produce byte-identical output",
+        "expected": "All 15 snapshot tests pass with textcharts backend",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 10,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -q",
+        "description": "Full BenchBox test suite passes with compatibility shims",
+        "expected": "All tests pass",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 11,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd packages/textcharts && uv run -- python -m pytest -q",
+        "description": "Standalone package tests pass independently",
+        "expected": "All tests pass",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 12,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv build packages/textcharts",
+        "description": "Standalone package builds as both sdist and wheel",
+        "expected": "Build succeeds and emits both .tar.gz and .whl artifacts",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 13,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"py\\.typed\" packages/textcharts",
+        "description": "Standalone package typing marker is shipped",
+        "expected": "py.typed exists and is included in package data",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 14,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"(from|import)\\s+benchbox\\.mcp\" benchbox/core/visualization/",
+        "description": "Layering boundary enforced: core visualization has no MCP imports",
+        "expected": "No matches",
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "last_result": null,
+        "last_run": null,
+        "seq": 15,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w15",
+        "wid": "w11"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w22",
+        "wid": "w12"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w3",
+        "wid": "w13"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w16",
+        "wid": "w14"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w10",
+        "wid": "w15"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w18",
+        "wid": "w16"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w2",
+        "wid": "w16"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w16",
+        "wid": "w17"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w1",
+        "wid": "w18"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w18",
+        "wid": "w19"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w21",
+        "wid": "w20"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w11",
+        "wid": "w21"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w20",
+        "wid": "w22"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w17",
+        "wid": "w3"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w19",
+        "wid": "w3"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w13",
+        "wid": "w4"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w14",
+        "wid": "w4"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w13",
+        "wid": "w8"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w14",
+        "wid": "w8"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Add to `benchbox/core/visualization/ascii/__init__.py` and `__all__`:\n- Data models: BarData, HistogramBar, BoxPlotSeries, LinePoint, ScatterPoint,\n  ComparisonBarData, DivergingBarData, SummaryStats, PercentileData,\n  SpeedupData, StackedBarData, StackedBarSegment, CDFSeriesData,\n  SparklineTableData, SparklineColumn, RankTableData\n- Config/infra: ASCIIChartOptions, ColorMode, TerminalCapabilities, TerminalColors\n- Factory functions: from_query_results, from_heatmap_data, from_metrics,\n  from_normalized_results\nThis establishes the canonical public surface for the package.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Expand ascii/__init__.py to export all data models, utilities, and factory functions",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full quality gate for visualization and integration surfaces",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Move packages/textcharts/ out of the BenchBox monorepo into its own\nproject directory (~/Developer/textcharts).\nSteps:\n1. Copy packages/textcharts/ to ~/Developer/textcharts/\n2. Verify standalone build: `cd ~/Developer/textcharts && uv build`\n3. Verify standalone tests: `cd ~/Developer/textcharts && uv run --group dev -- python -m pytest -q`\n4. Verify no benchbox imports: `rg \"(from|import)\\s+benchbox\" ~/Developer/textcharts/src/`\nGate: sdist + wheel build, all tests pass, zero benchbox imports.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move textcharts to standalone local directory and verify independent build",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "After BenchBox runs stable with the PyPI-published textcharts:\n- Add deprecation warnings to `benchbox/core/visualization/ascii/` shim modules\n- Update CLAUDE.md / AGENTS.md to reference ~/Developer/textcharts\n- Plan removal of shims for next major BenchBox version\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Deprecate temporary compatibility shims in BenchBox",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "`textcharts/__init__.py` exports:\n- ChartOptions (renamed from ASCIIChartOptions; original kept as alias)\n- ChartBase (renamed from ASCIIChartBase)\n- All chart classes without ASCII prefix: BarChart, Histogram, Heatmap,\n  BoxPlot, LineChart, ScatterPlot, CDFChart, ComparisonBar, DivergingBar,\n  SummaryBox, PercentileLadder, NormalizedSpeedup, StackedBar,\n  SparklineTable, RankTable\n- All data models unchanged: BarData, HistogramBar, BoxPlotSeries, etc.\n- Utilities: TerminalColors, TerminalCapabilities, ColorMode,\n  detect_terminal_capabilities\n- No dispatch/render() function - standalone users construct chart objects directly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define textcharts public API and class naming",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Guard against regression of historical coupling where core visualization\nimported MCP tooling. Keep shared rendering utilities in neutral\nvisualization modules and enforce direction checks in verification.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Eliminate cross-layer dependency cycles before extraction (core visualization must not import MCP helpers)",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "README should include:\n- Quick start example for each chart type\n- Chart gallery with rendered ASCII output examples\n- API reference for ChartOptions and all data models\n- Terminal capability detection explanation\nBuild verification: `cd packages/textcharts && uv build` (sdist + wheel)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Complete standalone packaging MVP (metadata, README with chart gallery, py.typed, sdist+wheel)",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Create `benchbox/core/visualization/ascii_api.py` that re-exports:\n- Everything from `ascii/__init__.py` (chart classes, data models, options, utils)\n- `render_ascii_chart_from_results` from `ascii_runtime.py`\n\nThen migrate these callers to import from `ascii_api` only:\n| File                                    | Deep imports to migrate | Count |\n| cli/commands/visualize.py               | ASCIIChartOptions, ascii_runtime | 2     |\n| mcp/tools/visualization.py              | ASCIIChartOptions, ascii_runtime | 2     |\n| core/visualization/chart_generator.py   | ASCIIChartOptions, ascii_runtime | 2     |\n| core/visualization/exporters.py         | 10+ chart classes, 10+ data models | ~20 |\n| core/visualization/post_run_summary.py  | 3 chart classes, 3 data models | 6     |\n\nNote: `ascii_runtime.py` itself is an allowed adapter and may continue\nimporting directly from ascii/ submodules.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create ascii_api.py facade and migrate all external callers",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Gate command (must return zero matches before extraction begins):\n```\nrg -n \"benchbox\\.core\\.visualization\\.ascii\" benchbox \\\n  | rg -v \"^benchbox/core/visualization/(ascii/|ascii_runtime|ascii_api|exporters|post_run_summary|chart_generator)\"\n```\nConsider adding as a CI check or pre-commit hook to prevent backsliding.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enforce internal API separation gate with automated boundary check",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "The single coupling point: `base.py:481` does\n`from benchbox.utils.scale_factor import format_scale_factor`.\nStrategy:\n1. Add `scale_factor_formatter: Callable[[float], str] | None = None` to ASCIIChartOptions\n2. In `ASCIIChartBase._render_subtitle` (base.py:479-483): use\n   `self.options.scale_factor_formatter(sf)` if set, else fallback to `f\"SF={sf}\"`\n3. Delete the `from benchbox.utils.scale_factor import format_scale_factor` line\n4. In `ascii_runtime.py` and `post_run_summary.py`: inject\n   `options.scale_factor_formatter = format_scale_factor` before passing to charts\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decouple format_scale_factor - the only benchbox import inside ascii/",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Create deterministic snapshot tests BEFORE extraction to establish parity baseline.\n- Fixed options: ASCIIChartOptions(use_color=False, use_unicode=True, width=80)\n- Store expected output as `.txt` files in `tests/fixtures/golden/ascii/`\n- One snapshot per chart type with representative data\n- Test file: `tests/contracts/visualization/test_ascii_golden_output.py`\n- These become the byte-for-byte parity check after extraction in w9.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create golden-output snapshot tests for all 15 chart types",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Explicitly separate concerns:\n- `textcharts` owns: chart primitives, rendering, terminal capabilities, color system\n- BenchBox owns: ascii_runtime.py (dispatch/NormalizedResult conversion),\n  exporters.py, post_run_summary.py, chart_types registry, templates\n- Naming: standalone drops `ASCII` prefix (BarChart, ChartOptions, ChartBase);\n  BenchBox shims re-export with `ASCII*` aliases\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write extraction ADR covering boundaries, ownership, and migration strategy",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Initialize ~/Developer/textcharts as a git repo and push to GitHub.\nSteps:\n1. `cd ~/Developer/textcharts && git init && git add . && git commit -m \"Initial commit\"`\n2. Create GitHub repo: `gh repo create joeharris76/textcharts --public --source .`\n3. Push: `git push -u origin main`\n4. Set up GitHub Actions CI (.github/workflows/ci.yml):\n   - Lint (ruff check)\n   - Test (pytest)\n   - Publish to PyPI on tag push\nGate: repo exists on GitHub, CI passes green on main.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create GitHub repository for textcharts and push initial release",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Replace the in-repo path dependency with a locally-built wheel to prove\nBenchBox works with textcharts as an external package.\nSteps:\n1. Build wheel: `cd ~/Developer/textcharts && uv build`\n2. Update BenchBox pyproject.toml: replace path dep with wheel install\n   `uv add ~/Developer/textcharts/dist/textcharts-0.1.0-py3-none-any.whl`\n3. Run full BenchBox test suite: `uv run -- python -m pytest -q`\n4. Run golden parity: `uv run -- python -m pytest tests/contracts/visualization/ -q`\n5. Run visualization tests: `uv run -- python -m pytest tests/unit/visualization/ -q`\n6. Remove packages/textcharts/ from BenchBox (it now lives externally)\nGate: all tests pass with wheel-installed textcharts, packages/textcharts/ removed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Install textcharts wheel into BenchBox and validate full test suite",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Publish the first release and switch BenchBox from wheel to PyPI version.\nSteps:\n1. Tag release: `cd ~/Developer/textcharts && git tag v0.1.0 && git push --tags`\n2. Publish: `uv publish dist/*` (or let CI handle it on tag)\n3. Update BenchBox pyproject.toml: `dependencies = [\"textcharts>=0.1.0\"]`\n4. `uv sync && uv run -- python -m pytest -q`\nGate: `pip install textcharts` works, BenchBox tests pass with PyPI version.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Publish textcharts to PyPI and switch BenchBox to versioned dependency",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Create `packages/textcharts/` with src layout:\n  packages/textcharts/\n    pyproject.toml    # name=\"textcharts\", version=\"0.1.0\", python>=3.10, no deps\n    README.md\n    LICENSE           # MIT (match BenchBox)\n    src/textcharts/\n      __init__.py     # Public API surface\n      py.typed\n      base.py         # ChartBase, ChartOptions, TerminalColors, etc.\n      bar_chart.py    # BarChart, BarData\n      ... (all 15 chart modules)\n    tests/\n      test_charts.py\nThis work starts only after internal API separation gates pass.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Scaffold textcharts in-repo package with src layout",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Copy `ascii/base.py` to `packages/textcharts/src/textcharts/base.py`.\n- Replace all `from benchbox.core.visualization.ascii.base import` with relative imports\n- `format_scale_factor` already decoupled in w18 (optional Callable)\n- Add `palette: tuple[str, ...] | None = None` to ChartOptions for custom palette support\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Copy and port base runtime primitives (options, colors, terminal capabilities, shared helpers)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Copy 6 modules to textcharts, rewrite imports:\n`from benchbox.core.visualization.ascii.base import` → `from textcharts.base import`\nVerify: `rg \"benchbox\" packages/textcharts/src/textcharts/{bar_chart,line_chart,scatter_plot,heatmap,box_plot,histogram}.py` returns nothing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Port foundational chart renderers (bar, line, scatter, heatmap, box, histogram)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Copy remaining 9 modules to textcharts, rewrite imports.\nAfter this step, all 15 chart types exist in textcharts.\nGate: `rg \"benchbox\" packages/textcharts/` returns zero matches.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Port advanced chart renderers (summary, comparison, diverging, percentile, normalized, stacked, cdf, rank, sparkline)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Replace `benchbox/core/visualization/ascii/` contents with thin re-exports:\n```python\n# benchbox/core/visualization/ascii/__init__.py\nfrom textcharts import BarChart as ASCIIBarChart, BoxPlot as ASCIIBoxPlot, ...\n```\nEach submodule becomes a one-line re-export:\n```python\n# benchbox/core/visualization/ascii/bar_chart.py\nfrom textcharts.bar_chart import *  # noqa: F401,F403\n```\n`ascii_api.py` facade continues working unchanged (imports from ascii/\nwhich now delegates to textcharts).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Introduce BenchBox compatibility shim so old import paths continue to work",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "In BenchBox `pyproject.toml`:\n```toml\ndependencies = [\"textcharts @ {root:uri}/packages/textcharts\"]\n```\nRun full BenchBox test suite to confirm compatibility shims work.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add textcharts as BenchBox path dependency and verify adapter wiring",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "extract-ascii-charting-into-standalone-library",
+        "notes": "Run snapshot tests created in w19 against the extracted textcharts renderers.\nMust produce byte-identical output to pre-extraction baselines.\nAlso verify no-color/unicode fallback paths via:\n  uv run -- python -m pytest tests/unit/visualization/test_nocolor_rendering.py -q\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run golden-output parity tests and verify byte-identical rendering",
+        "wid": "w9"
+      }
+    ]
+  }
+}

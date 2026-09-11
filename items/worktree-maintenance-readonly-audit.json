@@ -1,0 +1,252 @@
+{
+  "context": "Add typed evidence primitives and reuse only genuinely shared orphan-detector behavior. Parse porcelain without pruning, paginate GitHub, preserve every unavailable state, and redact and bound output. FINISH_CANDIDATE is only a timestamped observation and never contains bulk cleanup commands.",
+  "description": "Implement make worktree-audit as a bounded read-only inventory of every registered worktree and local branch. Combine live Git structure, exact GitHub PR evidence, structural-branch policy, and controller ownership evidence. Emit human and schema-versioned JSON classifications for active, stale, unknown, foreign, dirty, locked, detached, missing, open PR, closed-unmerged, wrong base, tip mismatch, missing object, API error, duplicate review, broken suspect, and finish candidate.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Collapse API error, no PR, and closed-unmerged",
+        "instead": "Preserve typed evidence states",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "why": "They require different decisions"
+      },
+      {
+        "dont": "Emit shell loops or deletion lists",
+        "instead": "Emit evidence and one classification per object",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "why": "Audit is not mutation authority"
+      },
+      {
+        "dont": "Infer safety from path prefixes",
+        "instead": "Use canonical repository and controller identity",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "why": "Paths can be valid elsewhere or foreign locally"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "needs_item": "worktree-maintenance-contract-fixtures"
+      }
+    ],
+    "item_meta": {
+      "category": "Repository Maintenance",
+      "completed_at": "2026-08-29T13:07:38Z",
+      "completed_pr": 1937,
+      "created_at": "2026-08-26T01:49:05Z",
+      "worktree": "worktree-maintenance"
+    },
+    "preserves": [
+      {
+        "behavior": "Audit performs no fetch pruning, worktree pruning, unlock, removal, branch deletion, PR mutation, or tracker mutation.",
+        "item_id": "worktree-maintenance-readonly-audit"
+      },
+      {
+        "behavior": "Dirty or ownership-uncertain worktrees cannot be finish candidates.",
+        "item_id": "worktree-maintenance-readonly-audit"
+      },
+      {
+        "behavior": "Network, authentication, pagination, parsing, missing-object, and identity errors fail closed.",
+        "item_id": "worktree-maintenance-readonly-audit"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "PR lookup and repository identity",
+        "decision": "reuse",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "path": "_project/scripts/detect_orphaned_commits.py"
+      },
+      {
+        "concept": "maintenance reporting",
+        "decision": "extend",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "path": "make/worktree-maintenance.mk"
+      },
+      {
+        "concept": "native worktree inventory",
+        "decision": "extend",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "path": "make/worktrees.mk"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/worktree_lifecycle.sh"
+      },
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/detect_orphaned_commits.py"
+      },
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/worktree_audit.py"
+      },
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/dev-loop-worktrees.md"
+      },
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "kind": "only_modify",
+        "path_glob": "make/help.mk"
+      },
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "kind": "only_modify",
+        "path_glob": "make/inventory.json"
+      },
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "kind": "only_modify",
+        "path_glob": "make/worktree-maintenance.mk"
+      },
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/worktree/test_worktree_audit.py"
+      },
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_worktree_audit.py"
+      },
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_detect_orphaned_commits.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_worktree_audit.py tests/integration/worktree/test_worktree_audit.py tests/unit/workflows/test_detect_orphaned_commits.py -q",
+        "description": "Audit policy and fixtures",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make makefile-inventory-check",
+        "description": "Make inventory",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make worktree-audit FORMAT=json | jq -e 'type == \"object\" and (.schema_version | type == \"number\")'",
+        "description": "Live JSON audit",
+        "expected": "exit 0 without mutation",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "worktree-maintenance-readonly-audit",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1937 extracted typed GitHub pagination and exact git/PR evidence",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "notes": null,
+        "started_at": "2026-08-29T13:07:22Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Extract typed GitHub pagination and exact head repository, PR state, base, head OID, and merge commit evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1937 implemented worktree path, lock, head, dirtiness evidence",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "notes": null,
+        "started_at": "2026-08-29T13:07:25Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement canonical worktree path, branch, head, lock, detached, prunable, missing, and dirtiness evidence",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1937 implemented policy classification and JSON schema",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "notes": null,
+        "started_at": "2026-08-29T13:07:27Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement policy classification and bounded schema-versioned JSON",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1937 added human output and make worktree-audit target",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "notes": null,
+        "started_at": "2026-08-29T13:07:30Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add human output and make worktree-audit without mutation",
+        "wid": "w3"
+      },
+      {
+        "evidence": "PR #1937 and #1938 tested squash merge, branch reuse, base checks",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "notes": null,
+        "started_at": "2026-08-29T13:07:32Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Test squash merge, post-merge commits, branch reuse, forks, bases, API failures, dirty states, locks, and ambiguity",
+        "wid": "w4"
+      },
+      {
+        "evidence": "PR #1937 and #1938 live report reviewed and merged",
+        "item_id": "worktree-maintenance-readonly-audit",
+        "notes": null,
+        "started_at": "2026-08-29T13:07:35Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run report-only on the live repository and independently review classifications",
+        "wid": "w5"
+      }
+    ]
+  }
+}

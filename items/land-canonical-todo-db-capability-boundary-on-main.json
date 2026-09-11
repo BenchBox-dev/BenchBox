@@ -1,0 +1,121 @@
+{
+  "context": "Isolated git worktree off feat/minimize-wrapper-skills; thin SKILL.md by moving router detail to references; add machine-readable standalone-vs-wrapper capability declaration and gate standalone-only verbs explicitly; full diff review; promotion PR to main; after merge fast-forward the live checkout branch (no branch switch in the dirty checkout).",
+  "description": "Predecessor align-canonical-agent-skills-with-authority-and-identity-policy was marked done on 2026-07-27, but its content sits only on feat/minimize-wrapper-skills (9 commits, no promotion PR); BenchBox mirrors were generated from the unpinned local checkout on that branch. Two BenchBox CI failures are rooted in canonical source: todo-db SKILL.md body is 52 non-empty lines (limit 40) and references/queries.md presents the standalone-only 'todo update' verb (todo-db >= 0.3) in a form indistinguishable from a project-wrapper invocation. Fix at canonical source in an isolated worktree (never the dirty ~/.skill-sync checkout), then promote to main. Recommended promotion: whole-branch PR to main after full-diff review (BenchBox mirrors already embed most of it; cherry-picking 9 interdependent commits invites drift) - rejected alternative documented in the PR. Joe's uncommitted WIP in ~/.skill-sync (skills/docs deletions, untracked skills/skill-sync.config.yaml) is preserved untouched.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-28T13:10:10Z",
+      "completed_pr": 7,
+      "created_at": "2026-07-28T12:50:15Z",
+      "worktree": "skill-sync-canonical"
+    },
+    "preserves": [
+      {
+        "behavior": "All commits authored and committed by Joe Harris <joeharris76@gmail.com>",
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main"
+      },
+      {
+        "behavior": "Joe's uncommitted working-tree changes in ~/.skill-sync (skills/docs deletions and untracked config) remain exactly as found",
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main"
+      },
+      {
+        "behavior": "Stable REVIEW-* policy IDs in SHARED/review-protocol remain present",
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main"
+      },
+      {
+        "behavior": "Standalone todo-db >= 0.3 functionality stays documented; no wrapper is taught unsupported commands",
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.skill-sync/skills/docs/**"
+      },
+      {
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.skill-sync/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "python3 -c \"import sys; t=open('/Users/joe/.skill-sync/skills/todo-db/SKILL.md').read(); b=t.split('---',2)[2]; sys.exit(0 if len([l for l in b.splitlines() if l.strip()])<=40 else 1)\"",
+        "description": "todo-db SKILL.md body is thin",
+        "expected": "exit 0 iff <=40 non-empty body lines",
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:10:25Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -qi standalone /Users/joe/.skill-sync/skills/todo-db/references/queries.md",
+        "description": "standalone-only verbs are capability-gated in queries.md",
+        "expected": "queries.md explicitly marks update as standalone-only",
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:10:27Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "sh -c 'cd /Users/joe/.skill-sync && git fetch -q origin && git diff --quiet origin/main -- skills/todo-db'",
+        "description": "canonical main holds the final todo-db content",
+        "expected": "live tree todo-db matches origin/main after promotion",
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:10:29Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "commit 5c11f5a in promote/minimize-wrapper-skills worktree: SKILL.md action table grouped by guide, body now 33 non-empty lines (verified via python3 count <=40)",
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main",
+        "notes": null,
+        "started_at": "2026-07-28T12:56:21Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Thin todo-db SKILL.md to <=40 non-empty body lines by moving routing detail into references",
+        "wid": "w1"
+      },
+      {
+        "evidence": "commit 5c11f5a: skill.yaml standalone_only_commands {update: >=0.3.0} (yaml.safe_load verified), queries.md update entry rewritten as standalone-only with rule-4 stop language; skill-sync validate --project <worktree> passed",
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main",
+        "notes": null,
+        "started_at": "2026-07-28T12:56:23Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add machine-readable capability boundary for standalone-only verbs and rewrite queries.md so wrapper-unsupported verbs are explicitly standalone-gated",
+        "wid": "w2"
+      },
+      {
+        "evidence": "full origin/main...feat diff adversarially reviewed (no secrets, no broken refs, lock verified 0 mismatches, identity policy rejects agent identities); promotion PR https://github.com/joeharris76/skill-sync-skills/pull/7 merged 2026-07-28T13:09:27Z as merge commit; decision + rejected cherry-pick alternative + transitional docs-skill state documented in PR body; live checkout fast-forwarded on its own branch (no checkout/switch), Joe's WIP byte-identical",
+        "item_id": "land-canonical-todo-db-capability-boundary-on-main",
+        "notes": null,
+        "started_at": "2026-07-28T13:10:08Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Review full origin/main...feat/minimize-wrapper-skills diff, document promotion decision and rejected alternative, open promotion PR to main, merge, fast-forward live checkout",
+        "wid": "w3"
+      }
+    ]
+  }
+}

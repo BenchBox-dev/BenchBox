@@ -1,0 +1,143 @@
+{
+  "context": "Capture the current origin/develop SHA, dispatch nightly.yml on develop, wait for completion without polling beyond the active batch, and inspect exact Windows job conclusions. If a hand-off-owned family remains red, fix it in a dedicated PR before completing this item; unrelated failures must be recorded with evidence and routed without weakening the Windows acceptance criterion.",
+  "description": "The hand-off's Windows families were fixed across multiple merged PRs, but the latest develop Nightly run 30690807993 predates those merges and still has failing Windows test jobs. Dispatch Nightly Validation from current develop, require both Windows 3.10 and 3.12 test jobs to complete successfully, and inventory any remaining failures with resolved run and job IDs.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Treat a pre-merge scheduled run as final proof",
+        "instead": "Dispatch from the current develop SHA",
+        "item_id": "windows-nightly-consolidated-postmerge-proof",
+        "why": "It does not contain the completed fixes"
+      },
+      {
+        "dont": "Use a literal xargs placeholder inside command substitution",
+        "instead": "Resolve run_id and job_id into non-empty variables first",
+        "item_id": "windows-nightly-consolidated-postmerge-proof",
+        "why": "It produced a vacuous zero-failure count"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-01T20:46:56Z",
+        "from_item": "windows-nightly-consolidated-postmerge-proof",
+        "id": 681,
+        "reason": "Run 30717140915 job 91414534073 failed only test_cooperative_cancel_with_real_set_event_still_cancels: the 0.1s sleeper can complete before the timeout handler inspects future.done() on a loaded runner, leaving the event correctly unset but making the test nondeterministic. This is outside the Windows acceptance criterion and needs a deterministic event-driven test.",
+        "resolution": "promoted",
+        "resolved_item": "nightly-macos-throughput-cooperative-cancel-flake",
+        "resolved_reason": null,
+        "summary": "macOS Nightly cooperative-cancel test races worker completion against timeout classification"
+      }
+    ],
+    "item_meta": {
+      "category": "verification",
+      "created_at": "2026-08-01T20:20:43Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A green required PR aggregator is not substituted for Nightly Windows proof",
+        "item_id": "windows-nightly-consolidated-postmerge-proof"
+      },
+      {
+        "behavior": "No assertion is weakened or test skipped merely to make Nightly green",
+        "item_id": "windows-nightly-consolidated-postmerge-proof"
+      },
+      {
+        "behavior": "Run and job IDs are resolved before failure counts are interpreted",
+        "item_id": "windows-nightly-consolidated-postmerge-proof"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-nightly-consolidated-postmerge-proof",
+        "kind": "do_not_modify",
+        "path_glob": "**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "run_id=$(gh run list --repo joeharris76/BenchBox --workflow nightly.yml --event workflow_dispatch --branch develop --limit 1 --json databaseId --jq '.[0].databaseId'); test -n \"$run_id\"; gh run view \"$run_id\" --repo joeharris76/BenchBox --json status,conclusion --jq 'select(.status==\"completed\" and .conclusion==\"success\")' | grep -q success",
+        "description": "Latest dispatched Nightly completed successfully",
+        "expected": "passes only for a completed successful current dispatch and fails while the workflow is red or incomplete",
+        "item_id": "windows-nightly-consolidated-postmerge-proof",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "run_id=$(gh run list --repo joeharris76/BenchBox --workflow nightly.yml --event workflow_dispatch --branch develop --limit 1 --json databaseId --jq '.[0].databaseId'); test -n \"$run_id\"; test \"$(gh run view \"$run_id\" --repo joeharris76/BenchBox --json jobs --jq '[.jobs[]|select((.name==\"test (windows-latest, 3.10)\" or .name==\"test (windows-latest, 3.12)\") and .conclusion==\"success\")]|length')\" -eq 2",
+        "description": "Both Windows interpreter test jobs succeeded",
+        "expected": "passes only when both Windows test jobs are green and fails on the pre-fix run",
+        "item_id": "windows-nightly-consolidated-postmerge-proof",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-nightly-consolidated-postmerge-proof",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-nightly-consolidated-postmerge-proof",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "windows-nightly-consolidated-postmerge-proof",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Dispatched Nightly Validation run 30717140915 from current origin/develop f5c7699bf6ca235b21adfa9d1fe08bbe4ab58389 after 2026-08-01T20:30:38Z; run URL https://github.com/joeharris76/BenchBox/actions/runs/30717140915.",
+        "item_id": "windows-nightly-consolidated-postmerge-proof",
+        "notes": null,
+        "started_at": "2026-08-01T20:30:38Z",
+        "started_branch": "fix/finish-three-workflow-ci-handoff",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-finish-ci-handoff",
+        "status": "done",
+        "summary": "Capture current develop SHA and dispatch Nightly Validation",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-nightly-consolidated-postmerge-proof",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wait for the dispatched run and inspect both Windows test jobs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-nightly-consolidated-postmerge-proof",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Fix any remaining hand-off-owned Windows failures and rerun",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-nightly-consolidated-postmerge-proof",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record final run and job links with zero Windows test failures",
+        "wid": "w3"
+      }
+    ]
+  }
+}

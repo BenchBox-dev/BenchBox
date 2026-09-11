@@ -1,0 +1,304 @@
+{
+  "context": "Build the receipt as a reusable display component fed by existing DetailResult\nfields. Add compare-specific aggregation separately so one result receipt does\nnot grow conditional compare logic. Keep the visual treatment compact:\n12-13px labels, 13-14px values, strong section labels, no paragraph-heavy\nmethodology in the primary surface.\n",
+  "description": "Add a trust-forward \"Run Receipt\" pattern to result detail, compare, and\nleaderboard surfaces. The hostile-reader test for database benchmarks is\nstraightforward: a vendor will attack hardware, version pinning, validation,\ntuning, cost normalization, and query scope before accepting the ranking.\nToday much of that context is either low in the page, collapsed, inconsistently\nlabeled, or absent from compare/leaderboard contexts.\n\nThe design goal is not more prose. It is an auditable receipt: command,\nbenchmark/scale/phase, platform and driver version, environment, validation,\ntuning, cost model, artifact IDs, bundle link, and eventually plan artifacts.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add long methodology prose to leaderboard rows",
+        "instead": "use badges and links there, full receipt on detail.",
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "why": "it destroys density"
+      },
+      {
+        "dont": "bury hardware/version/tuning/cost context below charts",
+        "instead": "show a receipt near the primary metrics.",
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "why": "these are the first things a skeptical database engineer will attack"
+      },
+      {
+        "dont": "imply plans are public when `has_plans` is false",
+        "instead": "show explicit unavailable status.",
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "why": "execution plans are a follow-on phase"
+      }
+    ],
+    "item_meta": {
+      "category": "Result Integrity",
+      "completed_at": "2026-05-01T00:00:00Z",
+      "created_at": "2026-05-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Bundle download URLs and result detail URLs remain stable.",
+        "item_id": "explorer-run-receipt-methodology-disclosure"
+      },
+      {
+        "behavior": "Execution plans remain a follow-on; this item only exposes availability/status.",
+        "item_id": "explorer-run-receipt-methodology-disclosure"
+      },
+      {
+        "behavior": "Existing MethodologyDisclosure tests continue to pass or are migrated to the new receipt/disclosure split.",
+        "item_id": "explorer-run-receipt-methodology-disclosure"
+      },
+      {
+        "behavior": "TrustBadge semantics remain consistent across home, benchmark, platform, compare, and detail pages.",
+        "item_id": "explorer-run-receipt-methodology-disclosure"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ComparabilityReceipt.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MethodologyDisclosure.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RunReceipt.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TrustBadge.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/ComparabilityReceipt.test.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MethodologyDisclosure.test.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/RunReceipt.test.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/TrustBadge.test.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/types.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Frontend typecheck and component/page tests pass.",
+        "expected": "All tests pass, including RunReceipt and ComparabilityReceipt coverage.",
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium -- --grep \"ResultDetail|Compare\"",
+        "description": "Manual detail and compare smoke.",
+        "expected": "Chromium browser smoke verifies `/results/r/{id}` and `/results/compare?ids=...` render their primary detail/compare surfaces.",
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "notes": "Add `results-explorer/src/components/RunReceipt.tsx`. It should render a\ndense two-column receipt with sections:\n  - Workload: benchmark, scale factor, phase/test type, query count,\n    sample count.\n  - Platform: platform, platform version, driver version, execution mode,\n    tuning mode/hash.\n  - Environment: OS, arch, CPU count, memory, Python.\n  - Integrity: trust label, visibility, validation status, compliance\n    class, ranking eligibility.\n  - Artifacts: result ID, short ID if available, bundle download, plans\n    availability, reproduce command if available.\n  - Cost: normalized cost status/model/scope once available.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design and implement compact RunReceipt component for result detail",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "notes": "On ResultDetail, place RunReceipt adjacent to or immediately below the\nprimary metric summary. MethodologyDisclosure can remain for deeper text,\nbut the receipt must be visible before charts/timing tables on desktop and\nreachable before raw samples on mobile.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Promote methodology from lower-page disclosure to above-the-fold trust panel",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "notes": "THIS ITEM OWNS the ComparabilityReceipt component. The downstream\n`explorer-compare-decision-summary` item consumes it (its w4 cohort\nguardrails render through this component) but does not redefine its\nAPI. In Compare.tsx, render a compact comparability strip showing which\nfields are identical across selected runs and which differ: benchmark,\nscale factor, phase, date window, platform versions, driver versions,\ntuning, validation, cost model, environment. Differences are explicit\nwarnings, not buried in row metadata.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add compare-page comparability receipt for selected result set",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "notes": "Add small trust/receipt affordances to row headers or result links in\nMetaLeaderboard, BenchmarkIndex, and PlatformIndex: trust badge,\nvalidation status, and quick link to the result detail receipt. Keep it\ncompact enough for dense tables.\nOwned files for this work unit:\n  - results-explorer/src/components/MetaLeaderboard.tsx\n  - results-explorer/src/components/QueryHeatmap.tsx\n  - results-explorer/src/components/RunReceipt.tsx\n  - results-explorer/src/components/TrustBadge.tsx\n  - results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx\n  - results-explorer/src/components/__tests__/QueryHeatmap.test.tsx\n  - results-explorer/src/components/__tests__/TrustBadge.test.tsx\n  - results-explorer/src/lib/duckdbQueries.ts\n  - results-explorer/src/lib/__tests__/duckdbQueries.test.ts\n  - results-explorer/src/pages/BenchmarkIndex.tsx\n  - results-explorer/src/pages/Home.tsx\n  - results-explorer/src/pages/PlatformIndex.tsx\n  - results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx\n  - results-explorer/src/pages/__tests__/Home.test.tsx\n  - results-explorer/src/pages/__tests__/PlatformIndex.test.tsx\n  - results-explorer/src/types.ts\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Surface methodology links from leaderboard rows and benchmark matrices",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "notes": "If `has_plans` is true, show \"Plans available\" linking to the future plan\nviewer/download route if present. If false, show \"Plans not published\" in\nthe receipt. Do not implement a full plan viewer in this TODO.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prepare execution-plan affordance without requiring public plans in this phase",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-run-receipt-methodology-disclosure",
+        "notes": "Tests should assert that query count and sample count are separate, bundle\nlinks render, validation/trust fields render, and compare warnings appear\nwhen selected runs differ in benchmark/scale/tuning/environment.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for receipt labels, count semantics, and compare warnings",
+        "wid": "w6"
+      }
+    ]
+  }
+}

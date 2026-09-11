@@ -1,0 +1,10 @@
+{
+  "description": "Ensure pytest’s default run succeeds without optional database connectors by isolating or skipping adapter suites that hard-fail when cloud drivers are absent.",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (Should-Fix Before Release)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "observability-quality"
+    }
+  }
+}

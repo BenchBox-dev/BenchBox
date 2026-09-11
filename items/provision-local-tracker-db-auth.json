@@ -1,0 +1,120 @@
+{
+  "context": "Prefer wrapper-side auto-mint of short-lived tokens over a static long-lived token in .env; never echo or persist token values; doctor and the fallback-refusal error must both name the provisioning path.",
+  "description": "Runs FIRST in the 2026-08-05 tracker-simplification batch (critical priority; deps to the sibling items cannot be added until the update verb lands — see expose-update-verb-in-project-wrapper). The G-round acceptance record in _project/specs/todo-db-tracker.md (~line 819) documents the deviation: TODO_DB_URL/TODO_DB_AUTH_TOKEN are provisioned in the remote CI environment only, verified absent locally, with an open maintainer note to fix local provisioning that was never actioned. Every local session since depends on ad-hoc knowledge of the turso-CLI mint pattern (turso db tokens create benchbox-todo); this session hit the wall again on 2026-08-05. Make local backend selection self-provisioning: when no explicit backend is configured and a logged-in turso CLI is available, the wrapper should mint a short-lived token itself (or, if the .env route is chosen, doctor must say exactly how to provision it). Failure mode today is a generic refusal that does not name the sanctioned local path.",
+  "legacy": {
+    "item_meta": {
+      "category": "tracker-simplification",
+      "completed_at": "2026-08-05T21:15:06Z",
+      "completed_pr": 1580,
+      "created_at": "2026-08-05T18:36:10Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Backend precedence --db > TODO_DB_PATH > TODO_DB_URL unchanged; explicit config always outranks auto-provisioning; tokens are never echoed, logged, or committed",
+        "item_id": "provision-local-tracker-db-auth"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "provision-local-tracker-db-auth",
+        "kind": "do_not_modify",
+        "path_glob": "_project/todo-db-export/*"
+      },
+      {
+        "item_id": "provision-local-tracker-db-auth",
+        "kind": "only_modify",
+        "path_glob": ".env.example"
+      },
+      {
+        "item_id": "provision-local-tracker-db-auth",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "provision-local-tracker-db-auth",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/todo-db-tracker.md"
+      },
+      {
+        "item_id": "provision-local-tracker-db-auth",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/*.md"
+      },
+      {
+        "item_id": "provision-local-tracker-db-auth",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/*.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "env -u TODO_DB_URL -u TODO_DB_AUTH_TOKEN -u TODO_DB_PATH _project/scripts/todo doctor >/dev/null 2>&1",
+        "description": "Bare environment reaches the hosted tracker",
+        "expected": "doctor exits 0 with no tracker env vars set, using the logged-in turso CLI (or documented .env) alone",
+        "item_id": "provision-local-tracker-db-auth",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run pytest tests/unit/scripts/test_todo_db.py -q",
+        "description": "Tracker test suite passes",
+        "expected": "all todo_db tests green",
+        "item_id": "provision-local-tracker-db-auth",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "provision-local-tracker-db-auth",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "provision-local-tracker-db-auth",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Decision: wrapper auto-mints short-lived turso token when no explicit backend is configured and turso CLI is logged in; explicit --db/TODO_DB_PATH/TODO_DB_URL always outrank; .env documented as manual alternative. Rationale: no static long-lived secrets on disk; matches the sanctioned local pattern in todo-db-tracker.md G-round acceptance.",
+        "item_id": "provision-local-tracker-db-auth",
+        "notes": null,
+        "started_at": "2026-08-05T18:39:03Z",
+        "started_branch": "claude/provision-local-tracker-db-auth",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/todo-tracker-storage-7725c9",
+        "status": "done",
+        "summary": "Decide mechanism",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1580: auto-mint via turso CLI with 1d expiry; bare-env doctor green; 106 unit tests",
+        "item_id": "provision-local-tracker-db-auth",
+        "notes": null,
+        "started_at": "2026-08-05T18:39:30Z",
+        "started_branch": "claude/provision-local-tracker-db-auth",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/todo-tracker-storage-7725c9",
+        "status": "done",
+        "summary": "Implement backend resolution fallback with clear doctor guidance",
+        "wid": "w2"
+      },
+      {
+        "evidence": "docs/operations/todo-db-benchbox-extraction.md Local auth provisioning + .env.example + spec note",
+        "item_id": "provision-local-tracker-db-auth",
+        "notes": null,
+        "started_at": "2026-08-05T20:48:13Z",
+        "started_branch": "claude/provision-local-tracker-db-auth",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/todo-tracker-storage-7725c9",
+        "status": "done",
+        "summary": "Document in ops runbook and .env.example",
+        "wid": "w3"
+      }
+    ]
+  }
+}

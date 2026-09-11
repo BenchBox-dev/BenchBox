@@ -1,0 +1,16 @@
+{
+  "description": "Create unit and integration tests for PySpark SQL adapter,\nmirroring the structure of existing PySpark DataFrame tests.\n\nTest coverage requirements:\n- Session management (singleton, configuration, shutdown)\n- Schema creation (DDL translation, constraint handling)\n- Data loading (CSV, Parquet, TBL formats)\n- Query execution (timing, result collection)\n- Integration with TPC-H SF=0.01\n\nAll tests must include Java version skip logic since\nPySpark 4.x is incompatible with Java 23+.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pyspark-sql-tests",
+        "needs_item": "pyspark-sql-registry-integration"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2025-12-07T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

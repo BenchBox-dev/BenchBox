@@ -1,0 +1,308 @@
+{
+  "description": "The G4 deferred-debt sweep (2026-07-19) classified all 629 open deferrals;\nthese 27 could not be resolved from the repo and need a MAINTAINER decision\n(product / policy / behavior / spend calls). This item links each one.\n\nFor each deferral, run ONE of:\n  todo promote <deferral_id> --to-item <new-slug>   # keep as tracked work\n  todo dismiss <deferral_id> --reason \"...\"          # drop it\n\nThe 27 (deferral_id · source item [state] · deferred action → decision needed):\n\n- #34 · todo-review-semantic-guardrails [planning] · Introduce a skipped/waived work status → Adding a skipped/waived TODO status is a lifecycle-semantics change; todo-review-semantic-guardrails (open) enforces the current model first. No schema item covers a new status; needs maintainer design decision.\n- #55 · placeholder-rows-fetch-safety [done] · Fixes to at-risk value consumers found by the w1 audit → The w1 at-risk-consumer audit table lives in the PR body, not the repo; the systemic placeholder-sentinel fix landed. Maintainer must review that audit to decide which residual consumer fixes are still warranted.\n- #72 · harmonize-benchmark-runtime-contract-and-base-classes [done] · Potential removal of top-level wrapper classes in `benchbox/*.py` → Top-level benchbox/*.py wrapper modules (tpch.py, ssb.py, etc.) exist and form the public import API; removing them is a backward-compat/API-stability decision maintainer must make. Not tracked.\n- #73 · platform-driver-version-capability-matrix-and-cloud-version-model [done] · Automated live-cloud verification against paid accounts in CI → Whether to provision/fund paid cloud accounts and set a secrets policy for automated live-verification in CI is an unmade cost/policy decision; reason deliberately decouples it from account availability. No open item covers it.\n- #126 · codex-pr-review-followups-week-2026-05-03 [done] · Cloud verification of MotherDuck database propagation (w18) → Confirming MotherDuck runs land on the configured non-default DB needs a live account; the w18 local fix already shipped. motherduck-cloud-features covers wizard/upload/cache, not this. Credential/priority call.\n- #133 · coverage-to-80-percent [done] · PySpark and LakeSail DataFrame adapters → coverage-to-80-percent (DONE) met its goal via scope refinement; PySpark/LakeSail adapter tests need live Spark/LakeSail engines. No owning open item; standing up that infra is a resourcing decision.\n- #142 · declare-undeclared-runtime-imports [done] · Decide which AI-primitive backend is the canonical default → Choosing the canonical default AI-primitives backend is an explicit product decision (declare-undeclared-runtime-imports DONE only declared deps). Not tracked by any open item; maintainer must decide.\n- #187 · generalize-tpc-tuning-base [done] · Measured performance ranking of candidate columns on live Databricks, BigQuery, Snowflake, or Redshift → Live measured column-perf ranking across Databricks/BigQuery/Snowflake/Redshift needs a credentials/spend decision. generalize-tpc-tuning-base (DONE) built semantics only; no open item owns live ranking.\n- #205 · migrate-psycopg2-to-psycopg3 [done] · Live integration tests against real PostgreSQL/TimescaleDB/QuestDB instances post-migration → psycopg3 migration DONE and gated by mocked unit suite. Live Postgres/TimescaleDB/QuestDB integration tests need external infra; no open item tracks it. Resourcing/infra decision.\n- #287 · uat-docker-platform-switch-cleanup [done] · Cleanup of externally managed Docker stacks → Cleaning externally-managed Docker stacks can delete developer data; the deferral explicitly requires separate human approval + design before any external-cleanup mode. Genuine maintainer safety decision.\n- #349 · benchmark-api-and-core-boundary-cleanup [done] · Split all of benchbox/core into engine and benchmark packages → Splitting benchbox/core into engine+benchmark packages is explicitly gated on a public-API decision and plugin-seam ADR; no such ADR exists in _project/decisions/. Maintainer must make that scoping decision first.\n- #397 · execution-results-driver-metadata-and-validation-semantics [done] · Redesign all validation stages as typed applicability/pass/fail objects → execution-results item (DONE) fixed the not-applicable-vs-failed conflation. A typed applicability/pass/fail validation-object redesign is large result-schema architecture; no open item owns it. Maintainer scoping decision.\n- #399 · execution-results-result-model-extension-contract [done] · Move all existing platform-specific result fields into `platform_extensions` → The DONE contract item delivered the policy/inventory but judged the wholesale platform-field->platform_extensions migration only 'directionally useful'; platform_extensions isn't even present in core. Whether to execute the risky migration is a maintainer call.\n- #405 · fail-open-policy-and-translation-strictness [done] · Make validation enabled by default for every benchmark → Blocking mode-policy work (fail-open-policy-and-translation-strictness) is DONE, but enabling validation by default for every benchmark is a potentially expensive, user-visible behavior change needing maintainer sign-off.\n- #417 · joinorder-canonical-cutover [done] · Removing joinorder_synthetic in a future release → joinorder_synthetic still exists (benchbox/core/joinorder_synthetic/) and is actively used as the Track-2 testbed; Joe set no deprecation contract. Whether to retire vs retain it is an explicit maintainer decision, deferred post-Step-2.\n- #462 · prompts-landing-phase5-mcp-parity [done] · MCP live-server integration tests for rendered prompts → prompts-landing phase5 MCP parity DONE with unit/render-smoke coverage. Live MCP-server integration tests are a separate surface needing infra; no open item covers them. Priority/infra decision.\n- #467 · release-required-main-pr-test-contract [done] · Make all live cloud and stress suites release-blocking → Making all live cloud + stress suites release-blocking is a CI-cost and cloud-credential-policy decision explicitly deferred out of the first mandatory release contract; maintainer must set that policy.\n- #476 · rename-experimental-concurrency-to-load-testing [done] · Harden the framework and decide whether to wire it into the CLI/UAT as a supported load-testing mode → load_testing lives in benchbox/experimental/, unwired from CLI/UAT, 'revisit when there is time to invest'. Whether to harden it and promote it to a supported CLI/UAT load-testing mode is an unmade product-investment decision.\n- #492 · testing-approach-correctness-gates [done] · Make live cloud correctness release-blocking → Making live-cloud correctness release-blocking requires credential/cost/flake-tolerance policy decisions explicitly out of this item's scope; a genuine maintainer release-gate policy call, no owning open item.\n- #510 · uat-shared-submit-classifier [done] · Unify UAT terminal-state vocabulary with CLI exit-code semantics end to end → The load-bearing classifier extraction (uat-shared-submit-classifier) is DONE; unifying UAT terminal-state vocabulary with CLI exit-code semantics end-to-end is the flagged larger API decision, untracked and needing maintainer judgment.\n- #516 · visualization-mcp-surface-and-help-contract [done] · Bundle or proxy the external textcharts MCP server through BenchBox → Bundling/proxying the external textcharts MCP server (which was deliberately extracted out of BenchBox) has namespace and support implications the from-item flagged as a product decision to document before adding registration behavior.\n- #522 · visualization-suggestions-and-render-orchestration [done] · Change CLI `--chart-type auto` from rendering all charts to rendering only recommended charts → cli/commands/visualize.py still treats --chart-type auto identically to all (renders every chart, line 102). Switching auto to render only recommended charts is a user-visible behavior change explicitly requiring approval not yet given.\n- #527 · write-primitives-architecture-fixes [done] · DuckDB datasketches extension stabilization → The PR #133 extension-drift blind spot is real, but vendoring vs replacing vs pinning DuckDB's community datasketches extension is a dependency-management decision with distinct tradeoffs; not covered by write-primitives-sketch-cloud-verification.\n- #573 · snowflake-clickhouse-open-table-format-loading [done] · Integration tests with real Snowflake/ClickHouse instances → snowflake-clickhouse-open-table-format-loading DONE with unit coverage; integration tests against real Snowflake/ClickHouse instances need cloud credentials. No open item tracks them; credential/infra decision.\n- #591 · postgres-extension-benchmarking-infrastructure [done] · CI/CD integration tests with Docker-based PostgreSQL extensions → postgres-extension-benchmarking-infrastructure DONE. CI integration tests with Docker-based PG extensions need Docker-in-Docker or dedicated runners; that's a CI-infrastructure/cost decision, not concretely scoped, no owning item.\n- #609 · uat-enabled-platforms-full-sweep-release-gate [done] · Run cloud/live platform UAT → The DONE sweep covered local Docker platforms; cloud/live platform UAT explicitly requires separate approval. No open item tracks a cloud UAT sweep; approval/spend decision for the maintainer.\n- #624 · uat-release-gate-enforcement [done] · Automated scheduled release-gate sweeps in CI (cloud runners with docker stacks) → uat-release-gate-enforcement shipped operator-run + committed-evidence enforcement. Automated scheduled cloud-runner docker sweeps in CI need a cost/credential policy decision explicitly flagged as its own; no open item owns it.\n\nProvenance: full triage in the session's g4_triage_final.tsv / g4_uncertain_queue.tsv.\nThese 27 are the only deferrals the sweep left open (475 dismissed, 127 promoted).",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T13:48:22Z",
+      "worktree": "main"
+    },
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #34 (from todo-review-semantic-guardrails)",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #55 (from placeholder-rows-fetch-safety)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #349 (from benchmark-api-and-core-boundary-cleanup)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #397 (from execution-results-driver-metadata-and-validation-semantics)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #399 (from execution-results-result-model-extension-contract)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #405 (from fail-open-policy-and-translation-strictness)",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #417 (from joinorder-canonical-cutover)",
+        "wid": "w14"
+      },
+      {
+        "evidence": "Deferral #462 was promoted; successor mcp-live-prompt-integration-coverage-v2-2 completed 2026-08-02 via PR #1469. Local stdio and loopback Streamable HTTP prompt integration coverage is retained as mission-consistent MCP work.",
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": "2026-08-16T22:45:08Z",
+        "started_branch": "docs/mcp-external-acceptance-20260816",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-mcp-external-acceptance-20260816",
+        "status": "done",
+        "summary": "Decide deferral #462 (from prompts-landing-phase5-mcp-parity)",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #467 (from release-required-main-pr-test-contract)",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #476 (from rename-experimental-concurrency-to-load-testing)",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #492 (from testing-approach-correctness-gates)",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #510 (from uat-shared-submit-classifier)",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #72 (from harmonize-benchmark-runtime-contract-and-base-classes)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Deferral #516 was promoted and resolved: mcp-textcharts-surface-boundary-v2-2 completed via PR #1470, and mcp-textcharts-bundle-proxy-product-security-decision-v2 recorded the accepted separate-client decision on 2026-08-08. No bundle or proxy work remains.",
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": "2026-08-16T22:45:13Z",
+        "started_branch": "docs/mcp-external-acceptance-20260816",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-mcp-external-acceptance-20260816",
+        "status": "done",
+        "summary": "Decide deferral #516 (from visualization-mcp-surface-and-help-contract)",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #522 (from visualization-suggestions-and-render-orchestration)",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #527 (from write-primitives-architecture-fixes)",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #573 (from snowflake-clickhouse-open-table-format-loading)",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #591 (from postgres-extension-benchmarking-infrastructure)",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #609 (from uat-enabled-platforms-full-sweep-release-gate)",
+        "wid": "w25"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #624 (from uat-release-gate-enforcement)",
+        "wid": "w26"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #73 (from platform-driver-version-capability-matrix-and-cloud-version-model)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #126 (from codex-pr-review-followups-week-2026-05-03)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #133 (from coverage-to-80-percent)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #142 (from declare-undeclared-runtime-imports)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #187 (from generalize-tpc-tuning-base)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #205 (from migrate-psycopg2-to-psycopg3)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "maintainer-review-g4-uncertain-deferrals",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide deferral #287 (from uat-docker-platform-switch-cleanup)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

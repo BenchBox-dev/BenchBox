@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: High\"\n- \"**Status**: ✅ Completed\"\n- \"**Description**: Update copyright and license declarations throughout the project to ensure proper attribution and TPC compliance\"\n- \"**Tasks**:\"\n- \"**Specific TPC Copyright Requirements**:\"\n- \"**Files Affected**: All source files (.py), documentation (.md), configuration files, examples, tests, package metadata\"\n- \"**Impact**: ✅ Ensures legal compliance, proper attribution, protects project intellectual property, and maintains TPC benchmark trademark compliance. Successfully added copyright headers to 323+ Python files, 108+ documentation files, and comprehensive legal documentation including COPYRIGHT.md with TPC Fair Use Policy compliance.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Legal and Licensing",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

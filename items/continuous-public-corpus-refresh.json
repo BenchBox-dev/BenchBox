@@ -1,0 +1,127 @@
+{
+  "context": "Schedule publication of an agreed matrix; do not invent a new benchmark framework. Point existing run machinery at published-results.",
+  "description": "Original customer-value step 9. Newest public bundle is 2026-07-30; inventory generated 2026-08-06. published-results last moved 2026-08-06. The explorer is only worth returning to if the corpus moves.\n\nThis is not a v0.4.0 /results/ launch blocker. First publish the already-run TPC-H SF10/SF100 and official TPC-DS bundles, then put a monthly (or similar) publication sweep on a calendar. Reuse existing nightly/UAT machinery for generation if useful, but the missing piece is publication to published-results, not more CI gates.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "build a new nightly UAT gate instead of publishing",
+        "instead": "INSTEAD schedule publication onto published-results",
+        "item_id": "continuous-public-corpus-refresh",
+        "why": "the corpus is stale from lack of submit, not lack of CI"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "continuous-public-corpus-refresh",
+        "needs_item": "add-third-benchmark-cohort-to-corpus"
+      },
+      {
+        "item_id": "continuous-public-corpus-refresh",
+        "needs_item": "raise-public-corpus-scale-ceiling"
+      }
+    ],
+    "item_meta": {
+      "category": "Customer-facing",
+      "completed_at": "2026-08-29T13:05:41Z",
+      "completed_pr": 1794,
+      "created_at": "2026-08-20T14:52:56Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not publish unofficial TPC-DS as official",
+        "item_id": "continuous-public-corpus-refresh"
+      },
+      {
+        "behavior": "Do not require an external contributor to land maintainer-run bundles",
+        "item_id": "continuous-public-corpus-refresh"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "continuous-public-corpus-refresh",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "continuous-public-corpus-refresh",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "continuous-public-corpus-refresh",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "continuous-public-corpus-refresh",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "continuous-public-corpus-refresh",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'import json; d=json.load(open(\"results-data/corpus-inventory.json\")); print(max(b[\"timestamp\"] for b in d[\"bundles\"]))'",
+        "description": "Corpus newest timestamp is newer than 2026-07-30",
+        "expected": "a date after 2026-07-30",
+        "item_id": "continuous-public-corpus-refresh",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "continuous-public-corpus-refresh",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "continuous-public-corpus-refresh",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "docs/operations/corpus-refresh.md: monthly DuckDB/DataFusion/Polars TPC-H/TPC-DS/SSB matrix; SF10/SF100 stay operator-run",
+        "item_id": "continuous-public-corpus-refresh",
+        "notes": null,
+        "started_at": "2026-08-20T19:09:29Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Choose the recurring matrix and cadence (platforms x benchmarks x scales) and write it down",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1794: seed-corpus.yml cron 0 7 1 * *; TPC-DS --official; existing develop PR then sync-results-data-to-published",
+        "item_id": "continuous-public-corpus-refresh",
+        "notes": null,
+        "started_at": "2026-08-20T19:16:48Z",
+        "started_branch": "chore/continuous-public-corpus-refresh",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-refresh",
+        "status": "done",
+        "summary": "Wire a scheduled path that produces and submits that matrix to published-results",
+        "wid": "w2"
+      },
+      {
+        "evidence": "published-results after #1786: newest bundle timestamp 2026-08-18 > 2026-07-30; max_sf 100; tpcds True. Monthly schedule produces the next cycle.",
+        "item_id": "continuous-public-corpus-refresh",
+        "notes": null,
+        "started_at": "2026-08-20T19:16:53Z",
+        "started_branch": "chore/continuous-public-corpus-refresh",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-refresh",
+        "status": "done",
+        "summary": "Confirm one scheduled cycle lands a newer bundle than 2026-07-30",
+        "wid": "w3"
+      }
+    ]
+  }
+}

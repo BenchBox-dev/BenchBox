@@ -1,0 +1,254 @@
+{
+  "context": "One route per PR: Benchmark, Platform, Query, Home, ResultDetail. Each adopts the picking owner and the shared tray, and takes the single label 'Compare selected', disabled below two picks with the reason in the tray. ResultDetail's treatment is an open question - it may keep a single hand-off rather than a selection affordance - and must be decided before its PR, not during.",
+  "description": "Five entry points, four labels, four selection owners: 'Compare ->' (Home.tsx:1098), 'Select 2 comparable results' (BenchmarkIndex.tsx:670, PlatformIndex.tsx:640), 'Compare 0 runs' (Compare), 'Compare (need 2+)' (Query.tsx:818), 'Compare this result' (ResultDetail.tsx:266).\n\nEach route migrates in its own PR so any one can be reverted alone. The old path keeps working until the last route lands.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Migrate Query and the Compare builder onto the shared fixed tray",
+        "instead": "INSTEAD stop tray adoption at BenchmarkIndex and PlatformIndex and share a copy helper instead",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "why": "Query's tray is inline and never occluded anything, the builder is itself the compare surface so a sticky springboard duplicates its own launch control, and accommodating fixed, inline and full-page layouts turns CompareTray into a mode-heavy abstraction"
+      },
+      {
+        "dont": "decide ResultDetail's selection model mid-PR",
+        "instead": "settle it before starting that route",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "why": "it is an open product question, not an implementation detail"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "migrate several routes in one PR",
+        "instead": "one route per PR",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "why": "a shared-tray regression would otherwise require reverting every route at once"
+      },
+      {
+        "dont": "remove Compare's candidate table here",
+        "instead": "leave it to rx-ux-19 behind its parity gate",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "why": "retirement needs the parity evidence, not just a working replacement"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "needs_item": "rx-ux-16-tray-accessibility"
+      },
+      {
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "needs_item": "rx-ux-17-query-paging-and-search"
+      },
+      {
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "needs_item": "rx-ux-26-selection-status-copy"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-25T06:10:30Z",
+      "completed_pr": 1893,
+      "created_at": "2026-08-22T14:49:50Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "/results/compare?ids=<one> pins that run and opens the builder (Compare.tsx:184+); ?ids=<a,b> renders a comparison. Both are live contracts (ResultDetail.tsx:266, e2e/routes/compare.spec.ts:58, compare-entrypoints.spec.ts:76).",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray"
+      },
+      {
+        "behavior": "Compare's candidate table stays until rx-ux-19",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray"
+      },
+      {
+        "behavior": "Compare's recovery rule that a multi-selection URL stays multi after a one-result recovery, so it does not collapse into the single-result builder (Compare.tsx:331-350).",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray"
+      },
+      {
+        "behavior": "Disabled reasons are exposed via aria-describedby (PlatformIndex.tsx:961, Query.tsx:900), not an accessible-name suffix. Follow the shipped pattern.",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray"
+      },
+      {
+        "behavior": "Each unmigrated route keeps working until its own PR lands",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "formatSelectedCount as the shared surface instead of a shared shell",
+        "decision": "extend",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "path": "results-explorer/src/lib/copyFormatters.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/**"
+      },
+      {
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium",
+        "description": "Chromium browser suite passes against a fresh build",
+        "expected": "fixtures verified, build succeeds, chromium suite green",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium e2e/routes/compare-entrypoints.spec.ts",
+        "description": "All entry points use one label and one mechanic",
+        "expected": "every entry point reaches a completed comparison through the same tray",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -l 'Compare 0 runs|Compare \\(need 2\\+\\)|Select 2 comparable results' results-explorer/src | wc -l | tr -d ' '",
+        "description": "No stale compare labels remain on any route",
+        "expected": "0",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Decided ResultDetail keeps ?ids=<one> pinned-builder hand-off (Compare.tsx:184+) AND pickingState toggle (dual entrypoint, preserves deep-link contract, adds persistent Add/Remove with compareHref at >=2)",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "notes": null,
+        "started_at": "2026-08-25T04:53:56Z",
+        "started_branch": "feat/rx-ux-18-migrate-entrypoints-to-tray",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-18-migrate-entrypoints-to-tray",
+        "status": "done",
+        "summary": "Decide ResultDetail selection model before migrating it",
+        "wid": "w1"
+      },
+      {
+        "evidence": "CLOSED BY #1810",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "notes": null,
+        "started_at": "2026-08-25T04:54:11Z",
+        "started_branch": "feat/rx-ux-18-migrate-entrypoints-to-tray",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-18-migrate-entrypoints-to-tray",
+        "status": "done",
+        "summary": "CLOSED BY #1810 - BenchmarkIndex already renders the shared CompareTray at :809",
+        "wid": "w2"
+      },
+      {
+        "evidence": "CLOSED BY #1810",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "notes": null,
+        "started_at": "2026-08-25T04:54:14Z",
+        "started_branch": "feat/rx-ux-18-migrate-entrypoints-to-tray",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-18-migrate-entrypoints-to-tray",
+        "status": "done",
+        "summary": "CLOSED BY #1810 - PlatformIndex already renders the shared CompareTray at :851",
+        "wid": "w3"
+      },
+      {
+        "evidence": "WILL NOT DO - Query inline tray retained per adversarial reviews",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "notes": null,
+        "started_at": "2026-08-25T04:54:16Z",
+        "started_branch": "feat/rx-ux-18-migrate-entrypoints-to-tray",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-18-migrate-entrypoints-to-tray",
+        "status": "done",
+        "summary": "WILL NOT DO - Query keeps its inline tray per two adversarial reviews; shared copy comes from rx-ux-26 instead",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Home CoverageSummary now shows picking count badge (Compare / Compare N selected) and href uses picking.compareHref; empty state -> builder",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "notes": null,
+        "started_at": "2026-08-25T04:54:01Z",
+        "started_branch": "feat/rx-ux-18-migrate-entrypoints-to-tray",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-18-migrate-entrypoints-to-tray",
+        "status": "done",
+        "summary": "Migrate Home entry point",
+        "wid": "w5"
+      },
+      {
+        "evidence": "ResultDetail now has aria-pressed picking toggle and compare-picked link at >=2; preserves /compare?ids=<one> contract",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "notes": null,
+        "started_at": "2026-08-25T04:54:06Z",
+        "started_branch": "feat/rx-ux-18-migrate-entrypoints-to-tray",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-18-migrate-entrypoints-to-tray",
+        "status": "done",
+        "summary": "Migrate ResultDetail per w1",
+        "wid": "w6"
+      },
+      {
+        "evidence": "4 e2e migrated-entrypoints pass (Home badge empty->picker, ResultDetail hand-off+toggle+compareHref, unified disabled rule, stale labels n/a); CompareTray+pickingState preserved; vitest 936; build+chromium green",
+        "item_id": "rx-ux-18-migrate-entrypoints-to-tray",
+        "notes": null,
+        "started_at": "2026-08-25T04:55:39Z",
+        "started_branch": "feat/rx-ux-18-migrate-entrypoints-to-tray",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-18-migrate-entrypoints-to-tray",
+        "status": "done",
+        "summary": "Verify one label and one disabled rule across the routes that actually adopt the tray",
+        "wid": "w7"
+      }
+    ]
+  }
+}

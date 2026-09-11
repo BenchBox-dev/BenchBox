@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: Medium\"\n- \"**Status**: ✅ Completed\"\n- \"**Description**: Create 2 `tuning.yaml` variants for each benchmark example in `examples/` - a fully tuned and no tunings variant named after the system and benchmark\"\n- \"**Tasks**:\"\n- \"**Files Affected**: 31 new files in `examples/` directory: 30 tuning configuration files + 1 comprehensive documentation file\"\n- \"**Implementation Results**:\"\n- \"**Impact**: ✅ Successfully provides users with ready-to-use tuning configurations for performance testing, enables easy comparison between optimized and baseline configurations, demonstrates full tuning system capabilities with platform-specific optimizations. Users can now easily compare performance impact of different optimization strategies across all major benchmarks.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

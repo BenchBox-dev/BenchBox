@@ -1,0 +1,147 @@
+{
+  "description": "`cd results-explorer && npm test -- --run src/pages/__tests__/Query.test.tsx`\nfails three cases on the current develop tip (commit 27fbd73d7,\nPR #270 merged). All three failures are\n`screen.getByText(\"Configure visible columns\")` returning no element:\n\n- \"uses public table labels and formatted values in the default result table\"\n  (Query.test.tsx:245)\n- \"exposes visible-columns sidebar text on Query page\"\n  (Query.test.tsx:269 textContent assertion)\n- \"orders mobile query controls so results appear before deep filters\"\n  (Query.test.tsx:336)\n\n`grep -rn \"Configure visible columns\" results-explorer/src/pages/Query.tsx`\nreturns no matches in the production source — the affordance label was\nremoved or renamed somewhere in the chain of PRs #266 / #268 / #269 / #270\nbut the tests were not updated to match. PR #269's release-readiness\nreport claimed `Tests 506 passed (506)` against the PR branch's tree,\nwhich masked the regression that landed on develop afterward.\n\nEither:\n  a) restore the affordance with the literal \"Configure visible columns\"\n     label so the existing accessibility/visibility contract holds, or\n  b) update the tests to match the new affordance label/behavior, with a\n     short note in the test file explaining the rename.\n\nBisect against PRs #266, #268, #269, #270 to confirm which change broke\nthe contract before deciding which side to repair.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete the test cases",
+        "instead": "(not specified)",
+        "item_id": "query-test-configure-visible-columns-failures",
+        "why": "they encode the existing public Query Workbench contract."
+      },
+      {
+        "dont": "silence the failing tests without restoring an equivalent visibility/columns affordance.",
+        "instead": "(not specified)",
+        "item_id": "query-test-configure-visible-columns-failures",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Bug Fix",
+      "completed_at": "2026-05-08T00:00:00Z",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Mobile drawer order: results panel before deep filters.",
+        "item_id": "query-test-configure-visible-columns-failures"
+      },
+      {
+        "behavior": "URL state, row-limit, export, and SQL behavior on the Query page.",
+        "item_id": "query-test-configure-visible-columns-failures"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-test-configure-visible-columns-failures",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "query-test-configure-visible-columns-failures",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "query-test-configure-visible-columns-failures",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/"
+      },
+      {
+        "item_id": "query-test-configure-visible-columns-failures",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "query-test-configure-visible-columns-failures",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Query.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/Query.test.tsx",
+        "description": "Query.test.tsx is fully green",
+        "expected": "all tests pass",
+        "item_id": "query-test-configure-visible-columns-failures",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run",
+        "description": "Full vitest run is green",
+        "expected": "all tests pass",
+        "item_id": "query-test-configure-visible-columns-failures",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-test-configure-visible-columns-failures",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-test-configure-visible-columns-failures",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-test-configure-visible-columns-failures",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-test-configure-visible-columns-failures",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Bisect develop tip back through PRs #266, #268, #269, #270 to find the breaking commit",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-test-configure-visible-columns-failures",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide whether to restore the affordance label or update the tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-test-configure-visible-columns-failures",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the chosen fix and confirm Query.test.tsx is green",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-test-configure-visible-columns-failures",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a regression note in the test file referencing this TODO and the breaking PR",
+        "wid": "w4"
+      }
+    ]
+  }
+}

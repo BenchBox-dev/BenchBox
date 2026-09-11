@@ -1,0 +1,210 @@
+{
+  "context": "Use the existing migration and replacement TODOs as prerequisites. Test from a clean environment with no sibling todo-db checkout and no globally installed CLI. Require package version/lock agreement, wrapper behavior, command parity, rollback evidence, and structural no-duplication checks.",
+  "description": "Final certification gate after the hosted schema migration and embedded-runtime replacement. Prove that a clean BenchBox checkout invokes exactly one locked todo-db package, that the wrapper has no legacy fallback, that CI cannot silently bypass the package, and that the duplicate implementation is deleted or restricted to explicitly bounded migration tooling. This item is the release gate for claiming canonical runtime ownership. It must remain blocked until the canonical package release, hosted schema migration, embedded-runtime replacement, and portable shadow tooling all pass.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Delete the legacy implementation before the canonical package, migration, and canary gates pass",
+        "instead": "Keep legacy code outside the default path for a bounded retention window, then remove it in a separate cleanup step",
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "why": "That would remove the only rollback path before the new runtime is proven"
+      },
+      {
+        "dont": "Switch between legacy and canonical databases automatically on command failure",
+        "instead": "Require an explicit human rollback decision and a versioned snapshot",
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "why": "Automatic fallback creates split-brain tracker state"
+      },
+      {
+        "dont": "Treat skill-sync verify as proof of runtime behavior",
+        "instead": "Run wrapper-level package, migration, audit, and lease-safety gates",
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "why": "It proves snapshot/lock integrity only"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "created_at": "2026-08-10T20:43:23Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No automatic legacy fallback between databases",
+        "item_id": "certify-benchbox-package-only-todo-runtime"
+      },
+      {
+        "behavior": "No claim of lease-safety parity until the actual BenchBox wrapper passes the canonical non-holder release test",
+        "item_id": "certify-benchbox-package-only-todo-runtime"
+      },
+      {
+        "behavior": "No generated skill snapshot is committed as a substitute for runtime verification",
+        "item_id": "certify-benchbox-package-only-todo-runtime"
+      },
+      {
+        "behavior": "Rollback is explicit and documented before the first canonical write",
+        "item_id": "certify-benchbox-package-only-todo-runtime"
+      },
+      {
+        "behavior": "The old database and final pre-cutover snapshot remain retained for the approved rollback window",
+        "item_id": "certify-benchbox-package-only-todo-runtime"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/.todo-db/**"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/_project/DONE/**"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/_project/TODO/**"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/.github/"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/Makefile"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/_project/scripts/todo"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/_project/specs/"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/docs/operations/"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv sync --project _project/scripts --locked && uv run --project _project/scripts -- todo-db --version",
+        "description": "BenchBox scripts dependency is lock-resolved and package version is available",
+        "expected": "exit 0",
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_standalone_compat.py tests/integration/test_todo_db_standalone_compat_real.py -q",
+        "description": "Wrapper integration tests pass against the package runtime",
+        "expected": "exit 0",
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n 'todo_db\\.py|BENCHBOX_TODO_DB_STANDALONE' _project/scripts/todo",
+        "description": "Default wrapper contains no embedded implementation or automatic standalone flag fallback",
+        "expected": "exit 0",
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n '/Users/joe/Developer/todo-db|../todo-db' _project/scripts/todo _project/scripts/todo_db_standalone_compat.py .github Makefile",
+        "description": "No production wrapper references the developer-machine standalone checkout",
+        "expected": "exit 0",
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run clean-clone package resolution, version/lock agreement, and wrapper-from-nested-directory checks",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Prove the default wrapper and CI path cannot invoke the embedded tracker or silently fall back",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run post-cutover canary, audit, export, and rollback-artifact verification",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "certify-benchbox-package-only-todo-runtime",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record final release evidence and remove or archive remaining legacy runtime references",
+        "wid": "w3"
+      }
+    ]
+  }
+}

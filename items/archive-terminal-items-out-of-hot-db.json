@@ -1,0 +1,114 @@
+{
+  "context": "Design-gate first: evaluate physical archival vs bounded queries/lightweight records in standalone todo-db repository (/Users/joe/Developer/todo-db). Implementation requires a concrete design approved by maintainers, foreign-key reference preservation, private lossless recovery outside public Git export, audit hash-chain continuity, and explicit destructive candidate authorization.",
+  "description": "Re-scoped design evaluation for archiving terminal items out of the hosted DB. The original proposal assumed BenchBox-local scripts (_project/scripts/todo_db.py) which were retired when standalone todo-db 0.6.1 was adopted. Direct primary connections and optimized single queries (ADR 0001, ADR 0002) eliminated the assumed performance bottleneck. Deleting items breaks item_deps foreign keys, readiness calculations, finding_links references, and audit chain integrity if done naively. Public git export strips findings and tokens, so private lossless recovery artifacts are required. Blocked on formal design approval before any implementation or production store surgery.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "archive-terminal-items-out-of-hot-db",
+        "needs_item": "todo-db-cutover-g5"
+      }
+    ],
+    "item_meta": {
+      "category": "tracker-simplification",
+      "created_at": "2026-08-05T18:35:27Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Archived items remain resolvable by id with full event history via the git export; the audit chain over remaining hot items stays valid",
+        "item_id": "archive-terminal-items-out-of-hot-db"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "archive-terminal-items-out-of-hot-db",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "archive-terminal-items-out-of-hot-db",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_shadow.py"
+      },
+      {
+        "item_id": "archive-terminal-items-out-of-hot-db",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/todo-db-tracker.md"
+      },
+      {
+        "item_id": "archive-terminal-items-out-of-hot-db",
+        "kind": "only_modify",
+        "path_glob": "_project/todo-db-export/README.md"
+      },
+      {
+        "item_id": "archive-terminal-items-out-of-hot-db",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/*.py"
+      },
+      {
+        "item_id": "archive-terminal-items-out-of-hot-db",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/*.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -z \"$(_project/scripts/todo list --state done)\" && test -z \"$(_project/scripts/todo list --state dropped)\"",
+        "description": "Hot DB holds no archived terminal backlog",
+        "expected": "after archiving, list --state done/dropped return empty from the hot DB (adjust if the design retains a recency window; then assert the window bound instead)",
+        "item_id": "archive-terminal-items-out-of-hot-db",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "archive-terminal-items-out-of-hot-db",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "archive-terminal-items-out-of-hot-db",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "archive-terminal-items-out-of-hot-db",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Design archive verb semantics incl. show/list behavior for archived ids",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "archive-terminal-items-out-of-hot-db",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement audited export-verify-delete transaction",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "archive-terminal-items-out-of-hot-db",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Tests and export README update",
+        "wid": "w3"
+      }
+    ]
+  }
+}

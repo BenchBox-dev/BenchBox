@@ -1,0 +1,10 @@
+{
+  "description": "Implement all 99 TPC-DS queries for both Pandas and Expression families.\nMore complex than TPC-H with advanced patterns.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "dataframe-tpcds"
+    }
+  }
+}

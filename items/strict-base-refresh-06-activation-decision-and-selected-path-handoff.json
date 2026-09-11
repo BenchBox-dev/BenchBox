@@ -1,0 +1,276 @@
+{
+  "context": "Write a signed-off decision record and update tracker state so exactly one pre-created path TODO becomes actionable. Both path TODOs start blocked. On SHADOW_ONLY, keep both blocked or drop them with reasons and retain full strict CI. On REDUCED_FAST_REFRESH, unblock only strict-base-refresh-07a-reduced-fast-refresh-rollout. On NATIVE_MERGE_QUEUE, unblock only strict-base-refresh-07b-native-merge-queue-migration. Never implement both.",
+  "description": "Act as the final no-activation-by-default gate. Consume the live policy record, shadow classifier evidence, historical replay, full-CI profile, and native merge-queue assessment. Select exactly one outcome: SHADOW_ONLY, REDUCED_FAST_REFRESH, or NATIVE_MERGE_QUEUE. A reduced path must name the exact lanes it may waive and explicitly accept residual runtime-integration risk. A queue path must have an operator-approved transfer and complete merge_group plan. The privileged steward remains out of scope.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Approve activation because shadow invariants matched full lint",
+        "instead": "use full-only failure replay and explicit residual-risk acceptance",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "why": "that does not prove skipped test safety"
+      },
+      {
+        "dont": "Select reduced refresh without naming every waived lane",
+        "instead": "bind an explicit typed waiver contract",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "why": "generic skipped status can hide missing or cancelled checks"
+      },
+      {
+        "dont": "Unblock both 07a and 07b",
+        "instead": "select one or remain shadow-only",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "why": "parallel merge authorities violate the consolidated policy"
+      },
+      {
+        "dont": "Use an arbitrary day or sample count as the sole gate",
+        "instead": "require all negative controls, reason coverage, and eligible-yield evidence",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "why": "coverage and counterexamples matter more than elapsed time"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "needs_item": "strict-base-refresh-03-historical-replay-and-negative-controls"
+      },
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "needs_item": "strict-base-refresh-04-whole-event-latency-and-full-ci-profile"
+      },
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "needs_item": "strict-base-refresh-05-native-merge-queue-transfer-assessment"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-14T18:32:19Z",
+      "completed_pr": 1740,
+      "created_at": "2026-08-14T12:13:57Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "A SHADOW_ONLY result is a valid completion and does not require engineering a fast path",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff"
+      },
+      {
+        "behavior": "Exactly one implementation authority can be actionable",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff"
+      },
+      {
+        "behavior": "Strict required current-base checks remain active until a selected path is fully deployed and accepted",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff"
+      },
+      {
+        "behavior": "The full code-lint job including ruff and ty remains mandatory for any reduced path",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "current required aggregate semantics",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "path": ".github/workflows/pr.yml"
+      },
+      {
+        "concept": "historical and negative-control evidence",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "path": "_project/audits/strict-base-refresh-replay-*.md"
+      },
+      {
+        "concept": "latency and full-CI cost evidence",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "path": "_project/decisions/strict-base-refresh-ci-profile-*.md"
+      },
+      {
+        "concept": "native queue migration evidence",
+        "decision": "reuse",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "path": "_project/decisions/strict-base-refresh-merge-queue-*.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "kind": "do_not_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "kind": "do_not_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/strict-base-refresh-activation-*.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test \"$(rg -o '^Selected outcome: (SHADOW_ONLY|REDUCED_FAST_REFRESH|NATIVE_MERGE_QUEUE)$' _project/decisions/strict-base-refresh-activation-*.md | wc -l | tr -d ' ')\" = \"1\"",
+        "description": "Decision contains exactly one allowed outcome",
+        "expected": "exit 0",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "last_result": "pass",
+        "last_run": "2026-08-14T18:32:04Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'full-only|semantic|hit rate|required-gate|all-workflow|lint|ty|waive|kill switch|rollback|operator|residual' _project/decisions/strict-base-refresh-activation-*.md",
+        "description": "Decision addresses every safety and operations gate",
+        "expected": "All required concepts are present",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "last_result": "pass",
+        "last_run": "2026-08-14T18:32:06Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "a=$(_project/scripts/todo show strict-base-refresh-07a-reduced-fast-refresh-rollout --json | jq -r 'if .blocked_reason == null then 1 else 0 end'); b=$(_project/scripts/todo show strict-base-refresh-07b-native-merge-queue-migration --json | jq -r 'if .blocked_reason == null then 1 else 0 end'); test $((a+b)) -le 1",
+        "description": "At most one path TODO is unblocked",
+        "expected": "exit 0",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "last_result": "pass",
+        "last_run": "2026-08-14T18:32:12Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo lint strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "description": "This TODO passes tracker quality lint",
+        "expected": "0 findings",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "last_result": "pass",
+        "last_run": "2026-08-14T18:32:16Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Selected outcome SHADOW_ONLY; 07a/07b remain blocked; live ruleset revalidated",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "notes": "Stop if evidence is stale, required contexts changed without coverage, or either assessment has unresolved critical gaps.",
+        "started_at": "2026-08-14T18:29:51Z",
+        "started_branch": "docs/strict-base-refresh-06-activation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-strict-base-refresh-06",
+        "status": "done",
+        "summary": "Revalidate every dependency artifact, live ruleset, current required contexts, and open-PR workflow state",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Selected outcome SHADOW_ONLY; 07a/07b remain blocked; live ruleset revalidated",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "notes": "No fixed sample count substitutes for negative-control and failure-replay coverage. Any unexplained waived-lane failure is NO_GO.",
+        "started_at": "2026-08-14T18:30:55Z",
+        "started_branch": "docs/strict-base-refresh-06-activation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-strict-base-refresh-06",
+        "status": "done",
+        "summary": "Apply coverage-based activation gates to classifier fallbacks, full-only failures, semantic controls, hit rate, and latency",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Selected outcome SHADOW_ONLY; 07a/07b remain blocked; live ruleset revalidated",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "notes": "State the unavoidable final validation for each option and the exact residual risk.",
+        "started_at": "2026-08-14T18:31:01Z",
+        "started_branch": "docs/strict-base-refresh-06-activation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-strict-base-refresh-06",
+        "status": "done",
+        "summary": "Compare shadow-only, reduced refresh, and native queue against safety, latency, maintenance, and operator constraints",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Selected outcome SHADOW_ONLY; 07a/07b remain blocked; live ruleset revalidated",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "notes": "Decision must match exactly SHADOW_ONLY, REDUCED_FAST_REFRESH, or NATIVE_MERGE_QUEUE.",
+        "started_at": "2026-08-14T18:31:07Z",
+        "started_branch": "docs/strict-base-refresh-06-activation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-strict-base-refresh-06",
+        "status": "done",
+        "summary": "Record one selected outcome and its lane, trust, kill-switch, rollback, and operator contract",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Selected outcome SHADOW_ONLY; 07a/07b remain blocked; live ruleset revalidated",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "notes": "Use todo unblock/drop/block with audit reasons. Never unblock both. SHADOW_ONLY unblocks neither.",
+        "started_at": "2026-08-14T18:31:13Z",
+        "started_branch": "docs/strict-base-refresh-06-activation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-strict-base-refresh-06",
+        "status": "done",
+        "summary": "Update tracker state so only the selected 07a or 07b path can become ready",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Selected outcome SHADOW_ONLY; 07a/07b remain blocked; live ruleset revalidated",
+        "item_id": "strict-base-refresh-06-activation-decision-and-selected-path-handoff",
+        "notes": "Review aggregator semantics, current-base race closure, auto-merge, required contexts, failure recovery, and operator authority.",
+        "started_at": "2026-08-14T18:31:18Z",
+        "started_branch": "docs/strict-base-refresh-06-activation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-strict-base-refresh-06",
+        "status": "done",
+        "summary": "Run independent adversarial review of the decision and selected-path TODO before implementation",
+        "wid": "w5"
+      }
+    ]
+  }
+}

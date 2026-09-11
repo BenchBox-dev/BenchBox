@@ -1,0 +1,198 @@
+{
+  "context": "Land per-platform in separate PRs under this one TODO's work units; each\nplatform migration ships with a before/after DDL snapshot test proving the\nrendered statements are intentional (identical, or a documented improvement).\n",
+  "description": "From the 2026-07-12 tuning review, findings C5 (policy side), R2/R3 (structural\nside), architecture assessment (evidence pinned to commit acfb8992). GATED on\nADR-3 (tuning-adr-baseline-definition-and-renderer-20260712).\n\nImplements the decided direction:\n- ONE capability registry keyed by canonical platform type; the six current\n  sources (interface.py compat map, generator registry,\n  platform_capabilities.py, adapter mixins, `benchbox tuning platforms`\n  tables, coverage matrix) become derivations or lookups of it;\n- ONE rendering path shared by dry-run preview and execution (per ADR-3,\n  expected: adapters consume core/tuning/generators/*); delete dead renderers\n  (clickhouse generate_tuning_clause has zero callers) and log-only apply\n  paths become real or explicitly declared no-capability;\n- BASELINE POLICY per ADR-3: relocate/record the ClickHouse OLAP session pack\n  (clickhouse/tuning.py:74-100), label engine-mandatory layout (StarRocks\n  DISTRIBUTED BY injection) in bundle metadata, and align the databricks-liquid\n  warn-vs-fail behavior with the recorded policy axis;\n- Databricks-specific layout validation moves out of interface.py\n  (_validate_databricks_effective_layout) into the platform layer.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "No big-bang rewrite across all platforms in one PR",
+        "instead": "(not specified)",
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "delete a mixin path before its generator replacement has a snapshot test",
+        "instead": "(not specified)",
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "needs_item": "tuning-adr-baseline-definition-and-renderer-20260712"
+      },
+      {
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "needs_item": "tuning-generator-registry-completeness-20260712"
+      },
+      {
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "needs_item": "tuning-platform-identity-canonical-keys-20260712"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing bundle schema compatibility during migration (renderer change must not silently change published metadata semantics without a schema note)",
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712"
+      },
+      {
+        "behavior": "Physical rendering identity boundaries (zorder vs liquid auto/manual vs duckdb tuned) per the databricks-liquid TODO must_preserve",
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/tuning/ddl_generator.py get_ddl_generator: registry seed — extend into the capability registry",
+        "decision": "extend",
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "path": "benchbox/core/tuning/ddl_generator.py"
+      },
+      {
+        "concept": "benchbox/platforms/base/format_capabilities.py: existing per-platform capability declaration pattern — reuse shape",
+        "decision": "reuse",
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "path": "benchbox/platforms/base/format_capabilities.py"
+      },
+      {
+        "concept": "docs/development/adapter-refactor-map.md: prior slice-by-slice platform refactor process — reuse",
+        "decision": "reuse",
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "path": "docs/development/adapter-refactor-map.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/**"
+      },
+      {
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dryrun.py"
+      },
+      {
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/**"
+      },
+      {
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit -q -k 'renderer or ddl_snapshot'",
+        "description": "Dry-run preview and execution render identical tuning DDL for a migrated platform",
+        "expected": "Snapshot tests pass; preview==execution assertion holds",
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning tests/unit/platforms tests/unit/cli/test_tuning* -q",
+        "description": "Full tuning suites green",
+        "expected": "All passing",
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "notes": "Added benchbox/core/tuning/capability_registry.py: PLATFORM_TUNING_CAPABILITIES\nmaps canonical platform type -> {TuningType: TuningCapability(rendered_via,\nmechanism_id, notes)}, derived from get_ddl_generator's registry,\ninterface.py's historical compatibility map, and direct adapter/mixin\ninspection. Covers the 9 platforms interface.py already knew (duckdb,\nsnowflake, bigquery, redshift, clickhouse, databricks, sqlite, postgresql,\nmysql) plus starrocks and doris (explicitly named by this TODO / w2).\n\ninterface.py's _PLATFORM_COMPATIBILITY_MAP and _KNOWN_COMPATIBILITY_PLATFORMS\nare now computed from capability_registry.interface_compatibility_map()\ninstead of hand-duplicated (deferred import inside a module-level helper\nto avoid the interface<->registry import cycle; registry imports TuningType\nfrom interface, which is already defined by the time the helper runs).\nplatform_capabilities.py's map_candidate_to_platform dispatch now checks\nmembership in capability_registry.WORKLOAD_PROFILE_MAPPED_PLATFORMS\ninstead of an implicit if/elif fallthrough.\n\nNO is_compatible_with_platform behavior changes shipped. One candidate\nwas investigated and rejected: Databricks TuningType.DISTRIBUTION looked\nlike a dead compatibility entry (no adapter renders a literal\nDISTRIBUTED-BY clause for it), but shipped tuned examples\n(examples/tunings/databricks/tpch_tuned.yaml, tpcds_tuned.yaml, etc.) set\n`distribution:` columns that the Z-ORDER workload-profile mapping folds\ninto ZORDER locality upstream of the adapter -- removing the entry would\nhave newly hard-errored those shipped configs. Documented in the\nregistry's module docstring instead of changed.\n\ntest_capability_source_drift.py did not exist yet (the TODO's prompt\nassumed prior scaffolding that wasn't present in this repo state), so it\nwas authored fresh with strict/empty EXPECTED_INTERFACE_VS_REGISTRY_DRIFT\n(interface.py's map is now literally `==` the registry's derivation, not\njust \"consistent\"), plus two non-empty, reasoned allowlists documenting\nreal remaining gaps this TODO did not close: ~12 DDL-generator-registered\nplatform aliases (trino, presto, athena, firebolt, azure_synapse/synapse,\ntimescaledb, questdb, pg-duckdb/pg_duckdb, pg-mooncake/pg_mooncake) with\nno capability_registry entry yet, since none of them are in this TODO's\nw2 migration order.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Introduce the capability registry; derive interface compat checks and platform_capabilities from it; consistency test flips from allowlist-drift to strict",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "notes": "Scope note vs. the original summary: migration order was duckdb ->\nclickhouse -> starrocks per this implementation's explicit brief; the\nunmerged PR #1176 conflict-avoidance note additionally kept this round\nout of benchbox/platforms/base/adapter.py and result_capture.py.\n\nDuckDB (done): _build_duckdb_ctas_sort_sql (shared by DuckDB and\nMotherDuck adapters, the real post-load CTAS-sort execution path via\nSortedIngestionMixin.apply_ctas_sort) now delegates to\ncore.tuning.generators.duckdb.DuckDBDDLGenerator via a TableTuning,\ninstead of hand-building the ORDER BY string. Output text is unchanged\n(proven by tests/unit/core/tuning/test_renderer_snapshot_duckdb.py:\npreview's tuning_clauses.sort_by text appears verbatim in the executed\nCTAS statement). Existing unit tests using Mock column objects were\nupdated to real TuningColumn instances, since the generator's\nTableTuning input validates column identifiers via isinstance.\n\nClickHouse (done): before this round, ClickHouse's real create_schema\nexecution path never consumed table_tunings (partitioning/sorting/\nclustering columns) at all -- _optimize_table_definition only ran the\nengine-mandatory PK-derived-or-ORDER-BY-tuple() fallback in every\ntuning mode, while dry-run preview rendered (unused) PARTITION BY/ORDER\nBY text via the generator. Tuned table_tunings now actually render\nPARTITION BY/ORDER BY at CREATE TABLE time via the same\nClickHouseDDLGenerator dry-run preview uses\n(ClickHouseWorkloadMixin._resolve_tuned_ddl_clauses), gated on\nself.tuning_enabled so baseline/notuning keeps only the\nPK-derived-or-tuple() fallback (that fallback is the untuned/\nengine-mandatory path per ADR-3 and is unchanged). Deleted\nClickHouseTuningMixin.generate_tuning_clause (reconfirmed zero\nproduction callers via `rg -n \"\\.generate_tuning_clause\\(\"`) and its\nfour dead-code unit tests. Proof:\ntests/unit/core/tuning/test_renderer_snapshot_clickhouse.py. Verified\nboth dry-run and a live chdb run (`benchbox run --platform\nclickhouse-local --benchmark tpch --scale 0.01 --tuning tuned`)\ncomplete successfully with the new path active; no shipped ClickHouse\ntuning example templates exist yet in examples/tunings/, so the CLI\ndry-run ddl_preview itself stayed empty in that smoke check -- the\ngenerator-call-path proof is the direct unit-constructed-TableTuning\nsnapshot tests, not the CLI smoke run.\n\nStarRocks (explicitly scoped out of migration, registry entry only):\nno benchbox.core.tuning.ddl_generator entry exists for \"starrocks\" and\nthis TODO explicitly forbids writing one this round. Confirmed\nStarRocksTuningMixin.apply_table_tunings only logs configured\npartitioning/sorting/distribution columns -- never renders them --\nand workload.py's schema rewrite unconditionally appends `DISTRIBUTED\nBY HASH(<first_column>) BUCKETS 8` when no distribution clause is\nalready present, in every tuning mode; that unconditional injection is\nkept exactly as-is (engine-mandatory baseline, not a tuned\nDISTRIBUTED-BY-key choice -- StarRocks requires a distribution clause\nfor a working table). capability_registry's \"starrocks\" entry records\nall three tuning types as rendered_via=\"none\" with reasons\ndistinguishing the log-only gap (partitioning/sorting) from the\nengine-mandatory-baseline gap (distribution). No code changes to\nbenchbox/platforms/starrocks/*.\n\nDatabricks (explicitly scoped out per this implementation's brief --\n\"SKIP migration (liquid work is owned by the blocked databricks\nTODO); registry entry only\"): capability_registry records Databricks'\ncurrent real behavior (PARTITIONING -> Delta PARTITIONED BY via the\ncloud_spark DDL mixin; CLUSTERING/Z_ORDERING/LIQUID_CLUSTERING ->\npost-load OPTIMIZE ZORDER BY / ALTER TABLE CLUSTER BY;\nAUTO_OPTIMIZE/AUTO_COMPACT -> Delta TBLPROPERTIES; DISTRIBUTION,\nBLOOM_FILTERS, MATERIALIZED_VIEWS -> none/unimplemented) without\ntouching benchbox/platforms/databricks/adapter.py's tuning-rendering\ncode. This is the \"third rendering universe\" ADR-3 calls out\n(SparkDDLGeneratorMixin) and needs its own migration/equivalence pass,\nwhich the blocked databricks-liquid-clustering-tuning-review-20260526\nTODO owns.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Renderer unification per ADR-3, one platform at a time starting duckdb -> clickhouse -> starrocks; dry-run preview calls the same renderer as execution",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "notes": "ClickHouseTuningMixin.configure_for_benchmark's OLAP session pack\n(join_algorithm=grace_hash, grace_hash_join_initial_buckets,\noptimize_aggregation_in_order, group_by_two_level_threshold, 50%-memory\nspill thresholds for external group-by/sort, 50%-memory max_bytes_in_join)\nnow fires when `self.tuning_enabled` is True instead of False -- the\nexact inversion ADR-3 flagged. The basic settings (max_memory_usage,\nmax_execution_time, max_threads, use_uncompressed_cache,\nenable_optimize_predicate_expression, allow_experimental_correlated_subqueries)\nand cache-control settings (use_query_cache family, gated on\ndisable_result_cache) are unchanged: harness-operational, they already\napplied in every mode. Pinned in\ntests/unit/platforms/test_clickhouse_adapter.py:\ntest_configure_for_benchmark_tuning_disabled_is_baseline_only asserts\ngrace_hash/optimize_aggregation_in_order are ABSENT even for an \"olap\"\nbenchmark type when tuning is disabled;\ntest_configure_for_benchmark_tuning_enabled_applies_olap_pack asserts\nthey're present when tuning is enabled. Also updated the\njoin-memory-multiplier and embedded-mode tests, which previously set\ntuning_enabled=False to reach the OLAP branch -- now set True.\n\nStarRocks DISTRIBUTED BY engine-mandatory labeling and ClickHouse/\nStarRocks session-SET-statement bundle-ledger recording were NOT\nimplemented here: per the governing ADR-3 \"Consequences\" section, the\nrecording half of baseline policy (bundle ledger entries in every\nmode) is explicitly the separate, gated\ntuning-applied-ledger-and-validation-status-20260712 TODO's job, not\nthis one's. This TODO's w1 capability_registry documents the\nengine-mandatory-vs-tuned distinction in its \"notes\" fields (consumed\nby both the drift test and `benchbox tuning platforms`), which is the\nlabeling contribution in scope here.\n\n`benchbox tuning platforms`'s SQL table (cli/commands/tuning_group.py)\nis now generated from capability_registry.PLATFORM_TUNING_CAPABILITIES\n(_sql_platform_capability_rows helper) instead of a hand-written\nplatform/feature-description list -- columns are now \"Compatible\nTuning Types\" and \"Rendering\" (flags any rendered_via=\"none\" gaps per\nplatform) rather than free-text prose. The DataFrame table is\nunchanged (out of registry scope, per this implementation's brief).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Baseline policy enforcement: session-pack relocation + engine-mandatory layout labeling + `benchbox tuning platforms` output generated from the registry",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "notes": "UnifiedTuningConfiguration._validate_databricks_effective_layout moved\nverbatim (same conditions, same error message text) to\nbenchbox/platforms/databricks/tuning_validation.py::validate_effective_layout,\ntaking `config: UnifiedTuningConfiguration` as a parameter instead of\n`self`. interface.py's validate_for_platform_detailed now reaches it\nthrough a small dispatch hook (_PLATFORM_EFFECTIVE_LAYOUT_VALIDATORS,\na dict of canonical platform key -> \"module:function\" resolved via\nimportlib.import_module + getattr at validation time) instead of a\nhardcoded `if platform_key == \"databricks\": self._validate_databricks...()`\nbranch whose implementation lived in this module. Behavior verified\nidentical against the existing Liquid Clustering validation tests\n(test_platform_optimization_config.py,\ntest_platform_identity_keys.py) and a direct reproduction of the\ndistribution-conflict error message.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Databricks layout validation to the platform layer; slim interface.py to pure data model",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "notes": "Removed both shims outright (no re-justification needed -- `benchbox\ntuning init/defaults/platforms` have covered their functionality since\nthe unified tuning command group shipped, and grep confirmed zero\ndocs/ references to either). Deleted\nbenchbox/cli/commands/tuning.py and benchbox/cli/commands/df_tuning.py;\nremoved their CommandSpec registrations and __all__ entries in\ncli/commands/__init__.py; removed the create_sample_tuning lazy-export\nentry in cli/main.py's historic compatibility layer.\n\nTest sweep (per-file): tests/unit/cli/commands/test_cli_tuning.py --\ndropped the direct create_sample_tuning import and its\nTestDeprecatedCommands command-level tests, replaced with\nTestRetiredShimsNotRegistered pinning both commands are now\nunregistered (cli.commands.get(...) is None), not merely hidden.\ntests/unit/cli/test_onboarding_df_tuning_behavioral.py -- kept the\nonboarding coverage (unrelated to the shims) and\n_create_profile_config helper coverage (now imported from\ntuning_group.py directly, since that is where the helper actually\nlives -- df_tuning.py only re-exported it), dropped the\nTestDfTuningCli class (df-tuning CLI invocation tests). Removed now-\nunused CliRunner/MagicMock imports.\ntests/unit/test_cli_documentation.py -- dropped\ntest_create_sample_tuning_help_enhanced and the create-sample-tuning\nparametrize entry. tests/unit/examples/test_examples_unified_runner.py\nleft as-is: its dummy-module stub defensively lists\ncreate_sample_tuning as a no-op attribute but never imports the real\n(now-deleted) module, and the stub module's catch-all __getattr__\nmakes the entry harmless either way.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retire deprecated CLI shims (create-sample-tuning, df-tuning) with docs/test sweep, or explicitly re-justify keeping them",
+        "wid": "w5"
+      }
+    ]
+  }
+}

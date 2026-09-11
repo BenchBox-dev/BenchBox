@@ -1,0 +1,61 @@
+{
+  "context": "Set the skeleton subtitle to the loaded copy so no visible hero text changes between loading and loaded states.",
+  "description": "After the headline was aligned, HomeLoadingSkeleton still reads 'Reproducible OLAP benchmark rankings, with public corpus browse below.' while the loaded hero reads 'Reproducible OLAP benchmark evidence with explicitly scoped rankings and public corpus browse below.' No test asserts the subtitle today, so there is no current failure, but the divergence leaves the same timing-dependent trap the headline fix removed.",
+  "legacy": {
+    "item_meta": {
+      "category": "Explorer UI contract",
+      "completed_at": "2026-08-04T12:14:11Z",
+      "completed_pr": 1517,
+      "created_at": "2026-08-04T00:10:39Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The skeleton still renders and still exposes its aria-busy loading region",
+        "item_id": "explorer-home-skeleton-subtitle-parity-20260803"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-home-skeleton-subtitle-parity-20260803",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "explorer-home-skeleton-subtitle-parity-20260803",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "explorer-home-skeleton-subtitle-parity-20260803",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -c -F \"Reproducible OLAP benchmark evidence with explicitly scoped rankings and public corpus browse below.\" results-explorer/src/pages/Home.tsx | grep -qx 2",
+        "description": "Skeleton and loaded hero share one subtitle",
+        "expected": "Exits 1 on the unfixed tree where only the loaded hero carries the copy; exits 0 once both do.",
+        "item_id": "explorer-home-skeleton-subtitle-parity-20260803",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:13:39Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Skeleton subtitle now matches the loaded hero in BOTH copy and classes. The class divergence was the more consequential half and was not in the item's title: mt-3/text-base in the skeleton against mt-2/text-sm sm:mt-3/sm:text-lg in the hero made the subtitle shift and reflow the instant data arrived - the same skeleton-vs-loaded drift as the headline (#1496) and the hero padding (#1499). Verified: rg -c returns 2 for the hero copy, and both <p> tags now carry an identical class string (lines 362 and 616). tsc --noEmit clean; Home.test.tsx 28 passed; the aria-busy loading region is untouched.",
+        "item_id": "explorer-home-skeleton-subtitle-parity-20260803",
+        "notes": null,
+        "started_at": "2026-08-04T12:13:33Z",
+        "started_branch": "fix/explorer-home-skeleton-subtitle-parity-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/upbeat-knuth-7adfae",
+        "status": "done",
+        "summary": "Set the skeleton subtitle to the loaded hero copy",
+        "wid": "w0"
+      }
+    ]
+  }
+}

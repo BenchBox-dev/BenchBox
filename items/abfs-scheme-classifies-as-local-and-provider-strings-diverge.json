@@ -1,0 +1,67 @@
+{
+  "context": "Introduce one canonical scheme/provider table (name, aliases, credential env vars, cloudpathlib prefix) and derive all four call sites from it, so adding a scheme cannot leave a gate behind. Decide explicitly whether abfs:// is supported: if yes it must classify as cloud and stage like abfss:// (PR #1303 routes abfss via CloudStagingPath); if no, it must be rejected loudly rather than silently becoming a relative directory.",
+  "description": "Same defect class as classify-snowflake-stage-paths-as-non-local (PR #1299), still live. is_cloud_path's scheme list is [s3, gs, gcs, az, abfss, azure, dbfs] -- 'abfs' is absent, so abfs://container@account.dfs.core.windows.net/data returns False and create_path_handler yields a RELATIVE PosixPath. Generated data therefore lands in a local 'abfs:' tree under the current working directory, exactly the mechanism behind the 319MB @~/ spill. Verified on develop: is_cloud_path=False, handler=PosixPath, relative=True. Meanwhile azure_synapse.py:93 gates on path_info['provider'] in ('az','abfs','abfss'), but get_cloud_path_info sets provider=parsed.scheme, which yields 'azure' for the documented azure:// form -- so Synapse REJECTS a valid, advertised output location, while accepting 'abfs' which the classifier can never produce. Third instance: validate_cloud_credentials' env_checks map (cloud_storage.py:710) has keys s3/gs/gcs/abfss/azure but NOT 'az', so the canonical az:// form skips the Azure credential env check entirely while its alias azure:// gets checked. Root cause is shared: scheme and provider strings are duplicated across classification (is_cloud_path), reporting (get_cloud_path_info), credential validation (env_checks) and platform gating (azure_synapse), with no single source of truth.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-07-26T13:06:45Z",
+      "completed_pr": 1314,
+      "created_at": "2026-07-26T12:49:11Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Snowflake stage paths keep routing through CloudStagingPath as PR #1299/#1303 established",
+        "item_id": "abfs-scheme-classifies-as-local-and-provider-strings-diverge"
+      },
+      {
+        "behavior": "s3://, gs://, gcs://, az://, azure://, abfss:// and dbfs:/ keep their current classification and handler types",
+        "item_id": "abfs-scheme-classifies-as-local-and-provider-strings-diverge"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "abfs-scheme-classifies-as-local-and-provider-strings-diverge",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/azure_synapse.py"
+      },
+      {
+        "item_id": "abfs-scheme-classifies-as-local-and-provider-strings-diverge",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/cloud_storage.py"
+      },
+      {
+        "item_id": "abfs-scheme-classifies-as-local-and-provider-strings-diverge",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      },
+      {
+        "item_id": "abfs-scheme-classifies-as-local-and-provider-strings-diverge",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from pathlib import Path; from benchbox.utils.cloud_storage import is_cloud_path, create_path_handler; bad=[p for p in ['s3://b/x','gs://b/x','gcs://b/x','az://c/x','azure://c/x','abfss://c@a.dfs.core.windows.net/x','abfs://c@a.dfs.core.windows.net/x'] if is_cloud_path(p) and isinstance(create_path_handler(p), Path) and not create_path_handler(p).is_absolute()]; assert not bad, bad; print('ok')\"",
+        "description": "No scheme accepted by is_cloud_path resolves to a relative local path",
+        "expected": "prints ok, exit 0",
+        "item_id": "abfs-scheme-classifies-as-local-and-provider-strings-diverge",
+        "last_result": "pass",
+        "last_run": "2026-07-26T13:03:17Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/utils/ tests/unit/platforms/ -q",
+        "description": "Cloud storage and platform tests pass",
+        "expected": "exit 0",
+        "item_id": "abfs-scheme-classifies-as-local-and-provider-strings-diverge",
+        "last_result": "pass",
+        "last_run": "2026-07-26T13:03:50Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

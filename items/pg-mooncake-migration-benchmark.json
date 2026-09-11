@@ -1,0 +1,126 @@
+{
+  "context": "Implement as a custom benchmark phase or standalone script rather than a\nfull benchmark suite. The simplest path:\n\n1. Use existing TPC-H load phase to populate heap tables (skip USING\n   columnstore in create_schema)\n2. Run a subset of power queries as \"heap baseline\"\n3. Execute ALTER TABLE ... SET ACCESS METHOD columnstore for each table,\n   timing each conversion\n4. Re-run the same query subset as \"columnstore comparison\"\n5. Collect storage sizes via pg_total_relation_size() before and after\n6. Output results using existing BenchmarkResults schema so\n   PlatformComparison.from_files() can compare heap vs columnstore runs\n\nReference: PgMooncakeAdapter.create_schema() already adds USING columnstore\nto DDL. The migration benchmark needs the inverse - load WITHOUT columnstore\nfirst, then convert.\n",
+  "description": "pg_mooncake users often migrate existing PostgreSQL heap tables to\ncolumnstore format. The conversion overhead (time, storage delta, locking\nimpact) is a key decision factor but currently unmeasured by BenchBox.\n\nThis benchmark would:\n1. Load data into standard PostgreSQL heap tables\n2. Convert to columnstore via ALTER TABLE ... SET ACCESS METHOD columnstore\n3. Measure conversion time, storage size before/after, and query performance\n   delta on the same workload pre- and post-conversion\n\nNo existing migration benchmarking infrastructure exists in BenchBox -\nthis is net-new capability.\n\nSplit from pg-extension-advanced-benchmarking (originally deferred from\npg-mooncake-platform-adapter, completed 2026-02-15).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "invent a custom results format",
+        "instead": "emit standard result files",
+        "item_id": "pg-mooncake-migration-benchmark",
+        "why": "the comparison infrastructure expects BenchmarkResults v2.0 JSON"
+      },
+      {
+        "dont": "modify the default create_schema path",
+        "instead": "add a separate code path or parameter for heap-first loading",
+        "item_id": "pg-mooncake-migration-benchmark",
+        "why": "existing benchmarks expect columnstore by default"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-22T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "BenchmarkResults schema compatibility - output must load via PlatformComparison.from_files()",
+        "item_id": "pg-mooncake-migration-benchmark"
+      },
+      {
+        "behavior": "Existing benchmark phase execution unaffected",
+        "item_id": "pg-mooncake-migration-benchmark"
+      },
+      {
+        "behavior": "PgMooncakeAdapter.create_schema() default behavior (USING columnstore on all tables)",
+        "item_id": "pg-mooncake-migration-benchmark"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pg-mooncake-migration-benchmark",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_mooncake.py"
+      },
+      {
+        "item_id": "pg-mooncake-migration-benchmark",
+        "kind": "only_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "pg-mooncake-migration-benchmark",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_pg_mooncake_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_pg_mooncake_adapter.py -v",
+        "description": "Existing pg_mooncake tests pass",
+        "expected": "all tests pass",
+        "item_id": "pg-mooncake-migration-benchmark",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/benchmark_mooncake_migration.py --help",
+        "description": "Migration script has help output",
+        "expected": "usage information displayed",
+        "item_id": "pg-mooncake-migration-benchmark",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pg-mooncake-migration-benchmark",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "pg-mooncake-migration-benchmark",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-migration-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create migration benchmark script with heap load, conversion timing, and columnstore re-query",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-migration-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add storage size collection (pg_total_relation_size) before and after conversion",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "pg-mooncake-migration-benchmark",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Output results in BenchmarkResults v2.0 format for use with PlatformComparison",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,168 @@
+{
+  "context": "w1/w2 form a pair: compute new fields in the pipeline, then widen\nthe Pydantic model to surface them. w3 is independent (sidecar\nemission in duckdb_builder.py) so it can land in parallel. w4\ngates both with unit tests; regenerate any snapshot fixtures under\ntests/ that encode the narrower MetaRank shape.\n\nFor speedup math, follow the plan's direction convention:\n  - latency (asc): speedup = best_metric / cell_metric → > 1 means slower\n  - throughput/score (desc): speedup = cell_metric / best_metric → < 1 means worse\nBoth forms make the cohort best = 1.0, which is what the UI renders.\n",
+  "description": "Phase F of the Results Explorer strategy revision\n(plans/purring-jingling-petal-ultraplan).\n\nThe master leaderboard (Phase B) and the query workbench (Phase C)\nboth need pipeline-side surface additions before the UI work can\nland.\n\n1) `_build_meta_leaderboard` in\n   `benchbox/core/explorer_pipeline/pipeline.py` already computes\n   `metric_value` per platform per cohort (line 217) but drops it\n   before the meta artifact is flattened (line 223, which keeps only\n   `{rank, total}`). The Home master leaderboard needs the absolute\n   value, the within-cohort speedup, and the primary metric/order so\n   it can format cells in the three render modes (Times / Ranks /\n   Speedup) without a second cohort lookup.\n\n2) The query workbench's column picker shouldn't hardcode the\n   column list. `DuckDBSnapshotBuilder._COLUMNS` is already\n   authoritative - emit it as `results_schema.json` next to\n   `results.duckdb` so the frontend can consume it directly.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hardcode latency-vs-throughput logic",
+        "instead": "read it",
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "why": "RankingConfig.primary_order already encodes the direction"
+      },
+      {
+        "dont": "recompute best per cohort in a second pass",
+        "instead": "fold speedup into that loop",
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "why": "the cohort iteration at pipeline.py:217 already has all values"
+      },
+      {
+        "dont": "remove {rank, total}",
+        "instead": "only add fields",
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "why": "existing frontends depend on them"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-17T00:00:00Z",
+      "created_at": "2026-04-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DuckDB snapshot output (results.duckdb) byte-for-byte identical - this item only adds a sidecar",
+        "item_id": "explorer-pipeline-meta-leaderboard-widening"
+      },
+      {
+        "behavior": "Existing frontend consumers that read only {rank, total} from MetaRank continue to work - extra keys are additive",
+        "item_id": "explorer-pipeline-meta-leaderboard-widening"
+      },
+      {
+        "behavior": "primary_metric / primary_order values match get_ranking_config() for every registered benchmark family",
+        "item_id": "explorer-pipeline-meta-leaderboard-widening"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/models.py"
+      },
+      {
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/pipeline.py"
+      },
+      {
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_duckdb_builder.py"
+      },
+      {
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/test_meta_leaderboard.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ -v",
+        "description": "Explorer pipeline unit tests green",
+        "expected": "all pass, including new MetaRank and results_schema tests",
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite green (no regressions elsewhere)",
+        "expected": "all green",
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox explorer build --data-dir results-data/ --output /tmp/explorer-out",
+        "description": "End-to-end pipeline run emits widened artifacts",
+        "expected": "/tmp/explorer-out/meta_leaderboard.json cells include metric_value/speedup_vs_best/primary_metric/primary_order; /tmp/explorer-out/results_schema.json exists",
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "notes": "benchbox/core/explorer_pipeline/pipeline.py:_build_meta_leaderboard\ncurrently flattens each cell to {rank, total} at line 223. Keep\nrank/total and add:\n  - metric_value: float | None (already computed at line 217)\n  - speedup_vs_best: float | None\n      * for latency-style metrics (primary_order == \"asc\"):\n          best / value\n      * for throughput/score metrics (primary_order == \"desc\"):\n          value / best\n    best = min or max of non-null metric_values in the cohort\n  - primary_metric: str (e.g. \"geomean_ms\", \"power_score\")\n  - primary_order: \"asc\" | \"desc\"\nPull primary_metric/primary_order from get_ranking_config(benchmark)\n- pipeline.py line 142 already calls this for the summary build,\nreuse the result.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Widen MetaRank cell shape to {rank, total, metric_value, speedup_vs_best, primary_metric, primary_order}",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "notes": "Widen MetaRank to include the new fields. Mark them Optional to\nremain backward-compatible with any cached artifacts (current\nconsumers only read {rank, total}, so extra keys are safe).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update MetaRank Pydantic model in explorer_pipeline/models.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "notes": "benchbox/core/explorer_pipeline/duckdb_builder.py - after the\nDuckDB file is written, serialize _COLUMNS (name + type) as\nresults_schema.json in the same output directory. No schema\nchange; just persisting the already-authoritative column list\nso the frontend's column picker (Phase C) doesn't have to\nhardcode it.\n\nShape:\n  {\"columns\": [{\"name\": \"...\", \"type\": \"...\"}, ...]}\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Emit results_schema.json next to results.duckdb",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-pipeline-meta-leaderboard-widening",
+        "notes": "- tests/unit/core/explorer_pipeline/test_meta_leaderboard.py (new):\n  assert each cell has metric_value, speedup_vs_best,\n  primary_metric, primary_order; check speedup math for a\n  latency cohort (best = min) and a throughput cohort\n  (best = max)\n- tests/unit/core/explorer_pipeline/test_duckdb_builder.py\n  (extended): assert results_schema.json exists next to\n  results.duckdb and lists the expected columns\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pipeline unit tests for widened MetaRank and results_schema.json emission",
+        "wid": "w4"
+      }
+    ]
+  }
+}

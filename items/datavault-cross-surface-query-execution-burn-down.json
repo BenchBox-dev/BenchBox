@@ -1,0 +1,145 @@
+{
+  "context": "Fix query projections/join suffixes at their source, express operations through the supported unified-frame API (adding generic facade support only where the operation is valid across backends), preserve SQL NULL aggregate semantics, and annotate the Data Vault generator/manifest with explicit loading metadata. Add focused regression tests by defect family, then rerun the full 44-cell probe.",
+  "description": "A bounded SF=0.01 load-faithful probe executed 44 SQL/DataFrame cells for all 22 Data Vault queries and found 28 divergences. Group the related Data Vault defects in this item: duplicate load_dts/record_source columns during chained joins in both expression and pandas implementations; expression queries calling unsupported UnifiedLazyFrame APIs (agg, rename_columns, with_column); Q17 pandas returning 0.0 where SQL returns NULL; and generated-table loading that lacks durable CSV dialect metadata. Evidence: /tmp/datavault-cross-surface-probe.log (2026-08-16). These are product defects; do not baseline them.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "created_at": "2026-08-17T03:06:57Z",
+      "worktree": "dataframe-benchmarks"
+    },
+    "preserves": [
+      {
+        "behavior": "Keep Data Vault SQL semantics, hash-key schema, lazy adapter imports, and backend-neutral unified-frame behavior; do not baseline execution errors or value mismatches.",
+        "item_id": "datavault-cross-surface-query-execution-burn-down"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/datavault/**"
+      },
+      {
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/equivalence/**"
+      },
+      {
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/unified_frame.py"
+      },
+      {
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/datavault/test_datavault_dataframe_queries.py tests/unit/core/test_dataframe_execution.py -q",
+        "description": "Focused Data Vault DataFrame regressions",
+        "expected": "all selected tests pass",
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark datavault",
+        "description": "Full bounded cross-surface proof",
+        "expected": "44 of 44 cells compared with zero divergences",
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Fix duplicate metadata-column join failures in Q2,Q3,Q5,Q8,Q9,Q10,Q11,Q12,Q13,Q18,Q20,Q21 across expression and pandas backends",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace or implement unsupported UnifiedLazyFrame agg, rename_columns, and with_column operations exercised by Q6,Q7,Q8,Q9,Q11,Q14,Q15,Q17,Q19,Q22",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Preserve SQL empty-aggregate NULL semantics for Q17 pandas instead of returning 0.0",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add explicit reusable-load CSV dialect metadata for all generated Data Vault tables",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "datavault-cross-surface-query-execution-burn-down",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run all 22 queries on expression and pandas and require 44/44 clean cells without known-divergence baselines",
+        "wid": "w5"
+      }
+    ]
+  }
+}

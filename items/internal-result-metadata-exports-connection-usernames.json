@@ -1,0 +1,118 @@
+{
+  "context": "Decide first whether a username is a secret to redact or an identifier to pseudonymize - the anonymization path already treats it as the latter, and treating one channel as secret while the other pseudonymizes is a policy split worth making deliberately rather than by default. If redaction is chosen, guard over-redaction as #1346 did: a bare 'user' substring also matches user_agent and num_users, so prefer bounded matching plus a non-credential guard test. Once shared handling covers it, DuckLake's adapter-local _CREDENTIAL_CONFIG_KEYS scrub can shrink.",
+  "description": "is_secret_option_key() (platform_options.py:72) does not match user/username/pg_user/http_user/login/account, so any adapter carrying a username in platform_config exports it verbatim in platform_raw_config. Measured 2026-07-31 on develop 8c9d7f8d8: sanitize_platform_options({'username':'alice-sentinel'}) returns it unchanged, and PostgreSQLAdapter(username=...,password=...) normalized metadata carries username in clear while password is '<redacted>'. Affects the ~25 adapters holding credential config. CORRECTION vs the first draft of this item, which rated this high and claimed published results were affected: the PUBLIC anonymization path PSEUDONYMIZES usernames (alice-sentinel -> user_b860e7bd6314) via identifier_keys, so published results are NOT exposed. The exposure is limited to internal/unanonymized result metadata - real, but a narrower channel than first claimed, hence medium. PR #1364 fixed this for DuckLake only via an adapter-local key scrub.",
+  "legacy": {
+    "item_meta": {
+      "category": "security",
+      "completed_at": "2026-07-31T23:52:01Z",
+      "completed_pr": 1381,
+      "created_at": "2026-07-31T16:36:26Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Already-redacted keys (password/token/secret/key_id/...) keep current behavior",
+        "item_id": "internal-result-metadata-exports-connection-usernames"
+      },
+      {
+        "behavior": "Non-credential keys such as user_agent still export real values",
+        "item_id": "internal-result-metadata-exports-connection-usernames"
+      },
+      {
+        "behavior": "Public/anonymized export keeps pseudonymizing usernames rather than redacting them, unless w1 deliberately changes that",
+        "item_id": "internal-result-metadata-exports-connection-usernames"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "internal-result-metadata-exports-connection-usernames",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/platform_options.py"
+      },
+      {
+        "item_id": "internal-result-metadata-exports-connection-usernames",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_platform_options_capture.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.results.platform_options import sanitize_platform_options as s;assert s({'username':'alice-sentinel'})['username'] != 'alice-sentinel'\"",
+        "description": "A connection username no longer survives sanitize_platform_options verbatim",
+        "expected": "exits 1 on an unfixed tree (verified 2026-07-31), 0 once handled",
+        "item_id": "internal-result-metadata-exports-connection-usernames",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.results.platform_options import sanitize_platform_options as s;r=s({'user_agent':'ua/1.0','num_users':7});assert r['user_agent']=='ua/1.0' and r['num_users']==7\"",
+        "description": "Non-credential lookalike keys are not over-redacted",
+        "expected": "passes before and after - guards the fix, not the defect",
+        "item_id": "internal-result-metadata-exports-connection-usernames",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_platform_options_capture.py -q",
+        "description": "Platform-options suite still green",
+        "expected": "all pass",
+        "item_id": "internal-result-metadata-exports-connection-usernames",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "internal-result-metadata-exports-connection-usernames",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "internal-result-metadata-exports-connection-usernames",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on develop c6e60fc: sanitize_platform_options passed username/user verbatim while the public path pseudonymizes to user_<hash> - asymmetry confirmed by driving both entry points",
+        "item_id": "internal-result-metadata-exports-connection-usernames",
+        "notes": null,
+        "started_at": "2026-07-31T23:51:20Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-internal-usernames",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Re-validate the internal-vs-public asymmetry on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Decision: REDACT on the internal path (the capture layer has no pseudonymizer and must not duplicate anonymization's salted hashing); public path pseudonymization untouched. Exact-normalized-match set _USERNAME_KEYS={user,username,userid,pguser,dbuser}",
+        "item_id": "internal-result-metadata-exports-connection-usernames",
+        "notes": null,
+        "started_at": "2026-07-31T23:51:23Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-internal-usernames",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Decide redact-vs-pseudonymize for usernames and implement it",
+        "wid": "w1"
+      },
+      {
+        "evidence": "TestUsernameRedactionInternalPath: username/user/pg_user redacted incl. nested; user_agent/num_users/users_table untouched; secret keys unchanged; 48 passed in capture suite, 8775 passed across results+platforms",
+        "item_id": "internal-result-metadata-exports-connection-usernames",
+        "notes": null,
+        "started_at": "2026-07-31T23:51:25Z",
+        "started_branch": "claude/benchbox-credential-egress-emxkl9-internal-usernames",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Tests for the chosen handling plus an over-redaction guard",
+        "wid": "w2"
+      }
+    ]
+  }
+}

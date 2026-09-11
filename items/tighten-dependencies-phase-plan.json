@@ -1,0 +1,206 @@
+{
+  "context": "Sequencing matters more than scope. Phase 0 starts with zero-risk dead\nremovals (sphinx pair, lxml) to build review confidence before touching\n`[project] dependencies` (jsonschema, chdb-core), which affect every\ninstall. Phase 2 then makes the jsonschema move structural rather than\ncosmetic. Phase 4 prevents regression. Phase 3 waits for a real release\nboundary.\n",
+  "description": "Umbrella TODO that sequences the dependency-tightening work emerging from\nthe `audit-imported-dependencies-for-elimination` audit\n(`docs/development/dependency-inventory.md`).\n\nThe audit flagged 6 of 76 packages (~8%) for elimination/relocation. Most\nof the realistic ceiling for tightening is unlocked not by individual\nflags, but by structural changes:\n\n  - Moving internal tooling (`_project/scripts/`) out of the shipped\n    manifest entirely (Phase 2).\n  - Adding a CI guard so the audit doesn't decay (Phase 4).\n\nThis parent TODO tracks all five phases. Phases 0 and 1 are already\nenumerated as standalone child TODOs (linked below). Phases 2 and 4\nare tracked as new child TODOs created alongside this parent. Phase 3\nis a deferred v0.3.0 milestone (breaking changes); recorded here for\ntraceability rather than as an immediate child TODO.\n\nRealistic outcome after all five phases:\n  - Core deps drop from 14 → 12 (−14%)\n  - Dev dep group drops by ≥3 packages\n  - Extras count drops ~10 (Phase 3, v0.3.0)\n  - Future regressions caught by CI",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle multiple phases into one PR",
+        "instead": "keep one TODO per PR",
+        "item_id": "tighten-dependencies-phase-plan",
+        "why": "reviewer surface and rollback granularity both suffer"
+      },
+      {
+        "dont": "chase the remaining 70 KEEP entries looking for hidden fat",
+        "instead": "focus structural effort on Phase 2 and Phase 4",
+        "item_id": "tighten-dependencies-phase-plan",
+        "why": "the audit already verified each has a real owner"
+      },
+      {
+        "dont": "execute Phase 3 outside a v0.3.0 milestone",
+        "instead": "needs deprecation window",
+        "item_id": "tighten-dependencies-phase-plan",
+        "why": "plain-name extras may be pinned in user installs in the wild"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "tighten-dependencies-phase-plan",
+        "id": 273,
+        "reason": "Driver modernization - out of scope for an *elimination* audit. File separately when product is ready.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: The psycopg2-to-psycopg3 migration this refers to was completed under the separately-tracked migrate-psycopg2-to-psycopg3 item (now DONE).",
+        "summary": "Migration off psycopg2-binary to psycopg3"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "tighten-dependencies-phase-plan",
+        "id": 274,
+        "reason": "Audit finding F4 documented these as intentional belt-and-suspenders; removal would silently break minimal Azure/QuestDB installs.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicit design decision: requests deps kept intentionally as belt-and-suspenders; removal would break minimal installs. Not deferred, declined.",
+        "summary": "Removing `requests` declarations from extras:cloud-spark* / extras:questdb"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "tighten-dependencies-phase-plan",
+        "id": 275,
+        "reason": "120 import sites in core; the duplicate declaration in extras (pyproject.toml:105) is a version-floor artifact, not waste.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Reason states the duplicate pyarrow declaration is an intentional version-floor artifact, not waste — no action needed.",
+        "summary": "Splitting pyarrow between core and dataframe extras"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-15T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Each phase lands as its own reviewable PR (no megacommit)",
+        "item_id": "tighten-dependencies-phase-plan"
+      },
+      {
+        "behavior": "Phase 0 children executed in the documented order to minimize blast radius",
+        "item_id": "tighten-dependencies-phase-plan"
+      },
+      {
+        "behavior": "Phase 3 (breaking) is NOT executed without a v0.3.0 release window",
+        "item_id": "tighten-dependencies-phase-plan"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tighten-dependencies-phase-plan",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "tighten-dependencies-phase-plan",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "tighten-dependencies-phase-plan",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "tighten-dependencies-phase-plan",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "tighten-dependencies-phase-plan",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/tighten-dependencies-phase-plan.yaml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import pathlib; planned = {p.stem for p in pathlib.Path('_project/TODO/main/planning').glob('*.yaml')}; done = {p.stem for p in pathlib.Path('_project/DONE/main/active').glob('*.yaml')}; required = {'clean-up-unused-sphinx-dev-deps', 'drop-lxml-dev-dep-or-port-test-to-stdlib', 'move-jsonschema-out-of-core-runtime-deps', 'drop-chdb-core-from-core-dependencies', 'declare-undeclared-runtime-imports'}; missing = required - (planned | done); assert not missing, 'Missing Phase 0 children: ' + str(missing); print('OK: all Phase 0 children present')\"",
+        "description": "All Phase 0 child TODOs exist in planning/ or completed in DONE/",
+        "expected": "OK: all Phase 0 children present",
+        "item_id": "tighten-dependencies-phase-plan",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import pathlib; planned = {p.stem for p in pathlib.Path('_project/TODO/main/planning').glob('*.yaml')}; done = {p.stem for p in pathlib.Path('_project/DONE/main/active').glob('*.yaml')}; required = {'extract-project-scripts-to-isolated-env', 'add-dependency-audit-ci-guard'}; missing = required - (planned | done); assert not missing, 'Missing children: ' + str(missing); print('OK: Phase 2+4 children present')\"",
+        "description": "Phase 2 + Phase 4 child TODOs exist",
+        "expected": "OK: Phase 2+4 children present",
+        "item_id": "tighten-dependencies-phase-plan",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tighten-dependencies-phase-plan",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tighten-dependencies-phase-plan",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tighten-dependencies-phase-plan",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "tighten-dependencies-phase-plan",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tighten-dependencies-phase-plan",
+        "notes": "Order: clean-up-unused-sphinx-dev-deps → drop-lxml-dev-dep-or-port-test-to-stdlib →\nmove-jsonschema-out-of-core-runtime-deps → drop-chdb-core-from-core-dependencies →\ndeclare-undeclared-runtime-imports.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Phase 0 - execute the 5 ready follow-ups in order: sphinx-dev-deps → lxml → jsonschema → chdb-core → declare-undeclared. One PR each.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tighten-dependencies-phase-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Phase 1 - fold into Phase 0's `declare-undeclared-runtime-imports` TODO (covers `pillow`, `ansi2html`, AI-primitives extras). No separate child TODO needed.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tighten-dependencies-phase-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Phase 2 - execute child TODO `extract-project-scripts-to-isolated-env` to give internal TODO/release tooling its own pyproject.toml so jsonschema/ruamel-yaml leave the main manifest entirely.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "tighten-dependencies-phase-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Phase 4 - execute child TODO `add-dependency-audit-ci-guard` to promote the audit's AST scripts into a `make audit-deps` check wired into CI.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "tighten-dependencies-phase-plan",
+        "notes": "Cut order:\n  1. Emit DeprecationWarning for the deprecated extras paths.\n  2. Update extras:all and docs in lockstep.\n  3. Remove aliases at v0.3.0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Phase 3 (deferred to v0.3.0) - deprecate plain-name extras (pandas/polars/modin/dask/pyspark/cudf) and the `databricks-connect` alias. Tracked in release plan, not as a near-term TODO.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

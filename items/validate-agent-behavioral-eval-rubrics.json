@@ -1,0 +1,88 @@
+{
+  "context": "Add explicit allowed actions/identities and required rubric fields to agent_instruction_audit.py; require unique scenario IDs, exact authority agreement, boolean mutation fields, and valid enums; add focused negative tests. Land with the corpus update in PR #1318.",
+  "description": "The behavioral scenario corpus now carries machine-scored authority, action, mutation, capture, and identity expectations. The existing deterministic audit ignores those fields, so a missing or malformed rubric could silently invalidate the live evaluation loop. Validate the rubric schema and enum/type constraints, with negative mutation tests.",
+  "legacy": {
+    "item_meta": {
+      "category": "Agent infrastructure",
+      "completed_at": "2026-07-28T16:20:15Z",
+      "completed_pr": 1318,
+      "created_at": "2026-07-28T14:36:04Z",
+      "worktree": "agent-instructions"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing stable policy-ID and authority-class checks remain active",
+        "item_id": "validate-agent-behavioral-eval-rubrics"
+      },
+      {
+        "behavior": "The audit remains deterministic and does not invoke an agent or network",
+        "item_id": "validate-agent-behavioral-eval-rubrics"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "validate-agent-behavioral-eval-rubrics",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "item_id": "validate-agent-behavioral-eval-rubrics",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_agent_instruction_audit.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_agent_instruction_audit.py -q -n 0",
+        "description": "Focused instruction audit tests pass",
+        "expected": "all pass",
+        "item_id": "validate-agent-behavioral-eval-rubrics",
+        "last_result": "pass",
+        "last_run": "2026-07-28T14:37:12Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make agent-instructions-check",
+        "description": "Instruction audit passes",
+        "expected": "exit 0",
+        "item_id": "validate-agent-behavioral-eval-rubrics",
+        "last_result": "pass",
+        "last_run": "2026-07-28T14:37:14Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "validate-agent-behavioral-eval-rubrics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "audit validates unique IDs, required evaluation rubric fields, action/identity enums, and strict boolean intent fields",
+        "item_id": "validate-agent-behavioral-eval-rubrics",
+        "notes": null,
+        "started_at": "2026-07-28T14:36:10Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Validate scenario rubric schema, enums, types, and ID uniqueness",
+        "wid": "w1"
+      },
+      {
+        "evidence": "3 negative mutation tests cover duplicate IDs, missing rubric field, invalid action/identity/non-boolean; focused suite 21 passed; make agent-instructions-check passes",
+        "item_id": "validate-agent-behavioral-eval-rubrics",
+        "notes": null,
+        "started_at": "2026-07-28T14:37:06Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add negative mutation tests for malformed and contradictory rubrics",
+        "wid": "w2"
+      }
+    ]
+  }
+}

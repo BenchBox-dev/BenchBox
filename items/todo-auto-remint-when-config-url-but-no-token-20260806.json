@@ -1,0 +1,99 @@
+{
+  "description": "PROPOSAL -- close as dismissed if the current friction is the deliberate posture.\n\n_project/scripts/todo_db.py already has _try_turso_auto_provision(), which mints a URL and a 1d token from the maintainer's logged-in turso CLI. _resolve_backend() only calls it when NO backend is configured at all (--db absent, TODO_DB_PATH unset, TODO_DB_URL unset, no .todo-db/config.json URL).\n\nBenchBox commits .todo-db/config.json with a hosted url, so that branch never fires. The configured-hosted path instead goes straight to 'error: hosted tracker: set TODO_DB_AUTH_TOKEN', and doctor reports AUTH FAILURE with a manual remedy. Every session (or every fresh shell, since the token lives in env only) therefore needs:\n\n  export TODO_DB_AUTH_TOKEN=eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODYxMzgzOTAsImlhdCI6MTc4NjA1MTk5MCwiaWQiOiIwMTlmNzZhNC01ZDAxLTcxYWUtYmEyNy01NDk2OTY5ZjEwZWIiLCJraWQiOiJzeDBwbVJiOWpaQnpBYkZZajFoRjFsVUxHYTBxa3RWMndhWXRWbE9wUGNRIiwicmlkIjoiYTY0ZmJiYzQtOGQxMC00MjRkLThlMmYtYjI4YzNkZTAxNTY4In0.Qo5U9yrawnZZT9Stu3yz-CjP5maQELan5eckN2VGjLuhiqZjpKk8P9BJ_gHCGlSzEM0ora7b2FM6fJHeAKoVBQ\n\nSuggested change: when a config/env URL is present but no token is set, fall through to the same _try_turso_auto_provision() path instead of erroring. It is the same turso CLI, the same 1d expiry, and the token still lives only in env -- the existing docstring already calls this 'the sanctioned local pattern'. Net effect is that the configured-hosted path gets the ergonomics the unconfigured path already has.\n\nCounter-argument to weigh before doing it: the current split may be intentional, forcing an explicit token for a shared/committed backend while auto-minting only throwaway local ones. If so, dismiss this and instead make the error message name the exact mint command for the configured db, which today the operator has to assemble from doctor's generic '<db>' placeholder.",
+  "legacy": {
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-09T12:49:51Z",
+      "completed_pr": 1646,
+      "created_at": "2026-08-06T21:33:11Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Plaintext http:// hosted URLs stay refused",
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806"
+      },
+      {
+        "behavior": "Tokens are never written to disk or echoed; env-only handling is unchanged",
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/green_unmerged_sweep.py"
+      },
+      {
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/required_lane.py"
+      },
+      {
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/soundness_drain_report.py"
+      },
+      {
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -k todo -q",
+        "description": "Tracker unit tests pass",
+        "expected": "exit 0",
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806",
+        "last_result": "pass",
+        "last_run": "2026-08-09T12:46:41Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1646 _resolve_backend: auto-mint token via turso when config URL present but no token (env-only, _try_turso_token_auto_mint)",
+        "item_id": "todo-auto-remint-when-config-url-but-no-token-20260806",
+        "notes": null,
+        "started_at": "2026-08-09T12:43:13Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Decide auto-remint vs sharper error message, then implement the chosen one",
+        "wid": "w0"
+      }
+    ]
+  }
+}

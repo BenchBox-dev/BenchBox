@@ -1,0 +1,186 @@
+{
+  "context": "Follow the CloudSpecs reference architecture: Vite build + DuckDB-WASM for\nbrowser-side analytics. Keep the framework minimal - Preact or vanilla TS.\nPre-render known routes at build time for SEO; use client-side routing only\nfor dynamic views (compare).\n",
+  "description": "Set up the frontend project for the results explorer at `benchbox.dev/results/`.\nThe explorer is a standalone static app built with Vite and TypeScript that\nuses DuckDB-WASM for browser-side analytics over the derived read model.\n\nThis TODO covers project scaffolding, build configuration, DuckDB-WASM\nintegration, data loading layer, and the shared layout/navigation shell.\nIndividual pages (home, browse, detail, compare) are separate TODOs.\n\nTechnology stack:\n- Build: Vite 6+\n- Language: TypeScript (strict mode)\n- Framework: Preact (lightweight) or vanilla TS - decide in w1\n- Analytics: DuckDB-WASM (@duckdb/duckdb-wasm)\n- Styling: Tailwind CSS or minimal custom CSS\n- Routing: File-based real paths (not hash routing) for stable share URLs\n\nThe app builds into `results-explorer/dist/`; the GitHub Pages workflow then\ncopies that output into `site/results/` so it deploys alongside the existing\nlanding page, docs, and blog.\n\n**Dependency note:** `resolve-results-explorer-brand-ownership` is NOT a\nblocker for scaffolding - implementation proceeds with BenchBox placement as\nthe working default. Brand must be resolved before launch (tracked in\n`launch-results-explorer-acceptance-and-seed`).\n\n`build-static-pipeline-bundles-to-read-model` is NOT a blocker for the\nscaffold shell (layout, routing, DuckDB-WASM init). The data access layer\n(w2) uses fixture data during development; production read models are\ninjected by the pipeline at CI time. Page-level TODOs\n(`implement-explorer-home-and-browse-pages`, `implement-results-compare-view`)\ncarry the explicit pipeline dependency so the scaffold can start as soon as\nthe strategy is complete.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle DuckDB-WASM inline",
+        "instead": "load it lazily on first analytics interaction",
+        "item_id": "scaffold-results-explorer-frontend",
+        "why": "the WASM binary is large (~4MB)"
+      },
+      {
+        "dont": "couple the explorer build to the Sphinx docs build",
+        "instead": "build independently and assemble in CI",
+        "item_id": "scaffold-results-explorer-frontend",
+        "why": "they have different toolchains and lifecycles"
+      },
+      {
+        "dont": "use hash-based routing (#/results/tpch)",
+        "instead": "use real paths with GitHub Pages 404 fallback",
+        "item_id": "scaffold-results-explorer-frontend",
+        "why": "benchmark result URLs must be stable and shareable"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "scaffold-results-explorer-frontend",
+        "needs_item": "define-results-platform-product-and-launch-strategy"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-03T00:00:00Z",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Explorer URLs must be real paths (not hash-based) for stable sharing and SEO",
+        "item_id": "scaffold-results-explorer-frontend"
+      },
+      {
+        "behavior": "The existing benchbox.dev landing page, docs, and blog must continue to build and deploy independently",
+        "item_id": "scaffold-results-explorer-frontend"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "scaffold-results-explorer-frontend",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "scaffold-results-explorer-frontend",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "scaffold-results-explorer-frontend",
+        "kind": "do_not_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "scaffold-results-explorer-frontend",
+        "kind": "do_not_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "scaffold-results-explorer-frontend",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run build && ls dist/",
+        "description": "Vite build succeeds and produces correct output",
+        "expected": "index.html, assets/, data/",
+        "item_id": "scaffold-results-explorer-frontend",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx serve dist -l 3000 &",
+        "description": "DuckDB-WASM loads and queries work in local preview",
+        "expected": "Server running, explorer pages accessible at localhost:3000/results/",
+        "item_id": "scaffold-results-explorer-frontend",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "scaffold-results-explorer-frontend",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "scaffold-results-explorer-frontend",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "scaffold-results-explorer-frontend",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "scaffold-results-explorer-frontend",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "scaffold-results-explorer-frontend",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "scaffold-results-explorer-frontend",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "scaffold-results-explorer-frontend",
+        "notes": "Decide: Preact (JSX component model, ~3KB) vs vanilla TypeScript (no framework).\nRecommendation: start with Preact - the component model helps for interactive\nviews (compare, filters) without the weight of React.\n\nInitialize the project at `results-explorer/` (or `site/results/`):\n- `npm create vite@latest results-explorer -- --template preact-ts`\n- Configure `vite.config.ts` with `base: '/results/'` for GitHub Pages subpath\n- Add TypeScript strict mode\n- Add `.gitignore` for node_modules, dist/\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose component model and initialize Vite project",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "scaffold-results-explorer-frontend",
+        "notes": "Install `@duckdb/duckdb-wasm` and create a data access module that:\n1. Initializes DuckDB-WASM on first use (lazy loading)\n2. Fetches and registers `results.duckdb` from the static data directory\n3. Exposes typed query functions:\n   - `getManifest()` - fetch and parse `manifest.json`\n   - `queryResults(filters)` - SQL query against DuckDB for filtered results\n   - `queryQueries(resultId)` - get query timings for a specific result\n   - `compareResults(ids[])` - get side-by-side query data for comparison\n4. Handles loading states and errors gracefully\n\nDuckDB-WASM WASM files should be served from the same origin (copy to\n`public/` or configure CDN). Test that the .duckdb file loads correctly\nin Chrome, Firefox, and Safari.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate DuckDB-WASM and build the data access layer",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "scaffold-results-explorer-frontend",
+        "notes": "Create the shared layout that wraps all explorer pages:\n- Header with BenchBox logo/name and nav links (Home, Docs, Blog, Results)\n- Results-specific sub-navigation (Browse by Benchmark, Browse by Platform)\n- Footer consistent with the rest of benchbox.dev\n- Responsive layout (desktop + tablet + mobile)\n\nThe header should match the existing benchbox.dev site navigation so the\nexplorer feels integrated, not like a separate app. Read the existing\nlanding page header for visual consistency.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build shared layout shell with navigation, header, and footer",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "scaffold-results-explorer-frontend",
+        "notes": "Set up routing that produces real URL paths (not hash-based):\n- `/results/` - home\n- `/results/tpch/` - benchmark index\n- `/results/duckdb/` - platform index\n- `/results/r/{result_id}` - result detail\n- `/results/compare?ids=id1,id2` - compare view\n\nFor GitHub Pages (no server-side routing), use one of:\na) Pre-render all known routes at build time (preferred - enables SEO)\nb) 404.html fallback that handles client-side routing\nc) Both: pre-render known routes + fallback for dynamic paths\n\nRecommendation: pre-render browse and detail pages at build time using\nmanifest.json. Compare view uses query params and client-side rendering.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure routing for real URL paths",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "scaffold-results-explorer-frontend",
+        "notes": "Configure the full build pipeline:\n1. `npm run build` produces optimized output in `dist/`\n2. Verify `base: '/results/'` produces correct asset paths\n3. Verify DuckDB-WASM files are included in the output\n4. Verify static data files (manifest.json, details/, results.duckdb) are\n   copied to `dist/data/`\n5. Test locally with `npx serve dist` that all routes work\n6. Document build prerequisites in a README\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add build scripts and verify Vite output",
+        "wid": "w5"
+      }
+    ]
+  }
+}

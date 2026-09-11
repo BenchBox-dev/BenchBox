@@ -1,0 +1,108 @@
+{
+  "description": "Non-required nits and improvements surfaced by the code review of\nexplorer-emit-benchmark-summary-artifact.  The two Required issues\n(missing percentile_stats test, missing sort-order test) were fixed\nimmediately post-review.  This item tracks the remaining nit/consider findings.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change sort behavior in w1 for any currently-registered benchmark family",
+        "instead": "(not specified)",
+        "item_id": "explorer-benchmark-summary-review-followups",
+        "why": "only the mechanism changes"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "_natural_sort_key output for all current query IDs - empty-string filter is behavior-equivalent in w2",
+        "item_id": "explorer-benchmark-summary-review-followups"
+      },
+      {
+        "behavior": "_platform_row_sort_key behavior for all current benchmark families - only extensibility changes in w1",
+        "item_id": "explorer-benchmark-summary-review-followups"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline/test_benchmark_summary.py -v -n 0",
+        "description": "Benchmark summary tests still pass",
+        "expected": "16 passed",
+        "item_id": "explorer-benchmark-summary-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Full fast test suite green",
+        "expected": "all green",
+        "item_id": "explorer-benchmark-summary-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-benchmark-summary-review-followups",
+        "notes": "pipeline.py:78-87 - _platform_row_sort_key hardcodes sort direction: negate\npower_score (higher-is-better), use geomean_ms as-is (lower-is-better).\nThis is correct for all current benchmark families but duplicates logic\nalready encoded in RankingConfig.primary_order.\n\nIf a future family added a metric where the direction didn't match these\nassumptions, the sort would silently be wrong.\n\nFix: pass `benchmark` name to _platform_row_sort_key and look up\nget_ranking_config(benchmark).primary_order to derive the negation flag:\n  cfg = get_ranking_config(benchmark)\n  primary_val = getattr(row, cfg.primary_metric)\n  if primary_val is None:\n      return (ineligible, float(\"inf\"))\n  metric = -primary_val if cfg.primary_order == \"desc\" else primary_val\n  return (ineligible, metric)\n\nNote: _build_benchmark_summaries already has the benchmark name in scope\nand already calls get_ranking_config(benchmark) at line 142.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consult RankingConfig.primary_order in _platform_row_sort_key",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-benchmark-summary-review-followups",
+        "notes": "pipeline.py:54-56 - re.split(r\"(\\d+)\", s) produces empty strings between\nnumber groups (e.g., \"Q10\" → [\"\", \"Q\", \"10\", \"\"]). Python's sort handles\nempty strings correctly (they sort first), but the intent is clearer with:\n  return [int(c) if c.isdigit() else c.lower() for c in re.split(r\"(\\d+)\", s) if c]\n\nLow-risk: behavior is identical for all current query IDs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Filter empty strings from _natural_sort_key output",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-benchmark-summary-review-followups",
+        "notes": "transformer.py:272 - filter `dt.display_ms is not None and dt.display_ms > 0`\nexcludes zero-millisecond measurements. For extremely fast queries (sub-ms\nrounded to 0), this would silently exclude them from percentile stats.\n\nFix: add a comment explaining the reason - presumably 0ms indicates a\ntiming error or warmup artifact, not a genuine instant result. If the\nintent is to exclude non-positive values, document it. If 0ms is valid,\nchange to `>= 0`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document why percentile filter uses display_ms > 0 not >= 0",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-benchmark-summary-review-followups",
+        "notes": "pipeline.py:381,395 - Path traversal check uses string prefix:\n  if not str(detail_path).startswith(str(details_dir.resolve()) + \"/\"):\n\nPython 3.9+ has Path.is_relative_to() which is more readable and avoids\nthe string manipulation:\n  if not detail_path.is_relative_to(details_dir.resolve()):\n\nFunctionally identical; Python ≥3.9 is already required by the project.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Use Path.is_relative_to() for path-traversal guard",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-benchmark-summary-review-followups",
+        "notes": "pipeline.py:165-256 - _build_meta_leaderboard is ~90 lines with nested\nfunctions and multiple accumulation passes. Consider extracting:\n  _rank_platforms_in_cohort(summary) → list[dict]\n  _compute_average_ranks(cohort_rows) → dict[str, float]\n\nNot urgent; logic is correct and well-commented. Low value until the\nfunction needs modification.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _build_meta_leaderboard into smaller helpers",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "context": "Use saturation reporter on committed evidence; rewrite only criteria that cannot fail; keep guard scenarios as categorical regression at low n; declare MDE in next contract. Prefer probe-only cheaper matrix unless per-scenario claims are wanted.",
+  "description": "criterion_saturation on v6 evidence: irrelevant_rejection and live_verification spread 0.0 across arms including memoryless control. Power section in docs/evaluation.md: per-scenario n=5 MDE≈0.18; aggregate Δ=0.05 needs ~63/arm. Scenario hardening (distractors, near-duplicates) and/or demotion of dead criteria from absolute bars. Phase 5 of remediation plan, revised after oracle circularity falsification.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "keep absolute bars on criteria with zero cross-arm spread",
+        "instead": "rewrite scenario or demote criterion",
+        "item_id": "memory-scenario-hardening-saturated-criteria",
+        "why": "measures corpus difficulty not candidate"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "v7 is now applied and intentionally retains irrelevant_rejection/live_verification as frozen acceptance bars. This TODO needs a separately selected next-contract policy or concrete scenario-corpus design; the current work order does not specify one, so no safe in-scope change is selected.",
+      "category": "Evaluation",
+      "created_at": "2026-08-05T22:10:28Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "No per-scenario verdict claims at n=5 without power declaration",
+        "item_id": "memory-scenario-hardening-saturated-criteria"
+      },
+      {
+        "behavior": "Saturation remains reported unconditionally in score output",
+        "item_id": "memory-scenario-hardening-saturated-criteria"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Power declaration requirements for v8+",
+        "decision": "extend",
+        "item_id": "memory-scenario-hardening-saturated-criteria",
+        "path": "/Users/joe/Developer/memory-governance/docs/evaluation.md"
+      },
+      {
+        "concept": "criterion_saturation",
+        "decision": "reuse",
+        "item_id": "memory-scenario-hardening-saturated-criteria",
+        "path": "/Users/joe/Developer/memory-governance/evaluation_runs/behavioral/src/memory_tooling/taxonomy.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-scenario-hardening-saturated-criteria",
+        "kind": "do_not_modify",
+        "path_glob": "reports/ab-results-v6-codex.json"
+      },
+      {
+        "item_id": "memory-scenario-hardening-saturated-criteria",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-scenario-hardening-saturated-criteria",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/behavioral/**"
+      },
+      {
+        "item_id": "memory-scenario-hardening-saturated-criteria",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/scenarios/**"
+      },
+      {
+        "item_id": "memory-scenario-hardening-saturated-criteria",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-scenario-hardening-saturated-criteria",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -c \"from pathlib import Path; import json; from memory_tooling.taxonomy import criterion_saturation; r=json.loads(Path('reports/ab-results-v6-codex.json').read_text()); print('ok', any(x.get('saturated') for x in criterion_saturation(r['summaries'])))\"",
+        "description": "Saturated gated criteria are rewritten or demoted in the active contract",
+        "expected": "Tooling still reports saturation; contract docs updated when criteria change",
+        "item_id": "memory-scenario-hardening-saturated-criteria",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-scenario-hardening-saturated-criteria",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "memory-scenario-hardening-saturated-criteria",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Inventory saturated metrics and arm-independent scenarios from v6 report",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-scenario-hardening-saturated-criteria",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Rewrite or demote dead criteria; update contracts and corpus",
+        "wid": "w1"
+      }
+    ]
+  }
+}

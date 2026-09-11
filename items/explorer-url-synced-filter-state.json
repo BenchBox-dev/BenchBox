@@ -1,0 +1,163 @@
+{
+  "context": "Land w1 + w4 (hook + tests) as a pure addition first, then the two\nmigrations as independent commits. Other pages that need URL state\n(new Home master leaderboard, new Query workbench) will adopt the\nhook as part of their own items - this item scopes to what exists\ntoday so the migration isn't tangled with new UI.\n",
+  "description": "Phase E of the Results Explorer strategy revision\n(plans/purring-jingling-petal-ultraplan).\n\nThe master leaderboard (Phase B) and the query workbench (Phase C)\nboth want shareable URLs that round-trip filter state. Existing\nBenchmarkIndex/PlatformIndex filter selects use local `useState`,\nwhich makes cohort/SF/phase choices invisible to navigation and\nbookmarks.\n\nIntroduce a tiny `useUrlState<T>(key, initial, serde)` hook using\n`history.replaceState` + `popstate`. Migrate existing filter\n`useState` call sites directly - no API surface invention, just a\nswap.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a routing library",
+        "instead": "stay vanilla",
+        "item_id": "explorer-url-synced-filter-state",
+        "why": "the current app uses preact-iso/vite-ssg"
+      },
+      {
+        "dont": "centralise all filter state into a context",
+        "instead": "per-key useUrlState is enough",
+        "item_id": "explorer-url-synced-filter-state",
+        "why": "filter concerns are page-local"
+      },
+      {
+        "dont": "use pushState",
+        "instead": "always replaceState",
+        "item_id": "explorer-url-synced-filter-state",
+        "why": "filter changes should not spam browser history"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-17T00:00:00Z",
+      "created_at": "2026-04-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing BenchmarkIndex/PlatformIndex filter behavior is identical - URL sync is additive",
+        "item_id": "explorer-url-synced-filter-state"
+      },
+      {
+        "behavior": "No new dependencies - hook uses only built-in history/popstate APIs",
+        "item_id": "explorer-url-synced-filter-state"
+      },
+      {
+        "behavior": "vite-ssg build continues to succeed (hook must be SSR-safe)",
+        "item_id": "explorer-url-synced-filter-state"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-url-synced-filter-state",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/useUrlState.test.ts"
+      },
+      {
+        "item_id": "explorer-url-synced-filter-state",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/useUrlState.ts"
+      },
+      {
+        "item_id": "explorer-url-synced-filter-state",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "explorer-url-synced-filter-state",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Explorer typecheck + Vitest suites green (including useUrlState tests)",
+        "expected": "all green",
+        "item_id": "explorer-url-synced-filter-state",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "vite-ssg build succeeds",
+        "expected": "build completes without SSR errors",
+        "item_id": "explorer-url-synced-filter-state",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run dev",
+        "description": "URL round-trips on BenchmarkIndex and PlatformIndex",
+        "expected": "changing SF/phase/tuning updates URL; reload restores state; back button works",
+        "item_id": "explorer-url-synced-filter-state",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-url-synced-filter-state",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-url-synced-filter-state",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-url-synced-filter-state",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-url-synced-filter-state",
+        "notes": "New file: results-explorer/src/lib/useUrlState.ts\n  - Read initial value from URL (?key=...) via the provided\n    serde.decode; fall back to `initial` if absent/invalid\n  - setValue updates state and calls\n    history.replaceState(null, \"\", newSearch) - no history spam\n  - Subscribe to `popstate` so back/forward re-hydrate state\n  - Provide a default serde for string; optionals:\n    arraySerde (comma-separated), numberSerde, jsonSerde\nMust be SSR-safe no-op (check typeof window) since vite-ssg\nis used for build.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement useUrlState<T>(key, initial, serde) hook",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-url-synced-filter-state",
+        "notes": "Direct swap: each `const [foo, setFoo] = useState(...)` that\ndrives a filter select becomes useUrlState with an appropriate\nkey (e.g., sf, phase, tuning). No behavior change beyond URL\nround-trip.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate BenchmarkIndex filter selects to useUrlState",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-url-synced-filter-state",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate PlatformIndex filter selects to useUrlState",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-url-synced-filter-state",
+        "notes": "tests in src/lib/__tests__/useUrlState.test.ts covering:\n  - initial value from URL beats `initial`\n  - invalid URL value falls back to `initial`\n  - setValue writes ?key=... without pushing history\n  - popstate re-hydrates (simulate via\n    window.dispatchEvent(new PopStateEvent('popstate')))\n  - SSR no-op when window is undefined\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Vitest coverage for useUrlState",
+        "wid": "w4"
+      }
+    ]
+  }
+}

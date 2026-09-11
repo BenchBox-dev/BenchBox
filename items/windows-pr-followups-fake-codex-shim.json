@@ -1,0 +1,48 @@
+{
+  "context": "Provide a platform-appropriate shim or inject the runner boundary; keep the production executor version check intact.",
+  "description": "Run 30434746317 fails test_run_action_loop_commits_before_replying because a POSIX shell file named 'codex' plus chmod is not a discoverable Windows executable, so the test reaches the real missing-executor error instead of its shim.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-29T13:05:07Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "production still rejects missing or too-old Codex executors",
+        "item_id": "windows-pr-followups-fake-codex-shim"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-pr-followups-fake-codex-shim",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_pr_review_followups.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_pr_review_followups.py -q",
+        "description": "PR follow-up action-loop tests pass",
+        "expected": "exit 0",
+        "item_id": "windows-pr-followups-fake-codex-shim",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-pr-followups-fake-codex-shim",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make the fake Codex executor portable across POSIX and Windows",
+        "wid": "w1"
+      }
+    ]
+  }
+}

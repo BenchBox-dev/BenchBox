@@ -1,0 +1,151 @@
+{
+  "context": "Pin the exact result.JSON bypass in all three discovery consumers, then require the shared helper to accept only canonical lowercase .json primary filenames while retaining case-insensitive companion and manifest exclusion.",
+  "description": "PR #1444 review P1 found that case-insensitive discovery accepts result.JSON while validate-submission.yml only detects lowercase *.json, allowing a primary bundle to bypass validation but enter inventory and Explorer. Restore workflow-aligned lowercase-only primary discovery without weakening regular-file or mixed-case companion exclusions.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-08-01T23:22:22Z",
+      "worktree": "results-explorer"
+    },
+    "preserves": [
+      {
+        "behavior": "JSON-named directories remain excluded from discovery.",
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801"
+      },
+      {
+        "behavior": "Mixed-case companion suffixes remain excluded even when the filename ends in lowercase .json.",
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801"
+      },
+      {
+        "behavior": "Primary discovery stays aligned with the lowercase Git pathspecs enforced by validate-submission.yml.",
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/validation/bundle.py"
+      },
+      {
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/test_pipeline.py"
+      },
+      {
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_generate_corpus_inventory.py"
+      },
+      {
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_validate_submission.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_validate_submission.py",
+        "description": "Exact uppercase bypass regression passes",
+        "expected": "TestDiscoverBundles",
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests -k \"bundle or submission or inventory\" -q",
+        "description": "Item 9 Python surface remains green",
+        "expected": "focused validation and inventory tests pass",
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Explorer frontend remains green",
+        "expected": "typecheck and Vitest pass",
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 -m fast -q",
+        "description": "Fast suite remains green",
+        "expected": "no regressions",
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate the P1 against PR #1444 head and the workflow pathspec contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add failing tests for result.JSON across validator inventory and Explorer discovery",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Restore lowercase-only primary discovery while retaining mixed-case companion exclusion",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr1444-uppercase-primary-validation-bypass-20260801",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify review publish and resolve the PR thread",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,453 @@
+{
+  "context": "Treat `benchbox.core.publishing` as a prototype inventory, not as the architecture to preserve verbatim.\nStart by mapping its genuinely useful concepts (artifact metadata, publish targets, retention intent)\nagainst the real product surface in `benchbox.core.results.exporter`, `benchbox/cli/output.py`,\n`benchbox/cli/commands/export.py`, `benchbox/cli/commands/results.py`, and the run export path in\n`benchbox/cli/commands/run.py`.\n\nThe first supported contract should publish already-exported result bundles, because that reuses the\ncanonical schema-v2 artifacts BenchBox already writes and avoids another serialization pathway. Build\npersistent publication metadata around those bundles, then layer optional post-run publishing on top.\n\nKeep backend behavior honest: only generate public/shareable URLs when the configured backend can\nactually provide them. For local or private targets, expose durable references and metadata rather\nthan pretending a short code is a usable permalink. Once the supported flow exists, collapse or\ndelete the leftover prototype-only branches so the repo does not carry two parallel systems.\n",
+  "description": "The completed item `_project/DONE/infrastructure-publishing/planning/automated-data-publishing-pipeline.yaml`\nintended to add a supported workflow for publishing benchmark results to local/cloud storage,\ngenerating permalinks, and managing published artifacts. The implementation delivered a substantial\nprototype under `benchbox/core/publishing/` plus a strong self-contained test suite, but it stopped\nshort of becoming a BenchBox feature.\n\nThis TODO is now explicitly scoped as the BenchBox-local artifact publication track. It should own\n`benchbox publish` style workflows for copying canonical result bundles to local/cloud storage and\ntracking durable publication metadata. Hosted result submission (`benchbox submit`) and the public\nexplorer at `benchbox.dev/results/` are tracked by the companion results-platform TODO cluster\ncreated from `_project/analysis/benchbox-results-platform-strategy.md`.\n\nCurrent state after review:\n- The publishing module has zero runtime or CLI consumers outside its own tests.\n- BenchBox already has a canonical result path in `benchbox.core.results.exporter` that powers\n  `benchbox run`, `benchbox export`, and `benchbox results`; the publishing module duplicates\n  serialization and output concerns instead of extending that path.\n- Publication state is process-local and in-memory (`ArtifactManager`, `PermalinkRegistry`), so\n  published artifacts, share links, and retention bookkeeping do not survive process exit.\n- Several advertised capabilities are incomplete or misleading: `secondary_storage` is unused,\n  notifications are placeholders, and `PublishFormat.PARQUET` is declared but not actually emitted.\n- The module generates short links, but BenchBox ships no resolver service, URL policy, or documented\n  public-link contract that makes those links broadly useful.\n\nThis follow-up effort treats the original work as a prototype that should either be promoted into\na supported user workflow or remain prunable dead code. The implementation plan below assumes the\nfeature is worth keeping and focuses on making it genuinely useful by integrating it with the\ncanonical results/export/history path rather than preserving a parallel subsystem.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "build a second result serialization pipeline",
+        "instead": "publish the real exported bundle instead",
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "why": "BenchBox already has a canonical schema-v2 exporter and companion file model"
+      },
+      {
+        "dont": "emit fake permalinks with no resolver or addressability contract",
+        "instead": "generate truthful backend-specific references instead",
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "why": "users will treat them as durable links"
+      },
+      {
+        "dont": "expose publishing only as hidden plumbing with zero CLI/API consumers",
+        "instead": "land a supported user-facing workflow early",
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "why": "that reproduces the original prototype failure"
+      },
+      {
+        "dont": "keep publication registries in memory only",
+        "instead": "persist publication metadata explicitly",
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "why": "publish/list/retention/share workflows must survive process exit"
+      },
+      {
+        "dont": "preserve unused prototype promises like secondary mirrors or notifications without a real integration path",
+        "instead": "defer them until the core flow works",
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "why": "they inflate scope and maintenance burden"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "productize-result-publishing-and-artifact-sharing",
+        "id": 446,
+        "reason": "Useful only after BenchBox has a supported persistent publication model and a real link contract.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly useful only after a supported persistent publication model and link contract exist; no evidence either exists yet.",
+        "summary": "Standalone HTTP redirect service for short permalinks"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "productize-result-publishing-and-artifact-sharing",
+        "id": 447,
+        "reason": "The prototype exposed placeholders, but automation should wait until the core publish/share workflow is stable.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Webhook/push integrations were placeholder-only, gated on the publish/share workflow stabilizing, with no committed demand. Speculative future automation, not a necessary action.",
+        "summary": "Webhook notifications and push integrations"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "productize-result-publishing-and-artifact-sharing",
+        "id": 448,
+        "reason": "Premature before there is proven in-repo adoption and a supported external interface.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly premature pending proven in-repo adoption and a supported external interface; neither condition is established yet.",
+        "summary": "Separate package extraction for publishing infrastructure"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_item": "define-results-platform-product-and-launch-strategy"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-03T00:00:00Z",
+      "created_at": "2026-03-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cloud-path handling in the canonical results/export path remains supported for existing backends",
+        "item_id": "productize-result-publishing-and-artifact-sharing"
+      },
+      {
+        "behavior": "Quiet-mode and MCP stdout isolation guarantees remain intact when publishing is added to CLI flows",
+        "item_id": "productize-result-publishing-and-artifact-sharing"
+      },
+      {
+        "behavior": "Schema-v2 result export behavior and companion file generation from `benchbox.core.results.exporter`",
+        "item_id": "productize-result-publishing-and-artifact-sharing"
+      },
+      {
+        "behavior": "`benchbox run`, `benchbox export`, and `benchbox results` remain functional and backward compatible for non-publishing users",
+        "item_id": "productize-result-publishing-and-artifact-sharing"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "do_not_modify",
+        "path_glob": "Benchmark query implementations"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "do_not_modify",
+        "path_glob": "Platform adapters unrelated to result export or publication"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "do_not_modify",
+        "path_glob": "Result schema payload format except for additive, versioned publication metadata changes"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/export.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/publish.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/results.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/output.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/publishing/"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/cloud_storage.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "docs/CLI_REFERENCE.md"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_export_cli.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_publish_cli.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_export_coverage.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_results.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_output.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/publishing/"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_results_exporter.py"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_run_export_consistency.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_results_exporter.py tests/unit/cli/test_cli_output.py tests/unit/cli/commands/test_results.py tests/unit/test_run_export_consistency.py -q",
+        "description": "Existing canonical results/export coverage still passes",
+        "expected": "All tests pass",
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands/test_export_coverage.py tests/integration/test_export_cli.py -q",
+        "description": "CLI export flow remains functional",
+        "expected": "All tests pass",
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/publishing/ tests/integration/test_publish_cli.py -q",
+        "description": "Publishing workflow has end-to-end coverage for supported backends",
+        "expected": "All tests pass",
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_cli_documentation.py tests/unit/cli/test_cli_main.py -q",
+        "description": "Default install help and results surfaces document the supported publish/share flow",
+        "expected": "All tests pass",
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w6",
+        "wid": "w10"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "notes": "Capture the original intent (`automated-data-publishing-pipeline`, commit `97138d3a5`) versus the\ncurrent execution reality. The matrix should explicitly classify each prototype capability as:\nkeep and integrate, redesign, or drop. Include concrete evidence for zero-consumer status and for\noverlap with `benchbox.core.results.exporter`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write a gap matrix comparing the prototype publishing module to the canonical results/export workflow",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "notes": "Add unit and integration coverage for the supported flow, then remove or collapse the leftover\nprototype-only code paths that are no longer needed. If the feature still fails to earn real\nproduct integration after this work, the repo should prefer pruning over carrying another dead\nsubsystem.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add end-to-end coverage and then retire or slim the remaining prototype-only surfaces",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "notes": "Decide the product shape before coding. At minimum, define whether BenchBox supports:\n1) publishing an existing exported result bundle,\n2) optional post-run publishing from `benchbox run`,\n3) listing published artifacts/history,\n4) retention/cleanup operations,\n5) stable share links for local and/or cloud backends.\nHosted service submission is intentionally out of scope here; this item should recommend a local\nor storage-backed `benchbox publish` surface and document why.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the supported user workflows, CLI surface, and success criteria for publishing and sharing results",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "notes": "Replace the current process-local registry model with durable publication metadata. The store should\npersist published artifact identity, source result bundle, storage targets, retention state, and\nshare-link metadata. The design should support local filesystem and cloud-path targets without\ndepending on an always-running service.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design and implement a persistent publication metadata model that survives process restart",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "notes": "The follow-up feature must publish the actual schema-v2 result bundle (`.json`, `.plans.json`,\n`.tuning.json`) produced by `benchbox.core.results.exporter`, not a second JSON shape from\n`Publisher._serialize_result()`. Unsupported prototype-only promises should either be implemented\nthrough the canonical exporter or removed from the supported surface.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor publishing to reuse canonical result bundles instead of duplicating result serialization",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "notes": "Add the supported user entry point for publishing and inspecting published artifacts. The workflow\nshould work on already-exported result files first, because that is the smallest broadly useful\ncontract and naturally composes with `benchbox run`, `benchbox export`, and future automation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement a first-class CLI/API path for publishing existing result bundles",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "notes": "Once publishing an existing bundle is supported, wire an optional publish step into the canonical\nrun lifecycle. The hook must reuse the already-exported bundle and preserve quiet-mode/output rules.\nAvoid special-case behavior that bypasses the exporter or creates different artifacts depending on\nwhether publishing is enabled.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add an optional post-run publish hook that composes with the existing run/export lifecycle",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "notes": "A short code or URL is only useful when it resolves to something durable. Define how BenchBox will\nrepresent published locations for:\n- local filesystem targets,\n- directly addressable object storage roots,\n- non-public/private cloud locations.\nIf BenchBox cannot resolve a public URL for a backend, expose a truthful reference (storage URI or\nmetadata record) instead of a fake permalink.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement backend-specific addressability rules so share links are real, stable, and documented",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "notes": "The current prototype can mark items archived in memory, but a supported feature needs durable\nretention behavior, safe re-publication of existing bundles, and explicit idempotency rules for\nduplicate content or duplicate publish requests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add retention, republish, and idempotency semantics on top of the persistent publication store",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "productize-result-publishing-and-artifact-sharing",
+        "notes": "Add CLI help, docs, and examples for both local and cloud publishing. The documentation must state\nexactly what kind of link/reference a user gets for each backend and what persistence guarantees\nBenchBox does and does not make.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the workflow, configuration, and supported backends with user-facing examples",
+        "wid": "w9"
+      }
+    ]
+  }
+}

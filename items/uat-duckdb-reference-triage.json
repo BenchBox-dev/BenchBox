@@ -1,0 +1,199 @@
+{
+  "context": "Gate on w0: do not guess NO_JSON causes — recover them with the new stderr\npersistence. For tpchavoc, prefer a DuckDB-valid query rewrite over pruning;\nprune only if the construct is genuinely unsupported. For\ntransaction_primitives staging-table init, trace the setup path that fails\nbefore the operations run. Each cell ends as PASS or an explicitly-pruned\nmodel-level gap — never an unexplained FAIL.\n",
+  "description": "DuckDB is the reference/oracle platform; comparative UAT results are only\ntrustworthy if it is green or its unsupported cells are explicitly pruned.\nIn the 2026-05-28 native sweep (uat_complete_native_20260528_20260528)\nDuckDB was NOT clean: 46 passed / 10 failed / 1 timed-out of 57 cells.\nEvidence (from resume.json + per-cell result JSONs):\n\n- tpchavoc 0.01/0.1: \"Parser Error: window functions are not allowed in\n  window definitions\"; also \"Binder Error: Ambiguous reference to column\n  name l_partkey\" (q27/660).\n- tpchavoc 1.0: timed-out, exit 124, UAT_TIMEOUT timeout_s=1200.\n- transaction_primitives 0.01: \"Parser Error: syntax error\" on\n  transaction_isolation_* ops; 0.1/1.0: \"Failed to initialize staging\n  tables before executing 'transaction_create_temp_table' /\n  'transaction_long_running_mixed'\" (q23/23 all fail).\n- write_primitives 0.01/0.1/1.0 and ai_primitives 0.01/1.0: NO_JSON,\n  exit 1, with ZERO captured error text (per-cell log held only the\n  command header; tee log was 0 bytes).\n\nThe NO_JSON root causes are currently unrecoverable from the artifacts;\nthey become debuggable once stderr persistence lands. This item depends on\nuat-artifact-integrity-and-failure-capture for that reason.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "prune a duckdb cell to make the reference look green",
+        "instead": "fix it or cite a real engine limit.",
+        "item_id": "uat-duckdb-reference-triage",
+        "why": "that destroys the oracle's value"
+      },
+      {
+        "dont": "raise the tpchavoc timeout without measuring actual runtime first",
+        "instead": "(not specified)",
+        "item_id": "uat-duckdb-reference-triage",
+        "why": "the 1.0 cell may be hung, not slow."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-duckdb-reference-triage",
+        "needs_item": "uat-artifact-integrity-and-failure-capture"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-29T00:00:00Z",
+      "created_at": "2026-05-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Any timeout change is justified with measured runtime, not raised blindly.",
+        "item_id": "uat-duckdb-reference-triage"
+      },
+      {
+        "behavior": "DuckDB cells that already pass (46/57) must not regress.",
+        "item_id": "uat-duckdb-reference-triage"
+      },
+      {
+        "behavior": "DuckDB remains the reference for cross-platform validation/comparison.",
+        "item_id": "uat-duckdb-reference-triage"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/ duckdb adapter + transaction/write/ai primitive executors (locate via the failing benchmark families) — reuse existing duckdb adapter patterns",
+        "decision": "reuse",
+        "item_id": "uat-duckdb-reference-triage",
+        "path": "benchbox/"
+      },
+      {
+        "concept": "tests/uat/timeouts.py — existing UAT_TIMEOUT mechanism; reuse for any justified timeout change on tpchavoc@1.0",
+        "decision": "reuse",
+        "item_id": "uat-duckdb-reference-triage",
+        "path": "tests/uat/timeouts.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-duckdb-reference-triage",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/orchestrator.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark tpchavoc --scale 0.01 --non-interactive --phases load,power && uv run -- benchbox run --platform duckdb --benchmark transaction_primitives --scale 0.01 --non-interactive --phases load,power",
+        "description": "DuckDB tpchavoc and transaction_primitives pass at 0.01",
+        "expected": "0 query failures",
+        "item_id": "uat-duckdb-reference-triage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark write_primitives --scale 0.01 --non-interactive --phases load,power",
+        "description": "DuckDB write_primitives / ai_primitives produce a result JSON (no NO_JSON)",
+        "expected": "result JSON written; summary.queries.failed == 0 or explicit prune",
+        "item_id": "uat-duckdb-reference-triage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-duckdb-reference-triage",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-duckdb-reference-triage",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-duckdb-reference-triage",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-duckdb-reference-triage",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-duckdb-reference-triage",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "uat-duckdb-reference-triage",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "uat-duckdb-reference-triage",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "uat-duckdb-reference-triage",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-duckdb-reference-triage",
+        "notes": "duckdb write_primitives (all scales) + ai_primitives (0.01, 1.0).\nRequires the failure-capture work to have landed. Capture to an\nignored local path; summarize cause in the PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-run the NO_JSON cells with stderr persistence enabled and capture exact root cause",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-duckdb-reference-triage",
+        "notes": "Decide: query rewrite (preferred if DuckDB-valid form exists) vs\ncompatibility exclusion (if the construct is genuinely unsupported).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve tpchavoc window-definition parser error + l_partkey ambiguity, or prune as a query-authoring gap",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-duckdb-reference-triage",
+        "notes": "Root cause was query 10_v8 (\"EXISTS pattern\"), NOT a slow run: its\nEXISTS subquery used unqualified columns (l2.l_orderkey = l_orderkey)\nthat silently bound to the inner alias l2, degenerating the correlated\nsemi-join into an uncorrelated full scan that DuckDB's planner blew up\nat SF1 (>180s, uninterruptible in-engine; EXPLAIN showed a\nself-equality filter l_orderkey=l_orderkey). Fixed by qualifying the\ncorrelation to the outer table (l2.l_orderkey = lineitem.l_orderkey),\nwhich DuckDB decorrelates into a RIGHT_SEMI hash join.\nEvidence (2026-05-29, DuckDB 1.3.2 / tpchavoc_sf1):\n  - before: query 10_v8 hung >180s; tpchavoc@1.0 exit 124.\n  - after:  10_v8 EXPLAIN shows SEMI join, executes in 0.1s; full\n            tpchavoc@1.0 load,power = 880/880 executions, 100%, PASSED.\nTimeout was NOT raised (anti-pattern: cell was hung, not slow).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix or justify tpchavoc@1.0 1200s timeout (optimize, raise with justification, or prune if stress-only)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-duckdb-reference-triage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix transaction_primitives staging-table init + parser syntax failures",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-duckdb-reference-triage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix write_primitives / ai_primitives NO_JSON failures per w0 root cause",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-duckdb-reference-triage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm DuckDB passes all required, non-pruned cells at 0.01/0.1/1.0",
+        "wid": "w5"
+      }
+    ]
+  }
+}

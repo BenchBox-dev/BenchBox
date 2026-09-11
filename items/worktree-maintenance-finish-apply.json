@@ -1,0 +1,274 @@
+{
+  "context": "Keep destructive behavior in BenchBox. Use no force, unlock, prune, gc, remote deletion, PR mutation, or scheduling. Test only in disposable fixtures until later explicit authorization permits live BenchBox destructive UAT. Update operations and instruction evaluation in the same change.",
+  "description": "After preview and adversarial review pass, enable APPLY=1 for one exact worktree. Immediately recheck target, owner, cleanliness, PR, base, head, merge commit, and objects. Apply only normal git worktree remove on the canonical path, then git update-ref -d on the local branch with EXPECTED_HEAD as expected old OID. Preserve and report partial success if the branch moved.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Retry deletion after expected-old-OID mismatch",
+        "instead": "Preserve the branch and report partial completion",
+        "item_id": "worktree-maintenance-finish-apply",
+        "why": "Mismatch proves concurrent or foreign change"
+      },
+      {
+        "dont": "Schedule APPLY=1 or consume audit buckets",
+        "instead": "Keep apply explicit and single-target",
+        "item_id": "worktree-maintenance-finish-apply",
+        "why": "Authorization must be fresh"
+      },
+      {
+        "dont": "Use force, branch -D, unlock, prune, or gc",
+        "instead": "Stop on the blocker",
+        "item_id": "worktree-maintenance-finish-apply",
+        "why": "Those operations can destroy unrelated work"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "needs_item": "worktree-maintenance-finish-preview"
+      }
+    ],
+    "item_meta": {
+      "category": "Repository Maintenance",
+      "created_at": "2026-08-26T01:49:27Z",
+      "worktree": "worktree-maintenance"
+    },
+    "preserves": [
+      {
+        "behavior": "A moved branch is preserved by expected-old-OID deletion.",
+        "item_id": "worktree-maintenance-finish-apply"
+      },
+      {
+        "behavior": "Live destructive UAT needs later explicit authorization.",
+        "item_id": "worktree-maintenance-finish-apply"
+      },
+      {
+        "behavior": "No remote branch, PR, lock, prunable registration, foreign resource, or schedule is mutated.",
+        "item_id": "worktree-maintenance-finish-apply"
+      },
+      {
+        "behavior": "Only one exact target can be mutated per invocation.",
+        "item_id": "worktree-maintenance-finish-apply"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "operator-driven branch cleanup",
+        "decision": "supersede",
+        "item_id": "worktree-maintenance-finish-apply",
+        "path": "docs/operations/dev-loop-worktrees.md"
+      },
+      {
+        "concept": "normal exact-path removal",
+        "decision": "extend",
+        "item_id": "worktree-maintenance-finish-apply",
+        "path": "scripts/worktree_lifecycle.sh"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "kind": "only_modify",
+        "path_glob": "docs/development/makefile-architecture.md"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/dev-loop-worktrees.md"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "kind": "only_modify",
+        "path_glob": "make/help.mk"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "kind": "only_modify",
+        "path_glob": "make/inventory.json"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "kind": "only_modify",
+        "path_glob": "make/worktrees.mk"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "kind": "only_modify",
+        "path_glob": "scripts/worktree_finish.py"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "kind": "only_modify",
+        "path_glob": "scripts/worktree_lifecycle.sh"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/worktree/**"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_agent_instruction_audit.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/integration/worktree/test_worktree_finish_apply.py tests/integration/worktree/test_worktree_finish_preview.py tests/integration/worktree/test_worktree_release_dirty_guard.py -q",
+        "description": "Disposable apply tests",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-finish-apply",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "if rg -n '(worktree remove --force|branch -D|worktree prune|git gc|worktree unlock|push .*--delete)' scripts/worktree_finish.py scripts/worktree_lifecycle.sh make/worktrees.mk; then exit 1; fi",
+        "description": "No forbidden cleanup commands",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-finish-apply",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/agent_instruction_audit.py",
+        "description": "Agent instruction audit",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-finish-apply",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Repository preflight",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-finish-apply",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-apply",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "worktree-maintenance-finish-apply",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-review preview evidence, races, repository policy, and protected branches before enabling apply",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "worktree-maintenance-finish-apply",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement exact normal worktree removal after the final revalidation barrier",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "worktree-maintenance-finish-apply",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement expected-old-OID local branch deletion and preserve partial success on movement",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "worktree-maintenance-finish-apply",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Test success, refusals, movement, ownership, partial completion, repeat invocation, and crash recovery in fixtures",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "worktree-maintenance-finish-apply",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update operations, Make architecture, help, AGENTS, and instruction evaluations while forbidding scheduled deletion",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "worktree-maintenance-finish-apply",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decision gate: adversarially verify exact identity and no path from stale evidence to mutation",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "worktree-maintenance-finish-apply",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Protected UAT gate: request later explicit authorization before applying to a live BenchBox worktree",
+        "wid": "w6"
+      }
+    ]
+  }
+}

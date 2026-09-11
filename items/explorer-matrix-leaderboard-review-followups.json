@@ -1,0 +1,79 @@
+{
+  "description": "Non-required nits surfaced by the code review of explorer-matrix-leaderboard-view.\nNo Required issues were found; all critical implementation items are correct.\nThis item tracks four minor polish improvements.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Compare.tsx grouped chart rendering - only adding a comment in w1",
+        "item_id": "explorer-matrix-leaderboard-review-followups"
+      },
+      {
+        "behavior": "QueryHeatmap heat coloring behavior - only adding a comment in w2 and guarding an unused call in w4",
+        "item_id": "explorer-matrix-leaderboard-review-followups"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Full test suite green",
+        "expected": "all green",
+        "item_id": "explorer-matrix-leaderboard-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-matrix-leaderboard-review-followups",
+        "notes": "Compare.tsx:196-198 - grouped bar chart uses `?? 0` for null display_ms\nvalues (queries where all runs failed).  Zero-height bars correctly\ndisappear visually, but the intent is non-obvious: a reader might wonder\nif 0 misrepresents failed queries as \"fastest.\"\n\nFix: add a one-line comment before the `?? 0`:\n  // Null means all runs failed; render as 0 so bar disappears rather than\n  // crashing the chart formatter.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add comment explaining ?? 0 fallback in Compare.tsx grouped chart",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-matrix-leaderboard-review-followups",
+        "notes": "QueryHeatmap.tsx:74 - filter `v > 0` silently excludes timing=0ms\n(physically impossible but could occur with rounding artifacts).\n\nFix: add a comment:\n  // Exclude zero/null cells; sub-ms values round to 0 in some runners.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document zero-timing filter intent in QueryHeatmap.tsx",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-matrix-leaderboard-review-followups",
+        "notes": "manifest.ts:79-80 - HTML detection uses `contentType.includes(\"text/html\")`.\nIf a real 5xx error page uses `application/json` content-type, the gzip\nDecompressionStream would throw with a cryptic \"DecompressionStream error\"\nrather than a meaningful HTTP error.\n\nFix: check `!res.ok` first:\n  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);\nThen proceed to content-type check for Vite SPA fallback detection.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Improve getBenchmarkSummary to also check !res.ok before content-type",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-matrix-leaderboard-review-followups",
+        "notes": "QueryHeatmap.tsx:272 - lightnessForCell is called unconditionally even\nwhen suppressHeat=true (single-platform view).  The result is immediately\ndiscarded.  This is a negligible waste but could confuse a reader.\n\nFix: guard the call:\n  const lightness = suppressHeat ? null : lightnessForCell(ms, minInCol);\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Suppress lightnessForCell call when suppressHeat is true",
+        "wid": "w4"
+      }
+    ]
+  }
+}

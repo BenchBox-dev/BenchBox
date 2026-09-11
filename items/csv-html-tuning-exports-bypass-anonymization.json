@@ -1,0 +1,125 @@
+{
+  "context": "Reuse AnonymizationManager._sanitize_public_message / remove_pii for the free-text columns; do not restructure the exporters. The gating rung checks that the CSV/HTML writers consult anonymization at all; tests pin the actual behavior.",
+  "description": "Found 2026-07-31 during the credential-egress review. ResultExporter anonymizes only the main JSON payload (exporter.py:320) and the .plans/.applied companions (:271-292). Three export surfaces never consult self.anonymize: _export_csv_detailed (exporter.py:515) writes a raw error_message column (:524) - driver error text that can carry DSNs/paths/secret assignments; _export_html_detailed (:579) renders the same data; and the .tuning.json companion (:279-284) is written with no anonymization branch at all. A user who exports with the default anonymize=True and publishes the CSV/HTML alongside the JSON is publishing unsanitized error text. Fix: when anonymize is enabled, route free-text fields (error_message and friends) in CSV/HTML through the anonymizer's message scrubbing, and give .tuning.json an anonymization branch (its tunings_applied content is low-risk but must not remain a silent exception).",
+  "legacy": {
+    "item_meta": {
+      "category": "security",
+      "completed_at": "2026-08-01T18:37:52Z",
+      "completed_pr": 1423,
+      "created_at": "2026-07-31T23:34:45Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "CSV/HTML column layout unchanged - values are scrubbed, not dropped",
+        "item_id": "csv-html-tuning-exports-bypass-anonymization"
+      },
+      {
+        "behavior": "anonymize=False output is byte-for-byte unchanged",
+        "item_id": "csv-html-tuning-exports-bypass-anonymization"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "csv-html-tuning-exports-bypass-anonymization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "csv-html-tuning-exports-bypass-anonymization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import inspect;from benchbox.core.results.exporter import ResultExporter as R;assert 'anonym' in inspect.getsource(R._export_csv_detailed) and 'anonym' in inspect.getsource(R._export_html_detailed)\"",
+        "description": "the CSV and HTML writers consult anonymization",
+        "expected": "exits 1 on an unfixed tree (verified 2026-07-31: neither method references anonymization), 0 once both branch on it",
+        "item_id": "csv-html-tuning-exports-bypass-anonymization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results -q",
+        "description": "results suite still green",
+        "expected": "all pass before and after - regression guard",
+        "item_id": "csv-html-tuning-exports-bypass-anonymization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "csv-html-tuning-exports-bypass-anonymization",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "csv-html-tuning-exports-bypass-anonymization",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "csv-html-tuning-exports-bypass-anonymization",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "csv-html-tuning-exports-bypass-anonymization",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on develop 4934e847d 2026-08-01: neither _export_csv_detailed nor _export_html_detailed referenced anonymization (rung exits 1); .tuning.json written raw",
+        "item_id": "csv-html-tuning-exports-bypass-anonymization",
+        "notes": null,
+        "started_at": "2026-08-01T17:35:21Z",
+        "started_branch": "fix/csv-html-tuning-anonymization",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Re-validate on current develop that the three surfaces skip anonymization",
+        "wid": "w0"
+      },
+      {
+        "evidence": "CSV branches route error text through _anonymize_free_text (public message policy via anonymize_result_payload); HTML assembly anonymizes each row copy via _anonymize_query_row before rendering; column layout unchanged",
+        "item_id": "csv-html-tuning-exports-bypass-anonymization",
+        "notes": null,
+        "started_at": "2026-08-01T17:35:26Z",
+        "started_branch": "fix/csv-html-tuning-anonymization",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Scrub free-text fields in CSV/HTML exports when anonymize is enabled",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tuning_payload passes through anonymize_result_payload when anonymize=True; anonymize=False path untouched",
+        "item_id": "csv-html-tuning-exports-bypass-anonymization",
+        "notes": null,
+        "started_at": "2026-08-01T17:35:32Z",
+        "started_branch": "fix/csv-html-tuning-anonymization",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Add the anonymization branch for .tuning.json",
+        "wid": "w2"
+      },
+      {
+        "evidence": "test_export_anonymization_surfaces.py: 7 tests (sentinel never in CSV/HTML under anonymize=True, verbatim under False, row shape preserved, helper no-op/empty passthrough); results suite 803 passed",
+        "item_id": "csv-html-tuning-exports-bypass-anonymization",
+        "notes": null,
+        "started_at": "2026-08-01T17:35:38Z",
+        "started_branch": "fix/csv-html-tuning-anonymization",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-10",
+        "status": "done",
+        "summary": "Tests: sentinel in error_message never reaches CSV/HTML/tuning output under anonymize=True; anonymize=False output unchanged",
+        "wid": "w3"
+      }
+    ]
+  }
+}

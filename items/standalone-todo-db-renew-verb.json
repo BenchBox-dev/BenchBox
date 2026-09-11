@@ -1,0 +1,98 @@
+{
+  "context": "Land the renew subcommand in the standalone todo-db package first (mirroring renew_claim's refusals: foreign lease, unclaimed item, and already-expired lease all rejected, CAS-guarded on the observed lease). Then add 'renew' to COMMANDS in the adapter and pin the routing with a test.",
+  "description": "PR #1374 added a 'renew' verb to BenchBox's _project/scripts/todo_db.py so a live session can re-stamp its own claim lease. The opt-in standalone path did not get it. todo_db_standalone_compat.py's COMMANDS frozenset does not list 'renew', and _command_index returns None for unrecognized verbs, whose fallback forwards argv raw to the standalone todo-db CLI - which has no renew subcommand. So 'todo renew <id>' fails under BENCHBOX_TODO_DB_STANDALONE=1 while working on the default path. Ordering matters: adding 'renew' to COMMANDS before the standalone package implements it converts a fallback failure into a routing failure, so the package change lands first. Default path is unaffected; the adapter is off by default.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "created_at": "2026-07-31T03:48:52Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "The default (non-standalone) todo path keeps working unchanged",
+        "item_id": "standalone-todo-db-renew-verb"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "standalone-todo-db-renew-verb",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "standalone-todo-db-renew-verb",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -q '\"renew\"' _project/scripts/todo_db_standalone_compat.py",
+        "description": "The adapter routes renew rather than falling through to a raw forward",
+        "expected": "renew is listed in the COMMANDS frozenset",
+        "item_id": "standalone-todo-db-renew-verb",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_standalone_compat.py -q -k renew",
+        "description": "Adapter routing for renew is pinned by a test",
+        "expected": "the renew routing test passes",
+        "item_id": "standalone-todo-db-renew-verb",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "standalone-todo-db-renew-verb",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "standalone-todo-db-renew-verb",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "standalone-todo-db-renew-verb",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-validate that renew is still absent from both the standalone CLI and the adapter COMMANDS set",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "standalone-todo-db-renew-verb",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement renew in the standalone todo-db package, matching BenchBox renew_claim semantics",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "standalone-todo-db-renew-verb",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add renew to the adapter COMMANDS frozenset and pin the routing with a test",
+        "wid": "w2"
+      }
+    ]
+  }
+}

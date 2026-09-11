@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #189 of generalize-tpc-tuning-base.\nDeferred: Extending the logical profile beyond TPC-H and TPC-DS\nReason deferred: Keep the first generalized profile scoped to the recovered TPC tuning evidence.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:29Z",
+      "worktree": "main"
+    }
+  }
+}

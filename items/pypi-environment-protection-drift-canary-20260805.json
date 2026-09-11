@@ -1,0 +1,147 @@
+{
+  "context": "Add an environment-protection check to release-canary (or sibling) using a token that can read environments; pin expected required_reviewers + reviewer id(s) + document accepted can_admins_bypass. Fail closed on missing rule; warn or fail on bypass policy per maintainer decision. Unit-test the parser against fixture JSON.",
+  "description": "Tag ruleset drift is continuously checked (TAG_RULESET_ENFORCED + release-canary ruleset-drift). The pypi GitHub environment required_reviewers gate is only pinned as a dated manual observation in docs/operations/repo-admin-settings.md (#1598/#1600). Residual: can_admins_bypass, empty reviewers, or deleted protection_rules can regress without a red canary.\n\nAccepted as residual honesty in #1600; this item makes continuous detection an explicit open TODO rather than silent debt. Depends on release-canary actually firing (release-canary-scheduled-activation / ruleset baseline items).",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "needs_item": "tag-and-pypi-environment-admin-hardening"
+      }
+    ],
+    "item_meta": {
+      "category": "ci-integrity",
+      "completed_at": "2026-08-13T14:09:31Z",
+      "completed_pr": 1674,
+      "created_at": "2026-08-05T23:40:23Z",
+      "worktree": "release-tooling"
+    },
+    "preserves": [
+      {
+        "behavior": "Legitimate release-finalize path must still publish after human approval; do not brick publish",
+        "item_id": "pypi-environment-protection-drift-canary-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/release-canary.yml"
+      },
+      {
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "kind": "only_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n \"required_reviewers|environments/pypi|environment.protection\" _project/scripts scripts .github/workflows/release-canary.yml || exit 1",
+        "description": "A checker module or script exists for environment protection",
+        "expected": null,
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-10T14:44:05Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_ruleset_drift.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/test_release_infrastructure.py -q -n 0 && printf \"governance drift tests passed\\\\n\"",
+        "description": "Focused governance-drift tests",
+        "expected": "governance drift tests passed",
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-13T14:09:25Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "2026-08-10 live API: pypi has exactly one required_reviewers rule for joeharris76 User id 57046; can_admins_bypass=true; prevent_self_review=false. repo-admin-settings.md records this as the accepted single-maintainer posture; test-pypi remains intentionally unpinned.",
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "notes": null,
+        "started_at": "2026-08-10T14:39:45Z",
+        "started_branch": "fix/pypi-environment-protection-drift-canary-20260810",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Define expected pypi (and optional test-pypi) protection pin from live API",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Extended scripts/ruleset_drift_check.py and release-canary.yml: the existing fail-closed drift job now fetches /environments/pypi and compares rule count, reviewer type/id/login, admin bypass, and prevent-self-review.",
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "notes": null,
+        "started_at": "2026-08-10T14:42:43Z",
+        "started_branch": "fix/pypi-environment-protection-drift-canary-20260810",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Implement checker + canary job step",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Reused RULESET_DRIFT_TOKEN (already full-admin visibility for rulesets) and documented its environment-read requirement plus continuous drift behavior in docs/operations/repo-admin-settings.md.",
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "notes": null,
+        "started_at": "2026-08-10T14:42:52Z",
+        "started_branch": "fix/pypi-environment-protection-drift-canary-20260810",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Wire secrets/token scope; document in runbook",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Focused governance-drift suite passes 111 tests on current develop. First post-merge canary run 31403274699, ruleset drift job 93503314722, completed success and logged Ruleset Drift - OK plus pypi required reviewer joeharris76 User id 57046. Later runs through 31685138121 also show the ruleset drift job successful.",
+        "item_id": "pypi-environment-protection-drift-canary-20260805",
+        "notes": null,
+        "started_at": "2026-08-10T14:42:58Z",
+        "started_branch": "fix/pypi-environment-protection-drift-canary-20260810",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Unit tests + first canary evidence",
+        "wid": "w3"
+      }
+    ]
+  }
+}

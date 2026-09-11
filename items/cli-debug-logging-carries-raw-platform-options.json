@@ -1,0 +1,135 @@
+{
+  "context": "Sanitize at the logging call sites with the existing sanitize_platform_options - do not invent a logging filter framework. Keep debug usefulness: redact values, keep keys.",
+  "description": "Found 2026-07-31 during the credential-egress review. benchbox/cli/database.py:425-433 logs extra={'platform_options': platform_options, 'runtime_overrides': runtime_overrides} with the RAW --platform-option values before any sanitization, and :485-488 logs the full built DatabaseConfig plus config.options the same way. DatabaseConfig is extra='allow' (core/schemas.py:340), so password/token ride along as extra fields. These extras are invisible under the CLI's plain formatters but are fully serialized by any structured/JSON handler - including the MCP server's JSONFormatter (benchbox/mcp/observability.py:45-82), which formats record extras into structured logs. Related smaller instance: benchbox/platforms/pyspark/session.py:348 logs the whole session config dict at debug. Fix: route these payloads through sanitize_platform_options (or an equivalent redacting view) before attaching them to log records.",
+  "legacy": {
+    "item_meta": {
+      "category": "security",
+      "completed_at": "2026-08-01T17:11:58Z",
+      "completed_pr": 1392,
+      "created_at": "2026-07-31T23:34:39Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Debug logs keep reporting which option KEYS were supplied and their provenance",
+        "item_id": "cli-debug-logging-carries-raw-platform-options"
+      },
+      {
+        "behavior": "No change to the options actually passed to config builders - logging only",
+        "item_id": "cli-debug-logging-carries-raw-platform-options"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/database.py"
+      },
+      {
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pyspark/session.py"
+      },
+      {
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/**"
+      },
+      {
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -n '\"platform_options\": platform_options' benchbox/cli/database.py",
+        "description": "cli/database.py no longer attaches raw platform_options to log records",
+        "expected": "exits 1 on an unfixed tree (verified 2026-07-31: the literal raw-attach exists at :428); exits 0 once the extras go through sanitization",
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_cli_orchestrator.py -q",
+        "description": "database-config orchestration suite still green",
+        "expected": "all pass before and after - regression guard (the full tests/unit/cli suite carries 3 pre-existing failures when run as root: invalid-output-dir tests that expect permission errors)",
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on develop d5aa8f398 2026-08-01: raw attach at cli/database.py:428, full config object at :490, raw SparkSessionConfig (incl. extra_configs) at pyspark/session.py:348; capturing-handler drive showed raw TOK-SENTINEL in extras",
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "notes": null,
+        "started_at": "2026-08-01T13:04:30Z",
+        "started_branch": "fix/cli-debug-logging-raw-options",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Re-validate on current develop that the call sites attach raw values (grep + a capturing-handler drive)",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Both cli/database.py sites route through sanitize_platform_options (options, runtime_overrides, config.model_dump()); capturing-handler drive shows motherduck_token/connection_string redacted, keys preserved",
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "notes": null,
+        "started_at": "2026-08-01T13:04:36Z",
+        "started_branch": "fix/cli-debug-logging-raw-options",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Sanitize platform_options/config extras at the cli/database.py call sites",
+        "wid": "w1"
+      },
+      {
+        "evidence": "pyspark session.py logs a dataclasses.replace copy with sanitized extra_configs (fs.s3a.secret.key class); import smoke ok",
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "notes": null,
+        "started_at": "2026-08-01T13:04:42Z",
+        "started_branch": "fix/cli-debug-logging-raw-options",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Sanitize the pyspark session-config debug log",
+        "wid": "w2"
+      },
+      {
+        "evidence": "tests/unit/cli/test_database_config_logging.py: sentinel never in records, keys stay visible, non-secrets keep real values; orchestrator suite 24 passed total",
+        "item_id": "cli-debug-logging-carries-raw-platform-options",
+        "notes": null,
+        "started_at": "2026-08-01T13:04:47Z",
+        "started_branch": "fix/cli-debug-logging-raw-options",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Tests: a capturing handler sees redacted values for password/token under both call sites",
+        "wid": "w3"
+      }
+    ]
+  }
+}

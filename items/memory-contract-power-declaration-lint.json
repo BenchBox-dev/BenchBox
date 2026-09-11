@@ -1,0 +1,75 @@
+{
+  "context": "Small test or make target scanning docs/evaluation/behavioral-v*-contract.md for required headings when version >= 8.",
+  "description": "docs/evaluation.md requires MDE, n, session budget, value hypothesis, and falsifier for contracts from v8 on, but nothing fails a PR if a contract omits them. Commit message claimed require; code only adds criterion_saturation. Add a docs check or test that contract files v8+ contain required sections.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fail historical contracts under new lint",
+        "instead": "apply only to v8+",
+        "item_id": "memory-contract-power-declaration-lint",
+        "why": "they predate the standing requirement"
+      }
+    ],
+    "item_meta": {
+      "category": "Evaluation",
+      "created_at": "2026-08-05T22:10:42Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "v3–v7 contracts are not retroactively failed by the linter",
+        "item_id": "memory-contract-power-declaration-lint"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Standing power requirement text",
+        "decision": "extend",
+        "item_id": "memory-contract-power-declaration-lint",
+        "path": "/Users/joe/Developer/memory-governance/docs/evaluation.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-contract-power-declaration-lint",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-contract-power-declaration-lint",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-contract-power-declaration-lint",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q -k power 2>/dev/null || true; test -f docs/evaluation.md",
+        "description": "Linter passes on current tree",
+        "expected": "Power lint exists and is green for current contracts",
+        "item_id": "memory-contract-power-declaration-lint",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "memory-contract-power-declaration-lint",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement contract power-section linter/test and wire into local check",
+        "wid": "w0"
+      }
+    ]
+  }
+}

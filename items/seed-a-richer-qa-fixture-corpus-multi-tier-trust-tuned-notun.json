@@ -1,0 +1,192 @@
+{
+  "context": "Keep production published-results and explorer public/data untouched. Grow the QA fixture corpus under results-explorer/test-fixtures/source plus generator variants so one TPC-H SF0.01 cohort has at least four platforms, the generated snapshot includes at least three trust labels (maintainer-run, community-submission, vendor-supplied), and at least two platforms in that cohort have a tuned/notuned pair. Prefer copying an existing curated public bundle into the fixture source over inventing a new production run. Raise verify-browser-fixtures.mjs to those minima. Do not edit explorer app chrome, publication workflows, or explorer_pipeline recency code.",
+  "description": "Promoted from deferral #248 of results-explorer-qa-pass2-fixes.\nDeferred: Seed a richer QA fixture corpus (multi-tier trust, tuned/notuned pairs, ≥4 platforms in one cohort)\nReason deferred: Pass-2 left S3.4 (trust + tuning chips), S5.5 (tuning sidecar\nlazy-load), and S6.2 (4-platform same-cohort compare) as\ncorpus-coverage gaps rather than app issues. Worth filing\nseparately so the QA pass actually exercises these controls\nin pass-3+. Out of scope for this remediation TODO.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "edit explorer app chrome, publication workflows, or explorer_pipeline recency code",
+        "instead": "change only fixture sources, the generator, and the fixture verifier",
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "why": "those surfaces are owned elsewhere and are not required to seed the QA corpus"
+      },
+      {
+        "dont": "invent a new production published-results run to fill a QA fixture gap",
+        "instead": "copy an existing curated public bundle into test-fixtures/source",
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "why": "this item is fixture-only; production corpus already has reusable TPC-H SF0.01 bundles"
+      }
+    ],
+    "item_meta": {
+      "claim_token": "017954b62a35c382d6fa87317e03e61c",
+      "claimed_at": "2026-09-04T20:22:44Z",
+      "claimed_branch": "feat/run-honesty-qa-fixtures",
+      "claimed_by": "mcp:grok-run-honesty-manager:joe@joe-mac-mini.local",
+      "claimed_session": "0d0e8e4c8289465e87c5c0bf9f3e8036",
+      "claimed_worktree": "/Users/joe/Developer/BenchBox.wt-run-honesty-fixtures",
+      "created_at": "2026-07-19T12:35:06Z",
+      "git_baseline": "c44fdfc457886d9340b75d86ecb6e29796fdbb98",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing TPC-H SF0.01 DuckDB/DataFusion/Polars compare happy-path still works",
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun"
+      },
+      {
+        "behavior": "Existing community-submission and DuckDB tuned generator variants remain",
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun"
+      },
+      {
+        "behavior": "Production published-results and results-explorer/public/data remain untouched",
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun"
+      },
+      {
+        "behavior": "The fixture generator still never writes to results-data/ or results-explorer/public/data/",
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/**"
+      },
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/generate-browser-fixtures.mjs"
+      },
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/verify-browser-fixtures.mjs"
+      },
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/test-fixtures/source/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures",
+        "description": "Regenerate and verify the browser fixture corpus",
+        "expected": "generate+verify pass; generated snapshot has >=4 platforms in one cohort, >=3 trust labels including vendor-supplied, and tuned/notuned pairs on >=2 platforms",
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "90d158dd40b7cd77f7884da242bc427f75b0fdcc inventory: 3 TPC-H SF0.01 platforms, maintainer+community trust, DuckDB-only tuned pair.",
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory current QA fixtures vs 4-platform, 3-trust, and dual-platform tuned-pair gaps.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "90d158dd copied results-data/bundles/tpch_sf001_pandas_df_20260826_210019_8bde2222.json to results-explorer/test-fixtures/source/bundles/tpch-pandas-sf0.01-20260826-8bde2222.json (result JSON only).",
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Copy an existing curated TPC-H SF0.01 public bundle into the QA fixture source as a 4th platform.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "90d158dd generator variant subdir vendor from Pandas; pipeline labels vendor-supplied. Verifier requires vendor-supplied.",
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add fixture-only generator variants covering maintainer-run, community-submission, and vendor-supplied.",
+        "wid": "w3"
+      },
+      {
+        "evidence": "90d158dd Pandas tuned sibling (tuned-pandas subdir + .tuning.json). DuckDB/Polars row counts unchanged.",
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add generator tuned/notuned pairs for at least two platforms in the same TPC-H SF0.01 cohort.",
+        "wid": "w4"
+      },
+      {
+        "evidence": "90d158dd verify-browser-fixtures.mjs requires >=4 platforms, three trust labels, two tuned pairs. cd results-explorer && npm run test:e2e:fixtures passed.",
+        "item_id": "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Raise verify-browser-fixtures.mjs to the new minima and document the richer fixture corpus.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "context": "Unify TPCH detection with the shared trailing-delimiter helper or make the byte path CRLF-aware; preserve exactly-one-pipe stripping, interior empty fields, chunk boundaries, and idempotence.",
+  "description": "Run 30434746317 shows five TPCH normalization failures: the binary tail probe misses '|\\r\\n', so normalize_tbl_trailing_delimiters reports false and leaves trailing pipes intact. Sorting now uses the shared text-mode field-count helper, but TPCH generation retains a separate byte-tail implementation.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-30T19:36:28Z",
+      "completed_pr": 1366,
+      "created_at": "2026-07-29T13:05:02Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "interior empty fields and already-normalized LF/CRLF files remain byte-stable apart from intended newline policy",
+        "item_id": "windows-tpch-trailing-delimiter-crlf-normalization"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-tpch-trailing-delimiter-crlf-normalization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/generator.py"
+      },
+      {
+        "item_id": "windows-tpch-trailing-delimiter-crlf-normalization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/file_format.py"
+      },
+      {
+        "item_id": "windows-tpch-trailing-delimiter-crlf-normalization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpch/test_tpch_trailing_delimiter_normalization.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/core/tpch/test_tpch_trailing_delimiter_normalization.py -q",
+        "description": "TPCH delimiter normalization regressions pass",
+        "expected": "exit 0",
+        "item_id": "windows-tpch-trailing-delimiter-crlf-normalization",
+        "last_result": "pass",
+        "last_run": "2026-07-30T19:35:25Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Two independent CRLF bugs in benchbox/core/tpch/generator.py; benchbox/utils/file_format.py was NOT needed despite being in scope. (1) _has_trailing_delimiter read the last two bytes and matched b'|\\\\n', which a CRLF file never matches - its tail is b'|\\\\r\\\\n' - so a Windows file was classified already-clean and never rewritten. Now reads three bytes and rstrips the terminator before looking for the delimiter, the same shape as the sorting.py fix in PR #1332. (2) The streaming rewrite replaced only b'|\\\\n', so even a detected CRLF file would have kept every delimiter; it now replaces b'|\\\\r\\\\n' and b'|\\\\n', preserving the terminator as found. The carry also had to grow from one byte to two, because a chunk boundary can fall inside '|\\\\r\\\\n' and a one-byte carry splits '|' from '\\\\r\\\\n'. Added six byte-explicit CRLF tests so both framings run on every platform, not just the Windows leg: detect+strip, interior empty fields, already-clean CRLF byte-stable (the must-preserve, including that terminators are not rewritten to LF), idempotence, an unterminated '|\\\\r' final row, and a chunk-boundary test that sweeps EVERY chunk size from 1 to len(payload). Proven to fail: reverting both fixes fails 5 of the 6; reverting ONLY the two-byte carry fails exactly the chunk-boundary test. tests/unit/core/tpch/ 295 passed. Fast lane 26085/26550.",
+        "item_id": "windows-tpch-trailing-delimiter-crlf-normalization",
+        "notes": null,
+        "started_at": "2026-07-30T19:30:10Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Make TPCH file-mode trailing-delimiter detection and rewrite CRLF-safe",
+        "wid": "w1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "context": "Either have bulk_transfer omit autoincrement PK columns when the caller asks for additive semantics (letting SQLite assign fresh ids), or generalise the offset approach into bulk_transfer so any caller gets it. Prefer whichever keeps row ORDER intact for append-only tables -- finding_events order is its meaning, so a fresh-id path must preserve relative order.",
+  "description": "todo_db.bulk_transfer builds its INSERT column list from PRAGMA table_info, which includes the autoincrement primary key, and copies staged values verbatim. Any transfer into a target that already holds rows with those ids fails on the first collision and rolls the whole transfer back.\n\nThis is not hypothetical: the phase-5 findings import hit it. Staging numbered finding_events.seq from 1 while production already held seq=1 from an earlier sync, so the very first insert would have aborted the entire 432-row transfer. It was found only by reading the target's maxima before writing -- the scratch-DB rehearsal could not surface it because that database was empty of findings.\n\nThe items domain is currently immune by accident, not by design: its only bulk caller uses --replace, which DELETEs every TRANSFER_TABLE first, so ids are always free. Any future additive (non-replace) transfer into a populated target reopens this.\n\nMitigated for findings only, by todo_findings.offset_staging_pks + target_findings_maxima. The general fix belongs in bulk_transfer.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Reassign ids in a way that reorders rows",
+        "instead": "preserve relative order explicitly and assert it in a test",
+        "item_id": "bulk-transfer-pk-collision-safety",
+        "why": "finding_events and events are append-only audit trails where sequence order carries the meaning"
+      },
+      {
+        "dont": "Test only against an empty target",
+        "instead": "cover a target that already holds rows at the same ids the staging database uses",
+        "item_id": "bulk-transfer-pk-collision-safety",
+        "why": "an empty target is exactly the case that hid this bug through a full scratch-Turso rehearsal"
+      }
+    ],
+    "item_meta": {
+      "category": "tracker",
+      "completed_at": "2026-08-05T15:14:28Z",
+      "completed_pr": 1540,
+      "created_at": "2026-07-30T18:45:45Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Append-only table row ORDER survives any id reassignment (finding_events order is the audit trail's meaning)",
+        "item_id": "bulk-transfer-pk-collision-safety"
+      },
+      {
+        "behavior": "The existing --replace transfer path stays byte-for-byte equivalent, including copied ids",
+        "item_id": "bulk-transfer-pk-collision-safety"
+      },
+      {
+        "behavior": "todo_findings.offset_staging_pks keeps working, or is removed only once bulk_transfer subsumes it",
+        "item_id": "bulk-transfer-pk-collision-safety"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "bulk-transfer-pk-collision-safety",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "bulk-transfer-pk-collision-safety",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "bulk-transfer-pk-collision-safety",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_findings.py"
+      },
+      {
+        "item_id": "bulk-transfer-pk-collision-safety",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q",
+        "description": "tracker script tests pass, including an additive transfer into a target with colliding ids",
+        "expected": "all pass",
+        "item_id": "bulk-transfer-pk-collision-safety",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "bulk-transfer-pk-collision-safety",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "bulk-transfer-pk-collision-safety",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1540: two tests seed the target with rows at the staged ids before transferring. Both fail on the unfixed tree with 'hosted pipeline error: UNIQUE constraint failed: events.seq' - the empty-target blind spot that hid this originally is closed by seeding first.",
+        "item_id": "bulk-transfer-pk-collision-safety",
+        "notes": null,
+        "started_at": "2026-08-05T15:14:20Z",
+        "started_branch": "fix/privacy-rejection-aborts-build-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add a failing test: additive bulk_transfer into a target that already holds rows at the staged ids",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1540 then corrected by #1544. Additive transfers omit reassignable PKs so SQLite assigns fresh ids in INSERT order; rows selected ORDER BY that key. #1540's first cut sniffed for any rowid alias, which review correctly flagged as unsound - deferrals.id is a rowid alias but is referenced by value from events.detail and from promoted item prose, so reassigning it would silently re-point audit rows. #1544 replaced the sniff with an explicit allowlist (events.seq and the four findings PKs); deferrals is excluded and now aborts loudly.",
+        "item_id": "bulk-transfer-pk-collision-safety",
+        "notes": null,
+        "started_at": "2026-08-05T15:14:22Z",
+        "started_branch": "fix/privacy-rejection-aborts-build-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Decide and implement PK-safe additive semantics (omit autoincrement PKs, or fold the offset into bulk_transfer)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Order: test_additive_transfer_preserves_append_only_order asserts staged event order survives reassignment. offset_staging_pks: reconciled not removed - the findings import calls bulk_transfer additively so it is now subsumed, and its comment claiming 'bulk_transfer copies primary keys verbatim' was corrected in place. Kept because it is independently tested. Residual deferrals gap logged as bulk-transfer-deferral-id-reference-remap.",
+        "item_id": "bulk-transfer-pk-collision-safety",
+        "notes": null,
+        "started_at": "2026-08-05T15:14:25Z",
+        "started_branch": "fix/privacy-rejection-aborts-build-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Assert append-only row order survives, and reconcile or remove todo_findings.offset_staging_pks",
+        "wid": "w3"
+      }
+    ]
+  }
+}

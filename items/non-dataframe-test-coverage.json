@@ -1,0 +1,486 @@
+{
+  "description": "Non-DataFrame coverage gaps across 4 categories totaling ~11,500 missing\nstatements. These are higher ROI than DataFrame queries because they protect\nthe core product (runners, generators, registry), CLI user experience, and\nplatform adapters.\n\nCategory breakdown (excluding DataFrame subsystem):\n- Core logic: ~12,629 miss at 76.5% (runners, generators, base adapter, ETL)\n- CLI: 3,123 miss at 70.6% (commands, config, output)\n- Cloud platforms: 7,409 miss at 59.4% (SQL generation, credentials)\n- Local platforms: 618 miss at 69.1% (DuckDB, DataFusion, Polars SQL)\n- Utils: 991 miss at 79.1% (validation, compilation, execution)\n\nTarget: ~9,500 additional statements covered, bringing non-DF code from\n~72% to ~82%. Combined with DataFrame TODO and coverage scope changes,\nthis reaches the 80% overall target.\n\nNote: TPC-DI ETL (transformations.py 1,053 miss + batch.py 882 miss = 1,935\nstmts) is deferred due to high effort and niche usage. This caps core_logic\nat ~79% even if all other core files hit 85%. The overall 80% target is still\nachievable because other categories (utils, local platforms) will exceed 85%.\n\nAll core/local/utils work is testable with real engines (DuckDB, DataFusion).\nCLI is testable via Click CliRunner. Cloud platforms test SQL generation and\nconfig logic without credentials.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add tests just to hit line coverage",
+        "instead": "every test should fail if the code under test is broken",
+        "item_id": "non-dataframe-test-coverage",
+        "why": "a test that can never fail is worse than no test"
+      },
+      {
+        "dont": "mock internal methods to test dispatchers",
+        "instead": "use real DuckDB/DataFusion/Polars wherever possible",
+        "item_id": "non-dataframe-test-coverage",
+        "why": "you're testing mock wiring not behavior"
+      },
+      {
+        "dont": "put 'coverage' in test filenames",
+        "instead": "name after the behavior being tested",
+        "item_id": "non-dataframe-test-coverage",
+        "why": "test names should describe what they verify"
+      },
+      {
+        "dont": "test cloud SQL generation by asserting mock.called",
+        "instead": "assert the generated SQL string contains expected clauses",
+        "item_id": "non-dataframe-test-coverage",
+        "why": "that doesn't verify SQL correctness"
+      },
+      {
+        "dont": "write import-only tests",
+        "instead": "every test must call a function and assert on its output",
+        "item_id": "non-dataframe-test-coverage",
+        "why": "importing a module is not testing it"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "non-dataframe-test-coverage",
+        "id": 435,
+        "reason": "TPC-DI ETL is 1,935 missing statements but requires complex DataFrame fixtures simulating CDC, SCD, and batch processing. High effort, niche benchmark. Cover after 80% overall target is reached.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: TPC-DI ETL coverage explicitly deferred until the overall 80% coverage target is reached; no evidence that condition is met.",
+        "summary": "TPC-DI ETL coverage (transformations.py 1,053 miss, batch.py 882 miss)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "non-dataframe-test-coverage",
+        "id": 436,
+        "reason": "Experimental code changes frequently. Testing to 80% is wasted effort if modules are restructured. Cover after modules graduate from experimental.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Gated on experimental modules 'graduating' from experimental status; no evidence that has happened.",
+        "summary": "Experimental module coverage (723 miss, 75.3%)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "non-dataframe-test-coverage",
+        "id": 437,
+        "reason": "Requires Spark session mocking which is fragile. Better covered by platform-live-integration-tests TODO with real Spark clusters.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Owning TODO platform-live-integration-tests is Completed and implemented PySpark session mocking/stub coverage addressing this concern.",
+        "summary": "Cloud Spark staging/session coverage (base/cloud_spark/ 175 miss)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "non-dataframe-test-coverage",
+        "id": 438,
+        "reason": "The top 6 cloud adapters in w20-w22 cover the most-used platforms. Remaining adapters can be covered incrementally after the 80% target.",
+        "resolution": "promoted",
+        "resolved_item": "remaining-cloud-platform-adapters-firebolt-questdb-trino-etc",
+        "resolved_reason": null,
+        "summary": "Remaining cloud platform adapters (firebolt, questdb, trino, etc.)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_item": "fix-coverage-theater"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "created_at": "2026-03-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing tests must continue to pass - new tests are additive",
+        "item_id": "non-dataframe-test-coverage"
+      },
+      {
+        "behavior": "Cloud adapter tests must not require real credentials - mock at connection boundary only",
+        "item_id": "non-dataframe-test-coverage"
+      },
+      {
+        "behavior": "Coverage config in pyproject.toml remains the source of truth for local dev",
+        "item_id": "non-dataframe-test-coverage"
+      },
+      {
+        "behavior": "No `assert True`, `assert result is not None`, or `hasattr`-only assertions in new tests",
+        "item_id": "non-dataframe-test-coverage"
+      },
+      {
+        "behavior": "Test suite speed: `make test-fast` must complete in < 60 seconds",
+        "item_id": "non-dataframe-test-coverage"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w1",
+        "wid": "w11"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w1",
+        "wid": "w12"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w16",
+        "wid": "w18"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w16",
+        "wid": "w19"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w1",
+        "wid": "w20"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w1",
+        "wid": "w21"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w1",
+        "wid": "w22"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w1",
+        "wid": "w24"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w13",
+        "wid": "w24"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w14",
+        "wid": "w24"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w15",
+        "wid": "w24"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w16",
+        "wid": "w24"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w11",
+        "wid": "w25"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w12",
+        "wid": "w25"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w20",
+        "wid": "w25"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w21",
+        "wid": "w25"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w22",
+        "wid": "w25"
+      },
+      {
+        "item_id": "non-dataframe-test-coverage",
+        "needs_wid": "w24",
+        "wid": "w25"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test base adapter concrete methods via DuckDB",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test coffeeshop generator",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test local platform adapters: DataFusion + write transformer",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test local platform adapters: DuckDB + Polars SQL",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test utils: tpc_compilation + execution_manager",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test utils: data_validation + dependency_validation",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test utils: verbosity + timeout_manager",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test CLI commands via CliRunner: run + compare",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test CLI commands via CliRunner: benchmarks + config",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test CLI commands: onboarding + df_tuning",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test CLI commands: platform + output + dryrun",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test base data_loading.py format detection and dispatch",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test cloud platform SQL generation: Redshift + Snowflake",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test cloud platform SQL generation: BigQuery + Databricks",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test cloud platform SQL generation: Athena + Azure Synapse",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test cloud credential resolution and validation",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Ratchet fail_under to 70 (intermediate gate)",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Ratchet fail_under to 80 and align CI coverage config",
+        "wid": "w25"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test TPC-H generator",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test TPC-DS benchmark runner",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test platform_registry.py operations",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test write_primitives benchmark operations",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test primitives generator_base",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test dryrun.py preview rendering",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "non-dataframe-test-coverage",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test joinorder generator",
+        "wid": "w9"
+      }
+    ]
+  }
+}

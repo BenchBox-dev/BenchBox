@@ -1,0 +1,202 @@
+{
+  "context": "Make the budget derive from the thing that is actually constrained. Introduce\n_CONTAINER_NAME_MAX_LEN = 64 and a replica-suffix budget, and have\ncompose_project_name accept the platform's longest service name so the project\nbudget becomes min(63, 64 - max_service_len - suffix - 1). The existing\nsha1-truncation branch already produces a deterministic name once the budget is\nright. Populate services=(...) for all 16 specs so the length is known without\nparsing YAML at call time, with a test asserting the tuples match the compose\nfiles. Add the guard test that enumerates every checked-in config x platform and\nasserts the full container id fits.\n",
+  "description": "tests/uat/docker_assets.py bounds _PROJECT_NAME_MAX_LEN = 63 and truncates the\nPROJECT name to fit. But the constrained identifier is the derived CONTAINER id,\n`<project>-<service>-<replica>`, which mocker caps at 64 characters. The project\nbudget therefore leaves no room for the service and replica suffix.\n\nMEASURED 2026-08-05 by enumerating every docker platform against the checked-in\nrelease-gate configs:\n  release-gate-02-docker-nonoltp: 13 of 16 platforms overflow (66-76 chars)\n  release-gate-03-docker-oltp:    11 of 16 platforms overflow (65-76 chars)\nWorst case, 76 chars:\n  benchbox-uat-gate-release-gate-02-docker-nonoltp-lakesail-lakesail-connect-1\n\nThis means the canonical release-gate stages 2 and 3 have NEVER been runnable on\nmacOS/mocker as committed. It was masked on 2026-08-04 with an ad-hoc short-name\nconfig; that workaround must not become the fix.\n\nLongest service name across the matrix is `lakesail-connect` (16). Only lakesail\nand velox declare `services=(...)` in their specs, so lengths for the other 14\nplatforms are only discoverable by parsing the compose files.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assume a single-digit replica index",
+        "instead": "budget for a multi-character replica suffix",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "why": "a scaled service reaches -10 and silently overflows again by one character"
+      },
+      {
+        "dont": "fix this by shortening the checked-in config names or the docker_project_prefix",
+        "instead": "derive the project budget from the container-id limit and prove it with an enumerating test",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "why": "that is the 2026-08-04 workaround; it leaves the real bound wrong and silently re-breaks the moment anyone adds a longer config name or platform"
+      },
+      {
+        "dont": "hardcode 45 or any other magic project length",
+        "instead": "compute from _CONTAINER_NAME_MAX_LEN minus the actual per-platform service length",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "why": "it encodes today's longest service name (lakesail-connect, 16) as a constant nobody will revisit when a longer service appears"
+      },
+      {
+        "dont": "parse compose YAML inside compose_project_name",
+        "instead": "populate spec.services once at module load and pass the length in",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "why": "it is called on hot teardown paths and must stay pure and cheap"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-08-05T15:01:26Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "Docker (non-mocker) behavior is unchanged in practice -- the new bound is tighter, never looser.",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit"
+      },
+      {
+        "behavior": "Project names stay deterministic: the same (config, platform, prefix) always yields the same name, so teardown of a prior sweep still matches.",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit"
+      },
+      {
+        "behavior": "The _compose_base_command safety regex rejecting unsafe project names is unchanged.",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit"
+      },
+      {
+        "behavior": "docker_project_prefix stays operator-configurable; the fix must work for any prefix, not just the shorter one.",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "DockerPlatformSpec.services already exists and is honoured by compose up/pull/build argv; populating it for all platforms is the intended mechanism, not a new field",
+        "decision": "reuse",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "path": "tests/uat/docker_assets.py"
+      },
+      {
+        "concept": "compose_project_name already implements deterministic sanitisation plus sha1 truncation; only the budget derivation is wrong -- extend, do not rewrite",
+        "decision": "extend",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "path": "tests/uat/docker_assets.py"
+      },
+      {
+        "concept": "existing project-name tests establish the naming contract; the new budget guard belongs alongside them",
+        "decision": "extend",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "path": "tests/uat/test_docker_assets.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "kind": "do_not_modify",
+        "path_glob": "docker/"
+      },
+      {
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/docker_assets.py"
+      },
+      {
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_docker_assets.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_docker_assets.py -q -k container_name_budget",
+        "description": "Docker asset tests pass including a named container-name budget test",
+        "expected": "at least one test collected and passing (pytest exits 5 if the selector matches nothing)",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_docker_assets.py -q",
+        "description": "Every checked-in UAT config x docker platform yields a container id within 64 chars",
+        "expected": "the enumerating guard covers all configs under tests/uat/configs and all 16 docker platforms",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python -c \"from tests.uat.docker_assets import docker_platform_specs as s;assert all(v.services for v in s().values()), [k for k,v in s().items() if not v.services]\"",
+        "description": "Every docker platform spec declares its compose services explicitly",
+        "expected": "exit 0; all 16 specs populated",
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Populate services for all 16 docker platform specs and test them against the compose files",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Derive the project-name budget from the container-id limit and service length",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add the enumerating guard over every checked-in config and platform",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-compose-project-name-overflows-container-id-limit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document the naming bound and the mocker 64-char limit in the operator guide",
+        "wid": "w3"
+      }
+    ]
+  }
+}

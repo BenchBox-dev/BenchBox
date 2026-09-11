@@ -1,0 +1,60 @@
+{
+  "context": "Rewrite the docstring to state the real reason for the precedence -- Modin reads MODIN_ENGINE directly, so whatever the environment names is what actually runs, and the adapter's job is to reconcile self.engine with it and reject an unreviewed value rather than report one backend while running another. Delete _MODIN_ENGINE outright; confirm with a repo-wide grep that nothing outside the module imports it before removing, since a module-level name can be imported from elsewhere even when it is unused in its own file.",
+  "description": "Two residues in benchbox/platforms/dataframe/modin_df.py left by #1515, both harmless today and both misleading to the next reader:\n\n1. STALE RATIONALE. _resolve_effective_engine's docstring (:266-274) explains that a pre-set MODIN_ENGINE wins over the constructor argument 'because `_configure_engine` uses `setdefault`'. #1515 changed _configure_engine to assign (:284-289), and its inline comment now says 'Assign rather than setdefault'. The two sit ~15 lines apart and contradict each other. The precedence itself is still deliberate and correct -- Modin reads the variable directly, and an operator's environment should decide -- but the stated reason no longer exists, so a reader who trusts the docstring will conclude the precedence is an accident of setdefault and 'fix' it.\n\n2. DEAD ENV READ. `_MODIN_ENGINE = os.environ.get(\"MODIN_ENGINE\", \"ray\").lower()` at :97 is evaluated at module import and referenced nowhere else in the file. It is an unvalidated, import-time snapshot of exactly the variable #1515 set out to bring under _validate_engine. It does nothing now, but it is a loaded trap: the next person who needs the engine name at module scope will reach for it and reintroduce the bypass.\n\nIdentified 2026-08-04 during the adversarial review of the mcp-v2-platform-options batch.",
+  "legacy": {
+    "item_meta": {
+      "category": "cleanup",
+      "created_at": "2026-08-04T23:26:38Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "A pre-set MODIN_ENGINE still wins over the constructor argument and is still validated against SUPPORTED_MODIN_ENGINES",
+        "item_id": "modin-engine-resolution-stale-doc-and-dead-global"
+      },
+      {
+        "behavior": "The adapter still supports unidist alongside ray and dask, while MCP still admits only ray and dask",
+        "item_id": "modin-engine-resolution-stale-doc-and-dead-global"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "modin-engine-resolution-stale-doc-and-dead-global",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "modin-engine-resolution-stale-doc-and-dead-global",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/modin_df.py"
+      },
+      {
+        "item_id": "modin-engine-resolution-stale-doc-and-dead-global",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_modin_df_coverage.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "bash -c '! grep -rn \"_MODIN_ENGINE\" benchbox/'",
+        "description": "No module-level unvalidated MODIN_ENGINE read remains",
+        "expected": "exits 1 today; exits 0 once the dead global is removed",
+        "item_id": "modin-engine-resolution-stale-doc-and-dead-global",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/platforms/dataframe/test_modin_df_coverage.py -q -n 0",
+        "description": "Engine resolution behaviour is unchanged",
+        "expected": "exits 0",
+        "item_id": "modin-engine-resolution-stale-doc-and-dead-global",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

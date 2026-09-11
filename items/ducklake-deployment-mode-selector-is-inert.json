@@ -1,0 +1,78 @@
+{
+  "context": "Either (a) map each mode to catalog/data_path defaults in from_config with explicit --platform-option winning, or (b) validate and reject a deployment_mode that contradicts the resolved catalog/storage axes. (b) is smaller and cannot silently change what a run measures; prefer it unless mode-as-shorthand is wanted.",
+  "description": "adapter_factory._resolve_deployment_mode() accepts --platform ducklake:<mode> and sets config['deployment_mode'], but benchbox/platforms/ducklake.py never reads it, so 'ducklake:postgres_catalog_s3' silently runs a local DuckDB-file catalog on local disk - the user believes they selected a deployment and got something else. The four modes are correctly MODELLED after w10 (catalog backend x storage location) and their descriptions say the real selection is --platform-option catalog= plus the data_path scheme, but nothing stops a contradictory selection.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-07-30T19:15:51Z",
+      "completed_pr": 1360,
+      "created_at": "2026-07-30T17:16:21Z",
+      "worktree": "ducklake-platform"
+    },
+    "preserves": [
+      {
+        "behavior": "Explicit --platform-option catalog=/data_path remain authoritative",
+        "item_id": "ducklake-deployment-mode-selector-is-inert"
+      },
+      {
+        "behavior": "Runs that pass no deployment_mode keep working exactly as today",
+        "item_id": "ducklake-deployment-mode-selector-is-inert"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ducklake-deployment-mode-selector-is-inert",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/ducklake.py"
+      },
+      {
+        "item_id": "ducklake-deployment-mode-selector-is-inert",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_ducklake_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_ducklake_adapter.py -q",
+        "description": "A contradictory deployment_mode no longer silently runs the wrong deployment",
+        "expected": "all pass; new test covers ducklake:postgres_catalog_s3",
+        "item_id": "ducklake-deployment-mode-selector-is-inert",
+        "last_result": "pass",
+        "last_run": "2026-07-30T19:14:40Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ducklake-deployment-mode-selector-is-inert",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "benchbox/platforms/ducklake.py: _DEPLOYMENT_MODE_AXES + _resolve_catalog_with_deployment_mode() + _warn_if_deployment_mode_contradicts_storage() wired into from_config. Mode now fills the catalog axis when unspecified; explicit --platform-option stays authoritative (must-preserve) and a contradiction warns instead of passing silently. Storage axis warns rather than defaulting - a bucket cannot be invented. Verified: mode alone -> postgres (was duckdb), no mode -> unchanged, explicit sqlite wins over mode, s3 mode + local path warns",
+        "item_id": "ducklake-deployment-mode-selector-is-inert",
+        "notes": null,
+        "started_at": "2026-07-30T19:11:08Z",
+        "started_branch": "fix/ducklake-deployment-mode-applied",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Make deployment_mode either apply the axes or reject a contradictory selection",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/platforms/test_ducklake_adapter.py TestDuckLakeDeploymentModeIsApplied: 12 tests (4 modes parametrized, no-mode unchanged, explicit-wins, both storage-mismatch directions, matching-produces-no-warning, unknown-mode-ignored, registry-drift guard). 116 pass. Mutation: removing the two calls from from_config fails 5",
+        "item_id": "ducklake-deployment-mode-selector-is-inert",
+        "notes": null,
+        "started_at": "2026-07-30T19:12:28Z",
+        "started_branch": "fix/ducklake-deployment-mode-applied",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Tests for each of the four modes incl. a contradictory combination",
+        "wid": "w2"
+      }
+    ]
+  }
+}

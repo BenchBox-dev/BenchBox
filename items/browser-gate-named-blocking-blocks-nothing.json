@@ -1,0 +1,124 @@
+{
+  "context": "Decide first whether the browser suite is worth blocking merges on, given its known cold-snapshot flakiness and its retry-based data waits. Both answers are defensible; what is not defensible is a job that calls itself blocking while nobody is required to look at it. Wiring it as required while it is red would block every PR, so ordering matters.",
+  "description": "ci-required-result in pr.yml lists 13 needs and no browser job is among them. The Chromium job lives in results-explorer-browser.yml and is named 'Chromium (full suite, blocking)', and develop's ruleset requires only ci-required-result, so a red Chromium suite blocks nothing. That is the reason the hardcoded fixture ids could go stale and stay stale across many PRs with the suite failing on every run and nothing surfacing it. A cross-workflow job cannot appear in another workflow's needs, so making it genuinely required is a ruleset change, not a needs edit. Either the label is wrong or the wiring is; today they disagree and the label is the one people read.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "browser-gate-named-blocking-blocks-nothing",
+        "needs_item": "explorer-fixture-ids-cover-every-spec-role"
+      }
+    ],
+    "item_meta": {
+      "category": "ci-defect",
+      "completed_at": "2026-08-05T22:37:58Z",
+      "completed_pr": 1594,
+      "created_at": "2026-08-04T23:46:46Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A job whose name claims to block either blocks or is renamed - the two must not disagree",
+        "item_id": "browser-gate-named-blocking-blocks-nothing"
+      },
+      {
+        "behavior": "Nothing becomes a required check while it is red; that blocks every PR in the repo",
+        "item_id": "browser-gate-named-blocking-blocks-nothing"
+      },
+      {
+        "behavior": "The suite's retry-based data waits are a known coverage trade-off, not evidence it should be demoted",
+        "item_id": "browser-gate-named-blocking-blocks-nothing"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "browser-gate-named-blocking-blocks-nothing",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "browser-gate-named-blocking-blocks-nothing",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "browser-gate-named-blocking-blocks-nothing",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/browser-ci.md"
+      },
+      {
+        "item_id": "browser-gate-named-blocking-blocks-nothing",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -q 'blocking' .github/workflows/results-explorer-browser.yml",
+        "description": "no job advertises itself as blocking while nothing depends on it",
+        "expected": "Fails on the unfixed tree today (measured exit 1). Satisfied by either outcome - a rename, or a rename plus wiring it into the ruleset",
+        "item_id": "browser-gate-named-blocking-blocks-nothing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import yaml,pathlib,sys; n=yaml.safe_load(pathlib.Path('.github/workflows/pr.yml').read_text())['jobs']['ci-required-result']['needs']; sys.exit(0 if n else 1)\"",
+        "description": "the required-check list is still parseable and non-empty",
+        "expected": "Passes today and must stay passing - this is the regression rung, not the falsifying one",
+        "item_id": "browser-gate-named-blocking-blocks-nothing",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "browser-gate-named-blocking-blocks-nothing",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "browser-gate-named-blocking-blocks-nothing",
+        "needs_wid": "w0",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Decision: suite gates merges. Live ruleset 15611785 requires 'Results Explorer browser gate'; chromium feeds browser-required-result; suite green.",
+        "item_id": "browser-gate-named-blocking-blocks-nothing",
+        "notes": null,
+        "started_at": "2026-08-05T22:35:19Z",
+        "started_branch": "fix/browser-gate-name-wiring-agreement",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Decide whether the browser suite should gate merges and reconcile the job name with the answer",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Already wired: ruleset context present; workflow gate job always(); recent runs success",
+        "item_id": "browser-gate-named-blocking-blocks-nothing",
+        "notes": null,
+        "started_at": "2026-08-05T22:36:37Z",
+        "started_branch": "fix/browser-gate-name-wiring-agreement",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "If it should gate, wire it into the required checks only once the suite is observed green",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Path not taken: rename/demote rejected because suite is green and ruleset-required; name matches reality",
+        "item_id": "browser-gate-named-blocking-blocks-nothing",
+        "notes": null,
+        "started_at": "2026-08-05T22:36:45Z",
+        "started_branch": "fix/browser-gate-name-wiring-agreement",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "If it should not gate, rename it and give a red suite a surfacing path that someone reads",
+        "wid": "w2"
+      }
+    ]
+  }
+}

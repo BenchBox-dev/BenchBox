@@ -1,0 +1,507 @@
+{
+  "context": "Use a capability-first architecture instead of adapter-by-adapter ad hoc logic.\n\n1. Inventory and classify platforms before changing behavior.\n2. Define canonical version semantics:\n   - driver version (Python client package)\n   - engine/platform version (remote service/runtime)\n3. Move capability declarations into explicit platform metadata/contract fields.\n4. Implement runtime binding only where live verification can prove correctness.\n5. Enforce fail-fast paths for unsupported combinations.\n6. Add schema+test coverage to prevent regression and metadata conflation.\n",
+  "description": "Follow-up planning item to close the remaining cross-platform gaps after the\ninitial runtime-isolation rollout.\n\nCurrent implementation now fails fast when an adapter is asked to use\n`isolated-site-packages` but does not explicitly support runtime binding.\nThis prevents incorrect `driver_version_actual` reporting, but it does not yet\nprovide a complete, explicit capability matrix and implementation plan across\nall platforms.\n\nThis item defines a detailed execution plan to:\n1. Ensure every platform that can support multiple Python driver versions does.\n2. Make capability declarations explicit and discoverable (not implicit via ad-hoc attr checks).\n3. Investigate and design an additional \"cloud platform/engine version\" concept\n   for platforms where Python client version is independent from underlying\n   service/runtime version.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "infer support only from optional class attrs discovered via `getattr`",
+        "instead": "define capability declarations explicitly in registry/contract metadata.",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "why": "this hides platform contract intent"
+      },
+      {
+        "dont": "populate `driver_version_actual` from resolver metadata alone",
+        "instead": "verify from live module/connection context.",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "why": "resolver output is not proof of live runtime import/execution"
+      },
+      {
+        "dont": "remove or rename existing result keys without compatibility layer",
+        "instead": "add new fields alongside existing ones.",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "why": "downstream consumers depend on current schema"
+      },
+      {
+        "dont": "silently continue on unsupported isolated runtime requests",
+        "instead": "fail fast with specific remediation guidance.",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "why": "that can produce invalid benchmark conclusions"
+      },
+      {
+        "dont": "treat cloud engine version as equivalent to Python driver version",
+        "instead": "model and export them separately.",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "why": "they are independently versioned lifecycles"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "id": 73,
+        "reason": "Requires account provisioning/secrets policy decisions; keep implementation and metadata model decoupled from account availability.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Automated live-cloud verification against paid accounts in CI"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_item": "platform-driver-runtime-isolation"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-20T00:00:00Z",
+      "created_at": "2026-02-20T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Default runs with no explicit driver version continue to behave exactly as today for all platforms.",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model"
+      },
+      {
+        "behavior": "DuckDB runtime-isolation behavior remains live-validated from the actual execution connection/module.",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model"
+      },
+      {
+        "behavior": "Result JSON keeps backward-compatible `platform.version` and `platform.client_version` fields.",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model"
+      },
+      {
+        "behavior": "Unsupported isolated-runtime requests fail fast with actionable errors; never silently downgrade to misleading metadata.",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/ssb/benchmark.py"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/ssb/queries.py"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/benchmark/runner.py"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/queries.py"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/benchmark.py"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/queries.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_platform_driver_runtime_contract.py tests/unit/utils/test_runtime_env.py -v --tb=short",
+        "description": "Driver runtime contract unit tests pass",
+        "expected": "all targeted contract/runtime tests pass with 0 failures",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_datafusion_adapter.py tests/unit/platforms/dataframe/test_datafusion_df.py -k 'driver or runtime or version' -v --tb=short",
+        "description": "DataFusion SQL and DataFrame runtime-binding tests pass",
+        "expected": "DataFusion adapter tests covering runtime/version behavior pass",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_query_plan_serialization.py tests/unit/core/test_runner_lifecycle.py -k 'driver or version' -v --tb=short",
+        "description": "Result schema/runner metadata propagation remains correct",
+        "expected": "driver/engine metadata fields are serialized correctly with no regression",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_duckdb_version_isolation.py tests/integration/test_platform_driver_version_matrix.py -v --tb=short",
+        "description": "Integration matrix verifies distinct actual driver versions across multiple supported platforms",
+        "expected": "integration tests prove per-run version isolation where platform capability allows",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "benchbox run --platform duckdb --benchmark tpch --scale 0.01 --platform-option driver_version=1.2.2 --non-interactive --quiet && benchbox run --platform datafusion --benchmark tpch --scale 0.01 --platform-option driver_version=51.0.0 --non-interactive --quiet",
+        "description": "Manual command matrix confirms runtime and metadata correctness",
+        "expected": "for supported platforms, result JSON shows distinct verified actual driver versions; unsupported combinations fail fast with explicit guidance",
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w8",
+        "wid": "w11"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w9",
+        "wid": "w11"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w2",
+        "wid": "w12"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w12",
+        "wid": "w13"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w11",
+        "wid": "w14"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w11",
+        "wid": "w15"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w5",
+        "wid": "w15"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w6",
+        "wid": "w15"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w13",
+        "wid": "w16"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w14",
+        "wid": "w16"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w15",
+        "wid": "w17"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w16",
+        "wid": "w17"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w17",
+        "wid": "w18"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w18",
+        "wid": "w19"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build an authoritative platform capability inventory from registry and adapters (driver package, mode/deployment, runtime-binding behavior, live version probe support)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement support (or explicit non-feasibility decision) for connector-heavy adapters: databricks, athena, clickhouse-cloud, firebolt, spark-family",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Codify standardized unsupported rationale and actionable fail-fast remediation messages for non-feasible platforms",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define cloud engine-version metadata model (field names, semantics, provenance/probe metadata)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement core models/schema/export wiring for engine-version metadata with backward compatibility",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement adapter-level engine-version probe hooks for selected cloud platforms and record probe provenance",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for capability declarations, resolver behavior, and fail-fast enforcement across SQL/DataFrame factories",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for cloud engine-version extraction and schema serialization",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add integration matrix tests for multi-version supported adapters plus regression coverage for unsupported paths",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run explicit manual verification matrix commands and capture artifact evidence for runtime/metadata correctness",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Publish architecture note and finalize rollout checklist (coverage table, unsupported exceptions, follow-up-only infeasible items)",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define canonical version semantics separating Python driver/client version from platform engine/service version",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define explicit capability declarations in platform metadata and adapter contract, with migration path from implicit getattr checks",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement shared capability resolver helpers and standardized error categories for unsupported runtime-binding combinations",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement and verify DataFusion SQL isolated runtime binding with live client-version validation",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement and verify DataFusion DataFrame isolated runtime binding with live client-version validation",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit remote/cloud adapters and classify each as feasible, blocked, or inapplicable for selectable Python driver versions",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement support (or explicit non-feasibility decision) for Trino-family adapters: trino, starburst, presto",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-driver-version-capability-matrix-and-cloud-version-model",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement support (or explicit non-feasibility decision) for warehouse adapters: bigquery, snowflake, redshift",
+        "wid": "w9"
+      }
+    ]
+  }
+}

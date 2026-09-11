@@ -1,0 +1,111 @@
+{
+  "context": "Update CONTRIBUTING.md (and any mirrored contributor quickstarts) to match make pr-open / pr-ready / READY=1 and draft→ready; add a one-line cross-link to docs/operations if present. Pin with a unit/doc contract test if the repo already patterns that for CONTRIBUTING claims.",
+  "description": "Canonical contributor docs still describe the pre-#1567 / pre-#1592 world: make pr-open runs gh pr merge --auto --squash and merges as soon as checks are green.\n\nActual policy (Makefile on develop; workflow after #1592): pr-open withholds auto-merge; pr-ready / READY=1 arms; workflow arms only on ready_for_review. Anyone following CONTRIBUTING re-creates the partial-stack race the hold closed, or is confused when bare pr-open no longer arms.\n\nOut of scope for #1592 (only Makefile help + docs/operations). Batch residual 2026-08-05 overall adversarial review Required residual #3.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "contributing-pr-open-auto-merge-docs-drift-20260805",
+        "needs_item": "auto-merge-workflow-defeats-the-makefile-hold-20260805"
+      }
+    ],
+    "item_meta": {
+      "category": "ci-integrity",
+      "completed_at": "2026-08-06T00:59:13Z",
+      "completed_pr": 1623,
+      "created_at": "2026-08-05T23:38:52Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Hands-free finished-branch path remains documented (pr-ready / READY=1)",
+        "item_id": "contributing-pr-open-auto-merge-docs-drift-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "contributing-pr-open-auto-merge-docs-drift-20260805",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "contributing-pr-open-auto-merge-docs-drift-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "contributing-pr-open-auto-merge-docs-drift-20260805",
+        "kind": "only_modify",
+        "path_glob": "CONTRIBUTING.md"
+      },
+      {
+        "item_id": "contributing-pr-open-auto-merge-docs-drift-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "contributing-pr-open-auto-merge-docs-drift-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! rg -n \"pr-open.*auto.?merge|merge --auto --squash\" CONTRIBUTING.md || rg -n \"pr-ready|READY=1|withhold\" CONTRIBUTING.md",
+        "description": "CONTRIBUTING does not claim pr-open arms auto-merge by default",
+        "expected": null,
+        "item_id": "contributing-pr-open-auto-merge-docs-drift-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-06T00:50:17Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "contributing-pr-open-auto-merge-docs-drift-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "contributing-pr-open-auto-merge-docs-drift-20260805",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventory: only CONTRIBUTING.md claims arm-on-open (L47/51/84-91/131: merge --auto --squash, 'one shot', auto-merge takes PR over line). Sibling docs already correct: docs/operations/repo-admin-settings.md, dev-loop-worktree-pool.md, pr-triage.md. No other docs/** arm-on-open drift for contributor loop.",
+        "item_id": "contributing-pr-open-auto-merge-docs-drift-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T00:47:57Z",
+        "started_branch": "fix/contributing-pr-open-docs",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Inventory CONTRIBUTING and sibling contributor docs for arm-on-open claims",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Rewrote CONTRIBUTING.md: pr-open withholds; step 5 documents pr-ready / READY=1 / ready_for_review hands-free arm path. Ladder green (withhold/pr-ready/READY=1 present; no merge --auto --squash).",
+        "item_id": "contributing-pr-open-auto-merge-docs-drift-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T00:48:29Z",
+        "started_branch": "fix/contributing-pr-open-docs",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Rewrite to withhold-by-default + pr-ready/READY=1/draft→ready",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added tests/unit/test_contributing_pr_open_auto_merge_docs.py; 2 passed (no merge --auto --squash; withhold + pr-ready + READY=1 + ready_for_review).",
+        "item_id": "contributing-pr-open-auto-merge-docs-drift-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T00:49:47Z",
+        "started_branch": "fix/contributing-pr-open-docs",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Add regression pin if a docs contract suite exists",
+        "wid": "w2"
+      }
+    ]
+  }
+}

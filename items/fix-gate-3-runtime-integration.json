@@ -1,0 +1,79 @@
+{
+  "context": "Do not begin until the authorization and worktree gates pass. Preserve unrelated changes, use temporary outputs for tests, fail closed on uncertainty, and stop on any data-loss or false-success signal.",
+  "description": "Run focused tests, local DuckDB/SQLite dry-runs, concurrency probes, manifest reuse, and import/manifest/compatibility gates. Stop if incomplete or corrupted results can still be marked successful.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "fix-gate-3-runtime-integration",
+        "needs_item": "fix-p1-cli-acceptance-tests"
+      },
+      {
+        "item_id": "fix-gate-3-runtime-integration",
+        "needs_item": "fix-p1-cloud-load-integrity"
+      },
+      {
+        "item_id": "fix-gate-3-runtime-integration",
+        "needs_item": "fix-p1-data-reuse-validation"
+      },
+      {
+        "item_id": "fix-gate-3-runtime-integration",
+        "needs_item": "fix-p1-timing-isolation"
+      }
+    ],
+    "item_meta": {
+      "category": "architecture-remediation",
+      "completed_at": "2026-08-26T21:28:08Z",
+      "completed_pr": 1925,
+      "created_at": "2026-08-26T17:08:31Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing user files, existing result artifacts, backward compatibility, rollback evidence",
+        "item_id": "fix-gate-3-runtime-integration"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-gate-3-runtime-integration",
+        "kind": "do_not_modify",
+        "path_glob": ".bossmode/**"
+      },
+      {
+        "item_id": "fix-gate-3-runtime-integration",
+        "kind": "do_not_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "fix-gate-3-runtime-integration",
+        "kind": "do_not_modify",
+        "path_glob": "test-results/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make platform-manifest-check && make compat-docs-check",
+        "description": "Runtime integration gate passes",
+        "expected": "exit 0",
+        "item_id": "fix-gate-3-runtime-integration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1925 runtime integration verified by 54 focused runner/timing/export/CLI tests and final make pr-preflight: 28,383 passed, 19 skipped.",
+        "item_id": "fix-gate-3-runtime-integration",
+        "notes": null,
+        "started_at": "2026-08-26T21:28:02Z",
+        "started_branch": "fix/architecture-integrity-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-architecture-integrity-batch",
+        "status": "done",
+        "summary": "Run P1 runtime, local integration, and compatibility gates",
+        "wid": "w1"
+      }
+    ]
+  }
+}

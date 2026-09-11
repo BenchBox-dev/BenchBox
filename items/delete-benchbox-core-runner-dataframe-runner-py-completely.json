@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #394 of execution-results-dataframe-routing-and-query-resolution.\nDeferred: Delete `benchbox/core/runner/dataframe_runner.py` completely\nReason deferred: The current public/backward-compat registry describes it as a deprecated internal compatibility runner; deletion needs a separate removal-window decision after helper imports migrate.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:07Z",
+      "worktree": "main"
+    }
+  }
+}

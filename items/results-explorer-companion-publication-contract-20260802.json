@@ -1,0 +1,183 @@
+{
+  "context": "Extend companion publication for tuning, plans, and applied artifacts using validator manifest/hash and anonymization paths. Set published flags only after a contained, validated copy succeeds.",
+  "description": "The transformer records has_tuning when a same-stem tuning sidecar exists, and ResultDetail fetches the derived .tuning.json URL, but the pipeline only copies plans sidecars. A real build produced has_tuning=true with no published tuning file, so the control 404s.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "copy every same-stem file",
+        "instead": "reuse validation and containment contracts",
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "why": "unvalidated files can leak data"
+      },
+      {
+        "dont": "fix only the React fetch",
+        "instead": "repair publication",
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "why": "the producer output is missing"
+      },
+      {
+        "dont": "set published flags before copy",
+        "instead": "derive flags from committed output",
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "why": "UI would advertise missing URLs"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "needs_item": "results-explorer-snapshot-portability-and-wal-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "Artifact integrity",
+      "completed_at": "2026-08-10T00:37:54Z",
+      "completed_pr": 1670,
+      "created_at": "2026-08-02T16:27:07Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Companions remain outside ranking metrics",
+        "item_id": "results-explorer-companion-publication-contract-20260802"
+      },
+      {
+        "behavior": "Malformed/private companions fail closed",
+        "item_id": "results-explorer-companion-publication-contract-20260802"
+      },
+      {
+        "behavior": "Manifest hashes and anonymization cover companions",
+        "item_id": "results-explorer-companion-publication-contract-20260802"
+      },
+      {
+        "behavior": "Published paths cannot escape bundles",
+        "item_id": "results-explorer-companion-publication-contract-20260802"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Validated plans copy",
+        "decision": "extend",
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "path": "_project/scripts/explorer_pipeline/pipeline.py"
+      },
+      {
+        "concept": "Stable public anonymization",
+        "decision": "reuse",
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "path": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "concept": "Companion hash contract",
+        "decision": "reuse",
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "path": "benchbox/validation/bundle.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/pipeline.py"
+      },
+      {
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/transformer.py"
+      },
+      {
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/**"
+      },
+      {
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q",
+        "description": "Tuning sidecar is emitted and has_tuning is true",
+        "expected": "Companion regression passes",
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:31:51Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration -q",
+        "description": "Submission and companion validation pass",
+        "expected": "Integration tests pass",
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:34:04Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventory found .plans.json already published with plans_published, while .tuning.json was only source-detected and .applied.json was only ingested as a receipt. Existing validation defines COMPANION_SUFFIXES and applied size/entry bounds; AnonymizationManager provides tuning/public payload boundaries.",
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "notes": null,
+        "started_at": "2026-08-10T00:21:21Z",
+        "started_branch": "fix/results-explorer-companion-publication-contract-20260809",
+        "started_worktree": "/private/tmp/bb-results-explorer-companion-20260809",
+        "status": "done",
+        "summary": "Inventory companion validation and hash rules",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added validated/canonical companion loading in transformer.py for plans, tuning, and applied sidecars; sanitized applied free text/identifiers; pipeline writes only contained public companions and derives has_tuning/plans_published after successful writes. Malformed/oversized/non-regular companions are skipped without advertisement; residual privacy leaks fail closed.",
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "notes": null,
+        "started_at": "2026-08-10T00:27:43Z",
+        "started_branch": "fix/results-explorer-companion-publication-contract-20260809",
+        "started_worktree": "/private/tmp/bb-results-explorer-companion-20260809",
+        "status": "done",
+        "summary": "Publish tuning and applied companions with flags",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added real tuning/applied publication tests, malformed companion suppression tests, existing plans/privacy regressions remain green, and applied payload redaction coverage. Exact verification passes: 339 unit explorer-pipeline tests; 951 integration tests with 12 environment/optional skips. Ruff check/format and diff check pass.",
+        "item_id": "results-explorer-companion-publication-contract-20260802",
+        "notes": null,
+        "started_at": "2026-08-10T00:28:06Z",
+        "started_branch": "fix/results-explorer-companion-publication-contract-20260809",
+        "started_worktree": "/private/tmp/bb-results-explorer-companion-20260809",
+        "status": "done",
+        "summary": "Add real-output, malformed, traversal, and privacy regressions",
+        "wid": "w2"
+      }
+    ]
+  }
+}

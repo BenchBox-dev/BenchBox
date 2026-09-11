@@ -1,0 +1,184 @@
+{
+  "context": "w0 re-reads the metric contract. w1 runs make dev-loop-metrics against recent code PRs and merge_group runs, splitting runner vs wall per event. w2 writes the snapshot and cites it from the future-state index evidence gates. Existing tracker item ci-baseline-representative-remeasure-sample is prior art to extend, not a duplicate 28-day WS9 sample unless that cheaper query shape is still required for this window.",
+  "description": "Second item in the CI-waste sequence. Replace the dated 2026-08-14 refresh timings with a live required-gate wall, all-event wall, and runner-minute split for recent code PRs and merge_group runs.\n\nUse the existing event_fanout_v1 contract and make dev-loop-metrics. Do not invent a second metrics stack. Per-event fan-out must distinguish pull_request synchronize siblings from the smaller merge_group sibling set.\n\nFeed the numbers into the future-state evidence gates that are blocked on CI-minute evidence. This item does not skip jobs.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "invent a second metrics stack or fan-out schema",
+        "instead": "extend event_fanout_v1 / make dev-loop-metrics",
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "why": "the ci-profile decision already forbids it"
+      },
+      {
+        "dont": "quote the 2026-08-14 27-31 minute / 80-84 runner-minute figures as current",
+        "instead": "publish a new snapshot from make dev-loop-metrics",
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "why": "pr.yml grew after that profile"
+      },
+      {
+        "dont": "treat a PR-only saving as a merge-queue saving",
+        "instead": "split runner and wall per event",
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "why": "merge_group runs a strictly smaller sibling set"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "needs_item": "ci-waste-ledger-and-queue-reconcile"
+      }
+    ],
+    "item_meta": {
+      "category": "CI",
+      "completed_at": "2026-08-31T19:11:31Z",
+      "completed_pr": 1981,
+      "created_at": "2026-08-27T23:11:36Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "No required check is skipped from this evidence",
+        "item_id": "ci-waste-dev-loop-remeasure"
+      },
+      {
+        "behavior": "event_fanout_v1 remains the metric contract",
+        "item_id": "ci-waste-dev-loop-remeasure"
+      },
+      {
+        "behavior": "make dev-loop-metrics remains the entrypoint",
+        "item_id": "ci-waste-dev-loop-remeasure"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "metric clocks",
+        "decision": "extend",
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "path": "_project/decisions/strict-base-refresh-ci-profile-2026-08-14.md"
+      },
+      {
+        "concept": "event_fanout_v1",
+        "decision": "reuse",
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "path": "_project/scripts/dev_loop_pr_metrics.py"
+      },
+      {
+        "concept": "CI-minute evidence gates",
+        "decision": "extend",
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "path": "docs/design/future-state/index.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/dev_loop_pr_metrics.py"
+      },
+      {
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/path_filter_decision.py"
+      },
+      {
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/**"
+      },
+      {
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/index.md"
+      },
+      {
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n '^dev-loop-metrics:' Makefile",
+        "description": "dev-loop-metrics target still exists",
+        "expected": "target present",
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "last_result": "pass",
+        "last_run": "2026-08-31T19:11:27Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'required_gate|all_workflow|runner' _project/analysis/ci-waste-remeasure-*.md docs/operations/repo-admin-settings.md",
+        "description": "snapshot file records required-gate, all-event, and runner-minute keys for both pull_request and merge_group",
+        "expected": "both events present",
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "last_result": "pass",
+        "last_run": "2026-08-31T19:11:28Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --name-only origin/develop -- .github/workflows",
+        "description": "no workflow files changed",
+        "expected": "empty",
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "last_result": "pass",
+        "last_run": "2026-08-31T19:11:29Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "strict-base-refresh CI profile, Makefile dev-loop-metrics, and event_fanout_v1 contract inspected at origin/develop 0f9f66827",
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "notes": null,
+        "started_at": "2026-08-31T16:02:45Z",
+        "started_branch": "docs/ci-waste-dev-loop-remeasure",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-dev-loop-remeasure",
+        "status": "done",
+        "summary": "Re-read strict-base-refresh-ci-profile metric contract and Makefile dev-loop-metrics; confirm event_fanout_v1 keys still match the claimed clocks",
+        "wid": "w0"
+      },
+      {
+        "evidence": "/tmp/ci-waste-event-fanout-pr.json (13 PRs, 11 code-routed) and /tmp/ci-waste-event-fanout-merge-group.json (5 exact-suite-filtered heads)",
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "notes": null,
+        "started_at": "2026-08-31T16:36:21Z",
+        "started_branch": "docs/ci-waste-dev-loop-remeasure",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-dev-loop-remeasure",
+        "status": "done",
+        "summary": "Run make dev-loop-metrics for recent code PRs and merge_group runs; report required-gate wall, all-event wall, and runner-minutes separately per event using the PR vs merge_group sibling table",
+        "wid": "w1"
+      },
+      {
+        "evidence": "_project/analysis/ci-waste-remeasure-2026-08-31.md plus future-state and repo-admin evidence references; focused assertions and Markdownlint pass",
+        "item_id": "ci-waste-dev-loop-remeasure",
+        "notes": null,
+        "started_at": "2026-08-31T16:36:26Z",
+        "started_branch": "docs/ci-waste-dev-loop-remeasure",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-ci-waste-dev-loop-remeasure",
+        "status": "done",
+        "summary": "Record the snapshot and point future-state evidence-gated proposals at those numbers; do not authorize extraction",
+        "wid": "w2"
+      }
+    ]
+  }
+}

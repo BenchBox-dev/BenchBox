@@ -1,0 +1,88 @@
+{
+  "context": "Thread conn.stale into the stats payload (e.g. top-level \"stale\": bool). Update the cutover probe verification text to assert stale is false in both reads. Keep existing keys untouched (additive only).",
+  "description": "Adversarial review (M2): hosted reads connect with sync_required=False; a failed sync sets conn.stale and warns on stderr only. The stats --json payload has no staleness field, so the 60s cutover quiescence probe comparing stdout fingerprints cannot distinguish 'no writes' from 'sync failed twice and both reads served the same stale replica'. The freeze is the actual gate, so this is corroboration-hardening, not a race fix.",
+  "legacy": {
+    "item_meta": {
+      "category": "hardening",
+      "completed_at": "2026-08-08T16:45:58Z",
+      "completed_pr": 1643,
+      "created_at": "2026-08-08T15:03:06Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "existing stats JSON keys unchanged (additive only)",
+        "item_id": "stats-json-stale-flag-for-quiescence-probe"
+      },
+      {
+        "behavior": "reads still degrade to stale replica with a stderr banner; writes still fail closed",
+        "item_id": "stats-json-stale-flag-for-quiescence-probe"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "stats-json-stale-flag-for-quiescence-probe",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "stats-json-stale-flag-for-quiescence-probe",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd $(git rev-parse --show-toplevel) && uv run -- python -m pytest tests/unit/scripts -q -k todo",
+        "description": "unit suite passes",
+        "expected": "todo script tests green",
+        "item_id": "stats-json-stale-flag-for-quiescence-probe",
+        "last_result": "pass",
+        "last_run": "2026-08-08T16:44:30Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_standalone_extensions.py -q -k stats_retains_package_activity_fingerprint",
+        "description": "Stats payload retains the stale activity flag",
+        "expected": "focused stats test passes",
+        "item_id": "stats-json-stale-flag-for-quiescence-probe",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "stats-json-stale-flag-for-quiescence-probe",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "stats() emits stale flag additive, grep pass, 614 todo tests green",
+        "item_id": "stats-json-stale-flag-for-quiescence-probe",
+        "notes": null,
+        "started_at": "2026-08-08T16:43:35Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add stale flag to stats JSON, additive, with unit test",
+        "wid": "w1"
+      },
+      {
+        "evidence": "updated migrate-hosted-tracker-db-to-todo-db-0-3-schema verify text to assert stale=false in both stats reads (stats stale flag available), additive",
+        "item_id": "stats-json-stale-flag-for-quiescence-probe",
+        "notes": null,
+        "started_at": "2026-08-08T16:44:51Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Update cutover probe verify text on migrate-hosted-tracker-db-to-todo-db-0-3-schema to assert stale=false in both reads",
+        "wid": "w2"
+      }
+    ]
+  }
+}

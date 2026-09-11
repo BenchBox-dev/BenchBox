@@ -1,0 +1,10 @@
+{
+  "description": "Replaced runtime-heavy dependencies with hermetic fakes during tests so the benchmark orchestration code is executed under coverage again.",
+  "legacy": {
+    "item_meta": {
+      "category": "Test Infrastructure",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

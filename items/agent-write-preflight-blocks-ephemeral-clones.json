@@ -1,0 +1,125 @@
+{
+  "context": "Decide the intended contract first: either the guard recognizes an ephemeral/CI clone directly (no sibling worktree pool present, or an explicit signal such as CI), or BENCHBOX_AGENT_PRIMARY_CLONE becomes the documented supported path for these sessions and the refusal message names it alongside worktree-claim. Either way the refusal must keep firing unchanged in a real primary clone, and the message should stop implying BENCHBOX_ALLOW_MAIN_CLONE_WRITE is the only way out. Extend tests/unit/test_agent_write_preflight.py, which already covers the reject/allow/worktree cases.",
+  "description": "scripts/agent_write_preflight.sh refuses whenever the working tree is not a linked worktree: it derives primary_clone from dirname(git rev-parse --git-common-dir) and rejects when that equals the toplevel. In a remote/ephemeral session (Claude Code on the web, CI, any container) the repo is a plain fresh clone, so the guard fires even though there is no primary clone to protect - the machinery it protects, and the pool it tells you to use, live on the maintainer's Mac. Its remedy 'make worktree-claim BRANCH=...' cannot work there: the pool targets sibling BenchBox.pool-NN directories that do not exist in a container. The only escape the message offers is BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1, documented for 'emergency main-clone hotfix work' needing explicit user authorization. That is semantically wrong for a container session and actively harmful as habit: it trains agents to reach for the broad override routinely, which erodes the guard in the one place it does matter. Note a targeted escape already exists and is untested for this case - BENCHBOX_AGENT_PRIMARY_CLONE (agent_write_preflight.sh:15) repoints the comparison without granting main-clone write - so the fix may be detection plus documentation rather than a new knob. Encountered while opening PR #1374 from a container, where the guard blocked 'make pr-open'.",
+  "legacy": {
+    "item_meta": {
+      "category": "tooling",
+      "completed_at": "2026-07-31T12:46:32Z",
+      "completed_pr": 1375,
+      "created_at": "2026-07-31T11:22:49Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A real primary clone still refuses without an override, and the existing BENCHBOX_ALLOW_MAIN_CLONE_WRITE escape keeps working",
+        "item_id": "agent-write-preflight-blocks-ephemeral-clones"
+      },
+      {
+        "behavior": "make pr-open and make skill-sync keep running the preflight before write work",
+        "item_id": "agent-write-preflight-blocks-ephemeral-clones"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agent-write-preflight-blocks-ephemeral-clones",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "agent-write-preflight-blocks-ephemeral-clones",
+        "kind": "only_modify",
+        "path_glob": "scripts/agent_write_preflight.sh"
+      },
+      {
+        "item_id": "agent-write-preflight-blocks-ephemeral-clones",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_agent_write_preflight.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_agent_write_preflight.py -q",
+        "description": "The guard's own suite passes, including the preserved primary-clone refusal",
+        "expected": "all cases green, refusal behavior unchanged in a real primary clone",
+        "item_id": "agent-write-preflight-blocks-ephemeral-clones",
+        "last_result": "pass",
+        "last_run": "2026-07-31T11:55:17Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_agent_write_preflight.py -q -k ephemeral",
+        "description": "An ephemeral clone is permitted without the broad main-clone-write override",
+        "expected": "the new ephemeral-clone case passes",
+        "item_id": "agent-write-preflight-blocks-ephemeral-clones",
+        "last_result": "pass",
+        "last_run": "2026-07-31T11:55:30Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! (BENCHBOX_AGENT_PRIMARY_CLONE= sh scripts/agent_write_preflight.sh 2>&1 >/dev/null | grep -q 'ALLOW_MAIN_CLONE_WRITE' ) || BENCHBOX_AGENT_PRIMARY_CLONE= sh scripts/agent_write_preflight.sh 2>&1 >/dev/null | grep -qE 'BENCHBOX_AGENT_PRIMARY_CLONE|ephemeral|container'",
+        "description": "The refusal message points at a remedy other than BENCHBOX_ALLOW_MAIN_CLONE_WRITE",
+        "expected": "the refusal names a targeted remedy, not only the broad override",
+        "item_id": "agent-write-preflight-blocks-ephemeral-clones",
+        "last_result": "pass",
+        "last_run": "2026-07-31T11:55:32Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agent-write-preflight-blocks-ephemeral-clones",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on develop a1e1328: guard exits 1 in this fresh non-worktree container clone. Signals: CI unset, GITHUB_ACTIONS unset, 1 git worktree, 0 pool siblings - so no standard CI variable would have covered this environment.",
+        "item_id": "agent-write-preflight-blocks-ephemeral-clones",
+        "notes": null,
+        "started_at": "2026-07-31T11:54:59Z",
+        "started_branch": "claude/benchbox-claim-state-hygiene-h9uhft",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Re-validate that the guard still refuses in a fresh non-worktree clone on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Contract decided: an explicit BENCHBOX_EPHEMERAL_CLONE=1 declaration, honored ONLY when no worktree pool is present (git worktree list == 1 and no *.pool-* sibling). Rejected pure auto-detection: nothing on disk distinguishes a container clone from a real primary clone, and gating on pool-absence alone would silently disable the guard on the maintainer's Mac after a worktree-pool-reset.",
+        "item_id": "agent-write-preflight-blocks-ephemeral-clones",
+        "notes": null,
+        "started_at": "2026-07-31T11:55:02Z",
+        "started_branch": "claude/benchbox-claim-state-hygiene-h9uhft",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Decide the contract",
+        "wid": "w1"
+      },
+      {
+        "evidence": "scripts/agent_write_preflight.sh: pool-gated BENCHBOX_EPHEMERAL_CLONE, refusal message now names it alongside worktree-claim, ALLOW_MAIN_CLONE_WRITE demoted to emergency-only. AGENTS.md worktree-policy paragraph added. Rung 3 pass.",
+        "item_id": "agent-write-preflight-blocks-ephemeral-clones",
+        "notes": null,
+        "started_at": "2026-07-31T11:55:50Z",
+        "started_branch": "claude/benchbox-claim-state-hygiene-h9uhft",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Implement it in scripts/agent_write_preflight.sh and update the AGENTS.md worktree-policy wording",
+        "wid": "w2"
+      },
+      {
+        "evidence": "4 tests added to tests/unit/test_agent_write_preflight.py (9 total, all pass). Two-way non-vacuity: against the pre-change script 2 feature tests fail; against a mutation dropping the pool gating, test_ephemeral_declaration_is_ignored_when_a_worktree_pool_is_present fails - the exact regression it exists to catch. Rungs 1-2 pass.",
+        "item_id": "agent-write-preflight-blocks-ephemeral-clones",
+        "notes": null,
+        "started_at": "2026-07-31T11:55:53Z",
+        "started_branch": "claude/benchbox-claim-state-hygiene-h9uhft",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Tests",
+        "wid": "w3"
+      }
+    ]
+  }
+}

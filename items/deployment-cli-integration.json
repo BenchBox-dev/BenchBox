@@ -1,0 +1,16 @@
+{
+  "description": "Integrate deployment mode awareness into the BenchBox CLI, providing clear\ndocumentation, help text, platform listing with deployment modes, and\nenhanced error messages for deployment-related issues.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "deployment-cli-integration",
+        "needs_item": "deployment-factory-integration"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-14T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

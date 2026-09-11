@@ -1,0 +1,68 @@
+{
+  "context": "No code change needed now. This is a watch item with a defined trigger.\n\nConfirm the gate is armed again at the first of these:\n- any community or vendor submission lands on develop or published-results, or\n- restore-corpus-coverage-after-20260823-trust-cut adds any bundle produced by `benchbox submit`.\n\nAt that point run the test and confirm it reports as passing, not skipping. If it still skips while a sidecar exists, the skip condition is wrong and must be fixed rather than widened.\n\nDo not resolve this item by deleting the skip and letting the assertion fail on an empty corpus; that just re-creates the false alarm PR #1939 removed.",
+  "description": "Introduced deliberately in PR #1939 (2026-08-28) and recorded here so it is not forgotten.\n\ntests/unit/scripts/test_corpus_privacy_invariant.py::test_every_manifest_bundle_hash_matches_its_bundle asserted `scanned` to stop the gate going vacuous. After the 2026-08-23 trust cut, every surviving bundle is maintainer-committed with no .manifest.json sidecar, so `scanned` is legitimately 0 and that assertion fired on a CORRECT corpus.\n\nIt now skips when the corpus holds no bundle-declaring sidecars, and still hard-fails in the case it was written for -- sidecars present but none scanned. It re-arms automatically the moment any sidecar lands, which is every submission path.\n\nWhy the gate matters, from its own docstring: on 2026-08-05 the residual-client_host strip rewrote 105 bundles without rerunning results_explorer_corpus_migrate.py, so the sidecar hashes went stale. Nothing failed on develop. The mirror to published-results refused to open, and the public corpus stayed frozen for eighteen days. This gate is what closes that hole.\n\nSo the risk is narrow but real: while the corpus has no sidecars, that protection is not running. Nothing is currently unprotected -- there are no sidecars to mismatch -- but the skip must not be allowed to become permanent scenery.",
+  "legacy": {
+    "item_meta": {
+      "category": "testing",
+      "completed_at": "2026-09-06T20:42:36Z",
+      "created_at": "2026-08-29T12:12:17Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The hard-fail branch for 'sidecar manifests exist but none were scanned' -- that is the anti-vacuity guard the gate was written for",
+        "item_id": "manifest-hash-gate-dormant-while-corpus-has-no-sidecars"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "manifest-hash-gate-dormant-while-corpus-has-no-sidecars",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_corpus_privacy_invariant.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- pytest tests/unit/scripts/test_corpus_privacy_invariant.py",
+        "description": "Gate is armed once any sidecar exists",
+        "expected": "test_every_manifest_bundle_hash_matches_its_bundle -q",
+        "item_id": "manifest-hash-gate-dormant-while-corpus-has-no-sidecars",
+        "last_result": "pass",
+        "last_run": "2026-09-06T20:42:35Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "manifest-hash-gate-dormant-while-corpus-has-no-sidecars",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Watch trigger evaluated on develop (HEAD d1accbb6ec4706664fcf33ba58f275d667982050): 182 manifest sidecars present in results-data/bundles/, 175 declaring bundle_file. Gate re-arming condition met.",
+        "item_id": "manifest-hash-gate-dormant-while-corpus-has-no-sidecars",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Watch",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Ran tests/unit/scripts/test_corpus_privacy_invariant.py::test_every_manifest_bundle_hash_matches_its_bundle: PASSED (1 passed in 7.61s). Gate scanned 175 bundle-declaring manifests with 0 mismatches and did not skip. Skip condition is intact and correctly arms when sidecars exist without widening.",
+        "item_id": "manifest-hash-gate-dormant-while-corpus-has-no-sidecars",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "If it still skips while a sidecar exists, fix the skip condition rather than widening it",
+        "wid": "w1"
+      }
+    ]
+  }
+}

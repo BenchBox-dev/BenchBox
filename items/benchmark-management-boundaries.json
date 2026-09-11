@@ -1,0 +1,10 @@
+{
+  "description": "- \"CLI execution pipeline now calls `benchbox.core.benchmark_loader.get_benchmark_instance` instead of importing/core class construction.\"\n- \"Added `tests/unit/cli/test_cli_benchmark_boundaries.py` to assert delegation to core loader.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

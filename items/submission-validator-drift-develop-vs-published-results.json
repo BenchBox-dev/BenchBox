@@ -1,0 +1,113 @@
+{
+  "context": "Forward-port develop validate-submission.yml onto published-results, preserving that branch-specific slim-corpus invocation. Read docs/development/adr/adr-published-results-slim-corpus-branch.md first. published-results is community-facing and outside the normal develop->PR flow, so the sync PR needs explicit maintainer approval before it is opened.",
+  "description": "The Submission Validator Drift Check workflow has failed on every run since 2026-07-06 (last green run 28762019048 @ 9f682a22d). The gate compares .github/workflows/validate-submission.yml between develop and the published-results branch and fails when they diverge. Evidence from run 30461875061 @ fe2c1b83d: published-results is STALE relative to develop on three hunks -- it lacks the --no-renames flag on both git diff invocations, lacks the .applied.json exclusion in the CHANGED filter, and is missing the entire CHANGED_APPLIED applied-ledger companion detection block added by #1334. Develop is authoritative for all three; published-results simply never received the forward-port. This item was filed after a session confirmed no existing tracker item covers it: submit-manifest-and-validator is about the submission MANIFEST schema (funding/result_source, vendor labels) scoped to submit.py and scripts/validate_submission.py, and release-canary-ruleset-drift-baseline-refresh is an unrelated drift gate.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-07-30T19:32:28Z",
+      "completed_pr": 1350,
+      "created_at": "2026-07-30T19:20:34Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Manifest-removal and corpus-inventory drift detection keep working; a manifest removal still trips validation",
+        "item_id": "submission-validator-drift-develop-vs-published-results"
+      },
+      {
+        "behavior": "No results-data bundle content is touched -- this syncs workflow logic only",
+        "item_id": "submission-validator-drift-develop-vs-published-results"
+      },
+      {
+        "behavior": "The published-results slim-branch invocation `uv run --no-project --python 3.11` survives the sync verbatim",
+        "item_id": "submission-validator-drift-develop-vs-published-results"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "submission-validator-drift-develop-vs-published-results",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/validate-submission.yml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git fetch origin published-results -q && git show origin/published-results:.github/workflows/validate-submission.yml | grep -q CHANGED_APPLIED",
+        "description": "published-results carries the applied-ledger companion detection block",
+        "expected": "block present on published-results",
+        "item_id": "submission-validator-drift-develop-vs-published-results",
+        "last_result": "pass",
+        "last_run": "2026-07-30T19:32:13Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git show origin/published-results:.github/workflows/validate-submission.yml | grep -qF -- \"uv run --no-project --python 3.11\"",
+        "description": "the slim-branch uv invocation is preserved on published-results",
+        "expected": "slim invocation intact",
+        "item_id": "submission-validator-drift-develop-vs-published-results",
+        "last_result": "pass",
+        "last_run": "2026-07-30T19:32:17Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh run list --repo joeharris76/BenchBox --workflow submission-validator-drift-check.yml --limit 1 --json conclusion --jq .[0].conclusion | grep -qx success",
+        "description": "the drift gate concludes success on its most recent run",
+        "expected": "gate green",
+        "item_id": "submission-validator-drift-develop-vs-published-results",
+        "last_result": "pass",
+        "last_run": "2026-07-30T19:32:22Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "submission-validator-drift-develop-vs-published-results",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "submission-validator-drift-develop-vs-published-results",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Normalized diff obtained from gate run 30461875061 (2026-07-29 @ fe2c1b83d): published-results lacked --no-renames on both git diff calls, lacked the .applied.json exclusion, and lacked the entire CHANGED_APPLIED applied-ledger block from #1334. All three classified develop-authoritative (published-results was simply stale); the only published-results-authoritative difference is the slim-branch 'uv run --no-project --python 3.11' invocation.",
+        "item_id": "submission-validator-drift-develop-vs-published-results",
+        "notes": null,
+        "started_at": "2026-07-30T19:31:46Z",
+        "started_branch": "fix/spellcheck-node-modules-skip-verify",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Produce the normalized develop-vs-published-results diff and classify each hunk as develop-authoritative or published-results-authoritative",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Already landed by PR #1350 ('fix(ci): sync validate-submission.yml from develop', published-results commit 45f19f7f1), which merged after the gate's last failing run. Verified: git diff origin/develop:.github/workflows/validate-submission.yml origin/published-results:... now shows ONLY the two intentional slim-branch 'uv run --no-project --python 3.11' lines - every develop-authoritative hunk is present on published-results. No further sync PR needed.",
+        "item_id": "submission-validator-drift-develop-vs-published-results",
+        "notes": null,
+        "started_at": "2026-07-30T19:31:52Z",
+        "started_branch": "fix/spellcheck-node-modules-skip-verify",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Forward-port the develop-authoritative hunks onto published-results, preserving the slim-branch uv invocation",
+        "wid": "w2"
+      },
+      {
+        "evidence": "No new PR required (#1350 did the sync). Proved green instead: dispatched the gate as run 30575103573 on 2026-07-30, conclusion=success - the first green Submission Validator Drift Check since 2026-07-06. The gate had simply not re-run since #1350 landed.",
+        "item_id": "submission-validator-drift-develop-vs-published-results",
+        "notes": null,
+        "started_at": "2026-07-30T19:31:57Z",
+        "started_branch": "fix/spellcheck-node-modules-skip-verify",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Open the sync PR against published-results (requires explicit maintainer approval) and confirm the drift gate goes green",
+        "wid": "w3"
+      }
+    ]
+  }
+}

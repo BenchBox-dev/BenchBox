@@ -1,0 +1,327 @@
+{
+  "context": "Follow the principle of least change: fix the validation inconsistency at the\npoint of comparison rather than restructuring how manifest entries are stored.\nDirectory-based entries are correct for data loading; only validation needs to\nbe aware of the directory case.\n\nImplementation pattern: create a single _compute_entry_size(path: Path) -> int\nhelper that mirrors exactly how converters compute size at write time. Use it\nin all 3 validation sites. Then optionally add is_directory to the manifest model\nfor explicit signaling.\n\nReference code for recursive size calculation:\n  delta_converter.py:158\n  iceberg_converter.py:278\n  ducklake_converter.py:218\n",
+  "description": "After converting TPC-H data to Delta format, every subsequent run triggers\n\"⚠️ Manifest validation failed; regenerating benchmark data\" even when nothing\nhas changed. Data regeneration is unnecessary but takes ~10s at SF=1.\n\nROOT CAUSE: Directory-based formats (Delta, Iceberg, DuckLake, partitioned Parquet)\nstore a single directory path in the manifest entry (e.g., \"lineitem/\") with\nsize_bytes computed as a recursive file sum via rglob(\"*\"). But validation calls\nfp.stat().st_size on that directory path, which returns the inode size (~96 bytes\non macOS/Linux) - never matching the stored recursive sum.\n\nThis was masked when vortex (a regular file format) was at format_preference[0].\nThe format_preference ordering fix (commit d643ccaca) moved delta to position 0,\nexposing the latent inconsistency.\n\nDESIGN ANALYSIS - Should we store individual files instead of directories?\nNo. Delta/Iceberg/DuckLake tables are loaded as directories (e.g.,\n`deltatable('path/to/lineitem/')`), not by listing individual parquet files.\nThe directory path IS the correct entry for downstream loaders. Storing individual\nfiles would break the loading contract and require changes to 6+ callers of\nget_table_files() plus all platform-specific data loading code.\n\nFIX STRATEGY: Make validation directory-aware. When a manifest entry path resolves\nto a directory, compute recursive file size (matching write-time calculation) instead\nof calling stat().st_size directly. Additionally, add an `is_directory` boolean to\nmanifest entries so validation doesn't need to probe the filesystem to determine\nentry type. This future-proofs for any new directory-based formats.\n\nAFFECTED VALIDATION SITES (confirmed by code reading):\n1. runner.py:1175-1177 - _validate_manifest_if_present()\n2. data_validation.py:498 - table expectation validation\n3. data_validation.py:530 - unknown benchmark file validation\n\nAFFECTED FORMATS: delta, iceberg, ducklake, partitioned parquet - all use\nrglob(\"*\") for size at write time but get stat().st_size at read time.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the get_table_files() return format",
+        "instead": "(not specified)",
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "why": "6 callers depend on the current dict-list structure"
+      },
+      {
+        "dont": "skip size validation for directories entirely",
+        "instead": "(not specified)",
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "why": "that would silently accept corrupted/incomplete data; use recursive sum instead"
+      },
+      {
+        "dont": "store individual parquet files from inside delta/iceberg directories",
+        "instead": "(not specified)",
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "why": "downstream loaders need the table directory path, not individual data files"
+      },
+      {
+        "dont": "use os.path.getsize on directories",
+        "instead": "(not specified)",
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "why": "it returns inode size just like stat().st_size; must use rglob"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "fix-manifest-validation-for-directory-based-formats",
+        "id": 184,
+        "reason": "For very large scale factors, rglob(\"*\") during validation could be slow.\nCould cache file count + total size in manifest, or use a checksum.\nNot needed now - validation runs once per benchmark invocation.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Reason states plainly 'Not needed now' -- speculative future optimization with no evidence of an actual perf problem.",
+        "summary": "Optimize _compute_entry_size for large directories"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "fix-manifest-validation-for-directory-based-formats",
+        "id": 185,
+        "reason": "Old manifests won't have is_directory. The helper probes the filesystem\nas fallback, so this is non-blocking. A migration script could be added\nlater if desired.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason states this is non-blocking with a filesystem-probe fallback already in place; 'could add later if desired' is not a firm need.",
+        "summary": "Backfill is_directory flag into existing manifests"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-03-04T00:00:00Z",
+      "created_at": "2026-03-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ConversionResult.output_files continues to accept both file and directory Path objects",
+        "item_id": "fix-manifest-validation-for-directory-based-formats"
+      },
+      {
+        "behavior": "File-based format validation (parquet, vortex, tbl) continues to use exact stat().st_size comparison",
+        "item_id": "fix-manifest-validation-for-directory-based-formats"
+      },
+      {
+        "behavior": "ManifestV2 serialization remains backward-compatible (is_directory defaults to False)",
+        "item_id": "fix-manifest-validation-for-directory-based-formats"
+      },
+      {
+        "behavior": "_validate_manifest_if_present() returns the same 3-tuple contract: (is_valid, manifest_dict_or_none, manifest_found)",
+        "item_id": "fix-manifest-validation-for-directory-based-formats"
+      },
+      {
+        "behavior": "data_validation.py size checks for regular files remain exact (not relaxed)",
+        "item_id": "fix-manifest-validation-for-directory-based-formats"
+      },
+      {
+        "behavior": "get_table_files() API and return format unchanged - all 6 callers unaffected",
+        "item_id": "fix-manifest-validation-for-directory-based-formats"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/manifest/io.py"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/manifest/models.py"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/conversion.py"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/data_validation.py"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/datagen_manifest.py"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_runner_manifest_reuse.py"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/test_manifest_validation.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_runner_manifest_reuse.py -v",
+        "description": "Existing manifest reuse tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/utils/test_manifest_validation.py -v",
+        "description": "Manifest validation tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/manifest/ -v",
+        "description": "Manifest model tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/utils/format_converters/ -v",
+        "description": "Format converter tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Smoke tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "needs_wid": "w6",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "notes": "Create a shared helper function (in datagen_manifest.py or a manifest utils module)\nthat computes the size of a manifest entry path:\n  - If path is a regular file: return path.stat().st_size (current behavior)\n  - If path is a directory: return sum(f.stat().st_size for f in path.rglob(\"*\") if f.is_file())\nThis matches exactly how size_bytes is computed at write time in delta_converter.py:158,\niceberg_converter.py:283, ducklake_converter.py:218, and parquet_converter.py:322.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add _compute_entry_size() helper that handles both files and directories",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "notes": "Replace the direct stat().st_size comparison at runner.py:1175-1177 with\n_compute_entry_size(fp). The check becomes:\n  if not fp.exists() or _compute_entry_size(fp) != size:\n      return False, None, True\nKeep the hasattr guards for cloud path compatibility.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix _validate_manifest_if_present() in runner.py to use the new helper",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "notes": "Same fix as w2 but in data_validation.py. Replace fp.stat().st_size with\n_compute_entry_size(fp) at both validation sites (line 498 for table expectations,\nline 530 for unknown benchmark validation).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix data_validation.py size checks at lines 498 and 530",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "notes": "Add optional `is_directory: bool = False` to ConvertedFileEntry in\nbenchbox/core/manifest/models.py. Update _manifest_v2_to_dict() in\nbenchbox/core/manifest/io.py to serialize this field (only when True,\nto avoid bloating existing manifests). This is forward-looking - validation\ncan optionally use this hint instead of probing the filesystem. Existing\nmanifests without the field default to False (file behavior).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add is_directory field to ConvertedFileEntry model and manifest serialization",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "notes": "In _update_manifest_with_results() (conversion.py:220), detect whether\noutput_file.is_dir() and set is_directory=True on the ConvertedFileEntry.\nThis ensures newly-written manifests carry the directory flag.\nAffected converters: delta, iceberg, ducklake, partitioned parquet.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set is_directory=True in all directory-based converters",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "notes": "Add tests to tests/unit/core/test_runner_manifest_reuse.py:\n1. test_directory_entry_validates_successfully - create a manifest with a\n   directory entry, populate it with files whose total size matches size_bytes,\n   verify validation returns (True, manifest, True)\n2. test_directory_entry_size_mismatch_detected - same but add/remove a file\n   so recursive sum differs, verify validation catches it\n3. test_file_entry_still_works - existing file-based validation unchanged\n\nAdd parallel tests to tests/unit/utils/test_manifest_validation.py for the\ndata_validation.py fix.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write unit tests for directory-based manifest validation",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "notes": "Test the helper directly:\n1. Regular file → returns stat().st_size\n2. Directory with files → returns recursive sum\n3. Directory with nested subdirectories → includes all nested files\n4. Empty directory → returns 0\n5. Non-existent path → raises FileNotFoundError (or returns -1, match design)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write unit test for _compute_entry_size helper",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-manifest-validation-for-directory-based-formats",
+        "notes": "End-to-end test that:\n1. Generates TPC-H data at SF=0.01\n2. Converts to Delta format\n3. Runs again - verify data is reused (no \"Manifest validation failed\" warning)\n4. Verify benchmark completes without regeneration\nIf an integration test fixture for delta conversion already exists in\ntests/integration/test_open_table_formats.py, extend it rather than creating\na new file.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integration test: Delta conversion → subsequent run reuses data",
+        "wid": "w8"
+      }
+    ]
+  }
+}

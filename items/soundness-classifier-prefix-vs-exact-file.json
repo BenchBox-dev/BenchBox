@@ -1,0 +1,91 @@
+{
+  "context": "Separate exact-file entries from directory-prefix entries so the two matchers agree with CODEOWNERS semantics, and pin the sibling shapes so the mirror claim stays true.",
+  "description": "is_soundness_path uses normalized.startswith(SOUNDNESS_PREFIXES), so an entry naming a single file also matches any path that merely starts with it. Measured: is_soundness_path returns True for benchbox/core/results/anonymization.py.bak. The failure mode is over-gating, which is fail-safe, so this is low priority. What it does break is the 1:1 mirror with .github/CODEOWNERS that #1529 claims, since CODEOWNERS matches the exact path and the classifier does not.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci-defect",
+      "created_at": "2026-08-04T23:43:06Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Every path CODEOWNERS gates stays gated - narrowing the matcher must not narrow real coverage",
+        "item_id": "soundness-classifier-prefix-vs-exact-file"
+      },
+      {
+        "behavior": "The classifier stays self-protecting",
+        "item_id": "soundness-classifier-prefix-vs-exact-file"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "soundness-classifier-prefix-vs-exact-file",
+        "kind": "only_modify",
+        "path_glob": ".github/CODEOWNERS"
+      },
+      {
+        "item_id": "soundness-classifier-prefix-vs-exact-file",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/auto_merge_soundness_paths.py"
+      },
+      {
+        "item_id": "soundness-classifier-prefix-vs-exact-file",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_auto_merge_soundness_paths.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import sys; sys.path.insert(0,'_project/scripts'); from auto_merge_soundness_paths import is_soundness_path; sys.exit(1 if is_soundness_path('benchbox/core/results/anonymization.py.bak') else 0)\"",
+        "description": "a sibling of an exact-file entry is not gated",
+        "expected": "Fails on the unfixed tree today (measured exit 1 - the sibling is classified review-required)",
+        "item_id": "soundness-classifier-prefix-vs-exact-file",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py -q",
+        "description": "the soundness suite stays green",
+        "expected": "Passes today and must stay passing - this is the regression rung, not the falsifying one",
+        "item_id": "soundness-classifier-prefix-vs-exact-file",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "soundness-classifier-prefix-vs-exact-file",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "soundness-classifier-prefix-vs-exact-file",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Separate exact-file entries from directory-prefix entries in the classifier",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "soundness-classifier-prefix-vs-exact-file",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Pin sibling shapes as auto-mergeable and keep the CODEOWNERS mirror test honest",
+        "wid": "w1"
+      }
+    ]
+  }
+}

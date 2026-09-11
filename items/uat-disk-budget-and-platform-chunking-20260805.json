@@ -1,0 +1,271 @@
+{
+  "context": "Add execute.platform_chunking so a sweep runs one platform at a time and prunes\ndatabases between chunks through the existing reuse-aware cleanup helpers.\nExtend preflight_budget to model per-platform database footprint times platform\ncount and either auto-enable chunking or fail preflight with the specific\nshortfall, instead of exhausting disk mid-sweep.\n",
+  "description": "Supersedes uat-disk-budget-and-platform-chunking, dropped the same day: verification ladders are\ncreate-time-only in this tracker, so a lint finding on a rung can only be\nfixed by recreating the item.\n\nRelease-gate stage 1 exhausted disk twice on 2026-08-04 (at 2.7 GB and 4 GB free)\nand had to be killed mid-sweep, which then hit the orphan defect tracked in\nuat-cell-teardown-orphans-child-processes.\n\nThe cause is structural, not incidental: loaded databases are per-platform and\nmeasured roughly 15 GB each, so 11 platforms need 90-150 GB concurrently. The\nexisting preflight budget does not model that, so the sweep passes preflight and\nthen dies partway through.\n\nThe workaround that did complete stage 1 was an out-of-tree shell driver running\none platform at a time and pruning databases between chunks. That mechanism\nbelongs in the framework rather than in a scratch script.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hardcode 15 GB as the per-platform footprint",
+        "instead": "derive from the configured scale rungs and record the basis in the lifecycle log",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "why": "it is one measurement at one scale ladder and will silently mislead at other scales"
+      },
+      {
+        "dont": "leave chunking as an out-of-tree shell script",
+        "instead": "land it as a config-driven execute mode with tests",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "why": "the scratch driver from 2026-08-04 was lost when the scratchpad was wiped, taking the only working stage-1 recipe with it"
+      },
+      {
+        "dont": "let preflight pass and discover the shortfall mid-sweep",
+        "instead": "fail preflight with the computed shortfall, or auto-enable chunking",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "why": "that is the current behavior and it costs hours plus an orphaned process cleanup every time"
+      },
+      {
+        "dont": "prune the whole databases root between chunks",
+        "instead": "prune per (platform, benchmark, scale) through the existing helpers",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "why": "it destroys the intentional cross-benchmark reuse cleanup.py exists to protect and silently inflates load times"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "needs_item": "uat-cell-teardown-orphans-child-processes-20260805"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-08-17T13:39:36Z",
+      "completed_pr": 1761,
+      "created_at": "2026-08-05T15:12:12Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "A single cells.jsonl stream and its .inprogress/.finalized markers remain the authoritative per-sweep record across chunks.",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805"
+      },
+      {
+        "behavior": "Release-gate stage ordering (native, then docker non-OLTP, then docker OLTP) is unchanged; chunking operates within a stage.",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805"
+      },
+      {
+        "behavior": "Reuse-aware pruning boundaries in cleanup.py are unchanged -- chunk pruning calls them, it does not bypass them.",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805"
+      },
+      {
+        "behavior": "preserve_datagen: true and datagen reuse across chunks are unchanged; only loaded databases are pruned.",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "reuse-aware pruning already knows the safe reuse boundaries (TPC-H databases reused by read_primitives); chunk pruning must go through it, not rm -rf",
+        "decision": "reuse",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "path": "tests/uat/cleanup.py"
+      },
+      {
+        "concept": "platform group enumeration already drives the sweep order; chunking iterates the same enumeration rather than defining its own",
+        "decision": "reuse",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "path": "tests/uat/matrix.py"
+      },
+      {
+        "concept": "existing budget estimator and headroom gate; extend with the per-platform database term rather than adding a second estimator",
+        "decision": "extend",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "path": "tests/uat/preflight_budget.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "docker/"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/cleanup.py"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/config.py"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/preflight.py"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/preflight_budget.py"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_cleanup.py"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_config.py"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_preflight.py"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_preflight_budget.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run python -c \"from tests.uat.config import ExecuteConfig as E;assert 'platform_chunking' in E.__dataclass_fields__\"",
+        "description": "platform_chunking is a real execute config field",
+        "expected": "FAILS (exit 1) on the unfixed tree: there is no chunked execute mode, so a full stage-1 sweep needs 90-150 GB at once. Exits 0 once the mode lands.",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-17T13:39:22Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_preflight_budget.py -q",
+        "description": "Preflight budget tests cover the per-platform database term and the shortfall message",
+        "expected": "budget accounts for platform count; insufficient disk fails preflight with the computed shortfall",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-17T13:39:28Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_cleanup.py tests/uat/test_phases.py -q -k chunk",
+        "description": "Chunked execution prunes between chunks through the reuse-aware helpers",
+        "expected": "at least one test collected and passing",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-17T13:39:32Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python -c \"from tests.uat.config import ExecuteConfig as E;assert 'platform_chunking' in E.__dataclass_fields__\"",
+        "description": "platform_chunking is a real execute config field",
+        "expected": "exit 0",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-17T13:39:34Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "DiskBudget now exposes measured per-platform loaded-database demand (database_by_platform_gib, concurrent_database_gib=sum, chunked_database_gib=max) derived only from inventory rows marked measured at the configured rungs; unmeasured/missing rows stay out of the map (no 15 GiB guess). format_disk_budget discloses measured-db platforms, concurrent vs chunked_max, and the measured-inventory basis. uv run -- python -m pytest tests/uat/test_preflight_budget.py -q -> 23 passed. Worktree /Users/joe/Developer/BenchBox.wt-uat-disk-budget-platform-chunking-20260817 commit pending.",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "notes": null,
+        "started_at": "2026-08-17T13:21:18Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Model per-platform database footprint in the preflight budget",
+        "wid": "w0"
+      },
+      {
+        "evidence": "format_disk_headroom_failure now names the computed shortfall plus measured concurrent vs chunked_max database terms and fails closed at preflight instead of exhausting disk mid-sweep. Preflight abort path passes budget_gate.budget through. uv run -- python -m pytest tests/uat/test_preflight_budget.py tests/uat/test_preflight.py -q -> 49 passed.",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "notes": null,
+        "started_at": "2026-08-17T13:25:16Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Fail preflight with the computed shortfall instead of exhausting disk mid-sweep",
+        "wid": "w1"
+      },
+      {
+        "evidence": "execute.platform_chunking is a real ExecuteConfig field (default false). Sequential execute logs [platform-chunk] start platform=... mode=one-platform-at-a-time when enabled; test_execute_platform_chunking_walks_one_platform_at_a_time and test_validate_config_accepts_platform_chunking pass. uv run python -c assert platform_chunking in ExecuteConfig.__dataclass_fields__ exits 0.",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "notes": null,
+        "started_at": "2026-08-17T13:27:01Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add execute platform_chunking running one platform at a time",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Chunked execute calls existing _maybe_prune_completed / can_prune / prune_database_dir at each platform boundary (per platform,benchmark,scale; datagen preserved). test_execute_platform_chunking_prunes_between_chunks_via_reuse_aware_helpers plus cleanup/phase -k chunk: 3 passed.",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "notes": null,
+        "started_at": "2026-08-17T13:28:39Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Prune between chunks via the reuse-aware cleanup helpers",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Documented execute.platform_chunking and measured concurrent vs chunked_max disk math in _project/specs/uat-framework.md and docs/operations/uat-framework.md (no 15 GiB guess; fail-closed shortfall abort; reuse-aware per-platform prune). Focused UAT suite 259 passed.",
+        "item_id": "uat-disk-budget-and-platform-chunking-20260805",
+        "notes": null,
+        "started_at": "2026-08-17T13:29:56Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Document the chunked mode and its disk math in the operator guide",
+        "wid": "w4"
+      }
+    ]
+  }
+}

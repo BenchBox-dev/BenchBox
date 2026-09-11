@@ -1,0 +1,253 @@
+{
+  "context": "Use w0 to revalidate from_config filtering, the PlatformOptimizationConfiguration validation rules, and conflict cases such as none plus liquid fields, liquid plus ZORDER, and liquid_clustering_auto plus explicit columns. Prefer translating normalized MCP values into the existing tuning configuration rather than adding a second clustering state channel. Implement the mapping at the narrowest boundary, run existing post-init/conflict validation, and ensure durable jobs serialize only the normalized non-secret intent. Add tests that capture the effective config before any cloud connection, assert each strategy and column path, and prove invalid combinations fail closed. Do not use live Databricks credentials or change auth/config discovery.",
+  "description": "Fix the PR #1465 Databricks defect where databricks_clustering_strategy and liquid_clustering_columns are accepted by MCP and forwarded into get_platform_adapter, but DatabricksAdapter.from_config filters them out before construction. The resolver reads only effective tuning configuration, so accepted values silently fall back to the default ZORDER strategy. Preserve credentials, host, HTTP path, catalog, schema, and staging ownership while making the two options effective or removing them from the MCP contract until a safe translation exists.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add direct adapter attributes that bypass PlatformOptimizationConfiguration",
+        "instead": "Translate into the effective tuning object or remove the option until that translation is supported.",
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "why": "The existing resolver and validation logic would then observe a different state from the applied tuning and result metadata."
+      },
+      {
+        "dont": "Relax conflict validation to accept contradictory combinations",
+        "instead": "Reject conflicts with a structured validation error before any remote connection.",
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "why": "That would make result metadata and physical layout diverge from requested intent."
+      },
+      {
+        "dont": "Test only that from_config receives raw kwargs",
+        "instead": "Assert the effective platform_optimizations values consumed by the resolver.",
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "why": "from_config currently drops unknown keys, which is the defect under review."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "needs_item": "mcp-v2-platform-option-contract-matrix-v3"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-04T11:59:20Z",
+      "completed_pr": 1513,
+      "created_at": "2026-08-02T16:38:15Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "Durable retries retain only normalized clustering intent and cannot introduce raw request mappings.",
+        "item_id": "mcp-v2-databricks-clustering-options-v3"
+      },
+      {
+        "behavior": "Existing CLI and tuning-file clustering semantics remain compatible, including conflict validation and result metadata.",
+        "item_id": "mcp-v2-databricks-clustering-options-v3"
+      },
+      {
+        "behavior": "No MCP request can set Databricks hostnames, HTTP paths, access tokens, catalog credentials, staging roots, or package versions.",
+        "item_id": "mcp-v2-databricks-clustering-options-v3"
+      },
+      {
+        "behavior": "No test performs a live Databricks connection or requires credentials.",
+        "item_id": "mcp-v2-databricks-clustering-options-v3"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "PlatformOptimizationConfiguration and clustering conflict validation",
+        "decision": "extend",
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "path": "benchbox/core/tuning/interface.py"
+      },
+      {
+        "concept": "effective clustering strategy resolver",
+        "decision": "extend",
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "path": "benchbox/platforms/databricks/adapter.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/security.py"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/server.py"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/databricks/client.py"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/interface.py"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databricks/adapter.py"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/development/mcp-platform-option-contract.md"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/test_durable_jobs.py"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/**"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_benchmark_tools.py"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_schemas.py"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms tests/unit/core/tuning tests/unit/mcp/test_schemas.py -q",
+        "description": "A from_config regression fails before the fix because both accepted options are dropped",
+        "expected": "exits 1 on the unfixed tree when effective clustering assertions are present; exits 0 after the values reach the resolver",
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T11:57:09Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_benchmark_tools.py tests/integration/mcp/test_durable_jobs.py -q",
+        "description": "Invalid clustering combinations fail before any remote connection",
+        "expected": "exits 1 on the unfixed tree if contradictory options are accepted or lost during replay; exits 0 after fail-closed validation passes",
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T11:57:16Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/platforms/databricks/adapter.py benchbox/core/tuning benchbox/mcp tests/unit/platforms tests/unit/core/tuning tests/unit/mcp tests/integration/mcp",
+        "description": "Scoped Databricks/tuning/MCP checks are clean",
+        "expected": "exits 1 on the unfixed tree if the plumbing patch has lint defects; exits 0 after scoped checks pass",
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-04T11:57:19Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "from_config filtering: DatabricksAdapter.from_config (adapter.py:268) rebuilds adapter_config from an explicit key list; raw databricks_clustering_strategy/liquid_clustering_columns are NOT in it, but tuning_config and tuning_enabled are. Chain confirmed: tuning_config -> PlatformAdapter sets self.unified_tuning_configuration (base/adapter.py:220) -> get_effective_tuning_configuration() (base/tuning_config.py:79) -> _resolve_databricks_clustering_strategy (adapter.py:173). So #1486/#1488 already close the translation half. Remaining defect reproduced: validate_platform_options('databricks', {'databricks_clustering_strategy':'z_order','liquid_clustering_columns':'a,b'}) is ACCEPTED at admission and persisted durably; the conflict only surfaces later as a raw ValueError from __post_init__ inside _prepare_adapter_platform_options, surfaced as an EXECUTION error. All conflict cases enumerated without cloud access: z_order+columns, liquid_clustering_auto+columns, none+columns.",
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:52:57Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Revalidate from_config filtering, tuning validation, and all clustering conflict cases without cloud access",
+        "wid": "w0"
+      },
+      {
+        "evidence": "See PR body; unit w1 of the Databricks clustering remediation.",
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:58:04Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement safe translation of normalized MCP clustering intent into effective tuning configuration",
+        "wid": "w1"
+      },
+      {
+        "evidence": "See PR body; unit w2 of the Databricks clustering remediation.",
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:58:09Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add strategy, columns, conflict, durable-persistence, and resolver regression tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": "See PR body; unit w3 of the Databricks clustering remediation.",
+        "item_id": "mcp-v2-databricks-clustering-options-v3",
+        "notes": null,
+        "started_at": "2026-08-04T11:58:15Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run focused tuning/MCP checks and reconcile public documentation",
+        "wid": "w3"
+      }
+    ]
+  }
+}

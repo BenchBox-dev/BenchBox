@@ -1,0 +1,167 @@
+{
+  "context": "Keep the contract small and ugly on purpose. A shared constant plus\na one-line assertion beats a generated TypeScript binding or an\nOpenAPI-style schema for a surface this narrow. If the coupling grows\n(more commands, richer output), revisit.\n",
+  "description": "The deterministic fixture corpus still shells out to\n`benchbox explorer build`, but it no longer depends on a brittle\nundocumented flag surface. The integration now has an explicit\ncontract:\n\n1. `benchbox/core/explorer_pipeline/contract.py` declares the versioned\n   build contract and required flags.\n2. `benchbox explorer build-contract` emits that contract as JSON.\n3. `results-explorer/scripts/validate-explorer-build-contract.mjs`\n   checks the version/flags before fixture generation starts.\n4. `tests/unit/cli/test_explorer_build_contract.py` pins the Python-side\n   command surface so drift fails in the unit suite before the browser\n   harness ever looks flaky.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "replace the subprocess call with an in-process Python→JS bridge",
+        "instead": "keep the shell-out and add the version check alongside it.",
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "why": "subprocess-based coupling is the only thing keeping the fixture generator deployable without a Node↔Python runtime"
+      },
+      {
+        "dont": "swallow the mismatch as a warning",
+        "instead": "exit non-zero on mismatch.",
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "why": "the whole point is to fail fast so the real root cause surfaces in CI"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "needs_item": "implement-results-explorer-browser-functional-tests"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-04-19T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The browser suite remains the source of truth for user-visible coverage; this TODO only adds an early warning, not replacement coverage.",
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift"
+      },
+      {
+        "behavior": "The fixture generator remains a single-entry `node scripts/generate-browser-fixtures.mjs` command - no new required env vars.",
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift"
+      },
+      {
+        "behavior": "`benchbox explorer build` continues to work for all current callers (the fixture generator and any doc snippets).",
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/explorer.py"
+      },
+      {
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/generate-browser-fixtures.mjs"
+      },
+      {
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/guard-browser-fixture-generator-against-benchbox-cli-drift.yaml",
+        "description": "The TODO item itself validates cleanly",
+        "expected": "Validation passes with no schema or DAG errors",
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_explorer_build_contract.py -q",
+        "description": "The Python contract test pins the flags the generator depends on",
+        "expected": "Contract test passes; flag surface unchanged",
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && node scripts/validate-explorer-build-contract.mjs",
+        "description": "The JS-side validator fails fast before fixture generation starts",
+        "expected": "Validator exits zero and prints the aligned version, command, and required flags",
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "notes": "Added `benchbox/core/explorer_pipeline/contract.py` plus the hidden\n`benchbox explorer build-contract` command in\n`benchbox/cli/commands/explorer.py`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Declare a stable contract surface on the Python side",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "notes": "The generator now runs\n`results-explorer/scripts/validate-explorer-build-contract.mjs`\nbefore it builds fixtures and exits non-zero on any mismatch.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Teach `generate-browser-fixtures.mjs` to assert the contract before invoking `benchbox explorer build`",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "guard-browser-fixture-generator-against-benchbox-cli-drift",
+        "notes": "Added `tests/unit/cli/test_explorer_build_contract.py`, which checks\nthe emitted contract JSON and asserts the required flag options are\nstill present on `explorer build`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a pytest that pins the Python-side flag surface",
+        "wid": "w3"
+      }
+    ]
+  }
+}

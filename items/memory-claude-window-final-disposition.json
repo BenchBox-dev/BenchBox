@@ -1,0 +1,130 @@
+{
+  "context": "Continue check-ins through window close. Produce final-acceptance.md (or equivalent) recording Live-mutation authorization close-out, canary acceptance, deletion-ledger decision (explicit none/skip), and Final acceptance or rollback. If reject: invoke rollout.rollback with reviewed expected hashes — never manual mv.",
+  "description": "Live Claude install is under monitoring 2026-08-04T23:13Z → 2026-08-06T23:13Z. Check-in 1 healthy; check-in 2 machine ABORT on MEMORY.md with Joe option A organic override. Remaining human gate: at window close accept install, roll back to parked previous, or extend the window. This is the only time-bound blocking action. Parked trees must remain intact until disposition. Corresponds to parent item work unit w8 intent (final acceptance) without requiring deletion-ledger apply (w7) when no deletions are approved. Relates to parent memory-rollout-v2-system-split-execution w8 (final acceptance) but must not list that item as a hard needs-edge: the parent cannot complete until this disposition exists (would be circular).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "agent self-accept or self-rollback the live install",
+        "instead": "present evidence and wait for explicit order",
+        "item_id": "memory-claude-window-final-disposition",
+        "why": "rollback owner is Joe"
+      },
+      {
+        "dont": "delete memory.previous before final acceptance",
+        "instead": "retain until accepted retention policy",
+        "item_id": "memory-claude-window-final-disposition",
+        "why": "removes rollback"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Batch blocker: the work order requires explicit Joe acceptance, rollback, or extension; existing evidence ends at Option A continue-window and has no final-acceptance artifact. Agent must not self-accept or self-rollback.",
+      "category": "Operations",
+      "created_at": "2026-08-05T22:12:32Z",
+      "worktree": "memory-rollout"
+    },
+    "preserves": [
+      {
+        "behavior": "No live memory mutation without Joe order",
+        "item_id": "memory-claude-window-final-disposition"
+      },
+      {
+        "behavior": "Option A for check-in 2 remains the operational disposition unless a new non-organic abort appears",
+        "item_id": "memory-claude-window-final-disposition"
+      },
+      {
+        "behavior": "Parked previous trees retained until final acceptance",
+        "item_id": "memory-claude-window-final-disposition"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Rollback procedure",
+        "decision": "reuse",
+        "item_id": "memory-claude-window-final-disposition",
+        "path": "/Users/joe/Developer/memory-governance/docs/manual/rollout.md"
+      },
+      {
+        "concept": "Window log + option A",
+        "decision": "extend",
+        "item_id": "memory-claude-window-final-disposition",
+        "path": "/Users/joe/Developer/memory-governance/reports/rollout/claude/monitoring-20260804.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-claude-window-final-disposition",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory.previous/**"
+      },
+      {
+        "item_id": "memory-claude-window-final-disposition",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-claude-window-final-disposition",
+        "kind": "only_modify",
+        "path_glob": "reports/rollout/claude/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && test -f reports/rollout/claude/final-acceptance.md && rg -q '^Final acceptance:' reports/rollout/claude/final-acceptance.md",
+        "description": "Final acceptance artifact records required human gates",
+        "expected": "final-acceptance.md exists with Final acceptance line after Joe decides",
+        "item_id": "memory-claude-window-final-disposition",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-claude-window-final-disposition",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-claude-window-final-disposition",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "memory-claude-window-final-disposition",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Continue monitoring check-ins through 2026-08-06T23:13Z (or extension)",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-claude-window-final-disposition",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Joe records accept, reject/rollback, or extend with rationale",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-claude-window-final-disposition",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Write reports/rollout/claude/final-acceptance.md (or rollback evidence) with required gate lines",
+        "wid": "w2"
+      }
+    ]
+  }
+}

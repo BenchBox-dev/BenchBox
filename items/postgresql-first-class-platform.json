@@ -1,0 +1,11 @@
+{
+  "description": "PostgreSQL adapter exists but needs improvements to be a first-class platform.\n\n**Current State (needs verification):**\n- Adapter: benchbox/platforms/postgresql.py (exists)\n- Registration: Listed in platform_registry.py\n- Connectivity: psycopg2 with COPY bulk loading\n- CLI: [VERIFY] Does it appear in wizard?\n- Documentation: [MISSING] No dedicated docs page\n- Examples: [MISSING] No example scripts\n- Tuning: [VERIFY] Are tuning profiles defined?\n\n**First-Class Platform Requirements:**\n- [ ] Appears in interactive CLI wizard with proper options\n- [ ] Dedicated documentation page (docs/platforms/postgresql.rst)\n- [ ] Example scripts in examples/getting_started/sql/\n- [ ] Platform-specific CLI options (host, port, database, etc.)\n- [ ] Tuning profile with OLAP-optimized settings\n- [ ] All TPC benchmarks (TPC-H, TPC-DS, SSB) verified working\n- [ ] Integration smoke tests in CI\n\n**Reference Platforms:**\nCompare against DuckDB and Snowflake adapters for first-class feature parity.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2025-01-07T00:00:00Z",
+      "created_at": "2025-12-21T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

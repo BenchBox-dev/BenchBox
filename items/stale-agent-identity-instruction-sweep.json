@@ -1,0 +1,199 @@
+{
+  "context": "Search, in this order: /Users/joe/.skill-sync/skills (canonical source), /Users/joe/.claude including CLAUDE.md and any settings or hook files, /Users/joe/.codex, this repo's _project/handoffs and docs, and .jsonl transcripts under /Users/joe/.claude/projects as a separate targeted pass. Classify every hit as (a) a durable reusable instruction that can be edited, (b) a one-off historical task instruction in a transcript, or (c) text originating from an external harness. Correct (a) to require the effective human identity and to forbid agent Co-Authored-By / *-Session trailers. For (b) and (c), do NOT fabricate a code fix: record that the source was task-local or external and state what would be needed to stop it. Regenerate any skill mirror only through `make skill-sync`; never hand-edit a mirror.",
+  "description": "A local agent session was observed executing `git config user.email noreply@anthropic.com && git config user.name Claude` inside /Users/joe/Developer/BenchBox.pool-09, which (see worktree-scoped-git-identity-at-claim) writes into the primary clone's shared config. The instruction came from task text, not from repo code: agent_instruction_audit.py only DETECTS the identity, and the only repo-side `git config user.*` writes are CI workflows setting benchbox-bot / github-actions[bot] in ephemeral CI checkouts. This item finds and corrects any DURABLE copy of that instruction so it stops being re-executed. Two search defects in the prior investigation must be corrected. First, the sweep excluded --glob '!*.jsonl' while the only confirmed evidence lived in a .jsonl transcript, so the search excluded its own evidence class. Second, it searched /Users/joe/.claude and /Users/joe/.codex but NOT /Users/joe/.skill-sync/skills, which is the canonical skill SOURCE and the single highest-value location: a copy there propagates into every generated mirror in every project. Scope note: the canonical skill source lives outside this repository, so that edit is an out-of-repo action recorded in the report, and only in-repo surfaces (handoffs, docs, AGENTS.md) are in this item's file scope.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Exclude .jsonl from the search because the files are large",
+        "instead": "Run transcripts as a separate targeted pass with a narrow pattern",
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "why": "The only confirmed evidence of the writer lives in a .jsonl transcript; excluding it hides the evidence class that produced the finding"
+      },
+      {
+        "dont": "Hand-edit a file under .claude/skills, .codex/skills, .gemini/skills or .antigravity/skills",
+        "instead": "Edit the canonical source under /Users/joe/.skill-sync/skills and run make skill-sync",
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "why": "They are generated mirrors; a hand edit is silently reverted by the next make skill-sync and breaks skill-sync-verify"
+      },
+      {
+        "dont": "Invent a local hook or fabricate a code fix when no durable writer is found",
+        "instead": "Report that the source was task-local or external, and record precisely what external change would stop it",
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "why": "The confirmed writer was an agent following task text; inventing a mechanism would encode a false root cause and leave the real supply untouched"
+      },
+      {
+        "dont": "Treat this cleanup as closing the recurrence",
+        "instead": "Rely on worktree-scoped-git-identity-at-claim for prevention and treat this item as reducing avoidable re-execution",
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "why": "The instruction text originates from an external agent harness that is still in service and will keep emitting it"
+      }
+    ],
+    "item_meta": {
+      "category": "repository-maintenance",
+      "completed_at": "2026-08-04T16:28:54Z",
+      "created_at": "2026-08-04T01:31:30Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing handoff documents keep their historical record; corrections are additive or targeted, not a rewrite of history",
+        "item_id": "stale-agent-identity-instruction-sweep"
+      },
+      {
+        "behavior": "Generated skill mirrors remain byte-identical to what make skill-sync produces from the canonical source",
+        "item_id": "stale-agent-identity-instruction-sweep"
+      },
+      {
+        "behavior": "The documented escape hatches stay available: BENCHBOX_ALLOW_AGENT_GIT_IDENTITY and BENCHBOX_ALLOW_AGENT_COAUTHOR for a task that explicitly authorized that exact identity or trailer",
+        "item_id": "stale-agent-identity-instruction-sweep"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "kind": "do_not_modify",
+        "path_glob": ".antigravity/skills/**"
+      },
+      {
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "kind": "do_not_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "kind": "do_not_modify",
+        "path_glob": ".codex/skills/**"
+      },
+      {
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "kind": "do_not_modify",
+        "path_glob": ".gemini/skills/**"
+      },
+      {
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "kind": "do_not_modify",
+        "path_glob": ".git/config"
+      },
+      {
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -s \"$HOME/.benchbox/git-identity-forensics/instruction-source-classification.md\"",
+        "description": "Unfixed-tree gate: the instruction-source classification record exists, naming for every hit whether it is durable-editable, one-off task text, or external-harness origin",
+        "expected": "exits 1 on an unfixed tree - the classification record does not exist today, so this rung fails until the sweep has been run and its outcome written down",
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n -i 'git config[^\\n]*user\\.(name|email)[^\\n]*noreply@(anthropic|openai)' AGENTS.md CLAUDE.md docs/development .claude/skills",
+        "description": "Unfixed-tree gate: no LIVE instruction surface tells an agent to set a vendor noreply identity. Deliberately excludes _project/handoffs (historical records may quote the command as evidence) and the todo-db export (item prose is self-matching).",
+        "expected": "no live instruction surface directs an agent to set an agent/service identity",
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "out=$(make skill-sync-verify 2>&1) && ! printf '%s' \"$out\" | grep -q skipping",
+        "description": "Generated mirrors match their canonical source and lock, and verify actually ran rather than skipping",
+        "expected": "non-zero exit if skill-sync-verify fails OR if it prints a 'skipping' line, since a skip is not a pass",
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make agent-instructions-check",
+        "description": "The instruction audit still passes",
+        "expected": "agent-instructions PASS",
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Canonical source ~/.skill-sync/skills: ZERO hits (the highest-value location, missed by the earlier sweep). ~/.codex: zero. ~/.claude excluding transcripts: one hit in .git/worktrees/skills-integration/COMMIT_EDITMSG, a Git message scratch buffer, not an instruction and not durable. No hit in CLAUDE.md, settings.json, settings.local.json or any hook file.",
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "notes": null,
+        "started_at": "2026-08-04T16:28:41Z",
+        "started_branch": "docs/harness-identity-instruction-boundary",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/benchbox-git-identity-fix-2d9e93",
+        "status": "done",
+        "summary": "Sweep the canonical skill source /Users/joe/.skill-sync/skills, plus ~/.claude (incl. CLAUDE.md, settings, hooks) and ~/.codex",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Separate targeted .jsonl pass over ~/.claude/projects (NOT excluded, per the anti-pattern): 3 files, 9 lines. 550d911f: line 3 user message (task text), lines 81/597/1312 assistant Bash tool_use executing the write in BenchBox.pool-09, lines 1619/1620 a Write of a handoff file quoting it (file never existed on disk afterwards, never tracked). 08774853: line 3 user message only, NO execution anywhere in that session. Third file is this session.",
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "notes": null,
+        "started_at": "2026-08-04T16:28:44Z",
+        "started_branch": "docs/harness-identity-instruction-boundary",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/benchbox-git-identity-fix-2d9e93",
+        "status": "done",
+        "summary": "Separate targeted pass over .jsonl transcripts under ~/.claude/projects",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Classification: NO durable writer exists. Repo hits are the guards themselves (agent_instruction_audit.py AGENT_EMAILS/SIGNING_SERVICE_EMAILS, agent_write_preflight.sh, their tests), unrelated submitted_by docs, or historical handoff records left intact per must-preserve. The real source is one-off task text from an EXTERNAL prompt template. No code fix fabricated, per the anti-pattern. CORRECTION TO ROOT CAUSE: it is not a Stop hook. It appears as the sessions OPENING USER MESSAGE, byte-identical in two sessions twelve days apart (2026-07-22, 2026-08-03); a Stop hook fires at turn end and would appear mid-session, and no hook file on this machine contains it. No mirror was hand-edited; skill-sync-verify genuinely ran (no skipping line).",
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "notes": null,
+        "started_at": "2026-08-04T16:28:47Z",
+        "started_branch": "docs/harness-identity-instruction-boundary",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/benchbox-git-identity-fix-2d9e93",
+        "status": "done",
+        "summary": "Classify every hit as durable-editable, one-off task text, or external-harness origin; correct durable copies at source and regenerate mirrors via make skill-sync",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Wrote ~/.benchbox/git-identity-forensics/instruction-source-classification.md with per-hit classification, the root-cause correction, and the liveness finding: instruction LIVE (re-issued 2026-08-03, not executed), writer NOT live (last execution 2026-07-24, newest agent stash 2026-07-27). Rungs: 1 PASS (record exists, non-empty); 2 PASS (no live instruction surface); 3 PASS (skill-sync-verify ran, no skipping line); 4 PASS (agent-instructions).",
+        "item_id": "stale-agent-identity-instruction-sweep",
+        "notes": null,
+        "started_at": "2026-08-04T16:28:51Z",
+        "started_branch": "docs/harness-identity-instruction-boundary",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/benchbox-git-identity-fix-2d9e93",
+        "status": "done",
+        "summary": "Write the classification record to ~/.benchbox/git-identity-forensics/instruction-source-classification.md",
+        "wid": "w4"
+      }
+    ]
+  }
+}

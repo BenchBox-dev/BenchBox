@@ -1,0 +1,11 @@
+{
+  "description": "Add DataFrame execution mode to the existing Databricks adapter. This is the\nCRITICAL PRIORITY item for Week 1 of the managed cloud Spark integration project.\n\nDatabricks is the market leader for managed Spark with the largest user base.\nThis implementation leverages 100% of existing infrastructure (session management,\nUC Volumes, Delta Lake, authentication) with minimal new code.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2025-12-24T00:00:00Z",
+      "created_at": "2025-12-24T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

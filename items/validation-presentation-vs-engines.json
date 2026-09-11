@@ -1,0 +1,10 @@
+{
+  "description": "- \"`benchbox/cli/validation.py` only handles display and orchestration; delegates to core `DataValidationEngine` and `DatabaseValidationEngine`.\"\n- \"Tests verify delegation and presentation:\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

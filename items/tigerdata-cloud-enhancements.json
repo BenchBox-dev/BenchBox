@@ -1,0 +1,88 @@
+{
+  "description": "Follow-up enhancements for the TigerData cloud deployment mode\n(timescaledb:cloud), split from completed timescaledb-cloud-deployment.\n\nThe core rebrand and cloud connection logic is done. These items improve\nsecurity posture, connection flexibility, and test confidence but require\na live TigerData account to implement and verify.\n",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-02-17T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing cloud unit tests continue to pass",
+        "item_id": "tigerdata-cloud-enhancements"
+      },
+      {
+        "behavior": "Self-hosted mode unchanged",
+        "item_id": "tigerdata-cloud-enhancements"
+      },
+      {
+        "behavior": "TIMESCALE_* backward compatibility preserved",
+        "item_id": "tigerdata-cloud-enhancements"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_timescaledb_cloud.py -v --tb=short",
+        "description": "Existing cloud tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "tigerdata-cloud-enhancements",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tigerdata-cloud-enhancements",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tigerdata-cloud-enhancements",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tigerdata-cloud-enhancements",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tigerdata-cloud-enhancements",
+        "notes": "TigerData provides three connection endpoints per service:\n- Direct (port 5432): standard PostgreSQL connection\n- Session pool: connection pooling with session affinity\n- Transaction pool: connection pooling per transaction\nEach uses a different port. Add a pool_mode option to _configure_cloud_mode()\nand document the port mapping.\nRequires a live TigerData account to test pool behavior differences.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add connection pooling mode selection (direct, session pool, transaction pool) - TigerData offers three connection modes on different ports",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tigerdata-cloud-enhancements",
+        "notes": "TigerData recommends verify-full but sslmode=require works today.\nNeeds a CA cert distribution strategy: bundled cert, system trust store,\nor user-provided path via TIGERDATA_SSLROOTCERT / platform option.\nConsider following the pattern used by other cloud adapters.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add sslmode=verify-full support with CA certificate configuration",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tigerdata-cloud-enhancements",
+        "notes": "Create pytest markers for live TigerData tests (e.g., @pytest.mark.tigerdata).\nTest connection, basic query, hypertable creation, and compression on a real\nTigerData instance. Skip by default; run only when TIGERDATA_HOST is set.\nAll code paths are already covered by unit tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add integration smoke tests with live TigerData account",
+        "wid": "w3"
+      }
+    ]
+  }
+}

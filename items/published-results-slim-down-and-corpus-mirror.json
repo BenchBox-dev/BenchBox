@@ -1,0 +1,196 @@
+{
+  "context": "Treat this as repository-shape work, not corpus work. The slim-down\nis the load-bearing step; the mirror is mechanical once the target\nshape is clear. Expect this to need explicit user approval at W2\n(force-push to a shared branch) and W4 (CI workflow change).\n",
+  "description": "The design intent for `published-results` is that it contains **only**\nthe results corpus and the metadata the results explorer needs (bundle\nJSONs, per-bundle manifests, `corpus-inventory.json`, the small set of\nhuman-readable corpus docs like `README.md` / `CORPUS_NOTES.md` /\n`SEED_CORPUS_SPEC.md`, and the corpus depth validator\n`validate_corpus.py`).\n\nReality on 2026-05-03 is different on two axes:\n\n1. **`published-results` is fat, not slim.** It currently sits at the\n   May-1 snapshot of develop (SHA `520d7055d`, 13,809 tracked files\n   including the full `benchbox/`, `tests/`, `_project/`, `_binaries/`,\n   all `.github/workflows/`, etc.). Develop has 1674 commits since.\n2. **The explorer build does not actually consume `published-results`.**\n   `docs.yml` and `results-explorer-browser.yml` trigger only on\n   `main` (push and PR). There is no promote-from-published-results\n   workflow. Bundles merged to `published-results` therefore do not\n   reach the explorer's static build pipeline; the explorer renders\n   `results-data/` from develop → main.\n\nConsequence: the Phase 2 contributor flow described in\n`docs/operations/results-phase-2-runbook.md` is convention-only at\npresent — landing a corpus PR on `published-results` does not move\nbundles to where the explorer reads. The\n`results-explorer-uat-corpus-integrate-validated-bundles` TODO had\nto land its 188 community-submission bundles via develop for the\nexplorer to render them, which deviates from the runbook.\n\nThis TODO does the structural cleanup: slim `published-results` down\nto the intended corpus-only shape, mirror the UAT-20260502 188-bundle\ndelta onto it so the conventional contributor target is current, and\ndecide whether the explorer build should also fire on\n`published-results` (or whether a develop ↔ published-results sync\nworkflow is the right answer).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "couple this to the byte-stable bundle emission TODO",
+        "instead": "this TODO just moves bytes; the canonicalization TODO changes how bytes are written.",
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "why": "they are separable concerns and bundling them grows scope"
+      },
+      {
+        "dont": "create a develop -> published-results sync that also overwrites contributor PRs in flight",
+        "instead": "the sync should rebase or merge, never force-push over contributor branches.",
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "why": "that erases external work"
+      },
+      {
+        "dont": "slim published-results without explicit user authorization for the force-push",
+        "instead": "gate on user approval at W2.",
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "why": "it is a shared branch with PRs that may be in flight or with stale-but-still-referenced commits"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "published-results-slim-down-and-corpus-mirror",
+        "id": 534,
+        "reason": "The slim-down resets published-results to a single commit; restoring per-PR history would require replaying every Phase 2 PR ever merged, which is not the deliverable here.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly states backfilling git history with curated messages is not the deliverable for the slim-down; deliberately excluded scope.",
+        "summary": "Backfilling published-results' git history with curated commit messages"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "needs_item": "results-explorer-uat-corpus-integrate-validated-bundles"
+      }
+    ],
+    "item_meta": {
+      "category": "Operations",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All bundles currently checked-in on develop's results-data/bundles/ remain merge-able through whichever new flow lands.",
+        "item_id": "published-results-slim-down-and-corpus-mirror"
+      },
+      {
+        "behavior": "The per-bundle manifest hash contract is intact across the slim-down (bundle bytes are not edited; only branch shape changes).",
+        "item_id": "published-results-slim-down-and-corpus-mirror"
+      },
+      {
+        "behavior": "The runbook (`docs/operations/results-phase-2-runbook.md`) reflects the new flow before declaring W4 done.",
+        "item_id": "published-results-slim-down-and-corpus-mirror"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/published-results-slim-down-and-corpus-mirror.yaml"
+      },
+      {
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/ (if a new ADR is needed)"
+      },
+      {
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-phase-2-runbook.md"
+      },
+      {
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "kind": "only_modify",
+        "path_glob": "published-results branch contents (via separate branch & PR)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git ls-tree -r origin/published-results --name-only | wc -l",
+        "description": "published-results' file count matches the slim-corpus-only target.",
+        "expected": "Approximately the count from the W1 ADR (target: hundreds, not 13k+).",
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "manual",
+        "description": "Explorer build picks up new bundles from the chosen flow (W4 verification).",
+        "expected": "A test merge to published-results either triggers explorer rebuild OR a documented separate develop PR is opened.",
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "notes": "Land a short ADR (or extend `docs/operations/results-phase-2-runbook.md`)\nlisting the exact paths that may live on `published-results`:\n`results-data/` (full subtree), `.gitignore`, `LICENSE`,\n`CONTRIBUTING.md`, optionally `README.md` (with corpus-flow guidance,\nnot the develop README), and minimal CI to run the per-bundle\nvalidators. Everything else gets removed when published-results is\nslimmed. Confirm with the user before doing the slim-down.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide the canonical published-results contents and confirm with maintainers",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "notes": "Fresh-orphan-branch approach: build a new commit on top of the\ndecided subtree, then force-push (with explicit user authorization)\n`published-results` to that commit. This loses the May-1 develop\nhistory on `published-results` but the history is preserved on\ndevelop and main; published-results' own log only ever needs to\ndescribe the corpus changes that have landed on it. Document the\none-time slim-down in the same ADR/runbook.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Slim published-results down to the intended subtree",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "notes": "Fork off the slimmed `published-results`, copy the bundle JSONs +\nper-bundle manifests + regenerated `corpus-inventory.json` from the\ndevelop-side staging (results-data/bundles/* on develop after the\nparent TODO merged), open a draft PR vs `published-results`. The PR\ndiff should be ~376 file additions (188 bundles + 188 manifests) +\ninventory regen + a small README update — small and review-friendly.\nTarget trust labels, validator outputs, and cohort gate behavior\nmust match what landed on develop.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Mirror the UAT-20260502 188-bundle integration onto slim published-results",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "published-results-slim-down-and-corpus-mirror",
+        "notes": "Pick one of:\n  a) A scheduled workflow that opens a draft PR mirroring the\n     `results-data/` subtree from develop to published-results when\n     drift is detected.\n  b) Extend `docs.yml` / `results-explorer-browser.yml` triggers to\n     also fire on `published-results` push events, so a merge to\n     that branch directly feeds the explorer build.\n  c) Document explicitly that `published-results` is convention-only\n     (Phase 2 contributor target) and that develop is the real\n     source of truth — and accept that \"PR vs published-results\"\n     must be paired with a develop merge.\nWhichever option lands, capture the decision in the runbook so\nfuture contributor PRs and maintainer reviews are not surprised.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire develop -> published-results sync (or explorer-build-on-published-results)",
+        "wid": "w4"
+      }
+    ]
+  }
+}

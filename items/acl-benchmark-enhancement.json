@@ -1,0 +1,9 @@
+{
+  "description": "Extend the Metadata Primitives benchmark to measure performance of access control\nmetadata operations. This includes:\n\n1. Performance of ADDING access controls (GRANT/REVOKE execution timing)\n2. Performance of QUERYING access controls (reading privilege metadata)\n\nNOT in scope: Performance of data read/write operations subject to ACLs.\n\nThe goal is to understand how ACL complexity (number of roles, grants, hierarchy depth)\naffects metadata introspection performance across different database platforms.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "metadata-primitives"
+    }
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "description": "Blind-spot `2026-05-04-113747` surfaced two recurring weaknesses in the\n/blog critique rubric for vendor-announcement response posts:\n\n1. Currency drift between outline write date and present-day shipped\n   state -- \"honest deferrals\" cited in an outline can become shipped\n   surface within days; the rubric has no Technical-lane check that\n   re-validates such claims against `git log` and `_project/TODO`/\n   `_project/DONE`.\n2. Partisan-reader response to framing -- vendor-response posts have a\n   guaranteed adversarial reader on the source-vendor's team; framings\n   that contrast (boring/novel, surface/hidden) carry the same\n   substance with less bridge-burning if rephrased into technical\n   specificity.\n\nThe current rubric's Risk axis mentions \"stale, partisan\" generically\nbut does not enforce a vendor-response-specific check. Adding three\ncheap axis additions closes the gap.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make the new checks fire on every post",
+        "instead": "(not specified)",
+        "item_id": "extend-blog-critique-vendor-response-axes",
+        "why": "gate them on 'post responds to a vendor or source-author publication' so evergreen content isn't slowed by checks that don't apply."
+      },
+      {
+        "dont": "remove the existing Risk axis",
+        "instead": "(not specified)",
+        "item_id": "extend-blog-critique-vendor-response-axes",
+        "why": "it stays as the generic catch-all; the new checks fire only on vendor-response posts."
+      }
+    ],
+    "item_meta": {
+      "category": "Tooling and Workflow",
+      "completed_at": "2026-05-06T00:00:00Z",
+      "created_at": "2026-05-05T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing seven rubric rows (Thesis/Audience/Evidence/Structure/Voice/Utility/Risk) and their questions remain present.",
+        "item_id": "extend-blog-critique-vendor-response-axes"
+      },
+      {
+        "behavior": "Scoring scale (9-10/7-8/5-6/<5) and Chain-mode rules are unchanged.",
+        "item_id": "extend-blog-critique-vendor-response-axes"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "extend-blog-critique-vendor-response-axes",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/blog/references/critique.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make skill-sync >/dev/null && grep -cE 'Currency|Partisan-Reader|Shelf-life' .claude/skills/blog/references/critique.md",
+        "description": "All three new checks appear in the critique reference",
+        "expected": ">= 3",
+        "item_id": "extend-blog-critique-vendor-response-axes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make skill-sync >/dev/null && grep -cE '^\\| (Thesis|Audience|Evidence|Structure|Voice|Utility|Risk) \\|' .claude/skills/blog/references/critique.md",
+        "description": "Existing rubric rows unchanged",
+        "expected": ">= 7",
+        "item_id": "extend-blog-critique-vendor-response-axes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "extend-blog-critique-vendor-response-axes",
+        "notes": "Add a checklist item under the existing Risk row of\n`.claude/skills/blog/references/critique.md`:\n\"If the outline cites blocked TODOs, honest deferrals, or 'not yet\nshipped' caveats, verify them against `git log` and the current\nstate of `_project/TODO/` and `_project/DONE/`. Flag any item\nthat's actually shipped since the outline was written.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add explicit Currency check to the Risk lane",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "extend-blog-critique-vendor-response-axes",
+        "notes": "Add a checklist item: \"For posts that respond to a vendor or\nsource-author publication, identify framings that contrast the\nsource against BenchBox's coverage (boring/novel, surface/hidden,\nobvious/clever). Confirm each framing survives the test 'would a\nreader from the source's team find this dismissive?' Substitute\ntechnical specificity for editorial contrast where the answer is\nyes.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Partisan-Reader check to the Voice lane",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "extend-blog-critique-vendor-response-axes",
+        "notes": "Add a top-level row to the rubric table: \"Shelf-life | Date the\noutline against the source publication; flag if the response\nwindow has expired (typical: 1-2 weeks after source announcement).\"\nDocument the trigger (vendor-response posts only) inline so it\ndoesn't fire on evergreen content.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Shelf-life axis (vendor-response posts have a 1-2 week peak window)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

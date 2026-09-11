@@ -1,0 +1,85 @@
+{
+  "description": "SCD2 audit finding #1. The blog draft and docs/benchmarks/write-primitives.md\nclaimed the portable SCD2 op \"runs unchanged\" on ClickHouse (and \"every target\nengine\"). False for merge_scd_type2_basic / _no_change: they use standard\nUPDATE, which ClickHouse lacks (row changes go through ALTER TABLE ... UPDATE\nmutations); no UPDATE->mutation rewrite exists in benchbox/sql_compat/. Only\nmerge_scd_type2_new_keys_only (pure INSERT) runs there unchanged. Verified only\non DuckDB. Decision (w0): Option A + one-line B caveat - scope the claim to\nstandard-DML engines, name ClickHouse (and DataFusion) as exceptions, keep the\nDuckDB proof.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-07-08T00:00:00Z",
+      "created_at": "2026-07-08T00:00:00Z",
+      "worktree": "write-primitives-scd2-followup"
+    },
+    "work_needs": [
+      {
+        "item_id": "scd2-portability-claim-accuracy",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "scd2-portability-claim-accuracy",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "scd2-portability-claim-accuracy",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "scd2-portability-claim-accuracy",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decision gate: chose Option A + caveat (scope to standard-DML engines; ClickHouse/DataFusion named as exceptions; DuckDB proof retained).",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-portability-claim-accuracy",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Corrected blog draft: TL;DR (:16), portability body (:102), and lock-in section (:166) no longer claim ClickHouse runs the UPDATE-based ops unchanged.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-portability-claim-accuracy",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Corrected docs/benchmarks/write-primitives.md SCD2 bullet: 'every target engine' -> standard-DML engines, with ClickHouse insert-only / DataFusion-skipped caveat.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-portability-claim-accuracy",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Added end-to-end honesty note: the harness setup population SQL (concat/CAST) is also standard-SQL, so the standard-DML scoping covers setup, not just the op.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-portability-claim-accuracy",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verified no em/en-dash remains in either edited file (incidentally fixed the pre-existing draft:104 and docs:130 dashes); footnotes untouched and previously confirmed resolving.",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "description": "The interactive CLI wizard (`benchbox run` with no arguments) guides users through\nconfiguration but doesn't show the equivalent command-line parameters. Users should\nsee the exact CLI command that would reproduce their choices before execution starts.\n\nThis enables:\n- Learning the CLI flags for future direct invocations\n- Scripting and automation of repeated benchmark runs\n- Documentation of benchmark configurations in runbooks\n- Easy sharing of benchmark setups with teammates",
+  "legacy": {
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2025-12-24T00:00:00Z",
+      "created_at": "2025-12-24T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

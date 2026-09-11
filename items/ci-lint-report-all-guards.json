@@ -1,0 +1,151 @@
+{
+  "description": "WS4 of _project/planning/ci-failure-reduction-plan.md. The pr.yml lint job runs ~15 independent guards sequentially and stops at the first failure, so a PR with multiple guard misses pays one full CI cycle (plus a triage wake) per discovery: fix ruff, push, discover timing-policy, push, discover compat-docs... Restructure so every independent guard runs with continue-on-error: true (locally: accumulate exit codes), then one aggregator step fails the job if any guard failed and writes a consolidated pass/fail table to GITHUB_STEP_SUMMARY. Guards stay individually visible in the UI; the round-trip count for multi-guard misses drops to 1. Mirror the same accumulate-then-fail structure in the ci-lint make target.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Let the aggregator read step outcomes by hand-listing step ids",
+        "instead": "Derive the guard set programmatically (steps context iteration or a naming convention checked by the parity test)",
+        "item_id": "ci-lint-report-all-guards",
+        "why": "New guards would silently escape aggregation"
+      },
+      {
+        "dont": "Merge all guards into one opaque mega-script step",
+        "instead": "Keep one step per guard with continue-on-error + a final aggregator",
+        "item_id": "ci-lint-report-all-guards",
+        "why": "Loses per-guard visibility and step-level timing in the Actions UI"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "ci-lint-report-all-guards",
+        "needs_item": "ci-lint-local-parity-pin"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "created_at": "2026-07-23T12:29:25Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Each guard's individual pass/fail remains visible per-step in the Actions UI",
+        "item_id": "ci-lint-report-all-guards"
+      },
+      {
+        "behavior": "The lint job remains a required (blocking) member of ci-required-result - aggregation must not soften the gate",
+        "item_id": "ci-lint-report-all-guards"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ci-lint-report-all-guards",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "ci-lint-report-all-guards",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "ci-lint-report-all-guards",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "ci-lint-report-all-guards",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "ci-lint-report-all-guards",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "ci-lint-report-all-guards",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "ci-lint-report-all-guards",
+        "kind": "only_modify",
+        "path_glob": "tests/system/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/system/test_ci_lint_parity.py -q",
+        "description": "Parity test still passes after restructure",
+        "expected": "passed",
+        "item_id": "ci-lint-report-all-guards",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make ci-lint",
+        "description": "Local mirror reports multiple failures in one run (inject two trivial guard breaks in a scratch branch, observe both reported)",
+        "expected": "both injected failures listed, exit nonzero",
+        "item_id": "ci-lint-report-all-guards",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-lint-report-all-guards",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "ci-lint-report-all-guards",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "ci-lint-report-all-guards",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ci-lint-report-all-guards",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Restructure pr.yml lint job: per-guard continue-on-error + aggregator step with GITHUB_STEP_SUMMARY table",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ci-lint-report-all-guards",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Mirror accumulate-then-fail in the ci-lint make recipe (report all failing guards, exit nonzero once)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ci-lint-report-all-guards",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update/verify the ci-lint parity pin test against the restructured job",
+        "wid": "w3"
+      }
+    ]
+  }
+}

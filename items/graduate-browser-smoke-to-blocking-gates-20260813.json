@@ -1,0 +1,77 @@
+{
+  "context": "Re-derive the live develop ruleset and workflow contract, then accumulate ten consecutive completed-success browser runs on develop. For each run verify the Chromium full suite plus WebKit and Firefox smoke jobs actually completed successfully; cancellations, skipped browser jobs, unrelated repositories, or admin bypasses do not count. Close only after the streak and required-context evidence are independently recorded.",
+  "description": "Replacement for the stale graduate-browser-smoke-to-blocking-gates specification. The canonical repository is joeharris76/BenchBox, Chromium is already a required Results Explorer browser-gate context on the live develop ruleset, and the remaining evidence is ten consecutive successful develop browser workflow runs with the required Chromium, WebKit, and Firefox jobs green. Use the real workflow-dispatch or develop-push history and record run IDs, SHAs, job conclusions, and the ruleset context without weakening or bypassing the gate.",
+  "legacy": {
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-08-13T18:13:30Z",
+      "created_at": "2026-08-13T16:31:32Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Chromium remains the blocking full suite; Firefox and WebKit must be observed green for the evidence streak but are not promoted to independent blocking contexts by this item.",
+        "item_id": "graduate-browser-smoke-to-blocking-gates-20260813"
+      },
+      {
+        "behavior": "No admin bypass, synthetic status, or skipped browser job counts as evidence.",
+        "item_id": "graduate-browser-smoke-to-blocking-gates-20260813"
+      },
+      {
+        "behavior": "The Results Explorer browser gate remains a required status context on develop.",
+        "item_id": "graduate-browser-smoke-to-blocking-gates-20260813"
+      },
+      {
+        "behavior": "The existing browser workflow and its concurrency policy remain intact unless a separately specified defect is found.",
+        "item_id": "graduate-browser-smoke-to-blocking-gates-20260813"
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "graduate-browser-smoke-to-blocking-gates-20260813",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "graduate-browser-smoke-to-blocking-gates-20260813",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Live repo joeharris76/BenchBox ruleset develop-squash-only requires Results Explorer browser gate (context confirmed via gh api); results-explorer-browser.yml has develop/release push triggers, release/develop PR coverage, and workflow_dispatch; browser workflow contract tests passed 13/13. Dispatched develop run 31720980543 for the evidence streak.",
+        "item_id": "graduate-browser-smoke-to-blocking-gates-20260813",
+        "notes": null,
+        "started_at": "2026-08-13T16:32:21Z",
+        "started_branch": "fix/results-explorer-curated-preview-launch-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-curated-preview-launch-20260813",
+        "status": "done",
+        "summary": "Re-derive the live browser workflow and develop ruleset contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Ten consecutive successful develop workflow runs completed: 31721890318, 31722762867, 31723632876, 31724524190, 31725359593, 31726237325, 31726981407, 31727822269, 31728695716 plus qualifying predecessor 31720980543; each had successful Chromium full suite, Firefox smoke, WebKit smoke, and Results Explorer browser gate jobs on develop. Final five runs were verified against merged/current develop heads; run 31722762867 recorded one retryable Firefox page-crash flake but the Firefox job and workflow succeeded.",
+        "item_id": "graduate-browser-smoke-to-blocking-gates-20260813",
+        "notes": null,
+        "started_at": "2026-08-13T16:33:09Z",
+        "started_branch": "fix/results-explorer-curated-preview-launch-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-curated-preview-launch-20260813",
+        "status": "done",
+        "summary": "Accumulate and verify ten consecutive green develop browser runs",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Independent closeout: live develop-squash-only ruleset requires ci-required-result and Results Explorer browser gate; all ten consecutive develop runs 31720980543, 31721890318, 31722762867, 31723632876, 31724524190, 31725359593, 31726237325, 31726981407, 31727822269, and 31728695716 completed successfully with Chromium, Firefox, WebKit, and aggregate browser-gate jobs green. No skipped browser jobs, admin bypass, or synthetic status was used.",
+        "item_id": "graduate-browser-smoke-to-blocking-gates-20260813",
+        "notes": null,
+        "started_at": "2026-08-13T18:12:59Z",
+        "started_branch": "fix/results-explorer-curated-preview-launch-20260813",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-curated-preview-launch-20260813",
+        "status": "done",
+        "summary": "Record independent streak evidence and close the browser-graduation gate",
+        "wid": "w2"
+      }
+    ]
+  }
+}

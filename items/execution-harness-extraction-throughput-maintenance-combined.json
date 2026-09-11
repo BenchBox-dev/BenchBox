@@ -1,0 +1,205 @@
+{
+  "description": "Follow-up to structural-debt-base-layer-tpc-and-module-split (PR #914, DONE).\n#914's w1 success_metric — \"platforms/base/execution.py carries no literal TPC\nbenchmark names in its dispatch path\" — was met ONLY for the power-test path:\n_execute_power_test (execution.py:682 on origin/develop) now dispatches via\nresolve_power_harness(benchmark_id) with zero literals. But _execute_throughput_test,\n_execute_maintenance_test, and _execute_combined_test still branch on literal\n`benchmark_id == \"tpch\"` / `== \"tpcds\"` (origin/develop execution.py ~713-779).\nThe guard test test_power_dispatch_path_has_no_literal_tpc_benchmark_names\ninspects only _execute_power_test, so the broader metric reads as met when it is\nnot. This item extends the capability-registry dispatch to the remaining three\ntest types and broadens the guard test to all four.\n\nBehavior-preserving refactor: throughput/maintenance/combined carry stream/cursor\nand connection-factory wiring (the TPC-DS path uses connection_factory +\n_make_stream_cursor for thread-safe cursors); that wiring must be preserved\nexactly, as #914 did for the power path.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a second dispatch mechanism; extend resolve_*_harness.",
+        "instead": "(not specified)",
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "change execution semantics while extracting",
+        "instead": "(not specified)",
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "why": "this is a structural move only, proven by unchanged results on the correctness/equivalence gates."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "execution-harness-extraction-throughput-maintenance-combined",
+        "id": 393,
+        "reason": "Only TPC has multi-phase power/throughput/maintenance shapes today; generalization is speculative until a second family needs it.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Generalizing the multi-phase harness registry to non-TPC families is already tracked as an open planning item. (tracked by generalize-multiphase-harness-registry-non-tpc)",
+        "summary": "Generalize the harness registry to non-TPC benchmark families."
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-06-30T00:00:00Z",
+      "created_at": "2026-06-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Byte-identical benchmark execution: query order, stream/cursor wiring, connection_factory + _make_stream_cursor thread-safe semantics, set_config_validation_mode call point.",
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined"
+      },
+      {
+        "behavior": "Public dispatch entry points (_execute_throughput_test etc.) keep their signatures and call contracts.",
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': 'benchbox/core/power_harnesses.py', 'note': 'resolve_power_harness + the per-benchmark power harness modules #914 introduced (core/tpch/platform_power.py, core/tpcds/platform_power.py). Extend this registry with throughput/maintenance/combined harness resolution; do not invent a parallel dispatch.'}",
+        "decision": "extend",
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/platforms/base/execution.py:682', 'note': 'The already-extracted _execute_power_test as the template: capability lookup, harness invocation, preserved connection/cursor wiring.'}",
+        "decision": "reuse",
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'tests/unit/platforms/', 'note': 'test_power_dispatch_path_has_no_literal_tpc_benchmark_names — broaden it to assert no literal TPC names across all four dispatch methods.'}",
+        "decision": "reuse",
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/power_harnesses.py"
+      },
+      {
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -k literal_tpc_benchmark_names -q",
+        "description": "No literal TPC names remain in any execution.py dispatch method",
+        "expected": "guard test asserts power, throughput, maintenance, and combined dispatch carry no literal benchmark_id == tpch/tpcds branches",
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests -m fast -k 'execution or power or throughput or maintenance' -q",
+        "description": "Benchmark execution is unchanged",
+        "expected": "execution behavior unchanged; all green",
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "notes": "Grep execution.py for `benchmark_id == \"tpc` and record each method + line\n(line numbers in this TODO are origin/develop at review time and will drift).\nConfirm the guard test currently inspects only _execute_power_test. Summarize\nin the PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-confirm the residual literals and the guard test scope on fresh develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "notes": "Move the TPC-H/TPC-DS throughput bodies behind a resolve_*_harness lookup,\npreserving stream/cursor and connection-factory wiring exactly. Per-benchmark\nbodies live under core/tpc{h,ds}/, mirroring the power split.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract throughput dispatch to capability resolution",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "notes": "Same treatment for _execute_maintenance_test, preserving the\nset_config_validation_mode call point and DML/refresh semantics.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract maintenance dispatch to capability resolution",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "notes": "_execute_combined_test composes power+throughput+maintenance; route it through\nthe now-extracted harnesses. No literal benchmark_id branch should remain.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract combined dispatch to capability resolution",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-harness-extraction-throughput-maintenance-combined",
+        "notes": "Extend test_power_dispatch_path_has_no_literal_tpc_benchmark_names (or add a\nsibling) to assert no literal TPC names in throughput/maintenance/combined too.\nThen correct the #914 DONE success_metric back to the full-dispatch claim (or\ncoordinate with holistic-review-followup-metadata-truth, which reworded it to\nthe interim power-path-only wording).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Broaden the guard test to all four dispatch methods and restore the strong metric",
+        "wid": "w4"
+      }
+    ]
+  }
+}

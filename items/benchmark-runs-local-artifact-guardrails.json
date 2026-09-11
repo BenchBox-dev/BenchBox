@@ -1,0 +1,255 @@
+{
+  "context": "Add detection after the root-cause fix, not before. Start with a small\nregression test that proves external-root runs leave the worktree clean.\nThen add a UAT hygiene check that snapshots the worktree-local\n`benchmark_runs` path before a run and compares after each run or at teardown.\nDocument the invariant and wire enforcement only where an external root is\nconfigured, so default local usage remains compatible.\n",
+  "description": "After `benchmark-runs-output-root-propagation` fixes the lifecycle bug,\nBenchBox needs regression guardrails so long UAT and corpus runs cannot\nsilently fill pool worktrees with duplicate generated data again.\n\nThe 2026-06-01 evidence showed the problematic shape clearly:\n\n- The corpus was launched from `/Users/joe/Developer/BenchBox.pool-01` with\n  `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`.\n- Despite that, `/Users/joe/Developer/BenchBox.pool-01/benchmark_runs`\n  accumulated about 4.2G of generated artifacts, mostly `datagen/`.\n- A similar stale/generated tree already existed in the primary clone under\n  `/Users/joe/Developer/BenchBox/benchmark_runs`.\n\nThis TODO adds test and operational guardrails that treat unexpected\nworktree-local `benchmark_runs` writes as a failure when an external output\nroot is configured. The guardrails must be precise enough to avoid breaking\nordinary ad hoc runs that intentionally use the cwd-local default.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "auto-delete unexpected artifacts",
+        "instead": "(not specified)",
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "why": "detection and reporting come first; cleanup is handled separately."
+      },
+      {
+        "dont": "ban every `benchmark_runs/` directory globally",
+        "instead": "(not specified)",
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "why": "BenchBox still supports cwd-local output for explicit local/default runs."
+      },
+      {
+        "dont": "make a broad disk scan mandatory for every unit test",
+        "instead": "(not specified)",
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "why": "keep expensive size checks in UAT/preflight paths."
+      },
+      {
+        "dont": "rely on documentation alone",
+        "instead": "(not specified)",
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "why": "add executable checks that fail when the invariant is broken."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "needs_item": "benchmark-runs-output-root-propagation"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-06-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Guardrail failures are actionable: they print the unexpected local path and expected configured root.",
+        "item_id": "benchmark-runs-local-artifact-guardrails"
+      },
+      {
+        "behavior": "Long-running UAT continues to use `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs` as the canonical shared root.",
+        "item_id": "benchmark-runs-local-artifact-guardrails"
+      },
+      {
+        "behavior": "No guardrail deletes or moves generated data automatically.",
+        "item_id": "benchmark-runs-local-artifact-guardrails"
+      },
+      {
+        "behavior": "Ordinary ad hoc runs with no `BENCHBOX_OUTPUT_DIR` and no explicit `--output` can still use cwd-local `benchmark_runs`.",
+        "item_id": "benchmark-runs-local-artifact-guardrails"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/utils/path_utils.py:resolve_benchmark_runs_dir — reuse the environment-aware root decision",
+        "decision": "reuse",
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "path": "benchbox/utils/path_utils.py:resolve_benchmark_runs_dir"
+      },
+      {
+        "concept": "docs/operations/uat-framework.md:Long-Running UAT — extend the existing shared-root requirement instead of adding a competing run-root policy",
+        "decision": "extend",
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "path": "docs/operations/uat-framework.md:Long-Running"
+      },
+      {
+        "concept": "make agent-write-preflight and make pr-preflight — reuse existing guard-command flow for repository hygiene checks",
+        "decision": "reuse",
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "path": "make"
+      },
+      {
+        "concept": "tests/uat/runner.py — extend the runner that already sets `BENCHBOX_OUTPUT_DIR` and passes `--output`",
+        "decision": "extend",
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "path": "tests/uat/runner.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/*/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      },
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/runner.py"
+      },
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_output_root_hygiene.py -q",
+        "description": "External-root artifact hygiene regression passes",
+        "expected": "test fails on unexpected cwd/benchmark_runs writes and passes when no local artifacts are created",
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_runner.py -q",
+        "description": "UAT runner tests still pass",
+        "expected": "all tests pass",
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_runner_helpers.py tests/unit/cli/test_orchestrator_data_sharing.py tests/unit/utils/test_path_utils.py -q",
+        "description": "Focused path tests from the root-cause TODO still pass",
+        "expected": "all tests pass",
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "PR preflight passes",
+        "expected": "all preflight checks pass",
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "notes": "Confirm the fixed code no longer creates worktree-local datagen artifacts\nduring a representative external-root run. Record checked SHA, command,\nrun root, and before/after worktree-local path state in the PR body or\nTODO notes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the guardrail target after output-root propagation lands",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "notes": "The test should create an isolated cwd with a configured external root,\nrun a lightweight representative generation path, and fail if\n`cwd/benchmark_runs` exists or any nested generator path points there.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a targeted unit or integration guard for explicit/env output roots",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "notes": "When `BENCHBOX_OUTPUT_DIR` or UAT `--output` points outside the current\nworktree, capture the initial state of `cwd/benchmark_runs` and fail the\nrun if new files or size growth appear there. The failure message must\nname both the expected root and the unexpected local path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a UAT-level pre/post artifact hygiene check for external-root runs",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "notes": "Update operations docs with the invariant: long-running UAT writes under\n`~/Developer/benchmark_runs`, never under a clone or pool worktree. Include\ncompact audit commands for `du`, recent writes, and large-file summaries.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the external-root invariant and emergency triage command",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-runs-local-artifact-guardrails",
+        "notes": "Prefer UAT/preflight-scoped enforcement over a global prohibition on\n`benchmark_runs/`. If adding to `make pr-preflight`, gate only unexpected\ngrowth or explicit external-root scenarios so developers can still run\nsmall local ad hoc benchmarks.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire the hygiene check into the appropriate local gate without making ordinary local runs noisy",
+        "wid": "w4"
+      }
+    ]
+  }
+}

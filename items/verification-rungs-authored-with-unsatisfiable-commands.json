@@ -1,0 +1,48 @@
+{
+  "description": "Two confirmed instances of the same defect: a verification command that can never pass regardless of implementation. (1) medium-test-timeout-headroom rung 1: 'grep -A1 medium-test .github/workflows/pr.yml | grep timeout-minutes' -- timeout-minutes sits 5+ lines below the match so -A1 never reaches it; verified failing against the ORIGINAL unmodified file by git-stashing all changes. It is also self-contradictory, since its expectation demands an inline comment and adding one pushes the value further from the match. (2) timing-policy-check-misreports-pytest-failure-as-violation rung 1: expects output ('reports a tooling/environment error') but todo verify grades only on exit code (todo_db.py:1809), and the correct behaviour there is a NON-ZERO exit. Root cause is shared with todo-verify-grades-only-on-exit-code: nothing checks that a rung's command actually encodes its expectation, and verifications are create-time-only so a bad rung can never be repaired. Sweep the corpus (2968 verifications across 1587 items) for rungs whose command is a bare grep/invocation while the expectation is negative or output-shaped, and fix the authoring guidance so commands are self-asserting (exit 0 iff satisfied).",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-28T23:11:04Z",
+        "from_item": "verification-rungs-authored-with-unsatisfiable-commands",
+        "id": 655,
+        "reason": "Sweep result with lint --include-done across 1626 items: exactly 2 unsatisfiable rungs remain -- results-explorer-qa-pass2-fixes seq 8 ('Page renders the NotFound component, not DOES-NOT-EXIST Results' with command 'open http://...', which always exits 0) and timing-policy-check-misreports-pytest-failure-as-violation seq 1 (expects output while the correct behaviour is a non-zero exit). BOTH are on state=done items. They cannot be fixed: verifications are create-time-only in this wrapper, the update verb is standalone-only (todo-db >= 0.3, see adopt-todo-db-standalone-cli-for-amendable-items), and amending a finished item is refused by design anyway -- a done record is history. So the sweep's repair half is not actionable until the adoption item lands, and even then amending done items is a separate policy question. Also correcting the record: PR #1311's body claimed this rule flags '8 of 2958 (0.27%)'. That figure came from a DRAFT regex in my calibration script, not from the rule that shipped. The shipped _EXPECTED_NEGATES_OUTPUT_RE binds 'must not' to an output verb (print|contain|report|emit|include|output|show) and has no 'rather than'/'instead of' alternations, so it flags 2, not 8. The narrower rule is the correct one -- 'must not fail with X' and 'instead of failing setup' ARE expressible by exit code, so the extra 6 were false positives -- but the published number was measured against code that was never merged.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Recorded as the sweep's finding rather than as further work. The 2 remaining rungs are on done items, which are immutable by design ('a finished item is history'), so there is nothing to schedule: repair depends entirely on adopt-todo-db-standalone-cli-for-amendable-items, which is already tracked, plus a separate policy call on whether done items may ever be amended. The corrected flag count (2, not the 8 published in PR #1311) is captured here and in this item's PR body so the number is not left wrong in the record.",
+        "summary": "The 2 rungs the sweep found sit on done items and cannot be repaired by any current mechanism"
+      }
+    ],
+    "item_meta": {
+      "completed_at": "2026-07-28T23:12:12Z",
+      "completed_pr": 1322,
+      "created_at": "2026-07-25T17:40:52Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing rung history stays auditable - amendments are logged",
+        "item_id": "verification-rungs-authored-with-unsatisfiable-commands"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "verification-rungs-authored-with-unsatisfiable-commands",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -k todo -q",
+        "description": "Tracker unit tests pass",
+        "expected": "exit 0",
+        "item_id": "verification-rungs-authored-with-unsatisfiable-commands",
+        "last_result": "fail",
+        "last_run": "2026-07-28T23:07:42Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

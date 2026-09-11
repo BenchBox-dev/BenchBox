@@ -1,0 +1,16 @@
+{
+  "description": "Implement create_schema() with SQLGlot translation from DuckDB dialect\nto Spark SQL dialect, handling Spark-specific limitations.\n\nSpark SQL has different DDL constraints than DuckDB:\n- CHECK constraints not supported\n- PRIMARY KEY is informational only (not enforced)\n- Different DECIMAL precision limits\n- Supports PARTITIONED BY for performance tuning\n- Supports USING clause for file format (PARQUET, DELTA)",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pyspark-sql-schema-translation",
+        "needs_item": "pyspark-sql-adapter-core"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2025-12-07T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

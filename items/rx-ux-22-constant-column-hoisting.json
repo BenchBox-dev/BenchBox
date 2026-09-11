@@ -1,0 +1,164 @@
+{
+  "context": "Implement hoisting for columns that are constant because of the route's query shape, computed once from the route contract rather than from the rendered rows. State the hoisted value in the caption. Sparse and filter-constant columns are explicitly out of scope; add a test asserting a sparse column survives.",
+  "description": "Columns whose value is constant by construction of a route spend table width repeating themselves. On the Platforms page 'Metric contract' repeats the same string across most rows, wrapping to two lines and roughly doubling row height.\n\nTwo corrections established by review that bound this item tightly:\n1. Dynamic removal - hiding a column because it happens to be constant for the CURRENT filter or page - causes columns to pop in and out, shifting layout, churning aria-colindex, and breaking e2e selectors. Only route-constant columns may be hoisted.\n2. Sparse is not empty. Platforms' 'Power score' is populated for 2 of 16 DuckDB rows, not 0. A sparse column must never be removed.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "hide a column because it is constant for the current filter or page",
+        "instead": "hoist only route-constant columns",
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "why": "dynamic removal shifts layout and breaks screen-reader column indexing"
+      },
+      {
+        "dont": "treat a sparse column as empty",
+        "instead": "keep it",
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "why": "Platforms' power score is populated for 2 of 16 rows; removing it would drop real data"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T18:58:37Z",
+      "completed_pr": 1823,
+      "created_at": "2026-08-22T14:50:08Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing e2e table selectors",
+        "item_id": "rx-ux-22-constant-column-hoisting"
+      },
+      {
+        "behavior": "Sparse columns, which stay visible",
+        "item_id": "rx-ux-22-constant-column-hoisting"
+      },
+      {
+        "behavior": "aria-colindex/aria-colcount stability across filters and pages",
+        "item_id": "rx-ux-22-constant-column-hoisting"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/DataTable.tsx"
+      },
+      {
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/**"
+      },
+      {
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "last_result": "pass",
+        "last_run": "2026-08-23T13:57:43Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium e2e/capability/accessibility-regressions.spec.ts",
+        "description": "Accessibility regression suite passes",
+        "expected": "no new axe violations",
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "last_result": "pass",
+        "last_run": "2026-08-23T13:57:50Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'constant column'",
+        "description": "Sparse columns retained and column indexing stable",
+        "expected": "power score column present; aria-colindex unchanged across filter changes",
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "last_result": "pass",
+        "last_run": "2026-08-23T13:57:56Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PlatformIndex computes metric-contract constancy from all unfiltered rows for the route; filter/page subsets never control column presence.",
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "notes": null,
+        "started_at": "2026-08-22T18:52:15Z",
+        "started_branch": "fix/rx-ux-22-constant-column-hoisting",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-22-constant-column-hoisting",
+        "status": "done",
+        "summary": "Compute route-constant columns from the route contract",
+        "wid": "w1"
+      },
+      {
+        "evidence": "A route-wide metric contract is removed from row cells and rendered in the native DataTable caption with aria-colcount updated.",
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "notes": null,
+        "started_at": "2026-08-22T18:52:20Z",
+        "started_branch": "fix/rx-ux-22-constant-column-hoisting",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-22-constant-column-hoisting",
+        "status": "done",
+        "summary": "Render hoisted values in the table caption",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Unit and Chromium constant-column tests retain Power score including sparse values and keep Metric contract when only the active filter makes it constant.",
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "notes": null,
+        "started_at": "2026-08-22T18:52:25Z",
+        "started_branch": "fix/rx-ux-22-constant-column-hoisting",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-22-constant-column-hoisting",
+        "status": "done",
+        "summary": "Test: sparse column survives; filter-constant column is not hoisted",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Headers and cells expose explicit aria-colindex; unit and Chromium tests prove Power score stays at index 8 across DuckDB benchmark filter changes (index 7 only on a route where Metric contract is hoisted).",
+        "item_id": "rx-ux-22-constant-column-hoisting",
+        "notes": null,
+        "started_at": "2026-08-22T18:52:30Z",
+        "started_branch": "fix/rx-ux-22-constant-column-hoisting",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-22-constant-column-hoisting",
+        "status": "done",
+        "summary": "Test: aria-colindex stable across filter and page changes",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "description": "Architecture reviews still default to McCabe, file size, and shrink credit, which are already green. Add an extension-cost axis: files and contracts required to add one SQL platform, one DataFrame platform, and one benchmark family. Treat that number as the primary complexity metric; treat McCabe and cloc as hygiene only. Do not recommend further autonomous file splits as the answer. Coordinate with architecture-review-ops-corpus-inventory but keep the measurements distinct.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-17T14:45:37Z",
+      "completed_pr": 1762,
+      "created_at": "2026-08-17T13:16:14Z",
+      "worktree": "quality-governance"
+    },
+    "scope_rules": [
+      {
+        "item_id": "architecture-review-extension-cost-axis",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "architecture-review-extension-cost-axis",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.skill-sync/skills/**"
+      },
+      {
+        "item_id": "architecture-review-extension-cost-axis",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/review-protocol.md"
+      },
+      {
+        "item_id": "architecture-review-extension-cost-axis",
+        "kind": "only_modify",
+        "path_glob": "docs/development/quality-gate-policy.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'extension-cost|extension cost' docs/agent/review-protocol.md docs/development/quality-gate-policy.md",
+        "description": "Guidance names extension-cost as the primary complexity metric",
+        "expected": "match",
+        "item_id": "architecture-review-extension-cost-axis",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "architecture-review-extension-cost-axis",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Defined extension-cost as files/contracts to add one SQL platform, one DataFrame platform, and one benchmark family.",
+        "item_id": "architecture-review-extension-cost-axis",
+        "notes": null,
+        "started_at": "2026-08-17T14:33:19Z",
+        "started_branch": "docs/review-protocol-axes-20260817",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-review-protocol-axes-20260817",
+        "status": "done",
+        "summary": "Define the extension-cost measurement for one SQL platform, one DataFrame platform, and one benchmark family",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added extension-cost axis to docs/agent/review-protocol.md and recorded McCabe/cloc as hygiene in docs/development/quality-gate-policy.md.",
+        "item_id": "architecture-review-extension-cost-axis",
+        "notes": null,
+        "started_at": "2026-08-17T14:33:56Z",
+        "started_branch": "docs/review-protocol-axes-20260817",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-review-protocol-axes-20260817",
+        "status": "done",
+        "summary": "Add the extension-cost axis to architecture-review guidance and treat McCabe/cloc as hygiene",
+        "wid": "w1"
+      }
+    ]
+  }
+}

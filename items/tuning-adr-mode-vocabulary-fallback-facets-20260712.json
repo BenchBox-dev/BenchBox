@@ -1,0 +1,80 @@
+{
+  "description": "Decision gate from the 2026-07-12 tuning-system deep review (evidence pinned to\ncommit acfb8992; findings C4-C6).\n\nDecisions needed before mode/facet implementation work:\n\n1. FALLBACK LABELING. `--tuning tuned` with no template silently runs a bare\n   default config still labeled \"tuned\" (benchbox/cli/tuning_resolver.py:295-307,\n   benchbox/cli/commands/run.py:1016-1022) and facet-matches curated-template\n   runs. Options: keep, introduce a distinct mode (e.g. tuned-fallback /\n   constraints), or refuse in non-interactive / --official runs.\n2. MODE VOCABULARY PIN. Python emits tuned/notuning/auto/<raw path> plus\n   \"balanced\" (benchbox/cli/tuning.py:52,56); the explorer knows\n   tuned/notuning/auto and defaults missing to \"untuned\"\n   (results-explorer/src/lib/facetMatching.ts:99). Decide the canonical value\n   set, whether raw file paths are a legal mode value (they leak local paths into\n   bundles), and how absent-vs-baseline must be distinguished.\n3. CROSS-PLATFORM \"TUNED\" FACET. Platform X tuned may render 6 physical\n   mechanisms while platform Y renders zero; the facet matches them. Decide\n   whether facet matching stays mode-string-based, incorporates\n   physical_rendering_id / mechanism counts, or adds a receipt-level warning.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "tuning-adr-mode-vocabulary-fallback-facets-20260712",
+        "id": 279,
+        "reason": "Owned by tuning-mode-vocabulary-and-facet-implementation-20260712",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Owning item tuning-mode-vocabulary-and-facet-implementation-20260712 is now in _project/DONE; the implementation work was completed there.",
+        "summary": "Implementation across resolver, schema, explorer"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture Decision",
+      "completed_at": "2026-07-12T00:00:00Z",
+      "created_at": "2026-07-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "prior_art": [
+      {
+        "concept": "benchbox/core/schemas.py:497: current free-string tuning_mode contract (comment-only) — supersede with pinned vocabulary",
+        "decision": "supersede",
+        "item_id": "tuning-adr-mode-vocabulary-fallback-facets-20260712",
+        "path": "benchbox/core/schemas.py:497"
+      },
+      {
+        "concept": "results-explorer/src/components/TuningBadge.tsx TUNING_CONFIG: current TS-side value set — reuse as starting vocabulary",
+        "decision": "reuse",
+        "item_id": "tuning-adr-mode-vocabulary-fallback-facets-20260712",
+        "path": "results-explorer/src/components/TuningBadge.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "ls docs/development/ | grep -i 'tuning'",
+        "description": "Decision record exists with the canonical mode value set and fallback policy",
+        "expected": "Committed decision record enumerating mode values, fallback labeling, and facet-matching rule",
+        "item_id": "tuning-adr-mode-vocabulary-fallback-facets-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-adr-mode-vocabulary-fallback-facets-20260712",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-adr-mode-vocabulary-fallback-facets-20260712",
+        "notes": "Recommendations from the review: distinct fallback mode + refuse under --official; pinned shared vocabulary artifact consumed by Python and TS; mode stays coarse facet with mechanism-set warning in receipt and physical_rendering_id promoted to matchable facet for TPC.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Draft ADR with options and recommendations for fallback labeling, vocabulary pin, facet rule",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-adr-mode-vocabulary-fallback-facets-20260712",
+        "notes": "Joe adopted the recommended defaults on 2026-07-12. Decision recorded in\ndocs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md:\n\n1. FALLBACK LABELING: a `--tuning tuned` run with no template gets the\n   distinct mode value `tuned-fallback` (not `tuned`), and is refused under\n   `--official`. Wizard-produced configs get source provenance `wizard`.\n2. VOCABULARY PIN: canonical tuning_mode values are exactly `tuned`,\n   `tuned-fallback`, `notuning`, `auto`, `custom`. Raw file paths are not\n   legal mode values; custom-file runs emit `custom` + a template\n   ref/hash. The wizard's `balanced` string maps into this set as a\n   template flavor, not a mode. Absent/unrecorded is a distinct\n   \"not recorded\" state in ingest and UI, never coerced to `notuning`.\n   The vocabulary lives in one shared artifact consumed by both Python\n   and TypeScript test suites.\n3. FACET RULE: tuning_mode stays the coarse comparability facet with\n   exact-match semantics over the pinned vocabulary; ComparabilityReceipt\n   warns when two \"tuned\" runs have disjoint physical mechanism sets;\n   physical_rendering_id becomes a secondary matchable facet for TPC\n   benchmarks. Unknown/not-recorded never silently matches `notuning`.\n\nImplementation is deferred to tuning-mode-vocabulary-and-facet-implementation-20260712,\ntuning-explorer-ingest-mode-extraction-20260712, and\ntuning-soundness-test-coverage-20260712.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Joe decides; record decisions and the pinned vocabulary in a decision record referenced by both Python and TS test suites",
+        "wid": "w2"
+      }
+    ]
+  }
+}

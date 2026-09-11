@@ -1,0 +1,73 @@
+{
+  "description": "The codebase has inconsistent file format detection patterns that fail to handle:\n1. Compressed files: `data.parquet.zst`, `data.csv.gz`\n2. Sharded files: `data.parquet.1`, `data.csv.2`, `data.tbl.1.zst`\n\nSome locations use `is_tpc_format()` which correctly handles compression, but then\ncheck `.parquet` or `.csv` directly on the suffix which breaks for compressed/sharded files.\n\nThe existing `is_tpc_format()` utility correctly iterates through suffixes skipping\ncompression extensions. We need analogous utilities for parquet and csv detection,\nthen update all locations using direct suffix checks.\n\nThis is a follow-up to the TPC delimiter detection consolidation work.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change function signatures",
+        "instead": "only change the internal implementation",
+        "item_id": "consolidate-file-format-detection",
+        "why": "callers depend on the current API"
+      },
+      {
+        "dont": "create a generic format detector class",
+        "instead": "follow the is_tpc_format() function style",
+        "item_id": "consolidate-file-format-detection",
+        "why": "simple predicate functions match the existing codebase pattern"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality",
+      "completed_at": "2026-02-07T00:00:00Z",
+      "created_at": "2026-01-27T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform tests continue to pass",
+        "item_id": "consolidate-file-format-detection"
+      },
+      {
+        "behavior": "Existing file format detection behavior for uncompressed files unchanged",
+        "item_id": "consolidate-file-format-detection"
+      },
+      {
+        "behavior": "is_tpc_format() API and return values unchanged",
+        "item_id": "consolidate-file-format-detection"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "consolidate-file-format-detection",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/"
+      },
+      {
+        "item_id": "consolidate-file-format-detection",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -m fast --tb=short -q",
+        "description": "All fast tests pass after refactoring",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "consolidate-file-format-detection",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox/",
+        "description": "Lint passes",
+        "expected": "no errors",
+        "item_id": "consolidate-file-format-detection",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

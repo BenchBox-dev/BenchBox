@@ -1,0 +1,55 @@
+{
+  "context": "Normalize Path inputs to the Snowflake stage grammar without broadening ordinary local path matching; retain anchored handling for @~, table, named, and qualified stages.",
+  "description": "Run 30434746317 fails is_snowflake_stage_path(Path('@~/benchbox')) because Windows stringifies Path with backslashes while the stage grammar accepts only forward slashes. The public helper explicitly accepts Path inputs, so behavior is platform-dependent.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-01T14:21:22Z",
+      "completed_pr": 1352,
+      "created_at": "2026-07-29T13:05:21Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "cloud URIs containing @ and ordinary local paths never classify as Snowflake stages",
+        "item_id": "windows-snowflake-stage-path-object-separators"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-snowflake-stage-path-object-separators",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/cloud_storage.py"
+      },
+      {
+        "item_id": "windows-snowflake-stage-path-object-separators",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/test_cloud_storage_snowflake_stage.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/utils/test_cloud_storage_snowflake_stage.py -q",
+        "description": "Snowflake stage classification tests pass",
+        "expected": "exit 0",
+        "item_id": "windows-snowflake-stage-path-object-separators",
+        "last_result": "pass",
+        "last_run": "2026-08-01T14:21:19Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Merged PR #1352 normalizes PurePath separators before Snowflake stage classification; focused current-develop tests passed.",
+        "item_id": "windows-snowflake-stage-path-object-separators",
+        "notes": null,
+        "started_at": "2026-08-01T14:21:11Z",
+        "started_branch": "fix/windows-canonical-newlines",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Normalize Path-object separators before Snowflake stage matching",
+        "wid": "w1"
+      }
+    ]
+  }
+}

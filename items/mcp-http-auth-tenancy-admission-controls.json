@@ -1,0 +1,316 @@
+{
+  "context": "Write a threat model first, then use the SDK authentication interface with TLS termination at the deployment boundary. Validate Host and Origin with TransportSecuritySettings. Derive an authenticated principal/workspace context for every request and use it to scope results, charts, exports, and execution records. Add authorization, per-principal rate/cost/scale/platform quotas, global and per-principal concurrency admission, bounded queues, and structured audit events. Reuse existing path containment and secret-scrubbing behavior; use durable shared stores for multi-worker limits rather than process globals. Keep remote binding gated behind explicit secure configuration that fails closed.",
+  "description": "The stdio subprocess boundary currently supplies implicit local trust. A remote HTTP endpoint would expose benchmark execution against configured databases plus result and chart file access. Stateless protocol requests do not provide authentication, authorization, tenant storage isolation, quotas, safe scheduling, or auditing. Build those controls before allowing any non-loopback bind or documenting a shared endpoint.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make 0.0.0.0 or :: the default bind address",
+        "instead": "default to loopback and require explicit secure remote configuration",
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "why": "it turns an opt-in local feature into an exposed execution surface"
+      },
+      {
+        "dont": "treat stateless MCP as an authentication or authorization mechanism",
+        "instead": "authenticate every request and authorize every protected operation",
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "why": "sessionless protocol transport does not establish identity or permissions"
+      },
+      {
+        "dont": "trust caller-supplied workspace or artifact paths",
+        "instead": "derive tenancy from the authenticated principal and resolve beneath server-owned roots",
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "why": "that permits cross-tenant access and traversal"
+      },
+      {
+        "dont": "use process-local dictionaries or semaphores as authoritative multi-worker quotas",
+        "instead": "coordinate limits through a durable shared backend",
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "why": "requests can alternate workers and processes restart"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "needs_item": "mcp-dual-transport-stateless-http"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "needs_item": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions"
+      }
+    ],
+    "item_meta": {
+      "category": "security",
+      "created_at": "2026-08-01T15:44:32Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing result-path containment and MCP error secret scrubbing remain enforced",
+        "item_id": "mcp-http-auth-tenancy-admission-controls"
+      },
+      {
+        "behavior": "Local stdio clients require no remote authentication configuration and retain current behavior",
+        "item_id": "mcp-http-auth-tenancy-admission-controls"
+      },
+      {
+        "behavior": "No credential, bearer token, database DSN, or raw secret material is written to logs or audit records",
+        "item_id": "mcp-http-auth-tenancy-admission-controls"
+      },
+      {
+        "behavior": "Remote bind remains fail-closed until authentication and transport-security configuration are valid",
+        "item_id": "mcp-http-auth-tenancy-admission-controls"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing MCP error shaping and secret scrubbing",
+        "decision": "extend",
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "path": "benchbox/mcp/errors.py"
+      },
+      {
+        "concept": "benchmark execution and result creation boundary",
+        "decision": "extend",
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "path": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "concept": "existing configured-root path containment",
+        "decision": "extend",
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "path": "benchbox/mcp/tools/path_utils.py"
+      },
+      {
+        "concept": "result discovery and artifact access",
+        "decision": "extend",
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "path": "benchbox/mcp/tools/results.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/benchmarks/**"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp*.md"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp*.md"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/**"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -q -k 'auth or origin or host or tenant or quota or admission or audit'",
+        "description": "Remote security and tenant-isolation unit coverage passes",
+        "expected": "all selected security controls pass",
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_tenant_isolation.py -q",
+        "description": "Cross-principal artifact and execution access is denied",
+        "expected": "principal A cannot list, read, cancel, or export principal B resources",
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_admission_control.py -q",
+        "description": "Concurrent calls obey durable rate and admission limits across workers",
+        "expected": "configured global and principal limits hold across two workers",
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_cli.py -q -k 'remote and fail_closed'",
+        "description": "Remote binding fails closed without complete secure configuration",
+        "expected": "non-loopback startup is rejected without auth and transport-security settings",
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_secret_egress.py -q",
+        "description": "Credential sentinel fixtures are absent from HTTP responses, audit records, traces, and captured logs",
+        "expected": "tests inject MCP_SECRET_SENTINEL through credentials and failing drivers, then assert it is absent from every observable surface",
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document assets, principals, trust boundaries, abuse cases, and fail-closed remote deployment requirements",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Integrate SDK authentication plus Host and Origin validation without logging credentials",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Introduce authenticated principal and workspace context and tenant-scope all result, chart, export, and execution access",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add authorization rules for benchmark execution, configured platforms, scale factors, and artifact reads",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement durable per-principal quotas, rate limits, bounded queues, and global/per-principal concurrency admission",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Emit redacted audit records linking principal, tool, execution ID, decision, and artifact",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-http-auth-tenancy-admission-controls",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add adversarial tests for missing/invalid auth, hostile Host/Origin, cross-tenant reads, quota bypass, overload, and secret egress",
+        "wid": "w7"
+      }
+    ]
+  }
+}

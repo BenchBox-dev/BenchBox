@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #253 of results-explorer-uat-defect-spark-pyspark-expression-compat.\nDeferred: Spark SQL TPCHavoc scalar subquery and dual rewrites\nReason deferred: Query-family-specific SQL compatibility work, not the shared schema retry failure.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:10Z",
+      "worktree": "main"
+    }
+  }
+}

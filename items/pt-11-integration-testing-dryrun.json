@@ -1,0 +1,44 @@
+{
+  "description": "Final integration work to ensure physical tuning is properly wired through\nthe entire system, with comprehensive testing and enhanced dry-run output.\n\n## Integration Goals\n\n1. **Tuning Config → DDL Flow**: Ensure tuning YAML reaches DDL generators\n2. **Dry-Run Enhancement**: Show exact DDL that will be executed\n3. **Result Recording**: Record applied tuning in benchmark results\n4. **Performance Validation**: Measure impact of tuning on query performance\n\n## Why This Is Separate\n\nThis TODO depends on all platform-specific DDL generators being complete.\nIt handles cross-cutting concerns that span multiple platforms.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pt-11-integration-testing-dryrun",
+        "needs_item": "pt-01-ddl-generator-protocol"
+      },
+      {
+        "item_id": "pt-11-integration-testing-dryrun",
+        "needs_item": "pt-03-redshift-ddl"
+      },
+      {
+        "item_id": "pt-11-integration-testing-dryrun",
+        "needs_item": "pt-04-duckdb-ddl"
+      },
+      {
+        "item_id": "pt-11-integration-testing-dryrun",
+        "needs_item": "pt-05-postgresql-timescaledb-ddl"
+      },
+      {
+        "item_id": "pt-11-integration-testing-dryrun",
+        "needs_item": "pt-06-trino-presto-athena-ddl"
+      },
+      {
+        "item_id": "pt-11-integration-testing-dryrun",
+        "needs_item": "pt-07-snowflake-ddl"
+      },
+      {
+        "item_id": "pt-11-integration-testing-dryrun",
+        "needs_item": "pt-08-databricks-spark-ddl"
+      },
+      {
+        "item_id": "pt-11-integration-testing-dryrun",
+        "needs_item": "pt-09-bigquery-ddl"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-01-03T00:00:00Z",
+      "worktree": "physical-tuning"
+    }
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "description": "PR #269 changed the `<a>` rule in `results-explorer/src/index.css` to:\n\n```css\na       { color: var(--bb-accent-hover); }   /* #1f6feb */\na:hover { color: var(--bb-accent); }         /* #58a6ff */\n```\n\nOn light data surfaces this produces a *lighter* blue on hover, inverting\nthe conventional darker-on-hover affordance most users expect. The token\nsemantics are partly to blame: `--bb-accent` and `--bb-accent-hover` were\nnamed for the dark global chrome where `--bb-accent-hover` is the deeper\npressed-state and `--bb-accent` is the lighter resting state.\n\nTwo clean fixes, pick one:\n\n  a) Swap the `a` and `a:hover` colors so resting state is `--bb-accent`\n     (or a new `--bb-link-fg` token) and hover is `--bb-accent-hover`,\n     making hover darker on light surfaces. This matches the conventional\n     affordance.\n\n  b) Introduce dedicated `--bb-link-fg` / `--bb-link-fg-hover` tokens so\n     `<a>` styling is independent of the dark-chrome accent semantics.\n\nThe decision is design-owned. Until the design call lands, the current\nrule is shipped on develop and observable on every link in the explorer,\nincluding breadcrumbs, methodology disclosures, tuning expand toggles,\nand data tables.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the rule without testing both light and dark chrome surfaces",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-link-hover-direction",
+        "why": "the dark chrome relies on the accent token producing legible text."
+      },
+      {
+        "dont": "reintroduce raw Tailwind `text-blue-*`/`text-brand-*` classes on `<a>`",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-link-hover-direction",
+        "why": "the rule must stay token-driven."
+      }
+    ],
+    "item_meta": {
+      "category": "Polish",
+      "completed_at": "2026-05-08T00:00:00Z",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing focus-visible ring behavior on links.",
+        "item_id": "results-explorer-retheme-link-hover-direction"
+      },
+      {
+        "behavior": "WCAG AA contrast on resting and hover states for both light data surfaces and dark chrome surfaces.",
+        "item_id": "results-explorer-retheme-link-hover-direction"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-retheme-link-hover-direction",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-retheme-link-hover-direction",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-retheme-link-hover-direction",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      },
+      {
+        "item_id": "results-explorer-retheme-link-hover-direction",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/"
+      },
+      {
+        "item_id": "results-explorer-retheme-link-hover-direction",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test -- --run && npx playwright test --project=chromium --workers=1 --grep-invert @performance",
+        "description": "Targeted unit + e2e suites stay green",
+        "expected": "no regressions",
+        "item_id": "results-explorer-retheme-link-hover-direction",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-retheme-link-hover-direction",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-retheme-link-hover-direction",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-link-hover-direction",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide between option (a) swap accent tokens or (b) introduce dedicated link tokens",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-link-hover-direction",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the chosen fix and update any docs that reference --bb-accent in link contexts",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-link-hover-direction",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Spot-check breadcrumbs, methodology disclosures, tuning toggles, and data tables in a real browser at 390/768/1280 widths",
+        "wid": "w3"
+      }
+    ]
+  }
+}

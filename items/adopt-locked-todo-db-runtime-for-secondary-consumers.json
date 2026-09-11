@@ -1,0 +1,144 @@
+{
+  "context": "Use the canonical todo-db init-project/wrapper contract or an equivalent thin wrapper backed by a project-local uv lock. Remove absolute and sibling paths. Do not copy tracker source into either consumer.",
+  "description": "After BenchBox's package-only runtime is certified, migrate other consumers that currently depend on a sibling todo-db checkout or an absolute developer path. Apply the same locked-package contract to Oxbow and textcharts only after repository ownership, database identity, and clean-clone expectations are confirmed. This is a follow-up, not a prerequisite for the BenchBox cutover.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assume the non-git Oxbow/textcharts directories are safe to mutate",
+        "instead": "Inventory and request owner authorization before implementation",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "why": "Their ownership and recovery boundaries require explicit confirmation"
+      },
+      {
+        "dont": "Use /Users/joe/Developer/todo-db or ../todo-db as the release contract",
+        "instead": "Use a project-local locked package environment",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "why": "That is not portable to a fresh clone or cloud runner"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "created_at": "2026-08-10T20:43:31Z",
+      "worktree": "todo-db-standalone-extraction"
+    },
+    "preserves": [
+      {
+        "behavior": "Each consumer retains a distinct project-bound database",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers"
+      },
+      {
+        "behavior": "No secondary consumer receives a copied tracker implementation",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers"
+      },
+      {
+        "behavior": "No token or hosted DSN credential is committed",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers"
+      },
+      {
+        "behavior": "Work stops if repository ownership or writable scope is ambiguous",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.skill-sync/skills/todo/**"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/Oxbow/_project/scripts/todo"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/Oxbow/skill-sync.yaml"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/textcharts/_project/scripts/todo"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/textcharts/skill-sync.yaml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! rg -n '/Users/joe/Developer/todo-db|../todo-db' /Users/joe/Developer/Oxbow/_project/scripts/todo /Users/joe/Developer/textcharts/_project/scripts/todo",
+        "description": "No secondary wrapper contains an absolute or sibling todo-db path",
+        "expected": "exit 0",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "false",
+        "description": "Secondary wrapper verification is replaced with a self-asserting clean-clone command after ownership and package manifests are confirmed",
+        "expected": "This deliberate placeholder keeps the item from completing until the consumer-specific command is authored",
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Inventory Oxbow and textcharts ownership, manifests, target databases, and current wrapper paths",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Pin the released todo-db package and replace non-portable runtime resolution",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "adopt-locked-todo-db-runtime-for-secondary-consumers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run clean-clone wrapper, identity, lease-safety, and local/hosted backend checks",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Implement DataFrame (Polars, Pandas, PySpark, DataFusion) versions of all 136 Read\nPrimitives queries. This benchmark tests fundamental database read operations and is\nthe ideal candidate for DataFrame expansion - it uses the TPC-H schema (already\nsupported by DataFrame loaders) and covers operations that map well to DataFrame APIs.\n\nThe Read Primitives catalog includes queries across 29 categories:\n- Aggregation (13 queries): COUNT, SUM, AVG, COUNT DISTINCT, GROUP BY\n- Filter (10 queries): WHERE clauses, predicate pushdown\n- Optimizer (13 queries): Subquery decorrelation, join reordering, constant folding\n- Array (9 queries): ARRAY operations, UNNEST, array aggregations\n- String (11 queries): LIKE, CONCAT, SUBSTRING, string functions\n- Order By (8 queries): Sorting, TOP-N, ORDER BY ALL\n- Window (6 queries): ROW_NUMBER, RANK, LAG/LEAD, aggregate windows\n- Qualify (6 queries): QUALIFY clause for window filtering\n- Shuffle (5 queries): Data redistribution patterns\n- Group By (5 queries): GROUP BY ALL, GROUP BY ROLLUP/CUBE\n- And 19 more categories with 1-4 queries each\n\nImplementation follows the established TPC-H DataFrame pattern using:\n- Expression family (Polars, PySpark, DataFusion): ctx.col(), ctx.lit(), lazy expressions\n- Pandas family (Pandas, Modin, Dask, cuDF): df['column'], boolean indexing, eager ops",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-25T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

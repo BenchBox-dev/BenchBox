@@ -1,0 +1,130 @@
+{
+  "description": "`supports_acl('duckdb')` currently returns `True` (or a non-False value)\nbecause 'duckdb' is missing from the `no_acl` frozenset in\n`benchbox/core/metadata_primitives/ddl.py:583`. DuckDB is a Tier 4\nplatform that does not support ACL / GRANT/REVOKE semantics, consistent\nwith its classification in `catalog/queries.yaml:1435-1438`.\n\nSurfaced as a pending work item (w2) in the DONE file for\n`reconcile-docs-review-code-followups` (completed 2026-04-16). Items w1\n(HashAlgorithm Literal narrowing) and w3 (stream cursor call sites) were\ncompleted; w2 was never executed.\n\nThe fix is a one-line change. The anti_pattern note from the DONE file\nspecifies: do NOT change supports_acl_introspection / role_hierarchy /\ncolumn_grants for DuckDB — those already correctly return False — only the\n`no_acl` set needs 'duckdb' added.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change supports_acl_introspection/role_hierarchy/column_grants for DuckDB",
+        "instead": "only the no_acl set needs updating",
+        "item_id": "duckdb-supports-acl-no-acl-set-fix",
+        "why": "those already return False"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All other platform ACL classifications are unaffected",
+        "item_id": "duckdb-supports-acl-no-acl-set-fix"
+      },
+      {
+        "behavior": "supports_acl_introspection('duckdb'), role_hierarchy('duckdb'), and column_grants('duckdb') remain unchanged (already return False correctly)",
+        "item_id": "duckdb-supports-acl-no-acl-set-fix"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/metadata_primitives/ddl.py:583 — add 'duckdb' to the no_acl set here",
+        "decision": "reuse",
+        "item_id": "duckdb-supports-acl-no-acl-set-fix",
+        "path": "benchbox/core/metadata_primitives/ddl.py:583"
+      },
+      {
+        "concept": "catalog/queries.yaml:1435-1438 — DuckDB Tier 4 classification; no ACL support",
+        "decision": "reuse",
+        "item_id": "duckdb-supports-acl-no-acl-set-fix",
+        "path": "catalog/queries.yaml:1435-1438"
+      },
+      {
+        "concept": "reconcile-docs-review-code-followups DONE file — w2 was the missed work item",
+        "decision": "reuse",
+        "item_id": "duckdb-supports-acl-no-acl-set-fix",
+        "path": "reconcile-docs-review-code-followups"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "duckdb-supports-acl-no-acl-set-fix",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/metadata_primitives/ddl.py"
+      },
+      {
+        "item_id": "duckdb-supports-acl-no-acl-set-fix",
+        "kind": "only_modify",
+        "path_glob": "tests/ (only if a test encodes the buggy True return value)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "python -c \"from benchbox.core.metadata_primitives.ddl import supports_acl; assert supports_acl('duckdb') is False, f'got {supports_acl(\\\"duckdb\\\")}'\" && echo OK",
+        "description": "supports_acl('duckdb') returns False after the fix",
+        "expected": "OK",
+        "item_id": "duckdb-supports-acl-no-acl-set-fix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -k metadata_primitives -m fast -q",
+        "description": "metadata_primitives tests pass",
+        "expected": "all tests pass",
+        "item_id": "duckdb-supports-acl-no-acl-set-fix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "duckdb-supports-acl-no-acl-set-fix",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "duckdb-supports-acl-no-acl-set-fix",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "duckdb-supports-acl-no-acl-set-fix",
+        "notes": "grep -n 'no_acl' benchbox/core/metadata_primitives/ddl.py\nConfirm 'duckdb' is absent from the set. Also verify:\n  python -c \"from benchbox.core.metadata_primitives.ddl import supports_acl; print(supports_acl('duckdb'))\"\nShould print True or raise; target is False after the fix.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm supports_acl('duckdb') still returns a non-False value at the cited line",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-supports-acl-no-acl-set-fix",
+        "notes": "One-line change: add 'duckdb' to the no_acl frozenset.\nDo NOT touch supports_acl_introspection, role_hierarchy, or column_grants\n— those already return False for DuckDB and are correct.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'duckdb' to the no_acl set in ddl.py:583",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "duckdb-supports-acl-no-acl-set-fix",
+        "notes": "uv run -- python -m pytest tests/ -k metadata_primitives -m fast -q\nIf any test asserts supports_acl('duckdb') is True, that test was\nencoding the bug — update it to assert False.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run metadata_primitives tests; update any test that encodes the old True return value",
+        "wid": "w2"
+      }
+    ]
+  }
+}

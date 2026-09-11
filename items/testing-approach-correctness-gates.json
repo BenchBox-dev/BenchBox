@@ -1,0 +1,460 @@
+{
+  "context": "Start with evidence refresh, because the prior review included both valid\nfindings and overstated conclusions. Then add the narrowest real-result\ndevelop-PR gate that preserves the important oracle. After that, make marker\nenforcement explicit and settle the medium-tier routing policy. Finish by\ncleaning only the named low-signal tests/docs and documenting the resulting\nlane contract.\n",
+  "description": "A testing-approach review correctly identified that BenchBox's strongest\nreal-result correctness oracle is not part of the develop PR gate:\n`tests/integration/test_local_platform_benchmark_matrix.py` is marked\n`integration + stress` and validates phase coverage, zero failed measurement\nqueries, benchmark query cardinality, and row counts against stored expected\nresults when available. The develop PR workflow runs only:\n`fast and not (slow or stress or resource_heavy or live_integration)`.\n\nThe review overreached in several places. Main/release and nightly workflows\ndo run non-fast integration coverage, and the release canary is release-gate\nevidence through freshness/checked-SHA policy. Mock usage is also not a\nrepo-wide defect by itself because many cloud/service adapters require SDK or\nservice doubles. Still, the rebuttal does not remove the central product risk:\na normal develop PR can merge without any small gated run proving that a real\nlocal benchmark produces a complete, correct result payload.\n\nThis TODO synthesizes both positions into a correction plan:\n  - add a bounded develop-PR real-result correctness gate without turning the\n    fast lane into the full stress matrix;\n  - make marker-strategy enforcement explicit instead of incidental;\n  - decide what `medium` means in automated lanes;\n  - retire coverage-theater and stale tests where examples show low\n    behavioral value;\n  - keep release/UAT/live-cloud policy separate from routine PR gates.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "broaden scope into live cloud, Docker service orchestration, or UAT release-gate policy.",
+        "instead": "(not specified)",
+        "item_id": "testing-approach-correctness-gates",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "choose a tiny scale if it removes expected-results validation without documenting the tradeoff.",
+        "instead": "(not specified)",
+        "item_id": "testing-approach-correctness-gates",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "delete mocked tests merely because they use mocks; delete or rewrite them when they validate implementation scaffolding instead of behavior.",
+        "instead": "(not specified)",
+        "item_id": "testing-approach-correctness-gates",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "edit TODO indexes by hand; regenerate them with the project TODO CLI.",
+        "instead": "(not specified)",
+        "item_id": "testing-approach-correctness-gates",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "promote the entire stress matrix into develop PR CI; the fix is a bounded correctness slice.",
+        "instead": "(not specified)",
+        "item_id": "testing-approach-correctness-gates",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use test-file counts or mock percentages as quality proof; inspect behavioral assertions and runtime contracts.",
+        "instead": "(not specified)",
+        "item_id": "testing-approach-correctness-gates",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "testing-approach-correctness-gates",
+        "id": 491,
+        "reason": "Useful after correctness lanes exist; not a prerequisite for closing the current CI routing gap.",
+        "resolution": "promoted",
+        "resolved_item": "evaluate-mutation-testing-on-dialect-result-model-core",
+        "resolved_reason": null,
+        "summary": "Evaluate mutation testing on dialect/result-model core"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "testing-approach-correctness-gates",
+        "id": 492,
+        "reason": "Requires credential, cost, and flake policy decisions outside this scoped testing-approach correction.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Make live cloud correctness release-blocking"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-06-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Develop PR feedback remains bounded; do not run the full stress matrix on every routine PR.",
+        "item_id": "testing-approach-correctness-gates"
+      },
+      {
+        "behavior": "Expected-results row-count validation must not be silently downgraded to mere nonzero-row smoke coverage.",
+        "item_id": "testing-approach-correctness-gates"
+      },
+      {
+        "behavior": "Live cloud, Docker service, and long-running UAT tests remain opt-in unless a separate policy TODO promotes them.",
+        "item_id": "testing-approach-correctness-gates"
+      },
+      {
+        "behavior": "Release canary freshness and checked-SHA evidence remain separate from routine develop PR attribution.",
+        "item_id": "testing-approach-correctness-gates"
+      },
+      {
+        "behavior": "SDK/service doubles remain allowed when they test orchestration behavior; only low-signal constructor-bypass/coverage-padding tests are targeted.",
+        "item_id": "testing-approach-correctness-gates"
+      },
+      {
+        "behavior": "The new correctness gate must fail on incomplete real benchmark execution, not only on CLI parsing or dry-run behavior.",
+        "item_id": "testing-approach-correctness-gates"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/pr.yml: extend develop PR code-impacting gates rather than replacing the fast lane",
+        "decision": "extend",
+        "item_id": "testing-approach-correctness-gates",
+        "path": ".github/workflows/pr.yml"
+      },
+      {
+        "concept": ".github/workflows/release-canary.yml: preserve asynchronous slow/resource-heavy release evidence",
+        "decision": "reuse",
+        "item_id": "testing-approach-correctness-gates",
+        "path": ".github/workflows/release-canary.yml"
+      },
+      {
+        "concept": ".github/workflows/test.yml: preserve main/release integration coverage semantics",
+        "decision": "reuse",
+        "item_id": "testing-approach-correctness-gates",
+        "path": ".github/workflows/test.yml"
+      },
+      {
+        "concept": "docs/operations/release-guide.md: preserve the documented release canary boundary",
+        "decision": "reuse",
+        "item_id": "testing-approach-correctness-gates",
+        "path": "docs/operations/release-guide.md"
+      },
+      {
+        "concept": "tests/integration/test_local_platform_benchmark_matrix.py: reuse its real benchmark completion, phase, cardinality, and expected-results assertions",
+        "decision": "reuse",
+        "item_id": "testing-approach-correctness-gates",
+        "path": "tests/integration/test_local_platform_benchmark_matrix.py"
+      },
+      {
+        "concept": "tests/unit/test_marker_strategy.py: reuse existing marker-policy assertions",
+        "decision": "reuse",
+        "item_id": "testing-approach-correctness-gates",
+        "path": "tests/unit/test_marker_strategy.py"
+      },
+      {
+        "concept": "tests/unit/test_standardized_test_commands.py: extend existing Makefile/workflow command ratchets",
+        "decision": "extend",
+        "item_id": "testing-approach-correctness-gates",
+        "path": "tests/unit/test_standardized_test_commands.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/release-canary.yml"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/validate-main-pr.yml"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/testing-approach-correctness-gates.yaml"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/power_test.py"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/release-guide.md"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "pytest-ci.ini"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "pytest.ini"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/README.md"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/e2e/test_local_platforms.py"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/test_local_platforms_smoke.py"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_benchmark_duckdb_execution.py.new"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_duckdb_olap_features.py.new"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_local_platform_benchmark_matrix.py"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/test_error_handling_consistency.py"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/databricks/test_databricks_df_adapter.py"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/databricks/test_databricks_df_adapter_coverage2.py"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/sql_compat/test_translate_sql_delegation.py"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_adjective_cleanup.py"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_marker_strategy.py"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_standardized_test_commands.py"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_pr_workflow_path_classifier.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_marker_strategy.py -q",
+        "description": "Marker strategy enforcement stays green after routing changes",
+        "expected": "all tests pass",
+        "item_id": "testing-approach-correctness-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_standardized_test_commands.py -q",
+        "description": "Command/workflow ratchets pass after CI target changes",
+        "expected": "all tests pass",
+        "item_id": "testing-approach-correctness-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-correctness-gate",
+        "description": "New bounded correctness lane proves real-result execution",
+        "expected": "passes and exercises real local benchmark execution",
+        "item_id": "testing-approach-correctness-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Broad pre-PR gate passes before opening implementation PR",
+        "expected": "passes",
+        "item_id": "testing-approach-correctness-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo show testing-approach-correctness-gates --json > /dev/null && _project/scripts/todo audit verify",
+        "description": "The completed item is readable and tracker history is intact",
+        "expected": "exit 0",
+        "item_id": "testing-approach-correctness-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "testing-approach-correctness-gates",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "testing-approach-correctness-gates",
+        "notes": "Evidence refreshed on 2026-06-01 against `origin/develop` in\n`fix/testing-approach-correctness-gates`.\n\nFindings:\n  - `.github/workflows/pr.yml` had only the fast coverage-bearing pytest\n    lane for develop PRs.\n  - `.github/workflows/test.yml` had release/main fast plus\n    integration-not-slow coverage but no bounded answer-set correctness\n    gate.\n  - `release-canary.yml` and `validate-main-pr.yml` intentionally keep\n    slow/resource-heavy release evidence separate from stress/live/UAT.\n  - `tests/integration/test_local_platform_benchmark_matrix.py` remained\n    `integration + stress` and still had phase, completion/cardinality,\n    and expected-result validation helpers.\n  - Marker counts were routing evidence only: medium 67, slow 63,\n    resource_heavy 14, stress 19.\n  - No existing non-stress local execution test provided an answer-set\n    row-count gate equivalent to the matrix helper.\n  - A strict first run of the all-query DuckDB/TPC-H slice failed because\n    no stored expected-results checks were evaluated; inspecting the JSON\n    showed measurement records use stream ids > 0, while answer files are\n    stream-0 only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refresh the testing-gate evidence against the current branch",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "testing-approach-correctness-gates",
+        "notes": "Implemented `make test-correctness-gate` using the existing matrix test\nnode `test_local_platform_benchmark_matrix[tpch-duckdb]`.\n\nContract:\n  - runs DuckDB/TPC-H at SF=1.0, not SF=0.01, so answer files are\n    available;\n  - sets `BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=6,14,15,17,19`, the\n    answer-backed query subset whose emitted row counts match stored\n    answer-set cardinalities;\n  - keeps phase coverage, zero-failure completion, and unique query\n    cardinality checks from the matrix helper;\n  - sets `BENCHBOX_STRICT_EXPECTED_RESULTS=1`, requiring all configured\n    gate queries to be checked against stored expected results;\n  - runs in develop PRs for code-impacting changes through\n    `.github/workflows/pr.yml`;\n  - also runs in `.github/workflows/test.yml` and is aggregated by\n    `release-required-result` for main/release PRs.\n  - existing PR workflow aggregator ratchets now assert\n    `ci-required-result` observes the correctness job.\n  - release workflow infrastructure ratchets now assert\n    `release-required-result` observes the correctness job.\n\nFollow-up (review of PR #737): the original `6,14,15,17,19` subset was a\nfalse oracle. The emitted result JSON recorded `rows=1` for every query\nbecause `PlatformAdapterCursor._extract_rows` collapses validated results to\nthe `first_row` sentinel, so `tpch/power_test.py` stored `len(rows)=1` rather\nthan the real cardinality; the only queries that \"passed\" were the five that\nhappen to expect exactly one row. Fixes landed:\n  - `tpch/power_test.py` now records `result_count` from the adapter-reported\n    `rows_returned`, so the JSON carries the true cardinality;\n  - the gate pins the reference qgen seed (`get_reference_seed`, previously\n    dead code) so stream-0 EXACT validation matches the stored answers;\n  - the subset is widened to the 18 answer-stable TPC-H queries\n    (`1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22`); Q11/Q16/Q18/Q20 are\n    excluded for documented answer-set boundary sensitivity;\n  - added a collectability ratchet and a develop-job `timeout-minutes`.\nVerified: `make test-correctness-gate` validates 18/18 EXACT in 36.08s.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design and implement a bounded develop-PR real-result correctness lane",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "testing-approach-correctness-gates",
+        "notes": "`make lint-markers` now performs both collection/registration validation\nand an explicit `tests/unit/test_marker_strategy.py -q` run. The command\nsurface ratchet asserts this does not drift back to collection-only\nbehavior.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make marker-strategy enforcement explicit in lint/preflight",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "testing-approach-correctness-gates",
+        "notes": "Policy encoded in `tests/README.md`: `medium` is an explicit local\nrouting tier, not an implicit CI guarantee. Correctness-relevant medium\ntests must be promoted into `fast`, an integration workflow, or\n`test-correctness-gate` when they become product-critical. The command\nsurface ratchet asserts the policy text remains present.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide the automated role of the medium tier",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "testing-approach-correctness-gates",
+        "notes": "Cleanup completed within the scoped files:\n  - rewrote Databricks DataFrame coverage helpers to construct\n    `DatabricksDataFrameAdapter` through its constructor with a fake\n    parent init, and removed stubbing of\n    `_build_query_result_with_validation`;\n  - deleted the stale `tests/unit/test_adjective_cleanup.py` smoke file;\n  - deleted the two committed `.py.new` integration stubs;\n  - removed hand-maintained E2E test counts from `tests/README.md`\n    (NOTE: the stale `specialized/` directory reference was NOT actually\n    removed here despite the original wording; it was corrected later\n    under testing-approach-oracle-hardening w5);\n  - removed the mock-the-`identify` SQL translation tests now covered by\n    the real sqlglot snapshot test, and strengthened two weak observable\n    SQL assertions;\n  - deleted the dead `test_invalid_queries_list_consistency` body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reduce coverage-theater tests and stale testing documentation",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "testing-approach-correctness-gates",
+        "notes": "Documented the final testing contract in `tests/README.md`,\n`docs/operations/release-guide.md`, and\n`docs/operations/repo-admin-settings.md`. The docs now distinguish the\ndevelop PR fast lane, develop/main correctness gate,\nintegration-not-slow release gate, release-canary slow/resource-heavy\nevidence, and advisory stress/live/UAT evidence.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the final testing contract and release boundary",
+        "wid": "w5"
+      }
+    ]
+  }
+}

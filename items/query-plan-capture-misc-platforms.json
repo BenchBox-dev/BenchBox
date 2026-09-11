@@ -1,0 +1,361 @@
+{
+  "context": "Start with MotherDuck (w1+w2) as the highest-confidence quick win — it reuses\nDuckDBQueryPlanParser with no new parsing code required. Then Databend (w3)\nbecause it runs locally. QuestDB (w4) is next since get_query_plan() already\nexists. Velox (w5) depends on the Presto/Trino TODO being done first. Doris and\nSingleStore (w6+w7) are lower priority since they require external cluster access.\ncuDF (w8) is documentation only. Consolidate all wiring tests in w9.\n",
+  "description": "Seven platforms each have distinct plan capture situations ranging from\ntrivial wiring to fundamental unsupportability. They are grouped here\nbecause they are lower priority than the main platform families and each\nrequires individual assessment before implementation.\n\nCurrent state:\n  1. QuestDB (benchbox/platforms/questdb.py:1219)\n     - get_query_plan(): ✅ implemented — but execute_query() delegates to\n       shared execute_sql_query() which does not call capture_query_plan().\n       QuestDB uses a non-standard HTTP REST API and its EXPLAIN format is\n       a JSON response specific to QuestDB's JITC compiler.\n     - No parser exists. No execute_query() override calls capture_query_plan().\n\n  2. VeloxAdapter (benchbox/platforms/velox.py:487)\n     - get_query_plan(): ✅ at line 487 — annotates VeloxColumnar vs JVM-fallback\n       nodes. Output is text with custom Velox operator names.\n     - No parser. No execute_query() capture call.\n     - Velox's EXPLAIN format (via Prestissimo) is JSON similar to Presto's format.\n       If PrestoTrinoQueryPlanParser is completed first (see presto-trino TODO),\n       Velox may be able to reuse it.\n\n  3. DatabendAdapter (benchbox/platforms/databend/adapter.py:579)\n     - get_query_plan(): ✅ at line 579. Databend uses `EXPLAIN <query>` returning\n       a text tree similar to DuckDB.\n     - execute_query() exists at line 502. No capture call.\n     - No parser exists.\n\n  4. MotherDuckAdapter (benchbox/platforms/motherduck.py:74)\n     - ✅ WIRED (commit d06fe3e3): get_query_plan(), get_query_plan_parser() reusing\n       DuckDBQueryPlanParser, and capture call in execute_query() all implemented.\n     - Unit tests for MotherDuck plan capture are not yet added (w9 pending).\n\n  5. cuDFAdapter (benchbox/platforms/cudf.py:594)\n     - get_query_plan(): ✅ at line 594 — but always returns None.\n       cuDF does not currently support EXPLAIN for its DataFrame or SQL layer.\n     - Resolution: document the limitation; mark as unsupported until cuDF\n       adds EXPLAIN support. No parser needed yet.\n\n  6. DorisAdapter (benchbox/platforms/doris.py)\n     - No get_query_plan() override. Inherits base (returns None).\n     - Doris supports `EXPLAIN <query>` with a text tree similar to MySQL EXPLAIN.\n     - No parser exists.\n\n  7. SingleStoreAdapter (benchbox/platforms/singlestore.py)\n     - No get_query_plan() override. Inherits base (returns None).\n     - SingleStore supports `EXPLAIN <query>` (MySQL-compatible).\n     - May be able to reuse or extend a MySQL/text-tree parser if one is added.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add Velox-specific operator name handling to PrestoTrinoAdapterBase",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-misc-platforms",
+        "why": "Velox extensions should be in VeloxAdapter."
+      },
+      {
+        "dont": "implement a cuDF parser stub expecting it will be called",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-misc-platforms",
+        "why": "cuDF always returns None and should continue to do so until upstream support exists."
+      },
+      {
+        "dont": "require a GPU or cuDF install for any unit tests.",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-misc-platforms",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "query-plan-capture-misc-platforms",
+        "id": 593,
+        "reason": "cuDF does not expose EXPLAIN or a plan inspection API. Defer until upstream cuDF adds support.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Blocked on upstream cuDF adding an EXPLAIN/plan-inspection API; external dependency, not BenchBox-actionable now.",
+        "summary": "cuDF EXPLAIN-based plan capture"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "query-plan-capture-misc-platforms",
+        "id": 594,
+        "reason": "This environment has no live Databend, QuestDB, Doris, or SingleStore\ncluster, so the parser fixtures under tests/fixtures/query_plans/ were\nsynthesized from each engine's documented EXPLAIN format rather than\ncaptured from a running server. The parsers, adapter wiring, and unit tests\nare complete and pass against those fixtures. A follow-up should run real\nEXPLAIN against each engine and diff against the fixtures, adjusting operator\nnames / indentation if the live output differs (especially: Databend's exact\nbox-drawing property keys, QuestDB's scan sub-operator names, Doris's\nEXPLAIN SHAPE PLAN availability on the deployed version, and SingleStore's\n\"|---\" connector spacing). The error-sentinel guard already prevents a\nmismatched/failed EXPLAIN from producing a bogus plan.\nTRACKED in its own item: query-plan-capture-misc-parser-live-validation\n(sibling of query-plan-capture-parser-live-validation, which covers the\nPresto/Trino, ClickHouse, and Spark synthetic-fixture parsers).\"\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Deferral text names its own tracking item explicitly; that item is open and covers exactly this live-cluster validation work. (tracked by query-plan-capture-misc-parser-live-validation)",
+        "summary": "Live-cluster validation of the Databend / QuestDB / Doris / SingleStore EXPLAIN fixtures"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-06-15T00:00:00Z",
+      "created_at": "2026-06-02T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All adapter execute_query() result dict shapes must not change for non-plan fields.",
+        "item_id": "query-plan-capture-misc-platforms"
+      },
+      {
+        "behavior": "MotherDuckAdapter must continue to work without a MotherDuck account for unit tests.",
+        "item_id": "query-plan-capture-misc-platforms"
+      },
+      {
+        "behavior": "Plan capture failure must be silent when strict_plan_capture=False for all seven platforms.",
+        "item_id": "query-plan-capture-misc-platforms"
+      },
+      {
+        "behavior": "cuDF adapter behavior must not change — get_query_plan() returning None is currently correct and expected.",
+        "item_id": "query-plan-capture-misc-platforms"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/query_plans/parsers/duckdb.py — reuse for MotherDuck (identical EXPLAIN format)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-misc-platforms",
+        "path": "benchbox/core/query_plans/parsers/duckdb.py"
+      },
+      {
+        "concept": "benchbox/core/query_plans/parsers/presto_trino.py — reuse for Velox (Prestissimo uses Presto JSON format)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-misc-platforms",
+        "path": "benchbox/core/query_plans/parsers/presto_trino.py"
+      },
+      {
+        "concept": "benchbox/platforms/duckdb.py:1038 — get_query_plan() text-EXPLAIN pattern",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-misc-platforms",
+        "path": "benchbox/platforms/duckdb.py:1038"
+      },
+      {
+        "concept": "benchbox/platforms/duckdb.py:1069 — get_query_plan_parser() lazy import pattern",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-misc-platforms",
+        "path": "benchbox/platforms/duckdb.py:1069"
+      },
+      {
+        "concept": "benchbox/platforms/questdb.py:1219 — existing QuestDB get_query_plan() to confirm format before writing parser",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-misc-platforms",
+        "path": "benchbox/platforms/questdb.py:1219"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/platform-expansion/planning/query-plan-capture-misc-platforms.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/databend.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/doris.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/questdb.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/registry.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/singlestore.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/cudf.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend/adapter.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/doris.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/motherduck.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/questdb.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/singlestore.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/velox.py"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/query_plans/"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_misc_plan_capture.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_misc_plan_capture.py -k motherduck -v",
+        "description": "MotherDuck plan capture wiring tests pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "query-plan-capture-misc-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_misc_plan_capture.py -v",
+        "description": "All new misc-platform unit tests pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "query-plan-capture-misc-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/ -q",
+        "description": "Full unit suite passes",
+        "expected": "0 failures, 0 errors",
+        "item_id": "query-plan-capture-misc-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "needs_wid": "w1",
+        "wid": "w9"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "needs_wid": "w2",
+        "wid": "w9"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "needs_wid": "w3",
+        "wid": "w9"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "needs_wid": "w4",
+        "wid": "w9"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "query-plan-capture-misc-platforms",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-misc-platforms",
+        "notes": "COMPLETED in PR #748 (develop commit e9999563; originally d06fe3e3 on the\nfeature branch). MotherDuckAdapter.get_query_plan() issues\nEXPLAIN (ANALYZE, FORMAT JSON) and get_query_plan_parser() returns\nDuckDBQueryPlanParser. Confirmed against the merged diff during the post-748\naudit. Dedicated MotherDuck wiring unit tests remain part of w9 (pending).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "MotherDuck: add get_query_plan() and get_query_plan_parser() reusing DuckDB components",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-misc-platforms",
+        "notes": "COMPLETED in PR #748 (develop commit e9999563). MotherDuckAdapter.execute_query()\nnow calls capture_query_plan() with the capture_plans guard and propagates\nquery_plan / plan_fingerprint / plan_capture_time_ms into the result dict.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "MotherDuck: integrate capture_query_plan() into execute_query()",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-misc-platforms",
+        "notes": "DONE. Implemented DatabendQueryPlanParser in\nbenchbox/core/query_plans/parsers/databend.py. Databend EXPLAIN emits a\nbox-drawing tree (\"├──\"/\"└──\"/\"│   \") where the operator name is a bare\nCamelCase line and properties are \"key: value\" child lines; the parser\nderives depth from the 4-char-per-level prefix, attaches property lines to\ntheir enclosing operator, and only nests on operator lines. Operator map\ncovers TableScan/ReadDataSource/ConstantTableScan→SCAN, HashJoin/RangeJoin→\nJOIN (join type from \"join type:\"), AggregateFinal/AggregatePartial plus the\nlegacy AggregatorTransform/FinalAggregator→AGGREGATE, Filter→FILTER,\nSort/SortingTransform→SORT, EvalScalar/Project→PROJECT, Limit→LIMIT,\nExchange→OTHER. Registered under dialect=\"databend\".\nDatabendAdapter: added get_query_plan_parser(), made get_query_plan() return\nNone on failure, and refactored execute_query() to call\n_merge_plan_capture_into_result() outside the try (so strict-mode\nPlanCaptureError propagates). Fixture: tests/fixtures/query_plans/\ndatabend_explain_sample.txt (synthesized from Databend's documented EXPLAIN\nformat; see deferred item for live-cluster validation).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Databend: collect EXPLAIN sample, implement DatabendQueryPlanParser",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-misc-platforms",
+        "notes": "DONE. Format correction: QuestDB's get_query_plan() (and its PG-wire\nEXPLAIN) returns the plan as an indented TEXT tree in a single QUERY PLAN\ncolumn — NOT a JSON object as the original note assumed. Implemented\nQuestDBQueryPlanParser in benchbox/core/query_plans/parsers/questdb.py for\nthat text tree: operator lines start upper-case (Sort, GroupBy, Async JIT\nFilter, PageFrame/DataFrame, Frame forward scan on: <table>, Hash Join,\netc.), property lines start lower-case (keys:/values:/filter:) and attach to\nthe nearest enclosing operator. Nesting is by relative indentation because\nQuestDB's step is not uniform. Registered under dialect=\"questdb\".\nQuestDBAdapter: added get_query_plan_parser() and overrode execute_query()\nto call _merge_plan_capture_into_result() after the shared\nexecute_sql_query() path (the rewriter is idempotent, so re-rewriting inside\nget_query_plan is safe). get_query_plan() keeps its existing error-string\nreturn on failure (pinned by test_questdb_adapter); the parser rejects that\nsentinel so capture degrades silently. Fixture:\ntests/fixtures/query_plans/questdb_explain_sample.txt.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "QuestDB: collect EXPLAIN sample, implement QuestDBQueryPlanParser",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-misc-platforms",
+        "notes": "DONE — and the original Presto/Trino premise was WRONG for this codebase.\nBenchBox's VeloxAdapter is Apache Gluten + Velox running ON Apache Spark\n(class bases: SparkLikeAdapterMixin, SparkDataLoadMixin,\nSparkQueryExecutionMixin; self._dialect = \"spark\"), NOT Prestissimo/Presto.\nVeloxAdapter.get_query_plan() issues Spark's `EXPLAIN EXTENDED` and annotates\nVeloxColumnar vs JVM-fallback nodes. The correct reuse is therefore\nSparkQueryPlanParser, not PrestoTrinoQueryPlanParser — so w5 was never truly\nblocked on the Presto/Trino TODO.\nNo new VeloxAdapter code was required: it already inherits execute_query()\nplan capture AND get_query_plan_parser() (→ SparkQueryPlanParser) from\nSparkQueryExecutionMixin. SparkQueryPlanParser already resolves Gluten\ntransformer operator names by substring (FilterExecTransformer→FILTER,\nHashAggregateTransformer→AGGREGATE, ShuffledHashJoinExecTransformer→JOIN,\nBatchScanTransformer→SCAN); the leading \"# Velox native execution\" annotation\nand logical-plan sections are skipped because the parser keys off the last\n\"== Physical Plan ==\" header. Registered \"velox\"→SparkQueryPlanParser in the\nregistry for platform-name lookups, and added a parser fixture + wiring tests.\nFixture: tests/fixtures/query_plans/velox_explain_extended_sample.txt.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Velox: assess plan format reuse and wire parser",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-misc-platforms",
+        "notes": "DONE. Decision: SEPARATE parsers — the two formats are structurally\ndifferent, so no shared MySQLCompatibleQueryPlanParser was created.\n  - Apache Doris (Nereids planner): plan capture uses `EXPLAIN SHAPE PLAN`,\n    which emits a clean dash-indented Physical* operator tree\n    (PhysicalResultSink / PhysicalHashJoin[INNER_JOIN] /\n    PhysicalOlapScan[table] ...). DorisQueryPlanParser parses depth from the\n    dash run (2 dashes per level) and reads the [...] qualifier for join\n    type / scanned table. DorisAdapter._explain_query_prefix() now defaults\n    to \"EXPLAIN SHAPE PLAN\" (still \"EXPLAIN VERBOSE\" for verbose); the\n    existing _format_query_plan_rows() already returns column 0.\n  - SingleStore: `EXPLAIN` returns a \"|---\" connector chain-tree where the\n    base pipeline is a parent→child chain and \"|---\" marks an extra (build)\n    branch. SingleStoreQueryPlanParser builds that chain-tree (depth from\n    4-char connector groups). SingleStoreAdapter adds a _format_query_plan_rows()\n    override to take column 0 so the parser gets clean tree text.\nBoth adapters: added get_query_plan_parser() and overrode execute_query() to\ncall _merge_plan_capture_into_result() after the shared MySQL-wire execution\npath. get_query_plan() keeps its existing error-string-on-failure contract\n(pinned by the adapter tests); the parsers reject that sentinel so capture\ndegrades silently. Registered \"doris\" and \"singlestore\" in the registry.\nFixtures: tests/fixtures/query_plans/{doris_shape_plan_sample.txt,\nsinglestore_explain_sample.txt} (synthesized from documented EXPLAIN output;\nsee deferred item for live-cluster validation).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Doris + SingleStore: assess EXPLAIN format compatibility; implement shared or separate parsers",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-misc-platforms",
+        "notes": "DONE as part of w6 (separate SingleStoreQueryPlanParser). SingleStoreAdapter\nnow has get_query_plan_parser()→SingleStoreQueryPlanParser, a\n_format_query_plan_rows() override for clean column-0 tree text, and an\nexecute_query() override that merges plan capture after the MySQL-wire\nexecution path (strict-mode PlanCaptureError propagates).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SingleStore: wire plan capture using parser chosen in w6",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-misc-platforms",
+        "notes": "DONE. Expanded the cuDFAdapter.get_query_plan() docstring to explain that\ncuDF's pandas-style DataFrame path (and its in-process SQL translation\nlayer) exposes no EXPLAIN / plan-inspection API, so it intentionally returns\nNone and capture records the absence rather than fabricating a plan. Added a\nforward-looking pointer: cudf-polars (the Polars GPU engine) does expose a\nlogical plan, so revisit this if BenchBox adopts that execution path.\nBehavior unchanged (still returns None); no parser, no wiring, no GPU needed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "cuDF: document EXPLAIN limitation and add an explicit unsupported comment",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-misc-platforms",
+        "notes": "DONE. Created tests/unit/platforms/test_misc_plan_capture.py covering\nMotherDuck, Databend, QuestDB, Velox, Doris, SingleStore:\n  - parser correctness against recorded fixtures (root operator type,\n    operator-type coverage, scanned tables, join-type INNER, scan count),\n  - empty/garbage input degrades gracefully (returns None, never raises),\n  - registry resolves every platform name to the expected parser,\n  - per-adapter wiring: get_query_plan_parser() returns the expected parser;\n    execute_query(capture_plans=True) stores query_plan + plan_fingerprint\n    via mock/fake connections; no EXPLAIN/plan when capture disabled; and a\n    successful query with an unavailable plan still returns status=SUCCESS.\nDatabend and SingleStore construction bypasses their missing driver deps via\nmonkeypatching check_platform_dependencies; no live cluster or GPU required.\nAll 39 cases pass; the full tests/unit/ suite is green.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for all newly wired adapters",
+        "wid": "w9"
+      }
+    ]
+  }
+}

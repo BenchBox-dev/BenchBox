@@ -1,0 +1,207 @@
+{
+  "context": "GUARDRAILS: single fat image - creating per-agent images or a registry.json is out of scope per GATE 0 locked decisions; USER agent stays the last Containerfile directive - any root entrypoint or su is a defect; one env-file for all AGENT_AUTH_ENVS, not one per var; auth secrets only via env-file, never CLI args (ps-visible) and never committed. Anti-patterns: no git add -A; no colons in work summaries when editing this item; compat shim must not reorder or eat flags.",
+  "description": "Generalize the image and launcher. Containerfile: rename user pi->agent (same UID/GID 1000) with compat symlink /home/pi -> /home/agent; add codex pinned via npm @openai/codex@VERSION with version assertion mirroring the pi pattern (Containerfile:86-91); claude is already installed. agents.d/{pi,claude,codex}.sh bash specs declaring AGENT_CMD, AGENT_AUTH_ENVS, AGENT_STATE_DIRS, AGENT_ALLOWLIST, AGENT_USES_PROXY, agent_render_config and agent_prompt_args hooks (prompt-flag syntax differs per agent - do NOT assume pi -p @file is universal). New entrypoint dispatcher runs as agent (SESSION_MODE=agent|persistent|shell). Extract lib/net.sh lib/gradle.sh lib/agents.sh into new scripts/agent-run.sh; scripts/run.sh becomes a compat shim (exec agent-run.sh --agent pi \"$@\"). Gradle cache dir renamed ~/.agent-container/gradle/<project> with one-time mv migration from ~/.pi-container-gradle. Home-path sweep must touch every /home/pi reference: run.sh:406,506-507,568,576,619,647 plus warmup mounts and GRADLE_USER_HOME.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "needs_item": "agentbox-phase1-egress-tinyproxy"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-07T04:00:18Z",
+      "created_at": "2026-08-07T00:01:45Z",
+      "worktree": "agent-container"
+    },
+    "preserves": [
+      {
+        "behavior": "Gradle isolation still prevents container paths leaking into host-visible project .gradle",
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch"
+      },
+      {
+        "behavior": "Legacy invocation PROJECT_DIR=... ./scripts/run.sh --model llama-local/... behaves identically to upstream",
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch"
+      },
+      {
+        "behavior": "No process inside any container runs as root (ps -o user shows only agent)",
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "kind": "do_not_modify",
+        "path_glob": "LICENSE"
+      },
+      {
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "kind": "do_not_modify",
+        "path_glob": "config/pi/**"
+      },
+      {
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/gradle-warmup.sh"
+      }
+    ],
+    "verifications": [
+      {
+        "command": null,
+        "description": "Agent matrix - for each of pi claude codex: --shell agent --version works (manual matrix, transcript in docs/spikes.md)",
+        "expected": null,
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Sandboxed real round-trip per agent - pi via socat path, claude+codex via proxy (manual, transcript in docs/spikes.md)",
+        "expected": null,
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Detach mode completes and exits for each agent (manual, transcript)",
+        "expected": null,
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd ~/Developer/agent-container && ! grep -rn \"/home/pi\" scripts/ lib/ --include=\"*.sh\" | grep -v \"symlink\"",
+        "description": "No stray /home/pi in scripts",
+        "expected": null,
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "last_result": "pass",
+        "last_run": "2026-08-07T04:00:06Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd ~/Developer/agent-container && grep -q \"agent-run.sh --agent pi\" scripts/run.sh",
+        "description": "Compat shim exists",
+        "expected": null,
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "last_result": "pass",
+        "last_run": "2026-08-07T04:00:08Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "post-Phase-1 sweep: 11 /home/pi hits all in scripts/run.sh (6,778,878,883,1006,1115,1123,1156,1167,1186,1196); all resolved",
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "notes": null,
+        "started_at": "2026-08-07T03:59:48Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-validate the /home/pi reference sweep list against the post-Phase-1 tree with grep before renaming anything",
+        "wid": "w0"
+      },
+      {
+        "evidence": "user pi->agent + /home/pi symlink, codex+claude pinned&asserted (build aborts on mismatch, tested), IMAGE_TAG agent-container; d627a2b/056a452",
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "notes": null,
+        "started_at": "2026-08-07T03:59:50Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Containerfile - agent user plus /home/pi symlink, codex pinned+asserted, IMAGE_TAG agent-container",
+        "wid": "w1"
+      },
+      {
+        "evidence": "agents.d/{pi,claude,codex}.sh + lib/agents.sh loader with all-7-field validation; per-agent allowlist verified bidirectionally isolated; d627a2b/40f1cf4",
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "notes": null,
+        "started_at": "2026-08-07T03:59:53Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "agents.d specs for pi, claude, codex plus lib/agents.sh loader and validation",
+        "wid": "w2"
+      },
+      {
+        "evidence": "SESSION_MODE dispatcher; prompt via stdin for claude/codex (never in ps, metachar-safe); 45cb45b/7aadf1f",
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "notes": null,
+        "started_at": "2026-08-07T03:59:56Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "New entrypoint dispatcher with SESSION_MODE and per-agent prompt-arg mapping",
+        "wid": "w3"
+      },
+      {
+        "evidence": "lib/net.sh+lib/gradle.sh extracted, agent-run.sh added, run.sh authoritative shim; behavioral compat test scripts/test-run-sh-compat.sh PASSES; 56a018e/731d741",
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "notes": null,
+        "started_at": "2026-08-07T03:59:58Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Extract lib/net.sh lib/gradle.sh into agent-run.sh; run.sh becomes compat shim",
+        "wid": "w4"
+      },
+      {
+        "evidence": "gradle cache ~/.agent-container/gradle/<project> with migration+collision warning; isolation verified (host .gradle stays empty); 56a018e",
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "notes": null,
+        "started_at": "2026-08-07T04:00:01Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Gradle cache rename with migration; complete /home/pi path sweep",
+        "wid": "w5"
+      },
+      {
+        "evidence": "AGENT_AUTH_ENVS plumbing built; NO credential wired per owner DEFER decision 2026-08-06",
+        "item_id": "agentbox-phase2-fat-image-agent-dispatch",
+        "notes": null,
+        "started_at": "2026-08-07T04:00:04Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Generalized single auth env-file plumbing for AGENT_AUTH_ENVS",
+        "wid": "w6"
+      }
+    ]
+  }
+}

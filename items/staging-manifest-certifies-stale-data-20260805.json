@@ -1,0 +1,260 @@
+{
+  "context": "Make manifest mismatch a rebuild trigger, reusing the existing force path rather than adding a parallel one.\n\nIn each setup(), derive `rebuild = force or not self._staging_manifest_matches(connection, required_tables)` before the drop loop, and gate the existing drop on `rebuild` instead of `force`. A dropped table re-enters the loop with current_count == 0 and repopulates through the already-audited path; _write_staging_manifest() then records provenance that is actually true. force=True semantics are unchanged (it still rebuilds unconditionally). A matching manifest still short-circuits, so intended reuse is preserved.\n\nreset() is deliberately out of scope: it truncates and repopulates from the same source at the same scale, so the manifest setup() already wrote still matches and is_setup() is correctly True afterwards. Verified on develop.\n\nThen fix the test that pins the bug. The fixture must make 'healed' and 'untouched' distinguishable -- grow the source tables between the two setups so the staging row count is the assertion.",
+  "description": "Follow-up to transactional-staging-reuse-ignores-provenance-20260805, which shipped as PR #1574 with its headline defect intact. The manifest machinery is sound; what it is bolted onto is not.\n\nMEASURED on develop @ 1fb677633e:\n\n  after scale-0.01 setup, txn_orders = 3\n  is_setup() for scale 1.0        -> False   (detection works)\n  after scale-1.0 setup(force=False), txn_orders = 3, orders = 6\n  is_setup() for scale 1.0        -> True    (reuse now certified)\n  benchbox_staging_manifest        -> ('Transaction Primitives', '1.0')\n\n_prepare_operation() in benchmark_base.py calls setup(connection, force=False). Inside setup(), the population branch is guarded by `if current_count == 0`, so a non-empty stale staging table takes the 'already populated' branch and is never rebuilt -- but _write_staging_manifest() at the end of setup() runs unconditionally. Detection therefore fires exactly once, nothing is rebuilt, and the manifest then asserts that scale-0.01 staging data is scale-1.0 data.\n\nNet position is worse than before #1574: the silent wrong answer is unchanged, and the database now carries a durable provenance record claiming it is correct. Both transaction_primitives and write_primitives have the identical shape.\n\nThe regression is currently PINNED AS CORRECT by tests/unit/core/transactional/test_staging_provenance.py::test_legacy_populated_unmanifested_database_forces_rebuild. Despite its name it asserts no rebuild: it seeds the staging tables from the same source at the same scale, so a healed database and an untouched one are byte-identical and the test cannot distinguish them.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add a separate rebuild path alongside the existing force drop loop",
+        "instead": "Widen the existing force condition to `force or manifest mismatch` in both files, changing one boolean.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "why": "The two is_setup() overrides already drifted once, which is how the original bug survived review. A second parallel drop path in each of two files is the same failure waiting to happen."
+      },
+      {
+        "dont": "Call setup(force=True) from _prepare_operation to sidestep the branch",
+        "instead": "Keep the reuse fast path; only mismatch triggers the rebuild.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "why": "That drops and rebuilds staging on every single operation, including the overwhelmingly common case where the manifest already matches."
+      },
+      {
+        "dont": "Fix this by moving _write_staging_manifest() inside the `if current_count == 0` branch",
+        "instead": "Make the mismatch rebuild the staging tables, then write the manifest.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "why": "That stops the false certification but leaves the stale data in place and is_setup() then returns False forever, so every operation re-enters setup() and re-skips the rebuild. It converts a silent wrong answer into a silent infinite no-op."
+      },
+      {
+        "dont": "Repair test_legacy_populated_unmanifested_database_forces_rebuild by asserting is_setup() flips False->True after setup()",
+        "instead": "Assert the staging row count changed to match the grown source. A test named forces_rebuild must fail if no rebuild occurs.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "why": "That is exactly the assertion that passes today on the broken tree. is_setup() flipping True only proves the manifest was written, which is the bug."
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-06T00:16:04Z",
+      "completed_pr": 1615,
+      "created_at": "2026-08-05T23:45:02Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A matching manifest still skips repopulation -- this restores the reuse optimization's correctness, it does not remove the optimization.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805"
+      },
+      {
+        "behavior": "Cross-benchmark reuse of a TPC-H loaded database (read_primitives etc.) is untouched; only the txn_/write_ staging tables are governed by the manifest.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805"
+      },
+      {
+        "behavior": "No change to result bundle schema or any published field.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805"
+      },
+      {
+        "behavior": "The manifest table schema and the shared helpers on TransactionalBenchmarkBase are unchanged.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805"
+      },
+      {
+        "behavior": "setup(force=True) still drops and rebuilds unconditionally.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "the force=True drop loop inside setup() (widen its condition rather than adding a second rebuild path)",
+        "decision": "extend",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "path": "benchbox/core/transaction_primitives/benchmark.py"
+      },
+      {
+        "concept": "_write_staging_manifest / _staging_manifest_matches from PR #1574 (both helpers are correct and stay unchanged; only their caller is wrong)",
+        "decision": "extend",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "path": "benchbox/core/transactional/benchmark_base.py"
+      },
+      {
+        "concept": "identical setup() drop loop and unconditional manifest write (same one-boolean change, applied in lockstep)",
+        "decision": "extend",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "path": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "concept": "existing provenance suite and _minimal_tpch_conn fixture (reuse the fixture, repair the one test that pins the bug)",
+        "decision": "extend",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "path": "tests/unit/core/transactional/test_staging_provenance.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/"
+      },
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transaction_primitives/benchmark.py"
+      },
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transactional/benchmark_base.py"
+      },
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_benchmark_edge_cases.py"
+      },
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/transactional/test_staging_provenance.py"
+      },
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/write_primitives/test_benchmark_execution.py"
+      },
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/write_primitives/test_benchmark_operations.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "PYTHONPATH=. uv run pytest tests/unit/core/transactional/test_staging_provenance.py -q -p no:cacheprovider -k stale_scale_rebuild",
+        "description": "A named regression test for the stale-scale rebuild exists in the provenance suite and passes",
+        "expected": "FAILS (exit 5, no tests collected) on the unfixed tree: no such test exists, and the suite's existing test_legacy_populated_unmanifested_database_forces_rebuild cannot detect a missing rebuild because it reseeds at the same scale. Exits 0 once a test asserting the staging row count tracks the grown source lands for both families.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-06T00:15:00Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run pytest tests/unit/core/transactional/test_staging_provenance.py tests/unit/core/test_benchmark_edge_cases.py -q -p no:cacheprovider",
+        "description": "The repaired provenance suite passes, including a forces_rebuild test that can actually fail",
+        "expected": "Green only after the fix AND after test_legacy_populated_unmanifested_database_forces_rebuild is reseeded at a different scale so a healed database differs observably from an untouched one.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-06T00:15:08Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python -c \"import sys;sys.path.insert(0,'.');from tests.unit.core.transactional.test_staging_provenance import _minimal_tpch_conn as m, _grow_tpch_source as g;from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark as T;c=m();T(scale_factor=0.01).setup(c,force=False);g(c);T(scale_factor=1.0).setup(c,force=False);n=c.execute('SELECT COUNT(*) FROM txn_orders').fetchone()[0];s=c.execute('SELECT COUNT(*) FROM orders').fetchone()[0];assert n==s,'stale staging certified as fresh: txn_orders=%d orders=%d'%(n,s)\"",
+        "description": "A stale staging set is rebuilt, not certified, when the source grows under a new scale (transaction_primitives)",
+        "expected": "FAILS (exit 1, 'stale staging certified as fresh: txn_orders=3 orders=6') on the unfixed tree: setup(force=False) skips repopulation of the non-empty stale table but writes the manifest anyway. Exits 0 once manifest mismatch triggers the rebuild.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-06T00:15:12Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python -c \"import sys;sys.path.insert(0,'.');from tests.unit.core.transactional.test_staging_provenance import _minimal_tpch_conn as m, _grow_tpch_source as g;from benchbox.core.write_primitives.benchmark import WritePrimitivesBenchmark as W;c=m();W(scale_factor=0.01).setup(c,force=False);g(c);W(scale_factor=1.0).setup(c,force=False);n=c.execute('SELECT COUNT(*) FROM delete_ops_lineitem').fetchone()[0];s=c.execute('SELECT COUNT(*) FROM lineitem').fetchone()[0];assert n==s,'stale write staging certified as fresh: delete_ops_lineitem=%d lineitem=%d'%(n,s)\"",
+        "description": "Same rebuild guarantee for write_primitives, which has the identical setup() shape",
+        "expected": "FAILS (exit 1, 'stale write staging certified as fresh: delete_ops_lineitem=3 lineitem=6') on the unfixed tree. Exits 0 once the same rebuild gate lands there.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-06T00:15:17Z",
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on develop tip 1fb677633e in .claude/worktrees/staging-manifest-stale: rung 1 fails with txn_orders=3 orders=6, rung 2 fails with delete_ops_lineitem=3 lineitem=6. Manifest is written in both cases.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "notes": null,
+        "started_at": "2026-08-05T23:46:13Z",
+        "started_branch": "chore/fast-lane-ceiling-28050-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-validate the measured evidence on the current develop tip before changing code",
+        "wid": "w0"
+      },
+      {
+        "evidence": "transaction_primitives/benchmark.py: rebuild = force or not _staging_manifest_matches(connection, required_tables); drop loop gated on rebuild. Rung 1 red on develop, green here.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "notes": null,
+        "started_at": "2026-08-05T23:51:49Z",
+        "started_branch": "chore/fast-lane-ceiling-28050-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Gate the transaction_primitives setup() drop loop on `force or not manifest match` so a stale staging set is rebuilt before the manifest is written",
+        "wid": "w1"
+      },
+      {
+        "evidence": "write_primitives/benchmark.py: identical gate. Rung 2 red on develop (delete_ops_lineitem=3 lineitem=6), green here.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "notes": null,
+        "started_at": "2026-08-05T23:51:53Z",
+        "started_branch": "chore/fast-lane-ceiling-28050-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Apply the identical change to write_primitives setup(), and replace the placeholder rung 2 with the real write_primitives staging table assertion",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Both legacy_populated tests reseeded with LIMIT 1 so healed != untouched; added test_stale_scale_rebuild_repopulates_staging for both families plus _grow_tpch_source/_rows helpers. Mutation-checked: with benchbox/ reverted, all 4 tests FAIL; with the fix, 14 pass.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "notes": null,
+        "started_at": "2026-08-05T23:51:57Z",
+        "started_branch": "chore/fast-lane-ceiling-28050-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Reseed test_legacy_populated_unmanifested_database_forces_rebuild at a grown source so healed and untouched are distinguishable, and add stale_scale_rebuild coverage for both families",
+        "wid": "w3"
+      },
+      {
+        "evidence": "CHANGELOG.md Unreleased/Fixed entry naming the unconditional manifest write and the one-time rebuild cost for existing databases.",
+        "item_id": "staging-manifest-certifies-stale-data-20260805",
+        "notes": null,
+        "started_at": "2026-08-05T23:52:01Z",
+        "started_branch": "chore/fast-lane-ceiling-28050-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "CHANGELOG entry recording that PR #1574's manifest did not rebuild, and that existing databases pay one real rebuild on next use",
+        "wid": "w4"
+      }
+    ]
+  }
+}

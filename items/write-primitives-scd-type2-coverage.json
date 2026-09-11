@@ -1,0 +1,286 @@
+{
+  "context": "1. Add the two staging-table specs to schema_specs.yaml (dimension +\n   change-staging), populated dynamically from TPC-H orders/customer so they\n   scale from 3 rows to 10M. Keep them in the MERGE category isolation group.\n2. Add SCD2 operations to operations.yaml following the existing one-line JSON\n   entry format: start with merge_scd_type2_basic (close-old + insert-new),\n   then optionally merge_scd_type2_no_change (idempotent re-run -> zero new\n   versions) and merge_scd_type2_new_keys_only (all inserts, no closes).\n3. Write SQL in portable standard dialect; rely on the existing sql_compat\n   rewrite layer for per-platform syntax rather than branching in the catalog.\n4. Validation queries assert: exactly one is_current=true row per business\n   key; changed keys produced a closed (is_current=false, valid_to<sentinel)\n   prior version; unchanged keys produced no new version.\n5. cleanup_sql restores the dimension to its pre-op state (DELETE inserted\n   versions, restore is_current/valid_to on reopened rows) so the op is\n   repeatable without a full reset.\n6. Document the new ops and staging tables in docs/benchmarks/write-primitives.md\n   (bump the MERGE operation count and the staging-table list).\n",
+  "description": "Add Slowly Changing Dimension (SCD) Type 2 coverage to the Write Primitives\nbenchmark. The MERGE category currently has 20 operations (overlap variants,\nconditional update/insert, ETL aggregation, ROW_NUMBER deduplication, etc.)\nbut NONE exercise the canonical SCD Type 2 dimension-maintenance pattern:\nclose the current version of a changed row (set is_current = false and stamp\nan end timestamp) and insert a new current version, keyed on a business key.\n\nThis is the single most common real-world MERGE workload in analytics ETL and\nis a conspicuous gap. It is fully portable SQL - expressible as a standard\nMERGE (or UPDATE + INSERT where MERGE is unavailable) on every platform the\nbenchmark targets (DuckDB, PostgreSQL, Snowflake, BigQuery, ClickHouse,\nDatabricks) - so it fits the benchmark's \"broad platform compatibility,\nnon-transactional cleanup\" design without compromise.\n\nMotivation: a Databricks/Delta Lake post (SCD Type 2 via APPLY CHANGES INTO\nvs ~200 lines of hand-written MERGE) highlighted the workload. The benchmark\nshould measure the portable MERGE form of this workload. The Databricks-native\ndeclarative form (APPLY CHANGES INTO) is intentionally OUT OF SCOPE here - see\nanti_patterns and deferred - and is evaluated narratively by the companion\nblog TODO (blog-apply-changes-into-vs-standard-sql).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add APPLY CHANGES INTO (or any DLT / Lakeflow declarative pipeline syntax) as a benchmark operation",
+        "instead": "express SCD2 as portable MERGE/UPDATE+INSERT instead.",
+        "item_id": "write-primitives-scd-type2-coverage",
+        "why": "it is not a standalone SQL statement and only runs inside a Databricks declarative pipeline, breaking the cross-platform + standalone-statement contract"
+      },
+      {
+        "dont": "hard-code orderkey/custkey ranges",
+        "instead": "derive the change set dynamically with percentage/range-bounded selects like the existing merge ops.",
+        "item_id": "write-primitives-scd-type2-coverage",
+        "why": "the op must run at any scale factor"
+      },
+      {
+        "dont": "mutate merge_ops_target for SCD2",
+        "instead": "add dedicated scd2_ops_* staging tables instead.",
+        "item_id": "write-primitives-scd-type2-coverage",
+        "why": "it lacks versioning columns and is shared by the existing 20 merge ops"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "write-primitives-scd-type2-coverage",
+        "id": 61,
+        "reason": "Declarative APPLY CHANGES INTO requires a DLT/Lakeflow pipeline context (streaming source, pipeline run), not a SQL-warehouse session, so it cannot execute inside the current execute/validate/cleanup harness. Revisit if/when a pipeline-execution path exists. Tracked narratively by blog-apply-changes-into-vs-standard-sql.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Databricks APPLY CHANGES INTO needs a DLT/Lakeflow pipeline context unavailable in the current harness; tracked narratively by a blog post, not a TODO.",
+        "summary": "Databricks-native APPLY CHANGES INTO rewrite for the SCD2 op via sql_compat"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "write-primitives-scd-type2-coverage",
+        "id": 62,
+        "reason": "Type 2 is the canonical history-retention workload and the one the source material highlights; add other types only if there is demand.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Type 1/Type 3 SCD variants explicitly gated on future demand beyond the canonical Type 2 workload; no evidence of demand.",
+        "summary": "Type 1 (overwrite) and Type 3 (previous-value column) SCD variants"
+      }
+    ],
+    "item_meta": {
+      "category": "Benchmark Development",
+      "completed_at": "2026-06-29T00:00:00Z",
+      "created_at": "2026-06-27T00:00:00Z",
+      "worktree": "benchmark-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All 20 existing merge operations keep their ids, SQL, and validation results unchanged",
+        "item_id": "write-primitives-scd-type2-coverage"
+      },
+      {
+        "behavior": "Existing staging-table setup/reset/teardown behavior for non-SCD2 categories is unaffected",
+        "item_id": "write-primitives-scd-type2-coverage"
+      },
+      {
+        "behavior": "Non-transactional explicit cleanup contract (no reliance on ROLLBACK) is preserved",
+        "item_id": "write-primitives-scd-type2-coverage"
+      },
+      {
+        "behavior": "WritePrimitives.get_all_operations() count increases by exactly the number of SCD2 ops added; existing operation ids are untouched",
+        "item_id": "write-primitives-scd-type2-coverage"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/write_primitives/catalog/operations.yaml:merge_deduplication_window_function — reuse percentage/range-bounded dynamic source derivation so the op works at any scale factor",
+        "decision": "reuse",
+        "item_id": "write-primitives-scd-type2-coverage",
+        "path": "benchbox/core/write_primitives/catalog/operations.yaml:merge_deduplication_window_function"
+      },
+      {
+        "concept": "benchbox/core/write_primitives/catalog/operations.yaml:merge_etl_aggregation_pattern — reuse the one-line JSON op shape (write_sql / validation_queries / cleanup_sql / platform_overrides)",
+        "decision": "reuse",
+        "item_id": "write-primitives-scd-type2-coverage",
+        "path": "benchbox/core/write_primitives/catalog/operations.yaml:merge_etl_aggregation_pattern"
+      },
+      {
+        "concept": "benchbox/core/write_primitives/schema_specs.yaml:merge_ops_target — extend the staging-table spec pattern for the new dimension + change-staging tables",
+        "decision": "extend",
+        "item_id": "write-primitives-scd-type2-coverage",
+        "path": "benchbox/core/write_primitives/schema_specs.yaml:merge_ops_target"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/schema_specs.yaml"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/write-primitives.md"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_write_primitives_duckdb.py"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_write_primitives_execution.py"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/benchmarks/test_write_primitives_core.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox import WritePrimitives; ops=WritePrimitives(0.01).get_all_operations(); print(any(k.startswith('merge_scd_type2') for k in ops))\"",
+        "description": "New SCD2 operation(s) are registered",
+        "expected": "True",
+        "item_id": "write-primitives-scd-type2-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py -q",
+        "description": "merge category count increased and existing ids preserved",
+        "expected": "all tests pass",
+        "item_id": "write-primitives-scd-type2-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -q -k scd2",
+        "description": "SCD2 op executes, validates, and cleans up on DuckDB",
+        "expected": "all tests pass",
+        "item_id": "write-primitives-scd-type2-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.write_primitives.catalog.loader import load_write_primitives_catalog as L; print(len(L().operations))\"",
+        "description": "Catalog still parses; raw entry count grows by the SCD2 ops added",
+        "expected": "raw catalog entry count > 133 (133 today; note get_all_operations() is the 109 user-facing count)",
+        "item_id": "write-primitives-scd-type2-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "write-primitives-scd-type2-coverage",
+        "needs_wid": "w3",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-scd-type2-coverage",
+        "notes": "In schema_specs.yaml, alongside merge_ops_target. Dimension columns:\nsurrogate sk, c_custkey business key, attribute subset, row_hash,\nis_current bool, valid_from, valid_to. Change-staging derived dynamically\nfrom TPC-H (changed + unchanged + new keys) with effective_ts + row_hash.\nRegister the new scd2_ops_* staging tables in benchmark.py's\ntable_population_map (so they are populated at setup) and reset_map (so they\nare restored on cleanup) — a spec-only addition would leave them empty and\nun-reset.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add scd2_ops_dim_customer and scd2_ops_stage_customer staging specs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-scd-type2-coverage",
+        "notes": "Close-old (UPDATE is_current=false, stamp valid_to) + insert-new current\nversion. Portable standard SQL. validation: exactly one current row per\nbusiness key; changed keys have a closed prior version. cleanup restores\npre-op state so the op is repeatable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add merge_scd_type2_basic operation to operations.yaml",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-scd-type2-coverage",
+        "notes": "merge_scd_type2_no_change (re-run with identical row_hash -> zero new\nversions) and merge_scd_type2_new_keys_only (all inserts, no closes).\nBoth reuse the w1 staging tables.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add SCD2 edge-case ops (no-change idempotent, new-keys-only)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-scd-type2-coverage",
+        "notes": "Assert ops registered, merge category count bumped, existing ids intact,\nvalidation_queries shape correct.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit tests - registration, count, validation, cleanup",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-scd-type2-coverage",
+        "notes": "End-to-end execute_operation: write -> validate (one current row per key)\n-> cleanup -> repeatable. Verify against actual TPC-H SF0.01 data.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integration test on DuckDB (-k scd2)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-scd-type2-coverage",
+        "notes": "Add SCD2 to the MERGE catalog list, bump the \"20 operations\" / \"109\noperations\" counts, and add scd2_ops_* tables to the staging-table list.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update docs/benchmarks/write-primitives.md",
+        "wid": "w6"
+      }
+    ]
+  }
+}

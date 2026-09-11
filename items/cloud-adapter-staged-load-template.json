@@ -1,0 +1,214 @@
+{
+  "context": "Extract the skeleton (w1) before touching either adapter, so the interface\nis designed against both existing implementations' actual needs rather\nthan generalized from just one. Resolve the casing question (w2) with a\ngrep across the codebase for table_stats consumers before choosing, since\nthis is the one place a wrong choice silently breaks a caller. Migrate\nredshift and snowflake together in one PR (w3) so the drift is fixed\natomically rather than leaving one platform on the old pattern.\n",
+  "description": "Architecture review (Work Area E, structural remediation) found that\n`benchbox/platforms/redshift.py:load_data` (starts at line 1794) and\n`benchbox/platforms/snowflake.py:load_data` (starts at line 762)\nindependently implement the same staged-load orchestration loop - resolve\ndata files per table, upload/stage, run the platform load command, record\nper-table row counts, log success/failure - with behavioral drift between\nthe two copies rather than a shared abstraction:\n\n- Key casing: redshift keys `table_stats` by `table_name.lower()`\n  (redshift.py:1817, 1828, 1838, 1849, 1859, 1870); snowflake keys by\n  `table_name.upper()` (snowflake.py:791, 806, 816).\n- Error reporting on failure: redshift logs the full error text\n  (`error_message = str(e) or repr(e) or type(e).__name__`, then\n  `self.logger.error(f\"Failed to load {table_name}: {error_message}\")`);\n  snowflake truncates to `str(e)[:100]`\n  (`self.logger.error(f\"Failed to load {table_name}: {str(e)[:100]}...\")`).\n  Same failure class, different diagnostic fidelity depending on which\n  platform hit it.\n\nSimilar near-identical duplication exists elsewhere in the same two files\nplus databricks: `apply_unified_tuning` (redshift.py:2637 vs\nsnowflake.py:1748) and `close_connection`, which is actually triplicated\n(redshift.py:2437, snowflake.py:1592,\n`benchbox/platforms/databricks/adapter.py:2288`). This TODO focuses on the\nstaged-load loop first since it has observable behavioral drift (the key\ncasing difference could already be causing lookup bugs for any caller that\nassumes a fixed case); the other duplications are cheaper copy-align fixes\nonce the load-loop template exists to model them on.\n\nThis is a targeted refactor, not a shrink-campaign item -\n`_project/goal-shrink-core-code.md` explicitly scopes \"dual-impl collapses\nthat trade correctness risk for lines\" out of the autonomous shrink loop;\nthis work is done deliberately with adapter test coverage as the safety\nnet, not for line-count credit.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "collapse apply_unified_tuning or close_connection into the same PR as the load-loop extraction",
+        "instead": "(not specified)",
+        "item_id": "cloud-adapter-staged-load-template",
+        "why": "each is a separate near-duplicate with its own risk surface; keep them as deferred follow-ups."
+      },
+      {
+        "dont": "force bigquery/databricks onto the shared skeleton if their staging model does not actually match",
+        "instead": "(not specified)",
+        "item_id": "cloud-adapter-staged-load-template",
+        "why": "a forced-fit abstraction is worse than two adapters with an honest small duplication."
+      },
+      {
+        "dont": "pick the casing convention without grepping downstream consumers of table_stats first",
+        "instead": "(not specified)",
+        "item_id": "cloud-adapter-staged-load-template",
+        "why": "a blind choice can silently break result reporting for whichever platform's casing changes."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "cloud-adapter-staged-load-template",
+        "id": 13,
+        "reason": "Same duplication pattern as the load loop but a separate method; sequence after the staged-load template proves the extraction pattern works, to avoid landing two large simultaneous refactors in one PR.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Deliberately sequenced follow-up under the same still-open staged-load-template item; not a separate untracked task. (tracked by cloud-adapter-staged-load-template)",
+        "summary": "Deduplicate apply_unified_tuning (redshift.py:2637 vs snowflake.py:1748)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "cloud-adapter-staged-load-template",
+        "id": 14,
+        "reason": "Smaller and lower-risk than the load loop; a good follow-up once platforms/base has an established place for shared connection-lifecycle helpers (see benchbox/platforms/base/connection_lifecycle.py, which may already be the right home).",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Deferral is a note on its own from_item (cloud-adapter-staged-load-template), which is itself still open and planning this exact work.",
+        "summary": "Deduplicate the triplicated close_connection (redshift.py:2437, snowflake.py:1592, databricks/adapter.py:2288)"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing result-capture and reporting code that reads table_stats keys continues to find its expected keys after the casing normalization in w2.",
+        "item_id": "cloud-adapter-staged-load-template"
+      },
+      {
+        "behavior": "Per-platform load behavior (COPY vs PUT+COPY INTO, S3 staging vs Snowflake stage, file-format setup) verified by existing adapter tests continues to work identically after migration.",
+        "item_id": "cloud-adapter-staged-load-template"
+      },
+      {
+        "behavior": "table_stats total row counts and the load_data return contract (tuple[dict[str, int], float, dict[str, Any] | None]) from benchbox/platforms/base/adapter.py:323 are unchanged.",
+        "item_id": "cloud-adapter-staged-load-template"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/base/adapter.py:323 load_data abstract method - the existing contract both adapters implement; the new skeleton must satisfy this same signature/return contract.",
+        "decision": "reuse",
+        "item_id": "cloud-adapter-staged-load-template",
+        "path": "benchbox/platforms/base/adapter.py:323"
+      },
+      {
+        "concept": "benchbox/platforms/base/connection_lifecycle.py - likely existing home for the deferred close_connection deduplication; check before creating a new module for that follow-up.",
+        "decision": "reuse",
+        "item_id": "cloud-adapter-staged-load-template",
+        "path": "benchbox/platforms/base/connection_lifecycle.py"
+      },
+      {
+        "concept": "benchbox/platforms/base/data_loading.py - existing shared data-loading helpers (COPY/CTAS loaders with trailing-delimiter handling per datafusion-tbl-trailing-delimiter-load) already used as a common base by other adapters; extend this file's pattern rather than starting a parallel shared-helpers module.",
+        "decision": "extend",
+        "item_id": "cloud-adapter-staged-load-template",
+        "path": "benchbox/platforms/base/data_loading.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cloud-adapter-staged-load-template",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "cloud-adapter-staged-load-template",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "cloud-adapter-staged-load-template",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "cloud-adapter-staged-load-template",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/staged_load.py"
+      },
+      {
+        "item_id": "cloud-adapter-staged-load-template",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "cloud-adapter-staged-load-template",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databricks/adapter.py"
+      },
+      {
+        "item_id": "cloud-adapter-staged-load-template",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/redshift.py"
+      },
+      {
+        "item_id": "cloud-adapter-staged-load-template",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k 'redshift or snowflake' -m 'not slow and not stress' --tb=short",
+        "description": "Redshift and Snowflake adapter load-data tests pass after migration to the shared skeleton",
+        "expected": "all redshift/snowflake adapter tests pass",
+        "item_id": "cloud-adapter-staged-load-template",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'table_stats\\[' benchbox/platforms/redshift.py benchbox/platforms/snowflake.py",
+        "description": "table_stats casing convention is consistent and documented",
+        "expected": "both files use the same .lower() or .upper() convention on table_stats keys",
+        "item_id": "cloud-adapter-staged-load-template",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cloud-adapter-staged-load-template",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "cloud-adapter-staged-load-template",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "cloud-adapter-staged-load-template",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cloud-adapter-staged-load-template",
+        "notes": "Add a shared skeleton to `benchbox/platforms/base/data_loading.py` (or\na new `benchbox/platforms/base/staged_load.py` if data_loading.py is\nalready large) implementing: resolve data files via\n`_resolve_data_files` -> per-table hook (upload/stage + platform-specific\nload command, e.g. COPY/PUT+COPY INTO) -> collect stats -> aggregate\ntiming. The per-table load command and any platform-specific setup\n(Redshift's S3 client + external schema, Snowflake's file formats +\nquery tag) stay as abstract hooks the subclass implements; only the\nloop/bookkeeping/logging shape is shared.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Extract a template-method staged-load skeleton in platforms/base",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-adapter-staged-load-template",
+        "notes": "Pick one casing convention (lower or upper) for the shared skeleton's\n`table_stats` dict keys. Check every caller of `load_data`'s returned\n`table_stats` (result capture, reporting, validation) for any\ncase-sensitive lookup before picking, since changing either platform's\ncasing could silently break a caller that currently works only because\nof that platform's specific case. Document the chosen convention in\nthe base class docstring so future adapters do not reintroduce drift.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Normalize table_stats key casing and document the choice",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-adapter-staged-load-template",
+        "notes": "Reimplement `RedshiftAdapter.load_data` and `SnowflakeAdapter.load_data`\nas thin per-table hooks over the new base skeleton, removing the\nduplicated loop/logging code. Normalize the error-logging behavior to\none policy (recommend: log full error text like redshift currently\ndoes, since truncating to 100 chars as snowflake does can hide the\nactionable part of a load error) - state the choice and rationale in\nthe PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Migrate redshift.py and snowflake.py to the shared skeleton",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "cloud-adapter-staged-load-template",
+        "notes": "After redshift+snowflake prove the template out, check whether\n`benchbox/platforms/bigquery.py` and\n`benchbox/platforms/databricks/adapter.py` have a load_data loop\nsimilar enough to migrate, or whether their staging model (e.g.\nDatabricks' different ingestion path) genuinely differs enough that\nforcing them onto the same skeleton would hurt readability. Migrate\nonly if it is a clean fit; otherwise record why they are excluded.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Evaluate bigquery/databricks for the same template",
+        "wid": "w4"
+      }
+    ]
+  }
+}

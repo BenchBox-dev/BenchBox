@@ -1,0 +1,194 @@
+{
+  "context": "Revalidate the audit against current first-party Codex and Claude memory documentation and current repository instructions, then produce an authority/location matrix and a decision ledger. Preserve historical evidence while separating it from current instructions. Record rejected alternatives: identical cross-system stores, hand-editing derived summaries, treating memory as enforcement, retaining globally injected live state with warnings only, and deleting all history.",
+  "description": "DECISION GATE for the 2026-07-27 adversarial audit of persistent Codex and Claude Code memories on this machine. The audit found useful evidence retention but unsafe authority promotion, stale cross-project state, four Codex summaries that stop before later source-session events, an unconditional Claude auto-commit/push directive, private operational details in auto-memory, no freshness/expiration schema, home-directory project leakage, and generated memory skills that duplicate authoritative repository/skill policy. This item records human decisions before any live memory changes: (1) authority order and which facts belong in AGENTS.md/CLAUDE.md, canonical skills, project docs, system-specific memory, a shared tooling project, or nowhere/live discovery; (2) whether to create a dedicated memory-governance/tooling repository or place tooling in an existing repository; (3) retention/expiry classes for preferences, architecture facts, task state, PR/version/path facts, prompts, worktrees, and sensitive operations; (4) approval for deletion/sanitization candidates; (5) token budgets, provenance/freshness fields, and promotion thresholds; (6) ownership and rollback requirements. Decisions must be recorded in this item with the exact heading 'Decisions approved for recommendations' before dependent implementation starts. This gate does not authorize deletion, live-memory edits, configuration changes, or rollout.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "choose a tooling repository implicitly",
+        "instead": "record an explicit owner/location decision before implementation",
+        "item_id": "memory-governance-authority-retention-decisions",
+        "why": "ownership determines scope, review, rollback, and cross-system coupling"
+      },
+      {
+        "dont": "edit generated summaries to make them look current",
+        "instead": "correct the source record or generator and regenerate derived layers",
+        "item_id": "memory-governance-authority-retention-decisions",
+        "why": "the next regeneration would overwrite the correction and preserve the upstream defect"
+      },
+      {
+        "dont": "treat a prior user instruction as a standing mandate merely because it appears in memory",
+        "instead": "classify provenance and require human approval for durable instructions",
+        "item_id": "memory-governance-authority-retention-decisions",
+        "why": "task-local instructions can become unsafe cross-session authority"
+      }
+    ],
+    "item_meta": {
+      "category": "governance",
+      "completed_at": "2026-07-27T17:50:32Z",
+      "created_at": "2026-07-27T17:33:00Z",
+      "worktree": "memory-governance"
+    },
+    "preserves": [
+      {
+        "behavior": "Historical evidence remains distinguishable from current instructions and current completion state",
+        "item_id": "memory-governance-authority-retention-decisions"
+      },
+      {
+        "behavior": "No live memory, configuration, deletion, or external publication occurs before its explicit approval gate",
+        "item_id": "memory-governance-authority-retention-decisions"
+      },
+      {
+        "behavior": "System and platform constraints, the current user request, current repository instructions, and verified code/runtime/remote state outrank memory",
+        "item_id": "memory-governance-authority-retention-decisions"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "project-scoped startup index with linked topic files",
+        "decision": "extend",
+        "item_id": "memory-governance-authority-retention-decisions",
+        "path": "/Users/joe/.claude/projects/-Users-joe-Developer-BenchBox/memory/MEMORY.md"
+      },
+      {
+        "concept": "evidence registry with task outcome and source-session routing",
+        "decision": "extend",
+        "item_id": "memory-governance-authority-retention-decisions",
+        "path": "/Users/joe/.codex/memories/MEMORY.md"
+      },
+      {
+        "concept": "repository-scoped durable instructions and write authorization boundaries",
+        "decision": "reuse",
+        "item_id": "memory-governance-authority-retention-decisions",
+        "path": "/Users/joe/Developer/BenchBox/AGENTS.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-governance-authority-retention-decisions",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-governance-authority-retention-decisions",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-governance-authority-retention-decisions",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-governance-authority-retention-decisions",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "./_project/scripts/todo show memory-governance-authority-retention-decisions | rg -q 'Decisions approved for recommendations'",
+        "description": "Decision ledger is complete",
+        "expected": "exit 0 after explicit human decisions are recorded",
+        "item_id": "memory-governance-authority-retention-decisions",
+        "last_result": "pass",
+        "last_run": "2026-07-27T17:50:44Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --quiet && test -z \"$(git status --porcelain)\"",
+        "description": "Decision gate made no repository changes",
+        "expected": "exit 0 in the decision worktree",
+        "item_id": "memory-governance-authority-retention-decisions",
+        "last_result": "pass",
+        "last_run": "2026-07-27T17:50:48Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-governance-authority-retention-decisions",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-governance-authority-retention-decisions",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-governance-authority-retention-decisions",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-governance-authority-retention-decisions",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-governance-authority-retention-decisions",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "2026-07-27 read-only refresh: 37 Codex rollout summaries (4 with material later source-session events), 5 Claude project-memory indexes/39 files, 0 broken links, 1 Claude orphan topic, 0 token-shaped secrets, stale cross-system tracker guidance and unsafe auto-push directive reconfirmed; official Codex and Claude loader docs rechecked",
+        "item_id": "memory-governance-authority-retention-decisions",
+        "notes": null,
+        "started_at": "2026-07-27T17:39:42Z",
+        "started_branch": "chore/memory-governance-decisions",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Revalidate the inventory, loader behavior, contradictions, sensitive-content classes, and current authority surfaces without changing live memory",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Approved authority/location matrix: prompt and verified policy outrank memory; repo rules in AGENTS.md/CLAUDE.md; reusable workflows in canonical skill-sync; evidence remains system-specific; drift-prone facts are rediscovered live; shared schema/evaluation tooling belongs in /Users/joe/Developer/memory-governance",
+        "item_id": "memory-governance-authority-retention-decisions",
+        "notes": null,
+        "started_at": "2026-07-27T17:50:05Z",
+        "started_branch": "chore/memory-governance-decisions",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Approve the authority and ownership matrix for user preferences, repository policy, reusable workflows, historical evidence, and drift-prone live facts",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Approved retention/privacy/rollback: preferences review 180d; architecture 90d; task/PR/branch/path/worktree facts expire 30d or terminal; sensitive operations excluded from startup memory; destructive cleanup requires reviewed manifest, backup, dry run, and explicit approval; backups retained at least 30d",
+        "item_id": "memory-governance-authority-retention-decisions",
+        "notes": null,
+        "started_at": "2026-07-27T17:50:09Z",
+        "started_branch": "chore/memory-governance-decisions",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Approve retention, expiration, deletion, privacy-sanitization, backup, and rollback policies",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Approved schema and promotion gates: authority/project/source/observed/freshness/completion/derived cursor-hash; Codex summary <=8KB; Claude index target <=12KB/120 lines; safety dimensions 100%, correctness and irrelevant rejection >=95%, recall >=90%, no context regression; BenchBox then one different project, >=20 sessions, immediate safety rollback",
+        "item_id": "memory-governance-authority-retention-decisions",
+        "notes": null,
+        "started_at": "2026-07-27T17:50:14Z",
+        "started_branch": "chore/memory-governance-decisions",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Approve provenance/freshness schema, project identity rules, context budgets, evaluation thresholds, and canary stop conditions",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Decisions approved for recommendations. Rejected: identical cross-system stores; hand-editing derived summaries; memory as enforcement; warning-only globally injected transient state; deleting all history. User approval: Proceed (2026-07-27).",
+        "item_id": "memory-governance-authority-retention-decisions",
+        "notes": null,
+        "started_at": "2026-07-27T17:50:18Z",
+        "started_branch": "chore/memory-governance-decisions",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Record 'Decisions approved for recommendations' and the rejected alternatives in the tracker decision ledger",
+        "wid": "w4"
+      }
+    ]
+  }
+}

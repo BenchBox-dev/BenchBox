@@ -1,0 +1,297 @@
+{
+  "description": "Add support for SiriusDB, a GPU-native SQL engine that accelerates analytical queries\nby offloading execution to graphics processors via DuckDB integration.\n\nSiriusDB is notable for:\n- 10x faster than DuckDB, 60x faster than ClickHouse at same hardware cost\n- Integrates with DuckDB via Substrait query format\n- Built on NVIDIA CUDA-X libraries (cuDF)\n- Plug-and-play with CPU fallback when GPU unavailable\n- Ideal for TPC benchmark acceleration\n\nReference: https://www.sirius-db.com, https://github.com/sirius-db/sirius\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify benchbox/platforms/duckdb.py",
+        "instead": "inherit from DuckDBAdapter and override only GPU-specific methods",
+        "item_id": "siriusdb-adapter",
+        "why": "SiriusDB extends DuckDB via extension loading"
+      },
+      {
+        "dont": "modify existing adapter files",
+        "instead": "create a new siriusdb.py file",
+        "item_id": "siriusdb-adapter",
+        "why": "SiriusDB is additive"
+      },
+      {
+        "dont": "require GPU for unit tests",
+        "instead": "mock GPU initialization and test CPU fallback path",
+        "item_id": "siriusdb-adapter",
+        "why": "CI has no GPU hardware"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-01-26T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "siriusdb-adapter"
+      },
+      {
+        "behavior": "DuckDB adapter behavior unchanged when SiriusDB extension is not loaded",
+        "item_id": "siriusdb-adapter"
+      },
+      {
+        "behavior": "Platform registry autodiscovery continues working for all existing platforms",
+        "item_id": "siriusdb-adapter"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "siriusdb-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "siriusdb-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "siriusdb-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/siriusdb.py"
+      },
+      {
+        "item_id": "siriusdb-adapter",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_siriusdb.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.siriusdb import SiriusDBAdapter; print('import OK')\"",
+        "description": "New adapter imports correctly",
+        "expected": "import OK",
+        "item_id": "siriusdb-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_siriusdb.py -v --tb=short",
+        "description": "Unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "siriusdb-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "Existing platform tests unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "siriusdb-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_duckdb_adapter.py -v --tb=short",
+        "description": "DuckDB adapter unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "siriusdb-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Set up SiriusDB development environment with GPU",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add unit tests (mocked GPU for CI)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run TPC-H validation with GPU acceleration",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Benchmark GPU vs CPU performance comparison",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document GPU memory requirements per SF",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Create platform documentation with GPU setup guide",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add AWS GPU instance recommendations",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document container deployment option",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add performance comparison charts",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Test extension loading and GPU initialization",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Identify supported vs unsupported query patterns",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document GPU memory requirements per scale factor",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Create SiriusDBAdapter extending DuckDBAdapter",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add GPU initialization in connection factory",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement GPU buffer size auto-configuration",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add CPU fallback detection and logging",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "siriusdb-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Support both local extension and container deployment",
+        "wid": "w9"
+      }
+    ]
+  }
+}

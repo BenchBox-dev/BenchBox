@@ -1,0 +1,288 @@
+{
+  "context": "Treat trend rendering as a data-contract issue first and an SVG issue second.\nDecide the duplicate-day semantics, then make TimeSeries consume point-level\nidentity data and render only claims the read model can support.\n",
+  "description": "Platform detail trend charts can render multiple observations for the same\nplatform and date while every point title repeats the identity of the first\nrun in the series. On `/results/p/duckdb/`, the chart showed three points\nwhose titles all referenced the same DuckDB result even though they came from\ndifferent rows.\n\nThis is not just a tooltip bug. The current time-series contract groups by\nplatform ID and uses `run_date` as the x-axis, but the read model can contain\nmultiple same-day submissions with different result IDs and no time-of-day\nordering. The UI must decide how to represent duplicate-day observations\nbefore drawing lines that imply a chronology that the data may not provide.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "aggregate duplicate runs without naming the aggregation policy.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "fix repeated titles by appending array indexes with no user-visible meaning.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "jitter duplicate dates unless the jitter corresponds to a real timestamp or documented sequence.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "suppress trend charts without giving users a path to the underlying runs.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "needs_item": "results-explorer-public-run-identity-and-receipt-reachability"
+      }
+    ],
+    "item_meta": {
+      "category": "Data Integrity",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "results-explorer-contract-followup"
+    },
+    "preserves": [
+      {
+        "behavior": "Point titles and aria text must identify the actual point/result being inspected.",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics"
+      },
+      {
+        "behavior": "Sparse or duplicate-day states must still let users inspect underlying result rows.",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics"
+      },
+      {
+        "behavior": "The fix must not drop valid historical data silently.",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics"
+      },
+      {
+        "behavior": "Trend charts must not imply a chronological ordering that is not present in the data.",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/src/components/ChartPanel.tsx can render TimeSeries on benchmark/chart routes.",
+        "decision": "reuse",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "path": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "concept": "results-explorer/src/components/TimeSeries.tsx groups by platform ID and currently builds series labels from the first entry.",
+        "decision": "reuse",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "path": "results-explorer/src/components/TimeSeries.tsx"
+      },
+      {
+        "concept": "results-explorer/src/lib/chartRegistry.ts defines the narrow historical entry shape consumed by TimeSeries.",
+        "decision": "reuse",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "path": "results-explorer/src/lib/chartRegistry.ts"
+      },
+      {
+        "concept": "results-explorer/src/lib/runIdentity.ts provides public run labels but needs point-level source data.",
+        "decision": "reuse",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "path": "results-explorer/src/lib/runIdentity.ts"
+      },
+      {
+        "concept": "results-explorer/src/pages/PlatformIndex.tsx builds platform detail trend cohorts and sparse trend copy.",
+        "decision": "reuse",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "path": "results-explorer/src/pages/PlatformIndex.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-trend-chart-point-identity-and-same-day-semantics/"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TimeSeries.tsx"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/charts.smoke.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/runIdentity.test.ts"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartRegistry.ts"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/runIdentity.ts"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/components/__tests__/charts.smoke.test.tsx",
+        "description": "TimeSeries and chart smoke tests pass",
+        "expected": "TimeSeries tests include point-level identity and duplicate-day semantics",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/PlatformIndex.test.tsx",
+        "description": "Platform detail tests cover trend empty states",
+        "expected": "platform trend duplicate/sparse-state tests pass",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"PASS|FAIL|TimeSeries|duplicate-day|point title|runin\" _project/verification-logs/results-explorer-trend-chart-point-identity-and-same-day-semantics/",
+        "description": "Browser evidence confirms trend point identity",
+        "expected": "verification log includes trend route evidence",
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "notes": "On the current snapshot, capture:\n  - one platform detail trend route with duplicate same-day runs, such as\n    `/results/p/duckdb/`;\n  - each rendered SVG point's `data-result-id`, title text, x position, and\n    date;\n  - SQL counts of platform/cohort/date groups with more than one result;\n  - sparse-trend empty-state text including the `runin` copy regression.\nStore findings in\n`_project/verification-logs/results-explorer-trend-chart-point-identity-and-same-day-semantics/w0.md`.\nDecision gate: if no duplicate-day cohorts exist in the checked snapshot,\nkeep the point-level identity tests using synthetic fixtures and record that\nthe product risk is latent rather than currently visible.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate trend evidence and duplicate-day cohorts",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "notes": "Decide how the UI treats multiple runs for the same platform/cohort/date\nbefore changing the chart. Acceptable outcomes include:\n  - hide the line chart for duplicate-day series and show a compact\n    duplicate-run table;\n  - aggregate duplicate-day points by a named policy such as latest\n    published run, best valid run, or median, while exposing the run count;\n  - render duplicate-day points as distinct observations only if the read\n    model includes a real timestamp or deterministic sequence field.\nDecision gate: do not jitter points or connect duplicate-day runs with a\nline unless the policy explains the implied ordering and tie handling.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose and document duplicate-day trend semantics",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "notes": "Update `TimeSeries` so each point title and accessible label is built from\nthat point's result identity, date, and metric value, not from the first\nentry in the series. If the component only receives series-level metadata,\nextend the narrow chart entry shape to carry the minimum fields needed for\npoint-level identity under the public run-identity contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make trend point titles and accessibility text point-specific",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "notes": "Apply the duplicate-day policy consistently on platform detail and any chart\npanel using `TimeSeries`. If aggregation is chosen, show the aggregation\npolicy and duplicate count. If chart suppression is chosen, show a compact\nstate that explains why a trend line is unavailable and gives access to the\nunderlying runs. If distinct points are chosen, use a data-backed sequence\nfield rather than layout-only jitter.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the chosen duplicate-day display policy",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "notes": "Fix the `1 published runin this comparable cohort` copy by making the space\nexplicit and adding a regression test for singular and plural trend\nempty-state text.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix sparse trend copy and empty-state grammar",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-trend-chart-point-identity-and-same-day-semantics",
+        "notes": "Add tests that cover:\n  - point titles use the point's result ID, not the first series result ID;\n  - duplicate same-day inputs follow the chosen display policy;\n  - sparse trend copy is grammatical for one run and multiple runs;\n  - chart titles remain unique when two platform names are the same.\nBrowser-check one normal trend, one duplicate-day trend or fixture route,\nand one sparse trend.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add trend semantics tests and browser evidence",
+        "wid": "w5"
+      }
+    ]
+  }
+}

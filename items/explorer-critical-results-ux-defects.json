@@ -1,0 +1,214 @@
+{
+  "context": "Fix each defect in the smallest owning component first, then add tests around\nthe observable behavior. For Query Workbench, avoid making `result_id` visible\nby default just to fix navigation; separate row identity from displayed\ncolumns. For Result Detail, audit all methodology labels that mention query\nscope so the copy cannot reuse sample-count terminology. For Platform trend,\nuse the existing ranking/cohort fields already emitted by\n`bench.benchmark_rankings` rather than inventing a frontend-only cohort key.\n",
+  "description": "Fix the correctness defects found while auditing the BenchBox Results Explorer\nbefore layering on larger visual and IA changes. These issues directly break\nnavigation or misrepresent benchmark data:\n\n- Query Workbench default `View ->` links can navigate to `/results/r/undefined`\n  because the default visible column set omits `result_id` while the row action\n  reads `row.result_id`.\n- Result detail methodology can label sample count as query scope, e.g. showing\n  \"Query scope: 88 queries\" on a page whose timing section has 22 logical\n  queries and 88 individual samples.\n- Platform page \"Performance Trend\" can mix unrelated benchmark/scale cohorts\n  such as SSB SF0.01, SSB SF0.1, TPC-H SF0.01, and TPC-H SF0.1 into one\n  geomean trend line, which implies a single longitudinal metric where none\n  exists.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hide the Query Workbench View link when result_id is not visible",
+        "instead": "carry row identity separately from displayed columns.",
+        "item_id": "explorer-critical-results-ux-defects",
+        "why": "navigation is a core row action"
+      },
+      {
+        "dont": "label measurement samples as queries",
+        "instead": "show logical queries and samples as separate counts.",
+        "item_id": "explorer-critical-results-ux-defects",
+        "why": "that overstates benchmark breadth"
+      },
+      {
+        "dont": "normalize mixed benchmark/scale rows into a single trend line",
+        "instead": "split by cohort or force a cohort selector.",
+        "item_id": "explorer-critical-results-ux-defects",
+        "why": "geomean values are cohort-relative"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-01T00:00:00Z",
+      "created_at": "2026-05-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing Result Detail route `/results/r/{result_id}` remains unchanged.",
+        "item_id": "explorer-critical-results-ux-defects"
+      },
+      {
+        "behavior": "Platform trend charts remain available, but only for comparable cohorts.",
+        "item_id": "explorer-critical-results-ux-defects"
+      },
+      {
+        "behavior": "Query Workbench CSV/JSON export continues to emit exactly the columns the user has selected (no extra hidden `result_id`); the projection-only fix keeps `result_id` available to row actions without leaking into export output.",
+        "item_id": "explorer-critical-results-ux-defects"
+      },
+      {
+        "behavior": "Query Workbench column picker continues to control visible table columns.",
+        "item_id": "explorer-critical-results-ux-defects"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MethodologyDisclosure.tsx"
+      },
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TimeSeries.tsx"
+      },
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MethodologyDisclosure.test.tsx"
+      },
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/queryFilters.ts"
+      },
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+      },
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Query.test.tsx"
+      },
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Frontend typecheck and unit tests pass.",
+        "expected": "TypeScript and Vitest pass, including new regressions for workbench links, methodology counts, and platform trend grouping.",
+        "item_id": "explorer-critical-results-ux-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Production explorer bundle still builds.",
+        "expected": "Vite production build completes without errors.",
+        "item_id": "explorer-critical-results-ux-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-critical-results-ux-defects",
+        "needs_wid": "w3",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-critical-results-ux-defects",
+        "notes": "In results-explorer/src/pages/Query.tsx, ensure `result_id` is always\navailable for row actions even when not visible. Preferred fix: keep\n`result_id` in the SELECT projection as a hidden key and render only the\nuser-selected columns. Add a regression test where DEFAULT_COLUMNS omits\n`result_id` but the \"View\" link still points to `/results/r/{id}`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make Query Workbench row actions independent of visible result_id column",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-critical-results-ux-defects",
+        "notes": "In results-explorer/src/pages/ResultDetail.tsx and/or\nMethodologyDisclosure, source logical query scope from `detail.query_count`\nor `detail.display_timings.length`, and sample count from\n`detail.queries.length`. The UI should say, for example, \"22 queries,\n88 measurement samples\" rather than \"88 queries\" when samples are the\nlarger number.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Correct Result Detail methodology copy to distinguish logical queries from samples",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-critical-results-ux-defects",
+        "notes": "In results-explorer/src/pages/PlatformIndex.tsx and\nresults-explorer/src/components/TimeSeries.tsx call sites, group trend\ndata by `(benchmark, scale_factor, phase, primary_metric)` before drawing.\nEither render cohort-specific small multiples or require an explicit cohort\nselector. Do not plot mixed cohorts on one y-axis.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Stop Platform page trend chart from combining different cohorts into one time series",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-critical-results-ux-defects",
+        "notes": "Extend Query.test.tsx with a case where DEFAULT_COLUMNS omits `result_id`\nbut the rendered \"View\" link still resolves to `/results/r/{id}`. Commit\nwith the w1 fix so navigation is locked in by the same change.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Query Workbench regression test for default row link without visible result_id",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-critical-results-ux-defects",
+        "notes": "Extend ResultDetail.test.tsx or MethodologyDisclosure.test.tsx to assert\n\"queries\" and \"measurement samples\" render as distinct counts when sample\ncount exceeds logical query count. Commit with the w2 fix.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Result Detail regression test for separate query and sample counts",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-critical-results-ux-defects",
+        "notes": "Extend PlatformIndex.test.tsx with rows from at least two distinct\n`(benchmark, scale_factor)` cohorts and assert the trend renderer either\nsplits cohorts into small multiples or refuses to render a single merged\nline. Commit with the w3 fix.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Platform trend regression test against mixed cohorts",
+        "wid": "w6"
+      }
+    ]
+  }
+}

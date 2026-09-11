@@ -1,0 +1,147 @@
+{
+  "context": "Follow the existing DuckDB pattern (duckdb.py:156-184) for directory detection:\n- Delta: check for _delta_log/ subdirectory\n- Iceberg: check for metadata/ subdirectory\n- Hudi: check for .hoodie/ subdirectory\nThen use spark.read.format(\"<format>\").load(path) for each detected format.\nRe-register platforms in format_capabilities.py only after tests confirm loading works.\n",
+  "description": "SparkDataLoadMixin._load_data_spark() (spark_execution_mixin.py:45-151) currently\nonly handles parquet and CSV.  Spark natively supports delta, iceberg, and hudi via\nspark.read.format(\"<format>\").load(path), but the mixin lacks format detection and\nrouting for these formats.\n\nThe shared mixin is only part of the Spark-family implementation story.  Some managed\nSpark adapters have their own staging/Livy/job-submission load paths and do not\ncurrently route through SparkDataLoadMixin.  This item therefore only closes the\nshared loader gap for adapters that actually use the mixin; remaining adapter-family\ngaps must be tracked separately.\n\nOnce mixin-backed loading code is implemented and verified, only the platforms whose\nruntime actually uses the mixin should be re-registered in format_capabilities.py.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add external library dependencies (deltalake, pyiceberg)",
+        "instead": "use the native Spark API",
+        "item_id": "spark-mixin-open-table-format-loading",
+        "why": "Spark has native format support via spark.read.format()"
+      },
+      {
+        "dont": "register platforms in format_capabilities.py before loading code is tested",
+        "instead": "implement and test loading first, then register",
+        "item_id": "spark-mixin-open-table-format-loading",
+        "why": "the fail-fast check will pass but load will fail at runtime"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "spark-mixin-open-table-format-loading",
+        "id": 75,
+        "reason": "Requires Spark cluster or local PySpark install with format jars",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Real Spark integration test for delta/iceberg/hudi loading requires a Spark cluster or local PySpark+format-jar install; infra dependency not shown as resolved.",
+        "summary": "Integration test with real Spark session loading delta/iceberg/hudi files"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "spark-mixin-open-table-format-loading",
+        "id": 76,
+        "reason": "Athena Spark, Dataproc-family, Synapse Spark, and Fabric Spark require separate non-mixin TODOs",
+        "resolution": "promoted",
+        "resolved_item": "managed-spark-adapter-follow-up-items",
+        "resolved_reason": null,
+        "summary": "Managed Spark adapter follow-up items"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing Spark adapter tests must pass without modification",
+        "item_id": "spark-mixin-open-table-format-loading"
+      },
+      {
+        "behavior": "SparkDataLoadMixin._load_data_spark() parquet and CSV loading paths must continue to work unchanged",
+        "item_id": "spark-mixin-open-table-format-loading"
+      },
+      {
+        "behavior": "format_capabilities.py fail-fast check: only re-register a platform after loading code is verified working",
+        "item_id": "spark-mixin-open-table-format-loading"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "spark-mixin-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/format_capabilities.py"
+      },
+      {
+        "item_id": "spark-mixin-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/spark_execution_mixin.py"
+      },
+      {
+        "item_id": "spark-mixin-open-table-format-loading",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/base/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base/ -v -k 'spark' --no-header -q",
+        "description": "Spark adapter tests pass",
+        "expected": "All tests pass",
+        "item_id": "spark-mixin-open-table-format-loading",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/base/test_format_capabilities.py -v --no-header -q",
+        "description": "Format capabilities tests pass with updated registrations",
+        "expected": "All tests pass",
+        "item_id": "spark-mixin-open-table-format-loading",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "spark-mixin-open-table-format-loading",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "spark-mixin-open-table-format-loading",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "spark-mixin-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add format detection and routing to SparkDataLoadMixin._load_data_spark()",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "spark-mixin-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for Spark format loading (mock-based)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "spark-mixin-open-table-format-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-register only mixin-backed Spark platforms in format_capabilities.py",
+        "wid": "w3"
+      }
+    ]
+  }
+}

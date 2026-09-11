@@ -1,0 +1,132 @@
+{
+  "description": "The cross-surface mutation-sensitivity suite measures whether each enforced\ngate's comparator actually catches a planted divergence. Two coupled defects make\nit test a DIFFERENT dataset than CI gates, and leave one enforced gate uncovered:\n\n1. Wrong scale. _build_gate_cell (tests/integration/test_cross_surface_mutation_\n   sensitivity.py:269) builds every cell with the GLOBAL EQUIVALENCE_SCALE,\n   ignoring the gate's own scale_factor. H2O-DB explicitly carries\n   scale_factor=_H2ODB_SCALE because its generator base is the 10M-row small tier\n   - the global 0.1 would emit ~1M rows (cross_surface.py:973 comment). So the\n   mutation harness measures sensitivity on a dataset that does not match the\n   enforced gate, and cannot host H2O-DB at all as written.\n\n2. Missing target. _TARGETS (test:100) lists ssb/amplab/coffeeshop/clickbench/\n   joinorder_synthetic but OMITS h2odb, even though h2odb is enforced in GATES\n   (cross_surface.py:973). The drift guard test_targets_cover_every_enforced_gate\n   (test:332) already asserts set(_TARGETS) == set(GATES) - so it is (or should\n   be) RED for h2odb. The work is to make that EXISTING guard pass and ensure its\n   lane runs in CI, not to add a new guard.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "pick an h2odb target that is vacuous (empty/all-NULL) at _H2ODB_SCALE",
+        "instead": "(not specified)",
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "why": "the sensitivity result would be meaningless (a BS3-vacuous pass)."
+      },
+      {
+        "dont": "use `gate.scale_factor or EQUIVALENCE_SCALE`",
+        "instead": "(not specified)",
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "why": "rely on the dataclass default; the `or` form silently substitutes policy and defeats the contract."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-06-28T00:00:00Z",
+      "created_at": "2026-06-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing gate mutation cells stay non-vacuous and their planted-mutation catches are unchanged.",
+        "item_id": "cross-surface-mutation-harness-scale-fidelity"
+      },
+      {
+        "behavior": "No change to production gate behavior or to CrossSurfaceGate semantics - this is test-harness fidelity only (plus possibly a CI lane wiring).",
+        "item_id": "cross-surface-mutation-harness-scale-fidelity"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': 'benchbox/core/equivalence/cross_surface.py:973', 'note': 'h2odb gate definition with scale_factor=_H2ODB_SCALE and the ~100k-row bounded-cell rationale - pick an h2odb target query that is non-vacuous at that scale.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'tests/integration/test_cross_surface_mutation_sensitivity.py:100', 'note': '_TARGETS map and the per-target caveat comments - add h2odb with a discriminating GROUP BY + ORDER BY query returning multiple non-NULL rows.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'tests/integration/test_cross_surface_mutation_sensitivity.py:269', 'note': '_build_gate_cell uses gate.build(EQUIVALENCE_SCALE, ...). Change to gate.build(gate.scale_factor, ...) - scale_factor is part of the gate contract (CrossSurfaceGate dataclass default), so use it directly, NOT `gate.scale_factor or EQUIVALENCE_SCALE` (that re-leaks policy into the test).'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'tests/integration/test_cross_surface_mutation_sensitivity.py:332', 'note': 'test_targets_cover_every_enforced_gate already asserts set(_TARGETS)==set(GATES). This item makes it pass; do not add a duplicate guard.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_cross_surface_mutation_sensitivity.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_cross_surface_mutation_sensitivity.py -q",
+        "description": "Every enforced gate is mutation-covered at its own scale",
+        "expected": "test_targets_cover_every_enforced_gate passes (6 gates incl h2odb); all mutation kinds caught; unmutated targets green",
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "notes": "Change _build_gate_cell to call gate.build(gate.scale_factor, tmp_path) so the\nmutation cell matches the enforced-gate cell. Use the dataclass default as the\nsingle source of truth; do not re-implement an `or EQUIVALENCE_SCALE` fallback.\nRe-verify the existing parametrized gates still build non-vacuous reference\nrows at their own scale.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build each mutation cell at the gate's own scale_factor",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "notes": "Pick an h2odb query (GROUP BY + ORDER BY) that returns multiple non-NULL rows\nat _H2ODB_SCALE (~100k rows), add it to _TARGETS, and confirm\ntest_targets_cover_every_enforced_gate (test:332) and\ntest_unmutated_target_is_green pass for h2odb. The unmutated cell must be\nnon-empty and discriminating; each mutation kind (flip_comparator,\ndrop_group_key, reverse_sort, drop_join) must be CAUGHT (and reverse_sort's\ndocumented order-blind miss for non-ORDER-BY shapes still holds where it\nlegitimately should).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a non-vacuous H2O-DB mutation target and make the drift guard green",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "cross-surface-mutation-harness-scale-fidelity",
+        "notes": "The drift guard only protects if its lane executes. Confirm the integration\nlane that collects test_cross_surface_mutation_sensitivity.py runs in\n.github/workflows (or add it to the appropriate required job). If it is a\nslow/integration marker excluded from the default lane, ensure at least the\nlightweight set(_TARGETS)==set(GATES) guard runs in a required lane so a future\ngate promotion cannot silently skip mutation coverage.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm the mutation-sensitivity lane actually runs in CI",
+        "wid": "w3"
+      }
+    ]
+  }
+}

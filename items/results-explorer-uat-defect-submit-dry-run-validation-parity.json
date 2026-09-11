@@ -1,0 +1,130 @@
+{
+  "description": "`benchbox submit --dry-run` exited 0 for\n`amplab_sf001_clickhouse_local_sql_20260502_185809_f2e17de5.json`, but the\nsame packaged bundle later failed `scripts/validate_submission.py` because of\nthe normalized-cost contract. This contradicts the hosted-results contract\ntext that says dry-run runs client-side validations.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate divergent validation logic",
+        "instead": "share or call the same validation rules where practical.",
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "why": "drift caused this defect"
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Experience",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Dry-run remains offline/local and does not upload results.",
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity"
+      },
+      {
+        "behavior": "Valid result dry-runs still show the PR-ready package preview.",
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "kind": "do_not_modify",
+        "path_glob": "tests/fixtures/published_results_validator.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/active/results-explorer-uat-defect-submit-dry-run-validation-parity.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/results-explorer-uat-defect-submit-dry-run-validation-parity.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_submit.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k 'submit and dry_run and validation' -q",
+        "description": "Dry-run rejects a known invalid bundle with the same validator error class.",
+        "expected": "selected submit dry-run validation tests pass",
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/validate_submission.py results-data/bundles",
+        "description": "Submission validator still accepts valid bundles.",
+        "expected": "valid committed bundles pass",
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "notes": "Research 2026-05-03:\n- UAT evidence:\n  `/Users/joe/Developer/benchmark_runs/results/amplab_sf001_clickhouse_local_sql_20260502_185809_f2e17de5.json`\n  and the packaged copy under\n  `/Users/joe/Developer/benchmark_runs/submissions/uat_20260502/bundle/`\n  reproduce the drift.\n- `uv run -- python scripts/validate_submission.py <packaged-bundle>` exits\n  1 with `Public leaderboard cost totals require normalized cost availability:\n  cost.total_usd cannot accompany cost_status 'unavailable'`.\n- `uv run -- benchbox submit <result> --dry-run --output /tmp/benchbox-submit-dryrun-check`\n  exits 0 and prints the PR-package preview; the dry-run writes no output\n  files.\n- `uv run -- benchbox submit <result> --dry-run --service` exits 0 and\n  prints the hosted upload preview with no credentials.\n- Divergence owner: `benchbox/cli/commands/submit.py` returns from both\n  dry-run paths before running the shared `scripts.validate_submission`\n  rules. The validator already owns the publish-blocking bundle contract;\n  do not duplicate it.\n- Database cleanup checkpoint: this work unit created no database outputs.\n  The only database-tree artifact was an empty\n  `/Users/joe/Developer/benchmark_runs/databases/flightdata_sf1` directory,\n  which was pruned. Reusable datagen under\n  `/Users/joe/Developer/benchmark_runs/datagen` is preserved because it is\n  shared across benchmarks such as TPC-H/read-primitives reuse.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Compare submit dry-run validation with scripts/validate_submission.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "notes": "Owned files for implementation: `benchbox/cli/commands/submit.py`, this\nTODO file, and `tests/unit/cli/commands/test_submit.py` only for updating\nexisting dry-run fixtures to valid schema-v2 bundle JSON if the new\nvalidator call makes those fixtures unrealistic. Reuse/call\n`scripts.validate_submission.validate_bundles` and `format_summary`; do not\nmove or fork `scripts/validate_submission.py` because\n`tests/integration/test_cross_branch_validator_contract.py` expects\nbyte-identical validator code and fixture sync.\nImplementation 2026-05-03:\n- `benchbox submit --dry-run --output` and `benchbox submit --dry-run\n  --service` now run `scripts/validate_submission.py` rules before printing\n  success previews.\n- Code review found module-name import failed through the console entry\n  point; fixed by loading the validator from `scripts/validate_submission.py`\n  by source-checkout file path.\n- Verification passed: ruff check/format on touched files, ty check on\n  touched files, `uv run -- python -m pytest\n  tests/unit/cli/commands/test_submit.py -q`, invalid UAT bundle fails both\n  dry-run modes with the normalized-cost validator error, valid committed\n  bundle still previews in both dry-run modes without writing files.\n- Database cleanup checkpoint: no database artifacts were created; dry-run\n  output paths remained absent and the reusable datagen tree was left\n  untouched.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make dry-run fail on the same publish-blocking bundle errors",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-submit-dry-run-validation-parity",
+        "notes": "Owned files for tests: `tests/unit/cli/commands/test_submit.py`, plus this\nTODO file for status/verification notes. Add targeted CLI coverage for both\nPR-package dry-run and hosted dry-run rejecting a bundle that\n`scripts.validate_submission` rejects.\nImplementation 2026-05-03:\n- Added targeted CLI regression tests for PR-package and hosted dry-run\n  validation failures using a schema-v2 bundle with `cost.total_usd`\n  alongside unavailable normalized cost provenance.\n- Tests assert the shared validator error is printed and dry-run\n  preview/upload text is not printed after validation failure.\n- Verification passed: ruff check/format for the test file, ty check for\n  the test file, `uv run -- python -m pytest\n  tests/unit/cli/commands/test_submit.py -q`, `uv run -- python -m pytest\n  tests -k 'submit and dry_run and validation' -q`, and `uv run -- python\n  scripts/validate_submission.py results-data/bundles`.\n- Database cleanup checkpoint: no database artifacts were created and no\n  removable database outputs were present. Reusable datagen was left\n  untouched; rounded `df -h` reported 39 GiB free, above the 5 GB hard-stop\n  threshold.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add CLI regression coverage for dry-run validation parity",
+        "wid": "w3"
+      }
+    ]
+  }
+}

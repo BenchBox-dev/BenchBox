@@ -1,0 +1,128 @@
+{
+  "context": "Extend check_target (or a MEMORY.md-aware helper) to treat baseline MEMORY.md specially when the only content change is additive index lines for paths already in the live tree's added set; mutation-test: pure adds, topic body rewrite, topic delete, index-only, mixed breach+add. Document operator behavior in docs/manual/monitor.md.",
+  "description": "Defect ledger #10. Post-swap monitoring classifies any change to a baseline file as BREACH, including MEMORY.md index updates that only list newly added organic topic files. Check-in 2 (2026-08-05) aborted on that path; Joe ruled option A (accept as organic, continue window) without ordering option C (recalibration). Implement classification so pure index updates accompanying organic additions are organic-additions (or a dedicated status), while deletion/modification of installed topic bodies remains BREACH. Preserve parked-tree integrity checks.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "silence all MEMORY.md changes",
+        "instead": "classify only additive index lines tied to organic added files",
+        "item_id": "memory-monitor-index-update-classification",
+        "why": "a wholesale index rewrite or drop of installed pointers is a real breach"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Implementation committed as a51c159, but the memory-governance repository has no origin remote; publication and complete --pr cannot proceed until a repository remote/PR path is provided.",
+      "category": "Operations",
+      "created_at": "2026-08-05T22:10:03Z",
+      "worktree": "memory-rollout"
+    },
+    "preserves": [
+      {
+        "behavior": "Deletion or rewrite of installed topic bodies remains an abort trigger",
+        "item_id": "memory-monitor-index-update-classification"
+      },
+      {
+        "behavior": "Joe's option-A operational override for check-in 2 remains on record",
+        "item_id": "memory-monitor-index-update-classification"
+      },
+      {
+        "behavior": "Parked previous trees stay hash-checked every check-in",
+        "item_id": "memory-monitor-index-update-classification"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Per-file baseline classification",
+        "decision": "extend",
+        "item_id": "memory-monitor-index-update-classification",
+        "path": "/Users/joe/Developer/memory-governance/memory_tooling/src/memory_tooling/monitoring.py"
+      },
+      {
+        "concept": "Check-in 2 abort + option A ruling",
+        "decision": "reuse",
+        "item_id": "memory-monitor-index-update-classification",
+        "path": "/Users/joe/Developer/memory-governance/reports/rollout/claude/monitoring-20260804.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-monitor-index-update-classification",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory.previous/**"
+      },
+      {
+        "item_id": "memory-monitor-index-update-classification",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-monitor-index-update-classification",
+        "kind": "only_modify",
+        "path_glob": "docs/manual/monitor.md"
+      },
+      {
+        "item_id": "memory-monitor-index-update-classification",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/src/memory_tooling/monitoring.py"
+      },
+      {
+        "item_id": "memory-monitor-index-update-classification",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/tests/test_monitoring.py"
+      },
+      {
+        "item_id": "memory-monitor-index-update-classification",
+        "kind": "only_modify",
+        "path_glob": "reports/defect-ledger.md"
+      },
+      {
+        "item_id": "memory-monitor-index-update-classification",
+        "kind": "only_modify",
+        "path_glob": "reports/rollout/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling -- python -m pytest memory_tooling/tests/test_monitoring.py -q",
+        "description": "Monitoring tests pass",
+        "expected": "New classification cases green; prior breach cases still fail closed",
+        "item_id": "memory-monitor-index-update-classification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-monitor-index-update-classification",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added and documented the status matrix; monitoring docs now distinguish additive MEMORY.md links from breaches. Verified with pytest memory_tooling/tests/test_monitoring.py -q (15 passed).",
+        "item_id": "memory-monitor-index-update-classification",
+        "notes": null,
+        "started_at": "2026-08-15T13:05:23Z",
+        "started_branch": "fix/memory-monitor-index-classification",
+        "started_worktree": "/Users/joe/Developer/memory-governance.wt-monitor-index",
+        "status": "done",
+        "summary": "Specify intended status matrix for MEMORY.md vs topic files under organic growth",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Implemented per-line baseline hashes and fail-closed additive-index classification; added regression tests for organic links, missing records, rewrites, and legacy baselines. Verified targeted pytest (15 passed), Ruff check, and Ruff format check.",
+        "item_id": "memory-monitor-index-update-classification",
+        "notes": null,
+        "started_at": "2026-08-15T13:09:06Z",
+        "started_branch": "fix/memory-monitor-index-classification",
+        "started_worktree": "/Users/joe/Developer/memory-governance.wt-monitor-index",
+        "status": "done",
+        "summary": "Implement classification + mutation tests; document in monitor manual",
+        "wid": "w1"
+      }
+    ]
+  }
+}

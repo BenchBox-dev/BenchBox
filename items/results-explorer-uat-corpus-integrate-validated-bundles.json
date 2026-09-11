@@ -1,0 +1,244 @@
+{
+  "context": "Treat this as a corpus-curation task, not a benchmarking task. The\nsource is the existing UAT corpus on disk; do NOT re-run benchmarks\nto refresh data. Lean on the existing validators\n(`scripts/validate_submission.py`) and explorer build pipeline rather\nthan writing new integration tooling. Land the audit matrix as a\nmarkdown file under `_project/handoffs/` so the curation reasoning is\nreviewable, not buried in commit messages.\n",
+  "description": "The 2026-05-02 UAT sweep produced a 376-bundle local submission package\nat `~/Developer/benchmark_runs/submissions/uat_20260502/` and a\nvalidator-clean 205-bundle subset at\n`~/Developer/benchmark_runs/submissions/uat_20260502_valid/`. Per the W5\ncompletion record, **no upstream submission was performed** — the agent\nintentionally stopped at local staging because 188 bundle errors and\n171 failing bundles clustered around two corpus-integrity defects.\n\nThose defects have since been fixed and merged (PRs #141 normalized-cost,\n#143 zero-query-timing, #145 flightdata SF1, #142 partial-success exit\ncontract). The validator-clean subset is now likely a strict undercount\nof what could be integrated, because some bundles previously failing on\ncontract issues should now validate cleanly against the fixed contracts.\n\nThis TODO performs the careful review the original UAT deferred:\nre-validate the full staged package against current contracts, audit the\nresulting clean set for corpus-quality balance (no platform/scale\nover-representation, no telemetry pathologies), integrate the reviewed\nbundles into `results-data/`, and open a `published-results` PR. The\nsource data is the existing UAT corpus on the local volume — this TODO\nmust NOT regenerate benchmark runs.\n\nThis work makes the corpus expansion goal of the UAT actually deliver:\nthe explorer's cross-scale comparison views are only meaningful when\nthere are enough cells per (platform, benchmark) at SF=0.01/0.1/1.0 to\ncompare against. Today the validator-clean snapshot has DataFusion 68 /\nPolars 41 / PySpark 34 / SQLite 28 / Spark 25 / DuckDB 9 across 51\ncohorts; the post-fix re-validation should improve those counts.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "commit the full 376-bundle set blindly because the validator now passes",
+        "instead": "review per-bundle and document exclusions.",
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "why": "some failures encode platform-level signals worth keeping visible"
+      },
+      {
+        "dont": "enable auto-merge on the published-results PR",
+        "instead": "open as draft and flip to ready manually.",
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "why": "corpus changes get human review, not the auto-merge backstop"
+      },
+      {
+        "dont": "modify benchbox/, results-explorer/, or scripts/ to make a bundle pass",
+        "instead": "if a bundle still fails, exclude it and file a defect TODO.",
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "why": "that conflates curation with engineering"
+      },
+      {
+        "dont": "regenerate or re-run benchmarks during this task",
+        "instead": "use the existing on-disk submission package as the source of truth.",
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "why": "re-running invalidates the audit trail tying bundles to the 2026-05-02 sweep"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "id": 554,
+        "reason": "The 2026-05-02 sweep was local-only by design; cloud rows are the scope of a separate `results-explorer-uat-cloud-corpus` if/when the explorer's cloud-facet surface is ready to be tested under load.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly deferred to a named follow-up 'if/when explorer's cloud-facet surface is ready'; that follow-up isn't in the open item list.",
+        "summary": "Cloud-platform corpus integration (Snowflake / BigQuery / Redshift / Athena / Databricks)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "id": 555,
+        "reason": "The sweep only ran load,power phases. Throughput bundles belong in a separate sweep and are out of scope here.",
+        "resolution": "promoted",
+        "resolved_item": "throughput-phase-corpus-expansion",
+        "resolved_reason": null,
+        "summary": "Throughput-phase corpus expansion"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "needs_item": "results-explorer-uat-defect-flightdata-sf1-corpus-integrity"
+      },
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "needs_item": "results-explorer-uat-defect-normalized-cost-unavailable-bundles"
+      },
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "needs_item": "results-explorer-uat-defect-partial-success-exit-contract"
+      },
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "needs_item": "results-explorer-uat-defect-zero-query-timing-bundles"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing curated entries in results-data/ remain in place and unmodified.",
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles"
+      },
+      {
+        "behavior": "Per-bundle manifest schema established by PR #95 — no schema drift.",
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles"
+      },
+      {
+        "behavior": "The original W5 staging directory and matrix_summary.tsv are not modified — they remain the audit-trail anchor.",
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles"
+      },
+      {
+        "behavior": "Trust label semantics (community-submission vs maintainer-curated) are not collapsed or invented.",
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "kind": "do_not_modify",
+        "path_glob": "_binaries/"
+      },
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-uat-corpus-integrate-validated-bundles.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/results-explorer-uat-corpus-integration-*.md"
+      },
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "kind": "only_modify",
+        "path_glob": "results-data/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/validate_submission.py ~/Developer/benchmark_runs/submissions/uat_20260502/",
+        "description": "Re-validation of the full staged package shows materially fewer failures than the original W5 log.",
+        "expected": "error count materially lower than 188; remaining failures all map to known still-open defect clusters",
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/validate_submission.py results-data/bundles",
+        "description": "Per-bundle contract validator passes against results-data after staging.",
+        "expected": "0 errors",
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "manual",
+        "description": "Explorer build ingests the new corpus and the cross-scale comparison view renders for at least 3 (platform, benchmark) pairs.",
+        "expected": "screenshots captured under explorer_uat verification logs",
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "notes": "The staged package lives at\n`~/Developer/benchmark_runs/submissions/uat_20260502/`. Run\n`uv run -- python scripts/validate_submission.py\n~/Developer/benchmark_runs/submissions/uat_20260502/` and capture the\nnew error / warning rate. Expect significant improvement vs the\noriginal W5 log (`submission_validation_20260502.log`,\n188 errors / 212 warnings) because PRs #141, #142, #143, #145 fixed\nthe dominant failure clusters.\n\nRecord the new totals and per-cluster breakdown to\n`~/Developer/benchmark_runs/logs/uat_20260502/submission_validation_revalidate_$(date +%Y%m%d).log`.\nCross-reference each remaining failure against the 14 defect TODOs to\nconfirm none of them are still-open clusters that should have been\nfixed; if so, surface the regression rather than silently excluding\nthe bundle.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the staged 376-bundle package against current contracts",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "notes": "Build a coverage matrix from the now-clean bundle set:\n  - cells per (platform, benchmark, scale)\n  - count of (platform, benchmark) pairs with all three SF rungs\n    (0.01, 0.1, 1.0) present — this is the cross-scale comparison\n    surface the explorer needs\n  - duplicate detection: same (platform, benchmark, scale, mode)\n    with multiple bundles\n  - telemetry sanity spot-checks: any zero or near-zero query timings\n    that survived #143; any cost contracts in unexpected states\nDocument the matrix and the bundles intentionally excluded from\nintegration (e.g., dup-from-retry, debug-only mode, suspicious timing).\nThis audit is the deliverable of the \"carefully review\" half of the\nuser's request and must not be skipped.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit the validator-clean set for corpus-quality balance",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "notes": "Copy the reviewed bundles into `results-data/bundles/` preserving the\nper-bundle manifest layout introduced by PR #95\n(`fix(results): support per-bundle published manifests`). Do not\noverwrite existing curated entries — collisions should be surfaced\nand resolved per-bundle rather than blindly preferring the new\nsubmission. Trust labels: community-submission unless the bundle was\nproduced by a maintainer-run platform under maintainer-controlled\nenvironment, in which case maintainer-curated. Do not invent new\ntrust labels.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Stage the reviewed bundles into a results-data working tree",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "notes": "Open the PR vs `published-results` (not `develop`, not `main`) as\n**draft**, per project convention for corpus changes. The hosted\nvalidator and per-bundle contract CI must be green before flipping to\nready-for-review. Do not enable auto-merge — published-results PRs\nget human review.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Open a draft published-results PR and confirm contract CI passes",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-corpus-integrate-validated-bundles",
+        "notes": "Run `benchbox explorer build --data-dir results-data/ --output\n/tmp/explorer-corpus-check/data` and exercise the resulting snapshot\nvia the static test server and Playwright smoke\n(results-explorer/scripts/serve-browser-tests.mjs). Specifically\ncover the cross-scale comparison view for at least 3 (platform,\nbenchmark) pairs that now have all three SF rungs — this is the\nsurface the original UAT under-tested, see blind-spot finding\n`2026-05-03-081920-uat-cross-scale-deliverable-not-guarded.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify explorer ingests the new corpus locally before flipping the PR ready",
+        "wid": "w5"
+      }
+    ]
+  }
+}

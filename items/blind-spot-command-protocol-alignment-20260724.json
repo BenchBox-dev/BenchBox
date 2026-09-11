@@ -1,0 +1,122 @@
+{
+  "context": "Decide whether to (a) update the command + README + validator to write drafts under the new protocol, or (b) revert/postpone the protocol flip until the capture path is migrated. Whichever is chosen, the command, docs/development/review-protocol.md, _project/blind-spots/README.md and the validator must agree in ONE commit so no window exists where an agent has contradictory mandatory instructions.",
+  "description": "chatgpt-codex-connector review finding on merged PR #1271 (P2, docs/development/review-protocol.md:131). Deferred from the PR-review sweep in PR #1292 as a coordinated governance change; tracked in GitHub issue #1293.\n\nWith the new drafts-only rule in place, any /blind-spot invocation now carries conflicting mandatory instructions: the command says to follow the protocol exactly, but still composes, writes, validates and reports _project/blind-spots/... (.claude/commands/blind-spot.md:14, :24-38). In the common path of using the slash command to capture a review finding, an agent must either violate the new 'only authorized write' invariant or be unable to complete the command.\nThread: https://github.com/joeharris76/BenchBox/pull/1271#discussion_r3634254553\n\nNote (verified 2026-07-24): .claude/commands/blind-spot.md IS tracked and not gitignored, so it can be edited in the same PR. The blocker is the governance decision, not file access.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "flip the protocol doc without updating the command and validator in the same commit",
+        "instead": "land all four surfaces together",
+        "item_id": "blind-spot-command-protocol-alignment-20260724",
+        "why": "that is precisely the contradictory-instruction window this item closes"
+      }
+    ],
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "completed_at": "2026-07-28T13:17:57Z",
+      "completed_pr": 1318,
+      "created_at": "2026-07-24T16:23:21Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "Agents have exactly one non-contradictory capture path at every commit",
+        "item_id": "blind-spot-command-protocol-alignment-20260724"
+      },
+      {
+        "behavior": "An existing tracked blind-spot file still validates under the validator after the change",
+        "item_id": "blind-spot-command-protocol-alignment-20260724"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "blind-spot-command-protocol-alignment-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "blind-spot-command-protocol-alignment-20260724",
+        "kind": "only_modify",
+        "path_glob": ".claude/commands/blind-spot.md"
+      },
+      {
+        "item_id": "blind-spot-command-protocol-alignment-20260724",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/README.md"
+      },
+      {
+        "item_id": "blind-spot-command-protocol-alignment-20260724",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/validate_blind_spot.py"
+      },
+      {
+        "item_id": "blind-spot-command-protocol-alignment-20260724",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/**"
+      },
+      {
+        "item_id": "blind-spot-command-protocol-alignment-20260724",
+        "kind": "only_modify",
+        "path_glob": "docs/development/review-protocol.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_blind_spot_tools.py -q",
+        "description": "blind-spot validator + tooling tests pass",
+        "expected": "all pass",
+        "item_id": "blind-spot-command-protocol-alignment-20260724",
+        "last_result": "pass",
+        "last_run": "2026-07-28T13:17:46Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "blind-spot-command-protocol-alignment-20260724",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "blind-spot-command-protocol-alignment-20260724",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Decision recorded in commit 6df7e57bd: capture path stays drafts-only (~/.benchbox/finding-drafts, already implemented in the command); authority moves to docs/development/agent-review-protocol.md (REVIEW-CAPTURE-001 codifies the invariant); legacy doc demoted to non-authoritative historical rationale, not deleted",
+        "item_id": "blind-spot-command-protocol-alignment-20260724",
+        "notes": null,
+        "started_at": "2026-07-28T13:04:26Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Decide: migrate the /blind-spot capture path to drafts, or postpone the protocol invariant; record the decision",
+        "wid": "w1"
+      },
+      {
+        "evidence": "commit 6df7e57bd lands command + legacy doc demotion + blind-spots README + findings spec in one commit alongside audit/test surfaces; validator needed no change (no protocol references); check-scope flags only the companion item's files (documented same-commit exception per the item's own anti-pattern)",
+        "item_id": "blind-spot-command-protocol-alignment-20260724",
+        "notes": null,
+        "started_at": "2026-07-28T13:04:28Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Land command + review-protocol + blind-spots README + validator consistently in one commit",
+        "wid": "w2"
+      },
+      {
+        "evidence": "end-to-end capture: draft written to ~/.benchbox/finding-drafts, validate_blind_spot.py OK, artifact removed, no commit/push/tracker write during capture; tests 46/46 pass",
+        "item_id": "blind-spot-command-protocol-alignment-20260724",
+        "notes": null,
+        "started_at": "2026-07-28T13:04:30Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Confirm a /blind-spot capture completes end-to-end without violating the protocol",
+        "wid": "w3"
+      }
+    ]
+  }
+}

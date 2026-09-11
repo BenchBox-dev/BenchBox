@@ -1,0 +1,337 @@
+{
+  "context": "Centralize identity generation before changing individual charts. Use the\nshortest unique qualifier set needed per cohort; do not force every chart\nto show every metadata field. Fallback to short result id only when\nversion, date, and hardware fields do not disambiguate. Run after\ncompare-flow-entrypoints so Compare.tsx is not edited by two concurrent\nworktrees.\n",
+  "description": "Introduce and apply a consistent run identity display so charts, tables, and\ncompare controls do not show indistinguishable duplicate labels such as\nDataFusion, Polars, PySpark, or Spark. Defects this item addresses were\nflagged in the 2026-05-08 Results Explorer follow-up review (chat-only\nartifact, not committed to _project/audits/). w0 rebinds the review\nevidence against develop tip and captures it to\n_project/verification-logs/results-explorer-run-identity-disambiguation/w0.log\nbefore any other work unit runs; that log replaces the previous \"review row\n#12 through #19 plus #40\" citations as the durable reference.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "append raw UUID-length ids to every label.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "invent metadata that is not present in the result snapshot.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "leave duplicate labels and rely on color alone.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "needs_item": "results-explorer-compare-flow-entrypoints"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend UX",
+      "created_at": "2026-05-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing color assignment should remain stable for the same run where possible.",
+        "item_id": "results-explorer-run-identity-disambiguation"
+      },
+      {
+        "behavior": "Full identity must be available by tooltip, accessible label, or details text.",
+        "item_id": "results-explorer-run-identity-disambiguation"
+      },
+      {
+        "behavior": "Small chart labels must stay scannable at standard desktop width.",
+        "item_id": "results-explorer-run-identity-disambiguation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "do_not_modify",
+        "path_glob": "Generated result data unless required identity fields are missing from the export."
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CDFChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CompareSummary.tsx"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/DistributionBox.tsx"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/PercentileLadder.tsx"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/PowerBar.tsx"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryDiffTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryTimingChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RankTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/SparklineTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/StackedPhase.tsx"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TimeSeries.tsx"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/runIdentity.ts"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/lib/__tests__/runIdentity.test.ts src/components/__tests__/charts.smoke.test.tsx src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/GroupedQueryChart.test.tsx src/components/__tests__/QueryDiffTable.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/pages/__tests__/Compare.test.tsx",
+        "description": "Run identity and duplicate-label tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: browser-check chart Rank, Distribution, Overview/Sparklines, Trend, and Compare with duplicate DataFusion/Polars fixtures'",
+        "description": "Manual duplicate-run browser check is complete",
+        "expected": "manual evidence captured in PR notes or audit artifact",
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "notes": "Walk Charts > Rank, Distribution (Box Plot, Percentiles, CDF), Overview\n(Performance, Power, Summary, Phases, Sparklines), Trend, and Compare\n(baseline select, result cards, Decision Summary, Query-Level Diff)\nagainst the current develop tip using a fixture cohort containing\nduplicate platforms (e.g., two DataFusion runs differing only by\nversion or hardware). Capture which surfaces show indistinguishable\nlabels to\n_project/verification-logs/results-explorer-run-identity-disambiguation/w0.log.\nOutput is the rebind reference for w1-w7 acceptance.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rebind run-identity review evidence against develop tip",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "notes": "Define compact, table, chart, select-option, and tooltip variants. The\nidentity must include platform name plus enough available qualifiers\nto distinguish duplicates: driver/platform version, run date, scale,\nhardware or deployment fingerprint, source tier, and short result id\nwhen other qualifiers remain identical.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define a shared RunIdentity formatter and component",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "notes": "Apply RunIdentity labels to Charts Rank column headers. Keep column\nwidths compact, provide full identity in a tooltip, and ensure\nduplicate platform headers no longer render as identical\nhuman-readable names.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply RunIdentity labels to Rank chart headers",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "notes": "`DistributionBox.tsx`, `CDFChart.tsx`, and `PercentileLadder.tsx`\nnow feed their row labels through\n`formatRunIdentitiesForCohort(summary.platforms, \"chart\")`. The\nPercentileLadder row interface gained an optional `displayLabel`\nso ChartPanel can pass cohort-aware labels in without changing\nPercentileStatsRow's other consumers (it falls back to `platform`\nfor any caller that hasn't migrated). The previous label\ntruncation budget (18-22 chars) is preserved; the tooltip path\nstays unchanged because the cohort-aware label already includes\nthe same qualifiers. Verification log:\n_project/verification-logs/results-explorer-run-identity-disambiguation/w346.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply RunIdentity labels to distribution chart rows",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "notes": "`PowerBar.tsx`, `StackedPhase.tsx`, and `SparklineTable.tsx` apply\n`formatRunIdentitiesForCohort(summary.platforms, ...)` to their\nleftmost label column. ChartPanel's local `PerformanceBar`\n(Overview > Performance) and the comparison-bar legend strip now\nconsume the same helper, so duplicate platform names show\nqualifier-suffixed labels (e.g. \"DataFusion v44 2026-04-01\" vs\n\"DataFusion v45 2026-04-15\"). Tests in\n`src/components/__tests__/charts.smoke.test.tsx` cover the\ndisambiguation pattern across DistributionBox, PowerBar, and\nSparklineTable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply RunIdentity labels to overview and sparkline charts",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "notes": "Apply RunIdentity to Compare baseline select options, result cards,\nDecision Summary winner statements, and Query-Level Diff candidate\ncolumns. Change copy from \"2 platforms\" to \"2 runs\" when selected\nresults have the same platform name. Run after the upstream Compare\nrebuild (results-explorer-compare-flow-entrypoints) so labels apply\nto the new builder structure.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply RunIdentity labels and run-aware copy to Compare",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "notes": "`TimeSeries.tsx` builds series descriptors first (one per\nplatform_id) and then runs them through\n`formatRunIdentitiesForCohort` with `RunIdentitySource` synthesized\nfrom the first historical entry. ChartHistoricalEntry doesn't\ncarry `driver_version` / `deployment_class`, so the cohort-aware\nformatter falls through to its short result_id tiebreaker when two\nplatform_ids share a display name — a clear improvement over the\nprior \"DataFusion / DataFusion\" legend collision while keeping\naggregation per platform_id intact. A more thorough fix that adds\nqualifier fields to ChartHistoricalEntry is a follow-up if/when\nthe corpus needs it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Disambiguate or aggregate repeated Trend chart series",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-run-identity-disambiguation",
+        "notes": "Add tests with duplicate platform fixtures for every affected\ncomponent. Assertions must fail if duplicate visible labels remain in\nchart headers, chart row labels, compare select options, or decision\nsummary copy.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover duplicate label cases across charts and Compare",
+        "wid": "w7"
+      }
+    ]
+  }
+}

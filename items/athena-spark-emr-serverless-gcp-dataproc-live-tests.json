@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #224 of platform-live-integration-tests.\nDeferred: Athena Spark, EMR Serverless, GCP Dataproc live tests\nReason deferred: These Spark-on-cloud platforms require significant cloud infrastructure (clusters, IAM roles, S3/GCS staging). Lower priority - the Spark execution path is partially covered by PySpark/LakeSail local tests.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:53Z",
+      "worktree": "main"
+    }
+  }
+}

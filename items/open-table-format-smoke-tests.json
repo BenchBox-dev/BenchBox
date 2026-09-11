@@ -1,0 +1,10 @@
+{
+  "description": "Add smoke tests to verify end-to-end functionality for all supported open table formats\n(Parquet, Delta Lake, Apache Iceberg). While comprehensive unit tests exist for the\nformat converters, there are no integration tests that verify the full pipeline works:\ndata generation → format conversion → platform loading → query execution.\n\nCurrent test coverage:\n- Unit tests: tests/unit/utils/format_converters/ (Parquet, Delta, Iceberg converters)\n- Missing: Integration tests verifying CLI --convert-format option\n- Missing: Smoke tests verifying platforms can read converted data\n- Missing: CI verification that optional dependencies (deltalake, pyiceberg) work",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2025-12-13T00:00:00Z",
+      "worktree": "testing-improvements"
+    }
+  }
+}

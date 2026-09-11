@@ -1,0 +1,24 @@
+{
+  "description": "Add dependency groups for cloud Spark platforms to pyproject.toml.\nEnables users to install platform-specific dependencies with\n`uv add benchbox --extra cloud-spark-<provider>`.\n\n**Current State (as of 2026-01-07):**\nAll 7 cloud Spark platform adapters are COMPLETE and registered:\n- AWS: Glue, EMR Serverless, Athena Spark (all use boto3)\n- GCP: Dataproc, Dataproc Serverless (use google-cloud-dataproc + storage)\n- Azure: Synapse Spark, Fabric Spark (use azure-identity + datalake + requests)\n- Snowflake: Snowpark Connect (uses snowflake-snowpark-python)\n\n**Problem:**\nThe existing `cloud-spark` extra in pyproject.toml only includes Databricks\ndependencies and has an outdated \"Future: AWS Glue, EMR...\" comment.\nProvider-specific extras (cloud-spark-aws, cloud-spark-gcp, cloud-spark-azure)\ndon't exist.\n\n**Scope:**\nThis TODO is ONLY about pyproject.toml dependency groups, not platform\nimplementation (which is already complete).",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "cloud-spark-dependency-groups",
+        "needs_item": "athena-spark-platform"
+      },
+      {
+        "item_id": "cloud-spark-dependency-groups",
+        "needs_item": "dataproc-serverless-platform"
+      },
+      {
+        "item_id": "cloud-spark-dependency-groups",
+        "needs_item": "synapse-spark-platform"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2025-12-24T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

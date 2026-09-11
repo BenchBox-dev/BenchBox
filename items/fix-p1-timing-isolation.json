@@ -1,0 +1,67 @@
+{
+  "context": "Do not begin until the authorization and worktree gates pass. Preserve unrelated changes, use temporary outputs for tests, fail closed on uncertainty, and stop on any data-loss or false-success signal.",
+  "description": "Replace query-id-only active state with an execution token covering iteration, stream, and context. Make metric recording and cleanup token-scoped and test synchronized repeated IDs.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "fix-p1-timing-isolation",
+        "needs_item": "fix-gate-2-p0-review"
+      }
+    ],
+    "item_meta": {
+      "category": "architecture-remediation",
+      "completed_at": "2026-08-26T21:15:57Z",
+      "completed_pr": 1925,
+      "created_at": "2026-08-26T17:08:21Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing user files, existing result artifacts, backward compatibility, rollback evidence",
+        "item_id": "fix-p1-timing-isolation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-p1-timing-isolation",
+        "kind": "do_not_modify",
+        "path_glob": ".bossmode/**"
+      },
+      {
+        "item_id": "fix-p1-timing-isolation",
+        "kind": "do_not_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "fix-p1-timing-isolation",
+        "kind": "do_not_modify",
+        "path_glob": "test-results/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- pytest -q --override-ini=addopts= tests/unit/core/results/test_display_timing.py",
+        "description": "Concurrent timing isolation passes",
+        "expected": "all tests pass",
+        "item_id": "fix-p1-timing-isolation",
+        "last_result": "pass",
+        "last_run": "2026-08-26T21:15:56Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Commit 395dd486a: timing state is keyed by execution token with ContextVar and locking, preserving concurrent repeated query attribution. Threaded overlap test passes. Full preflight: 28,381 passed, 19 skipped.",
+        "item_id": "fix-p1-timing-isolation",
+        "notes": null,
+        "started_at": "2026-08-26T20:31:06Z",
+        "started_branch": "fix/architecture-integrity-batch",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-architecture-integrity-batch",
+        "status": "done",
+        "summary": "Implement execution-scoped timing tokens and concurrency tests",
+        "wid": "w1"
+      }
+    ]
+  }
+}

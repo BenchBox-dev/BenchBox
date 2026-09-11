@@ -1,0 +1,213 @@
+{
+  "context": "Work units are mostly independent but w2/w3 both touch setup.cfg, so\nsequence w1 (verification) first, then w2 and w3 together (both edit\nsetup.cfg - do them in the same change to avoid a broken intermediate\nstate), then w4 as a separate, optional, independently-landable change.\nFor w3, actually diff pytest.ini against pytest-ci.ini and pyproject.toml's\ndead [tool.pytest.ini_options] before deciding - the dead copy may have\ndrifted from pytest.ini over time (e.g. its marker list is a different,\npossibly stale, subset) and that drift itself is worth noting even if\nthe block is being deleted, in case any marker only exists in the dead\ncopy and needs to be ported to the surviving file.\n",
+  "description": "Test-strategy review of packaging/config found three independent, low-risk\nhygiene items in the top-level packaging and pytest config files:\n\n1. **Stale `setup.py`.** `pyproject.toml` fully declares the project via\n   PEP 621 `[project]` (`name = \"benchbox\"`, `version = \"0.2.1\"`, real\n   `dependencies`) with `build-backend = \"setuptools.build_meta\"`\n   (pyproject.toml:1-7). `setup.py` separately declares\n   `version=\"0.1.0\"` and a tiny, wrong `install_requires=[\"pytest>=6.0.0\",\n   \"pytest-cov>=2.10.0\", \"pytest-mock>=3.3.0\"]` (test-only deps, not the\n   real runtime dependency set). Since setuptools' PEP 517 build backend\n   reads project metadata from `pyproject.toml`'s `[project]` table when\n   present, `setup.py`'s `setup()` call is very likely vestigial for\n   `uv build` / wheel builds today - but this must be verified, not\n   assumed, before deleting it (see w1).\n\n2. **Dead `setup.cfg` sections.** `setup.cfg` has `[flake8]` and\n   `[isort]` sections, but the project's actual lint/format tooling is\n   `ruff` (per `pyproject.toml`'s `[dependency-groups] dev` pinning\n   `ruff==0.11.13`, and `make lint`/`make format` targets) - flake8 and\n   isort are not installed or invoked anywhere. `setup.cfg` also has a\n   `[tool:pytest]` section (`testpaths = tests`, a `markers` list) that\n   is a SECOND pytest config in addition to `pytest.ini` and\n   `pyproject.toml`'s `[tool.pytest.ini_options]` - a third copy of the\n   same settings, silently ignored (see #3).\n\n3. **Three pytest config homes, only one active.** Pytest's config\n   discovery picks the first of `pytest.ini` / `pyproject.toml` /\n   `setup.cfg` / `tox.ini` it finds in the rootdir, in that priority\n   order - `pytest.ini` exists at the repo root, so it always wins\n   for a bare `uv run -- python -m pytest` invocation, making\n   `pyproject.toml`'s `[tool.pytest.ini_options]` (lines 424-481) and\n   `setup.cfg`'s `[tool:pytest]` section silently dead. This is visibly\n   true from `pyproject.toml:426`: `minversion = \"0.2.1\"` - a copy-paste\n   of the PROJECT version into a field pytest interprets as \"minimum\n   pytest version required,\" which is meaningless (pytest's real version\n   is always >= \"0.2.1\" as a version-comparison string, so the check\n   never fires) and clearly never validated against pytest's actual\n   `minversion` semantics because nobody runs this config block.\n   There is ALSO a fourth file, `pytest-ci.ini`, which IS actively used -\n   explicitly passed via `-c pytest-ci.ini` in `Makefile:316` (`test-ci`)\n   and `Makefile:547,550,553,556-558` (`coverage-fast`, `coverage-all`,\n   `coverage-html`, `coverage-report`) - so any consolidation plan must\n   account for THREE real config surfaces (`pytest.ini` for local/default\n   runs, `pytest-ci.ini` for CI/coverage runs via explicit `-c`, and the\n   dead `pyproject.toml`/`setup.cfg` copies), not two.\n\nSeparately (same TODO, same theme): `benchbox/__init__.py`,\n`pyproject.toml`'s `[project].version`, `pyproject.toml`'s\n`[tool.pytest.ini_options].minversion` (the meaningless copy above),\n`README.md`, `docs/README.md`, and `benchbox/utils/VERSION_MANAGEMENT.md`\nall separately hardcode `\"0.2.1\"` - 5 of these 6 are intentionally\ntracked and cross-checked by `benchbox/utils/version.py`'s\n`check_version_consistency()` (canonical source\n`benchbox/__init__.py:17`, doc paths validated via\n`_ADDITIONAL_VERSION_PATHS`/`DOCUMENTATION_VERSION_PATHS`,\n`version.py:32-37`) - so the runtime-consistency risk is already\nmitigated for those 5. The 6th (pytest's stray `minversion`) is NOT\ntracked by that checker and is simply meaningless config, addressed by\nitem 3 above (whichever config file survives should not carry a\nproject-version-shaped `minversion`). `dynamic = [\"version\"]` (reading\nversion from `benchbox/__init__.py` at build time) would collapse the\n`[project].version` copy specifically, but is scoped to a decision +\nimplementation work unit here, not a larger version-management rewrite.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle the dynamic-version decision (w4) into the same PR as the config-file pruning (w1-w3)",
+        "instead": "keep w4 as its own PR if adopted.",
+        "item_id": "packaging-config-hygiene",
+        "why": "they're independently risky and independently revertable"
+      },
+      {
+        "dont": "delete pytest-ci.ini or change its content as a side effect of w3",
+        "instead": "if w3's decision affects it, do so as an explicit, separately-verified change with each Makefile target re-run.",
+        "item_id": "packaging-config-hygiene",
+        "why": "it's actively used by 5+ Makefile targets"
+      },
+      {
+        "dont": "delete setup.py before verifying uv build output in w1",
+        "instead": "verify empirically, don't assume from reading docs alone.",
+        "item_id": "packaging-config-hygiene",
+        "why": "setuptools' PEP 517 backend behavior with a coexisting setup.py + pyproject.toml [project] table can vary by setuptools version"
+      },
+      {
+        "dont": "let setup.cfg's [tool:pytest] markers list silently disappear without checking whether it contains any marker not present in pytest.ini's markers list",
+        "instead": "diff the marker lists before deleting.",
+        "item_id": "packaging-config-hygiene",
+        "why": "a marker used in a test file but never declared anywhere becomes a --strict-markers failure"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-04T00:00:00Z",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Makefile targets test-ci, coverage, coverage-fast, coverage-all, coverage-html, coverage-report continue to work with pytest-ci.ini exactly as before - do not delete or restructure pytest-ci.ini without updating every Makefile reference in the same change.",
+        "item_id": "packaging-config-hygiene"
+      },
+      {
+        "behavior": "The xdist safety shim behavior (_benchbox_pytest_xdist_safety.py, loaded via `-p _benchbox_pytest_xdist_safety` in pytest.ini's addopts) - if w3 picks option (A), this line must survive in pytest.ini unchanged; if option (B), it must be carried into pyproject.toml's addopts equivalent exactly.",
+        "item_id": "packaging-config-hygiene"
+      },
+      {
+        "behavior": "benchbox/utils/version.py::check_version_consistency() continues to pass for whichever version-string copies remain after w4's decision.",
+        "item_id": "packaging-config-hygiene"
+      },
+      {
+        "behavior": "make test-fast selection semantics (whatever marker expression / config file it currently resolves through) - verify with `make test-fast` before and after w3, comparing collected test counts.",
+        "item_id": "packaging-config-hygiene"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "packaging-config-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "CI workflow files (.github/workflows/*.yml) unless a Makefile target they call changes its config file argument"
+      },
+      {
+        "item_id": "packaging-config-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile targets other than what's needed to keep them pointed at the correct config file name"
+      },
+      {
+        "item_id": "packaging-config-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/__init__.py (version string stays as the canonical source unless w4 explicitly changes how it's read, not its value)"
+      },
+      {
+        "item_id": "packaging-config-hygiene",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/version.py"
+      },
+      {
+        "item_id": "packaging-config-hygiene",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "packaging-config-hygiene",
+        "kind": "only_modify",
+        "path_glob": "pytest-ci.ini"
+      },
+      {
+        "item_id": "packaging-config-hygiene",
+        "kind": "only_modify",
+        "path_glob": "pytest.ini"
+      },
+      {
+        "item_id": "packaging-config-hygiene",
+        "kind": "only_modify",
+        "path_glob": "setup.cfg"
+      },
+      {
+        "item_id": "packaging-config-hygiene",
+        "kind": "only_modify",
+        "path_glob": "setup.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv build --wheel && python -c \"import zipfile,glob; z=zipfile.ZipFile(sorted(glob.glob('dist/*.whl'))[-1]); print(z.read([n for n in z.namelist() if n.endswith('METADATA')][0]).decode()[:400])\"",
+        "description": "uv build succeeds and produces correct METADATA before and after setup.py deletion",
+        "expected": "Version: 0.2.1 and a real Requires-Dist list, not pytest/pytest-cov/pytest-mock only",
+        "item_id": "packaging-config-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-fast",
+        "description": "make test-fast still selects the same set of tests after config consolidation",
+        "expected": "Same pass/fail/collected counts as before the change (compare test session summary line)",
+        "item_id": "packaging-config-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-ci",
+        "description": "make test-ci and coverage targets still work with pytest-ci.ini",
+        "expected": "Runs successfully using pytest-ci.ini, no config-not-found errors",
+        "item_id": "packaging-config-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rn 'flake8\\|isort' Makefile .github/workflows/ || true",
+        "description": "No flake8/isort invocation anywhere in CI or Makefile after setup.cfg pruning",
+        "expected": "No matches (or only unrelated historical comments)",
+        "item_id": "packaging-config-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.utils.version import check_version_consistency; check_version_consistency()\"",
+        "description": "Version consistency checker still passes",
+        "expected": "No exception raised / returns a consistent result",
+        "item_id": "packaging-config-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "packaging-config-hygiene",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "packaging-config-hygiene",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "packaging-config-hygiene",
+        "notes": "Before deleting, run `uv build` (or `uv build --wheel`) on the\ncurrent tree and inspect the built wheel's METADATA (version,\nRequires-Dist) to confirm it reflects `pyproject.toml`'s\n`[project]` table (version 0.2.1, real dependency list), NOT\n`setup.py`'s version 0.1.0 / test-only install_requires. If\nconfirmed, delete `setup.py` and re-run `uv build` to prove the\nbuild still succeeds identically afterward (same METADATA, modulo\nbuild timestamp).\n\nRESULT: Confirmed. Before deletion, `uv build --wheel` produced\nbenchbox-0.2.1-py3-none-any.whl with Version: 0.2.1 and 184\nRequires-Dist entries from pyproject.toml's real dependency list\n(not setup.py's 3 test-only deps). After deleting setup.py, the\nidentical build command produced the same wheel filename with an\nidentical file manifest and Requires-Dist list.\n\nBONUS FINDING: METADATA was NOT byte-identical before/after -\nsetup.py's coexistence was silently overriding\n`requires-python`. Before deletion: `Requires-Python: >=3.10` plus\n`Dynamic: requires-python` (setup.py's `python_requires=\">=3.10\"`\nwas winning over pyproject.toml's `requires-python =\n\">=3.10,<3.15\"`, silently dropping the `<3.15` upper bound cap).\nAfter deletion: `Requires-Python: <3.15,>=3.10` (correct, matches\npyproject.toml) and `Dynamic: requires-python` is gone. So\nsetup.py was not purely vestigial - it was shipping a wrong,\nwider Python-version constraint in every built wheel. Deleting it\nfixes a real (if minor) packaging bug, not just tidies dead code.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify uv build is unaffected by setup.py, then delete it",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "packaging-config-hygiene",
+        "notes": "Remove `[flake8]` and `[isort]` from `setup.cfg` (ruff is the active\nlinter/formatter; grep the repo for any CI step, pre-commit hook, or\nMakefile target invoking `flake8` or `isort` first to be certain\nnothing depends on them - expected: none). Remove `[tool:pytest]`\nfrom `setup.cfg` as part of w3's config-home decision (don't leave a\nfourth pytest config source around even if `pytest.ini` still wins\npriority-wise). If `setup.cfg` ends up empty after these removals,\ndelete the file entirely rather than leaving a zero-content stub.\n\nRESULT: Confirmed `grep -rn 'flake8\\|isort' Makefile\n.github/workflows/ .pre-commit-config.yaml` returned no matches.\nsetup.cfg's three sections were `[flake8]`, `[isort]`, and\n`[tool:pytest]` (testpaths=tests, python_files=test_*.py, markers:\nslow/integration/sqlite only) - removing all three left nothing,\nso the file was deleted outright rather than left as an empty\nstub. Its 3-marker list (slow, integration, sqlite) is a strict\nsubset of pytest.ini's markers, so no drift/orphaned-marker risk\nfrom this deletion.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prune dead flake8/isort/[tool:pytest] sections from setup.cfg",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "packaging-config-hygiene",
+        "notes": "DECISION: Option (A) implemented, as recommended. Deleted\n`[tool.pytest.ini_options]` entirely from pyproject.toml (lines\n425-481) and `[tool:pytest]` from setup.cfg (folded into w2's\ndeletion of the whole file). pytest.ini and pytest-ci.ini are\nuntouched (`git diff pytest.ini pytest-ci.ini` is empty) and\nremain the two real config surfaces.\n\nMARKER DRIFT FOUND: pyproject.toml's dead marker list had three\nmarkers NOT present in pytest.ini's list: `datafusion`,\n`firebolt`, `databend` (plain form - pytest.ini/pytest-ci.ini only\nhave `live_databend`, not a bare `databend`, and have no\n`datafusion`/`firebolt` markers at all). Grepped\n`tests/**/*.py` for `@pytest.mark.(datafusion|firebolt|databend)`\n- zero matches (only references are in _project/DONE/*.yaml\nplanning docs, not actual test files). Since --strict-markers is\nonly enforced by pytest.ini/pytest-ci.ini (the dead pyproject.toml\nblock was never read), and no test file uses these markers, this\ndrift was inert and required no porting before deletion. Noting\nit here per the anti_patterns checklist.\n\nsetup.cfg's `[tool:pytest]` marker list (slow, integration,\nsqlite) is a strict subset of pytest.ini's - no drift there.\n\nDocs check: grepped CONTRIBUTING.md and AGENTS.md for\npytest.ini/pyproject.toml/setup.cfg pytest references.\nCONTRIBUTING.md:145 says \"The default `pytest.ini` is optimized\nfor quick local feedback. Use the CI profile when you need\ncoverage...\" - already accurate under option (A), no edit needed.\nAGENTS.md had no pytest-config-location references to fix.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide and implement the single pytest config home",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "packaging-config-hygiene",
+        "notes": "Scope is a DECISION plus (if adopted) a small implementation - not a\nbroader version-management rewrite. If adopted: set\n`dynamic = [\"version\"]` in `pyproject.toml`'s `[project]` table,\nremove the static `version = \"0.2.1\"` line, and add the\ncorresponding `[tool.setuptools.dynamic]` section pointing at\n`benchbox.__version__` (setuptools supports `attr:\nbenchbox.__version__` for this). Verify `uv build` and `benchbox\n--version` / `benchbox --version-json` still report the correct\nversion afterward, and that\n`benchbox/utils/version.py::check_version_consistency()` still\npasses (it may need a small update if it currently reads\n`pyproject.toml`'s `[project].version` key directly via\n`_PYPROJECT_CACHE` - check `version.py` for exactly how it sources\nthe \"pyproject.toml version\" side of its comparison before assuming\nno change is needed). If NOT adopted, record the reasoning\n(5 tracked copies + 1 runtime checker is judged sufficient\nmitigation) as a one-line comment near\n`_ADDITIONAL_VERSION_PATHS` in version.py so a future reader doesn't\nre-raise the same question without context.\n\nDECISION: NOT adopted. Confirmed by reading version.py:\n`get_pyproject_version()` (line ~210) reads `[project].version`\ndirectly out of the tomllib-parsed dict via `_PYPROJECT_CACHE` -\nif `[project].version` becomes `dynamic = [\"version\"]`, that key\nis simply absent from the static TOML parse (tomllib doesn't\nresolve `[tool.setuptools.dynamic]` attr: pointers - that's a\nsetuptools build-time behavior, not a TOML-level fact), so\n`get_pyproject_version()` would silently start returning None.\nThat flips \"pyproject.toml\" from a real tracked source to a\nmissing one in `check_version_consistency()`'s dev-mode\naccounting, which is a regression the fix would have to\ncompensate for (e.g. teaching version.py to resolve\n`attr:` dynamic version pointers itself) - real, non-trivial\nversion.py surgery for a decision framed as \"small\". The 5\ntracked copies (`benchbox.__init__`, `installed-dist`,\n`pyproject.toml`, `README.md`, `docs/README.md`,\n`VERSION_MANAGEMENT.md`) plus `check_version_consistency()` are\nalready a solid drift-detection net for a single low-traffic\nversion string; collapsing one more copy isn't worth the added\ncomplexity now. The actual motivating problem (pytest's\nmeaningless `minversion = \"0.2.1\"` copy-paste) is fully resolved\nby w3 deleting the dead `[tool.pytest.ini_options]` block, so\nthere's no remaining live bug pushing toward adopting dynamic\nversion. Reasoning recorded as a comment block in\nbenchbox/utils/version.py directly above\n`_ADDITIONAL_VERSION_PATHS` for future readers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide and optionally implement dynamic = [\"version\"] to collapse the [project].version literal",
+        "wid": "w4"
+      }
+    ]
+  }
+}

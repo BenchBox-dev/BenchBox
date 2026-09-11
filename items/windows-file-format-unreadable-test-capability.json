@@ -1,0 +1,120 @@
+{
+  "context": "Read has_trailing_delimiter and patch the narrowest open/read operation used by that function so this single test raises PermissionError/OSError independent of effective uid and ACL model. Assert the exception propagates. Do not change product exception handling unless the reduced test proves a product defect.",
+  "description": "tests/unit/utils/test_file_format.py::TestHasTrailingDelimiterSurfacesReadFailures::test_unreadable_file_raises_rather_than_reporting_clean fails on Windows because chmod(0o000) does not make a file unreadable under Windows ACL semantics. The product contract is still correct: has_trailing_delimiter must propagate an OSError from the read boundary rather than return False. Make the regression deterministic on every platform by injecting the read failure at the narrow file-open/read seam, while retaining missing-file and directory cases as real filesystem coverage.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Change product code to manufacture a permission check",
+        "instead": "Let the actual open/read error remain authoritative.",
+        "item_id": "windows-file-format-unreadable-test-capability",
+        "why": "Pre-checking mode bits is racy and does not model Windows ACLs."
+      },
+      {
+        "dont": "Skip the test on Windows or when running as root",
+        "instead": "Inject PermissionError at the product's read boundary.",
+        "item_id": "windows-file-format-unreadable-test-capability",
+        "why": "The exception propagation contract is platform independent and can be tested deterministically."
+      }
+    ],
+    "item_meta": {
+      "category": "Test portability",
+      "created_at": "2026-08-01T14:02:02Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A missing input path and a directory passed as a file still raise OSError through real filesystem operations.",
+        "item_id": "windows-file-format-unreadable-test-capability"
+      },
+      {
+        "behavior": "Empty and blank-only readable files still return False.",
+        "item_id": "windows-file-format-unreadable-test-capability"
+      },
+      {
+        "behavior": "The test remains green under root, ordinary POSIX users, and Windows.",
+        "item_id": "windows-file-format-unreadable-test-capability"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-file-format-unreadable-test-capability",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/utils/file_format.py"
+      },
+      {
+        "item_id": "windows-file-format-unreadable-test-capability",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/test_file_format.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/utils/test_file_format.py -q",
+        "description": "File-format tests pass",
+        "expected": "exit 0",
+        "item_id": "windows-file-format-unreadable-test-capability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -z \"$(git diff --name-only origin/develop...HEAD -- benchbox/utils/file_format.py)\"",
+        "description": "Product file-format module is outside the patch",
+        "expected": "exit 0",
+        "item_id": "windows-file-format-unreadable-test-capability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-file-format-unreadable-test-capability",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-file-format-unreadable-test-capability",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-file-format-unreadable-test-capability",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Identify the exact open/read seam used by has_trailing_delimiter",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-file-format-unreadable-test-capability",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace chmod-based unreadability with deterministic injected OSError",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-file-format-unreadable-test-capability",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run the file-format suite and confirm production code is untouched",
+        "wid": "w2"
+      }
+    ]
+  }
+}

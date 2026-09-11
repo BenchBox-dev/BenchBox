@@ -1,0 +1,235 @@
+{
+  "context": "A population-SQL change (distinct effective_ts per change_type group) unlocks\nmeaningful cleanup scoping for the two ops with disjoint change_types\n(basic vs no_change). It does NOT unlock basic-vs-new_keys_only isolation,\nbecause both consume the same shared 'new' staging rows and would otherwise\ninsert with the identical valid_from. That pair additionally needs an\noperation-specific discriminator applied at INSERT time by new_keys_only's\nown write_sql (w2) - a narrow, scoped change to that one op's body, not a\nrewrite of the ops' logic. Sequence: differentiate population effective_ts\n(w1), add the new_keys_only discriminator (w2), re-scope the cleanups and\nany effective_ts-filtered validations using both (w3/w4), then re-verify\nseed-state on both engines (w5). Keep the dates/offsets close so the\n\"single-batch\" framing in docs/blog stays accurate.\n",
+  "description": "Follow-up deferred from scd2-basic-idempotency-and-cleanup-scoping (audit\nfinding N4, cleanup half). The idempotency guard landed (PR #1157), but the\ncross-op cleanup contamination was NOT fixed and cannot be fixed within\noperations.yaml alone.\n\nProblem: all three staging change_type groups share one effective_ts\n(DATE '2026-01-01'), set in _get_population_sql\n(benchbox/core/write_primitives/benchmark.py, the scd2_ops_stage_customer\nbranch). Every SCD2 op's cleanup is\n  DELETE FROM scd2_ops_dim_customer WHERE valid_from IN (SELECT effective_ts FROM stage)\n  UPDATE ... WHERE is_current = false AND valid_to IN (SELECT effective_ts FROM stage)\nBecause the subquery returns the same {2026-01-01} for every group, qualifying\nit by change_type isolates nothing. Reproduced in the audit (repro2.py ATTACK\n3b): running merge_scd_type2_basic's cleanup after merge_scd_type2_new_keys_only's\nwrite deletes all 20 of new_keys_only's inserted rows.\n\nThis is latent, not shipping-broken: each op runs its own cleanup immediately\nafter its write in the normal flow, so contamination only occurs across ops\nwhen a cleanup is skipped (swallowed failure). The merged idempotency guard\n(N4 first half) and validation gating (N1, PR #1150) already make such a\nswallowed-cleanup state fail the run observably rather than silently. So this\nis a robustness/correctness hardening, not a fire.\n\nFix: give each change_type group a distinct effective_ts in _get_population_sql\n(e.g. changed -> 2026-01-01, unchanged -> 2026-01-02, new -> 2026-01-03), so\neach op's cleanup - qualified by that op's change_type(s) - touches only its own\nrows. effective_ts is not part of the row_hash fingerprint, so this does not\naffect change detection; it does change valid_from/valid_to values, so the\nDuckDB and PostgreSQL SCD2 seed-state assertions and the validation queries that\nfilter on effective_ts must be re-checked.\n\nIMPORTANT correction (review finding, 2026-07-12): per-change_type effective_ts\nalone does NOT isolate the actually-reproduced basic-after-new_keys_only case.\nmerge_scd_type2_basic and merge_scd_type2_new_keys_only both insert from the\nSAME 'new' staging rows in scd2_ops_stage_customer - population-time\ndifferentiation is a property of the STAGE rows, and both ops read the\nidentical s.effective_ts value from those rows into valid_from, so their\ninserted rows share the exact same cleanup key regardless of which op did the\ninserting. Distinguishing \"which op consumed this stage row\" needs a discriminator\napplied at INSERT time by each operation's own write_sql (e.g. new_keys_only\nstamping s.effective_ts + a small op-specific INTERVAL offset, or a new\nprovenance column on the dimension table), not just a per-change_type\npopulation value. See the revised w1/w2 scope below.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assume per-change_type effective_ts alone separates basic's new-key inserts from new_keys_only's",
+        "instead": "(not specified)",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "why": "both read s.effective_ts verbatim from the same shared 'new' stage rows, so their inserted valid_from values are identical without w2's per-operation discriminator (review finding, 2026-07-12)."
+      },
+      {
+        "dont": "put effective_ts into the row_hash fingerprint",
+        "instead": "keep it out.",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "why": "change detection must stay independent of the batch timestamp"
+      },
+      {
+        "dont": "rewrite basic's or no_change's UPDATE/INSERT bodies",
+        "instead": "(not specified)",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "why": "only new_keys_only's INSERT needs the w2 discriminator; the other two ops' logic is correct as-is."
+      },
+      {
+        "dont": "scope cleanups by c_custkey",
+        "instead": "scope by effective_ts / change_type / the w2 op discriminator instead.",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "why": "basic and new_keys_only share the same 'new' custkeys"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-12T00:00:00Z",
+      "worktree": "scd2-audit-followup"
+    },
+    "preserves": [
+      {
+        "behavior": "All three SCD2 ops still validate green on DuckDB and live PostgreSQL, seed restored exactly (0 rows deviating).",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts"
+      },
+      {
+        "behavior": "The fixed-size 20/20/20 change batch and scale-independence are preserved.",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts"
+      },
+      {
+        "behavior": "The idempotency guard on merge_scd_type2_basic stays intact.",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts"
+      },
+      {
+        "behavior": "row_hash fingerprint semantics unchanged (effective_ts is not part of the fingerprint).",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/scd2-audit-followup/scd2-basic-idempotency-and-cleanup-scoping.yaml deferred[] - the origin of this follow-up",
+        "decision": "reuse",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "path": "_project/DONE/scd2-audit-followup/scd2-basic-idempotency-and-cleanup-scoping.yaml"
+      },
+      {
+        "concept": "benchbox/core/write_primitives/benchmark.py _get_population_sql scd2_ops_stage_customer branch - the effective = DATE '2026-01-01' shared across all three group INSERTs (the line to differentiate)",
+        "decision": "reuse",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "path": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "concept": "benchbox/core/write_primitives/catalog/operations.yaml merge_scd_type2_basic / _no_change / _new_keys_only cleanup_sql - qualify DELETE/UPDATE subqueries by the op's change_type once effective_ts is distinct",
+        "decision": "reuse",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "path": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "concept": "tests/integration/platforms/test_write_primitives_scd2_postgresql_live.py - live PG seed/cleanup assertions to re-verify",
+        "decision": "reuse",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "path": "tests/integration/platforms/test_write_primitives_scd2_postgresql_live.py"
+      },
+      {
+        "concept": "tests/integration/test_write_primitives_duckdb.py TestWritePrimitivesSCD2DuckDB - seed-state assertions (50/50/0, closed counts) to re-verify",
+        "decision": "reuse",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "path": "tests/integration/test_write_primitives_duckdb.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/test_write_primitives_scd2_postgresql_live.py"
+      },
+      {
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_write_primitives_duckdb.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -k scd2 -n 0 -q",
+        "description": "SCD2 DuckDB integration green including a new cross-op cleanup-isolation test.",
+        "expected": "all pass, including the new isolation test",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/platforms/test_write_primitives_scd2_postgresql_live.py -m live_postgresql -n 0 -q",
+        "description": "Live PostgreSQL SCD2 coverage still green.",
+        "expected": "all pass (or skip if no PG container)",
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Assign a distinct effective_ts per change_type group in _get_population_sql (changed/unchanged/new). Resolves basic-vs-no_change only; see w2 for basic-vs-new_keys_only.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add an op-specific discriminator to new_keys_only's INSERT (e.g. valid_from = s.effective_ts + an op-tagged offset) so its rows differ from basic's inserts of the same shared 'new' staged keys.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Qualify basic and no_change cleanup_sql DELETE/UPDATE subqueries by change_type and, where the group is shared, the w2 discriminator.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Audit every SCD2 validation query filtering on effective_ts (no_rows_closed_by_batch, no_rows_closed, the N3 cardinality checks) and re-scope using w1/w2.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-cleanup-isolation-distinct-effective-ts",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-verify DuckDB + live PostgreSQL seed-state; add a test proving basic's and new_keys_only's cleanups no longer cross-delete each other's rows, in both run orders.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

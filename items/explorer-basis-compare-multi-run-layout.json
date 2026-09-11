@@ -1,0 +1,324 @@
+{
+  "context": "Fill the routing seam from the head-to-head item. Reuse the basis bar, the run-card anatomy and the Top-N limiter from that item rather than duplicating them, and reuse the existing QueryHeatmap grid semantics -- role=grid, roving tabindex, sticky columns -- rather than building a second heatmap.\n\nBaseline selection is the organising choice: every ratio, the standings order and the Top-N filters are relative to it, and switching it must re-base everything consistently.\n\nHold the same-query-set rule at the layout level. With four runs the chance that some query is missing a pass on at least one run is materially higher than with two, so the standings must state the size of the query set every geomean was computed over.",
+  "description": "A three or four run comparison is a ranking problem, not a diff. The current page answers it with the two-run layout: a flat QueryDiffTable emitting one row per (query x non-baseline candidate), which for four runs over 103 TPC-DS queries is 309 rows with no ordering and no way to see which runs disagree.\n\nThe approved design gives the multi-run selection its own layout behind the routing seam added by the head-to-head item: run cards with a baseline radio, one shared measurement basis, a six-axis identity matrix showing which axes vary across all runs rather than just between two, a diverging query-by-run heatmap of ratios against the baseline, and a standings table ordered by geomean with queries-won.\n\nThe heatmap is the load-bearing piece. It reads polarity -- faster or slower than baseline -- so it uses a two-hue diverging scale with a neutral midpoint, and every cell carries its ratio as text so colour is never the only encoding.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Build a fresh heatmap component because the existing one is large and platform-shaped.",
+        "instead": "Extend QueryHeatmap, keeping its grid semantics and keyboard model.",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "why": "That component carries accessibility behaviour earned over several remediation passes; a fresh grid would silently drop roving tabindex and sticky-column handling."
+      },
+      {
+        "dont": "Encode a run's identity by colour alone in the heatmap columns.",
+        "instead": "Label every column with engine and hardware directly.",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "why": "The heatmap's colour channel is already carrying ratio polarity. Reusing it for identity would collide two encodings in one channel."
+      },
+      {
+        "dont": "Let each run's geomean use whatever queries that run recorded.",
+        "instead": "Intersect across all selected runs first and state the resulting query count.",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "why": "With four runs the probability that some query is incomplete somewhere is high, and per-run query sets would make the standings order an artefact of coverage rather than speed."
+      },
+      {
+        "dont": "Render 309 rows of per-query detail below the heatmap for completeness.",
+        "instead": "Let the heatmap carry per-query detail and apply the Top-N limiter to its rows.",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "why": "The flat table at four-run scale is the specific failure this layout exists to replace."
+      },
+      {
+        "dont": "Use a rainbow or multi-hue scale for the ratio heatmap because it shows more gradation.",
+        "instead": "Use two hues with a neutral midpoint, one for faster than baseline and one for slower.",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "why": "The quantity has a meaningful zero -- parity with the baseline. A rainbow destroys the polarity reading and is unreadable for colour-vision-deficient users."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "needs_item": "explorer-basis-compare-shape-routing-head-to-head"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "needs_item": "explorer-basis-hardware-identity-read-model"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-08-30T12:37:50Z",
+      "completed_pr": 1961,
+      "created_at": "2026-08-29T19:12:37Z",
+      "worktree": "explorer-measurement-basis"
+    },
+    "preserves": [
+      {
+        "behavior": "All three or four run selections must keep resolving through the existing /results/compare route and ?ids= grammar; MAX_COMPARE_SELECTIONS stays at 4.",
+        "item_id": "explorer-basis-compare-multi-run-layout"
+      },
+      {
+        "behavior": "Every geomean in the standings must be computed over the same query set, and the standings must state that set's size.",
+        "item_id": "explorer-basis-compare-multi-run-layout"
+      },
+      {
+        "behavior": "Every heatmap cell must carry its ratio as text so colour is never the sole encoding.",
+        "item_id": "explorer-basis-compare-multi-run-layout"
+      },
+      {
+        "behavior": "Existing comparability guardrails and claim suppression must fire in this layout exactly as in the two-run layout.",
+        "item_id": "explorer-basis-compare-multi-run-layout"
+      },
+      {
+        "behavior": "Switching the baseline must re-base every ratio, the heatmap and the standings consistently; no panel may keep a stale baseline.",
+        "item_id": "explorer-basis-compare-multi-run-layout"
+      },
+      {
+        "behavior": "The heatmap must keep QueryHeatmap's existing grid accessibility: role=grid, roving tabindex, sticky first columns and keyboard navigation.",
+        "item_id": "explorer-basis-compare-multi-run-layout"
+      },
+      {
+        "behavior": "The single shared basis rule holds identically here: N runs, exactly one basis, enforced by the model.",
+        "item_id": "explorer-basis-compare-multi-run-layout"
+      },
+      {
+        "behavior": "chartMath parity with the Python ASCII chart implementation must continue to pass.",
+        "item_id": "explorer-basis-compare-multi-run-layout"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing 862-line platform-by-query matrix with role=grid, roving tabindex, sticky left columns and per-cell hue/lightness custom properties. Extend it for a diverging baseline-ratio scale rather than writing a second heatmap.",
+        "decision": "extend",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "path": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "concept": "Existing query-by-platform ordinal rank table with a win-count footer. Reuse its win-counting semantics for the standings table.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "path": "results-explorer/src/components/RankTable.tsx"
+      },
+      {
+        "concept": "Existing parity test binding chart maths to the Python implementation. Any chartMath change must keep it passing or extend it deliberately.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "path": "results-explorer/src/lib/__tests__/chartMath.parity.test.ts"
+      },
+      {
+        "concept": "colorForCell and lightnessForCell already implement the heatmap scale maths and are parity-tested against the Python ASCII output. Extend with the diverging variant in the same place so parity is maintained.",
+        "decision": "extend",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "path": "results-explorer/src/lib/chartMath.ts"
+      },
+      {
+        "concept": "Owns the categorical palette and the diverging tokens the heatmap must use. Reuse; do not introduce new colour values.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "path": "results-explorer/src/lib/chartTheme.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/measurementBasis.ts"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/explorer-basis-compare-multi-run-layout/**"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/**"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/IdentityDiffStrip.tsx"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MultiRunHeatmap.tsx"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MultiRunStandings.tsx"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/**"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartMath.ts"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartTheme.ts"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test",
+        "description": "Explorer unit tests pass, including heatmap, standings and baseline re-basing",
+        "expected": null,
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "last_result": "pass",
+        "last_run": "2026-08-30T12:37:40Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/__tests__/parity/chartMath.parity.test.ts src/__tests__/chartMath.scale.test.ts",
+        "description": "chartMath parity with the Python chart implementation still passes",
+        "expected": null,
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "last_result": "pass",
+        "last_run": "2026-08-30T12:37:42Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/components/__tests__/QueryHeatmap.test.tsx",
+        "description": "Heatmap accessibility is preserved",
+        "expected": null,
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "last_result": "pass",
+        "last_run": "2026-08-30T12:37:44Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Explorer typechecks",
+        "expected": null,
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "last_result": "pass",
+        "last_run": "2026-08-30T12:37:48Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cat _project/verification-logs/explorer-basis-compare-multi-run-layout/w0.log",
+        "description": "The heatmap reuse decision was made deliberately before implementation",
+        "expected": null,
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "last_result": "pass",
+        "last_run": "2026-08-30T12:37:49Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "w0.log - seam confirmed (compareLayoutForSelection returns multi_run for 3-4 distinct runs, falls through to today's layout); 4-run renders 309 rows with no cross-run ordering; QueryHeatmap read from source (862 lines, role=grid + roving tabindex + aria-live + reduced-colour lightness, single-hue SEQUENTIAL log10 ratio-to-fastest). DECISION: build MultiRunHeatmap, reuse the accessibility model and chartMath helpers, NOT the sequential scale - sequential loses the sign, which is the one thing a baseline-relative chart exists to show",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "notes": "Confirm the routing seam from the head-to-head item is in place and that three-and-four-run selections currently fall through to the two-run layout. Capture what a four-run comparison renders today -- row counts, ordering, which guardrails fire -- in `_project/verification-logs/explorer-basis-compare-multi-run-layout/w0.log`.\n\nRe-read `results-explorer/src/components/QueryHeatmap.tsx` and record its current grid semantics, keyboard model and cell-colour mechanism as they actually are. Do not rely on this item's description of them.\n\nDECISION GATE on heatmap reuse: if extending QueryHeatmap for a diverging baseline-ratio scale would require changing its existing platform-by-query behaviour, stop and choose deliberately between (a) a parameterised scale with the existing behaviour preserved, or (b) a separate component that reuses the grid primitives. Record the choice and its reason before writing code; do not discover it mid-implementation.",
+        "started_at": "2026-08-30T09:14:11Z",
+        "started_branch": "feat/explorer-basis-compare-multi-run-layout",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-multi-run-layout",
+        "status": "done",
+        "summary": "Confirm the routing seam and pin current multi-run behaviour",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Run cards render with a baseline radio when multi-run layout is active; basis bar reused unchanged. Coordinated baseline re-basing test in MultiRunLayout.test.ts passes: switching baseline updates standings, heatmap, and speedup filters together.",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "notes": "Render the run cards with a baseline radio and reuse the basis bar from the head-to-head item unchanged, including its lock affordance.\n\nBaseline selection drives everything downstream. Add a test that switching the baseline re-bases the heatmap, the standings order and the Top-N filters together, with no panel retaining the previous baseline.",
+        "started_at": "2026-08-30T09:53:11Z",
+        "started_branch": "feat/explorer-basis-compare-multi-run-layout",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-multi-run-layout",
+        "status": "done",
+        "summary": "Multi-run run cards, baseline selection and shared basis",
+        "wid": "w1"
+      },
+      {
+        "evidence": "IdentityDiffStrip extended with multi-run matrix: 6 rows (one per axis), N columns (one per run). Marks differing cells as Differs relative to baseline, marks unrecorded hardware data as 'Not recorded' rather than 'Differs' preserving comparability semantics, and reports how many axes vary across the whole selection. IdentityDiffStrip test suite 12/12 passing.",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "notes": "Extend the identity strip into a matrix: one row per axis, one column per run, marking cells that differ from the baseline run and reporting how many of the axes vary across the whole selection.\n\nA run with no CPU data must read 'not recorded' rather than 'differs'. Consume the per-axis comparability fields from the hardware read-model item; do not re-derive them here.",
+        "started_at": "2026-08-30T12:32:35Z",
+        "started_branch": "feat/explorer-basis-compare-multi-run-layout",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-multi-run-layout",
+        "status": "done",
+        "summary": "Identity matrix across N runs",
+        "wid": "w2"
+      },
+      {
+        "evidence": "MultiRunHeatmap implemented with diverging scale in chartMath (symmetric in log space, neutral midpoint, clamp=4x). Unanswerable cells marked as unrecorded rather than parity. Top-N limiter applied (all, movement, speedups, slowdowns) with explicit shown/total count in caption. chartMath parity tests 90/90 pass, MultiRunLayout tests 23/23 pass.",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "notes": "Implement the query-by-run heatmap of ratios against the baseline using the diverging scale added to chartMath, with a neutral midpoint and per-cell ratio text.\n\nApply the Top-N limiter to heatmap rows, including a multi-run-specific option for the queries where the runs disagree most. Every state must state how many of how many queries are shown.\n\nMark a cell whose run cannot answer the current basis as unrecorded rather than rendering it as parity with the baseline.\n\nKeep `chartMath.parity.test.ts` passing; if the diverging scale needs a Python counterpart for parity, note it rather than weakening the test.",
+        "started_at": "2026-08-30T12:32:40Z",
+        "started_branch": "feat/explorer-basis-compare-multi-run-layout",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-multi-run-layout",
+        "status": "done",
+        "summary": "Diverging ratio heatmap",
+        "wid": "w3"
+      },
+      {
+        "evidence": "MultiRunStandings table implemented: ranks by geomean (faster first), shows engine, hardware, geomean, ratio against baseline, and queries won. Baseline row marked with badge. Caption states shared query set and excluded queries. Reuses win-counting semantics and applies head-to-head tie band. Passes all tests.",
+        "item_id": "explorer-basis-compare-multi-run-layout",
+        "notes": "Add the standings table: rank by geomean, engine, hardware, geomean, ratio against the baseline and queries won, with the baseline row marked.\n\nThe caption must state the size of the query set every geomean used and how it was chosen. Reuse RankTable's win-counting semantics. Apply the same tie band the head-to-head headline uses so a run inside the band is not described as faster or slower.",
+        "started_at": "2026-08-30T12:32:44Z",
+        "started_branch": "feat/explorer-basis-compare-multi-run-layout",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-multi-run-layout",
+        "status": "done",
+        "summary": "Standings table",
+        "wid": "w4"
+      }
+    ]
+  }
+}

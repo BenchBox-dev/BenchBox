@@ -1,0 +1,100 @@
+{
+  "description": "Non-required nits and improvements surfaced by the code review of\nexplorer-cross-benchmark-meta-leaderboard.  Three Required issues were\nfixed immediately post-review:\n  - _get_val() now uses getattr(row, primary_metric) instead of hardcoded field names\n  - href benchmark name is URL-encoded\n  - platform_records sort is stable (secondary sort by platform_id)\nThis item tracks the remaining nit/consider findings.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "MetaLeaderboard rendering for all current artifact shapes",
+        "item_id": "explorer-meta-leaderboard-review-followups"
+      },
+      {
+        "behavior": "avg_rank sort order - only adding a comment in w5, no logic change",
+        "item_id": "explorer-meta-leaderboard-review-followups"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ -n 0",
+        "description": "Pipeline unit tests pass",
+        "expected": "all passed",
+        "item_id": "explorer-meta-leaderboard-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "TypeScript test suite green",
+        "expected": "all green",
+        "item_id": "explorer-meta-leaderboard-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-meta-leaderboard-review-followups",
+        "notes": "Home.tsx:80-82 - guard checks `metaLeaderboard && metaLeaderboard.cohorts.length > 0`\nbefore rendering MetaLeaderboard.  But MetaLeaderboard.tsx:23-25 already handles\nempty data (returns null when platforms.length === 0 or cohorts.length === 0).\nThe outer check is redundant.\n\nFix: simplify to:\n  {metaLeaderboard && <MetaLeaderboard data={metaLeaderboard} />}\n\nMetaLeaderboard handles the empty-data case internally.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Simplify Home.tsx meta-leaderboard guard to trust MetaLeaderboard.tsx internal guard",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-meta-leaderboard-review-followups",
+        "notes": "MetaLeaderboard.tsx:102 - avg_rank displayed with `.toFixed(1)` (1 decimal).\nPipeline emits 2 decimal places (pipeline.py:244).\nResult: pipeline emits 1.25, frontend shows \"1.2\".\n\nFix: either display 2 decimals in UI (.toFixed(2)) or reduce pipeline precision to 1\n(round(..., 1)).  The 2-decimal pipeline value is the authority.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align avg_rank decimal display in MetaLeaderboard.tsx with pipeline precision",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-meta-leaderboard-review-followups",
+        "notes": "MetaLeaderboard.tsx:23 - `const { cohorts, platforms } = data;`\nIf a corrupted or partial meta-leaderboard.json.gz is served, `platforms`\ncould be undefined and `.length` would crash.\n\nFix:\n  const { cohorts = [], platforms = [] } = data ?? {};\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add defensive destructuring defaults in MetaLeaderboard.tsx",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-meta-leaderboard-review-followups",
+        "notes": "pipeline.py:185-188 - cohort_key, label, and href derivation is repeated\ninline inside the loop.  Could be a small helper:\n  def _cohort_metadata(benchmark, scale_factor, phase):\n      sf = _sf_str(scale_factor)\n      return {\"key\": f\"...\", \"label\": f\"...\", \"href\": f\"...\"}\n\nLow value until the loop needs modification; extract when next touched.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _cohort_metadata helper in pipeline.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-meta-leaderboard-review-followups",
+        "notes": "pipeline.py:244 - avg_rank is rounded to 2 decimal places.  Two platforms\nwith identical averages (e.g., both 1.25) are ordered by platform_id\n(secondary key added in the Required fix above).  Add a comment documenting\nthe tie-breaking rule so future readers don't wonder:\n  # Platforms with equal avg_rank are ordered alphabetically by platform_id.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add avg_rank rounding comment explaining tie-breaking",
+        "wid": "w5"
+      }
+    ]
+  }
+}

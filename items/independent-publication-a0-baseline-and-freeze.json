@@ -1,0 +1,227 @@
+{
+  "context": "Capture desired, built, deployed, and observed state separately. Record exact SHAs, artifact and database digests, deployment IDs, branch protection, environment policy, accepted-path union, and live probes. Define the archive-preservation floor and incident owner before implementation starts.",
+  "description": "Establish an evidence-fresh baseline before changing publication control. Inventory the live Pages deployment, release-driven deploy path, accepted published-results tree, mirror PRs, branch rules, environments, artifact sizes, deployment duration, and current live corpus identity. Declare a temporary migration freeze on destructive corpus rewrites, mirror retirement, and release-deploy removal. Counts are evidence only, never migration targets.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Disable the current deploy during inventory",
+        "instead": "freeze destructive changes while production remains intact",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "why": "there is no proven replacement yet"
+      },
+      {
+        "dont": "Rewrite the corpus to a clean expected count",
+        "instead": "compute and preserve the exact accepted path union",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "why": "a count can omit accepted published-only history"
+      }
+    ],
+    "item_meta": {
+      "category": "Publication Architecture",
+      "completed_at": "2026-08-31T21:02:53Z",
+      "created_at": "2026-08-31T20:36:51Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Every accepted published-results bundle and published-only path remains recoverable.",
+        "item_id": "independent-publication-a0-baseline-and-freeze"
+      },
+      {
+        "behavior": "The current production deploy remains enabled until a tested replacement and rollback exist.",
+        "item_id": "independent-publication-a0-baseline-and-freeze"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Preserve the published-results authority across future ingest architecture",
+        "decision": "extend",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "path": "_project/analysis/ingest-architecture-design.md"
+      },
+      {
+        "concept": "Reconcile the accepted slim-branch authority and its migration assumptions",
+        "decision": "extend",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "path": "docs/development/adr/adr-published-results-slim-corpus-branch.md"
+      },
+      {
+        "concept": "Reconcile the recorded Pages assembly and Results Explorer strategy",
+        "decision": "extend",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "path": "docs/development/benchbox-results-platform-strategy.md"
+      },
+      {
+        "concept": "Reuse current release and deployment evidence conventions",
+        "decision": "reuse",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "path": "docs/operations/release-guide.md"
+      },
+      {
+        "concept": "Extend the existing live branch and environment inventory",
+        "decision": "extend",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "path": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "concept": "Extend the existing publication asset and trust-boundary model",
+        "decision": "extend",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "path": "docs/reference/threat-model.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/**"
+      },
+      {
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/publication/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run python scripts/publication/capture_baseline.py --check",
+        "description": "Baseline captures live branch, environment, deployment, and corpus identity",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "last_result": "pass",
+        "last_run": "2026-08-31T21:23:05Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run pytest tests/unit/scripts/publication/test_baseline.py -q",
+        "description": "Accepted corpus inventory is set-preserving, with no count-as-target assumption",
+        "expected": "all tests pass",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "last_result": "pass",
+        "last_run": "2026-08-31T21:23:12Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/check_plan_reconciliation.py --todo-prefix independent-publication-",
+        "description": "All prior decision and open-gate surfaces are cited or explicitly superseded",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "last_result": "pass",
+        "last_run": "2026-08-31T21:23:15Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "needs_wid": "w1",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "docs/operations/publication-baseline-2026-08-31.json captured 2026-08-31T20:54Z; pins repository policy, develop/release/published-results SHAs, docs workflow run 33135867190, Pages environment/deployment 6134546097, mirror PRs, and live database digest",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "notes": null,
+        "started_at": "2026-08-31T20:49:51Z",
+        "started_branch": "feat/publication-a0-baseline",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a0-baseline",
+        "status": "done",
+        "summary": "Capture live repository, branch, environment, workflow, deployment, and corpus state",
+        "wid": "w1"
+      },
+      {
+        "evidence": "uv run pytest tests/unit/scripts/publication/test_baseline.py -q: 5 passed; baseline accepted_path_union is exact set union and published_only_paths is asserted as a subset, never a count target",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "notes": null,
+        "started_at": "2026-08-31T20:55:13Z",
+        "started_branch": "feat/publication-a0-baseline",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a0-baseline",
+        "status": "done",
+        "summary": "Compute the accepted corpus path union and identify published-only paths",
+        "wid": "w2"
+      },
+      {
+        "evidence": "baseline records workflow duration_seconds, Actions artifact sizes/digests, live database bytes/cache headers, bandwidth telemetry as unavailable, and rollback instructions tied to release SHA f841b85f1d40cc2396f16fb185d1dfbb371ac1a3",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "notes": null,
+        "started_at": "2026-08-31T20:55:19Z",
+        "started_branch": "feat/publication-a0-baseline",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a0-baseline",
+        "status": "done",
+        "summary": "Record current Pages size, duration, bandwidth, and rollback evidence",
+        "wid": "w3"
+      },
+      {
+        "evidence": "_project/decisions/independent-publication-a0-freeze-2026-08-31.md blocks destructive rewrites, mirror retirement, and release deploy removal behind named G1-G5 gates; docs/operations/independent-publication-baseline.md provides operations and incident guidance",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "notes": null,
+        "started_at": "2026-08-31T20:55:24Z",
+        "started_branch": "feat/publication-a0-baseline",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a0-baseline",
+        "status": "done",
+        "summary": "Publish the migration freeze and named decision gates",
+        "wid": "w4"
+      },
+      {
+        "evidence": "scripts/publication/check_plan_reconciliation.py deterministically validates 7 prior/future-state surfaces, G1-G5, and the documented A0-A4 tracker priority sequence; verification seq 3 passed at 2026-08-31T21:02:52Z",
+        "item_id": "independent-publication-a0-baseline-and-freeze",
+        "notes": null,
+        "started_at": "2026-08-31T20:55:29Z",
+        "started_branch": "feat/publication-a0-baseline",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-publication-a0-baseline",
+        "status": "done",
+        "summary": "Reconcile future-state indexes, migration gates, readiness evidence, and open tracker priorities",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "context": "Tiny tooling addition. Reuse the generate_indexes.py pattern; the only real\ndecisions are the module list (from the parent) and the LOC-counting rule\n(from the existing manual table). Add a --check mode so CI enforces freshness.\n",
+  "description": "Promoted from the deferred item in\n[[uat-config-schema-spec-realignment]] (surfaced by the UAT-effort\nassessment, 2026-07-16). The UAT spec carries a module/LOC table that is\nmaintained by a dated manual re-measure. That table drifts silently between\nre-measures, and the realignment item chose a manual re-measure as\nsufficient-for-now (\"Tooling nicety; a dated manual re-measure with the\nrealignment is sufficient and the table drifts slowly.\").\n\nThis item makes the table generated instead of hand-maintained: a small\nscript measures the LOC of the named UAT modules from the tree and either\nemits the table or checks it in CI, so the number stops drifting.\n\nGated on the realignment item because that item establishes the authoritative\nmodule list and the table's current shape; auto-generating a table whose rows\nare about to be re-scoped would be wasted work.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "redefine which modules or which lines count",
+        "instead": "(not specified)",
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "why": "reproduce the parent's table definition, or the generated numbers will disagree with the spec's intent."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-spec-module-loc-table-autogen",
+        "id": 46,
+        "reason": "Only the UAT spec module/LOC table is in scope; a general docs-count framework is a separate effort.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Generalizing the LOC-table generator to unspecified 'other doc count-tables' is premature/vague before the single UAT-spec instance proves out.",
+        "summary": "Generalise the generator to other doc count-tables"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "needs_item": "uat-config-schema-spec-realignment"
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Experience / Tooling",
+      "completed_at": "2026-07-21T23:03:06Z",
+      "completed_pr": 1258,
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "The generated table matches the realignment item's module definitions and LOC-counting rules exactly (no silent redefinition of what counts).",
+        "item_id": "uat-spec-module-loc-table-autogen"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "The repo rule (PR template Public Contract Check) that platform/benchmark count claims in docs must be generated/checked from metadata, not editorial — this table should follow the same discipline.",
+        "decision": "reuse",
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "path": "The"
+      },
+      {
+        "concept": "_project/scripts/generate_indexes.py — existing generator style/CLI conventions to match for the new LOC-table generator.",
+        "decision": "reuse",
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "path": "_project/scripts/generate_indexes.py"
+      },
+      {
+        "concept": "uat-config-schema-spec-realignment — establishes the authoritative module list this generator measures; consume it, do not re-derive the list.",
+        "decision": "reuse",
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "path": "uat-config-schema-spec-realignment"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "kind": "only_modify",
+        "path_glob": "CI/pre-commit wiring for the --check mode"
+      },
+      {
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/ (new LOC-table generator)"
+      },
+      {
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md (generated table)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/<new-loc-table-script>.py --check",
+        "description": "Generator reproduces the spec table and --check fails on drift",
+        "expected": "check passes against the committed table; a deliberate edit makes it fail",
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "last_result": "fail",
+        "last_run": "2026-07-21T23:01:53Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Pinned the module list + bucket mapping + LOC rule from the manual spec table (26 modules under tests/uat/, 9 buckets, raw wc -l). Confirmed the committed actual-LOC column is already stale post-#1251/#1257 (charter-drift #1252 set pre-#1251 values), demonstrating the need for autogen.",
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "notes": "Confirm uat-config-schema-spec-realignment landed and read the resulting\nmodule/LOC table: which modules are rows, how LOC is counted (with/without\ntests, blanks, comments). The generator must reproduce that definition.\n",
+        "started_at": "2026-07-21T22:55:35Z",
+        "started_branch": "chore/uat-spec-loc-table-autogen",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Re-validate the manual table exists post-realignment and pin its module list",
+        "wid": "w0"
+      },
+      {
+        "evidence": "_project/scripts/uat_loc_table.py: reads the spec, updates each module row's Actual column from wc -l (preserving Responsibility/est, robust to pipes via second-to-last cell), and regenerates a per-bucket+total summary between UAT-LOC-SUMMARY markers from a pinned module->bucket map (reproduces, does not redefine, the manual table's module set + wc -l rule). --check diffs generated vs committed (exit 1 on drift, proven: a tweaked Actual -> exit 1); default rewrites. ruff+ty clean.",
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "notes": "Small script (align with existing _project/scripts conventions and the\ngenerate_indexes.py style) that measures the pinned modules and renders\nthe spec table, plus a --check mode for CI that fails on drift. Follow the\nrepo rule that count claims in docs are generated/checked, not editorial.\n",
+        "started_at": "2026-07-21T23:01:44Z",
+        "started_branch": "chore/uat-spec-loc-table-autogen",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Write the LOC-table generator/checker",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Wired --check into .github/workflows/lint.yml (hashFiles-guarded, beside timing_policy) + .pre-commit-config.yaml (id: uat-loc-table, pass_filenames:false, files: tests/uat/*.py|the spec|the generator). Replaced the hand-maintained per-bucket numbers in the spec with the generated marker block + a note that the Actual column and buckets are autogen; removed stale landing-size LOCs. Generator regenerated the table to current develop (total 10,216). --check green.",
+        "item_id": "uat-spec-module-loc-table-autogen",
+        "notes": "Replace the hand-maintained table with generated output and add the\n--check invocation to the appropriate lint/pre-commit path so it cannot\ndrift again.\n",
+        "started_at": "2026-07-21T23:01:48Z",
+        "started_branch": "chore/uat-spec-loc-table-autogen",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Wire the check into the spec/CI and replace the manual table",
+        "wid": "w2"
+      }
+    ]
+  }
+}

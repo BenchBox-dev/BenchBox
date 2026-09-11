@@ -1,0 +1,173 @@
+{
+  "context": "Pin both defects with failing tests, then guard the empty top slice with a width fallback and replace the argv coalescing with an explicit None check.",
+  "description": "Two defects in _project/scripts/check_complexity.py from the 2026-08-09 adversarial review of PR #1644, deferred at merge without a tracker record. First, _print_report computes max() over the empty top slice, so --top 0 raises ValueError instead of printing a zero-row report (line 451). Second, main() uses argv or sys.argv[1:], so an explicitly passed empty argument list falls back to the process argv (line 522) and a programmatic main([]) parses foreign options such as pytest flags. Both are the falsy-coalescing defect class this repository's own quality batch banned.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Fix the crash by rejecting --top 0.",
+        "instead": "Handle the empty slice with a width fallback and print zero rows.",
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "why": "Zero is a valid requested row count for a summary-only report."
+      },
+      {
+        "dont": "Use truthiness to distinguish None from an empty argument list.",
+        "instead": "Use sys.argv slice only when argv is None.",
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "why": "An empty list is a valid explicit argument vector."
+      }
+    ],
+    "item_meta": {
+      "category": "Quality Governance and Tooling Correctness",
+      "created_at": "2026-08-11T12:39:55Z",
+      "worktree": "quality-governance"
+    },
+    "preserves": [
+      {
+        "behavior": "Command-line invocation via make targets behaves identically.",
+        "item_id": "harden-complexity-checker-cli-arguments-20260811"
+      },
+      {
+        "behavior": "Default report output and exit semantics for --top greater than zero are unchanged.",
+        "item_id": "harden-complexity-checker-cli-arguments-20260811"
+      },
+      {
+        "behavior": "The measured complexity policy and hard ceiling are unchanged.",
+        "item_id": "harden-complexity-checker-cli-arguments-20260811"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Live measured complexity checker introduced by PR #1644.",
+        "decision": "extend",
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "path": "_project/scripts/check_complexity.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/check_complexity.py"
+      },
+      {
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_check_complexity.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/check_complexity.py --no-fail --top 0 >/dev/null",
+        "description": "Report with --top 0 prints without crashing",
+        "expected": "Exits nonzero with ValueError on the unfixed tree; exits 0 after the repair.",
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import sys; sys.path.insert(0, '_project/scripts'); import check_complexity; sys.argv = ['check_complexity.py', '--definitely-invalid-flag']; raise SystemExit(check_complexity.main([]))\"",
+        "description": "main with an explicit empty list ignores process argv",
+        "expected": "Exits nonzero on the unfixed tree because the foreign flag is parsed; exits 0 after the repair by running with pure defaults.",
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_check_complexity.py -q",
+        "description": "Focused checker tests pass",
+        "expected": "All checker tests pass including the two new regression cases.",
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check _project/scripts/check_complexity.py tests/unit/scripts/test_check_complexity.py",
+        "description": "Touched tooling satisfies Ruff",
+        "expected": "Ruff exits zero.",
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Pin the --top 0 ValueError and the main empty-list argv fallback in failing regression tests",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement the empty-slice width fallback and the explicit None check for argv",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "harden-complexity-checker-cli-arguments-20260811",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Restore each defect as a negative control, prove its regression test fails, then restore the fix",
+        "wid": "w2"
+      }
+    ]
+  }
+}

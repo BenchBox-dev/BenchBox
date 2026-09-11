@@ -1,0 +1,317 @@
+{
+  "context": "Treat each numbered signature as a shared-layer bug first. Start from w0\nreproduction at 0.01 to localize whether the fault is in datagen schema,\nthe DataFrame loader's column binding, type inference, or the UnifiedExpr\ntranslation. Fix once at the shared layer; verify the fix clears the\nsignature on every engine the evidence named. Modin (51/51 NO_JSON) is\ntracked separately — capture its root cause once stderr persistence lands\n(see uat-artifact-integrity-and-failure-capture) before deciding if it\nbelongs here.\n",
+  "description": "The 2026-05-29 dataframe sweep\n(uat_complete_native_remaining_non_oltp_20260528_20260529) exposed several\nfailures with IDENTICAL signatures across independent engines\n(pandas-df, polars-df, pyspark-df, dask-df, and datafusion). Identical\nfailures across unrelated engines point to BenchBox defects in the shared\nDataFrame loader/translation path, not to per-engine limitations. Evidence\n(errors[] from the per-cell result JSONs):\n\n1. datavault load_end_dts unresolvable on polars/pandas/pyspark (q66/66,\n   all scales). polars: 'unable to find column \"load_end_dts\"; valid\n   columns: [\"92cec9d0fb7ef6a...\"]'; pyspark suggests columns like\n   [``, `0.02`, `1996-02-12`] -> the datavault loader is binding header\n   rows / column names wrong.\n2. pandas date-as-string typing: tpch q39/66, flightdata q60/60,\n   read_primitives q90/456 all fail with\n   \"'<=' / '>=' not supported between instances of 'str' and\n   'datetime.date'\" -> date columns load as strings in the pandas path.\n3. write_primitives bulk_load_append_mode: pandas/polars/pyspark all fail\n   ~q195-204/399 with \"Operation bulk_load_append_mode failed: IO Error:\n   No files found that...\" -> shared write_primitives file-discovery bug.\n4. datafusion positional column names: nyctaxi/flightdata/tsbs_devops fail\n   with \"Schema error: No field named pickup_datetime. Valid fields are\n   trips.f0\" -> table registration drops real column names, exposing\n   f0/f1/f2.\n5. pandas tpcds every query fails (q309/309) with KeyError 'd_date_sk'.\n6. UnifiedExpr clickbench: polars \"cannot create expression literal for\n   value of type UnifiedExpr\"; pyspark \"'UnifiedExpr' object has no\n   attribute '_get_object_id'\" -> literal/expression translation bug.\n\nNote: polars|tpcdi correctly self-reports \"TPC-DI DataFrame ETL requires\ntransactional maintenance capabilities\" — that is a genuine limitation and\nbelongs in uat-native-dataframe-compatibility-rules, NOT here.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "mask a defect by adding a compatibility-prune rule",
+        "instead": "pruning is only for model-level gaps.",
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "why": "that hides a real bug"
+      },
+      {
+        "dont": "special-case per engine",
+        "instead": "fix the shared loader/translation layer.",
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "why": "identical signatures across engines mean one shared cause"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "uat-cross-engine-dataframe-defects",
+        "id": 285,
+        "reason": "No error text was captured (per-cell logs held only the command header; tee log was 0 bytes). Cannot be triaged until stderr persistence lands in uat-artifact-integrity-and-failure-capture (w2). Re-run one modin-df cell after that to recover the cause, then decide whether the fix belongs in this item or its own.",
+        "resolution": "promoted",
+        "resolved_item": "root-cause-modin-df-51-51-no-json-entire-platform-produced-z",
+        "resolved_reason": null,
+        "summary": "Root-cause modin-df 51/51 NO_JSON (entire platform produced zero result JSONs in the 2026-05-29 run)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-05-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Engines that already pass these benchmarks (per the run: polars/pandas/pyspark passing cells) must not regress.",
+        "item_id": "uat-cross-engine-dataframe-defects"
+      },
+      {
+        "behavior": "Genuine limitations (polars tpcdi transactional ETL) stay failures/prunes, not forced green.",
+        "item_id": "uat-cross-engine-dataframe-defects"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "PR #689 fix(spark): default warehouse_dir to benchmark_runs/databases — recently touched the spark df path; check for overlap with the pyspark datavault/flightdata failures",
+        "decision": "reuse",
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "path": "PR"
+      },
+      {
+        "concept": "benchbox/ DataFrame loader + UnifiedExpr translation layer (locate via the failing benchmark adapters: datavault, nyctaxi, flightdata, tsbs_devops, clickbench, write_primitives) — fix at the shared layer, not per engine",
+        "decision": "reuse",
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "path": "benchbox/"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/compatibility.py"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/clickbench.py"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/clickbench/dataframe_queries/"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/datavault/dataframe_queries/"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/dataframe_queries/"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/dataframe_queries/"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/flightdata.py"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/read_primitives.py"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/write_primitives.py"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "for p in pandas-df polars-df pyspark-df; do uv run -- benchbox run --platform $p --benchmark datavault --scale 0.01 --non-interactive --phases load,power; done",
+        "description": "Targeted dataframe cells pass at scale 0.01",
+        "expected": "0 query failures for datavault load_end_dts across all three engines",
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform datafusion --benchmark nyctaxi --scale 0.01 --non-interactive --phases load,power",
+        "description": "Datafusion nyctaxi resolves real column names",
+        "expected": "no 'Valid fields are trips.f0' schema errors",
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q -k 'datavault or nyctaxi or flightdata or clickbench or write_primitives or tpcds'",
+        "description": "Relevant adapter unit tests pass",
+        "expected": "all pass",
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "needs_wid": "w0",
+        "wid": "w5"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "needs_wid": "w0",
+        "wid": "w6"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "notes": "Reproduced the smallest failing cells locally. Datavault failed before\nschema-object normalization on pandas/polars with missing load_end_dts\nor first-row-value column names. Pandas TPC-H/FlightData date queries\nfailed with str/date comparisons. Native DataFusion NYC Taxi registered\ntrips.f0 instead of pickup_datetime. Pandas TPC-DS Q1 failed on\nd_date_sk. ClickBench Q21 failed on UnifiedExpr literals in polars and\npyspark. write_primitives bulk_load_append_mode did not reproduce on\ncurrent develop; pandas/polars/pyspark all executed the query and only\nexited non-clean because validation_status=not_run.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce each signature at scale 0.01 and confirm it is shared-layer, not per-engine",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "notes": "Added shared schema normalization for dict, dict-of-columns, and table-object schemas; verified Datavault Q1 on pandas-df, polars-df, and pyspark-df.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix datavault column-name/header binding so load_end_dts resolves consistently",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "notes": "Pandas CSV/TBL loads now parse schema-backed date columns as Arrow date32 and timestamp columns as datetime64; verified TPC-H Q1/Q7, FlightData ontime-by-carrier, and read_primitives intrinsic_to_date.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix pandas date typing: load date columns as date/datetime, not str (tpch, flightdata, read_primitives)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "notes": "No code change: the signature was stale on current develop. pandas-df, polars-df, and pyspark-df bulk_load_append_mode executed successfully; nonzero exits were validation_status=not_run only.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix write_primitives bulk_load_append_mode file discovery (pandas/polars/pyspark)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "notes": "DataFusion schema normalization now handles dict-of-columns schemas and CSV-to-Parquet conversion preserves supplied column names; NYC Taxi trip-duration-analysis passed.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix datafusion table registration to preserve real column names instead of f0/f1/f2",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "notes": "DataFrame load paths now derive column names from benchmark schemas beyond TPC-H; pandas-df TPC-DS Q1 passed.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix pandas TPC-DS d_date_sk binding (q309/309)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "notes": "Unified string methods unwrap recorded scalar literals before delegating to backend APIs; ClickBench Q21 passed on polars-df and pyspark-df.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix UnifiedExpr literal/expression translation for polars and pyspark clickbench",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-cross-engine-dataframe-defects",
+        "notes": "Ran targeted affected cells plus the TODO fast selector: 1925 passed, 1 skipped. Full dataframe matrix remains outside this single-PR runtime envelope; targeted cells cover each reproduced signature.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-run affected cells at 0.01 then full dataframe matrix; confirm green or genuinely-limited",
+        "wid": "w7"
+      }
+    ]
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "context": "First add diagnostic assertions or a reduced subprocess case that records normalized top/common/primary paths on Windows-shaped inputs. Prefer making the shell guard compare canonical Git-native paths and count worktrees/siblings consistently; if production behavior is already correct and only the fixture is malformed, repair the fixture. Add a simulated mixed-path regression so macOS can exercise the Windows normalization logic.",
+  "description": "Nightly run 30690807993 fails three agent_write_preflight tests on both Windows versions: an undeclared plain clone is accepted, an ephemeral clone beside a pool is accepted, and refusal guidance is absent. The production guard passes its primary tests but the temporary clone fixtures cross the Git-for-Windows/MSYS path boundary. Diagnose whether git rev-parse, realpath, dirname/find, or environment inheritance makes top_abs differ from primary_abs or hides the sibling pool. Fix the narrowest boundary while preserving the load-bearing rule that BENCHBOX_EPHEMERAL_CLONE cannot disable protection wherever a pool exists.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Skip the safety tests on Windows",
+        "instead": "Normalize or faithfully simulate the path boundary and keep the assertions.",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability",
+        "why": "The guard is used by cross-platform agents and the Windows failures show a possible fail-open path."
+      },
+      {
+        "dont": "Trust BENCHBOX_EPHEMERAL_CLONE without checking for a pool",
+        "instead": "Retain both the single-worktree and zero-pool predicates.",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability",
+        "why": "That turns the narrow disposable-clone declaration into a blanket bypass."
+      }
+    ],
+    "item_meta": {
+      "category": "Safety test portability",
+      "created_at": "2026-08-01T14:01:56Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "BENCHBOX_EPHEMERAL_CLONE=1 is honored only for a disposable clone with one worktree and no pool siblings.",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability"
+      },
+      {
+        "behavior": "Primary-clone writes remain refused without the emergency override.",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability"
+      },
+      {
+        "behavior": "The test continues asserting refusal text names both the pool workflow and the narrow ephemeral declaration.",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-agent-write-preflight-fixture-path-portability",
+        "kind": "only_modify",
+        "path_glob": "scripts/agent_write_preflight.sh"
+      },
+      {
+        "item_id": "windows-agent-write-preflight-fixture-path-portability",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_agent_write_preflight.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/test_agent_write_preflight.py -q",
+        "description": "Agent preflight unit suite passes",
+        "expected": "exit 0",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make agent-write-preflight",
+        "description": "Repository write preflight still accepts this claimed pool worktree",
+        "expected": "exit 0",
+        "item_id": "windows-agent-write-preflight-fixture-path-portability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-agent-write-preflight-fixture-path-portability",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-agent-write-preflight-fixture-path-portability",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-agent-write-preflight-fixture-path-portability",
+        "notes": "Determine which comparison/pool probe differs; do not edit before the cause is demonstrated.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reduce and localize the Windows fail-open path",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-agent-write-preflight-fixture-path-portability",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Normalize the affected guard or fixture boundary without weakening policy",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-agent-write-preflight-fixture-path-portability",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a regression for mixed Git-for-Windows and MSYS path forms",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,867 @@
+{
+  "description": "Integrate Microsoft Fabric Spark Notebooks as a supported BenchBox platform for\nmanaged Spark-based benchmarking in the Fabric ecosystem.\n\nMicrosoft Fabric Spark is fundamentally different from Fabric Warehouse:\n- **Fabric Warehouse** (existing): T-SQL based, uses COPY INTO for data loading\n- **Fabric Spark** (this TODO): PySpark-based, uses Livy API for job submission\n\nThis fills a critical gap: the existing FabricWarehouseAdapter explicitly notes\nthat Lakehouse data loading requires Spark, which is currently unsupported.\nThis adapter would enable:\n- Full Lakehouse benchmarking with read/write capabilities\n- V-Order optimization (Spark-only feature in Fabric)\n- Delta Lake native operations\n- OneLake integration via Spark paths\n\nKey technical characteristics:\n- Spark 3.4+ runtime with Fabric-specific configurations\n- Livy REST API for remote job submission (notebooks execute remotely)\n- Entra ID authentication (consistent with Fabric ecosystem)\n- OneLake paths: abfss://{workspace}@onelake.dfs.fabric.microsoft.com/...\n- Delta Lake as default table format\n\nReference: fabric_warehouse.py:14-30 documents the Warehouse vs Lakehouse distinction\nand explicitly states Lakehouse requires Spark for data loading.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create a local SparkSession",
+        "instead": "all Spark code must be submitted as string via POST /sessions/{id}/statements",
+        "item_id": "fabric-spark-notebooks-platform",
+        "why": "Fabric Spark only runs remotely via Livy API"
+      },
+      {
+        "dont": "duplicate OneLake upload logic",
+        "instead": "extract shared OneLake logic to a common internal module",
+        "item_id": "fabric-spark-notebooks-platform",
+        "why": "fabric_warehouse.py already implements it"
+      },
+      {
+        "dont": "modify fabric_warehouse.py's public interface",
+        "instead": "extract shared code to a new internal module if needed",
+        "item_id": "fabric-spark-notebooks-platform",
+        "why": "it's in production use"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-19T00:00:00Z",
+      "created_at": "2026-01-12T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "fabric-spark-notebooks-platform"
+      },
+      {
+        "behavior": "FabricWarehouseAdapter continues to pass all tests",
+        "item_id": "fabric-spark-notebooks-platform"
+      },
+      {
+        "behavior": "Platform registry autodiscovery continues working for all existing platforms",
+        "item_id": "fabric-spark-notebooks-platform"
+      },
+      {
+        "behavior": "fabric_warehouse.py public interface unchanged",
+        "item_id": "fabric-spark-notebooks-platform"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/fabric_warehouse.py"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/spark.py"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/credentials/fabric_spark.py"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/fabric_spark.py"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_fabric_spark_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.fabric_spark import FabricSparkAdapter; print('import OK')\"",
+        "description": "New adapter imports correctly",
+        "expected": "import OK",
+        "item_id": "fabric-spark-notebooks-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_fabric_spark_adapter.py -v --tb=short",
+        "description": "Unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "fabric-spark-notebooks-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "Existing platform tests unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "fabric-spark-notebooks-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_fabric_warehouse_adapter.py -v --tb=short",
+        "description": "Fabric Warehouse adapter unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "fabric-spark-notebooks-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w6",
+        "wid": "w10"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w11",
+        "wid": "w13"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w11",
+        "wid": "w14"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w15",
+        "wid": "w16"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w15",
+        "wid": "w17"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w15",
+        "wid": "w18"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w19",
+        "wid": "w20"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w19",
+        "wid": "w21"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w19",
+        "wid": "w22"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w23",
+        "wid": "w24"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w23",
+        "wid": "w25"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w23",
+        "wid": "w26"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w27",
+        "wid": "w28"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w27",
+        "wid": "w29"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w30",
+        "wid": "w31"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w30",
+        "wid": "w32"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w30",
+        "wid": "w33"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w34",
+        "wid": "w35"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w34",
+        "wid": "w36"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w34",
+        "wid": "w37"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w38",
+        "wid": "w39"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w38",
+        "wid": "w40"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w38",
+        "wid": "w41"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w42",
+        "wid": "w43"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w42",
+        "wid": "w44"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w42",
+        "wid": "w45"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w46",
+        "wid": "w47"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w46",
+        "wid": "w48"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w46",
+        "wid": "w49"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w46",
+        "wid": "w50"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "fabric-spark-notebooks-platform",
+        "needs_wid": "w6",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create benchbox/platforms/fabric_spark.py adapter",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement proper error handling and retry logic",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement OneLake data staging",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reuse OneLake upload logic from fabric_warehouse.py",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Generate abfss:// paths for Spark access",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle Delta Lake table creation paths",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement schema creation via Spark SQL",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Generate CREATE TABLE ... USING DELTA statements",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support OneLake table paths (managed tables in Lakehouse)",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle Fabric-specific Spark configurations",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement data loading",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement FabricSparkAdapter class inheriting from PlatformAdapter",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Load data via spark.read.csv/parquet from OneLake staging",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write to Delta tables with insertInto or saveAsTable",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support V-Order optimization during write",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement query execution",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Execute Spark SQL queries via Livy statements",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Parse result schema and row counts",
+        "wid": "w25"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle Fabric-specific query timeout handling",
+        "wid": "w26"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement result cache control",
+        "wid": "w27"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Disable Spark SQL cache for benchmarking accuracy",
+        "wid": "w28"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Clear Delta Lake caches between queries",
+        "wid": "w29"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set _dialect = 'spark' for SQLGlot transpilation",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Fabric Spark optimizations",
+        "wid": "w30"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enable V-Order for columnar optimization",
+        "wid": "w31"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure appropriate Spark pool sizing via session conf",
+        "wid": "w32"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement OPTIMIZE and Z-ORDER for Delta tables",
+        "wid": "w33"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add platform info collection",
+        "wid": "w34"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture Spark version from Livy session",
+        "wid": "w35"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture executor/driver configuration",
+        "wid": "w36"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Record Fabric capacity unit information if available",
+        "wid": "w37"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create unit tests for Fabric Spark adapter",
+        "wid": "w38"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test Livy session management mocking",
+        "wid": "w39"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Livy session management (create/poll/delete)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test statement execution and result parsing",
+        "wid": "w40"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test OneLake path generation",
+        "wid": "w41"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create integration tests",
+        "wid": "w42"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test against actual Fabric workspace (requires credentials)",
+        "wid": "w43"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test TPC-H SF=0.01 end-to-end",
+        "wid": "w44"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document CI/CD approach (skip without credentials)",
+        "wid": "w45"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create documentation",
+        "wid": "w46"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create docs/platforms/fabric-spark.md with connection guide",
+        "wid": "w47"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document Fabric workspace setup requirements",
+        "wid": "w48"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document Lakehouse vs Warehouse usage guidance",
+        "wid": "w49"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Entra ID authentication for Livy API",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add authentication setup (service principal, managed identity)",
+        "wid": "w50"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Livy statement execution",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create statement submission via POST /sessions/{id}/statements",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement async polling for statement completion",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "fabric-spark-notebooks-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle statement output parsing (JSON/DataFrame results)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

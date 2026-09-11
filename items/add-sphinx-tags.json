@@ -1,0 +1,11 @@
+{
+  "description": "Add the sphinx-tags extension to enable tag-based navigation and discovery\nacross 201 documentation files. This includes infrastructure setup, a controlled\nvocabulary taxonomy of 40 tags, and systematic tagging of all pages.\n\nKey decisions made during planning:\n- Tags placed after the H1 title in all documents\n- Index files get minimal tags only (1-2 category tags)\n- All 38 Python API RST files will be fully tagged\n- Badge colors coordinated with Furo theme\n\nReference plan: /Users/joe/.claude/plans/swift-noodling-harp.md",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2025-01-09T00:00:00Z",
+      "created_at": "2025-01-09T00:00:00Z",
+      "worktree": "docs-experience"
+    }
+  }
+}

@@ -1,0 +1,410 @@
+{
+  "context": "Handle the three defects separately; they have different correct remedies.\n\nDECISION GATE w1 (trust): decide per bundle-cohort, from provenance evidence, whether it is maintainer-run or a genuine outside submission. Relabel ONLY those with maintainer provenance. Do not bulk-flip the column. If provenance for a cohort cannot be established from results-data/README.md, the manifest sidecar, or the originating UAT run record, leave it community-submission and say so.\n\nDECISION GATE w3 (no-query rows): choose ONE per cohort -- re-run to produce per-query timings, or withdraw the bundle from the public corpus. Do not leave undisplayable rows in a curated preview.\n\nDECISION GATE w4 (validation): choose ONE per bundle -- re-run under validation so phases.validation.status becomes PASSED, or downgrade summary.validation to not_run so the site stops asserting a check that never happened. Never edit summary.validation upward to match a claim.\n\nThen add a corpus admission check so all three classes fail closed on the next submission rather than being re-litigated.",
+  "description": "MEASURED 2026-08-23 against the built snapshot results-explorer/public/data/results.duckdb (207 rows) and the 207 bundles under results-data/bundles/ (203 flat + 4 nested under ssb/<platform>/sf*/).\n\nThree independent defects make the public corpus far less useful than the data it already contains:\n\n1. TRUST MISLABELLING (largest lever). is_ranking_eligible is FALSE for 192 of 207 rows. 191 of those carry ranking_exclusion_reason='trust_not_rankable' purely because trust_label='community-submission'. results-data/README.md:38-46 documents these bundles as the maintainer-run UAT sweep of 2026-05-02 -- they are not outside submissions. The leaderboard therefore renders 15 rows. Correcting the label on genuinely maintainer-run bundles takes it to ~206.\n\n2. RESULTS WITH NO QUERY DATA. 60 of 207 rows have display_exclusion_reason='no_queries' and zero matching rows in query_executions (amplab 9, h2odb 9, tsbs_devops 9, tpch_skew 9, ssb 9, nyctaxi 9, coffeeshop 6). They cannot be displayed, compared, or ranked. They are corpus weight with no reader value.\n\n3. VALIDATION CLAIMED BUT NOT RUN. 112 of 207 bundles report summary.validation = passed/partial while phases.validation.status = NOT_RUN (83 NOT_RUN+passed, 29 NOT_RUN+partial). The explorer surfaces validation_status='passed' for 142 rows. docs/development/result-integrity-validation.md:31-39 states not_run is not publication-clean. Publishing 'validated' numbers that were never validated is the fastest way to lose a benchmarking project's credibility.\n\nA bundle produced by current develop does NOT have defect 3: an official TPC-DS SF1 DuckDB run on 2026-08-23 emitted phases.validation.status=PASSED and summary.validation=passed consistently. These are legacy artifacts of the May 2026 sweep, so re-running is a viable remedy, not only a code fix.\n\nThis item gates the public launch of benchbox.dev/results/.\n\n---\n\n## SUPERSEDED BY THE 2026-08-23 TRUST CUT — re-measure before acting (noted 2026-08-29)\n\nEvery measurement above is against a corpus that no longer exists. PRs #1939 (develop) and #1940 (published-results) withdrew all 130 bundles run before 2026-08-23, including the entire 2026-05-02 UAT sweep this item is about.\n\nRe-measured against the post-cut snapshot built from the 9 surviving bundles:\n\n  total rows                9\n  ranking-eligible          8\n  excluded: failed_queries  1   (tpcds SF10 Spark, one failed query)\n  trust labels              9/9 maintainer-run, zero trust_not_rankable\n\nDefect 1 (trust mislabelling) has no remaining instances: no surviving bundle has a sidecar, so none is labelled community-submission. Defects 2 and 3 likewise have no surviving instances.\n\nThis item looks closeable as overtaken by events rather than fixed on its merits. Confirm before closing: the underlying failure mode (sidecar presence alone implying community provenance) was addressed separately and is documented in results-data/README.md, but nothing here re-verifies that on new data. Future coverage restored under restore-corpus-coverage-after-20260823-trust-cut is where it would resurface.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assume corpus work is visible because its TODO is done",
+        "instead": "INSTEAD verify against the branch the release is cut from",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "why": "tpch_sf10 and tpch_sf100 DuckDB bundles are on published-results and absent from develop, so the site would still show a SF1 ceiling"
+      },
+      {
+        "dont": "Delete the 60 no-query bundles without recording why",
+        "instead": "INSTEAD record re-run or withdraw per cohort in the work-unit evidence",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "why": "the corpus loses coverage with no trace"
+      },
+      {
+        "dont": "Hand-edit trust_label in corpus-inventory.json",
+        "instead": "INSTEAD fix the sidecar/label derivation, or omit the sidecar for maintainer-committed bundles as PR #1839 does",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "why": "the inventory is generated and _derive_trust_label will overwrite it on the next regeneration"
+      },
+      {
+        "dont": "Loosen the explorer's ranking-eligibility rule so the 191 rows qualify",
+        "instead": "INSTEAD fix the labels",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "why": "the rule is correct and the data is wrong"
+      },
+      {
+        "dont": "Raise summary.validation to match a claim, or lower phases.validation.status to hide the mismatch",
+        "instead": "INSTEAD re-run under validation, or downgrade the summary to not_run",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "why": "both make the corpus assert something no run produced"
+      },
+      {
+        "dont": "UPDATE results SET trust_label='maintainer-run' across the corpus",
+        "instead": "INSTEAD relabel only cohorts with recorded maintainer provenance, per cohort, with the evidence cited",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "why": "it destroys the community/maintainer distinction the submission trust model depends on and would silently promote any real outside submission"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-29T12:40:16Z",
+      "completed_pr": 1909,
+      "created_at": "2026-08-23T13:07:41Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Genuine community submissions keep trust_label=community-submission and are never silently promoted to maintainer-run",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows"
+      },
+      {
+        "behavior": "The published-results branch remains the corpus archive; changes reach it by the normal submission/validation path",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows"
+      },
+      {
+        "behavior": "bundle_sha256 integrity: a relabel must regenerate the inventory hash, never leave the recorded hash stale",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "publication-clean definition that already forbids not_run",
+        "decision": "reuse",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "path": "docs/development/result-integrity-validation.md"
+      },
+      {
+        "concept": "existing corpus validation entry point",
+        "decision": "extend",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "path": "results-data/validate_corpus.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/publishing/"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "kind": "only_modify",
+        "path_glob": "benchbox/validation/"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "kind": "only_modify",
+        "path_glob": "benchbox/validation/**"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "kind": "only_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "kind": "only_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/public/data/results.duckdb"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import json,os;bad=[p for r,_,fs in os.walk('results-data/bundles') for f in fs if f.endswith('.json') and not f.endswith('.manifest.json') for p in [os.path.join(r,f)] if (json.load(open(p)).get('phases',{}).get('validation',{}).get('status'))=='NOT_RUN' and (json.load(open(p)).get('summary',{}).get('validation')) in ('passed','partial')];print(len(bad))\"",
+        "description": "No published result claims validation it did not run",
+        "expected": "0",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "last_result": "pass",
+        "last_run": "2026-08-25T22:58:31Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import duckdb;c=duckdb.connect('results-explorer/public/data/results.duckdb',read_only=True);print(c.execute(\\\"select count(*) from results where display_exclusion_reason='no_queries'\\\").fetchone())\"",
+        "description": "No published result is undisplayable",
+        "expected": "0",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "last_result": "pass",
+        "last_run": "2026-08-25T22:58:33Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import json,os;inv={b['file'] for b in json.load(open('results-data/corpus-inventory.json'))['bundles']};disk={os.path.relpath(os.path.join(r,f),'results-data/bundles') for r,_,fs in os.walk('results-data/bundles') for f in fs if f.endswith('.json') and not f.endswith('.manifest.json')};print('inv_only',sorted(inv-disk));print('disk_only',sorted(disk-inv))\"",
+        "description": "Inventory and on-disk bundle sets reconcile exactly",
+        "expected": "both sets empty",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "last_result": "pass",
+        "last_run": "2026-08-25T22:58:36Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git ls-tree -r --name-only origin/develop -- results-data/bundles > /tmp/d.txt; git ls-tree -r --name-only origin/published-results -- results-data/bundles > /tmp/p.txt; comm -13 /tmp/d.txt /tmp/p.txt",
+        "description": "The corpus develop ships from is not behind published-results",
+        "expected": "empty (no bundle exists on published-results but not on develop)",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh run list --branch develop --workflow 'Corpus Drift Check' --limit 3",
+        "description": "Corpus Drift Check is green",
+        "expected": "most recent conclusion is success",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py -q",
+        "description": "Submission validation rejects zero-query passed bundles",
+        "expected": "focused validator tests pass",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "last_result": "pass",
+        "last_run": "2026-08-25T22:58:42Z",
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import duckdb;c=duckdb.connect('results-explorer/public/data/results.duckdb',read_only=True);print(c.execute(\\\"select count(*) filter (where not is_ranking_eligible and coalesce(ranking_exclusion_reason,'')=''), count(*) filter (where is_ranking_eligible and coalesce(validation_status,'')!='passed'), count(*) filter (where ranking_exclusion_reason='failed_queries') from results\\\").fetchone())\"",
+        "description": "Ranking exclusions are explicit and truthful",
+        "expected": "zero excluded rows without a reason; zero non-clean ranking rows; retained failed-query rows remain explicit",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "last_result": "pass",
+        "last_run": "2026-08-25T22:58:45Z",
+        "seq": 9,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "needs_wid": "w0",
+        "wid": "w6"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "needs_wid": "w4",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-derived live 2026-08-23: snapshot has 207 rows, is_ranking_eligible False for 192 (191 trust_not_rankable + 1 insufficient_query_coverage); 60 rows display_exclusion_reason=no_queries; 112 of 207 bundles have phases.validation.status=NOT_RUN with summary.validation passed/partial",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "notes": null,
+        "started_at": "2026-08-23T18:07:39Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-derive all three counts live from the current snapshot and bundles; do not trust the figures quoted in this description",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PROVENANCE ESTABLISHED from the sidecars themselves: 188 submitted_by='BenchBox UAT' (the maintainer's 2026-05-02 UAT sweep, documented in results-data/README.md and _project/handoffs/results-explorer-uat-corpus-integration-20260503.md), 3 submitted_by='Joe Harris'. Zero arms-length outside submissions exist in the corpus, so correcting these is not a promotion. Two remaining .manifest.json files are migration ledgers, not submission manifests, and were left alone.",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "notes": null,
+        "started_at": "2026-08-23T18:07:42Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "DECISION GATE - establish maintainer-vs-community provenance per cohort and record the evidence source before changing any trust_label",
+        "wid": "w1"
+      },
+      {
+        "evidence": "The 59 current failed-query bundles were triaged under corpus-65-bundles-carry-failed-queries. Approved disposition retains truthful partial capability evidence as non-ranking; PR #1909 leaves all failures intact and every one excluded with ranking_exclusion_reason=failed_queries.",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "notes": null,
+        "started_at": "2026-08-25T17:41:58Z",
+        "started_branch": "chore/v0-4-0-non-uat-integration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-v0-4-0-non-uat-integration",
+        "status": "done",
+        "summary": "Label correction exposed 65 results with failed_queries that trust_not_rankable was masking. Triage with w3 (no_queries) - re-run or withdraw",
+        "wid": "w10"
+      },
+      {
+        "evidence": "PR #1880 rejects empty query lists, zero summary totals, warmup-only timing, and summary.validation=passed that contradicts failed measurement evidence. Whole checked-in corpus validation and focused negative controls pass.",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "notes": null,
+        "started_at": "2026-08-24T22:36:23Z",
+        "started_branch": "fix/corpus-authority-integrity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-authority-integrity",
+        "status": "done",
+        "summary": "Add fail-closed admission checks for zero-query and inconsistent validation claims",
+        "wid": "w11"
+      },
+      {
+        "evidence": "commit 30f5d4873 adds clean Polars/PySpark TPC-H SF1 bundles; standalone submission validation passed 2 bundles with 0 errors/warnings; corpus validator passed 138 bundles/34 cohorts; snapshot invariants passed; eligible 53->55 and meta platforms 6->8",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "notes": null,
+        "started_at": "2026-08-25T22:56:33Z",
+        "started_branch": "fix/corpus-validation-claim-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-validation-claim-policy",
+        "status": "done",
+        "summary": "Add clean Polars and PySpark SF1 evidence and rebuild the publication snapshot",
+        "wid": "w12"
+      },
+      {
+        "evidence": "PR #1843. Fixed at the seam: result_source is now authoritative in BOTH derivations (scripts/generate_corpus_inventory.py and _project/scripts/explorer_pipeline/pipeline.py), with unknown provenance failing safe to community-submission. 191 sidecars backfilled with result_source=internal, one line each. Rebuilt snapshot: ranking-eligible 15 -> 78; trust_not_rankable eliminated. Lockstep test pins the two derivations across six sidecar states.",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "notes": null,
+        "started_at": "2026-08-23T18:07:44Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Relabel only the bundles with proven maintainer provenance; regenerate the inventory and snapshot",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Develop PR #1880 and published-results PR #1882 withdraw exactly 60 invalid zero-query DataFrame bundles plus paired manifests. Seventeen truthful SQL cohort partners are temporarily removed so ten affected cohorts disappear rather than falling below the three-platform floor. Branch inventories are regenerated; all published-only archive pairs survive.",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "notes": null,
+        "started_at": "2026-08-24T22:47:08Z",
+        "started_branch": "fix/corpus-authority-integrity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-authority-integrity",
+        "status": "done",
+        "summary": "DECISION GATE - for each of the 60 no-query bundles decide re-run or withdraw, then execute it",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Approved truthful-evidence treatment implemented in PR #1909 head f428cd525: 52 legacy bundles with phases.validation.status NOT_RUN were downgraded from summary.validation passed/partial to not_run; no rerun evidence was fabricated and query records were unchanged.",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "notes": null,
+        "started_at": "2026-08-25T17:41:48Z",
+        "started_branch": "chore/v0-4-0-non-uat-integration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-v0-4-0-non-uat-integration",
+        "status": "done",
+        "summary": "DECISION GATE - for each of the 112 validation-claiming bundles decide re-run or downgrade to not_run, then execute it",
+        "wid": "w4"
+      },
+      {
+        "evidence": "PR #1909 adds fail-closed admission for passed/partial claims when phases.validation is missing, malformed, unknown, not_run, or not_validated; trusted mirror retains explicit not_run. Focused validator/export tests passed.",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "notes": null,
+        "started_at": "2026-08-25T17:41:51Z",
+        "started_branch": "chore/v0-4-0-non-uat-integration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-v0-4-0-non-uat-integration",
+        "status": "done",
+        "summary": "Add a corpus admission check that rejects a bundle whose summary.validation outranks phases.validation.status, or which carries zero query executions",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Confirmed not a defect: inventory reconciles both layouts exactly (inv_only and disk_only both empty). Only flat-glob analysis tooling is misled. Left as documentation.",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "notes": null,
+        "started_at": "2026-08-23T18:07:49Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "LOW - two layouts coexist (203 flat, 4 nested under ssb/). The inventory reconciles both correctly; only flat-glob tooling is misled. Unify or document, do not treat as a defect",
+        "wid": "w6"
+      },
+      {
+        "evidence": "Explorer snapshot rebuilt from 136 bundles; make explorer-snapshot-check passed. Counts: validation passed 54, partial 30, not_run 52; eligible 53; exclusions failed_queries 59, validation_not_clean 23, insufficient_query_coverage 1; zero exclusions lack an explicit reason.",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "notes": null,
+        "started_at": "2026-08-25T17:41:53Z",
+        "started_branch": "chore/v0-4-0-non-uat-integration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-v0-4-0-non-uat-integration",
+        "status": "done",
+        "summary": "Confirm the rebuilt snapshot before any public deploy",
+        "wid": "w7"
+      },
+      {
+        "evidence": "Publication path established in .github/workflows/sync-results-data-to-published.yml: develop results-data pushes or workflow_dispatch create a SHA-pinned generated mirror PR onto published-results using a union overlay that preserves published-only submissions. Current published-results has exactly three archive-only bundle+manifest pairs; sync must run after #1909 merges.",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "notes": null,
+        "started_at": "2026-08-25T17:41:56Z",
+        "started_branch": "chore/v0-4-0-non-uat-integration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-v0-4-0-non-uat-integration",
+        "status": "done",
+        "summary": "Establish how a bundle merged to published-results reaches develop's results-data, so completed corpus work is not invisible on the site",
+        "wid": "w8"
+      },
+      {
+        "evidence": "Root cause confirmed and fixed in PR #1843; the defect existed independently in BOTH generate_corpus_inventory.py and explorer_pipeline/pipeline.py - fixing only the first left the shipping snapshot unchanged.",
+        "item_id": "corpus-mislabelling-leaves-the-leaderboard-with-15-rows",
+        "notes": null,
+        "started_at": "2026-08-23T18:07:47Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "ROOT CAUSE FOUND 2026-08-23",
+        "wid": "w9"
+      }
+    ]
+  }
+}

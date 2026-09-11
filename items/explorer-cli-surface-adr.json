@@ -1,0 +1,223 @@
+{
+  "context": "Read-mostly. Two grep-based inventories (w1, w2) inform an ADR (w3).\nUse `docs/development/adr/TEMPLATE-results-data-extraction.md` as the\nstructural template if a TEMPLATE-adr.md is not present.\n\nDo not pre-commit to one of the four options before the inventories are\ncomplete; the migration-cost numbers are load-bearing.\n",
+  "description": "`benchbox explorer build` (and the hidden `benchbox explorer build-contract`)\npublish a static read-model for the `results-explorer` React app. They are\nnot benchmark-runner operations, yet they sit on the user-facing `benchbox`\nCLI surface and ship under `benchbox/cli/commands/explorer.py` alongside a\n7-file core package at `benchbox/core/explorer_pipeline/`.\n\nProvenance audit (this session):\n  - Both commands were added in commit `f9d08d38b` (\"Migration: populate\n    develop branch from private working tree (Phase 4 w4)\", 2026-04-27).\n    That was a bulk migration squash, not a discrete reviewed PR.\n  - The breadcrumb at `.github/workflows/docs.yml:105` attributes them to\n    PR #46, but #46 is `docs(contributing): name the version JSON key +\n    non-uv fallback` — a contributing-results.md docs PR, unrelated to the\n    CLI surface. The in-tree provenance trail lies.\n  - No `_project/specs/` document scopes the explorer CLI surface; Phase-4\n    migration TODO only lists the file paths as \"to migrate\", not as a\n    command surface to design.\n\nThis TODO is the decision step. It does not move any code. It produces an\nADR that locks the destination so downstream migration (TODO\n`explorer-cli-surface-migration`) has a concrete target.\n\nThe four candidate destinations are:\n\n  1. **hide-only**: `hidden=True` on `explorer_group`. Cheapest. Does not\n     solve intermingling — code stays in `benchbox/`, import surface stays\n     public, only `--help` discoverability changes. Likely rejected.\n  2. **new sibling package** `benchbox_explorer/` with its own\n     `console_script` (e.g. `benchbox-explorer-publish`). Separate pip\n     artifact; clean conceptual boundary; external CI/scripts can still\n     script against a stable binary.\n  3. **`_project/scripts/explorer/`** invoked via `uv run -- python -m\n     _project.scripts.explorer.publish`. In-tree maintainer tool; not\n     installed; tightest \"this is not a public surface\" signal.\n  4. **co-locate in `results-explorer/`** as a Python sub-package called\n     from `results-explorer/scripts/`. Tightest coupling to the only\n     consumer. Mixes Python and Node trees.\n\nThe ADR must also resolve three gating sub-questions:\n\n  a. Does `benchbox/core/explorer_pipeline/` ALSO relocate, or only the\n     CLI wrapper? Argument for \"yes\": same intermingling concern; the\n     package serves only the explorer site. Argument for \"no\": existing\n     tests under `tests/unit/core/explorer_pipeline/` and import sites\n     like `benchbox/cli/help.py` would need follow-up. Decision here\n     shapes the migration cost.\n\n  b. Backwards-compat alias for one release: keep\n     `benchbox explorer build` as a thin deprecation shim that prints a\n     `DeprecationWarning` and forwards to the new entry point, then drop\n     it in the next minor release? Or hard-cut and update all known\n     callers in the same PR? BenchBox is v0.2.x pre-1.0, so a hard cut\n     is defensible; the ADR should still record the call.\n\n  c. End-user error path when a stale snapshot is detected: today,\n     `results-explorer/src/db.ts:196` tells the user to run\n     `benchbox explorer build`. After the move, the message must point\n     at the maintainer-only entry. For non-maintainers (e.g., someone\n     running `npm run dev` against a downloaded snapshot), the message\n     should redirect to \"refresh the snapshot from the published site\"\n     or similar, not to a CLI they shouldn't be running.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make this ADR conditional on Phase 8/9 migration work",
+        "instead": "(not specified)",
+        "item_id": "explorer-cli-surface-adr",
+        "why": "the explorer surface should be decided independently of the remaining migration phases (which TODO `migration-phase-api-surface-gate` handles separately)."
+      },
+      {
+        "dont": "relocate any code in this TODO",
+        "instead": "(not specified)",
+        "item_id": "explorer-cli-surface-adr",
+        "why": "moving code without the locked decision creates churn and re-litigates the choice in the migration PR. Defer all moves to `explorer-cli-surface-migration`."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-cli-surface-adr",
+        "id": 155,
+        "reason": "Owned by TODO `explorer-cli-surface-migration` (depends on this TODO).",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Verified: benchbox/cli/commands has no explorer.py, and _project/scripts/explorer_publish.py + explorer_pipeline/ exist -- the ADR-recommended code move already happened.",
+        "summary": "Actually move any code per the ADR's recommendation."
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-cli-surface-adr",
+        "id": 156,
+        "reason": "Owned by TODO `migration-phase-api-surface-gate`; this ADR is scoped to the explorer surface only.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Owning item migration-phase-api-surface-gate is already DONE; the broader CLI user/maintainer-split revisit is resolved or moot there.",
+        "summary": "Revisit the user-vs-maintainer split for other parts of the `benchbox` CLI."
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture",
+      "completed_at": "2026-05-14T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "explorer-cli-surface-adr"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing CI builds, browser-fixture generation, and UAT explorer-smoke must continue to work unchanged; this TODO does not touch them.",
+        "item_id": "explorer-cli-surface-adr"
+      },
+      {
+        "behavior": "No code is moved or renamed in this TODO. ADR-only.",
+        "item_id": "explorer-cli-surface-adr"
+      },
+      {
+        "behavior": "`benchbox --help` output is unchanged in this TODO.",
+        "item_id": "explorer-cli-surface-adr"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/scripts/ — existing in-tree maintainer scripts directory (validate_todo.py, generate_indexes.py, etc.); candidate destination for option 3, reuse layout if chosen.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-adr",
+        "path": "_project/scripts/"
+      },
+      {
+        "concept": "benchbox/cli/commands/__init__.py:22 — registration site for `explorer_group`; reuse the registration pattern (or its absence) for whatever replaces it.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-adr",
+        "path": "benchbox/cli/commands/__init__.py:22"
+      },
+      {
+        "concept": "benchbox/cli/commands/explorer.py — current Click subgroup; supersede or relocate per ADR.",
+        "decision": "supersede",
+        "item_id": "explorer-cli-surface-adr",
+        "path": "benchbox/cli/commands/explorer.py"
+      },
+      {
+        "concept": "benchbox/core/explorer_pipeline/ — 7-file core package (contract.py, duckdb_builder.py, models.py, pipeline.py, ranking.py, transformer.py, compare_math.py); reuse intact, only the housing changes.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-adr",
+        "path": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "concept": "docs/development/adr/ — existing ADR location with TEMPLATE-results-data-extraction.md as the structural reference; reuse format.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-adr",
+        "path": "docs/development/adr/"
+      },
+      {
+        "concept": "results-explorer/scripts/explorer-build-contract.mjs — Node-side consumer that calls `benchbox explorer build-contract` to fetch the output contract; reference for how an external script binds to the entry point.",
+        "decision": "reuse",
+        "item_id": "explorer-cli-surface-adr",
+        "path": "results-explorer/scripts/explorer-build-contract.mjs"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-cli-surface-adr",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/adr-explorer-cli-surface.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f docs/development/adr/adr-explorer-cli-surface.md && wc -l docs/development/adr/adr-explorer-cli-surface.md",
+        "description": "ADR file exists and validates as markdown.",
+        "expected": "non-zero line count",
+        "item_id": "explorer-cli-surface-adr",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE '^## (Decision|Recommendation|Sub-question)' docs/development/adr/adr-explorer-cli-surface.md",
+        "description": "ADR records a single recommended option and answers all three sub-questions (a, b, c).",
+        "expected": ">= 4",
+        "item_id": "explorer-cli-surface-adr",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'docs.yml|generate-browser-fixtures|explorer_pipeline' docs/development/adr/adr-explorer-cli-surface.md",
+        "description": "Inventories from w1 and w2 are present in the ADR body.",
+        "expected": ">= 3",
+        "item_id": "explorer-cli-surface-adr",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-cli-surface-adr",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-cli-surface-adr",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-cli-surface-adr",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-cli-surface-adr",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-cli-surface-adr",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-cli-surface-adr",
+        "notes": "Before writing the ADR proper, re-run the provenance probes that this\nTODO's description cites and commit the resulting facts as a\n\"Provenance Facts\" section in the ADR. This durability-pins the\nevidence so future readers do not have to re-derive it.\n\nCommands:\n  - `git show --stat f9d08d38b -- benchbox/cli/commands/explorer.py`\n    → expect ~221-line file addition under that path.\n  - `git log -1 --format=%s%n%n%b f9d08d38b`\n    → expect title \"Migration: populate develop branch from private\n    working tree (Phase 4 w4)\".\n  - `gh pr view 46 --json title,body | head -2`\n    → expect title to be `docs(contributing): ...` (NOT the explorer\n    CLI), confirming the breadcrumb at `.github/workflows/docs.yml:105`\n    is mis-attributed.\n  - `git log --all --diff-filter=A --oneline -- benchbox/cli/commands/explorer.py`\n    → expect only `f9d08d38b` and `d28dbe66f` (the consistency-fix PR).\n  - `git blame .github/workflows/docs.yml -L 100,108`\n    → expect `0182c9556c` (v0.2.1 release commit), confirming the\n    misattributed Note line.\n\nOutput: a 5-10 line \"Provenance Facts\" block at the top of the ADR\nrecording: introduction commit, PR (none / migration squash),\nbreadcrumb misattribution target, and the command set above so a\nfuture reader can re-run verbatim.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate provenance evidence and pin it in the ADR",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cli-surface-adr",
+        "notes": "Grep targets (run from repo root):\n  - `git grep -n \"benchbox explorer build\\|benchbox explorer build-contract\"`\n  - `git grep -nE \"explorer_group|from benchbox\\.cli\\.commands\\.explorer\"`\n  - `git grep -nE \"from benchbox\\.core\\.explorer_pipeline\"`\n\nKnown seed list to confirm and extend:\n  - `.github/workflows/docs.yml:103`\n  - `results-explorer/scripts/generate-browser-fixtures.mjs:489`\n  - `results-explorer/scripts/explorer-build-contract.mjs:17`\n  - `tests/uat/.../explorer_smoke.py` (UAT W7 phase)\n  - `Makefile` `uat-explorer-smoke` target (line ~1612)\n  - `docs/development/browser-test-architecture.md:35,119,130`\n  - `docs/operations/results-phase-2-runbook.md:109`\n  - `results-explorer/src/db.ts:196` (frontend error remediation text)\n  - audit docs under `_project/audits/results-explorer-*.md`\n  - tests under `tests/unit/cli/test_explorer_build_contract.py`\n\nOutput: a single table in the ADR with each call site, its category\n(CI / fixture / UAT / docs / runtime / test), and migration cost\n(one-liner / multi-line / non-trivial).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory every call site of the current CLI surface",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cli-surface-adr",
+        "notes": "The decision on sub-question (a) (does the pipeline also move?) turns\non how leaky the package's public import surface is.\n\nGrep targets:\n  - `git grep -nE \"from benchbox\\.core\\.explorer_pipeline|import benchbox\\.core\\.explorer_pipeline\"` excluding the package itself.\n\nOutput: list of every import site outside `benchbox/core/explorer_pipeline/`,\ngrouped by importer (CLI / test / other).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory imports of `benchbox.core.explorer_pipeline.*` from outside the package",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cli-surface-adr",
+        "notes": "Path: `docs/development/adr/adr-explorer-cli-surface.md`.\n\nStructure:\n  - Context (the provenance audit summary, citing this TODO).\n  - Forces: user-vs-maintainer surface separation; CI dependency stability;\n    external script consumers; migration cost; reversibility; consistency\n    with other maintainer tools in `_project/scripts/`.\n  - Options 1-4 with explicit pros/cons and migration-cost estimate from\n    the w1/w2 inventories.\n  - Decision matrix scoring each option on the forces.\n  - Recommendation with rationale.\n  - Resolutions to sub-questions (a), (b), (c) from the description.\n  - Consequences: what TODO `explorer-cli-surface-migration` will do.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Draft the ADR with a 4-option decision matrix",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cli-surface-adr",
+        "notes": "Open a PR with only the ADR (no code moves). On merge, this TODO is\nCompleted and `explorer-cli-surface-migration` is unblocked.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Land the ADR on develop",
+        "wid": "w4"
+      }
+    ]
+  }
+}

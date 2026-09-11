@@ -1,0 +1,136 @@
+{
+  "context": "Reuse the established correctness-gate policy the parent's exclusion mirrors —\nderive expectations from the seed's parameters instead of excluding. Small,\nadditive change to the validation path, guarded by a wrong-seed regression\ntest.\n",
+  "description": "Promoted from the deferred item in\n[[tpch-throughput-seed-validation-fix]] (surfaced by the UAT-effort\nassessment, 2026-07-16). The seed-validation fix currently EXCLUDES Q11,\nQ16, Q18, and Q20 from row-count validation because their result cardinality\ndepends on the substitution parameters (the seed), and a single fixed\nexpectation would be wrong for a different seed. Excluding them unblocks the\ngate but leaves four queries unvalidated for row count.\n\nThis item closes that hole by deriving the expected row count PER SEED rather\nthan excluding the query — computing the parameter-aware answer-set\ncardinality for the seed in use, so Q11/16/18/20 are validated like the rest.\n\nGated on the parent because the exclusion lives in the parent's validation\npath; this strengthening only makes sense once that path exists and is green.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "simply widen the row-count tolerance to make Q11/16/18/20 pass",
+        "instead": "(not specified)",
+        "item_id": "tpch-throughput-parameter-aware-rowcounts",
+        "why": "that defeats the validation; expectations must be seed-derived and exact."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "tpch-throughput-parameter-aware-rowcounts",
+        "id": 42,
+        "reason": "TPC-H Q11/16/18/20 is the concrete gap the parent left; a general framework is a larger design not required to close it.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Generalizing per-seed cardinality derivation to TPC-DS is explicitly a larger framework not required to close the parent gap; parent item is itself still open/planning.",
+        "summary": "Generalise per-seed cardinality derivation to other benchmarks (TPC-DS parameterised queries)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "tpch-throughput-parameter-aware-rowcounts",
+        "needs_item": "tpch-throughput-seed-validation-fix"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Superseded by the validated bounded-RANGE policy in tpch-throughput-rowcount-validation-range-mode; do not implement exact per-seed validation in parallel. Reopen only if new evidence shows RANGE is insufficient.",
+      "category": "Testing and Quality Assurance",
+      "claimed_at": "2026-08-12T12:25:07Z",
+      "claimed_by": "joe@joe-mac-mini.local",
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "Non-parameterised queries keep their existing fixed expected row counts unchanged.",
+        "item_id": "tpch-throughput-parameter-aware-rowcounts"
+      },
+      {
+        "behavior": "The gate stays green for the correct seed and fails for an incorrect expectation (no silent re-widening to always-pass).",
+        "item_id": "tpch-throughput-parameter-aware-rowcounts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tpch-throughput-parameter-aware-rowcounts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/expected_results/"
+      },
+      {
+        "item_id": "tpch-throughput-parameter-aware-rowcounts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "tpch-throughput-parameter-aware-rowcounts",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/validation/"
+      },
+      {
+        "item_id": "tpch-throughput-parameter-aware-rowcounts",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_throughput.py"
+      },
+      {
+        "item_id": "tpch-throughput-parameter-aware-rowcounts",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -k 'throughput and (q11 or q16 or q18 or q20 or rowcount)' -q",
+        "description": "Q11/16/18/20 validated (not excluded) and wrong-seed fails",
+        "expected": "the four queries are validated per-seed; a wrong-seed expectation fails",
+        "item_id": "tpch-throughput-parameter-aware-rowcounts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tpch-throughput-parameter-aware-rowcounts",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tpch-throughput-parameter-aware-rowcounts",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tpch-throughput-parameter-aware-rowcounts",
+        "notes": "Confirm Q11/16/18/20 are still excluded post-parent, and find where the\nsubstitution parameters for a seed are available (dsqgen/qgen inputs or\nthe stored query parameters) so expected cardinality can be derived.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-validate the exclusion is still in place and locate the seed→parameter derivation",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpch-throughput-parameter-aware-rowcounts",
+        "notes": "Compute the parameter-aware expected cardinality for each of the four\nqueries from the seed's parameters (reference-answer computation), rather\nthan a fixed literal. Mirror the existing correctness-gate derivation\napproach if one exists.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Derive per-seed expected row counts for Q11/16/18/20",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpch-throughput-parameter-aware-rowcounts",
+        "notes": "Remove Q11/16/18/20 from the exclusion set, wire in the derived\nexpectations, and add a test that a wrong-seed expectation fails (proving\nthe validation is parameter-aware, not re-widened to always-pass).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace the exclusion with the derived validation and add regression coverage",
+        "wid": "w2"
+      }
+    ]
+  }
+}

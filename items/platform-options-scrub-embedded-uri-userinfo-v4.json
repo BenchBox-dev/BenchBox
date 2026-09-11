@@ -1,0 +1,118 @@
+{
+  "context": "Add value-level URI userinfo scrubbing after the exact-key classifier, drive database and HTTP-style URI sentinels through sanitize_platform_options, and retain non-secret URL/path/tuning values byte-for-byte.",
+  "description": "Platform option values can contain credential-bearing URI userinfo even when their keys are not classified as secret. Scrub passwords and tokens embedded in URI userinfo before internal or public result capture, while preserving ordinary URLs, filesystem paths, tuning values, and explicit-key redaction.",
+  "legacy": {
+    "item_meta": {
+      "category": "Security",
+      "completed_at": "2026-08-02T13:51:12Z",
+      "completed_pr": 1480,
+      "created_at": "2026-08-02T13:24:27Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "non-secret filesystem paths and tuning values",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v4"
+      },
+      {
+        "behavior": "ordinary URLs without credential userinfo",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v4"
+      },
+      {
+        "behavior": "the existing explicit-key redaction policy",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v4"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v4",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/platform_options.py"
+      },
+      {
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v4",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_platform_options_capture.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "PYTHONPATH=. uv run --all-extras -- python -c 'import json; from benchbox.core.results.platform_options import sanitize_platform_options; out=sanitize_platform_options({\"database_path\":\"postgresql://user:URI_PASSWORD@db.example/db\",\"output_location\":\"https://user:URI_TOKEN@example.com/export\",\"threads\":4}); text=json.dumps(out); assert \"URI_PASSWORD\" not in text and \"URI_TOKEN\" not in text'",
+        "description": "credential material embedded in non-secret option values is absent after sanitization",
+        "expected": "exits 1 on an unfixed tree because URI userinfo survives; exits 0 after value-level URI scrubbing",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v4",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:50:13Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run --all-extras -- python -c 'from benchbox.core.results.platform_options import sanitize_platform_options; out=sanitize_platform_options({\"url\":\"https://public.example/export\",\"path\":\"/tmp/data\",\"sort_key\":\"o_orderkey\"}); assert out=={\"url\":\"https://public.example/export\",\"path\":\"/tmp/data\",\"sort_key\":\"o_orderkey\"}'",
+        "description": "ordinary URL and option-value behavior remains green",
+        "expected": "passes before and after as a regression guard",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v4",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:50:16Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run --all-extras -- pytest tests/unit/core/results/test_platform_options_capture.py -q",
+        "description": "platform option tests pass",
+        "expected": "passes before and after as a regression guard",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v4",
+        "last_result": "pass",
+        "last_run": "2026-08-02T13:50:22Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v4",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v4",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "On clean current origin/develop a9ae8326, the URI-userinfo gate exited 1 with AssertionError because URI_PASSWORD and URI_TOKEN survived. Regression guards passed: ordinary URL/path/tuning exact-output guard exited 0 and platform option tests passed 58 tests with 5 dependency warnings.",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v4",
+        "notes": null,
+        "started_at": "2026-08-02T13:31:23Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/private/tmp/benchbox-credential-egress-alias-gate2-20260802",
+        "status": "done",
+        "summary": "Re-drive credential-bearing URI values through option boundaries",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added value-level URI userinfo scrubbing for scheme://userinfo@host strings, masking the complete userinfo as **** while preserving scheme, host, path, ordinary URLs, filesystem paths, and tuning values. Driven gate passes; platform option tests pass 59 tests with 5 dependency warnings; Ruff clean.",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v4",
+        "notes": null,
+        "started_at": "2026-08-02T13:48:45Z",
+        "started_branch": "fix/platform-options-uri-userinfo-20260802",
+        "started_worktree": "/private/tmp/benchbox-credential-egress-uri-20260802",
+        "status": "done",
+        "summary": "Scrub URI userinfo without redacting ordinary URLs",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Verification ladder passed on implemented tree: seq1 URI credential sentinels absent; seq2 ordinary URL/path/tuning exact-output guard passes; seq3 platform option tests pass 59 tests with 5 dependency warnings. todo check-scope reports scope OK for 2 changed files.",
+        "item_id": "platform-options-scrub-embedded-uri-userinfo-v4",
+        "notes": null,
+        "started_at": "2026-08-02T13:50:11Z",
+        "started_branch": "fix/platform-options-uri-userinfo-20260802",
+        "started_worktree": "/private/tmp/benchbox-credential-egress-uri-20260802",
+        "status": "done",
+        "summary": "Run platform option and result export regressions",
+        "wid": "w2"
+      }
+    ]
+  }
+}

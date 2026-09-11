@@ -1,0 +1,332 @@
+{
+  "context": "Treat benchmark and platform pages as one browse system. Reuse Home\nleaderboard semantics for heatmap, badges, units, and missing values. Add\nbrowse-specific guardrails for cross-benchmark, cross-scale, and sparse trend\ninterpretation. Keep the pages dense, but make comparability boundaries\nvisible.\n",
+  "description": "PR #246 captured benchmark and platform browse issues after the route matrix\nrendered cleanly: compare selection is too implicit, platform trends have\nweak value when data is sparse, platform tables mix benchmark/scale cohorts\nwithout enough guardrails, and the Star Schema route displays SSB naming with\nmany `0 ms` values that need explicit interpretation.\n\nThis TODO turns those browse-page findings into a concrete plan for\nBenchmarkIndex, PlatformIndex, QueryHeatmap, trend sections, compare entry,\nand benchmark-specific data labels.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "chart mixed benchmark/scale cohorts as a single comparable trend.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "display rounded sub-ms values as `0 ms` without an explanation or alternative format.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hide compare entry until after users already know to select rows.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make mobile users inspect large matrices without a scroll cue, sticky context, or card fallback.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make trust and validation badges visually dominate per-query timings.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "needs_item": "results-explorer-retheme-schema-cost-regression"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "needs_item": "results-explorer-retheme-theme-system-foundation"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Benchmark route contract `/results/{benchmark}/?sf=...&phase=...`.",
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation"
+      },
+      {
+        "behavior": "Existing row-selection to Compare flow and compact IDs where available.",
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation"
+      },
+      {
+        "behavior": "High-contrast heatmap toggle behavior.",
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation"
+      },
+      {
+        "behavior": "Platform route contract `/results/p/{platform_id}/`.",
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation"
+      },
+      {
+        "behavior": "Sortable table behavior and receipt/detail links.",
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RankTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/SparklineTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TimeSeries.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/benchmarkLabels.ts"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/format.ts"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/components/__tests__/QueryHeatmap.test.tsx",
+        "description": "Benchmark and platform tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --grep \"benchmark|platform\"",
+        "description": "Benchmark/platform browser smoke passes",
+        "expected": "Chromium browser smoke passes for benchmark and platform routes",
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: recapture benchmark and platform routes at 390, 768, 1280, 1600 plus TPC-H list/high-contrast and compare against PR #246 screenshots'",
+        "description": "Manual PR #246 browse recapture is clean",
+        "expected": "manual evidence shows U-3, DQ-5, and DQ-7 resolved or explicitly deferred",
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "notes": "Use the PR #246 screenshots to confirm current ownership and behavior in\n`BenchmarkIndex.tsx`, `PlatformIndex.tsx`, `QueryHeatmap.tsx`,\n`RankTable.tsx`, and trend/sparkline components. Confirm which routes\nhave one-row cohorts, sparse trends, hidden compare actions, and mobile\noverflow.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce benchmark and platform browse evidence after current data loads",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "notes": "Benchmark and platform pages should show a persistent compare affordance,\ndisabled state, or selected-result tray that explains the rule before the\nuser knows to click checkboxes. Single selection should say that two or\nmore comparable results are required. Incompatible selection should\nexplain which dimension differs.\n\nKeep the selected-result language and route to Compare consistent across\nbenchmark and platform pages.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make compare selection visible before users select rows",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "notes": "Apply the same metric/unit/direction and badge hierarchy rules as Home:\n  - per-query values must keep units and timing precision clear;\n  - heatmap meaning must be visible and high-contrast compatible;\n  - trust and validation badges must not overpower timings;\n  - missing, failed, no-run, and zero/sub-ms states must be distinct;\n  - matrix/list/rank modes must have consistent labels and URL state.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retheme benchmark matrix/list views around metric and badge clarity",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "notes": "The platform table mixes benchmark families, scale factors, phases, and\ndates. Group or label rows so users do not read SSB, TPC-H SF0.01, and\nTPC-H SF0.1 as one comparable leaderboard. Primary metric labels should\nexplain whether the value is a power score, geomean latency, or another\nbenchmark-derived metric.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Guard platform tables against invalid cross-cohort interpretation",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "notes": "For one or two observations, avoid large empty time-series plots that\nimply a meaningful trend. Use a compact sparse-data state, sparkline with\nexplicit \"limited observations\" label, or hide the trend until enough\npoints exist. Trend sections must name benchmark, scale, phase, metric,\nand unit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace low-information sparse trends with guarded sparse-data states",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "notes": "The `/results/star_schema/` route may use `SSB` as the human-facing label,\nbut the page must make the Star Schema Benchmark/SSB equivalence explicit.\nValues shown as `0 ms` need a formatting rule and visible explanation:\nuse `<1 ms`, a precision footnote, or another non-misleading display if\nvalues are rounded below precision.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Clarify Star Schema, SSB naming, and zero/sub-ms timing display",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "notes": "Ensure no-result, filtered-empty, one-platform, no-run, and not-comparable\nstates are actionable. A one-row benchmark matrix or sparse platform\nhistory should tell users what can and cannot be inferred.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Polish browse empty, filtered-empty, and no-comparison states",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-browse-platform-evidence-remediation",
+        "notes": "Add targeted tests for compare affordance, benchmark labels, zero/sub-ms\ndisplay, platform grouping, sparse trends, and mobile overflow. Recapture\nbenchmark and platform screenshots at 390px, 768px, 1280px, and 1600px,\nincluding TPC-H list/high-contrast and Star Schema/SSB routes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add browse-page tests and recapture PR #246 route evidence",
+        "wid": "w8"
+      }
+    ]
+  }
+}

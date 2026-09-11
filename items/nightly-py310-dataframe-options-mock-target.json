@@ -1,0 +1,62 @@
+{
+  "context": "Locate where get_config_manager actually lives now and patch that import site, or restructure the test to inject config without monkeypatching CLI internals.",
+  "description": "Nightly test (ubuntu-latest, 3.10) fails tests/unit/cli/test_run_dataframe_platform_options.py::TestDataFrameOptionReachesConfig::test_datafusion_df_target_partitions_reaches_create_config with AttributeError: <function main> does not have the attribute 'get_config_manager' — a patch target that no longer exists on the object being patched (import-path drift; may reproduce on all versions but only surfaces in the nightly matrix). Pre-existing before the agent-instruction PRs; discovered 2026-07-29.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-29T11:52:56Z",
+        "from_item": "nightly-py310-dataframe-options-mock-target",
+        "id": 658,
+        "reason": "Root cause of this nightly failure, out of scope here (fix is in benchbox/, item is scoped to tests/unit/cli/**). benchbox/cli/__init__.py __getattr__ resolves 'main' by doing 'from benchbox.cli.main import main' then 'globals()[name] = main', caching the FUNCTION under the same name as the submodule. Whichever happens first in a given process wins: import the submodule first and the module binding survives; touch the attribute first and the function clobbers it. Python >= 3.11 hides this because unittest.mock._get_target uses pkgutil.resolve_name (imports the dotted path, module wins); 3.10 walks with getattr and lands on the function. Verified against the real package: with package-only import then attribute access, 3.10's resolver returns <function main> with has get_config_manager=False. Latent elsewhere - tests/unit/conftest.py:51, tests/unit/cli/test_run_driver_version_announcement.py:83, test_cli_main.py:152/206/276/379 (+ ConfigManager/SystemProfiler at 116/603/604/618), test_compression_cli.py:44/122/221 all still use the string target and are one test-distribution away from the same failure. Removing the shadow fixes all of them at once; patching each test file is a band-aid.",
+        "resolution": "promoted",
+        "resolved_item": "cli-package-shadows-main-submodule-with-function",
+        "resolved_reason": null,
+        "summary": "benchbox.cli lazily caches the main() function over the main submodule"
+      }
+    ],
+    "item_meta": {
+      "completed_at": "2026-07-29T11:59:12Z",
+      "completed_pr": 1329,
+      "created_at": "2026-07-29T11:40:24Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The test still proves --df-target-partitions reaches the created config (no vacuous pass)",
+        "item_id": "nightly-py310-dataframe-options-mock-target"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "nightly-py310-dataframe-options-mock-target",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_run_dataframe_platform_options.py -q -n 0",
+        "description": "test passes",
+        "expected": "all pass",
+        "item_id": "nightly-py310-dataframe-options-mock-target",
+        "last_result": "pass",
+        "last_run": "2026-07-29T11:53:54Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Repointed the patch from the string target 'benchbox.cli.main.get_config_manager' to patch.object(_main_module, 'get_config_manager'), resolving the module once via sys.modules - the same indirection the file already uses for _run_module and that test_quiet_mode.py:19 uses for _main_mod. Root cause is not a missing attribute: benchbox/cli/__init__.py caches the main() FUNCTION into globals under the submodule's name, so on Python 3.10 (unittest.mock._importer walks with getattr) the target resolves to <function main> which has no get_config_manager. Python >= 3.11 masks it via pkgutil.resolve_name. Replayed 3.10's resolver against the real package: package-only import then attribute access yields <function main>, has get_config_manager=False (pre-fix) vs module/True (post-fix); a minimal same-shape package on a real 3.10.17 interpreter reproduces the nightly's exact message. No vacuous pass: the DataFusion class is not skipped locally, all 13 tests in the file run, and test_datafusion_df_target_partitions_reaches_create_config still asserts create_config received platform_key=='datafusion' and options['target_partitions']==4. Full tests/unit/cli/ green at 1604 passed.",
+        "item_id": "nightly-py310-dataframe-options-mock-target",
+        "notes": null,
+        "started_at": "2026-07-29T11:52:43Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Repoint or replace the patch target and confirm the option still reaches create_config",
+        "wid": "w1"
+      }
+    ]
+  }
+}

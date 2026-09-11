@@ -1,0 +1,49 @@
+{
+  "description": "Follow-up promoted from guards-fix-aborts-on-skill-sync-unreadable-tree-2 (deferral 674). The containment fix was proven with a deterministic failing-CLI stub in an ephemeral clone; the original failure mode (skill-sync CLI printing unable to read tree for a pinned SHA in a fresh pool worktree) and the drift path need one confirmation run where the real CLI exists (/Users/joe/Developer/skill-sync). Confirm: (1) make guards-fix completes its summary and surfaces the skill-sync error when the CLI fails; (2) a genuine mirror drift still fails make skill-sync-check.",
+  "legacy": {
+    "item_meta": {
+      "category": "validation",
+      "completed_at": "2026-08-01T12:50:32Z",
+      "created_at": "2026-07-31T23:47:47Z",
+      "worktree": "ci-infrastructure"
+    },
+    "preserves": [
+      {
+        "behavior": "No behavior change expected from this item - it is a confirmation run; any fix it uncovers is new work",
+        "item_id": "guards-fix-skill-sync-real-cli-manual-confirmation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "guards-fix-skill-sync-real-cli-manual-confirmation",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make guards-fix 2>&1 | grep -q 'guards-fix done'",
+        "description": "guards-fix completes and reports on the real-CLI machine",
+        "expected": "run ONLY on the machine with the real skill-sync CLI installed; must print the completion summary even when the skill-sync step fails, with the underlying error surfaced above it",
+        "item_id": "guards-fix-skill-sync-real-cli-manual-confirmation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Ran 2026-08-01 on the real-CLI machine (develop d5aa8f398, disposable worktree). Outcome 1: the real skill-sync CLI reproduced the original failure ('Command failed: git checkout a48d0c02... fatal: unable to read tree') in a fresh worktree; make guards-fix surfaced the error, printed the WARNING line, completed its summary ('guards-fix done'), exit 0 - rung 1 passes. Outcome 2: genuine drift (hand-edited .claude/skills/test/SKILL.md) fails 'make skill-sync-verify' loudly (modified-file does not match the lock, Error 1) - the gate CI (guard-skill-sync-verify) and pre-commit actually run. Note: 'make skill-sync-check' is a structural doctor and passes on content drift; the enforcement target is skill-sync-verify (documented parity exception covers the CI network case).",
+        "item_id": "guards-fix-skill-sync-real-cli-manual-confirmation",
+        "notes": null,
+        "started_at": "2026-08-01T12:50:26Z",
+        "started_branch": "fix/todo-freeze-gate-hardening",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run the confirmation on the real-CLI machine and record both outcomes on this item",
+        "wid": "w1"
+      }
+    ]
+  }
+}

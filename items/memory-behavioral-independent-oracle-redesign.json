@@ -1,0 +1,285 @@
+{
+  "context": "Create a versioned response schema with generic decision, memory-disposition, authority, verification, completion, and answer fields. Keep scenario expectations only in scorer-side oracle fixtures. Derive safety failures from structured choices and answer content, not model confession. Preserve prior raw evidence in its durable backup, write new raw evidence to a versioned external directory, rerun all 72 Codex sessions, and document that the old arm is superseded. Extend candidate metadata so inline Claude MEMORY facts are accounted for, indexes have useful labels, auto-commit is conditional rather than silently deleted, and the ad-hoc authority conflict is explicit human-review-required.",
+  "description": "The completed remediation proved the 72 Codex runs are authentic and corrected trusted-vs-retrieved scoring, but the behavioral gate remains circular: prompts reveal required verification/property labels, answer correctness is not scored, and safety is largely model self-report. The existing 72 Codex results therefore cannot support promotion. Redesign the response contract and scenario oracle so expected decisions are never injected, derive safety failures deterministically, rerun Codex, and address the reviewed treatment-utility gaps before any Claude quota is spent.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "copy live memory prose into committed fixtures",
+        "instead": "record hashes, titles, provenance, and dispositions only",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "why": "candidate fixtures must remain content-safe"
+      },
+      {
+        "dont": "overwrite or delete the prior raw evidence",
+        "instead": "use a new versioned raw root and retain the existing backup",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "why": "the audit chain must remain reconstructable"
+      },
+      {
+        "dont": "paste required verification keys or expected decisions into prompts",
+        "instead": "keep the answer key scorer-side only",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "why": "label transcription is not behavioral evidence"
+      },
+      {
+        "dont": "score model-authored property or failure labels as ground truth",
+        "instead": "derive correctness and safety from independent scenario expectations",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "why": "self-report makes the gate circular"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "needs_item": "memory-behavioral-gate-remediation"
+      }
+    ],
+    "item_meta": {
+      "category": "quality",
+      "completed_at": "2026-07-28T14:52:26Z",
+      "created_at": "2026-07-28T14:18:16Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Expected scenario decisions and safety outcomes never enter model prompts",
+        "item_id": "memory-behavioral-independent-oracle-redesign"
+      },
+      {
+        "behavior": "Live Codex and Claude memories and settings remain byte-unchanged",
+        "item_id": "memory-behavioral-independent-oracle-redesign"
+      },
+      {
+        "behavior": "No sensitive memory text or matched secret value is committed",
+        "item_id": "memory-behavioral-independent-oracle-redesign"
+      },
+      {
+        "behavior": "Safety failures are derived from observable response fields and answer content",
+        "item_id": "memory-behavioral-independent-oracle-redesign"
+      },
+      {
+        "behavior": "The prior 72-run Codex evidence remains recoverable from Git and the durable raw backup",
+        "item_id": "memory-behavioral-independent-oracle-redesign"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "kind": "only_modify",
+        "path_glob": "docs/claude-memory/**"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "kind": "only_modify",
+        "path_glob": "docs/codex-memory/**"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/claude/**"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/codex/**"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/scenarios/**"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q -k 'answer_key or independent_oracle'",
+        "description": "No answer key enters prompts",
+        "expected": "exit 0; prompt leak and oracle-independence mutations pass",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q",
+        "description": "All behavioral scorer and mutation tests pass",
+        "expected": "exit 0",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling/codex -- python -m pytest -q && uv run --project memory_tooling/claude -- python -m pytest -q",
+        "description": "Both treatment candidates pass strict fixture audits",
+        "expected": "exit 0; all candidate mutation tests pass",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m memory_tooling.audit --check-evaluation-isolation && test $(find evaluation_runs/behavioral/results -name 'codex-*.json' | wc -l | tr -d ' ') -eq 72",
+        "description": "Fresh Codex v2 corpus is complete and isolated",
+        "expected": "exit 0; 72 Codex results, unique sessions, unchanged live memory",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && grep -q 'independent oracle' reports/promotion-decision.md && grep -q 'Promotion decision:' reports/promotion-decision.md",
+        "description": "Promotion packet rejects circular evidence",
+        "expected": "exit 0; revised evidence and explicit decision documented",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "9539495: v2 generic response schema and scorer-only oracle; answer-key tests pass",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "notes": null,
+        "started_at": "2026-07-28T14:19:11Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Define version-2 response schema and independent scenario expectations without exposing answer keys in prompts",
+        "wid": "w0"
+      },
+      {
+        "evidence": "375ee9f: deterministic independent scoring for decision, authority, disposition, completion, verification, safety, cells, and 30% Codex context gate",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "notes": null,
+        "started_at": "2026-07-28T14:51:52Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Implement deterministic answer, authority, memory-disposition, completion, verification, and safety scoring",
+        "wid": "w1"
+      },
+      {
+        "evidence": "375ee9f,e62caaa: all 40 Claude sources accounted without source prose; labeled indexes, conditional preference, deterministic freshness; Codex update-note authority clarified",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "notes": null,
+        "started_at": "2026-07-28T14:51:56Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Revise treatment metadata for inline facts, labeled indexes, conditional preferences, and authority conflicts",
+        "wid": "w2"
+      },
+      {
+        "evidence": "34 scorer tests, 10 Claude tests, and 6 Codex tests pass; mutations cover leaks, wrong decisions, trust, completion, privacy, schema, duplicates, counts, authority, freshness",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "notes": null,
+        "started_at": "2026-07-28T14:52:02Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add mutations for wrong answers, unsafe trust, false completion, sensitive echo, and leaked answer keys",
+        "wid": "w3"
+      },
+      {
+        "evidence": "3db86c7: fresh 72/72 Codex v2 sessions; zero subprocess failures; both live memory hashes unchanged; raw evidence backed up with 363 verified hashes",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "notes": null,
+        "started_at": "2026-07-28T14:52:06Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Run a fresh 72-session Codex baseline, treatment, and control corpus into a versioned external raw root",
+        "wid": "w4"
+      },
+      {
+        "evidence": "3db86c7,fe56025: canonical report and final no-promote packet; treatment ties baseline behavior, has 14 safety failures, and regresses context 12.6%; Claude run not justified",
+        "item_id": "memory-behavioral-independent-oracle-redesign",
+        "notes": null,
+        "started_at": "2026-07-28T14:52:10Z",
+        "started_branch": "chore/memory-behavioral-evaluation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Regenerate reports and document superseded evidence, utility decisions, limitations, and Claude prerequisites",
+        "wid": "w5"
+      }
+    ]
+  }
+}

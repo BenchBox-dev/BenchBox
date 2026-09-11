@@ -1,0 +1,156 @@
+{
+  "description": "Four independent robustness gaps in the plan-capture subsystem, each a separate\nfailure mode from the missing CI gate (tracked in plan-capture-blocking-ci-gate):\n\n1. Implicit phase-eligibility. adapter.py:120 defaults\n   plan_capture_phase_eligible=True and ~12 SaaS adapters inherit it implicitly.\n   It is a correctness-critical flag (it decides whether plan capture is isolated\n   from measured timing); a future non-EXPLAIN subclass would silently inherit\n   True.\n2. Timeout thread leak. On a capture timeout, result_capture.py:828 leaves a live\n   EXPLAIN thread on the measurement connection (an accepted tradeoff). It cannot\n   perturb MEASURED timing (post-measurement phase), but it can corrupt SUBSEQUENT\n   captures in the same phase - untested.\n3. Plan identity / misattribution. Plans are captured and attached by query_id,\n   but for stream/seed-specific SQL (TPC power-test streams, unseeded variants)\n   the SQL bound to a query_id can differ from the measured statement, so the\n   attached plan may describe a different query text than the one timed.\n4. Comparable-subset honesty. The cross-engine comparable subset is an\n   operator-type multiset over a single query shape (test_cross_engine_\n   conformance.py) with no tables/predicates - a meaningful harmonization check but\n   near-trivial as \"plan equivalence\". Either strengthen it or relabel it so\n   consumers do not over-trust it.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "claim cross-engine plan equivalence from an operator-type multiset",
+        "instead": "(not specified)",
+        "item_id": "plan-capture-robustness-hardening",
+        "why": "strengthen it or relabel it."
+      },
+      {
+        "dont": "make plan-capture eligibility a silent base default for new adapters",
+        "instead": "(not specified)",
+        "item_id": "plan-capture-robustness-hardening",
+        "why": "require an explicit declaration."
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-06-28T00:00:00Z",
+      "created_at": "2026-06-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The centralized is_dml_query double-execution guard is unchanged.",
+        "item_id": "plan-capture-robustness-hardening"
+      },
+      {
+        "behavior": "The post-measurement capture phase stays isolated; measured timing is unaffected by any change here.",
+        "item_id": "plan-capture-robustness-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': 'benchbox/platforms/base/adapter.py:120', 'note': 'plan_capture_phase_eligible default; DuckDB/PostgreSQL/Redshift already declare it explicitly (postgresql.py:256) - the pattern to apply to all adapters.'}",
+        "decision": "reuse",
+        "item_id": "plan-capture-robustness-hardening",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/platforms/base/result_capture.py (_merge_plan_capture_into_result), plan_capture_phase.py', 'note': \"Where capture is keyed to a result; w3 must key on the result's executed_sql, not query_id alone.\"}",
+        "decision": "reuse",
+        "item_id": "plan-capture-robustness-hardening",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/platforms/base/result_capture.py:828', 'note': 'Documented timeout-thread tradeoff; the connection-fencing fix goes here / in the capture phase.'}",
+        "decision": "reuse",
+        "item_id": "plan-capture-robustness-hardening",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'tests/unit/query_plans/test_cross_engine_conformance.py:70, benchbox/core/query_plans/comparison.py:105', 'note': 'The comparable-subset definition and corpus to strengthen or relabel.'}",
+        "decision": "reuse",
+        "item_id": "plan-capture-robustness-hardening",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "plan-capture-robustness-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/plan_capture_phase.py"
+      },
+      {
+        "item_id": "plan-capture-robustness-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/"
+      },
+      {
+        "item_id": "plan-capture-robustness-hardening",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "plan-capture-robustness-hardening",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "plan-capture-robustness-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_plan_capture_phase_eligibility.py -q",
+        "description": "No adapter relies on the implicit eligibility default",
+        "expected": "passes; every concrete adapter declares plan_capture_phase_eligible in its own class dict",
+        "item_id": "plan-capture-robustness-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_plan_capture_phase.py -q -k identity",
+        "description": "Per-result plan identity holds across same-id streams",
+        "expected": "each result's plan matches its executed_sql; two same-query_id streams carry distinct plans",
+        "item_id": "plan-capture-robustness-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "plan-capture-robustness-hardening",
+        "notes": "Declare plan_capture_phase_eligible explicitly on every concrete adapter\n(matching DuckDB/PG/Redshift). Add a unit test asserting no adapter relies on\nthe inherited base default for this flag (introspect the class dict, not the\nresolved attribute).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make plan_capture_phase_eligible explicit on every adapter and assert no implicit inheritance",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "plan-capture-robustness-hardening",
+        "notes": "Add a test reproducing back-to-back captures where the first times out, then\neither fence the measurement connection (reset/reconnect before the next\ncapture) or serialize captures behind a fresh connection. Preserve the\npost-measurement isolation guarantee (measured timing unaffected).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Bound the capture timeout thread so it cannot corrupt subsequent captures",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "plan-capture-robustness-hardening",
+        "notes": "Audit _capture_plans_post_measurement / _merge_plan_capture_into_result so each\nresult carries the plan of ITS executed_sql. Add a test with two streams of the\nsame query_id whose SQL differs, asserting each result carries its own plan\n(no cross-stream misattribution).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Key plan capture/attachment on the result's exact executed SQL, not query_id alone",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "plan-capture-robustness-hardening",
+        "notes": "Either add table-identity to the comparable subset and expand the conformance\ncorpus to >=3 query shapes, OR relabel it in docs/output as \"operator-shape\nharmonization\" (not plan equivalence) so consumers do not over-trust matching\nsubsets. Recommend the relabel unless multi-engine plan comparison becomes a\npublished feature. Pick one and record the decision.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Strengthen or honestly relabel the cross-engine comparable subset",
+        "wid": "w4"
+      }
+    ]
+  }
+}

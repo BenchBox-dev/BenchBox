@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #582 of first-class-clickhouse-local-server-cloud-platforms.\nDeferred: Backfill or rewrite historical result artifacts so old `clickhouse` labels are normalized to new platform names in archived datasets\nReason deferred: Runtime read compatibility matters immediately; bulk artifact migration can follow once the live platform contract is stable",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:37:01Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

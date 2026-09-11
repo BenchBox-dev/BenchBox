@@ -1,0 +1,219 @@
+{
+  "description": "Extend existing BenchBox worktree and PR helpers for the canonical prepared-batch contract. One integrator collects related member commits using ordinary Git branch merges, owns an append-only feature branch and opens one final PR to develop. Workers return verified commits in isolated worktrees; they do not open nested PRs or mutate the integration checkout. Default execution is serial member preparation; concurrent workers are optional only when independent scope and existing claim authority permit them. Keep this separate from canonical tracker implementation and from consumer rollout.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Mark prepared members done, reset their baselines, or widen their scopes to make a batch pass",
+        "instead": "Preserve durable prepared receipts and verify each member plus the final combined tree",
+        "item_id": "batch-feature-branch-integration",
+        "why": "That would bypass dependency and attribution guarantees rather than implement branch delivery"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "batch-feature-branch-integration",
+        "needs_item": "batch-prepared-delivery-tracker-and-skill"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-09-08T11:46:21Z",
+      "worktree": "batch-branch-integration"
+    },
+    "preserves": [
+      {
+        "behavior": "GitHub native merge queue remains the only protected-branch merger; feature branches are never supported PR bases in this mode.",
+        "item_id": "batch-feature-branch-integration"
+      },
+      {
+        "behavior": "No generated skill edits as source, new scheduler, privileged bot, direct protected-branch push, force push of a shared integration branch, or automatic destructive cleanup.",
+        "item_id": "batch-feature-branch-integration"
+      },
+      {
+        "behavior": "Prepared and integrated are not done; required reviews, final-tree verification, external dependencies, publication approval and soak conditions remain enforced.",
+        "item_id": "batch-feature-branch-integration"
+      },
+      {
+        "behavior": "Preserve normal single-item and serial batch behavior, one active member claim per principal, current verification authority and existing audit history.",
+        "item_id": "batch-feature-branch-integration"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing detector excludes never-PR worker branches",
+        "decision": "extend",
+        "item_id": "batch-feature-branch-integration",
+        "path": "_project/scripts/detect_orphaned_commits.py"
+      },
+      {
+        "concept": "Existing creation transaction and identity guard",
+        "decision": "extend",
+        "item_id": "batch-feature-branch-integration",
+        "path": "scripts/worktree_lifecycle.sh"
+      },
+      {
+        "concept": "Existing worktree identity and ownership metadata",
+        "decision": "extend",
+        "item_id": "batch-feature-branch-integration",
+        "path": "scripts/worktree_lifecycle_metadata.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "batch-feature-branch-integration",
+        "kind": "do_not_modify",
+        "path_glob": ".agents/skills/**"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "kind": "do_not_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/batch-feature-delivery.md"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/dev-loop-worktrees.md"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "kind": "only_modify",
+        "path_glob": "scripts/batch_integration.py"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "kind": "only_modify",
+        "path_glob": "scripts/worktree_lifecycle.sh"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "kind": "only_modify",
+        "path_glob": "scripts/worktree_lifecycle_metadata.py"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/worktree/test_batch_integration.py"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/worktree/test_worktree_lifecycle_metadata.py"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_worktree_identity.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/integration/worktree/test_batch_integration.py tests/integration/worktree/test_worktree_lifecycle_metadata.py tests/unit/test_worktree_identity.py -q",
+        "description": "Feature integration and lifecycle controls hold under real Git replay",
+        "expected": "exit 0; wrong head/owner/scope and missing evidence reject, interrupted merges resume once, normal worktree creation remains compatible",
+        "item_id": "batch-feature-branch-integration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "batch-feature-branch-integration",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "batch-feature-branch-integration",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "batch-feature-branch-integration",
+        "notes": "Use the source contract and existing lifecycle metadata as prior art. Resolve repository ID, batch ID, owner generation, target develop, expected integration head, member base/head, scope and authority before any mutation. The local ignored ledger under common-repo metadata is a recoverable cache of canonical receipts, never a replacement tracker. Register its path with existing metadata; do not invent a global branch registry.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Define the branch assembly contract against canonical prepared receipts",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "batch-feature-branch-integration",
+        "notes": "Extend make worktree-create with an explicit resolved starting commit/ref for batch members; ordinary default stays origin/develop. Validate commit existence, repository association and requested expected feature head. Retain identity pinning, collision serialization, primary-clone read-only policy and failure rollback. Never use force worktree checkout to share one branch or overwrite existing work.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Support verified feature-head worktree creation without weakening creation guards",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "batch-feature-branch-integration",
+        "notes": "Implement one thin helper behind existing Make workflow. Lock only the local integration transaction, verify live owner and expected head before/after, use fast-forward where possible and an ordinary recorded merge for divergent accepted worker branches. Inspect the entire introduced range, not only tip commit. No squash of worker evidence, shared-branch rebase or automatic force push. Conflicts become owned pending work; preserve state for resume or explicit abort, attribute resolution edits and rerun relevant member/integration verification. Write integration receipt before reporting accepted; recover crash after merge before receipt without repeating merge.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Merge accepted worker branches with expected-head checks and recoverable receipts",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "batch-feature-branch-integration",
+        "notes": "Every accepted worker commit must map to integration head and final pre-squash PR head; after squash use exact reviewed tree/receipt binding, not naive ancestor-of-develop. Preserve rejected, missing, orphaned, superseded and failed members with owners. Never auto-delete worker branches/worktrees; feed existing finish preview with fresh evidence. Review or late worker arrivals after readiness use the existing revision-withdrawal flow. A source branch disappearing does not erase an outstanding obligation.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reconcile unlanded worker commits and preserve safe publication and cleanup boundaries",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "batch-feature-branch-integration",
+        "notes": "Use real temporary Git repositories and public helper commands with fake hosted events. Cover two independent workers, one dependent member, unknown start ref, dirty/colliding worktree, competing integrators, stale remote head, hidden unrelated ancestor commit, conflict resolution, failed push, crash after merge, deleted branch, final squash, late commit after readiness, and abort without losing work. Show one final PR and no feature-base PRs. Targeted member tests remain distinct from full combined-tree certification.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replay merge, conflict, restart, ownership and unauthorized-content failures",
+        "wid": "w4"
+      }
+    ]
+  }
+}

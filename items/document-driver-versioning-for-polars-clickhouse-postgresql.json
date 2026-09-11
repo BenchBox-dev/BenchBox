@@ -1,0 +1,157 @@
+{
+  "context": "For each platform doc, locate the \"Platform Options\" or \"Configuration\" section and\nadd a new subsection immediately after the options table:\n\n### Testing a Specific [Platform Name] Version\n\n```bash\nbenchbox run --platform [platform] --benchmark tpch \\\n  --platform-option driver_version=X.Y.Z \\\n  --platform-option driver_auto_install=true\n```\n\nSee {ref}`driver-version-management` for the full guide, including why `uv run` may\nrevert a manually-installed version and how to work around it.\n\nUse the exact same wording as duckdb.md lines 79-88 for consistency, substituting\nthe correct platform name and a realistic version number (e.g., polars 1.36.1,\nclickhouse-connect 0.10.0, psycopg2-binary 2.9.11).\n\nFor driver-version-management.md, add one example per platform to the\n\"Pattern 1: driver_auto_install\" block - a brief comment line + the benchbox run\ncommand is sufficient (no new sections needed).\n",
+  "description": "The DuckDB platform doc (docs/platforms/duckdb.md) was updated in the previous TODO\n(document-driver-version-selection-behavior) to include a \"Testing a Specific DuckDB Version\"\nsection with a concrete example and a cross-reference to the driver-version-management guide.\n\nThree other platform docs are missing equivalent coverage:\n\n  docs/platforms/polars.md\n    - No mention of driver versioning. After the polars extra is made optional, users\n      will need to know how to install a specific polars version.\n\n  docs/platforms/clickhouse-cloud.md\n    - No driver versioning section. The platform uses clickhouse-connect; users may want\n      to pin a specific connector release for reproducibility.\n\n  docs/platforms/postgresql.md\n    - Has basic install info but no guidance on driver version selection or the uv.lock\n      revert issue.\n\nThe fix for each file is the same pattern used for duckdb.md:\n  1. Add a \"Testing a Specific [Platform] Driver Version\" subsection under Configuration\n     or Platform Options, with a concrete --platform-option driver_version example\n  2. Add a {ref}`driver-version-management` cross-reference link\n\nAdditionally, the driver-version-management.md guide itself should reference these\nplatforms in its examples (currently it only shows duckdb and snowflake examples).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add version numbers that don't match the current optional-extra floors",
+        "instead": "use the same versions as pyproject.toml optional extras",
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "why": "it will confuse users"
+      },
+      {
+        "dont": "duplicate the full driver-version-management guide content in each platform doc",
+        "instead": "add only a short example + link",
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "why": "it will go stale"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-02-23T00:00:00Z",
+      "created_at": "2026-02-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing content in all four docs files is not removed or restructured - only append new sections",
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql"
+      },
+      {
+        "behavior": "The {ref}`driver-version-management` cross-reference format matches what is used in duckdb.md",
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql"
+      },
+      {
+        "behavior": "driver-version-management.md remains the single authoritative guide - platform docs link to it, not duplicate it",
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/clickhouse-cloud.md"
+      },
+      {
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/polars.md"
+      },
+      {
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/postgresql.md"
+      },
+      {
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "kind": "only_modify",
+        "path_glob": "docs/usage/driver-version-management.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -l 'driver_version' docs/platforms/polars.md docs/platforms/clickhouse-cloud.md docs/platforms/postgresql.md",
+        "description": "All three platform docs contain a driver_version example",
+        "expected": "All three files listed (each contains 'driver_version')",
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -l 'driver-version-management' docs/platforms/polars.md docs/platforms/clickhouse-cloud.md docs/platforms/postgresql.md",
+        "description": "All three platform docs contain the cross-reference link",
+        "expected": "All three files listed",
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run sphinx-build -W docs docs/_build/html 2>&1 | grep -i 'warning\\|error' | head -20",
+        "description": "Sphinx doc build produces no warnings for the new cross-references",
+        "expected": "No warnings or errors related to the new cross-references",
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'Testing a Specific Polars Version' callout to docs/platforms/polars.md with driver_version + driver_auto_install example and {ref}`driver-version-management` link",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'Testing a Specific clickhouse-connect Version' callout to docs/platforms/clickhouse-cloud.md: same pattern as w1, note that the driver package is 'clickhouse-connect' not 'clickhouse'",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'Testing a Specific psycopg2 Version' callout to docs/platforms/postgresql.md: same pattern as w1, note that the driver package is 'psycopg2-binary'",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "document-driver-versioning-for-polars-clickhouse-postgresql",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add polars and clickhouse-connect examples to docs/usage/driver-version-management.md Pattern 1 block alongside existing duckdb/snowflake examples",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: High\"\n- \"**Status**: Completed ✅\"\n- \"**Description**: Hardened resource monitoring and performance summary support in `benchbox/platforms/base.py`, removing the final TODO placeholders before release.\"\n- \"**Context**: The base adapter previously exposed minimal metrics and left TODO markers, making benchmark outputs inconsistent and limiting result diagnostics.\"\n- \"**Tasks**:\"\n- \"**Files Affected**:\"\n- \"**Success Metrics**:\"\n- \"**Impact**: HIGH - Provides actionable telemetry in benchmark results, clears lingering TODOs, and gives users immediate insight into performance and resource profiles.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (COMPLETED)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

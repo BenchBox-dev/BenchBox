@@ -1,0 +1,147 @@
+{
+  "context": "Use the existing scripts as-is for triage. Migration is mechanical:\n  elapsed = time.time() - start  →  elapsed = mono_time() - start\nwhere mono_time() is benchbox.utils.clock.mono_time. Only migrate sites\nthat compute elapsed durations; preserve sites that record absolute moments.\n\nFor the allowlist, group entries by directory with a one-line rationale per\ngroup rather than per-line.\n",
+  "description": "Quality plan Phase 2a. BenchBox has 154 uses of `time.time()` (wall-clock)\nand 465 of `mono_time()`/`perf_counter()`. The wall-clock uses are\nlegitimate for event timestamps but DANGEROUS in benchmark execution paths\n(NTP adjustments, leap seconds, system clock changes corrupt measurements).\n\nAn allowlist already exists at _project/config/timing_wall_clock_allowlist.json\nand a script timing_audit.py / timing_policy_check.py exists, but it is NOT\nenforced by CI. Today a contributor can introduce a new wall-clock call in\na hot path and nothing catches it.\n\nThis TODO: audit the 154 sites against the allowlist, move any execution-path\nuses to mono_time(), then wire timing_policy_check.py into pre-commit + CI.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a blanket allowlist entry for whole directories",
+        "instead": "be specific or migrate",
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "why": "that hides drift"
+      },
+      {
+        "dont": "change the clock module API",
+        "instead": "extend, don't rename",
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "why": "callers rely on mono_time() name"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-04-13T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Event timestamps that genuinely need wall-clock (e.g., result file metadata) keep using time.time()",
+        "item_id": "quality-make-timing-policy-ci-gate"
+      },
+      {
+        "behavior": "Existing timing_audit.py and timing_policy_check.py interfaces unchanged",
+        "item_id": "quality-make-timing-policy-ci-gate"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/timing_policy_check.py --strict",
+        "description": "Timing policy check passes",
+        "expected": "All wall-clock usage either approved in allowlist or migrated",
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- pre-commit run timing-policy-check --all-files",
+        "description": "Pre-commit timing hook is wired and passes on the repository",
+        "expected": "timing policy hook passes",
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast test suite passes after migrations",
+        "expected": "all tests pass",
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run `_project/scripts/timing_audit.py --report` and triage all 154 time.time() sites - categorize as: (a) event timestamp [keep], (b) execution timing [migrate to mono_time], (c) audit log [keep]",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate any category (b) sites to mono_time(); update allowlist for the (a)/(c) cases that aren't yet listed",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `_project/scripts/timing_policy_check.py --strict` to .pre-commit-config.yaml as a local hook with a stable id (timing-policy-check)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a CI step in .github/workflows/lint.yml running `uv run -- python _project/scripts/timing_policy_check.py --strict` - fail on unlisted wall-clock",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-make-timing-policy-ci-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the timing policy in AGENTS.md (1 paragraph) and link from CONTRIBUTING",
+        "wid": "w5"
+      }
+    ]
+  }
+}

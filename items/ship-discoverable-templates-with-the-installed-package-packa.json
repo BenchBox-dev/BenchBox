@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #282 of tuning-docs-env-contract-fixes-20260712.\nDeferred: Ship discoverable templates with the installed package (package resources) so --tuning tuned works outside a repo checkout\nReason deferred: Behavior/packaging change beyond a docs fix; needs its own sizing after the precedence doc makes the limitation visible (review finding N8)",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:17Z",
+      "worktree": "main"
+    }
+  }
+}

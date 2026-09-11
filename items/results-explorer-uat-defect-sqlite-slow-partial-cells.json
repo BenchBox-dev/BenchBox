@@ -1,0 +1,137 @@
+{
+  "context": "Treat the shared partial-success leak as closed by\n`results-explorer-uat-defect-partial-success-exit-contract`. For this TODO, reproduce the SQLite-local smoke,\nidentify the first high-impact SQLite-specific failure cluster, then either fix the adapter behavior or document an\nexplicit SQLite limitation when the behavior is inherent to SQLite. Keep all changes out of shared result-status,\npublication, submit, and Explorer ranking code unless a SQLite-only regression cannot be expressed without that surface.\n\nProcess cleanup: check free space before and after SQLite smoke verification. If available space is below 40GB,\nremove loaded local database artifacts under `/Users/joe/Developer/benchmark_runs/databases/` when present, but\npreserve reusable generated data under `/Users/joe/Developer/benchmark_runs/datagen/` because TPC-H and derived\nworkloads can reuse it. Continue working above 5GB free; stop only if available space falls below 5GB.\n",
+  "description": "SQLite had several UAT failures and timeouts in TPC-H-source workloads, TPC-DS\nOBT exited 137, and some cells returned passed status while query-level\nfailures were present. This should be separated from the shared partial-success\nstatus contract because SQLite also has platform-specific performance and\ncompatibility behavior to classify.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "mask SQLite query failures as successful benchmark cells",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "why": "Explorer publication depends on honest status."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "needs_item": "results-explorer-uat-defect-partial-success-exit-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "SQLite adapter remains dependency-light and local-only.",
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells"
+      },
+      {
+        "behavior": "Shared status-contract fixes are not duplicated in SQLite-specific code.",
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/results-explorer-uat-defect-sqlite-slow-partial-cells.yaml"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/sqlite.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/sqlite.md"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/adapters/test_manifest_fallback_sqlite.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_sqlite_adapter.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_sqlite_real_connection.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox run --platform sqlite --benchmark tpch --scale 0.01 --phases load,power --non-interactive",
+        "description": "SQLite smoke terminates with correct pass/fail/skip classification.",
+        "expected": "completed result or explicit classified failure",
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast tests remain green.",
+        "expected": "all selected tests pass",
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "notes": "W1 split and ownership inventory (2026-05-03):\n- The shared partial-success publication/ranking contract was completed in\n  `_project/DONE/main/active/results-explorer-uat-defect-partial-success-exit-contract.yaml`.\n  That item owns `benchbox/core/results/status.py`, `benchbox/cli/commands/run.py`,\n  `benchbox/cli/commands/submit.py`, `benchbox/cli/commands/publish.py`, and the shared\n  Explorer ranking transformer/model paths. This SQLite TODO must not reopen that surface.\n- This TODO is limited to SQLite platform behavior seen in UAT: local SQLite load/power execution,\n  platform-specific query compatibility/timeouts, and whether SQLite failures are classified honestly\n  once the shared status contract receives them.\n- Current SQLite adapter surface is `benchbox/platforms/sqlite.py`: connection configuration, schema creation,\n  `DataLoader`-based loading, and per-query execution that returns `SUCCESS` or `FAILED` dictionaries.\n- Existing SQLite coverage is concentrated in `tests/unit/platforms/test_sqlite_adapter.py`,\n  `tests/unit/platforms/test_sqlite_real_connection.py`, and\n  `tests/unit/adapters/test_manifest_fallback_sqlite.py`. W3 should add coverage there unless W2\n  proves the regression belongs in a narrower CLI smoke test.\n- Disk check before W1 edits: 34GiB free; `/Users/joe/Developer/benchmark_runs/databases` was 0B and\n  `/Users/joe/Developer/benchmark_runs/datagen` was 15G. Preserve datagen for reuse across TPC-H and\n  read-primitives-style workloads; clean loaded database artifacts only when present.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Separate SQLite platform defects from the shared partial-success contract",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "notes": "Work-unit-owned files before editing:\n- `benchbox/platforms/sqlite.py`\n- `docs/platforms/sqlite.md` (only if the highest-impact finding is a documented SQLite limitation)\n\nW2 result (2026-05-03):\n- Reproduced the TODO smoke before the fix. Current `develop` no longer showed a partial-status leak:\n  `summary.validation=passed`, 66/66 query executions passed, and zero failed queries.\n- The highest-impact SQLite-specific cluster was TPC-H Q21 latency. Without persistent SQLite indexes,\n  Q21 took about 68-70s per run because correlated subqueries repeatedly scanned `lineitem`.\n- Added post-load TPC-H helper indexes in `benchbox/platforms/sqlite.py` for the `lineitem`, `orders`,\n  `supplier`, and `nation` access paths used by Q21. The indexes are created after bulk load and included\n  in load timing.\n- Documented the helper indexes and database cleanup/reuse behavior in `docs/platforms/sqlite.md`.\n- Fresh exact smoke after deleting the generated SQLite DB passed with 66/66 query executions; Q21 dropped\n  to about 29-31ms and measurement runs completed in about 12s.\n- W2 code review found no required fixes. W3 still owns focused regression coverage for helper index creation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix or document the highest-impact SQLite-specific timeout/partial cluster",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-sqlite-slow-partial-cells",
+        "notes": "Work-unit-owned files before editing:\n- `tests/unit/platforms/test_sqlite_adapter.py`\n- `tests/unit/platforms/test_sqlite_real_connection.py`\n- `tests/unit/adapters/test_manifest_fallback_sqlite.py`\n- a narrower CLI or integration test file only if W2 changes CLI-visible SQLite classification behavior\n\nW3 result (2026-05-03):\n- Added fast real-connection regression coverage in `tests/unit/platforms/test_sqlite_real_connection.py`.\n- Covered that minimal TPC-H tables receive the four helper indexes.\n- Covered that non-TPC-H benchmarks do not receive those TPC-H-specific indexes.\n- W3 review found and fixed one formatting issue. During W3 smoke, a W2 follow-up removed the SQLite `ANALYZE`\n  side effect so database reuse does not warn about `sqlite_stat1`.\n- Verification passed: targeted SQLite tests (45 passed), exact SQLite smoke (66/66 query executions passed),\n  and fast suite (21,545 passed, 5 skipped).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add SQLite-specific regression or skip classification coverage",
+        "wid": "w3"
+      }
+    ]
+  }
+}

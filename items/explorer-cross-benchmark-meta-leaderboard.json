@@ -1,0 +1,189 @@
+{
+  "context": "The pipeline already iterates through every bundle once. After the\nper-benchmark artifacts are built, iterate the in-memory accumulators\nagain to compute ranks: for each cohort, sort by the cohort's primary\nmetric and assign 1-based ranks. Aggregate across cohorts per engine.\n\nFrontend is a pure table render. No interactivity in the first cut -\nclicking a cohort header navigates to the matrix leaderboard for that\ncohort.\n",
+  "description": "The 2026-04-15 strategy review observed that BenchBox's multi-benchmark\nstory is a real differentiator vs ClickBench but the current Home page\ndoes not lean into it. A cross-benchmark meta-leaderboard answers\n\"which engines consistently do well across benchmarks?\" - a question\nno single-benchmark site can answer.\n\nApproach: compute per-engine performance *rank* within each\n(benchmark, scale, phase) cohort, then surface aggregate rank across\ncohorts. Ranks normalize away the incompatible units (power_score vs\ngeomean_ms) that make direct cross-benchmark comparison impossible.\n\nVisualization: a compact table on the home page with columns per\nbenchmark cohort and a cell showing the engine's rank (e.g., \"1/4\")\nplus a summary \"Average rank: 1.5\" column on the right.\n\nNot included: any claim that the meta-leaderboard is an official or\nweighted score. It is a transparent rank-aggregation across whatever\ncohorts the corpus contains, with all inputs visible and linkable.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hide the methodology panel behind a 'why' link",
+        "instead": "show it inline below the table",
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "why": "the whole point is transparency"
+      },
+      {
+        "dont": "include cohorts with only 1 platform",
+        "instead": "filter them out at pipeline time",
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "why": "rank is meaningless there"
+      },
+      {
+        "dont": "invent a weighted composite score",
+        "instead": "use simple rank aggregation with all inputs visible",
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "why": "any weighting is indefensible and masks the inputs"
+      },
+      {
+        "dont": "penalize platforms that didn't run a cohort",
+        "instead": "show N/A and exclude from that platform's average",
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "why": "missing data is not a loss"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "needs_item": "explorer-emit-benchmark-summary-artifact"
+      },
+      {
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "needs_item": "explorer-matrix-leaderboard-view"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-15T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Home page remains navigable - the meta-leaderboard is additive, not replacing global nav",
+        "item_id": "explorer-cross-benchmark-meta-leaderboard"
+      },
+      {
+        "behavior": "No invented composite scores - only transparent rank aggregation",
+        "item_id": "explorer-cross-benchmark-meta-leaderboard"
+      },
+      {
+        "behavior": "Recent Results section remains on the home page in a secondary position",
+        "item_id": "explorer-cross-benchmark-meta-leaderboard"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer/pipeline.py"
+      },
+      {
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/public/data/meta_leaderboard.json"
+      },
+      {
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f results-explorer/public/data/meta_leaderboard.json && echo exists",
+        "description": "meta_leaderboard.json is emitted",
+        "expected": "exists",
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'import json; d = json.load(open(\"results-explorer/public/data/meta_leaderboard.json\")); assert all(len(c[\"platforms\"]) >= 2 for c in d[\"cohorts\"])'",
+        "description": "Meta-leaderboard only includes cohorts with ≥2 platforms",
+        "expected": "no assertion failure",
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'MetaLeaderboard' results-explorer/src/pages/Home.tsx",
+        "description": "Home page renders MetaLeaderboard",
+        "expected": "imported and rendered",
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "TypeScript compiles",
+        "expected": "no errors",
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "notes": "Scan every BenchmarkSummary and emit\nresults-explorer/public/data/meta_leaderboard.json with:\n  {cohorts: [{benchmark, scale, phase,\n              platforms: [{platform, rank, total}]}],\n   summary: [{platform, avg_rank, appearances}]}\nExclude cohorts with only 1 platform.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add MetaLeaderboard computation to pipeline.py; emit meta_leaderboard.json",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "notes": "Table: one column per cohort (abbreviated header 'TPC-H SF0.01\npwr'), cells show rank fraction. Rightmost column 'Avg Rank';\nrows sorted by avg_rank ascending.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build MetaLeaderboard component at src/components/MetaLeaderboard.tsx",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate MetaLeaderboard into Home.tsx as hero panel; demote Recent Results",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-cross-benchmark-meta-leaderboard",
+        "notes": "Explain: (a) rank is within-cohort; (b) only cohorts with ≥2\nplatforms count; (c) platforms missing from a cohort are N/A, not\npenalized; (d) avg_rank is a simple mean across appearances;\n(e) link to the full methodology discussion.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add transparency disclosure panel below the meta-leaderboard",
+        "wid": "w4"
+      }
+    ]
+  }
+}

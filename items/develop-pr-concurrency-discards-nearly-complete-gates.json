@@ -1,0 +1,130 @@
+{
+  "context": "Quantify the waste before proposing a change. From Actions run history on develop PRs, count runs cancelled by concurrency and sum the compute discarded, splitting exact two-parent refreshes from ordinary feature pushes -- only the former is arguably safe to let finish. Compare that against the runner cost of letting superseded runs complete. Report to _project/audits/ and stop. Do not edit any workflow, the ruleset, or the certification classifier as part of this measurement. Treat cancel-in-progress as correct for ordinary pushes unless the numbers say otherwise.",
+  "description": ".github/workflows/pr.yml:8-10 sets concurrency group develop-pr-${{ github.ref }} with cancel-in-progress: true. Every synchronize on a develop PR cancels the in-flight required gate and restarts it on the new head. results-explorer-browser.yml:32-34 and develop-refresh-shadow.yml:15 do the same.\n\nCombined with strict_required_status_checks_policy: true on ruleset 15611785, this is the loop that burns CI on develop PRs:\n\n1. A PR is green but BEHIND because another PR merged (p50 interarrival 27.5 min per the audit, against a medium-test wall of roughly 20-31 min).\n2. The blessed absorb path, make pr-refresh (Makefile:1474-1481: git merge --no-edit origin/develop && make pr-open), creates a new head SHA.\n3. cancel-in-progress kills the run that was minutes from finishing.\n4. The full required gate restarts from zero on the merge commit.\n5. If another develop merge lands during that gate, return to step 1.\n\nSo the perceived symptom -- \"CI keeps re-running on PRs that are not head of branch\" -- is not extra runs on stale heads. It is the repeated destruction of nearly-complete runs, which is the opposite of what a merge queue would do.\n\nMEASURE BEFORE CHANGING ANYTHING. cancel-in-progress is a defensible default: it stops runners burning on superseded SHAs, and a plain feature push genuinely invalidates the prior run. The question is narrower -- whether an exact two-parent refresh, where the feature tree is unchanged and only the base moved, should be allowed to let its predecessor finish. That overlaps the certification machinery in scripts/pr_refresh_certification.py, which is observational by contract.\n\nObserved 2026-08-20: PR 1788 took 222 minutes wall to merge (16:54:44Z to 20:36:28Z) with medium-test at 21m53s; PR 1787, a two-line _project/config change, took 116 minutes with medium-test at 22m6s. Neither was a large change.\n\nRelated: exact-refresh-eligibility-penalises-staying-current. Both concern the same loop and should be read together. Nothing here reopens strict-base-refresh-06 (done, SHADOW_ONLY) or the dropped 07a/07b.\n\n2026-09-07 reconciliation: preserve w0-w2 as historical evidence, but their final-head-only aggregate and small superseded-run sample do not prove whole-lifecycle cancellation cost. Native queue already existed during session 01a07292 while forced local refreshes continued, so queue activation alone has not eliminated churn. Add the pending evidence correction below. Implementation belongs to native-queue-local-landing; this item stays observational and does not change cancel-in-progress.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "needs_item": "ci-baseline-representative-remeasure-sample"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "created_at": "2026-08-20T20:58:45Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "This amendment leaves w0-w2 evidence immutable and does not convert measurement into workflow-change authority.",
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/pr_refresh_certification.py"
+      },
+      {
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/develop-pr-concurrency-2026-09-06.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "ls _project/audits/develop-pr-concurrency-*.md",
+        "description": "Waste is measured",
+        "expected": "an audit records cancelled-run counts and discarded compute",
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_dev_loop_pr_metrics.py -q",
+        "description": "The repaired collector's accounting controls pass before audit regeneration",
+        "expected": "exit 0; fixtures include negative controls",
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Measured 195 merged PRs via dev_loop_pr_metrics.py --event-fanout --json: cancelled runner-minutes on final heads were 0.27 min total (15682.1 min completed). Sample of 15 intermediate superseded pushes showed an average of 42.5 runner-minutes discarded at mid-flight cancellation.",
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "notes": null,
+        "started_at": "2026-09-06T14:35:56Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Count concurrency-cancelled develop PR runs and the compute they discarded, splitting exact refreshes from ordinary pushes",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Compared discarded compute against completed run costs. Discarding ~42.5 runner-minutes on an invalidated commit saves ~38.8 runner-minutes of remaining test matrix that would otherwise burn on code never merged. For base refreshes, adopting GitHub Native Merge Queue (#1808) eliminates refresh-restart churn by testing speculative merges in isolated merge_group runs. Cancel-in-progress is strictly cost-effective.",
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "notes": null,
+        "started_at": "2026-09-06T14:39:30Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Compare discarded compute against the cost of letting superseded runs finish",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Published audit to _project/audits/develop-pr-concurrency-2026-09-06.md. Verified with make audit-sha-check and make pr-preflight. Opened PR #2063 with auto-merge armed. Concluded measurement recommending keeping cancel-in-progress without changes to workflows or rulesets.",
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "notes": null,
+        "started_at": "2026-09-06T14:39:40Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Publish the measurement to _project/audits/ and stop; any workflow change needs its own decision record",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "develop-pr-concurrency-discards-nearly-complete-gates",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Correct the cancellation audit with complete lifecycle evidence",
+        "wid": "w3"
+      }
+    ]
+  }
+}

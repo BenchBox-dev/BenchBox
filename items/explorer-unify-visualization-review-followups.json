@@ -1,0 +1,110 @@
+{
+  "description": "Non-required nits and improvements surfaced by the code review of\nexplorer-unify-visualization-foundations.  Four Required issues\n(vsSlowestRatio inversion for power_score, weak type for\nranking_primary_metric, misleading error message, unthrottled\nResizeObserver) were fixed immediately post-review.  This item tracks\nthe remaining nit/consider findings.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-04-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- chartTheme",
+        "description": "chartTheme tests pass with extended coverage",
+        "expected": "all tests pass",
+        "item_id": "explorer-unify-visualization-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- Compare",
+        "description": "Compare tests pass with new cases",
+        "expected": "all tests pass",
+        "item_id": "explorer-unify-visualization-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Full test suite green",
+        "expected": "all green",
+        "item_id": "explorer-unify-visualization-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-unify-visualization-review-followups",
+        "notes": "StackedPhase.tsx:27-30 - PHASE_COLORS uses inline hex literals\n\"#3b82f6\", \"#10b981\", \"#f59e0b\", \"#ef4444\" - the same four\npalette colors as PALETTE in chartTheme.ts - bypassing paletteColor().\n\nFix: export PHASE_COLORS from chartTheme.ts or replace inline\nliterals with paletteColor(0..3).  chartTheme.ts already has the\nanti-pattern documented in its docblock.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move StackedPhase.tsx PHASE_COLORS to chartTheme.ts",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-unify-visualization-review-followups",
+        "notes": "chartTheme.ts exports HEAT_MIN_RATIO=1 and HEAT_MAX_RATIO=10 but\nno file imports them.  chartMath.ts:colorForCell hardcodes the\nsame values (Math.max(1, Math.min(10, ...))).\n\nFix: either import HEAT_MIN_RATIO/HEAT_MAX_RATIO in chartMath.ts\nand use them in colorForCell, or remove the exports from chartTheme.ts.\nThe former is cleaner - makes colorForCell respect changes in one place.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove dead HEAT_MIN_RATIO / HEAT_MAX_RATIO exports or use them in colorForCell",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-unify-visualization-review-followups",
+        "notes": "useElementSize.ts has no standalone test.  It is tested indirectly\nthrough NormalizedSpeedupChart.test.tsx but the fallback path\n(typeof ResizeObserver === \"undefined\"), the cleanup/disconnect call\non unmount, and the hidden-element (0×0) edge case are not exercised.\n\nAdd results-explorer/src/__tests__/useElementSize.test.ts covering:\n  (a) ResizeObserver unavailable → falls back to offsetWidth\n  (b) disconnect() is called on unmount (no leak)\n  (c) 0×0 container → stays at defaultWidth (size not updated)\n  (d) Same-dimension resize → functional update returns prev (no re-render)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add dedicated useElementSize unit test",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-unify-visualization-review-followups",
+        "notes": "chartTheme.test.ts only tests PALETTE, paletteColor, FASTER_FILL,\nSLOWER_FILL, and DIVERGING_MAX_PCT.  These exports are untested:\n  - TIME_SERIES_PALETTE / timeSeriesColor\n  - HEAT_MIN_RATIO / HEAT_MAX_RATIO\n  - SPEEDUP_LOG2_MIN / SPEEDUP_LOG2_MAX / SPEEDUP_LOG2_RANGE\n  - SPEEDUP_GRID_STOPS\n\nAdd parametrized assertions: correct count, no duplicate values,\nexpected types, SPEEDUP_LOG2_RANGE == MAX - MIN.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend chartTheme.test.ts to cover untested exports",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-unify-visualization-review-followups",
+        "notes": "BenchmarkIndex.tsx:325 - `summaryError.startsWith(\"No benchmark data\navailable\")` is a string-prefix match on a user-visible message.\nIf manifest.ts changes the message wording, the empty-state branch\nsilently reverts to the amber error banner.\n\nFix: export a typed error class or sentinel constant from manifest.ts:\n  export class BenchmarkNotPublishedError extends Error { ... }\nThen BenchmarkIndex.tsx checks `summaryError instanceof BenchmarkNotPublishedError`.\nOr a simpler option: export a sentinel string constant\n  export const BENCHMARK_NOT_PUBLISHED = \"BENCHMARK_NOT_PUBLISHED\";\nand throw/check that instead of the user-visible string.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace string-prefix error sentinel in BenchmarkIndex.tsx",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-unify-visualization-review-followups",
+        "notes": "Compare.test.tsx has a header comment listing 4 test cases but only\nimplements cases (b) and (c).  Missing:\n  (a) Summary card \"vs worst\"/\"vs slowest\" value agrees with the\n      breakdown table ratio for the same row.\n  (d) Baseline selector changes which result is treated as baseline\n      in the speedup chart section.\n\nThese are regression guards for the dual-speedup fix and the baseline\nselection UX.  Add them as additional test functions in Compare.test.tsx.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement missing Compare.test.tsx cases (a) and (d)",
+        "wid": "w6"
+      }
+    ]
+  }
+}

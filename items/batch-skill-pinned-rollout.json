@@ -1,0 +1,245 @@
+{
+  "description": "Deliver the revised canonical todo-db batch action to BenchBox through skill-sync, together with a verified compatible MCP runtime and repository workflow. The source_name=todo-db override owns this skill; do not patch BenchBox mirrors or the skill-sync-skills catalog as source. Expose a clear feature delivery mode for related changes and retain the serial mode for independent work. A source PR or local mirror update alone is not installed behavior.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Mark prepared members done, reset their baselines, or widen their scopes to make a batch pass",
+        "instead": "Preserve durable prepared receipts and verify each member plus the final combined tree",
+        "item_id": "batch-skill-pinned-rollout",
+        "why": "That would bypass dependency and attribution guarantees rather than implement branch delivery"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "needs_item": "batch-feature-branch-integration"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "needs_item": "pr-followup-resumable-ownership"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "needs_item": "pr-local-validation-singleflight"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "needs_item": "pr-revision-readiness-transaction"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-09-08T11:46:24Z",
+      "worktree": "batch-skill-rollout"
+    },
+    "preserves": [
+      {
+        "behavior": "GitHub native merge queue remains the only protected-branch merger; feature branches are never supported PR bases in this mode.",
+        "item_id": "batch-skill-pinned-rollout"
+      },
+      {
+        "behavior": "Implement the source, helpers and rollout using the currently supported serial/ordinary PR workflow. Feature mode is enabled only after its runtime, helpers and installed skill pass; do not use the new batching mode to satisfy its own undeployed prerequisites.",
+        "item_id": "batch-skill-pinned-rollout"
+      },
+      {
+        "behavior": "No generated skill edits as source, new scheduler, privileged bot, direct protected-branch push, force push of a shared integration branch, or automatic destructive cleanup.",
+        "item_id": "batch-skill-pinned-rollout"
+      },
+      {
+        "behavior": "Prepared and integrated are not done; required reviews, final-tree verification, external dependencies, publication approval and soak conditions remain enforced.",
+        "item_id": "batch-skill-pinned-rollout"
+      },
+      {
+        "behavior": "Preserve normal single-item and serial batch behavior, one active member claim per principal, current verification authority and existing audit history.",
+        "item_id": "batch-skill-pinned-rollout"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Generated consumer to regenerate from canonical source",
+        "decision": "extend",
+        "item_id": "batch-skill-pinned-rollout",
+        "path": ".claude/skills/todo-db/references/batch.md"
+      },
+      {
+        "concept": "Fold related work into one PR without feature-base PRs",
+        "decision": "extend",
+        "item_id": "batch-skill-pinned-rollout",
+        "path": "docs/development/pr-base-branch-policy.md"
+      },
+      {
+        "concept": "todo-db source ownership and immutable ref deployment",
+        "decision": "extend",
+        "item_id": "batch-skill-pinned-rollout",
+        "path": "skill-sync.yaml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/todo-db/**"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "kind": "only_modify",
+        "path_glob": ".gitattributes"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/batch-rollout-evidence.json"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/batch-feature-delivery.md"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/review-protocol.md"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/dev-loop-worktrees.md"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.lock"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.yaml"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/worktree/test_batch_skill_delivery.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make skill-integrity-check",
+        "description": "Pinned skill integrity and generated consumer contract",
+        "expected": "exit 0; exact merged source, generated lock and tracked/untracked runtime materializations agree",
+        "item_id": "batch-skill-pinned-rollout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/integration/worktree/test_batch_skill_delivery.py -q",
+        "description": "Installed batch guide drives both feature delivery and unchanged serial operation",
+        "expected": "exit 0; public MCP/real Git scenarios reject stale prepared evidence and close members only after the declared final outcome",
+        "item_id": "batch-skill-pinned-rollout",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "batch-skill-pinned-rollout",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "batch-skill-pinned-rollout",
+        "notes": "Read batch-source-delivery receipt and compare live source main ancestry. Follow existing runtime provisioning to install compatible todo-db server and operator-run required schema migration; never invent agent-side DB migration or run stored verification commands. Verify actual MCP initialization/tools and public batch operations in an isolated test project. If runtime/schema lacks capability, feature mode fails closed with an owned blocker and serial mode remains usable. No new credential or global plugin migration is authorized by this item.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Pin merged canonical source and verify the live MCP capability before activation",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "batch-skill-pinned-rollout",
+        "notes": "Advance only the todo-db immutable source ref, preview/sync with existing make skill-sync in a clean authorized worktree, review source delta and generated tracked mirrors/lock, and verify active .agents materialization. Keep unrelated skill pins/content unchanged. Amend repo bindings so an explicitly delegated batch worker stops at verified commits and the integrator owns final PR; publication authority stays user-defined. No requirement for a separate PR per member. Feature branches remain forbidden PR bases.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Synchronize canonical batch instructions and reconcile repository worker closeout",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "batch-skill-pinned-rollout",
+        "notes": "Teach mode selection by common acceptance/rollback/approval boundaries; do not bundle arbitrary backlog, cross-repo changes, long soak or protected activation into one PR. Keep branch lifetime/review-size bounds declared per batch; split when exceeded, carrying member evidence and dependencies. Permit an early draft PR when hosted-platform feedback is needed; explain current draft pushes still run CI. No new CI skips. Before publication check declared member set complete, no active member writers, current integrated test evidence, and exact readiness contract.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document assembly, publication checkpoints and recovery through the actual batch entrypoint",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "batch-skill-pinned-rollout",
+        "notes": "Replay actual deployed batch instructions against isolated repo/tracker and fake GitHub using public tools, not narrative-only rubric checks. Scenario has A then dependent B, unrelated C remains serial, verified worker commit integration, pause/restart before and after push, review edit, wrong-head rejection and all member closeouts attached to one final PR. Required human verification is explicit and owned; no repeat status nudges for routine supported transitions. Confirm old serial instructions still work.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Prove installed instructions drive prepare, merge, review, recovery and shared closeout",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "batch-skill-pinned-rollout",
+        "notes": "Record source commit, runtime version/schema/capabilities, BenchBox pin and mirror hashes, implementation PRs, actual test receipts and residual operator steps. Rehearse disabling feature mode and restoring previous skill pin without deleting prepared records or stranding members; existing batches remain inspectable/recoverable. Finish at installed and independently verified behavior; live efficiency pilot belongs to pr-process-low-drama-acceptance.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record deployed source/runtime parity and execute reversible rollback rehearsal",
+        "wid": "w4"
+      }
+    ]
+  }
+}

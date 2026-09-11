@@ -1,0 +1,98 @@
+{
+  "context": "Emit an informational lint line for exempt-category items (e.g. 'falsifiability check skipped: category flake') so exemptions are auditable. Do NOT add a category enum - corpus evidence kills it. Optionally tighten the weak bare-word alternates to phrase-anchored forms; weigh the cost of re-flagging honest 'fails until X' phrasings before doing so.",
+  "description": "Driven 2026-08-01 on a scratch DB: an item created with --category flake and a rung whose expected reads 'always passes' lints clean under lint.require_falsifiable_rung=on. --category is unvalidated free text (the hosted corpus has 170+ distinct values, so an enum would break import losslessness and is not viable). The exemption itself is semantically right for tripwires/acceptance runs; the hole is that it is INVISIBLE - lint output never says an item was exempted, so a wrongly-categorized item skips the check silently. Also observed: bare 'today'/'once'/'until' anywhere in expected text satisfies _GATING_EXPECTED_RE (corpus impact small: 4 open items pass only via weak words, 2 of them honestly gating).",
+  "legacy": {
+    "item_meta": {
+      "category": "Tracker integrity",
+      "completed_at": "2026-08-01T18:27:11Z",
+      "completed_pr": 1424,
+      "created_at": "2026-08-01T12:41:54Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Category stays free text (170+ legacy values; import losslessness)",
+        "item_id": "todo-lint-falsifiability-exemption-invisible"
+      },
+      {
+        "behavior": "The flake/validation exemptions keep working - this makes them visible, not stricter",
+        "item_id": "todo-lint-falsifiability-exemption-invisible"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-lint-falsifiability-exemption-invisible",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "todo-lint-falsifiability-exemption-invisible",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_v2.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo lint xdist-internalerror-monitoring-gate-flake | grep -qi 'exempt'",
+        "description": "lint surfaces the exemption on a real flake-category item",
+        "expected": "exits 1 on the unfixed tree (verified 2026-08-01, hosted backend); exits 0 once lint prints the exemption note. Needs the hosted tracker env.",
+        "item_id": "todo-lint-falsifiability-exemption-invisible",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q -k 'exempt'",
+        "description": "the new behavior has dedicated tests",
+        "expected": "exits 5 on the unfixed tree (no tests collected, verified 2026-08-01); all pass once w1 lands",
+        "item_id": "todo-lint-falsifiability-exemption-invisible",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py -q -k lint",
+        "description": "existing lint suite still green",
+        "expected": "all pass before and after - regression guard, not a gate",
+        "item_id": "todo-lint-falsifiability-exemption-invisible",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-lint-falsifiability-exemption-invisible",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated 2026-08-01 on scratch DB: category-flake item with an always-passes rung linted clean and silent under require_falsifiable_rung=on",
+        "item_id": "todo-lint-falsifiability-exemption-invisible",
+        "notes": null,
+        "started_at": "2026-08-01T17:38:25Z",
+        "started_branch": "fix/todo-lint-exemption-visibility",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Re-validate the silent exemption on a scratch DB on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "lint_item_notes emits 'note: falsifiability check skipped - category X is exempt'; notes print without counting or affecting exit code; 3 tests (-k exempt); hosted rung 1 now exits 0 on xdist-internalerror-monitoring-gate-flake",
+        "item_id": "todo-lint-falsifiability-exemption-invisible",
+        "notes": null,
+        "started_at": "2026-08-01T17:38:31Z",
+        "started_branch": "fix/todo-lint-exemption-visibility",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Emit the exemption note in lint output with tests",
+        "wid": "w1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,479 @@
+{
+  "context": "Post-process generated TBL/CSV files rather than modifying dbgen output.\nUse PyArrow's write_table() with sort_columns for Parquet output. New module\nbenchbox/core/data_organization/ should be called by the existing generator\npipeline after TBL generation, not replace it. Execute in three phases within\nthis TODO: (1) Parquet sorted export + CLI/config wiring, (2) clustering and\npartition-aware strategies, (3) Delta Lake and Iceberg integrations using the\nsame validated ordering abstractions and tests.\n",
+  "description": "Enable BenchBox to generate benchmark datasets (TPC-H, TPC-DS, etc.) that are\npre-sorted or pre-clustered in open table formats like Parquet, Delta Lake,\nand Iceberg. This allows users to:\n\n1. Test zone map / data skipping effectiveness across platforms\n2. Compare sorted vs unsorted query performance\n3. Evaluate Z-order and Hilbert clustering strategies\n4. Create reproducible benchmark datasets with controlled data organization\n\nCurrently, BenchBox generates data in TBL format and loads it into platforms.\nThe data order depends on the dbgen tool output and platform loading behavior.\nThis TODO adds explicit control over data organization in the generated files.\n\nKey use cases:\n- Generate Parquet files sorted by date columns for time-series benchmarks\n- Create Z-ordered Delta Lake tables for multi-dimensional filtering\n- Produce Iceberg tables with optimized partition/sort strategies\n- Enable A/B testing of data organization strategies",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make sorting the default",
+        "instead": "require explicit opt-in via --data-format or tuning config",
+        "item_id": "presorted-open-table-format-datasets",
+        "why": "unsorted data is needed for baseline benchmarks"
+      },
+      {
+        "dont": "modify dbgen binary output format",
+        "instead": "sort as a post-processing step only",
+        "item_id": "presorted-open-table-format-datasets",
+        "why": "TPC compliance requires unmodified dbgen output"
+      },
+      {
+        "dont": "sort in-memory for SF>=10",
+        "instead": "use PyArrow's chunked/streaming sort",
+        "item_id": "presorted-open-table-format-datasets",
+        "why": "lineitem at SF=10 is 6GB+ and will OOM"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-23T00:00:00Z",
+      "created_at": "2026-01-07T00:00:00Z",
+      "worktree": "physical-tuning"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing TPC-H data generation produces identical output when sorting is not requested",
+        "item_id": "presorted-open-table-format-datasets"
+      },
+      {
+        "behavior": "No regression in data generation time for default (unsorted) path",
+        "item_id": "presorted-open-table-format-datasets"
+      },
+      {
+        "behavior": "benchbox run --platform duckdb --benchmark tpch --scale 0.01 completes with same row counts",
+        "item_id": "presorted-open-table-format-datasets"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/config/models.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/config/tuning.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/data_organization/__init__.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/data_organization/clustering.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/data_organization/sorting.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/generator/__init__.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/generator.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/factory.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/open_table_formats/*.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "docs/guides/data-organization-strategies.md"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/core/data_organization/test_presorted_generation.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/open_table_formats/test_*"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/data_organization/test_clustering.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/data_organization/test_sorting.py"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/open_table_formats/test_*"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'generator or datagen' -v --tb=short",
+        "description": "Existing data generation tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "presorted-open-table-format-datasets",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'sorted or presorted' -v --tb=short",
+        "description": "Sorted output is actually sorted",
+        "expected": "all tests pass",
+        "item_id": "presorted-open-table-format-datasets",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/core/data_organization/test_presorted_generation.py -k 'row_count_equivalence' -v --tb=short",
+        "description": "Sorted and unsorted runs preserve identical row counts per TPC-H table",
+        "expected": "row_count_equivalence passes for all asserted tables",
+        "item_id": "presorted-open-table-format-datasets",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/core/data_organization/test_presorted_generation.py -k 'sortedness_metric or sort_key_monotonic' -v --tb=short",
+        "description": "Sorting key monotonicity is validated on generated Parquet output",
+        "expected": "sortedness checks pass with no ordering violations",
+        "item_id": "presorted-open-table-format-datasets",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w14",
+        "wid": "w11"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w10",
+        "wid": "w12"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w14",
+        "wid": "w12"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w4",
+        "wid": "w13"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w5",
+        "wid": "w13"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w10",
+        "wid": "w14"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w7",
+        "wid": "w14"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w11",
+        "wid": "w15"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w12",
+        "wid": "w15"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w14",
+        "wid": "w15"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w7",
+        "wid": "w15"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w13",
+        "wid": "w6"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "presorted-open-table-format-datasets",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create data_organization module skeleton with sorting interface and config types",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support cluster-by columns in tuning config",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Generate sorted Delta Lake tables with OPTIMIZE",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Generate Iceberg tables with sort orders",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement partition-aware sorting with unit tests",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integration tests verifying sortedness metrics end-to-end",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Documentation: data organization strategies guide",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire data_organization into generator pipeline as post-TBL hook",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement single-column sorting (e.g., by date) with unit tests",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement multi-column sorting with order specification and unit tests",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement configurable row group size for zone map granularity with unit tests",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate with tuning config for sort column and partition specification",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add CLI option: --data-format parquet-sorted",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Z-order encoding for Parquet with unit tests",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "presorted-open-table-format-datasets",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Hilbert curve encoding option with unit tests",
+        "wid": "w9"
+      }
+    ]
+  }
+}

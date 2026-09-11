@@ -1,0 +1,215 @@
+{
+  "context": "Extend the existing docs.yml workflow rather than creating a separate workflow.\nThis ensures atomic site assembly: all components (landing, docs, blog, explorer)\nare built in one workflow run and deployed together. The explorer build is\nadditive - it adds steps but doesn't change existing ones.\n",
+  "description": "Wire the results explorer into the existing GitHub Pages deployment so that\na single `git push` to `main` builds and deploys the complete site:\nlanding page + Sphinx docs + blog + results explorer.\n\nThis TODO modifies `.github/workflows/docs.yml` (or adds a companion workflow)\nto include the explorer build steps: run the static build pipeline, build the\nVite app, and assemble the output into the `/site/results/` directory.\n\nIt also adds the \"Results\" link to the shared site navigation so users can\ndiscover the explorer from any page on benchbox.dev.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create a separate GitHub Pages deployment for the explorer",
+        "instead": "assemble everything into one /site/ directory",
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "why": "GitHub Pages supports only one source per repo"
+      },
+      {
+        "dont": "let explorer build failures silently skip deployment",
+        "instead": "fail the workflow explicitly",
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "why": "a broken explorer should block deployment"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "needs_item": "build-static-pipeline-bundles-to-read-model"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "needs_item": "implement-explorer-home-and-browse-pages"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "needs_item": "implement-result-detail-page"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "needs_item": "implement-results-compare-view"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "needs_item": "scaffold-results-explorer-frontend"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-03T00:00:00Z",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing docs workflow jobs (linkcheck, spellcheck, example-validation, docstring-coverage) must not be affected",
+        "item_id": "integrate-explorer-into-github-pages-deployment"
+      },
+      {
+        "behavior": "Existing landing page, Sphinx docs, and blog must continue to build and deploy correctly",
+        "item_id": "integrate-explorer-into-github-pages-deployment"
+      },
+      {
+        "behavior": "GitHub Pages deployment must remain a single atomic upload (not multiple competing deployments)",
+        "item_id": "integrate-explorer-into-github-pages-deployment"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "kind": "only_modify",
+        "path_glob": "docs/_templates/"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "kind": "only_modify",
+        "path_glob": "docs/conf.py"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "kind": "only_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "act -j build --dryrun",
+        "description": "Full site builds successfully in CI",
+        "expected": "All steps listed, no errors",
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "ls site/results/index.html site/results/tpch/index.html site/results/r/*/index.html",
+        "description": "Explorer pages are present in assembled site",
+        "expected": "All files exist",
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "notes": "Modify `.github/workflows/docs.yml` so the workflow also triggers on\n`results-explorer/**` and `results-data/**`, then add build steps after the\nexisting Sphinx build:\n\n1. Set up Node.js (v20+)\n2. Install explorer dependencies: `cd results-explorer && npm ci`\n3. Run static build pipeline: `uv run -- python scripts/build_read_model.py --input results-data/bundles/ --output results-explorer/public/data/`\n4. Build explorer: `cd results-explorer && npm run build`\n5. Copy explorer output to site assembly: `mkdir -p site/results && cp -R results-explorer/dist/. site/results/`\n\nThe step order matters: pipeline must run before Vite build (Vite needs data\nfiles in `public/data/`), and explorer copy must happen before the Pages\nupload action.\n\nConsider caching `node_modules` and `.duckdb` artifacts for faster CI.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add explorer build steps to the GitHub Pages workflow",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "notes": "Ensure the workflow installs Node.js and npm dependencies. Add caching:\n- Cache `results-explorer/node_modules` keyed on `package-lock.json` hash\n- Cache DuckDB-WASM binaries if they're large\n\nVerify the workflow runs end-to-end on a test branch before merging.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add results-explorer npm dependencies to CI",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "notes": "Add a \"Results\" link to the benchbox.dev navigation that appears on:\n- Landing page header (in `landing/`)\n- Sphinx docs header (via Furo theme customization in `docs/conf.py` or\n  `docs/_templates/`)\n- Blog header\n- Explorer header (already has it from scaffold TODO)\n\nThe link should point to `/results/` and be visually consistent with\nexisting nav items.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'Results' navigation link to the shared site header",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "notes": "GitHub Pages serves 404.html for unknown paths. For the explorer's\nclient-side routes (especially compare view with query params), add a\n`404.html` in the `results/` directory that:\n1. Detects if the URL is a valid explorer route\n2. If yes, loads the explorer app and handles routing client-side\n3. If no, shows a friendly \"result not found\" page\n\nAlternatively, if all routes are pre-rendered at build time, the 404\nonly needs to handle truly invalid paths. Test both scenarios.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 404 fallback for client-side routing",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-explorer-into-github-pages-deployment",
+        "notes": "Before merging to main:\n1. Push to a test branch with GitHub Pages enabled\n2. Verify the full site deploys: landing + docs + blog + explorer\n3. Verify all explorer pages load correctly:\n   - /results/ (home)\n   - /results/tpch/ (benchmark index)\n   - /results/duckdb/ (platform index)\n   - /results/r/{id} (detail page)\n   - /results/compare?ids=a,b (compare view)\n4. Verify DuckDB-WASM loads and filtering works\n5. Verify raw bundle download links work\n6. Test on Chrome, Firefox, Safari\n7. Check that existing docs, landing, and blog pages are unaffected\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "End-to-end deployment test on a staging branch",
+        "wid": "w5"
+      }
+    ]
+  }
+}

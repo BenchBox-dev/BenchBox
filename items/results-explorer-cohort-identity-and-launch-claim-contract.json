@@ -1,0 +1,274 @@
+{
+  "context": "Make an explicit architecture decision for raw provenance versus canonical comparison identity. Preserve original benchmark slug and test_type for evidence, introduce centrally generated canonical family/phase fields only where equivalence is justified, and recompute rankings from those fields. Where equivalence cannot be proven, retain separate cohorts and explain them. Tie public positioning to a machine-checkable coverage summary: a curated-preview label may ship with narrow data; a general leaderboard claim requires an agreed breadth threshold.",
+  "description": "The real curated snapshot has 207 results but only 15 ranking-eligible rows across seven stored cohorts, three stored benchmark slugs, two human benchmark families, and scale factors no larger than 0.1. SSB is split between ssb and star_schema, while TPC-H contains standard and power phases. The hosted-results contract treats phase mismatch as a warning, but the Explorer cohort key and Compare UI treat phase as identity. Resolve those semantic contradictions before making a broad Database Leaderboards claim.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "merge phases solely to increase leaderboard density",
+        "instead": "require documented query-set and execution-semantic equivalence before aggregation",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "why": "power, throughput, standard, and vendor-specific phases may measure different workloads"
+      },
+      {
+        "dont": "rewrite raw ssb/star_schema or standard/power provenance in place",
+        "instead": "add a derived canonical identity beside immutable raw fields",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "why": "the original evidence vocabulary is needed to audit historical results"
+      },
+      {
+        "dont": "solve narrow coverage only by changing marketing copy",
+        "instead": "fix the contract and use honest copy as a separate launch-positioning control",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "why": "identity fragmentation would continue to distort comparison and future growth"
+      }
+    ],
+    "item_meta": {
+      "category": "Data Integrity",
+      "completed_at": "2026-08-02T14:07:20Z",
+      "completed_pr": 1482,
+      "created_at": "2026-08-02T04:27:51Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cohorts are merged only after semantic equivalence is documented; display aliases alone never authorize ranking aggregation.",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract"
+      },
+      {
+        "behavior": "Metric direction, ranking eligibility, speedup denominators, and query-coverage gates remain fail-closed.",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract"
+      },
+      {
+        "behavior": "Older snapshots fail with the existing version-remediation path if the read-model shape changes.",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract"
+      },
+      {
+        "behavior": "Raw submitted benchmark slug, test_type, query evidence, trust label, and result identity remain available for audit.",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract"
+      },
+      {
+        "behavior": "The UI never presents 15 eligible rows as broad database-market coverage without an explicit preview/coverage qualification.",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Replace ad-hoc detail.test_type-or-power cohort construction with the agreed canonical identity function.",
+        "decision": "supersede",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "path": "_project/scripts/explorer_pipeline/pipeline.py"
+      },
+      {
+        "concept": "Make the hosted comparison contract authoritative for whether phase is identity or an annotated mismatch.",
+        "decision": "extend",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "path": "docs/reference/hosted-results-contract.md"
+      },
+      {
+        "concept": "Align frontend comparability with the same generated identity fields used by ranking.",
+        "decision": "extend",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "path": "results-explorer/src/lib/compareCohort.ts"
+      },
+      {
+        "concept": "Reuse display aliases only for presentation; do not treat them as the data canonicalizer.",
+        "decision": "reuse",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "path": "results-explorer/src/lib/displayLabels.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/equivalence/**"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/expected_results/**"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/hosted-results-contract.md"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/explorer-build-contract.mjs"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/**"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/**"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'from pathlib import Path; t=Path(\"_project/scripts/explorer_pipeline/pipeline.py\").read_text(); assert \"detail.test_type or \\\"power\\\"\" not in t'",
+        "description": "Pipeline no longer derives cohort phase through the implicit fallback expression",
+        "expected": "Fails on the unfixed tree; exits 0 when cohort identity uses the explicit canonical contract.",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "last_result": "pass",
+        "last_run": "2026-08-02T14:04:41Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline tests/unit/scripts/test_explorer_build_contract.py -q && cd results-explorer && npx vitest run src/lib/__tests__/db-remediation-pin.test.ts src/lib/__tests__/compareCohort.test.ts src/lib/__tests__/displayLabels.test.ts",
+        "description": "Pipeline, read-model, and cross-language version contracts pass",
+        "expected": "Canonical identity and read-model pins agree across Python and TypeScript.",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "last_result": "pass",
+        "last_run": "2026-08-02T14:04:51Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --workers=1 e2e/routes",
+        "description": "Real-corpus ranking and route checks pass",
+        "expected": "Selectors, rankings, labels, Compare, and direct routes reflect the agreed identity with no unexplained rank or speedup drift.",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "last_result": "pass",
+        "last_run": "2026-08-02T14:06:59Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Repo corpus inventory showed raw star_schema and ssb aliases, plus distinct power/standard phases; result-integrity-validation.md:124 maps star_schema -> ssb, while hosted-results-contract.md requires phase-sensitive identity. Decision: canonical benchmark ssb, canonical phase normalized test_type or unknown; raw fields remain immutable.",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "notes": "Inventory all raw slugs/test types and compare query sets, execution phases, aggregation math, and hosted-contract language. Record which aliases are equivalent, which phases remain distinct, how unknown future values behave, and whether the current seven cohorts should normalize to a different count.",
+        "started_at": "2026-08-02T13:45:25Z",
+        "started_branch": "feat/results-explorer-cohort-identity-contract",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Decide canonical benchmark and phase identity from evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1482 commit de9ffc601 adds canonical_benchmark_slug/canonical_phase in the Python pipeline, canonical SQL/UI helpers, and read-model v7 pins in Python, browser runtime, and build-contract validator; old snapshots fail the existing remediation gate.",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "notes": "Derive canonical benchmark family and comparison phase centrally, preserve raw fields, update cohort/ranking tables and schema docs, bump read_model_version if shape or semantics change, and keep the Python/JS build-contract pins in lockstep.",
+        "started_at": "2026-08-02T14:04:08Z",
+        "started_branch": "feat/results-explorer-cohort-identity-contract",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Implement one versioned canonical identity in pipeline and read model",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1482 aligns BenchmarkIndex, Home, Compare, facet matching, query helpers, labels, and chart summaries; star_schema/ssb share one canonical option while raw aliases remain visible in legacy evidence.",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "notes": "Remove accidental duplicate benchmark options while retaining transparent legacy provenance. Use the same comparability decision for ranking and Compare; explain retained phase differences rather than silently suppressing or merging them.",
+        "started_at": "2026-08-02T14:04:15Z",
+        "started_branch": "feat/results-explorer-cohort-identity-contract",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Align Browse, Compare, filters, and labels with canonical identity",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1482 changes Home to BenchBox Curated Results Preview with explicitly scoped ranking language and retains corpus scope summary controls.",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "notes": "Generate a coverage summary containing eligible rows, cohort count, human families, platforms, trust exclusions, query-coverage exclusions, and scale range. Define a curated-preview launch label now; document quantitative criteria required before restoring an unqualified Database Leaderboards claim. Coordinate rather than duplicate add-third-benchmark-cohort-to-corpus.",
+        "started_at": "2026-08-02T14:04:21Z",
+        "started_branch": "feat/results-explorer-cohort-identity-contract",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Gate public leaderboard wording on measured breadth",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Python pipeline tests: 317 passed; Vitest: 850/850; typecheck passed; exact guard passed; fixture generation/build passed; Chromium routes: 64 passed in 2.1m; tracker verify runs 1/2/3 all pass. Canonical alias and unknown-phase behavior matched fresh fixture/browser routes.",
+        "item_id": "results-explorer-cohort-identity-and-launch-claim-contract",
+        "notes": "Independently recompute rankings, metric direction, speedups, geomeans, and percentiles after canonicalization; then exercise benchmark selectors, direct routes, Compare, and copy against a fresh curated snapshot. Any changed ranking must be explained by the approved identity decision.",
+        "started_at": "2026-08-02T14:04:27Z",
+        "started_branch": "feat/results-explorer-cohort-identity-contract",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Recompute math and browser behavior on the real corpus",
+        "wid": "w4"
+      }
+    ]
+  }
+}

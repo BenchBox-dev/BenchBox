@@ -1,0 +1,173 @@
+{
+  "context": "Use canonical benchmark identity for mismatch, heading, label, and warning calculations while preserving Mixed Benchmark for genuinely different families.",
+  "description": "PR #1482 canonicalizes severe mismatch checks, but Compare still computes mixedBenchmark from raw benchmark slugs. ssb and star_schema can therefore avoid a severe mismatch while displaying the contradictory Mixed Benchmark heading.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assert only heading text",
+        "instead": "test heading, mismatch, and claims together",
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "why": "claim state can still drift"
+      },
+      {
+        "dont": "remove Mixed Benchmark globally",
+        "instead": "compare canonical family identity",
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "why": "real family differences still need warning"
+      },
+      {
+        "dont": "rewrite source IDs",
+        "instead": "canonicalize at presentation boundary",
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "why": "legacy URLs and provenance depend on them"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "needs_item": "results-explorer-phase-facet-null-canonicalization-20260802"
+      }
+    ],
+    "item_meta": {
+      "category": "Cohort identity",
+      "completed_at": "2026-08-12T13:30:47Z",
+      "completed_pr": 1698,
+      "created_at": "2026-08-02T16:27:35Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Different benchmark families remain visibly non-comparable",
+        "item_id": "results-explorer-alias-heading-consistency-20260802"
+      },
+      {
+        "behavior": "Legacy slugs remain accepted in URLs/source",
+        "item_id": "results-explorer-alias-heading-consistency-20260802"
+      },
+      {
+        "behavior": "Warning and claim suppression stay coherent",
+        "item_id": "results-explorer-alias-heading-consistency-20260802"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Canonical benchmark helper",
+        "decision": "reuse",
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "path": "results-explorer/src/lib/displayLabels.ts"
+      },
+      {
+        "concept": "Mixed heading and mismatch logic",
+        "decision": "extend",
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "path": "results-explorer/src/pages/Compare.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayLabels.ts"
+      },
+      {
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.a11y.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/Compare.test.tsx",
+        "description": "SSB aliases do not produce false Mixed Benchmark",
+        "expected": "Alias tests pass",
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "last_result": "fail",
+        "last_run": "2026-08-12T13:30:38Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/Compare.a11y.test.tsx",
+        "description": "Different families retain warning and suppression",
+        "expected": "Mixed-family tests pass",
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Defined presentation semantics: canonical benchmark identity controls cohort/mixedness and comparison headings; raw benchmark slugs remain in result data and detail URLs; genuine canonical-family differences still suppress winner claims.",
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "notes": null,
+        "started_at": "2026-08-12T13:22:56Z",
+        "started_branch": "fix/results-explorer-alias-heading-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-alias-heading-20260812",
+        "status": "done",
+        "summary": "Define family versus raw-slug presentation semantics",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Compare now computes mixed-benchmark state from canonicalBenchmarkSlug values and renders the canonical heading label; severe mismatch/claim suppression remains for genuinely different benchmark families, while raw benchmark slug is retained for breadcrumb routing.",
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "notes": null,
+        "started_at": "2026-08-12T13:24:16Z",
+        "started_branch": "fix/results-explorer-alias-heading-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-alias-heading-20260812",
+        "status": "done",
+        "summary": "Align heading, mismatch, and claim state",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added Compare regressions for star_schema/ssb alias comparability and genuine mixed-benchmark suppression, covering heading, guardrail claim state, and winner suppression together.",
+        "item_id": "results-explorer-alias-heading-consistency-20260802",
+        "notes": null,
+        "started_at": "2026-08-12T13:24:27Z",
+        "started_branch": "fix/results-explorer-alias-heading-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-alias-heading-20260812",
+        "status": "done",
+        "summary": "Add alias and genuinely-mixed regressions",
+        "wid": "w2"
+      }
+    ]
+  }
+}

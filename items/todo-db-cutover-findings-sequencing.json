@@ -1,0 +1,61 @@
+{
+  "context": "Update the extraction doc for schema v4; add an explicit sequencing rule (phase 5 must not land before cutover, OR cutover gains a findings-aware restore with per-table row-count parity including finding tables); add the findings-parity assertion to the cutover checklist and rehearsal.",
+  "description": "The documented restore-based cutover (extraction doc, pre-findings: still says schema v3) excludes findings tables end-to-end: the shadow snapshot exports items-domain only, restore_legacy copies only tracker tables, and audit verify covers only the events chain — so the drill passes GREEN while the findings domain is dropped. Zero findings rows exist today, but if findings-phase5-import lands before cutover, cutover silently discards the imported corpus and its provenance. This ordering constraint is written down nowhere.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-08T00:41:48Z",
+      "completed_pr": 1641,
+      "created_at": "2026-07-26T13:03:22Z",
+      "worktree": "todo-db"
+    },
+    "scope_rules": [
+      {
+        "item_id": "todo-db-cutover-findings-sequencing",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/findings-domain.md"
+      },
+      {
+        "item_id": "todo-db-cutover-findings-sequencing",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/todo-db-benchbox-extraction.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -q 'findings' docs/operations/todo-db-benchbox-extraction.md",
+        "description": "Docs",
+        "expected": null,
+        "item_id": "todo-db-cutover-findings-sequencing",
+        "last_result": "pass",
+        "last_run": "2026-08-08T00:41:45Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "adr-todo-freeze-supersedes-claim-check.md",
+        "item_id": "todo-db-cutover-findings-sequencing",
+        "notes": null,
+        "started_at": "2026-08-08T00:38:38Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Post-findings extraction-doc update + explicit sequencing constraint",
+        "wid": "w1"
+      },
+      {
+        "evidence": "docs/operations/todo-db-benchbox-extraction.md: findings gate — w2 parity (hosted)",
+        "item_id": "todo-db-cutover-findings-sequencing",
+        "notes": null,
+        "started_at": "2026-08-08T00:41:20Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Findings-inclusive parity gate on the cutover checklist",
+        "wid": "w2"
+      }
+    ]
+  }
+}

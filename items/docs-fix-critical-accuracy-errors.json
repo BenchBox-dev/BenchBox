@@ -1,0 +1,120 @@
+{
+  "description": "Documentation audit (2026-04-01) found 3 critical accuracy errors that will\ncause user failures if followed:\n\n1. `docs/advanced/custom-benchmarks.md` has a Python syntax error (missing\n   colon in loop statement) and calls a non-existent method\n   `get_create_tables_sql(\"duckdb\")` with a dialect parameter that doesn't\n   exist in the API.\n\n2. `docs/benchmarks/ai-primitives.md` documents a complete benchmark (16\n   queries, schema, examples) that has NO implementation in the codebase.\n   Users cannot run this benchmark.\n\n3. `docs/tutorials/dataframe-quickstart.md` uses `-o` as shorthand for\n   `--output`, but no such short flag exists in the CLI. Also references\n   deprecated `--df-tuning` and `benchbox df-tuning` commands that should\n   be `benchbox tuning`.\n\nThese are the highest-impact doc bugs because they cause immediate user\nerrors when following the documentation.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-04-01T00:00:00Z",
+      "created_at": "2026-04-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "docs-fix-critical-accuracy-errors",
+        "kind": "only_modify",
+        "path_glob": "docs/advanced/custom-benchmarks.md"
+      },
+      {
+        "item_id": "docs-fix-critical-accuracy-errors",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/ai-primitives.md"
+      },
+      {
+        "item_id": "docs-fix-critical-accuracy-errors",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/index.md"
+      },
+      {
+        "item_id": "docs-fix-critical-accuracy-errors",
+        "kind": "only_modify",
+        "path_glob": "docs/tutorials/dataframe-quickstart.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import ast, re, pathlib; src=pathlib.Path('docs/advanced/custom-benchmarks.md').read_text(); blocks=re.findall(r'```python\\n(.*?)```', src, re.S); [ast.parse(b) for b in blocks]; print('PASS: all code blocks parse')\"",
+        "description": "Python code blocks in custom-benchmarks.md parse without syntax errors",
+        "expected": "PASS: all code blocks parse",
+        "item_id": "docs-fix-critical-accuracy-errors",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'get_create_tables_sql.*duckdb\\|get_create_tables_sql.*dialect' docs/advanced/custom-benchmarks.md || echo 'PASS: no phantom API call'",
+        "description": "No reference to non-existent get_create_tables_sql dialect parameter",
+        "expected": "PASS: no phantom API call",
+        "item_id": "docs-fix-critical-accuracy-errors",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "if [ ! -f docs/benchmarks/ai-primitives.md ]; then echo 'PASS: file removed'; else grep -q 'Not Yet Implemented\\|not yet implemented\\|Planned' docs/benchmarks/ai-primitives.md && echo 'PASS: marked as planned' || echo 'FAIL: no implementation marker'; fi",
+        "description": "ai-primitives.md removed or clearly marked as not implemented",
+        "expected": "PASS",
+        "item_id": "docs-fix-critical-accuracy-errors",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n '\\b-o\\b' docs/tutorials/dataframe-quickstart.md | grep -v '\\-\\-o' || echo 'PASS: no bare -o flags'",
+        "description": "No bare -o flags remain in dataframe quickstart",
+        "expected": "PASS: no bare -o flags",
+        "item_id": "docs-fix-critical-accuracy-errors",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rn 'df-tuning\\|df_tuning' docs/tutorials/ || echo 'PASS: no deprecated refs'",
+        "description": "No df-tuning references remain",
+        "expected": "PASS: no deprecated refs",
+        "item_id": "docs-fix-critical-accuracy-errors",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "docs-fix-critical-accuracy-errors",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix syntax error and non-existent API call in custom-benchmarks.md",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-fix-critical-accuracy-errors",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove or stub ai-primitives.md - no implementation exists",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-fix-critical-accuracy-errors",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix incorrect -o flag and deprecated df-tuning in dataframe-quickstart.md",
+        "wid": "w3"
+      }
+    ]
+  }
+}

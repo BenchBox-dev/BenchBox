@@ -1,0 +1,189 @@
+{
+  "description": "The last leg of the ADR-001 trust story (docs/development/\ntuning-adr-001-trust-and-hash-semantics.md names introspection receipts as\nthe design direction; the applied-ledger work deliberately left\napplied_verified unclaimable). After tuning application and data load,\nintrospect the live schema (SHOW CREATE TABLE / information_schema /\nduckdb_constraints) per platform, compare against the ledger's executed DDL\nintents, and emit a receipt into the .tuning.json companion. For tuned\nClickHouse runs the applied ledger also records session SETs, not just DDL\n(benchbox/core/tuning/applied_ledger.py); introspection must corroborate\nevery ledgered entry of every kind, DDL and session-setting readback alike,\nbefore validation_status upgrades to applied_verified. A run whose schema\nmatches while a session setting was ignored or reset must not receive\napplied_verified. Mismatches (of either kind) downgrade with a diff list.\nIntrospection failure is non-fatal and leaves applied_unverified (never\nblocks a run).\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "No screen-scraping of engine-specific DDL text where a structured catalog exists",
+        "instead": "(not specified)",
+        "item_id": "tuning-introspection-receipts-20260716",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-22T21:06:13Z",
+        "from_item": "tuning-introspection-receipts-20260716",
+        "id": 638,
+        "reason": "Skipped during #4 to avoid conflict with the then-unmerged #1264 (same receipt components). #1264 now merged -> follow-up can add the verified-state chip/row.",
+        "resolution": "promoted",
+        "resolved_item": "explorer-verified-state-display-20260722",
+        "resolved_reason": null,
+        "summary": "Explorer receipt display of verified state (results-explorer/src)"
+      },
+      {
+        "created_at": "2026-07-22T21:06:15Z",
+        "from_item": "tuning-introspection-receipts-20260716",
+        "id": 639,
+        "reason": "A full duckdb --tuning tuned/sorting run cannot reach applied_verified: DuckDB renders SORTING as CREATE INDEX pre-load, then the loader CTAS sorted-ingestion (CREATE OR REPLACE TABLE AS SELECT ORDER BY) DROPS the index -> no catalog footprint survives. Soundness invariant working correctly. Fix: record the CTAS ORDER BY as a corroboratable footprint, or re-create the index post-load. Also: ClickHouse minting applied_verified needs its key DDL (CREATE TABLE phase) folded into the ledger.",
+        "resolution": "promoted",
+        "resolved_item": "tuning-verification-footprint-duckdb-clickhouse-20260722",
+        "resolved_reason": null,
+        "summary": "Make DuckDB sorting verification-eligible (record a corroboratable footprint)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-22T21:07:28Z",
+      "completed_pr": 1268,
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Introspection never fails or slows a run materially (bounded queries, non-fatal)",
+        "item_id": "tuning-introspection-receipts-20260716"
+      },
+      {
+        "behavior": "applied_verified is claimable ONLY via corroboration - never derived from the ledger alone",
+        "item_id": "tuning-introspection-receipts-20260716"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/tuning/applied_ledger.py: entry kinds the receipts corroborate - extend",
+        "decision": "extend",
+        "item_id": "tuning-introspection-receipts-20260716",
+        "path": "benchbox/core/tuning/applied_ledger.py"
+      },
+      {
+        "concept": "benchbox/platforms/clickhouse/tuning.py validate_session_cache_control: existing settings-readback pattern - reuse",
+        "decision": "reuse",
+        "item_id": "tuning-introspection-receipts-20260716",
+        "path": "benchbox/platforms/clickhouse/tuning.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-introspection-receipts-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/**"
+      },
+      {
+        "item_id": "tuning-introspection-receipts-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/**"
+      },
+      {
+        "item_id": "tuning-introspection-receipts-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "tuning-introspection-receipts-20260716",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "tuning-introspection-receipts-20260716",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "tuning-introspection-receipts-20260716",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --non-interactive --output /tmp/receipt-check",
+        "description": "E2E tuned duckdb run reaches applied_verified with a receipt in the companion",
+        "expected": "validation_status applied_verified; receipt lists corroborated intents",
+        "item_id": "tuning-introspection-receipts-20260716",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-introspection-receipts-20260716",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tuning-introspection-receipts-20260716",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-introspection-receipts-20260716",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tuning-introspection-receipts-20260716",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "docs/development/tuning-introspection-receipts.md: phase x mechanism -> catalog-query map, trust rule, session-SET decision (transient, not eligible), DuckDB CTAS caveat.",
+        "item_id": "tuning-introspection-receipts-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T21:05:52Z",
+        "started_branch": "feat/tuning-introspection-receipts",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Start gate: applied-ledger PR merged; design note mapping ledger entry kinds to per-platform introspection queries",
+        "wid": "w0"
+      },
+      {
+        "evidence": "benchbox/core/tuning/introspection.py: IntrospectionReceipt/ReceiptEntry/IntrospectedState, Introspector protocol, platform-agnostic corroborate(ledger,state). corroborated = bool(verifiable) and all(verdict==CORROBORATED); unverifiable/absent/mismatch/errored-state BLOCK. Reuses #1 vocab (not forked). Unit tests in test_introspection.py.",
+        "item_id": "tuning-introspection-receipts-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T21:06:04Z",
+        "started_branch": "feat/tuning-introspection-receipts",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Receipt model + comparison in core/tuning (platform-agnostic; corroboration rules per entry kind)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "duckdb_introspection.py DuckDBTuningIntrospector (duckdb_indexes() expressions, structured not DDL text); clickhouse/introspection.py ClickHouseTuningIntrospector (system.tables sorting_key/partition_key). Both bounded (LIMIT, scoped to ledger_tables) + non-fatal (errored state, never raise).",
+        "item_id": "tuning-introspection-receipts-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T21:06:06Z",
+        "started_branch": "feat/tuning-introspection-receipts",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "DuckDB + ClickHouse introspectors (constraints/indexes; SHOW CREATE TABLE partition/order clauses)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "adapter.py get_tuning_introspector() + _corroborate_applied_ledger(): SOLE applied_verified emitter (adapter.py:1108), only from applied_unverified, only when receipt.corroborated, fully try-guarded. applied_ledger.py to_payload(receipt=); exporter.py anonymizes the receipt. duckdb/clickhouse override get_tuning_introspector. overall_status still never returns applied_verified.",
+        "item_id": "tuning-introspection-receipts-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T21:06:08Z",
+        "started_branch": "feat/tuning-introspection-receipts",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Status upgrade wiring + companion export + explorer receipt display of verified state",
+        "wid": "w3"
+      },
+      {
+        "evidence": "test_introspection.py + test_duckdb_introspection.py (adapter-upgrades-to-verified-ONLY-via-corroboration; induced mismatch->applied_unverified+diff; absent; introspection-failure->applied_unverified) + test_clickhouse_introspection.py + test_applied_receipt_export.py. 44 introspection tests pass; 9297 broad suite pass; ruff/ty clean. Demonstrated real path: index persists -> applied_verified 2/2; mismatch -> applied_unverified.",
+        "item_id": "tuning-introspection-receipts-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T21:06:11Z",
+        "started_branch": "feat/tuning-introspection-receipts",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Tests: corroborated run upgrades to applied_verified; induced mismatch downgrades with diff; introspection failure stays applied_unverified",
+        "wid": "w4"
+      }
+    ]
+  }
+}

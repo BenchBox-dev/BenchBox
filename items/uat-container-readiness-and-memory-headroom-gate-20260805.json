@@ -1,0 +1,307 @@
+{
+  "context": "(a) After `up --wait` returns 0, settle for a configurable docker_settle_s\n(default 10), run compose ps, and fail the platform block if any service is\nExited or Restarting; then TCP-probe via the existing host_reachability_endpoint.\nRoute the failure into the startup_failed path execute.py already models, so the\nremaining stacks still run and the cells are not miscounted as failures.\n(b) Add preflight.free_memory_min_gib mirroring free_space_min_gib, including the\n0-disables convention, and log engine, host free memory and per-platform VM\nrequest to uat_lifecycle.log.\n",
+  "description": "Supersedes uat-container-readiness-and-memory-headroom-gate, dropped the same day: verification ladders are\ncreate-time-only in this tracker, so a lint finding on a rung can only be\nfixed by recreating the item.\n\nTwo independent defects that combined to waste a full sweep.\n\n(a) FALSE-POSITIVE READINESS. compose_up_command issues\n`up -d --wait --wait-timeout <n>` and tests/uat/phases/execute.py treats exit 0 as\n'platform is up'. OBSERVED 2026-08-04: mocker reported CedarDB Started, and\n`mocker compose ps` showed diag-net-cedardb-1 Exited roughly 29 seconds later.\nUAT then ran 171 cells against a dead stack; all 171 failed on connection errors\nand were recorded as cell failures rather than as a startup failure.\n\n(b) NO MEMORY GATE. Preflight gates free DISK (free_space_min_gib) but not free\nMEMORY. Under mocker each container is its own VM with independent memory sizing.\nContainer log from the same run:\n  Running under cgroup memory limit: 1024 MB (host has 1112 MB)\n  WARNING: io_uring_register_buffers: Bad address\n  FATAL: unable to register fixed io_uring buffer\nHost state: 72 MB free of 16 GB, 11.7 of 13.3 GB swap used. The root cause was\nhost memory exhaustion, NOT a mocker defect -- an important correction to the\ninitial diagnosis, which wrongly proposed abandoning mocker.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "conclude that mocker is broken and switch the release gate to docker",
+        "instead": "gate on memory headroom and verify readiness after start",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "why": "this was investigated on 2026-08-04 and the root cause was host memory exhaustion; mocker was previously validated at real cost and switching would discard that work while leaving the missing gate in place"
+      },
+      {
+        "dont": "count cells against a stack that failed its readiness check as cell failures",
+        "instead": "record startup_failed and mark the platform's cells skipped-unreachable",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "why": "that is exactly what produced the misleading 171/171 result and hid the real cause"
+      },
+      {
+        "dont": "gate on total RAM instead of currently free memory",
+        "instead": "gate on measured free memory with swap pressure logged alongside",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "why": "the failing host had 16 GB total and 72 MB free; total capacity says nothing about headroom"
+      },
+      {
+        "dont": "raise docker_start_timeout_s in response to these failures",
+        "instead": "add a post-start settle plus compose ps state check",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "why": "the container reported Started and then died -- a longer timeout waits longer for something already reported healthy"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-06T00:48:01Z",
+        "from_item": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "id": 700,
+        "reason": "w0's _check_docker_platform_readiness calls sleep_fn(cleanup.docker_settle_s) and run_execute defaults sleep_fn to time.sleep with docker_settle_s=10. Every test_phases.py call site in the w0 work adds sleep_fn=lambda _s: None; the run_execute call in tests/uat/test_sweep_durability.py::test_interrupt_mid_cell_still_tears_down_docker_stack does not, so that test will pass but sleep a real 10s per run. Could not be fixed ahead of w0 because run_execute does not accept sleep_fn on develop today. The docker-verb half of this fixture is already fixed on branch claude/strange-hertz-5938fa.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Fixed in commit d6f0b963f6 on fix/uat-container-readiness-gate-20260805: the run_execute call in test_interrupt_mid_cell_still_tears_down_docker_stack now passes sleep_fn=lambda _s: None, matching the test_phases.py call sites. Verified by wall clock -- tests/uat/ drops from 16.2s to 8.0s with the whole suite green (612 passed).",
+        "summary": "test_sweep_durability's run_execute call needs sleep_fn=lambda _s: None once w0 lands"
+      },
+      {
+        "created_at": "2026-08-06T00:48:13Z",
+        "from_item": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "id": 701,
+        "reason": "The item's only_modify list covers tests/uat/test_phases.py and tests/uat/test_sweep_durability.py but not tests/uat/test_orchestrator.py, which still classifies compose argvs as 'up' if 'up' in argv else 'down' at line 1064. If that fake feeds a run_execute path that reaches w0's post-start compose ps, the ps call is recorded as a spurious 'down' the same way. Needs a scope amendment (scope-update) or its own item before w0 merges; not touched here because it is out of scope for both this item and the fixture fix on claude/strange-hertz-5938fa.",
+        "resolution": "promoted",
+        "resolved_item": "uat-test-orchestrator-docker-verb-classify-20260805",
+        "resolved_reason": null,
+        "summary": "tests/uat/test_orchestrator.py:1064 has the same two-way docker verb classifier and is outside this item's scope"
+      },
+      {
+        "created_at": "2026-08-06T00:48:42Z",
+        "from_item": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "id": 702,
+        "reason": "Commit d4ad9e5144 'fix(uat): re-verify Docker readiness after up --wait and gate on free memory' implements the post-start settle + compose ps state check, the startup_failed routing, and the preflight free_memory_min_gib gate, touching execute.py, config.py, docker_assets.py, preflight_budget.py, test_phases.py, test_config.py, test_preflight_budget.py plus the docs and spec. It is unreachable: no local or remote branch or tag contains it (git for-each-ref --contains and git branch -a --contains both return nothing), no checked-out worktree HEAD descends from it, git rev-list --all --children lists no children, and neither docker_settle_s nor free_memory_min_gib exists anywhere under tests/ on origin/develop. No PR was ever opened for it. Only reflog entries currently keep the object alive, so it is gc-eligible once those expire. Whoever claims this item should verify the commit still resolves and recover it (branch at that SHA, rebase onto develop) rather than reimplementing w0/w1/w2 from scratch.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Recovered. d4ad9e5144 was preserved as refs/heads/rescue/uat-readiness-d4ad9e5144, then cherry-picked onto current develop as 2bdffe6530 on fix/uat-container-readiness-gate-20260805. Sole conflict was the auto-generated UAT LOC table in _project/specs/uat-framework.md, resolved by regenerating with _project/scripts/uat_loc_table.py (--check now clean). All nine files are inside the item's only_modify scope; all four ladder rungs pass.",
+        "summary": "w0/w1/w2 appear already implemented in orphaned commit d4ad9e5144 -- recover it before reimplementing"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "needs_item": "uat-compose-project-name-overflows-container-id-limit-20260805"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-08-09T14:31:31Z",
+      "completed_pr": 1654,
+      "created_at": "2026-08-05T15:10:53Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "A single platform's startup failure still does not abort the sweep (uat-docker-stack-recovery w2 behavior).",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805"
+      },
+      {
+        "behavior": "Exactly one docker stack runs at a time; parallel_platforms stays hard-rejected.",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805"
+      },
+      {
+        "behavior": "UAT never runs docker system/volume/image prune or unqualified compose down; only project-scoped teardown.",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805"
+      },
+      {
+        "behavior": "free_space_min_gib: 0 keeps disabling the disk gate; free_memory_min_gib: 0 disables the memory gate the same way.",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805"
+      },
+      {
+        "behavior": "resolve_container_cli precedence is unchanged: env override, then mocker-if-present on macOS, then docker.",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "tcp_probe plus docker_assets.host_reachability_endpoint already implement host-side reachability; reuse for the post-start check",
+        "decision": "reuse",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "path": "tests/uat/matrix.py"
+      },
+      {
+        "concept": "startup_failed handling already records a platform's cells as skipped-unreachable and advances to the next stack (uat-docker-stack-recovery w2); route the new readiness failure into it rather than adding a parallel path",
+        "decision": "reuse",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "path": "tests/uat/phases/execute.py"
+      },
+      {
+        "concept": "existing disk budget gate establishes the config surface, the 0-disables convention and the lifecycle log shape; the memory gate mirrors it",
+        "decision": "extend",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "path": "tests/uat/preflight_budget.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "docker/"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/config.py"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/docker_assets.py"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/preflight_budget.py"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_config.py"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_preflight_budget.py"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_sweep_durability.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run python -c \"from tests.uat.config import PreflightConfig as P;assert 'free_memory_min_gib' in P.__dataclass_fields__\"",
+        "description": "free_memory_min_gib is a real preflight config field",
+        "expected": "FAILS (exit 1) on the unfixed tree: preflight gates disk but not memory, so a host with 72 MB free still starts container VMs. Exits 0 once the gate lands.",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-09T14:31:11Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_phases.py -q -k 'readiness or settle'",
+        "description": "Execute-phase tests cover a container that reports started then exits",
+        "expected": "at least one test collected and passing; the platform is recorded startup_failed and the sweep advances",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-09T14:07:32Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_config.py tests/uat/test_preflight_budget.py -q",
+        "description": "Config and preflight budget tests cover the memory gate including the 0-disables convention",
+        "expected": "free_memory_min_gib parsed, validated, and 0 disables the gate",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-09T14:07:45Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python -c \"from tests.uat.config import PreflightConfig as P;assert 'free_memory_min_gib' in P.__dataclass_fields__\"",
+        "description": "The memory gate is a real config field with the same disable convention as the disk gate",
+        "expected": "exit 0",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-09T14:07:48Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Post-start settle + compose ps state check + reachability re-probe land in _check_docker_platform_readiness (tests/uat/phases/execute.py), commit 2bdffe6530. Ladder rung 2 passes: uv run -- python -m pytest tests/uat/test_phases.py -q -k 'readiness or settle' -> 4 passed.",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T01:14:21Z",
+        "started_branch": "fix/uat-container-readiness-gate-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/strange-hertz-5938fa",
+        "status": "done",
+        "summary": "Add post-start settle plus compose ps state check and TCP probe after compose up",
+        "wid": "w0"
+      },
+      {
+        "evidence": "A failed readiness verdict routes into the existing startup_failed path in _start_docker_platform_if_needed (same routing as a compose-up failure), so the platform's cells are recorded startup_failed and the sweep advances. Commit 2bdffe6530; covered by rung 2's readiness tests and by tests/uat/test_orchestrator.py::test_disk_floor_abort_carries_startup_failed_count.",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T01:14:25Z",
+        "started_branch": "fix/uat-container-readiness-gate-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/strange-hertz-5938fa",
+        "status": "done",
+        "summary": "Route a failed readiness check into the existing startup_failed path",
+        "wid": "w1"
+      },
+      {
+        "evidence": "preflight.free_memory_min_gib gate added in tests/uat/preflight_budget.py + tests/uat/config.py mirroring free_space_min_gib's 0-disables convention. Commit 2bdffe6530. Ladder rungs 1, 3 and 4 pass: PreflightConfig exposes free_memory_min_gib and tests/uat/test_config.py + tests/uat/test_preflight_budget.py -> 120 passed.",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T01:14:29Z",
+        "started_branch": "fix/uat-container-readiness-gate-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/strange-hertz-5938fa",
+        "status": "done",
+        "summary": "Add preflight free_memory_min_gib gate mirroring the disk gate",
+        "wid": "w2"
+      },
+      {
+        "evidence": "_free_memory_abort_reason logs engine identity, host free-memory reading with swap-pressure note, and the per-platform VM request to uat_lifecycle.log on every gated call (tests/uat/preflight_budget.py, commit 2bdffe6530). Covered by tests/uat/test_preflight_budget.py in rung 3 (120 passed).",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T01:14:42Z",
+        "started_branch": "fix/uat-container-readiness-gate-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/strange-hertz-5938fa",
+        "status": "done",
+        "summary": "Log engine, host free memory and per-platform VM request to uat_lifecycle.log",
+        "wid": "w3"
+      },
+      {
+        "evidence": "docs/operations/uat-framework.md gains a 'Memory headroom gate' section documenting mocker per-container VM sizing, the io_uring dependency and the 2026-08-04 failure signature (cgroup memory limit -> 'unable to register fixed io_uring buffer' -> Exited after Started). +91 lines in commit 2bdffe6530; markdownlint passed in pre-commit.",
+        "item_id": "uat-container-readiness-and-memory-headroom-gate-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T01:14:46Z",
+        "started_branch": "fix/uat-container-readiness-gate-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/strange-hertz-5938fa",
+        "status": "done",
+        "summary": "Document mocker per-container VM sizing, the io_uring dependency and the failure signature",
+        "wid": "w4"
+      }
+    ]
+  }
+}

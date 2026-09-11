@@ -1,0 +1,293 @@
+{
+  "context": "Model result schema as multiple consumer policies sharing one implementation.\nThis preserves the useful distinction between strict runtime loading, legacy\nnormalization, public submission forward-acceptance, and explorer input\nsafety while ending duplicated accept lists.\n",
+  "description": "Result bundles are already a product boundary consumed by the CLI, hosted\nresults, public submissions, and explorer pipeline. The current policy is\nfragmented: runtime loading is strict, normalization handles legacy shapes,\npublic submission accepts forward-compatible 2.x, and the explorer parser\nreads broad optional fields without an input schema gate.\n\nThis item centralizes consumer-specific result-schema policy without erasing\nthe different intents of producer/runtime, normalizer, submission, and\nexplorer consumers.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix explorer by adding more .get defaults",
+        "instead": "gate the input before projection.",
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "why": "that hides incompatible bundles"
+      },
+      {
+        "dont": "replace all version checks with one global ACCEPTED_SCHEMA_VERSIONS list",
+        "instead": "expose named policies instead.",
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "why": "the consumers intentionally have different risk postures"
+      },
+      {
+        "dont": "update docs to say v2.1 is current unless tests prove producer and consumer policy agree.",
+        "instead": "(not specified)",
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "result-schema-policy-and-explorer-input-gate",
+        "id": 478,
+        "reason": "This TODO defines policy and gates first; broad migration machinery should be designed after the next schema change is known.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Full one-way schema-migration framework explicitly deferred until the next schema version is known; no open item tracks it.",
+        "summary": "Build a full one-way migration framework for every future schema version"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "result-schema-policy-and-explorer-input-gate",
+        "id": 479,
+        "reason": "Valuable but larger than the immediate input-gate risk.",
+        "resolution": "promoted",
+        "resolved_item": "rewrite-explorer-transformer-to-use-typed-models-throughout",
+        "resolved_reason": null,
+        "summary": "Rewrite explorer transformer to use typed models throughout"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      }
+    ],
+    "item_meta": {
+      "category": "Results",
+      "completed_at": "2026-05-21T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not make explorer failures cryptic; unsupported-version errors must name accepted versions and the consumer policy.",
+        "item_id": "result-schema-policy-and-explorer-input-gate"
+      },
+      {
+        "behavior": "Do not remove legacy normalization paths that public submissions still depend on.",
+        "item_id": "result-schema-policy-and-explorer-input-gate"
+      },
+      {
+        "behavior": "Do not weaken runtime loader strictness without an explicit contract-map update.",
+        "item_id": "result-schema-policy-and-explorer-input-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/planning/define-hosted-results-contract-and-governance-model.yaml: prior governance framing -- preserve trust/visibility separation.",
+        "decision": "reuse",
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "path": "_project/DONE/main/planning/define-hosted-results-contract-and-governance-model.yaml"
+      },
+      {
+        "concept": "benchbox/core/results/normalizer.py: existing legacy normalization behavior -- preserve useful compatibility while centralizing version rules.",
+        "decision": "reuse",
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "path": "benchbox/core/results/normalizer.py"
+      },
+      {
+        "concept": "docs/reference/hosted-results-contract.md: current hosted-result contract -- extend rather than invent a second public artifact policy.",
+        "decision": "extend",
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "path": "docs/reference/hosted-results-contract.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "kind": "only_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_submission_validation.py"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/explorer/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results -q",
+        "description": "Run focused result schema policy tests.",
+        "expected": "Result schema and normalizer policy tests pass.",
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests -k 'submission or explorer or schema_policy' --tb=short",
+        "description": "Run focused submission/explorer tests touched by the policy gate.",
+        "expected": "All focused policy consumer tests pass.",
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "Validate TODO graph after completing this item.",
+        "expected": "Dependency graph is valid.",
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "notes": "Completed 2026-05-21 at checked SHA 8ab19cf2b19d1022e828de16c299bfa8e14c34d0.\n\nRevalidation summary before edits:\n  - benchbox/core/results/schema.py declared SCHEMA_VERSION = \"2.1\" and\n    locally accepted only \"2.0\" and \"2.1\" in SchemaV2Validator.\n  - benchbox/core/results/loader.py strictly considered/loaded only\n    top-level version \"2.0\" and \"2.1\".\n  - benchbox/core/results/normalizer.py treated known \"2.0\"/\"2.1\"\n    as v2 and mapped missing/1.x/unknown shapes to \"1.x\" legacy\n    normalization.\n  - scripts/validate_submission.py accepted any \"2.\" prefix for public\n    submissions; this PR preserves forward numeric 2.x acceptance and\n    rejects malformed values.\n  - _project/scripts/explorer_pipeline/transformer.py parsed bundles\n    with broad .get() access and no version gate before this TODO.\n  - docs/reference/hosted-results-contract.md and docs/contributing-results.md\n    referred to schema-v2 bundles but did not name the consumer-specific\n    acceptance policy.\n\nCentral policy after edits:\n  - Producer/exporter current schema: 2.1.\n  - Runtime schema validator, runtime loader, exporter listing, and\n    explorer input: 2.0 and 2.1 only.\n  - Normalizer: 2.0 and 2.1 as v2; all other shapes through legacy\n    best-effort fallback.\n  - Public submission validator: numeric schema family 2.x; malformed\n    versions such as \"2.x\" are rejected.\n\nCommit a compact summary containing checked SHA, current SCHEMA_VERSION,\naccepted versions by consumer, and any line drift.\n\nMinimum evidence to re-check:\n  - benchbox/core/results/schema.py: SCHEMA_VERSION.\n  - benchbox/core/results/loader.py: strict runtime accept list.\n  - benchbox/core/results/normalizer.py: legacy normalization behavior.\n  - scripts/validate_submission.py: public submission acceptance.\n  - _project/scripts/explorer_pipeline/transformer.py: input parsing.\n  - docs/reference/hosted-results-contract.md and docs/contributing-results.md.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate current result-schema policy sites and consumer intent",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "notes": "Add a small policy module under benchbox/core/results/ that exposes named\nrules for producer/runtime, loader, normalizer, public submission, and\nexplorer input. Preserve each consumer's intent; do not force one global\nallowlist if that changes behavior.\n\nThe policy must make these cases explicit: 2.0, 2.1, unknown 2.x, 1.x,\nmissing schema_version, and malformed schema_version.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create one result schema policy module with consumer-specific acceptance rules",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "notes": "Replace duplicated version checks with named policy calls. Preserve:\n  - Runtime loader strictness for unknown versions unless explicitly changed.\n  - Normalizer ability to upgrade known legacy shapes.\n  - Public submission forward-acceptance only if the new policy declares it.\n\nAny behavior change must be documented in docs/reference/public-contracts.md\nand docs/reference/hosted-results-contract.md.\n\nImplementation note: tests/fixtures/published_results_validator.py was\nsynced byte-for-byte with scripts/validate_submission.py because the\nexisting cross-branch validator drift guard requires it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update loader, normalizer, and submission validator to call the central policy",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "notes": "Gate the explorer pipeline before _project/scripts/explorer_pipeline/transformer.py\nstarts broad .get() parsing. Unknown or unsupported versions must fail\nwith an actionable error that names the accepted explorer input policy.\n\nDo not rewrite the whole transformer in this TODO. The target is an\nearly, explicit gate that prevents silent field drops.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add an explorer input bundle gate before broad transformer parsing",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "notes": "Include unit tests for the policy module plus integration-style tests\nproving loader, normalizer, submission validation, and explorer gate call\nthe policy they claim to use.\n\nTests must document expected behavior per consumer. A passing test that\nonly asserts \"raises something\" is not enough.\n\nImplementation note: tests/unit/core/results/test_query_plan_serialization.py\nwas updated to assert the new named runtime schema policy message from\nSchemaV2Validator.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add schema-policy tests for 2.0, 2.1, unknown 2.x, 1.x, missing, and malformed versions",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "result-schema-policy-and-explorer-input-gate",
+        "notes": "Reconcile docs/reference/result-formats.md, docs/contributing-results.md,\nand docs/reference/hosted-results-contract.md so v1.x is clearly marked\nlegacy and v2.1 is the current schema unless the code says otherwise.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update result-format and hosted-results docs to declare schema v2.1 status",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,192 @@
+{
+  "context": "Declare the missing token in both theme blocks. Prefer reusing the tone-info treatment that already passes over minting new tokens; only introduce a theme-aware --bb-selected-* pair if a solid fill is explicitly chosen. Add a hygiene test so the undeclared-token class of defect cannot recur - it needs an allowlist because ~18 :root tokens are legitimately light-only (fonts, breakpoints, type scale, insets, skeleton metrics).",
+  "description": "A systematic audit of every bg/text token pair in results-explorer/src, with contrast computed for both themes at HEAD 39ead3a41, found three defects. (1) --bb-tone-warning-border is referenced on five zero-state banners - BenchmarkIndex.tsx:701, PlatformIndex.tsx:682, Compare.tsx:1019, Query.tsx:888, ComparabilityReceipt.tsx:49 - and is declared nowhere in index.css. It is the only referenced-but-undeclared --bb-* token in the app; border-color silently falls back to currentColor, so those banners outline themselves in the warning text colour and read far heavier than every other panel. (2) accent-hover on fg-primary computes to 2.66:1 light and 4.26:1 dark, failing AA in both themes, at Home.tsx:1165 (tuning/trust/date filter chips) and Query.tsx:721 (row-limit chips). Critically --bb-fg-inverse is NOT a valid blanket fix: in dark it is #0d1117 giving 4.08:1, worse than today. Meanwhile BenchmarkIndex.tsx:601 already paints its active trust chips with tone-info-bg on tone-info-fg, which computes to 8.49:1 light and 9.74:1 dark - so the app already contains a passing treatment for the same control. (3) surface-app on data-fg-subtle computes to 4.40:1 light at BenchmarkIndex.tsx:605, a marginal AA miss on inactive trust chips. .btn-danger also computes 3.70:1 light and 3.08:1 dark but is referenced only by a primitives test, so it is latent rather than shipping. Sixteen pairs were checked; the remaining ones clear 4.5:1 in both themes. Not compare-path work - both adversarial reviews were explicit that this must not ride in the compare batch.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Assert every :root token also exists in the dark block without an allowlist",
+        "instead": "INSTEAD allowlist them explicitly",
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "why": "~18 tokens including fonts, breakpoints, type scale, insets and skeleton radii are correctly theme-invariant"
+      },
+      {
+        "dont": "Bundle this into the compare-path batch",
+        "instead": "INSTEAD ship independently",
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "why": "these chips are Home filter and Query row-limit controls with no compare involvement, and both reviews called the coupling out"
+      },
+      {
+        "dont": "Swap the failing chip to --bb-fg-inverse",
+        "instead": "INSTEAD reuse tone-info, or mint a theme-aware pair if solid is chosen",
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "why": "fg-inverse flips per theme and lands at 4.08 to 1 on accent-hover in dark, worse than the 4.26 it replaces"
+      }
+    ],
+    "item_meta": {
+      "category": "bug",
+      "created_at": "2026-08-24T12:30:43Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Both themes stay above 4.5 to 1 for normal text after the change",
+        "item_id": "rx-ux-23-theme-token-hygiene"
+      },
+      {
+        "behavior": "Existing passing pairs keep their current values - only the three failing pairs change",
+        "item_id": "rx-ux-23-theme-token-hygiene"
+      },
+      {
+        "behavior": "The ~18 legitimately light-only tokens stay light-only via an explicit allowlist, not by weakening the test",
+        "item_id": "rx-ux-23-theme-token-hygiene"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "node-env source-walking hygiene test shape",
+        "decision": "extend",
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "path": "results-explorer/src/__tests__/userFacingStringHygiene.test.ts"
+      },
+      {
+        "concept": "active trust chips already use the passing tone-info pair",
+        "decision": "reuse",
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "path": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/tailwind.config.js"
+      },
+      {
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/**"
+      },
+      {
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer/src && grep -rno 'var(--bb-[a-z0-9-]*)' . | sed 's/.*var(//;s/)//' | sort -u > /tmp/u && grep -o -- '--bb-[a-z0-9-]*:' index.css | sed 's/:$//' | sort -u > /tmp/d && comm -23 /tmp/u /tmp/d",
+        "description": "No undeclared token references remain",
+        "expected": "empty output",
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/__tests__/themeTokenHygiene.test.ts",
+        "description": "Hygiene test catches a deliberately undeclared token",
+        "expected": "pass, and fails when a bogus var is introduced",
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run",
+        "description": "Explorer unit suite green",
+        "expected": "all pass",
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "needs_wid": "w1",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Declare --bb-tone-warning-border in the light and dark blocks of index.css",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "GATE - choose tinted or solid for the selected filter chip - tinted reuses tone-info at zero new tokens and matches the trust chips, solid needs a theme-aware pair at 6.70 light and 7.49 dark",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Apply the w2 decision at Home.tsx",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Raise the inactive trust chip at BenchmarkIndex.tsx",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "rx-ux-23-theme-token-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add themeTokenHygiene test asserting every var(--bb-*) reference resolves, with an explicit light-only allowlist",
+        "wid": "w5"
+      }
+    ]
+  }
+}

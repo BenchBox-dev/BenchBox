@@ -1,0 +1,53 @@
+{
+  "context": "Determine whether the bot misreads authorship generally or only under specific conditions (rebased branches, force-pushed heads, PRs whose base is a non-develop branch - #1514 was stacked on another claude/* branch and had no CI when the comment was filed, which may correlate). Collect two or three more instances before concluding. If the misread is systematic, either disable that rule for this repo or file it upstream with the reproduction. Whatever the outcome, record in AGENTS.md that authorship findings must be verified against git log and the commits API before any history rewrite.",
+  "description": "On 2026-08-04 chatgpt-codex-connector[bot] filed a P1 on PR #1514 claiming 'The reviewed commit's author and committer are both Codex <codex@openai.com>, a known agent/service identity ... must be recreated with an authorized identity'. The claim is false. The comment's own original_commit_id is d1c3755b30, whose identity is author=Joe Harris <joeharris76@gmail.com> and committer=Joe Harris <joeharris76@gmail.com>, confirmed both locally via git log and through GitHub's commits API. All commits in that chain carry the same human identity, and the repo's own 'reject stale agent Git identity' pre-commit hook passed on each. This matters because the remediation the bot demands - recreate the commits - is destructive history rewriting, and an agent or human who trusts the finding without checking will do it for no reason. It also competes with a real policy that DOES bite (stale agent identity in a shared clone's .git/config), so a false positive here trains people to dismiss the true signal. Refutation with evidence posted at https://github.com/joeharris76/BenchBox/pull/1514#discussion_r3712772659",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-17T00:17:07Z",
+      "completed_pr": 1724,
+      "created_at": "2026-08-04T15:26:14Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The genuine agent-identity guard (pre-commit hook plus repo policy) keeps failing closed on real agent-authored commits",
+        "item_id": "codex-reviewer-false-authorship-p1"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "codex-reviewer-false-authorship-p1",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "codex-reviewer-false-authorship-p1",
+        "kind": "only_modify",
+        "path_glob": ".github/**"
+      },
+      {
+        "item_id": "codex-reviewer-false-authorship-p1",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "codex-reviewer-false-authorship-p1",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -rqi 'authorship' AGENTS.md",
+        "description": "The verify-before-rewrite rule is written where agents will read it",
+        "expected": "exits 1 until the guidance to verify authorship findings against git log and the commits API is recorded; exits 0 once it is",
+        "item_id": "codex-reviewer-false-authorship-p1",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

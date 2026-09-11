@@ -1,0 +1,289 @@
+{
+  "context": "Inventory first, then classify. Only after the claim classes are explicit,\nimplement a narrow drift check that targets current public source files. Avoid\na naive repository-wide grep gate that fails on historical evidence or build\nartifacts. Fix stale public claims in the same PR so the new gate lands green.\n",
+  "description": "PR #502 updated the public contract map and MCP docs, but review found other\npublic surfaces that still carry hand-maintained benchmark breadth claims such\nas \"22 benchmarks\" or exact coverage counts. README has a registry-backed\nmarker, but landing copy, architecture docs, CLI utility docs, and development\ndocs can still drift from benchmark registry metadata and support-status\npolicy.\n\nAdd a compact drift gate for public benchmark count and support claims. The\ngate should distinguish authoritative registry-derived claims from editorial\nexamples, and it should make stale exact counts visible before release. This\nwork should not force all narrative docs to become generated; it should define\nwhere exact public claims are allowed and how they are checked.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a global grep that scans docs/_build or _project history",
+        "instead": "classify source paths first.",
+        "item_id": "public-benchmark-claim-drift-gate",
+        "why": "historical/generated text will create noisy false positives"
+      },
+      {
+        "dont": "hard-code counts in a new script without deriving expected values from the registry",
+        "instead": "import registry helpers.",
+        "item_id": "public-benchmark-claim-drift-gate",
+        "why": "that recreates the drift problem"
+      },
+      {
+        "dont": "make README the only checked surface",
+        "instead": "include the durable public source files found in w0.",
+        "item_id": "public-benchmark-claim-drift-gate",
+        "why": "landing and reference docs are also public"
+      },
+      {
+        "dont": "replace useful explanatory copy with generated blobs",
+        "instead": "check exact counts and source-of-truth claims only.",
+        "item_id": "public-benchmark-claim-drift-gate",
+        "why": "docs still need readable narrative"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "public-benchmark-claim-drift-gate",
+        "id": 463,
+        "reason": "docs/usage/ is outside this TODO's scope_limit. faq.md:32 says 'eighteen benchmarks' (stale; registry has 22 public). Repair it and extend test_public_benchmark_count_claims_are_registry_derived to cover faq.md in a follow-up that includes docs/usage/.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Spot-checked: 'eighteen benchmarks' string is no longer present in docs — the stale claim has already been fixed.",
+        "summary": "Fix stale 'eighteen benchmarks' claim in docs/usage/faq.md and add it to the drift gate"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "needs_item": "benchmark-support-status-and-discovery-policy"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation and Contracts",
+      "completed_at": "2026-05-25T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Editorial benchmark examples can remain narrative if they avoid exact authoritative count claims.",
+        "item_id": "public-benchmark-claim-drift-gate"
+      },
+      {
+        "behavior": "Generated docs under docs/_build remain excluded from source drift checks.",
+        "item_id": "public-benchmark-claim-drift-gate"
+      },
+      {
+        "behavior": "Historical DONE/TODO records are not rewritten just because they contain old count evidence.",
+        "item_id": "public-benchmark-claim-drift-gate"
+      },
+      {
+        "behavior": "README registry count markers remain checked against runtime metadata.",
+        "item_id": "public-benchmark-claim-drift-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/pr.yml: public contract source-derived claim check - extend or mirror for benchmark claim fragments.",
+        "decision": "extend",
+        "item_id": "public-benchmark-claim-drift-gate",
+        "path": ".github/workflows/pr.yml"
+      },
+      {
+        "concept": "README.md: benchbox-registry-counts marker block - preserve as authoritative user-facing count source.",
+        "decision": "reuse",
+        "item_id": "public-benchmark-claim-drift-gate",
+        "path": "README.md"
+      },
+      {
+        "concept": "docs/reference/public-contracts.md: Count and Drift Policy - extend claim-class rules instead of scattering policy language.",
+        "decision": "extend",
+        "item_id": "public-benchmark-claim-drift-gate",
+        "path": "docs/reference/public-contracts.md"
+      },
+      {
+        "concept": "tests/unit/core/test_benchmark_api_contract.py: benchmark API snapshot marker - reuse registry-derived counts for benchmark-specific assertions.",
+        "decision": "reuse",
+        "item_id": "public-benchmark-claim-drift-gate",
+        "path": "tests/unit/core/test_benchmark_api_contract.py"
+      },
+      {
+        "concept": "tests/unit/core/test_platform_registry.py: README and platform docs count marker tests - reuse marker-check pattern for public benchmark claims.",
+        "decision": "reuse",
+        "item_id": "public-benchmark-claim-drift-gate",
+        "path": "tests/unit/core/test_platform_registry.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/design/architecture.md"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/development/result-integrity-validation.md"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "kind": "only_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_benchmark_api_contract.py"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_platform_registry.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_benchmark_api_contract.py tests/unit/core/test_platform_registry.py -q",
+        "description": "Benchmark contract tests cover the new drift check.",
+        "expected": "All selected contract tests pass.",
+        "item_id": "public-benchmark-claim-drift-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make docs-validate",
+        "description": "Docs validation remains green after public claim edits.",
+        "expected": "Documentation validation passes.",
+        "item_id": "public-benchmark-claim-drift-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "PR public contract workflow snippet remains syntactically valid through the fast unit lane.",
+        "expected": "Fast tests pass.",
+        "item_id": "public-benchmark-claim-drift-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "public-benchmark-claim-drift-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "public-benchmark-claim-drift-gate",
+        "notes": "Search for phrases such as \"22 benchmarks\", \"23 benchmark\", \"registered\nbenchmarks\", \"supported benchmarks\", \"benchmark variety\", and benchmark\nsupport/status vocabulary. Classify each hit as authoritative,\nregistry-derived, editorial example, stale, generated output, or internal\nplanning context. Exclude `docs/_build/` and generated index artifacts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory exact benchmark count, coverage, and support-claim text across public docs, landing pages, scripts, and generated docs sources",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "public-benchmark-claim-drift-gate",
+        "notes": "Extend the public contract map or a nearby developer doc with concrete\nrules: exact public counts must be registry-derived or checked; editorial\nexamples may avoid exact totals; generated outputs must state their\ngenerator; internal TODO/DONE history does not create public contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define allowed claim classes and source-of-truth rules",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "public-benchmark-claim-drift-gate",
+        "notes": "Prefer extending an existing lightweight docs/contract test over adding a\nbroad fragile scanner. The check should cover durable public surfaces such\nas README markers, landing source copy, architecture docs, CLI reference\ndocs, and result-integrity coverage docs. It should report file paths and\nthe stale phrase or missing registry-derived marker.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement a focused drift check for benchmark count and support-status claims",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "public-benchmark-claim-drift-gate",
+        "notes": "Update exact count claims to derive from the registry-backed marker where\npractical. Where exact counts are not important, reword copy to avoid a\nbrittle total. Do not update historical TODO/DONE files unless they are\nbeing used as current public documentation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Repair stale public claims or reword them as editorial examples",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "public-benchmark-claim-drift-gate",
+        "notes": "Place the check where maintainers already expect public contract drift to\nfail, such as a unit contract test or the existing PR public-contract gate.\nKeep failure output concise and redirect any large inventory output to\n`/tmp` or a generated local artifact that is not committed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire the drift check into the narrowest existing verification lane",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,441 @@
+{
+  "context": "w1: Read each CC=13 function, classify per guidelines in prior waves\n(reduce-cyclomatic-complexity-violations, reduce-cc14-complexity-cluster).\nRecord in classification-matrix format. After classification, add new\nwork units for any additional refactorables beyond w3-w13.\n\nw2: Batch-add inherent entries to pyproject.toml under new section header.\n\nw3-w13: For each refactoring:\n1. Read the function and its callers/tests\n2. Extract private helper methods in the same module\n3. Run focused tests + lint after each extraction\n4. Verify CC reduced via: uv run -- python scripts/check_complexity.py 2>&1 | grep function_name\n5. Commit per work unit\n\nw14: Update warn_complexity threshold and verify.\n",
+  "description": "Completed on 2026-03-12.\n\nLive scope at start:\n- 63 non-excluded functions at CC=13\n- warn threshold at 15, so CC=13 sat below the ratchet but still defined the ceiling\n\nOutcome:\n- Refactored 16 accidental-complexity functions below CC=13 using helper extraction\n  and data-driven configuration patterns\n- Classified the remaining 47 CC=13 functions as inherent validator/serializer,\n  spec-orchestrator, or platform-semantic complexity\n- Added narrow function-level exclusions in `pyproject.toml` with matching rows in\n  `quality/complexity/classification-matrix.yaml`\n- Lowered `warn_complexity` from 15 to 13\n\nFinal state:\n- Worst non-excluded function complexity: CC=12\n- `make complexity-check`: 0 warnings, 0 failures\n- `.venv/bin/python -m ruff check .`: passed\n- `.venv/bin/python -m pytest -m fast -q`: passed",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add new abstractions (base classes, protocols)",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "why": "extraction alone achieves the CC target"
+      },
+      {
+        "dont": "change public API signatures",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "why": "all targets are internal functions"
+      },
+      {
+        "dont": "lower max_complexity (currently 20)",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "why": "the exclude list handles inherent complexity above the warn threshold; only warn_complexity should decrease as the ceiling drops"
+      },
+      {
+        "dont": "move code to new files",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "why": "helpers share private state with the parent function"
+      },
+      {
+        "dont": "refactor functions classified as inherent",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "why": "their complexity reflects domain reality; use exclude_functions instead"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "reduce-cc13-complexity-ceiling",
+        "id": 231,
+        "reason": "The 11 refactorable functions in w3-w13 come from the top-20 sample.\nw1 will classify the remaining 67 CC=13 functions, likely identifying\n~25-35 more refactorables. Each should be added as an individual work\nunit following the w3-w13 format (one function per unit, with file path,\npattern, and approach). w14 needs-edges must be updated to include them.\n",
+        "resolution": "promoted",
+        "resolved_item": "add-work-units-for-additional-refactorables-discovered-durin",
+        "resolved_reason": null,
+        "summary": "Add work units for additional refactorables discovered during w1 classification"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-03-12T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All refactored functions must produce identical behavior - no semantic changes",
+        "item_id": "reduce-cc13-complexity-ceiling"
+      },
+      {
+        "behavior": "Excluded functions from prior complexity waves remain untouched",
+        "item_id": "reduce-cc13-complexity-ceiling"
+      },
+      {
+        "behavior": "Existing tests must continue to pass without modification",
+        "item_id": "reduce-cc13-complexity-ceiling"
+      },
+      {
+        "behavior": "exclude_functions entries must include CC score and rationale comment",
+        "item_id": "reduce-cc13-complexity-ceiling"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/compare.py"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/compare_dataframes.py"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/database.py"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/comparison.py"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/data_loader.py"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/metadata_primitives/benchmark.py"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/pg_extension_comparison.py"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/comparison.py"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/database.py"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make complexity-check",
+        "description": "Complexity check passes with no functions at CC>=13",
+        "expected": "PASSED: all functions within complexity limit",
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import ast, tomllib; from pathlib import Path; excludes=set(tomllib.load(open('pyproject.toml','rb')).get('tool',{}).get('benchbox',{}).get('complexity',{}).get('exclude_functions',[])); cc13=[1 for f in Path('benchbox').rglob('*.py') for n in ast.walk(ast.parse(f.read_text())) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and f'{f}:{n.name}' not in excludes and sum(1 for c in ast.walk(n) if isinstance(c,(ast.If,ast.While,ast.For,ast.ExceptHandler)))>=12]; print(f'{len(cc13)} functions at CC>=13')\"",
+        "description": "No non-excluded CC>=13 functions remain",
+        "expected": "0 functions at CC>=13",
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "No regressions in fast suite",
+        "expected": "All fast tests pass",
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check .",
+        "description": "Lint passes",
+        "expected": "All checks passed",
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w2",
+        "wid": "w10"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w2",
+        "wid": "w11"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w2",
+        "wid": "w12"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w2",
+        "wid": "w13"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w10",
+        "wid": "w14"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w11",
+        "wid": "w14"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w12",
+        "wid": "w14"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w3",
+        "wid": "w14"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w4",
+        "wid": "w14"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w5",
+        "wid": "w14"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w6",
+        "wid": "w14"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w7",
+        "wid": "w14"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w8",
+        "wid": "w14"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w9",
+        "wid": "w14"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "needs_wid": "w2",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Classify all 87 CC=13 functions as inherent or refactorable",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor run_benchmark (CC 13->~6) - extract query selection and category summary",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor generate_comparison_report (CC 13->~5) - extract metric section formatter",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor generate_plan_comparison_summary (CC 13->~7) - extract execution map builder",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor calculate_rankings (CC 13->~7) - extract metric config to dict",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Lower warn threshold from 15 to 13 in pyproject.toml",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add inherent-complexity CC=13 exclusions to pyproject.toml",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _compare_plans (CC 13->~6) - extract execution map builder",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _run_platform_comparison (CC 13->~6) - extract output writer",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor create_config (CC 13->~6) - data-driven driver option sync",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _generate_head_to_head (CC 13->~7) - extract pair scoring",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _generate_insights (CC 13->~5) - extract per-section generators",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _get_source_files (CC 13->~7) - extract table path resolution",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc13-complexity-ceiling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _get_pyarrow_types (CC 13->~6) - extract per-source type extraction",
+        "wid": "w9"
+      }
+    ]
+  }
+}

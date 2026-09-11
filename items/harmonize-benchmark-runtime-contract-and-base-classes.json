@@ -1,0 +1,410 @@
+{
+  "context": "1) Define and codify one runtime protocol for loader-resolved benchmarks.\n2) Extract shared result-construction logic into a single reusable module.\n3) Make both base classes delegate to that shared implementation, then close\n   remaining behavior gaps (minimal results, validation helpers).\n4) Migrate outlier benchmarks (nyctaxi, tsbs_devops) onto the canonical\n   runtime base contract with minimal behavior changes.\n5) Unify benchmark loader and benchmark registry metadata sources so supported\n   benchmark sets cannot drift.\n6) Add regression tests that assert contract conformance and lifecycle\n   behavior parity across representative benchmarks and modes.\n",
+  "description": "BenchBox currently has a split benchmark runtime architecture:\n\n1) Most loader-resolved core benchmarks inherit `benchbox.base.BaseBenchmark`,\n   which contains a fallback result-building path.\n2) A smaller subset inherits `benchbox.core.base_benchmark.BaseBenchmark`,\n   which has newer lifecycle helpers and result-builder behavior.\n3) Some loader-resolved benchmarks (notably nyctaxi and tsbs_devops) inherit\n   neither base class and do not provide required runtime methods such as\n   `create_enhanced_benchmark_result`.\n\nThis divergence causes behavioral drift and latent regressions. A recent\nper-table timing fix landed in `benchbox.core.base_benchmark` but did not\npropagate to the dominant `benchbox.base` execution path used by most\nloader-resolved benchmarks.\n\nThis item unifies runtime behavior behind one canonical contract and one\nshared result-construction implementation, then migrates all loader-resolved\nbenchmarks to conform to that contract.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "patch only one base class path",
+        "instead": "centralize behavior in one shared implementation",
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "why": "loader-resolved benchmarks use multiple inheritance paths"
+      },
+      {
+        "dont": "silently change benchmark IDs, class names, or public CLI benchmark names",
+        "instead": "preserve external identifiers and add explicit compatibility tests",
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "why": "that breaks user workflows and automation"
+      },
+      {
+        "dont": "widen scope into unrelated platform adapter refactors",
+        "instead": "constrain changes to benchmark base/loader/registry/runtime surfaces",
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "why": "this is a runtime-contract harmonization effort"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "id": 72,
+        "reason": "Out of scope for runtime harmonization; requires separate API stability and migration policy discussion",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Potential removal of top-level wrapper classes in `benchbox/*.py`"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-26T00:00:00Z",
+      "created_at": "2026-02-26T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Current DataFrame execution path behavior and platform metadata remain unchanged",
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes"
+      },
+      {
+        "behavior": "Existing benchmark IDs and CLI benchmark selection behavior remain stable",
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes"
+      },
+      {
+        "behavior": "Existing preflight, manifest, and postload validation semantics remain unchanged when enabled",
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes"
+      },
+      {
+        "behavior": "Result schema v2 output structure remains backward compatible for existing consumers",
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes"
+      },
+      {
+        "behavior": "`benchbox.base.BaseBenchmark.create_enhanced_benchmark_result()` remains backward compatible with existing kwargs (`table_statistics`, `data_loading_time`, `phases`, `execution_metadata`)",
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes"
+      },
+      {
+        "behavior": "`benchbox.core.runner.runner.run_benchmark_lifecycle()` continues to return `BenchmarkResults` with expected execution modes for `data_only`, `load_only`, and setup-only branches",
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/base_benchmark.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_loader.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/contracts/benchmark_runtime.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/benchmark.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/result_factory.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tsbs_devops/benchmark.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/backward-compatibility.md"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/python-api/base.rst"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/nyctaxi/test_nyctaxi_benchmark.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_base_benchmark.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_benchmark_runtime_contract.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_loader_registry_parity.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_runner_lifecycle.py"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tsbs_devops/test_tsbs_devops_benchmark.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_benchmark_runtime_contract.py -q",
+        "description": "Runtime contract tests pass for all loader-resolved benchmark classes",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_loader_registry_parity.py -q",
+        "description": "Loader and registry benchmark sets are aligned and importable",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_base_benchmark.py tests/unit/core/results/test_builder.py -q",
+        "description": "Result construction paths preserve per-table load timing propagation and zero-duration handling",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_runner_lifecycle.py tests/unit/core/nyctaxi/test_nyctaxi_benchmark.py tests/unit/core/tsbs_devops/test_tsbs_devops_benchmark.py -q",
+        "description": "Lifecycle paths (data_only/load_only/setup_only/standard) behave consistently across representative benchmarks",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w7",
+        "wid": "w9"
+      },
+      {
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define benchmark runtime protocol and add conformance tests over all loader-resolved benchmark classes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run targeted verification matrix and capture any remaining compatibility failures",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve compatibility failures discovered in verification and re-run affected suites",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document deprecation/compatibility notes for benchmark-base internals and finalize cleanup boundaries",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract shared result-construction logic into a single module and add focused unit coverage",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor `benchbox.base.BaseBenchmark` to delegate to shared result-construction logic and close fallback drift (per_table_timings, zero-duration guard)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor `benchbox.core.base_benchmark.BaseBenchmark` to reuse the same shared result-construction path without duplication",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add/align minimal-result and validation helper support across canonical runtime base behavior",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate nyctaxi benchmark to the canonical runtime base contract",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate tsbs_devops benchmark to the canonical runtime base contract",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unify benchmark loader and benchmark registry benchmark-set definitions and add parity tests",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-benchmark-runtime-contract-and-base-classes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add lifecycle regression tests across representative benchmarks for data_only, load_only, setup_only, and standard paths",
+        "wid": "w9"
+      }
+    ]
+  }
+}

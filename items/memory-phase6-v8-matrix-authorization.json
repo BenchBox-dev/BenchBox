@@ -1,0 +1,132 @@
+{
+  "context": "Publish contract v8 first (MDE, n, budget, value hypothesis, falsifier). Then one authorized run, score, publish. No silent reruns against drifted stores if real corpus used.",
+  "description": "Phase 6 of remediation: only after independent-oracle posture (ADR), scenario hardening and/or real-corpus readiness, power+cost clause in contract v8, and explicit Joe quota authorization. Recommended default was 189 sessions at MDE 0.05 aggregate-only; revise after hardening design. Zero spend without authorization.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "run 189 sessions to calibrate after the fact",
+        "instead": "declare MDE and falsifier before the run",
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "why": "HARKing / unpowered claims"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "needs_item": "memory-adr-0001-oracle-grounding-decision"
+      },
+      {
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "needs_item": "memory-scenario-hardening-saturated-criteria"
+      },
+      {
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "needs_item": "memory-v7-contract-apply-and-cli"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Quota spend; blocked until ADR/v7/scenario work lands AND Joe explicitly authorizes session budget.",
+      "category": "Evaluation",
+      "created_at": "2026-08-05T22:11:29Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Aggregate-only claims unless per-scenario n supports declared MDE",
+        "item_id": "memory-phase6-v8-matrix-authorization"
+      },
+      {
+        "behavior": "No quota spend without explicit Joe authorization recorded in the item",
+        "item_id": "memory-phase6-v8-matrix-authorization"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "v8+ power declaration requirements",
+        "decision": "extend",
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "path": "/Users/joe/Developer/memory-governance/docs/evaluation.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "kind": "do_not_modify",
+        "path_glob": "reports/ab-results-v6-codex.json"
+      },
+      {
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/behavioral/**"
+      },
+      {
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "kind": "only_modify",
+        "path_glob": "reports/ab-results-v8*.json"
+      },
+      {
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "kind": "only_modify",
+        "path_glob": "reports/promotion-decision-v8.md"
+      },
+      {
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && test -f docs/evaluation/behavioral-v8-contract.md && rg -q 'Minimum detectable effect|MDE' docs/evaluation/behavioral-v8-contract.md",
+        "description": "v8 report includes criterion_saturation and declared MDE section in contract",
+        "expected": "v8 contract exists with MDE before any run is treated as authoritative",
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Draft v8 contract with power/cost/falsifier; Joe authorizes session budget",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-phase6-v8-matrix-authorization",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Execute matrix once under authorization; score and publish",
+        "wid": "w1"
+      }
+    ]
+  }
+}

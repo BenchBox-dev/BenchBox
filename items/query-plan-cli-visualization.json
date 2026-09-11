@@ -1,0 +1,11 @@
+{
+  "description": "Implement CLI commands for query plan analysis and ASCII visualization of\nquery plans. Includes compare-plans command for cross-platform/cross-run\ncomparison, and visualization utilities for rendering plans as ASCII trees\nwith side-by-side diffs.\n\n**CLI Commands**:\n- `benchbox run --capture-plans`: Capture plans during benchmark (already added)\n- `benchbox compare-plans`: Compare plans from different runs/platforms\n- `benchbox show-plan`: Display single plan as ASCII tree",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2025-11-23T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-cli"
+    }
+  }
+}

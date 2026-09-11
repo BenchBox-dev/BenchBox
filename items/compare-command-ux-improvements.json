@@ -1,0 +1,10 @@
+{
+  "description": "Address two UX issues with the `benchbox compare` command:\n\n1. **Superfluous --run flag**: The `--run` flag is awkward and inconsistent with\n   `benchbox run` which doesn't require a `--run` flag. Mode should be inferred\n   from the arguments provided.\n\n2. **No interactive guidance**: Unlike `benchbox run`, `compare` has no interactive\n   wizard when called without arguments. Users must already know the exact syntax.\n\nCurrent state:\n- benchbox compare --run -p duckdb -p sqlite  # Awkward --run flag\n- benchbox compare result1.json result2.json   # File comparison\n- benchbox compare                              # Error - no guidance\n\nTarget state:\n- benchbox compare -p duckdb -p sqlite          # Run mode (inferred from -p)\n- benchbox compare result1.json result2.json    # File mode (inferred from args)\n- benchbox compare                              # Interactive wizard",
+  "legacy": {
+    "item_meta": {
+      "category": "Usability",
+      "created_at": "2025-12-14T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

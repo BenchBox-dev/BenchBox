@@ -1,0 +1,167 @@
+{
+  "context": "Follow the pattern established in complexity batches 3-7: extract private helper\nfunctions within the same module, preserve the public function signature exactly,\nand ensure the extracted helpers are independently testable.\n",
+  "description": "Four CLI functions at CC=14 have extractable sub-concerns that can be\ndecomposed into focused helpers without losing clarity.\n\nTarget functions:\n1. prompt_phases (benchmarks.py:891) - extract _parse_phase_input() for dual-mode parser\n2. prompt_platform_options (benchmarks.py:1387) - extract _prompt_single_option() type-dispatch\n3. prompt_cloud_output_location (cloud_storage.py:21) - extract _prompt_and_validate_cloud_path()\n4. check_dependencies (commands/checks.py:20) - extract _show_matrix(), _show_platform(), _show_overview()",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change public function signatures",
+        "instead": "only extract internal helpers",
+        "item_id": "complexity-cli-prompts-w15",
+        "why": "callers depend on them"
+      },
+      {
+        "dont": "move helpers to separate files",
+        "instead": "keep them in the same module",
+        "item_id": "complexity-cli-prompts-w15",
+        "why": "these are small extractions"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-21T00:00:00Z",
+      "created_at": "2026-02-21T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "check_dependencies --matrix, --platform, and default output formats unchanged",
+        "item_id": "complexity-cli-prompts-w15"
+      },
+      {
+        "behavior": "prompt_cloud_output_location() validation logic for cloud:// paths unchanged",
+        "item_id": "complexity-cli-prompts-w15"
+      },
+      {
+        "behavior": "prompt_phases() return type and behavior remain identical (list of phase strings)",
+        "item_id": "complexity-cli-prompts-w15"
+      },
+      {
+        "behavior": "prompt_platform_options() correctly prompts for all option types (choice, bool, int, string)",
+        "item_id": "complexity-cli-prompts-w15"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "complexity-cli-prompts-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/benchmarks.py"
+      },
+      {
+        "item_id": "complexity-cli-prompts-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/cloud_storage.py"
+      },
+      {
+        "item_id": "complexity-cli-prompts-w15",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/checks.py"
+      },
+      {
+        "item_id": "complexity-cli-prompts-w15",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/ -v",
+        "description": "All CLI tests pass",
+        "expected": "all tests pass",
+        "item_id": "complexity-cli-prompts-w15",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make complexity-check",
+        "description": "Complexity check passes and these functions drop below 14",
+        "expected": "PASSED; prompt_phases, prompt_platform_options, prompt_cloud_output_location, check_dependencies no longer in top-20",
+        "item_id": "complexity-cli-prompts-w15",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "complexity-cli-prompts-w15",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "complexity-cli-prompts-w15",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "complexity-cli-prompts-w15",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "complexity-cli-prompts-w15",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "complexity-cli-prompts-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _parse_phase_input() from prompt_phases in benchmarks.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-cli-prompts-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _prompt_single_option() from prompt_platform_options in benchmarks.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-cli-prompts-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _prompt_and_validate_cloud_path() from prompt_cloud_output_location in cloud_storage.py",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-cli-prompts-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _show_matrix(), _show_platform(), _show_overview() from check_dependencies in checks.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-cli-prompts-w15",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run complexity check and full test suite to verify no regressions",
+        "wid": "w5"
+      }
+    ]
+  }
+}

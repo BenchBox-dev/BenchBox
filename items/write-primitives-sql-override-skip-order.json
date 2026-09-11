@@ -1,0 +1,157 @@
+{
+  "context": "Compute the skip decision from (operation, platform_key) first; only if the op\nis runnable, apply sql_override (or the platform override, or the base SQL).\nThis preserves adapter-rewrite priority for the SQL body while making the\nskip policy authoritative. Minimal reorder inside _get_effective_write_sql;\nno call-site changes needed.\n",
+  "description": "SCD2 adversarial audit finding N8 (live defect, broader than SCD2).\nbenchbox/core/write_primitives/benchmark.py:398-399 returns sql_override\nbefore EVERY skip check: the aggregate-state check, the Postgres skips, the\nDuckDB MERGE token gate, the platform_overrides null check, the bulk-load file\ncheck, AND the staging-population guard.\n\nConsequence verified (scratchpad repro3.py ATTACK 6c + a direct check):\nbulk_load_upsert_mode carries platform_overrides: {datafusion: null,\nstarrocks: null}, yet DataFusionAdapter.preprocess_operation_sql\n(benchbox/platforms/datafusion.py:170-178) returns rewritten SQL for every\nbulk_load op. That rewritten SQL is threaded in as sql_override\n(execution.py:1052-1055), so _get_effective_write_sql returns it at :398-399\nand the datafusion:null override is never consulted - an op explicitly marked\nunsupported on DataFusion RUNS there.\n\nThis also answers the audit's question about the SCD2 datafusion:null\noverrides: they are honored today only BY ACCIDENT of category. The three SCD2\nops are category 'merge', so preprocess_operation_sql returns None\n(datafusion.py:179) and no sql_override is set, so the null override is\nrespected. Nothing structural protects them - a future SCD2 preprocess hook\nwould silently bypass the override.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "drop adapter preprocessing",
+        "instead": "only make skip checks outrank it.",
+        "item_id": "write-primitives-sql-override-skip-order",
+        "why": "DataFusion bulk_load genuinely needs the CREATE EXTERNAL TABLE rewrite"
+      },
+      {
+        "dont": "special-case bulk_load_upsert_mode",
+        "instead": "fix the ordering.",
+        "item_id": "write-primitives-sql-override-skip-order",
+        "why": "the ordering bug is general (any preprocess hook + any null override)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-11T00:00:00Z",
+      "created_at": "2026-07-10T00:00:00Z",
+      "worktree": "scd2-audit-followup"
+    },
+    "preserves": [
+      {
+        "behavior": "Legitimate adapter preprocessing (e.g. DataFusion bulk_load COPY -> CREATE EXTERNAL TABLE rewrite) still applies for ops that are NOT skipped.",
+        "item_id": "write-primitives-sql-override-skip-order"
+      },
+      {
+        "behavior": "SCD2 ops on DuckDB/Postgres remain runnable and unaffected (they set no sql_override).",
+        "item_id": "write-primitives-sql-override-skip-order"
+      },
+      {
+        "behavior": "The staging-population guard, bulk-load file check, and Postgres/DuckDB skips still fire for their ops.",
+        "item_id": "write-primitives-sql-override-skip-order"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/write_primitives/benchmark.py:372-442 _get_effective_write_sql - the ordering to fix (:398-399 early return vs :408-440 skip checks)",
+        "decision": "reuse",
+        "item_id": "write-primitives-sql-override-skip-order",
+        "path": "benchbox/core/write_primitives/benchmark.py:372-442"
+      },
+      {
+        "concept": "benchbox/core/write_primitives/catalog/operations.yaml bulk_load_upsert_mode platform_overrides {datafusion: null, starrocks: null} - the override being bypassed",
+        "decision": "reuse",
+        "item_id": "write-primitives-sql-override-skip-order",
+        "path": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "concept": "benchbox/platforms/base/execution.py:1048-1055 where preprocessed SQL becomes sql_override",
+        "decision": "reuse",
+        "item_id": "write-primitives-sql-override-skip-order",
+        "path": "benchbox/platforms/base/execution.py:1048-1055"
+      },
+      {
+        "concept": "benchbox/platforms/datafusion.py:170-179 preprocess_operation_sql (returns rewritten SQL for every bulk_load op)",
+        "decision": "reuse",
+        "item_id": "write-primitives-sql-override-skip-order",
+        "path": "benchbox/platforms/datafusion.py:170-179"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-sql-override-skip-order",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "write-primitives-sql-override-skip-order",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/datafusion.py"
+      },
+      {
+        "item_id": "write-primitives-sql-override-skip-order",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-sql-override-skip-order",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/write_primitives"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py -n 0 -q",
+        "description": "Write-primitives unit + DuckDB integration green.",
+        "expected": "all pass",
+        "item_id": "write-primitives-sql-override-skip-order",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/write_primitives -n 0 -q -k override_skip_order",
+        "description": "New test: datafusion:null op skips despite a returned sql_override.",
+        "expected": "new test passes",
+        "item_id": "write-primitives-sql-override-skip-order",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-primitives-sql-override-skip-order",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "write-primitives-sql-override-skip-order",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sql-override-skip-order",
+        "notes": "Affected checks that currently sit AFTER the :398-399 early return:\naggregate-state, Postgres skips, DuckDB token gate, platform_overrides null,\nbulk-load file check, staging-population guard. The skip decision depends on\n(operation, platform_key), not on the preprocessed SQL text, so compute it\nfirst and apply the override only if the op is not skipped. Keep\nadapter-preprocessing priority for the SQL body once the op is runnable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reorder _get_effective_write_sql so all skip checks run before the sql_override short-circuit.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sql-override-skip-order",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regression test: bulk_load_upsert_mode (datafusion:null) is SKIPPED on datafusion even though preprocess_operation_sql returns rewritten SQL.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sql-override-skip-order",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document that the SCD2 datafusion:null overrides are honored only because category='merge' yields no preprocess override; note the ordering now enforces it structurally.",
+        "wid": "w3"
+      }
+    ]
+  }
+}

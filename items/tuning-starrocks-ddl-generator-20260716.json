@@ -1,0 +1,143 @@
+{
+  "context": "Start only after PR #1180 (capability registry + renderer pattern) and the\napplied-ledger PR have merged to develop - this TODO builds directly on both.\n",
+  "description": "Decision by Joe 2026-07-16: write the generator (StarRocks tuned currently\nrenders nothing; capability registry honestly says rendered_via: none).\n\nImplement benchbox/core/tuning/generators/starrocks.py per the StarRocks\nphysical surface (PARTITION BY range/expr, DISTRIBUTED BY HASH(cols) BUCKETS n,\nduplicate-key ORDER BY), register it in get_ddl_generator, flip the capability\nregistry entries from none to ddl, and migrate the StarRocks adapter schema\npath to consume the generator following the #1180 pattern (dry-run preview and\nexecution share the renderer; engine-mandatory DISTRIBUTED BY fallback stays\nfor untuned tables). Applied-ledger instrumentation for the rendered DDL.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "No adapter-side bespoke clause strings",
+        "instead": "(not specified)",
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "why": "the generator is the single renderer"
+      },
+      {
+        "dont": "change ClickHouse/DuckDB paths",
+        "instead": "(not specified)",
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-22T12:57:14Z",
+      "completed_pr": 1262,
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Engine-mandatory DISTRIBUTED BY HASH injection for untuned tables (baseline behavior unchanged)",
+        "item_id": "tuning-starrocks-ddl-generator-20260716"
+      },
+      {
+        "behavior": "get_ddl_generator never raises",
+        "item_id": "tuning-starrocks-ddl-generator-20260716"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/tuning/generators/clickhouse.py + #1180 clickhouse migration: the consume-the-generator adapter pattern - reuse",
+        "decision": "reuse",
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "path": "benchbox/core/tuning/generators/clickhouse.py"
+      },
+      {
+        "concept": "benchbox/core/tuning/generators/doris.py: closest engine family (Doris/StarRocks share DISTRIBUTED BY semantics) - reuse structure",
+        "decision": "reuse",
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "path": "benchbox/core/tuning/generators/doris.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/**"
+      },
+      {
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/starrocks/**"
+      },
+      {
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning tests/unit/platforms -q -k 'starrocks or registry or drift'",
+        "description": "Snapshot + registry tests green; dry-run preview shows StarRocks tuning clauses",
+        "expected": "All passing; preview==execution snapshot holds",
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "last_result": "pass",
+        "last_run": "2026-07-22T12:56:17Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "New benchbox/core/tuning/generators/starrocks.py StarRocksDDLGenerator(BaseDDLGenerator): render_distribution_clause (DISTRIBUTED BY HASH(`col`) BUCKETS 8 default), render_partition_clause, render_order_by_clause as the single clause source for preview+execution; generate_tuning_clauses -> TuningClauses(distribute_by/partition_by/order_by). test_starrocks_ddl_generator.py: per-type rendering, backtick quoting, bucket defaults/overrides, no-tuning->engine-mandatory-only, dry-run to_dict/to_json.",
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T12:41:50Z",
+        "started_branch": "feat/tuning-starrocks-ddl-generator",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Write StarRocksDDLGenerator + unit tests (clause rendering, quoting, bucket defaults)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Registered 'starrocks'->StarRocksDDLGenerator in get_ddl_generator (never raises; NoOp only for unknown). capability_registry.py starrocks PARTITIONING/SORTING/DISTRIBUTION flipped rendered_via none->ddl (starrocks_ddl_generator, preview==execution). Drift allowlist: added starrocks to EXPECTED_GENERATOR_ONLY_KEYS in test_capability_source_drift.py; test_ddl_generator_registry test_starrocks_falls_back_loudly -> test_starrocks_is_registered.",
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T12:41:58Z",
+        "started_branch": "feat/tuning-starrocks-ddl-generator",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Register in get_ddl_generator; update capability registry entries + drift-test allowlists",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Migrated starrocks/workload.py _optimize_table_definition to render tuned PARTITION BY/DISTRIBUTED BY/ORDER BY via get_ddl_generator (clause strings from generator, not bespoke f-strings). Gated on tuning_enabled; tuned dist col overrides first-col baseline; clause order PARTITION->DISTRIBUTED->ORDER; no duplicate DISTRIBUTED BY. Untuned output BYTE-IDENTICAL (diffed 7 tables). test_renderer_snapshot_starrocks.py: baseline pin, tuned parity, preview==execution. Verify: 279 passed; ruff/ty clean. w4 pending #1 merge.",
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T12:42:01Z",
+        "started_branch": "feat/tuning-starrocks-ddl-generator",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Migrate starrocks workload/schema path to consume the generator; snapshot tests (tuned vs baseline; no duplicate DISTRIBUTED BY)",
+        "wid": "w3"
+      },
+      {
+        "evidence": "starrocks/workload.py _optimize_table_definition records rendered tuned PARTITION BY/DISTRIBUTED BY/ORDER BY into self._applied_tuning_ledger (PHASE_DDL, mechanism=starrocks_ddl_generator, table=name) via _record_starrocks_tuning_to_ledger; engine-mandatory first-col DISTRIBUTED BY excluded (baseline, not tuning); guarded (no ledger -> safe no-op). Tuned run now derives applied_unverified not noop; starrocks table tunings not flagged dropped. Tests: TestStarRocksAppliedLedgerInstrumentation (4) in test_renderer_snapshot_starrocks.py. Rebased onto #1-merged develop (24a473935).",
+        "item_id": "tuning-starrocks-ddl-generator-20260716",
+        "notes": null,
+        "started_at": "2026-07-22T12:55:45Z",
+        "started_branch": "feat/tuning-starrocks-ddl-generator",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Ledger instrumentation for rendered DDL; dropped-intents no longer flags starrocks table tunings",
+        "wid": "w4"
+      }
+    ]
+  }
+}

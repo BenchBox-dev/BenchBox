@@ -1,0 +1,154 @@
+{
+  "context": "This item never performs the decisions or the work they unblock; it only carries them so they cannot be lost between sessions. Agents keep reports/human-decision-queue.md current, add evidence as it lands, and record each ruling in place with a date. The item completes only when no entry is still marked PENDING.",
+  "description": "Eight decisions block the memory remediation effort and none may be taken by an agent. D1 promotion ruling for the v3 Claude candidate, which strictly dominates its baseline but is held by a pair-scoped gate. D2 promotion ruling for the v5 Codex candidate, which beats baseline on correctness, recall, and payload but fails on decision-label flags. D3 evaluator taxonomy redesign versus per-scenario adjudication. D4 the two classifier-blocked v3 oracle adjudications. D5 authorization to spend new model quota. D6 live-mutation boundary sign-off for phase 4. D7 closure of the stale v2 phase-3 item whose work units were correctly never executed. D8 the terminal drop of a superseded v3 item. Full statements, evidence, and options are in reports/human-decision-queue.md.",
+  "legacy": {
+    "item_meta": {
+      "category": "governance",
+      "completed_at": "2026-08-04T12:17:41Z",
+      "created_at": "2026-08-03T23:42:33Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "A ruling is recorded only when Joe stated it explicitly, never inferred from silence or from an agent summary",
+        "item_id": "memory-governance-human-decision-queue"
+      },
+      {
+        "behavior": "Live Codex and Claude memory and settings remain byte-unchanged while any entry is pending",
+        "item_id": "memory-governance-human-decision-queue"
+      },
+      {
+        "behavior": "This item records decisions and never performs them or the work they gate",
+        "item_id": "memory-governance-human-decision-queue"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-governance-human-decision-queue",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-governance-human-decision-queue",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-governance-human-decision-queue",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-governance-human-decision-queue",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-governance-human-decision-queue",
+        "kind": "only_modify",
+        "path_glob": "reports/human-decision-queue.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -q 'D8' /Users/joe/Developer/memory-governance/reports/human-decision-queue.md",
+        "description": "Every open decision is stated in the queue with evidence",
+        "expected": "All eight decisions appear with status, evidence paths, and options",
+        "item_id": "memory-governance-human-decision-queue",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && ! rg -q 'PENDING' reports/human-decision-queue.md",
+        "description": "No decision remains unruled",
+        "expected": "Every entry carries a RULED date and decision",
+        "item_id": "memory-governance-human-decision-queue",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-governance-human-decision-queue",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-governance-human-decision-queue",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-governance-human-decision-queue",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-governance-human-decision-queue",
+        "needs_wid": "w0",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "commit 26108c2. Queue kept current through the batch: added D10 (materializing the 5 missing candidate record classes - agent must not guess which real memories are repository policy); gave D2 two facts measured after its packet was written (candidate stale vs 49 changed live files incl MEMORY.md; 39/39 historical_observation so 5 of 6 exercised classes absent) plus a new option (c) regenerate and re-gate; corrected D3/D5 for the lost offline path; recorded the two rungs left failing rather than forced to pass, with reasons. 10 decisions open, all PENDING",
+        "item_id": "memory-governance-human-decision-queue",
+        "notes": null,
+        "started_at": "2026-08-04T01:39:00Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Keep reports/human-decision-queue.md accurate as evidence lands and flag any decision made moot by later work",
+        "wid": "w0"
+      },
+      {
+        "evidence": "All ten rulings recorded in reports/human-decision-queue.md (commit 10cbc68) on 2026-08-04: D1 promote the Claude candidate alone; D2 regenerate the Codex candidate and re-gate; D3 redesign the taxonomy; D4 deferred as subsumed; D5 full 180-session matrix authorized; D6 install authorized but HALTED before mutation on a staleness finding; D7 v2 item closed as gated non-executions; D8 both superseded items dropped; D9 accept the evidence loss; D10 deferred until the taxonomy lands. Sequencing chosen: redesign, regenerate, then run.",
+        "item_id": "memory-governance-human-decision-queue",
+        "notes": null,
+        "started_at": "2026-08-04T12:17:28Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Record Joe's rulings on the two promotion decisions D1 and D2 with dates and rationale",
+        "wid": "w1"
+      },
+      {
+        "evidence": "All ten rulings recorded in reports/human-decision-queue.md (commit 10cbc68) on 2026-08-04: D1 promote the Claude candidate alone; D2 regenerate the Codex candidate and re-gate; D3 redesign the taxonomy; D4 deferred as subsumed; D5 full 180-session matrix authorized; D6 install authorized but HALTED before mutation on a staleness finding; D7 v2 item closed as gated non-executions; D8 both superseded items dropped; D9 accept the evidence loss; D10 deferred until the taxonomy lands. Sequencing chosen: redesign, regenerate, then run.",
+        "item_id": "memory-governance-human-decision-queue",
+        "notes": null,
+        "started_at": "2026-08-04T12:17:31Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Record Joe's rulings on the evaluator direction and oracle adjudications D3 and D4",
+        "wid": "w2"
+      },
+      {
+        "evidence": "All ten rulings recorded in reports/human-decision-queue.md (commit 10cbc68) on 2026-08-04: D1 promote the Claude candidate alone; D2 regenerate the Codex candidate and re-gate; D3 redesign the taxonomy; D4 deferred as subsumed; D5 full 180-session matrix authorized; D6 install authorized but HALTED before mutation on a staleness finding; D7 v2 item closed as gated non-executions; D8 both superseded items dropped; D9 accept the evidence loss; D10 deferred until the taxonomy lands. Sequencing chosen: redesign, regenerate, then run.",
+        "item_id": "memory-governance-human-decision-queue",
+        "notes": null,
+        "started_at": "2026-08-04T12:17:34Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Record Joe's rulings on quota and live-mutation authorization D5 and D6",
+        "wid": "w3"
+      },
+      {
+        "evidence": "All ten rulings recorded in reports/human-decision-queue.md (commit 10cbc68) on 2026-08-04: D1 promote the Claude candidate alone; D2 regenerate the Codex candidate and re-gate; D3 redesign the taxonomy; D4 deferred as subsumed; D5 full 180-session matrix authorized; D6 install authorized but HALTED before mutation on a staleness finding; D7 v2 item closed as gated non-executions; D8 both superseded items dropped; D9 accept the evidence loss; D10 deferred until the taxonomy lands. Sequencing chosen: redesign, regenerate, then run.",
+        "item_id": "memory-governance-human-decision-queue",
+        "notes": null,
+        "started_at": "2026-08-04T12:17:38Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Execute the tracker hygiene rulings D7 and D8 once Joe has decided them",
+        "wid": "w4"
+      }
+    ]
+  }
+}

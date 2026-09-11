@@ -1,0 +1,153 @@
+{
+  "context": "Use the existing Python comparator unchanged. Each integration test\nbuilds (reference_rows, comparison_rows) via each platform's existing\nadapter, then calls compare_query_results() and asserts report.matched.\n\nFor ClickHouse-local, lean on the existing docker harness in\ndocker/clickhouse/. For Polars-DF and DataFusion, reuse the dataframe\nplatform runners directly.\n\nStart with TPC-H SF=0.01 only. Expand to TPC-DS as a separate follow-up\nonce TPC-H is stable in nightly for at least one week.\n",
+  "description": "Follow-up slice of quality-add-cross-platform-result-validation.\n\nThat TODO delivered the comparator (benchbox/core/validation/cross_platform.py),\nits unit tests (tests/unit/core/test_cross_platform_validation.py), and\nthe developer doc (docs/development/result-validation.md). What remains is\nthe live integration matrix and the nightly workflow - both require\nplatform credentials or heavier local infrastructure, so they were split\noff to preserve bounded review surface.\n\nScope:\n  - Integration pytest suite at tests/integration/validation/test_cross_platform.py\n    that executes the standard query sets on DuckDB (reference) vs each\n    comparison platform at SF=0.01.\n  - First matrix stays credential-free: DuckDB × {DataFusion, Polars-DF,\n    ClickHouse-local container}. Cloud platforms (Snowflake, Databricks)\n    are a separate follow-up if/when the nightly lane gains secrets.\n  - Nightly workflow at .github/workflows/cross-platform-validation.yml\n    running the suite and publishing structured diff artifacts on failure.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "edit the comparator module",
+        "instead": "file a new comparator TODO if behavior needs to change",
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "why": "the unit suite pins its contract"
+      },
+      {
+        "dont": "hard-code credentials",
+        "instead": "snowflake/databricks join in a separate slice",
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "why": "the first matrix is credential-free by design"
+      },
+      {
+        "dont": "paper over a divergence with loose tolerance",
+        "instead": "every loosened Tolerance must cite a spec rule in the rationale field",
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "why": "that defeats the purpose"
+      },
+      {
+        "dont": "run the suite on every PR",
+        "instead": "nightly only",
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "why": "cross-platform suites are expensive and flaky under cloud noise"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "needs_item": "quality-add-cross-platform-result-validation"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-04-14T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Comparator module (benchbox/core/validation/cross_platform.py) untouched by this TODO - it is already shipped",
+        "item_id": "quality-cross-platform-validation-integration-matrix"
+      },
+      {
+        "behavior": "Fast test lane duration unchanged - new tests are live_integration only",
+        "item_id": "quality-cross-platform-validation-integration-matrix"
+      },
+      {
+        "behavior": "No new required PR check - nightly-only signal; CI on PR stays as-is",
+        "item_id": "quality-cross-platform-validation-integration-matrix"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/validation/test_cross_platform.py -v -m live_integration",
+        "description": "Integration suite passes locally on the no-credentials matrix",
+        "expected": "all tests pass",
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --with actionlint actionlint .github/workflows/cross-platform-validation.yml",
+        "description": "Nightly workflow file is valid",
+        "expected": "(no errors)",
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'mark.fast' tests/integration/validation/test_cross_platform.py || echo 0",
+        "description": "New integration test file carries no mark.fast markers - fast lane unaffected",
+        "expected": "0",
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write tests/integration/validation/test_cross_platform.py: DuckDB × DataFusion, TPC-H SF=0.01; comparator STRICT by default; Tolerance overrides must cite spec rules",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend the suite to DuckDB × Polars-DF and DuckDB × ClickHouse-local (docker). Keep test markers = live_integration so the fast lane is unaffected.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add .github/workflows/cross-platform-validation.yml running on cron (nightly) plus workflow_dispatch. On failure, upload a structured JSON diff artifact per failed (benchmark, platform-pair) cell.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-cross-platform-validation-integration-matrix",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document a triage runbook: how to read the diff artifact, how to file a TODO with spec-anchored rationale if the divergence is legitimate, and how to roll back an adapter change that broke a column.",
+        "wid": "w4"
+      }
+    ]
+  }
+}

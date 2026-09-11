@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #342 of architecture-contract-map-and-support-taxonomy.\nDeferred: Rewrite architecture.md around the new contract map\nReason deferred: Do after this map lands and downstream TODOs resolve their product-surface decisions.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:37Z",
+      "worktree": "main"
+    }
+  }
+}

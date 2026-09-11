@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Priority**: Medium\"\n- \"**Status**: Completed\"\n- \"**Description**: Automatically compile TPC-H (`qgen`, `dbgen`) and TPC-DS (`dsdgen`, `dsqgen`) binaries when source code is present but compiled files are missing\"\n- \"**Tasks**:\"\n- \"**Implementation Summary**:\"\n- \"**Files Created/Modified**:\"\n- \"**Impact**: Successfully reduces setup friction for users with TPC source code, eliminates need for manual compilation steps, improves developer experience with automatic tool preparation while maintaining backward compatibility\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

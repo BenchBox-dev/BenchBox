@@ -1,0 +1,118 @@
+{
+  "description": "Three process gaps were deferred from `codex-pr-review-followups-week-2026-05-03`\n(DONE, 2026-05-04). All three relate to the quality of TODO `verification:`\nblocks and the blind-spot remediation lifecycle:\n\n(a) BUGGY VERIFICATION COMMANDS IN DONE FILES — Codex flagged verification\n    commands in four DONE-state TODOs as likely broken: wildcard `--queries`,\n    `find -newer` multi-arg arity, DuckDB filename glob, and `$(date)`\n    recomputed across midnight (PRs #110, #117, #121, #122). These TODOs are\n    in DONE and their commands are no longer run, but the patterns expose a\n    class of silent false-positive \"verified\" completions. The fix belongs in\n    `_project/audits/codex-weekly-sweep-template.md` — add negative checks for\n    these antipatterns so the next sweep catches them before TODOs land.\n\n(b) MULTI-LINE COMMAND: SCHEMA VALIDATION — A `verification.command` value\n    containing unescaped newlines would silently misparse as multi-line YAML\n    (surfaced by PR #161 review of\n    `results-explorer-uat-methodology-blind-spot-remediation`). Extend\n    `_project/scripts/validate_todo.py` or the JSON schema to reject\n    `verification.command` values that contain newlines, so this class can't\n    ship in a future TODO.\n\n(c) ACTIONED-COMPLETION CONVENTION — When a blind-spot remediation TODO has\n    acceptance criteria requiring all linked findings to end as\n    `merged-to-todo` or `dismissed`, but one ends as `actioned` instead, the\n    TODO fails its own completion gate even though the finding was addressed\n    (surfaced by PR #163: `results-explorer-uat-methodology-blind-spot-remediation`).\n    Decide: widen the criteria to allow `actioned` for convention-only\n    remediations, OR amend the historical DONE entry. Document the chosen\n    convention so future blind-spot remediation TODOs use it consistently.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a blanket 'no multi-line commands' rule in the schema if intentional multi-line blocks (|) are used elsewhere",
+        "instead": "(not specified)",
+        "item_id": "codex-sweep-verification-command-antipatterns",
+        "why": "scope the check to detect unescaped inline newlines only"
+      },
+      {
+        "dont": "amend the four DONE files' broken verification commands",
+        "instead": "(not specified)",
+        "item_id": "codex-sweep-verification-command-antipatterns",
+        "why": "they are in DONE and should not be reopened; the template fix prevents recurrence"
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Tooling",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The codex sweep template remains runnable (do not add checks that require interactive approval)",
+        "item_id": "codex-sweep-verification-command-antipatterns"
+      },
+      {
+        "behavior": "validate_todo.py --all still passes all existing TODO/DONE files after the newline validation is added",
+        "item_id": "codex-sweep-verification-command-antipatterns"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/README.md — the natural home for the blind-spot remediation convention documentation",
+        "decision": "reuse",
+        "item_id": "codex-sweep-verification-command-antipatterns",
+        "path": "_project/TODO/README.md"
+      },
+      {
+        "concept": "_project/TODO_SCHEMA.yaml — consider adding a pattern or format constraint to verification.command",
+        "decision": "reuse",
+        "item_id": "codex-sweep-verification-command-antipatterns",
+        "path": "_project/TODO_SCHEMA.yaml"
+      },
+      {
+        "concept": "_project/audits/codex-weekly-sweep-template.md — extend with antipattern checks rather than creating a parallel checklist",
+        "decision": "extend",
+        "item_id": "codex-sweep-verification-command-antipatterns",
+        "path": "_project/audits/codex-weekly-sweep-template.md"
+      },
+      {
+        "concept": "_project/scripts/validate_todo.py — extend existing validation rather than writing a separate linter",
+        "decision": "extend",
+        "item_id": "codex-sweep-verification-command-antipatterns",
+        "path": "_project/scripts/validate_todo.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -c \"find -newer|--queries|[$][(]date|filename.*glob\" _project/audits/pr-review-sweep-template.md",
+        "description": "Current PR sweep template documents the four semantic antipatterns",
+        "expected": "4 or more matches",
+        "item_id": "codex-sweep-verification-command-antipatterns",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_verification_lint.py -q",
+        "description": "Verification-command semantic lint regressions pass",
+        "expected": "all verification lint tests pass",
+        "item_id": "codex-sweep-verification-command-antipatterns",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "codex-sweep-verification-command-antipatterns",
+        "notes": "Add negative checks to _project/audits/codex-weekly-sweep-template.md for:\n- Wildcard --queries (should be explicit query names)\n- `find -newer` with more than two positional args (arity bug)\n- DuckDB filename glob in a command string (e.g., *.duckdb patterns)\n- $(date) or $(date +...) inside a verification command (recomputed across midnight)\nThe four DONE files with the known bugs are:\n  read-primitives-approximate-aggregate-queries.yaml\n  write-primitives-sketch-persistence-category.yaml\n  read-primitives-approximate-aggregates-dataframe-coverage.yaml\n  results-explorer-uat-multi-scale-corpus-sweep.yaml\nRecord which patterns they embodied so the template is concrete.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add verification-command antipattern checks to codex-weekly-sweep-template.md",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-sweep-verification-command-antipatterns",
+        "notes": "In _project/scripts/validate_todo.py or _project/TODO_SCHEMA.yaml, add\nvalidation that rejects verification.command strings containing '\\n'.\nA multi-line command in YAML must use a block scalar (|) which already\nsignals intent — the validation should catch the accidental inline newline\ncase, not intentional multi-line blocks. Test with a synthetic TODO that\nhas a command with an embedded newline.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend validate_todo.py (or schema) to reject verification.command values containing newlines",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "codex-sweep-verification-command-antipatterns",
+        "notes": "Read the existing acceptance criteria pattern in blind-spot remediation\nTODOs. Decide: should 'actioned' be an accepted terminal state alongside\n'merged-to-todo' and 'dismissed' for convention-only findings? Document\nthe decision in _project/TODO/README.md under a \"Blind-spot remediation\nlifecycle\" heading (or equivalent section). Optionally amend the historical\nDONE entry for results-explorer-uat-methodology-blind-spot-remediation to\nrecord the finding.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the actioned-completion convention for blind-spot remediation TODOs",
+        "wid": "w3"
+      }
+    ]
+  }
+}

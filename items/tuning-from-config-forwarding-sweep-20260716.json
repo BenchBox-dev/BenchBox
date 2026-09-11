@@ -1,0 +1,100 @@
+{
+  "description": "From the 2026-07 remediation batch (#1176 w0 discovery): the tuning config\nnever reached adapters on the direct CLI path. #1176 fixed the channel and\nduckdb; a parallel fix covered questdb. Roughly 48 other platforms'\nfrom_config implementations still drop tuning_enabled / the tuning_config\nobject / tuning_source / tuning_source_file, so tuning silently no-ops on\nthem via the direct path. Sweep every from_config to forward the tuning\nkeys, and add a parametrized registry-driven test asserting every registered\nadapter preserves them (constructing with stub configs, no live connections).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "No per-platform bespoke channel names",
+        "instead": "(not specified)",
+        "item_id": "tuning-from-config-forwarding-sweep-20260716",
+        "why": "use the exact keys #1176 established"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-17T00:00:00Z",
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Each adapter's existing from_config behavior for its own keys",
+        "item_id": "tuning-from-config-forwarding-sweep-20260716"
+      },
+      {
+        "behavior": "No new required constructor params - forwarding only",
+        "item_id": "tuning-from-config-forwarding-sweep-20260716"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-from-config-forwarding-sweep-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "tuning-from-config-forwarding-sweep-20260716",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms -q -k 'from_config or forwarding'",
+        "description": "Registry-driven forwarding test green across all platforms",
+        "expected": "All registered adapters preserve tuning kwargs",
+        "item_id": "tuning-from-config-forwarding-sweep-20260716",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-from-config-forwarding-sweep-20260716",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tuning-from-config-forwarding-sweep-20260716",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-from-config-forwarding-sweep-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Start gate: verify PR #1176 merged; enumerate from_config implementations and classify forwarding status",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-from-config-forwarding-sweep-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Mechanical sweep: forward tuning keys in every from_config (follow the duckdb/questdb pattern)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-from-config-forwarding-sweep-20260716",
+        "notes": "Skip-gate platforms whose import needs missing optional deps, matching existing registry-test conventions.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Parametrized test over the platform registry: from_config preserves tuning kwargs for every adapter",
+        "wid": "w2"
+      }
+    ]
+  }
+}

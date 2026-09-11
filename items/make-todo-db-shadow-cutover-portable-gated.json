@@ -1,0 +1,177 @@
+{
+  "context": "Extend _project/scripts/todo_db_shadow.py and its tests. Use the locked BenchBox package command for local scratch imports and hosted read-only snapshots. Keep migration reports and rollback artifacts outside the repository unless an explicit ADR says otherwise.",
+  "description": "Prepare the existing BenchBox shadow migration tooling for the canonical package cutover. Remove hardcoded developer-machine paths and make the shadow tool invoke the locked todo-db package from the BenchBox project environment. Preserve fail-closed protections for protected databases, existing targets, empty sources, zero-item imports, identity mismatches, and unredacted credentials. This item owns migration tooling only; it does not implement tracker behavior. It is blocked on the canonical package release.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Hardcode /Users/joe/Developer/todo-db or rely on a sibling checkout",
+        "instead": "Invoke the package from BenchBox's locked uv environment",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "why": "Fresh clones and CI cannot reproduce that path"
+      },
+      {
+        "dont": "Run migration against the live target before a fresh scratch rehearsal passes",
+        "instead": "Require a non-empty scratch target, normalized parity, and audit verification first",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "why": "The migration is destructive and previous export/import formats have diverged"
+      },
+      {
+        "dont": "Treat a passed item-count comparison as full parity",
+        "instead": "Compare all supported tables and semantic fields with explicit expected differences",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "why": "Findings, dependencies, scope, audit, and identity can still be lost"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "needs_item": "release-canonical-todo-db-holder-only"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-13T15:40:36Z",
+      "completed_pr": 1684,
+      "created_at": "2026-08-10T20:46:05Z",
+      "worktree": "todo-db-standalone-extraction"
+    },
+    "preserves": [
+      {
+        "behavior": "Bind the destination to project_id benchbox and the canonical BenchBox repository identity",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated"
+      },
+      {
+        "behavior": "Keep lossless versioned snapshots and reports off-repository and redact credentials",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated"
+      },
+      {
+        "behavior": "Never report a successful zero-item or empty-source migration",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated"
+      },
+      {
+        "behavior": "Never restore over a protected or existing target",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated"
+      },
+      {
+        "behavior": "Use a leased maintenance freeze for the full snapshot-to-restore window; claim checks alone are insufficient",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/.todo-db/**"
+      },
+      {
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/_project/decisions/"
+      },
+      {
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/_project/scripts/todo_db_shadow.py"
+      },
+      {
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/docs/operations/todo-db-benchbox-extraction.md"
+      },
+      {
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox/tests/unit/scripts/test_todo_db_shadow.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_shadow.py -q",
+        "description": "Shadow migration unit tests pass",
+        "expected": "exit 0",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:40:26Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -q '/Users/joe/Developer/todo-db' _project/scripts/todo_db_shadow.py",
+        "description": "Developer-machine standalone path is absent from the shadow tool",
+        "expected": "exit 0",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:40:28Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_shadow.py -q -k 'protected or existing or empty or zero'",
+        "description": "Shadow tool remains fail-closed for protected and existing targets",
+        "expected": "exit 0",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "last_result": "pass",
+        "last_run": "2026-08-13T15:40:34Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "In /Users/joe/Developer/BenchBox.pool-shadow-cutover, removed the developer checkout parameter and hardcoded path. The shadow tool now invokes only uv run --project _project/scripts -- todo-db, with no PATH/sibling fallback; missing scripts project fails closed. Full targeted suite and path guard passed: 17 tests, no /Users/joe/Developer/todo-db match.",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "notes": null,
+        "started_at": "2026-08-10T21:42:17Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Replace hardcoded standalone checkout and package paths with the locked BenchBox project command",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Updated docs/operations/todo-db-benchbox-extraction.md and added _project/decisions/todo-db-shadow-portable-command-boundary-2026-08-10.md. They define YAML/hosted snapshot source-of-truth, explicit benchbox identity, no fallback, leased freeze for hosted mutation, durable off-repository backup, scratch-only rollback, and fail-closed parity gates.",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "notes": null,
+        "started_at": "2026-08-10T21:47:06Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Document and enforce source-of-truth, project identity, maintenance-freeze, and rollback-artifact gates",
+        "wid": "w1"
+      },
+      {
+        "evidence": "On 2026-08-13, PR #1684 package boundary was present on current develop. Full shadow suite passed 17 tests; protected/existing/empty/zero negative controls passed 4 tests. A fresh /tmp scratch import of the non-empty 6fde4cd36^ corpus processed 1,364 YAML records: legacy=1,364, standalone=1,364, zero field/missing/unexpected diffs, every tracked table count equal, metadata equal, event provenance equal, supplemental dependency provenance equal, and report comparison.passed=true. Artifacts: /tmp/benchbox-todo-shadow-parity.MYDe82/.",
+        "item_id": "make-todo-db-shadow-cutover-portable-gated",
+        "notes": null,
+        "started_at": "2026-08-10T21:47:31Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run local scratch parity and fail-closed regression tests",
+        "wid": "w2"
+      }
+    ]
+  }
+}

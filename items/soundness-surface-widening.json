@@ -1,0 +1,181 @@
+{
+  "description": "The review-required soundness surface in `_project/scripts/auto_merge_soundness_paths.py`\n(`SOUNDNESS_PREFIXES`, lines 11-15: `benchbox/core/equivalence/`,\n`benchbox/core/query_plans/parsers/`, plus the `benchbox/core/**/validation.py`\nregex) is mirrored 1:1 in `.github/CODEOWNERS`. It covers the comparator and\nplan-parser code paths but omits several oracle-adjacent assets that define or\nfeed \"correct\" for the same soundness checks:\n\n- `benchbox/core/expected_results/**` — the reference-value loader\n  (`benchbox/core/expected_results/loader.py`), registry, and the\n  hash-pinned digest fixtures themselves (e.g.\n  `benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json`).\n  A PR editing that JSON digest file today auto-merges with zero review, even\n  though it silently redefines what counts as a correct TPC-H result.\n- `benchbox/sql_compat/**` — semantic query rewrites (rule registrations under\n  `benchbox/sql_compat/rules/`) that can change what SQL is actually executed\n  against a platform without touching the comparator itself. High-churn: most\n  files here are per-platform DDL/query-rewrite rules added routinely, so a\n  blanket prefix would create real merge friction.\n- `benchbox/platforms/base/result_capture.py` — houses\n  `validate_loaded_data` / `validate_row_counts`, which delegate to\n  `ValidationService` / `DataValidator`, and the plan-capture pipeline\n  (`get_query_plan_parser`, `capture_query_plan`) that feeds the parsers in\n  `benchbox/core/query_plans/parsers/`. Currently outside the soundness set.\n- `_project/scripts/auto_merge_soundness_paths.py` itself, and the workflows\n  that define or invoke the gate (`.github/workflows/auto-merge-on-open.yml`,\n  `pr.yml`, `release.yml`) — a PR editing the predicate or the workflow that\n  runs it can currently weaken its own gate without triggering owner review.\n  (This last point overlaps with auto-merge-predicate-base-ref-execution;\n  see deps below — do not implement self-protection in both places.)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add benchbox/sql_compat/ wholesale without recording the churn tradeoff",
+        "instead": "(not specified)",
+        "item_id": "soundness-surface-widening",
+        "why": "grep git log for recent commit volume under that tree before deciding, since it is explicitly called out as high-churn in the description."
+      },
+      {
+        "dont": "implement the workflow/predicate self-protection here AND in auto-merge-predicate-base-ref-execution",
+        "instead": "(not specified)",
+        "item_id": "soundness-surface-widening",
+        "why": "pick one owner for that concern (see deps.needs there) to avoid duplicated or conflicting logic."
+      },
+      {
+        "dont": "widen SOUNDNESS_PREFIXES without updating .github/CODEOWNERS in the same commit",
+        "instead": "(not specified)",
+        "item_id": "soundness-surface-widening",
+        "why": "they are asserted to match by test_codeowners_covers_soundness_paths, and a mismatch means require_code_owner_review silently does nothing for the new paths."
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The existing equivalence/, query_plans/parsers/, and **/validation.py coverage in SOUNDNESS_PREFIXES is unchanged (only additive widening).",
+        "item_id": "soundness-surface-widening"
+      },
+      {
+        "behavior": "auto-merge-on-open.yml, make pr-open, and CODEOWNERS continue to read from the single SOUNDNESS_PREFIXES source of truth — no second hardcoded copy of the path list is introduced.",
+        "item_id": "soundness-surface-widening"
+      },
+      {
+        "behavior": "tests/unit/test_auto_merge_soundness_paths.py stays green (updated, not skipped or weakened).",
+        "item_id": "soundness-surface-widening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/CODEOWNERS — mirrors SOUNDNESS_PREFIXES 1:1 today; must stay in lockstep with any change here.",
+        "decision": "reuse",
+        "item_id": "soundness-surface-widening",
+        "path": ".github/CODEOWNERS"
+      },
+      {
+        "concept": "_project/scripts/auto_merge_soundness_paths.py:SOUNDNESS_PREFIXES — the single source of truth being widened; keep it the only place the prefix tuple is defined.",
+        "decision": "reuse",
+        "item_id": "soundness-surface-widening",
+        "path": "_project/scripts/auto_merge_soundness_paths.py:SOUNDNESS_PREFIXES"
+      },
+      {
+        "concept": "_project/scripts/ruleset_review_enforcement.py:SOUNDNESS_PATH_GLOBS — narration derived from SOUNDNESS_PREFIXES for the review-enforcement predicate; will pick up new prefixes automatically once SOUNDNESS_PREFIXES changes, but double-check the printed glob list still reads sensibly.",
+        "decision": "reuse",
+        "item_id": "soundness-surface-widening",
+        "path": "_project/scripts/ruleset_review_enforcement.py:SOUNDNESS_PATH_GLOBS"
+      },
+      {
+        "concept": "tests/unit/test_auto_merge_soundness_paths.py:test_codeowners_covers_soundness_paths — the pinned unit test asserting CODEOWNERS lines match the predicate; update it alongside the prefix change, do not let it silently start failing.",
+        "decision": "reuse",
+        "item_id": "soundness-surface-widening",
+        "path": "tests/unit/test_auto_merge_soundness_paths.py:test_codeowners_covers_soundness_paths"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "soundness-surface-widening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/expected_results/"
+      },
+      {
+        "item_id": "soundness-surface-widening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/result_capture.py"
+      },
+      {
+        "item_id": "soundness-surface-widening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "soundness-surface-widening",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/ruleset_drift_check.py"
+      },
+      {
+        "item_id": "soundness-surface-widening",
+        "kind": "only_modify",
+        "path_glob": ".github/CODEOWNERS"
+      },
+      {
+        "item_id": "soundness-surface-widening",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/auto_merge_soundness_paths.py"
+      },
+      {
+        "item_id": "soundness-surface-widening",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/ruleset_review_enforcement.py"
+      },
+      {
+        "item_id": "soundness-surface-widening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_auto_merge_soundness_paths.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py -v",
+        "description": "Soundness-path predicate unit tests pass with the widened set, including new true/false cases for expected_results and result_capture.py",
+        "expected": "all tests pass, including test_codeowners_covers_soundness_paths",
+        "item_id": "soundness-surface-widening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "printf 'benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json\\n' | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin",
+        "description": "A PR path under the new prefixes is classified as soundness=true",
+        "expected": "true",
+        "item_id": "soundness-surface-widening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "soundness-surface-widening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "soundness-surface-widening",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "soundness-surface-widening",
+        "notes": "Recommend at minimum: benchbox/core/expected_results/ (all of it — the\nloader, registry, and digest fixtures together define correctness) and\nbenchbox/platforms/base/result_capture.py (single file, low churn). For\nbenchbox/sql_compat/, weigh whether to include the whole tree (high churn,\nmost edits are routine per-platform rule additions) versus a narrower\nsubset — e.g. only benchbox/sql_compat/rules/_registration.py and\nbenchbox/sql_compat/resolver.py/decision.py (the rule-dispatch core, where\na bug silently changes which rewrites apply) rather than every\nrules/*_rewrites.py leaf. Decide and record the reasoning in the PR\ndescription; do not widen sql_compat/ wholesale without weighing the\nfriction tradeoff explicitly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide the widened prefix/glob set, weighing review friction against oracle coverage",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "soundness-surface-widening",
+        "notes": "Edit _project/scripts/auto_merge_soundness_paths.py:SOUNDNESS_PREFIXES and\n.github/CODEOWNERS together in the same commit. Update\ntests/unit/test_auto_merge_soundness_paths.py's parametrized\nis_soundness_path cases (both matching and non-matching) and\ntest_codeowners_covers_soundness_paths to reflect the new set. Run the\nfull test file, not just the new cases, to catch regressions in the\nexisting equivalence/parsers/validation.py coverage.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update SOUNDNESS_PREFIXES and CODEOWNERS in lockstep; keep the pinning test green",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "soundness-surface-widening",
+        "notes": "SOUNDNESS_PATH_GLOBS in _project/scripts/ruleset_review_enforcement.py is\nderived from SOUNDNESS_PREFIXES, so no code change should be needed, but\nrun its CLI against a fixture to eyeball that the expanded glob list in\nits FAILED/OK output still reads clearly (it's user-facing text in the\nrunbook verify command's output).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update ruleset_review_enforcement.py's narration and confirm it renders correctly",
+        "wid": "w3"
+      }
+    ]
+  }
+}

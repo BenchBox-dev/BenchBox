@@ -1,0 +1,90 @@
+{
+  "context": "Throwaway shell only; nothing merged except docs/spikes.md. Verify Codex Desktop tolerates a ProxyCommand host entry if exec path wins (it enumerates ~/.ssh/config). Anti-pattern: do not build setup-ssh.sh here; spike answers one question.",
+  "description": "DECISION SPIKE, throwaway code only. Unverified assumption from review: nobody knows whether the host can reach a --publish port of a container on an --internal network (no host gateway). Test: internal-network container running nc -l 2222 with --publish 127.0.0.1:2299:2222, connect from host. Fallback to also test: ssh ProxyCommand \"container exec -i NAME nc 127.0.0.1 2222\" which needs no published port and opens zero ingress holes. OUTPUT IS A DECISION: docs/spikes.md gets a \"Spike A verdict:\" line naming publish or exec as the Phase 3 ingress design, with raw command transcripts. Phase 3 must not start until this verdict exists. GUARDRAIL: if publish works, still record the exec fallback as the macOS 26.1 (#919) workaround.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "agentbox-spike-a-ssh-ingress-decision",
+        "needs_item": "agentbox-phase0-fork-and-preflight-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-07T01:44:46Z",
+      "created_at": "2026-08-07T00:00:15Z",
+      "worktree": "agent-container"
+    },
+    "preserves": [
+      {
+        "behavior": "No changes to scripts or Containerfile from this spike",
+        "item_id": "agentbox-spike-a-ssh-ingress-decision"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agentbox-spike-a-ssh-ingress-decision",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": " cd ~/Developer/agent-container && grep -qE \"^Spike A verdict: (publish|exec|socket)\" docs/spikes.md",
+        "description": "Verdict recorded ",
+        "expected": null,
+        "item_id": "agentbox-spike-a-ssh-ingress-decision",
+        "last_result": "pass",
+        "last_run": "2026-08-07T01:44:38Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agentbox-spike-a-ssh-ingress-decision",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "agentbox-spike-a-ssh-ingress-decision",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "publish experiment re-run after refutation; corrected finding: publish works full-duplex, host-side half-close is the real defect; commit eb6270b",
+        "item_id": "agentbox-spike-a-ssh-ingress-decision",
+        "notes": null,
+        "started_at": "2026-08-07T01:43:40Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run publish-from-internal-network experiment and capture transcript",
+        "wid": "w1"
+      },
+      {
+        "evidence": "exec ProxyCommand tested; also passes full real-sshd battery; commit eb6270b",
+        "item_id": "agentbox-spike-a-ssh-ingress-decision",
+        "notes": null,
+        "started_at": "2026-08-07T01:43:43Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run ProxyCommand-over-container-exec experiment and capture transcript",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Spike A verdict: publish, recorded docs/spikes.md:131 with correction notice and Phase 3 design; commit eb6270b",
+        "item_id": "agentbox-spike-a-ssh-ingress-decision",
+        "notes": null,
+        "started_at": "2026-08-07T01:43:45Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record Spike A verdict line and chosen Phase 3 ingress design in docs/spikes.md",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "context": "Hand-run only, no repo scripts changed. Measure, do not trust: verify claude and codex actually honor HTTPS_PROXY. Anti-patterns: no --with-internet workarounds counted as success (that is exactly the failure mode this gate exists to prevent); no allowlist wildcards; secrets stay in env, never in the repo or in this tracker (export is public).",
+  "description": "THE go/no-go gate for the whole program. The hard requirement (arbitrary agents inside the sandbox) fails with upstream single-target socat because socat raw-forwards to the local inference server and is not an HTTP proxy; cloud agents need a CONNECT proxy doing DNS on the internet side. Hand-run tinyproxy in an alpine container dual-homed on sandboxed+default. From a second sandboxed container using the EXISTING pi image (claude-code is already installed at Containerfile:66): HTTPS_PROXY=http://EGRESS_IP:8888 claude -p \"say hi\" must succeed while curl --max-time 5 https://google.com must fail. Repeat for codex exec with codex hand-installed. Capture every denied domain from tinyproxy logs as the seed AGENT_ALLOWLIST per agent. GATE RULE: if this cannot be made to work after honest effort, the Apple-container approach dies — record NO-GO, escalate the Lima pivot to Joe, and do not start Phase 1.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "agentbox-spike-b-sandboxed-cloud-agent-gate",
+        "needs_item": "agentbox-phase0-fork-and-preflight-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-07T01:44:49Z",
+      "created_at": "2026-08-07T00:00:19Z",
+      "worktree": "agent-container"
+    },
+    "preserves": [
+      {
+        "behavior": "No repo script or image changes from this spike",
+        "item_id": "agentbox-spike-b-sandboxed-cloud-agent-gate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agentbox-spike-b-sandboxed-cloud-agent-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd ~/Developer/agent-container && grep -qE \"^Spike B verdict: (GO|NO-GO)\" docs/spikes.md",
+        "description": "Verdict recorded",
+        "expected": null,
+        "item_id": "agentbox-spike-b-sandboxed-cloud-agent-gate",
+        "last_result": "pass",
+        "last_run": "2026-08-07T01:44:40Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd ~/Developer/agent-container && grep -q \"api.anthropic.com\" docs/spikes.md",
+        "description": "Allowlist seeds captured",
+        "expected": null,
+        "item_id": "agentbox-spike-b-sandboxed-cloud-agent-gate",
+        "last_result": "pass",
+        "last_run": "2026-08-07T01:44:42Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agentbox-spike-b-sandboxed-cloud-agent-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "agentbox-spike-b-sandboxed-cloud-agent-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "agentbox-spike-b-sandboxed-cloud-agent-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "dual-homed tinyproxy proven; --network twice works, interface order sets default route and resolv.conf; commit 4080d18/a8ddc7a",
+        "item_id": "agentbox-spike-b-sandboxed-cloud-agent-gate",
+        "notes": null,
+        "started_at": "2026-08-07T01:43:48Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Stand up hand-run tinyproxy egress container dual-homed on sandboxed and default networks",
+        "wid": "w1"
+      },
+      {
+        "evidence": "claude leg NOT run: host uses Keychain OAuth, no portable credential; credential-minting declined as unauthorized. Recorded as UNTESTED, carried to Phase 2 as blocker",
+        "item_id": "agentbox-spike-b-sandboxed-cloud-agent-gate",
+        "notes": null,
+        "started_at": "2026-08-07T01:43:51Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Prove sandboxed claude round-trip via proxy while direct egress fails; capture transcript",
+        "wid": "w2"
+      },
+      {
+        "evidence": "codex authenticated round-trip through proxy reached OpenAI quota limit; domains captured as allowlist seeds; commit a8ddc7a",
+        "item_id": "agentbox-spike-b-sandboxed-cloud-agent-gate",
+        "notes": null,
+        "started_at": "2026-08-07T01:43:53Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Prove sandboxed codex round-trip; capture denied-domain log as allowlist seeds per agent",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Spike B verdict: GO (conditional - claude auth leg unverified, blocking Phase 2) at docs/spikes.md:465",
+        "item_id": "agentbox-spike-b-sandboxed-cloud-agent-gate",
+        "notes": null,
+        "started_at": "2026-08-07T01:43:56Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record Spike B verdict GO or NO-GO with evidence in docs/spikes.md",
+        "wid": "w4"
+      }
+    ]
+  }
+}

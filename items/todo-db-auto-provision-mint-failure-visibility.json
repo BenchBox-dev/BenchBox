@@ -1,0 +1,102 @@
+{
+  "context": "Thread a structured provision-result (ok|skipped_absent|failed{reason}) through _resolve_backend into doctor and the implicit-local write refusal; never log secrets.",
+  "description": "Defect found during 2026-08-05 tracker-simplification batch close-out (post #1580).\n\n_when_ no backend is selected, `_try_turso_auto_provision` returns None on ANY mint failure (turso absent, not logged in, nonzero exit, empty token) and `_resolve_backend` falls through to the implicit local DB. doctor then reports \"implicit local fallback\" with no indication that a mint was attempted and failed. Operators debugging \"why am I on local?\" cannot tell \"turso missing\" from \"turso present but token mint failed\" (e.g. wrong expiration flag, auth expired, wrong DB name).\n\nDesired: when turso is on PATH and a mint is attempted, doctor and the write-refusal path report a distinct WARN/FAIL (mint attempted, reason class: not-logged-in / bad-expiration / empty-output / nonzero-exit) without ever printing the token or full URL. Precedence and hermetic tests that stub turso-absent must stay unchanged.",
+  "legacy": {
+    "item_meta": {
+      "category": "tracker-simplification",
+      "completed_at": "2026-08-08T00:42:49Z",
+      "completed_pr": 1641,
+      "created_at": "2026-08-05T23:19:11Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Explicit --db / TODO_DB_PATH / TODO_DB_URL still outrank auto-provision",
+        "item_id": "todo-db-auto-provision-mint-failure-visibility"
+      },
+      {
+        "behavior": "Hermetic tests continue to stub turso absent by default",
+        "item_id": "todo-db-auto-provision-mint-failure-visibility"
+      },
+      {
+        "behavior": "Tokens and hosted URLs are never printed or written to disk",
+        "item_id": "todo-db-auto-provision-mint-failure-visibility"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-db-auto-provision-mint-failure-visibility",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "todo-db-auto-provision-mint-failure-visibility",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/todo-db-tracker.md"
+      },
+      {
+        "item_id": "todo-db-auto-provision-mint-failure-visibility",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_doctor.py"
+      },
+      {
+        "item_id": "todo-db-auto-provision-mint-failure-visibility",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_db_turso_autoprovision.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": " uv run -- python -m pytest tests/unit/scripts/test_todo_db_turso_autoprovision.py -q ",
+        "description": "Unit coverage for mint-failure paths ",
+        "expected": " exit 0",
+        "item_id": "todo-db-auto-provision-mint-failure-visibility",
+        "last_result": "pass",
+        "last_run": "2026-08-08T00:42:36Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": " uv run -- python -m pytest tests/unit/scripts/test_todo_db_doctor.py -q ",
+        "description": "Doctor suite still green ",
+        "expected": " exit 0",
+        "item_id": "todo-db-auto-provision-mint-failure-visibility",
+        "last_result": "pass",
+        "last_run": "2026-08-08T00:42:44Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-db-auto-provision-mint-failure-visibility",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "structured provision result in todo_db.py PR #1602",
+        "item_id": "todo-db-auto-provision-mint-failure-visibility",
+        "notes": null,
+        "started_at": "2026-08-05T23:28:41Z",
+        "started_branch": "fix/todo-db-mint-failure-visibility",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/batch2-mint",
+        "status": "done",
+        "summary": "Return structured provision result from _try_turso_auto_provision",
+        "wid": "w1"
+      },
+      {
+        "evidence": "doctor WARN + write-refusal reason class; 31 unit tests PR #1602",
+        "item_id": "todo-db-auto-provision-mint-failure-visibility",
+        "notes": null,
+        "started_at": "2026-08-05T23:40:13Z",
+        "started_branch": "fix/todo-db-mint-failure-visibility",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/batch2-mint",
+        "status": "done",
+        "summary": "Report mint-failure class in doctor and write-refusal (no secrets)",
+        "wid": "w2"
+      }
+    ]
+  }
+}

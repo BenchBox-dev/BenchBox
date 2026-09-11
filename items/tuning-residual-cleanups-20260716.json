@@ -1,0 +1,102 @@
+{
+  "description": "Small residuals recorded across the 2026-07 remediation batch reviews:\n1. platforms/base/tuning.py:109 still passes display platform_name to\n   is_compatible_with_platform (zero runtime call sites; flagged in #1174).\n2. ClickHouseTuningMixin.apply_platform_optimizations reads\n   platform_config.clickhouse_optimizations - an attribute\n   PlatformOptimizationConfiguration never defines; pre-existing dead/broken\n   code that raises if invoked (found during applied-ledger work).\n3. Module-size guardrail exact-fit races: two batch PRs tripped\n   tests/system/test_module_size_thresholds.py because limits are set to the\n   exact current size; adopt a small headroom convention (e.g. +25 lines)\n   with a comment documenting it.\n4. Blind-spot bookkeeping: triage the five 2026-07-12 tuning blind-spots to\n   actioned via sweep_blind_spots.py (all were remediated by the batch), and\n   add one new capture for the newly-proven class: config silently lost\n   across a serialization boundary between producer and consumer (the\n   from_config gap).",
+  "legacy": {
+    "item_meta": {
+      "category": "Code Quality",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Guardrail still fails on real unbounded growth (headroom is small and documented)",
+        "item_id": "tuning-residual-cleanups-20260716"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-residual-cleanups-20260716",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/**"
+      },
+      {
+        "item_id": "tuning-residual-cleanups-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/tuning.py"
+      },
+      {
+        "item_id": "tuning-residual-cleanups-20260716",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/**"
+      },
+      {
+        "item_id": "tuning-residual-cleanups-20260716",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "tuning-residual-cleanups-20260716",
+        "kind": "only_modify",
+        "path_glob": "tests/system/test_module_size_thresholds.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms tests/system/test_module_size_thresholds.py -q -k 'tuning or size'",
+        "description": "Targeted suites + blind-spot validation green",
+        "expected": "All passing; validate_blind_spot.py OK on new/changed captures",
+        "item_id": "tuning-residual-cleanups-20260716",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-residual-cleanups-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Canonicalize or remove the tuning.py:109 display-name path",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-residual-cleanups-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix or delete the dead clickhouse_optimizations branch (decide by reading callers; add test either way)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-residual-cleanups-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Guardrail headroom convention in test_module_size_thresholds.py with documented policy",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-residual-cleanups-20260716",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Blind-spot triage (5x actioned) + new capture for the serialization-boundary config-loss class; validate files",
+        "wid": "w4"
+      }
+    ]
+  }
+}

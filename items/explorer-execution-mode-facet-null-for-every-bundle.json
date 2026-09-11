@@ -1,0 +1,185 @@
+{
+  "context": "DECISION GATE w1: pick the authoritative source key and its precedence order, from evidence rather than assumption. Candidates: platform.config.execution_mode (what current develop emits), execution.mode, config.mode. The 105 bundles where config.mode='dataframe' but execution.mode='sql' prove the two disagree, so the precedence must be justified against actual run provenance, not chosen for convenience. Record which key wins and why, and what happens when they conflict (prefer leaving NULL over guessing).\n\nThen fix the extractor, backfill the snapshot, and pin it with a test that fails if any published bundle yields NULL. Audit tuning_mode, compliance_class, and has_plans for the same class of key-path drift before closing.",
+  "description": "MEASURED 2026-08-23. execution_mode is NULL for all 207 rows in results-explorer/public/data/results.duckdb, so the SQL-vs-DataFrame facet -- the differentiator BenchBox leads with in the README -- filters nothing on the public site.\n\nCause: _project/scripts/explorer_pipeline/transformer.py:339-351 (_execution_mode) reads only config.execution_mode and execution.execution_mode. No bundle writes either key.\n - Legacy corpus bundles write config.mode and execution.mode (across 207: 105 have config.mode='dataframe' with execution.mode='sql', 100 have sql/sql, 2 dataframe/dataframe -- so config.mode alone is NOT a safe source).\n - A bundle produced by current develop writes platform.config.execution_mode='sql' (verified on tpcds_sf1_duckdb_sql_20260823_085826_fc9467d8.json). The transformer misses this too, so the facet stays NULL for NEW bundles as well. This is a live bug, not a legacy-data problem.\n\nSame shape, same file, worth checking together: tuning_mode is NULL for all 207 rows, compliance_class is NULL for all 207, and has_plans is false for all 207.\n\nNot to be confused with rewrite-explorer-transformer-to-use-typed-models-throughout, which is a refactor and does not fix this.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Default a NULL execution_mode to 'sql'",
+        "instead": "INSTEAD leave NULL and let the test fail",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "why": "it would mislabel every DataFrame result and the facet would be confidently wrong instead of visibly empty"
+      },
+      {
+        "dont": "Read config.mode alone",
+        "instead": "INSTEAD apply the precedence decided in w1",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "why": "105 of 207 bundles have config.mode='dataframe' while execution.mode='sql'"
+      },
+      {
+        "dont": "Rewrite the transformer to typed models as part of this fix",
+        "instead": "INSTEAD make the narrow fix and leave the refactor to its own item",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "why": "that is a separate tracked refactor and it would bury a one-key fix in a large diff"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-23T19:30:45Z",
+      "completed_pr": 1837,
+      "created_at": "2026-08-23T13:08:26Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "A genuinely unknown mode stays NULL rather than being inferred",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle"
+      },
+      {
+        "behavior": "Bundles remain unmodified: this is a read-side extraction fix, not a corpus rewrite",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_tuning_mode already documents a multi-location fallback pattern",
+        "decision": "extend",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "path": "_project/scripts/explorer_pipeline/transformer.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/ && uv run -- python -c \"import duckdb; c=duckdb.connect(\\\"results-explorer/public/data/results.duckdb\\\", read_only=True); rows=c.execute(\\\"select execution_mode, count(*) from results group by 1 order by 1\\\").fetchall(); assert rows and all(mode in (\\\"dataframe\\\", \\\"sql\\\") and count > 0 for mode, count in rows), rows; assert c.execute(\\\"select count(*) from results where execution_mode is null\\\").fetchone()[0] == 0\"",
+        "description": "Published corpus resolves execution_mode without NULL rows",
+        "expected": "no NULL bucket; sql and dataframe both populated",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "last_result": "pass",
+        "last_run": "2026-08-23T19:30:33Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=/tmp/benchbox-rx-exec-mode-next uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 --non-interactive && uv run -- python -c \"from pathlib import Path; import json; files=list(Path(\\\"/tmp/benchbox-rx-exec-mode-next/results\\\").glob(\\\"*.json\\\")); assert files, \\\"no result bundle\\\"; payload=json.loads(files[-1].read_text()); assert payload.get(\\\"platform\\\",{}).get(\\\"config\\\",{}).get(\\\"execution_mode\\\") == \\\"sql\\\", payload.get(\\\"platform\\\",{}).get(\\\"config\\\")\"",
+        "description": "A freshly generated DuckDB bundle resolves execution_mode",
+        "expected": "new DuckDB result carries execution_mode=sql",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "last_result": "pass",
+        "last_run": "2026-08-23T19:30:42Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Measured 2026-08-23 over all 207 bundles: config.execution_mode and execution.execution_mode absent from every bundle; platform.config.execution_mode present on all 207; config.mode present on all 207 and agreeing; execution.mode says sql for 105 dataframe runs",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "notes": null,
+        "started_at": "2026-08-23T14:07:05Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-derive the NULL counts and the key paths present in both a legacy bundle and a freshly generated one",
+        "wid": "w0"
+      },
+      {
+        "evidence": "DECISION: precedence config.execution_mode > platform.config.execution_mode > config.mode > execution.execution_mode. execution.mode EXCLUDED - it misreports 105 dataframe runs as sql. Conflict rule: first hit wins; value outside {sql,dataframe} stays None. Independent witness: filename suffix _df_/_sql_ agrees on all 200 bundles that carry one.",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "notes": null,
+        "started_at": "2026-08-23T14:07:08Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "DECISION GATE - choose the source key and precedence, with the conflict rule for the 105 disagreeing bundles; record the reasoning",
+        "wid": "w1"
+      },
+      {
+        "evidence": "transformer.py _execution_mode rewritten with _EXECUTION_MODE_KEY_PATHS. Corpus result: 207 NULL -> 107 dataframe / 100 sql. PR #1837",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "notes": null,
+        "started_at": "2026-08-23T14:07:10Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Fix _execution_mode and regenerate the snapshot",
+        "wid": "w2"
+      },
+      {
+        "evidence": "tests/unit/scripts/explorer_pipeline/test_transformer.py: TestExecutionModeExtraction (8 cases) plus TestPublishedCorpusResolvesExecutionMode - fails if any published bundle yields NULL, and if resolved mode disagrees with the filename suffix",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "notes": null,
+        "started_at": "2026-08-23T14:07:13Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add a pipeline test that fails when a published bundle produces a NULL execution_mode",
+        "wid": "w3"
+      },
+      {
+        "evidence": "AUDITED: tuning_mode, compliance_class and has_plans are NOT the same defect. Zero bundles carry any tuning, compliance or plan key, so those extractors are correct and the facets are empty for lack of DATA, not a missing reader. Remedy belongs to the corpus item (re-run with tuning/plan capture), not to a transformer fix.",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "notes": null,
+        "started_at": "2026-08-23T14:07:15Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Audit tuning_mode, compliance_class and has_plans for the same key-path drift and record findings; fix or file separately",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Verified by running the extractor over the full corpus post-fix: 107 dataframe / 100 sql, zero NULL. make pr-preflight green (28,019 passed).",
+        "item_id": "explorer-execution-mode-facet-null-for-every-bundle",
+        "notes": null,
+        "started_at": "2026-08-23T14:07:18Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm the facet actually filters in the built site",
+        "wid": "w5"
+      }
+    ]
+  }
+}

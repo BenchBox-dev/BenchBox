@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #574 of snowflake-clickhouse-open-table-format-loading.\nDeferred: ClickHouse Delta support via conversion or external tooling\nReason deferred: ClickHouse lacks native Delta support; would need Parquet conversion layer",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:58Z",
+      "worktree": "main"
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "description": "Shim UAT protocol against the hosted backend.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:52:14Z",
+        "from_item": "uat-hosted-item",
+        "id": 630,
+        "reason": "out of scope",
+        "resolution": "promoted",
+        "resolved_item": "uat-hosted-item-followup",
+        "resolved_reason": null,
+        "summary": "follow-up polish"
+      }
+    ],
+    "item_meta": {
+      "completed_at": "2026-07-18T19:52:23Z",
+      "created_at": "2026-07-18T19:51:56Z",
+      "worktree": "spike"
+    },
+    "preserves": [
+      {
+        "behavior": "existing behavior stays",
+        "item_id": "uat-hosted-item"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-hosted-item",
+        "kind": "only_modify",
+        "path_glob": "_project/*"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "true",
+        "description": "unit gate",
+        "expected": null,
+        "item_id": "uat-hosted-item",
+        "last_result": "pass",
+        "last_run": "2026-07-18T19:52:12Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-hosted-item",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "pytest tests/unit/scripts -q: 800 passed",
+        "item_id": "uat-hosted-item",
+        "notes": null,
+        "started_at": "2026-07-18T19:52:06Z",
+        "started_branch": "feat/todo-db-hosted",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "implement the thing",
+        "wid": "w1"
+      },
+      {
+        "evidence": "verify ladder seq 1 pass",
+        "item_id": "uat-hosted-item",
+        "notes": null,
+        "started_at": "2026-07-18T19:52:10Z",
+        "started_branch": "feat/todo-db-hosted",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "verify the thing",
+        "wid": "w2"
+      }
+    ]
+  }
+}

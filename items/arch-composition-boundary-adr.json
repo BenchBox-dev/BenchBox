@@ -1,0 +1,251 @@
+{
+  "context": "Characterization of the two SQL primitives first. Two small prototypes in a branch or appendix, then a short ADR under docs/development/adr/. No production fold of cloud adapters in this item.",
+  "description": "DECISION GATE. Do not start a repo-wide injection campaign before this ADR lands.\n\nDeclared layering is utils < core < platforms < cli (.importlinter). Implemented layering allowlists ~34 core→platforms edges including runner.runner, platform_registry→platforms.base, and dryrun→platforms. run_service already injects AdapterFactory; runner.py still imports get_platform_adapter.\n\nOption A: finish 'core is kernel' with protocols and injection; delete allowlisted edges incrementally.\nOption B: introduce benchbox.runtime above core and platforms as the composition layer. benchbox/runtime does not exist today — B is greenfield.\n\nPrototype requirement: one of the two prototypes MUST be the SQL execute/validate edge. It already straddles the boundary:\n- CursorValidationQueryExecutionMixin in benchbox/core/benchmark_mixins.py:159 (inheritance, logs PASS/FAIL, always connection.cursor(), no rollback, no result digest)\n- execute_sql_query in benchbox/platforms/base/sql_execution.py:49 (injected callables, rollback, result digest, pre-created cursor, validation without PASS/FAIL logs)\n\nThose two disagree on observable behavior. Folding either way without choosing a home layer is the defect this ADR prevents.\n\nSecond prototype: one runner edge (remove get_platform_adapter from runner.py behind the existing factory) OR one DataFrame edge. Do not invent a synthetic example.\n\nStop condition: the ADR names (1) the winning option, (2) the winning SQL primitive's home layer, (3) the deletion order for allowlisted core→platforms edges. If neither option survives both prototypes, record that outcome and stop — do not invent Option C as a mechanical core split.\n\nDoes not block arch-delete-dead-setup-lifecycle-fork or arch-docs-truth-refresh.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a third SQL execute helper",
+        "instead": "choose one home layer",
+        "item_id": "arch-composition-boundary-adr",
+        "why": "two incumbents already disagree; a third is more drift"
+      },
+      {
+        "dont": "split benchbox/core into packages here",
+        "instead": "decide A vs B only",
+        "item_id": "arch-composition-boundary-adr",
+        "why": "the plugin-seam doc rejects mechanical core splits"
+      },
+      {
+        "dont": "start deleting .importlinter ignores across the repo in this item",
+        "instead": "name the deletion order only",
+        "item_id": "arch-composition-boundary-adr",
+        "why": "allowlist deletion is ordered by the ADR, then executed later"
+      },
+      {
+        "dont": "treat Firebolt MRO depth as the reason not to share a primitive",
+        "instead": "compare rollback, digest, cursor ownership, and validation logging",
+        "item_id": "arch-composition-boundary-adr",
+        "why": "depth 14 vs 15 is not the defect"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture",
+      "completed_at": "2026-08-14T02:15:26Z",
+      "completed_pr": 1728,
+      "created_at": "2026-08-14T01:18:22Z",
+      "worktree": "arch-simplification"
+    },
+    "preserves": [
+      {
+        "behavior": "MCP still must not import benchbox.cli",
+        "item_id": "arch-composition-boundary-adr"
+      },
+      {
+        "behavior": "No production cloud adapter execute_query body is replaced in this item",
+        "item_id": "arch-composition-boundary-adr"
+      },
+      {
+        "behavior": "One-engine scoped-surfaces ADR remains in force",
+        "item_id": "arch-composition-boundary-adr"
+      },
+      {
+        "behavior": "Public PlatformAdapter and BaseBenchmark contracts unchanged",
+        "item_id": "arch-composition-boundary-adr"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "allowlisted layering exceptions",
+        "decision": "extend",
+        "item_id": "arch-composition-boundary-adr",
+        "path": ".importlinter"
+      },
+      {
+        "concept": "AdapterFactory injection",
+        "decision": "reuse",
+        "item_id": "arch-composition-boundary-adr",
+        "path": "benchbox/core/run_service.py"
+      },
+      {
+        "concept": "core API files free of concrete adapter imports",
+        "decision": "extend",
+        "item_id": "arch-composition-boundary-adr",
+        "path": "docs/design/future-state/benchmark-family-plugin-seam/README.md"
+      },
+      {
+        "concept": "one engine, scoped surfaces, layering",
+        "decision": "extend",
+        "item_id": "arch-composition-boundary-adr",
+        "path": "docs/development/adr/adr-one-engine-scoped-surfaces.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/databricks/adapter.py"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/redshift.py"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_mixins.py"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/sql_execution.py"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/benchmark-family-plugin-seam/README.md"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/contract-index.md"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/**"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/runner/**"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make lint-imports",
+        "description": "Import linter still green (no unplanned ignore deletions)",
+        "expected": "PASS",
+        "item_id": "arch-composition-boundary-adr",
+        "last_result": "pass",
+        "last_run": "2026-08-14T02:15:23Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f docs/development/adr/adr-runtime-composition-boundary.md && rg -q \"Option A|Option B|neither survived\" docs/development/adr/adr-runtime-composition-boundary.md",
+        "description": "Runtime composition ADR exists and records the selected boundary",
+        "expected": "exit 0",
+        "item_id": "arch-composition-boundary-adr",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "arch-composition-boundary-adr",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Current origin/develop is 723126bf3; .importlinter still declares utils < core < platforms < cli, with runner.runner and related core-to-platforms edges allowlisted; SQL primitives remain at benchmark_mixins.py:159 and base/sql_execution.py:49.",
+        "item_id": "arch-composition-boundary-adr",
+        "notes": null,
+        "started_at": "2026-08-14T02:03:49Z",
+        "started_branch": "docs/arch-composition-boundary-adr",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-composition-boundary-adr",
+        "status": "done",
+        "summary": "Re-validate cited importlinter edges and SQL primitive line numbers on current origin/develop.",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Compared both incumbents: the core mixin always allocates/closes connection.cursor, emits query_statistics/resource_usage, logs validation PASS/FAIL, and does not rollback; the platform helper accepts a pre-created cursor, rolls back failures, supports result digests, and has no PASS/FAIL log path. Import inventory confirms runner.py:66 and runner.py:1132 are the direct factory edges.",
+        "item_id": "arch-composition-boundary-adr",
+        "notes": null,
+        "started_at": "2026-08-14T02:03:54Z",
+        "started_branch": "docs/arch-composition-boundary-adr",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-composition-boundary-adr",
+        "status": "done",
+        "summary": "Inventory allowlisted core→platforms edges and the two SQL execute primitives' behavioral deltas.",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added executable SQL prototypes under tests/unit/platforms/test_composition_boundary_sql_prototypes.py: Option A uses CursorValidationQueryExecutionMixin; Option B injects execute_sql_query with callbacks. Four characterization assertions preserve the observable cursor, rollback, statistics, and lifecycle differences.",
+        "item_id": "arch-composition-boundary-adr",
+        "notes": null,
+        "started_at": "2026-08-14T02:08:23Z",
+        "started_branch": "docs/arch-composition-boundary-adr",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-composition-boundary-adr",
+        "status": "done",
+        "summary": "Prototype the SQL execute edge both as core mixin and as platforms-layer injected function.",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added tests/unit/core/runner/test_composition_boundary_runner_prototype.py: run_service AdapterFactory injection is exercised, and _configure_lifecycle_adapter accepts a prebuilt adapter without invoking runner.get_platform_adapter. Both runner prototypes pass.",
+        "item_id": "arch-composition-boundary-adr",
+        "notes": null,
+        "started_at": "2026-08-14T02:08:28Z",
+        "started_branch": "docs/arch-composition-boundary-adr",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-composition-boundary-adr",
+        "status": "done",
+        "summary": "Prototype one runner or DataFrame injection edge; do not fold production adapters.",
+        "wid": "w3"
+      },
+      {
+        "evidence": "ADR docs/development/adr/adr-runtime-composition-boundary.md records Option A winner, core home for the canonical SQL primitive, executable prototype findings, runner injection gate, ordered allowlist deletion waves, and explicit rejection of benchbox.runtime. Future-state indexes link the decision without changing runtime code.",
+        "item_id": "arch-composition-boundary-adr",
+        "notes": null,
+        "started_at": "2026-08-14T02:08:51Z",
+        "started_branch": "docs/arch-composition-boundary-adr",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-arch-composition-boundary-adr",
+        "status": "done",
+        "summary": "Write the ADR with winner, primitive home layer, and allowlist deletion order — or record neither survived.",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,256 @@
+{
+  "context": "Extend the lifecycle boundary without changing worktree-remove. Resolve canonical target identity, refresh PR and base evidence, query controller release evidence, and emit bounded human and JSON previews. Accept no list, glob, age, classification bucket, or branch-only sweep.",
+  "description": "Add make worktree-finish as preview-only for one exact absolute path and expected full branch-tip OID. Repeat every structural, ownership, cleanliness, exact PR, base, head, merge-commit, and remote evidence check. Never trust a saved audit. Show the exact proposed normal worktree removal and expected-old-OID local ref deletion while performing no mutation.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Accept lists, globs, ages, or branch-only input",
+        "instead": "Require one canonical path and expected OID",
+        "item_id": "worktree-maintenance-finish-preview",
+        "why": "Broad selectors weaken identity"
+      },
+      {
+        "dont": "Consume an old FINISH_CANDIDATE",
+        "instead": "Repeat every check at preview time",
+        "item_id": "worktree-maintenance-finish-preview",
+        "why": "State can change after audit"
+      },
+      {
+        "dont": "Hide apply behind an undocumented flag",
+        "instead": "Mechanically disable mutation",
+        "item_id": "worktree-maintenance-finish-preview",
+        "why": "Destructive enablement needs separate review"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "needs_item": "worktree-maintenance-readonly-audit"
+      }
+    ],
+    "item_meta": {
+      "category": "Repository Maintenance",
+      "completed_at": "2026-09-10T23:07:00Z",
+      "completed_pr": 2075,
+      "created_at": "2026-08-26T01:49:21Z",
+      "worktree": "worktree-maintenance"
+    },
+    "preserves": [
+      {
+        "behavior": "Active, foreign, dirty, locked, detached, missing, moved, ambiguous, or API-uncertain targets are rejected.",
+        "item_id": "worktree-maintenance-finish-preview"
+      },
+      {
+        "behavior": "Every preview uses fresh evidence and an expected full OID.",
+        "item_id": "worktree-maintenance-finish-preview"
+      },
+      {
+        "behavior": "Preview changes no worktree, branch, ref, lock, PR, remote, tracker, or controller state.",
+        "item_id": "worktree-maintenance-finish-preview"
+      },
+      {
+        "behavior": "worktree-remove retains existing behavior and keeps the branch.",
+        "item_id": "worktree-maintenance-finish-preview"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "read-only evidence",
+        "decision": "reuse",
+        "item_id": "worktree-maintenance-finish-preview",
+        "path": "_project/scripts/worktree_audit.py"
+      },
+      {
+        "concept": "native lifecycle wrapper",
+        "decision": "extend",
+        "item_id": "worktree-maintenance-finish-preview",
+        "path": "make/worktrees.mk"
+      },
+      {
+        "concept": "exact clean removal checks",
+        "decision": "extend",
+        "item_id": "worktree-maintenance-finish-preview",
+        "path": "scripts/worktree_lifecycle.sh"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "kind": "only_modify",
+        "path_glob": "docs/development/makefile-architecture.md"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/dev-loop-worktrees.md"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "kind": "only_modify",
+        "path_glob": "make/help.mk"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "kind": "only_modify",
+        "path_glob": "make/inventory.json"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "kind": "only_modify",
+        "path_glob": "make/worktrees.mk"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/verify_lane_isolation.py"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "kind": "only_modify",
+        "path_glob": "scripts/worktree_finish.py"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "kind": "only_modify",
+        "path_glob": "scripts/worktree_lifecycle.sh"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/worktree/**"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_check_release_curation.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/integration/worktree/test_worktree_finish_preview.py tests/integration/worktree/test_worktree_release_dirty_guard.py -q",
+        "description": "Finish preview tests",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-finish-preview",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "if git diff --unified=0 origin/develop...HEAD -- scripts make | rg -n '^\\+.*(git worktree remove|git update-ref -d|branch -D)'; then exit 1; fi",
+        "description": "No destructive preview invocation",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-finish-preview",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make makefile-inventory-check",
+        "description": "Make inventory",
+        "expected": "exit 0",
+        "item_id": "worktree-maintenance-finish-preview",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "worktree-maintenance-finish-preview",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Defined validate_inputs, FinishPreviewResult schema, human/json formats, and no-mutation verification.",
+        "item_id": "worktree-maintenance-finish-preview",
+        "notes": null,
+        "started_at": "2026-09-06T20:31:59Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Define exact preview inputs, outputs, errors, and no-mutation proof",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Implemented _check_worktree_structure validating target registration, cleanliness, lock state, branch attachment, and expected OID match.",
+        "item_id": "worktree-maintenance-finish-preview",
+        "notes": null,
+        "started_at": "2026-09-06T20:42:17Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement target, registration, repository, branch, head, lock, directory, and status revalidation",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Implemented _evaluate_pr_integration and controller hold revalidation, ensuring fresh PR reachability, tip checks, and opaque controller holds.",
+        "item_id": "worktree-maintenance-finish-preview",
+        "notes": null,
+        "started_at": "2026-09-06T20:42:25Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Refresh exact PR, base, head, merge commit, object, and manual-release evidence; treat controller evidence as opaque hold",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Implemented format_human_report and JSON serialization emitting bounded preview actions naming exact worktree path and expected-old-OID update-ref deletion.",
+        "item_id": "worktree-maintenance-finish-preview",
+        "notes": null,
+        "started_at": "2026-09-06T20:42:34Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Emit bounded previews naming only exact proposed worktree and expected-old-OID operations",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Added tests/integration/worktree/test_worktree_finish_preview.py with 21 tests covering wildcards, primary clone refusal, detached, locked, dirty, legacy, malformed, controller, and PR hold states.",
+        "item_id": "worktree-maintenance-finish-preview",
+        "notes": null,
+        "started_at": "2026-09-06T20:42:42Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Test movement, injection, symlinks, fork collisions, API failures, and every hold classification",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Verified zero mutation via test_actionable_preview_and_no_mutation and diff anti-pattern verification.",
+        "item_id": "worktree-maintenance-finish-preview",
+        "notes": null,
+        "started_at": "2026-09-06T20:43:00Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Decision gate: verify no preview path invokes worktree removal or ref deletion",
+        "wid": "w5"
+      }
+    ]
+  }
+}

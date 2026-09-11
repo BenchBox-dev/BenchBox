@@ -1,0 +1,175 @@
+{
+  "context": "Use DuckDB as reference because (a) it's the project's lingua franca and\n(b) TPC-H/TPC-DS expected answer sets exist for it. For each benchmark, run\nthe standard query set on reference + comparison platforms, normalize result\nshape (column order per query spec, decimal scale), then diff. Surface\ndivergences with row/column locator + values.\n\nFor tolerances, start strict (exact match) and add per-query overrides only\nwhen a real spec rule (e.g., TPC-H epsilon for floating-point aggregates)\njustifies it.\n\nTreat the pytest suite as the canonical execution surface for v1. If a\nhuman-facing CLI becomes desirable later, add it after the comparison\nsemantics stabilize rather than inventing `benchbox validate-results` up\nfront.\n",
+  "description": "Quality plan Phase 2b - anchor of the measurement-integrity workstream.\nBenchBox's product is trustworthy benchmark results, but the audit found no\ncentralized correctness validation comparing query results across platforms.\nToday, divergent results between (say) DuckDB and ClickHouse on the same\nTPC-H query at SF=0.01 would not fail CI.\n\nBuild a `core/validation/cross_platform.py` module plus a pytest-based\nvalidation suite. The core comparator should run a benchmark on a reference\nplatform (DuckDB) and a comparison platform, then assert result-set equality\nwith per-benchmark tolerances (numeric precision, ordering rules per TPC\nspec, NULL handling). Wire the integration suite into a nightly CI matrix\ncovering DuckDB × {ClickHouse local, DataFusion, Polars-DF} at SF=0.01.\n\nKeep v1 test-first rather than coupling it to a brand-new CLI surface. If\ncontributors still want a human-facing command after the pytest workflow\nproves useful, create that as a follow-up TODO instead of baking it into the\nfirst delivery.\n\nThis TODO is also the safety net for the adapter-base refactor\n(quality-refactor-adapter-base-into-cohesive-modules).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hide divergences with loose tolerances",
+        "instead": "every loosened tolerance must cite a spec rule",
+        "item_id": "quality-add-cross-platform-result-validation",
+        "why": "that defeats the purpose"
+      },
+      {
+        "dont": "invent a new top-level CLI in the first slice",
+        "instead": "stabilize the comparator in pytest first",
+        "item_id": "quality-add-cross-platform-result-validation",
+        "why": "command design will distract from correctness semantics"
+      },
+      {
+        "dont": "run on every PR",
+        "instead": "nightly only",
+        "item_id": "quality-add-cross-platform-result-validation",
+        "why": "cross-platform suites are expensive and flaky in cloud"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "quality-add-cross-platform-result-validation",
+        "id": 537,
+        "reason": "Split to follow-up quality-cross-platform-validation-integration-matrix to keep this completed TODO's review surface bounded.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: quality-cross-platform-validation-integration-matrix.yaml is already in _project/DONE — this integration-test wiring is complete.",
+        "summary": "Wire cross-platform result validation into integration tests over local platform pairs at SF=0.01"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "quality-add-cross-platform-result-validation",
+        "id": 538,
+        "reason": "Split to follow-up quality-cross-platform-validation-integration-matrix after the comparator semantics stabilize.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Named follow-up TODO quality-cross-platform-validation-integration-matrix is Completed; nightly cross-platform validation workflow already shipped.",
+        "summary": "Add nightly cross-platform validation workflow with structured diff artifacts"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-04-12T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing per-platform tests continue to run on PR; this is a new layer, not a replacement",
+        "item_id": "quality-add-cross-platform-result-validation"
+      },
+      {
+        "behavior": "Fast test suite duration unchanged (this is live_integration, not fast)",
+        "item_id": "quality-add-cross-platform-result-validation"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/validation/test_cross_platform.py -v",
+        "description": "Cross-platform comparator unit tests pass",
+        "expected": "all tests pass",
+        "item_id": "quality-add-cross-platform-result-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/validation/test_cross_platform.py -v -m integration",
+        "description": "Cross-platform integration suite passes on the local matrix",
+        "expected": "all tests pass",
+        "item_id": "quality-add-cross-platform-result-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --with actionlint actionlint .github/workflows/cross-platform-validation.yml",
+        "description": "Workflow file is valid",
+        "expected": "(no errors)",
+        "item_id": "quality-add-cross-platform-result-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-add-cross-platform-result-validation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "quality-add-cross-platform-result-validation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quality-add-cross-platform-result-validation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "quality-add-cross-platform-result-validation",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-add-cross-platform-result-validation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design tolerance model: per-benchmark spec (TPC-H §2.6.3 ordering, decimal precision, NULL rules) - document in module docstring",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-add-cross-platform-result-validation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement validation/cross_platform.py comparator plus focused unit coverage for normalization and tolerance rules",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-add-cross-platform-result-validation",
+        "notes": "Split to follow-up quality-cross-platform-validation-integration-matrix - live matrix + nightly workflow bundled there to keep this TODO's review surface bounded.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create follow-up for pytest integration tests over (benchmark, platform) pairs at SF=0.01",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-add-cross-platform-result-validation",
+        "notes": "Split to follow-up quality-cross-platform-validation-integration-matrix.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create follow-up for nightly cross-platform validation workflow and diff artifacts",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-add-cross-platform-result-validation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the validation contract in docs/development/result-validation.md including how to run the pytest suite locally, how to add new platforms, and how tolerance overrides are justified",
+        "wid": "w5"
+      }
+    ]
+  }
+}

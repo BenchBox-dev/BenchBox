@@ -1,0 +1,298 @@
+{
+  "context": "Lock path selection first, then generate the selected implementation TODO.\nDo not put both implementations into this item's `work[]`; the local TODO\nmodel cannot represent branch choice without a skipped status. If the\ngenerated TODO needs to differ from the locked spec, cite the Step 5\nmeasurement or Step 0 availability evidence that forced the change.\n\nPath A is significantly simpler if available. Path B is a real software\nproject (workflow + bot credentials + state machine) and needs fork smoke\ntesting before enabling on develop.\n",
+  "description": "Deferred queue gate and spec handoff. This TODO does NOT implement a\nqueue directly. If Step 5 measurement returns BUILD QUEUE, this item\nchooses the viable path and creates exactly one follow-up implementation\nTODO from the locked spec below:\n\n  - Path A: native GitHub Merge Queue\n  - Path B: BenchBox Merge Steward\n\nThis shape is intentional. The TODO work-unit graph only supports\n`pending`, `in_progress`, and `done`, so mutually exclusive Path A/Path B\nimplementation units cannot live in the same flat DAG without deadlocking\ndownstream work. The generated follow-up TODO becomes the executable\nimplementation item; this gate records the path and prevents re-debating\nsettled design decisions.\n\nStatus starts as Blocked (on Step 5). Three resolution paths:\n  - Step 5 -> DO NOT BUILD: this TODO moves to DONE with completion note\n    \"queue not needed; closed by Step 5 measurement <date>\"\n  - Step 5 -> BUILD QUEUE: this TODO unblocks, status -> Not Started,\n    work units below create the selected implementation TODO\n  - Step 5 -> REASSESS: stays Blocked, deps point to next measurement\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add both Path A and Path B implementation units to this TODO",
+        "instead": "create exactly one selected-path TODO",
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "why": "the flat work DAG cannot mark the unchosen path skipped"
+      },
+      {
+        "dont": "add full matrix to queue-tier CI",
+        "instead": "keep queue light, heavy stays nightly",
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "why": "that's exactly the over-engineering Steps 3-5 prevented"
+      },
+      {
+        "dont": "begin queue work without Step 5 saying BUILD",
+        "instead": "premature start wastes effort",
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "why": "Step 5 might say DO NOT BUILD"
+      },
+      {
+        "dont": "remove develop-post-merge.yml just because the queue runs queue-tier CI",
+        "instead": "both protect different failure modes",
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "why": "queue-tier and post-merge check different SHAs"
+      },
+      {
+        "dont": "skip trust lanes",
+        "instead": "`pull_request_target` is forbidden anywhere in steward workflows",
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "why": "public repos with write-token automation are an exfiltration risk"
+      },
+      {
+        "dont": "use a long-lived PAT for the steward",
+        "instead": "use App with scoped permissions",
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "why": "rotation burden and audit trail are worse than a GitHub App"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-6-queue-decision-gate",
+        "id": 20,
+        "reason": "Only one selected-path TODO should be created. The rejected path is documented in the decision record to avoid a deadlocked flat DAG.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: This is the explicitly rejected/unselected queue path; by design only the selected Step 6 path (already open) is tracked.",
+        "summary": "Unselected queue implementation path"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-6-queue-decision-gate",
+        "id": 21,
+        "reason": "Org transfer is a separate decision with broader implications (URLs, integrations, billing). If Step 5 says BUILD and Path A requires transfer, escalate that decision separately.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Native MQ/org-transfer escalation is a conditional sub-note of the still-open, active parent queue-decision-gate item. (tracked by dev-loop-step-6-queue-decision-gate)",
+        "summary": "Native MQ migration via org transfer"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-6-queue-decision-gate",
+        "id": 22,
+        "reason": "Labels + comments are sufficient for one-person ops. Add dashboard if queue volume justifies it.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: This deferral's own from_item IS the open tracked item dev-loop-step-6-queue-decision-gate; not a separate untracked task.",
+        "summary": "Queue dashboard / observability beyond labels"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "needs_item": "dev-loop-step-5-measurement-window"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "imported from YAML status: Blocked",
+      "category": "Core Functionality",
+      "created_at": "2026-04-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing pr-open semantics during deprecation period — do not break in-flight workflows mid-rollout",
+        "item_id": "dev-loop-step-6-queue-decision-gate"
+      },
+      {
+        "behavior": "Heavy validation stays in nightly — do not move it back to the queue path",
+        "item_id": "dev-loop-step-6-queue-decision-gate"
+      },
+      {
+        "behavior": "Only one path implementation TODO exists — no flat-DAG deadlock from mutually exclusive Path A/Path B work",
+        "item_id": "dev-loop-step-6-queue-decision-gate"
+      },
+      {
+        "behavior": "Step 3's lightweight PR-tier CI — the queue does not promote develop to release-grade gating",
+        "item_id": "dev-loop-step-6-queue-decision-gate"
+      },
+      {
+        "behavior": "develop-post-merge.yml safety net from Step 4 remains active even with a queue",
+        "item_id": "dev-loop-step-6-queue-decision-gate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/test.yml, develop-post-merge.yml, nightly.yml, release.yml (implementation TODO territory)"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "kind": "do_not_modify",
+        "path_glob": "CLAUDE.md, AGENTS.md, CONTRIBUTING.md (implementation TODO will own queue-flow docs and trust lanes)"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub branch protection / rulesets (implementation TODO toggles merge-queue rule)"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile (implementation TODO will own pr-submit and queue handoff)"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "kind": "do_not_modify",
+        "path_glob": "tests/, .pre-commit-config.yaml (orthogonal to queue path selection)"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/dev-loop-step-6-queue-decision-gate.yaml (status/completion updates)"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/dev-loop-step-6a-native-merge-queue.yaml (new, Path A only)"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/dev-loop-step-6b-merge-steward.yaml (new, Path B only)"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/dev-loop-queue-path-*.md (new decision record)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -cE '^Selected path: (A|B) \\(' _project/decisions/dev-loop-queue-path-*.md",
+        "description": "Path A or Path B chosen with rationale recorded",
+        "expected": "1",
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test \"$(ls _project/TODO/main/planning/dev-loop-step-6[ab]-*.yaml 2>/dev/null | wc -l | tr -d ' ')\" = \"1\" && echo ok",
+        "description": "Exactly one selected-path implementation TODO exists",
+        "expected": "ok",
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "f=$(ls _project/TODO/main/planning/dev-loop-step-6[ab]-*.yaml); uv run --project _project/scripts -- python _project/scripts/validate_todo.py \"$f\" --strict",
+        "description": "Generated implementation TODO validates strictly",
+        "expected": "valid",
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "f=$(ls _project/TODO/main/planning/dev-loop-step-6[ab]-*.yaml); ! grep -qE 'ONLY if|mark this .* skipped|needs: \\[w2, w3\\]' \"$f\" && echo ok",
+        "description": "Generated implementation TODO has no mutually exclusive DAG branches",
+        "expected": "ok",
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "f=$(ls _project/TODO/main/planning/dev-loop-step-6[ab]-*.yaml); grep -cE 'queue-tier|pr-submit|queue:approved|queue:abandoned|pull_request_target|develop-post-merge|CLAUDE.md|AGENTS.md|CONTRIBUTING.md|Pre-approved' \"$f\"",
+        "description": "Common queue policy is present in generated TODO",
+        "expected": ">= 10",
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "notes": "Re-read Step 0 w6 finding (native MQ availability) and the Step 5\ndecision record. Path A (native MQ) requires repo/ruleset support for\nGitHub Merge Queue. Path B (steward) is the fallback.\n\nIf Step 0 confirmed user-owned repo and GitHub APIs still do not\nexpose merge-queue rules for this repo, Path B is mandatory unless\nthe user has since transferred the repo to an org. If org transfer\nis on the table, evaluate it as a separate decision (one-time\nfriction vs ongoing steward maintenance), not inside implementation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm BUILD decision and choose native MQ vs steward",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "notes": "Create `_project/decisions/dev-loop-queue-path-<date>.md` with:\n  - Selected path: A or B\n  - Step 0 evidence used\n  - Step 5 BUILD QUEUE metrics that justified starting\n  - Why the unselected path was rejected\n  - Whether org transfer was considered and why it is/is not part\n    of the queue rollout\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Write queue path decision record",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "notes": "Create ONE of these files, not both:\n  - Path A: `_project/TODO/main/planning/dev-loop-step-6a-native-merge-queue.yaml`\n  - Path B: `_project/TODO/main/planning/dev-loop-step-6b-merge-steward.yaml`\n\nThe generated TODO must be a normal implementation item with flat\n`work[]` units and no mutually exclusive branches.\n\nPath A locked spec:\n  1. Enable \"Require merge queue\" on develop branch protection or\n     the ruleset that targets develop.\n  2. Add `merge_group:` trigger to the workflows that report\n     queue-tier checks.\n  3. Keep Step 3's lightweight PR-tier checks; queue-tier is also\n     light (lint + Ubuntu 3.12 fast tests), not release-grade.\n  4. Confirm `gh pr merge --auto --squash` remains the submission\n     mechanism for develop PRs.\n  5. Update CLAUDE.md/AGENTS.md to describe the queue-managed flow.\n  6. Update CLAUDE.md pre-approved command buckets for any new\n     queue-facing commands or labels.\n\nPath B locked spec:\n  1. Implement BenchBox Merge Steward as a single-concurrency\n     workflow triggered by `queue:ready`.\n  2. Concurrency group: `benchbox-develop-integrator`,\n     `cancel-in-progress: false`.\n  3. Loop oldest-first by `queue:ready` label timestamp.\n  4. For each PR: reset to current origin/develop, apply PR branch\n     onto that tip, run queue-tier checks, then merge or eject.\n  5. Conflict: label `queue:conflict`, comment with files, continue.\n  6. Test fail: label `queue:failed`, comment with job, continue.\n  7. Use a GitHub App with `contents: write` and\n     `pull_requests: write`; no long-lived PAT.\n  8. Smoke test in a fork with clean, conflicting, failing, and\n     untrusted PRs before enabling on develop.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Create exactly one selected-path implementation TODO",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "notes": "The selected implementation TODO must include these common work units\nor guardrails:\n  - Queue-tier CI is light: lint + Ubuntu 3.12 fast tests only.\n    Heavy validation stays in nightly.\n  - Add `make pr-submit` as pr-open + queue handoff + hygiene:\n    refuse dirty worktree, capture immutable head SHA, skip drafts,\n    and bypass auto-queue for workflow/steward changes.\n  - Keep `make pr-open` as a deprecated alias for one release.\n  - Update CLAUDE.md and AGENTS.md with the submitted/queued flow,\n    including when agents use `make pr-submit` vs deprecated\n    `make pr-open`, whether they should wait, and how queue\n    ejections are repaired.\n  - Update CLAUDE.md Pre-approved Commands so `make pr-submit`\n    and any safe queue-status commands are explicitly classified;\n    queue admin/reset commands must not be hidden in broad wildcards.\n  - Define trusted vs untrusted lanes. Untrusted PRs require manual\n    `queue:approved`; `pull_request_target` is forbidden in steward\n    workflows.\n  - Update CONTRIBUTING.md with the external contributor path:\n    untrusted PRs require manual `queue:approved`; PR-controlled\n    workflow/steward changes bypass auto-queue.\n  - Define bounce ownership and retry budget: original author owns\n    `queue:conflict` / `queue:failed`; 3 ejections max, then\n    `queue:abandoned`.\n  - Keep develop-post-merge.yml active as Step 4's safety net.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add common queue policy requirements to the selected TODO",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-6-queue-decision-gate",
+        "notes": "Run strict validation on the generated TODO and `todo_cli.py\ncheck-graph`. The generated TODO is the implementation item to work\nnext. This gate is complete once:\n  - Exactly one implementation TODO exists\n  - The decision record exists\n  - The generated TODO is valid, graph-safe, and has runnable\n    verification commands\n  - The unselected path is documented as rejected/deferred\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Validate the generated TODO and close this gate",
+        "wid": "w5"
+      }
+    ]
+  }
+}

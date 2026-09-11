@@ -1,0 +1,131 @@
+{
+  "context": "Use ast module to find @pytest.mark.skip(if), @pytest.mark.xfail decorators\nand inline pytest.skip()/pytest.xfail() calls. For each, capture the\ncondition expression and reason kwarg.\n\nTriage rule of thumb: if you can't explain in one sentence why this test is\nskipped, either improve the reason or remove the test.\n",
+  "description": "Quality plan Phase 4d. The audit found 276 skip/xfail markers across the\ntest suite. Many are legitimate (conditional on optional deps like PYSPARK,\nCUDA, etc.) but there is no audit trail establishing that. Quietly-dead\ntests can mask real failures and rot over time as the underlying conditions\nchange.\n\nTriage every skip/xfail. Each must have either:\n  1. A `reason=` string referencing an issue/ticket, OR\n  2. A condition that's clearly self-explanatory (e.g., `not PYSPARK_AVAILABLE`)\n     AND a comment explaining why this test exists if PySpark is the only\n     way to validate it\n  3. Removal if no longer relevant",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bulk-remove without reading each test",
+        "instead": "case-by-case",
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale",
+        "why": "some are legitimately conditional"
+      },
+      {
+        "dont": "make the warning into an error",
+        "instead": "warn-only initially",
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale",
+        "why": "too disruptive"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-04-13T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Skip conditions for optional dependencies remain functional (don't break PYSPARK_AVAILABLE-style guards)",
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale"
+      },
+      {
+        "behavior": "Test count unchanged unless removal is explicitly justified",
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run scripts/audit_skip_xfail.py --output /tmp/skip_audit.csv && wc -l /tmp/skip_audit.csv",
+        "description": "Audit script runs and produces inventory",
+        "expected": "≥ 276 lines",
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "All tests still pass (no regressions from edits)",
+        "expected": "all tests pass",
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/conftest_warn_check.py -v",
+        "description": "Conftest warning fires on a synthetic skip without reason",
+        "expected": "warning emitted for unreasoned skip",
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Generate inventory: scripts/audit_skip_xfail.py walks tests/, emits CSV with (file, line, marker_type, condition, current_reason)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Triage inventory in batches by directory: tests/unit/platforms/, tests/unit/core/, tests/integration/ - for each, decide keep/improve/remove",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply changes - improve reasons, remove dead skips, file follow-up TODOs for any xfail that should become passing",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-audit-skip-xfail-markers-add-rationale",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a pytest plugin or conftest hook that warns on skip/xfail without reason= (don't fail - would be too disruptive - warn only)",
+        "wid": "w4"
+      }
+    ]
+  }
+}

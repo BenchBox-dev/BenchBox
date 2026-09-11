@@ -1,0 +1,249 @@
+{
+  "context": "w1 is pure deletion plus doc scrub -- grep for 'resume' across tests/uat,\nMakefile, _project/specs/uat-framework.md, docs/operations/uat-*.md and\nremove each surface. w2 introduces one helper (write to\npath.with_suffix('.tmp') in the same directory, fsync, os.replace) and\nthreads it through the five write sites. w3 changes the default template\nstring and its expansion. Keep the PR reviewable: deletion commit,\ndurability commit.\n",
+  "description": "DECISION (user, 2026-07-11): delete the resume machinery and lean on\ndatagen-reuse making restarts cheap, rather than hardening it.\n\nWhy deletion is the right call -- the resume path was verified fragile in\nfour independent ways on develop @ fc31f3604:\n(a) load_resume_attempts (tests/uat/orchestrator.py:70-81) checks neither\n    manifest version nor config_name nor commit -- resuming with a\n    different config or on different code silently replays stale records;\n(b) replayed passed cells never verify result_path still exists;\n(c) the manifest is written only for free-space aborts (orchestrator.py\n    :263-272, :310-317, :346-354, all gated on the prose string\n    `\"free space\" in abort_reason`) -- docker/validate/package aborts were\n    never resumable anyway;\n(d) `--resume` is unreachable from the documented make surface (no\n    RESUME= passthrough at Makefile:2206/:2224).\n\nDeletion scope: _write_resume_manifest, load_resume_attempts,\nbuild_resume_runner, RESUME_MANIFEST_VERSION (orchestrator.py),\n`--resume` flags on the sweep and execute subparsers (_cli.py:504, :566)\nand their handler branches (_cli.py:78-79, :409-413), resume-manifest\nsections in _project/specs/uat-framework.md (Section 3 \"Resume manifest\",\nSection 9.4) and docs/operations/uat-framework.md, and the resume-runner\ntests in test_orchestrator.py / test_runner.py.\n\nKEPT AND HARDENED -- the abort-safe provenance artifacts (#691) stay; the\nrestart story becomes \"rerun the config; datagen reuse + ladder pruning\nmake it cheap\". Two durability defects in those artifacts get fixed here\nbecause resume's deletion makes the artifacts the ONLY record:\n\n1. SAME-DAY EVIDENCE DESTRUCTION: default log dirs are date-granular\n   (`uat_{date}`, config.py:55, execute.py:758-763) and every durable\n   artifact is opened mode \"w\" (cells.jsonl orchestrator.py:579, sidecar\n   :576-578, compatibility_pruned.jsonl :609-625, matrix_summary TSV).\n   A second same-day run of the same config silently overwrites the first\n   run's evidence.\n\n2. NO ATOMIC WRITES ANYWHERE: every artifact is written in place. A crash\n   mid-write leaves torn JSON/TSV; the sidecar is written before\n   cells.jsonl so a crash between the two leaves a fresh sidecar beside a\n   stale cell stream, and `make uat-report` will combine them.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "leave a deprecation shim for --resume",
+        "instead": "(not specified)",
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "why": "the flag was unreachable from make; a hard removal with a clear argparse error is honest."
+      },
+      {
+        "dont": "switch artifacts to append-mode as the collision fix",
+        "instead": "(not specified)",
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "why": "distinct run dirs are the fix; append-mode reintroduces the double-counting class of bug the mode-w design avoided."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-resume-retirement-artifact-durability",
+        "id": 626,
+        "reason": "Submissions are keyed by config {name} not {date}; collision semantics differ (append vs overwrite) and package-phase behavior is under uat-release-gate-enforcement's remit.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Package-phase/submissions-dir behavior is under uat-release-gate-enforcement's remit, and that TODO is Completed.",
+        "summary": "Timestamped submissions dirs (submissions_dir_template has the same date-granular default)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "needs_item": "uat-status-taxonomy-exit-code-fixes"
+      }
+    ],
+    "item_meta": {
+      "category": "Reliability / Data Integrity",
+      "completed_at": "2026-07-11T00:00:00Z",
+      "created_at": "2026-07-11T00:00:00Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "Abort paths still emit cells.jsonl + sidecar + compatibility_pruned.jsonl + partial TSV (the #691 abort-safe provenance contract).",
+        "item_id": "uat-resume-retirement-artifact-durability"
+      },
+      {
+        "behavior": "Existing logs_dir_template values in checked-in configs keep working verbatim (only the DEFAULT template changes).",
+        "item_id": "uat-resume-retirement-artifact-durability"
+      },
+      {
+        "behavior": "cells.jsonl + sidecar schema stays readable by _cli.py report (only write mechanics change, not content).",
+        "item_id": "uat-resume-retirement-artifact-durability"
+      },
+      {
+        "behavior": "generated-rerun-shards/ configs remain untouched -- they are frozen evidence of past sweeps, not consumers of the deleted machinery.",
+        "item_id": "uat-resume-retirement-artifact-durability"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/ result exporters and _project/scripts/generate_indexes.py were checked for an existing temp+rename helper: none found in the UAT dependency set, so a small `_atomic_write(path, data)` helper inside tests/uat/ is genuinely new (single function, not a module).",
+        "decision": "reuse",
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "path": "benchbox/"
+      },
+      {
+        "concept": "tests/uat/orchestrator.py:_emit_abort_artifacts -- the abort-provenance path that stays; the atomic-write helper wraps its existing writes. Extend.",
+        "decision": "extend",
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "path": "tests/uat/orchestrator.py:_emit_abort_artifacts"
+      },
+      {
+        "concept": "tests/uat/phases/execute.py:758-771 default_log_dir -- the {date} template expansion point where run-dir uniqueness is added. Extend (add {time} or a collision-suffix), do not invent a second template mechanism.",
+        "decision": "extend",
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "path": "tests/uat/phases/execute.py:758-771"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/uat-framework.md"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/README.md"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/_cli.py"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/config.py"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/orchestrator.py"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/report.py"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/validate.py"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_cli_dispatch.py"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_config.py"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_orchestrator.py"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_runner.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! (grep -rni 'resume' tests/uat/ --include='*.py' | grep -vi 'resumable\\|datagen')",
+        "description": "No resume references remain in Python code",
+        "expected": "no hits",
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! (grep -ni 'resume' Makefile _project/specs/uat-framework.md docs/operations/uat-framework.md tests/uat/README.md | grep -vi 'resumable\\|datagen')",
+        "description": "No resume references remain in Makefile, spec, or operator docs",
+        "expected": "no hits (or only prose explaining the removal)",
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/ -m fast -q",
+        "description": "UAT unit suite green, including new atomicity/ordering/collision tests",
+        "expected": "all pass",
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "notes": "Deleted _write_resume_manifest, load_resume_attempts, build_resume_runner,\nRESUME_MANIFEST_VERSION, and the ResumeAttempts alias from\ntests/uat/orchestrator.py, along with the now-dead `attempted`/manifest\nbranches in run_sweep (the preflight-abort branch's manifest write was\nunreachable dead code -- execute never runs before a preflight abort).\nRemoved --resume from both the sweep and execute argparse subparsers and\ntheir handlers in tests/uat/_cli.py. Renamed\n_build_disk_floor_runner's attempted_for_resume param to attempted_cells\nsince it is still needed for abort-artifact emission independent of\nresume. Removed the now-unused `cell_key` import and `_optional_path`\nhelper. Replaced the two resume-manifest-asserting tests in\ntest_orchestrator.py with resume-free versions\n(test_disk_floor_abort_emits_partial_artifacts,\ntest_execute_free_space_abort_emits_partial_artifacts) that keep\ncovering the #691 abort-safe-artifact-emission contract; deleted\ntest_manifest_runner_reuses_attempted_cells_and_runs_complement outright\n(tested a function that no longer exists). Scrubbed resume-manifest\nsections from _project/specs/uat-framework.md (Section 3 block,\nSection 9.4 -- folded 9.5 down to 9.4, \"four classes\" -> \"three\nclasses\"), docs/operations/uat-framework.md (heading + resume-with\ninstructions + the four-classes list), and tests/uat/README.md. No hard\nremoval shim; --resume now fails argparse with an \"unrecognized\narguments\" error. No RESUME= passthrough existed in the Makefile to\nremove (confirmed via grep). Makefile's unrelated release-cut \"resume\"\nterminology (a different feature) was left untouched.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete resume machinery: orchestrator functions + manifest writes, --resume CLI flags and handler branches, resume tests; scrub resume mentions from spec and operator docs",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "notes": "Added atomic_write_text(path, text) to tests/uat/phases/report.py (temp\nsibling via with_name(name + \".tmp\"), fsync, os.replace, parent mkdir).\nPlaced it there rather than orchestrator.py to avoid a circular import:\norchestrator.py already imports report.py, and validate.py now imports\nreport.py too, so report.py stays the acyclic leaf both depend on.\nThreaded it through all five write sites: _write_cells_jsonl and\n_write_compatibility_pruned_jsonl in orchestrator.py (rewritten to build\ncontent as a string/list-join instead of writing to an open handle),\nrun_validate's validator_rollup.tsv write in phases/validate.py (was\nalready a single write_text call, swapped directly), and write_report's\nmatrix_summary TSV in phases/report.py (rewritten to build a `lines`\nlist, joined and written once at the end). Content is byte-identical to\nthe prior mode=\"w\" writes -- verified via the existing content-asserting\ntests (JSONL field checks, TSV footer checks) all still passing\nunmodified. Added 3 new tests in test_phases.py covering the helper\ndirectly: write+cleanup-of-.tmp, overwrite semantics, and that a\nsimulated os.replace failure leaves the previous good artifact\nuntouched (no torn write).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add temp-file+os.replace atomic writes for cells.jsonl, accounting sidecar, compatibility_pruned.jsonl, validator_rollup.tsv, matrix_summary TSV (single shared helper in tests/uat/)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "notes": "Changed the OutputConfig dataclass default and the config-loader\nfallback in tests/uat/config.py from \"uat_{date}\" to \"uat_{date}_{time}\".\ndefault_log_dir() in tests/uat/phases/execute.py now also expands\n{time} -> HHMMSS from the `now` passed in (or datetime.now()). str\n.replace is a no-op when a placeholder is absent, so all 32 checked-in\nconfigs with an explicit {date}-only logs_dir_template (verified by\ngrep) keep rendering identically -- confirmed by a new\ntest_default_log_dir_explicit_date_only_template_still_works test.\nAdded test_default_log_dir_substitutes_time_component and\ntest_default_log_dir_time_avoids_same_day_collision (unit-level, in\ntest_phases.py) plus an orchestrator-level\ntest_two_sweeps_in_one_process_land_in_distinct_log_dirs in\ntest_orchestrator.py that mocks datetime.now with two distinct\nsame-day values across two run_sweep() calls and asserts the resulting\nlog dirs differ (deterministic, not timing-dependent -- avoids\nsame-wall-clock-second flakiness in a fast test loop).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make default run dirs collision-free: the default log-dir template gains a time component; test that two same-day sweeps land in distinct dirs",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-resume-retirement-artifact-durability",
+        "notes": "Reordered _write_cells_jsonl in orchestrator.py: the cell-stream content\nis now built and atomic_write_text'd to cells.jsonl before the\naccounting sidecar is computed and written. Added\ntest_write_cells_jsonl_writes_cell_stream_before_accounting_sidecar,\nwhich wraps report_phase.atomic_write_text with a recording wrapper\n(still delegating to the real implementation) and asserts the call\norder is [cells.jsonl, sidecar].\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write cells.jsonl before its accounting sidecar (reverse current order) so a crash between the two cannot leave a fresh sidecar beside a stale stream; add an ordering test",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,338 @@
+{
+  "context": "Build one core profile, one core suggester, and one core render-set outcome.\nKeep UI-specific formatting at the edges: CLI prints, MCP serializes. Make\nnot-applicable a first-class outcome rather than overloading it with unknown\nchart-type handling.\n",
+  "description": "Independent verification confirmed that result-aware chart recommendation and\nrendering orchestration are duplicated between CLI, MCP, and a private\n`ResultPlotter` method.\n\nThe current local evidence at SHA a63ae1a76 showed:\n\n  - `benchbox/mcp/tools/visualization.py:_build_chart_suggestions()` emits a\n    rich MCP suggestion list but never recommends `power_bar`.\n  - `benchbox/core/visualization/result_plotter.py:_suggest_chart_types()`\n    includes `power_bar`, but no production path calls it; tests pin behavior\n    that users do not see.\n  - CLI template/type rendering in `benchbox/cli/commands/visualize.py` and\n    MCP template/type rendering in `benchbox/mcp/tools/visualization.py`\n    duplicate source loading, template iteration, skip handling, and\n    pairwise validation with different rules.\n  - `render_ascii_chart_from_results()` returns `None` both for missing\n    handlers and known-but-inapplicable chart/data combinations. MCP validates\n    unknown chart types before rendering, but still reports post-render\n    `None` as \"Unsupported chart type\", which is misleading for valid charts\n    such as `stacked_phase` with no phase data.\n\nThis TODO creates a single core result-aware recommendation and render-set\norchestration layer, then makes CLI and MCP format that shared outcome\ninstead of reimplementing the workflow.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add another MCP-only suggestion branch for `power_bar` without removing the divergent suggestion model.",
+        "instead": "(not specified)",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "delete tests for `power_bar` suggestions unless replacement tests cover the production path.",
+        "instead": "(not specified)",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "import MCP or Click/Rich types into core visualization orchestration.",
+        "instead": "(not specified)",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "rely on `None` alone to mean both unknown chart and not-applicable chart.",
+        "instead": "(not specified)",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "visualization-suggestions-and-render-orchestration",
+        "id": 522,
+        "reason": "That is a user-visible behavior change; this TODO may prepare the shared suggester but should not change CLI auto semantics unless explicitly approved.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Change CLI `--chart-type auto` from rendering all charts to rendering only recommended charts"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "visualization-suggestions-and-render-orchestration",
+        "id": 523,
+        "reason": "The current MCP implementation returns inline ASCII; this TODO only centralizes orchestration and messaging.",
+        "resolution": "promoted",
+        "resolved_item": "add-file-output-support-to-mcp-chart-generation",
+        "resolved_reason": null,
+        "summary": "Add file-output support to MCP chart generation"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "visualization-suggestions-and-render-orchestration",
+        "id": 524,
+        "reason": "Templates should be routed through shared orchestration, not redesigned here.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason states templates should route through shared orchestration rather than be redesigned as part of this item; no concrete redesign plan exists.",
+        "summary": "Redesign chart templates"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "needs_item": "visualization-chart-registry-and-exporter-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Visualization",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI `visualize --chart-type all` and default `auto` continue to render the expected chart set unless the implementation records an explicit behavior-change decision.",
+        "item_id": "visualization-suggestions-and-render-orchestration"
+      },
+      {
+        "behavior": "MCP `generate_chart` keeps returning inline ASCII content for successful ASCII renders.",
+        "item_id": "visualization-suggestions-and-render-orchestration"
+      },
+      {
+        "behavior": "MCP `suggest_charts` response keeps chart suggestions, data profile, and primary recommendation fields unless client compatibility is updated.",
+        "item_id": "visualization-suggestions-and-render-orchestration"
+      },
+      {
+        "behavior": "Pairwise-only charts still require exactly two results when invoked explicitly.",
+        "item_id": "visualization-suggestions-and-render-orchestration"
+      },
+      {
+        "behavior": "Template rendering continues to skip inapplicable charts rather than failing the entire template when at least one chart renders.",
+        "item_id": "visualization-suggestions-and-render-orchestration"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/commands/visualize.py: current console rendering behavior - preserve `auto` and template semantics unless explicitly changed.",
+        "decision": "reuse",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "path": "benchbox/cli/commands/visualize.py"
+      },
+      {
+        "concept": "benchbox/core/visualization/chart_types.py: `requires_two_results` metadata - use instead of hard-coding pairwise chart names.",
+        "decision": "reuse",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "path": "benchbox/core/visualization/chart_types.py"
+      },
+      {
+        "concept": "benchbox/core/visualization/result_plotter.py: normalization and currently dead private suggester - delegate or delete private suggestion behavior.",
+        "decision": "reuse",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "path": "benchbox/core/visualization/result_plotter.py"
+      },
+      {
+        "concept": "benchbox/core/visualization/templates.py: named chart bundles - reuse rather than duplicating template iteration.",
+        "decision": "reuse",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "path": "benchbox/core/visualization/templates.py"
+      },
+      {
+        "concept": "benchbox/core/visualization/utils.py: existing shared subtitle and power-run helpers - reuse for profile extraction.",
+        "decision": "reuse",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "path": "benchbox/core/visualization/utils.py"
+      },
+      {
+        "concept": "benchbox/mcp/tools/visualization.py: current agent-facing suggestion and render surface - preserve response compatibility where possible.",
+        "decision": "reuse",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "path": "benchbox/mcp/tools/visualization.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark execution paths"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "kind": "do_not_modify",
+        "path_glob": "result schema serialization"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "kind": "do_not_modify",
+        "path_glob": "textcharts package source under .venv/"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/visualize.py"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/visualization.py"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/test_visualize_cli.py tests/unit/visualization/test_power_run_charting.py tests/unit/mcp/test_visualization_tools.py -q",
+        "description": "Focused CLI and MCP visualization tests pass.",
+        "expected": "CLI and MCP chart rendering/suggestion tests pass.",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_visualization_tools.py tests/unit/visualization/test_power_run_charting.py -k 'power_bar or suggest' -q",
+        "description": "Suggestion coverage check confirms `power_bar` can be recommended.",
+        "expected": "Production-facing suggestion tests prove power-result inputs can recommend power_bar.",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_visualization_tools.py -k 'inapplicable or unsupported or chart' -q",
+        "description": "Known inapplicable chart no longer reports as unsupported through MCP tests.",
+        "expected": "Unknown chart and known-but-inapplicable chart cases are distinct.",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph remains valid after implementation.",
+        "expected": "TODO validation and graph checks pass.",
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "notes": "Revalidated against checked SHA\n`4d436d76e4f2bd59a2a0588afb66ac672ff0605d`. Grep found the MCP-only\nsuggestion helpers, the private `ResultPlotter._suggest_chart_types()`,\nlow-level `render_ascii_chart_from_results()` callers, and\n`requires_two_results` metadata. Representative normalized results now\nrecommend `performance_bar,power_bar,distribution_box,query_heatmap,\nquery_histogram,percentile_ladder,cdf_chart,cost_scatter,time_series,\nnormalized_speedup,sparkline_table,rank_table,stacked_phase`; every\nrecommended ID is present in `ALL_CHART_TYPES`, and `power_bar` is\nrecommended. The low-level renderer still returns `None` for both an\nunknown chart and known-but-inapplicable `stacked_phase`, so the new core\norchestration layer classifies those outcomes before MCP/CLI formatting.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate suggestion coverage, production callers, and ambiguous None paths",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "notes": "Added `VisualizationDataProfile` in\n`benchbox/core/visualization/suggestions.py` covering result count,\nplatforms, query count/data, power data, cost data, timestamps, phase\ndata, and pairwise eligibility. It is independent of MCP, Click, and Rich.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define a shared result data profile used by suggestion and applicability decisions",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "notes": "Added `recommend_charts()` and `select_primary_chart()` in the shared\ncore module. MCP suggestion helpers delegate to those functions, and the\nprivate `ResultPlotter._suggest_chart_types()` delegates for compatibility.\n`power_bar` is recommended for `power_at_size` or power-run results;\npairwise-only recommendations require exactly two results.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace divergent suggesters with one core recommendation function",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "notes": "Added `render_chart_set()` and structured outcome dataclasses in\n`benchbox/core/visualization/orchestration.py`. Outcomes include rendered\nentries, skipped chart reasons, validation errors, template metadata, and\nstrict pairwise mode without importing CLI or MCP types.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create a shared render outcome for explicit chart lists and templates",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "notes": "Unknown chart types now produce render validation errors. Known chart\nIDs that render no content produce structured `SkippedChart` reasons,\nand MCP reports them as not applicable rather than unsupported.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Disambiguate unknown chart types from valid-but-inapplicable chart/data combinations",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "visualization-suggestions-and-render-orchestration",
+        "notes": "CLI and MCP now route chart rendering through `render_chart_set()` and\nMCP routes suggestions through the shared recommender. CLI preserves\n`auto/all` behavior while using the shared outcome for pairwise\nvalidation and template skip tracking. Tests cover shared orchestration,\nMCP `power_bar` suggestions, and known-inapplicable messaging. The UAT\nCLI-surface drift guard now allows the intentional internal\n`visualize.py` implementation change while still rejecting Click\ndecorator or command signature drift.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Route CLI and MCP through the shared orchestration and update tests",
+        "wid": "w5"
+      }
+    ]
+  }
+}

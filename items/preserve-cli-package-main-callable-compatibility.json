@@ -1,0 +1,145 @@
+{
+  "context": "Keep `benchbox.cli.main` as the canonical lazy compatibility module and give that module a small ModuleType subclass with `__call__` forwarding to its existing lazily resolved `main` export. This preserves module identity, dotted patching, `inspect.ismodule`, and callable package imports without eagerly importing benchbox.cli.app or heavy platform dependencies.",
+  "description": "Read-only review of PR #1338 confirmed that its resolver fix changes the explicitly exported package API: before the PR, `from benchbox.cli import main` returns a callable function; after it, the same import returns a non-callable module. The submodule must remain a real ModuleType so Python 3.10 dotted patch resolution reaches `benchbox.cli.main.get_config_manager`, but the historic package-level callable contract should not be silently removed.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "eagerly import benchbox.cli.app to obtain its main function",
+        "instead": "resolve the existing lazy main export only when the module is called",
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "why": "eager import pulls in the CLI command tree and optional platform dependencies"
+      },
+      {
+        "dont": "restore package-level caching of the entrypoint function under the name main",
+        "instead": "keep the submodule bound and make the compatibility module callable",
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "why": "function caching recreates the order-dependent Python 3.10 resolver defect"
+      }
+    ],
+    "item_meta": {
+      "category": "CLI compatibility",
+      "completed_at": "2026-07-29T13:54:31Z",
+      "completed_pr": 1338,
+      "created_at": "2026-07-29T13:46:53Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "benchbox.cli.main remains a real ModuleType for Python 3.10 dotted target resolution",
+        "item_id": "preserve-cli-package-main-callable-compatibility"
+      },
+      {
+        "behavior": "from benchbox.cli import main remains callable",
+        "item_id": "preserve-cli-package-main-callable-compatibility"
+      },
+      {
+        "behavior": "importing benchbox.cli or benchbox.cli.main does not import polars or datafusion",
+        "item_id": "preserve-cli-package-main-callable-compatibility"
+      },
+      {
+        "behavior": "the benchbox console entrypoint remains benchbox.cli.app:main",
+        "item_id": "preserve-cli-package-main-callable-compatibility"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/__init__.py"
+      },
+      {
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/main.py"
+      },
+      {
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_startup_imports.py"
+      },
+      {
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_run_dataframe_platform_options.py"
+      },
+      {
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_lazy_modules_fast.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.cli import main; import types; assert isinstance(main, types.ModuleType) and callable(main)\"",
+        "description": "Package import is simultaneously callable and a module",
+        "expected": "exit 0",
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "last_result": "pass",
+        "last_run": "2026-07-29T13:48:23Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import benchbox.cli; _ = benchbox.cli.main; from unittest.mock import patch; p=patch('benchbox.cli.main.get_config_manager'); p.start(); p.stop()\"",
+        "description": "Python 3.10-style dotted patch target still resolves",
+        "expected": "exit 0",
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "last_result": "pass",
+        "last_run": "2026-07-29T13:48:26Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import sys; from benchbox.cli import main; assert callable(main); assert 'polars' not in sys.modules and 'datafusion' not in sys.modules\"",
+        "description": "Callable compatibility module remains lazy",
+        "expected": "exit 0",
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "last_result": "pass",
+        "last_run": "2026-07-29T13:48:28Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/cli/test_cli_startup_imports.py tests/unit/test_lazy_modules_fast.py -q",
+        "description": "Focused lazy CLI contract tests pass",
+        "expected": "all pass",
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "last_result": "pass",
+        "last_run": "2026-07-29T13:48:32Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Implemented _CallableMainModule in benchbox/cli/main.py; Python 3.10.17 shim proof confirms ModuleType identity, callable behavior, and dotted patch resolution.",
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "notes": null,
+        "started_at": "2026-07-29T13:47:03Z",
+        "started_branch": "fix/cli-package-main-shadow",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Make the historic main compatibility module callable while preserving ModuleType identity",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added fresh-interpreter callable assertion and call-delegation regression plus lazy-module callable coverage; focused suite passes 10 tests.",
+        "item_id": "preserve-cli-package-main-callable-compatibility",
+        "notes": null,
+        "started_at": "2026-07-29T13:48:05Z",
+        "started_branch": "fix/cli-package-main-shadow",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Add fresh-interpreter regressions for callable import, dotted patching, and lazy dependencies",
+        "wid": "w2"
+      }
+    ]
+  }
+}

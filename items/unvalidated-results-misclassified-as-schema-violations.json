@@ -1,0 +1,243 @@
+{
+  "context": "Add a fifth terminal state rather than widening either set.\nDerive UNVALIDATED_VALIDATION_STATUSES = NON_CLEAN_VALIDATION_STATUSES -\nCLI_FAILURE_VALIDATION_STATUSES so no third literal set can drift.\nclassify_loaded_result returns SubmitTerminalState.unvalidated when there are no\nfailed queries, no translation fallback, and the validation status falls in that\nderived set. `benchbox submit` keeps refusing (exit 1) with an accurate message;\nUAT omits `unvalidated` from submit_state_is_cell_failure and reports it as its\nown column so it stays visible rather than silently absorbed.\n",
+  "description": "benchbox/core/results/status.py defines two sets and documents the correct policy\nboundary in a comment: NON_CLEAN_VALIDATION_STATUSES (broad, includes not_run and\nnot_validated) governs publication, while CLI_FAILURE_VALIDATION_STATUSES\n(narrow) governs whether a run FAILED. The comment states plainly that a\ncompleted run whose validation never executed -- DataFrame mode, --validation\ndisabled -- is not a failed run.\n\nsubmit_classification.classify_loaded_result ignores that boundary. It calls\nresult_non_clean_reason (broad set) and collapses every non-clean result that has\nno failed queries into SubmitTerminalState.schema_violation.\n\nTwo surfaces are wrong as a result:\n  - `benchbox submit` refuses DataFrame results with the message 'result is not a\n    clean pass', naming a schema violation that did not occur. Refusal is\n    correct; the stated reason is not.\n  - tests/uat/runner.py::submit_state_is_cell_failure lists schema_violation, so\n    UAT downgrades every DataFrame cell to FAILED.\n\nOBSERVED 2026-07-31, release-gate stage 1: six DataFrame platforms reported 0%\npass. True rates once corrected by hand: polars-df 80%, datafusion-df 80%,\npandas-df 69%, pyspark-df 64%, dask-df 55%. Draft at\n~/.todo-db/finding-drafts/benchbox/dataframe-schema-violation-misclassification-2026-07-31.md.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hand-maintain a third literal status set",
+        "instead": "derive it by set subtraction and assert the partition in a test",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "why": "the two existing sets already drifted in effect; a third invites the same failure"
+      },
+      {
+        "dont": "make UAT treat unvalidated as a plain pass with no separate reporting",
+        "instead": "pass the cell but report unvalidated in its own column in matrix_summary.tsv",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "why": "it would hide the fact that a majority of DataFrame cells are unverified, replacing a false alarm with false confidence"
+      },
+      {
+        "dont": "remove not_run/not_validated from NON_CLEAN_VALIDATION_STATUSES",
+        "instead": "add a distinct terminal state and leave both sets intact",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "why": "that set governs publication -- dropping them would let genuinely unvalidated results be published as clean, which is far worse than the reporting bug being fixed"
+      },
+      {
+        "dont": "special-case DataFrame platforms by name anywhere in the classifier",
+        "instead": "classify on validation status, which is the actual signal",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "why": "the classifier is shared with `benchbox submit`, where platform identity is not a legitimate input; --validation-disabled SQL runs hit the same path"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-08-05T15:01:14Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "NON_CLEAN_VALIDATION_STATUSES and CLI_FAILURE_VALIDATION_STATUSES keep their current membership.",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations"
+      },
+      {
+        "behavior": "`benchbox submit` still refuses an unvalidated result with a non-zero exit; only the message changes. Publication policy is NOT loosened.",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations"
+      },
+      {
+        "behavior": "compliance_class refusal is still checked BEFORE clean-ness, so an unofficial-and-unvalidated result still classifies as unofficial.",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations"
+      },
+      {
+        "behavior": "query_failure, schema_violation and missing_manifest keep their existing meanings and stay UAT cell failures.",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "CLI_FAILURE_VALIDATION_STATUSES and its comment already encode the exact policy boundary this item applies; derive from it rather than adding a third literal set",
+        "decision": "reuse",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "path": "benchbox/core/results/status.py"
+      },
+      {
+        "concept": "single-source-of-truth classifier shared by CLI and UAT specifically so the two cannot drift; the new state must be added here, not at either call site",
+        "decision": "extend",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "path": "benchbox/core/results/submit_classification.py"
+      },
+      {
+        "concept": "existing contract test asserts CLI and UAT agree per state; extend its case table with the new state",
+        "decision": "extend",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "path": "tests/unit/core/results/test_submit_classifier_contract.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/validation/"
+      },
+      {
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/status.py"
+      },
+      {
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/submit_classification.py"
+      },
+      {
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/_cli.py"
+      },
+      {
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/runner.py"
+      },
+      {
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_runner.py"
+      },
+      {
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_submit_classifier_contract.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_submit_classifier_contract.py -q",
+        "description": "Submit classifier contract tests pass, including the new unvalidated case",
+        "expected": "unvalidated fixture asserts CLI refuses and UAT does not count it as a cell failure",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python -c \"from benchbox.core.results.status import NON_CLEAN_VALIDATION_STATUSES as N, CLI_FAILURE_VALIDATION_STATUSES as C, UNVALIDATED_VALIDATION_STATUSES as U;assert C < N and U == N - C and U and not (U & C)\"",
+        "description": "The status sets partition cleanly and the derived set is non-empty",
+        "expected": "exit 0",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python -c \"from tests.uat.runner import submit_state_is_cell_failure as f;assert not f('unvalidated');assert f('schema_violation') and f('query_failure') and f('missing_manifest')\"",
+        "description": "UAT does not treat unvalidated as a cell failure",
+        "expected": "exit 0",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands -q -k submit",
+        "description": "Submit CLI still exits non-zero on an unvalidated result",
+        "expected": "refusal preserved, message names the unvalidated cause rather than a schema violation",
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Derive UNVALIDATED_VALIDATION_STATUSES and add result_unvalidated_reason to status",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add the unvalidated terminal state and route it in classify_loaded_result",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Give submit CLI an accurate refusal message for unvalidated results",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Exclude unvalidated from UAT cell failure and add its own report column",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "unvalidated-results-misclassified-as-schema-violations",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Extend the contract test table and assert the set partition",
+        "wid": "w4"
+      }
+    ]
+  }
+}

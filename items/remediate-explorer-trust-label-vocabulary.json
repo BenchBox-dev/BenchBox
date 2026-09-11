@@ -1,0 +1,156 @@
+{
+  "description": "Source: _project/audits/results-explorer-publication-adversarial-review.md\n(develop_sha fddedf26), findings §2.20 (Advisory) and §2.21 (Advisory).\n\n§2.20 — The publisher's canonical set is\nbenchbox/core/publishing/bundle_publisher.py:30\nVALID_LABELS = (maintainer-run, community-submission, ci, local,\nunofficial-research). But the explorer's TrustBadge config keys are\nci-verified, ci-validated, local-run\n(results-explorer/src/components/TrustBadge.tsx:19-43) and ranking\neligibility is {maintainer-run, ci-verified} (models.py:82-89). So a bundle\nlabeled `ci` or `local` by the publisher renders under the \"unrecognised —\ncontact maintainers\" fallback and (for `ci`) is not ranking-eligible despite\nthe publisher treating it as first-class; `unofficial-research` has no\nexplorer badge at all. The two halves of the platform disagree on the label\nvocabulary.\n\n§2.21 — TrustBadge.tsx:64 `if (!trustLabel) return null;` hides the badge\nentirely on an empty label instead of showing an explicit \"unknown\" (moot\ntoday because the snapshot schema makes trust_label NOT NULL, but the\ncomponent contract is hide-on-missing).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a third divergent label set",
+        "instead": "collapse to one canonical vocabulary referenced by both sides.",
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "why": "there are already two"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "needs_item": "remediate-submission-trust-label-enforcement"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing curated badge tones for maintainer-run and ci-verified.",
+        "item_id": "remediate-explorer-trust-label-vocabulary"
+      },
+      {
+        "behavior": "is_ranking_eligible semantics: community-submission and local stay excluded from official rankings.",
+        "item_id": "remediate-explorer-trust-label-vocabulary"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/publishing/bundle_publisher.py:30 VALID_LABELS — reuse as (or reconcile toward) the canonical vocabulary.",
+        "decision": "reuse",
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "path": "benchbox/core/publishing/bundle_publisher.py:30"
+      },
+      {
+        "concept": "results-explorer/src/components/TrustBadge.tsx:TRUST_CONFIG — extend to cover every canonical label.",
+        "decision": "extend",
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "path": "results-explorer/src/components/TrustBadge.tsx:TRUST_CONFIG"
+      },
+      {
+        "concept": "results-explorer/src/lib/displayLabels.ts:formatTrustLabel — reuse the existing 'unknown' rendering for the empty-state fix.",
+        "decision": "reuse",
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "path": "results-explorer/src/lib/displayLabels.ts:formatTrustLabel"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/validation/bundle.py"
+      },
+      {
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/models.py"
+      },
+      {
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/publishing/bundle_publisher.py"
+      },
+      {
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TrustBadge.tsx"
+      },
+      {
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayLabels.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "npm --prefix results-explorer test -- TrustBadge",
+        "description": "Every publisher VALID_LABELS value renders a non-fallback badge; empty renders 'unknown'",
+        "expected": "new/updated test asserts each VALID_LABELS value maps to a curated badge (not the 'unrecognised' fallback) and empty → 'unknown'; suite passes",
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "npm --prefix results-explorer test -- TrustBadge -t 'vocabulary'",
+        "description": "The ci↔ci-verified / local↔local-run mappings are covered by a test, not just a grep",
+        "expected": "a test enumerates the canonical labels and asserts each resolves; fails if a VALID_LABELS value is unmapped",
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "notes": "Pick the single source of truth (publisher VALID_LABELS vs explorer\nTRUST_CONFIG) and reconcile ci↔ci-verified and local↔local-run\nexplicitly. Ensure unofficial-research has an explorer badge. Document the\ncanonical list where both sides reference it.\n\n2026-07-06 FOLLOW-UP FIX (review-followup-sweep): the ci↔ci-verified\nreconciliation only landed on the explorer badge side (TrustBadge.tsx\ngot a distinct `ci` entry alongside `ci-verified`) -- the ranking side\nwas missed. `bundle_publisher.VALID_LABELS` has never accepted\n\"ci-verified\" as a label (it's parametrized as a bad/invalid case in\ntest_bundle_publisher_label.py); the publisher's real spelling is \"ci\".\nBut `RANKING_ELIGIBLE_TRUST_LABELS` in\n`_project/scripts/explorer_pipeline/models.py` only listed\n\"ci-verified\", so every bundle the publisher could actually produce\nwith the ci label was structurally excluded from official rankings --\nthe exact §2.20 defect this TODO was opened to close, still live.\nFixed by adding \"ci\" to RANKING_ELIGIBLE_TRUST_LABELS (kept\n\"ci-verified\" too, since TrustBadge.tsx still renders it distinctly for\nany historical data using that spelling). Added\ntest_ci_public_verified_is_eligible and extended\ntest_ranking_eligible_trust_labels_constant.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define one canonical trust-label vocabulary shared by the publisher, pipeline, and explorer",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "notes": "Update results-explorer/src/components/TrustBadge.tsx TRUST_CONFIG so\nevery VALID_LABELS value renders a curated badge; keep the fallback only\nfor genuinely unknown strings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Map every publisher label to an explorer badge (no silent 'unrecognised' for a valid label)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-explorer-trust-label-vocabulary",
+        "notes": "TrustBadge.tsx:64 — render DEFAULT_CONFIG/'unknown' on empty rather than\nhiding the trust dimension. Update the pinning tests\n(results-explorer/src/components/__tests__/).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Render an explicit 'unknown' badge on empty trust label instead of returning null",
+        "wid": "w3"
+      }
+    ]
+  }
+}

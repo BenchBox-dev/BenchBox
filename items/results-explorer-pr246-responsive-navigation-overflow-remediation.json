@@ -1,0 +1,266 @@
+{
+  "context": "Treat responsive behavior as a shared product contract instead of page-local\nCSS cleanup. Start by enumerating surfaces, then implement the smallest\nshared primitives and route overrides needed to satisfy the PR #246 evidence.\nPrefer tests that catch overflow and hidden navigation before relying on\nmanual screenshots alone.\n",
+  "description": "PR #246 found that the Results Explorer has cross-route responsive risks:\nQuery disappears from the 390px secondary nav, dense tables clip columns and\nrow actions, and chart/table affordances are inconsistent at mobile and\ntablet widths. These are not isolated CSS defects; they are route-level\nresponsive contracts that must be specified, implemented, and regression\ntested.\n\nThis TODO creates the integrated responsive remediation plan for the PR #246\nevidence. It should be worked alongside page-specific retheme items, but it\nowns the shared rules for navigation, horizontal scroll affordances, sticky\nfirst/action columns, card fallbacks, focus-visible semantics, and target\nreachability.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "accept horizontal scrolling without a visible affordance or sticky context.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "fix one route by adding bespoke responsive behavior that contradicts another route.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hide route navigation on mobile without an obvious menu, wrap, or scroll cue.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make mobile users reach row actions only by discovering invisible horizontal overflow.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use a focus ring to represent selected rows or active chart data.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "needs_item": "results-explorer-retheme-theme-system-foundation"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All public Results Explorer routes and share URLs.",
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation"
+      },
+      {
+        "behavior": "Dense desktop data scanning at 1280px and 1600px.",
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation"
+      },
+      {
+        "behavior": "Existing query/filter URL state contracts.",
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation"
+      },
+      {
+        "behavior": "High-contrast/reduced-color behavior for heatmaps and charts.",
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation"
+      },
+      {
+        "behavior": "Keyboard access to nav, filter controls, table sort, chart tabs, compare selection, disclosures, and row actions.",
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/playwright.config.ts"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- src/components/__tests__ src/pages/__tests__",
+        "description": "Responsive and accessibility tests pass",
+        "expected": "all relevant unit and accessibility tests pass",
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --grep \"responsive|layout|a11y|mobile\"",
+        "description": "Chromium responsive browser smoke passes",
+        "expected": "responsive browser smoke passes or skipped grep is documented",
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: recapture audited routes at 390 and 768 and compare against PR #246 mobile/tablet screenshots'",
+        "description": "Manual mobile/tablet PR #246 evidence recapture is clean",
+        "expected": "no hidden nav item, clipped row action, or chart/table overflow remains without affordance",
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "notes": "For `/results/`, benchmark, platform, result detail, compare, and query,\ndecide the responsive treatment for each major surface:\n  - app/nav shell;\n  - primary actions;\n  - filter bars and drawers;\n  - table/grid surfaces;\n  - chart panels;\n  - row actions and compare actions.\n\nEach contract must name whether the route uses horizontal scroll with\nsticky columns, compact cards, stacked controls, a drawer, or responsive\nchart scaling. Store the decision in code comments only if needed; prefer\ntests and audit notes as the durable contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write explicit responsive contracts for every audited route",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "notes": "Fix the 390px nav state where `Query` is off-canvas with no strong menu\nor scroll cue. The active route should remain discoverable on mobile,\nincluding when the user is already on `/results/query`. Use a wrapped nav,\nmobile menu, or visible horizontal-scroll affordance with scroll shadow.\n\nVerify target sizes are practical for touch and that keyboard focus order\nthrough nav items is predictable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make mobile secondary navigation fully discoverable",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "notes": "Audit and harden:\n  - Home Recent Results and MetaLeaderboard;\n  - Benchmark QueryHeatmap matrix/list;\n  - PlatformIndex table;\n  - Result Detail timing/sample tables;\n  - Compare Query-Level Diff;\n  - Query Workbench result and SQL tables.\n\nAdd scroll shadows, sticky first/action columns, mobile card summaries, or\nexplicit \"scroll for more columns\" cues. Row actions and compare actions\nmust not fall off the right edge without an affordance.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Harden shared table overflow affordances and action reachability",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "notes": "Fix chart containers so SVGs never exceed their cards at 390px or 768px.\nInclude Result Detail and Compare first because PR #246 captured concrete\nclipping and sparse plot evidence. Add guardrails for clipped labels,\nlegends overlapping plot content, huge empty plot regions, and delayed\nResizeObserver sizing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Harden chart width, labels, and plot-domain behavior across mobile and tablet",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "notes": "Define a shared state model that distinguishes:\n  - keyboard focus-visible;\n  - active route/tab/mode;\n  - selected row/result;\n  - analytical highlight;\n  - hover;\n  - disabled or unavailable action;\n  - warning/error/trust/validation state.\n\nApply it across nav, segmented controls, filter controls, chart tabs,\nleaderboard cells, table rows, compare checkboxes, and disclosures.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize focus-visible, active, selected, hover, disabled, and warning states",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "notes": "Add or extend Playwright checks for 390px, 768px, 1280px, and 1600px:\n  - nav exposes all routes or a visible menu/scroll affordance;\n  - no document body width exceeds viewport except intentional scroll\n    containers;\n  - intentional table scroll containers show affordance;\n  - row actions remain reachable;\n  - chart SVG bounds stay within cards;\n  - focus-visible is not confused with selected/active data state.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add viewport regression checks for responsive contracts",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-responsive-navigation-overflow-remediation",
+        "notes": "Recapture the mobile and tablet screenshot set named in this TODO. Store\nthe after evidence under `_project/audits/` and compare against the PR\n#246 baseline. Any remaining off-canvas nav, clipped action, or chart\noverflow must be fixed or tracked as a release-blocking TODO.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Recapture responsive PR #246 evidence after remediation",
+        "wid": "w7"
+      }
+    ]
+  }
+}

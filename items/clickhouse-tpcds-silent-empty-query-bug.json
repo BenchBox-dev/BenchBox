@@ -1,0 +1,136 @@
+{
+  "context": "Start with diagnostic (w1) to understand whether dsqgen works locally on DuckDB.\nIf DuckDB succeeds, the issue is ClickHouse-adapter-specific query setup.\nIf DuckDB also fails, the dsqgen binary is the root cause.\n\nFor the code fix, add a guard in power_test.py's _run_power_test() method:\nafter query generation, check len(queries) == 0 and raise a descriptive error\nrather than iterating over an empty list. In queries.py, track per-query failures\nand raise when all queries fail.\n",
+  "description": "ClickHouse SF1 runs for tpcds and tpcds_obt show power_test status \"COMPLETED\" with\nduration 0ms and an empty queries list. The phase silently swallows a query generation\nfailure, reporting success when zero queries actually executed.\n\nTwo candidate root causes:\n\nPath A (most likely): dsqgen binary missing/failing silently. TPCDSQueryManager.get_all_queries()\nin benchbox/core/tpcds/queries.py catches dsqgen exceptions per-query and skips them. If all 99\nfail, it returns an empty dict. The power test runner iterates over zero queries and reports\nCOMPLETED.\n\nPath B: _preflight_validate_generation() in power_test.py raises RuntimeError, caught at the\nphase level, returning an empty result list.\n\nVerification showed tpcds_obt did not share the same root cause. Base tpcds was fixed by\nsurfacing zero-query dsqgen failures, while tpcds_obt required adapter routing changes so it\nruns through the generic OBT power-test path instead of the specialized TPC-DS stream runner.\n\nThis is the highest-priority fix because it blocks ~195 queries across both benchmarks and\nmasks the actual root cause (likely dsqgen binary availability on the ClickHouse Cloud host).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "catch and swallow all exceptions in query generation",
+        "instead": "(not specified)",
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug",
+        "why": "individual query failures are acceptable but total failure must be surfaced"
+      },
+      {
+        "dont": "silently return empty results",
+        "instead": "raise a clear error instead",
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug",
+        "why": "this masks dsqgen failures and produces misleading 'COMPLETED' status"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-08T00:00:00Z",
+      "created_at": "2026-04-08T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Power test phase still completes normally when queries are present",
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug"
+      },
+      {
+        "behavior": "TPCDSQueryManager.get_all_queries() continues to work when dsqgen succeeds for all queries",
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug"
+      },
+      {
+        "behavior": "tpcds_obt executes its OBT query set via the generic adapter path instead of the base TPC-DS runner",
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpcds/ -v -k 'zero_quer'",
+        "description": "Zero-query generation raises error instead of silent completion",
+        "expected": "Tests pass showing FAILED status when 0 queries generated",
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Diagnose: run `benchbox run --platform duckdb --benchmark tpcds --scale 0.01 --phases power` to determine if dsqgen works locally",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "In benchbox/core/tpcds/queries.py, add warning logging when dsqgen fails for individual queries, and raise error when total success count is zero",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "In power_test.py, detect 0-query generation and set phase status to FAILED with descriptive error message. Also fixed schema.py to derive power_test phase status from real executions.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for zero-query detection in both queries.py and power_test.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-tpcds-silent-empty-query-bug",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-run ClickHouse tpcds and tpcds_obt at SF1 to verify fix surfaces the actual error",
+        "wid": "w5"
+      }
+    ]
+  }
+}

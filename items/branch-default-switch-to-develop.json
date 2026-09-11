@@ -1,0 +1,135 @@
+{
+  "description": "BRANCHING-STRATEGY REVIEW (2026-07-06, session on PR #993). The repo already\ntreats `develop` as the integration branch — all PRs target it, the\ndevelop-squash-only ruleset and develop-post-merge auto-revert live there —\nbut GitHub's default_branch is still `main` (confirmed via\n`gh api repos/joeharris76/BenchBox --jq .default_branch` -> \"main\"). This\nitem flips the default to `develop`.\n\nDecision A is deliberately separated from the main->release rename\n(Decision B, see rename-release-branch-main-to-release): A is a low-risk,\nreversible, one-call admin change and captures most of the value on its own.\n\nKEY INTERACTION — this resolves an open High/In-Progress TODO. GitHub runs\non.schedule workflows ONLY from the default branch's copy of the file.\nrelease-canary.yml lives on develop, not main, so its daily cron has never\nfired (see release-canary-scheduled-activation, whose w1 menu proposes\nlanding the file on main as options (a)/(b)/(c)). Making develop the default\ndissolves that problem: the canary — and any future scheduled workflow\nauthored on develop — registers and fires with no per-release re-landing.\nCross-link and re-scope that item when this lands.\n\nVerified safe (documented in the session's branch-rename runbook draft):\nPyPI trusted publishing is branch-independent (keyed on repo + workflow\nfilename release.yml + environment pypi, never a branch), and GitHub Pages\ndeploys via deploy-pages (source = \"GitHub Actions\", not a branch). Neither\nis affected by changing the default branch.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle the main->release rename into this item",
+        "instead": "keep them separate PRs/items.",
+        "item_id": "branch-default-switch-to-develop",
+        "why": "Decision B has real functional blast radius (verify-tag-on-main, test.yml base_ref gates) and Decision A's value plus low risk should not wait on it"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-07-08T00:00:00Z",
+      "created_at": "2026-07-06T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "PyPI trusted publishing and GitHub Pages config — both branch-independent; do not touch them as part of this change.",
+        "item_id": "branch-default-switch-to-develop"
+      },
+      {
+        "behavior": "main stays release-only and push-restricted regardless of the default-branch setting — the default flip changes clone/PR/UI defaults and scheduled-workflow source, not the release gating.",
+        "item_id": "branch-default-switch-to-develop"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/nightly.yml — the scheduled workflow currently on main that DOES fire; after the default flips, scheduled workflows fire from develop instead, so confirm nightly still triggers as expected.",
+        "decision": "reuse",
+        "item_id": "branch-default-switch-to-develop",
+        "path": ".github/workflows/nightly.yml"
+      },
+      {
+        "concept": "_project/TODO/main/active/release-canary-scheduled-activation.yaml — the open item this resolves; its w1 option menu (a/b/c) predates and omits the develop-as-default option. Re-scope its w2/w3 once this lands.",
+        "decision": "reuse",
+        "item_id": "branch-default-switch-to-develop",
+        "path": "_project/TODO/main/active/release-canary-scheduled-activation.yaml"
+      },
+      {
+        "concept": "docs/operations/repo-admin-settings.md — the admin-state runbook; its 'Scheduled activation' section is written under the main-as-default premise and must be updated to reflect develop-as-default.",
+        "decision": "reuse",
+        "item_id": "branch-default-switch-to-develop",
+        "path": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "branch-default-switch-to-develop",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "branch-default-switch-to-develop",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "branch-default-switch-to-develop",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh api repos/joeharris76/BenchBox --jq .default_branch",
+        "description": "Default branch is develop",
+        "expected": "develop",
+        "item_id": "branch-default-switch-to-develop",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/joeharris76/BenchBox/actions/workflows --jq '.workflows[].path' | grep release-canary",
+        "description": "Scheduled canary now registered",
+        "expected": ".github/workflows/release-canary.yml present",
+        "item_id": "branch-default-switch-to-develop",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "branch-default-switch-to-develop",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "branch-default-switch-to-develop",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "branch-default-switch-to-develop",
+        "notes": "`gh api -X PATCH repos/joeharris76/BenchBox -f default_branch=develop`.\nAdmin-only. Reversible: re-run with default_branch=main to roll back.\nRecord the dated before/after in repo-admin-settings.md.\nDONE 2026-07-08: maintainer ran the PATCH. Verified via MCP\nsearch_repositories -> default_branch=\"develop\" (was \"main\").\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "ADMIN: set default_branch=develop",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "branch-default-switch-to-develop",
+        "notes": "After the flip, confirm release-canary.yml is registered:\n`gh api repos/joeharris76/BenchBox/actions/workflows --jq '.workflows[].path'`\nnow includes .github/workflows/release-canary.yml, and\n`gh api .../actions/workflows/release-canary.yml/runs` no longer 404s.\nDispatch once (workflow_dispatch) to prove liveness; expected first\nresult is RED on 0.3.0's broken import (that is the canary working —\nsee release-recovery-v0-3-1). Confirm nightly.yml still fires from the\nnew default.\nDONE 2026-07-08: Actions list-workflows API now returns 26 registered\nworkflows (was 19); Release Canary (id 309070628) is present and active,\nas are phase3-promotion-review and orphaned-commit-detector — all\npreviously unregistered develop-only scheduled workflows. Registration\n(the blocker) is confirmed. Immediate workflow_dispatch was NOT run to\navoid an unprompted CI run; the daily 08:00 UTC cron now fires on its\nown (expected first result RED on broken 0.3.0 — cross-link into\nrelease-recovery-v0-3-1 when it lands). Maintainer may dispatch for\ninstant proof if desired.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify scheduled workflows now register and fire from develop",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "branch-default-switch-to-develop",
+        "notes": "The 'Scheduled activation of release-canary.yml' section and any text\nasserting 'the default branch is main' become stale. Rewrite to reflect\ndevelop-as-default; several (a)/(b)/(c) workarounds for the canary\nbecome unnecessary. Record the new live state with a date.\nDONE 2026-07-08: added a dated RESOLVED banner to the 'Scheduled\nactivation' section and corrected the 'default branch (main)' assertion\nto note develop-as-default. Conservative edit — historical analysis and\nstill-live code-path descriptions (bootstrap, RELEASE_CANARY_REF shell,\nliveness guard) preserved rather than rewritten.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update repo-admin-settings.md: the default-branch premise inverts",
+        "wid": "w3"
+      }
+    ]
+  }
+}

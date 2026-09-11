@@ -1,0 +1,287 @@
+{
+  "context": "Start by deciding whether migration is feasible in one bounded PR. If it is,\nmigrate the two deprecated-base consumers and delete the duplicated base. If\nit is not, extract shared result/validation behavior and add a hard boundary\ntest so the deprecated surface cannot attract new benchmarks. For the simple\nmixin, reuse the existing runtime contract style instead of inventing a broad\nframework.\n",
+  "description": "Independent verification at checked SHA e60986923 confirmed the deprecated\ninternal base remains load-bearing for exactly two loader benchmarks:\n\n  datavault -> benchbox.core.datavault.benchmark.DataVaultBenchmark\n  tpcds_obt -> benchbox.core.tpcds_obt.benchmark.TPCDSOBTBenchmark\n\n`benchbox/core/base_benchmark.py` is labeled deprecated and retained for\ninternal compatibility, but it duplicates result creation and validation\nhelpers from `benchbox/base.py`. Verified duplicated method names include\n`create_enhanced_benchmark_result`, `create_minimal_benchmark_result`,\n`_resolve_output_dir`, `validate_preflight`, `validate_manifest`, and\n`validate_loaded_data`. Their signatures are currently similar, but they are\ndifferent method objects, and `_attach_performance_snapshot` exists only on\nthe public base.\n\nIndependent verification also confirmed `SimpleBenchmarkMixin` is a\ndocstring-only duck-typed contract. A dummy class inheriting\n`SimpleBenchmarkMixin` defines successfully and fails only at runtime with\n`AttributeError: 'BadSimple' object has no attribute 'query_manager'`. This\ncontrasts with `CursorValidationQueryExecutionMixin`, which uses\n`__init_subclass__` enforcement for required methods.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "enforce SimpleBenchmarkMixin requirements so broadly that intermediate mixins fail before concrete benchmark classes are defined.",
+        "instead": "(not specified)",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "leave two editable copies of result/validation helpers without a boundary test and migration owner.",
+        "instead": "(not specified)",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "migrate datavault or tpcds_obt without preserving their current output path conventions.",
+        "instead": "(not specified)",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "refactor unrelated benchmark query logic while changing base contracts.",
+        "instead": "(not specified)",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "needs_item": "canonical-benchmark-id-resolution"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "created_at": "2026-05-22T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Datavault and TPC-DS OBT remain importable loader benchmarks.",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation"
+      },
+      {
+        "behavior": "Existing AMPLab, ClickBench, and SSB simple benchmark behavior remains unchanged.",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation"
+      },
+      {
+        "behavior": "Result schema fields and validation helper return types remain backward compatible.",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation"
+      },
+      {
+        "behavior": "TPC-DS OBT keeps separate source-data and OBT output-directory behavior.",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/base.py: public BaseBenchmark result/validation helpers - prefer as the future implementation surface.",
+        "decision": "reuse",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "path": "benchbox/base.py"
+      },
+      {
+        "concept": "benchbox/core/base_benchmark.py: deprecated compatibility base - migrate or shrink to a thin shared layer.",
+        "decision": "reuse",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "path": "benchbox/core/base_benchmark.py"
+      },
+      {
+        "concept": "benchbox/core/benchmark_mixins.py: CursorValidationQueryExecutionMixin.__init_subclass__ - reuse enforcement style where suitable.",
+        "decision": "reuse",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "path": "benchbox/core/benchmark_mixins.py"
+      },
+      {
+        "concept": "benchbox/core/simple_benchmark_mixin.py: documented SimpleBenchmarkMixin requirements - convert from prose-only to enforced contract.",
+        "decision": "reuse",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "path": "benchbox/core/simple_benchmark_mixin.py"
+      },
+      {
+        "concept": "tests/unit/core/test_benchmark_api_contract.py: import-boundary tests - natural home for deprecated-base boundary assertions.",
+        "decision": "reuse",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "path": "tests/unit/core/test_benchmark_api_contract.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "kind": "do_not_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/base_benchmark.py"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_result_validation.py"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/simple_benchmark_mixin.py"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_benchmark_api_contract.py tests/unit/core/test_loader_registry_parity.py tests/test_base.py -q",
+        "description": "Base contract and loader parity tests cover deprecated-base migration or boundary.",
+        "expected": "All selected contract tests pass.",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core -k 'simple or benchmark_api_contract or loader_registry_parity' -q",
+        "description": "Simple benchmark consumers still pass their focused tests.",
+        "expected": "Focused unit tests pass without runtime AttributeError regressions.",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite remains green after base/mixin changes.",
+        "expected": "Fast tests pass.",
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "notes": "Re-run a read-only check that iterates loader classes and prints any\nsubclass of `benchbox.core.base_benchmark.BaseBenchmark`. Also define a\nthrowaway `SimpleBenchmarkMixin` consumer with missing attributes and\nconfirm whether failure occurs at class definition or runtime. Keep raw\noutput outside git.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate deprecated-base consumers and simple-mixin enforcement gap",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "notes": "Evaluate two paths:\n  1. Migrate `datavault` and `tpcds_obt` to `benchbox.base.BaseBenchmark`\n     and delete or drastically shrink `benchbox/core/base_benchmark.py`.\n  2. Extract shared result/validation methods into one mixin/helper used\n     by both bases while migration remains pending.\nPrefer full migration if constructor/output-dir differences are tractable\ninside one PR. If not, use shared extraction with a dated migration TODO.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose between full migration and shared helper extraction for deprecated-base result/validation logic",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "notes": "Ensure `create_enhanced_benchmark_result`, minimal result creation,\npreflight validation, manifest validation, and loaded-data validation use\none implementation path. Preserve `datavault` and `tpcds_obt` default\noutput-directory semantics, including source-data paths for TPC-DS OBT.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate or de-duplicate result creation and validation helpers",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "notes": "If full migration is completed, assert no loader benchmark subclasses the\ndeprecated base and consider deleting the file. If shared extraction is\nchosen, assert only the explicitly approved migration stragglers use it\nand link that approval to a TODO or documented deadline.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add an import-boundary test for deprecated-base usage",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "notes": "Apply the existing `CursorValidationQueryExecutionMixin.__init_subclass__`\npattern if practical. If attribute enforcement is too noisy for mixin\ncomposition, define a `Protocol` and add focused tests for AMPLab,\nClickBench, and SSB. The enforcement should catch missing\n`query_manager`, `_table_load_order`, `_get_table_schema`, and query\nexecution methods before `_load_data` or `run_benchmark` fails deep at\nruntime.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enforce `SimpleBenchmarkMixin` structural requirements at class definition or via Protocol tests",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-base-and-mixin-contract-consolidation",
+        "notes": "Cover `datavault` and `tpcds_obt` construction, output directory\ndefaults, validation fallback identifiers, and result creation if they\nmigrate. Add a negative test for an invalid `SimpleBenchmarkMixin`\nconsumer and positive coverage for the existing consumers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression tests for migrated base behavior and mixin contract failures",
+        "wid": "w5"
+      }
+    ]
+  }
+}

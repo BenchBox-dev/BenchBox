@@ -1,0 +1,159 @@
+{
+  "context": "Small change in resolve_backend + command entry: distinguish explicit local (silent) from implicit default fallback (loud/fatal), add backend-identity line, cover with unit tests, document in the tracker spec.",
+  "description": "2026-07-21 adversarial UAT review finding (P2, tracker integrity): resolve_backend (_project/scripts/todo_db.py:308-324) silently falls back to <main-root>/.todo-db/todo.sqlite when none of --db / TODO_DB_PATH / TODO_DB_URL is set. During the review this fallback answered `todo stats` with 1 active item while the hosted production DB has 32 active items - and a review subagent acted on the wrong picture. Local sessions without remote-env creds (the normal case per todo-db hosted ops: TODO_DB_URL/TODO_DB_AUTH_TOKEN live only in the cloud env) get a confidently wrong tracker view with zero indication.\n\nGuard: on the IMPLICIT default-path fallback, either exit 2 with a pointer to the hosted-access pattern, or emit an unmistakable stderr banner (e.g. 'LOCAL FALLBACK DB - NOT the production tracker') on every command; print backend kind on all commands (local path vs 'hosted' - never the DSN). Explicit --db and TODO_DB_PATH pins stay silent: they are the supported test seam.\n\nDecide fail-vs-warn deliberately: `init` and fresh-clone bootstrap must keep working, and CI jobs that pin TODO_DB_PATH must be unaffected.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "auto-redirect to the hosted DB when creds happen to be findable",
+        "instead": "keep precedence; just make the fallback visible",
+        "item_id": "todo-cli-local-fallback-guard",
+        "why": "resolve_backend's precedence is deliberate (TODO_DB_PATH outranks TODO_DB_URL); magic redirection is the failure mode it prevents"
+      },
+      {
+        "dont": "make explicit TODO_DB_PATH pins warn or fail",
+        "instead": "guard only the implicit default-path fallback",
+        "item_id": "todo-cli-local-fallback-guard",
+        "why": "tests and CI legitimately pin local files; noise there trains people to ignore the banner"
+      },
+      {
+        "dont": "print the DSN, URL, or token in the banner",
+        "instead": "print backend kind, plus the filesystem path only for local backends",
+        "item_id": "todo-cli-local-fallback-guard",
+        "why": "the CLI contract explicitly never echoes its DSN; hosted creds are secrets"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-21T12:24:44Z",
+        "from_item": "todo-cli-local-fallback-guard",
+        "id": 632,
+        "reason": "The recorded seq2 command selects _project/scripts, whose dependency manifest lacks pytest and BenchBox test dependencies; root-uv equivalent passes. Fix command authoring/runner validation generically rather than adding test-only dependencies to the production scripts environment.",
+        "resolution": "promoted",
+        "resolved_item": "todo-verification-uv-project-self-contained",
+        "resolved_reason": null,
+        "summary": "Make todo verification commands self-contained across uv project boundaries"
+      }
+    ],
+    "item_meta": {
+      "category": "Developer Experience",
+      "completed_at": "2026-07-21T12:30:45Z",
+      "completed_pr": 1240,
+      "created_at": "2026-07-21T11:43:36Z",
+      "worktree": "todo-db-standalone-extraction"
+    },
+    "preserves": [
+      {
+        "behavior": "Explicit --db PATH and TODO_DB_PATH behavior byte-identical (tests and tools pin local files deliberately).",
+        "item_id": "todo-cli-local-fallback-guard"
+      },
+      {
+        "behavior": "Hosted-mode behavior and the never-echo-DSN contract unchanged.",
+        "item_id": "todo-cli-local-fallback-guard"
+      },
+      {
+        "behavior": "The G6 weekly export job (read-only token) keeps working unchanged.",
+        "item_id": "todo-cli-local-fallback-guard"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "export made truly read-only for the G6 job - the read/write command split this guard can reuse",
+        "decision": "reuse",
+        "item_id": "todo-cli-local-fallback-guard",
+        "path": "_project/scripts/todo_db.py (PR #1226)"
+      },
+      {
+        "concept": "resolve_backend precedence (--db > TODO_DB_PATH > TODO_DB_URL > default local) with documented rationale",
+        "decision": "extend",
+        "item_id": "todo-cli-local-fallback-guard",
+        "path": "_project/scripts/todo_db.py:308-324"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-cli-local-fallback-guard",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "todo-cli-local-fallback-guard",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/todo-db-tracker.md"
+      },
+      {
+        "item_id": "todo-cli-local-fallback-guard",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "env -u TODO_DB_URL -u TODO_DB_PATH _project/scripts/todo stats",
+        "description": "Implicit fallback is loud",
+        "expected": "nonzero exit or unmistakable LOCAL-FALLBACK stderr banner; behavior with TODO_DB_URL set is unchanged",
+        "item_id": "todo-cli-local-fallback-guard",
+        "last_result": "pass",
+        "last_run": "2026-07-21T12:23:40Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python -m pytest tests/unit/scripts -k 'fallback or backend' -q",
+        "description": "Unit coverage",
+        "expected": "implicit-loud / explicit-silent / hosted-unchanged all covered",
+        "item_id": "todo-cli-local-fallback-guard",
+        "last_result": "fail",
+        "last_run": "2026-07-21T12:23:53Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-cli-local-fallback-guard",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "todo-cli-local-fallback-guard",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Decision recorded in _project/specs/todo-db-tracker.md: implicit reads warn and remain available; implicit writes fail before connect; init and true dry-runs remain available; explicit local pins are warning-free; every invocation reports backend kind without hosted DSN/token.",
+        "item_id": "todo-cli-local-fallback-guard",
+        "notes": null,
+        "started_at": "2026-07-21T12:15:53Z",
+        "started_branch": "fix/todo-cli-fallback-and-scope-guard-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Decide fail-vs-banner for implicit fallback (consider: reads banner + exit 0, writes exit 2 unless explicitly pinned); record rationale in the spec",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Implemented backend-origin resolution, stderr backend identity, implicit-local read warning/write refusal with init and dry-run exceptions, plus authorized recursive trailing-slash scope matching and exit-status verification semantics. Ruff clean; focused fallback/backend/scope tests pass.",
+        "item_id": "todo-cli-local-fallback-guard",
+        "notes": null,
+        "started_at": "2026-07-21T12:22:31Z",
+        "started_branch": "fix/todo-cli-fallback-and-scope-guard-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Implement in resolve_backend/dispatch; backend-identity line on every command (kind only, never DSN/token)",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Ruff check/format clean; implicit fallback command exits 0 with backend identity plus LOCAL FALLBACK banner; root uv test run over test_todo_db.py/test_todo_db_v2.py/test_todo_db_hosted.py/test_todo_wrapper.py: 162 passed. Recorded seq2 command was also run and fails before collection because the isolated _project/scripts manifest has no pytest; equivalent root-uv selection passes and the command-environment defect is promoted as a follow-up.",
+        "item_id": "todo-cli-local-fallback-guard",
+        "notes": null,
+        "started_at": "2026-07-21T12:23:38Z",
+        "started_branch": "fix/todo-cli-fallback-and-scope-guard-20260721",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Unit tests: implicit fallback loud, explicit --db/TODO_DB_PATH silent, hosted unchanged; update _project/specs/todo-db-tracker.md",
+        "wid": "w3"
+      }
+    ]
+  }
+}

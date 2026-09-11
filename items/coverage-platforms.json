@@ -1,0 +1,244 @@
+{
+  "context": "Follow existing patterns in tests/unit/platforms/. For cloud adapters,\nmock all SDK clients (boto3, google-cloud, snowflake-connector). For\ncredential modules, test env var parsing, config file loading, and\nvalidation logic. For DataFrame adapters, use small in-memory DataFrames.\nunified_frame.py is the largest file - focus on the public API methods\nand expression translation.\n",
+  "description": "Several platform adapter modules are below 50% test coverage. These include\nboth DataFrame platform abstractions and cloud/remote platform adapters.\n\nCurrent coverage breakdown:\n  - platforms/dataframe/unified_frame.py: 31.0% (930 missing)\n  - platforms/dataframe/benchmark_mixin.py: 38.5% (232 missing)\n  - platforms/dataframe/expression_family.py: 45.7% (215 missing)\n  - platforms/dataframe/dask_df.py: 26.1% (139 missing)\n  - platforms/dataframe/ducklake_maintenance.py: 0.0% (126 missing)\n  - platforms/credentials/redshift.py: 25.2% (333 missing)\n  - platforms/credentials/bigquery.py: 31.1% (171 missing)\n  - platforms/credentials/snowflake.py: 34.6% (123 missing)\n  - platforms/databricks/credentials.py: 31.7% (127 missing)\n  - platforms/databricks/dataframe_adapter.py: 23.6% (120 missing)\n  - platforms/athena.py: 39.7% (356 missing)\n  - platforms/fabric_warehouse.py: 43.9% (252 missing)\n  - platforms/influxdb/adapter.py: 26.3% (101 missing)\n  - platforms/influxdb/client.py: 44.0% (94 missing)\n  - platforms/cudf.py: 48.1% (175 missing)\n  - platforms/motherduck.py: 35.9% (84 missing)\n  - platforms/clickhouse_cloud.py: 49.3% (35 missing)\n\nCloud platform tests should mock all external API calls. DataFrame platform\ntests can use in-memory data.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "import heavy cloud SDKs at module level in test files",
+        "instead": "use unittest.mock.patch or lazy imports",
+        "item_id": "coverage-platforms",
+        "why": "they add 2-5s import overhead and may not be installed"
+      },
+      {
+        "dont": "require cloud credentials for unit tests",
+        "instead": "mock all SDK clients (boto3, google-cloud, snowflake-connector)",
+        "item_id": "coverage-platforms",
+        "why": "CI has no cloud access and tests must be runnable offline"
+      },
+      {
+        "dont": "test platform-specific SQL dialect generation",
+        "instead": "test adapter configuration, connection logic, and error handling instead",
+        "item_id": "coverage-platforms",
+        "why": "dialect translation is covered by separate dialect tests"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-02-18T00:00:00Z",
+      "created_at": "2026-02-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform tests continue to pass",
+        "item_id": "coverage-platforms"
+      },
+      {
+        "behavior": "No changes to production code",
+        "item_id": "coverage-platforms"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "coverage-platforms",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "coverage-platforms",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "All platform tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "coverage-platforms",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/dataframe/unified_frame.py (31.0% → 50%)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/athena.py (39.7% → 50%)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/fabric_warehouse.py (43.9% → 50%)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/databricks/dataframe_adapter.py (23.6% → 50%)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/influxdb/ (26-44% → 50%)",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/cudf.py (48.1% → 50%)",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/motherduck.py (35.9% → 50%)",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/clickhouse_cloud.py (49.3% → 50%)",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/dataframe/benchmark_mixin.py (38.5% → 50%)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/dataframe/expression_family.py (45.7% → 50%)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/dataframe/dask_df.py (26.1% → 50%)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/dataframe/ducklake_maintenance.py (0% → 50%)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/credentials/redshift.py (25.2% → 50%)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/credentials/bigquery.py (31.1% → 50%)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/credentials/snowflake.py (34.6% → 50%)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-platforms",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for platforms/databricks/credentials.py (31.7% → 50%)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

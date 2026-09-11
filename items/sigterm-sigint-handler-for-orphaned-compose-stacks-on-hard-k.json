@@ -1,0 +1,10 @@
+{
+  "description": "Promoted from deferral #618 of uat-container-engine-routing.\nDeferred: SIGTERM/SIGINT handler for orphaned compose stacks on hard kill\nReason deferred: finally-scoped teardown covers Python-level failures; hard-kill recovery has a documented manual path (uat-docker-cleanup). A signal handler interacts with the timeout process-group kill ladder and needs its own design.",
+  "legacy": {
+    "item_meta": {
+      "blocked_reason": "Superseded by uat-sweep-durability-and-signal-teardown (PR #1251): that PR installs the sweep-process SIGTERM->SweepCancelled shim so SIGTERM/SIGINT run the per-platform finally teardown (compose down) instead of orphaning stacks, sweep-process-only so the timeouts.py process-group kill ladder is untouched. The only residual case -- SIGKILL/kill -9 -- is inherently un-trappable by any handler and already has the documented manual path (make uat-docker-cleanup). UNBLOCK: once #1251 merges, drop this shell as superseded (provenance = deferral #618 of uat-container-engine-routing); if a SIGKILL-orphan auto-reaper is still wanted, recreate as a scoped new item.",
+      "created_at": "2026-07-19T12:37:14Z",
+      "worktree": "uat-hardening"
+    }
+  }
+}

@@ -1,0 +1,210 @@
+{
+  "description": "Two related blind-spots flagged that TODOs whose safety predicate rests\non external/transient evidence (upstream behavior, harness output,\ndependency-resolved version) have no schema-level mechanism to record\nor verify the evidence durability:\n\n- `2026-05-04-074634` -- the /todo review rubric scores write-time\n  quality, not implement-time freshness. A TODO that sits in planning/\n  for weeks may have evidence that has silently rotted.\n- `2026-05-04-083819` -- W0 verification-only commits cite evidence in\n  free-text commit messages; a reviewer landing the PR days later\n  cannot replay it.\n\nThis TODO ships three thin conventions:\n\n1. Optional `freshness_check` block in the TODO schema, OR a strong-\n   convention \"w0: re-validate evidence\" first work unit for upstream-\n   dependent items (w1 picks).\n2. A new freshness axis on the /todo review rubric -- unconditionally,\n   regardless of which mechanism w1 picks. The rubric must score\n   freshness whether the schema field exists or the convention is\n   review-time-only.\n3. A `_project/verification-logs/<todo-id>/<work-id>.log` committed-\n   artifact convention for verification-only commits.\n\nThe companion `extend-five-axis-review-rubric` TODO ships the\n/code review side (verification-only / evidence-durability branch);\nthis TODO owns the /todo review side and the artifact convention.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "capture verification logs that contain secrets or local-machine paths",
+        "instead": "(not specified)",
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "why": "the convention is for upstream-evidence transcripts (e.g. `pip show sqlglot`, harness stdout), not for runtime traces."
+      },
+      {
+        "dont": "make the freshness_check field required",
+        "instead": "(not specified)",
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "why": "backwards-incompatible schema changes break every existing TODO file."
+      },
+      {
+        "dont": "skip the rubric update in w3 even if w1 picks the schema path",
+        "instead": "(not specified)",
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "why": "the rubric is the durable enforcement layer regardless of mechanism."
+      }
+    ],
+    "item_meta": {
+      "category": "Tooling and Workflow",
+      "completed_at": "2026-05-06T00:00:00Z",
+      "created_at": "2026-05-05T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "/todo review rubric existing axes (clarity / completeness / actionability / freshness / guardrails / work-breakdown) are unchanged in name and weight.",
+        "item_id": "todo-skill-evidence-durability-conventions"
+      },
+      {
+        "behavior": "Existing TODO files validate against the unchanged schema (the new field is optional).",
+        "item_id": "todo-skill-evidence-durability-conventions"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/code/SKILL.md"
+      },
+      {
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/todo/SKILL.md"
+      },
+      {
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO_ENTRY_TEMPLATE.yaml"
+      },
+      {
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/validate_todo.py"
+      },
+      {
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -E 'freshness_check|verification-logs|w0:.*re-validate' _project/TODO_ENTRY_TEMPLATE.yaml",
+        "description": "TODO_ENTRY_TEMPLATE documents the chosen mechanism",
+        "expected": "matches >= 1",
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all",
+        "description": "validate_todo accepts an example TODO using the new field/convention",
+        "expected": "exit 0",
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f _project/verification-logs/README.md",
+        "description": "verification-logs directory and README exist",
+        "expected": "exit 0",
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make skill-sync >/dev/null && grep -E 'freshness' .claude/skills/todo/SKILL.md",
+        "description": "/todo review rubric carries a freshness axis",
+        "expected": "matches >= 1",
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "notes": "Choose between (a) adding `freshness_check:` as a new optional\nfield in `_project/TODO_ENTRY_TEMPLATE.yaml` + `validate_todo.py`,\nor (b) elevating \"w0: re-validate research evidence\" to a strong\nnaming convention enforced by the /todo review rubric only.\nDecision criterion: is the value worth the schema/validator churn,\nor is review-time enforcement enough? Record the chosen path and\nrationale in this TODO before w2 starts. Both paths still get the\nrubric update in w3 -- that work is unconditional.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide schema vs convention path for upstream-evidence TODOs; document decision",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "notes": "If schema path: add `freshness_check:` field, extend\n`validate_todo.py`, document in `_project/TODO_ENTRY_TEMPLATE.yaml`.\nIf convention path: extend `_project/TODO_ENTRY_TEMPLATE.yaml` with\na worked `w0:` example and call out the naming convention in\n`.claude/skills/todo/SKILL.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the chosen freshness mechanism (schema field OR strong w0 convention)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "notes": "Add a freshness axis to `.claude/skills/todo/SKILL.md` review\nrubric that fires on TODOs whose `description` cites upstream\nevidence (specific version, harness PASS, observed behavior). The\naxis scores 0-3 on whether the TODO has a runnable re-validation\ncommand and whether the resolved version is bound to the TODO.\nThis work runs regardless of w1's choice; the schema vs convention\ndecision affects implementation but the rubric still needs the\naxis either way.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend /todo review rubric with a freshness axis (unconditional)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "notes": "Create `_project/verification-logs/README.md` documenting:\n\"commit captured stdout under\n`_project/verification-logs/<todo-id>/<work-id>.log` for\nverification-only work units.\" Add a `.gitkeep` so the path\nexists even when empty. Update `.claude/skills/code/SKILL.md`\n(debug/iterate notes) to point at the convention for evidence-\nonly commits.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add `_project/verification-logs/` convention for verification-only commits",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "notes": "Pick one current TODO whose work units include re-running an\nexternal harness (e.g. a `track-upstream-platform-workarounds`\nchild item) and apply the new convention as a worked example.\nReference the example from the TODO_ENTRY_TEMPLATE comment so the\nnext author finds it immediately.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the convention to one in-flight TODO as a reference example",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-skill-evidence-durability-conventions",
+        "notes": "Recommended by blind-spot `2026-05-04-074634` (third item).\nGrep `_project/TODO/*/planning/` for descriptions citing\n\"retire\", \"remove workaround\", \"narrow cap once upstream\", or\n\"drop deprecation once Python X.Y\" -- any 2+ matches confirm\nthat the schema/convention pays for itself. List matches in\nthis TODO's notes. If 0-1 matches, the work in w1-w5 still\nships but the schema-level option (vs convention) loses some\nof its justification.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Sweep planning/ for sibling 'retire workaround once upstream lands' TODOs",
+        "wid": "w6"
+      }
+    ]
+  }
+}

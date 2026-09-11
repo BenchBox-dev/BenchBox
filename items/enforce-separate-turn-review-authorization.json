@@ -1,0 +1,99 @@
+{
+  "context": "State the later-turn boundary in AGENTS.md and the active project protocol; add project semantic anchors and negative audit tests; rerun behavioral evaluation.",
+  "description": "Behavioral evaluation showed the compact BenchBox binding weakened the canonical REVIEW-AUTH-001 rule: bundled review-and-fix prompts could be interpreted as immediate write authority. Preserve the canonical requirement that remediation needs explicit authorization in a later user turn, and mechanically detect loss of the project binding.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "enforce-separate-turn-review-authorization",
+        "needs_item": "review-protocol-authority-single-source-cutover"
+      }
+    ],
+    "item_meta": {
+      "completed_at": "2026-07-28T16:20:18Z",
+      "completed_pr": 1318,
+      "created_at": "2026-07-28T15:20:29Z",
+      "worktree": "chore/agent-instruction-todos"
+    },
+    "preserves": [
+      {
+        "behavior": "Review remains read-only until a later user turn explicitly authorizes remediation",
+        "item_id": "enforce-separate-turn-review-authorization"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "enforce-separate-turn-review-authorization",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "enforce-separate-turn-review-authorization",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "item_id": "enforce-separate-turn-review-authorization",
+        "kind": "only_modify",
+        "path_glob": "docs/development/agent-review-protocol.md"
+      },
+      {
+        "item_id": "enforce-separate-turn-review-authorization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_agent_instruction_audit.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_agent_instruction_audit.py -q -n 0",
+        "description": "focused audit tests",
+        "expected": "exit 0",
+        "item_id": "enforce-separate-turn-review-authorization",
+        "last_result": "pass",
+        "last_run": "2026-07-28T15:20:43Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make agent-instructions-check",
+        "description": "instruction audit",
+        "expected": "exit 0",
+        "item_id": "enforce-separate-turn-review-authorization",
+        "last_result": "pass",
+        "last_run": "2026-07-28T15:20:45Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "enforce-separate-turn-review-authorization",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Commit e5bd87cbe states the later-user-turn gate in AGENTS.md and docs/development/agent-review-protocol.md; final Codex candidate evaluation at 6919f5f2d passes both review-remediation repetitions.",
+        "item_id": "enforce-separate-turn-review-authorization",
+        "notes": null,
+        "started_at": "2026-07-28T15:20:37Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Restore explicit later-turn semantics in active instructions",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Commits e5bd87cbe and 6919f5f2d add canonical/project semantic anchors, missing-section detection, and negative tests; 24 focused audit tests pass.",
+        "item_id": "enforce-separate-turn-review-authorization",
+        "notes": null,
+        "started_at": "2026-07-28T15:20:40Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add deterministic project-binding drift enforcement",
+        "wid": "w2"
+      }
+    ]
+  }
+}

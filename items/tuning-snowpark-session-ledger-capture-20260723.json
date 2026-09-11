@@ -1,0 +1,10 @@
+{
+  "description": "Follow-up split from tuning-native-spark-snowpark-ledger-capture-20260722 (native Spark done in PR touching _spark_helpers.py). Snowpark (snowpark_connect.py) currently applies NO tuning-derived self._session.sql(...) session setting: apply_platform_optimizations (base/cloud_spark/mixins.py SparkTuningMixin) returns [], and configure_for_benchmark issues only 'ALTER SESSION SET USE_CACHED_RESULT = FALSE' (benchmarking hygiene applied to ALL runs, not tuning-derived; recording it would falsely report baseline runs as applied_unverified). Decide where Snowpark should apply tuning-derived session settings (e.g. warehouse size / session params from unified_config.platform_optimizations) and record only those via the shared applied_ledger vocab (PHASE_SESSION), mirroring CloudSparkConfigMixin.configure_for_benchmark and the native-Spark spark.conf.set capture. Needs maintainer input on the intended Snowpark tuning-session surface.",
+  "legacy": {
+    "item_meta": {
+      "blocked_reason": "DECISION RECORDED 2026-07-30 (Joe): (1) Snowpark's tuning identity is Snowflake, not Spark — compute is Snowflake's, so Spark session confs are largely inert and clustering keys are the meaningful lever; do NOT inherit CloudSparkConfigMixin and do NOT record the USE_CACHED_RESULT cache-hygiene statement. (2) Apply clustering POST-LOAD via ALTER TABLE ... CLUSTER BY, mirroring snowflake.py, since Snowpark writes plain tables via save_as_table/COPY INTO. (3) Native Snowflake first. Step 1 landed as PR #1371 (snowflake-cluster-key-corroboration-20260730): the shared classifier now understands ALTER TABLE ... CLUSTER BY and a SnowflakeTuningIntrospector corroborates it against INFORMATION_SCHEMA.CLUSTERING_KEY. This item is now a FEATURE task, not a capture task: make Snowpark apply a post-load clustering key, after which capture and corroboration are inherited. Still blocked pending that implementation; unblock when someone picks it up.",
+      "created_at": "2026-07-23T12:36:02Z",
+      "worktree": "main"
+    }
+  }
+}

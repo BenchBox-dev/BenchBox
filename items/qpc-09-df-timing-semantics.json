@@ -1,0 +1,172 @@
+{
+  "description": "QueryProfileContext.get_profile computes execution_time_ms wall-to-wall\nfrom context creation (profiling.py:187), and plan capture runs inside that\nwindow (expression_family.py:1431-1437). So enabling --capture-plans\nchanges reported per-query times on DataFrame platforms, while SQL\nplatforms capture after timing (duckdb.py:957 vs :969). A/B comparisons\nwhere one side had capture enabled are skewed; cross-family comparisons\nembed inconsistent timing semantics within a single run.\n\nFinding: F5.1.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "subtract an estimated capture cost",
+        "instead": "(not specified)",
+        "item_id": "qpc-09-df-timing-semantics",
+        "why": "measure the capture phase explicitly."
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness / Timing",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "Timing policy checks (_project/scripts/timing_policy_check.py) pass",
+        "item_id": "qpc-09-df-timing-semantics"
+      },
+      {
+        "behavior": "planning_time_ms / collect_time_ms fields and their meaning",
+        "item_id": "qpc-09-df-timing-semantics"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/dataframe/profiling.py:139-200 QueryProfileContext",
+        "decision": "reuse",
+        "item_id": "qpc-09-df-timing-semantics",
+        "path": "benchbox/core/dataframe/profiling.py:139-200"
+      },
+      {
+        "concept": "benchbox/platforms/dataframe/expression_family.py:1421-1445 capture-inside-window",
+        "decision": "reuse",
+        "item_id": "qpc-09-df-timing-semantics",
+        "path": "benchbox/platforms/dataframe/expression_family.py:1421-1445"
+      },
+      {
+        "concept": "tests/unit/core/results/test_schema_timing_contract.py / test_exporter_timing_contract.py — the repo's timing-policy pattern",
+        "decision": "reuse",
+        "item_id": "qpc-09-df-timing-semantics",
+        "path": "tests/unit/core/results/test_schema_timing_contract.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-09-df-timing-semantics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/profiling.py"
+      },
+      {
+        "item_id": "qpc-09-df-timing-semantics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/benchmark_mixin.py"
+      },
+      {
+        "item_id": "qpc-09-df-timing-semantics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/expression_family.py"
+      },
+      {
+        "item_id": "qpc-09-df-timing-semantics",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe -q -k 'profil or timing'",
+        "description": "Capture on/off produces equal execution_time_ms for identical work",
+        "expected": "all pass, including new contract test",
+        "item_id": "qpc-09-df-timing-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/validate_todo_indexes.py",
+        "description": "Timing policy gate",
+        "expected": "exit 0",
+        "item_id": "qpc-09-df-timing-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-09-df-timing-semantics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "qpc-09-df-timing-semantics",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "qpc-09-df-timing-semantics",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "qpc-09-df-timing-semantics",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-09-df-timing-semantics",
+        "notes": "Chose measure-and-subtract: QueryProfileContext gains start_plan_capture/end_plan_capture; get_profile computes execution_time_ms as wall minus the MEASURED capture time (clamped at 0). Capture time surfaced as plan_capture_time_ms on QueryExecutionProfile. planning_time_ms / collect_time_ms meaning preserved. Timing semantics documented in the profile docstring. expression_family and the profile_query_execution helper both wrap capture_query_plan in the timed phase; benchmark_mixin surfaces plan_capture_time_ms on the result row.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: add a plan_capture timed phase to QueryProfileContext and define execution_time_ms to exclude capture time.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-09-df-timing-semantics",
+        "notes": "tests/unit/platforms/dataframe/test_df_timing_contract.py: same fake query profiled with capture on/off; a slow (40ms) fake capture must NOT appear in execution_time_ms while plan_capture_time_ms carries it. Also unit-level QueryProfileContext and profile_query_execution coverage.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create: timing contract test — capture on/off must report equal execution_time_ms; capture time gets its own field.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-09-df-timing-semantics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Review: adversarial code review (timing-policy check compliance, downstream consumers of execution_time_ms/planning/collect fields).",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-09-df-timing-semantics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix: address review findings; re-run verification.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-09-df-timing-semantics",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Submit PR referencing qpc-09.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

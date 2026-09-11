@@ -1,0 +1,16 @@
+{
+  "description": "Enhance the existing Snowflake DDL generation to fully utilize the tuning\nconfiguration system and improve automatic clustering management.\n\n## Snowflake Physical Tuning Features\n\n### Automatic Clustering\nSnowflake's primary tuning mechanism:\n```sql\nCREATE TABLE t (...) CLUSTER BY (col1, col2);\nALTER TABLE t CLUSTER BY (col1, col2);\n```\n\nNotes:\n- Snowflake automatically maintains clustering in background\n- No manual partition creation needed\n- Best for columns used in WHERE, JOIN, ORDER BY\n\n### Micro-Partitions (Automatic)\nSnowflake automatically partitions data into ~16MB micro-partitions.\nUsers cannot control this directly - it's fully automatic.\n\n### Search Optimization Service\nOptional acceleration for point lookups:\n```sql\nALTER TABLE t ADD SEARCH OPTIMIZATION ON EQUALITY(col);\n```\n\n## Current State\n\nSnowflake adapter (`benchbox/platforms/snowflake.py`) has:\n- `generate_tuning_clause()` method (line ~1448) - generates CLUSTER BY\n- `apply_table_tunings()` method (line ~1498) - runs ALTER CLUSTER BY\n- Issue: Uses inline config, doesn't fully use tuning YAML",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pt-07-snowflake-ddl",
+        "needs_item": "pt-01-ddl-generator-protocol"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-01-03T00:00:00Z",
+      "worktree": "physical-tuning"
+    }
+  }
+}

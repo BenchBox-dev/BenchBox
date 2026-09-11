@@ -1,0 +1,11 @@
+{
+  "description": "Remove Kaleido, Pandas, and Pillow from visualization dependencies, keeping only Plotly.\n\n**Motivation:**\n- Pandas is NOT used in any visualization code (0 imports) but adds ~50MB and 4 transitive deps\n- Pillow is NOT used in any visualization code\n- Kaleido requires Chrome/Chromium binary, causing installation issues in containers/CI\n- Simplifies installation and reduces dependency footprint\n\n**Trade-off:**\n- Loses static image export (PNG, SVG, PDF) - only HTML export remains\n- HTML exports include full Plotly.js (~2-5MB per file) but work everywhere\n- Users needing static images can screenshot or use browser print-to-PDF\n\n**Evidence from codebase analysis:**\n- `benchbox/core/visualization/` has 0 pandas imports\n- `benchbox/core/visualization/` has 0 pillow imports\n- Kaleido only used in `exporters.py:71-72` for `pio.write_image()`",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2025-01-28T00:00:00Z",
+      "created_at": "2025-01-28T00:00:00Z",
+      "worktree": "main"
+    }
+  }
+}

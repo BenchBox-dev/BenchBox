@@ -1,0 +1,168 @@
+{
+  "context": "Validate the candidate, replace the DB atomically, remove only the exact published sibling WAL after successful promotion, and fail visibly if cleanup cannot be proven.",
+  "description": "The staged WAL guard rejects candidate sidecars but promotion replaces results.duckdb without removing an old output/results.duckdb.wal. This leaves a non-self-contained output directory and preserves the contamination shape the portability remediation targets.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete active DB before validation",
+        "instead": "retain atomic candidate promotion",
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "why": "interruption could empty the site"
+      },
+      {
+        "dont": "ignore stale WAL because browser uses HTTP",
+        "instead": "enforce DB-only portability",
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "why": "other consumers can replay it"
+      },
+      {
+        "dont": "remove broad .wal globs",
+        "instead": "resolve one exact sibling path",
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "why": "that risks unrelated data"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "needs_item": "results-explorer-empty-snapshot-gate-20260802"
+      }
+    ],
+    "item_meta": {
+      "category": "Snapshot portability",
+      "completed_at": "2026-08-12T12:58:31Z",
+      "completed_pr": 1695,
+      "created_at": "2026-08-02T16:27:14Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cleanup failure is visible",
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802"
+      },
+      {
+        "behavior": "Cleanup targets only results.duckdb.wal",
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802"
+      },
+      {
+        "behavior": "Last-good DB stays active until validation",
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Atomic promotion",
+        "decision": "extend",
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "path": "_project/scripts/explorer_pipeline/pipeline.py"
+      },
+      {
+        "concept": "Candidate WAL rejection",
+        "decision": "reuse",
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "path": "_project/scripts/results_explorer_snapshot_invariants.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/pipeline.py"
+      },
+      {
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_results_explorer_snapshot_invariants.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q",
+        "description": "Stale output WAL is absent after promotion",
+        "expected": "Promotion cleanup passes",
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "last_result": "fail",
+        "last_run": "2026-08-12T12:57:39Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_results_explorer_snapshot_invariants.py -q",
+        "description": "Promoted DB opens without sibling WAL",
+        "expected": "Portability tests pass",
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "last_result": "fail",
+        "last_run": "2026-08-12T12:58:22Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Promotion ordering defined: validate candidate DB first, atomically replace output/results.duckdb, remove only output/results.duckdb.wal, then perform best-effort legacy artifact cleanup; WAL cleanup errors remain visible after DB promotion.",
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "notes": null,
+        "started_at": "2026-08-12T12:49:57Z",
+        "started_branch": "fix/results-explorer-stale-wal-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-stale-wal-20260812",
+        "status": "done",
+        "summary": "Define exact DB/WAL ordering",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added _remove_published_wal() in _project/scripts/explorer_pipeline/pipeline.py; it unlinks only output/results.duckdb.wal after os.replace(candidate_db, output/results.duckdb), ignores only FileNotFoundError, and raises a visible OSError for cleanup failure.",
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "notes": null,
+        "started_at": "2026-08-12T12:52:20Z",
+        "started_branch": "fix/results-explorer-stale-wal-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-stale-wal-20260812",
+        "status": "done",
+        "summary": "Implement exact stale-WAL cleanup",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added pipeline regressions for exact stale-WAL removal and visible cleanup failure after DB promotion, plus snapshot-invariant DB-only reopen coverage. Tests: 343 passed in tests/unit/scripts/explorer_pipeline; 2 passed in tests/unit/scripts/test_results_explorer_snapshot_invariants.py; Ruff check/format passed.",
+        "item_id": "results-explorer-snapshot-stale-wal-cleanup-20260802",
+        "notes": null,
+        "started_at": "2026-08-12T12:52:48Z",
+        "started_branch": "fix/results-explorer-stale-wal-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-stale-wal-20260812",
+        "status": "done",
+        "summary": "Add stale-WAL and DB-only reopen regressions",
+        "wid": "w2"
+      }
+    ]
+  }
+}

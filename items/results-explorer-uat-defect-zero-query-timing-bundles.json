@@ -1,0 +1,98 @@
+{
+  "description": "W5 full-package validation reported 54 occurrences where all query timings\nwere `0ms`, which the hosted submission validator treats as likely invalid\ndata. These bundles were excluded from the validator-clean Explorer UAT subset.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "replace zero timings with arbitrary epsilon values",
+        "instead": "fix the measurement/export source or reject the result.",
+        "item_id": "results-explorer-uat-defect-zero-query-timing-bundles",
+        "why": "that corrupts benchmark metrics"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Failed or unsupported query timings are not fabricated.",
+        "item_id": "results-explorer-uat-defect-zero-query-timing-bundles"
+      },
+      {
+        "behavior": "Measured durations continue to use monotonic timing.",
+        "item_id": "results-explorer-uat-defect-zero-query-timing-bundles"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/validate_submission.py results-data/bundles",
+        "description": "Submission validation rejects or repairs all-zero timing bundles deterministically.",
+        "expected": "no all-query-timings-zero errors for publishable bundles",
+        "item_id": "results-explorer-uat-defect-zero-query-timing-bundles",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run _project/scripts/timing_policy_check.py --strict",
+        "description": "Timing policy still passes.",
+        "expected": "strict timing policy passes",
+        "item_id": "results-explorer-uat-defect-zero-query-timing-bundles",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-zero-query-timing-bundles",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-zero-query-timing-bundles",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-zero-query-timing-bundles",
+        "notes": "W1 trace result (2026-05-03):\n  - The full UAT submission package at\n    `~/Developer/benchmark_runs/submissions/uat_20260502/bundle`\n    contains 54 all-zero timing bundles out of 376. The validator-clean\n    subset at\n    `~/Developer/benchmark_runs/submissions/uat_20260502_valid/bundle`\n    contains 0 all-zero timing bundles out of 205.\n  - Affected platforms in the full package: DataFusion 20, Pandas 8,\n    Polars 7, Dask 6, PySpark 6, SQLite 4, ClickHouse Local 3. Affected\n    benchmarks: tpcdi 15, datavault 12, transaction_primitives 12,\n    joinorder 4, nyctaxi 3, tsbs_devops 3, flightdata 2,\n    metadata_primitives 2, tpchavoc 1.\n  - The submitted invalid rows are dominated by failed/skipped query\n    rows: 3145 FAILED rows, 55 SUCCESS rows, and 36 SKIPPED rows across\n    the 54 all-zero bundles. Representative examples include\n    `datavault_sf001_datafusion_df_20260502_223505_ffc2a449.json`\n    (66 failed queries, validation partial) and\n    `transaction_primitives_sf001_pyspark_df_20260502_214438_c695537b.json`\n    (all skipped query rows).\n  - `scripts/validate_submission.py` is behaving correctly: lines\n    431-454 only count query rows with `ms > 0` as non-zero timing\n    signal, and lines 457-471 reject bundles where no query has positive\n    timing.\n  - Schema-v2 export is the publish-surface that exposes the problem:\n    `benchbox/core/results/schema.py::_build_query_results_section`\n    writes `entry[\"ms\"] = round(exec_time_ms, 1)` for every query row\n    with timing data, including failed, skipped, warmup, metadata, and\n    summary rows.\n  - Producer paths that intentionally emit zero timing for non-measured\n    work include DataFrame skipped rows and skip summaries in\n    `benchbox/platforms/dataframe/benchmark_mixin.py`, DataFrame\n    measurement exception fallback rows in the same module, and SQL\n    execution exception fallback rows in\n    `benchbox/platforms/base/execution.py`.\n  - W2 owned implementation file:\n    `benchbox/core/results/schema.py`.\n  - W3 owned test files:\n    `tests/unit/core/results/test_schema_timing_contract.py` and\n    `tests/unit/scripts/test_validate_submission.py`.\n  - Validator semantics should remain unchanged; it correctly rejects\n    all-zero submitted bundles. The fix should either omit\n    non-measurement/non-success zero rows from exported timing signal or\n    make zero-timing export non-publishable without fabricating timings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Identify which platform/result paths emit all-zero query timings",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-zero-query-timing-bundles",
+        "notes": "Implemented in `benchbox/core/results/schema.py`.\nSchema-v2 query and summary timing export now preserves genuinely\nmeasured positive sub-millisecond durations instead of rounding them\ndown to `0.0ms`. True zero-duration rows still export as zero, so the\nsubmission validator continues to reject non-measured all-zero bundles\ninstead of accepting fabricated timings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix timing export or classify zero-timing results as non-publishable",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-zero-query-timing-bundles",
+        "notes": "Added focused regression coverage in\n`tests/unit/core/results/test_schema_timing_contract.py` for positive\nsub-millisecond schema export and in\n`tests/unit/scripts/test_validate_submission.py` for true all-zero\nfailed/skipped bundle rejection plus positive sub-ms validator acceptance.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression coverage for zero-timing rejection",
+        "wid": "w3"
+      }
+    ]
+  }
+}

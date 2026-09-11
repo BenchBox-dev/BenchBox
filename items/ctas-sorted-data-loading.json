@@ -1,0 +1,207 @@
+{
+  "description": "BenchBox's tuning infrastructure generates sort clauses via DuckDBDDLGenerator\n(e.g., `ORDER BY L_SHIPDATE, L_ORDERKEY`), but the data loader uses INSERT INTO\nstatements that don't preserve sorting.\n\nDuckDB doesn't support inline ORDER BY in CREATE TABLE. Sorted tables must be\ncreated via CTAS patterns:\n  CREATE TABLE sorted_table AS SELECT * FROM source ORDER BY col;\n\nThe current DataLoader uses INSERT INTO with VALUES, which doesn't apply sorting.\nThis gap was discovered during sorted data performance experiments showing 5-28x\nspeedups for selective queries when data is properly sorted (zone map pruning).\n\nThe fix requires modifying the data loading path to:\n1. Detect when tuning config specifies sorting for a table\n2. Use CTAS pattern instead of INSERT INTO for those tables\n3. Support both fresh load (CTAS) and append scenarios",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify DataLoader.load() default behavior",
+        "instead": "add CTAS as an opt-in path triggered by tuning config",
+        "item_id": "ctas-sorted-data-loading",
+        "why": "existing platforms depend on INSERT INTO"
+      },
+      {
+        "dont": "remove INSERT INTO fallback",
+        "instead": "keep both paths",
+        "item_id": "ctas-sorted-data-loading",
+        "why": "not all platforms support CTAS"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-18T00:00:00Z",
+      "created_at": "2026-01-07T00:00:00Z",
+      "worktree": "physical-tuning"
+    },
+    "preserves": [
+      {
+        "behavior": "DuckDB adapter backward compatible when no tuning config provided",
+        "item_id": "ctas-sorted-data-loading"
+      },
+      {
+        "behavior": "Existing INSERT INTO loading path unchanged for non-sorted tables",
+        "item_id": "ctas-sorted-data-loading"
+      },
+      {
+        "behavior": "benchbox run --platform duckdb --benchmark tpch --scale 0.01 produces identical row counts",
+        "item_id": "ctas-sorted-data-loading"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_duckdb*.py -v --tb=short",
+        "description": "Existing DuckDB tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "ctas-sorted-data-loading",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'sorted or ctas' -v --tb=short",
+        "description": "Row counts match after CTAS vs INSERT INTO loading",
+        "expected": "all tests pass",
+        "item_id": "ctas-sorted-data-loading",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ctas-sorted-data-loading",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "ctas-sorted-data-loading",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "ctas-sorted-data-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document current data loading flow in DataLoader class",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sorted-data-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit tests for sorted CTAS loading",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sorted-data-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integration test: verify sortedness after load",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sorted-data-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Performance validation: confirm zone map pruning benefit",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sorted-data-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Identify integration point for tuning config in load path",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sorted-data-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design CTAS-based loading strategy for DuckDB",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sorted-data-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle fresh load scenario (CTAS)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sorted-data-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle append scenario (temp table + ordered insert)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sorted-data-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tuning_config parameter to DataLoader",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sorted-data-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement DuckDB CTAS handler for sorted tables",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sorted-data-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Modify DuckDB adapter to pass tuning config to loader",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "ctas-sorted-data-loading",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add generate_ctas_ddl usage in data loading path",
+        "wid": "w9"
+      }
+    ]
+  }
+}

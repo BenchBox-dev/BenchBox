@@ -1,0 +1,130 @@
+{
+  "context": "Inventory at least four audit-document patterns, define a minimal provenance schema, extend audit_sha_check with deterministic parsing and fixtures, and spot-replay one numeric claim per affected document before any bulk remediation.",
+  "description": "Finding 2026-07-18-190500-evidence-tree-sha-provenance-mismatch shows audit-sha-check proves only that a pinned SHA exists, not that numeric evidence was measured from that tree. Add a per-measurement measured_at_sha convention or require replay at the document pin, then enforce it for number-bearing audit evidence and sweep existing audits without rewriting unrelated history.",
+  "legacy": {
+    "item_meta": {
+      "category": "Audit provenance",
+      "completed_at": "2026-08-01T17:46:55Z",
+      "completed_pr": 1426,
+      "created_at": "2026-08-01T14:20:13Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing develop_sha existence checks remain fail closed.",
+        "item_id": "audit-evidence-measured-sha-binding"
+      },
+      {
+        "behavior": "Narrative documents without empirical numeric claims do not require fabricated provenance.",
+        "item_id": "audit-evidence-measured-sha-binding"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "audit-evidence-measured-sha-binding",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/**"
+      },
+      {
+        "item_id": "audit-evidence-measured-sha-binding",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/audit_sha_check.py"
+      },
+      {
+        "item_id": "audit-evidence-measured-sha-binding",
+        "kind": "only_modify",
+        "path_glob": "docs/development/agent-review-protocol.md"
+      },
+      {
+        "item_id": "audit-evidence-measured-sha-binding",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**audit*"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts -k 'audit and sha' -q",
+        "description": "Audit provenance tests",
+        "expected": "fails to reject a mismatched measurement SHA on the unfixed tree; exit 0 after guard",
+        "item_id": "audit-evidence-measured-sha-binding",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make audit-sha-check",
+        "description": "Audit SHA guard",
+        "expected": "exit 0",
+        "item_id": "audit-evidence-measured-sha-binding",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "audit-evidence-measured-sha-binding",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "audit-evidence-measured-sha-binding",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "audit-evidence-measured-sha-binding",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventoried base develop stamps, explicit checked-tree stamps, test-result counts, inventory counts, and narrative date/version/PR identifiers across 27 audit files; only empirical count/result classes require measurement binding.",
+        "item_id": "audit-evidence-measured-sha-binding",
+        "notes": null,
+        "started_at": "2026-08-01T17:39:08Z",
+        "started_branch": "fix/audit-evidence-sha-binding",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Inventory four or more audit evidence conventions and classify number-bearing claims",
+        "wid": "w0"
+      },
+      {
+        "evidence": "docs/development/agent-review-protocol.md specifies develop_sha, checked_sha, measured_at_sha, replay_sha, and replay_scope semantics plus contradiction handling.",
+        "item_id": "audit-evidence-measured-sha-binding",
+        "notes": null,
+        "started_at": "2026-08-01T17:39:16Z",
+        "started_branch": "fix/audit-evidence-sha-binding",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Specify measured_at_sha versus replay-sha semantics",
+        "wid": "w1"
+      },
+      {
+        "evidence": "audit_sha_check.py now rejects missing/mismatched measured SHA and unbounded replay provenance; 10 focused audit+SHA tests and marker checks pass.",
+        "item_id": "audit-evidence-measured-sha-binding",
+        "notes": null,
+        "started_at": "2026-08-01T17:39:24Z",
+        "started_branch": "fix/audit-evidence-sha-binding",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Implement the provenance validator and focused fixtures",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Backfilled three reachable numeric evidence records without rewriting historical claims. Hosted unit-hardening spot replay at 9ccb704e produced 80 passed; credentialed live and historical totals explicitly remain unreplayed.",
+        "item_id": "audit-evidence-measured-sha-binding",
+        "notes": null,
+        "started_at": "2026-08-01T17:39:33Z",
+        "started_branch": "fix/audit-evidence-sha-binding",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Spot-replay affected audits and make only evidence-backed corrections",
+        "wid": "w3"
+      }
+    ]
+  }
+}

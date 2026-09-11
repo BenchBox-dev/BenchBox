@@ -1,0 +1,67 @@
+{
+  "context": "Do not begin until the authorization and worktree gates pass. Preserve unrelated changes, use temporary outputs for tests, fail closed on uncertainty, and stop on any data-loss or false-success signal.",
+  "description": "Load the exact --config path, defer manager construction, reject missing or malformed files with nonzero status, and add subprocess coverage for valid, alternate, malformed, and missing configs.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "fix-p0-config-validation",
+        "needs_item": "fix-gate-1-baseline"
+      }
+    ],
+    "item_meta": {
+      "category": "architecture-remediation",
+      "completed_at": "2026-08-26T20:57:52Z",
+      "completed_pr": 1925,
+      "created_at": "2026-08-26T17:08:08Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing user files, existing result artifacts, backward compatibility, rollback evidence",
+        "item_id": "fix-p0-config-validation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-p0-config-validation",
+        "kind": "do_not_modify",
+        "path_glob": ".bossmode/**"
+      },
+      {
+        "item_id": "fix-p0-config-validation",
+        "kind": "do_not_modify",
+        "path_glob": "_project/handoffs/**"
+      },
+      {
+        "item_id": "fix-p0-config-validation",
+        "kind": "do_not_modify",
+        "path_glob": "test-results/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from pathlib import Path; import subprocess; import tempfile; p=Path(tempfile.mktemp(suffix=\\\".yaml\\\")); p.write_text(\\\"database: [unclosed\\\\n\\\", encoding=\\\"utf-8\\\"); r=subprocess.run([\\\"uv\\\", \\\"run\\\", \\\"--\\\", \\\"benchbox\\\", \\\"validate\\\", \\\"--config\\\", str(p)], capture_output=True, text=True); p.unlink(missing_ok=True); assert r.returncode != 0; assert \\\"Configuration is valid\\\" not in r.stdout + r.stderr\"",
+        "description": "Malformed explicit config fails closed",
+        "expected": "exit 0",
+        "item_id": "fix-p0-config-validation",
+        "last_result": "pass",
+        "last_run": "2026-08-26T20:57:51Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Commit 995a78050e: explicit --config validation loads the requested file in strict mode and fails closed. Focused public CLI/config tests: 26 passed. Full preflight: 28,381 passed, 19 skipped.",
+        "item_id": "fix-p0-config-validation",
+        "notes": null,
+        "started_at": "2026-08-26T20:15:49Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement fail-closed config loading and subprocess acceptance tests",
+        "wid": "w1"
+      }
+    ]
+  }
+}

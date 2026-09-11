@@ -1,0 +1,84 @@
+{
+  "context": "Render the note on the evidence line (or an indented continuation when it is long) without changing get_finding or the --json payload, which are already correct. Add a regression test asserting the note appears in human output, since the existing tests only exercised --json.",
+  "description": "_print_finding (_project/scripts/todo_findings.py) prints each evidence row as path, optional line range, and pattern -- but never the 'note' field. get_finding selects note and 'show --json' does emit it, so the data is present and only the human-readable rendering hides it. An agent triaging with the default 'todo finding show <id>' therefore cannot see evidence notes at all, which matters because the note is where the reviewer explains WHY a path is evidence.\n\nSmall and fully independent of the v4 migration, so it ships without waiting on any production gate. Kept as its own item rather than folded into findings-schema-v4-lossless-legacy-fields precisely so it is not stranded behind that item's authorization gate.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Change get_finding's SELECT or the --json payload shape",
+        "instead": "change only the _print_finding rendering and assert the JSON stays unchanged",
+        "item_id": "findings-show-hides-evidence-note",
+        "why": "both already include note; the defect is display-only, and altering the JSON would break any consumer pinned to it"
+      },
+      {
+        "dont": "Mark the new or edited test module 'fast'",
+        "instead": "use 'unit' and 'medium' markers and confirm with the timing policy check",
+        "item_id": "findings-show-hides-evidence-note",
+        "why": "the fast-lane cap in _project/config/fast_test_lane_policy.json has near-zero headroom and CI's timing_policy_check --strict trips on any fast-lane addition"
+      }
+    ],
+    "item_meta": {
+      "category": "tracker",
+      "completed_at": "2026-07-29T17:02:49Z",
+      "completed_pr": 1341,
+      "created_at": "2026-07-29T16:39:20Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "Evidence lines without a note render exactly as they do today (no trailing separator or empty field)",
+        "item_id": "findings-show-hides-evidence-note"
+      },
+      {
+        "behavior": "todo finding show --json output is byte-identical to today's",
+        "item_id": "findings-show-hides-evidence-note"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-show-hides-evidence-note",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-show-hides-evidence-note",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "findings-show-hides-evidence-note",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_findings.py"
+      },
+      {
+        "item_id": "findings-show-hides-evidence-note",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q",
+        "description": "findings script tests pass, including a case asserting the evidence note reaches human output",
+        "expected": "all pass",
+        "item_id": "findings-show-hides-evidence-note",
+        "last_result": "pass",
+        "last_run": "2026-07-29T16:51:11Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "_print_finding now renders an indented 'note:' continuation; TestShowRendersEvidenceNote covers a note-bearing row, a note-less row (asserted byte-identical to before), and the unchanged JSON payload. 59 passed in test_todo_findings.py.",
+        "item_id": "findings-show-hides-evidence-note",
+        "notes": null,
+        "started_at": "2026-07-29T16:51:02Z",
+        "started_branch": "feat/findings-lossless-mapping",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Render the evidence note in _print_finding and add the regression test covering both a note-bearing and a note-less evidence row",
+        "wid": "w1"
+      }
+    ]
+  }
+}

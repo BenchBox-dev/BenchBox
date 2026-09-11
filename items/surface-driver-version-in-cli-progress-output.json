@@ -1,0 +1,147 @@
+{
+  "context": "In benchbox/cli/commands/run.py, the \"Running ...\" line is at line 1369 (direct execution\npath). The database_config is created at line 1402 via db_manager.create_config().\n\nMove the console.print to after line 1406 (after database_config is fully created).\nAt that point, database_config.driver_version_actual and database_config.driver_version_resolved\nare both populated by ensure_driver_version() inside database.py.\n\nUse driver_version_actual if set, fall back to driver_version_resolved, fall back to\nomitting the driver clause entirely. Do not show \"None\" or \"unknown\".\n\nThe interactive mode (not direct execution) uses a different code path - check if the\nsame pattern applies there (around line 1924 where platform_type is resolved).\n",
+  "description": "BenchBox currently prints \"Running {benchmark} on {platform} at scale {scale}\" before\nresolving the database config, so the driver version isn't known at that point. Users\nhave no visible indication of which driver version actually ran until they inspect the\nresult JSON.\n\nThis became a concrete UX problem: a user manually installed duckdb==1.5.0.dev307 via\nuv pip install, then ran benchbox without specifying --platform-option driver_version=X.\nuv run silently reverted the package to the uv.lock-pinned 1.4.3 before Python started.\nThe result JSON correctly reported 1.4.3, but the user only discovered the discrepancy\nby reading the result file - never from the CLI output.\n\nThe fix is to emit driver version after config resolution, either by:\n  a) Moving the \"Running ...\" line to after database_config is created (line 1402 in\n     commands/run.py), so version is available to include inline.\n  b) Adding a second, briefer line like \"  ↳ driver: duckdb 1.4.3 (current-process)\"\n     immediately after config creation.\n\nThe preferred output is option (a): one combined line.\nTarget format: \"Running {benchmark} on {platform} at scale {scale} [driver {version}]\"\nExample: \"Running clickbench on duckdb at scale 10.0 [driver 1.4.3]\"\n\nFor platforms where no version was explicitly requested (the common case), still show\nthe actual resolved version so the user can see what's running. For platforms without\na driver package (e.g., SQLite), omit the driver clause.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the --dry-run output path",
+        "instead": "scope only to direct execution path",
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "why": "it has different semantics"
+      },
+      {
+        "dont": "emit the version before database_config creation",
+        "instead": "move the print line to after line 1406",
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "why": "it won't be resolved yet"
+      },
+      {
+        "dont": "show 'driver: None' or 'driver: unknown'",
+        "instead": "omit the driver clause when version is not available",
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "why": "it's noise"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-23T00:00:00Z",
+      "created_at": "2026-02-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Non-interactive/--non-interactive mode continues to work correctly",
+        "item_id": "surface-driver-version-in-cli-progress-output"
+      },
+      {
+        "behavior": "The 'Running ...' line still appears before benchmark execution begins (not after)",
+        "item_id": "surface-driver-version-in-cli-progress-output"
+      },
+      {
+        "behavior": "The output format for platforms without a driver package (SQLite) is not broken",
+        "item_id": "surface-driver-version-in-cli-progress-output"
+      },
+      {
+        "behavior": "benchbox run --dry-run output is not affected",
+        "item_id": "surface-driver-version-in-cli-progress-output"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases power --non-interactive 2>&1 | grep 'Running tpch'",
+        "description": "Output line includes driver version for DuckDB run",
+        "expected": "Running tpch on duckdb at scale 0.01 [driver 1.4.3] (or similar with actual version)",
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Existing fast unit tests still pass",
+        "expected": "All tests pass with 0 failures",
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move 'Running...' print line to after database_config creation in commands/run.py (line ~1402) and include driver version from database_config.driver_version_actual or driver_version_resolved",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle the no-driver-package case (e.g., SQLite) gracefully - omit driver clause when driver_package is None or version is unknown",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit/snapshot test verifying the new output format for both driver-present and driver-absent cases",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "surface-driver-version-in-cli-progress-output",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Check the interactive mode code path (around line 1924 in commands/run.py where platform_type is resolved) and apply the same driver version display pattern if applicable",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Implement DataFrame expression and pandas-family query implementations for\nTPC-DS-OBT using OBT-specific semantics.\n\nThis work should use the OBT SQL query manager as validation reference and\navoid assuming normalized TPC-DS join structures.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-07T00:00:00Z",
+      "created_at": "2026-02-07T00:00:00Z",
+      "worktree": "dataframe-benchmarks"
+    }
+  }
+}

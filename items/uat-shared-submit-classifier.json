@@ -1,0 +1,231 @@
+{
+  "context": "Lift the classification policy from submit.py:587-606 into a pure function in\nbenchbox/core (no ctx.exit, returns the enum). Import\nCLI_REFUSED_COMPLIANCE_CLASSES from benchbox/validation/bundle.py rather than\nredeclaring it. Make submit.py and runner.py both call it; each keeps its own\nsurface mapping. Pin with a fixture-matrix contract test.\n",
+  "description": "Outcome of a 4-round adversarial architecture review of the UAT layer\n(tests/uat/). The review converged on a \"boundary reset\": UAT's chartered\nscope IS evidence-producing release-gate orchestration over named artifacts\n(_project/specs/uat-framework.md:31,35-38,268,688,693), but it should\nconsume canonical BenchBox surfaces rather than fork policy.\n\nThis item fixes the highest-risk fork: UAT re-implements the submit\n*classification policy*.\n\n- tests/uat/runner.py:60 (classify_for_submit) re-expresses the decision\n  tree that maps result predicates -> terminal state (and which terminal\n  states are refusals) that benchbox/cli/commands/submit.py:587-606 already\n  owns. The two surfaces will drift: when submit policy changes, UAT silently\n  reports a different submittability verdict than `benchbox submit` enforces.\n- tests/uat/runner.py:27 locally redefines\n  frozenset({\"unofficial_nonstandard\",\"unofficial_subscale\"}) instead of\n  importing CLI_REFUSED_COMPLIANCE_CLASSES from\n  benchbox/validation/bundle.py:46 (verified identical literals). Add a third\n  refused class upstream and UAT silently diverges.\n\nNOTE (precision from the review): the leaf predicates are NOT duplicated.\nrunner.py:22-23 already correctly imports result_non_clean_reason and\nresult_failed_query_count from benchbox.core.results.status. Only the\nclassification *policy* + the copy-pasted frozenset are duplicated. Do not\n\"fix\" the predicate imports.\n\nEstablishes the principle every other UAT finding is an instance of:\nconsume canonical surfaces, do not fork policy.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "leave the frozenset literal in runner.py:27 'just in case'",
+        "instead": "(not specified)",
+        "item_id": "uat-shared-submit-classifier",
+        "why": "import the canonical set or the drift returns"
+      },
+      {
+        "dont": "put ctx.exit or CLI concerns in the shared classifier",
+        "instead": "(not specified)",
+        "item_id": "uat-shared-submit-classifier",
+        "why": "keep it pure so UAT can consume it without click"
+      },
+      {
+        "dont": "reimplement result_non_clean_reason / result_failed_query_count",
+        "instead": "(not specified)",
+        "item_id": "uat-shared-submit-classifier",
+        "why": "they are already imported correctly; only policy is duplicated"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-shared-submit-classifier",
+        "id": 510,
+        "reason": "Vocabulary alignment is a larger API decision; the classifier extraction is the load-bearing fix.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Unify UAT terminal-state vocabulary with CLI exit-code semantics end to end"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-31T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Leaf predicate imports from benchbox.core.results.status stay as-is — only policy is being deduplicated",
+        "item_id": "uat-shared-submit-classifier"
+      },
+      {
+        "behavior": "UAT terminal-state outputs (submittable/unofficial/query_failure/schema_violation/missing_manifest) remain unchanged for existing fixtures",
+        "item_id": "uat-shared-submit-classifier"
+      },
+      {
+        "behavior": "benchbox submit exit codes and user-facing refusal messages remain byte-identical for each terminal state",
+        "item_id": "uat-shared-submit-classifier"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/commands/submit.py — preserve CLI message/exit behavior while moving pure policy out of the command",
+        "decision": "reuse",
+        "item_id": "uat-shared-submit-classifier",
+        "path": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "concept": "benchbox/core/results/status.py — reuse existing result_non_clean_reason/result_failed_query_count predicates; do not move or duplicate them",
+        "decision": "reuse",
+        "item_id": "uat-shared-submit-classifier",
+        "path": "benchbox/core/results/status.py"
+      },
+      {
+        "concept": "benchbox/validation/bundle.py:CLI_REFUSED_COMPLIANCE_CLASSES — reuse the canonical refusal set instead of redefining literals",
+        "decision": "reuse",
+        "item_id": "uat-shared-submit-classifier",
+        "path": "benchbox/validation/bundle.py:CLI_REFUSED_COMPLIANCE_CLASSES"
+      },
+      {
+        "concept": "tests/uat/runner.py:SubmitTerminalState — preserve the UAT-facing vocabulary as an adapter over the shared classifier",
+        "decision": "reuse",
+        "item_id": "uat-shared-submit-classifier",
+        "path": "tests/uat/runner.py:SubmitTerminalState"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-shared-submit-classifier",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/status.py (predicates are already canonical)"
+      },
+      {
+        "item_id": "uat-shared-submit-classifier",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/validation/bundle.py (import CLI_REFUSED_COMPLIANCE_CLASSES, do not redefine)"
+      },
+      {
+        "item_id": "uat-shared-submit-classifier",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "uat-shared-submit-classifier",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/ (new shared classifier module/function)"
+      },
+      {
+        "item_id": "uat-shared-submit-classifier",
+        "kind": "only_modify",
+        "path_glob": "tests/ (new contract test)"
+      },
+      {
+        "item_id": "uat-shared-submit-classifier",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/runner.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'unofficial_nonstandard' tests/uat/runner.py || echo 'absent'",
+        "description": "Local frozenset literal is gone from UAT",
+        "expected": "absent (literal no longer defined locally)",
+        "item_id": "uat-shared-submit-classifier",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -k submit_classifier_contract -q",
+        "description": "CLI/UAT terminal-state contract test passes",
+        "expected": "all contract cases pass",
+        "item_id": "uat-shared-submit-classifier",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_submit_service.py tests/uat/test_runner.py tests/uat/test_package.py -q",
+        "description": "Existing submit + UAT unit tests still pass",
+        "expected": "0 failures",
+        "item_id": "uat-shared-submit-classifier",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-shared-submit-classifier",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-shared-submit-classifier",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-shared-submit-classifier",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-shared-submit-classifier",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-shared-submit-classifier",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-shared-submit-classifier",
+        "notes": "Confirm runner.py:60 policy duplication, runner.py:27 local frozenset,\nsubmit.py:587-606 inline policy, and bundle.py:46\nCLI_REFUSED_COMPLIANCE_CLASSES. Record a compact summary (file:line,\nmatched literals) so the fix targets current code, not the review snapshot.\n\nRE-VALIDATION (2026-07-16): the finding NO LONGER EXISTS — the extraction\nalready landed in the tree. This item was misfiled in DONE with a stale\n`status: Not Started` field and later restored to planning on that basis\n(PR #1181); the engineering work itself was executed. Evidence:\n  - benchbox/core/results/submit_classification.py present (shared policy;\n    exports SubmitTerminalState + classify_result_path).\n  - benchbox/cli/commands/submit.py:37-38 imports the shared module and\n    maps its enum to CLI exit codes (no inline decision tree).\n  - tests/uat/runner.py:74-81 classify_for_submit is a thin adapter over\n    classify_result_path; the local frozenset is GONE\n    (`grep unofficial_nonstandard tests/uat/runner.py` -> absent).\n  - bundle.py:59 CLI_REFUSED_COMPLIANCE_CLASSES remains the single\n    canonical refusal set; no literal re-list anywhere.\n  - tests/unit/core/results/test_submit_classifier_contract.py exists.\nVerification block re-run clean on 2026-07-16 (see verification:).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the duplication still exists at the cited lines",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-shared-submit-classifier",
+        "notes": "New function returns the terminal-state enum from the result-status\npredicates already in benchbox.core.results.status, importing\nCLI_REFUSED_COMPLIANCE_CLASSES from benchbox/validation/bundle.py rather\nthan re-listing literals. Keep it side-effect free (no ctx.exit); callers\nmap the enum to their own surface (CLI exit code vs UAT enum).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract a single shared submit-classification function in benchbox/core",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-shared-submit-classifier",
+        "notes": "Replace the inline decision branches at submit.py:587-606 with a call to\nthe shared classifier; preserve exact CLI exit codes and user-facing\nmessages (see must_preserve).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor benchbox/cli/commands/submit.py to consume the shared classifier",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-shared-submit-classifier",
+        "notes": "classify_for_submit becomes a thin adapter over the shared classifier.\nDelete the local frozenset at runner.py:27. Keep UAT's terminal-state\nvocabulary mapping in one place.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor tests/uat/runner.py to consume the shared classifier; delete local frozenset",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-shared-submit-classifier",
+        "notes": "Drive a matrix of result fixtures (clean, query_failure, schema_violation,\nmissing_manifest, unofficial_*) through both surfaces; assert identical\nterminal-state/refusal verdict. This is the drift guard. Consider sharing\na CI-contract-test harness with [[uat-single-connection-registry]].\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a CI contract test asserting CLI and UAT agree on terminal state",
+        "wid": "w4"
+      }
+    ]
+  }
+}

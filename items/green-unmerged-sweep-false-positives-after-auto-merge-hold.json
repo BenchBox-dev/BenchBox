@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #697 of auto-merge-workflow-defeats-the-makefile-hold-20260805.\nDeferred: green_unmerged_sweep false-positives after auto-merge hold\nReason deferred: Script still classifies intentional holds as stranded; out of this TODO scope (_project/scripts). Needs follow-up item.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-08-05T22:32:29Z",
+      "worktree": "main"
+    }
+  }
+}

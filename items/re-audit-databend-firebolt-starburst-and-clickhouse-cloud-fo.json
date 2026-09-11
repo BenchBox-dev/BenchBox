@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #311 of eliminate-non-data-loading-wrong-layer-compensation.\nDeferred: Re-audit Databend, Firebolt, Starburst, and ClickHouse Cloud for broader config-ownership standardization after the confirmed fixes land\nReason deferred: The review found similar-looking patterns, but not enough caller-context proof to classify them as confirmed wrong-layer compensation in the current flows",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:26Z",
+      "worktree": "main"
+    }
+  }
+}

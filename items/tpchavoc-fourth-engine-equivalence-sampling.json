@@ -1,0 +1,242 @@
+{
+  "context": "Mirror the second/third-engine pattern for ClickHouse - a build helper, a\nfind_clickhouse_divergences, a run_clickhouse_sample, an engine-keyed\nCLICKHOUSE_KNOWN_DIVERGENCES, and (only if needed) a CLICKHOUSE_TPCHAVOC_SKIPS\nexecution-filter (w0). Run the oracle in report mode and classify divergences,\nexpecting the first real result-semantic differences because ClickHouse uses a\nNATIVE non-Postgres dialect (w1). Fix translation bugs at the seam and declare\nirreducible engine-semantic result differences as justified exceptions (w2),\npick a bounded routine-CI posture from evidence (w3), and update the cross-engine\nconclusion to a dialect-FAMILY claim (w4). DuckDB stays the hard gate.\n",
+  "description": "The TPC-Havoc cross-dialect equivalence oracle now samples THREE engines: the\nDuckDB SQL gate (PR #770, the hard blocker, KNOWN_DIVERGENCES empty), the\nPostgreSQL sample (PR #803, 203/203 executable, POSTGRES_KNOWN_DIVERGENCES\nempty), and the DataFusion sample (PR #806, 206/206 executable,\nDATAFUSION_KNOWN_DIVERGENCES empty). The three-engine conclusion (PR #806 w4)\nwas that translation divergence is SYSTEMATIC-ZERO: every variant an engine can\nexecute is result-equivalent to canonical TPC-H run through the SAME translation\non the SAME instance; cross-engine differences live only in WHICH variants\nexecute (bounded by per-engine skip-lists), never in the RESULTS of the ones\nthat do.\n\nBut there is a confound: all three engines translate through a PostgreSQL-shaped\nseam. SQLGlot normalizes \"datafusion\" -> \"postgres\"\n(benchbox/utils/dialect_utils.py:normalize_dialect_for_sqlglot), and \"netezza\"\n(the TPC-H source dialect) -> \"postgres\" too, so DuckDB, Postgres, and DataFusion\nall receive SQL that is essentially Postgres-family. The systematic-zero result\nmay therefore reflect that the seam emits one dialect family faithfully - NOT\nthat it is faithful to an engine with genuinely different result semantics.\n\nThis TODO closes that gap with a FOURTH engine that translates through a NATIVE,\nnon-Postgres SQLGlot dialect and has known result-semantic differences:\nClickHouse. Unlike DataFusion, \"clickhouse\" is a first-class SQLGlot write\ndialect (normalize_dialect_for_sqlglot(\"clickhouse\") == \"clickhouse\"), so the\nvariants and canonical are rendered through a DIFFERENT code path in the seam.\nClickHouse also differs on exactly the result-semantic axes the earlier TODOs\nflagged as the highest-information contrast: integer vs float division, NULL\nordering/placement, implicit casts, and Decimal-vs-Float aggregation. If the\nsystematic-zero result holds here, it is strong evidence the seam is faithful\nacross dialect FAMILIES; if it breaks, the divergences localize precisely the\nresult-semantic gaps a Postgres-shaped sample structurally cannot see.\n\nThis is the `deferred` follow-on recorded in BOTH\ntpchavoc-cross-dialect-equivalence-sampling.yaml and\ntpchavoc-third-engine-equivalence-sampling.yaml. It remains a SAMPLE: the DuckDB\ngate stays the hard blocker; this does NOT gate all ~20 platforms.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "compare a ClickHouse variant result to a DuckDB/Postgres/DataFusion canonical",
+        "instead": "(not specified)",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "why": "run canonical on the SAME engine, same dialect, both sides."
+      },
+      {
+        "dont": "gate all ~20 platforms in routine CI",
+        "instead": "(not specified)",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "why": "one more engine, decided from evidence."
+      },
+      {
+        "dont": "patch individual variants for what is a translation-layer bug",
+        "instead": "(not specified)",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "why": "fix the seam so the fix generalizes across variants and engines."
+      },
+      {
+        "dont": "treat a CLICKHOUSE_TPCHAVOC_SKIPS entry as an equivalence pass",
+        "instead": "(not specified)",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "why": "exclude un-executable variants, never mark them equivalent."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-06-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Only an unreachable/unusable engine is a SKIP (mirror run_postgres_sample's connect-only skip); schema/load/translation/sweep failures must propagate.",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling"
+      },
+      {
+        "behavior": "Reuse find_divergences, validate_variant_equivalence, and _report; no per-engine fork of the comparator/oracle.",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling"
+      },
+      {
+        "behavior": "The DuckDB SQL equivalence gate stays the hard, blocking gate with empty KNOWN_DIVERGENCES (220/220, exit 0).",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling"
+      },
+      {
+        "behavior": "The PostgreSQL and DataFusion samples stay green; POSTGRES_/DATAFUSION_KNOWN_DIVERGENCES and their TPCHAVOC_SKIPS semantics are unchanged.",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/pr.yml postgres-integration (service container) and datafusion-integration (in-process) jobs - the two non-blocking CI-posture templates to choose between.",
+        "decision": "reuse",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "path": ".github/workflows/pr.yml"
+      },
+      {
+        "concept": "benchbox/core/tpchavoc/equivalence.py - the engine-agnostic oracle (find_divergences + the shared _report). Mirror build_postgres_with_tpch / build_datafusion_with_tpch, find_<engine>_divergences, run_<engine>_sample, and the engine-keyed <ENGINE>_KNOWN_DIVERGENCES. Do NOT fork the comparator.",
+        "decision": "reuse",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "path": "benchbox/core/tpchavoc/equivalence.py"
+      },
+      {
+        "concept": "benchbox/platforms/clickhouse* (clickhouse/, clickhouse_local.py, clickhouse_server.py, clickhouse_cloud.py) - existing ClickHouse adapters; clickhouse-local/chDB may allow an in-process or single-binary run that is cheaper than a server container.",
+        "decision": "reuse",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "path": "benchbox/platforms/clickhouse*"
+      },
+      {
+        "concept": "benchbox/sql_compat/rules/execution_filter/postgres_tpchavoc.py and datafusion_tpchavoc.py - the per-engine execution-filter skip pattern (excluded, never marked equivalent), registered for the platform and wired into TPCHavocBenchmark.get_platform_skip_queries.",
+        "decision": "reuse",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "path": "benchbox/sql_compat/rules/execution_filter/postgres_tpchavoc.py"
+      },
+      {
+        "concept": "benchbox/utils/dialect_utils.py:normalize_dialect_for_sqlglot - 'clickhouse' is a NATIVE SQLGlot dialect (not normalized to postgres), which is the whole point: it exercises a different translation path than the three Postgres-family engines sampled so far.",
+        "decision": "reuse",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "path": "benchbox/utils/dialect_utils.py:normalize_dialect_for_sqlglot"
+      },
+      {
+        "concept": "tests/integration/platforms/test_tpchavoc_postgres_equivalence.py and test_tpchavoc_datafusion_equivalence.py - the live-sample test pattern (module-scoped fixture, sweep once, clean skip when the engine is unreachable).",
+        "decision": "reuse",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "path": "tests/integration/platforms/test_tpchavoc_postgres_equivalence.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpchavoc/"
+      },
+      {
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make tpchavoc-equivalence-report-clickhouse  # report mode",
+        "description": "ClickHouse report-mode oracle enumerates divergences excluding un-executable variants",
+        "expected": "categorized divergence list over ClickHouse-executable variants; skip-list variants excluded",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make tpchavoc-equivalence-report",
+        "description": "DuckDB hard gate stays green and blocking after the fourth engine is added",
+        "expected": "checked 220 variants - 0 divergent, 220 equivalent; exit 0",
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "notes": "RESOLVED. Added to benchbox/core/tpchavoc/equivalence.py: CLICKHOUSE_TARGET_DIALECT\n= \"clickhouse\", build_clickhouse_with_tpch, find_clickhouse_divergences,\nrun_clickhouse_sample, and `--engine clickhouse` in main(). RUN MODE: in-process\nClickHouse via chDB (ClickHouseLocalAdapter / clickhouse-local) - the cheapest\nfaithful engine, no service container (chDB 4.1.6 is already a dev dependency).\nThe chDB client exposes execute(sql).fetchall() natively and raises per query, so\nfind_divergences' per-query error isolation works with no autocommit transaction.\nCanonical via tpch.get_query(q, dialect=\"clickhouse\") and variants via\ntranslate_query_text(sql, \"netezza\", \"clickhouse\") - both through the SAME native\nclickhouse seam (NOT normalized to postgres) so shared translation cancels out. The\ncomparator and _report are reused verbatim - no per-engine fork. Each table's row\ncount is verified (>0) so a partial load cannot produce a false green. MergeTree\nORDER BY (PK-derived by the adapter) is physical layout only and never changes\nresults. CLICKHOUSE_SESSION_SETTINGS={\"join_use_nulls\":1} configures SQL-standard\nLEFT JOIN NULL semantics (the semantics canonical TPC-H and the variants assume,\nand that the other three engines use natively); this is documented, NOT used to\nmute a divergence - the residual divergences are still reported and the JOIN-NULL\ndefault is itself recorded as an engine-semantic difference in w4. A\ncomparator-robustness fix in validation.py (_numeric_values_equal coerces both\noperands to float) lets the reused comparator compare ClickHouse's Decimal averages\nagainst canonical Float64 instead of crashing on `float - Decimal`; it is\nengine-agnostic and keeps DuckDB/Postgres/DataFusion green.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire the ClickHouse build helper + sample path, reusing find_divergences and _report",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "notes": "RESOLVED. Ran `python -m benchbox.core.tpchavoc.equivalence --engine clickhouse` at\nSF=0.1. The raw sweep (no skip-list, ClickHouse default settings) surfaced 28\ndivergences - the richest surface of any sampled engine, as expected for the first\nnative non-Postgres dialect. Classification:\n\n(a) translation-layer bugs: NONE. The native-clickhouse translation is faithful;\n    every divergence is an execution gap or an engine-semantic result difference,\n    so there was no seam bug to fix (w2).\n\n(b) irreducible engine-semantic RESULT differences -> CLICKHOUSE_KNOWN_DIVERGENCES\n    (7 entries, three classes):\n      - decimal-division-truncation (1_v4): ClickHouse SUM(decimal)/COUNT keeps the\n        operand Decimal scale (avg_qty = Decimal('25.53')) where canonical AVG\n        returns full Float64 (25.5376...). The \"Decimal-vs-Float\" axis this engine\n        was chosen to surface.\n      - sum-empty-group-zero (3_v7, 7_v7, 10_v7, 10_v8): ClickHouse SUM/sumIf over\n        an all-filtered group returns 0, not NULL, so variants emulating a WHERE\n        filter with SUM(...) FILTER(...) + HAVING <agg> IS NOT NULL never drop the\n        empty groups canonical's WHERE removes (extra rows: e.g. 3_v7 15224 vs 1216).\n      - correlated-subquery-decorrelation (2_v8, 13_v1): ClickHouse's partial,\n        experimental correlated-subquery decorrelation computes a different result\n        for these shapes (13_v1 correlated scalar COUNT -> NULL for an empty\n        correlation; 2_v8 doubly-correlated NOT EXISTS -> different row set).\n    The LEFT JOIN NULL-fill cases (14_v5, 16_v3, 16_v5) were the documented\n    join_use_nulls=0 default; configuring SQL-standard join_use_nulls=1 (w0)\n    resolves them, so they are NOT listed (the default itself is recorded as an\n    engine-semantic note rather than a per-variant exception).\n\n(c) real variant defects the DuckDB gate missed: NONE. Every variant still passes\n    the DuckDB gate (220/220); the ClickHouse divergences are engine-semantic or\n    executability, never a latent variant bug.\n\nUn-executable variants (18) -> CLICKHOUSE_TPCHAVOC_SKIPS execution-filter\n(benchbox/sql_compat/rules/execution_filter/clickhouse_tpchavoc.py): correlated\nsubqueries in ORDER BY (3_v1, 5_v1, 10_v1, 16_v1), in aggregate-function arguments\n(4_v7, 4_v10, 14_v8, 17_v7, 17_v10), and behind specific plan steps (13_v8, 16_v4);\nthe missing DuckDB LIST aggregate / list lambdas (1_v7, also skipped on\nPG/DataFusion); nested aggregates (5_v4, 11_v4); SUM over a Variant(Decimal,Float64)\nfrom a mixed-type CASE (3_v10, 5_v10); a window function in WHERE (3_v9); and a\nGROUP BY on a CASE aliased to the same name as a column it references (1_v10).\nThese RAISE on ClickHouse, are excluded (never marked equivalent), and the same SQL\npasses the DuckDB gate, confirming they are engine gaps not variant defects.\n\nFinal report-mode result: checked 202 variants - 7 divergent (all classified), 195\nequivalent, exit 0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the oracle on ClickHouse in report mode and classify divergences",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "notes": "RESOLVED. No translation-seam fix was needed: w1 found zero translation-layer bugs\n(the native-clickhouse rendering of both canonical and variants is faithful), so\ntranslate_query_text / translate_sql_query were left unchanged and NO per-variant\nhacks were added. The divergence surface was driven down two legitimate ways, each\ndocumented:\n  - SQL-standard NULL semantics (join_use_nulls=1) via CLICKHOUSE_SESSION_SETTINGS,\n    resolving the three LEFT JOIN NULL-fill cases (14_v5, 16_v3, 16_v5) that arose\n    only from ClickHouse's non-standard default - the semantics the benchmark and\n    the other three engines already assume. This is a global engine configuration,\n    not a per-variant hack, and does not mute the residual divergences.\n  - comparator robustness: validation.py:_numeric_values_equal now coerces both\n    operands to float before comparing, so the reused comparator compares\n    ClickHouse's Decimal averages against canonical Float64 within tolerance instead\n    of raising TypeError. The tolerance itself (1e-10) was NOT loosened - 1_v4 is a\n    genuine ~0.007 Decimal-truncation divergence and is reported, not muted.\nCLICKHOUSE_KNOWN_DIVERGENCES holds ONLY the 7 irreducible engine-semantic RESULT\ndifferences, each with a class (decimal-division-truncation, sum-empty-group-zero,\ncorrelated-subquery-decorrelation) and rationale. Un-executable variants stay in\nCLICKHOUSE_TPCHAVOC_SKIPS (18, registered for clickhouse-local/server/cloud and\nwired into get_platform_skip_queries), never marked equivalent. DuckDB (220/220),\nPostgres (203/203), and DataFusion (206/206) stay green and their KNOWN_DIVERGENCES\n/ TPCHAVOC_SKIPS are unchanged.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Drive divergences down; declare true engine-semantic exceptions",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "notes": "RESOLVED. DECISION: option (a) - a bounded check in a non-blocking CI job. Added a\nnew `clickhouse-integration` job in .github/workflows/pr.yml (continue-on-error:\ntrue) running tests/integration/platforms/test_tpchavoc_clickhouse_equivalence.py,\nmirroring the in-process datafusion-integration job.\n\nRATIONALE: the run is green against its classified baseline and fast (~22s\nend-to-end, in-process chDB, no service container), so option (b)'s trigger (\"too\nslow/flaky\") does not apply. The surface is NOT empty (7 engine-semantic\ndivergences), but it is fully classified and asserted against\nCLICKHOUSE_KNOWN_DIVERGENCES with a companion test that the classified entries still\ndiverge (so the baseline cannot silently rot), which is exactly what a routine\nsample should pin - so option (b)'s \"dominated by declared engine differences\"\ntrigger is satisfied as a stable, asserted baseline rather than an excuse to make it\nopt-in. continue-on-error keeps it a SAMPLE: the DuckDB SQL gate (correctness-gate\njob, KNOWN_DIVERGENCES empty) remains the only hard blocker, and we deliberately do\nNOT gate the other ~18 platforms in routine CI (anti-pattern #1). Selected in CI\nwith `-m \"tpchavoc\"` + a pinned path (overriding the default fast-lane deselect),\nlike the DataFusion job. A fast, no-DB comparator guard\n(tests/integration/test_tpchavoc_validator_numeric_coercion.py, [integration, fast])\nruns in the routine lane to protect the validation.py coercion seam change that the\nhard DuckDB gate also depends on. Added the Makefile target\n`tpchavoc-equivalence-report-clickhouse`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide the routine-CI posture for the fourth engine and wire it",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "notes": "RESOLVED. CONCLUSION: the systematic-zero result does NOT survive a native-dialect\nengine, and that is the informative outcome - it localizes exactly the\nresult-semantic gaps a Postgres-shaped sample structurally cannot see. Across four\nengines:\n  - DuckDB 220/220 (hard gate, KNOWN_DIVERGENCES empty),\n  - PostgreSQL 203/203 executable (KNOWN_DIVERGENCES empty),\n  - DataFusion 206/206 executable (KNOWN_DIVERGENCES empty),\n  - ClickHouse 195/202 executable equivalent, 7 classified engine-semantic\n    divergences (CLICKHOUSE_KNOWN_DIVERGENCES non-empty).\nThe three Postgres-family engines are systematic-zero because SQLGlot normalizes\nnetezza/datafusion -> postgres, so they all received one dialect family. ClickHouse\n- the first engine on a NATIVE non-Postgres dialect - confirms the seam is still\nFAITHFUL (zero translation-layer bugs: every divergence is an engine-semantic result\ndifference or an executability gap, none a mistranslation), but it is faithful\n\"modulo documented engine result-semantics\", not systematic-zero. The differences\nClickHouse surfaces are precisely the axes the earlier TODOs predicted: Decimal-vs-\nFloat division truncation, SUM-of-empty-group = 0 vs NULL, LEFT JOIN NULL-fill\n(resolved by standard join_use_nulls=1), and partial correlated-subquery\ndecorrelation. So the four-engine claim is: the dialect-translation seam is faithful\nacross dialect FAMILIES; what differs between engines is (1) WHICH variants execute\n(per-engine skip-lists) and (2) on a native-dialect engine, a small, enumerable set\nof irreducible engine result-semantics - never a silent mistranslation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Synthesize the four-engine signal and update the cross-engine conclusion",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "tpchavoc-fourth-engine-equivalence-sampling",
+        "notes": "RESOLVED (review follow-up to the two #817 threads).\n\n(1) Transform-wrapper parity. The sample now routes both canonical and variant SQL\nthrough the SAME production query-time rewrites the real ClickHouse adapter applies\n(ClickHouseQueryTransformer.transform - Decimal/Float casts + safe division - then\nadd_query_settings), via a new engine-agnostic `execute_transform` hook on\nfind_divergences and `_clickhouse_execute_transform`. Applied identically to both\nsides, so shared transforms still cancel out. Re-verified at SF=0.1: the classified\nsurface is UNCHANGED (7 CLICKHOUSE_KNOWN_DIVERGENCES still diverge, no new\nunclassified ones).\n\nSurfaced and fixed a real production bug: safe_division wrapped a WINDOWED divisor\n`SUM(x) OVER (...)` as the invalid `NULLIF(SUM(x), 0) OVER (...)` (ClickHouse:\n'NULLIF ... OVER' is not a window function), which would also fail variant 8_v9 and\nany windowed-division TPC-DS query on real ClickHouse runs. The operand scanner now\ntreats `agg(...) OVER (...)` as one operand, so it wraps as\n`NULLIF(SUM(x) OVER (...), 0)`.\n\n(2) NULL-ordering scope. The order-insensitive comparator (it sorts both sides)\nstructurally cannot observe a difference that shows up only as NULL placement within\nan ORDER BY, so that axis is NOT sampled by this row-set oracle - now documented\nexplicitly in the equivalence module docstring. Covering it would need a separate\norder-sensitive check on the NULL-bearing-sort-key subset; left out of scope here.\n\nIs a fifth engine worth sequencing? NO. We now have both a Postgres-family cohort\n(systematic-zero) and a non-Postgres-family engine (faithful + a fully classified\nresult-semantic residue) agreeing that the seam introduces no translation\ndivergence. A fifth engine would re-confirm executability/result-semantics that are\nalready engine-documented, at the cost of another CI surface, without testing a new\nseam path. The DuckDB gate stays the hard blocker; the three samples stay\nnon-blocking.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Post-review fidelity follow-ups: production query-time transforms + NULL-ordering scope",
+        "wid": "w5"
+      }
+    ]
+  }
+}

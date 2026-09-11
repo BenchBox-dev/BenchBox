@@ -1,0 +1,11 @@
+{
+  "description": "The MCP benchmark tools were incorrectly importing and using CLI internal classes\ninstead of the clean public API provided by BaseBenchmark. This architectural\nmistake caused a runtime bug (calling non-existent `profile()` method) and created\nongoing maintenance burden as CLI internals evolved independently.\n\n**Previous (Wrong) Approach:**\n```python\nfrom benchbox.cli.benchmarks import BenchmarkManager  # CLI internal\nfrom benchbox.cli.orchestrator import BenchmarkOrchestrator  # CLI internal\nfrom benchbox.cli.system import SystemProfiler  # CLI internal\n\nmanager = BenchmarkManager()\norchestrator = BenchmarkOrchestrator()\nresult = orchestrator.execute_benchmark(config, db_config, system_profile, phases)\n```\n\n**Correct Approach (using public API):**\n```python\nfrom benchbox.core.benchmark_registry import get_benchmark_class\nfrom benchbox.platforms import get_platform_adapter, is_dataframe_platform\nfrom benchbox.core.system import SystemProfiler\n\nbenchmark_class = get_benchmark_class(\"tpch\")\nbenchmark = benchmark_class(scale_factor=0.01)\nadapter = get_platform_adapter(\"duckdb\")\nresults = benchmark.run_with_platform(adapter)\n```\n\nThe `BaseBenchmark.run_with_platform()` method (base.py:432) is explicitly documented as:\n\"This is the standard method that all benchmarks should support for integration\nwith the CLI and other orchestration tools.\"\n\nThis refactoring achieved:\n1. Eliminated all dependency on CLI internals (zero imports from benchbox.cli.*)\n2. Uses the stable public API designed for programmatic access\n3. MCP automatically benefits from improvements to the core API\n4. Reduced code duplication between MCP and CLI\n5. dry_run() now uses core DryRunExecutor for parity with CLI",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-18T00:00:00Z",
+      "created_at": "2026-01-18T00:00:00Z",
+      "worktree": "mcp-integration"
+    }
+  }
+}

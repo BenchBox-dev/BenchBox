@@ -1,0 +1,143 @@
+{
+  "context": "Use run 30717140915 bound to develop SHA f5c7699bf6ca235b21adfa9d1fe08bbe4ab58389. Resolve exact job names from the run, require every Windows job to be successful, and separately link the unrelated macOS throughput cancellation-test failure to its promoted TODO without weakening Windows acceptance.",
+  "description": "Nightly run 30717140915 was dispatched from current develop after all hand-off Windows fixes merged. The first proof item incorrectly required the entire cross-platform workflow to succeed even though its stated acceptance criterion is the two Windows suites and unrelated failures must be routed separately. Verify the run completed, require both Windows 3.10 and 3.12 test jobs plus Windows integration, package, and framing jobs to succeed, and preserve any unrelated failure in its own tracked item.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Ignore an unrelated red job",
+        "instead": "Create or link a separate reviewed TODO with the exact run and job",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2",
+        "why": "The final workflow still exposed actionable evidence"
+      },
+      {
+        "dont": "Require unrelated platform jobs to pass before concluding whether Windows is fixed",
+        "instead": "Require all Windows jobs and route other failures explicitly",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2",
+        "why": "That conflates independent failure domains"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-01T20:54:53Z",
+        "from_item": "windows-nightly-consolidated-postmerge-proof-v2",
+        "id": 682,
+        "reason": "Both Windows 3.10 job 91414534071 and 3.12 job 91414534066 fail the same two tests. PR #1406 made shutil.which find codex.cmd, but subprocess.run([codex,...], shell=False) still raises WinError 2; the test harness needs an explicit cross-platform invocation seam without weakening action-loop coverage.",
+        "resolution": "promoted",
+        "resolved_item": "windows-pr-followups-fake-codex-shim-v3",
+        "resolved_reason": null,
+        "summary": "PR-followups fake Codex .cmd launcher is discoverable but not executable via subprocess on Windows"
+      }
+    ],
+    "item_meta": {
+      "category": "verification",
+      "created_at": "2026-08-01T20:46:49Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A green required PR aggregator is not substituted for Nightly Windows proof",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2"
+      },
+      {
+        "behavior": "Every Windows job in the dispatched run must be successful",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2"
+      },
+      {
+        "behavior": "Unrelated platform failures are tracked separately rather than hidden by the Windows acceptance criterion",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2",
+        "kind": "do_not_modify",
+        "path_glob": "**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh run view 30717140915 --repo joeharris76/BenchBox --json status,headSha --jq 'select(.status==\"completed\" and .headSha==\"f5c7699bf6ca235b21adfa9d1fe08bbe4ab58389\")' | grep -q completed",
+        "description": "The bound Nightly run is complete",
+        "expected": "passes after the bound run completes and fails on the unfixed or still-running state",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test \"$(gh run view 30717140915 --repo joeharris76/BenchBox --json jobs --jq '[.jobs[]|select(.name|ascii_downcase|contains(\"windows\"))|select(.conclusion!=\"success\")]|length')\" -eq 0 && test \"$(gh run view 30717140915 --repo joeharris76/BenchBox --json jobs --jq '[.jobs[]|select(.name|ascii_downcase|contains(\"windows\"))]|length')\" -eq 5",
+        "description": "Every Windows job in the bound run succeeded",
+        "expected": "passes only when all five Windows jobs are successful and fails on the pre-fix Nightly",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Run 30717140915 completed on bound develop SHA f5c7699bf6ca235b21adfa9d1fe08bbe4ab58389 with overall failure; exact platform jobs inspected separately.",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:54:44Z",
+        "started_branch": "fix/finish-three-workflow-ci-handoff",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-finish-ci-handoff",
+        "status": "done",
+        "summary": "Revalidate run 30717140915 SHA and completion state",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:54:50Z",
+        "started_branch": "fix/finish-three-workflow-ci-handoff",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-finish-ci-handoff",
+        "status": "in_progress",
+        "summary": "Inspect every Windows job and require successful conclusions",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Route unrelated platform failures to explicit tracked work",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record final Windows job links and zero Windows failures",
+        "wid": "w3"
+      }
+    ]
+  }
+}

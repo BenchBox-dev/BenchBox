@@ -1,0 +1,107 @@
+{
+  "description": "The UAT release gate (#1162) is wired and fail-closed but DORMANT for one more release by the trusted-base model: origin/release still runs the pre-UAT readiness script. The NEXT release (N) runs the old gate and ships the new script to release; the gate ACTIVATES at release N+1. There is no committed _project/release-evidence/uat-gate-summary.json on develop today, so before the SECOND release from now an operator must run the 3-stage release-gate sweep, run make uat-gate-check STAGE1=.. STAGE2=.. STAGE3=.., and commit the resulting uat-gate-summary.json (green verdict, clean tree, source SHA an ancestor of the release head, <=21 days old) to develop. Otherwise validate-base (a required, no-bypass check on release) hard-blocks the N+1 release PR. Verified fail-closed end-to-end in the batch final validation.\n\nSTAGE 1 ATTEMPT 2026-08-24: release-gate-01-native-dataframe dry-run passed, then the actual run on PR #1867 head e70f2ff59 was capped at 7200s after 166 cell records while processing sqlite SF1. No completed matrix_summary.tsv, validator rollup, or stage report was produced; this is incomplete evidence and cannot advance the gate. Run root: /Users/joe/Developer/benchmark_runs/logs/uat_20260824_081349. Command log: /tmp/uat-release-gate-stage1-20260824.log.\n\nCURRENT 2026-08-24: merged request-only smoke exposed the LakeSail endpoint-option registration defect; PR #1875 fixes it. Do not treat the managed release-gate chain as runnable until #1875 merges and a host sustains ClickHouse's measured 5.25 GiB request.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-09T15:09:13Z",
+        "from_item": "uat-release-gate-first-evidence-bootstrap",
+        "id": 709,
+        "reason": "requires live UAT cells on multiple platforms, operator-gated evidence bootstrap before second release per trusted-base model",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "3-stage release-gate sweep requires operator day + docker stacks, not runnable in batch session"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Live state 2026-08-26T20:53:55Z: final protected develop candidate is cf1f799ad79469eb3b4309102bb12d141fddc46a; PR #1921 and #1922 are merged and protected Develop PR run 32996416086 passed. A fresh Stage 1 sweep is actively running from /Users/joe/Developer/BenchBox.wt-v0-4-0-uat-final-evidence at the final SHA, root /Users/joe/Developer/benchmark_runs/logs/uat_20260826_162031, with 80 completed cells (79 passed, 1 failed), every completed cell bound to source_commit_sha=cf1f799. The failure is DataFusion TPC-H SF1 query 18 resource exhaustion; current process is datafusion joinorder SF1. No final UAT evidence is valid yet: no report/summary artifacts or committed _project/release-evidence/uat-gate-summary.json exist. Do not start another run or Docker stage; wait for this ordered Stage 1 run to finish and review its non-green cell. SQLite advanced read/write policy remains unresolved and the host is concurrently under heavy unrelated workload.",
+      "category": "Operations",
+      "claimed_at": "2026-08-09T15:09:08Z",
+      "claimed_by": "joe@joe-mac-mini.local",
+      "created_at": "2026-07-19T21:46:27Z",
+      "worktree": "uat-hardening"
+    },
+    "scope_rules": [
+      {
+        "item_id": "uat-release-gate-first-evidence-bootstrap",
+        "kind": "only_modify",
+        "path_glob": "_project/release-evidence/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/release_readiness_check.py --help",
+        "description": "committed evidence has green verdict and passes release_readiness_check",
+        "expected": "exit 0",
+        "item_id": "uat-release-gate-first-evidence-bootstrap",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-release-gate-first-evidence-bootstrap",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-release-gate-first-evidence-bootstrap",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-release-gate-first-evidence-bootstrap",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "no _project/release-evidence/uat-gate-summary.json on develop, README confirms trusted-base bootstrap, gate dormant until N+1",
+        "item_id": "uat-release-gate-first-evidence-bootstrap",
+        "notes": null,
+        "started_at": "2026-08-09T15:09:04Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm no committed uat-gate-summary.json exists on develop and the gate is still on the trusted-base bootstrap",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-release-gate-first-evidence-bootstrap",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run the 3-stage release-gate sweep (stage1/2/3 run dirs)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-release-gate-first-evidence-bootstrap",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "make uat-gate-check STAGE1 STAGE2 STAGE3 to build the combined evidence",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-release-gate-first-evidence-bootstrap",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Commit _project/release-evidence/uat-gate-summary.json to develop before the N+1 release PR",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "context": "Decide the single source of truth for FlightData query parameters and make both surfaces read it: either derive FLIGHTDATA_DEFAULT_PARAMS from the same data-coverage constants the SQL catalog uses (LAST_AVAILABLE_YEAR / the query catalog), or have the DataFrame runner call the existing set_parameter_overrides() with the SQL-side parameters. Do NOT special-case the gate -- the defect is in the product run path.",
+  "description": "FlightData's two surfaces are parameterized from different sources. The SQL queries carry date literals derived from the data's actual coverage (get_query('best-routes') at SF=0.01 emits 2024-12-01 / 2025-01-01, from LAST_AVAILABLE_YEAR). The DataFrame surface instead uses a hardcoded FLIGHTDATA_DEFAULT_PARAMS = {start_date: date(2018,1,1), end_date: date(2019,1,1)} in benchbox/core/flightdata/dataframe_queries.py. The generator produces the LAST available year, so the DataFrame window matches ZERO rows: every FlightData DataFrame query returns an empty result while the SQL query returns rows. This is not a gate artifact -- it means FlightData DataFrame runs have been timing queries over an empty date range, so their results are meaningless. Evidence: with the CSV-header loader defect fixed (PR #1441) the type errors disappear and all 20 queries x 2 backends still diverge with the identical signature 'Row count mismatch. Original: N, Variant: 0'. A set_parameter_overrides() hook already exists in the module, which suggests the runner was meant to supply parameters and does not.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-09T14:31:21Z",
+      "completed_pr": 1654,
+      "created_at": "2026-08-01T20:38:17Z",
+      "worktree": "dataframe-benchmarks"
+    },
+    "preserves": [
+      {
+        "behavior": "The SQL surface's parameters are unchanged; the DataFrame surface moves to match the data, not the reverse",
+        "item_id": "flightdata-dataframe-date-params-miss-the-generated-data"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "flightdata-dataframe-date-params-miss-the-generated-data",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/**"
+      },
+      {
+        "item_id": "flightdata-dataframe-date-params-miss-the-generated-data",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import sys;sys.path.insert(0,'.');from benchbox.core.flightdata.benchmark import FlightDataBenchmark as B;import re;q=B(scale_factor=0.01).get_query('best-routes');from benchbox.core.flightdata.dataframe_queries import FLIGHTDATA_DEFAULT_PARAMS as P;ys=sorted(set(re.findall(r'(\\d{4})-\\d{2}-\\d{2}',q)));sys.exit(0 if str(P['start_date'].year) in ys else 1)\"",
+        "description": "the DataFrame date window covers the generated data",
+        "expected": "exit 0 once aligned; exits 1 on an unfixed tree where the DataFrame window is 2018 and the SQL window is 2024/2025",
+        "item_id": "flightdata-dataframe-date-params-miss-the-generated-data",
+        "last_result": "pass",
+        "last_run": "2026-08-09T14:31:15Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "flightdata-dataframe-date-params-miss-the-generated-data",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "benchbox/core/flightdata/dataframe_queries.py: FLIGHTDATA_DEFAULT_PARAMS now derived from LAST_AVAILABLE_YEAR (2024-12-01/2025-01-01) matching SQL catalog",
+        "item_id": "flightdata-dataframe-date-params-miss-the-generated-data",
+        "notes": null,
+        "started_at": "2026-08-09T14:03:58Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Pick the single parameter source and make both surfaces read it",
+        "wid": "w1"
+      },
+      {
+        "evidence": "uv run verification: SQL years [2024,2025] DEFAULT 2024-12-01 passes; get_dataframe_queries() override already synced",
+        "item_id": "flightdata-dataframe-date-params-miss-the-generated-data",
+        "notes": null,
+        "started_at": "2026-08-09T14:04:07Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Prove a FlightData DataFrame query returns the same row count as its SQL twin",
+        "wid": "w2"
+      }
+    ]
+  }
+}

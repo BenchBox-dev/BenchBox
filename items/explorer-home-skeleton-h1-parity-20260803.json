@@ -1,0 +1,131 @@
+{
+  "context": "Set the skeleton headline to the canonical loaded copy so the h1 is stable across loading and loaded states, then update the Vitest loading-state assertion that pins the retired string. This is the root-cause fix that makes heading assertions time-invariant.",
+  "description": "PR #1482 renamed the loaded Home h1 to 'BenchBox Curated Results Preview' (Home.tsx ~352) but left HomeLoadingSkeleton's h1 as 'BenchBox Database Leaderboards' (~598, reached from the early return ~257). The retired string now exists ONLY in the loading skeleton, so every e2e heading assertion became timing-dependent: asserting before data load silently matches the skeleton, asserting after it fails deterministically. Proven 2026-08-03 by local Playwright run on develop 3af42e29b - a probe asserting the retired heading passed in 152ms before load and failed after load.",
+  "legacy": {
+    "item_meta": {
+      "category": "Explorer UI contract",
+      "created_at": "2026-08-03T23:34:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Loaded copy stays the narrower curated-preview claim, not the broader leaderboards claim",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803"
+      },
+      {
+        "behavior": "The loading skeleton still renders and still exposes its aria-busy loading region",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803"
+      },
+      {
+        "behavior": "Vitest loading-state coverage still asserts a heading, not merely the spinner text",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -c -F \"BenchBox Curated Results Preview\" results-explorer/src/pages/Home.tsx | grep -qx 2",
+        "description": "Skeleton and loaded hero share one canonical headline",
+        "expected": "Exit 0 only when exactly two h1 lines carry the canonical copy",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -q -F \"BenchBox Database Leaderboards\" results-explorer/src/pages/Home.tsx",
+        "description": "Retired headline is absent from Home.tsx",
+        "expected": "Exit 0 when the retired string no longer exists in source",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/Home.test.tsx",
+        "description": "Home Vitest suite passes with the updated loading-state assertion",
+        "expected": "All Home unit tests pass",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-home-skeleton-h1-parity-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Set HomeLoadingSkeleton h1 to the canonical curated-preview copy",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-home-skeleton-h1-parity-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update the Vitest loading-state heading assertion",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-home-skeleton-h1-parity-20260803",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm no source reference to the retired headline remains",
+        "wid": "w2"
+      }
+    ]
+  }
+}

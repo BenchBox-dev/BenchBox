@@ -1,0 +1,103 @@
+{
+  "context": "Add a narrowly applied pytest fixture that monkeypatches _executor_command to the logical codex command only for RecordingRunner-based unit tests. Extend FakeCodexCommandRunner to recognize both the logical command and the resolved launcher path so the real action-loop test keeps using the portable Bash prefix. Do not alter production code.",
+  "description": "Nightly run 30720867434 Windows 3.12 job 91424309946 fails four tests after PR #1442 moved Windows launcher resolution ahead of the injected runner. RecordingRunner tests must explicitly pin the logical codex command so they test version parsing and orchestration rather than host installation; the real fake-launcher action-loop test must still exercise Windows resolution and process execution.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-01T23:06:34Z",
+      "completed_pr": 1455,
+      "created_at": "2026-08-01T22:35:19Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Production _executor_command and CommandRunner behavior remain unchanged",
+        "item_id": "windows-pr-followups-recording-runner-executor-seam"
+      },
+      {
+        "behavior": "The action-loop test still executes the real fake process and verifies commit-before-reply ordering",
+        "item_id": "windows-pr-followups-recording-runner-executor-seam"
+      },
+      {
+        "behavior": "The missing-binary test still exercises a FileNotFoundError raised by the injected runner",
+        "item_id": "windows-pr-followups-recording-runner-executor-seam"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-pr-followups-recording-runner-executor-seam",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_pr_review_followups.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_pr_review_followups.py -k \"check_executor_version or run_executor_for_comment or run_action_loop_commits_before_replying\" -q",
+        "description": "Focused executor and action-loop tests",
+        "expected": "fails on the unfixed Windows tree when Codex is absent and passes after mocked-runner command resolution is isolated",
+        "item_id": "windows-pr-followups-recording-runner-executor-seam",
+        "last_result": "pass",
+        "last_run": "2026-08-01T22:38:20Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_pr_review_followups.py -q",
+        "description": "Complete PR-followups test module",
+        "expected": "fails on the unfixed Windows tree with the four Nightly failures and passes without weakening the real launcher coverage",
+        "item_id": "windows-pr-followups-recording-runner-executor-seam",
+        "last_result": "pass",
+        "last_run": "2026-08-01T22:38:25Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-pr-followups-recording-runner-executor-seam",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-pr-followups-recording-runner-executor-seam",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Nightly run 30720867434 completed with identical failures in Windows 3.10 job 91424309937 and 3.12 job 91424309946: four RecordingRunner tests fail because _executor_command performs host PATH resolution before the injected runner; all non-Windows jobs and three other Windows jobs passed.",
+        "item_id": "windows-pr-followups-recording-runner-executor-seam",
+        "notes": null,
+        "started_at": "2026-08-01T22:37:10Z",
+        "started_branch": "fix/windows-recording-runner-executor-seam",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-windows-codex-shim",
+        "status": "done",
+        "summary": "Confirm the Windows 3.10 and 3.12 failure set and revalidate the resolution boundary",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added a fixture only to five RecordingRunner-based executor tests so they pin the logical codex command; extended FakeCodexCommandRunner to intercept both logical codex and the Windows-resolved launcher path. Production code is unchanged.",
+        "item_id": "windows-pr-followups-recording-runner-executor-seam",
+        "notes": null,
+        "started_at": "2026-08-01T22:37:15Z",
+        "started_branch": "fix/windows-recording-runner-executor-seam",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-windows-codex-shim",
+        "status": "done",
+        "summary": "Add a narrow RecordingRunner executor-command fixture and launcher-aware fake runner",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Recorded verification passed: 6 focused tests, 34 complete-module tests, Ruff check, and Ruff format check.",
+        "item_id": "windows-pr-followups-recording-runner-executor-seam",
+        "notes": null,
+        "started_at": "2026-08-01T22:38:16Z",
+        "started_branch": "fix/windows-recording-runner-executor-seam",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-windows-codex-shim",
+        "status": "done",
+        "summary": "Run focused and complete-module verification",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,230 @@
+{
+  "context": "For schema creation: Add a critical_failures counter. After processing all statements,\nif critical_failures > 0, raise RuntimeError with a summary of which tables failed.\n\"Critical\" means any CREATE TABLE statement (vs. CREATE INDEX or ALTER TABLE).\n\nFor QuestDB REFERENCES filter: Replace the full-statement-string check with a regex\nthat removes only FOREIGN KEY and REFERENCES constraint clauses from within CREATE TABLE\nstatements, preserving the rest of the statement.\n\nFor pg_duckdb/pg_mooncake: Narrow the except clause to catch only the specific exceptions\nthat are expected (e.g., psycopg2.ProgrammingError for extension-not-found), and re-raise\nunexpected exceptions.\n\nFor StarRocks mock detection: Remove the hasattr check. Fix the test mock to return\nproper results from the validation query.\n",
+  "description": "Adversarial code reviews found that several adapters silently swallow errors in\ncritical paths, producing misleading benchmark results instead of failing fast:\n\n1. **Doris create_schema()** (PR #30): Catches exceptions from individual DDL\n   statements with logger.warning() and continues. If a critical table creation fails\n   (e.g., lineitem in TPC-H), the benchmark proceeds to load data and execute queries\n   against missing tables.\n\n2. **QuestDB create_schema()** (PR #28): Same pattern - logs warning and skips failed\n   DDL statements. Combined with the REFERENCES keyword filter that drops entire\n   CREATE TABLE statements containing FK references, this can silently lose tables.\n\n3. **pg_duckdb create_connection()** (PR #32): Generic except Exception catches all\n   non-RuntimeError exceptions from GUC SET statements and extension checks, logs\n   warning, returns connection in potentially aborted transaction state.\n\n4. **pg_mooncake create_connection()** (PR #32): Same pattern. Extension configuration\n   failures (S3 bucket, extension creation) silently swallowed. Adapter proceeds without\n   S3 storage configured.\n\n5. **StarRocks _validate_data_integrity()** (PR #33): Mock detection anti-pattern -\n   checks hasattr(connection, \"_mock_name\") to short-circuit validation. Test-aware\n   logic in production code.\n\n6. **QuestDB REFERENCES keyword filter** (PR #28): Drops entire CREATE TABLE statements\n   that contain the word \"REFERENCES\" anywhere in the statement string, not just FK\n   constraint clauses.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add test-awareness to production code",
+        "instead": "fix tests instead",
+        "item_id": "platform-adapter-silent-error-handling",
+        "why": "it creates fragile coupling"
+      },
+      {
+        "dont": "use bare except",
+        "instead": "catch specific exception types",
+        "item_id": "platform-adapter-silent-error-handling",
+        "why": "it catches SystemExit and KeyboardInterrupt"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-16T00:00:00Z",
+      "created_at": "2026-02-15T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass",
+        "item_id": "platform-adapter-silent-error-handling"
+      },
+      {
+        "behavior": "create_connection() still returns a usable connection on success",
+        "item_id": "platform-adapter-silent-error-handling"
+      },
+      {
+        "behavior": "create_schema() still handles legitimate 'already exists' errors gracefully",
+        "item_id": "platform-adapter-silent-error-handling"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/postgres.py"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/doris.py"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_duckdb.py"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_mooncake.py"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/questdb.py"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/starrocks/adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_doris_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_pg_duckdb_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_pg_mooncake_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_questdb_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_starrocks_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "All platform adapter tests pass",
+        "expected": "all tests pass",
+        "item_id": "platform-adapter-silent-error-handling",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-silent-error-handling",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-silent-error-handling",
+        "notes": "doris.py:329-335 - count failures, raise if >0 critical tables missing",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add failure counting to Doris create_schema() - warn if critical tables fail",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-silent-error-handling",
+        "notes": "questdb.py:254 - use targeted regex to remove only FK constraint clauses",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix QuestDB REFERENCES filter - strip FK clauses instead of dropping entire statements",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-silent-error-handling",
+        "notes": "questdb.py - same pattern as Doris fix",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add failure counting to QuestDB create_schema()",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-silent-error-handling",
+        "notes": "pg_duckdb.py:261-265 - catch specific exceptions or re-raise after logging",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Narrow pg_duckdb create_connection() exception handling",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-silent-error-handling",
+        "notes": "pg_mooncake.py:171-175 - same pattern as pg_duckdb fix",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Narrow pg_mooncake create_connection() exception handling",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-silent-error-handling",
+        "notes": "starrocks/adapter.py:95 - fix test stubs to return proper data instead",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove mock detection from StarRocks _validate_data_integrity()",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-silent-error-handling",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for error handling improvements",
+        "wid": "w7"
+      }
+    ]
+  }
+}

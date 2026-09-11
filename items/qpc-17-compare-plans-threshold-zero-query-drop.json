@@ -1,0 +1,141 @@
+{
+  "description": "Follow-up from the qpc-11 (#1026) review. In\nbenchbox/cli/commands/compare_plans.py::_build_comparisons the append\ncondition is roughly:\n  overall_similarity < threshold or (not explicit_query_id and threshold == 0.0)\nWith BOTH an explicit --query-id AND --threshold 0.0, the first clause is\n`similarity < 0.0` (always False) and the second is\n`(not True and ...)` (always False), so the requested query is never appended;\nthe command then prints \"No plans available for comparison\" and exits 0. Net:\nsingle-query comparison output is unreachable at the default threshold — a\nconfusing product quirk (surfaced because a test vacuously passed on this\nexit-0 path before qpc-11 hardened it).\n\nFix: when a query_id is explicitly requested, always include that query's\ncomparison regardless of threshold (threshold should filter the multi-query\nsweep, not suppress an explicit single-query request).\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the threshold default; fix the explicit-query interaction only.",
+        "instead": "(not specified)",
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Usability / CLI",
+      "created_at": "2026-07-07T00:00:00Z",
+      "worktree": "query-plan-capture"
+    },
+    "preserves": [
+      {
+        "behavior": "Default (no --query-id) threshold-sweep behavior unchanged",
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/cli/commands/compare_plans.py::_build_comparisons — the append condition",
+        "decision": "reuse",
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "path": "benchbox/cli/commands/compare_plans.py::_build_comparisons"
+      },
+      {
+        "concept": "tests/unit/cli/commands/test_compare_plans_coverage.py — qpc-11 real-loader test now asserts real comparison content",
+        "decision": "reuse",
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "path": "tests/unit/cli/commands/test_compare_plans_coverage.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/compare_plans.py"
+      },
+      {
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands/test_compare_plans_coverage.py -q",
+        "description": "Explicit query at threshold 0.0 produces output",
+        "expected": "all pass, including the explicit-query-at-0.0 test",
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make _build_comparisons always include an explicitly-requested --query-id's comparison regardless of --threshold; threshold filters only the unfiltered sweep.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Test: --query-id X --threshold 0.0 emits X's comparison (not 'No plans available'); the multi-query threshold sweep is unchanged.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Review: adversarial code review (default multi-query behavior preserved; no double-count).",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Fix review findings; re-run verification.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "qpc-17-compare-plans-threshold-zero-query-drop",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Submit PR referencing qpc-17.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "context": "Mirror whatever fix test-export-invalid-output-dir-assumes-non-root settles on, so all three read consistently: either construct a path whose creation fails regardless of privilege, or guard on euid with a recorded reason. Do not weaken what each test proves - the exporter, the dry run, and the probe must still be shown to surface an error rather than reporting success.",
+  "description": "test-export-invalid-output-dir-assumes-non-root records that test_export_with_invalid_output_dir cannot pass as root, but its only_modify is tests/unit/cli/test_cli_output.py, so it fixes one of three tests with the same root cause. The other two fail identically in a root container and are not covered by any item. test_cli_dryrun.py TestDryRunErrorHandling test_dry_run_with_missing_output_dir expects an uncreatable output directory, which root can create. test_file_format.py TestHasTrailingDelimiterSurfacesReadFailures test_unreadable_file_raises_rather_than_reporting_clean chmods a file to 0o000 and expects OSError, which root bypasses entirely. Both were confirmed failing on clean origin/develop at a1e1328 with no local changes, so neither is caused by recent work; the file_format one in particular is NOT a defect in trailing-delimiter-probe-swallows-read-errors, whose product behavior is correct. Real CI is unaffected because its runners are not root, so this only bites container and remote agent sessions - where it costs every session the work of re-deriving that the failures are environmental.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "created_at": "2026-07-31T13:49:03Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Each test still proves its subject raises rather than silently reporting success",
+        "item_id": "root-privilege-assumptions-beyond-the-exporter-test"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "root-privilege-assumptions-beyond-the-exporter-test",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_dryrun.py"
+      },
+      {
+        "item_id": "root-privilege-assumptions-beyond-the-exporter-test",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/test_file_format.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_cli_dryrun.py tests/unit/utils/test_file_format.py -q",
+        "description": "Both files pass in a root container without weakening their assertions",
+        "expected": "green regardless of effective uid",
+        "item_id": "root-privilege-assumptions-beyond-the-exporter-test",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "root-privilege-assumptions-beyond-the-exporter-test",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "root-privilege-assumptions-beyond-the-exporter-test",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm both tests fail as root and pass as non-root on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "root-privilege-assumptions-beyond-the-exporter-test",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Apply the chosen fix to both tests, matching the exporter item's approach",
+        "wid": "w1"
+      }
+    ]
+  }
+}

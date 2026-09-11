@@ -1,0 +1,111 @@
+{
+  "context": "Either reclaim the slot properly (make worktree-pool-disk-clean / FORCE=1 make worktree-release for a slot whose branch has merged), or narrow the spellcheck guard so it never walks gitignored trees -- the latter fixes the class rather than this instance, since any slot that has run the explorer e2e suite will reacquire node_modules.",
+  "description": "/Users/joe/Developer/BenchBox.pool-01 carries roughly 300 MB of gitignored residue left by a previous occupant: results-explorer/node_modules (~300 MB) and results-explorer/playwright-report (~520 KB). The `spellcheck` guard inside `make pr-preflight` walks the filesystem rather than tracked files, so it reports thousands of codespell hits from installed npm packages and minified reports, and pr-preflight fails with 'FAILED guards: spellcheck' for any agent who claims that slot -- with nothing wrong in their own change.\n\nObserved this session: pr-preflight failed on an unrelated findings-domain change while `make pr-open`'s own CI-mirroring preflight passed, and codespell over the actually-changed files was clean. The owning branch (fix/explorer-e2e-dataload-flakiness) has since merged, so the residue is orphaned rather than active work.\n\nPrior art: results-explorer-uat-defect-pool02-artifact-cleanup (done) tracked the same shape of problem for pool-02.\n\nDeliberately not cleaned in-session: deleting several hundred MB of another session's untracked files is a destructive filesystem action requiring explicit authorization, and node_modules is expensive to reinstall.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Delete another session's untracked files without checking the slot's branch has merged",
+        "instead": "confirm the owning branch merged (or the slot is clean and ahead=0), then reclaim through the documented worktree targets",
+        "item_id": "worktree-pool-01-artifact-cleanup",
+        "why": "a pool slot may hold live uncommitted work, and node_modules is expensive to restore"
+      },
+      {
+        "dont": "Fix only this slot and close the item",
+        "instead": "scope the spellcheck guard to tracked or non-ignored paths so the class cannot recur",
+        "item_id": "worktree-pool-01-artifact-cleanup",
+        "why": "any slot that runs the explorer e2e suite reacquires node_modules, so the guard trips again on the next claimant"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "DIAGNOSIS CORRECTED 2026-08-04 by running it, not reading it. (1) Rung 1 is VACUOUS: `make spellcheck` uses `git ls-files`, so it never listed untracked files; it exits 0 in pool-01 WITH results-explorer/node_modules present, and cannot fail while the stated defect exists. w2's premise ('scope the spellcheck guard to non-gitignored paths') is therefore already satisfied and was never the cause. (2) The REAL cause of the pr-preflight break is the slot's broken .venv: `make uat-artifact-hygiene` runs `uv run --no-sync`, which cannot repair it, so the guard dies on ModuleNotFoundError: No module named 'yaml' instead of reporting anything actionable. (3) w1's precondition IS met: pool-01 is clean, ahead=0 vs origin/develop, and never had a PR, so it is orphaned by the documented criteria; the release was attempted and needs operator permission. Rungs are create-time-only, so this item needs drop+recreate against the real cause -- superseded here rather than edited (same call as D8/D11).",
+      "category": "infrastructure",
+      "created_at": "2026-07-30T18:46:02Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing worktree claim/release behaviour for slots with unmerged work",
+        "item_id": "worktree-pool-01-artifact-cleanup"
+      },
+      {
+        "behavior": "spellcheck still covers every tracked file it covers today",
+        "item_id": "worktree-pool-01-artifact-cleanup"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "worktree-pool-01-artifact-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "worktree-pool-01-artifact-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/**"
+      },
+      {
+        "item_id": "worktree-pool-01-artifact-cleanup",
+        "kind": "only_modify",
+        "path_glob": ".codespellrc"
+      },
+      {
+        "item_id": "worktree-pool-01-artifact-cleanup",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "worktree-pool-01-artifact-cleanup",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "worktree-pool-01-artifact-cleanup",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make spellcheck",
+        "description": "spellcheck ignores gitignored trees, so a slot with node_modules present still passes",
+        "expected": "exit 0 even when results-explorer/node_modules exists",
+        "item_id": "worktree-pool-01-artifact-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "worktree-pool-01-artifact-cleanup",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "worktree-pool-01-artifact-cleanup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm the residue is orphaned (owning branch merged, slot clean) and reclaim or clean the pool-01 slot",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "worktree-pool-01-artifact-cleanup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Scope the spellcheck guard to non-gitignored paths so any slot with node_modules present still passes pr-preflight",
+        "wid": "w2"
+      }
+    ]
+  }
+}

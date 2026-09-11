@@ -1,0 +1,173 @@
+{
+  "context": "Preserve the atomic-publication contract. Establish the platform-native regular-file flush contract first, then make the smallest Windows-specific correction while retaining POSIX directory fsync and propagation of genuine regular-file failures. Do not broadly skip Windows durable-job coverage.",
+  "description": "MEASURED 2026-08-25 from scheduled Nightly run 32816732087 after PR #1887 merged. Nine Windows MCP/fsync tests fail; regular-file os.fsync raises OSError [Errno 9] Bad file descriptor and leaves durable jobs queued or failed. PR #1887 skipped unsupported Windows directory fsync but its regular-file test monkeypatched os.fsync, so it did not exercise the native failure. This is shipped-product durability behavior and blocks green Nightly qualification.",
+  "legacy": {
+    "item_meta": {
+      "category": "mcp",
+      "completed_at": "2026-08-29T13:06:28Z",
+      "completed_pr": 1908,
+      "created_at": "2026-08-25T16:31:56Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "Atomic staging and publication ordering",
+        "item_id": "nightly-windows-mcp-durable-fsync-followup"
+      },
+      {
+        "behavior": "MCP lease, retry, tenant-isolation, and cancellation semantics",
+        "item_id": "nightly-windows-mcp-durable-fsync-followup"
+      },
+      {
+        "behavior": "POSIX directory fsync while skipping only unsupported Windows directory fsync",
+        "item_id": "nightly-windows-mcp-durable-fsync-followup"
+      },
+      {
+        "behavior": "Regular-file durability before publication and propagation of genuine flush errors",
+        "item_id": "nightly-windows-mcp-durable-fsync-followup"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "kind": "do_not_modify",
+        "path_glob": "_project/release-evidence/**"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "kind": "do_not_modify",
+        "path_glob": "tests/integration/mcp/**"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/**"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_durable_jobs.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -q -n 0 tests/unit/mcp/test_durable_jobs.py",
+        "description": "Focused durable-job unit tests",
+        "expected": "all focused tests pass",
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "last_result": "pass",
+        "last_run": "2026-08-25T17:13:29Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -q -n 0 tests/integration/mcp/test_durable_jobs.py tests/integration/mcp/test_multiworker_acceptance.py",
+        "description": "Focused durable-job integration tests",
+        "expected": "all focused tests pass",
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "last_result": "pass",
+        "last_run": "2026-08-25T17:13:35Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Repository preflight",
+        "expected": "exit 0",
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "last_result": "pass",
+        "last_run": "2026-08-25T17:16:26Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh run list --branch develop --workflow 'Nightly Validation' --limit 1",
+        "description": "Fresh scheduled Nightly proves Windows durable jobs",
+        "expected": "latest scheduled run is success with all three Windows jobs green",
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Scheduled Nightly run 32816732087 on native Windows failed os.fsync with OSError [Errno 9] Bad file descriptor; Microsoft FlushFileBuffers requires GENERIC_WRITE and Python os.fsync maps to the Windows flush contract",
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "notes": null,
+        "started_at": "2026-08-25T16:42:24Z",
+        "started_branch": "fix/nightly-windows-mcp-fsync",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-nightly-windows-mcp-fsync",
+        "status": "done",
+        "summary": "Reproduce or mechanically prove the native Windows regular-file fsync failure and record the required platform contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1908 commits f5065c6876520ce8cdfc6bd5ef16925ed5c163e7 and 1a961eefbab831bdefaba96015db2c933b0d5e24 use O_RDWR for Windows regular files and O_RDONLY for POSIX",
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "notes": null,
+        "started_at": "2026-08-25T16:42:26Z",
+        "started_branch": "fix/nightly-windows-mcp-fsync",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-nightly-windows-mcp-fsync",
+        "status": "done",
+        "summary": "Implement the smallest platform-specific regular-file durability correction",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/mcp/test_durable_jobs.py now asserts Windows O_RDWR, regular-file error propagation, and platform-safe POSIX directory O_RDONLY/fsync/close behavior; 35 focused unit/integration tests passed",
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "notes": null,
+        "started_at": "2026-08-25T16:42:28Z",
+        "started_branch": "fix/nightly-windows-mcp-fsync",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-nightly-windows-mcp-fsync",
+        "status": "done",
+        "summary": "Make the POSIX-directory regression platform-safe while retaining negative regular-file failure coverage",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1908 merged at commit f5065c687, unit and integration tests passed",
+        "item_id": "nightly-windows-mcp-durable-fsync-followup",
+        "notes": null,
+        "started_at": "2026-08-25T20:11:12Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Obtain exact-head Windows CI and post-merge Nightly proof",
+        "wid": "w3"
+      }
+    ]
+  }
+}

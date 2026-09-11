@@ -1,0 +1,245 @@
+{
+  "context": "Build hosted submission on top of existing export/history surfaces, not as a\nparallel runner. Submission should work for already-exported results first,\nthen compose naturally with the run lifecycle.\n",
+  "description": "BenchBox already has strong local run/export/history workflows, but it does\nnot have a supported hosted submission flow. This item adds the hosted CLI\ncontract, authentication model, and status/reporting flow for sending\ncanonical result bundles to BenchBox services.\n\nThe critical product rule is that hosted submission should not overload the\nsemantics of local artifact publication. `benchbox publish` and\n`benchbox submit` must stay distinct so users know whether they are copying\nfiles to storage or uploading results into the hosted platform.\n\n**Phase assignment:** Phase 2-3. Phase 2 uses a simpler PR-based submission\nmodel (`benchbox submit --output` packages a bundle for PR contribution).\nThe full hosted API + auth flow described here is Phase 3, contingent on\nsubmission volume exceeding what PR-based review can handle.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bypass the existing exporter when sending hosted submissions",
+        "instead": "submit the canonical bundle",
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "why": "that creates incompatible local vs hosted artifacts"
+      },
+      {
+        "dont": "hide hosted submission inside generic export or results flags",
+        "instead": "expose a first-class submit surface",
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "why": "users need to understand when they are invoking a networked service"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "needs_item": "define-hosted-results-contract-and-governance-model"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "needs_item": "define-results-platform-product-and-launch-strategy"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "needs_item": "design-results-ingest-storage-and-derived-read-model"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Hosted submission uploads the canonical schema-v2 bundle instead of a second bespoke payload shape",
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth"
+      },
+      {
+        "behavior": "`benchbox run`, `benchbox export`, and `benchbox results` remain valid for users who never interact with the hosted platform",
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m benchbox submit --help 2>&1 | grep -c 'submit'",
+        "description": "Submit command skeleton is importable and --help works",
+        "expected": "1",
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -q",
+        "description": "Submit unit tests pass",
+        "expected": "All tests pass",
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/test_hosted_submission.py -q",
+        "description": "Submit integration tests pass against mock service",
+        "expected": "All tests pass",
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "notes": "Output landed at `_project/research/submit-cli-surface.md`\n(2026-04-27). Full --help text for the extended command with\n--service and --output as auto-selecting modes (preserves v0.2.x\nbehavior exactly). Two new config sections (service, submission)\nwith a deprecated-alias migration plan for the existing\nsubmit_to_service / service_url placeholders. Separate\n`benchbox auth` command tree for token management; keychain-first\nstorage with encrypted-file fallback. --dry-run semantics for both\nmodes documented. Out-of-scope-for-launch list (--watch, web UI,\nOAuth) explicit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Sketch the CLI surface: draft `benchbox submit --help` output and config key names",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "notes": "Output landed at `_project/research/submit-reuse-points.md`\n(2026-04-27). Reuse table covers bundle loading, manifest\nconstruction, companion resolution, history persistence — all\nfrom Phase 2's existing surfaces. The canonical schema-v2 bundle\nis what the service receives; no second wire format. Net-new\nmodules enumerated (HTTP transport, idempotency-key persistence,\nauth store, auth CLI, service-mode submit handler). Composition\nseam: existing `benchbox submit` entry point dispatches to\nPR-packaging or hosted-service path based on flags / config.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Map submit to existing result export surfaces - identify reuse points in exporter and results CLI",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "notes": "Landed 2026-04-27 in commit df621a787:\n  - --service / --visibility / --idempotency-key / --wait flags\n    on the existing `benchbox submit` command.\n  - New `_dispatch_service_mode` handler.\n  - --service --dry-run validates the bundle locally, prints\n    the upload preview (URL, hash, companions, visibility,\n    idempotency key, wait), and returns 0 with no credentials.\n  - --service without --dry-run surfaces a clear \"not yet\n    implemented\" message and exits 1, since w4-w7 (auth,\n    upload, status polling) need the real hosted ingest API\n    to integrate against.\n  - 8 new unit tests in tests/unit/cli/commands/test_submit.py\n    cover dry-run path, default URL, custom URL passthrough,\n    visibility flag + rejection, idempotency-key passthrough,\n    not-implemented refusal, and the unchanged PR-package\n    default behavior.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement `benchbox submit` command skeleton with --dry-run and local validation",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "notes": "On first submit, prompt for token. Store securely (keyring or encrypted\nfile). On subsequent runs, load token from storage. Handle 401 by prompting\nfor re-auth rather than hard-failing. Do not store plaintext tokens in\nconfig files.\n\nLanded 2026-05-01:\n  - Added `benchbox auth login/status/refresh/logout`.\n  - Added `benchbox.cli.submit_auth` with env-token precedence,\n    OS-keyring storage, hidden prompt fetch, keyring overwrite refresh,\n    and token-redacted auth status.\n  - Wired non-dry-run `benchbox submit --service` to resolve auth before\n    the still-placeholder upload path. `--service --dry-run` remains\n    credential-free.\n  - `/code review W4` found and fixed two auth-flow issues: refresh now\n    refuses to hide a replacement keyring token behind an active env\n    override, and logout reports \"not found\" accurately before deleting.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement authentication: token fetch, local keychain storage, and refresh flow",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "notes": "POST the canonical schema-v2 bundle. Poll for async processing status\n(accepted → validated → published). Retry on transient errors (5xx,\nnetwork). Re-submit with same bundle must be idempotent - service returns\nthe existing hosted URL rather than creating a duplicate.\n\nLanded 2026-05-01 against the documented Phase 3 contract in\n`docs/reference/hosted-results-contract.md`:\n  - Added stdlib multipart POST transport for `/v1/submissions`.\n  - Sends bearer auth, visibility, companion files, manifest, and a\n    stable UUIDv5 idempotency key derived from service URL + bundle hash\n    unless the caller supplies `--idempotency-key`.\n  - Retries transient upload/status failures (5xx and network errors)\n    with exponential backoff.\n  - Polls `/v1/submissions/{submission_id}/status` until published or\n    rejected when `--wait` is enabled; `--no-wait` exits after accepted\n    upload with the submission id.\n  - Retries once with refreshed auth on 401.\n  - `/code review W5` found and fixed two issues: 401/last-5xx error\n    classification no longer depends on JSON error bodies, and\n    `--no-wait` now reports accepted rather than complete.\nThis is unit/contract tested only; w7 still owns the full mock-service\nintegration suite.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement upload, status polling, retries, and idempotent re-submit",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "notes": "After a successful submission, persist the hosted URL in local history.\n`benchbox results --submitted` lists past submissions with their hosted\nURLs. Builds on the existing results history surfaces without modifying\nthe exporter.\n\nLanded 2026-05-01:\n  - Added hosted-submission history sidecars next to the submitted result\n    file, preserving the canonical bundle bytes.\n  - Records status, submission id, public result id, public URL,\n    idempotency key, service URL, and manifest-derived benchmark\n    metadata without storing tokens.\n  - Added `benchbox results --submitted`.\n  - Skipped `.submission.json` sidecars from normal exported-result\n    discovery.\n  - `/code review W6` found and fixed a history overwrite bug: sidecar\n    names now include a sanitized idempotency key so idempotent retries\n    update one record while distinct service/key submissions are retained.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Connect hosted result URL and submission history into `benchbox results --submitted`",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "notes": "Unit tests: CLI flag parsing, dry-run output, auth token storage/retrieval.\nIntegration tests: full submit flow with a mock service (httpretty or\nrespx). Cover retry, idempotency, and 401 re-auth paths.\n\nLanded 2026-05-01:\n  - Added `tests/integration/test_hosted_submission.py` with a local\n    `ThreadingHTTPServer` mock service.\n  - Covers real CLI result loading, multipart upload, status polling,\n    history sidecar creation, transient 5xx retry with stable\n    idempotency key, 401 keyring refresh, and idempotent re-submit.\n  - `/code review W7` found and fixed a coverage weakness: the\n    integration tests now exercise the real schema-v2 result loader\n    instead of monkeypatching `load_result_file`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write unit and integration tests for the full hosted submission flow",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-benchbox-cli-submit-and-service-auth",
+        "notes": "Update docs/CLI_REFERENCE.md and docs/reference/cli/ with submit command\ndocs. Add a how-to page covering the end-to-end workflow:\nrun → export → submit → track hosted URL.\n\nLanded 2026-05-01:\n  - Updated `docs/CLI_REFERENCE.md`, `docs/reference/cli/submit.md`,\n    `docs/reference/cli/results.md`, and the CLI index for hosted submit,\n    auth, `--service`, and `results --submitted`.\n  - Added `docs/reference/cli/auth.md`.\n  - Added `docs/guides/hosted-submission.md` and linked it from the\n    guides index.\n  - Corrected hosted contract snippets for current manifest filenames,\n    `--service`, keyring/env auth, and primary-file `bundle_hash` plus\n    `companion_hashes`.\n  - `/code review W8` found and fixed stale schema/hash docs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update CLI reference docs and add hosted-submission walkthrough",
+        "wid": "w8"
+      }
+    ]
+  }
+}

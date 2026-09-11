@@ -1,0 +1,16 @@
+{
+  "description": "Add Amazon Athena for Apache Spark platform adapter. This is AWS's interactive\nnotebook-based Spark service with sub-second startup.\n\nUses notebook-style execution model (Jupyter kernel) rather than batch jobs.\nReuses 100% of S3 staging and AWS authentication patterns.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "athena-spark-platform",
+        "needs_item": "aws-glue-platform"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2025-12-24T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

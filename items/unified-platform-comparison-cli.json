@@ -1,0 +1,11 @@
+{
+  "description": "Extend existing `benchbox compare` command to support running benchmarks\nacross multiple platforms, unifying SQL and DataFrame comparison.\n\nProblem:\n- Currently have: benchbox compare (result files only), benchbox compare-dataframes\n- Adding compare-sql would create 3 comparison commands\n- SQL and DataFrame comparisons share 80% of the same options\n- User confusion about which command to use\n\nSolution: Extend `benchbox compare` with --run mode:\n- benchbox compare results/*.json                    # Existing: compare files\n- benchbox compare --run -p duckdb -p clickhouse     # NEW: run & compare SQL\n- benchbox compare --run -p polars-df -p pandas-df   # NEW: run & compare DataFrame\n- benchbox compare --run --type sql -p duckdb -p sqlite  # Explicit type\n\nBenefits:\n- Single `compare` command (no new commands)\n- Backwards compatible with existing file comparison\n- Shared codebase for visualization, reporting\n- Unified documentation\n- Deprecate compare-dataframes (alias to compare --run --type dataframe)",
+  "legacy": {
+    "item_meta": {
+      "category": "Performance and Efficiency",
+      "completed_at": "2025-12-14T00:00:00Z",
+      "created_at": "2025-12-14T00:00:00Z",
+      "worktree": "platform-comparison"
+    }
+  }
+}

@@ -1,0 +1,283 @@
+{
+  "context": "Centralize reason copy first, then add compact row-level display and\npage-level zero-state recovery on each compare surface.\n",
+  "description": "The compare builder and source pages currently expose disabled row checkboxes\nwith the reason hidden in `title` text or not visible at all. When no rows are\nselectable, the user sees controls but no recovery path. This TODO adds\nvisible, keyboard-accessible reason and recovery states for every page that\ncontains compare selection.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make disabled controls visually indistinguishable from enabled controls.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "provide a recovery action that changes selected rows without making the change visible.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "show generic `not comparable` copy when the row has a specific machine-readable reason.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use only the checkbox `title` attribute for important reasons.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "needs_item": "results-explorer-comparison-eligibility-contract-repair"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-11T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "results-explorer-followup-todo-review"
+    },
+    "preserves": [
+      {
+        "behavior": "Ineligible rows remain unselectable.",
+        "item_id": "results-explorer-compare-disabled-recovery-states"
+      },
+      {
+        "behavior": "Reason formatting must use stable reason codes, not ad hoc string matching.",
+        "item_id": "results-explorer-compare-disabled-recovery-states"
+      },
+      {
+        "behavior": "Reason text must be visible without mouse hover and available to screen readers.",
+        "item_id": "results-explorer-compare-disabled-recovery-states"
+      },
+      {
+        "behavior": "Recovery actions must not silently broaden filters without user action.",
+        "item_id": "results-explorer-compare-disabled-recovery-states"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/src/lib/displayEligibility.ts or equivalent shared eligibility helper should own reason formatting.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "path": "results-explorer/src/lib/displayEligibility.ts"
+      },
+      {
+        "concept": "results-explorer/src/pages/BenchmarkIndex.tsx:compare selection state on benchmark detail.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "path": "results-explorer/src/pages/BenchmarkIndex.tsx:compare"
+      },
+      {
+        "concept": "results-explorer/src/pages/Compare.tsx:disabled checkbox title text and builder row rendering.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "path": "results-explorer/src/pages/Compare.tsx:disabled"
+      },
+      {
+        "concept": "results-explorer/src/pages/PlatformIndex.tsx:compare selection state on platform detail.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "path": "results-explorer/src/pages/PlatformIndex.tsx:compare"
+      },
+      {
+        "concept": "results-explorer/src/pages/Query.tsx:Query Workbench compare action.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "path": "results-explorer/src/pages/Query.tsx:Query"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-compare-disabled-recovery-states/"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/compareExclusionReasons.ts"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayEligibility.ts"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/Compare.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Query.test.tsx",
+        "description": "Disabled compare reason tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/Compare.a11y.test.tsx src/pages/__tests__/BenchmarkIndex.a11y.test.tsx src/pages/__tests__/PlatformIndex.a11y.test.tsx src/pages/__tests__/Query.a11y.test.tsx",
+        "description": "Accessibility checks cover visible reasons",
+        "expected": "focused accessibility tests for visible disabled reasons pass",
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"zero-selectable|disabled reason|clear filters|PASS|FAIL\" _project/verification-logs/results-explorer-compare-disabled-recovery-states/",
+        "description": "Browser recovery evidence exists",
+        "expected": "logs include browser evidence for zero-selection recovery",
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "notes": "Inspect benchmark detail, platform detail, Query Workbench, Compare\nbuilder, and result-detail builder state on the checked git SHA after the\neligibility repair has regenerated the snapshot. Record route, fixture\nresult IDs, exclusion reason codes, where each disabled reason comes from,\nwhether it is visible, and whether a user can recover by changing filters.\nStore screenshots or DOM text evidence in\n`_project/verification-logs/results-explorer-compare-disabled-recovery-states/w0.log`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory every disabled compare control and current reason source",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "notes": "Add a small shared formatter that maps stable reason codes to:\n  - short row text;\n  - detailed tooltip/help text;\n  - recovery hint when applicable;\n  - severity/category.\nCover at least `no_queries`, `no_valid_display_timing`,\n`missing_timings`, `insufficient_query_coverage`, and any rank-only\nexclusion code. Include pluralization and punctuation here so pages do not\nreimplement copy differently.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create a shared compare exclusion reason formatter",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "notes": "Add a compact reason column or inline muted reason next to disabled rows in\n`/results/compare`. The row must not rely on browser `title` as the only\nexplanation. Add a page-level zero-selectable callout with the dominant\nreason counts and one recovery action, such as clearing filters or choosing\nanother cohort.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Show visible disabled reasons in the Compare builder",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "notes": "For each source page, disabled compare controls need an adjacent row status\nor an accessible details affordance. Disabled primary buttons must look\ndisabled and state what is missing: not enough selected rows, no eligible\nrows in current filters, or selected rows from incompatible cohorts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Show visible disabled reasons on benchmark, platform, and query pages",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "notes": "Add tests for:\n  - all rows disabled with visible reason summary;\n  - some rows enabled and some disabled;\n  - selecting one row updates button copy;\n  - selecting incompatible rows is impossible or explains why;\n  - keyboard focus announces disabled reason text.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add zero-selection and mixed-selection tests",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-disabled-recovery-states",
+        "notes": "In a browser, intentionally filter to a zero-selectable state, confirm the\ncallout appears, use the recovery action, and verify selectable rows return.\nDecision gate: do not complete this item if a user can still encounter a\ndisabled compare screen with no visible reason or next action.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Browser-check recovery paths with filters",
+        "wid": "w5"
+      }
+    ]
+  }
+}

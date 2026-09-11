@@ -1,0 +1,245 @@
+{
+  "context": "Pattern: identify the phases of each function using blank-line or comment boundaries.\nExtract each phase to a private function with a clear name describing its role.\nKeep all extracted functions in the same file unless they're generic utilities.\n\nFor wizard steps: prefer a single _wizard_step() helper over one helper per step,\nsince steps are structurally identical (same shape, different data).\n",
+  "description": "9 CLI and core orchestration functions mix multiple independent concerns (validation,\nloading, business logic, output) in a single large function. Each function has 3-6\ndistinct phases that can be extracted to named private helpers, making the top-level\nfunction a readable orchestration narrative.\n\nTarget functions:\n  benchbox/base.py:create_enhanced_benchmark_result                 (20)\n  benchbox/cli/commands/compare.py:_run_file_comparison             (20)\n  benchbox/cli/tuning.py:run_dataframe_write_wizard                 (20)\n  benchbox/cli/tuning_resolver.py:resolve_tuning                    (18)\n  benchbox/cli/commands/shell.py:shell                              (18)\n  benchbox/core/cost/integration.py:add_cost_estimation_to_results  (18)\n  benchbox/core/dryrun.py:_extract_ddl_preview                      (18)\n  benchbox/core/dryrun.py:save_dry_run_results                      (15)\n  benchbox/cli/commands/aggregate.py:aggregate                      (16)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add logging or validation to the new helpers beyond what's in the original",
+        "instead": "(not specified)",
+        "item_id": "complexity-cli-orchestration-w14",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "change function signatures visible to callers (CLI commands, test fixtures)",
+        "instead": "(not specified)",
+        "item_id": "complexity-cli-orchestration-w14",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "merge phases that have different error handling",
+        "instead": "(not specified)",
+        "item_id": "complexity-cli-orchestration-w14",
+        "why": "keep their error paths distinct"
+      },
+      {
+        "dont": "over-extract: aim for 3-5 helpers per function, not 10",
+        "instead": "(not specified)",
+        "item_id": "complexity-cli-orchestration-w14",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-22T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "_run_file_comparison: comparison output (all formats) must be identical",
+        "item_id": "complexity-cli-orchestration-w14"
+      },
+      {
+        "behavior": "add_cost_estimation_to_results: cost values must be identical (floating point exact)",
+        "item_id": "complexity-cli-orchestration-w14"
+      },
+      {
+        "behavior": "create_enhanced_benchmark_result: output BenchmarkResult must be structurally identical",
+        "item_id": "complexity-cli-orchestration-w14"
+      },
+      {
+        "behavior": "resolve_tuning: tuning resolution logic must produce same config for all inputs",
+        "item_id": "complexity-cli-orchestration-w14"
+      },
+      {
+        "behavior": "run_dataframe_write_wizard: wizard UX flow and resulting config must be unchanged",
+        "item_id": "complexity-cli-orchestration-w14"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/aggregate.py"
+      },
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/compare.py"
+      },
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/shell.py"
+      },
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/tuning.py"
+      },
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/tuning_resolver.py"
+      },
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/cost/integration.py"
+      },
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dryrun.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/ -q --timeout=30",
+        "description": "Integration tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "complexity-cli-orchestration-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Smoke tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "complexity-cli-orchestration-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/check_complexity.py --top 150 2>&1 | grep -E '(create_enhanced|run_file_comparison|write_wizard|resolve_tuning|shell.*329|add_cost_estimation|extract_ddl|save_dry_run|aggregate.*40)'",
+        "description": "Target functions below warn threshold",
+        "expected": "No WARN entries for the 9 target functions",
+        "item_id": "complexity-cli-orchestration-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-cli-orchestration-w14",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "complexity-cli-orchestration-w14",
+        "notes": "benchbox/base.py:588 - Mix of result field extraction, fallback normalization,\nand dict manipulation. Extract:\n- _normalize_benchmark_id(raw) → str\n- _extract_query_results(raw_queries) → list[QueryResult]\n- _build_execution_meta(raw) → ExecutionMeta\nTop-level becomes: normalize → extract → build → return.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decompose create_enhanced_benchmark_result into factory + normalizer helpers",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-cli-orchestration-w14",
+        "notes": "benchbox/cli/commands/compare.py:1082 - four clear phases:\n- _validate_comparison_inputs(file1, file2, opts) → or raise\n- _load_comparison_files(file1, file2) → (result1, result2)\n- _compute_comparison(r1, r2, opts) → ComparisonResult (delegate to existing)\n- _output_comparison(comparison, opts) → None\nMain function becomes 4 calls + early returns on validation failure.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decompose _run_file_comparison into validate/load/compare/output helpers",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-cli-orchestration-w14",
+        "notes": "benchbox/cli/tuning.py:694 - 4+ wizard steps follow identical pattern:\n  capability_check → user_prompt → config_update\nExtract _wizard_step(capability, prompt, config_key) → value or None.\nEach step becomes a single function call. Steps are independent.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decompose run_dataframe_write_wizard into per-step handlers",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-cli-orchestration-w14",
+        "notes": "benchbox/cli/tuning_resolver.py:162 - 4 sequential cases (notuning, auto, explicit path, tuned).\nEach case is self-contained. Extract:\n- _resolve_notuning() → TuningConfig\n- _resolve_auto(platform, benchmark) → TuningConfig\n- _resolve_explicit_path(path) → TuningConfig\n- _resolve_tuned(platform, benchmark) → TuningConfig\nMain function: mode → handler dispatch (dict or if/elif, each a 1-liner).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decompose resolve_tuning into per-mode handler functions",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-cli-orchestration-w14",
+        "notes": "shell (cli/commands/shell.py:329): extract _resolve_platform_from_args,\n_discover_platform_interactive, _launch_shell_for_platform.\nadd_cost_estimation_to_results (core/cost/integration.py:70): extract\n_validate_cost_inputs, _compute_query_costs, _compute_phase_costs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decompose shell command and add_cost_estimation_to_results",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-cli-orchestration-w14",
+        "notes": "_extract_ddl_preview (dryrun.py:963): extract _build_table_ddl(table, tunings) → str.\nsave_dry_run_results (dryrun.py:175): extract _save_queries_to_dir, _save_ddl_file.\naggregate (cli/commands/aggregate.py:40): extract _filter_results, _aggregate_metrics.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decompose _extract_ddl_preview, save_dry_run_results, and aggregate",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-cli-orchestration-w14",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run smoke tests and complexity check; verify all 9 functions below warn threshold",
+        "wid": "w7"
+      }
+    ]
+  }
+}

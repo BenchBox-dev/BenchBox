@@ -1,0 +1,280 @@
+{
+  "context": "Start with shared compare-selection state and row ordering helpers before\ntouching individual pages. Fix BenchmarkIndex visibility first because it is\nthe only remaining hard blocker. Then reuse the same compatible-row ordering\nbehavior in Compare and Query so the recovery affordance is consistent.\n",
+  "description": "The 2026-05-09 post-completion Results Explorer review on develop\ndbac33ee1 found that compare entrypoints are still not reliably usable from\nevery page. Benchmark detail checkboxes render at 0x0 and cannot be clicked;\nCompare and Query Workbench both hide compatible second choices far below\nthe current viewport after the first selection; and Compare picker checkbox\naccessible names are still under-disambiguated.\n\nThis item addresses review findings #1, #2, #3, and #11 recorded in\n_project/audits/results-explorer-post-completion-review-2026-05-09.md.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add URL-editing instructions as a fallback.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "relax cohort compatibility just to make two visible rows selectable.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "strand compatible rows below hundreds of incompatible disabled rows.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use zero-size inputs with no visible proxy control.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend UX",
+      "completed_at": "2026-05-10T00:00:00Z",
+      "created_at": "2026-05-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cohort compatibility remains benchmark + scale + phase + primary metric.",
+        "item_id": "results-explorer-post-completion-compare-selection-recovery"
+      },
+      {
+        "behavior": "Existing /results/compare?ids=... deep links continue to render comparisons.",
+        "item_id": "results-explorer-post-completion-compare-selection-recovery"
+      },
+      {
+        "behavior": "Platform detail compare selection that already generates a URL remains functional.",
+        "item_id": "results-explorer-post-completion-compare-selection-recovery"
+      },
+      {
+        "behavior": "Static export behavior remains client-only; no server endpoint is introduced.",
+        "item_id": "results-explorer-post-completion-compare-selection-recovery"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-post-completion-compare-selection-recovery/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/compareSummary.ts"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/Compare.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/PlatformIndex.test.tsx",
+        "description": "Targeted compare-selection tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual/browser: select two compatible rows from /results/tpch/, /results/compare, /results/query, and /results/p/polars/; each opens a valid compare page'",
+        "description": "Browser compare-selection smoke passes",
+        "expected": "manual evidence captured in PR notes or verification log",
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "notes": "Captured static-source revalidation against rebased develop tip\n(21f1980c2 + ebf0c2a95) at\n_project/verification-logs/results-explorer-post-completion-compare-selection-recovery/w0.log.\nFindings: #2, #3, #11 reproduce in source; #1 (0×0 checkbox) does NOT\nreproduce — `QueryHeatmap.tsx:600,605` renders `h-4 w-4` checkboxes\ninside `w-12` cells. Per the audit doc's acceptance contract, the\nalready-satisfied finding moves w1 to skip-as-done.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate compare-selection defects on the current develop tip",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "notes": "Skipped — finding #1 (0×0 checkboxes) does not reproduce against\ndevelop tip. `QueryHeatmap.tsx` mobile (line 459-466) and desktop\n(line 599-606) renders both use `class=\"h-4 w-4 ...\"` (16×16 px)\ninside `w-12 min-w-12` (48 px wide) cells, with no\n`display: none` / `opacity-0` overlay or zero-size proxy. Per the\naudit acceptance contract this finding is treated as\nalready-satisfied at gate time. See\n_project/verification-logs/results-explorer-post-completion-compare-selection-recovery/w0.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make benchmark-detail compare checkboxes visible and clickable",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "notes": "Compare picker now partitions filtered rows via a shared\n`compareCohortPartition` helper in `compareCohort.ts` so compatible\ncandidates surface above incompatibles. A new \"Compatible only\"\ncheckbox in the filter strip defaults on whenever the cohort is\nlocked (`compare-builder-compatible-only`), and the status copy\nsurfaces the hidden incompatible count\n(\"1 incompatible row hidden.\"). Selection clear reverts the lock\nand the toggle disappears with no incompatibles to hide. Vitest\ncoverage in `compareCohort.test.ts` (8 tests) and\n`Compare.test.tsx` (\"compare picker hides incompatible candidates\nby default and surfaces the hidden count\").\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move compatible candidates into view in the Compare picker",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "notes": "Query Workbench reuses the same `compareCohortPartition` helper to\nreorder rows so compatibles bubble above incompatibles. A\n\"Compatible only\" checkbox in the tray (`query-compare-compatible-only`)\ndefaults on once the cohort signature locks, and the tray text\nsurfaces the hidden-incompatible count. Existing disabled-row\ntooltip behavior is unchanged when users toggle the filter off.\nVitest coverage in `Query.test.tsx`\n(\"query workbench hides incompatible rows by default and surfaces\nthe hidden count\").\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move compatible candidates into view in Query Workbench",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "notes": "New `compareSelectionLabel` helper in `compareCohort.ts` builds a\nlabel like \"Select Polars TPC-H SF 0.1 power 2026-05-02 (0093bb7a)\nfor comparison\" by appending platform, benchmark (via\n`formatBenchmarkLabel` so the SSB legacy slug stays distinct),\nscale, phase, run date, and the trailing short-id token. Wired\ninto Compare picker, QueryHeatmap mobile + desktop tables, Query\nWorkbench, and PlatformIndex. Visible UI is unaffected; this is\npurely for SR/locator parity. Vitest coverage in\n`compareCohort.test.ts` and dedicated cases in `Compare.test.tsx`\nand `Query.test.tsx` that prove same-platform rows produce\ndistinct accessible names.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Disambiguate compare-selection accessible names everywhere",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-compare-selection-recovery",
+        "notes": "Two new Playwright cases in\n`results-explorer/e2e/captures/followup-usability-release.spec.ts`:\n\"Compare picker hides incompatible candidates after first selection\nby default\" and \"Query compare tray defaults compatible-only after\nfirst selection\". Both pin the new toggle's defaulted-on state and\nthat the row count drops after the first selection. Existing\ncoverage already drove `launchFirstBuilderComparison` and the\nQuery compare tray prompt; those continue to assert the launch URL\ncontract for two-compatible-rows starts. Per CLAUDE.md long-running\nUAT discipline, the Playwright suite is gated by the team's e2e CI\nrun rather than executed inline here.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add end-to-end regression coverage for compare selection starts",
+        "wid": "w5"
+      }
+    ]
+  }
+}

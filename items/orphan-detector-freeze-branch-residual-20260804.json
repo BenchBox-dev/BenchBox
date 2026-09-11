@@ -1,0 +1,74 @@
+{
+  "context": "Confirm with the branch owner whether the branch is still needed. If the ADR content on develop is equivalent, allowlist both SHAs with that evidence recorded; the detector compares SHAs and not content, so a cherry-pick would not clear them either. If the branch is finished, delete it - the detector only inspects branches that still exist.",
+  "description": "Once PR #1521 makes the orphaned-commit detector run on every develop push, develop shows a red detector run until every flagged orphan is resolved or allowlisted. After #1521 and #1527 land, two remain, both on test/freeze-bulk-path-coverage, an active branch belonging to another session: cc01856f9da6f3dc815c0810936a88e3897132e7 'docs(decisions): record the bulk_transfer PK-collision assessment in the ADR' and 43fd39fe4d990d6906dfcbb1fd4f914595114b2c, a merge of origin/develop into that branch. Both look benign - the ADR text was verified already present on develop, and a merge commit carries no unique content - but they were not touched because the branch is live and re-landing or allowlisting another session's work without their context risks duplicating it. Left flagged rather than silently allowlisted, since burying real lost work in the allowlist is how these got lost in the first place.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-04T17:32:19Z",
+      "completed_pr": 1534,
+      "created_at": "2026-08-04T12:47:45Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No orphan is allowlisted without recorded evidence that its content already reached develop",
+        "item_id": "orphan-detector-freeze-branch-residual-20260804"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "orphan-detector-freeze-branch-residual-20260804",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "orphan-detector-freeze-branch-residual-20260804",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/known-stranded-commits.txt"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "GITHUB_TOKEN=$(gh auth token) GITHUB_REPOSITORY=joeharris76/BenchBox uv run -- python _project/scripts/detect_orphaned_commits.py",
+        "description": "The orphan detector reports no unacknowledged orphans",
+        "expected": "Exits 1 on the unfixed tree, where two unacknowledged orphans on test/freeze-bulk-path-coverage fail the run, and exits 0 once both are resolved.",
+        "item_id": "orphan-detector-freeze-branch-residual-20260804",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "orphan-detector-freeze-branch-residual-20260804",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Confirmed both commits carry no unique content. cc01856f's ADR text ('PK-collision'/'bulk_transfer' in _project/decisions/todo-db-cutover-write-freeze-2026-08-01.md) was verified PRESENT on develop; 43fd39fe is a merge of origin/develop into that branch and carries nothing of its own. The branch remains live and belongs to another session, so it was not deleted.",
+        "item_id": "orphan-detector-freeze-branch-residual-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T17:32:06Z",
+        "started_branch": "diag/develop-lint",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Confirm the branch status and whether its content is fully represented on develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Both SHAs allowlisted in _project/analysis/known-stranded-commits.txt via PR #1534 with the evidence above recorded inline. Necessary because PR #1521 made the detector run per push: leaving two acknowledged-benign orphans unlisted would have made every run red, which is precisely how a genuinely new orphan gets scrolled past. Verified after: detector exits 0, 'No NEW orphaned commits detected'.",
+        "item_id": "orphan-detector-freeze-branch-residual-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T17:32:13Z",
+        "started_branch": "diag/develop-lint",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Allowlist both SHAs with evidence, or delete the branch",
+        "wid": "w1"
+      }
+    ]
+  }
+}

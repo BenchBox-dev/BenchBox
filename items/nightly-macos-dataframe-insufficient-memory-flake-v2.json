@@ -1,0 +1,104 @@
+{
+  "context": "Use a narrow non-autouse fixture or explicit patch for mocked execution tests and simulate low memory to prove isolation.",
+  "description": "A prior macOS nightly flaked 22 mocked dataframe tests when the production memory precheck observed a roughly 0.4 GiB deficit; reruns passed. Classify tests that intend to exercise memory policy, then stub only mocked execution paths so ambient RAM cannot decide unrelated unit outcomes. Keep production guards unchanged.",
+  "legacy": {
+    "item_meta": {
+      "category": "Test determinism",
+      "completed_at": "2026-08-01T17:09:44Z",
+      "completed_pr": 1415,
+      "created_at": "2026-08-01T14:07:20Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Dedicated memory tests retain pass and fail coverage.",
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake-v2"
+      },
+      {
+        "behavior": "Real runs still abort when estimated memory exceeds available capacity.",
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/**"
+      },
+      {
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/conftest.py"
+      },
+      {
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_benchmark_mixin.py"
+      },
+      {
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_benchmark_mixin_behavioral.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/platforms/dataframe/test_benchmark_mixin.py tests/unit/platforms/dataframe/test_benchmark_mixin_behavioral.py -q",
+        "description": "Dataframe mixin tests",
+        "expected": "can fail on the unfixed tree under simulated marginal memory; exit 0 after isolation",
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Search of both affected modules found 27 mocked run_benchmark calls but no intentional check_sufficient_memory or InsufficientMemoryError assertions. Dedicated memory pass/fail coverage remains in tests/unit/core/dataframe/test_dataframe_capabilities.py and tests/unit/core/runner/test_dataframe_runner_lifecycle.py.",
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake-v2",
+        "notes": null,
+        "started_at": "2026-08-01T17:07:04Z",
+        "started_branch": "fix/nightly-macos-dataframe-memory-flake",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Classify tests that intentionally cover memory policy",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added a non-autouse sufficient_dataframe_memory fixture under the dataframe test subtree and opted in only test_benchmark_mixin.py and test_benchmark_mixin_behavioral.py. No production dataframe paths changed; sibling and dedicated policy tests retain the real check.",
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake-v2",
+        "notes": null,
+        "started_at": "2026-08-01T17:07:10Z",
+        "started_branch": "fix/nightly-macos-dataframe-memory-flake",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Isolate only mocked execution tests from ambient free RAM",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added a regression that forces reported available memory to 0.01 GiB while mocked execution still completes. Affected modules pass 55 tests; dedicated capabilities and runner lifecycle memory coverage passes 94 tests, including insufficient-memory abort behavior.",
+        "item_id": "nightly-macos-dataframe-insufficient-memory-flake-v2",
+        "notes": null,
+        "started_at": "2026-08-01T17:07:13Z",
+        "started_branch": "fix/nightly-macos-dataframe-memory-flake",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Simulate marginal RAM and run both policy and execution tests",
+        "wid": "w2"
+      }
+    ]
+  }
+}

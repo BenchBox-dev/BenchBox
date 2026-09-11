@@ -1,0 +1,119 @@
+{
+  "description": "Source: _project/audits/results-explorer-publication-adversarial-review.md\n(develop_sha fddedf26), findings §2.17 (Advisory) and §2.18 (Advisory; the\nsample-ID part borders on Required — the section is unusable as written).\n\n§2.17 — results-explorer-qa.md:331 tells the tester to \"confirm bench.results\nis a view.\" It is a TABLE (duckdb_builder.py:371,:282); the real protection is\nthe read-only attach (results-explorer/src/db.ts:278\n`ATTACH 'results.duckdb' AS bench (READ_ONLY)`), and there is no SQL statement\nfiltering (Query.tsx:608-617 passes raw SQL). DDL/DML against bench.* is\nrejected because the attach is read-only, but CREATE/SET against the in-memory\ncatalog succeed transiently — so \"no-op\" is the wrong word. The security\nproperty holds; the doc's stated mechanism does not exist.\n\n§2.18 — results-explorer-qa.md:5 claims the fixture corpus spans\nduckdb/sqlite/datafusion/polars with 12 results, but there is no sqlite\nfixture anywhere and 5 of 6 sample result IDs in §S5 do not exist in the tree\n(only tpch-duckdb-sf0.01-20260403-7fe93365 is real). §S3.1 (\"view mode not\nURL-synced\") and §S3.4 (\"trust filter not URL-synced\") are both stale —\nBenchmarkIndex.tsx:211 and the facet URL-state hook show both ARE URL-synced.\nresults-explorer-browser-testing.md:70-72 overstates the push trigger as\n\"every push\" (it is branches:[main] only).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assert bench.results is a view to make the doc 'true'",
+        "instead": "describe the read-only attach that actually provides the property.",
+        "item_id": "remediate-qa-and-browser-test-doc-accuracy",
+        "why": "it is a table"
+      },
+      {
+        "dont": "invent sample IDs",
+        "instead": "derive them from the committed fixtures.",
+        "item_id": "remediate-qa-and-browser-test-doc-accuracy",
+        "why": "that recreates the current defect"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The QA plan's overall structure and section numbering (only the inaccurate content changes).",
+        "item_id": "remediate-qa-and-browser-test-doc-accuracy"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/e2e/routes/query.spec.ts:153-168 — cite this existing test as the evidence for the reworded S7.6 claim.",
+        "decision": "reuse",
+        "item_id": "remediate-qa-and-browser-test-doc-accuracy",
+        "path": "results-explorer/e2e/routes/query.spec.ts:153-168"
+      },
+      {
+        "concept": "results-explorer/test-fixtures/source/bundles/ — the source of truth for real sample IDs (w2).",
+        "decision": "reuse",
+        "item_id": "remediate-qa-and-browser-test-doc-accuracy",
+        "path": "results-explorer/test-fixtures/source/bundles/"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remediate-qa-and-browser-test-doc-accuracy",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "remediate-qa-and-browser-test-doc-accuracy",
+        "kind": "only_modify",
+        "path_glob": "docs/development/results-explorer-browser-testing.md"
+      },
+      {
+        "item_id": "remediate-qa-and-browser-test-doc-accuracy",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'is a view' docs/operations/results-explorer-qa.md",
+        "description": "S7.6 no longer claims a view",
+        "expected": "no match; wording describes READ_ONLY attach",
+        "item_id": "remediate-qa-and-browser-test-doc-accuracy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures >/dev/null 2>&1 && uv run --project .. -- python -c \"import duckdb,re,pathlib; ids=set(re.findall(r'[a-z_]+-[a-z-]+-sf[0-9.]+-[0-9]{8}-[0-9a-f]{8}', pathlib.Path('../docs/operations/results-explorer-qa.md').read_text())); con=duckdb.connect('test-fixtures/.generated/data/results.duckdb', read_only=True); real={r[0] for r in con.execute('select distinct result_id from benchmark_matrix_cells').fetchall()}; missing=sorted(i for i in ids if i not in real); print('MISSING:', missing) if missing else print('all resolve')\"\n",
+        "description": "Every §S5 sample ID is a normalized result_id in the generated corpus (NOT a source-bundle filename)",
+        "expected": "all resolve — the IDs are recomputed result_ids in results.duckdb; do NOT grep source-bundle filenames (those are pre-normalization hashes and will always mismatch)",
+        "item_id": "remediate-qa-and-browser-test-doc-accuracy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remediate-qa-and-browser-test-doc-accuracy",
+        "notes": "Replace the \"is it a view?\" check with: \"the bench database is attached\nREAD_ONLY (db.ts:278); writes to bench.* error; writes to the in-memory\ncatalog succeed but are tab-local and transient and cannot alter the\npublished snapshot.\" Reference the pinning e2e test\n(results-explorer/e2e/routes/query.spec.ts:153-168).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reword S7.6 to describe the real read-only-attach protection",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-qa-and-browser-test-doc-accuracy",
+        "notes": "Derive real IDs from results-explorer/test-fixtures/source/bundles/;\ndrop the non-existent sqlite surface (or add a fixture if it is intended);\ncorrect the result count.\n\n2026-07-06 RESOLVED (no doc change needed): the four §S5 IDs are CORRECT.\nThey are the pipeline's recomputed result_ids (sha256 of the normalized\ncorpus bundle bytes), NOT the source-bundle filename hashes — the doc body\n(:240-247) says so explicitly. A fresh `npm run test:e2e:fixtures` produces\nexactly 010ee756 (duckdb) / a6bb8a70 (datafusion) / a62d0d72 (polars) /\n3cdeede0 (star_schema-duckdb) in the generated results.duckdb, matching the\ndoc verbatim. The earlier \"wrong hash\" report was a FALSE POSITIVE from the\nstale verification command below, which grepped source-bundle FILENAMES (the\npre-normalization hashes 7fe93365/c0d4f3d9/39bb1a7b/ac3ed9a9) instead of the\nnormalized result_ids. Verification command corrected to query the generated\ncorpus; w1 and w3 already landed. Item complete.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate the §S5 sample result IDs and the corpus-surface description from the actual fixtures",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-qa-and-browser-test-doc-accuracy",
+        "notes": "Update results-explorer-qa.md §S3.1/§S3.4 to reflect that view mode and\ntrust filter are URL-synced; correct\nresults-explorer-browser-testing.md:70-72 push trigger to branches:[main].\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Delete the stale 'not URL-synced' notes (§S3.1, §S3.4) and fix the browser-testing trigger claim",
+        "wid": "w3"
+      }
+    ]
+  }
+}

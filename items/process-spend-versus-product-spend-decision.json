@@ -1,0 +1,188 @@
+{
+  "context": "This is a decision item, not an implementation item. Produce a number, then decide a cap.\n\nDECISION GATE w2: choose ONE policy and record it: (a) a hard ratio cap -- process churn may not exceed product churn over a rolling window; (b) a freeze list of paths that accept only defect fixes until a named customer-facing milestone ships; (c) no cap, with the reason recorded and this item dropped. Option (c) is a legitimate outcome if the measurement does not hold up; what is not acceptable is leaving it unexamined.\n\nWhichever is chosen, keep every safety gate. The target is discretionary process ENGINEERING -- new tracker features, new agent instruction surfaces, new meta-tests -- not the checks that protect releases and privacy.",
+  "description": "MEASURED 2026-08-23 over git history since 2026-06-01 (991 commits on the local develop tip).\n\nCORRECTION FIRST: an earlier pass of this review reported '714 of 991 commits (72%) touched only process files'. That figure was WRONG -- the classifier used 'grep -qv', and this machine's grep is ugrep, where -q reports whether any line MATCHED and ignores the -v inversion, so every commit containing any process path was scored process-only. Two independent adversarial reviewers flagged it. Do not cite the 72% figure.\n\nThe corrected, reproducible measurements:\n - Commits touching ONLY process paths (_project/, .github/, docs/operations/, docs/agent/, .claude/, .todo*, scripts/, make/, Makefile, AGENTS.md, CLAUDE.md): 208 of 991 (21%). An independent reviewer got ~200 by the same definition.\n - Commits touching the shipped package benchbox/: 373 of 991 (37.6%).\n - Line churn, excluding the bulk results-data/ JSON which would otherwise dominate: agent and tracker process files 389,833 lines (60.7%); the shipped Python package 65,051 lines (10.1%); process-scaffolding tests 57,286 lines (8.9%); the results explorer 6,038 lines (0.9%); user docs 4,226 lines (0.7%).\n - Standing surface: 31 CI workflows; 151 targets in the Makefile (191 tracked in make/inventory.json); a 1,796-line Makefile plus 584 lines across make/*.mk; 133 of 1,343 test_*.py files (9.9%) test process scaffolding rather than the product.\n\nSo the commit-count story is unremarkable and the CHURN story is the real one: roughly six lines of hand-written change go into tracker and agent-process files for every one that goes into the thing customers install.\n\nSecondary evidence of the cost: _project/todo-db-export/ was last written 2026-08-16 and already disagrees with the live tracker -- during this review an external reviewer drew four wrong conclusions from it, including claims about items that had been revalidated on 2026-08-17 and 2026-08-20. A published artifact that is a week stale is worse than no artifact.\n\nThis item is deliberately NOT 'delete the gates'. Adversarial review pushed back on that and was right: the UAT, privacy and release-evidence gates exist because v0.3.0 shipped a broken install.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Cite the 72% process-only figure",
+        "instead": "INSTEAD use 21% of commits and the 60.7%/10.1% churn split",
+        "item_id": "process-spend-versus-product-spend-decision",
+        "why": "it was an artifact of ugrep's -qv semantics and is wrong"
+      },
+      {
+        "dont": "Delete or disable the UAT, privacy, submission or release-evidence gates under this item",
+        "instead": "INSTEAD target only discretionary process engineering",
+        "item_id": "process-spend-versus-product-spend-decision",
+        "why": "they exist because v0.3.0 shipped a broken install, and adversarial review specifically rejected removing them"
+      },
+      {
+        "dont": "Implement a blocking CI gate that fails builds on a churn ratio",
+        "instead": "INSTEAD make it an observable report",
+        "item_id": "process-spend-versus-product-spend-decision",
+        "why": "that adds process to solve a process problem"
+      },
+      {
+        "dont": "Treat this item as authorization to stop tracker work mid-flight",
+        "instead": "INSTEAD apply the decision to new discretionary work",
+        "item_id": "process-spend-versus-product-spend-decision",
+        "why": "in-flight items still need their evidence recorded"
+      }
+    ],
+    "item_meta": {
+      "category": "Process and Workflow",
+      "created_at": "2026-08-23T13:12:55Z",
+      "worktree": "quality-governance"
+    },
+    "preserves": [
+      {
+        "behavior": "Every existing safety gate stays: UAT release-gate evidence, corpus privacy scrubbing, submission validation, release rollback targets",
+        "item_id": "process-spend-versus-product-spend-decision"
+      },
+      {
+        "behavior": "Worktree write policy, commit identity policy, and the no-agent-attribution rule are unaffected",
+        "item_id": "process-spend-versus-product-spend-decision"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing shrink program and its ledger",
+        "decision": "extend",
+        "item_id": "process-spend-versus-product-spend-decision",
+        "path": "_project/goal-shrink-core-code.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "process-spend-versus-product-spend-decision",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "process-spend-versus-product-spend-decision",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "process-spend-versus-product-spend-decision",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "process-spend-versus-product-spend-decision",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/"
+      },
+      {
+        "item_id": "process-spend-versus-product-spend-decision",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "process-spend-versus-product-spend-decision",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "run the w0 script against git history since 2026-06-01",
+        "description": "The churn measurement reproduces",
+        "expected": "process-to-product churn ratio is reported and matches the recorded figure within rounding",
+        "item_id": "process-spend-versus-product-spend-decision",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "todo show process-spend-versus-product-spend-decision",
+        "description": "A decision is recorded",
+        "expected": "w2 evidence names the chosen option and the reason",
+        "item_id": "process-spend-versus-product-spend-decision",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "process-spend-versus-product-spend-decision",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "process-spend-versus-product-spend-decision",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "process-spend-versus-product-spend-decision",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "process-spend-versus-product-spend-decision",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "process-spend-versus-product-spend-decision",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-derive every figure in the description with a checked-in script; do not reuse the numbers quoted here without reproducing them",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "process-spend-versus-product-spend-decision",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Separate discretionary process engineering from safety gates, naming which paths fall in each",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "process-spend-versus-product-spend-decision",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "DECISION GATE - choose ratio cap, freeze list, or no cap; record the reason",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "process-spend-versus-product-spend-decision",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide whether _project/todo-db-export/ should be refreshed on a schedule, marked clearly as a dated snapshot, or withdrawn, given it misled an external reviewer while a week stale",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "process-spend-versus-product-spend-decision",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "If a cap or freeze is chosen, make it observable - a periodic report, not a blocking gate",
+        "wid": "w4"
+      }
+    ]
+  }
+}

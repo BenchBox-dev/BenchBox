@@ -1,0 +1,271 @@
+{
+  "context": "Make the contract explicit first, then enforce it route by route. Treat row\ndensity as information architecture: primary cells stay primary, secondary\nprovenance moves into a compact affordance.\n",
+  "description": "The latest review still found mixed theme surfaces and density traps: dark\nchrome over light analytical bodies without an explicit design contract, and\nbenchmark matrices whose frozen region remains tall because platform,\nversion, trust, validation, and receipt details compete for primary row\nspace. This TODO sets small, enforceable UI contracts rather than one-off CSS\nfixes.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "accept screenshots only at one scroll position; sticky alignment must be checked after horizontal scroll.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "chase isolated colors without deciding the overall surface contract.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "fix row height by shrinking text below usable size.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "remove trust or receipt data to gain density; move it to a lower-priority affordance.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-11T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "results-explorer-followup-todo-review"
+    },
+    "preserves": [
+      {
+        "behavior": "Dense rows remain readable and keyboard navigable.",
+        "item_id": "results-explorer-surface-theme-and-density-contract"
+      },
+      {
+        "behavior": "Receipt and provenance access remain available from matrix rows.",
+        "item_id": "results-explorer-surface-theme-and-density-contract"
+      },
+      {
+        "behavior": "Sticky headers and frozen columns remain aligned during horizontal scroll.",
+        "item_id": "results-explorer-surface-theme-and-density-contract"
+      },
+      {
+        "behavior": "Theme changes do not reduce contrast below WCAG AA for table text and controls.",
+        "item_id": "results-explorer-surface-theme-and-density-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/src/components/QueryHeatmap.tsx or matrix components own sticky/frozen behavior.",
+        "decision": "reuse",
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "path": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "concept": "results-explorer/src/components/RunReceipt.tsx and result detail pages provide provenance destinations.",
+        "decision": "reuse",
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "path": "results-explorer/src/components/RunReceipt.tsx"
+      },
+      {
+        "concept": "results-explorer/src/index.css and route/component class names define global surface tokens.",
+        "decision": "reuse",
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "path": "results-explorer/src/index.css"
+      },
+      {
+        "concept": "results-explorer/src/pages/BenchmarkIndex.tsx renders benchmark matrix rows and frozen columns.",
+        "decision": "reuse",
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "path": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-surface-theme-and-density-contract/"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/App.tsx"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RunIdentity.tsx"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RunReceipt.tsx"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/components/__tests__/QueryHeatmap.test.tsx",
+        "description": "Frontend tests covering benchmark matrix and route layout pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run build",
+        "description": "Frontend build and typecheck pass",
+        "expected": "both commands exit 0",
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"theme contract|row height|sticky alignment|receipt|PASS|FAIL\" _project/verification-logs/results-explorer-surface-theme-and-density-contract/",
+        "description": "Browser evidence confirms theme and density contracts",
+        "expected": "logs include route and benchmark matrix evidence",
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "notes": "On the checked git SHA, inspect `/results/`, `/results/<benchmark>/`,\n`/results/p/<platform>/`, `/results/query`, `/results/compare`, and one\nresult detail route at desktop and one narrow viewport. Capture route,\nviewport, screenshot/text evidence, row-height measurements, sticky\nalignment state, receipt/provenance reachability, and the specific theme\nmismatch or density trap in\n`_project/verification-logs/results-explorer-surface-theme-and-density-contract/w0.log`.\nThen decide whether the Results Explorer should be:\n  - dark analytical app throughout; or\n  - dark global chrome with a light data workspace.\nDocument the chosen rule in implementation notes and, if appropriate, a\nsmall UI README or test fixture. Decision gate: no theme edits until the\ncontract is explicit, because mixed dark/light surfaces can be intentional\nonly if applied consistently.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rebind theme and density evidence, then document the surface contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "notes": "Check `/results/`, `/results/<benchmark>/`, `/results/p/<platform>/`,\n`/results/query`, `/results/compare`, and result detail pages. Ensure\nbackgrounds, cards, controls, tables, chart panels, and error/empty states\nfollow the chosen contract. Remove isolated route-level overrides that\nproduce chrome/body mismatch.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the theme contract to all Results Explorer routes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "notes": "Decide the maximum primary frozen columns and row height budget for\nbenchmark matrices. Recommended contract:\n  - selection checkbox;\n  - compact platform/run identity;\n  - one primary score or geomean column;\n  - trust, validation, version, receipt, and source details behind compact\n    metadata, hover, or row expansion.\nDecision gate: do not move metadata until tests identify which fields must\nremain visible for auditability.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the benchmark matrix frozen-region density contract",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "notes": "Update benchmark matrix rows so trust badges, validation state, platform\nversion, and receipt links do not force tall rows in the frozen region.\nKeep receipt/provenance reachable through a compact details affordance or\nrow expansion. Verify sticky headers and frozen columns stay aligned while\nhorizontally scrolling query columns.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move secondary metadata out of the default frozen row stack",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "notes": "Add tests or browser smoke checks asserting:\n  - no route violates the chosen surface theme contract;\n  - benchmark matrix row height stays within the documented budget;\n  - frozen columns and scrolled query headers remain aligned;\n  - receipt/provenance remains reachable after metadata compaction.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add visual and DOM assertions for theme and density",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-surface-theme-and-density-contract",
+        "notes": "Capture standard desktop evidence for all routes and a narrow viewport\nspot check for the benchmark matrix. Decision gate: do not complete if\ntheme mismatch remains unexplained or if metadata compaction hides receipt\naccess.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Browser-check standard desktop and one narrow viewport",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,355 @@
+{
+  "context": "Generalize the proven TPC-Havoc DataFrame gate rather than inventing a new\ncomparator: extract a shared harness (w0), inventory applicability (w1), stand\nup a production-faithful DataFrame-loading substrate (w5) and fix the loader\nbugs it surfaces (w6), re-base ssb onto it (w7), then land report-mode across\nthe ungated dual-surface benchmarks (w2), burn down (w3), and flip bounded CI\ngates with fast-lane companions (w4). SQL is the live reference for its own\nDataFrame surface; no hand-maintained answer keys; the DataFrame surface runs\non its real production data path so divergences are real, not dtype artifacts.\n",
+  "description": "TPC-Havoc now ships two result-equivalence gates that proved a discipline:\nexecute a candidate query and a trusted reference over the SAME bounded\nsmall-SF DuckDB dataset and compare results live (order-insensitive, float-\ntolerant), with no hand-maintained expected answers. The SQL gate\n(benchbox/core/tpchavoc/equivalence.py) compares each SQL variant to canonical\nTPC-H; the DataFrame gate (benchbox/core/tpchavoc/dataframe_equivalence.py)\ncompares each DataFrame variant to canonical TPC-H SQL. Together they found and\nfixed ~42 silent correctness defects.\n\nThat discipline is currently TPC-Havoc-only, by construction. But ~14\nbenchmarks ship a DataFrame query surface (amplab, clickbench, coffeeshop,\ndatavault, flightdata, joinorder, nyctaxi, read_primitives, ssb, tpcds,\ntpcds_obt, tpch, tpch_skew, tsbs_devops) in ADDITION to their SQL surface, and\nnothing checks that the two surfaces agree. Worse, stored expected results\nexist for ONLY tpch and tpcds (benchbox/core/expected_results/tpch_results.py,\ntpcds_results.py) - so for every other dual-surface benchmark there is NO\ncorrectness oracle of any kind: SQL and DataFrame implementations both execute\n\"green\" while their results are unverified and may silently disagree.\n\nCross-surface equivalence is the cheap, maintenance-free oracle for exactly\nthis gap: SQL and DataFrame are independent implementations of the same logical\nquery, so a divergence proves at least one is wrong - without needing a\nhand-curated answer key. This work generalizes the TPC-Havoc DataFrame-gate\nharness into a shared, benchmark-agnostic helper, then rolls out a bounded\nSQL<->DataFrame equivalence gate to the dual-surface benchmarks, SQL as the\nreference for its own DataFrame surface.\n\nNote: for tpch/tpcds the expected-results registry already validates each\nsurface against a stored answer key (transitive equivalence), so they are\nlower priority here; the highest value is the dual-surface benchmarks with NO\noracle today (ssb first - canonical and small - then clickbench, joinorder,\ncoffeeshop, etc.).\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "execute DataFrame queries OR load their data via a bespoke path",
+        "instead": "use the DataFrame runner/mixin for query dispatch AND the production loader/adapters for data loading (w5).",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "why": "the gate must reflect the real product run path"
+      },
+      {
+        "dont": "gate a full platform matrix",
+        "instead": "one bounded small-SF DuckDB cell per benchmark.",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "why": "routine PRs must stay cheap"
+      },
+      {
+        "dont": "silence a real divergence by adding it to the baseline",
+        "instead": "fix the wrong surface.",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "why": "the baseline is for intentional differences only"
+      },
+      {
+        "dont": "write a new result comparator or data builder",
+        "instead": "generalize and reuse it.",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "why": "the TPC-Havoc harness already does this"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-cross-surface-equivalence-gate",
+        "id": 6,
+        "reason": "Cross-engine sampling is its own discipline (see tpchavoc-cross-dialect-equivalence-sampling); keep these gates DuckDB-bounded first.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Extending equivalence gating beyond DuckDB matches the scope of the open cross-surface gate breadth rollout item. (tracked by cross-surface-gate-rollout-followups)",
+        "summary": "Cross-surface equivalence on a second engine"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-cross-surface-equivalence-gate",
+        "id": 7,
+        "reason": "Cross-surface cannot apply; their oracle gap is owned by benchmark-correctness-oracle-coverage-map.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Reason states this gap is owned by benchmark-correctness-oracle-coverage-map, which is open and tracks it.",
+        "summary": "Benchmarks that ship only one surface"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-29T11:49:31Z",
+      "completed_pr": 891,
+      "created_at": "2026-06-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ResultValidator tolerance/checksum semantics are unchanged; reuse, do not fork, the comparator and the DuckDB SQL-reference data builder.",
+        "item_id": "benchmark-cross-surface-equivalence-gate"
+      },
+      {
+        "behavior": "The TPC-Havoc SQL and DataFrame gates stay green with empty KNOWN_DIVERGENCES and unchanged behavior.",
+        "item_id": "benchmark-cross-surface-equivalence-gate"
+      },
+      {
+        "behavior": "The production DataFrame loader/adapters are reused, not forked; any change there (w6) is a genuine loader bug fix that keeps the real DataFrame run path working (re-verify the DataFrame benchmark run), never gate-only special-casing.",
+        "item_id": "benchmark-cross-surface-equivalence-gate"
+      },
+      {
+        "behavior": "benchbox run default (execution-only) behavior is unchanged for every benchmark; the gates are additive.",
+        "item_id": "benchmark-cross-surface-equivalence-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/<bench>/dataframe_queries(.py or package) and <bench>/queries.py (or get_queries) for each dual-surface benchmark - the two surfaces to compare (note: some, e.g. ssb/tpcds/clickbench, ship dataframe_queries as a package directory rather than a single module).",
+        "decision": "reuse",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "path": "benchbox/core/<bench>/dataframe_queries(.py"
+      },
+      {
+        "concept": "benchbox/core/expected_results/ (registry.py, tpch_results.py, tpcds_results.py) - the only existing correctness oracles; documents that coverage stops at tpch/tpcds.",
+        "decision": "reuse",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "path": "benchbox/core/expected_results/"
+      },
+      {
+        "concept": "benchbox/core/runner/dataframe_runner.py and benchbox/platforms/dataframe/benchmark_mixin.py - how DataFrame queries actually execute and materialize; the gate must use the same execution path, not a bespoke one.",
+        "decision": "reuse",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "path": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "concept": "benchbox/core/tpchavoc/dataframe_equivalence.py - build_dataframe_contexts, materialize_rows, fetch_canonical_rows, find_dataframe_divergences, main; the template to generalize (it already compares a DataFrame result to a SQL reference on DuckDB).",
+        "decision": "reuse",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "path": "benchbox/core/tpchavoc/dataframe_equivalence.py"
+      },
+      {
+        "concept": "benchbox/core/tpchavoc/equivalence.py - build_duckdb_with_tpch, find_divergences, strip_top_n, KNOWN_DIVERGENCES, main; the SQL-side harness and the empty-baseline fail-on-divergence pattern.",
+        "decision": "reuse",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "path": "benchbox/core/tpchavoc/equivalence.py"
+      },
+      {
+        "concept": "tests/integration/test_tpchavoc_variant_equivalence.py - the fast default-lane regression companion; mirror it per gated benchmark.",
+        "decision": "reuse",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "path": "tests/integration/test_tpchavoc_variant_equivalence.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make tpchavoc-dataframe-equivalence-report",
+        "description": "Generalized harness reproduces the existing TPC-Havoc DataFrame gate result",
+        "expected": "still 0 divergent (re-expressed on the shared harness, unchanged)",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "introduce a wrong projection in one SSB DataFrame query, run the SSB cross-surface gate",
+        "description": "A new dual-surface gate fails when one surface is deliberately broken",
+        "expected": "gate FAILS (non-zero), naming the divergent query",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w5",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w6",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w7",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w8",
+        "wid": "w4"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w9",
+        "wid": "w4"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "needs_wid": "w6",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "notes": "Factor the data-build + run-SQL + run-DataFrame + compare loop out of\ntpchavoc/dataframe_equivalence.py into a shared core helper parameterized by\nbenchmark (DDL/data builder, SQL query accessor, DataFrame query accessor,\nvalidator). Re-express the existing TPC-Havoc DataFrame gate on top of it\nwith NO behavior change (its gate must stay green and byte-equivalent in\nresult). Reuse validate_variant_equivalence / the result validator and the\nDuckDB data builder; do not fork them.\n\nDONE: shared harness landed at benchbox/core/equivalence/dataframe_surface.py\n(build_dataframe_contexts, materialize_rows, fetch_reference_rows,\nfind_surface_divergences, SurfaceDivergence, _normalize_value). The TPC-Havoc\nDataFrame gate (benchbox/core/tpchavoc/dataframe_equivalence.py) is now a thin\nwrapper over it: it injects the canonical-TPC-H reference, the variant/backend\ncell enumeration, and the reused validate_variant_equivalence comparator +\nbuild_duckdb_with_tpch data builder. Gate re-verified byte-equivalent:\n\"checked 440 variant-backend cells - 0 divergent, 440 equivalent\". Fast-lane\ntests/integration/test_tpchavoc_dataframe_variant_equivalence.py still passes;\nnew fast-lane unit coverage at tests/unit/core/equivalence/.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract a benchmark-agnostic cross-surface equivalence harness from the TPC-Havoc DataFrame gate",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Superseded by the landed work. The dual-surface inventory is now materialised as benchbox/core/equivalence/builders/ (amplab, clickbench, coffeeshop, h2odb, joinorder_synthetic, read_primitives, ssb) plus the tpchavoc DataFrame gate, and query-id correspondence is asserted per-benchmark by the gates themselves. Verified on origin/develop 2026-07-29.",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "notes": "NOT YET COMPLETE — kept open so downstream work units that `needs: [w1]` are not\nunblocked with unverified query mappings: nyctaxi and tsbs still need independent\nmapping verification, and clickbench's SQL id set / construction is unconfirmed.\nFlip to done only once those three are verified.\n\nFor each benchmark with both surfaces, confirm the SQL and DataFrame query\nsets cover the same logical queries (matching ids/keys) and can run on a\nshared DuckDB cell. Record which are in scope, which are single-surface\n(out of scope here - owned by benchmark-correctness-oracle-coverage-map),\nand any that need per-benchmark normalization (top-N/LIMIT, column order).\n\nIN PROGRESS. Surface scan (dataframe_queries module OR package) confirms a\nDataFrame surface for: amplab, clickbench, coffeeshop, datavault,\nflightdata, joinorder, joinorder_synthetic, nyctaxi, read_primitives, ssb,\ntpcds, tpcds_obt, tpch, tpch_skew, tsbs_devops, h2odb (+ tpchavoc). The\nungated, no-expected-results dual-surface targets per the TODO are: ssb,\nclickbench, joinorder, coffeeshop, amplab, nyctaxi, flightdata, tsbs_devops,\ntpcds_obt, tpch_skew, read_primitives.\n\nConfirmed and gated: ssb - SQL get_queries() and the SSB_DATAFRAME_QUERIES\nregistry both key by identical ids Q1.1..Q4.3 (13 queries, 1:1). Per-\nbenchmark normalization finding: schema shape is heterogeneous - TPC-H/\ntpchavoc expose typed Table/Column objects, but ssb/amplab/coffeeshop/etc.\nexpose dict-shaped TABLES. The shared harness now offers\nbuild_dataframe_contexts_from_specs((name, [(col, sql_type)])) so both\nshapes reuse one DuckDB->Arrow->register loop.\n\nVERIFIED id-correspondence + feasibility map for the ungated targets\n(probed SQL get_queries() vs each DataFrame registry's get_query_ids()):\n  - ssb            13 ids, 1:1 (Q1.1..Q4.3)              GATED (#815).\n  - coffeeshop     11 ids, 1:1                           ready; but DuckDB\n      ->Arrow date32 contexts break its pandas impls (date-vs-string\n      compare) -> needs the data-path decision below before gating.\n  - flightdata     20 ids, 1:1 (friendly names)          ready; NOTE no\n      synthetic generator module (uses real downloaded data) - confirm a\n      bounded data source before gating.\n  - read_primitives 157 SQL vs 152 DF                    gate the 152-id\n      intersection (5 SQL-only ids have no DF impl).\n  - amplab          8 ids, count matches; DF ids are Q-prefixed ('1'->'Q1')\n      -> mechanical id normalization in the spec.\n  - tpch_skew      22 ids, same; DF Q-prefixed ('1'->'Q1') -> same.\n  - nyctaxi        25 ids; SQL friendly-names vs DF 'Q1'..'Q25'  -> AMBIGUOUS\n      ordering map; needs independent verification of which SQL id == which\n      Qn before asserting (do NOT guess).\n  - tsbs_devops    18 ids; same friendly-name vs 'Qn' ambiguity as nyctaxi.\n  - joinorder      113 ids, 1:1 string keys BUT scale_factor=1.0-only\n      (canonical IMDb) -> does NOT fit the SF=0.1 bounded cell; use SF=1 or\n      joinorder_synthetic, a separate decision.\n  - clickbench     43 DF ids; benchmark construction differs (abstract base)\n      -> confirm SQL id set + construction before gating.\n  - tpcds_obt      (per source TODO) DF is a 3-query stub vs ~89 SQL - gate\n      only the implemented intersection or defer.\n",
+        "started_at": "2026-07-29T11:49:19Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Inventory dual-surface benchmarks and confirm SQL<->DataFrame query-id correspondence",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Superseded: w3 (burn down divergences), which needs w2, is already done, and every enumerated divergence was closed by w8 (tie-aware comparator, ClickBench) and w9 (schema column types, joinorder_synthetic). Report mode is retained as the make *-cross-surface-equivalence-report targets. Verified on origin/develop 2026-07-29.",
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "notes": "Prioritize benchmarks with NO expected-results oracle: ssb, clickbench,\njoinorder, coffeeshop, amplab, nyctaxi, flightdata, tsbs_devops, tpcds_obt,\ntpch_skew, read_primitives. Report (benchmark, query, kind, deltas) without\nasserting. Capture stdout to /tmp and summarize counts in the PR/TODO.\n\nIN PROGRESS. ssb reported clean on the INTERIM DuckDB->Arrow substrate (#815):\n26 query-backend cells (13 queries x 2 backends) at SF=0.1, 0 divergent. This\nre-runs on the production-loader substrate (w5-w7); ssb is expected to stay\nclean but is re-confirmed there. Remaining ungated benchmarks are reported on\nthe production substrate as each gate is built (now needs w5/w6/w7).\n\namplab reported on the production substrate (SF=0.1, 16 query-backend cells =\n8 queries x 2 backends): 10/16 cells divergent on the FIRST report - exactly\nthe date-vs-string defect class w6 predicted (the 5 queries touching the\ndate32-typed uservisits.visitDate: Q2/Q2a/Q3/Q4/Q5, both backends), each\nraising \"cannot compare date to a string value\" under the production loader's\ndtypes. Burned down in w3 (see below); amplab now reports 0/16 divergent.\n\nAPPLICABILITY SWEEP: a reproducible sweep\n(_project/scripts/cross_surface_applicability_sweep.py ->\n_project/analysis/cross-surface-applicability.md, locked by\ntests/unit/test_cross_surface_applicability.py) classifies the dual-surface\nUNGUARDED benchmarks by whether they ship a DataFrame query `QueryRegistry`\n(the registry the cross-surface gate builders consume directly) - the\nauthoritative gate-applicability signal. `supports_dataframe` over-counts\n(it is a LOADING flag); the production query *resolver* under-counts (it\nmisses per-benchmark `<BENCH>_DATAFRAME_QUERIES` registries - e.g. it\nreturned 0 for coffeeshop, which #842 nonetheless gated). Registry detection\nfixes both.\n\nRESULT (16 unguarded candidates; coffeeshop already gated/excluded):\n  - GATEABLE, ids overlap as-is (6): clickbench, flightdata, h2odb,\n    joinorder, joinorder_synthetic, read_primitives (152/157 ids).\n  - GATEABLE, needs id normalization first (6): amplab, datavault, nyctaxi,\n    tpch_skew, tsbs_devops (ids Q-prefixed/friendly vs SQL ids), tpcds_obt\n    (only 3 DF queries vs 89 SQL - partial).\n  - w2 FALLBACK, NO DataFrame query registry (4): metadata_primitives,\n    tpcdi, transaction_primitives, write_primitives. Only these four need a\n    differential second-engine or curated expected-results oracle.\nSo the cross-surface gate burn-down is ~12 benchmarks, not 2 (the earlier\nresolver-based \"only 2\" was wrong).\n\nCAVEAT proven during the sweep: a GENERIC build is not load-faithful (it\nloads DataFrame contexts without the schema/headers the production loader\napplies, yielding spurious \"column not found\" divergences), so enumerating\nREAL divergence counts requires a load-faithful per-benchmark builder like\nbuild_ssb_duckdb. That builder work is w3 (clickbench done; the other 11\ngateable benchmarks next, normalizing ids where the sweep flags it).\n",
+        "started_at": "2026-07-29T11:49:22Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run the cross-surface gate in report mode over the ungated dual-surface benchmarks and enumerate divergences",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "notes": "DONE. Burn-down complete for every wired/staged gate: ssb (0), amplab (10\ndate-vs-string impl bugs fixed in the DataFrame surface), coffeeshop (0),\njoinorder_synthetic (loader dtype/null fixes, w9 -> 26/26), clickbench (the\nremaining cells were the tie-ambiguous top-N class, not logic bugs - resolved\nby the w8 tie-aware comparator, with Q18's order-less LIMIT classified as a\njustified known-divergence). No real divergence was masked into a baseline;\nthe only baseline entry is ClickBench Q18 (genuinely order-less LIMIT). The\nlast in_progress reason was the ClickBench tie cells, which w8 cleared - so\nw3 closes with w8. Original plan below.\n\nFor each divergence, determine which surface is wrong and fix it; verify the\nfix makes the two surfaces agree. Where a difference is intentional and\ndefensible (e.g. a surface deliberately omits a presentational LIMIT),\nrecord it as a classified, justified known-divergence entry, mirroring the\nTPC-Havoc baseline discipline (default: empty baseline, every query matches).\n\nIN PROGRESS. ssb: no burndown required (0 divergences); baseline empty.\n\namplab: 10 divergences, all the projection-faithfulness/dtype class (NOT a\nloader bug). Root cause: the amplab DataFrame impls compared the date-typed\nvisitDate column to ISO-STRING literals (\"2000-01-01\"), which raises under\nthe production loader's date32 dtype - i.e. the production amplab DataFrame\nrun was itself broken for Q2/Q2a/Q3/Q4/Q5. Fixed the WRONG surface (the\nDataFrame impls), mirroring the TPC-H DataFrame queries whose date params are\ntyped datetime.date objects: AMPLAB_DEFAULT_PARAMS (and the impl fallbacks)\nnow carry date(2000,1,1)/date(2000,1,3) instead of strings, so the\ncomparison succeeds on both backends. No gate-local cast, no loader change,\nno baseline entry. Verified against CANONICAL SQL (the gate), not a sibling\nDataFrame impl: 0/16 divergent, with Q2 (70 rows), Q2a (6), Q4 (100)\nmeaningfully exercising the date filter+join (non-vacuous). baseline empty.\n\nclickbench: load-faithful gate WIRED (build_clickbench_duckdb), STAGED_GATES\n(NOT GATES), runnable via `make clickbench-cross-surface-equivalence-report`.\n\nBURN-DOWN PROGRESS (full detail:\n_project/analysis/clickbench-cross-surface-divergences.md):\n  - DETERMINISM FIX (prerequisite): the ClickBench generator was UNSEEDED, so\n    every run produced different data and top-N/tie-sensitive cells flipped\n    divergence run-to-run (the gate was flaky). Added random.seed(42) in\n    _generate_data_local (mirrors SSBDataGenerator); the gate is now\n    deterministic (verified: two runs report the identical divergence set).\n  - ALL 10 engine/error-category cells FIXED: added UnifiedStrExpr.replace\n    (Q29) and UnifiedLazyFrame.slice (Q39-42) to the shared abstraction;\n    compared EventDate to native date literals not strings (Q37-43); pandas\n    `<> ''` filters now exclude NULL via .notna() to match SQL/Polars\n    (Q25/27). 1129 dataframe/clickbench unit tests still pass.\n  - REMAINING: 27 stable value-divergence cells across 14 queries. TRIAGE\n    (verified by direct SQL-vs-DataFrame set/count comparison): these are\n    mostly NOT logic bugs. The DataFrame computes CORRECT aggregates; the\n    divergences are the gate's order-sensitive row-by-row comparison of\n    tie-ambiguous top-N (`ORDER BY col ... LIMIT N` with ties spanning the\n    cutoff). E.g. Q32/Q33 top-10 are all count=1 (thousands of count-1\n    groups, LIMIT keeps an arbitrary 10); Q16 count distribution is IDENTICAL\n    on both surfaces (only tied rows reorder). So the fix is GATE-LEVEL\n    (deterministic total-order tie-breaker on both surfaces, OR a tie-aware\n    validator, OR classify tie-ambiguous queries), NOT per-query ClickBench\n    fixes. Exception: Q17/Q24 empty-string-vs-None is the deferred loader\n    null/dtype materialization issue (see joinorder_synthetic). Detail:\n    _project/analysis/clickbench-cross-surface-divergences.md.\nSo ClickBench has ~no genuine DataFrame logic bugs; promote STAGED_GATES->GATES\nonce the gate handles tie-ambiguity + the loader dtype fix lands (w4).\njoinorder_synthetic and the other registry-bearing benchmarks (per the\ncorrected applicability sweep) are the next gates to wire.\n\nGENERATOR SEEDING AUDIT (_project/analysis/gateable-generator-seeding-audit.md):\nan unseeded generator makes any cross-surface gate flaky (as ClickBench was).\nAudited every gateable benchmark's generator. Most are seeded (ssb, amplab,\nh2odb, tpch_skew, tsbs_devops, clickbench) or RNG-free (coffeeshop static\nseed-data, read_primitives). FIX: joinorder_synthetic used unseeded random\nand is the next gate to wire - added random.seed(42) in its\n_generate_data_local; verified its data tables are now byte-identical across\nruns (the only residual file-byte diff is the manifest timestamp, which the\ngate does not read). The five external/derived-data benchmarks (datavault,\nflightdata, joinorder, nyctaxi, tpcds_obt) have no synthetic RNG; confirm\ntheir bounded data source is stable when wiring each.\n\njoinorder_synthetic: gate WIRED (build_joinorder_synthetic_duckdb, STAGED_GATES,\n`make joinorder-synthetic-cross-surface-equivalence-report`; 13 queries x 2\nbackends). Wiring surfaced a SHARED DataFrame-loader bug: the production loader\napplies column names from get_benchmark_schema_columns, but that extractor did\nnot understand joinorder_synthetic's schema shape (columns are raw DDL strings\nlike \"id INTEGER PRIMARY KEY\") -> returned no columns -> every table loaded\nHEADERLESS, all 26 cells errored. Fixed schema_utils.py (column_name/\ncolumn_sql_type) to parse DDL-string columns - a general fix benefiting any\nstring-schema benchmark - dropping divergences 26 -> 10 (16 cells now pass;\n791 dataframe/equivalence unit tests still pass). REMAINING 10 cells are\ndtype-mismatch errors (loader applies column names but type-INFERS dtypes\ninstead of applying schema types: \"expected String type\" on 1a/1b/5a/8a/9a/10a;\n\"string vs numeric\" on 4a/12a). Follow-up: apply schema column TYPES when\nloading the DataFrame surface (types now available from column_sql_type). Detail:\n_project/analysis/joinorder-synthetic-cross-surface-divergences.md.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Burn down divergences (fix the wrong surface) or declare intentional ones",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "notes": "DONE for the two STAGED gates (the prerequisite-driven promotion w8/w9\nunblocked). clickbench and joinorder_synthetic moved STAGED_GATES -> GATES in\ncross_surface.py; both wired as BLOCKING steps in the pr.yml correctness-gate\njob (make clickbench-cross-surface-equivalence-report,\nmake joinorder-synthetic-cross-surface-equivalence-report) beside ssb/amplab/\ncoffeeshop; medium-marker fast-lane regressions added\n(tests/integration/test_{clickbench,joinorder_synthetic}_cross_surface_equivalence.py)\nmirroring test_ssb_cross_surface_equivalence.py; unit test updated\n(test_clickbench_and_joinorder_are_enforced_gates). Proved each FAILS on a\nplanted divergence (clickbench Q1 count+1000 -> Q1_expression+Q1_pandas;\njoinorder 1a value+99999 -> 1a_expression+1a_pandas; no collateral).\nclickbench's only baseline entry is the order-less Q18; joinorder_synthetic is\nclean. Regenerated the oracle coverage map (make oracle-coverage-map) - both\nnow show cross-surface \"guarded\" (15 UNGUARDED, was 17 dual-surface) - and\ncommitted it; updated the coverage-map TODO w1 dispatch note. STAGED_GATES is\nnow empty. ssb/amplab/coffeeshop and TPC-Havoc gates re-verified green.\n\nFOLLOW-ON (separate focused gate PRs, tracked by\nbenchmark-correctness-oracle-coverage-map w1, NOT a blocker for this item):\nwire the remaining gateable dual-surface benchmarks one PR each - datavault,\nflightdata, nyctaxi, read_primitives (152-id intersection), tpcds_obt\n(partial), tpch_skew, tsbs_devops (several need id normalization or a bounded\ndata-source check first), and joinorder (SF=1-only; covered by\njoinorder_synthetic). Each follows the same recipe: build_<bench>_duckdb,\nregister in GATES, add a pr.yml step + a fast-lane test, prove a planted\ndivergence fails, regenerate the coverage map.\n\nDONE so far (follow-on gate PRs): h2odb (2026-06-24) - enforced GATE,\nbuild_h2odb_duckdb on a bounded SF=0.01 ~100k-row cell (its generator base is\nthe 10M-row small tier, so the shared SF=0.1 would emit ~1M rows; every query\nstays discriminating at 100k). SQL/DataFrame ids correspond 1:1 (Q1..Q10).\nWiring caught a REAL DataFrame bug: the Polars Q9 percentile defaulted to\n\"nearest\" interpolation, disagreeing with both pandas (linear) and SQL\nPERCENTILE_CONT - fixed the WRONG surface by passing interpolation=\"linear\"\n(added an additive `interpolation` arg to UnifiedExpr.quantile, default\n\"nearest\" so other callers are unchanged). Q9's only residue is one classified\nknown-divergence per backend: DuckDB's PERCENTILE_CONT over the DECIMAL(8,2)\nfare_amount column returns the percentile at the column's 2-decimal scale\n(77.87) while the DataFrame computes the same linear percentile over float64\n(77.874) - verified presentational (casting the SQL arg to DOUBLE yields the\nDataFrame value), not a logic bug. Evidence: gate green + deterministic across\n3 runs (18/20 cells strictly compared, 2 classified); planted Q4 corruption\nflags only Q4_expression (no collateral); coverage map shows h2odb guarded\n(UNGUARDED 15 -> 14). The applicability sweep's gateable example was retargeted\nh2odb -> flightdata (h2odb left the unguarded-candidate set).\n\nOriginal plan: one bounded small-SF DuckDB cell per gated benchmark, wired into\nthe correctness-gate CI job and a Make target, mirroring\ntpchavoc-(dataframe-)equivalence-report. Add a medium-marker pytest per\nbenchmark like tests/integration/test_tpchavoc_variant_equivalence.py.\nProve each gate fails when a deliberate divergence is introduced into one\nsurface.\n\nIN PROGRESS. Generic cross-surface gate landed at\nbenchbox/core/equivalence/cross_surface.py (find_cross_surface_divergences,\nCrossSurfaceGate, GATES registry) reusing the shared harness +\nResultValidator; the DataFrame side executes through the real\nDataFrameQuery.get_impl_for_family dispatch. First gated benchmark: ssb -\n`make ssb-cross-surface-equivalence-report` (added to the correctness-gate\nCI job in pr.yml), fast-lane tests/integration/test_ssb_cross_surface_equivalence.py\n(medium marker), and unit coverage tests/unit/core/equivalence/test_cross_surface.py.\nVerified the gate FAILS on a planted SSB defect (only Q1.1_expression\ndiverges, no collateral).\n\nSecond gated benchmark: amplab - `make amplab-cross-surface-equivalence-report`\n(added to the correctness-gate CI job in pr.yml beside ssb), fast-lane\ntests/integration/test_amplab_cross_surface_equivalence.py (medium marker).\nRegistered build_amplab_duckdb in the GATES registry (maps SQL ids \"1\"..\"5\"\nto DataFrame ids \"Q1\"..\"Q5\"). Verified the gate FAILS on a planted amplab\ndefect (Q4 expression total_revenue doubled -> only 4_expression diverges, no\ncollateral). Remaining ungated benchmarks: clickbench, joinorder, coffeeshop,\nnyctaxi, flightdata, tsbs_devops, tpcds_obt, tpch_skew, read_primitives - one\nfocused gate PR each.\n\nBLOCKED-ON for the two STAGED gates: clickbench and joinorder_synthetic are\nWIRED in STAGED_GATES (report mode) but cannot promote to GATES until the two\ncross-cutting prerequisite fixes land - w8 (tie-aware top-N comparator, clears\nClickBench's 27 tie-ambiguous cells) and w9 (loader dtype-from-schema, clears\njoinorder_synthetic's 10 cells + ClickBench Q17/Q24). Hence w4 now needs\n[w3, w8, w9]. ssb/amplab/coffeeshop were already promoted under this item and\nare unaffected by w8/w9.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Promote to bounded CI gates and add fast-lane regressions",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "notes": "DONE. Added build_production_contexts() in core/equivalence/cross_surface.py:\nper backend it instantiates the real adapter and calls the new public\nBenchmarkExecutionMixin.load_benchmark_into_context() - the exact data path\nrun_benchmark uses (_extract_benchmark_config + _load_data_phase, prefer_parquet\ndefault), stopping short of query execution. CrossSurfaceData now carries the\nbenchmark instance + data_dir (not table_specs); the DuckDB SQL reference and\nboth DataFrame backends read the SAME generated files. The comparator and the\nDuckDB SQL-reference builder are unchanged. (No new fork of the loader: the\ngate calls the production mixin.) Original plan below.\n\nReplace the gate's bespoke DuckDB->Arrow context-build\n(build_dataframe_contexts_from_specs) with one that loads each backend's\nDataFrame context via the REAL production loader, so the gate exercises the\nsame data path (and dtypes) a production DataFrame run uses - honoring the\n\"use the real runner/mixin path, not a bespoke one\" anti-pattern for DATA\nLOADING as well as query execution.\n\nReuse, do not fork: the reference adapters' load path\n(benchbox/platforms/dataframe/{polars_df,pandas_df}.py load_table /\nload_tables_from_data_source / _load_tables_into_context) and\nbenchbox/core/dataframe/data_loader.py DataFrameDataLoader. Drive it with\nthe benchmark's schema_info (column names/types) and the correct\ndelimiter/trailing-delimiter/parquet handling that a bare\nload_tables_from_data_source call skips (this was the cause of the SSB\nmis-load). Generate data once; the SQL reference (DuckDB) and BOTH DataFrame\nbackends must read the SAME generated data so \"same bounded cell\" still holds.\nKeep the comparator and the DuckDB SQL-reference builder reused (unchanged).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build a production-faithful DataFrame-context substrate for the gate (reuse the real loader)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "notes": "DONE (#821). Made the Pandas loader's date-column inference TYPE-AWARE:\n_pandas_parse_date_columns now takes the schema column types and never\ntreats a numeric-typed column as a date even if its name ends in date/time,\nso SSB's INTEGER lo_orderdate/lo_commitdate load as integers (real string\ndates like d_date VARCHAR still parse). Behavior is unchanged when types are\nabsent. Threaded benchmark -> load_table -> _load_csv_files -> read_csv ->\n_pandas_parse_date_columns; abstract load_table signature made honest. SSB\nnow loads via the production loader (gate 26/26). Routing coffeeshop through\nthe real loader surfaced GENUINE divergences (date32-vs-string impl bugs,\nvalue mismatches, a KeyError) - logged for w2/w3 burndown, NOT masked.\nOriginal plan + diagnosis below.\n\nDriving the real loader over real benchmark data exposes loader defects the\ngate must not paper over. Known, reproduced:\n  * Pandas adapter date heuristic: _pandas_parse_date_columns\n    (benchbox/platforms/dataframe/pandas_df.py:62) infers date columns by\n    NAME suffix only (\"*date\"/\"*_date\") with no type check, then\n    _coerce_date_columns casts them to date32. SSB's lo_orderdate /\n    lo_commitdate are INTEGER YYYYMMDD datekeys, so the loader tries to\n    date-parse integers and raises (\"month must be in 1..12\"). Fix: gate\n    date-coercion on the column's SCHEMA TYPE (thread schema_info types\n    through), never the name alone, so integer datekeys load as integers.\nFor each benchmark, confirm its impls run under the loader's production\ndtypes; where an impl genuinely fails under the dtype its production run\nuses (e.g. coffeeshop pandas impls compare a date column to a STRING\nliteral), that is a REAL divergence/bug to report and burn down in w3 - do\nNOT add a gate-local cast to mask it. Only fix loader code where the LOADER\nis wrong (e.g. the type-blind date heuristic), not to accommodate a wrong impl.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix production-loader correctness bugs surfaced by real benchmarks (now in-scope: benchbox/platforms/dataframe/)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "notes": "DONE. The SSB gate + its fast-lane test now build DataFrame contexts via\nbuild_production_contexts (w5); re-verified 26/26, 0 divergent at SF=0.1 and\nre-proved the planted-defect failure (corrupting Q1.1's expression impl\nflags exactly Q1.1_expression, no collateral) on the new substrate. The\ntpchavoc DataFrame gate is LEFT on its DuckDB->Arrow path (it is a\nvariant-vs-canonical gate, not cross-surface) and re-confirmed green. The\nDuckDB->Arrow builder (build_dataframe_contexts_from_specs) remains in\ndataframe_surface for tpchavoc; only the cross-surface gate moved. Original\nplan below.\n\nSwitch the merged SSB gate (#815) from DuckDB->Arrow to the w5 substrate and\nre-verify it stays green (26/26) under production dtypes; this is the\nreference example every later benchmark follows. Re-confirm the TPC-Havoc\nSQL + DataFrame gates are unchanged (the tpchavoc DataFrame gate may keep its\nown DuckDB->Arrow path - decide whether to migrate it too or leave it, since\nit is a variant-vs-canonical gate, not cross-surface). Update the fast-lane\ntests accordingly. Re-prove the planted-defect failure on the new substrate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-base the SSB gate (and the shared harness) onto the production-loader substrate; re-verify",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "notes": "DONE. Made ResultValidator.validate_results_exact opt-in tie_aware (additive,\ndefault False so the TPC-Havoc gates are byte-unchanged). Chose option (b) (a\ntie-aware comparator) over (a) (the ClickBench SQL queries are also the perf\nqueries, so adding tie-breaker ORDER BY columns would pollute the benchmark)\nand over weakening to set-equality.\n\nMECHANISM: the relaxation engages ONLY after the strict sorted-positional\ncomparison fails, and accepts a divergence iff it is exactly an ambiguous\ntop-N boundary tie - deterministically, independent of run-to-run tie\nreordering:\n  - the differing rows are the multiset difference each way (the swapped tie\n    members); the rest are byte-identical (the deterministic remainder);\n  - there must be an order-key column c that is monotonic across the\n    reference result (the ORDER BY key is; a grouped non-key column is not),\n    whose value on EVERY swapped row equals the reference's boundary value\n    original[-1][c] (stable even when tied rows reorder), the boundary value\n    occurs >=2 times (a genuine tie, not a unique last row), and is an\n    extreme (min/max) of the column.\nSo a real value-misplacement bug outside the tie (wrong order-key value,\nwrong non-key value on a determined row, wrong row count, unique-last-row\nchange) puts a non-boundary value into the swap and still FAILS. The\ncross-surface gate passes tie_aware=True; TPC-Havoc keeps the default.\n\nAn EARLIER attempt inferred the key by splitting on all monotonic columns\njointly; DuckDB's non-deterministic tie order made a non-key column\n(SearchPhrase) coincidentally monotonic in ~1/3 of runs, so the gate was\nflaky. The multiset-difference + boundary-value formulation is order-stable\n(the count column always qualifies); verified 5 consecutive clean runs.\n\nQ18 (`... GROUP BY ... LIMIT 10` with NO ORDER BY over ~97k groups) is the\none genuinely order-less query - any 10 rows are valid and the two surfaces\npick different subsets (both verified subsets of the full grouped result).\nIt is the last-resort option (c): classified in clickbench's\nknown_divergences with justification, NOT masked (the tie-aware comparator\nhandles every ORDER BY ... LIMIT case; only this order-less LIMIT needs a\nbaseline entry).\n\nEVIDENCE: make clickbench-cross-surface-equivalence-report 27 -> 0\nunclassified (Q18's 1-2 classified cells aside), stable across 5 runs; ssb\n26/26, amplab 16/16, coffeeshop 22/22, joinorder_synthetic 26/26 all 0\ndivergent on the tie_aware path; TPC-Havoc SQL 220/220 and DataFrame 440/440\nunchanged (default strict path); a planted REAL ClickBench defect (Q1 count\n+1000) still flags Q1_expression+Q1_pandas; 80 tpchavoc+equivalence unit\ntests pass (6 new tie_aware cases lock accept/reject behavior). Files:\nbenchbox/core/tpchavoc/validation.py, benchbox/core/equivalence/cross_surface.py.\nOriginal triage below.\n\nPREREQUISITE for promoting ClickBench STAGED_GATES->GATES (w4). Surfaced and\ntriaged during w3 ClickBench burn-down (PR #848; detail in\n_project/analysis/clickbench-cross-surface-divergences.md).\n\nROOT CAUSE (verified by direct SQL-vs-DataFrame set/count comparison): the 27\nremaining ClickBench divergences are NOT logic bugs. The DataFrame computes\nCORRECT aggregates; the gate's comparator (ResultValidator.validate_results_exact\nin benchbox/core/tpchavoc/validation.py) sorts both sides then compares\nrow-by-row, so for `ORDER BY <col> ... LIMIT N` queries whose ties span the\nLIMIT cutoff it reports a false divergence: SQL and the DataFrame each keep a\ndifferent (equally valid) subset of the tied rows. E.g. Q32/Q33 top-10 are all\ncount=1 (thousands of count-1 groups; LIMIT 10 keeps an arbitrary 10); Q16's\ncount distribution 4,4,4,4,4,4,3,3,3,3 is IDENTICAL on both surfaces, only the\ntied rows reorder/swap at the boundary.\n\nFIX (gate/validator-level, NOT 27 per-query ClickBench changes - pick one):\n  (a) append a deterministic total-order tie-breaker (remaining columns / a\n      stable key) to the ORDER BY on BOTH surfaces before comparison, or\n  (b) make the comparator tie-aware: compare the MULTISET of rows sharing the\n      boundary order-key value instead of position-by-position, or\n  (c) classify genuinely tie-ambiguous queries as accepted/justified\n      divergences (last resort - prefer a real total order).\nReuse, do not fork, ResultValidator; keep it able to catch genuine\nvalue-misplacement bugs (do not weaken to set-equality across all columns).\n\nVERIFY: after the fix, `make clickbench-cross-surface-equivalence-report` drops\nfrom 27 divergent cells to only the w9 loader-dtype residue (Q17/Q24), and a\nplanted real ClickBench defect still fails the gate (no masking).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make the cross-surface comparator tie-aware for top-N queries (clears ClickBench's 27 tie-ambiguous cells)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-cross-surface-equivalence-gate",
+        "notes": "DONE. Made the production DataFrame loader apply the schema's declared column\nTYPES (and DuckDB-matching empty-field semantics) instead of per-file\ninference. Three loader-layer fixes, all additive, no per-query changes:\n\n  1. SQL-type -> Arrow-type map was incomplete. The CSV->Parquet conversion\n     (the Polars/expression path, which reads read_parquet) only typed the\n     handful of names in SchemaMapper.PYARROW_TYPE_MAP (VARCHAR/CHAR/INTEGER/\n     DATE/...), so declared TEXT/STRING/BIGINT/NUMERIC/... columns fell\n     through to PyArrow inference - an all-NULL TEXT column (joinorder\n     movie_companies.note) inferred as Null, a numeric-looking TEXT column\n     (movie_info_idx.info ratings) as float64. Added\n     SchemaMapper.sql_type_to_pyarrow() covering every SQL type family\n     (TEXT/STRING/CHAR -> string, INT family -> int64, DECIMAL/FLOAT family\n     -> float64, DATE -> date32, TIMESTAMP/DATETIME -> timestamp[us]) and\n     routed _extract_arrow_types through it. Cleared the 6 Polars\n     \"expected String type\" cells (1a/1b/5a/8a/9a/10a) and the float64-vs-str\n     cells (4a/12a).\n  2. Pandas reads CSV, not Parquet (its recommended_data_format is CSV), so\n     the Parquet fix did not reach it. read_csv now (a) reads declared text\n     columns as object (so numeric-looking text is not inferred float64) and\n     (b) parses a declared DATE/TIMESTAMP column as temporal even when its\n     NAME does not match the date-suffix heuristic (ClickBench\n     ClientEventTime TIMESTAMP was read as a raw string vs DuckDB's datetime).\n     Date detection is now TYPE-aware (extends the w6 numeric-exclusion).\n  3. Empty-string vs NULL (ClickBench Q17/Q24): the DataFrame surface emitted\n     None where the SQL surface emits \"\". Root cause was the per-benchmark\n     CSV null_marker, NOT dtype: DuckDB resolves nullstr via\n     resolve_csv_dialect (ClickBench null_marker=None -> empty kept \"\";\n     JoinOrder null_marker=\"\" -> empty -> NULL), while the DataFrame path\n     always nulled empties (coincidentally matching JoinOrder, diverging from\n     ClickBench). Threaded the SAME resolved null_marker into both surfaces:\n     the Parquet conversion sets strings_can_be_null = (null_marker is not\n     None); pandas restores \"\" on declared string columns when null_marker is\n     None; pandas load_table now resolves null_marker via resolve_csv_dialect\n     (not the file-extension heuristic) so JoinOrder still nulls empties.\n     Bumped the DataFrame Parquet cache v3->v4 (conversion rules changed).\n\nEVIDENCE:\n  - make joinorder-synthetic-cross-surface-equivalence-report: 26/26, 0\n    divergent (was 16/26). Deterministic (seeded generator).\n  - make clickbench-cross-surface-equivalence-report: Q24 fully cleared (both\n    backends); Q17's empty-string/dtype residue cleared - Q17's remaining\n    divergence is the tie-ambiguous top-N (ORDER BY COUNT(*) DESC LIMIT 10,\n    different tied UserIDs per backend), which is w8's domain, not w9. Overall\n    clickbench 27 -> 22 divergent; the 22 are exactly the w8 tie-ambiguous set.\n  - Enforced gates unaffected: ssb 26/26, amplab 16/16, coffeeshop 22/22, all\n    0 divergent (their null_marker is \"\" or .tbl, or None with no compared\n    empties). tpchavoc SQL gate 220/220 and DataFrame gate 440/440, 0\n    divergent (the latter uses DuckDB->Arrow, unaffected).\n  - 1863 tests/unit/core/dataframe + core/equivalence + platforms/dataframe\n    pass. ruff clean; no new ty diagnostics. Real benchbox-run DataFrame load\n    path re-verified (data loads via the production loader unchanged; the\n    NOT_RUN CLI query-selection quirk pre-exists on develop).\nFiles: benchbox/core/dataframe/data_loader.py (sql_type_to_pyarrow,\n_get_null_markers, null_marker threading, cache v4),\nbenchbox/platforms/dataframe/pandas_df.py (string-col dtype, type-aware date\nparse, empty-string restore), benchbox/platforms/dataframe/pandas_family.py\n(resolve_csv_dialect for the benchmark-instance null_marker). Original plan\nbelow.\n\nPREREQUISITE for promoting joinorder_synthetic STAGED_GATES->GATES (w4) and for\nClickBench Q17/Q24 (empty-string-vs-None). DEFERRED by user decision\n(2026-06-21) to keep that session focused; it remains REQUIRED for w4 and is\ntracked here so it is not lost. Detail:\n_project/analysis/joinorder-synthetic-cross-surface-divergences.md and the\nQ17/Q24 exception in clickbench-cross-surface-divergences.md.\n\nROOT CAUSE: the production DataFrame loader applies column NAMES from the schema\n(get_benchmark_schema_columns, fixed in #846 to parse DDL-string columns) but\nthen TYPE-INFERS dtypes per file rather than applying the schema's declared\ncolumn TYPES. So columns whose content looks numeric, or is null-heavy, get the\nwrong dtype and the query's comparisons fail. joinorder_synthetic: 10 cells -\n\"expected String type\" (Polars) on 1a/1b/5a/8a/9a/10a; \"string vs numeric\" on\n4a/12a. ClickBench: SQL emits \"\" where the DataFrame emits None (Q17 col 1,\nQ24 col 14) - same null/dtype materialization issue. NOTE the divergence\nreproduces on the read_parquet path (the loader converts CSV->parquet via\nDataFrameDataLoader, then read_parquet), NOT read_csv - an earlier CSV-layer\nschema_overrides attempt was on the wrong layer and was reverted (#847); the\nfix must apply schema types on the parquet/materialization path the loader\nactually uses.\n\nFIX (loader-layer, not per-query): apply the schema column TYPES when loading\nthe DataFrame surface (types are available from\nbenchbox/core/dataframe/schema_utils.py column_sql_type), so a column declared\nVARCHAR/TEXT loads as string and INTEGER as int instead of relying on per-file\ndtype inference. Reuse the production loader/adapters (benchbox/platforms/\ndataframe/, benchbox/core/dataframe/data_loader.py); keep the change additive\nand re-verify the normal DataFrame benchmark run path (must_preserve).\n\nVERIFY: `make joinorder-synthetic-cross-surface-equivalence-report` reaches\n26/26 (from 16/26); ClickBench Q17/Q24 clear; dataframe/equivalence unit tests\nstay green.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply schema column TYPES (not just names) when loading the DataFrame surface (clears joinorder_synthetic's 10 dtype cells)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

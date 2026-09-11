@@ -1,0 +1,317 @@
+{
+  "context": "This is a textbook vertical-slice refactor (SHARED/slicing-framework.md).\nFor each slice:\n  1. Move a cohesive group of methods to the new module\n  2. Re-export from adapter.py: `from .connection import *` (with __all__)\n  3. Run uv run -- python -m pytest -m fast -q  → must pass\n  4. Run cross-platform validation suite        → must pass\n  5. Commit with prefix `refactor(platforms/base):`\n  6. Push, confirm CI green, then proceed to next slice\n\nZERO adapter implementation file may be modified beyond import lines (and\nonly if absolutely required, which it shouldn't be given re-exports).\n",
+  "description": "Quality plan Phase 3. benchbox/platforms/base/adapter.py is 5,158 lines -\nthe single largest non-generated file in the repo and the foundation\nunderlying all 73 adapter implementations. Its size makes review,\nnavigation, and safe modification difficult; bugs here have maximum\nblast radius.\n\nSplit by responsibility (NOT by size) into focused modules behind a\nre-export shim, so all 73 adapter implementations keep their imports\nunchanged. Vertical slices: extract one submodule per slice, run full\ncross-platform validation between slices, commit per slice.\n\nThe read-only mapping work lives in a separate prep TODO\n(quality-map-adapter-base-refactor-scope) so analysis can start early while\ncode-moving work remains blocked on the safety nets.\n\nProposed split:\n  base/adapter.py          (Protocol/ABC only - ~400 lines)\n  base/connection.py       (Connection lifecycle, retries - ~600 lines)\n  base/execution.py        (Query execution, timing wrap - ~800 lines)\n  base/data_loading.py     (Native + external table modes - ~900 lines)\n  base/result_capture.py   (Status, errors, plans - ~600 lines)\n  base/dialect_translation.py (sqlglot integration - ~700 lines)\n  base/tuning.py           (Tuning hook resolution - ~500 lines)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "collapse multiple slices into one commit",
+        "instead": "one commit per slice",
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "why": "review and rollback need slice-level granularity"
+      },
+      {
+        "dont": "extract while adapters or tests are in flight on other branches",
+        "instead": "coordinate timing",
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "why": "merge conflicts will be brutal"
+      },
+      {
+        "dont": "modify adapter implementation files",
+        "instead": "limit scope to base/",
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "why": "that's a different refactor"
+      },
+      {
+        "dont": "rename any public symbol",
+        "instead": "preserve names exactly even if they're imperfect",
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "why": "73 adapters depend on them"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "needs_item": "quality-add-cross-platform-result-validation"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "needs_item": "quality-make-timing-policy-ci-gate"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "needs_item": "quality-map-adapter-base-refactor-scope"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-13T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ALL 73 adapter implementations import from `benchbox.platforms.base.adapter` unchanged",
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules"
+      },
+      {
+        "behavior": "All existing platform-specific tests pass after every slice (≥21,000 tests)",
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules"
+      },
+      {
+        "behavior": "Cross-platform validation suite (from quality-add-cross-platform-result-validation) passes after every slice",
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules"
+      },
+      {
+        "behavior": "Public protocol surface of PlatformAdapter (every @abstractmethod, every public attribute) is byte-identical",
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules"
+      },
+      {
+        "behavior": "Timing semantics (mono_time vs wall-clock) preserved exactly per timing policy",
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "kind": "do_not_modify",
+        "path_glob": "(any other adapter implementation)"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/databricks/"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb/"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/redshift.py"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/snowflake/"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adapter-refactor-map.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Full fast test suite passes after every slice",
+        "expected": "all tests pass",
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/validation/test_cross_platform.py -v -m integration",
+        "description": "Cross-platform validation passes",
+        "expected": "PASS",
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "wc -l benchbox/platforms/base/adapter.py",
+        "description": "adapter.py final size ≤ 600 lines",
+        "expected": "≤ 600",
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'from benchbox.core.platform_registry import PlatformRegistry; print(len(PlatformRegistry.get_available_platforms()))'",
+        "description": "Platform registry still enumerates adapters after each slice",
+        "expected": "prints a positive platform count with no error",
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "needs_wid": "w5",
+        "wid": "w10"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SLICE 1 - Extract dialect_translation.py (dialect/translate_sql/get_tpc_base_dialect). Smallest cluster per refactor map §4. Re-export from adapter.py. Run full fast suite.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SLICE 3b - Extract connection_wrappers.py (DriverIsolationCapability, check_isolation_capability, PlatformAdapterConnection, _NoCloseProxy). Re-export from adapter.py.",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SLICE 2a - Extract sorted_ingestion.py (sorted-ingestion capability/resolve/metadata + CTAS-sort helpers + state).",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SLICE 2b - Extract tuning_config.py (effective config, validate_tuning_*, apply_unified_tuning, configure_for_benchmark).",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SLICE 2c - Consolidate per-table tuning hooks into tuning.py (apply_table_tunings, supports_tuning_type, generate_tuning_clause).",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SLICE 3a - Extract connection_lifecycle.py (test_connection, validate/require_dependencies, get_connection_from_pool, drop_database, handle_existing_database, check_database_exists*).",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SLICE 4 - Extract data_loading.py (create_schema, load_data, external tables, _create_enhanced_* phase helpers).",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SLICE 5 - Extract result_capture.py (plan capture, validate_loaded_data/row_counts, _collect_resource_utilization).",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SLICE 6 - Extract execution.py (execute_query, power/throughput/maintenance drivers; keep run_enhanced_benchmark on facade).",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-refactor-adapter-base-into-cohesive-modules",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Final cleanup - adapter.py contains only facade + re-exports. Verify ≤600 lines. Update docs/development/adapter-refactor-map.md.",
+        "wid": "w9"
+      }
+    ]
+  }
+}

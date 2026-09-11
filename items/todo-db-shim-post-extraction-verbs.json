@@ -1,0 +1,78 @@
+{
+  "context": "Teach the shim the full 0.3.0 surface (two-level injection points, RO/RW token mapping, drafts-dir mapping for finding sync), refuse-with-message for verbs it cannot safely route, and add compat tests per verb.",
+  "description": "todo_db_standalone_compat.py predates findings/update/doctor/init-project (written 2026-07-21). Two-level commands (finding X, audit verify) get --db/identity injected BETWEEN levels -> argparse usage error. Unknown verbs (finding sync/candidates, update, doctor) pass through unpinned: the standalone's default resolution then silently creates fork databases — a passthrough write can SUCCEED into a fresh empty DB at the archived .todo-db/todo.sqlite path (split-brain, writes lost). Also maps list/ready/stats to the standalone's READ_ONLY mode which demands TODO_DB_RO_AUTH_TOKEN absent from BenchBox environments. Zero shim test coverage for any new verb. Until fixed, BENCHBOX_TODO_DB_STANDALONE=1 must be considered unsafe.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-08T00:59:13Z",
+      "completed_pr": 1641,
+      "created_at": "2026-07-26T13:03:19Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Legacy default path (no BENCHBOX_TODO_DB_STANDALONE) byte-identical behavior",
+        "item_id": "todo-db-shim-post-extraction-verbs"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-db-shim-post-extraction-verbs",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "todo-db-shim-post-extraction-verbs",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_standalone_compat.py -q",
+        "description": "Compat suite",
+        "expected": null,
+        "item_id": "todo-db-shim-post-extraction-verbs",
+        "last_result": "pass",
+        "last_run": "2026-08-08T00:59:07Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "todo_db_standalone_compat.py: finding added to COMMANDS, identity inserted before top-level (BEFORE finding/audit) fixing two-level BETWEEN-levels injection; audit verify still routes via verify",
+        "item_id": "todo-db-shim-post-extraction-verbs",
+        "notes": null,
+        "started_at": "2026-07-26T13:09:55Z",
+        "started_branch": "fix/abfs-scheme-and-provider-strings",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Route finding/audit two-level commands with correct flag placement",
+        "wid": "w1"
+      },
+      {
+        "evidence": "todo_db_standalone_compat.py: standalone refuse fork DB, map RO/RW tokens + TODO_DB_FINDING_DRAFTS_DIR via env passthrough, legacy path byte-identical (compat 41 passed)",
+        "item_id": "todo-db-shim-post-extraction-verbs",
+        "notes": null,
+        "started_at": "2026-08-08T00:56:25Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Map RO/RW tokens + drafts dir; refuse unroutable verbs loudly; never create a DB the legacy tracker does not know",
+        "wid": "w2"
+      },
+      {
+        "evidence": "tests/unit/scripts/test_todo_db_standalone_compat.py: +8 tests covering every 0.3.0 verb (update/scope-update/freeze/finding/sweep-stale/migrate/doctor) + refusal for finding without DB (49 passed)",
+        "item_id": "todo-db-shim-post-extraction-verbs",
+        "notes": null,
+        "started_at": "2026-08-08T00:57:26Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Compat tests covering every 0.3.0 verb through the shim",
+        "wid": "w3"
+      }
+    ]
+  }
+}

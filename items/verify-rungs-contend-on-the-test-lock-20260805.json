@@ -1,0 +1,88 @@
+{
+  "context": "Distinguish 'the rung's command failed' from 'the rung could not be run'. A lock acquisition timeout is not evidence about the code. Consider serialising rungs behind the same lock the tests use, retrying once on lock contention, or recording a third outcome (blocked/indeterminate) that is visibly not a pass and visibly not a verdict. Separately, a lock whose owning pid is gone should be reclaimable rather than blocking.",
+  "description": "Running the verification ladder rung-by-rung records a FAIL for a rung whose command passes. Observed on published-results-prs-receive-zero-ci-20260805: rung 1 recorded pass at 2026-08-05T18:27:16Z, rung 2 recorded fail at 18:27:21Z - five seconds later. Rung 2's command is 'uv run -- python -m pytest tests/unit/workflows/test_stacked_pr_base_guard.py -q', which passes standing alone: four consecutive clean runs, 5 passed each time.\n\nMECHANISM: pytest here takes an exclusive ~/.benchbox/test.lock. Two rungs launched back to back overlap, the second cannot acquire the lock, and the runner records that as a rung failure rather than as 'could not run'. It also leaves the lock behind - after the failure the file read 'pid:13412 ... tests/unit/workflows/test_stacked_pr_base_guard.py -q' while 'ps -p 13412' showed no such process, so the next session inherits a stale lock and is blocked by a rung that already finished.\n\nWHY THIS MATTERS MORE THAN A FLAKE: the ladder is the evidence record. A rung that reports failure for an environmental reason is indistinguishable, in the tracker, from a rung that caught a real regression - so the discipline degrades exactly the way a vacuous pass does, one sign flipped. It also cannot be corrected after the fact: once the item is 'done' the CLI refuses both 'claim' and 'verify --run', so the false FAIL is permanent in the record. That item's rung 2 is recorded fail today for this reason and nothing else.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-09T18:29:22Z",
+      "completed_pr": 1663,
+      "created_at": "2026-08-05T18:29:17Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A rung whose command genuinely fails still records fail - the fix must not turn real failures into 'indeterminate'",
+        "item_id": "verify-rungs-contend-on-the-test-lock-20260805"
+      },
+      {
+        "behavior": "Concurrent sessions are still prevented from racing the same test resources",
+        "item_id": "verify-rungs-contend-on-the-test-lock-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "verify-rungs-contend-on-the-test-lock-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "verify-rungs-contend-on-the-test-lock-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "verify-rungs-contend-on-the-test-lock-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "verify-rungs-contend-on-the-test-lock-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit -q -k verify_rung_lock_contention",
+        "description": "A rung blocked by lock contention is not recorded as a failure",
+        "expected": "Fails on the unfixed tree, where the runner has no outcome other than pass or fail and a blocked rung is recorded as fail",
+        "item_id": "verify-rungs-contend-on-the-test-lock-20260805",
+        "last_result": "pass",
+        "last_run": "2026-08-09T18:25:19Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "verify-rungs-contend-on-the-test-lock-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "uv run -- python -m pytest tests/unit -q -k verify_rung_lock_contention was blocked by the existing ~/.benchbox/test.lock holder pid:28209 (pytest -k ruleset), confirming lock contention is surfaced before any test assertion; existing standalone runner state was inspected and not modified.",
+        "item_id": "verify-rungs-contend-on-the-test-lock-20260805",
+        "notes": null,
+        "started_at": "2026-08-09T18:09:18Z",
+        "started_branch": "fix/verify-rungs-lock-contention",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Reproduce the contention by running two rungs back to back and confirm the second fails on lock acquisition rather than on assertions",
+        "wid": "w0"
+      },
+      {
+        "evidence": "tests/unit/scripts/test_todo_db.py::TestVerifyRun::test_verify_run_lock_contention_is_indeterminate and ::test_verify_run_ignores_stale_lock_diagnostic pass; run_verification serializes through the shared test.lock, returns indeterminate without executing on timeout, preserves genuine pass/fail, and advisory lock acquisition ignores dead-owner diagnostic text.",
+        "item_id": "verify-rungs-contend-on-the-test-lock-20260805",
+        "notes": null,
+        "started_at": "2026-08-09T18:13:13Z",
+        "started_branch": "fix/verify-rungs-lock-contention",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Separate command-failed from could-not-run, and make a stale lock whose owner is dead reclaimable",
+        "wid": "w1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "context": "probe",
+  "description": "probe item for payload schema discovery; will be dropped immediately",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "do not do X",
+        "instead": "do Z instead",
+        "item_id": "zz-schema-probe-20260801",
+        "why": "because Y"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-08-01T12:19:37Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "p1",
+        "item_id": "zz-schema-probe-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "zz-schema-probe-20260801",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "zz-schema-probe-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "fast tests",
+        "expected": "all pass",
+        "item_id": "zz-schema-probe-20260801",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "zz-schema-probe-20260801",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "zz-schema-probe-20260801",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "first",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "zz-schema-probe-20260801",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "second",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "context": "Decide where permanence attaches - at commit, as documented, or at publication - and make the written contract match the minted value either way. An alias mechanism is only worth building if permanence attaches before the corpus stops moving.",
+  "description": "hosted-results-contract.md records public_result_id as permanent once minted, with format {benchmark}-{platform}-sf{scale_factor}-{date} and collisions resolved by the minting service appending -{n}. What is actually minted carries a content-hash suffix, so the documented format and the documented collision mechanism are both wrong, and every re-derivation of the corpus changes every id. #1537 rotates all 207. There is no alias or redirect mechanism, and no deployed Explorer, so the cost is zero today and non-zero after the first public deploy. This follows the field-set decision because that decision determines whether another rotation is coming.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "public-result-id-permanence-and-documented-format",
+        "needs_item": "published-pseudonym-oracle-and-field-set"
+      }
+    ],
+    "item_meta": {
+      "category": "contract",
+      "completed_at": "2026-08-05T23:43:42Z",
+      "completed_pr": 1605,
+      "created_at": "2026-08-04T23:43:15Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Ids stay content-addressed unless the ADR deliberately trades that away and says what replaces it",
+        "item_id": "public-result-id-permanence-and-documented-format"
+      },
+      {
+        "behavior": "Whatever is decided must hold before the Explorer's first public deploy",
+        "item_id": "public-result-id-permanence-and-documented-format"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "public-result-id-permanence-and-documented-format",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "public-result-id-permanence-and-documented-format",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/**"
+      },
+      {
+        "item_id": "public-result-id-permanence-and-documented-format",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/hosted-results-contract.md"
+      },
+      {
+        "item_id": "public-result-id-permanence-and-documented-format",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -q 'sha8' docs/reference/hosted-results-contract.md",
+        "description": "the documented format names the content-hash suffix that is actually minted",
+        "expected": "Fails on the unfixed tree today (measured exit 1)",
+        "item_id": "public-result-id-permanence-and-documented-format",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "ls docs/development/adr | grep -q 'result-id'",
+        "description": "the permanence decision is recorded as an ADR",
+        "expected": "Fails on the unfixed tree today (measured exit 1 - no such ADR)",
+        "item_id": "public-result-id-permanence-and-documented-format",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "public-result-id-permanence-and-documented-format",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "public-result-id-permanence-and-documented-format",
+        "needs_wid": "w0",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "ADR docs/development/adr/adr-public-result-id-permanence.md: permanence at publication; format with sha8; alias not needed pre-deploy",
+        "item_id": "public-result-id-permanence-and-documented-format",
+        "notes": null,
+        "started_at": "2026-08-05T23:26:38Z",
+        "started_branch": "docs/public-result-id-permanence",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Decide whether permanence attaches at commit or at publication and record it as an ADR",
+        "wid": "w0"
+      },
+      {
+        "evidence": "hosted-results-contract.md §1.1 format includes sha8 and fail-closed collision rules",
+        "item_id": "public-result-id-permanence-and-documented-format",
+        "notes": null,
+        "started_at": "2026-08-05T23:27:37Z",
+        "started_branch": "docs/public-result-id-permanence",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Correct the documented format and collision mechanism to match what is minted",
+        "wid": "w1"
+      },
+      {
+        "evidence": "ADR §3: no alias/redirect needed before first public deploy",
+        "item_id": "public-result-id-permanence-and-documented-format",
+        "notes": null,
+        "started_at": "2026-08-05T23:27:46Z",
+        "started_branch": "docs/public-result-id-permanence",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Decide whether an alias or redirect mechanism is needed before the first public deploy",
+        "wid": "w2"
+      }
+    ]
+  }
+}

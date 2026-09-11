@@ -1,0 +1,75 @@
+{
+  "description": "SCD2 audit findings #2/#3/#4. On re-check against current develop most of the\nscope was already resolved, leaving one real live fix:\n- docs/_build stale \"109 operations\" (finding #2): already untracked and\n  gitignored on develop (.gitignore:54; git ls-files docs/_build = 0) since the\n  audit was taken - no action needed.\n- em-dashes at draft:104 / docs:130 (finding #4): fixed by the sibling\n  portability PR (#1057), which rewrote those exact lines.\n- stale count comment at tests/integration/test_write_primitives_duckdb.py:513\n  (\"109 total - 20 MERGE\", finding #3): the one remaining live fix.\nDecision (w0): docs/_build -> untrack (already true on develop), so this TODO\nonly corrects the test comment; historical _project/DONE and _archive \"109\"\nreferences are left intact as accurate records of past state.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "scd2-doc-count-hygiene",
+        "id": 629,
+        "reason": "Genuine coverage gap for the #931 shipped skip path and the production no-reset cleanup path, but larger than this hygiene fix; deferred as its own follow-up.",
+        "resolution": "promoted",
+        "resolved_item": "add-duckdb-test-asserting-scd2-ops-success-legacy-merge-into",
+        "resolved_reason": null,
+        "summary": "Add DuckDB test asserting SCD2 ops SUCCESS + legacy MERGE INTO ops SKIPPED under platform_key='duckdb', plus a no-reset sequential dim-restored-to-seed test."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "scd2-doc-count-hygiene",
+        "needs_item": "scd2-portability-claim-accuracy"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-07-08T00:00:00Z",
+      "created_at": "2026-07-08T00:00:00Z",
+      "worktree": "write-primitives-scd2-followup"
+    },
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "scd2-doc-count-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decision gate: docs/_build untrack (Option B). Verified already untracked + gitignored on develop; CI rebuilds docs from source, so the committed copy was unused.",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-doc-count-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "No-op: docs/_build already untracked and in .gitignore on current develop; the stale committed HTML the audit saw is no longer tracked.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-doc-count-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Corrected tests/integration/test_write_primitives_duckdb.py:513 comment to 112 ops / 20 failing MERGE INTO, and clarified this path is un-gated (no platform_key) vs the shipped skip path.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "scd2-doc-count-hygiene",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Em-dashes at draft:104 / docs:130 fixed by portability PR #1057 (rewrote those lines); confirmed 0 dashes there after that change.",
+        "wid": "w3"
+      }
+    ]
+  }
+}

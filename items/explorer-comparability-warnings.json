@@ -1,0 +1,157 @@
+{
+  "context": "Comparability check runs client-side after both DetailResult objects are\nloaded. Returns a list of warnings; each warning renders as a dismissible\nbanner above the chart area.\n\nWarning text should explain the implication, not just state the fact.\n\"Execution mode differs: sql vs dataframe\" is insufficient - add\n\"results may not reflect platform SQL performance differences\".\n",
+  "description": "The strategy doc (§ Trust, Visibility, and Ranking) lists the dimensions\non which two results are comparability-breaking. Phase 1 enforces\nhard-blocks on benchmark and scale factor mismatch. Execution mode and\ntuning mode are also comparability-breaking - a SQL vs DataFrame\ncomparison or a tuned vs notuning comparison can look like a platform\nperformance difference when it is actually a configuration difference.\n\nPhase 1 couldn't enforce these because execution_mode and tuning_mode\nweren't in the manifest. Once explorer-extend-manifest-and-pipeline\nlands, the Compare view can inspect them and warn.\n\nThis TODO adds visible warnings (not hard-blocks) when:\n  - The two results differ on execution_mode (SQL vs DataFrame)\n  - The two results differ on tuning_mode (tuned vs notuning)\n  - The two results use different query subsets (full vs partial)\n\nWarnings are prominent (banner at top of compare view) but not blocking -\nintentional cross-tuning comparisons are valuable.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "conflate warnings with trust labels",
+        "instead": "separate concerns, separate UI elements",
+        "item_id": "explorer-comparability-warnings",
+        "why": "comparability is about methodology, trust is about provenance"
+      },
+      {
+        "dont": "hard-block on execution_mode or tuning_mode mismatch",
+        "instead": "warn and allow",
+        "item_id": "explorer-comparability-warnings",
+        "why": "intentional cross-mode comparisons are valid analytical use cases"
+      },
+      {
+        "dont": "show warnings for equal values",
+        "instead": "only warn when the dimension actually differs",
+        "item_id": "explorer-comparability-warnings",
+        "why": "that would be noise"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-comparability-warnings",
+        "needs_item": "explorer-add-tuning-config-visibility"
+      },
+      {
+        "item_id": "explorer-comparability-warnings",
+        "needs_item": "explorer-extend-manifest-and-pipeline"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-14T00:00:00Z",
+      "created_at": "2026-04-14T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Compare view still renders when warnings are present",
+        "item_id": "explorer-comparability-warnings"
+      },
+      {
+        "behavior": "Cross-tuning and cross-mode comparisons are allowed (not blocked) - warning is advisory, not preventive",
+        "item_id": "explorer-comparability-warnings"
+      },
+      {
+        "behavior": "Existing hard-block on benchmark mismatch and scale-factor mismatch - these remain blocking",
+        "item_id": "explorer-comparability-warnings"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-comparability-warnings",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/ (no pipeline changes)"
+      },
+      {
+        "item_id": "explorer-comparability-warnings",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "explorer-comparability-warnings",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ComparabilityBanner.tsx (new)"
+      },
+      {
+        "item_id": "explorer-comparability-warnings",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'comparability\\|ComparabilityWarning\\|execution_mode.*warn\\|tuning_mode.*warn' results-explorer/src/pages/Compare.tsx",
+        "description": "Comparability check function present",
+        "expected": "check logic present",
+        "item_id": "explorer-comparability-warnings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'benchmark.*mismatch\\|scale_factor.*mismatch\\|hard.block\\|Cannot compare' results-explorer/src/pages/Compare.tsx",
+        "description": "Hard-blocks still enforced",
+        "expected": "hard-block logic still present",
+        "item_id": "explorer-comparability-warnings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "TypeScript compiles cleanly",
+        "expected": "(no errors)",
+        "item_id": "explorer-comparability-warnings",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-comparability-warnings",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-comparability-warnings",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-comparability-warnings",
+        "notes": "Dimensions to check:\n  - execution_mode: warn if \"sql\" vs \"dataframe\"\n  - tuning_mode: warn if \"tuned\" vs \"notuning\"\n  - query subset: warn if query_count differs and both are <full set\n  - test_type: warn if \"power\" vs \"throughput\"\n\nAll are severity=warning (yellow banner), not error (red block).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add comparability check function to Compare.tsx: given two DetailResult objects, return a list of ComparabilityWarning records {dimension, value_a, value_b, severity}.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-comparability-warnings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Render ComparabilityWarning banners above the compare chart: yellow background, icon + message per differing dimension. Dismissible.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-comparability-warnings",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend cohort validation in Compare.tsx: execution_mode + tuning_mode mismatches produce soft-warns; benchmark + scale mismatches remain hard-blocks.",
+        "wid": "w3"
+      }
+    ]
+  }
+}

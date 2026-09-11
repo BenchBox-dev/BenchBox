@@ -1,0 +1,250 @@
+{
+  "description": "The 2026-05-05 tuned UAT sweep marked 855 cells \"skipped unreachable\"\nbecause their target platforms were not provisioned on the local host.\nThis was not a defect in those platforms — they simply require a\nprocess or container the UAT host had not started.\n\nAffected platforms:\n\n  - Lakesail (local Sail / pysail server not provisioned)\n  - 15 TCP-backed SQL platforms: cedardb, clickhouse-server, databend,\n    doris, influxdb, pg-duckdb, pg-mooncake, postgresql, presto,\n    questdb, singlestore, starrocks, timescaledb, trino, velox\n\nReachable platforms in the same sweep were `duckdb`, `datafusion`,\n`lakesail` (incomplete), and `clickhouse-local`.\n\nSource: `_project/handoffs/results-explorer-uat-tuned-followup-20260505.md`\n(\"Coverage\" + \"Defect Classification → Environment/provisioning\").\nFollow-up to PR #235. Builds on the inventory landed by\n`_project/DONE/main/active/results-explorer-uat-defect-local-platform-provisioning.yaml`\n(closed 2026-05-03) — that TODO catalogued what needs to be running;\nthis one converts the catalogue into a runbook and per-platform\nbring-up target.\n\nToday an operator running a multi-platform sweep has to know which\nplatforms need a TCP server up, on which port, and how to start it.\nThat tribal knowledge means most sweeps cover only the embedded\nsubset; cross-platform comparison drifts toward the easy-to-provision\nedge of the matrix.\n\nThis TODO either documents the provisioning steps in a\nreproducible runbook, or — where realistic — automates them via the\nexisting Docker / pool tooling so `make uat-sweep` brings up the\nrequired platforms before enumeration.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "consolidate runbook steps into a script that hides the per-platform commands",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "why": "operators benefit from seeing the literal commands; the script is the convenience, not the truth."
+      },
+      {
+        "dont": "couple `make uat-sweep` to bringing up every platform implicitly",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "why": "bring-up is opt-in via `preflight.local_platforms_check` or explicit `make uat-bring-up`. Implicit bring-up makes 'why is my disk full' a UAT-framework debugging session."
+      },
+      {
+        "dont": "start automating a platform without a healthcheck",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "why": "a `docker compose up` that returns before the server is accepting connections produces flaky sweeps and is worse than 'document only'."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "needs_item": "results-explorer-uat-defect-local-platform-provisioning"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-06T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "BenchBox connector defaults — port and connection logic stays in the connectors, not the UAT framework.",
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation"
+      },
+      {
+        "behavior": "Current `skipped_unreachable` terminal state — the sweep does not become more aggressive about failing when a platform is missing unless `local_platforms_check` is opted in.",
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation"
+      },
+      {
+        "behavior": "Each platform's existing test suite (tests/integration/test_local_platform_benchmark_matrix.py).",
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/connectors/"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/local-platform-provisioning.tsv"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-local-provisioning.md"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "kind": "only_modify",
+        "path_glob": "scripts/uat-bring-up/"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/_cli.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/config.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/orchestrator.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/preflight.py"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_preflight.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "wc -l docs/operations/local-platform-provisioning.tsv",
+        "description": "Provisioning TSV is checked in and covers all 16 platforms",
+        "expected": ">= 17 (header + 16 platforms)",
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "for p in lakesail cedardb clickhouse-server databend doris influxdb pg-duckdb pg-mooncake postgresql presto questdb singlestore starrocks timescaledb trino velox; do grep -q \"$p\" docs/operations/uat-local-provisioning.md || echo MISSING $p; done",
+        "description": "Operator runbook exists and references each platform",
+        "expected": "(no MISSING lines)",
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make uat-bring-up PLATFORM=does-not-exist 2>&1 | tail -1",
+        "description": "`make uat-bring-up PLATFORM=<unknown>` fails with a clear error",
+        "expected": "non-zero exit; error mentions 'unknown platform'",
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_preflight.py -m fast -k local_platforms_check -q",
+        "description": "Optional preflight reachability check works against a known-down port",
+        "expected": "all green",
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "notes": "Evidence-durability gate per `_project/verification-logs/README.md`.\nThe \"855 cells skipped unreachable\" + 16-platform list is anchored\nto one sweep; pin the live numbers so the runbook in w5 cites a\nreproducible source:\n\n  LOGS=~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun\n  awk -F'\\t' 'NR==1 || $4==\"skipped-unreachable\" {print}' \\\n    \"$LOGS/coverage_cells.tsv\" | wc -l\n  awk -F'\\t' 'NR>1 {print $4}' \"$LOGS/coverage_cells.tsv\" | sort | uniq -c\n  cat \"$LOGS/coverage_platform_summary.tsv\"\n\nExpected (handoff anchor): 856 lines from the first command (header\n+ 855 skipped-unreachable cells), and a full status split matching\nthe handoff. Capture stdout under\n`_project/verification-logs/results-explorer-uat-defect-local-platform-bring-up-automation/w0.log`\nand commit. If a platform listed in the description is now reachable\n(because it was provisioned independently), drop it from the w1\ninventory before authoring the runbook.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture the current unreachable-platform set from the 2026-05-05 sweep coverage TSV",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "notes": "For each of the 16 platforms, capture:\n  - default port the BenchBox connector expects\n  - launch command (docker compose service name, native binary, etc.)\n  - whether `docker-compose.yml` already defines the service\n  - whether a healthcheck exists\nOutput: `docs/operations/local-platform-provisioning.tsv` keyed\nby platform with the columns above. Land as a checked-in artifact.\n\nCompleted with a 17-line TSV (header + 16 platforms) covering endpoint,\nprocess/container, compose file/service, healthcheck, decision,\nbring-up command, and notes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory each platform's current readiness contract: what process/container, what port, what env",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "notes": "Some platforms are heavy enough or licensed enough that automated\nbring-up isn't warranted (e.g., Singlestore, large vendor images).\nDecision per platform: `document` (runbook step only) vs.\n`automate` (a target that brings it up). Output: `decision`\ncolumn on the TSV from w1.\n\nAutomated: cedardb, clickhouse-server, databend, doris, influxdb,\npostgresql, presto, questdb, singlestore, starrocks, trino, velox.\nDocument-only: lakesail, pg-duckdb, pg-mooncake, timescaledb.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Distinguish 'document only' from 'automate' per platform",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "notes": "Generic Make target that dispatches per-platform:\n  make uat-bring-up PLATFORM=postgresql  # docker compose up + wait\n  make uat-bring-up PLATFORM=trino       # docker compose up + wait\nWraps the service launch + a TCP/health probe with a timeout.\nIdempotent: re-running on an already-up service is a no-op + OK.\nAdd a fast-marked unit test that asserts the dispatcher returns\na sensible error on an unknown platform.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "For 'automate' platforms, add a `make uat-bring-up PLATFORM=<name>` target that starts and healthchecks",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "notes": "When set, the preflight phase pings each platform in\n`platforms.include` and aborts the sweep with a clear error if any\nrequested platform is unreachable AND not in the `automate` set.\n`automate`-set platforms get a one-shot `make uat-bring-up`\nattempt before the abort. Default: `false` (preserves current\n\"skip unreachable\" behaviour).\n\nWired through `tests/uat/config.py`, orchestrator, and standalone\n`tests.uat._cli execute` so the field is reachable from YAML.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Optional `preflight.local_platforms_check: true` config field that runs reachability per requested platform",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-local-platform-bring-up-automation",
+        "notes": "Per-platform sections (16 entries) covering the document-only\nbring-up steps, ports, and any quirks (e.g., Doris JDK requirement,\nTrino catalog config, Lakesail `pysail` install). Cross-link to\nthe new `make uat-bring-up` for automate-set platforms. This is\nthe canonical reference; the platform-readiness TSV from w1 is\nthe index.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write the operator runbook in `docs/operations/uat-local-provisioning.md`",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,227 @@
+{
+  "context": "This is a CI-governance change, not application code. Add one step to\nvalidate-submission.yml (the published-results submission gate): compute the\nbase...HEAD diff filtered to results-data/bundles/vendor/, and if non-empty AND\ngithub.event.pull_request.author_association is not OWNER/MEMBER/COLLABORATOR,\nemit ::error:: and exit 1. author_association is set by GitHub from the actor's\nrelationship to the repo and is not controllable by PR content; fork PRs (how\ncommunity contributors submit) run the base-branch workflow copy, so the gate\ncannot be edited away in the same PR. Add a lightweight test asserting the step\nis present. The workflow reaches published-results via the existing mirror.\n",
+  "description": "The vendor-supplied trust label is RANKING-ELIGIBLE (D2) and is derived purely\nfrom a bundle living under the top-level `results-data/bundles/vendor/` subtree\n(generate_corpus_inventory.py::_is_vendor_subtree and\nexplorer_pipeline/pipeline.py::_is_vendor_subtree). The submission validator\nonly rejects a bundle that self-asserts result_source=vendor OUTSIDE that path;\nit does NOT stop a contributor who simply drops a file INTO vendor/. So the only\nreal control is a review gate on WHO may add under vendor/.\n\nBranch reframing (2026-07-07): community/vendor submissions PR to\n`published-results` (submit.py:82, contributing-results.md:79), validated by\n.github/workflows/validate-submission.yml. The develop-only\nSOUNDNESS_PREFIXES/auto-merge-on-open machinery does NOT govern that branch, so\nthe original \"add vendor/ to SOUNDNESS_PREFIXES + develop CODEOWNERS\" idea gates\nthe WRONG branch (it would only cover maintainer-added bundles on develop, the\nlow-risk actor). The gate belongs on published-results, on the submission-PR\npath itself.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "gate this on develop's SOUNDNESS_PREFIXES/auto-merge machinery",
+        "instead": "(not specified)",
+        "item_id": "vendor-label-codeowners-governance",
+        "why": "it does not run on published-results submission PRs."
+      },
+      {
+        "dont": "rely on the validator's result_source check as the enforced control",
+        "instead": "(not specified)",
+        "item_id": "vendor-label-codeowners-governance",
+        "why": "an attacker omits result_source and the path alone grants the label."
+      },
+      {
+        "dont": "trust a value the PR itself can set (a manifest field, a commit trailer) for the maintainer check",
+        "instead": "(not specified)",
+        "item_id": "vendor-label-codeowners-governance",
+        "why": "use author_association."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "vendor-label-codeowners-governance",
+        "needs_item": "submit-manifest-and-validator"
+      }
+    ],
+    "item_meta": {
+      "category": "Security",
+      "completed_at": "2026-08-10T00:22:34Z",
+      "completed_pr": 1078,
+      "created_at": "2026-07-07T00:00:00Z",
+      "worktree": "results-labels-funding"
+    },
+    "preserves": [
+      {
+        "behavior": "A community submission to results-data/bundles/ (non-vendor) is unaffected.",
+        "item_id": "vendor-label-codeowners-governance"
+      },
+      {
+        "behavior": "Legitimate maintainer vendor-bundle additions still pass (author_association in OWNER/MEMBER/COLLABORATOR).",
+        "item_id": "vendor-label-codeowners-governance"
+      },
+      {
+        "behavior": "The existing 'Reject validator or workflow changes' self-green defense is unchanged.",
+        "item_id": "vendor-label-codeowners-governance"
+      },
+      {
+        "behavior": "The submission-validator drift check between develop and published-results stays green.",
+        "item_id": "vendor-label-codeowners-governance"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/submission-validator-drift-check.yml + sync-results-data-to-published.yml — reference (how the workflow reaches published-results; the change must survive the drift check)",
+        "decision": "reuse",
+        "item_id": "vendor-label-codeowners-governance",
+        "path": ".github/workflows/submission-validator-drift-check.yml"
+      },
+      {
+        "concept": ".github/workflows/validate-submission.yml 'Reject validator or workflow changes' step — extend (add a sibling step that rejects non-maintainer additions under results-data/bundles/vendor/, using github.event.pull_request.author_association)",
+        "decision": "extend",
+        "item_id": "vendor-label-codeowners-governance",
+        "path": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "concept": "_project/DONE/main/planning/auto-merge-review-gate-admin-enforcement.yaml — reference (the require_code_owner_review admin action, RETIRED 2026-07-18 without being applied; a CODEOWNERS DiD on develop cannot go live unless that decision's revisit triggers fire)",
+        "decision": "reuse",
+        "item_id": "vendor-label-codeowners-governance",
+        "path": "_project/DONE/main/planning/auto-merge-review-gate-admin-enforcement.yaml"
+      },
+      {
+        "concept": "benchbox/validation/bundle.py::_validate_manifest_provenance — reference (the advisory result_source=vendor guard this workflow rule is the real teeth for)",
+        "decision": "reuse",
+        "item_id": "vendor-label-codeowners-governance",
+        "path": "benchbox/validation/bundle.py::_validate_manifest_provenance"
+      },
+      {
+        "concept": "scripts/generate_corpus_inventory.py::_is_vendor_subtree + _project/scripts/explorer_pipeline/pipeline.py::_is_vendor_subtree — reference (the path -> vendor-supplied label derivation being gated; keep the vendor/ prefix definition consistent)",
+        "decision": "reuse",
+        "item_id": "vendor-label-codeowners-governance",
+        "path": "scripts/generate_corpus_inventory.py::_is_vendor_subtree"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "vendor-label-codeowners-governance",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/auto_merge_soundness_paths.py (Option A rejected)"
+      },
+      {
+        "item_id": "vendor-label-codeowners-governance",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/validation/bundle.py (the advisory guard stays as-is)"
+      },
+      {
+        "item_id": "vendor-label-codeowners-governance",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/generate_corpus_inventory.py (label derivation is correct)"
+      },
+      {
+        "item_id": "vendor-label-codeowners-governance",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/validate-submission.yml"
+      },
+      {
+        "item_id": "vendor-label-codeowners-governance",
+        "kind": "only_modify",
+        "path_glob": "docs/contributing-results.md"
+      },
+      {
+        "item_id": "vendor-label-codeowners-governance",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/hosted-results-contract.md"
+      },
+      {
+        "item_id": "vendor-label-codeowners-governance",
+        "kind": "only_modify",
+        "path_glob": "tests/ (a test asserting the vendor-gate step exists)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import yaml; wf=yaml.safe_load(open('.github/workflows/validate-submission.yml')); assert any('vendor' in str(s).lower() for j in wf['jobs'].values() for s in j.get('steps',[]))\"",
+        "description": "Workflow YAML parses and the vendor-gate step is present",
+        "expected": "no assertion error",
+        "item_id": "vendor-label-codeowners-governance",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:17:31Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows/test_validate_submission_vendor_gate.py -q",
+        "description": "Regression test pins the vendor-gate step",
+        "expected": "passes",
+        "item_id": "vendor-label-codeowners-governance",
+        "last_result": "pass",
+        "last_run": "2026-08-10T00:22:06Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "vendor-label-codeowners-governance",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "vendor-label-codeowners-governance",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "vendor-label-codeowners-governance",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "vendor-label-codeowners-governance",
+        "needs_wid": "w1",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "vendor-label-codeowners-governance",
+        "notes": "Mirror the existing \"Reject validator or workflow changes\" step: diff base...HEAD for results-data/bundles/vendor/, and fail with a clear ::error:: if any match and the actor is not a maintainer. Fork PRs run the base-branch copy, so the check cannot be neutralized by the PR.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a validate-submission.yml step that fails a PR adding/modifying files under results-data/bundles/vendor/ when author_association is not a maintainer (OWNER/MEMBER/COLLABORATOR).",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "vendor-label-codeowners-governance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a test/lint asserting the vendor-gate step exists in the workflow so it cannot silently regress; ensure the submission-validator drift check still passes.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "vendor-label-codeowners-governance",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update hosted-results-contract.md + contributing-results.md to state the enforced control (published-results validate-submission gate on vendor/), replacing the \"advisory only\" hedging.",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Option A remains intentionally unimplemented: require_code_owner_review was retired 2026-07-18 and the documented revisit trigger has not fired; the published-results gate is the active control.",
+        "item_id": "vendor-label-codeowners-governance",
+        "notes": "Deferred indefinitely: the require_code_owner_review target was retired\n2026-07-18 (self-approval deadlock) without being applied. Only\nactionable if a retirement revisit trigger fires (extra write-access\ncollaborators, or agent PRs under a separate bot identity) — see\ndocs/operations/repo-admin-settings.md, \"Soundness-path review\nenforcement (RETIRED 2026-07-18)\".\n",
+        "started_at": "2026-08-10T00:22:17Z",
+        "started_branch": "docs/credential-egress-closeout-v4",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-13",
+        "status": "done",
+        "summary": "OPTIONAL defense-in-depth: add CODEOWNERS /results-data/bundles/vendor/ on develop (Option A) IF require_code_owner_review is ever enabled.",
+        "wid": "w4"
+      },
+      {
+        "evidence": "PR #1078 (merged 2026-07-09) mirrors the vendor gate to published-results; current vendor-gate regression suite is 5 passed and the live branch PR is merged.",
+        "item_id": "vendor-label-codeowners-governance",
+        "notes": "validate-submission.yml runs the published-results COPY for fork PRs, so the gate is inert until synced there. submission-validator-drift-check.yml will flag the drift after the develop change lands (by design) - that is the reminder to open this sync PR. Until w5 merges, the enforced control is NOT live on published-results.",
+        "started_at": "2026-08-10T00:22:23Z",
+        "started_branch": "docs/credential-egress-closeout-v4",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-13",
+        "status": "done",
+        "summary": "REQUIRED to go live: mirror the vendor-gate step to published-results via a hand-opened sync PR (the branch the gate actually protects).",
+        "wid": "w5"
+      }
+    ]
+  }
+}

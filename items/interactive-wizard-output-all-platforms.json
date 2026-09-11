@@ -1,0 +1,10 @@
+{
+  "description": "Currently, the interactive wizard only prompts for output location when a cloud\nplatform is selected. However, users may want to specify custom output locations\nfor local platforms too, especially for:\n1. Organizing results by project\n2. Using faster storage (SSD, RAM disk)\n3. Avoiding disk space issues on default location\n4. Integration with external tools",
+  "legacy": {
+    "item_meta": {
+      "category": "User Experience",
+      "created_at": "2025-12-21T00:00:00Z",
+      "worktree": "ux-improvements"
+    }
+  }
+}

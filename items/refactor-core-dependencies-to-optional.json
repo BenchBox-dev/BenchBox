@@ -1,0 +1,10 @@
+{
+  "description": "Platform-specific packages have accumulated in pyproject.toml core dependencies\nthat should be optional extras. This causes install bloat, dependency conflicts,\nand cross-platform issues (e.g., PySpark requires Java).\n\nCurrent core dependencies that should be optional:\n- polars>=1.35.2 (DataFrame platform)\n- datafusion>=50.1.0 (SQL/DataFrame platform)\n- presto-python-client>=0.8.4 (SQL platform)\n- clickhouse-driver>=0.2.9 (SQL platform)\n- pyspark>=4.0.1 (DataFrame platform - requires Java!)\n- dask[distributed]>=2024.8.0 (DataFrame platform)\n\nCore dependencies should only include CLI essentials:\n- click, rich (CLI framework)\n- pyyaml (config parsing)\n- packaging (version handling)\n- jsonschema (validation)\n\nDuckDB should remain as the default reference platform for ease of use.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-03T00:00:00Z",
+      "worktree": "infrastructure-publishing"
+    }
+  }
+}

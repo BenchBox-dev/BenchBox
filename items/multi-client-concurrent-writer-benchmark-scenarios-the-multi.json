@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #95 of ducklake-catalog-storage-backends.\nDeferred: Multi-client / concurrent-writer benchmark scenarios (the 'multiplayer DuckDB' story)\nReason deferred: Single-process benchmarking parity first; concurrency benchmarks are a separate research item",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:33:40Z",
+      "worktree": "ducklake-platform"
+    }
+  }
+}

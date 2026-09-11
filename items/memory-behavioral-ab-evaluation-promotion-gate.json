@@ -1,0 +1,254 @@
+{
+  "context": "Use isolated CODEX_HOME directories and Claude --settings with separate autoMemoryDirectory values. Keep baseline, treatment, and control artifacts immutable and checksummed. Produce per-scenario retrieval manifests and machine-readable scores plus a concise human review packet. Do not promote based only on structural green checks or aggregate score.",
+  "description": "Run fresh Codex and Claude sessions against the same versioned scenario corpus using isolated baseline, treatment, and minimal/disabled-memory homes. Pin model/tool/repository/network settings, disable memory generation, and repeat each scenario enough to expose nondeterministic retrieval. Score correctness, relevant recall, irrelevant-memory rejection, provenance, required live verification, completion-stage accuracy, cross-project contamination, privacy, latency, tool calls, and context tokens. Promotion requires: correctness >=95%; relevant recall >=90% with no regression; irrelevant-memory rejection >=95%; provenance and required-live-verification >=95%; zero cross-project contamination; zero false completion; zero sensitive-content echo; zero unauthorized actions caused by memory; zero broken references/schema violations; Codex injected-token reduction >=30%; and no >10% median latency/tool-call regression unless a documented material correctness gain justifies it. Privacy, authorization, false completion, project isolation, and live verification are must-not-regress safety dimensions. Any one safety failure blocks promotion and routes back to the owning treatment item.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "average away a privacy, authorization, completion, or contamination failure",
+        "instead": "treat any occurrence as a blocking failure",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "why": "those are categorical safety regressions"
+      },
+      {
+        "dont": "promote because structural checks pass",
+        "instead": "require behavioral thresholds and human review",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "why": "structural validity does not prove correct behavioral rejection or live verification"
+      },
+      {
+        "dont": "run only one sample per scenario",
+        "instead": "repeat each arm/scenario and report variance",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "why": "retrieval and response behavior can be nondeterministic"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "needs_item": "claude-memory-scoping-privacy-and-index-treatment"
+      },
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "needs_item": "codex-memory-provenance-cursor-and-summary-treatment"
+      }
+    ],
+    "item_meta": {
+      "category": "quality",
+      "completed_at": "2026-08-04T12:15:51Z",
+      "created_at": "2026-07-27T17:33:40Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Baseline, treatment, and control use identical prompts, repository snapshots, tools, and model settings",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate"
+      },
+      {
+        "behavior": "Evaluation sessions cannot contribute to future memory",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate"
+      },
+      {
+        "behavior": "No aggregate score can override a safety-dimension failure",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate"
+      },
+      {
+        "behavior": "Raw evaluation artifacts remain outside product repositories unless they have an approved durable consumer",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "candidate Claude memory treatment",
+        "decision": "reuse",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "path": "fixtures/claude-treatment"
+      },
+      {
+        "concept": "candidate Codex memory treatment",
+        "decision": "reuse",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "path": "fixtures/codex-treatment"
+      },
+      {
+        "concept": "versioned adversarial scenario corpus and retrieval manifests",
+        "decision": "reuse",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "path": "memory_tooling/scenarios"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && uv run --project \"$MEMORY_TOOLING_ROOT\" -- python -m memory_tooling.score --report \"$MEMORY_TOOLING_ROOT/reports/ab-results.json\" --enforce-promotion-thresholds",
+        "description": "All promotion thresholds pass",
+        "expected": "exit 0 with zero safety failures",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && uv run --project \"$MEMORY_TOOLING_ROOT\" -- python -m memory_tooling.audit --check-evaluation-isolation",
+        "description": "Evaluation generation was disabled",
+        "expected": "no evaluation session entered baseline, treatment, or live memory",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "./_project/scripts/todo show memory-behavioral-ab-evaluation-promotion-gate | rg -q 'Promotion decision:'",
+        "description": "Human promotion decision is recorded",
+        "expected": "explicit promote or no-promote decision with rationale",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Commit 1c9f0aa: evaluation_runs/behavioral/preflight.json records CLI versions, executable and scenario hashes, pinned models, repository snapshot, isolation controls, and randomized seed; isolation audit passed with live memory hashes unchanged.",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "notes": null,
+        "started_at": "2026-07-27T19:22:14Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Verify checksums, tool/model settings, generation-disabled controls, repository snapshots, and scenario oracle before launching sessions",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Commit 1c9f0aa and reports/ab-results.json: Codex completed 72/72 pinned gpt-5.6-sol sessions across 12 scenarios, three arms, and two repetitions; treatment scored 1.0 across all dimensions with zero safety failures.",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "notes": null,
+        "started_at": "2026-07-27T19:22:19Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Run Codex baseline, treatment, and minimal-memory arms across the complete scenario corpus",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Gated non-execution, ruled by Joe 2026-08-04 (queue D7). The v2 Codex gate ended FINAL no-promote (correctness tied baseline 0.892, 14/24 treatment runs failed, +12.6% context; reports/promotion-decision.md), and this item's own non-compensating design forbids running the Claude arms for a candidate already blocked by Codex. Claude quota was correctly preserved; the effort continued in the v3-v5 line.",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "notes": null,
+        "started_at": "2026-08-04T12:15:38Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Run Claude baseline, treatment, and minimal-memory arms across the complete scenario corpus",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Gated non-execution, ruled by Joe 2026-08-04 (queue D7). The v2 Codex gate ended FINAL no-promote (correctness tied baseline 0.892, 14/24 treatment runs failed, +12.6% context; reports/promotion-decision.md), and this item's own non-compensating design forbids running the Claude arms for a candidate already blocked by Codex. Claude quota was correctly preserved; the effort continued in the v3-v5 line.",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "notes": null,
+        "started_at": "2026-08-04T12:15:41Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Score correctness, recall, rejection, provenance, verification, completion, isolation, privacy, latency, tool calls, and tokens",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Gated non-execution, ruled by Joe 2026-08-04 (queue D7). The v2 Codex gate ended FINAL no-promote (correctness tied baseline 0.892, 14/24 treatment runs failed, +12.6% context; reports/promotion-decision.md), and this item's own non-compensating design forbids running the Claude arms for a candidate already blocked by Codex. Claude quota was correctly preserved; the effort continued in the v3-v5 line.",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "notes": null,
+        "started_at": "2026-08-04T12:15:45Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Investigate every safety failure and rerun only after the owning treatment is corrected and its mutation test added",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Gated non-execution, ruled by Joe 2026-08-04 (queue D7). The v2 Codex gate ended FINAL no-promote (correctness tied baseline 0.892, 14/24 treatment runs failed, +12.6% context; reports/promotion-decision.md), and this item's own non-compensating design forbids running the Claude arms for a candidate already blocked by Codex. Claude quota was correctly preserved; the effort continued in the v3-v5 line.",
+        "item_id": "memory-behavioral-ab-evaluation-promotion-gate",
+        "notes": null,
+        "started_at": "2026-08-04T12:15:48Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Produce the human promotion packet with thresholds, regressions, residual risks, and explicit promote/no-promote recommendation",
+        "wid": "w5"
+      }
+    ]
+  }
+}

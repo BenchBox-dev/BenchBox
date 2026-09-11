@@ -1,0 +1,238 @@
+{
+  "context": "Implement in order w1 → w2 → w3 → w4 → w5. Encode `w5 -> w3` in the work DAG\nbecause both slices touch the same prompt flow in `benchbox/cli/benchmarks.py`.\n\nw1 and w2 are small logic fixes, but each must add or update focused unit coverage\nin the adjacent CLI test files so the behavior is pinned by tests rather than\nby one-off shell repros.\n\nw3 must verify the user-facing fallback text by exercising `_prompt_custom_phases()`\nand capturing console output; `_parse_phase_input()` alone is not sufficient because\nit does not print the fallback guidance.\n\nw4 must verify the adapter boundary directly. Do not rely on `benchbox run --dry-run`\nfor this defect because the dry-run query extraction path does not hit\n`_apply_query_subset()` for TPC-H/TPC-DS.\n\nw5 requires tracing `test_execution_type` through the full interactive flow,\ndeleting the dead prompt, and updating benchmark-manager tests that currently\nexercise `_prompt_execution_type()` directly.\n",
+  "description": "Running `benchbox run` without arguments triggers the interactive setup wizard.\nA session identified five distinct defects, all confined to the interactive path\n(non-interactive CLI usage is unaffected):\n\n1. Phase selection prompt gives no indication that numbers refer to phase indices (1-6),\n   not query numbers. Entering \"37\" (intending Query 37) silently falls back to \"power\"\n   with no explanation of why it failed or where to actually specify query numbers.\n2. Query IDs collected as \"Q37\" format but adapter validates against bare \"37\" keys,\n   causing a hard runtime failure after Spark finishes loading data.\n3. Scale factor recommendation returns 0.01 for benchmarks (e.g. TPC-DS) where the\n   minimum valid scale is 1.0 - recommendation is outside the available options list.\n4. Tuning shown as \"tuned\" in the Configuration Preview and CLI command even when\n   the user declined tuning configuration.\n5. \"Test Execution Type\" selection (standard/power/…) is dead input - it has no effect\n   on phase defaults and is overwritten by a subsequent re-derivation from phases.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a 'Q' prefix everywhere else to match the prompt format",
+        "instead": "(not specified)",
+        "item_id": "fix-interactive-runner-defects",
+        "why": "that couples all callers to one format"
+      },
+      {
+        "dont": "add a noisy error message for the tuning decline case",
+        "instead": "(not specified)",
+        "item_id": "fix-interactive-runner-defects",
+        "why": "it should just work silently with the correct state"
+      },
+      {
+        "dont": "change scale_options lists in benchmark_registry.py",
+        "instead": "(not specified)",
+        "item_id": "fix-interactive-runner-defects",
+        "why": "the fix is in the recommendation logic, not the options"
+      },
+      {
+        "dont": "change the normalization in prompt_query_subset()",
+        "instead": "(not specified)",
+        "item_id": "fix-interactive-runner-defects",
+        "why": "fix it at the adapter boundary so all callers benefit"
+      }
+    ],
+    "item_meta": {
+      "category": "Bug Fix",
+      "completed_at": "2026-04-12T00:00:00Z",
+      "created_at": "2026-04-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Configuration Preview correctly reflects the actual tuning state chosen",
+        "item_id": "fix-interactive-runner-defects"
+      },
+      {
+        "behavior": "Non-interactive CLI flags --tuning tuned and --tuning notuning are unaffected",
+        "item_id": "fix-interactive-runner-defects"
+      },
+      {
+        "behavior": "Phase selection still works correctly when user types comma-separated indices ('1,2,4') or names ('generate,load,power')",
+        "item_id": "fix-interactive-runner-defects"
+      },
+      {
+        "behavior": "Phase-derived execution mode mapping in benchbox/cli/commands/run.py remains the only source of truth for test_execution_type",
+        "item_id": "fix-interactive-runner-defects"
+      },
+      {
+        "behavior": "_apply_query_subset() continues to work for CLI callers that already pass bare integer query IDs (e.g. '37', not 'Q37')",
+        "item_id": "fix-interactive-runner-defects"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-interactive-runner-defects",
+        "kind": "do_not_modify",
+        "path_glob": "Any benchmark runner or data generation logic"
+      },
+      {
+        "item_id": "fix-interactive-runner-defects",
+        "kind": "do_not_modify",
+        "path_glob": "Platform adapter files other than base/adapter.py"
+      },
+      {
+        "item_id": "fix-interactive-runner-defects",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py (scale_options lists are correct)"
+      },
+      {
+        "item_id": "fix-interactive-runner-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/benchmarks.py"
+      },
+      {
+        "item_id": "fix-interactive-runner-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "fix-interactive-runner-defects",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "fix-interactive-runner-defects",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_benchmark_manager_behavioral.py"
+      },
+      {
+        "item_id": "fix-interactive-runner-defects",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_interactive_dry_run.py"
+      },
+      {
+        "item_id": "fix-interactive-runner-defects",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_run_command_interactive_paths.py"
+      },
+      {
+        "item_id": "fix-interactive-runner-defects",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_base_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_benchmark_manager_behavioral.py -x -q -k recommended_scale",
+        "description": "Scale recommendation remains valid when the benchmark minimum scale is 1.0",
+        "expected": "passed",
+        "item_id": "fix-interactive-runner-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_interactive_dry_run.py -x -q -k phases",
+        "description": "Phase fallback guidance is verified at the prompt layer, including the typed input and query-step hint",
+        "expected": "passed",
+        "item_id": "fix-interactive-runner-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_base_adapter.py -x -q -k query_subset",
+        "description": "Adapter query subset filtering accepts both bare IDs and Q-prefixed IDs at the `_apply_query_subset()` boundary",
+        "expected": "passed",
+        "item_id": "fix-interactive-runner-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_run_command_interactive_paths.py tests/unit/cli/test_interactive_dry_run.py -x -q -k tuning",
+        "description": "Declining tuning in the interactive flow suppresses `--tuning` in the preview and leaves `tuning_enabled` false",
+        "expected": "passed",
+        "item_id": "fix-interactive-runner-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_benchmark_manager_behavioral.py tests/unit/cli/test_run_command_interactive_paths.py tests/unit/cli/test_cli_test_execution.py -x -q -k execution",
+        "description": "Removing the dead execution-type prompt preserves phase-derived execution mode behavior",
+        "expected": "passed",
+        "item_id": "fix-interactive-runner-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_benchmark_manager_behavioral.py tests/unit/cli/test_interactive_dry_run.py tests/unit/cli/test_run_command_interactive_paths.py tests/unit/platforms/test_base_adapter.py -x -q",
+        "description": "Targeted interactive and adapter regression suite passes for all touched modules",
+        "expected": "passed",
+        "item_id": "fix-interactive-runner-defects",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-interactive-runner-defects",
+        "needs_wid": "w3",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-interactive-runner-defects",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix scale factor recommendation returning value outside available options",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-interactive-runner-defects",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix tuning state: decline branch must set tuning='notuning', not 'tuned'",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-interactive-runner-defects",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Improve phase selection error messaging: explain out-of-range input and point to query step",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-interactive-runner-defects",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix query ID format mismatch: normalize Q-prefix in _apply_query_subset()",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-interactive-runner-defects",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Eliminate dead 'Test Execution Type' step from interactive wizard",
+        "wid": "w5"
+      }
+    ]
+  }
+}

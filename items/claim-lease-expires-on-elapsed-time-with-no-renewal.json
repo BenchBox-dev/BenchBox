@@ -1,0 +1,142 @@
+{
+  "context": "Add a renewal path (e.g. 'todo renew <id>' plus a renew_claim() that re-stamps claimed_at only for the current holder, CAS-guarded on the observed lease exactly as claim_item and sweep_stale are), and have the long-running verbs (start/done/verify) re-stamp the lease as a side effect so an active session stays live without ceremony. Decide explicitly whether takeover should stay silent or require a --force/--steal flag; that decision is part of w2.",
+  "description": "claimed_at is written exactly once, in claim_item (todo_db.py:1327), and no verb refreshes it: the CLI has no renew/heartbeat subcommand and todo_db exposes no renewal function. Lease liveness is therefore pure elapsed time via _lease_expired (todo_db.py:1130). Past DEFAULT_LEASE_TTL_HOURS both readers treat a still-live claim as free: ready_items (todo_db.py:1660) offers the item to every other actor, and claim_item (todo_db.py:1303, plus the 'claimed_at < cutoff' arm of its UPDATE predicate at :1328) lets a second actor take it. The takeover silently overwrites claimed_by and the original holder is never notified, so two sessions can work one item at once. Reproduced on a scratch DB: agent-A claims, 25h elapse with no renewal available, the item appears in agent-B's ready queue and agent-B's claim succeeds without error. sweep_stale's own comment (todo_db.py:1625-1627) already anticipates 'a renewal the sweeping replica had not seen', so the CAS defense was written for a renewal mechanism that was never built. Note the TTL is not what makes this safe today -- both readers ignore the claim regardless of whether sweep-stale ever runs, so raising the TTL only moves the cliff.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-30T19:41:35Z",
+        "from_item": "claim-lease-expires-on-elapsed-time-with-no-renewal",
+        "id": 672,
+        "reason": "renew is implemented in BenchBox's _project/scripts/todo_db.py only. todo_db_standalone_compat.py's COMMANDS frozenset does not list it, and its fallback forwards unrecognized verbs raw to the standalone todo-db CLI, which has no renew - so 'todo renew' fails under the opt-in BENCHBOX_TODO_DB_STANDALONE=1 path. That adapter is outside this item's only_modify scope and the standalone verb has to land in the todo-db package first, so it is a separate change. Default path is unaffected: the adapter is opt-in and off by default.",
+        "resolution": "promoted",
+        "resolved_item": "standalone-todo-db-renew-verb",
+        "resolved_reason": null,
+        "summary": "Teach the standalone todo-db CLI and its BenchBox compat adapter the renew verb"
+      }
+    ],
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-07-31T03:49:15Z",
+      "completed_pr": 1374,
+      "created_at": "2026-07-30T19:18:54Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "An actor can still claim an item whose holder is genuinely gone; renewal must not create permanently stuck leases",
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal"
+      },
+      {
+        "behavior": "sweep_stale stays CAS-safe: a lease that changed hands between read and write is never clobbered",
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo"
+      },
+      {
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo --help 2>&1 | grep -qE '(^|[^a-z-])renew([^a-z-]|$)'",
+        "description": "The CLI exposes a claim-renewal verb",
+        "expected": "renew appears in the subcommand list",
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal",
+        "last_result": "pass",
+        "last_run": "2026-07-30T19:39:31Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_hardening.py -q -k renew",
+        "description": "A renewed lease survives past the TTL, stays hidden from other actors in ready, and refuses a foreign claim",
+        "expected": "the renewal regression tests pass",
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal",
+        "last_result": "pass",
+        "last_run": "2026-07-30T19:39:45Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db.py tests/unit/scripts/test_todo_db_hardening.py -q",
+        "description": "The tracker unit suites stay green",
+        "expected": "no regressions in claim/sweep/lease behavior",
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal",
+        "last_result": "pass",
+        "last_run": "2026-07-30T19:39:58Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on develop e29ef9e: no renewal API exists (dir(todo_db) has no renew*), a 25h-old live lease is offered to another actor by ready_items, and that actor's claim_item succeeds and overwrites claimed_by with no error. Scratch-DB repro, production untouched.",
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal",
+        "notes": null,
+        "started_at": "2026-07-30T19:31:49Z",
+        "started_branch": "claude/benchbox-claim-state-hygiene-h9uhft",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Re-validate the defect on current develop before changing anything",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added _touch_lease() (CAS-guarded on the exact observed lease, no txn of its own) and renew_claim() + 'todo renew' in _project/scripts/todo_db.py. Refuses a foreign lease, an unclaimed item, and an already-expired lease. Rung 1 pass.",
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal",
+        "notes": null,
+        "started_at": "2026-07-30T19:40:26Z",
+        "started_branch": "claude/benchbox-claim-state-hygiene-h9uhft",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Add renew_claim() + 'todo renew', CAS-guarded to the current holder",
+        "wid": "w1"
+      },
+      {
+        "evidence": "start_unit/done_unit/run_verification now call _touch_lease inside their existing _write_txn, so a working session stays live. Takeover decision: NO --force flag - it would risk the 'holder genuinely gone' must-preserve. Instead takeover is now announced: claim_item returns displaced_holder and _print_work_order warns on stderr; the claim event records previous_claimed_at too. Rungs 2-3 pass.",
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal",
+        "notes": null,
+        "started_at": "2026-07-30T19:40:31Z",
+        "started_branch": "claude/benchbox-claim-state-hygiene-h9uhft",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Re-stamp the lease from start/done/verify, and decide whether takeover needs an explicit flag",
+        "wid": "w2"
+      },
+      {
+        "evidence": "9 tests (12 with parametrization) in tests/unit/scripts/test_todo_db_hardening.py::TestClaimRenewal, incl. a pinned test of the pre-fix takeover. Non-vacuity checked by neutering _touch_lease: 5 fail, incl. all 3 implicit-renewal variants and the core regression. tests/unit/scripts/ 1195 passed.",
+        "item_id": "claim-lease-expires-on-elapsed-time-with-no-renewal",
+        "notes": null,
+        "started_at": "2026-07-30T19:40:36Z",
+        "started_branch": "claude/benchbox-claim-state-hygiene-h9uhft",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Regression tests",
+        "wid": "w3"
+      }
+    ]
+  }
+}

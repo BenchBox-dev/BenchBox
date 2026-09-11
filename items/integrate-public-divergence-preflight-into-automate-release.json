@@ -1,0 +1,224 @@
+{
+  "description": "OBSOLETED on 2026-04-26: superseded by the single-repo migration plan\n(_project/TODO/main/planning/single-repo-migration-phase-*.yaml). The\ndivergence preflight protects against external commits on the public\nmirror being destroyed by force-push; the migration deletes the\nforce-push and the bidirectional sync model entirely. Phase 6 deletes\nautomate_release.py and benchbox-sync.\n\nOriginal description below preserved for historical context.\n\n---\n\n`scripts/automate_release.py` calls `prepare_release.py` (line 1073), which\ndeletes and rebuilds the target public tree from scratch. Anything on public\nmain that is not present in private at that point is destroyed. Today,\nnothing checks for that condition.\n\nFailure mode: a community PR is merged into the public repo between releases.\nThe next `automate_release.py --push` run silently squashes those commits\naway during the force-rewrite of public main. Author attribution and\nexternal work are lost.\n\nGoal: insert a preflight check that detects unexpected commits on public\nmain since the last `v*` tag (or unexpected file-level conflicts) BEFORE\nthe destructive rebuild, and abort with an actionable message unless the\nuser explicitly opts in via a new `--allow-public-divergence` flag.\n\nApproach: extract a programmatic `check_public_repo_state(source, target)`\nfunction from the existing `cmd_status` in `benchbox/release/sync.py`,\nreturning a `PublicRepoState` dataclass. `automate_release.py` imports and\ncalls it (no subprocess - existing precedent at automate_release.py:43-49\nalready imports from `benchbox.release.workflow`).\n\nPlan file: /Users/joe/.claude/plans/make-a-detailed-and-dynamic-bentley.md\n(Phase B).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change `cmd_push` or `cmd_pull`",
+        "instead": "(not specified)",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "why": "they are out of scope for this item; only `cmd_status` is being refactored to share logic with the new function."
+      },
+      {
+        "dont": "couple the divergence check to `--force-tag`",
+        "instead": "(not specified)",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "why": "they are different concerns (force-tag overwrites a local tag; divergence override accepts losing public commits); keep flags semantically distinct."
+      },
+      {
+        "dont": "default `--allow-public-divergence` to True",
+        "instead": "(not specified)",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "why": "the entire point is to fail loudly when external commits would be destroyed; opt-in is the safe default."
+      },
+      {
+        "dont": "make check_public_repo_state mutate the target repo",
+        "instead": "(not specified)",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "why": "it is a preflight; even a fetch is questionable. Read-only only, so the user can rerun it safely as many times as they want."
+      },
+      {
+        "dont": "shell out to `benchbox-sync` as a subprocess",
+        "instead": "(not specified)",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "why": "the existing precedent (automate_release.py:43-49) already imports from benchbox.release; subprocess adds latency, hides errors, and complicates testing."
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-04-26T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Default behaviour without `--allow-public-divergence` errs on the side of safety - aborting is the safe failure mode.",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release"
+      },
+      {
+        "behavior": "The `cmd_status` CLI output remains usable (no breaking change for users running `benchbox-sync status` from the shell). Internal refactor only.",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release"
+      },
+      {
+        "behavior": "The `compare_repos` function and `RepoComparison` dataclass (workflow.py:1048, :934) are unchanged - only consumed by the new function.",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release"
+      },
+      {
+        "behavior": "The existing source-side drift detection in `automate_release.py` (lines 1068, 1136-1140 - `sync_start_sha` and post-verify check) remains in place and unchanged.",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release"
+      },
+      {
+        "behavior": "The two-remote rule from CLAUDE.md - nothing in this work item should change push targets, default remotes, or the public/private rule.",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "kind": "only_modify",
+        "path_glob": "benchbox/release/sync.py"
+      },
+      {
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "kind": "only_modify",
+        "path_glob": "scripts/automate_release.py"
+      },
+      {
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/release/test_release_sync_unit.py"
+      },
+      {
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_scripts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/release/test_release_sync_unit.py -v",
+        "description": "Sync unit tests pass including new check_public_repo_state cases",
+        "expected": "all tests pass",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_release_scripts.py -v",
+        "description": "Release script smoke tests pass including the new divergence-abort test",
+        "expected": "all tests pass",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m benchbox.release.sync status",
+        "description": "benchbox-sync status produces output equivalent to before refactor",
+        "expected": "Same output structure as pre-refactor (no regression)",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/automate_release.py --version 0.0.0-test --dry-run --skip-ci --skip-tests -y",
+        "description": "automate_release with --dry-run on a clean fixture exits 0",
+        "expected": "exit 0",
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "notes": "In `benchbox/release/sync.py`, add:\n\n  @dataclass\n  class PublicRepoState:\n      target_exists: bool\n      target_clean: bool\n      comparison: RepoComparison | None\n      commits_ahead_of_last_tag: int\n      commits_ahead_shas: list[str]   # \"abbrev_sha - subject\" lines\n      last_tag: str | None\n\n      @property\n      def has_unexpected_divergence(self) -> bool:\n          return self.commits_ahead_of_last_tag > 0 or (\n              self.comparison is not None and self.comparison.has_conflicts\n          )\n\n  def check_public_repo_state(source: Path, target: Path) -> PublicRepoState:\n      \"\"\"Read-only programmatic equivalent of `benchbox-sync status`.\"\"\"\n\nImplementation reuses:\n- `is_git_repo`, `is_repo_clean` (sync.py:38-51)\n- `compare_repos` (workflow.py:1048)\n- `git describe --tags --abbrev=0 --match v*` for last_tag\n- `git rev-list --count <last_tag>..HEAD` for commits_ahead_of_last_tag\n- `git log --format='%h - %s' <last_tag>..HEAD` for commits_ahead_shas\nFunction MUST be read-only - no fetch, no commits, no mutations.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add PublicRepoState dataclass and check_public_repo_state() to sync.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "notes": "Rewrite `cmd_status` in sync.py:148-188 to:\n  1. Call `check_public_repo_state(source, target)`\n  2. Print the existing emit() output using fields from the returned state\nNo CLI behaviour change. `benchbox-sync status` output should be\nbyte-identical (modulo any added \"commits ahead of last tag: N\" line if\nwe want to surface that here too - decide during implementation).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Refactor cmd_status to be a thin wrapper around check_public_repo_state",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "notes": "In `tests/unit/release/test_release_sync_unit.py`, add cases:\n  1. Target missing entirely (target_exists=False, no comparison)\n  2. Target exists, clean, at last tag (no divergence, has_unexpected=False)\n  3. Target ahead by N commits since last tag (commits_ahead>0,\n     has_unexpected=True, shas list populated)\n  4. Target with file-level conflicts (comparison.has_conflicts=True,\n     has_unexpected=True)\nUse existing test fixtures (the file already creates throwaway git repos\nvia tmp_path). Run `uv run -- python -m pytest\ntests/unit/release/test_release_sync_unit.py -v`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add unit tests for check_public_repo_state covering 4 cases",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "notes": "1. Add to argparse (after the existing flags around automate_release.py:949):\n     parser.add_argument(\n         \"--allow-public-divergence\",\n         action=\"store_true\",\n         help=\"Proceed even if public main has commits not present in \"\n              \"private since the last tag (DESTRUCTIVE).\",\n     )\n2. Insert new step between line 1063 (post-CI confirm) and line 1073\n   (prepare_release call). Pseudocode:\n\n     from benchbox.release.sync import check_public_repo_state\n\n     print(\"\\nStep 3.5/8: Public repo divergence preflight\")\n     state = check_public_repo_state(source, target)\n     if state.target_exists and state.has_unexpected_divergence:\n         print(f\"❌ Public has commits since last tag ({state.last_tag}):\")\n         for line in state.commits_ahead_shas:\n             print(f\"     {line}\")\n         if state.comparison and state.comparison.has_conflicts:\n             print(f\"   {len(state.comparison.conflicts)} files conflict.\")\n         print(\"\\n   These would be destroyed by prepare_release.py.\")\n         print(\"   Resolve:\")\n         print(f\"     uv run -- python -m benchbox.release.sync pull \"\n               f\"--revspec {state.last_tag}..HEAD\")\n         print(\"   ...then commit on private and re-run.\")\n         if not args.allow_public_divergence:\n             return 1\n         print(\"   --allow-public-divergence set, continuing (DESTRUCTIVE).\")\n\n3. Renumber subsequent step labels (Step 4/8 -> Step 4/9 etc.) so the\n   progress indicators stay coherent. Or relabel as \"Step 3.5/8\" and\n   leave existing labels - decide during implementation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add --allow-public-divergence flag and Step 3.5 preflight to automate_release.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "notes": "At automate_release.py:1170 and :1178 (both branches of the --push if/else),\nreplace the line:\n    print(\"  4. Sync fixes back to private repo:\")\n    print(f\"     cd {source} && git push private main\")\nwith:\n    print(\"  4. Pull any external public changes back to private:\")\n    print(f\"     uv run -- python -m benchbox.release.sync pull \"\n          f\"--revspec v{version}..origin/main\")\n    print(\"     ...then commit the merged result on private.\")\nRationale: a bare `git push private main` does not import public-side\ncommunity PRs. Closing the bidirectional contract is what makes the new\npreflight in w4 trustworthy across releases.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update post-release print to recommend benchbox-sync pull instead of bare git push",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "integrate-public-divergence-preflight-into-automate-release",
+        "notes": "Add to `tests/unit/test_release_scripts.py` a test that:\n  1. Creates a fixture target git repo with a v0.0.1 tag\n  2. Adds an extra \"fake external\" commit on main after the tag\n  3. Invokes `automate_release.main()` with `--dry-run --version 0.0.2\n     --target <fixture> --skip-ci --skip-tests --skip-content-check -y`\n  4. Asserts non-zero exit AND the abort message includes the fake commit's\n     abbreviated SHA\n  5. Re-invokes with `--allow-public-divergence` added; asserts proceeds\n     (still in dry-run, so no actual destruction)\nThis is the load-bearing test that the gate works.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add smoke test that automate_release aborts on divergence without the override",
+        "wid": "w6"
+      }
+    ]
+  }
+}

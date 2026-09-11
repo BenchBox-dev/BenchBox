@@ -1,0 +1,10 @@
+{
+  "description": "Build comprehensive testing infrastructure for query plan capture, including\nintegration tests across platforms, performance regression tests, edge case\ncoverage, and concurrency tests for throughput phase.\n\n**Current Gap**: No integration tests, minimal edge case coverage, no\nperformance tests, no concurrency validation.\n\n**Target**: ≥80% test coverage with integration, performance, and stress tests.",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing & Quality",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-remediation"
+    }
+  }
+}

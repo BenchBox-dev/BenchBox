@@ -1,0 +1,270 @@
+{
+  "context": "Treat the transaction writer and its attested receipt as the normal publication authority. Keep the legacy approved-manifest fallback during migration. After the verified publication and independent-monitor evidence exist, disable the release Pages job, retire the sync mirror writer, preserve release API-doc production and the accepted archive, and reconcile only proven set-equivalent mirror replacements. Keep branch and environment policy changes separate from artifact approval.",
+  "description": "Retire release-to-Pages coupling and redundant mirror publication only after the replacement transaction writer is proven. Package release validation continues to produce packages and versioned API documentation without publishing the site, Explorer, or accepted corpus. Mirror changes are reconciled by exact path set and content digest; an older or newer PR alone is not evidence for closure. The former fixed soak and manual publication attribution inputs are superseded.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Close mirror PRs based on age or naming",
+        "instead": "prove exact set and digest replacement before closure",
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "why": "a newer mirror can still omit published-only paths"
+      },
+      {
+        "dont": "Delete release publication wiring before corpus cutover",
+        "instead": "retire coupling only after all independent lanes and rollback are proven",
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "why": "that creates a production update gap"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-09-04T17:32:48Z",
+        "from_item": "independent-publication-a10-release-and-mirror-retirement",
+        "id": 725,
+        "reason": "G5 closure record publication-freeze-closure-2026-09-04 (PR 2041): removing release-to-Pages coupling with no replacement deployer would leave production undeployable. G1-G4 permit retirement but no replacement path was built in this workstream. Deferring the surgery scope to a follow-up workstream; freeze retirement rows transfer to it.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Retirement scope transferred to freeze-closure record carried restrictions (publication-freeze-closure-2026-09-04, PR 2041); promote_deferral is broken server-side (missing new_item_id arg). Follow-up production-deployer workstream to be filed with create tooling when available.",
+        "summary": "Retirement surgery needs an independent production deployer first"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "needs_item": "independent-production-deployer-and-retirement"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "needs_item": "independent-publication-a9-corpus-production-cutover"
+      }
+    ],
+    "item_meta": {
+      "category": "Publication Architecture",
+      "created_at": "2026-08-31T20:38:12Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No accepted corpus path is lost when mirror PRs are merged or closed.",
+        "item_id": "independent-publication-a10-release-and-mirror-retirement"
+      },
+      {
+        "behavior": "Package release validation and protected-branch rules remain at least as strong as before.",
+        "item_id": "independent-publication-a10-release-and-mirror-retirement"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Preserve the validated package release process and remove only publication coupling",
+        "decision": "extend",
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "path": "docs/operations/release-guide.md"
+      },
+      {
+        "concept": "Narrow release curation after independent publication is proven",
+        "decision": "extend",
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "path": "scripts/check_release_curation.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "kind": "only_modify",
+        "path_glob": ".github/RELEASE_PR_TEMPLATE.md"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "kind": "only_modify",
+        "path_glob": "make/inventory.json"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "kind": "only_modify",
+        "path_glob": "results-data/README.md"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "kind": "only_modify",
+        "path_glob": "scripts/check_release_curation.py"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_check_release_curation.py"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run pytest tests/unit/scripts/test_check_release_curation.py tests/unit/test_release_infrastructure.py tests/unit/workflows -q",
+        "description": "Release infrastructure keeps package and API-doc publication independent from the site and corpus writer",
+        "expected": "all tests pass",
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "human review of signed receipt and independent monitor evidence",
+        "description": "Replacement writer and external monitor have current verified production evidence before legacy retirement",
+        "expected": "retirement prerequisites are current and complete",
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/audit_mirror_prs.py --repo BenchBox-dev/BenchBox --base published-results --strict-union",
+        "description": "Open corpus mirror changes have exact path-set and content-digest dispositions",
+        "expected": "exit 0 or every exception is explicitly recorded",
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Prove all independent production lanes and receipts remain healthy",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Remove release-to-Pages coupling while retaining release API-doc artifact production",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update release curation rules, Make targets, templates, docs, and tests",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Compute exact set and digest equivalence for every corpus mirror PR",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Merge required union replacement and close only proven superseded mirrors",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "independent-publication-a10-release-and-mirror-retirement",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run a package release rehearsal with no unintended site or corpus deploy",
+        "wid": "w6"
+      }
+    ]
+  }
+}

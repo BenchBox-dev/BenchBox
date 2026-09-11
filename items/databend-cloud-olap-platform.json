@@ -1,0 +1,272 @@
+{
+  "description": "Implement Databend (https://github.com/databendlabs/databend) as a supported platform\nin BenchBox. Databend is a cloud-native, Rust-based data warehouse with Snowflake-\ncompatible SQL, compute/storage separation, and object storage backend.\n\n**Key Technical Approach:**\n- Use Snowflake SQLGlot dialect as translation proxy (Databend claims ~100% compatibility)\n- Leverage `databend-driver` (v0.28.2+) for DB-API 2.0 connectivity\n- Implement lightweight QueryTransformer for edge cases if needed\n- Deploy Databend + MinIO via Docker Compose for CI testing\n\n**Rationale for Low Priority:**\nBased on comprehensive analysis (Jan 2025), integration was deferred because:\n1. SQLGlot does NOT support Databend as a native dialect\n2. Significant platform overlap with ClickHouse, Snowflake, and Firebolt\n3. Lower enterprise adoption compared to alternatives\n4. Medium-high integration complexity due to custom translation layer\n\n**Conditions for Prioritization:**\n- SQLGlot adds native Databend dialect support\n- User demand accumulates (3+ explicit requests)\n- Databend Cloud enterprise adoption grows\n- TPC-certified benchmark results published",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-16T00:00:00Z",
+      "created_at": "2025-01-07T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "work_needs": [
+      {
+        "item_id": "databend-cloud-olap-platform",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "databend-cloud-olap-platform",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "databend-cloud-olap-platform",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create databend/ platform module structure",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add query plan capture support (EXPLAIN)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement tuning support (clustering keys)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test all 22 TPC-H queries for compatibility",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test all 99 TPC-DS queries for compatibility",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement QueryTransformer for edge cases if needed",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document any query modifications required",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create unit tests (test_databend_adapter.py)",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create Docker Compose for Databend + MinIO",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add integration smoke tests",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add CI workflow for Databend testing",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement base DatabendAdapter class",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create platform documentation (docs/platforms/databend.md)",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add example script (examples/getting_started/cloud/)",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update platform comparison matrix",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement connection handling with databend-driver",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure Snowflake dialect as translation proxy",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement CLI argument registration",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add databend dependency group to pyproject.toml",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement schema creation with Snowflake SQL translation",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement data loading (INSERT batching)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "databend-cloud-olap-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement query execution with result handling",
+        "wid": "w9"
+      }
+    ]
+  }
+}

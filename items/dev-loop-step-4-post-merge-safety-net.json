@@ -1,0 +1,339 @@
+{
+  "context": "Build the workflow changes incrementally:\n  1. cancel-in-progress (w1) is a small, low-risk YAML edit\n  2. Auto-revert (w2) is the substantive change — use peter-evans/\n     create-pull-request@v6 (mature, well-tested) rather than rolling\n     a custom revert script\n  3. Metrics (w3) is independent of auto-revert; both can run in\n     parallel jobs in the same workflow\n  4. Make target (w5) is the human-facing surface for w3\n  5. Docs (w4) once the behavior is confirmed\n  6. Smoke test in fork (w6) BEFORE merging — auto-revert that\n     opens spurious PRs would be very noisy to roll back\n\nFor revert conflicts: the fallback to \"open an issue\" is intentional.\nAn auto-revert that conflicts probably means later commits depend on\nthe broken one, so a human needs to decide whether to revert the\nwhole stack or fix forward.\n\nFor metrics: keep it simple. JSON files in workflow artifacts, no\ndatabase, no service. Step 5 reads the last 30 days and aggregates.\nIf we end up wanting longer retention, push to a `metrics` orphan\nbranch instead — but that's a Step 5 decision, not Step 4.\n",
+  "description": "Strengthens `develop-post-merge.yml` so that relaxing strict-base in\nStep 3 has a credible safety net, not just a notification. When\ndevelop goes red post-merge, the workflow automatically opens a revert\nPR for the offending SHA (or an issue if revert conflicts), and emits\nbasic dev-loop metrics that feed Step 5's measurement window.\n\nSequence: this MUST land after Step 3 (relaxed strict-base), because\nthe auto-revert is the mitigation for the increased post-merge risk\nintroduced by Step 3.\n\nSingle PR via `make pr-open`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "auto-merge the revert PR",
+        "instead": "open it but require manual approval",
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "why": "a human should decide whether to revert vs fix-forward"
+      },
+      {
+        "dont": "cancel-in-progress on develop-post-merge",
+        "instead": "every landed SHA must be verified independently",
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "why": "fast PR landings would skip safety checks on intermediate SHAs"
+      },
+      {
+        "dont": "chain to Step 5 work in this PR",
+        "instead": "keep the surface small",
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "why": "metrics emission is the deliverable here; aggregation/threshold-checking is Step 5"
+      },
+      {
+        "dont": "page or alert on every red",
+        "instead": "over-paging trains agents to ignore the channel",
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "why": "the auto-revert PR IS the alert"
+      },
+      {
+        "dont": "skip the fork smoke test (w6)",
+        "instead": "30 minutes in a fork is cheap insurance",
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "why": "a buggy auto-revert on production develop would be loud and embarrassing"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-4-post-merge-safety-net",
+        "id": 148,
+        "reason": "Out of scope; the auto-revert PR is the notification. Add only if Step 5 shows reverts are missed.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Slack/Discord notifications gated on Step 5 showing reverts are being missed; no such evidence indicated, condition unmet.",
+        "summary": "Slack/Discord notifications on develop-red"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-4-post-merge-safety-net",
+        "id": 149,
+        "reason": "Intentional human gate. A human decides revert vs fix-forward. Revisit if revert PRs accumulate unmerged.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Intentional permanent human-gate design decision, not deferred work; revisit only if revert PRs pile up, no evidence of that.",
+        "summary": "Auto-merge of revert PRs after green CI"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dev-loop-step-4-post-merge-safety-net",
+        "id": 150,
+        "reason": "JSON artifacts + make dev-loop-metrics is sufficient for Step 5. Build a dashboard only if the metrics become a routine inspection target.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Dashboard/Grafana only warranted 'if metrics become a routine inspection target'; no evidence that threshold was reached.",
+        "summary": "Metrics dashboard / Grafana"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "needs_item": "dev-loop-step-3-ci-rebalance-and-strict-base-off"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-30T00:00:00Z",
+      "created_at": "2026-04-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing develop-post-merge.yml job definitions and their pass/fail signal — Step 4 ADDS auto-revert, does not replace existing checks",
+        "item_id": "dev-loop-step-4-post-merge-safety-net"
+      },
+      {
+        "behavior": "GITHUB_TOKEN scope: auto-revert needs `contents: write` and `pull-requests: write` — confirm permissions block in workflow declares these",
+        "item_id": "dev-loop-step-4-post-merge-safety-net"
+      },
+      {
+        "behavior": "Issue and PR labels are namespaced (incident:*) so they don't conflict with existing labels",
+        "item_id": "dev-loop-step-4-post-merge-safety-net"
+      },
+      {
+        "behavior": "Metrics artifacts are JSON, not human-readable text — Step 5 aggregator depends on machine-parseable shape",
+        "item_id": "dev-loop-step-4-post-merge-safety-net"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/nightly.yml (Step 3 owns this)"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/release.yml (release CI is unchanged)"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/test.yml (Step 3 owns this)"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub branch protection / rulesets (Step 3 owns these)"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile pr-open, pr-fanout, pr-refresh targets (Steps 1 and 3 own these)"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile worktree-add, worktree-claim, worktree-pool-*, worktree-release targets (Step 2 owns these)"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md (failure flow and dev-loop metrics sections)"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md (failure flow, dev-loop metrics, and Pre-approved Commands sections)"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "kind": "only_modify",
+        "path_glob": "Makefile (dev-loop-metrics target only)"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/dev-loop-auto-revert-fork-test-*.md (new fork validation evidence)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -A 3 'concurrency:' .github/workflows/develop-post-merge.yml | grep -c 'cancel-in-progress: false'",
+        "description": "develop-post-merge.yml uses cancel-in-progress: false",
+        "expected": ">= 1",
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE '(auto-revert|revert.*failure)' .github/workflows/develop-post-merge.yml",
+        "description": "Auto-revert job exists in develop-post-merge.yml",
+        "expected": ">= 1",
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'name: metrics' .github/workflows/develop-post-merge.yml",
+        "description": "Metrics job emits an artifact named 'metrics'",
+        "expected": ">= 1",
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make dev-loop-metrics 2>&1 | grep -cE 'P50|P95|red rate|runner'",
+        "description": "make dev-loop-metrics produces a non-empty summary",
+        "expected": ">= 4",
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'dev-loop-metrics|P50|P95|post-merge red|runner minutes' CLAUDE.md AGENTS.md",
+        "description": "dev-loop-metrics is documented for agents and pre-approved in CLAUDE.md",
+        "expected": ">= 3",
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'incident:develop-red|auto-revert' CLAUDE.md AGENTS.md",
+        "description": "Failure flow is documented in agent-facing docs",
+        "expected": ">= 2",
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE 'Fork validation|failing SHA|revert PR|conflict issue|workflow run' _project/decisions/dev-loop-auto-revert-fork-test-*.md",
+        "description": "PR description includes fork-test evidence",
+        "expected": ">= 4",
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "notes": "Currently the workflow likely has a `concurrency:` block that\nmay cancel in-progress runs when a new push lands. Change:\n  concurrency:\n    group: develop-post-merge-${{ github.sha }}\n    cancel-in-progress: false\nGroup key on `github.sha` (not `github.ref`) so each landed SHA\ngets its own concurrency lane and runs to completion. This is\nnecessary so fast-landing PRs don't cause the workflow to skip\nchecking intermediate SHAs.\n\nImplementation record (2026-04-30):\n  - Updated `.github/workflows/develop-post-merge.yml` so the\n    concurrency group is `develop-post-merge-${{ github.sha }}`.\n  - Set `cancel-in-progress: false` so a later push to `develop`\n    cannot cancel the post-merge safety check for an earlier landed SHA.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set cancel-in-progress: false on develop-post-merge.yml",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "notes": "New job `auto-revert-on-failure` triggered by\n`workflow_run.conclusion == 'failure'` (or as a continuation\njob in the same workflow with `if: failure()`). Steps:\n  1. Identify the failing SHA (`github.sha` of the post-merge run)\n  2. Identify the PR that introduced the SHA via\n     `gh pr list --state merged --search \"<sha>\"`\n  3. Create branch `auto-revert/<short-sha>` from develop\n  4. `git revert --no-edit <sha>` (single SHA, no merge commits)\n  5. If revert succeeds: push branch, open PR with title\n     `Revert <pr-title> (#<pr-num>) — develop went red post-merge`,\n     body includes failing run URL + originating PR link, label\n     `incident:develop-red`, request review from PR author\n  6. If revert fails (conflict): open issue with same metadata,\n     label `incident:develop-red-revert-conflict`, no PR\nUse `peter-evans/create-pull-request@v6` action or a small\ngh-cli script.\n\nImplementation record (2026-04-30):\n  - Added `auto-revert-on-failure` to\n    `.github/workflows/develop-post-merge.yml` with\n    `needs: [lint, fast-test]` and an `always()` guard that runs only\n    when one of those post-merge checks fails.\n  - Added job-level permissions `contents: write`,\n    `pull-requests: write`, and `issues: write`, which are the minimum\n    scopes needed to push a revert branch and open either a PR or issue.\n  - Used an inline `gh` script so the same job can identify the\n    associated squash-merge PR, create idempotent incident labels, open\n    an `auto-revert/<short-sha>` PR when `git revert --no-edit` succeeds,\n    and request review from the originating PR author when possible.\n  - Added conflict fallback: if the revert does not apply cleanly, the\n    job aborts the revert and opens an\n    `incident:develop-red-revert-conflict` issue with the failing SHA,\n    run URL, originating PR URL, and attempted branch name.\n  - W2 review issue addressed during implementation: the job uses\n    `needs.*.result` rather than job-level `failure()` alone, so skipped\n    or successful post-merge jobs do not accidentally trigger a revert.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add auto-revert PR generation on red",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "notes": "Add a `metrics` job that runs with `if: always()` for every push to\ndevelop, so both green and red post-merge runs emit a machine-readable\nrecord. Computes and writes JSON artifact:\n  {\n    \"merged_at\": \"<ISO-8601>\",\n    \"pr_number\": N,\n    \"pr_open_to_merged_seconds\": N,\n    \"post_merge_red\": false,\n    \"develop_red_detected_at\": null,\n    \"auto_revert_pr_opened_at\": null,\n    \"time_to_revert_pr_seconds\": null,\n    \"next_green_develop_run_at\": null,\n    \"time_to_recover_red_seconds\": null,\n    \"conflict_on_merge\": <bool from PR labels/comments>,\n    \"orphaned_failed_pr\": false,\n    \"ci_runner_minutes\": N\n  }\nOn failure, the auto-revert job should update or emit the same shape\nwith `post_merge_red: true`, `develop_red_detected_at`, and\n`auto_revert_pr_opened_at`. `next_green_develop_run_at` and\n`time_to_recover_red_seconds` may be null at artifact creation time;\n`make dev-loop-metrics` must fill them by scanning later successful\ndevelop-post-merge runs. Artifact retention: 90 days (covers the\nStep 5 measurement window). One file per merge. Step 5 aggregates\nthese records plus the explicit PR audit sources named there.\n\nImplementation record (2026-04-30):\n  - Added a `metrics` job to `.github/workflows/develop-post-merge.yml`\n    with `if: always()` and `needs: [lint, fast-test,\n    auto-revert-on-failure]`, so every develop push emits metrics after\n    the selected post-merge checks and any auto-revert attempt finish.\n  - The metrics job uses read-only `actions`/`contents` permissions,\n    queries the associated squash-merge PR through GraphQL, and writes\n    `dev-loop-metrics/<sha>.json`.\n  - The JSON includes the Step 4 shape: merge timestamp, PR number,\n    PR-open-to-merge seconds, post-merge red status, red detection time,\n    auto-revert PR timestamp when one was opened, recovery placeholders,\n    conflict/orphan flags, and summed completed-job runner minutes.\n  - Added a 90-day artifact upload named `metrics` for Step 5's\n    measurement window.\n  - W3 review issue addressed during implementation: the metrics job\n    has only read permissions, and the GitHub jobs query requests one\n    bounded page (`per_page=100`) so the captured payload is valid JSON.\n  - W3 review timing issue fixed: `develop_red_detected_at` is derived\n    from the failed `lint`/`fast-test` job completion timestamp instead\n    of the later metrics-job start time, so `time_to_revert_pr_seconds`\n    cannot go negative when auto-revert finishes before metrics runs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Emit per-PR dev-loop metrics as workflow artifact",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "notes": "Add a section \"If develop goes red\":\n  - The post-merge workflow detects the failure within ~5 min\n  - It auto-opens a revert PR (label: incident:develop-red) OR\n    an issue if revert conflicts\n  - Original PR author gets review-requested on the revert\n  - Agents do NOT need to monitor CI proactively\n  - To repair: `make worktree-claim BRANCH=fix/<original-issue>`,\n    fix, resubmit\nReplace any older \"monitor your PR until green\" guidance.\n\nImplementation record (2026-04-30):\n  - Updated `CLAUDE.md` with an \"If develop goes red\" flow: the\n    post-merge workflow opens an `incident:develop-red` revert PR, or an\n    `incident:develop-red-revert-conflict` issue when the revert\n    conflicts.\n  - Updated `AGENTS.md` with the same operating guidance and removed\n    the placeholder language that Step 4 would expand the safety net\n    later.\n  - Documented that agents do not need to monitor CI proactively after\n    auto-merge; the generated revert PR or conflict issue is the alert.\n  - Documented the repair path:\n    `make worktree-claim BRANCH=fix/<original-issue>`, fix, preflight,\n    and resubmit with `make pr-open`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the new failure flow in CLAUDE.md and AGENTS.md",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "notes": "`make dev-loop-metrics` downloads the last N (default 30) days\nof metrics artifacts and prints a summary:\n  - P50/P95 PR-to-merged time\n  - Post-merge red rate\n  - Conflict rate\n  - Runner minutes total\nUsed by Step 5 reviewer (manual or scripted) to check thresholds.\nImplementation: `gh run list --workflow develop-post-merge.yml\n--json conclusion,databaseId | gh run download <id> -n metrics`,\nthen aggregate the JSON files.\nDocument this target in CLAUDE.md and AGENTS.md near the post-merge\nsafety-net / dev-loop workflow text. In CLAUDE.md, add it to the\npre-approved read-only PR/Worktree or metrics bucket; the command\nreads workflow artifacts through `gh` and does not mutate repo state.\n\nImplementation record (2026-04-30):\n  - Added `make dev-loop-metrics` with `DEV_LOOP_METRICS_DAYS` (default\n    30) and `DEV_LOOP_METRICS_LIMIT` (default 100). The target lists\n    recent `develop-post-merge.yml` push runs on `develop`, downloads\n    available `metrics` artifacts, and aggregates their JSON files.\n  - The summary prints metrics artifact count, P50/P95 PR-to-merged\n    seconds, post-merge red rate, conflict rate, and total runner\n    minutes. If no artifacts exist yet, it still prints a non-empty\n    `n/a` summary instead of failing.\n  - Documented the target in `CLAUDE.md` and `AGENTS.md` near the\n    post-merge safety-net flow.\n  - Added `make dev-loop-metrics` to the CLAUDE.md pre-approved\n    read-only PR/Worktree command bucket because it only reads workflow\n    artifacts through `gh`.\n  - W5 review issues addressed during implementation: the target handles\n    an empty metrics-artifact window without failing, and P50/P95 use\n    nearest-rank percentiles instead of lower-rank indexing.\n  - Final Step 4 verification issue addressed: the summary prints\n    `runner minutes total` with lowercase `runner` so the TODO\n    verification command passes as written.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add make dev-loop-metrics target for ad-hoc inspection",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "dev-loop-step-4-post-merge-safety-net",
+        "notes": "Before merging this PR, validate the auto-revert path end-to-end\nin a fork: cherry-pick a commit that fails the post-merge tests,\npush to a fork's develop, confirm the workflow opens a revert PR\nwith correct title/body/labels. If revert conflicts, confirm the\nfallback issue is opened correctly.\nDocument the test in PR description AND write\n`_project/decisions/dev-loop-auto-revert-fork-test-<date>.md` with\nfork repo, failing SHA, workflow run URL, revert PR URL or conflict\nissue URL, and screenshots/CLI excerpts sufficient for review.\n\nImplementation record (2026-04-30):\n  - A true same-account fork was impossible: GitHub rejected\n    `joeharris76/BenchBox` -> `joeharris76/BenchBox-dev-loop-smoke-*`\n    because one user account cannot own both a parent and a fork. No\n    organization target was available, so W6 used public disposable\n    mirror `joeharris76/benchbox-dev-loop-smoke-20260430`.\n  - Configured the mirror and canonical repository workflow setting with\n    `default_workflow_permissions=read` and\n    `can_approve_pull_request_reviews=true`, which is required for\n    `GITHUB_TOKEN` to create pull requests when the job requests\n    `pull-requests: write`.\n  - First smoke SHA `35dd478645e5ed34b5b21d33e625bab8e88ddef5`\n    exposed a workflow-file edge case: GitHub rejected the revert branch\n    push because the reverted commit changed `.github/workflows/*` and\n    `GITHUB_TOKEN` lacks `workflows` permission.\n  - W6 review issue addressed in `.github/workflows/develop-post-merge.yml`:\n    push failures and `gh pr create` failures now open a manual-action\n    issue labeled `incident:develop-red-revert-conflict` instead of\n    failing without an incident artifact.\n  - Final smoke SHA `cff5c591941c989cd0c3003d552142d93489e238`\n    validated the normal path: run\n    `https://github.com/joeharris76/benchbox-dev-loop-smoke-20260430/actions/runs/25189439117`\n    opened revert PR\n    `https://github.com/joeharris76/benchbox-dev-loop-smoke-20260430/pull/1`\n    from `auto-revert/cff5c591941c` to `develop` with label\n    `incident:develop-red`.\n  - Evidence written to\n    `_project/decisions/dev-loop-auto-revert-fork-test-2026-04-30.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run smoke test against a known-bad SHA in a fork",
+        "wid": "w6"
+      }
+    ]
+  }
+}

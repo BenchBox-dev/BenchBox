@@ -1,0 +1,320 @@
+{
+  "context": "Treat compare as a user journey, not a per-page button check. Build fixtures\nfrom the generated snapshot, run each path in a browser, then codify the\npaths as regression tests.\n",
+  "description": "Compare controls now exist across the Results Explorer, but the latest review\nfound that none of the visible entrypoints can complete because every row is\ndisabled. After eligibility is repaired, each entrypoint needs a real browser\nacceptance path that proves the user can discover, select, and complete a\ncomparison without editing the URL.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "mark this complete because unit tests pass; every visible entrypoint needs browser proof.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "rely on URL editing as a fallback path.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "skip Query Workbench because it is powered by DuckDB; it is one of the advertised compare entrypoints.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use hard-coded stale result IDs without first deriving them from the current snapshot.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "needs_item": "results-explorer-comparison-eligibility-contract-repair"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-11T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "results-explorer-followup-todo-review"
+    },
+    "preserves": [
+      {
+        "behavior": "Compare URLs with explicit IDs remain shareable and reloadable.",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates"
+      },
+      {
+        "behavior": "Existing filters and sort controls remain usable while selections are active.",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates"
+      },
+      {
+        "behavior": "Ineligible rows remain blocked from selection after the eligibility repair.",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates"
+      },
+      {
+        "behavior": "Users do not need to edit query parameters manually.",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/e2e/ or existing browser smoke harness: use for acceptance coverage.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "path": "results-explorer/e2e/"
+      },
+      {
+        "concept": "results-explorer/src/pages/BenchmarkIndex.tsx:benchmark selection controls and compare button.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "path": "results-explorer/src/pages/BenchmarkIndex.tsx:benchmark"
+      },
+      {
+        "concept": "results-explorer/src/pages/Compare.tsx:builder, selected-run state, and compare route.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "path": "results-explorer/src/pages/Compare.tsx:builder"
+      },
+      {
+        "concept": "results-explorer/src/pages/PlatformIndex.tsx:platform table selection and filtering.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "path": "results-explorer/src/pages/PlatformIndex.tsx:platform"
+      },
+      {
+        "concept": "results-explorer/src/pages/Query.tsx:query workbench row selection.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "path": "results-explorer/src/pages/Query.tsx:query"
+      },
+      {
+        "concept": "results-explorer/src/pages/ResultDetail.tsx:Compare this result entrypoint.",
+        "decision": "reuse",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "path": "results-explorer/src/pages/ResultDetail.tsx:Compare"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "kind": "do_not_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-compare-entrypoint-happy-path-gates/"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e -- --project=chromium --grep \"compare entrypoint\"",
+        "description": "Compare entrypoint browser suite passes",
+        "expected": "all compare entrypoint tests pass",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Compare.test.tsx",
+        "description": "Frontend unit tests still pass for compare pages",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"benchmark detail|platform detail|Query Workbench|Compare this result|empty Compare builder|PASS|FAIL\" _project/verification-logs/results-explorer-compare-entrypoint-happy-path-gates/",
+        "description": "Manual evidence log exists for the checked SHA",
+        "expected": "logs include pass/fail evidence for all five entrypoints",
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "needs_wid": "w0",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "notes": "Query the regenerated snapshot for at least two stable comparable cohorts\nand capture the checked git SHA, snapshot file path/checksum, SQL used, and\nselected fixture rows:\n  - one benchmark-detail cohort;\n  - one platform-detail cohort;\n  - one cohort reachable from Query Workbench filters.\nCapture result IDs, platform labels, benchmark, scale, phase, metric, and\nexpected compare URL in\n`_project/verification-logs/results-explorer-compare-entrypoint-happy-path-gates/w0.log`.\nDecision gate: if no fixture has two comparable rows, stop and return to\n`results-explorer-comparison-eligibility-contract-repair`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define canonical compare fixtures from the regenerated snapshot",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "notes": "From `/results/<benchmark>/`, select two eligible rows, confirm the primary\ncompare button enables, click it, and verify the compare page renders:\n  - breadcrumb with benchmark and Compare;\n  - selected platform cards;\n  - decision summary or valid insufficient-evidence state;\n  - chart panel;\n  - comparability receipt;\n  - share URL button.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prove benchmark detail selection completes a comparison",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "notes": "From `/results/p/<platform>/`, filter or scroll to two comparable rows from\nthe same cohort, select them, click Compare, and verify the same completion\ncriteria as w1. Confirm page-level filters do not clear selection\nunexpectedly unless the selected rows leave the visible cohort.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prove platform detail selection completes a comparison",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "notes": "Use Query Workbench filters to surface a comparable cohort, select two\neligible rows, verify the `Compare` action enables, click it, and confirm\nthe compare page is shareable and reloadable. Confirm CSV/JSON export\ncontrols and SQL scratchpad state are not required to complete the compare\nflow.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prove Query Workbench selection completes a comparison",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "notes": "Open a result detail page for a compare-eligible run, click `Compare this\nresult`, verify the builder opens with that run pinned, select a compatible\nsecond run, and complete the comparison. The pinned run must be visible,\nremovable only through an explicit action, and not silently dropped by\nfilters.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prove result-detail Compare this result can add a compatible second row",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "notes": "Open `/results/compare` without IDs, use the in-page builder to choose a\nbenchmark/scale/cohort, select two rows, and complete a comparison. The page\nmust not tell users to edit the URL and must provide enough filters to find\neligible rows.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prove empty Compare builder can start and complete a comparison",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-compare-entrypoint-happy-path-gates",
+        "notes": "Add or extend Playwright/browser-use acceptance tests for the five paths\nabove. Tests should assert visible enabled controls, final route state,\nselected result IDs in the share URL, and a rendered compare summary.\nDecision gate: this TODO cannot complete with manual-only evidence.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add automated browser coverage for all five compare paths",
+        "wid": "w6"
+      }
+    ]
+  }
+}

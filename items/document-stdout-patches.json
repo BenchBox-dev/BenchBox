@@ -1,0 +1,17 @@
+{
+  "description": "The TPC-DS stdout fix (commit 3911fd3a) applied patches to enable streaming\ndata generation but lacks documentation equivalent to what TPC-H has.\n\nTPC-H has a comprehensive PATCHES.md file documenting the stdout patch\nand crediting gregrahn/tpch-kit. TPC-DS needs the same treatment to:\n\n1. Document the patches applied for future maintainers\n2. Credit the original fix author (gregrahn/tpcds-kit commit 7992dbb)\n3. Help users understand the streaming capability exists\n\nThis was identified during code review of the stdout fix implementation.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "document-stdout-patches",
+        "needs_item": "patch-tpcds-source-stdout"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-01-15T00:00:00Z",
+      "created_at": "2026-01-15T00:00:00Z",
+      "worktree": "tpcds-docs"
+    }
+  }
+}

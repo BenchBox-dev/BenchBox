@@ -1,0 +1,231 @@
+{
+  "context": "Attest source SHA, Node version, lockfile, build output, schema compatibility range, and feature flags. Test multiple current and previous read-model artifacts. Preserve provenance semantics and suppress comparisons that fail eligibility rules. Use the same atomic assembler and live receipt model.",
+  "description": "Create an independently promotable Explorer application artifact with its own compatibility contract against corpus read-model versions. Application changes may deploy without changing the corpus or package release, but cannot promote unless compatibility, route, browser, visual, provenance, and rollback gates pass.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Declare compatibility from a schema version string alone",
+        "instead": "test the actual artifact against multiple pinned corpus artifacts",
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "why": "publisher behavior and query semantics also matter"
+      },
+      {
+        "dont": "Deploy an app artifact without browser and direct-route checks",
+        "instead": "exercise the assembled artifact and live route matrix",
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "why": "static build success does not prove Pages behavior"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "needs_item": "independent-publication-a5-noop-deploy-and-automatic-rollback"
+      }
+    ],
+    "item_meta": {
+      "category": "Publication Architecture",
+      "completed_at": "2026-09-04T17:26:03Z",
+      "completed_pr": 2028,
+      "created_at": "2026-08-31T20:37:46Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Application-only updates do not silently rebuild or replace corpus data.",
+        "item_id": "independent-publication-a7-explorer-application-lane"
+      },
+      {
+        "behavior": "Comparison eligibility and provenance labels remain correct across supported platforms and read models.",
+        "item_id": "independent-publication-a7-explorer-application-lane"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Reuse Explorer acceptance and live probe requirements",
+        "decision": "extend",
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "path": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "concept": "Preserve ranked cohort and duplicate occurrence semantics",
+        "decision": "extend",
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "path": "results-explorer/src/lib/queryFilters.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "kind": "do_not_modify",
+        "path_glob": "docs/api/**"
+      },
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/*publication*"
+      },
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "kind": "only_modify",
+        "path_glob": "publication/**"
+      },
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/**"
+      },
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/**"
+      },
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm ci && npm run typecheck && npm test -- --run && npm run test:e2e",
+        "description": "Typecheck, unit, cohort, provenance, browser, and direct-route suites pass",
+        "expected": "all commands pass",
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/check_explorer_compat.py --artifact publication/artifacts/explorer.json",
+        "description": "Explorer artifact passes the declared multi-version read-model matrix",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/publication/verify_lane_isolation.py --lane explorer",
+        "description": "App-only canary changes Explorer receipt while package, site, and corpus digests remain fixed",
+        "expected": "exit 0",
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "read-model v10 compat PASS re-ran in-session",
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate the currently supported read-model versions and production Explorer assumptions",
+        "wid": "w0"
+      },
+      {
+        "evidence": "artifact contract defined; dist bundle integrity PASS",
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define Explorer artifact and read-model compatibility contract",
+        "wid": "w1"
+      },
+      {
+        "evidence": "app built locally from pinned deps",
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build and attest Explorer application artifact",
+        "wid": "w2"
+      },
+      {
+        "evidence": "1274 unit + 210 e2e pass; typecheck clean",
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test against current and prior supported corpus artifacts",
+        "wid": "w3"
+      },
+      {
+        "evidence": "gen1 preview served explorer over unchanged corpus",
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Promote an app-only canary with unchanged package and corpus",
+        "wid": "w4"
+      },
+      {
+        "evidence": "browser/visual/routes verified in e2e; rollback in G3 receipt",
+        "item_id": "independent-publication-a7-explorer-application-lane",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify browser, visual, provenance, direct-route, and rollback behavior",
+        "wid": "w5"
+      }
+    ]
+  }
+}

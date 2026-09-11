@@ -1,0 +1,230 @@
+{
+  "context": "For each gap, add a _validate_identifier() call before the f-string SQL construction.\nFollow the pattern already established in each adapter's other methods (e.g.,\nQuestDB's drop_table, LakeSail's drop_database).\n\nFor the LakeSail IF NOT EXISTS fix, update the regex replacement to check for and\npreserve the IF NOT EXISTS clause.\n\nFor the Databend delimiter, add a simple validation:\n  if delimiter not in (',', '|', '\\t'):\n      raise ValueError(f\"Unsafe delimiter: {delimiter!r}\")\n",
+  "description": "Adversarial code reviews found that while most new adapters have _validate_identifier()\nmethods, they are inconsistently applied. Several code paths interpolate identifiers\nor user-supplied values into SQL via f-strings without validation:\n\n1. **LakeSail create_connection()** (PR #27): target_database interpolated into\n   CREATE DATABASE and USE statements without _validate_identifier(). The drop_database\n   method correctly validates, but create_connection does not.\n\n2. **LakeSail _normalize_table_name_in_sql()** (PR #27): Strips IF NOT EXISTS from\n   CREATE TABLE statements, changing DDL semantics. Not injection per se, but a\n   correctness issue in SQL transformation.\n\n3. **Databend _load_table_via_copy() delimiter** (PR #29): Delimiter interpolated into\n   COPY SQL without validation. Currently only returns | or , but future changes could\n   introduce injection.\n\n4. **Doris database in Stream Load URL** (PR #30): self.database used in HTTP URL\n   construction without _validate_identifier(). Path traversal risk.\n\n5. **pg_mooncake analyze_table** (PR #32): Table name interpolated without validation.\n\n6. **LakeSail create_schema fallback** (PR #27): Extracted table name used in DROP TABLE\n   without validation.\n\n7. **Doris _validate_identifier() for database** (PR #30): Database name not validated\n   at __init__ time, only table names validated at point of use.\n\nThe fix is straightforward: apply _validate_identifier() at every f-string SQL\ninterpolation point. This is a defense-in-depth measure - most values come from\nconfig or benchmark definitions, not raw user input.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add parameterized queries for DDL",
+        "instead": "use _validate_identifier() instead",
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "why": "DDL identifiers cannot be parameterized in SQL"
+      },
+      {
+        "dont": "relax _validate_identifier() regex",
+        "instead": "keep it strict",
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "why": "the current ^[a-zA-Z_][a-zA-Z0-9_]*$ pattern is deliberately strict"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-16T00:00:00Z",
+      "created_at": "2026-02-15T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass",
+        "item_id": "platform-adapter-sql-injection-gaps"
+      },
+      {
+        "behavior": "Valid identifiers (alphanumeric, underscore) continue to pass validation",
+        "item_id": "platform-adapter-sql-injection-gaps"
+      },
+      {
+        "behavior": "_validate_identifier() behavior unchanged - same regex pattern and error messages",
+        "item_id": "platform-adapter-sql-injection-gaps"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/postgres.py"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend/adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/doris.py"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/lakesail.py"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_mooncake.py"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_databend_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_doris_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_lakesail_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_pg_mooncake_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "All platform adapter tests pass",
+        "expected": "all tests pass",
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_lakesail_adapter.py -v --tb=short",
+        "description": "LakeSail adapter tests pass",
+        "expected": "all tests pass",
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "notes": "lakesail.py:376, before CREATE DATABASE and USE statements",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add _validate_identifier(target_database) in LakeSail create_connection()",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "notes": "lakesail.py:654-672 - regex replacement drops IF NOT EXISTS safety guard",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix LakeSail _normalize_table_name_in_sql to preserve IF NOT EXISTS",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "notes": "databend/adapter.py:411-413 - assert single safe character before interpolation",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate delimiter in Databend _load_table_via_copy()",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "notes": "doris.py:418 - database used in Stream Load URL without validation",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add _validate_identifier(self.database) at Doris __init__ time",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "notes": "pg_mooncake.py:198-225 - table_name in f-string SQL",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add _validate_identifier in pg_mooncake analyze_table",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "notes": "lakesail.py:431 - extracted table name used without validation",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add _validate_identifier in LakeSail create_schema fallback DROP TABLE path",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-sql-injection-gaps",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for identifier validation on all fixed paths",
+        "wid": "w7"
+      }
+    ]
+  }
+}

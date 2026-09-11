@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #236 of remediate-coverage-theater.\nDeferred: Rewrite CLI setup tests to use real config files instead of 54 patches\nReason deferred: Lower priority - CLI setup is less critical than platform execution paths",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:59Z",
+      "worktree": "main"
+    }
+  }
+}

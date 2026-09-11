@@ -1,0 +1,255 @@
+{
+  "context": "MINIMUM-CHANGE STRATEGY - inject parameters through centralized parameter functions,\nnot through DataFrameContext Protocol changes.\n\nKey insight: TPC-DS already has a single choke point - every query calls\nget_parameters(query_id) from parameters.py. Adding an optional `overrides` parameter\nto this function is the minimum fix for all 99 TPC-DS queries: zero query function\nmodifications needed.\n\nTPC-H is harder: queries inline values directly (TPCH_PARAMS dict is dead code).\nThe minimum fix requires: (1) consolidate inline values into a TPCH_DEFAULT_PARAMS dict,\n(2) create get_tpch_parameters(query_id, overrides=None), (3) refactor 44 query functions\n(22 expression + 22 pandas) to call it. This is unavoidable scope.\n\nParameter extraction from binaries:\n1. Run qgen/dsqgen for each query with a given seed/SF/stream\n2. Parse substitution values from generated SQL using regex anchored to SQL keywords\n3. Return dict structure matching the existing parameter formats\n4. Cache results per seed/SF/stream combination\n\nOverride injection mechanism: Use a module-level _parameter_overrides dict in each\nparameters module. The dataframe_runner sets it before query execution and clears it\nafter. The get_*_parameters() functions check overrides first, then fall back to static\ndefaults. This avoids touching DataFrameContext, DataFrameQuery, or any platform adapter.\n\nPhase 6 approach: Fix the 3 identified gaps with minimal scope:\n- Q7/Q8: Add start_date/end_date to TPCH_DEFAULT_PARAMS, update 4 functions to read from params\n- Q96: This is the sole TPC-DS query that bypasses get_parameters() - add the call to both impls\n- Tests: Add integration-level tests that verify query functions actually consume overrides\n",
+  "description": "DataFrame query implementations for TPC-H (22 queries) and TPC-DS (99 queries) use\nhardcoded static parameter values instead of deriving parameters from the same\nseed-based generation that SQL queries use via the qgen/dsqgen binaries. This means:\n\n1. SQL queries produce different parameter values for each stream/seed combination\n   (as the TPC spec requires), while DataFrame queries always use the same fixed values\n   regardless of stream_id or seed.\n2. SQL and DataFrame modes cannot be meaningfully compared because they execute\n   different workloads when using any non-default seed.\n3. Multi-stream throughput tests in DataFrame mode repeat identical parameters across\n   streams instead of varying them per the TPC specification.\n\nThe ordering permutation logic is already correct - both SQL and DataFrame modes use\nTPCHStreams.PERMUTATION_MATRIX and TPCDSPermutationGenerator respectively. The gap\nis purely in parameter substitution.\n\nIMPORTANT: The two benchmarks have different parameter access patterns:\n- TPC-DS: All 99 queries call get_parameters(query_id) from parameters.py - a single\n  centralized choke point. Minimum fix: modify get_parameters() to accept overrides.\n- TPC-H: All 22 queries INLINE parameter values directly (e.g., cutoff_date = date(1998, 9, 2)).\n  The TPCH_PARAMS dict at module top is dead documentation - never referenced by any\n  query function. Minimum fix: create a get_tpch_parameters(query_id) function, then\n  refactor each query to call it instead of using inline literals.\n\nPOST-IMPLEMENTATION REVIEW (2026-02-06):\nPhases 1-5 are complete and the core mechanism works. An adversarial code review\nidentified 3 defects that require a follow-up Phase 6:\n- BUG: TPC-H Q7/Q8 have hardcoded date parameters that bypass the override system\n- BUG: TPC-DS Q96 bypasses get_parameters() and uses hardcoded literals directly\n- GAP: Missing integration-level tests that verify query functions consume overrides\n- STYLE: Misplaced import in parameter_extractor.py",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "build a full SQL parser for parameter extraction",
+        "instead": "keep extraction targeted to known parameter slots",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "why": "regex on well-known TPC query templates is sufficient and far simpler"
+      },
+      {
+        "dont": "change Q7/Q8 default date values from 1995-01-01/1996-12-31",
+        "instead": "parameterize for consistency but preserve exact defaults",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "why": "these are TPC-H spec-fixed values that do not vary with seed"
+      },
+      {
+        "dont": "change the DataFrameContext Protocol or any of its 5 implementations",
+        "instead": "use module-level override dicts instead",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "why": "that forces changes to PolarsDataFrameContext, ExpressionFamilyContext, PandasFamilyContext, and all platform adapters"
+      },
+      {
+        "dont": "change the function signature of expression_impl/pandas_impl callables",
+        "instead": "inject params through the parameter functions instead",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "why": "every query registration binds Callable[[DataFrameContext], Any] and changing this signature requires updating 200+ registrations"
+      },
+      {
+        "dont": "modify the permutation/ordering logic",
+        "instead": "this TODO is parameter-only",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "why": "ordering is already correct for both TPC-H and TPC-DS in DataFrame mode"
+      },
+      {
+        "dont": "parse dsqgen output by positional character offset",
+        "instead": "use regex patterns anchored to SQL keywords instead",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "why": "SQL formatting may vary by dialect flag"
+      },
+      {
+        "dont": "reimplement qgen/dsqgen parameter generation algorithms in Python",
+        "instead": "extract from binary output instead",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "why": "these algorithms are complex, version-specific, and maintained by the TPC"
+      },
+      {
+        "dont": "remove the static default parameter values",
+        "instead": "keep them as defaults",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "why": "they serve as documentation and fallback when binaries are unavailable"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "needs_item": "fix-tpch-reference-seed-and-parameter-parity"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-06T00:00:00Z",
+      "created_at": "2026-02-06T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "All 22 TPC-H query functions produce identical results when no overrides are set (static defaults match current inline values exactly)",
+        "item_id": "dataframe-parameter-substitution-parity"
+      },
+      {
+        "behavior": "All 99 TPC-DS query functions continue to call get_parameters(N) with no signature change - overrides parameter is optional with default None",
+        "item_id": "dataframe-parameter-substitution-parity"
+      },
+      {
+        "behavior": "DataFrameContext Protocol and all 5 implementations unchanged: DataFrameContext (Protocol), DataFrameContextImpl (ABC), PolarsDataFrameContext, ExpressionFamilyContext, PandasFamilyContext",
+        "item_id": "dataframe-parameter-substitution-parity"
+      },
+      {
+        "behavior": "Existing DataFrame benchmark results at default seed remain reproducible",
+        "item_id": "dataframe-parameter-substitution-parity"
+      },
+      {
+        "behavior": "Q7/Q8 dates are spec-fixed at 1995-01-01 to 1996-12-31 regardless of seed - Phase 6 parameterizes them for architectural consistency but the default values MUST remain these exact dates",
+        "item_id": "dataframe-parameter-substitution-parity"
+      },
+      {
+        "behavior": "TPCDSPermutationGenerator ordering logic is unchanged - permutations are already correct",
+        "item_id": "dataframe-parameter-substitution-parity"
+      },
+      {
+        "behavior": "TPCHStreams.PERMUTATION_MATRIX ordering logic is unchanged - permutations are already correct",
+        "item_id": "dataframe-parameter-substitution-parity"
+      },
+      {
+        "behavior": "The params = get_parameters(N) call pattern in all TPC-DS query functions continues to work without modification",
+        "item_id": "dataframe-parameter-substitution-parity"
+      },
+      {
+        "behavior": "qgen/dsqgen binary invocation patterns in QGenBinary and DSQGenBinary remain untouched",
+        "item_id": "dataframe-parameter-substitution-parity"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/context.py"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/query.py"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/c_tools.py"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/streams.py"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/queries.py"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/streams.py"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/dataframe_runner.py"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/dataframe_queries/parameters.py"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/dataframe_queries/queries.py"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/parameter_extractor.py"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/dataframe_queries.py"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/parameter_extractor.py"
+      },
+      {
+        "item_id": "dataframe-parameter-substitution-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_parameter_parity.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_parameter_parity.py -v",
+        "description": "TPC-H DataFrame parameters match qgen output for seed=1 SF=1",
+        "expected": "All parameter parity tests pass",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'dataframe' -v --timeout=120",
+        "description": "Existing DataFrame tests still pass (backward compatibility)",
+        "expected": "All existing DataFrame tests pass, 0 regressions",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v",
+        "description": "Platform adapter tests still pass (no Protocol breakage)",
+        "expected": "All platform tests pass, 0 failures",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m benchbox run --platform polars-df --benchmark tpch --scale 0.01 --queries Q1,Q3,Q6 --phases power",
+        "description": "Smoke test: DataFrame benchmark runs end-to-end",
+        "expected": "Benchmark completes successfully with 3 query results",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_parameter_parity.py -k 'q7 or q8' -v",
+        "description": "Phase 6: Q7/Q8 date parameterization",
+        "expected": "Q7/Q8 date override tests pass",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_parameter_parity.py -k 'q96' -v",
+        "description": "Phase 6: Q96 parameterization",
+        "expected": "Q96 parameter tests pass",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_parameter_parity.py -k 'integration' -v",
+        "description": "Phase 6: Integration-level override propagation",
+        "expected": "Integration tests verify overrides reach query functions",
+        "item_id": "dataframe-parameter-substitution-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,198 @@
+{
+  "description": "PR #2079 regenerated the stale seed but current test_ledger_seed.py still sets PINNED_SOURCE_REF=origin/published-results. An independent mirror can turn unchanged code red and trigger a wrongly attributed revert (#2073). Adopt capture-once immutable revision/digest patterns from docs/operations/independent-publication-baseline.md and scripts/publication/create_ledger_seed.py. Coordinate overlapping paths with the active independent-production-deployer-and-retirement owner before implementation; do not edit their worktree or shortcut the current soak.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Treat a snapshot, a queued review, a skipped hook or an unbound passing check as completion",
+        "instead": "Bind actual evidence to the relevant PR/head/input and retain an explicit owned next action",
+        "item_id": "publication-ledger-reproducible-inputs",
+        "why": "The observed session repeatedly lost asynchronous work or overstated evidence"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "needs_item": "ci-baseline-representative-remeasure-sample"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-09-08T02:40:31Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "A stale live publication input remains visible and owned; reproducibility success must not imply freshness.",
+        "item_id": "publication-ledger-reproducible-inputs"
+      },
+      {
+        "behavior": "Preserve attested artifact/digest binding, active publication ownership and the separately approved soak/retirement sequence.",
+        "item_id": "publication-ledger-reproducible-inputs"
+      },
+      {
+        "behavior": "Preserve raw benchmark bundles, published identities, hashes and corpus union; no destructive corpus rewrite.",
+        "item_id": "publication-ledger-reproducible-inputs"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "publication-ledger-reproducible-inputs",
+        "path": "docs/operations/independent-publication-baseline.md"
+      },
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "publication-ledger-reproducible-inputs",
+        "path": "scripts/publication/create_ledger_seed.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "do_not_modify",
+        "path_glob": ".agents/skills/**"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "do_not_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/develop-post-merge.yml"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/sync-results-data-to-published.yml"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/corpus-refresh.md"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/independent-publication-baseline.md"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "only_modify",
+        "path_glob": "publication/ledger-seed.json"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/check_corpus_bijection.py"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "only_modify",
+        "path_glob": "scripts/publication/create_ledger_seed.py"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/publication/test_check_corpus_bijection.py"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/publication/test_ledger_seed.py"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_sync_results_workflow.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/publication/test_ledger_seed.py tests/unit/scripts/publication/test_check_corpus_bijection.py tests/unit/test_sync_results_workflow.py -q",
+        "description": "Immutable seed validation and separate freshness survive moving refs",
+        "expected": "exit 0; behavioral negative controls fail on the prior implementation",
+        "item_id": "publication-ledger-reproducible-inputs",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "publication-ledger-reproducible-inputs",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "publication-ledger-reproducible-inputs",
+        "notes": "Reconcile the merged #2079 fix and current publication/retirement contracts. Record the exact accepted corpus SHA and any additional source tree/digest needed to reproduce the seed; resolve a moving ref once before generation and persist provenance. Define explicit migration for older seeds.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record immutable ledger source identities and reconcile current publication ownership",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "publication-ledger-reproducible-inputs",
+        "notes": "Make reproducibility tests use that immutable recorded input and isolated fixtures. Fetch/resolve only explicit revisions when needed; unavailable input fails clearly rather than silently skipping or switching to a newer branch. Keep digest, union, disposition and content verification intact.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Validate seed reproducibility against recorded revisions and isolated fixtures",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "publication-ledger-reproducible-inputs",
+        "notes": "Separate current publication freshness from reproducibility. Assign the existing corpus promotion/mirror path responsibility for an idempotent seed reconciliation after accepted-head movement, with explicit captured old/new identities, compare-and-set conflict handling, and an actionable failure owner. Do not add a second publication authority or hide freshness drift.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Assign moving-ref freshness and idempotent seed reconciliation to the existing corpus flow",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "publication-ledger-reproducible-inputs",
+        "notes": "Reproduce #2066/#2073 ordering in an isolated repository: advancing published-results cannot change validation of the old recorded snapshot; freshness detects the new input; reconciliation updates once; concurrent movement, tampered digest, missing source, repeat delivery and rollback fail or recover correctly. Preserve legacy deployment/mirror until the existing retirement approval.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replay mirror movement, concurrent input changes, tampering and rollback",
+        "wid": "w3"
+      }
+    ]
+  }
+}

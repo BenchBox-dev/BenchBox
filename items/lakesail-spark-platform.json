@@ -1,0 +1,1498 @@
+{
+  "description": "Integrate LakeSail Sail as a supported BenchBox platform for high-performance\nSpark-compatible SQL and DataFrame benchmarking.\n\nLakeSail Sail is a Rust-based, drop-in replacement for Apache Spark that delivers\nsignificant performance improvements while maintaining full Spark SQL and DataFrame\nAPI compatibility. Key characteristics:\n\n- **4x faster execution** with 94% lower hardware costs vs Apache Spark (TPC-H SF100)\n- **Zero rewrite migration**: Uses standard PySpark client via Spark Connect protocol\n- **Dual execution modes**: Multi-threaded single-host or distributed cluster\n- **Modern architecture**: Built on DataFusion with Rust workers\n- **Active development**: Supports Spark 3.5 and 4.0, with roadmap for streaming\n\nThis is a strategic platform addition because:\n1. Growing interest in Spark alternatives with better performance/cost ratios\n2. Direct comparison with existing Spark adapter validates performance claims\n3. DataFrame API support enables benchbox dataframe mode (-df suffix)\n4. Open-source with commercial support model fits enterprise evaluation needs\n\nTechnical approach:\n- Leverage existing PySpark client (Sail implements Spark Connect server)\n- Can potentially reuse significant code from spark.py/pyspark adapters\n- SQLGlot 'spark' dialect for query translation\n- Support both local (single-node) and distributed deployment modes\n\nReference implementations:\n- benchbox/platforms/spark.py (SQL-based Spark)\n- benchbox/platforms/pyspark/sql_adapter.py (PySpark SQL)\n- benchbox/platforms/dataframe/pyspark_df.py (PySpark DataFrame)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add pyspark as a required dependency",
+        "instead": "keep it as an optional dependency",
+        "item_id": "lakesail-spark-platform",
+        "why": "it is large and only needed for LakeSail/Spark users"
+      },
+      {
+        "dont": "create a local SparkSession directly",
+        "instead": "connect via remote endpoint",
+        "item_id": "lakesail-spark-platform",
+        "why": "LakeSail uses Spark Connect to a Sail server"
+      },
+      {
+        "dont": "modify spark.py or pyspark adapters",
+        "instead": "create separate lakesail.py",
+        "item_id": "lakesail-spark-platform",
+        "why": "LakeSail should be additive"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-16T00:00:00Z",
+      "created_at": "2026-01-20T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "lakesail-spark-platform"
+      },
+      {
+        "behavior": "Existing spark.py adapter unchanged",
+        "item_id": "lakesail-spark-platform"
+      },
+      {
+        "behavior": "No new required dependencies added to core install",
+        "item_id": "lakesail-spark-platform"
+      },
+      {
+        "behavior": "Platform registry autodiscovery continues working for all existing platforms",
+        "item_id": "lakesail-spark-platform"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "lakesail-spark-platform",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/dataframe/pyspark_df.py"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/pyspark/"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/spark.py"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/lakesail_df.py"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/lakesail.py"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_lakesail_df.py"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_lakesail_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.lakesail import LakeSailAdapter; print('import OK')\"",
+        "description": "New adapter imports correctly",
+        "expected": "import OK",
+        "item_id": "lakesail-spark-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_lakesail_adapter.py -v --tb=short",
+        "description": "Unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "lakesail-spark-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "Existing platform tests unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "lakesail-spark-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_spark_adapter.py -v --tb=short",
+        "description": "Spark adapter unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "lakesail-spark-platform",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w6",
+        "wid": "w10"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w11",
+        "wid": "w13"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w11",
+        "wid": "w14"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w11",
+        "wid": "w15"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w16",
+        "wid": "w17"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w16",
+        "wid": "w18"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w16",
+        "wid": "w19"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w16",
+        "wid": "w20"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w21",
+        "wid": "w22"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w21",
+        "wid": "w23"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w21",
+        "wid": "w24"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w21",
+        "wid": "w25"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w26",
+        "wid": "w27"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w26",
+        "wid": "w28"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w26",
+        "wid": "w29"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w30",
+        "wid": "w31"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w30",
+        "wid": "w32"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w30",
+        "wid": "w33"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w30",
+        "wid": "w34"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w35",
+        "wid": "w36"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w35",
+        "wid": "w37"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w35",
+        "wid": "w38"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w35",
+        "wid": "w39"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w40",
+        "wid": "w41"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w40",
+        "wid": "w42"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w40",
+        "wid": "w43"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w44",
+        "wid": "w45"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w44",
+        "wid": "w46"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w44",
+        "wid": "w47"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w48",
+        "wid": "w49"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w48",
+        "wid": "w50"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w48",
+        "wid": "w51"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w52",
+        "wid": "w53"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w52",
+        "wid": "w54"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w52",
+        "wid": "w55"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w52",
+        "wid": "w56"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w57",
+        "wid": "w58"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w57",
+        "wid": "w59"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w57",
+        "wid": "w60"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w61",
+        "wid": "w62"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w61",
+        "wid": "w63"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w61",
+        "wid": "w64"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w61",
+        "wid": "w65"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w61",
+        "wid": "w66"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w67",
+        "wid": "w68"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w67",
+        "wid": "w69"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w67",
+        "wid": "w70"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w67",
+        "wid": "w71"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w72",
+        "wid": "w73"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w72",
+        "wid": "w74"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w72",
+        "wid": "w75"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w72",
+        "wid": "w76"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w77",
+        "wid": "w78"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w77",
+        "wid": "w79"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w77",
+        "wid": "w80"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w77",
+        "wid": "w81"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w77",
+        "wid": "w82"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w77",
+        "wid": "w83"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w84",
+        "wid": "w85"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w84",
+        "wid": "w86"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w84",
+        "wid": "w87"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w88",
+        "wid": "w89"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w88",
+        "wid": "w90"
+      },
+      {
+        "item_id": "lakesail-spark-platform",
+        "needs_wid": "w88",
+        "wid": "w91"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create benchbox/platforms/lakesail.py SQL adapter",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement proper session cleanup in close_connection()",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement schema and data operations",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement create_schema() for database/table DDL",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement load_data() for Parquet/CSV ingestion",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support Sail's native Parquet handling (DataFusion-based)",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle TPC trailing delimiter edge cases",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement query execution",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement execute_query() with timing measurement",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle result collection and row count validation",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement proper error handling for Sail-specific errors",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement LakeSailAdapter class inheriting from PlatformAdapter",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add query plan capture support if available",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create benchbox/platforms/dataframe/lakesail_df.py adapter",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement LakeSailDataFrameAdapter inheriting from ExpressionFamilyAdapter",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define type aliases (LakeSailDF, LakeSailLazyDF, LakeSailExpr)",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement PySpark DataFrame/Column expression mappings",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure Spark Connect client for DataFrame operations",
+        "wid": "w25"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement DataFrame context management",
+        "wid": "w26"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create context initialization connecting to Sail server",
+        "wid": "w27"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement lazy vs materialized evaluation semantics",
+        "wid": "w28"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle SparkSession lifecycle for DataFrame mode",
+        "wid": "w29"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set _dialect = 'spark' for SQLGlot transpilation",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement DataFrame query operations",
+        "wid": "w30"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Map TPC-H queries to DataFrame expression chains",
+        "wid": "w31"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement window functions via PySpark Column API",
+        "wid": "w32"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle aggregation and grouping operations",
+        "wid": "w33"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement result materialization timing",
+        "wid": "w34"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add platform metadata to registry",
+        "wid": "w35"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'lakesail' entry to _build_platform_metadata() in platform_registry.py",
+        "wid": "w36"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define capabilities (supports_sql, supports_dataframe)",
+        "wid": "w37"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure deployment modes (local, distributed)",
+        "wid": "w38"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 'lakesail-df' alias for DataFrame mode",
+        "wid": "w39"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Spark Connect client configuration for Sail server",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register adapter imports",
+        "wid": "w40"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add LakeSailAdapter import with try/except in platforms/__init__.py",
+        "wid": "w41"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add LakeSailDataFrameAdapter import for -df mode",
+        "wid": "w42"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register config builder if needed for dynamic configuration",
+        "wid": "w43"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement CLI options",
+        "wid": "w44"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add --lakesail-endpoint option for server address",
+        "wid": "w45"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add --lakesail-mode option for local vs distributed",
+        "wid": "w46"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add --lakesail-workers option for distributed mode",
+        "wid": "w47"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement Sail-specific optimizations",
+        "wid": "w48"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure DataFusion optimizer settings if exposed",
+        "wid": "w49"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure connection to Sail server endpoint (local or cluster)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enable/disable result caching for benchmark accuracy",
+        "wid": "w50"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure memory and parallelism settings",
+        "wid": "w51"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement platform info collection",
+        "wid": "w52"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture Sail version from server",
+        "wid": "w53"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture DataFusion version if available",
+        "wid": "w54"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Record deployment mode (local/distributed) and worker count",
+        "wid": "w55"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Record Spark Connect protocol version",
+        "wid": "w56"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement tuning interface",
+        "wid": "w57"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement supports_tuning_type() for applicable tunings",
+        "wid": "w58"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support partition tuning if applicable",
+        "wid": "w59"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement connection management",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document Sail-specific configuration options",
+        "wid": "w60"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create unit tests for SQL adapter",
+        "wid": "w61"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create tests/unit/platforms/test_lakesail_adapter.py",
+        "wid": "w62"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Mock PySpark/Spark Connect dependencies",
+        "wid": "w63"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test initialization and configuration handling",
+        "wid": "w64"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test connection string generation",
+        "wid": "w65"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test query execution flow",
+        "wid": "w66"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create unit tests for DataFrame adapter",
+        "wid": "w67"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create tests/unit/platforms/dataframe/test_lakesail_df.py",
+        "wid": "w68"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test expression API mapping",
+        "wid": "w69"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create SparkSession via Spark Connect to Sail server",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test context lifecycle management",
+        "wid": "w70"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test schema inference",
+        "wid": "w71"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create integration tests",
+        "wid": "w72"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create tests/integration/platforms/test_lakesail_smoke.py",
+        "wid": "w73"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test TPC-H SF=0.01 end-to-end (requires running Sail server)",
+        "wid": "w74"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test DataFrame mode execution",
+        "wid": "w75"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add skip markers for CI without Sail server",
+        "wid": "w76"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create platform documentation",
+        "wid": "w77"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create docs/platforms/lakesail.md with full user guide",
+        "wid": "w78"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document installation (pip install pysail or pyspark)",
+        "wid": "w79"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle Sail-specific connection parameters (endpoint, auth)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document Sail server setup and configuration",
+        "wid": "w80"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document deployment modes (local vs distributed)",
+        "wid": "w81"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add CLI usage examples",
+        "wid": "w82"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Python API usage examples",
+        "wid": "w83"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create example scripts",
+        "wid": "w84"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create examples/getting_started/sql/lakesail_tpch.py",
+        "wid": "w85"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create examples/getting_started/dataframe/lakesail_df_tpch.py",
+        "wid": "w86"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create examples/platforms/lakesail_vs_spark_comparison.py",
+        "wid": "w87"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update platform overview documentation",
+        "wid": "w88"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add LakeSail to docs/platforms/overview.md",
+        "wid": "w89"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement test_connection() for Sail server health check",
+        "wid": "w9"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add to platform comparison tables",
+        "wid": "w90"
+      },
+      {
+        "evidence": null,
+        "item_id": "lakesail-spark-platform",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document Spark vs LakeSail benchmark comparison guidance",
+        "wid": "w91"
+      }
+    ]
+  }
+}

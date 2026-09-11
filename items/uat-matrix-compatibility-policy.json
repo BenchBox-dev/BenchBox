@@ -1,0 +1,260 @@
+{
+  "context": "Treat compatibility pruning as data, not control-flow folklore. Reuse the\nexisting SQL compatibility registry if it can represent platform/benchmark\ngates cleanly; otherwise add the smallest dedicated UAT compatibility layer\nand document why the SQL registry was not a good fit.\n",
+  "description": "The 2026-05-12 enabled-platform run enumerated a broad set of enabled-platform\ncells but did not provide durable accounting for \"all possible benchmarks\" by\nplatform. The local enumeration path reports 57 candidate cells per platform\nacross 22 public benchmarks and three scale rungs, while the observed\n`matrix_summary.tsv` contains 96 executed cells because early failure\nbehavior and scale filtering stopped many candidates before execution.\n\nUAT needs a first-class compatibility gate: every benchmark excluded for a\nplatform must have an explicit rule id, source evidence, and justification.\nEverything else must run, and the report must distinguish executed, passed,\nfailed, timed out, compatibility-pruned, and ladder-pruned cells.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "count early-stop-pruned cells as passed, failed, or compatibility-pruned",
+        "instead": "(not specified)",
+        "item_id": "uat-matrix-compatibility-policy",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hard-code a list of benchmarks to skip inside `enumerate.py` without rule ids and source evidence",
+        "instead": "(not specified)",
+        "item_id": "uat-matrix-compatibility-policy",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "let the enabled-platform coverage sweep silently stop after the first failure on a platform",
+        "instead": "(not specified)",
+        "item_id": "uat-matrix-compatibility-policy",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-matrix-compatibility-policy",
+        "id": 612,
+        "reason": "This TODO only creates compatibility/run-accounting policy; platform-specific SQL fixes are separate.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Overly broad ('optimizer rewrites for every SQL dialect'), explicitly out of scope for the compatibility-policy TODO; not concretely actionable as stated.",
+        "summary": "Add broad feature-level optimizer rewrites for every SQL dialect"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-matrix-compatibility-policy",
+        "needs_item": "uat-pg-extension-auth-propagation"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "uat-enabled-platforms-remediation"
+    },
+    "preserves": [
+      {
+        "behavior": "Benchmark registry public metadata remains the source for public benchmark discovery",
+        "item_id": "uat-matrix-compatibility-policy"
+      },
+      {
+        "behavior": "Do not exclude a benchmark solely because it failed in one UAT run; each exclusion needs explicit incompatibility evidence",
+        "item_id": "uat-matrix-compatibility-policy"
+      },
+      {
+        "behavior": "Existing small UAT smoke configs can retain fast early-stop behavior if coverage sweeps get complete accounting",
+        "item_id": "uat-matrix-compatibility-policy"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/benchmark_registry.py:93-260 -- public benchmark metadata and scale options used by UAT",
+        "decision": "reuse",
+        "item_id": "uat-matrix-compatibility-policy",
+        "path": "benchbox/core/benchmark_registry.py:93-260"
+      },
+      {
+        "concept": "benchbox/sql_compat/registry.py -- existing compatibility rule registration pattern to reuse or deliberately supersede",
+        "decision": "supersede",
+        "item_id": "uat-matrix-compatibility-policy",
+        "path": "benchbox/sql_compat/registry.py"
+      },
+      {
+        "concept": "docs/compat/capability-matrix.md:13-39 -- platform capability report generated from compatibility metadata",
+        "decision": "reuse",
+        "item_id": "uat-matrix-compatibility-policy",
+        "path": "docs/compat/capability-matrix.md:13-39"
+      },
+      {
+        "concept": "docs/compat/skip-reference.md -- existing documented skip/block vocabulary",
+        "decision": "reuse",
+        "item_id": "uat-matrix-compatibility-policy",
+        "path": "docs/compat/skip-reference.md"
+      },
+      {
+        "concept": "tests/uat/matrix.py:220-419 -- registry-driven benchmark resolution and argv generation",
+        "decision": "reuse",
+        "item_id": "uat-matrix-compatibility-policy",
+        "path": "tests/uat/matrix.py:220-419"
+      },
+      {
+        "concept": "tests/uat/phases/enumerate.py:1-86 -- current UAT enumeration filters dataframe vs SQL-only and scale metadata, but has no SQL-platform benchmark gate",
+        "decision": "reuse",
+        "item_id": "uat-matrix-compatibility-policy",
+        "path": "tests/uat/phases/enumerate.py:1-86"
+      },
+      {
+        "concept": "tests/uat/phases/report.py -- UAT report generation path that should expose pruned and executed counts",
+        "decision": "reuse",
+        "item_id": "uat-matrix-compatibility-policy",
+        "path": "tests/uat/phases/report.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-matrix-compatibility-policy",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/*/queries.py"
+      },
+      {
+        "item_id": "uat-matrix-compatibility-policy",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "uat-matrix-compatibility-policy",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "uat-matrix-compatibility-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "uat-matrix-compatibility-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "uat-matrix-compatibility-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/compat/"
+      },
+      {
+        "item_id": "uat-matrix-compatibility-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-matrix-compatibility-policy",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_matrix.py tests/uat/test_phases.py tests/uat/test_report.py -m fast -q",
+        "description": "UAT enumeration/report unit coverage passes",
+        "expected": "passes with tests for compatibility-pruned and early-stop-pruned accounting",
+        "item_id": "uat-matrix-compatibility-policy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/reference_usage_audit.py --summary && uv run -- python -m pytest tests/unit/core/sql_compat tests/unit/sql_compat -m fast -q",
+        "description": "Compatibility metadata validates and generated docs stay current",
+        "expected": "passes or produces only documented non-blocking compatibility-doc warnings",
+        "item_id": "uat-matrix-compatibility-policy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-sweep CONFIG=tests/uat/configs/uat-enabled-platforms-enumeration.yaml",
+        "description": "Coverage-sweep config enumerates all non-blocked cells for enabled platforms",
+        "expected": "Report shows candidate, executed, compatibility-pruned, and early-stop-pruned counts for lakesail, pg-duckdb, pg-mooncake, and timescaledb",
+        "item_id": "uat-matrix-compatibility-policy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-matrix-compatibility-policy",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-matrix-compatibility-policy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-matrix-compatibility-policy",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-matrix-compatibility-policy",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-matrix-compatibility-policy",
+        "notes": "Re-run or script the enumeration for `lakesail`, `pg-duckdb`,\n`pg-mooncake`, and `timescaledb` on the current branch, and compare it to\nthe 2026-05-12 artifact counts. Commit only a compact summary if durable\nevidence is needed; keep raw enumeration output under `/tmp` or\n`BENCHBOX_OUTPUT_DIR`.\n\nCurrent coverage-sweep config\n`tests/uat/configs/uat-enabled-platforms-enumeration.yaml` enumerates\n88 executable cells and 0 compatibility-pruned cells for `lakesail`,\n`pg-duckdb`, `pg-mooncake`, and `timescaledb` at SF=0.01 across all\npublic benchmarks. The prior broad run's 96 executed rows reflected a\ndifferent multi-rung config plus early-stop behavior, not a durable\ncompatibility policy.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Recompute current candidate and observed cell accounting",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-matrix-compatibility-policy",
+        "notes": "Add or extend a registry-backed rule model for platform/benchmark\ncompatibility. A rule must include platform, benchmark, rule id, status\nsuch as `blocked` or `experimental`, a human-readable reason, and source\nevidence. Prefer reusing SQL compatibility registry patterns before\nadding a new convention.\n\nAdded UAT-local compatibility rules in `tests/uat/compatibility.py`.\nThis deliberately avoids coupling runtime `benchbox.sql_compat` to\nUAT-only run policy. Rules expose `rule_id`, `status`, `reason`, and\n`evidence`; the first rule covers dataframe platforms paired with\nSQL-only benchmarks.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the platform-benchmark compatibility data model",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-matrix-compatibility-policy",
+        "notes": "Update enumeration so compatibility-pruned cells are emitted with reasons\nand not silently dropped. Update matrix/report outputs to show candidate,\nexecuted, compatibility-pruned, early-stop-pruned, passed, failed, and\ntimed-out counts per platform and benchmark.\n\n`enumerate_cells_with_pruning()` now returns executable cells plus\ncompatibility-pruned cells. The orchestrator writes\n`compatibility_pruned.jsonl`, and report footers include candidate,\nexecuted, compatibility-pruned, early-stop-pruned, passed, failed, and\ntimed-out counts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply compatibility rules during UAT enumeration and reporting",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-matrix-compatibility-policy",
+        "notes": "The enabled-platform UAT config must be able to run all non-blocked\nbenchmarks for each enabled platform. If early-stop behavior remains for\nshort developer smoke runs, it must be disabled or separately accounted\nfor in coverage sweeps.\n\nAdded `tests/uat/configs/uat-enabled-platforms-enumeration.yaml` for the\nenabled-platform coverage-sweep shape. It sets `early_stop_on_failure:\nfalse` and a high `early_stop_after_s` so non-blocked cells are attempted\nrather than ladder-pruned in coverage runs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add coverage-sweep mode that attempts every non-blocked cell",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-matrix-compatibility-policy",
+        "notes": "Document how to add a platform/benchmark incompatibility rule, what\nevidence is acceptable, and how a compatibility-pruned cell appears in\nUAT reports.\n\nUpdated `docs/operations/uat-framework.md` with the UAT compatibility\nrule format, the separation from runtime SQL compatibility, and the\n`compatibility_pruned.jsonl`/report-footer accounting semantics.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the rule format and update existing UAT docs",
+        "wid": "w4"
+      }
+    ]
+  }
+}

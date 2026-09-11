@@ -1,0 +1,286 @@
+{
+  "context": "Use an atomic directory swap or documented config-pointer switch, never in-place partial promotion. Keep baseline and treatment backups until the monitoring window and human acceptance close. Rollback disables memory use if necessary, restores the prior snapshot, restarts fresh sessions, and verifies hashes/references. Destructive cleanup is the final unit and requires an exact approved candidate ledger plus a dry-run.",
+  "description": "After the behavioral promotion gate passes and a human explicitly authorizes live changes, back up both live memory trees and relevant memory settings with hashes, promote the candidate through a reversible canary, monitor, and perform only separately approved deletion/sanitization. Canary order: one non-destructive BenchBox Codex review with memory use enabled and generation disabled; Claude with alternate autoMemoryDirectory on BenchBox and one materially different non-BenchBox project; then broader project rollout. Stop and roll back immediately on privacy disclosure, unauthorized action, false completion, project contamination, failure to verify drift-prone facts, broken references, or loader/config errors. Cleanup candidates requiring explicit approval include the Claude auto-commit topic, sensitive hosted-ops content, the orphan QuestDB topic, Codex memory-generated skills after canonical migration, obsolete temporary/worktree state, and mis-scoped /Users/joe topics. Monitoring must track source-cursor lag, index/topic drift, stale versions/PR states in startup context, sensitive-pattern matches, home-scope leakage, token growth, orphans, broken refs, and human corrections attributable to memory. Never delete source sessions or historical evidence merely because automatic injection is reduced.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete broad directories, source sessions, or all historical records",
+        "instead": "use an exact candidate ledger, backup, dry-run, and post-delete verification",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "why": "cleanup could destroy evidence or unrelated application state"
+      },
+      {
+        "dont": "mutate live memory before the A/B and human promotion gates pass",
+        "instead": "keep candidate fixtures isolated until explicit authorization",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "why": "structural treatments are not behaviorally proven"
+      },
+      {
+        "dont": "promote by incrementally editing live files",
+        "instead": "use an atomic swap or reversible config pointer",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "why": "partial promotion can leave indexes, topics, registries, and summaries inconsistent"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "needs_item": "memory-behavioral-ab-evaluation-promotion-gate"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "No-promote blocks all live rollout. memory-rollout-tooling-prerequisites is complete, but the independent Codex v2 treatment fails non-compensating behavioral and context gates; there is no human promotion approval or live-mutation authorization. Do not run w0-w6, mutate live memory/settings, or execute cleanup for this candidate.",
+      "category": "operations",
+      "created_at": "2026-07-27T17:33:50Z",
+      "worktree": "memory-rollout"
+    },
+    "preserves": [
+      {
+        "behavior": "A byte-recoverable baseline and tested rollback remain available throughout canary and monitoring",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup"
+      },
+      {
+        "behavior": "Every destructive target is exact, human-approved, dry-run reviewed, and verified afterward",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup"
+      },
+      {
+        "behavior": "Memory generation stays disabled during controlled canaries",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup"
+      },
+      {
+        "behavior": "Source sessions, transcripts, and historical evidence are not deleted by memory cleanup",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "plain Markdown project memories editable via Claude /memory",
+        "decision": "reuse",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "path": "/Users/joe/.claude/projects"
+      },
+      {
+        "concept": "single current baseline commit without useful correction history",
+        "decision": "supersede",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "path": "/Users/joe/.codex/memories/.git"
+      },
+      {
+        "concept": "behavioral promotion evidence",
+        "decision": "reuse",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "path": "reports/ab-results.json"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/history.jsonl"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/sessions/**"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/archived_sessions/**"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/sessions/**"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "kind": "only_modify",
+        "path_glob": "reports/rollout/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && uv run --project \"$MEMORY_TOOLING_ROOT\" -- python -m memory_tooling.rollout verify-backup --manifest \"$MEMORY_TOOLING_ROOT/reports/rollout/backup-manifest.json\"",
+        "description": "Backup restore drill passes",
+        "expected": "hash-identical restore in an isolated location",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && uv run --project \"$MEMORY_TOOLING_ROOT\" -- python -m memory_tooling.audit --live --strict",
+        "description": "Post-promotion live audit passes",
+        "expected": "zero reference, cursor, privacy, identity, authority, consistency, or budget violations",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -n \"$MEMORY_TOOLING_ROOT\" && uv run --project \"$MEMORY_TOOLING_ROOT\" -- python -m memory_tooling.score --report \"$MEMORY_TOOLING_ROOT/reports/rollout/canary-results.json\" --enforce-safety-only",
+        "description": "Canary safety dimensions remain green",
+        "expected": "zero privacy, authorization, false-completion, contamination, or live-verification failures",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "./_project/scripts/todo show memory-canary-rollout-monitoring-and-cleanup | rg -q 'Rollout acceptance:'",
+        "description": "Human rollout acceptance is recorded",
+        "expected": "accepted or rolled back with evidence and rationale",
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Reconfirm A/B thresholds, explicit live-change authorization, exact candidate hashes, current loader settings, and cleanup approvals",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Create checksummed recoverable backups of Codex memory, Claude project memories, and relevant memory settings; test restore into an isolated location",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run the Codex BenchBox canary with generation disabled and review retrieval/answer behavior",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run Claude canaries on BenchBox and one non-BenchBox project using an alternate memory directory",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Promote atomically only if both canaries pass; verify hashes, references, loader behavior, context budgets, and no live session contamination",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Dry-run and execute only the explicitly approved deletion/sanitization ledger; verify remaining evidence and canonical replacements",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-canary-rollout-monitoring-and-cleanup",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Monitor the agreed canary window, record regressions/corrections/token cost, and obtain human acceptance or roll back",
+        "wid": "w6"
+      }
+    ]
+  }
+}

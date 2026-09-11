@@ -1,0 +1,63 @@
+{
+  "context": "Add reproducible telemetry and a documented rung matrix; run a smoke first, then the smallest failing/full-scale rung, and record the selected memory M, load memory L, and driver timeout T as evidence. Do not derive the floor from total RAM or a different host metric, and do not hardcode a new limit before a real trace.",
+  "description": "Measure the completed bounded streaming loader under the real ClickHouse server UAT path. Capture host available/free/swap, engine/container memory, ClickHouse memory metrics, throughput, driver timeout, and responsiveness throughout SF1 loading; compare the existing 1 GiB baseline with 4 GiB and only escalate to 8/12 GiB when the trace justifies it. Select the lowest envelope that completes without OOM, cgroup kill, timeout, unbounded growth, or 1,000-row application inserts.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "uat-clickhouse-server-streaming-memory-calibration",
+        "needs_item": "uat-clickhouse-server-streaming-loader"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-13T13:31:52Z",
+      "completed_pr": 1706,
+      "created_at": "2026-08-12T22:57:40Z",
+      "worktree": "clickhouse-streaming-memory"
+    },
+    "scope_rules": [
+      {
+        "item_id": "uat-clickhouse-server-streaming-memory-calibration",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-clickhouse-server-streaming-memory-calibration",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-streaming-memory-calibration",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/clickhouse_memory.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-streaming-memory-calibration",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_clickhouse_memory.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -q tests/uat/test_phases.py tests/uat/test_docker_assets.py tests/uat/test_config.py",
+        "description": "Focused UAT telemetry/config tests",
+        "expected": "pass",
+        "item_id": "uat-clickhouse-server-streaming-memory-calibration",
+        "last_result": "pass",
+        "last_run": "2026-08-13T13:23:58Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "sh -c 'rg -n \"^[[:space:]]*mem_limit:|CLICKHOUSE_MEMORY_LIMIT[[:space:]]*[:=]\" docker/clickhouse >/dev/null; test $? -eq 1 && echo OK'",
+        "description": "No calibration compose memory assignment exists",
+        "expected": "OK",
+        "item_id": "uat-clickhouse-server-streaming-memory-calibration",
+        "last_result": "pass",
+        "last_run": "2026-08-13T13:26:07Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

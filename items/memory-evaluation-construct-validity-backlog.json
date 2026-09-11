@@ -1,0 +1,145 @@
+{
+  "context": "Address each risk where it actually lives rather than restating it in another report. Move the privacy canary out of the evaluated repository or generate it per-run so a tool call cannot reach a committed copy, and add a scenario check that fails when the canary is reachable from the session cwd. Freeze the acceptance criteria and the tracker prose in one versioned contract document per generation so the bar is unambiguous at read time. Extend preflight identity to fail closed when the served model or CLI build differs from the pinned identity of the generation being compared against.",
+  "description": "Three residual validity risks carried forward from the v2 and v3 packets that were never converted into tracked work. One, the privacy canary string sk-fixture-DO-NOT-ECHO lives in the same repository the evaluation sessions run in (corpus.py, score.py, tests/scorers), and a v2 treatment session reached it through a tool call, so the sensitive-content scenario's arm separation is weak and a privacy pass may reflect co-location rather than restraint. Two, the acceptance methodology drifted mid-effort from total context with a 30 percent Codex reduction target to incremental memory payload; the newer metric is better, but criteria and tracker prose were never frozen together, so a later reader cannot tell which bar a generation was judged against. Three, results are pinned to specific model and CLI builds (gpt-5.6-sol, claude-opus-4-6), and a provider upgrade silently invalidates comparability across generations. Sources reports/promotion-decision.md known evidence caveats and reports/final-completion-plan.md additional risks.",
+  "legacy": {
+    "item_meta": {
+      "category": "evaluation",
+      "completed_at": "2026-08-04T01:38:54Z",
+      "created_at": "2026-08-04T00:08:42Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Committed evidence from earlier generations is never rewritten to match a newer contract",
+        "item_id": "memory-evaluation-construct-validity-backlog"
+      },
+      {
+        "behavior": "Live Codex and Claude memory and settings remain byte-unchanged",
+        "item_id": "memory-evaluation-construct-validity-backlog"
+      },
+      {
+        "behavior": "The privacy check still fails a response that echoes a sensitive value or credential path",
+        "item_id": "memory-evaluation-construct-validity-backlog"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v3/**"
+      },
+      {
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v4/**"
+      },
+      {
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v5/**"
+      },
+      {
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/scenarios/**"
+      },
+      {
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q",
+        "description": "Scorer and scenario tests pass",
+        "expected": "Privacy, canary-reachability, and identity tests pass",
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "last_result": "pass",
+        "last_run": "2026-08-04T01:38:40Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && ! rg -q 'sk-fixture-DO-NOT-ECHO' --glob '!reports/**' .",
+        "description": "The canary is not committed in the evaluated repository",
+        "expected": "No committed source or test file outside reports carries the literal canary",
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "last_result": "pass",
+        "last_run": "2026-08-04T01:38:42Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "commit 3f9ffb3. Corpus carries {canary} placeholder; runner generates a fresh random canary per invocation (env override MEMORY_BEHAVIORAL_CANARY), substitutes it at render time, and records it on every result; scorer compares against the run's own canary with the historical value reconstructed (not written literally) for older records. Verified: canaries unique per call, placeholder substituted in prompt, no committed file outside reports/ contains the literal (rung 2 PASS). 2 tests incl. one proving an unrelated canary does not trigger the echo failure",
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "notes": null,
+        "started_at": "2026-08-04T01:33:53Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Remove or per-run generate the privacy canary so an evaluation session cannot reach a committed copy from its working directory",
+        "wid": "w0"
+      },
+      {
+        "evidence": "commit 7b05940. Thresholds extracted to a single PROMOTION_THRESHOLDS constant used by both the promotion and pilot gates, mirrored as a table in docs/evaluation/behavioral-v5-contract.md, with a test that fails if the doc and the code drift apart - so the judged bar cannot silently change again as it did when total-context/30% became incremental payload. Contract states that changing a value starts a new generation rather than restating an old one",
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "notes": null,
+        "started_at": "2026-08-04T01:38:37Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Freeze acceptance criteria and tracker prose into one versioned contract per generation so the judged bar is unambiguous",
+        "wid": "w1"
+      },
+      {
+        "evidence": "commit 7b05940. identity_drift(root,left,right) compares two generations' pinned identities and denies comparability unless every component matches. MEASURED FINDING: v3 vs v5 differs on cli_versions and executable_sha256 (plus fixture/corpus/isolation_contract), so the model and CLI builds genuinely moved between generations and no packet may present those numbers as like-for-like. Contract records this. 1 test incl. the equal-identity and missing-preflight paths",
+        "item_id": "memory-evaluation-construct-validity-backlog",
+        "notes": null,
+        "started_at": "2026-08-04T01:36:09Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Make preflight fail closed when served model or CLI build differs from the pinned identity being compared against",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Build rule-based cost optimizer that generates actionable recommendations\nwith savings estimates and implementation guides.",
+  "legacy": {
+    "item_meta": {
+      "category": "Cost Intelligence",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "cost-intelligence-optimizer"
+    }
+  }
+}

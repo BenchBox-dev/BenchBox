@@ -1,0 +1,11 @@
+{
+  "description": "The codebase has ~15 locations that duplicate benchmark name variant detection\nusing `or` chains like `\"tpch\" in x or \"tpc-h\" in x`. These should use the\ncentralized `normalize_benchmark_id()` utility introduced in commit 8117828c.\n\nThis is a code hygiene issue, not a bug. The current code works correctly but:\n1. Duplicates logic that could drift out of sync\n2. Is harder to extend when adding new benchmarks\n3. Inconsistent with the now-canonical normalize_benchmark_id() pattern\n\nNote: Some locations already use the cleaner tuple-membership pattern\n`benchmark.lower() in (\"tpch\", \"tpc-h\")` which is acceptable and performant.",
+  "legacy": {
+    "item_meta": {
+      "category": "Code Quality",
+      "completed_at": "2026-01-27T00:00:00Z",
+      "created_at": "2026-01-27T00:00:00Z",
+      "worktree": "core-functionality"
+    }
+  }
+}

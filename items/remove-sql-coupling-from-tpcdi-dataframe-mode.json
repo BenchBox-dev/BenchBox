@@ -1,0 +1,191 @@
+{
+  "context": "Reuse existing DataFrameMaintenanceOperations protocol (maintenance_interface.py:300-427)\nand get_maintenance_operations_for_platform() (maintenance_interface.py:783-866) as the\nDataFrame backend's write layer. Follow the WritePrimitivesBenchmark pattern\n(write_primitives/benchmark.py:1196-1287) for capability-driven DataFrame execution.\n\nExtract SQL logic from benchmark.py into SQLETLBackend - this is a move, not a rewrite.\nThe _load_warehouse_data(), validate_etl_results(), and SCD processor SQL methods become\nmethods on SQLETLBackend. The existing run_etl_pipeline() becomes the shared orchestrator\nthat accepts a backend parameter instead of a connection.\n\nPhase order matters: backend protocol first, then Transform refactor, then wiring, then\ncleanup. Run tests after each phase.\n",
+  "description": "TPC-DI's execute_dataframe_workload() currently resolves a SQL connection via\nSQLConnectionProvider.get_sql_connection() and passes it to run_etl_pipeline(),\nwhich executes raw SQL INSERT INTO, executemany(), executescript(), and validation\nvia SELECT COUNT(*). The DataFrame variant should NEVER use SQL.\n\nThe fix: introduce a TPCDIETLBackend protocol with SQL and DataFrame implementations.\nExtract a shared mode-agnostic ETL orchestrator for Extract + Transform, then create\nseparate Load/Validate/SCD backends. The DataFrame backend delegates to the existing\nDataFrameMaintenanceOperations protocol (insert_rows, update_rows, merge_rows).\nAdditionally, eliminate the double CSV serialization in the Transform phase by having\ntransforms return DataFrames directly.\n\nSQLConnectionProvider and get_sql_connection() are removed entirely from the\nDataFrame subsystem since the concept is architecturally wrong - DataFrame adapters\nshould never be asked for SQL connections.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create a new write abstraction",
+        "instead": "delegate to it",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "why": "DataFrameMaintenanceOperations already provides insert_rows/update_rows/merge_rows with per-platform implementations"
+      },
+      {
+        "dont": "keep staging CSV files as an intermediate format",
+        "instead": "return DataFrames directly",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "why": "the Transform phase already produces pandas DataFrames internally and writing/reading CSVs is wasteful double I/O"
+      },
+      {
+        "dont": "leave SQLConnectionProvider in benchbox/core/dataframe/",
+        "instead": "remove it entirely",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "why": "the DataFrame subsystem should never expose SQL concepts"
+      },
+      {
+        "dont": "modify the SQL path behavior",
+        "instead": "only extract their logic into SQLETLBackend",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "why": "run_etl_benchmark and run_full_benchmark must continue working identically"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-02-08T00:00:00Z",
+      "worktree": "dataframe-benchmarks"
+    },
+    "preserves": [
+      {
+        "behavior": "DataFrameMaintenanceOperations protocol and its concrete implementations (Polars, Delta Lake, Iceberg, DuckLake) are not modified",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode"
+      },
+      {
+        "behavior": "ETLPhaseResult, ETLBatchResult, ETLResult dataclasses in etl/results.py are not modified",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode"
+      },
+      {
+        "behavior": "Existing DataFrame platform tests (test_benchmark_mixin.py) continue to pass",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode"
+      },
+      {
+        "behavior": "SQL path (run_etl_benchmark → run_etl_pipeline → SQL INSERT) continues to work exactly as before via SQLETLBackend",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode"
+      },
+      {
+        "behavior": "TPC-DI stage result schema (query_id, status, execution_time, records_processed, records_loaded, rows_returned, first_row) is unchanged",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode"
+      },
+      {
+        "behavior": "get_dataframe_etl_capabilities() capability checking remains functional",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode"
+      },
+      {
+        "behavior": "run_full_benchmark() and all SQL-mode TPC-DI entry points remain unbroken",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/maintenance_interface.py"
+      },
+      {
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/query.py"
+      },
+      {
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcdi/etl/results.py"
+      },
+      {
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/"
+      },
+      {
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/__init__.py"
+      },
+      {
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/context.py"
+      },
+      {
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/"
+      },
+      {
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/benchmark_mixin.py"
+      },
+      {
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpcdi/"
+      },
+      {
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_benchmark_mixin.py"
+      },
+      {
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_connection_provider_contract.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpcdi/ -v",
+        "description": "All TPC-DI unit tests pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/ -v",
+        "description": "All DataFrame platform tests pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -r 'SQLConnectionProvider' benchbox/",
+        "description": "No SQLConnectionProvider references remain in benchbox/",
+        "expected": "No output (zero hits)",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -r 'get_sql_connection' benchbox/",
+        "description": "No get_sql_connection references remain in benchbox/",
+        "expected": "No output (zero hits)",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check .",
+        "description": "Lint passes",
+        "expected": "No lint errors",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast test suite passes",
+        "expected": "All fast-marked tests pass",
+        "item_id": "remove-sql-coupling-from-tpcdi-dataframe-mode",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

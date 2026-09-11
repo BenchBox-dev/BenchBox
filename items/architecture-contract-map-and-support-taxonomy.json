@@ -1,0 +1,287 @@
+{
+  "context": "Treat this as a taxonomy and governance change first. Start from existing\ndocumented commitments, then reconcile code evidence against those\ncommitments. Prefer a small, enforceable contract map over aspirational prose.\n",
+  "description": "BenchBox has several real product contracts that are only partially declared:\nCLI behavior, Python wrappers, BaseBenchmark.run_with_platform, adapter\nsubclassing, MCP tools, result JSON, explorer input, generated compatibility\ndocs, platform availability, and experimental modules. The architecture is\nstill sound, but future work is making contract decisions implicitly.\n\nThis item creates one authoritative map of public/stable, beta-public,\ninternal, experimental, deprecated, generated, and repo-only surfaces. It also\ndefines support status vocabulary for platforms and benchmarks so docs,\nregistry metadata, packaging, MCP, and PR review use the same language.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "collapse wrappers into internals just because they duplicate CLI reachability",
+        "instead": "classify them first, then decide deprecation separately.",
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "why": "tests assert wrapper facades as public behavior"
+      },
+      {
+        "dont": "generate platform counts from docs",
+        "instead": "generate docs from registry metadata or fail the drift check.",
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "why": "docs are the drifting surface"
+      },
+      {
+        "dont": "introduce vague tiers like supported-ish",
+        "instead": "use the finite support_status vocabulary.",
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "why": "ambiguous tiers recreate the same blind spot"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "architecture-contract-map-and-support-taxonomy",
+        "id": 340,
+        "reason": "Completed by platform-support-status-and-extension-health after the taxonomy was accepted.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Reason states it was already completed by platform-support-status-and-extension-health; that item is not in open_items (done).",
+        "summary": "Fully migrate every platform registry entry to support_status"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "architecture-contract-map-and-support-taxonomy",
+        "id": 341,
+        "reason": "Belongs in benchmark-support-status-and-discovery-policy; platform migration did not cover benchmark metadata.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Target item benchmark-support-status-and-discovery-policy (DONE) states support_status was added to every BENCHMARK_METADATA entry; migration already completed.",
+        "summary": "Fully migrate every benchmark registry entry to support_status"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "architecture-contract-map-and-support-taxonomy",
+        "id": 342,
+        "reason": "Do after this map lands and downstream TODOs resolve their product-surface decisions.",
+        "resolution": "promoted",
+        "resolved_item": "rewrite-architecture-md-around-the-new-contract-map",
+        "resolved_reason": null,
+        "summary": "Rewrite architecture.md around the new contract map"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture",
+      "completed_at": "2026-05-21T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not change runtime behavior except for narrowly scoped docs/checklist validation needed by this TODO.",
+        "item_id": "architecture-contract-map-and-support-taxonomy"
+      },
+      {
+        "behavior": "Do not downgrade existing public wrapper tests or imply wrappers are unsupported without an explicit deprecation decision.",
+        "item_id": "architecture-contract-map-and-support-taxonomy"
+      },
+      {
+        "behavior": "Do not mark experimental code as stable merely because it is packaged.",
+        "item_id": "architecture-contract-map-and-support-taxonomy"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Makefile: compat docs generation targets -- reuse generated-docs checks where feasible.",
+        "decision": "reuse",
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "path": "Makefile"
+      },
+      {
+        "concept": "docs/reference/backward-compatibility.md: existing shim/deprecation registry -- extend, do not duplicate.",
+        "decision": "extend",
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "path": "docs/reference/backward-compatibility.md"
+      },
+      {
+        "concept": "docs/reference/hosted-results-contract.md: existing product-contract style -- reuse the crisp contract language.",
+        "decision": "reuse",
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "path": "docs/reference/hosted-results-contract.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "only_modify",
+        "path_glob": ".github/"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "only_modify",
+        "path_glob": "docs/design/future-state/"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate",
+        "description": "Validate TODO graph and schema after adding the contract-map item.",
+        "expected": "Validation passes or reports only pre-existing unrelated TODO issues.",
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_benchmark_api_contract.py tests/unit/core/test_platform_registry.py tests/unit/core/results/test_schema_policy.py tests/unit/mcp/test_run_surface_contract.py --tb=short",
+        "description": "Run targeted docs checks added by this work.",
+        "expected": "Contract, count, support-status, schema-policy, and MCP run-surface checks pass or skip only for missing optional MCP SDK.",
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "notes": "Capture a compact committed summary of checked SHA, inspected files, and\nany line-number drift. Do not commit raw command transcripts.\n\nMinimum evidence to re-check:\n  - README support disclaimer and platform counts: README.md:35-48.\n  - Backward-compat registry: docs/reference/backward-compatibility.md:24-84.\n  - Wrapper facade tests: tests/unit/test_wrapper_facades_fast.py.\n  - MCP public API decision: _project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml.\n  - Existing future-state architecture docs under docs/design/future-state/.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate contract-surface evidence against the current branch before editing",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "notes": "The table must cover at least: CLI commands/options, Python wrapper\nfacades, benchbox.base.BaseBenchmark, BaseBenchmark.run_with_platform,\ncore.base_benchmark, adapter subclassing hooks, platform registry\nmetadata, MCP tools, result JSON bundles, explorer read model,\nsubmission validator behavior, sql_compat rule catalog, generated docs,\nbenchbox.experimental, _project scripts, and TODO/ADR docs.\n\nRequired columns: surface, current tier, owner, compatibility promise,\ndeprecation path, verification gate, and source of truth.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create docs/reference/public-contracts.md with a complete surface classification table",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "notes": "Define allowed statuses: stable, beta, experimental, repo_only,\ndeprecated, document_only. Record what each status means for packaging,\ndocs, registry visibility, MCP exposure, CI coverage, and breakage policy.\n\nThis work unit defines the vocabulary and contract. It may add minimal\nschema/constants only if that avoids duplicating strings in follow-up\nitems. Full registry migration belongs to the platform-extension TODO.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a support_status taxonomy for platforms and benchmarks",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "notes": "Add or update the project PR checklist so any new public, beta-public,\ndeprecated, generated, or experimental surface must update the contract\nmap or explicitly state why no contract-map change is needed.\n\nThe checklist must mention result schema, MCP params, platform support\nstatus, wrapper facades, adapter subclassing hooks, and generated docs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a PR checklist gate for public/deprecated surface changes",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "notes": "Promote active architecture decisions from scattered TODOs and\nfuture-state docs into one index. Include status, owner, blocking gates,\nand the current implementation surface.\n\nAt minimum index:\n  - docs/design/future-state/formalize-mcp-internal-apis/README.md.\n  - docs/design/future-state/isolate-experimental-core-subsystems/README.md.\n  - docs/reference/backward-compatibility.md entries for wrappers and core.base_benchmark.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create an ADR/contract index for scattered future-state decisions",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "architecture-contract-map-and-support-taxonomy",
+        "notes": "Add generated or tested checks for platform counts, benchmark counts,\nsupport-status tables, result-schema version claims, and adapter\navailability statements. The check should fail on contradictory claims\nlike docs saying a platform is both unavailable and supported.\n\nPrefer generating tables from registry metadata where possible. If a\nsection is intentionally editorial, mark it as non-authoritative in the\npublic contract map.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add docs drift checks for current-count and support-claim statements",
+        "wid": "w5"
+      }
+    ]
+  }
+}

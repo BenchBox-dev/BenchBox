@@ -1,0 +1,726 @@
+{
+  "context": "Start with evidence, not edits: build a full clone-group matrix before changing code.\nFor each group classified as parallel_implementation, identify the narrowest shared abstraction\npoint (utility function, mixin, or core helper module) and migrate incrementally.\nKeep each consolidation track independently testable and committable.\nApply ignore rules only after explicit group-level classification and only with narrow scope.\nRe-run duplicate scan after each consolidation track to confirm the expected impact.\n",
+  "description": "The latest `make duplicate-check-verbose` run reports 401 duplicate function groups and\n13,796 duplicated lines (threshold 15,180). The first consolidation pass removed high-value\nduplicates, but the report still contains many mixed groups where some are intentional\nboilerplate while others are true parallel implementations.\n\nThis follow-up TODO performs a full classification pass for all currently identified clone\ngroups, then applies the correct action for each class:\n- Intended duplication: keep implementation but mark with narrow ignore rules.\n- Parallel implementation: centralize shared logic into core modules/mixins/helpers and update call sites.\n\nThe key deliverable is a complete, auditable triage map of every reported clone group plus\nimplementation work that lowers duplicated lines further and reduces noise in future reports.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change public benchmark facade signatures during refactor",
+        "instead": "centralize internals only.",
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "why": "downstream modules and tests rely on them"
+      },
+      {
+        "dont": "consolidate structurally similar but domain-specific SQL/generator logic",
+        "instead": "require demonstrated behavioral equivalence first.",
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "why": "AST shape can be misleading"
+      },
+      {
+        "dont": "ignore whole directories in duplicate config",
+        "instead": "use narrow function/path-level ignores tied to classified groups.",
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "why": "this hides future regressions"
+      },
+      {
+        "dont": "introduce deep inheritance chains for consolidation",
+        "instead": "prefer focused mixins/helpers.",
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "why": "adapter hierarchy is already complex"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "duplicate-code-followup-triage-centralization",
+        "id": 69,
+        "reason": "Some adapter duplicates may look parallel but depend on platform-specific cursor/session behavior best validated in live integrations.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Vague: no concrete list of which adapter duplicates need live-platform validation; not actionable as stated, not tracked elsewhere.",
+        "summary": "Consolidation requiring live cloud platform behavior validation"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "duplicate-code-followup-triage-centralization",
+        "id": 70,
+        "reason": "High risk of over-abstraction; keep as intentional or defer unless strong equivalence evidence exists.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly recommends keeping SQL bodies as intentional absent strong equivalence evidence; not an actionable task.",
+        "summary": "Refactoring large benchmark SQL/query bodies that are structurally similar but domain-different"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_item": "consolidate-duplicate-code"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-02-20T00:00:00Z",
+      "created_at": "2026-02-20T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "DataFrame adapter correctness for pandas-family and expression-family query execution paths.",
+        "item_id": "duplicate-code-followup-triage-centralization"
+      },
+      {
+        "behavior": "Duplicate checker remains useful (no broad ignores that hide real regressions).",
+        "item_id": "duplicate-code-followup-triage-centralization"
+      },
+      {
+        "behavior": "Firebolt/Presto/Trino execution semantics and error handling behavior in platform adapter tests.",
+        "item_id": "duplicate-code-followup-triage-centralization"
+      },
+      {
+        "behavior": "Spark-family load paths continue to support current file formats and loading options.",
+        "item_id": "duplicate-code-followup-triage-centralization"
+      },
+      {
+        "behavior": "Top-level benchmark facade APIs (`get_query`, `get_queries`, `get_create_tables_sql`) remain backwards compatible.",
+        "item_id": "duplicate-code-followup-triage-centralization"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/main.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/context.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/dataframe/protocols.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/core-functionality/planning/duplicate-code-followup-triage-centralization.yaml"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "_project/quality/duplicate-code-followup/classification-matrix.yaml"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "_project/quality/duplicate-code-followup/latest-duplicates.json"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "_project/quality/duplicate-code-followup/latest-duplicates.txt"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/amplab.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/clickbench.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_mixins.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/query.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_manager.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/queries.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/query_analytics.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/query_etl.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/query_validation.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/azure_synapse.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/clickhouse.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/firebolt.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/h2odb.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/metadata_primitives.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/cudf_df.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/dask_df.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/datafusion_df.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/expression_family.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/modin_df.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/pandas_df.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/pandas_family.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/polars_df.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/firebolt.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/lakesail.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/presto.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/spark.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/trino.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/read_primitives.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/ssb.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/tpcdi.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/transaction_primitives.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/write_primitives.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adding-new-platforms.md"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "scripts/check_duplicate_code.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/amplab/test_amplab_dataframe_queries.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/clickbench/test_clickbench_dataframe_queries.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/dataframe/test_query.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/h2odb/test_h2odb_dataframe_queries.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/read_primitives/test_catalog_loader.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/read_primitives/test_query_manager_variants.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/ssb/test_ssb_dataframe_queries.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpcdi/test_config_schema_queries_coverage.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpcdi/test_tpcdi_sql_dataframe_parity.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/transaction_primitives/test_generator_coverage.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_cudf_df_coverage.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_dask_df_coverage.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_datafusion_df.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_expression_family.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_modin_df_coverage.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_pandas_df.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_pandas_family.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_polars_df.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_firebolt_adapter.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_lakesail_adapter.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_presto_adapter.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_spark_adapter.py"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_trino_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import json,yaml,pathlib; r=pathlib.Path('_project/quality/duplicate-code-followup/latest-duplicates.json'); m=pathlib.Path('_project/quality/duplicate-code-followup/classification-matrix.yaml'); report=json.loads(r.read_text()); matrix=yaml.safe_load(m.read_text()); rows=matrix['groups'] if isinstance(matrix,dict) and 'groups' in matrix else matrix; report_ids={g['hash'] for g in report['groups']}; matrix_ids={row['group_hash'] for row in rows}; missing=report_ids-matrix_ids; extra=matrix_ids-report_ids; assert not missing and not extra, f'missing={len(missing)} extra={len(extra)}'; print(f'coverage_ok groups={len(report_ids)}')\"",
+        "description": "All clone groups in current report have explicit classifications and actions",
+        "expected": "coverage_ok groups=<count>, with zero missing/extra group hashes.",
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make duplicate-check-verbose",
+        "description": "Core duplicate checker passes at new threshold",
+        "expected": "PASS with duplicated lines below updated threshold.",
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q -n 0",
+        "description": "Fast regression suite remains green",
+        "expected": "all fast tests pass, 0 failures.",
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ tests/unit/core/dataframe/ -q -n 0",
+        "description": "Targeted platform and dataframe tests remain green after consolidation",
+        "expected": "all targeted tests pass, 0 failures.",
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w5",
+        "wid": "w10"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w5",
+        "wid": "w11"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w10",
+        "wid": "w12"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w6",
+        "wid": "w12"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w7",
+        "wid": "w12"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w8",
+        "wid": "w12"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w9",
+        "wid": "w12"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w12",
+        "wid": "w13"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w10",
+        "wid": "w15"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "needs_wid": "w5",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Run `make duplicate-check-verbose` plus JSON mode from `scripts/check_duplicate_code.py`.\nPersist artifacts under `_project/quality/duplicate-code-followup/` with timestamped files and\nrefresh canonical pointers:\n- `_project/quality/duplicate-code-followup/latest-duplicates.txt`\n- `_project/quality/duplicate-code-followup/latest-duplicates.json`\nInclude top groups and full-group inventory for review traceability.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture baseline duplicate report artifacts in machine-readable and reviewable formats",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Evaluate and centralize genuinely parallel adapter methods (for example cloud adapter\nplatform info blocks, cache/session validators, shared execute/load flows) while preserving\nplatform-specific error semantics.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consolidate platform adapter parallel implementations into scoped mixins",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Address repeated query metadata accessors/filtering helpers and generator scaffolding\nonly where behavioral equivalence is demonstrated.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consolidate TPC-DI and generator helper duplicates that are true parallel scaffolding",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Run targeted unit suites for every touched module family and resolve regressions before final verification.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run targeted regression tests per consolidation/ignore track and fix breakages",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Verify behavior parity with targeted tests for each consolidation track plus fast suite.\nUpdate threshold in pyproject to observed duplicated-line count plus 10% headroom.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run regression suite, re-run duplicate check, and lower threshold to new baseline + safety margin",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Record total line reduction, finalized threshold, and list of consolidated groups.\nMove item through active -> done workflow only after all verification passes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Finalize TODO completion state, capture before/after metrics, and regenerate indexes",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Add or update project documentation with a clear taxonomy of SQL platform `execute_query`\nvariants discovered during w10 analysis, including:\n- DBAPI cursor + validation-helper family\n- Spark SQL collect family\n- cloud Spark submit/wait/fetch job family\n- Livy statement API family\n- engine-specific outliers (BigQuery/DataFusion/Databend/MotherDuck/InfluxDB)\nDocument which families are safe consolidation targets now vs intentionally distinct.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document execute_query variant families and consolidation boundaries",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Create a checklist with objective decision criteria and examples.\nAdd explicit disqualifiers for false consolidations (protocol methods, interface contracts,\nand facade delegation wrappers that are intentionally repetitive).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define strict classification rubric for intended boilerplate vs parallel implementation",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Classify top 30 groups first, then refine rubric language where disagreements/ambiguity appear.\nThis phase locks classification examples before full-inventory triage.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pilot classification on top duplicate groups and calibrate rubric",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Evaluate every currently identified group from the full inventory (beyond top-N).\nOutput one row per group with class, rationale, action, confidence, and owner module.\nWrite matrix to `_project/quality/duplicate-code-followup/classification-matrix.yaml`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Classify remaining duplicate groups and produce complete action matrix",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Verify one-to-one coverage between latest duplicate report groups and matrix rows.\nNo implementation starts until coverage and action mapping are complete and internally consistent.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate matrix completeness and freeze implementation/ignore backlog",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Update duplicate checker config/script with tightly scoped ignore rules\n(function names plus path constraints where needed). Avoid broad suppressions and broad path wildcards.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement ignore rules batch A for intended adapter/protocol boilerplate groups",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Apply ignores for verified intentional duplication in thin facades and domain-specific structural clones.\nKeep ignore entries traceable to matrix rows and rationale.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement ignore rules batch B for intended facade/structural non-parallel groups",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Target groups such as repeated benchmark wrapper helpers (`get_queries`, `get_query`,\n`get_create_tables_sql`) and repeated query metadata/filter helper patterns where behavior matches.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consolidate benchmark facade/query-helper parallel implementations into shared core utilities",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "duplicate-code-followup-triage-centralization",
+        "notes": "Focus on true parallel methods (`merge`, `groupby_agg`, `col/lit/from_pandas`, scalar conversion helpers)\nwhere semantics are aligned across adapters.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consolidate DataFrame family parallel implementations via pandas/expression shared helpers",
+        "wid": "w9"
+      }
+    ]
+  }
+}

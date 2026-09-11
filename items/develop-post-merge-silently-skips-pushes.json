@@ -1,0 +1,62 @@
+{
+  "context": "First confirm the gap is reproducible rather than a one-off: instrument by recording, for each develop push, whether a post-merge run exists for that exact sha -- a small scheduled job or a check in the existing metrics job can do this and will also quantify how often it happens. If GitHub is dropping runs, the standard mitigation is to stop relying solely on the per-push trigger: add a scheduled sweep that runs the same gates against the current develop tip, so a dropped push-run is covered within a bounded window. Do not paper over it by making the workflow re-run on unrelated events. Note the ordering dependency: while 'develop-post-merge-lint-red-since-1494' is open, a newly-firing run will fail for that separate reason, so fix or at least diagnose the red streak first or the two will be confused.",
+  "description": "'Develop post-merge' triggers on `push: branches: [develop]` with no path filter and `cancel-in-progress: false`, so every squash merge should produce a run. On 2026-08-04 six consecutive merges produced none.\n\nEvidence -- merge time then develop sha, cross-checked against the workflow's own run list (60-run window, which covers the whole period):\n  12:03:00 bae7800c61 (#1510)  no run\n  13:42:56 b1181142d0 (#1511)  no run\n  14:11:33 0869a21af1 (#1513)  no run\n  14:38:52 336f5c0309 (#1514)  no run\n  15:21:54 cf234c8387 (#1515)  no run\n  15:45:25 0473812133 (#1520)  no run\nRuns DID fire in the same window on other pushes: 13:45:38 on 09faf5edf7 and 14:12:14 on 4a909721e5 -- the latter one second after #1513 merged, on a different sha. After 14:12 no run at all until 16:20 on d1f7cbcdff, spanning three of the six merges.\n\nImpact: the post-merge safety net exists precisely to validate the real develop tip after a squash merge, and it silently did not do so for six merges in a row. Combined with 'develop-post-merge-lint-red-since-1494' (the runs that DO fire are failing), develop currently has no working post-merge validation. A skipped run is worse than a failed one because nothing signals its absence -- `gh pr checks` on the PR still shows green, and the run list simply has a gap.\n\nMechanism not yet established. Candidates: GitHub dropping push-event workflow runs when pushes arrive close together, a repo-level concurrent-run limit, or an interaction with the SHA-keyed concurrency group. Establish the mechanism before proposing a fix.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-05T23:13:50Z",
+      "completed_pr": 1599,
+      "created_at": "2026-08-04T16:34:17Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No workflow gains permissions beyond what it has today",
+        "item_id": "develop-post-merge-silently-skips-pushes"
+      },
+      {
+        "behavior": "Post-merge keeps running on every develop push it already catches; a sweep is additive, not a replacement",
+        "item_id": "develop-post-merge-silently-skips-pushes"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "develop-post-merge-silently-skips-pushes",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "develop-post-merge-silently-skips-pushes",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "develop-post-merge-silently-skips-pushes",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "develop-post-merge-silently-skips-pushes",
+        "kind": "only_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "develop-post-merge-silently-skips-pushes",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "bash -c 'shas=$(git log --format=%H origin/develop -10); runs=$(gh run list --workflow develop-post-merge.yml --limit 60 --json headSha --jq .[].headSha); for s in $shas; do echo \"$runs\" | grep -q \"$s\" || exit 1; done'",
+        "description": "Every recent develop push has a post-merge run for its exact sha",
+        "expected": "exits 1 today because six develop shas have no post-merge run; exits 0 once every push is covered by a run or a sweep",
+        "item_id": "develop-post-merge-silently-skips-pushes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

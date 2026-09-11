@@ -1,0 +1,262 @@
+{
+  "context": "Make the product-tier decision first. If MCP is intentionally narrower, make\nthat explicit and test docs. If parity is required, create a shared service\nbelow CLI and MCP rather than binding MCP to CLI command code.\n",
+  "description": "MCP is intentionally not routed through CLI internals today. A completed\nproject decision moved MCP onto the public BaseBenchmark.run_with_platform\nAPI, while MCP's exposed parameters remain narrower than CLI and docs appear\nbehind actual tool options. The architecture question is product scope, not a\nsimple \"call the CLI orchestrator\" fix.\n\nThis item decides whether MCP is a smoke/control-plane surface or a\nCLI-equivalent execution surface. If it becomes CLI-equivalent, introduce a\nshared core execution service below both CLI and MCP rather than coupling MCP\nto CLI internals.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add MCP params without schema-derived or tested docs",
+        "instead": "(not specified)",
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "why": "docs drift is the known failure mode."
+      },
+      {
+        "dont": "call MCP smoke-only in conversation while docs imply general benchmark execution",
+        "instead": "(not specified)",
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "why": "choose one tier and document it."
+      },
+      {
+        "dont": "route MCP through BenchmarkOrchestrator just because it has more flags",
+        "instead": "create a non-CLI service if parity is required.",
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "why": "that reintroduces CLI coupling"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "mcp-product-surface-and-shared-run-service-decision",
+        "id": 434,
+        "reason": "Only valid if the explicit fidelity decision chooses CLI-equivalent.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Decision recorded: MCP is a smoke/control-plane surface, not CLI-equivalent; exposing every CLI flag was explicitly not selected.",
+        "summary": "Expose every CLI flag through MCP"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      }
+    ],
+    "item_meta": {
+      "category": "MCP",
+      "completed_at": "2026-05-21T00:00:00Z",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not broaden MCP parameters without updating docs and tests in the same change.",
+        "item_id": "mcp-product-surface-and-shared-run-service-decision"
+      },
+      {
+        "behavior": "Do not import CLI command modules from benchbox.mcp.",
+        "item_id": "mcp-product-surface-and-shared-run-service-decision"
+      },
+      {
+        "behavior": "Do not undo the completed decision to use public run_with_platform unless an ADR explicitly supersedes it.",
+        "item_id": "mcp-product-surface-and-shared-run-service-decision"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml: completed decision to use public benchmark API -- preserve unless superseded.",
+        "decision": "reuse",
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "path": "_project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml"
+      },
+      {
+        "concept": "benchbox/base.py: BaseBenchmark.run_with_platform documented for orchestration tools -- use as current public API evidence.",
+        "decision": "reuse",
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "path": "benchbox/base.py"
+      },
+      {
+        "concept": "benchbox/cli/orchestrator.py: CLI option plumbing -- compare behavior, but do not import as MCP dependency without a new decision.",
+        "decision": "reuse",
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "path": "benchbox/cli/orchestrator.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/run_service.py"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests -k 'mcp and benchmark' --tb=short",
+        "description": "Run focused MCP tool tests.",
+        "expected": "MCP benchmark surface tests pass.",
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests -k 'mcp and docs' --tb=short",
+        "description": "Run docs/schema drift test added for MCP params.",
+        "expected": "MCP docs match actual tool parameter schema.",
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "notes": "Completed evidence at checked SHA\n15fedc5bfa6308a82a49b0398ee759b92077c97f:\n  - _project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml\n    records the prior decision to move MCP away from CLI internals and onto\n    public benchmark/adapter APIs.\n  - benchbox/base.py documents BaseBenchmark.run_with_platform as the\n    standard programmatic execution hook for CLI-adjacent orchestration\n    tools and MCP.\n  - benchbox/mcp/tools/benchmark.py exposes run_benchmark with platform,\n    benchmark, scale_factor, queries, phases, mode, capture_plans, dry_run,\n    and validate_only.\n  - benchbox/cli/commands/run.py and benchbox/cli/orchestrator.py expose a\n    broader CLI lifecycle surface including output roots, platform and\n    benchmark options, tuning/table layout, force, official, seed,\n    iterations, compression, validation policy, plan config, progress,\n    cache, and publish controls.\n  - docs/reference/mcp.md had stale standalone tool sections and omitted\n    current run_benchmark params before this TODO.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate MCP public API decision, current params, CLI params, and docs drift",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "notes": "Decision recorded in docs/reference/public-contracts.md and\ndocs/reference/mcp.md: MCP is a beta-public smoke/control-plane automation\nsurface, not a CLI-equivalent execution surface.\n\nThe supported run options are platform, benchmark, scale_factor, queries,\nphases, mode, capture_plans, dry_run, and validate_only. CLI-only controls\nare documented as product-scope omissions, not hidden parameters or current\nimplementation debt. Dry-run preview is documented as the core default\nload/power model rather than phase-param parity. MCP result bundles are\nschema-comparable to CLI-generated result bundles, but MCP does not claim\nCLI option parity.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decision gate: classify MCP as smoke/control-plane or CLI-equivalent",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "notes": "Implemented the smoke/control-plane path. No shared run service was added\nbecause CLI equivalence was explicitly not selected for this product tier.\nThe implementation change is docs and contract-test alignment; no\nbenchbox.mcp dependency on benchbox.cli was introduced.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the selected MCP fidelity path without CLI-internal coupling",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "notes": "Added tests/unit/mcp/test_run_surface_contract.py. It verifies registered\nMCP tool names, all documented tool parameter schemas/defaults,\nintentional CLI-only omissions, absence of stale standalone tool docs, and\nabsence of benchbox.cli imports under benchbox/mcp.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add MCP-vs-CLI contract tests for the selected fidelity tier",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-product-surface-and-shared-run-service-decision",
+        "notes": "docs/reference/mcp.md now documents the actual tool inventory and\nrun_benchmark schema, including mode, capture_plans, dry_run, and\nvalidate_only. The new contract tests compare the docs against the FastMCP\nschema so future parameter drift fails in unit tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update MCP docs and examples from actual tool schema",
+        "wid": "w4"
+      }
+    ]
+  }
+}

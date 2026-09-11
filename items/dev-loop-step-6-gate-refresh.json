@@ -1,0 +1,110 @@
+{
+  "context": "Preserve the original item's must-preserve and anti-pattern content verbatim in the recreated item; this item only re-homes mechanics, it does not re-litigate the Path A/B design.",
+  "description": "Found by adversarial review of the CI-failure-reduction items (WS2 of _project/planning/ci-failure-reduction-plan.md is delegated to dev-loop-step-6-queue-decision-gate). That gate item's execution machinery is stale: its only_modify globs and ALL FIVE verifications target _project/TODO/main/planning/*.yaml - a directory that no longer exists after the hosted-DB tracker migration (confirmed 2026-07-23: _project/TODO is gone) - and it is blocked on the step-5 measurement window with no wiring to the WS9 baseline (dev-loop-metrics-ci-failure-baseline-2) that the reduction plan says should arbitrate the queue decision. The gate's DESIGN content (Path A native merge queue vs Path B steward, trust-lane anti-patterns, queue-tier CI policy) is sound and must be preserved - only its mechanics need re-homing.\n\nSince the tracker has no update command, the refresh means: drop the stale item with a reason pointing here, and recreate it carrying over its design content with (a) scope/verifications re-homed to the hosted tracker (_project/decisions/dev-loop-queue-path-*.md stays; selected-path TODO becomes a `todo create`, verified via `todo show`), (b) its step-5 blocked_reason re-evaluated, and (c) the WS9 baseline 2-week review added as an explicit input to the w1 BUILD/DO-NOT-BUILD decision.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Re-litigate or water down the original gate's anti-patterns while re-homing",
+        "instead": "Copy them verbatim into the recreated item",
+        "item_id": "dev-loop-step-6-gate-refresh",
+        "why": "They encode security decisions (no pull_request_target, no long-lived PAT) that predate and outrank this refresh"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-07-23T18:56:54Z",
+      "created_at": "2026-07-23T13:51:43Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "The gate stays a decision gate: no queue implementation work starts from this item",
+        "item_id": "dev-loop-step-6-gate-refresh"
+      },
+      {
+        "behavior": "The gate's design decisions (Path A/B options, trust-lane anti-patterns, queue-tier CI policy) carry over verbatim - this is a mechanical re-home, not a redesign",
+        "item_id": "dev-loop-step-6-gate-refresh"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dev-loop-step-6-gate-refresh",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "dev-loop-step-6-gate-refresh",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "dev-loop-step-6-gate-refresh",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "dev-loop-step-6-gate-refresh",
+        "kind": "do_not_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "dev-loop-step-6-gate-refresh",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo show dev-loop-step-6-queue-decision-gate-2 --json | grep -c 'dev-loop-metrics-ci-failure-baseline'",
+        "description": "Recreated gate item exists with hosted-tracker mechanics and baseline wiring",
+        "expected": ">= 1 (exit 0)",
+        "item_id": "dev-loop-step-6-gate-refresh",
+        "last_result": "pass",
+        "last_run": "2026-07-23T18:56:22Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! _project/scripts/todo show dev-loop-step-6-queue-decision-gate-2 --json | grep -q '_project/TODO/'",
+        "description": "No verification on the recreated item references the retired YAML tree",
+        "expected": "exit 0",
+        "item_id": "dev-loop-step-6-gate-refresh",
+        "last_result": "fail",
+        "last_run": "2026-07-23T18:56:24Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dev-loop-step-6-gate-refresh",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "confirmed 2026-07-23: _project/TODO absent (ls: No such file); gate item scope/verifications still target _project/TODO/main/planning/*.yaml; dev-loop-step-5-measurement-window state=active (not abandoned)",
+        "item_id": "dev-loop-step-6-gate-refresh",
+        "notes": null,
+        "started_at": "2026-07-23T18:54:15Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-todocli",
+        "status": "done",
+        "summary": "Re-validate: confirm _project/TODO is still absent, the gate item still targets it, and step-5's actual state (in_progress vs abandoned)",
+        "wid": "w0"
+      },
+      {
+        "evidence": "gate re-homed: dev-loop-step-6-queue-decision-gate dropped (reason points forward); recreated with design content verbatim (5 preserves, 6 anti-patterns), hosted-tracker mechanics, deps on step-5 + WS9 baseline. Live id is -3 (-2 was a momentary intermediate, dropped for a lint-required w0). Lint: 0 findings",
+        "item_id": "dev-loop-step-6-gate-refresh",
+        "notes": null,
+        "started_at": "2026-07-23T18:55:00Z",
+        "started_branch": "HEAD",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-todocli",
+        "status": "done",
+        "summary": "Drop + recreate the gate item with hosted-tracker mechanics, preserved design content, and the WS9 baseline wired in as decision input",
+        "wid": "w1"
+      }
+    ]
+  }
+}

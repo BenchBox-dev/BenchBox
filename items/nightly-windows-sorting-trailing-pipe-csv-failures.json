@@ -1,0 +1,73 @@
+{
+  "context": "Reproduce framing on CRLF input; route the writer's CSV read through the same trailing-delimiter detection as ingest; fix regex asserts for Windows message variants.",
+  "description": "Nightly Validation test (windows-latest, 3.10/3.12) fails 8+ tests in tests/unit/core/data_organization/test_sorting.py with pyarrow.lib.ArrowInvalid 'CSV parse error: Expected N columns, got N+1' on rows like '3|1998-03-01|' — the trailing-pipe framing class documented for dbgen EOL divergence (PR #1053 fixed the ingest path via get_data_extension; the sorted-parquet writer test path apparently still mis-frames on Windows CRLF/trailing-delimiter). Also two regex-assert failures in the same file (test_single_column_sorting_rejects_unknown_column, test_partition_column_validation). Pre-existing: fails at c0c96bddb (before agent-instruction PRs) and at 06484de94. Discovered 2026-07-29 during agent-instruction remediation close-out.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-29T12:11:17Z",
+      "completed_pr": 1332,
+      "created_at": "2026-07-29T11:39:55Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing green behavior on macOS/Linux fast lanes",
+        "item_id": "nightly-windows-sorting-trailing-pipe-csv-failures"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "nightly-windows-sorting-trailing-pipe-csv-failures",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/data_organization/**"
+      },
+      {
+        "item_id": "nightly-windows-sorting-trailing-pipe-csv-failures",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/data_organization/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/data_organization/test_sorting.py -q -n 0",
+        "description": "sorting tests pass locally",
+        "expected": "all pass; Windows proof via next Nightly Validation run",
+        "item_id": "nightly-windows-sorting-trailing-pipe-csv-failures",
+        "last_result": "pass",
+        "last_run": "2026-07-29T11:56:39Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "nightly-windows-sorting-trailing-pipe-csv-failures",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Root cause: _source_has_trailing_delimiter() probed the last 2 bytes for b'|\\n'; a CRLF file's tail is b'|\\r\\n', so trailing-delimiter framing was misread as absent on Windows and PyArrow got N+1 fields for N column names. Replaced the private byte probe with the shared benchbox.utils.file_format.has_trailing_delimiter (already used by every other reader; reads text-mode so CRLF is normalized, and compares field counts rather than matching a byte tail). Proven across 4 framings (LF/CRLF x trailing/clean) - private probe was wrong only on CRLF+trailing; shared helper correct in all 4. Rung 1: 29 passed -n 0.",
+        "item_id": "nightly-windows-sorting-trailing-pipe-csv-failures",
+        "notes": null,
+        "started_at": "2026-07-29T11:53:34Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Reproduce and fix the trailing-pipe/CRLF framing in the sorted-parquet writer test path",
+        "wid": "w1"
+      },
+      {
+        "evidence": "No regex change was needed - the unit's premise (cross-platform error-message drift) was a misdiagnosis. Proven: _read_tbl_files() runs before _sort_table(), so on CRLF input pyarrow raised ArrowInvalid ('CSV parse error: Expected 2 columns, got 3') before the ValueError could be raised. pytest.raises(ValueError, match=...) therefore failed on exception TYPE, not on message text; the messages are identical on all platforms. Both asserts pass once w1 fixes the framing probe. Added test_crlf_source_still_reports_unknown_sort_column to pin the validation-outranks-framing ordering, plus test_reads_trailing_delimiter_tbl_with_crlf_line_endings; both write explicit CRLF bytes so the Windows-only framing is now exercised on every platform. Verified non-vacuous: both fail with the exact nightly signature when the prod fix is reverted.",
+        "item_id": "nightly-windows-sorting-trailing-pipe-csv-failures",
+        "notes": null,
+        "started_at": "2026-07-29T11:57:03Z",
+        "started_branch": "fix/oracle-map-independence-provenance-split",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Fix the two regex assertion failures for cross-platform error messages",
+        "wid": "w2"
+      }
+    ]
+  }
+}

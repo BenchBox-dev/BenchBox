@@ -1,0 +1,109 @@
+{
+  "context": "Remove blanket serial mode from the responsive block so an early failure cannot suppress unrelated viewport coverage, keeping serial only where a test genuinely depends on a previous test's state.",
+  "description": "e2e/responsive.spec.ts sets test.describe.configure serial mode on line 35, so the first failure aborts every remaining test in the block. On develop 3af42e29b the single stale-headline failure suppressed 23 downstream tests, and both CI and a local run reported that only as '1 failed ... 23 did not run'. Behind the mask sat two genuine desktop and wide above-the-fold regressions that nobody could see. Verified 2026-08-03: switching the block to parallel mode locally ran all 25 tests and surfaced both real failures, so serial mode is not required for these tests to pass.",
+  "legacy": {
+    "item_meta": {
+      "category": "Explorer test integrity",
+      "completed_at": "2026-08-04T00:35:00Z",
+      "completed_pr": 1500,
+      "created_at": "2026-08-03T23:42:55Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Any test that genuinely depends on prior state keeps an explicit narrow serial scope",
+        "item_id": "explorer-e2e-serial-mask-removal-20260803-v2"
+      },
+      {
+        "behavior": "Every existing responsive assertion is retained, none deleted to make the block pass",
+        "item_id": "explorer-e2e-serial-mask-removal-20260803-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-e2e-serial-mask-removal-20260803-v2",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-e2e-serial-mask-removal-20260803-v2",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "explorer-e2e-serial-mask-removal-20260803-v2",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/responsive.spec.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! rg -q -F \"test.describe.configure({ mode: \\\"serial\\\" })\" results-explorer/e2e/responsive.spec.ts",
+        "description": "Blanket serial mode is gone from the responsive block",
+        "expected": "Exits 1 on the unfixed tree where whole-file serial mode is still set on line 35; exits 0 once the blanket abort is removed.",
+        "item_id": "explorer-e2e-serial-mask-removal-20260803-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-04T00:31:35Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --workers=1 --retries=0 e2e/responsive.spec.ts",
+        "description": "Every responsive test executes and passes",
+        "expected": "All responsive tests run with zero did-not-run entries",
+        "item_id": "explorer-e2e-serial-mask-removal-20260803-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-04T00:32:44Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-e2e-serial-mask-removal-20260803-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-e2e-serial-mask-removal-20260803-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Audited responsive.spec.ts for shared state: no beforeAll, no beforeEach, no module-level mutable state. Every test takes its own page fixture and sets its own viewport, so no test depends on a previous test's state. Serial mode bought nothing and only propagated aborts.",
+        "item_id": "explorer-e2e-serial-mask-removal-20260803-v2",
+        "notes": null,
+        "started_at": "2026-08-04T00:30:57Z",
+        "started_branch": "fix/explorer-e2e-serial-mask-removal-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Identify which responsive tests genuinely need shared state",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Switched the block from mode serial to mode parallel with a comment recording why, so an independent viewport failure can no longer suppress unrelated coverage. No narrow serial scope was needed because no test shares state.",
+        "item_id": "explorer-e2e-serial-mask-removal-20260803-v2",
+        "notes": null,
+        "started_at": "2026-08-04T00:31:27Z",
+        "started_branch": "fix/explorer-e2e-serial-mask-removal-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Remove blanket serial mode and scope it narrowly if still needed",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Behavioural proof, not just a green run. Injected a deliberate failure into the first viewport test: the suite reported 4 failed and 21 PASSED with zero did-not-run entries, so an early failure no longer suppresses unrelated coverage. Under the previous serial mode the same injection would have aborted the block. Probe reverted; only the mode change and its comment remain.",
+        "item_id": "explorer-e2e-serial-mask-removal-20260803-v2",
+        "notes": null,
+        "started_at": "2026-08-04T00:31:33Z",
+        "started_branch": "fix/explorer-e2e-serial-mask-removal-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Confirm the full block executes with no suppressed tests",
+        "wid": "w2"
+      }
+    ]
+  }
+}

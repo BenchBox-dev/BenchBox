@@ -1,0 +1,16 @@
+{
+  "description": "Implement load_data() method for PySparkSQLAdapter supporting\nlocal and cloud data sources in CSV, Parquet, and TBL formats.\n\nUnlike Databricks (cloud-only), PySpark SQL supports both local\nfile paths and cloud storage (S3, GCS, ABFS).\n\nData loading flow:\n1. Read files into DataFrame (spark.read.csv/parquet)\n2. Apply column names from schema\n3. Write as managed Spark table (saveAsTable)\n4. Verify row counts",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pyspark-sql-data-loading",
+        "needs_item": "pyspark-sql-adapter-core"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2025-12-07T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

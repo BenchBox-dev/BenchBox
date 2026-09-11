@@ -1,0 +1,270 @@
+{
+  "context": "Single PR on develop after 02 completes. Update pyproject URLs and release-infrastructure tests, CLI submit/exceptions, Sphinx source_repository, site headers including results-explorer headerContract.ts and site-header parity tests, landing HTML, README Codecov badge after regenerating the token, contributing docs, operations runbooks with new ruleset IDs edited in place, tracker config and todo-db-export.yml repository, script DEFAULT_REPO fallbacks, issue template owner and develop branch (not main), linkcheck_ignore, Makefile comment, flightdata downloader User-Agent URL. Run ruleset-drift unit tests before pr-open. List intentional keep-hits (CODEOWNERS @joeharris76, pypi reviewer, JoinOrder url, answers URL, skill-sync, Turso, published blog) in the PR body.",
+  "description": "Phase 6 / gate G6. After G5, land one develop PR that retargets public and load-bearing joeharris76/BenchBox pins to BenchBox-dev/BenchBox. Must not touch SOUNDNESS_PREFIXES or CODEOWNERS soundness paths, JoinOrder data_manifest.toml url, answers default URL, CODEOWNERS user, pypi reviewer identity, skill-sync URLs, Turso hostname, or published blog permalinks. Blocked until github-org-transfer-02-operator-cutover completes.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Edit benchbox/core/joinorder/data_manifest.toml or expected_results/download.py",
+        "instead": "Leave release download URLs on the old owner for redirect",
+        "item_id": "github-org-transfer-03-pin-update",
+        "why": "manifest hash and shipped wheels"
+      },
+      {
+        "dont": "Open this PR before G5 or base it on an unmerged feature branch",
+        "instead": "Base on current develop after cutover",
+        "item_id": "github-org-transfer-03-pin-update",
+        "why": "Stacked PRs have zero CI; dest URLs 404 before transfer"
+      },
+      {
+        "dont": "Reflow ruleset-drift parse blocks in repo-admin-settings.md",
+        "instead": "Replace owner strings and IDs in place",
+        "item_id": "github-org-transfer-03-pin-update",
+        "why": "parse_expected_rulesets fails closed and would unmerge develop"
+      },
+      {
+        "dont": "Touch SOUNDNESS_PREFIXES paths so the PR needs code-owner self-approval",
+        "instead": "Keep the pin-update soundness-free",
+        "item_id": "github-org-transfer-03-pin-update",
+        "why": "GitHub forbids self-approval and develop has no bypass"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "needs_item": "github-org-transfer-02-operator-cutover"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-22T14:18:49Z",
+      "created_at": "2026-08-21T02:12:02Z",
+      "worktree": "github-org-transfer"
+    },
+    "preserves": [
+      {
+        "behavior": "CODEOWNERS @joeharris76",
+        "item_id": "github-org-transfer-03-pin-update"
+      },
+      {
+        "behavior": "JoinOrder manifest url and hash",
+        "item_id": "github-org-transfer-03-pin-update"
+      },
+      {
+        "behavior": "PYPI_REQUIRED_REVIEWERS User 57046 joeharris76",
+        "item_id": "github-org-transfer-03-pin-update"
+      },
+      {
+        "behavior": "Published blog permalinks",
+        "item_id": "github-org-transfer-03-pin-update"
+      },
+      {
+        "behavior": "_DEFAULT_ANSWERS_BASE_URL",
+        "item_id": "github-org-transfer-03-pin-update"
+      },
+      {
+        "behavior": "docs/CNAME, apex A/AAAA, and Pages domain verification are operator cutover work not this PR",
+        "item_id": "github-org-transfer-03-pin-update"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "runbook parse markers",
+        "decision": "reuse",
+        "item_id": "github-org-transfer-03-pin-update",
+        "path": "scripts/ruleset_drift_check.py"
+      },
+      {
+        "concept": "pyproject URL contract",
+        "decision": "extend",
+        "item_id": "github-org-transfer-03-pin-update",
+        "path": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "concept": "cross-surface GitHub header link",
+        "decision": "extend",
+        "item_id": "github-org-transfer-03-pin-update",
+        "path": "tests/unit/test_site_header_parity.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "do_not_modify",
+        "path_glob": ".github/CODEOWNERS"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "do_not_modify",
+        "path_glob": "_blog/**"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/expected_results/**"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/data_manifest.toml"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "do_not_modify",
+        "path_glob": "docs/blog/**"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": ".github/ISSUE_TEMPLATE/config.yml"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/todo-db-export.yml"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": ".todo-db/config.json"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": "CONTRIBUTING.md"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": "DISCLAIMER.md"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/**"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/downloader.py"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": "landing/**"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/headerContract.ts"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_release_infrastructure.py -q",
+        "description": "Release metadata URLs match the org",
+        "expected": "pass",
+        "item_id": "github-org-transfer-03-pin-update",
+        "last_result": "pass",
+        "last_run": "2026-08-22T14:18:40Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_site_header_parity.py -q",
+        "description": "Site header parity includes the org GitHub URL",
+        "expected": "pass",
+        "item_id": "github-org-transfer-03-pin-update",
+        "last_result": "pass",
+        "last_run": "2026-08-22T14:18:44Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_ruleset_drift.py tests/unit/release/test_ruleset_drift_review_coverage.py -q",
+        "description": "Ruleset drift parser still accepts the runbook",
+        "expected": "pass",
+        "item_id": "github-org-transfer-03-pin-update",
+        "last_result": "pass",
+        "last_run": "2026-08-22T14:18:48Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'joeharris76/BenchBox/releases/download' benchbox/core/joinorder/data_manifest.toml",
+        "description": "JoinOrder manifest url is unchanged",
+        "expected": "url still the old owner release path",
+        "item_id": "github-org-transfer-03-pin-update",
+        "last_result": "pass",
+        "last_run": "2026-08-22T14:18:48Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "github-org-transfer-03-pin-update",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1803: retargeted pyproject, CLI, landing, header contract, and flightdata User-Agent URLs",
+        "item_id": "github-org-transfer-03-pin-update",
+        "notes": null,
+        "started_at": "2026-08-22T14:16:08Z",
+        "started_branch": "fix/org-transfer-pins",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-org-transfer-pins",
+        "status": "done",
+        "summary": "Retarget public site, pyproject, CLI, landing, header-contract, and flightdata User-Agent URLs plus tests",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1803: retargeted tracker, script defaults, issue template, and runbook IDs in place",
+        "item_id": "github-org-transfer-03-pin-update",
+        "notes": null,
+        "started_at": "2026-08-22T14:16:13Z",
+        "started_branch": "fix/org-transfer-pins",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-org-transfer-pins",
+        "status": "done",
+        "summary": "Retarget tracker, script defaults, issue template, linkcheck ignore, and runbook IDs in place",
+        "wid": "w1"
+      }
+    ]
+  }
+}

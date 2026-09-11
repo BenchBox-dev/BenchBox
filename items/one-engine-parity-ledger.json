@@ -1,0 +1,182 @@
+{
+  "context": "Docs + tests only; no runtime changes. Model the ledger table so the existing docs-drift test machinery (schema-derived tables) can parse and assert it. The support-status drift test mirrors the benchmark-side pattern: derive expected exposure from PlatformRegistry metadata and assert the docs table matches.",
+  "description": "Close the enforcement gaps from the review. (1) Only run_benchmark has a CLI-omission ledger; add a per-tool CLI<->MCP mapping ledger to docs/reference/mcp.md covering all 12 local tools (each tool names its CLI counterpart(s) or 'none', and each CLI command family absent from MCP carries a tier tag from the one-engine ADR: security-scoped / interaction-scoped / not-yet-demanded). (2) Extend tests/unit/mcp/test_run_surface_contract.py so every ledger row is asserted against the live tool registry and every omission carries exactly one ratified tier tag. (3) docs/platforms/support-status.md:20-25 has CLI/MCP exposure columns with no drift test (unlike its docs/benchmarks sibling tested at tests/unit/core/test_benchmark_api_contract.py:43) -- add the equivalent registry-driven drift test. (4) Record the demand-driven tool expansion backlog (publish/submit/report/tuning/plan-history as future MCP tools) as deferrals on this item, NOT as TODO items -- under the contract they are promotable when demanded, and speculative surface is negative value on a tenant-scoped server.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create TODO items now for each potential future MCP tool",
+        "instead": "record them as deferrals here, promotable on demand",
+        "item_id": "one-engine-parity-ledger",
+        "why": "speculative tools on a tenant-scoped server are permanent schema/docs/security liabilities nobody asked for"
+      },
+      {
+        "dont": "hand-maintain the support-status exposure table without a registry source",
+        "instead": "derive expectations from PlatformRegistry metadata in the test",
+        "item_id": "one-engine-parity-ledger",
+        "why": "hand-maintained tables are how the benchmarks/platforms docs diverged in the first place"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "one-engine-parity-ledger",
+        "needs_item": "one-engine-adr-scoped-surfaces"
+      },
+      {
+        "item_id": "one-engine-parity-ledger",
+        "needs_item": "one-engine-mcp-run-service-adoption"
+      }
+    ],
+    "item_meta": {
+      "category": "MCP",
+      "completed_at": "2026-08-09T15:02:28Z",
+      "completed_pr": 1650,
+      "created_at": "2026-08-04T17:15:42Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "Docs param tables remain schema-derived; the new ledger must not contradict them.",
+        "item_id": "one-engine-parity-ledger"
+      },
+      {
+        "behavior": "Existing run_benchmark omission ledger rows survive (retagged by the ADR item, extended here).",
+        "item_id": "one-engine-parity-ledger"
+      },
+      {
+        "behavior": "No new MCP tools are added by this item.",
+        "item_id": "one-engine-parity-ledger"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "The docs/benchmarks support-status drift test to mirror for platforms",
+        "decision": "reuse",
+        "item_id": "one-engine-parity-ledger",
+        "path": "tests/unit/core/test_benchmark_api_contract.py"
+      },
+      {
+        "concept": "Ledger assertion machinery to extend from one tool to twelve",
+        "decision": "extend",
+        "item_id": "one-engine-parity-ledger",
+        "path": "tests/unit/mcp/test_run_surface_contract.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "one-engine-parity-ledger",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "one-engine-parity-ledger",
+        "kind": "only_modify",
+        "path_glob": "_project/config/fast_test_lane_policy.json"
+      },
+      {
+        "item_id": "one-engine-parity-ledger",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/support-status.md"
+      },
+      {
+        "item_id": "one-engine-parity-ledger",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "one-engine-parity-ledger",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      },
+      {
+        "item_id": "one-engine-parity-ledger",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -k 'ledger or tool_inventory or mapping' -q",
+        "description": "Every registered MCP tool appears in the ledger with a CLI mapping",
+        "expected": "12-tool ledger asserted against the live registry.",
+        "item_id": "one-engine-parity-ledger",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core -k 'support_status and platform' -q",
+        "description": "Platforms support-status docs are drift-tested",
+        "expected": "Exposure columns derive from PlatformRegistry and match the docs.",
+        "item_id": "one-engine-parity-ledger",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "one-engine-parity-ledger",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "one-engine-parity-ledger",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "one-engine-parity-ledger",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1650 merged 8e9a040103+16b907718e: ledger+tests green (13 mcp ledger/tool_inventory/mapping, 3 core support_status platform)",
+        "item_id": "one-engine-parity-ledger",
+        "notes": null,
+        "started_at": "2026-08-09T15:02:13Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-verify ledger/test state at HEAD after upstream items landed",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1650 merged 8e9a040103+16b907718e: ledger+tests green (13 mcp ledger/tool_inventory/mapping, 3 core support_status platform)",
+        "item_id": "one-engine-parity-ledger",
+        "notes": null,
+        "started_at": "2026-08-09T15:02:16Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Author the 12-tool ledger with tier tags; extend contract tests to assert it",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1650 merged 8e9a040103+16b907718e: ledger+tests green (13 mcp ledger/tool_inventory/mapping, 3 core support_status platform)",
+        "item_id": "one-engine-parity-ledger",
+        "notes": null,
+        "started_at": "2026-08-09T15:02:19Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Platforms support-status drift test mirroring the benchmarks pattern",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1650 merged 8e9a040103+16b907718e: ledger+tests green (13 mcp ledger/tool_inventory/mapping, 3 core support_status platform)",
+        "item_id": "one-engine-parity-ledger",
+        "notes": null,
+        "started_at": "2026-08-09T15:02:22Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record demand-driven tool-expansion deferrals",
+        "wid": "w3"
+      }
+    ]
+  }
+}

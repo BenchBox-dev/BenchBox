@@ -1,0 +1,88 @@
+{
+  "context": "Two candidate mitigations; pick per maintainer preference. (a) Make the version gate degrade gracefully so read-only subcommands (list/show/stats/ready/export) still run against an older-but-forward-compatible schema and only writes fail - the outage here was mostly lost read access, so this has the smaller blast radius. (b) Add CI that fails a PR bumping todo_db.py's schema version unless the hosted migration has been applied, or auto-applies it on merge. Record the decision either way so the next bump does not repeat it.",
+  "description": "Supersedes todo-cli-schema-bump-must-ship-with-db-migration (dropped only to attach a work breakdown). PR #1347 (74aee99, 'feat/findings schema v4') bumped _project/scripts/todo_db.py to n=4 while the hosted benchbox-todo DB was still schema_version=3. Because the version check runs before every subcommand, EVERY todo command on develop failed - including read-only list/stats/show - with 'database schema_version=3, CLI expects 4; run todo migrate to upgrade it'. The tracker is the project's only TODO record, so the window between merging a CLI bump and someone manually running migrate is a total tracker outage for all sessions. Observed live on 2026-07-30 and resolved by running todo migrate. AGENTS.md already states the principle: 'A drift/pinning guard and its required-CI wiring must land in the same PR.' Not covered by migrate-hosted-tracker-db-to-todo-db-0-3-schema, which is the separate 0.3 cutover.",
+  "legacy": {
+    "item_meta": {
+      "category": "todo-db",
+      "created_at": "2026-07-30T12:08:25Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Writes must still refuse to run against a schema the CLI does not understand; no silent data corruption",
+        "item_id": "todo-cli-schema-bump-must-ship-with-db-migration-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-cli-schema-bump-must-ship-with-db-migration-v2",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "todo-cli-schema-bump-must-ship-with-db-migration-v2",
+        "kind": "only_modify",
+        "path_glob": "_project/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts -k todo -q",
+        "description": "read-only subcommands survive a CLI-ahead-of-DB skew, or CI blocks the bump",
+        "expected": "exit 0",
+        "item_id": "todo-cli-schema-bump-must-ship-with-db-migration-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-cli-schema-bump-must-ship-with-db-migration-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-cli-schema-bump-must-ship-with-db-migration-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "todo-cli-schema-bump-must-ship-with-db-migration-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Confirm the failure mode by pointing a v3-schema DB at the current CLI and checking that read-only subcommands fail",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-cli-schema-bump-must-ship-with-db-migration-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide between graceful read-only degradation and a CI bump guard, and record the decision",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-cli-schema-bump-must-ship-with-db-migration-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement the chosen guard with its test coverage",
+        "wid": "w2"
+      }
+    ]
+  }
+}

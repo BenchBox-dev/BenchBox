@@ -1,0 +1,141 @@
+{
+  "context": "1. Add optional environment fields to SummaryStats dataclass (os, python, cpus, memory).\n2. In ASCIISummaryBox._render_single_metrics(), render a two-column layout when\n   environment data is present: left column = metrics, right column = env info,\n   separated by a vertical box-drawing char.\n3. In _render_comparison_metrics(), apply the same two-column layout.\n4. In generate_post_run_summary(), extract system_profile from BenchmarkResults\n   and populate the new SummaryStats fields.\n5. Graceful fallback: if system_profile is None or terminal is too narrow,\n   render the current single-column layout.\n\nFollow existing patterns in summary_box.py for box-drawing characters,\nANSI color handling, and visible-length padding calculations.\n",
+  "description": "The post-run summary box currently renders benchmark metrics (Geo Mean, Total,\nQueries, Best, Worst) in a single column with unused whitespace on the right.\nAdd key system environment details (OS, Python version, CPU count/arch, memory)\nas a right-aligned column next to the metrics, giving users immediate context\nabout the hardware/software configuration that produced the results.\n\nTarget layout (single-run):\n```\n┌────────────────────────────────────────────────────────────────────┐\n│                   ClickBench on DuckDB (SF 1.0)                   │\n├──────────────────────────────┬─────────────────────────────────────┤\n│ Geo Mean:  1.6ms             │  OS: Darwin 25.2.0                 │\n│ Total:     48.8ms            │  Python: 3.12.11 (uv)              │\n│ Queries:   27                │  CPUs: 10 (arm64)                  │\n│                              │  Memory: 16 GB                     │\n├──────────────────────────────┴─────────────────────────────────────┤\n│ Best: Q6 (1.0ms), Q13 (1.0ms), Q15 (1.0ms)                      │\n│ Worst: Q19 (4.0ms), Q10 (3.5ms), Q33 (3.0ms)                    │\n└────────────────────────────────────────────────────────────────────┘\n```\n\nThe data is already available: BenchmarkResults has a `system_profile` field\n(SystemProfile dataclass from benchbox/core/schemas.py) with os_name,\nos_version, architecture, cpu_cores_logical, memory_total_gb, python_version.\n\nThe summary box is rendered in two places:\n- Post-run CLI: generate_post_run_summary() in post_run_summary.py\n- MCP charts: generate_chart() with chart_type=\"summary_box\"",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "call platform.uname() or psutil at render time",
+        "instead": "use result.system_profile",
+        "item_id": "summary-box-system-environment-info",
+        "why": "the renderer should be pure and system info should come from the result object"
+      },
+      {
+        "dont": "hard-code a fixed box width",
+        "instead": "use options.get_effective_width() and fall back to single-column if too narrow",
+        "item_id": "summary-box-system-environment-info",
+        "why": "terminal widths vary"
+      }
+    ],
+    "item_meta": {
+      "category": "Visualization",
+      "completed_at": "2026-02-10T00:00:00Z",
+      "created_at": "2026-02-10T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ASCIISummaryBox.render() remains a pure function (no side effects, no I/O)",
+        "item_id": "summary-box-system-environment-info"
+      },
+      {
+        "behavior": "Box width auto-detection still works; environment column only appears when terminal is wide enough",
+        "item_id": "summary-box-system-environment-info"
+      },
+      {
+        "behavior": "Existing single-run and comparison summary box layouts still render correctly when system_profile is None",
+        "item_id": "summary-box-system-environment-info"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "summary-box-system-environment-info",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "summary-box-system-environment-info",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "summary-box-system-environment-info",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/schemas.py"
+      },
+      {
+        "item_id": "summary-box-system-environment-info",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/summary_box.py"
+      },
+      {
+        "item_id": "summary-box-system-environment-info",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/post_run_summary.py"
+      },
+      {
+        "item_id": "summary-box-system-environment-info",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/visualization/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/visualization/test_post_run_summary.py -v --tb=short",
+        "description": "Existing summary box tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "summary-box-system-environment-info",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/visualization/ -k 'system_environment or env_info' -v --tb=short",
+        "description": "New environment info renders in summary box",
+        "expected": "new tests pass showing environment details in box",
+        "item_id": "summary-box-system-environment-info",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "summary-box-system-environment-info",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "summary-box-system-environment-info",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "summary-box-system-environment-info",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add optional environment fields to SummaryStats and render two-column layout in ASCIISummaryBox",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "summary-box-system-environment-info",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire system_profile data from BenchmarkResults into SummaryStats in generate_post_run_summary()",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "summary-box-system-environment-info",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for environment info rendering (present, absent, narrow terminal)",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,110 @@
+{
+  "context": "Build the explorer as a standalone subsite under the BenchBox public domain.\nPrefer static or precomputed routes for canonical result pages, then add\nricher browser-side interactivity on top of the derived read model.\n",
+  "description": "BenchBox needs a public-facing results explorer that feels like a product, not\na directory listing of JSON files. The explorer should live at\n`benchbox.dev/results/`, integrate with the existing public site, and provide\nstable result pages, browse flows, and compare surfaces over derived\npublic read models.\n\n**Phase assignment:** This is the Phase 1 core deliverable. It does NOT depend\non the hosted governance model or full ingest architecture - Phase 1 uses a\nstatic build pipeline (canonical bundles → JSON manifests + DuckDB snapshot)\ndeployed to GitHub Pages. The governance and ingest TODOs were removed as\nblockers because Phase 1 is entirely maintainer-curated with no hosted services.\n\nThis TODO is a **tracking umbrella** for the Phase 1 implementation. It does\nnot contain implementation work itself - it mirrors the milestone state of the\nresults-explorer cluster. Mark each work unit done when the corresponding\ncluster item(s) are completed. Mark this item Completed when w3 is done.\n\nNote: resolve-results-explorer-brand-ownership must be resolved before launch\nbut does not block implementation. BenchBox placement is the working default.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hide the canonical raw bundle behind a UI-only representation",
+        "instead": "make the underlying bundle downloadable from result pages",
+        "item_id": "build-results-explorer-subsite-on-benchbox-dev",
+        "why": "reproducibility matters"
+      },
+      {
+        "dont": "use hash-only routing for canonical public result URLs",
+        "instead": "use real result paths or pre-rendered files",
+        "item_id": "build-results-explorer-subsite-on-benchbox-dev",
+        "why": "stable shareable pages matter for a benchmark site"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "build-results-explorer-subsite-on-benchbox-dev",
+        "needs_item": "define-results-platform-product-and-launch-strategy"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Explorer result pages link back to the canonical raw bundle and do not invent a second source of truth",
+        "item_id": "build-results-explorer-subsite-on-benchbox-dev"
+      },
+      {
+        "behavior": "Landing page, docs, and blog remain deployable under the existing GitHub Pages workflow until the new explorer is proven",
+        "item_id": "build-results-explorer-subsite-on-benchbox-dev"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -d results-explorer/dist/ && test -f results-explorer/dist/index.html && echo PRESENT",
+        "description": "Explorer Vite build output exists with an index",
+        "expected": "PRESENT",
+        "item_id": "build-results-explorer-subsite-on-benchbox-dev",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd landing && npm run build 2>&1 | grep -c '[Ee]rror' || echo 0",
+        "description": "Existing docs and landing pages build cleanly after explorer is integrated",
+        "expected": "0",
+        "item_id": "build-results-explorer-subsite-on-benchbox-dev",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "build-results-explorer-subsite-on-benchbox-dev",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "build-results-explorer-subsite-on-benchbox-dev",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "build-results-explorer-subsite-on-benchbox-dev",
+        "notes": "Tracked by: generate-seed-corpus-for-results-explorer,\nbuild-static-pipeline-bundles-to-read-model\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Milestone: seed corpus generated and build pipeline operational",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-results-explorer-subsite-on-benchbox-dev",
+        "notes": "Tracked by: scaffold-results-explorer-frontend,\nimplement-explorer-home-and-browse-pages,\nimplement-result-detail-page,\nimplement-results-compare-view\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Milestone: frontend scaffold and all explorer pages implemented",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "build-results-explorer-subsite-on-benchbox-dev",
+        "notes": "Tracked by: integrate-explorer-into-github-pages-deployment,\nlaunch-results-explorer-acceptance-and-seed\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Milestone: explorer deployed to GitHub Pages and acceptance-tested",
+        "wid": "w3"
+      }
+    ]
+  }
+}

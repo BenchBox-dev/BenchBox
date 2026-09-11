@@ -1,0 +1,146 @@
+{
+  "description": "The isolated capture phase runs AFTER all timed queries, on the measurement\nconnection. For read-only workloads this is exactly correct. But when the\nworkload MUTATES data during the run, the post-measurement capture sees the\nPOST-mutation database state, so the captured plan (and its cardinality\nestimates / chosen join order) can differ from the plan the optimizer actually\nchose when the query ran during measurement.\n\nConcretely (verified 2026-06-15):\n  - Standard power and throughput query sets are SELECT-only (TPC-H/TPC-DS\n    permutations contain no DML), so no divergence there.\n  - Maintenance tests (TPC-H RF1/RF2 inserts+deletes, TPC-DS data maintenance)\n    and combined mode (power -> throughput -> maintenance) DO change table\n    cardinalities. In combined mode the maintenance step runs AFTER the measured\n    query phases, so a single post-run capture reflects post-maintenance data.\n  - Any benchmark whose query set itself contains DML has the same exposure.\n\nThis was a non-issue while capture was inline (the plan was captured at the\nmoment each query ran). Moving capture to a post-measurement phase introduces the\ndivergence, so the canonical-isolation work must resolve it rather than silently\ncapturing a plan that never ran.\n\nOptions to evaluate:\n  A) Capture-before-mutation: run the isolated capture pass at the point in the\n     lifecycle BEFORE the first data-mutating step (e.g. before maintenance in\n     combined mode), still outside any timed loop.\n  B) Per-phase capture: capture once per measured sub-phase (after power, before\n     maintenance) so each captured plan matches the data state it ran against.\n  C) Documented read-only contract: capture only for read-only runs; for runs that\n     mutate data, emit a clear warning that captured plans reflect end-of-run state\n     (and/or skip capture for the mutating queries).\nThe chosen option must keep capture out of the timed window and out of concurrent\nstreams.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "move capture back inside the timed loop to dodge this",
+        "instead": "solve it within the isolated-phase model.",
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "why": "that re-contaminates measurement"
+      },
+      {
+        "dont": "silently capture a post-mutation plan for a query that ran against pre-mutation data",
+        "instead": "capture before mutation or label/skip it.",
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "why": "the fingerprint then describes a plan that never executed"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "needs_item": "query-plan-capture-canonical-isolation"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-06-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Capture stays outside the timed window and outside concurrent streams.",
+        "item_id": "query-plan-capture-post-measurement-divergence"
+      },
+      {
+        "behavior": "Read-only workloads keep capturing correct plans with no behavior change.",
+        "item_id": "query-plan-capture-post-measurement-divergence"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/tpch/maintenance_test.py — RF1/RF2 (insert/delete, changes cardinalities)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "path": "benchbox/core/tpch/maintenance_test.py"
+      },
+      {
+        "concept": "benchbox/platforms/base/execution.py — _capture_plans_post_measurement; _execute_combined_test (power->throughput->maintenance)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "path": "benchbox/platforms/base/execution.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/plan_capture_phase.py"
+      },
+      {
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/execution.py"
+      },
+      {
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "kind": "only_modify",
+        "path_glob": "docs/features/query-plan-analysis.md"
+      },
+      {
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/ -k 'capture and (combined or maintenance or mutation)' -v",
+        "description": "Combined/DML run captures a plan matching the measured data state (or warns)",
+        "expected": "captured plan matches measured-state expectation or documented warning fires",
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "notes": "Enumerate the run shapes where the post-measurement DB state differs from the\nmeasured state (combined mode, maintenance, DML-containing query sets). Quantify\nwhether captured fingerprints actually change for representative cases.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Characterize divergence: which test types / benchmarks mutate data before capture",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "notes": "Choose per the trade-offs; coordinate with query-plan-capture-canonical-isolation\nw3 (all-test-type coverage) since both touch where in the lifecycle the phase fires.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide the resolution (before-mutation / per-phase / documented contract)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "notes": "Add a test on DuckDB combined mode (or a DML-containing query set) asserting the\ncaptured plan matches the data state it was measured against (or that the\ndocumented warning fires and capture is skipped/labelled accordingly).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement + test the chosen resolution",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-post-measurement-divergence",
+        "notes": "Related fidelity gap raised in PR #889 review (chatgpt-codex-connector, P2): the\nphase records executed queries in _phase_recorded_queries keyed by query_id via\nsetdefault (benchbox/platforms/base/result_capture.py and execution.py). In\nTPC-H/TPC-DS power/throughput the SAME query_id renders DIFFERENT SQL per\nseed/stream (e.g. TPCHPowerTest derives seed + stream_id*1000 and passes\nstream_id to get_query). With setdefault-by-query_id only the FIRST variant's SQL\nis recorded, so _capture_plans_post_measurement captures one plan and attaches it\n(plan + fingerprint + capture_time) to EVERY later row sharing that query_id —\nrows that actually ran a different variant. While fingerprints still embed literal\nvalues (query-plan-capture-fingerprint-literal-normalization is Not Started), those\nattached fingerprints are wrong for the non-first variants.\nThis is PRE-EXISTING isolated-phase behavior (it already affects the originally\nphase-eligible engines: DuckDB/MotherDuck/PostgreSQL/Redshift/SQLite/DataFusion);\nthe canonical-isolation cutover (PR #889) extended the same phase to the remaining\nEXPLAIN engines per the ratified contract, so it now applies uniformly.\nResolution to evaluate (coordinate with the literal-normalization TODO): key\n_phase_recorded_queries by concrete SQL (or (query_id, sql)) and attach captured\nplans to result rows by matching SQL, so each row gets the plan for the variant it\nactually ran — for ALL eligible engines, not just the ones added in #889.\nInterim contract: under \"capture once per query — a plan is a property of\n(query, schema, engine)\", once fingerprints are literal-normalized the structural\nfingerprint is variant-stable and the attachment is correct; the per-variant\nANALYZE timing remains representative rather than exact.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Preserve per-stream/seed query variants in the phase recording buffer",
+        "wid": "w4"
+      }
+    ]
+  }
+}

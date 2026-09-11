@@ -1,0 +1,10 @@
+{
+  "description": "Closed the gaps identified in the adversarial review of the lifecycle migration by correcting phase selection, success reporting, and coverage, while cleaning up obsolete helpers.",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (Should-Fix Before Release)",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #312 of equivalence-waiver-expiry-policy.\nDeferred: Automatically opening an issue/PR or paging an owner when a review_by date passes.\nReason deferred: Out of scope; this item only adds the detectable signal (a warning/failure at report time). Automating a proactive nudge is a separate CI/scheduling concern.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:28Z",
+      "worktree": "main"
+    }
+  }
+}

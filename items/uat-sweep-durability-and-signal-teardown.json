@@ -1,0 +1,163 @@
+{
+  "context": "Append-only row writes with an atomic finalize artifact, a sweep-process-only SIGTERM shim, and a cancellation lifecycle event; report/gate treat unfinalized runs as failed, never green.",
+  "description": "2026-07-21 adversarial UAT review finding (P2): cells.jsonl and the accounting sidecar are written only after the whole execute phase returns (tests/uat/orchestrator.py:272-280) and uat_gate_summary.json only at the very end (:504-518); only DiskFloorAbort is artifact-safe mid-sweep (:229-271). An uncaught exception or SIGKILL mid-execute loses every completed cell's durable record (raw logs survive but are unreportable via make uat-report). SIGTERM is worse: no signal handler exists anywhere in tests/uat (timeouts.py only manages the CELL subprocess group), so Python's default SIGTERM action skips the finally teardown at tests/uat/phases/execute.py:300-313 entirely - a plain `kill <pid>` leaves the Docker stack up AND loses the records, while Ctrl-C (KeyboardInterrupt) tears down correctly. docker_cleanup.py:3-8 names hard-kill recovery as make uat-docker-cleanup's job, so the stack half is acknowledged-by-design - but kill-vs-Ctrl-C asymmetry is a footgun during multi-hour release-gate sweeps, and the durability half has no mitigation at all.\n\nWork: append each cell's row incrementally (or flush per platform) with an explicit finalize marker so a partial file can never read as a complete sweep; SIGTERM->raise shim in the sweep process so kill == Ctrl-C; record sweep-level cancellation as a lifecycle event (today it is only inferable from a missing gate summary). Interacts with uat-evidence-provenance-binding: the finalize marker is also what the digest/gate side should require - coordinate row/marker shape, and land this SECOND if both are in flight.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "buffer rows in memory and flush on a timer",
+        "instead": "append + flush at cell completion",
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "why": "the failure mode being fixed is process death; timers lose the tail"
+      },
+      {
+        "dont": "install signal handlers inside cell subprocesses",
+        "instead": "sweep-process-only shim",
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "why": "timeouts.py owns process-group kill semantics for cells; competing handlers break the 124/timeout contract"
+      },
+      {
+        "dont": "let a partial cells.jsonl pass for a complete sweep",
+        "instead": "explicit finalize marker; report/gate-check require it",
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "why": "gate soundness: a killed sweep must stay distinguishable and non-green, or durability becomes a forgery vector"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-21T21:27:45Z",
+      "completed_pr": 1251,
+      "created_at": "2026-07-21T11:43:46Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "DiskFloorAbort behavior and exit codes unchanged; sweep exit codes unchanged.",
+        "item_id": "uat-sweep-durability-and-signal-teardown"
+      },
+      {
+        "behavior": "cells.jsonl ROW schema unchanged (report/gate consumers parse it); the finalize marker is a separate artifact or trailing sentinel, decided with the provenance item.",
+        "item_id": "uat-sweep-durability-and-signal-teardown"
+      },
+      {
+        "behavior": "timeouts.py cell-subprocess process-group kill semantics untouched.",
+        "item_id": "uat-sweep-durability-and-signal-teardown"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing cells.jsonl write/read contract",
+        "decision": "extend",
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "path": "tests/uat/cells_io.py"
+      },
+      {
+        "concept": "DiskFloorAbort - the one existing artifact-safe mid-sweep abort path to generalize",
+        "decision": "extend",
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "path": "tests/uat/orchestrator.py:229-271"
+      },
+      {
+        "concept": "cell-subprocess SIGTERM->SIGKILL escalation (do not touch)",
+        "decision": "reuse",
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "path": "tests/uat/timeouts.py:82-123"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      },
+      {
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/cells_io.py"
+      },
+      {
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/orchestrator.py"
+      },
+      {
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/report.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat -k 'sigterm or durab or incremental or finalize' -q",
+        "description": "Kill mid-sweep keeps rows, tears down, exits nonzero",
+        "expected": "completed cells' rows present after simulated SIGTERM; teardown invoked; unfinalized run rejected as green by report",
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "last_result": "pass",
+        "last_run": "2026-07-21T21:22:00Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_runner.py tests/uat/test_report.py tests/uat/test_report_accounting.py -q",
+        "description": "Existing lane unchanged",
+        "expected": "all pass",
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "last_result": "pass",
+        "last_run": "2026-07-21T21:22:06Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "cells_io.CellStreamWriter appends+fsyncs each row at cell completion (hooked via orchestrator _build_disk_floor_runner cell_stream); write_cells_jsonl writes the atomic .finalized marker last + clears .inprogress; make uat-report treats a lingering .inprogress w/o .finalized as INCOMPLETE (exit 2) while marker-less legacy artifacts stay green. Tests: test_sweep_durability.py w1 cases + full tests/uat lane 569 passed.",
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "notes": null,
+        "started_at": "2026-07-21T21:02:30Z",
+        "started_branch": "fix/uat-sweep-durability-signal-teardown",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Incremental per-cell append of cells.jsonl + sidecar flush (atomic finalize marker on completion); report refuses to treat an unfinalized run as green",
+        "wid": "w1"
+      },
+      {
+        "evidence": "orchestrator._install_sweep_sigterm_shim installs a sweep-process-only SIGTERM->SweepCancelled(KeyboardInterrupt) shim; run_sweep restores the prior handler in a finally; interrupt unwinds through run_execute per-platform finally (docker teardown) and exits nonzero. Tests: test_sigterm_shim_raises_sweepcancelled..., test_run_sweep_restores_previous_sigterm_handler, test_interrupt_mid_cell_still_tears_down_docker_stack.",
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "notes": null,
+        "started_at": "2026-07-21T21:21:11Z",
+        "started_branch": "fix/uat-sweep-durability-signal-teardown",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "SIGTERM->raise shim in the sweep process (not cell subprocesses) so finally-teardown and nonzero exit behave exactly like Ctrl-C",
+        "wid": "w2"
+      },
+      {
+        "evidence": "SIGTERM handler records '[cancel] signal=<name> phase=<phase> ...' to uat_lifecycle.log (offset-aware timestamp via append_lifecycle_log) before raising. Test: test_sigterm_shim_raises_sweepcancelled_and_records_cancellation asserts the [cancel] line + signal name + phase.",
+        "item_id": "uat-sweep-durability-and-signal-teardown",
+        "notes": null,
+        "started_at": "2026-07-21T21:21:16Z",
+        "started_branch": "fix/uat-sweep-durability-signal-teardown",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-05",
+        "status": "done",
+        "summary": "Record sweep-level cancellation (signal name, phase, timestamp) in uat_lifecycle.log",
+        "wid": "w3"
+      }
+    ]
+  }
+}

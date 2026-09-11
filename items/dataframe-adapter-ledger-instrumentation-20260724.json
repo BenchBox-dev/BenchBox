@@ -1,0 +1,120 @@
+{
+  "context": "Pick ONE of: (a) make ledger export opt-in per adapter until each records its settings, so an uninstrumented adapter publishes no claim rather than a false noop; or (b) instrument datafusion-df and dask-df _apply_tuning() with _record_runtime_tuning() before the export call. Option (b) is the fuller fix; option (a) is the safer interim. Decide explicitly and record the rationale in the PR body.",
+  "description": "chatgpt-codex-connector review finding on merged PR #1269 (P2, benchbox/platforms/dataframe/tuning_mixin.py:284). Deferred from the PR-review sweep in PR #1292 because the fix is a design fork that determines what validation_status published runs carry; tracked in GitHub issue #1293.\n\nThe ledger writer now runs for EVERY TuningConfigurableMixin adapter, but production adapters whose _apply_tuning() was never instrumented (notably datafusion-df and dask-df) export a status derived from an empty ledger. For example DataFusion's thread_count changes _target_partitions but adds no _record_runtime_tuning() entry, so set_tuning_info() publishes validation_status=\"noop\" and no applied hash for a run that was genuinely tuned.\nThread: https://github.com/joeharris76/BenchBox/pull/1269#discussion_r3634087174",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "leave the export path emitting noop for an adapter that was actually tuned",
+        "instead": "either record the real settings or publish no claim at all",
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724",
+        "why": "a false noop is published evidence that the run was untuned"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-24T16:22:55Z",
+      "worktree": "dataframe-benchmarks"
+    },
+    "preserves": [
+      {
+        "behavior": "An untuned DataFrame run still reports noop legitimately",
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724"
+      },
+      {
+        "behavior": "Instrumented adapters (polars-df and any other already recording entries) keep their current validation_status and applied hash",
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/equivalence/**"
+      },
+      {
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/expected_results/**"
+      },
+      {
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/**"
+      },
+      {
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/**"
+      },
+      {
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/dataframe/**"
+      },
+      {
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/ tests/unit/core/dataframe/ -q",
+        "description": "DataFrame adapter + loader tests pass",
+        "expected": "all pass",
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "428e47a55d92a9326c99df09dbeb5966fc2c03bf chose option (b): record applied DataFusion/Dask settings. Left cudf/modin/pyspark/lakesail uninstrumented. Rationale in commit body.",
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide and document opt-in-export vs instrument-adapters, citing which production adapters are currently uninstrumented",
+        "wid": "w1"
+      },
+      {
+        "evidence": "428e47a55d92a9326c99df09dbeb5966fc2c03bf instruments datafusion_df._apply_tuning and dask_df._apply_tuning with _record_runtime_tuning after each applied setting.",
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the chosen option so a tuned datafusion-df / dask-df run no longer publishes validation_status=noop with no applied hash",
+        "wid": "w2"
+      },
+      {
+        "evidence": "428e47a55d92a9326c99df09dbeb5966fc2c03bf extends tests/unit/platforms/dataframe/test_tuning_ledger_parity.py; uv run -- python -m pytest tests/unit/platforms/dataframe/ -q -> 1158 passed.",
+        "item_id": "dataframe-adapter-ledger-instrumentation-20260724",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add regression coverage asserting an uninstrumented adapter does not publish a false noop",
+        "wid": "w3"
+      }
+    ]
+  }
+}

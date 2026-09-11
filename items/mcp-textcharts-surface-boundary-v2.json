@@ -1,0 +1,156 @@
+{
+  "context": "Revalidate the actual BenchBox tool list and any supported client or harness configuration that can expose the external textcharts server. Treat the current documented separation as the safe default. Record the namespace, ownership, configuration, and support decision in the MCP reference and public-contracts documentation. Add a regression assertion that BenchBox transport inventories contain only the result-aware BenchBox visualization tools. If bundling or proxying is desired later, create a separate architecture and security TODO before implementation.",
+  "description": "Promoted from open deferral #516 on visualization-mcp-surface-and-help-contract. BenchBox exposes result-aware suggest_charts and generate_chart tools, while the installed textcharts dependency has a separate raw-primitive MCP server. Source alone cannot establish whether a client harness exposes both servers together. Resolve and record the supported boundary with runtime evidence before any bundling or proxying decision; this follow-up must not silently register external textcharts tools.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-08-02T01:21:54Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "BenchBox MCP exposes only result-aware suggest_charts and generate_chart tools",
+        "item_id": "mcp-textcharts-surface-boundary-v2"
+      },
+      {
+        "behavior": "No external server registration changes occur without an explicit product, security, and support decision",
+        "item_id": "mcp-textcharts-surface-boundary-v2"
+      },
+      {
+        "behavior": "Raw textcharts primitive tools remain a separate namespace and are never silently proxied or bundled",
+        "item_id": "mcp-textcharts-surface-boundary-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/**"
+      },
+      {
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "kind": "do_not_modify",
+        "path_glob": "textcharts/**"
+      },
+      {
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp*.md"
+      },
+      {
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/test_transport_contract_parity.py"
+      },
+      {
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -q \"does not register or proxy|separate raw\" docs/reference/mcp.md docs/reference/public-contracts.md",
+        "description": "The documented boundary is explicit and current",
+        "expected": "exits 1 if the boundary is absent or stale; exits 0 once the supported separation is recorded",
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f tests/integration/mcp/test_transport_contract_parity.py && rg -q \"textcharts|suggest_charts|generate_chart\" tests/integration/mcp/test_transport_contract_parity.py",
+        "description": "Transport contract tests assert no implicit textcharts registration",
+        "expected": "exits 1 until the regression assertion is added; exits 0 once the inventory guard is present",
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/integration/mcp/test_transport_contract_parity.py tests/unit/mcp/test_visualization_tools.py tests/unit/mcp/test_discovery_tools.py -q",
+        "description": "MCP transport parity remains green",
+        "expected": "exits 1 until the boundary guard is implemented; exits 0 once the supported surface remains green",
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate runtime tool-list evidence for BenchBox and separately configured textcharts MCP servers across supported client contexts",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record the supported namespace, ownership, configuration, and no-implicit-proxy boundary in the MCP reference and public-contracts documentation",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add transport-contract regression coverage proving BenchBox exposes result-aware visualization tools without silently registering textcharts raw primitives",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-textcharts-surface-boundary-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Obtain an explicit product decision on any future bundle or proxy, and open a separate architecture/security item before changing registration behavior",
+        "wid": "w3"
+      }
+    ]
+  }
+}

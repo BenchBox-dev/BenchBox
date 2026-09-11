@@ -1,0 +1,139 @@
+{
+  "description": "Non-required nits and improvements surfaced by the code review of\nexplorer-close-chart-type-coverage-gaps. The two Required issues (PowerBar\ncolor index, PercentileLadder caller color index) were fixed immediately\npost-review. This item tracks the remaining four findings.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change computeECDFPoints for w2",
+        "instead": "(not specified)",
+        "item_id": "explorer-chart-coverage-review-followups",
+        "why": "the math is correct; only the SVG path rendering changes"
+      },
+      {
+        "dont": "gate Histogram/Box/CDF tabs on platform count alone",
+        "instead": "(not specified)",
+        "item_id": "explorer-chart-coverage-review-followups",
+        "why": "gate on actual non-null timing values"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "explorer-chart-coverage-review-followups",
+        "id": 314,
+        "reason": "Interactivity is out of scope for this follow-up item",
+        "resolution": "promoted",
+        "resolved_item": "interactive-cdfchart-tooltip-showing-exact-percentile-at-cur",
+        "resolved_reason": null,
+        "summary": "Interactive CDFChart tooltip showing exact percentile at cursor position"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "BenchmarkIndex existing tab gating logic for percentiles/power/phases/cost tabs",
+        "item_id": "explorer-chart-coverage-review-followups"
+      },
+      {
+        "behavior": "CDFChart parity test (computeECDFPoints) must still pass - only the SVG path rendering changes",
+        "item_id": "explorer-chart-coverage-review-followups"
+      },
+      {
+        "behavior": "RankTable ordinal display for n=1,2,3 must still return 1st/2nd/3rd",
+        "item_id": "explorer-chart-coverage-review-followups"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- RankTable",
+        "description": "ordinal handles 21st/22nd/23rd correctly",
+        "expected": "tests pass including ordinal edge cases",
+        "item_id": "explorer-chart-coverage-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- NewCharts",
+        "description": "CDFChart unit test still passes after step-render change",
+        "expected": "CDFChart svg test passes",
+        "item_id": "explorer-chart-coverage-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- BenchmarkIndex",
+        "description": "BenchmarkIndex test passes with updated tab gating",
+        "expected": "all BenchmarkIndex tests pass",
+        "item_id": "explorer-chart-coverage-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Full test suite green",
+        "expected": "all green",
+        "item_id": "explorer-chart-coverage-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-chart-coverage-review-followups",
+        "notes": "RankTable.tsx:21-25 - ordinal() only special-cases 1/2/3; everything\nelse falls through to `${n}th`.  Renders \"21th\", \"22nd\"→\"22th\" for\nn >= 21 that end in 1/2/3 (except 11/12/13 which are correctly \"th\").\nUnlikely with current platform counts but technically wrong.\n\nFix: standard ordinal suffix rule -\n  const suffixes = [\"th\",\"st\",\"nd\",\"rd\"];\n  const v = n % 100;\n  return `${n}${suffixes[(v - 20) % 10] ?? suffixes[v] ?? suffixes[0]}`;\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix ordinal() in RankTable to handle n >= 21 correctly",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-chart-coverage-review-followups",
+        "notes": "CDFChart.tsx:103-115 uses `L` (lineto) to connect CDF points, producing\nsmooth diagonal lines.  A true ECDF is a step function: horizontal\nsegment to the x-value, then vertical jump to the next cumulative\nfraction.  The Python reference (textcharts.cdf_chart) renders steps.\nVisual divergence is minor on dense data (22+ queries) but visible on\nsparse distributions.\n\nFix: render H→V steps instead of diagonal L commands.  No math change\nneeded - computeECDFPoints output is already correct.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Render CDFChart as ECDF steps, not smooth lines",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-chart-coverage-review-followups",
+        "notes": "BenchmarkIndex.tsx:383-386 - The Histogram, Box Plot, and CDF tabs are\nunconditionally shown (hardcoded true).  When all platform timings are\nnull or empty, clicking these tabs shows a blank section because each\nchart guards internally and returns null.  The Percentiles, Power, Phases,\nand Cost tabs are already data-gated.\n\nFix: add a `hasTimings` guard:\n  const hasTimings = s.platforms.some(\n    (p) => Object.values(p.timings).some((v) => v !== null && v > 0)\n  );\nThen use hasTimings for the histogram/distribution/cdf entries.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Data-gate Histogram / Box Plot / CDF tabs in BenchmarkIndex",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-chart-coverage-review-followups",
+        "notes": "chartRegistry.meta.test.ts:19-36 - CANONICAL_IDS is a third hardcoded\ncopy of the chart type list (alongside chart_types.py and chartRegistry.ts).\nThe test detects TS-side drift but NOT Python-side drift: if someone adds\na 17th type to chart_types.py without updating the test's list, the test\npasses.\n\nFix options:\n  (a) Parse chart_types.py at test time using Node fs.readFileSync +\n      regex to extract chart IDs from _CHART_SPECS.\n  (b) Emit a machine-readable chart-ids.json from the Python pipeline\n      as a build artifact and compare against that.\n  (c) Accept the current triple-write but add a comment warning that\n      chart_types.py is the authority and all three must be kept in sync.\n\nOption (c) is the lowest friction; (a) is the most robust.  Avoid (b)\nsince it couples the static build to the test suite.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace hardcoded CANONICAL_IDS in meta-test with dynamic chart_types.py parse",
+        "wid": "w4"
+      }
+    ]
+  }
+}

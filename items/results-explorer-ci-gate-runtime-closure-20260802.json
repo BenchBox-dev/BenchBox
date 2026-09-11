@@ -1,0 +1,170 @@
+{
+  "context": "Add explicit setup-python and setup-uv steps, preserve ci-required-result blocking semantics, and add workflow contract coverage so a clean runner cannot regress to an unexecutable gate.",
+  "description": "PR #1471 added a blocking explorer-vitest job, but the job installs Node only while db-remediation-pin.test.ts and tuningModeVocabulary.test.ts invoke uv. All open Results Explorer PRs fail with spawnSync uv status null. Repair the job without weakening its required status.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make the job advisory",
+        "instead": "keep ci-required-result fail-closed",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "why": "the gate is intended to block develop PRs"
+      },
+      {
+        "dont": "rely on developer-machine tooling",
+        "instead": "declare runner setup in workflow",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "why": "the failure occurs on clean runners"
+      },
+      {
+        "dont": "remove or mock uv-spawning tests",
+        "instead": "install uv and run the real commands",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "why": "that hides the cross-language contract"
+      }
+    ],
+    "item_meta": {
+      "category": "CI reliability",
+      "completed_at": "2026-08-09T02:03:44Z",
+      "created_at": "2026-08-02T16:26:39Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No continue-on-error is introduced",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802"
+      },
+      {
+        "behavior": "Python and Node versions remain pinned",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802"
+      },
+      {
+        "behavior": "explorer-vitest remains required when selected",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802"
+      },
+      {
+        "behavior": "uv-spawning tests continue to run for real",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Explicit Python/uv/Node setup",
+        "decision": "reuse",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "path": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "concept": "Workflow contract tests",
+        "decision": "extend",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "path": "tests/unit/workflows"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'from pathlib import Path; t=Path(\".github/workflows/pr.yml\").read_text(); s=t[t.index(\"explorer-vitest:\"):t.index(\"parity-check:\")]; assert \"astral-sh/setup-uv\" in s and \"actions/setup-python\" in s and \"continue-on-error\" not in s'",
+        "description": "Explorer Vitest installs Python and uv and is not advisory",
+        "expected": "Exit 0",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "last_result": "pass",
+        "last_run": "2026-08-02T20:29:23Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q",
+        "description": "Workflow contract tests pass",
+        "expected": "All workflow tests pass",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "last_result": "pass",
+        "last_run": "2026-08-02T20:29:34Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run",
+        "description": "Frontend suite passes with uv-dependent tests",
+        "expected": "Vitest exits 0",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "last_result": "pass",
+        "last_run": "2026-08-02T20:29:59Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Current clean branch already includes the required runner contract in .github/workflows/pr.yml explorer-vitest: actions/setup-python@v5 (Python 3.12) followed by astral-sh/setup-uv@v4 and uv sync --group dev; no advisory setting is present.",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "notes": null,
+        "started_at": "2026-08-02T20:26:37Z",
+        "started_branch": "fix/results-explorer-ci-gate-runtime-closure-20260802",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Specify clean-runner prerequisites and required-result behavior",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added tests/unit/workflows/test_pr_workflow_path_classifier.py::test_explorer_vitest_job_declares_clean_runner_python_and_uv_setup, asserting pinned Python/uv setup precedes npm install and no Explorer step is advisory; targeted workflow test passed 20 tests.",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "notes": null,
+        "started_at": "2026-08-02T20:28:03Z",
+        "started_branch": "fix/results-explorer-ci-gate-runtime-closure-20260802",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Add setup steps and workflow contract coverage",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Ran the real frontend suite (results-explorer npm test -- --run): 70 files and 857 tests passed. Existing workflow contract tests cover ci-required-result failure propagation for explorer-vitest; no advisory setting is present.",
+        "item_id": "results-explorer-ci-gate-runtime-closure-20260802",
+        "notes": null,
+        "started_at": "2026-08-02T20:28:39Z",
+        "started_branch": "fix/results-explorer-ci-gate-runtime-closure-20260802",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Run real Vitest and verify required-result propagation",
+        "wid": "w2"
+      }
+    ]
+  }
+}

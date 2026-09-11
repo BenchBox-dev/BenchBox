@@ -1,0 +1,260 @@
+{
+  "context": "Keep fixture tests deterministic, but add a separate UAT smoke contract that\ndiscovers ids from the generated external corpus. Validate the corpus before\nbrowser launch so route failures point to UI behavior rather than missing data.\n",
+  "description": "The 2026-05-12 enabled-platform UAT `explorer_smoke` phase failed after the\nResults Explorer build and fixture generation succeeded. `playwright_smoke.log`\nshows 2/9 tests passed and 7 route assertions failed. The failed route tests\nexpected fixture-specific headings and facets such as DuckDB/TPC-H content,\nwhile the corrected UAT artifact corpus only had clean LakeSail result bundles.\n\nUAT Explorer smoke should prove the packaged external corpus can be loaded and\nnavigated. It should not fail merely because a coverage run does not contain\nthe same benchmark/platform ids as the frontend developer fixture corpus.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "commit Playwright report directories, screenshots, or generated browser artifacts",
+        "instead": "(not specified)",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hard-code DuckDB/TPC-H expectations into UAT external-corpus smoke",
+        "instead": "(not specified)",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "weaken route assertions to only test that the app shell loads",
+        "instead": "(not specified)",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-explorer-smoke-external-corpus",
+        "id": 611,
+        "reason": "The UAT failure is smoke-test corpus coupling, not a product navigation redesign.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Explicitly rejected: the UAT failure was smoke-test corpus coupling, not a navigation/route-hierarchy problem.",
+        "summary": "Redesign Results Explorer route hierarchy"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "needs_item": "uat-matrix-compatibility-policy"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "uat-enabled-platforms-remediation"
+    },
+    "preserves": [
+      {
+        "behavior": "Developer fixture route tests still verify the known frontend fixture corpus",
+        "item_id": "uat-explorer-smoke-external-corpus"
+      },
+      {
+        "behavior": "Playwright screenshots/reports remain outside git unless they are intentional docs assets",
+        "item_id": "uat-explorer-smoke-external-corpus"
+      },
+      {
+        "behavior": "UAT external-corpus smoke validates real packaged result bundles from the UAT run",
+        "item_id": "uat-explorer-smoke-external-corpus"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/playwright_smoke.log -- observed 2/9 pass, 7 route failures",
+        "decision": "reuse",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "path": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/playwright_smoke.log"
+      },
+      {
+        "concept": "results-explorer/e2e/routes/benchmark-index.spec.ts -- failed hard-coded benchmark route assertion",
+        "decision": "reuse",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "path": "results-explorer/e2e/routes/benchmark-index.spec.ts"
+      },
+      {
+        "concept": "results-explorer/e2e/routes/compare.spec.ts -- failed fixture-dependent compare assertion",
+        "decision": "reuse",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "path": "results-explorer/e2e/routes/compare.spec.ts"
+      },
+      {
+        "concept": "results-explorer/e2e/routes/platform-index.spec.ts -- failed hard-coded platform route assertion",
+        "decision": "reuse",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "path": "results-explorer/e2e/routes/platform-index.spec.ts"
+      },
+      {
+        "concept": "results-explorer/e2e/routes/result-detail.spec.ts -- failed fixture-dependent detail assertion",
+        "decision": "reuse",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "path": "results-explorer/e2e/routes/result-detail.spec.ts"
+      },
+      {
+        "concept": "results-explorer/e2e/support/fixtures.ts -- fixture lookup helper used by failing route tests",
+        "decision": "reuse",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "path": "results-explorer/e2e/support/fixtures.ts"
+      },
+      {
+        "concept": "tests/uat/phases/explorer_smoke.py -- UAT phase that builds fixtures and invokes Playwright smoke",
+        "decision": "reuse",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "path": "tests/uat/phases/explorer_smoke.py"
+      },
+      {
+        "concept": "tests/uat/test_explorer_smoke.py -- existing Python-side smoke phase coverage",
+        "decision": "reuse",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "path": "tests/uat/test_explorer_smoke.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/dist/"
+      },
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/playwright-report/"
+      },
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/test-results/"
+      },
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package.json"
+      },
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/explorer_smoke.py"
+      },
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_explorer_smoke.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_explorer_smoke.py -m fast -q",
+        "description": "Python UAT Explorer smoke coverage passes",
+        "expected": "passes with corpus-contract and dynamic-id smoke cases",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --grep @smoke --project chromium",
+        "description": "Frontend fixture route tests still pass",
+        "expected": "passes against the standard fixture corpus",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-sweep CONFIG=tests/uat/configs/uat-explorer-external-corpus-smoke.yaml",
+        "description": "External-corpus smoke passes against a UAT result directory",
+        "expected": "Explorer smoke derives ids from the packaged corpus and passes without hard-coded DuckDB/TPC-H assumptions",
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "notes": "Confirmed the failure mode was fixture coupling: the UAT smoke invoked\n`--grep @smoke`, which selected route tests hard-coded to deterministic\nDuckDB/TPC-H fixture ids instead of deriving ids from the packaged UAT\ncorpus. No screenshots, Playwright reports, or raw browser artifacts were\ncommitted.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate Explorer smoke failure against current UAT corpus",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "notes": "Added `results-explorer/e2e/smoke/external-corpus.spec.ts` under a\ndedicated `@uat-external-corpus` tag. The test reads the mounted\n`E2E_FIXTURE_DIR`, discovers benchmark/platform/result/query ids from\nbundle JSON, and asserts those routes render. The developer fixture route\nsmoke remains under `@smoke`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Split fixed fixture route tests from external-corpus UAT smoke",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "notes": "`tests/uat/phases/explorer_smoke.py` now validates non-empty result\nbundles and required `run`, `benchmark`, `scale_factor`, and `platform`\nmetadata before Playwright. It also resolves package roots to their\n`bundle/` subdirectory so submission manifests are not treated as result\nbundles.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add corpus-contract checks before launching Playwright",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-explorer-smoke-external-corpus",
+        "notes": "Updated `docs/operations/uat-framework.md` to document the\n`@uat-external-corpus` UAT smoke, the per-run\n`explorer_corpus_contract.json`, and the separate developer fixture\nroute command.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update UAT Explorer smoke docs and CI commands",
+        "wid": "w3"
+      }
+    ]
+  }
+}

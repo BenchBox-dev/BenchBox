@@ -1,0 +1,316 @@
+{
+  "context": "Land w1 first (lazy import) — it alone restores the minimal import surface and\nde-risks everything downstream. Then w2-w5 (structural fix, latent imports,\nreal contract test, strengthened gate) so removing pandas in w6 is safe and\nre-regression-proof. w7 is a documentation/decision pass aligning with\ndependency-inventory F1/F2. The whole sequence must land on develop BEFORE\n`make release-cut VERSION=0.3.1`, so v0.3.1 ships the minimal core, not the\npandas patch. Functional code fixes (w1-w3, w6) belong in a feature/fix PR;\ntest/gate changes (w4, w5) can ride along or in a sibling PR.\n",
+  "description": "PR #681 fixed the v0.3.0 clean-install failure (`import benchbox` raised\nImportError without pandas) by adding `pandas>=2.0.0` to\n`[project.dependencies]` (`pyproject.toml:50-52`). That treated the symptom,\nnot the cause.\n\nRoot cause: `import benchbox` eagerly pulls an engine-specific module that\nimports pandas at module top level. The reachable chain is\n`benchbox/__init__.py:28` -> `platforms/__init__.py:286` ->\n`adapter_factory.py:17` -> `clickhouse/__init__.py:5` -> `adapter.py:13` ->\n`setup.py:9` -> `client.py:11 import pandas as pd`. `platforms/__init__.py`\nalready lazy-loads `ClickHouseAdapter` via `__getattr__`, but\n`adapter_factory.py:17` reaches through the package `__init__`, defeating that\nlazy design. `client.py` uses pandas at exactly one runtime site\n(`client.py:144`, an empty-result `pd.DataFrame()`), so it is trivially\nlazy-able.\n\nConsequences of the patch: every install — including a DuckDB-only SQL run —\nnow pays ~49 MB (pandas + pytz, tzdata, python-dateutil, six) for a library it\nmay never touch. pandas is simultaneously a hard core dep AND an optional\nextra (`pandas`, `dataframe-pandas`, `tpcdi`, `modin`, `dask`, `all`), an\nincoherent manifest. This contradicts the project's own documented thin-core\nphilosophy: `docs/development/dependency-inventory.md:159` classifies pandas\nas \"DF/BM\" (DataFrame/Benchmark-specific, not core), and finding F1\n(`:209-227`) recommends removing engine-specific libs from core for exactly\nthis reason.\n\nv0.3.1 is UNRELEASED, so the correct fix lands NOW: make the import surface\nminimal and drop pandas back to extras before the cut, rather than shipping\nthe heavy patch and deferring. Everyone who needs pandas still gets it via the\nextras and transitively via `chdb` (which requires pandas).\n\nThis TODO is a gate on `release-recovery-v0-3-1` w3 (`make release-cut\nVERSION=0.3.1`): the cut should carry the minimal-surface fix, not the patch.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix only client.py and leave the latent imports",
+        "instead": "(not specified)",
+        "item_id": "drop-pandas-from-core-dependencies",
+        "why": "the user requires ALL blind spots addressed; w3 closes the next-failure vector."
+      },
+      {
+        "dont": "keep pandas core and defer to v0.3.2",
+        "instead": "(not specified)",
+        "item_id": "drop-pandas-from-core-dependencies",
+        "why": "v0.3.1 is unreleased, so the correct minimal-core fix lands now at zero extra release cost."
+      },
+      {
+        "dont": "keep the string-assert test (test_release_infrastructure.py:99-107)",
+        "instead": "(not specified)",
+        "item_id": "drop-pandas-from-core-dependencies",
+        "why": "it tests the manifest text, not the import contract, and will both block w6 and fail to catch the real defect."
+      },
+      {
+        "dont": "remove pandas from core (w6) before the core-only-minus-pandas gate (w5) is green",
+        "instead": "(not specified)",
+        "item_id": "drop-pandas-from-core-dependencies",
+        "why": "that gate is the only thing preventing a silent re-regression of the v0.3.0 failure."
+      }
+    ],
+    "item_meta": {
+      "category": "Dependency Management",
+      "created_at": "2026-05-30T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DataFrame mode, TPC-DI, and ClickHouse-local (chdb) runs must keep working — they receive pandas via their extras.",
+        "item_id": "drop-pandas-from-core-dependencies"
+      },
+      {
+        "behavior": "Do not re-tag, force-push, or alter the immutable v0.3.0 tag/PyPI artifact.",
+        "item_id": "drop-pandas-from-core-dependencies"
+      },
+      {
+        "behavior": "Do not weaken the release-required context or the core-only smoke gate to land this.",
+        "item_id": "drop-pandas-from-core-dependencies"
+      },
+      {
+        "behavior": "`import benchbox` MUST succeed on a clean core install at every step; w1 satisfies this before pandas leaves core in w6.",
+        "item_id": "drop-pandas-from-core-dependencies"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/release.yml"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/dataframe_queries.py"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder_synthetic/dataframe_queries.py"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/ssb/dataframe_queries/queries.py"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/adapter_factory.py"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/__init__.py"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/client.py"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": "docs/development/dependency-inventory.md"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'import sys; sys.modules[\"pandas\"]=None; import benchbox; print(benchbox.__version__)'",
+        "description": "benchbox imports with pandas made unavailable in-process",
+        "expected": "prints the version without ImportError",
+        "item_id": "drop-pandas-from-core-dependencies",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'import benchbox, sys; assert \"pandas\" not in sys.modules, sorted(m for m in sys.modules if \"pandas\" in m)'",
+        "description": "No top-level pandas import remains reachable from import benchbox",
+        "expected": "exit 0 (pandas not imported)",
+        "item_id": "drop-pandas-from-core-dependencies",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv pip install --dry-run '.[tpcdi]' >/dev/null && echo ok",
+        "description": "pandas-needing extras still resolve",
+        "expected": "ok",
+        "item_id": "drop-pandas-from-core-dependencies",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo audit verify",
+        "description": "Hosted tracker integrity remains valid",
+        "expected": "exit 0 with a valid event hash chain",
+        "item_id": "drop-pandas-from-core-dependencies",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "if uv export --no-dev --no-emit-project 2>/dev/null | rg -q \"^pandas==\"; then exit 1; fi",
+        "description": "pandas is absent from the resolved core dependency set",
+        "expected": "exit 0 only when pandas is absent",
+        "item_id": "drop-pandas-from-core-dependencies",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "drop-pandas-from-core-dependencies",
+        "needs_wid": "w1",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "drop-pandas-from-core-dependencies",
+        "notes": "Bind the evidence this TODO rests on before changing code, and capture the\nBEFORE baseline that the size success-metric is measured against. Re-run and\nrecord a compact summary (command + PASS/FAIL + key counts) — not raw logs —\nin this work unit's notes and the PR body:\n  - Import surface still pulls pandas (expect pandas present today):\n    `uv run -- python -c 'import benchbox, sys; print(\"pandas\" in sys.modules)'`\n    -> expect True (this is the defect; expect False after w1).\n  - Reachable chain unchanged at the cited lines:\n    `clickhouse/client.py:11` import, `:144` sole `pd.` use;\n    `adapter_factory.py` -> `clickhouse/deployment_mode`;\n    `clickhouse/__init__.py` eager `.adapter/.client/.setup` re-export.\n  - Core dependency-size baseline:\n    `uv export --no-dev --no-emit-project | grep -cE '^(pandas|pytz|tzdata|python-dateutil|six)=='`\n    and record installed size of those wheels. Pin the measured number so\n    the \"~49 MB\" / \"drops ~49 MB\" claims are re-runnable, not asserted.\nIf any cited line has drifted, update the dependent work units before\nstarting.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the import chain and measure the core dependency-size baseline",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-pandas-from-core-dependencies",
+        "notes": "Move `import pandas as pd` out of module scope in\n`benchbox/platforms/clickhouse/client.py:11` into the function that uses it\n(`client.py:144`). Mirror the in-function import pattern already used by\n`benchbox/core/tpch/dataframe_queries.py:1064`. This single change removes\npandas from the entire `import benchbox` surface and is sufficient to make\na clean core install import without pandas present.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Lazy-ize the one reachable eager pandas import in the ClickHouse client",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-pandas-from-core-dependencies",
+        "notes": "Structural root cause. `adapter_factory.py:17` imports the pure helper\n`clickhouse/deployment_mode.py` but executing `clickhouse/__init__.py:5-11`\neagerly re-exports the heavy `adapter`/`setup`/`client` modules. Either\n(a) make `clickhouse/__init__.py` lazy via module `__getattr__`, or\n(b) have `adapter_factory.py:17` import `deployment_mode` by full path\nwithout triggering the package `__init__`. Without this, the next engine\nmodule added to the chain re-introduces the #681 failure.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Break the ClickHouse package-init eager re-export that defeats lazy loading",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-pandas-from-core-dependencies",
+        "notes": "BLIND SPOT: not reachable on the import surface today, but a future wiring\nof these benchmarks recreates the exact #681 failure. Convert top-level\n`import pandas` to in-function in:\n  - benchbox/core/joinorder/dataframe_queries.py:33\n  - benchbox/core/ssb/dataframe_queries/queries.py:8\n  - benchbox/core/joinorder_synthetic/dataframe_queries.py:17\nConfirm none are reached from `import benchbox` before and after.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Convert the latent top-level pandas imports to in-function imports",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-pandas-from-core-dependencies",
+        "notes": "BLIND SPOT: `tests/unit/test_release_infrastructure.py:99-107` asserts the\nSTRING `pandas>=` is present in pyproject — it locks in the #681 patch and\nwill fail once pandas leaves core (w6). Replace it with a test that imports\n`benchbox` in a pandas-blocked / minimal-deps environment (e.g. a\n`sys.modules['pandas'] = None` guard or subprocess with pandas absent) and\nasserts success. Test the CONTRACT (import works on minimal deps), not the\nmanifest text.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace the wrong-contract pandas test with a minimal-deps import test",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-pandas-from-core-dependencies",
+        "notes": "BLIND SPOT: a core-only clean-install smoke test exists\n(`.github/workflows/nightly.yml:235`, `test.yml:302`:\n`uv run --isolated --no-project --with <wheel> -- python -c \"import benchbox\"`),\nbut it now PASSES because pandas is core — it no longer proves the surface\nis minimal, which is why 0.3.0 shipped broken. Strengthen it to install the\nCORE deps WITHOUT pandas (or block pandas) and assert `import benchbox`\nsucceeds. Confirm this gate runs on the release path (`release.yml:181,188`),\nnot only nightly/test, so a broken import surface blocks the tag.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make the core-only smoke gate prove a minimal import surface and gate the release",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-pandas-from-core-dependencies",
+        "notes": "Only after w1-w5 are green. Remove `pandas>=2.0.0` from\n`[project.dependencies]` (`pyproject.toml:52`). It remains in the `tpcdi`,\n`pandas`, `dataframe-pandas`, `modin`, `dask`, and `all` extras, and arrives\ntransitively via `chdb`. Verify with `uv` that a core-only resolve excludes\npandas and that each pandas-needing extra still resolves. Resolve the\ncore-dep/extra contradiction.\nBLIND SPOT (pin): the `pandas>=2.0.0` floor was copied, not chosen (it\npredates #681 across the extras). Decide deliberately: keep `>=2.0.0` or\ntighten/loosen with a one-line rationale; do not leave it as cargo-culted.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove pandas from core dependencies and reconcile the extras/pin",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "drop-pandas-from-core-dependencies",
+        "notes": "`pyarrow` and `numpy` are reached on `import benchbox` and are core. Verify\nthat is intentional (results/Arrow handling is plausibly genuinely core) and\nrecord the decision. Cross-reference `dependency-inventory.md` F1\n(`chdb-core` flagged for removal from core) and F2 (`jsonschema`) so this\nwork aligns with the documented thin-core direction rather than fixing only\npandas in isolation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit remaining eager heavy imports on the import surface",
+        "wid": "w7"
+      }
+    ]
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "context": "Widen SNAPSHOT_TABLES to include findings, finding_evidence, finding_links, finding_events and finding_sections, and move RESTORE_LEGACY_REQUIRED_TABLES with it - build_snapshot fails closed when they diverge, so they must change together. Do NOT touch EXPORT_TABLE_ALLOWLIST: the committed export must stay findings-free and test_todo_db_export_allowlist.py enforces that. Widening the snapshot is safe because write_snapshot already refuses any destination inside a Git work tree, so prose cannot reach the repository. Add a test asserting a snapshot carries findings while a committed export does not, so the two boundaries cannot drift into each other.",
+  "description": "BenchBox half of Joe's 2026-07-30 option-A decision (carry findings across the todo-db migration). PR #1354 deliberately scoped the snapshot to SNAPSHOT_TABLES = frozenset(TRANSFER_TABLES) | {meta}, excluding findings, because restore-legacy discarded unknown tables anyway and shipping review prose that will be thrown away only risks leaking it. Once the todo-db side lands, that reasoning inverts: findings must be IN the snapshot or the migration is still lossy. ORDERING (cannot be a tracked dep - the prerequisite lives in the todo-db project's own tracker): restore-legacy-carry-findings-and-reject-unknown-tables must land FIRST, then this, then migrate-hosted-tracker-db-to-todo-db-0-3-schema. Widening the snapshot before the importer accepts findings would make it fail once that importer starts rejecting unknown tables, which is part of the same todo-db item.",
+  "legacy": {
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-07-30T19:17:44Z",
+      "completed_pr": 1361,
+      "created_at": "2026-07-30T16:54:57Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "the committed export stays findings-free (EXPORT_TABLE_ALLOWLIST unchanged, test_todo_db_export_allowlist.py still passes)",
+        "item_id": "snapshot-carry-findings-in-migration-snapshot"
+      },
+      {
+        "behavior": "write_snapshot keeps refusing destinations inside a Git work tree",
+        "item_id": "snapshot-carry-findings-in-migration-snapshot"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "snapshot-carry-findings-in-migration-snapshot",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "snapshot-carry-findings-in-migration-snapshot",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_export_allowlist.py -q",
+        "description": "A snapshot carries findings while a committed export does not",
+        "expected": "exit 0",
+        "item_id": "snapshot-carry-findings-in-migration-snapshot",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo audit verify && uv run -- python -m pytest tests/integration/test_todo_db_standalone_compat_real.py -q -k real_locked_wrapper_preserves_package_export_bytes",
+        "description": "Current locked wrapper preserves the complete package snapshot",
+        "expected": "audit and focused snapshot test pass",
+        "item_id": "snapshot-carry-findings-in-migration-snapshot",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "snapshot-carry-findings-in-migration-snapshot",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "SNAPSHOT_TABLES widened to TRANSFER_TABLES | {meta} | RESTORE_LEGACY_OPTIONAL_TABLES (the five findings tables). The fail-closed guard in build_snapshot was rewritten to match the importer's real contract rather than a single equality: restore-legacy REQUIRES its 12 tables and REJECTS anything outside required|optional, so the check now asserts required <= snapshot <= required|optional and names which direction broke. Against the live tracker the snapshot went from 12 to 17 tables and now carries 65 findings, 3 evidence rows, 36 links, 325 finding events and 8 sections - all of which the previous 12-table snapshot silently dropped. EXPORT_TABLE_ALLOWLIST untouched, so the committed export stays findings-free.",
+        "item_id": "snapshot-carry-findings-in-migration-snapshot",
+        "notes": null,
+        "started_at": "2026-07-30T19:10:36Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Widen SNAPSHOT_TABLES and RESTORE_LEGACY_REQUIRED_TABLES together to include the five findings tables",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added TestSnapshotCarriesFindingsButExportDoesNot: a finding inserted with a sentinel string reaches build_snapshot's output but appears in NO file written by write_export, proving the two boundaries stay separate; plus a fail-closed test that a snapshot scope the importer would reject raises rather than building. Also corrected three tests from PR #1354 that asserted the OLD contract and now fail by design - test_snapshot_scope_is_transfer_tables_plus_meta, test_snapshot_matches_what_restore_legacy_requires, and test_snapshot_excludes_findings_tables. They were rewritten to the new contract (composition including findings, two-direction importer check, and inclusion instead of exclusion with a comment explaining the inversion) rather than deleted, so coverage is preserved and the change of intent is explicit in the diff. End-to-end: the widened snapshot restored through the merged todo-db importer with all 17 tables matching exactly (items 1706, findings 65, finding_events 325, finding_sections 8) and audit verify clean at 4286 events. tests/unit/scripts/ 1186 passed. NOTE: a stale ~/.benchbox/test.lock (dead pid 7766 from pool-03) blocked the suite; cleared with make test-unlock.",
+        "item_id": "snapshot-carry-findings-in-migration-snapshot",
+        "notes": null,
+        "started_at": "2026-07-30T19:16:45Z",
+        "started_branch": "feat/snapshot-carry-findings",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Test that a snapshot carries findings while a committed export still does not",
+        "wid": "w2"
+      }
+    ]
+  }
+}

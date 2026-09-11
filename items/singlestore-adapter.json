@@ -1,0 +1,360 @@
+{
+  "description": "Add support for SingleStore (formerly MemSQL), a distributed SQL database designed\nfor real-time analytics and transactions with both row and column storage.\n\nSingleStore is notable for:\n- Real-time analytics with sub-second query latency\n- Distributed architecture with horizontal scaling\n- MySQL wire protocol compatibility\n- Native Python SDK with 10x faster data reading than PyMySQL\n- Cloud (Helios) and self-managed deployment options\n\nReference: https://docs.singlestore.com/",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "modify existing adapter files",
+        "instead": "create a new singlestore.py file",
+        "item_id": "singlestore-adapter",
+        "why": "SingleStore is additive"
+      },
+      {
+        "dont": "use PyMySQL",
+        "instead": "use the singlestoredb package",
+        "item_id": "singlestore-adapter",
+        "why": "SingleStore's native singlestoredb SDK is significantly faster"
+      },
+      {
+        "dont": "use rowstore tables for TPC fact tables",
+        "instead": "default to columnstore for all benchmark tables",
+        "item_id": "singlestore-adapter",
+        "why": "columnstore is dramatically faster for analytical queries"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "singlestore-adapter",
+        "id": 596,
+        "reason": "Streaming ingest is a niche use case; core adapter should stabilize first",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: singlestore-non-tpc-csv-null-marker remains open, indicating the core SingleStore adapter is still stabilizing; streaming-ingest precondition not met.",
+        "summary": "Pipeline ingestion support for streaming scenarios"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "singlestore-adapter",
+        "id": 597,
+        "reason": "Default shard keys may be sufficient; optimization only justified after profiling",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Advanced shard-key optimization explicitly conditioned on profiling showing default keys insufficient; no such profiling evidence.",
+        "summary": "Advanced shard key optimization per benchmark schema"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-01-26T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "singlestore-adapter"
+      },
+      {
+        "behavior": "No new required dependencies added to core install (singlestoredb is optional)",
+        "item_id": "singlestore-adapter"
+      },
+      {
+        "behavior": "Platform registry autodiscovery continues working for all existing platforms",
+        "item_id": "singlestore-adapter"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "singlestore-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/clickhouse_cloud.py"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/doris.py"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/__init__.py"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/credentials/singlestore.py"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/singlestore.py"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/cloud-platforms.rst"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/comparison-matrix.md"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/index.md"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/singlestore.md"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/sql-platforms.rst"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_singlestore.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.singlestore import SingleStoreAdapter; print('import OK')\"",
+        "description": "New adapter imports correctly",
+        "expected": "import OK",
+        "item_id": "singlestore-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_singlestore.py -v --tb=short",
+        "description": "Unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "singlestore-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "Existing platform tests unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "singlestore-adapter",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w4",
+        "wid": "w11"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w5",
+        "wid": "w11"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w4",
+        "wid": "w9"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "singlestore-adapter",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "singlestore-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research SingleStore SQL extensions, columnstore vs rowstore, and bulk loading options",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "singlestore-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run TPC-H/TPC-DS validation at SF 0.01 and SF 1",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "singlestore-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create platform documentation page and update index/comparison matrix",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "singlestore-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research distributed join patterns, shard key strategies, and Helios vs self-managed differences",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "singlestore-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create SingleStoreAdapter skeleton class with platform registration metadata",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "singlestore-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement connection factory with singlestoredb SDK (Helios + self-managed)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "singlestore-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add columnstore DDL generation for TPC schemas with shard key configuration",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "singlestore-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement bulk loading via LOAD DATA LOCAL INFILE",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "singlestore-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement query execution and result reading",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "singlestore-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add SingleStore credential helper for Helios and self-managed",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "singlestore-adapter",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for SingleStore adapter",
+        "wid": "w9"
+      }
+    ]
+  }
+}

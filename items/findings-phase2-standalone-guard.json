@@ -1,0 +1,11 @@
+{
+  "description": "Follow-up promoted from findings-phase2-export-boundary deferral #641 (w4). The always-on committed snapshot already honors EXPORT_TABLE_ALLOWLIST (items.jsonl/events.jsonl/index.md). This item hardens the OPT-IN standalone package path: when TODO_DB_PACKAGE_VERSION is set, _write_legacy_export in todo_db_standalone_compat.py writes the full lossless todo-db.json (all tables) into the committed EXPORT_DIR, which would carry findings prose once findings tables exist. Decide + implement one of: (a) filter envelope['tables'] to EXPORT_TABLE_ALLOWLIST for the COMMITTED todo-db.json (needs the standalone package to confirm its envelope table layout so meta/migrations are not dropped, and to reconcile the pinned source==restored restore round-trip), or (b) rework todo-db-export.yml so the lossless envelope is a CI artifact only, not committed (reconciling test_restore_validation_compares_the_complete_export_envelope). Requires the external standalone todo-db package to test against.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-07-29T12:03:36Z",
+      "completed_pr": 1327,
+      "created_at": "2026-07-22T22:24:13Z",
+      "worktree": "findings-domain"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Implement algorithms for comparing query plans across platforms, runs, and\nqueries. Includes logical plan comparison (tree diff), physical plan comparison,\nand similarity scoring (tree edit distance). Supports three comparison scenarios:\ncross-platform, cross-run, and cross-query.\n\n**Comparison Scenarios**:\n1. Cross-platform: Compare DuckDB vs DataFusion for same query\n2. Cross-run: Detect plan regressions between benchmark runs\n3. Cross-query: Find structurally similar queries",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2025-11-23T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-comparison"
+    }
+  }
+}

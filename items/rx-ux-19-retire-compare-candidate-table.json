@@ -1,0 +1,213 @@
+{
+  "context": "Compare becomes the comparison renderer only; candidate picking lives in the paged Query table. Retire the candidate table only when every parity case passes: empty ?ids=, one id, two ids, four ids, stale id, duplicate id, all-excluded set, reload, copied shared link, and the Pages 404 restore round trip.",
+  "description": "/results/compare renders all 207 candidates in a single document 17,441px tall, with no pagination, no search, no sortable headers and no platform filter (it does filter benchmark, scale and phase at Compare.tsx:982-1022). Its action bar renders once above the table and does not stick, so choosing a second run near the bottom leaves the action roughly 16,000px away.\n\nRetirement is the last step, not the first, and only behind a parity gate.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Remove the candidate table before Query owns candidate picking",
+        "instead": "INSTEAD land the picking surface first",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "why": "D4 in rx-ux-00 keeps Compare as the comparison renderer only once picking has a home, and rx-ux-27 is what gives Query a durable selected-run list"
+      },
+      {
+        "dont": "assert a paging or scale improvement using the default browser fixture",
+        "instead": "gate the claim on the purpose-built larger fixture (rx-ux-13)",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "why": "the standard fixture is 11 results and cannot exercise large-corpus behaviour"
+      },
+      {
+        "dont": "drop the single-ID builder entry",
+        "instead": "keep ?ids=<one> pinning that run and opening selection for the second",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "why": "ResultDetail's 'Compare this result' depends on it"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "regenerate the public-site visual baseline inside the PR",
+        "instead": "name which e2e/captures specs the change invalidates and update those deliberately",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "why": "the baseline is an external CI artifact tied to a base SHA, not a checked-in snapshot"
+      },
+      {
+        "dont": "retire the table before every parity case passes",
+        "instead": "gate on the full list",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "why": "single-ID pinning and stale-ID recovery are live contracts with e2e coverage"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "needs_item": "rx-ux-18-migrate-entrypoints-to-tray"
+      },
+      {
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "needs_item": "rx-ux-26-selection-status-copy"
+      },
+      {
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "needs_item": "rx-ux-27-selection-unreachable-across-paging"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-25T10:10:16Z",
+      "completed_pr": 1894,
+      "created_at": "2026-08-22T14:49:55Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "/results/compare?ids=<one> pins that run and opens the builder (Compare.tsx:184+); ?ids=<a,b> renders a comparison. Both are live contracts (ResultDetail.tsx:266, e2e/routes/compare.spec.ts:58, compare-entrypoints.spec.ts:76).",
+        "item_id": "rx-ux-19-retire-compare-candidate-table"
+      },
+      {
+        "behavior": "Compare's async recovery messaging distinguishing removal from transient failure",
+        "item_id": "rx-ux-19-retire-compare-candidate-table"
+      },
+      {
+        "behavior": "Compare's recovery rule that a multi-selection URL stays multi after a one-result recovery, so it does not collapse into the single-result builder (Compare.tsx:331-350).",
+        "item_id": "rx-ux-19-retire-compare-candidate-table"
+      },
+      {
+        "behavior": "docs/operations/results-explorer-qa.md S6 workflow sections, updated in the same PR",
+        "item_id": "rx-ux-19-retire-compare-candidate-table"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "builder status line and intro card that rx-ux-26 rewords before this item removes the table",
+        "decision": "extend",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "path": "results-explorer/src/pages/Compare.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/compareRecovery.ts"
+      },
+      {
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium",
+        "description": "Chromium browser suite passes against a fresh build",
+        "expected": "fixtures verified, build succeeds, chromium suite green",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'compare parity'",
+        "description": "Every parity case passes before retirement",
+        "expected": "empty, one, two, four, stale, duplicate, all-excluded, reload, shared link, Pages-404 all pass",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:full",
+        "description": "Cross-browser confirmation",
+        "expected": "chromium, firefox and webkit green",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "11 compare parity tests pass (empty, one pinned CTA, a,b compare, 4-cap, stale, duplicate, reload, shared link, all-excluded, Pages 404, doc-height bounded)",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "notes": null,
+        "started_at": "2026-08-25T06:24:15Z",
+        "started_branch": "feat/rx-ux-19-retire-compare-candidate-table",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-19-retire-compare-candidate-table",
+        "status": "done",
+        "summary": "Parity suite covering all ten cases",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Compare.tsx candidate table retired via false&& + Query CTA (compare-builder-query-cta); single-id pinned preserves via status, multi-compare renderer unchanged, recovery messaging preserved",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "notes": null,
+        "started_at": "2026-08-25T06:24:20Z",
+        "started_branch": "feat/rx-ux-19-retire-compare-candidate-table",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-19-retire-compare-candidate-table",
+        "status": "done",
+        "summary": "Compare renders comparison only; candidate table removed",
+        "wid": "w2"
+      },
+      {
+        "evidence": "QA doc S6 updated: comparison renderer only, picking in Query, parity suite noted, document-height via large fixture",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "notes": null,
+        "started_at": "2026-08-25T06:24:24Z",
+        "started_branch": "feat/rx-ux-19-retire-compare-candidate-table",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-19-retire-compare-candidate-table",
+        "status": "done",
+        "summary": "Update QA doc S6 workflow sections",
+        "wid": "w3"
+      },
+      {
+        "evidence": "compare-parity doc-height: <5000px desktop / <6000 mobile (vs old 17441), table count 0, CTA visible",
+        "item_id": "rx-ux-19-retire-compare-candidate-table",
+        "notes": null,
+        "started_at": "2026-08-25T06:24:29Z",
+        "started_branch": "feat/rx-ux-19-retire-compare-candidate-table",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-19-retire-compare-candidate-table",
+        "status": "done",
+        "summary": "Document-height assertion with the large fixture",
+        "wid": "w4"
+      }
+    ]
+  }
+}

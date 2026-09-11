@@ -1,0 +1,235 @@
+{
+  "context": "Three patterns to apply:\n1. Enumeration loop: FIELDS = [(\"src_attr\", \"dst_attr\"), ...]; for s, d in FIELDS: setattr(dst, d, getattr(src, s))\n2. Conditional accumulation: CONDITIONS = [(predicate_fn, value), ...]; result = [v for fn, v in CONDITIONS if fn()]\n3. Optional dict builder: KEYS = [(\"src\", \"dst\"), ...]; return {d: src[s] for s, d in KEYS if s in src}\n\nDo not add abstraction layers beyond what's needed - a simple list + comprehension is sufficient.\nKeep field definitions close to the function (module-level constant or near the function).\n",
+  "description": "10 functions have high complexity caused by 10-20 nearly-identical conditional blocks\nthat check a field, apply a transformation, and assign to a target. These are pure\nmechanical repetition - not real branching logic - and should be collapsed into either\na loop over a field-definition list or a helper that handles the pattern once.\n\nTarget functions and pattern:\n  benchbox/core/dataframe/tuning/interface.py:get_enabled_settings    (20) - check condition → add enum\n  benchbox/core/runner/runner.py:_enrich_driver_runtime_metadata       (20) - extract adapter field → assign to result\n  benchbox/core/results/schema.py:_build_execution_from_context        (18) - extract context field → dict entry\n  benchbox/core/results/schema.py:_build_config_block                  (17) - extract with fallback → dict entry\n  benchbox/core/schemas.py:populate_driver_metadata                    (17) - options.get() → assign if not set\n  benchbox/core/schemas.py:to_cli_args                                 (16) - non-default field → append arg string\n  benchbox/core/manifest/io.py:_manifest_v2_to_dict                    (18) - optional field present → add to dict\n  benchbox/core/tuning/interface.py:get_enabled_tuning_types           (16) - check config attr → add to set\n  benchbox/core/dryrun.py:_extract_df_tuning                           (16) - hasattr + is_default → build dict\n  benchbox/cli/dryrun.py:generate_cli_command                          (16) - non-default flag → append to parts list\n\nEach requires a field-definition approach: declare a list/dict of (source_field,\ncondition, transform, target_field) tuples, iterate once.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the output type or structure of any function (callers depend on these)",
+        "instead": "(not specified)",
+        "item_id": "complexity-field-extraction-w14",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "create a FieldExtractor class",
+        "instead": "(not specified)",
+        "item_id": "complexity-field-extraction-w14",
+        "why": "a list + loop is sufficient and more readable"
+      },
+      {
+        "dont": "merge the field definitions across functions",
+        "instead": "(not specified)",
+        "item_id": "complexity-field-extraction-w14",
+        "why": "each function gets its own field list"
+      },
+      {
+        "dont": "skip testing get_enabled_settings",
+        "instead": "(not specified)",
+        "item_id": "complexity-field-extraction-w14",
+        "why": "it drives all tuning decisions"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-22T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "_build_execution_from_context: result dict must have identical keys/values for all inputs",
+        "item_id": "complexity-field-extraction-w14"
+      },
+      {
+        "behavior": "_enrich_driver_runtime_metadata: all metadata fields must be populated identically",
+        "item_id": "complexity-field-extraction-w14"
+      },
+      {
+        "behavior": "generate_cli_command: generated command must be copy-pasteable and functionally identical",
+        "item_id": "complexity-field-extraction-w14"
+      },
+      {
+        "behavior": "get_enabled_settings: output set must contain exactly the same TuningType values as before",
+        "item_id": "complexity-field-extraction-w14"
+      },
+      {
+        "behavior": "to_cli_args: CLI arg string output must be identical for all benchmark configurations",
+        "item_id": "complexity-field-extraction-w14"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/dryrun.py"
+      },
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/tuning/interface.py"
+      },
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dryrun.py"
+      },
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/manifest/io.py"
+      },
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/schemas.py"
+      },
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/interface.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Smoke tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "complexity-field-extraction-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/check_complexity.py --top 150 2>&1 | grep -E '(get_enabled_settings|enrich_driver|build_execution|build_config_block|populate_driver|to_cli_args|manifest_v2|get_enabled_tuning|extract_df_tuning|generate_cli_command)'",
+        "description": "Target functions below warn threshold",
+        "expected": "No WARN entries for the 10 target functions",
+        "item_id": "complexity-field-extraction-w14",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "complexity-field-extraction-w14",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "complexity-field-extraction-w14",
+        "notes": "Both in tuning interface files. Pattern: for each setting, if condition → add enum.\nReplace with SETTING_CONDITIONS = [(condition_fn, TuningType.X), ...] + list comprehension.\nget_enabled_settings: ~20 if blocks → 1 loop.\nget_enabled_tuning_types: ~8 if blocks → 1 loop.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Simplify get_enabled_settings and get_enabled_tuning_types with field iteration",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-field-extraction-w14",
+        "notes": "benchbox/core/runner/runner.py - 8+ identical extraction blocks:\n  if adapter.X is not None: result.X = adapter.X\nDefine METADATA_FIELDS = [\"hostname\", \"driver_version\", ...] and iterate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Simplify _enrich_driver_runtime_metadata with field-mapping loop",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-field-extraction-w14",
+        "notes": "Both in benchbox/core/results/schema.py.\n_build_execution_from_context: 12+ conditional blocks → FIELD_MAP = {\"ctx_key\": \"result_key\"}\n_build_config_block: fallback extraction → FALLBACK_SOURCES = [(\"compression\", [...]), ...]\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Simplify _build_execution_from_context and _build_config_block",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-field-extraction-w14",
+        "notes": "populate_driver_metadata: 8+ `if options.get(k): self.field = v` → loop over OPTION_FIELD_MAP.\nto_cli_args: 12+ non-default checks → loop over FIELD_CLI_ARGS = [(field, \"--flag\", converter), ...].\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Simplify populate_driver_metadata and to_cli_args in schemas.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-field-extraction-w14",
+        "notes": "benchbox/core/manifest/io.py - repeated `if key in obj: d[target] = obj[key]` pattern.\nExtract helper: _add_optional(src, dst, key, target=None) and call it per field.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Simplify _manifest_v2_to_dict optional-field extraction",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-field-extraction-w14",
+        "notes": "_extract_df_tuning (dryrun.py): hasattr + is_default → 10 identical blocks → loop.\ngenerate_cli_command (cli/dryrun.py): non-default → append → 12 blocks → loop over\nPARAM_CLI_MAP = [(attr, \"--flag\", default), ...].\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Simplify _extract_df_tuning and generate_cli_command",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "complexity-field-extraction-w14",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run smoke tests and complexity check; verify all 10 functions below warn threshold",
+        "wid": "w7"
+      }
+    ]
+  }
+}

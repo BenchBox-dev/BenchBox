@@ -1,0 +1,155 @@
+{
+  "context": "Set the skeleton headline to the canonical loaded copy so the h1 is stable across loading and loaded states, then update the Vitest loading-state assertion that pins the retired string. This is the root-cause fix that makes heading assertions time-invariant.",
+  "description": "PR #1482 renamed the loaded Home h1 to 'BenchBox Curated Results Preview' (Home.tsx ~352) but left HomeLoadingSkeleton's h1 as 'BenchBox Database Leaderboards' (~598, reached from the early return ~257). The retired string now exists ONLY in the loading skeleton, so every e2e heading assertion became timing-dependent: asserting before data load silently matches the skeleton, asserting after it fails deterministically. Proven 2026-08-03 by local Playwright run on develop 3af42e29b - a probe asserting the retired heading passed in 152ms before load and failed after load.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-04T00:08:16Z",
+        "from_item": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "id": 684,
+        "reason": "Out of scope: this item scopes do_not_modify results-explorer/e2e/**. The spec is skipped by default and only runs with PR246_HOME_CAPTURE=1, so it does not affect CI, but it will fail for anyone who opts in after this change. Not covered by any existing item: explorer-home-smoke-loaded-assertions covers e2e/routes/home.spec.ts and the blocked results-explorer-responsive-headline-contract-20260802 covers e2e/responsive.spec.ts, leaving this capture spec orphaned.",
+        "resolution": "promoted",
+        "resolved_item": "explorer-pr246-capture-headline-refresh-20260803",
+        "resolved_reason": null,
+        "summary": "e2e/captures/pr246-home-remediation.spec.ts still asserts the retired 'BenchBox Database Leaderboards' headline"
+      },
+      {
+        "created_at": "2026-08-04T00:09:54Z",
+        "from_item": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "id": 685,
+        "reason": "Same defect class as the headline, one level down. Skeleton reads 'Reproducible OLAP benchmark rankings, with public corpus browse below.' while the loaded hero reads 'Reproducible OLAP benchmark evidence with explicitly scoped rankings and public corpus browse below.' No test asserts the subtitle today, so there is no current failure, but it leaves the same timing-dependent trap for anyone who later asserts on it. Kept out of this PR to hold the change to the tracked headline unit; in scope for a follow-up since Home.tsx is already only_modify here.",
+        "resolution": "promoted",
+        "resolved_item": "explorer-home-skeleton-subtitle-parity-20260803",
+        "resolved_reason": null,
+        "summary": "HomeLoadingSkeleton subtitle still diverges from the loaded hero subtitle"
+      }
+    ],
+    "item_meta": {
+      "category": "Explorer UI contract",
+      "completed_at": "2026-08-04T00:11:41Z",
+      "completed_pr": 1496,
+      "created_at": "2026-08-03T23:42:28Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Loaded copy stays the narrower curated-preview claim, not the broader leaderboards claim",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2"
+      },
+      {
+        "behavior": "The loading skeleton still renders and still exposes its aria-busy loading region",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2"
+      },
+      {
+        "behavior": "Vitest loading-state coverage still asserts a heading, not merely the spinner text",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -c -F \"BenchBox Curated Results Preview\" results-explorer/src/pages/Home.tsx | grep -qx 2",
+        "description": "Skeleton and loaded hero share one canonical headline",
+        "expected": "Exits 1 on the unfixed tree, where only one h1 carries the canonical copy; exits 0 once both do. Confirmed failing on develop 3af42e29b.",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-04T00:08:37Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -q -F \"BenchBox Database Leaderboards\" results-explorer/src/pages/Home.tsx",
+        "description": "Retired headline is absent from Home.tsx",
+        "expected": "Exits 1 on the unfixed tree because the retired string is still in the skeleton; exits 0 after the fix.",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-04T00:08:39Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/pages/__tests__/Home.test.tsx",
+        "description": "Home Vitest suite passes with the updated loading-state assertion",
+        "expected": "All Home unit tests pass",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-04T00:08:47Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "HomeLoadingSkeleton h1 at Home.tsx:598 now reads 'BenchBox Curated Results Preview', matching the loaded hero at :352. Rung 1 (exactly two canonical h1 lines) and rung 2 (retired string absent) both flipped from FAIL to PASS on this branch.",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "notes": null,
+        "started_at": "2026-08-04T00:06:23Z",
+        "started_branch": "fix/explorer-home-skeleton-h1-parity-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Set HomeLoadingSkeleton h1 to the canonical curated-preview copy",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Home.test.tsx loading-state assertion now expects the canonical 'BenchBox Curated Results Preview'. Loading state remains pinned by the snapshot-init text, the aria-busy region, and the absence of Recent Results, so the test still discriminates loading from loaded. npx vitest run src/pages/__tests__/Home.test.tsx: 28 passed.",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "notes": null,
+        "started_at": "2026-08-04T00:07:03Z",
+        "started_branch": "fix/explorer-home-skeleton-h1-parity-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Update the Vitest loading-state heading assertion",
+        "wid": "w1"
+      },
+      {
+        "evidence": "rg over results-explorer/src/ returns no match for the retired headline. Remaining references are confined to three e2e specs, all outside this item's scope; the orphaned capture spec is recorded as a deferral.",
+        "item_id": "explorer-home-skeleton-h1-parity-20260803-v2",
+        "notes": null,
+        "started_at": "2026-08-04T00:07:43Z",
+        "started_branch": "fix/explorer-home-skeleton-h1-parity-20260803",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-adversarial-review-268b2d",
+        "status": "done",
+        "summary": "Confirm no source reference to the retired headline remains",
+        "wid": "w2"
+      }
+    ]
+  }
+}

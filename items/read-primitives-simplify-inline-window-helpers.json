@@ -1,0 +1,179 @@
+{
+  "description": "During the read_primitives cross-surface burn-down (PR #891) three Polars\nplatform helpers were found buggy and FIXED at the source with regression tests\n(PR #891, commit \"fix(dataframe): repair window_lag/lead/ntile + UnifiedExpr.desc()\nsort marker\"; tests in tests/unit/platforms/dataframe/test_window_and_sort_fixes.py):\n  - window_lag / window_lead (polars_df.py): now shift in the window ORDER BY\n    order via shift().over(partition, order_by=...).\n  - window_ntile (polars_df.py): now uses the correct SQL NTILE piecewise bucket\n    formula.\n  - UnifiedExpr.desc() (unified_frame.py): now a real descending sort marker.\n\nBecause the helpers were buggy at the time, a few read_primitives EXPRESSION impls\nwere written with inline raw Polars (via `.native`) to route around them. Those\nimpls are correct and fully gate-verified, but now that the helpers are fixed they\ncould be simplified back onto the unified API for readability/portability (the\nunified helpers also work on non-Polars expression backends, whereas the inline\n`.native` Polars is Polars-only).\n\nCandidate impls (benchbox/core/read_primitives/dataframe_queries.py), all\nEXPRESSION-family only (the pandas impls are already idiomatic pandas):\n  - window_lead_lag_expression_impl (impl_base of window_lead_lag_same_frame):\n    raw pl.col(...).shift(±1).over(...) -> ctx.window_lag / ctx.window_lead.\n  - qualify_lag_lead_expression_impl: raw shift(1).over(...) -> ctx.window_lag.\n  - qualify_ntile_expression_impl: inline NTILE piecewise -> ctx.window_ntile.\n\nIMPORTANT PREREQUISITE (why this is not a trivial swap): the catalog SQL for\nthese queries now carries a deterministic window ORDER BY TIE-BREAK\n(e.g. `ORDER BY o_orderdate, o_orderkey`, `ORDER BY o_totalprice, o_orderkey`),\nand the inline impls sort by that COMPOSITE key. The current helper signatures\ntake `order_by: list[tuple[str, bool]]` but only read `order_by[0]` (a SINGLE\norder column). So before the impls can use the helpers, the helpers must be\nextended to honor a MULTI-COLUMN order_by (composite tie-break). Without that,\nswapping in the helpers would drop the tie-break and re-introduce the\nnon-deterministic-window divergences the burn-down fixed.\n\nNOT candidates (these use raw Polars for ops the unified API genuinely lacks -\nleave them inline): window_moving_frame (bounded ROWS / 30-day RANGE frames),\nstatistical_correlation / statistical_variance (population moments: pl.cov,\npl.corr, var/std with ddof), olap_cube_analysis / olap_rollup_analysis (CUBE /\nROLLUP grouping-set unions), timeseries_trend_analysis (regression slope over\nepoch seconds). These have no unified-helper equivalent and are out of scope.\n\nThis is OPTIONAL cleanup: the inline impls are correct and the gate is green, so\nthis only reduces Polars-specific code in favor of the portable unified helpers.\nDefer indefinitely if the churn is not worth it.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "rewrite the pandas impls",
+        "instead": "(not specified)",
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "why": "this cleanup is about the Polars expression family only."
+      },
+      {
+        "dont": "swap impls onto the helpers before w1",
+        "instead": "extend the helpers first.",
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "why": "the helpers only honor order_by[0] today, so the composite tie-break would be silently dropped and the gate would regress"
+      },
+      {
+        "dont": "touch the unsupported-op impls (rolling frames, ddof moments, CUBE/ROLLUP, regression slope)",
+        "instead": "leave them inline raw-Polars.",
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "why": "the unified API has no equivalent"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "read-primitives-simplify-inline-window-helpers",
+        "id": 30,
+        "reason": "The descending=[...] form is canonical and clearer; now that desc() is fixed both work, but there is no value in churning these back.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly argues against doing this: no value in churning .sort() calls back once both forms work equivalently.",
+        "summary": "Reverting the `.sort([names], descending=[...])` calls to `.sort(col.desc())`."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-06-27T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The deterministic window tie-breaks (the composite ORDER BY) are preserved - dropping them would re-introduce non-deterministic-window divergences.",
+        "item_id": "read-primitives-simplify-inline-window-helpers"
+      },
+      {
+        "behavior": "The read_primitives cross-surface gate stays green (every compared cell matches; no NEW known_divergences).",
+        "item_id": "read-primitives-simplify-inline-window-helpers"
+      },
+      {
+        "behavior": "pandas impls and the raw-Polars impls for unsupported ops (window_moving_frame, statistical_correlation/variance, olap_cube/rollup, timeseries_trend_analysis) are left as-is.",
+        "item_id": "read-primitives-simplify-inline-window-helpers"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/read_primitives/dataframe_queries.py:window_lead_lag_expression_impl/qualify_lag_lead_expression_impl/qualify_ntile_expression_impl — the inline raw-Polars impls to simplify (expression family only).",
+        "decision": "reuse",
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "path": "benchbox/core/read_primitives/dataframe_queries.py:window_lead_lag_expression_impl/qualify_lag_lead_expression_impl/qualify_ntile_expression_impl"
+      },
+      {
+        "concept": "benchbox/platforms/dataframe/polars_df.py:window_lag — currently does `order_by[0]` only; the single-key limitation is the blocker for the tie-break queries.",
+        "decision": "reuse",
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "path": "benchbox/platforms/dataframe/polars_df.py:window_lag"
+      },
+      {
+        "concept": "benchbox/platforms/dataframe/polars_df.py:window_lag/window_lead/window_ntile — the fixed helpers to extend with multi-column order_by, then call from the impls.",
+        "decision": "extend",
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "path": "benchbox/platforms/dataframe/polars_df.py:window_lag/window_lead/window_ntile"
+      },
+      {
+        "concept": "tests/integration/test_read_primitives_cross_surface_equivalence.py — the gate test that must stay green after the refactor (the real safety net).",
+        "decision": "reuse",
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "path": "tests/integration/test_read_primitives_cross_surface_equivalence.py"
+      },
+      {
+        "concept": "tests/unit/platforms/dataframe/test_window_and_sort_fixes.py — extend with multi-column order_by assertions before relying on it in the impls.",
+        "decision": "extend",
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "path": "tests/unit/platforms/dataframe/test_window_and_sort_fixes.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "kind": "only_modify",
+        "path_glob": "_project/"
+      },
+      {
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/dataframe_queries.py"
+      },
+      {
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/polars_df.py"
+      },
+      {
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/test_window_and_sort_fixes.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/test_window_and_sort_fixes.py -q",
+        "description": "Helpers honor a multi-column order_by",
+        "expected": "tests pass, including new multi-column order_by cases",
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make read-primitives-cross-surface-equivalence-report",
+        "description": "read_primitives gate still green after the refactor",
+        "expected": "exit 0; 'SQL and DataFrame surfaces are equivalent (modulo classified exceptions)'",
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "notes": "Generalize the helpers from `order_by[0]` to the full `order_by` list:\nshift().over(partition, order_by=[cols...], descending=[...]) for lag/lead, and\nrank('ordinal') over the composite order for ntile. Add unit-test cases with a\ntwo-column order_by (a value column + an id tie-break) to\ntest_window_and_sort_fixes.py.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Extend window_lag/window_lead/window_ntile to honor a multi-column order_by (composite tie-break), with unit tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "notes": "Replace the inline raw-Polars in window_lead_lag_expression_impl,\nqualify_lag_lead_expression_impl, qualify_ntile_expression_impl with\nctx.window_lag / ctx.window_lead / ctx.window_ntile using the composite\norder_by (matching the catalog SQL tie-break). Leave the pandas impls and the\ngenuinely-unsupported-op impls (window_moving_frame, statistical_*, olap_*,\ntimeseries) untouched.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Rewrite the three read_primitives expression impls onto the unified helpers",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "read-primitives-simplify-inline-window-helpers",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-verify the read_primitives gate stays green",
+        "wid": "w3"
+      }
+    ]
+  }
+}

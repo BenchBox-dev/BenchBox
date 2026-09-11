@@ -1,0 +1,90 @@
+{
+  "context": "Verification and decision only; no production code. Anti-pattern: documenting a Desktop flow that was not run end-to-end on the actual Mini.",
+  "description": "DECISION GATEWAY. The Codex Desktop SSH-remote-project feature is ALPHA (introduced Codex App v26.415, app-server spawned over ssh hosts auto-detected from ~/.ssh/config). Before Phase 4 invests in docs and E2E: (1) confirm the feature still exists and works in the currently shipping Codex App; (2) if GATE 0 chose exec ingress, confirm the app accepts a ProxyCommand-only Host entry; (3) re-verify or strike the \"container machine auto-maps host home\" claim - review flagged it as likely podman/colima conflation since Apple container has no machine subcommand (check container help); (4) confirm the honest scope: Claude Code Desktop has NO SSH remote mode (Local/Worktree/Cloud only) - the Claude path is VS Code Remote-SSH or ssh -t, and Phase 4 docs must say so plainly. DECISION RULE: if the Codex feature regressed or rejects our Host entry shape, scope Phase 4 down to CLI-over-ssh docs and record why - do not ship aspirational Desktop docs.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "agentbox-gate1-desktop-feature-preflight",
+        "needs_item": "agentbox-phase3-persistent-ssh"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-07T05:54:19Z",
+      "created_at": "2026-08-07T00:02:36Z",
+      "worktree": "agent-container"
+    },
+    "preserves": [
+      {
+        "behavior": "No production code changes at the gate",
+        "item_id": "agentbox-gate1-desktop-feature-preflight"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agentbox-gate1-desktop-feature-preflight",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd ~/Developer/agent-container && grep -qE \"^GATE 1: (FULL|SCOPED-DOWN)\" docs/spikes.md",
+        "description": "Gate verdict recorded",
+        "expected": null,
+        "item_id": "agentbox-gate1-desktop-feature-preflight",
+        "last_result": "pass",
+        "last_run": "2026-08-07T05:54:17Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agentbox-gate1-desktop-feature-preflight",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "agentbox-gate1-desktop-feature-preflight",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Codex.app NOT installed; feature real (v26.415 alpha, ~/.ssh/config discovery). Identified OUR risk: Phase3 Include indirection may defeat host discovery (openai/codex #29335,#36242). login-shell bootstrap CONFIRMED OK; agent-forwarding limitation aligns with Spike C",
+        "item_id": "agentbox-gate1-desktop-feature-preflight",
+        "notes": null,
+        "started_at": "2026-08-07T05:54:09Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Verify current Codex App SSH-remote behavior against a persistent container from Phase 3",
+        "wid": "w1"
+      },
+      {
+        "evidence": "container machine DOES exist in CLI 1.1.0 (create/delete/inspect/run/set/start/stop, home-mount, cpus/memory). Original review assertion was WRONG and is corrected in docs/spikes.md:714+",
+        "item_id": "agentbox-gate1-desktop-feature-preflight",
+        "notes": null,
+        "started_at": "2026-08-07T05:54:12Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Resolve the container-machine claim against container help output; record verdict",
+        "wid": "w2"
+      },
+      {
+        "evidence": "GATE 1: SCOPED-DOWN at docs/spikes.md:714; Phase 4 documents only host-verifiable steps; container-machine prohibition withdrawn",
+        "item_id": "agentbox-gate1-desktop-feature-preflight",
+        "notes": null,
+        "started_at": "2026-08-07T05:54:15Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Record GATE 1 verdict and Phase 4 scope in docs/spikes.md",
+        "wid": "w3"
+      }
+    ]
+  }
+}

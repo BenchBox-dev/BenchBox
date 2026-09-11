@@ -1,0 +1,172 @@
+{
+  "context": "Update Makefile pr-ready and pr-arm-auto-merge to handle queue enqueuing. Update auto-merge-on-open.yml to verify soundness paths and cancel auto-merge / queue entry on unreviewed changes. Update scripts/auto_merge_soundness_paths.py tests.",
+  "description": "Phase 3 / Gate MQ-3. Adapt developer tooling (Makefile pr-open, pr-ready, pr-refresh) and auto-merge revocation automation (auto-merge-on-open.yml) to operate correctly with GitHub Merge Queue enqueuing semantics. Ensure PRs touching SOUNDNESS_PREFIXES strictly withhold auto-enqueue until maintainer review is granted.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Allow automatic queue entry for soundness paths",
+        "instead": "Require explicit manual review and enqueue for soundness PRs",
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "why": "Maintainer review is required before merging any soundness path change"
+      },
+      {
+        "dont": "Remove pr-refresh target from Makefile",
+        "instead": "Retain pr-refresh with clear queue guidance",
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "why": "Developers still need local rebase and conflict resolution helpers"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "needs_item": "merge-queue-02-workflow-merge-group-triggers"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-08-22T16:57:16Z",
+      "created_at": "2026-08-22T15:31:23Z",
+      "worktree": "merge-queue"
+    },
+    "preserves": [
+      {
+        "behavior": "Preflight validation contracts remain strict",
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation"
+      },
+      {
+        "behavior": "STALE=1 escape hatch remains functional in Makefile",
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation"
+      },
+      {
+        "behavior": "Soundness paths never auto-merge or auto-enqueue without maintainer review",
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "auto-merge revocation guard",
+        "decision": "extend",
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "path": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "concept": "pr-open and pr-ready entrypoints",
+        "decision": "extend",
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "path": "Makefile"
+      },
+      {
+        "concept": "soundness path classification predicate",
+        "decision": "extend",
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "path": "_project/scripts/auto_merge_soundness_paths.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub rulesets or hosted admin settings"
+      },
+      {
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/auto_merge_soundness_paths.py"
+      },
+      {
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "kind": "only_modify",
+        "path_glob": "docs/development/development.md"
+      },
+      {
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_auto_merge_soundness_paths.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py -q",
+        "description": "Soundness path test suite passes",
+        "expected": "pass",
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "last_result": "pass",
+        "last_run": "2026-08-22T16:57:14Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make -n pr-ready",
+        "description": "Makefile pr-ready target parses cleanly",
+        "expected": "pass",
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "last_result": "pass",
+        "last_run": "2026-08-22T16:57:15Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Updated Makefile pr-open, pr-ready, and pr-arm-auto-merge documentation and messages for merge queue enqueuing",
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "notes": null,
+        "started_at": "2026-08-22T16:56:06Z",
+        "started_branch": "fix/merge-queue-03-soundness-and-tooling-adaptation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-03",
+        "status": "done",
+        "summary": "Update Makefile pr-ready, pr-open, and pr-refresh for merge queue commands and warnings",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Documented merge queue dequeueing on soundness path changes in auto-merge-on-open.yml",
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "notes": null,
+        "started_at": "2026-08-22T16:56:12Z",
+        "started_branch": "fix/merge-queue-03-soundness-and-tooling-adaptation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-03",
+        "status": "done",
+        "summary": "Wire soundness withholding in auto-merge-on-open.yml and preflight helpers",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Updated development.md with PR lifecycle and verified 38 soundness path tests pass",
+        "item_id": "merge-queue-03-soundness-and-tooling-adaptation",
+        "notes": null,
+        "started_at": "2026-08-22T16:56:18Z",
+        "started_branch": "fix/merge-queue-03-soundness-and-tooling-adaptation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-merge-queue-03",
+        "status": "done",
+        "summary": "Verify soundness path enforcement tests and CLI behavior",
+        "wid": "w2"
+      }
+    ]
+  }
+}

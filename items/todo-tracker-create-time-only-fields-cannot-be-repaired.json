@@ -1,0 +1,59 @@
+{
+  "context": "Decide what is safely mutable before an item reaches done: description and verification command/expected are strong candidates, scope globs likely too. Add an 'amend' verb restricted to those fields, log every change via the existing event log so auditability is preserved, and refuse amendment once state=done. Separately, let promote() carry --only-modify/--do-not-modify/--preserve/--verify/--work so promoted items are not born guardrail-less.",
+  "description": "The tracker has no update/edit verb (create, claim, release, deps, unblock, start, done, defer, promote, dismiss, complete, drop, block, list, ready, stats, check-scope, verify, lint, sweep-stale, migrate, config, export, finding). Combined with scope/verifications being create-time-only, an item authored with a mistake stays wrong forever. Three distinct instances hit in the 2026-07-25 follow-up batch alone: (1) promote() accepts only title/priority/worktree/description, so all four promoted items shipped with NO scope globs, NO verification ladder and NO work units -- check-scope passes trivially rather than meaningfully, and scope had to be self-policed in the PR body each time; (2) timing-policy-check-misreports-pytest-failure-as-violation rung 1 is unsatisfiable as authored and cannot be amended, so it reads fail forever despite a correct fix; (3) todo-verify-grades-only-on-exit-code's description proposes an approach that research disproved (evaluating expected against stdout would fail 2787 of 2939 verifications), and the description could not be corrected -- the rebuttal had to live in PR #1311's body instead. Dropping and recreating is not a workaround: drop is terminal and reserves the id forever, and dependents would need new ids. See verification-rungs-authored-with-unsatisfiable-commands for the rung-specific sweep; this item is about the ergonomics gap that produced them.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-28T23:02:49Z",
+        "from_item": "todo-tracker-create-time-only-fields-cannot-be-repaired",
+        "id": 654,
+        "reason": "Implemented update in _project/scripts/todo_db.py, then tests/unit/scripts/test_todo_wrapper.py::TestSkillThinness failed with 'standalone_only_commands overlaps wrapper handlers: [update]'. The todo-db skill states it outright: 'Standalone-only actions -- declared machine-readably in the skill sidecar as standalone_only_commands, currently update -- exist only in todo-db >= 0.3.' Two tests enforce the boundary and one of them hardcodes update as THE example of a wrapper-unsupported verb, with the comment that the sets 'must stay disjoint'. So amendment is already solved upstream in todo-db >= 0.3; this repo's embedded wrapper deliberately omits it, and reimplementing it here is the wrong fix. I reverted that half. Remaining real work, unaddressed anywhere: adopt todo-db >= 0.3 as the project's CLI (or route the wrapper's unsupported verbs to it) so amendment becomes available to this repo -- that is a dependency/adoption decision, not a code patch, and it is out of this item's only_modify allowlist of todo_db.py + tests. The promote-guardrails half WAS in scope and shipped: promote now accepts --only-modify/--do-not-modify/--preserve/--verify/--work/--category/--approach, so promoted items are no longer born without scope or a ladder.",
+        "resolution": "promoted",
+        "resolved_item": "adopt-todo-db-standalone-cli-for-amendable-items",
+        "resolved_reason": null,
+        "summary": "The 'add an amend verb' half is superseded: update already exists upstream and is deliberately NOT a wrapper handler"
+      }
+    ],
+    "item_meta": {
+      "category": "tooling",
+      "completed_at": "2026-07-28T23:03:56Z",
+      "completed_pr": 1321,
+      "created_at": "2026-07-26T12:49:53Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing item history stays auditable - amendments are logged, not silent overwrites",
+        "item_id": "todo-tracker-create-time-only-fields-cannot-be-repaired"
+      },
+      {
+        "behavior": "drop keeps its terminal, id-reserving semantics",
+        "item_id": "todo-tracker-create-time-only-fields-cannot-be-repaired"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-tracker-create-time-only-fields-cannot-be-repaired",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "todo-tracker-create-time-only-fields-cannot-be-repaired",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -k todo -q",
+        "description": "Tracker unit tests pass",
+        "expected": "exit 0",
+        "item_id": "todo-tracker-create-time-only-fields-cannot-be-repaired",
+        "last_result": "fail",
+        "last_run": "2026-07-28T22:58:55Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,218 @@
+{
+  "description": "Session 01a07292 exposed queued-branch push rejection (#2055/#2056), unpublished fixes, wrong-PR operations, and #2076 merging before its corrections. Extend Makefile pr-open/pr-ready and the existing hold/revocation path. Prior art: Makefile:1376-1454, _project/scripts/auto_merge_soundness_paths.py, tests/unit/workflows/test_auto_merge_partial_stack_race.py, scripts/worktree_lifecycle_metadata.py. A local safety preflight or an empty thread scan is not completed review. Coordinate all writers through explicit repo/PR/node-id/head/worktree identity; do not infer the PR from a reused branch alone.\n\nFEATURE-BATCH EXTENSION: the ready transaction also binds batch ID/version, declared member set, owner generation and current integration head. Require every member integrated with valid attribution, no active/pending authorized member writer, all final-tree verifications and current review dispositions. A late member, changed batch membership, conflict resolution or edit to prior member content invalidates readiness and affected receipts. Use the canonical prepared contract and existing helper, not a second readiness implementation. Standard non-batch PRs retain their current interface.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Treat a snapshot, a queued review, a skipped hook or an unbound passing check as completion",
+        "instead": "Bind actual evidence to the relevant PR/head/input and retain an explicit owned next action",
+        "item_id": "pr-revision-readiness-transaction",
+        "why": "The observed session repeatedly lost asynchronous work or overstated evidence"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "needs_item": "batch-prepared-delivery-tracker-and-skill"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "needs_item": "ci-baseline-representative-remeasure-sample"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-09-08T02:40:13Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "KEEP_IDLE and SHADOW_ONLY remain in force for skip/shard/demotion/reduced-refresh proposals; this plan does not activate them.",
+        "item_id": "pr-revision-readiness-transaction"
+      },
+      {
+        "behavior": "Keep GitHub native merge queue as the only merger; no privileged steward, bypass actor, direct protected-branch push, or new bot credential.",
+        "item_id": "pr-revision-readiness-transaction"
+      },
+      {
+        "behavior": "Preserve required PR, merge_group, and post-merge coverage, soundness maintainer review, explicit user authority, and durable hold labels.",
+        "item_id": "pr-revision-readiness-transaction"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "pr-revision-readiness-transaction",
+        "path": "Makefile"
+      },
+      {
+        "concept": "Existing implementation or governing evidence to extend without a parallel authority",
+        "decision": "extend",
+        "item_id": "pr-revision-readiness-transaction",
+        "path": "tests/unit/workflows/test_auto_merge_partial_stack_race.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "do_not_modify",
+        "path_glob": ".agents/skills/**"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "do_not_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/**"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/auto_merge_soundness_paths.py"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "only_modify",
+        "path_glob": "docs/agent/review-protocol.md"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/dev-loop-worktrees.md"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "only_modify",
+        "path_glob": "scripts/pr_landing.py"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_pr_landing.py"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_auto_merge_hold_is_durable.py"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_auto_merge_enablement_point.py"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_auto_merge_partial_stack_race.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_pr_landing.py tests/unit/workflows/test_auto_merge_enablement_point.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/test_auto_merge_hold_is_durable.py -q",
+        "description": "Revision/readiness transitions prevent wrong-head and late-fix merges",
+        "expected": "exit 0; behavioral negative controls fail on the prior implementation",
+        "item_id": "pr-revision-readiness-transaction",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "pr-revision-readiness-transaction",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "pr-revision-readiness-transaction",
+        "notes": "Define explicit start-revision and ready transitions using one cohesive helper behind existing Make targets. Bind repo, PR node/number, expected head, branch and worktree; reconcile lifecycle metadata and live GitHub state. Preserve the initial snapshot and deny ambiguous or foreign ownership.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Define explicit PR, head, worktree and owner identity for revision and readiness",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-revision-readiness-transaction",
+        "notes": "Before the first edit, disable previous auto-merge/dequeue or apply an effective existing draft/hold mechanism, verify the hold remotely, then permit writes. If merge wins the race, stop modifying that closed PR and preserve commits for a correctly identified follow-up. Never remove a user/maintainer hold.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Withdraw and verify prior readiness before any revision begins",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-revision-readiness-transaction",
+        "notes": "Ready requires local/remote head agreement, no unpublished authorized work, completed configured review on that exact head (including top-level findings), evidence for all dispositions, required checks and maintainer approvals. Queue through an expected-head compare-and-set API/CLI option; a head change invalidates readiness. A successful API request is not proof of merge.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Require completed exact-head review and checks before expected-head enqueue",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-revision-readiness-transaction",
+        "notes": "Replay late-review-before-push, concurrent writer, head changing between check/enqueue, already-queued update, wrong worktree/PR, outage, durable user hold and soundness scenarios. Show an ordinary completed authorized PR can still proceed without repeated user confirmation; record residual races outside participating writers.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replay late review, concurrent writers, head races and protected holds",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-revision-readiness-transaction",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Bind feature-batch membership, integrated receipts and writer quiescence to readiness",
+        "wid": "w4"
+      }
+    ]
+  }
+}

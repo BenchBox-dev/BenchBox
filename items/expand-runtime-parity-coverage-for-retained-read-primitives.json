@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #154 of ensure-read-primitives-variant-comparability.\nDeferred: Expand runtime parity coverage for retained read_primitives variants not covered by the first local parity suite\nReason deferred: The first pass targets the highest-risk families. Follow-up coverage should include array_unnest (clickhouse, bigquery), array_agg_simple (clickhouse), struct_construction (clickhouse), list_transform (clickhouse), and the duckdb/clickhouse paths of map_construction so retained variants do not drift silently.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:13Z",
+      "worktree": "main"
+    }
+  }
+}

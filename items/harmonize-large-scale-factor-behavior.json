@@ -1,0 +1,411 @@
+{
+  "description": "Follow-on to harmonize-scale-factor-baselines (completed 2026-04-07). That TODO established\nSF=1 ≈ 1 GB baselines for all adjustable benchmarks. This TODO addresses three categories of\nissue discovered when reviewing how those baselines scale at SF 10, 100, and 1000:\n\n1. **Quadratic scaling (TSBS DevOps)** - both num_hosts and duration_days scale linearly with\n   SF, so total rows grow as SF². SF=10 produces ~93 GB instead of ~9.3 GB. SF=100 produces\n   ~9.2 TB instead of ~93 GB. This violates the \"SF=N ≈ N GB\" mental model.\n\n2. **Saturation ceilings (FlightData, NYC Taxi)** - these real-data benchmarks hit hard data\n   ceilings and silently stop scaling. FlightData exhausts the BTS corpus (456 months) at\n   SF≈11.12, capping at ~10.7 GB. NYC Taxi saturates sample_rate at 1.0 when SF≥10, capping\n   at ~9.6 GB. Neither benchmark warns the user.\n\n3. **Documentation errors** - scale factor tables in CoffeeShop, TSBS DevOps, and NYC Taxi\n   docs contain incorrect projections that don't match actual code behavior.\n\nThe four purely-linear benchmarks (CoffeeShop, H2O.db, JoinOrder, AMPLab) scale correctly -\nno code changes needed for those, only the CoffeeShop doc fix.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add backwards-compatibility shims",
+        "instead": "change formulas directly",
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "why": "BenchBox is still in beta (v0.2.0)"
+      },
+      {
+        "dont": "change row counts for spec-locked benchmarks (TPC-H, TPC-DS, SSB)",
+        "instead": "only adjustable benchmarks are in scope",
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "why": "their row counts are defined by the TPC/SSB specifications"
+      },
+      {
+        "dont": "introduce a global calibration multiplier layer",
+        "instead": "scale each benchmark's own parameters directly",
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "why": "it adds indirection that makes per-benchmark tuning harder"
+      },
+      {
+        "dont": "synthesize fake data without research gate approval",
+        "instead": "w3 (FlightData) and w5 (NYC Taxi) research gates must evaluate replication strategies before any synthetic data is added",
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "why": "the value of real-data benchmarks is historical authenticity"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "harmonize-large-scale-factor-behavior",
+        "id": 407,
+        "reason": "Evaluated in w3 research gate. If w3 recommends replication, this is superseded by w4. If w3 recommends ceiling-only, this remains deferred - real-data integrity is more valuable than arbitrary scaling.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly conditioned on the w3 research gate recommending replication; no evidence that outcome occurred (ceiling-only more likely per own reasoning).",
+        "summary": "Extend FlightData beyond natural corpus via synthetic augmentation"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "harmonize-large-scale-factor-behavior",
+        "id": 408,
+        "reason": "Same rationale as d1. However, w4 research may reveal that the expanded Green/HVFHV corpus already raises the ceiling significantly. Revisit after w4 findings.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Gated on 'w4 research' findings about corpus ceiling; no evidence that revisit trigger occurred, not tracked elsewhere.",
+        "summary": "Extend NYC Taxi beyond natural corpus via synthetic augmentation"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "harmonize-large-scale-factor-behavior",
+        "id": 409,
+        "reason": "Not critical - low SFs are primarily for CI/testing where exact size doesn't matter. Document rather than fix.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly downgrades this to 'document rather than fix'; not critical, no fix action left to promote.",
+        "summary": "Fix TSBS low-SF floor behavior (SF=0.01 and SF=0.1 produce identical output)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-07T00:00:00Z",
+      "created_at": "2026-04-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing query sets, schemas, SQL files unchanged",
+        "item_id": "harmonize-large-scale-factor-behavior"
+      },
+      {
+        "behavior": "Benchmarks must still produce valid data at SF=0.01 (CI/testing scale)",
+        "item_id": "harmonize-large-scale-factor-behavior"
+      },
+      {
+        "behavior": "CompressionMixin behavior unchanged",
+        "item_id": "harmonize-large-scale-factor-behavior"
+      },
+      {
+        "behavior": "Linear benchmarks (CoffeeShop, H2O.db, JOB, AMPLab) need no code changes",
+        "item_id": "harmonize-large-scale-factor-behavior"
+      },
+      {
+        "behavior": "SF=1 baselines unchanged - the original harmonization is correct at SF=1",
+        "item_id": "harmonize-large-scale-factor-behavior"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/clickbench/"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/ssb/"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/utils/compression_mixin.py"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/flightdata/downloader.py"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/downloader.py"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/benchmark_specs.py"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tsbs_devops/generator.py"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/coffeeshop.md"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/nyctaxi.md"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/tsbs-devops.md"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/generators/test_scale_factor_harmonization.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.tsbs_devops.generator import TsbsDevopsGenerator; g1=TsbsDevopsGenerator(scale_factor=1); g10=TsbsDevopsGenerator(scale_factor=10); print(f'SF=1: {g1.num_hosts} hosts, {g1.duration_days} days'); print(f'SF=10: {g10.num_hosts} hosts, {g10.duration_days} days')\"",
+        "description": "TSBS scaling is linear after fix",
+        "expected": "SF=10 should show ~1000 hosts with same duration as SF=1 (2 days)",
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import logging; logging.basicConfig(level=logging.WARNING); from benchbox.core.flightdata.downloader import FlightDataDownloader; d=FlightDataDownloader(scale_factor=100)\" 2>&1 | grep -i warn",
+        "description": "FlightData warns at ceiling",
+        "expected": "Warning message about month ceiling being reached",
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import logging; logging.basicConfig(level=logging.WARNING); from benchbox.core.nyctaxi.downloader import NycTaxiYellowDownloader; d=NycTaxiYellowDownloader(scale_factor=100)\" 2>&1 | grep -i warn",
+        "description": "NYC Taxi warns at saturation",
+        "expected": "Warning message about sample_rate saturation at 1.0",
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/generators/test_scale_factor_harmonization.py -v",
+        "description": "Existing tests pass",
+        "expected": "All tests pass including new linearity tests",
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Full test suite passes",
+        "expected": "All fast tests pass with no regressions",
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "needs_wid": "w2",
+        "wid": "w10"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "needs_wid": "w4",
+        "wid": "w10"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "needs_wid": "w6",
+        "wid": "w10"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "needs_wid": "w2",
+        "wid": "w11"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "needs_wid": "w2",
+        "wid": "w12"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "needs_wid": "w4",
+        "wid": "w12"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "needs_wid": "w6",
+        "wid": "w12"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "needs_wid": "w6",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "notes": "The TSBS DevOps generator currently scales both num_hosts and duration_days linearly with\nSF, producing quadratic total data growth (SF² instead of SF). Research how to linearize.\n\nResearch questions:\n1. What is the canonical TSBS scaling model? Check official tsbs_generate_data defaults\n   and published papers. Does the standard approach scale by host count, duration, or both?\n2. Evaluate three fix options for achieving linear SF-to-size scaling:\n   (a) Fix duration at DEFAULT_DURATION_DAYS (2), scale only num_hosts → simplest,\n       matches canonical TSBS model where more hosts = more distinct time series\n   (b) Use sqrt(SF) for each dimension so hosts×days product grows linearly → preserves\n       both-dimension scaling but with non-intuitive per-dimension values\n   (c) Keep hosts as primary axis with sub-linear days multiplier → compromise\n3. For each option, calculate projected sizes at SF=0.01, 0.1, 1, 10, 100, 1000.\n   Verify that SF=1 still produces ~0.93 GB (must not break baseline).\n4. Consider the low-SF floor behavior: max(10, ...) and max(1, ...) cause SF=0.01 and\n   SF=0.1 to produce identical output (10 hosts, 1 day). Does the chosen fix affect this?\n5. Review whether changing the formula requires updating benchmark_specs.py sf1_row_counts.\n\nOutput: recommend the best option with projected size table and implementation plan.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research TSBS quadratic scaling - evaluate options to achieve linear SF-to-size scaling",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "notes": "Add a \"Scaling Behavior\" or \"Large Scale Factors\" section to docs for TSBS DevOps,\nFlightData, and NYC Taxi explaining ceilings, saturation, or (post-fix) linear scaling.\nFlightData does not currently have a docs/benchmarks/flightdata.md - either create one\nor add notes to the most appropriate existing location.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add scaling behavior notes to each affected benchmark's docs",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "notes": "Extend tests/unit/generators/test_scale_factor_harmonization.py. For each adjustable\nbenchmark, generate at SF=0.01 and SF=0.02, verify the row count ratio is ~2× (not ~4×\nas TSBS would currently produce). This catches quadratic scaling regressions. Also test\nthat FlightData/NYC Taxi ceiling warnings are emitted at high SF.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add scaling linearity tests to test_scale_factor_harmonization.py",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "notes": "After all fixes, verify projected sizes at SF=10 are within 0.5×-2.0× of the expected\nN×1GB for all adjustable benchmarks. This is a final integration check, not a unit test.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cross-benchmark validation - verify projected sizes at SF=10",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "notes": "Apply w1 findings. Most likely: fix duration_days at DEFAULT_DURATION_DAYS (2), scale only\nnum_hosts. Update benchmark_specs.py sf1_row_counts if the formula changes affect SF=1\noutput (it shouldn't if duration stays at 2 days for SF=1).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "TSBS DevOps - linearize scaling formula to fix quadratic growth",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "notes": "The BTS flight corpus spans 456 months (Jan 1987 - Dec 2024), exhausted at SF≈11.12.\nBeyond that, FlightData silently caps at ~10.7 GB. Evaluate whether controlled synthetic\nreplication of the source data could extend the ceiling to achieve linear scaling at\nhigher scale factors.\n\nResearch questions:\n1. What replication strategies preserve benchmark validity?\n   (a) Duplicate entire months with perturbed dates (shift year/month forward) - preserves\n       seasonal patterns and carrier distributions but creates recognizable duplicates\n   (b) Row-level sampling with replacement and field perturbation (jitter delays, swap\n       carriers, randomize flight numbers) - more realistic but harder to implement\n   (c) Tile-based replication: at SF=20, use all 456 real months + 364 replicated months\n       with a synthetic \"era\" column to distinguish - simple, transparent, auditable\n   (d) Weighted oversampling of recent years (more representative of modern traffic\n       patterns) - produces more realistic large-scale data but introduces bias\n2. Does replication compromise the benchmark's value proposition? FlightData's strength\n   is real historical data. If replicated data just duplicates query results (same carriers,\n   same routes, same delays), does it actually stress-test the engine differently than\n   the original corpus, or just multiply I/O?\n3. What is the practical demand for FlightData at SF > 10? Is this a real use case or\n   theoretical? If no one needs SF=100 FlightData, a warning + documentation may suffice.\n4. If replication is adopted, how should _scale_to_months() change? Currently:\n   months = min(max(1, round(SF * 41)), 456). Would need a two-phase approach:\n   Phase 1 (SF ≤ ~11): download real months as today\n   Phase 2 (SF > ~11): download all 456 months + generate replicated data to fill gap\n5. What metadata should replicated rows carry? A flag column (is_synthetic=true)?\n   A replicated_from_month column? Or should replicas be indistinguishable?\n6. Impact on query result validation - if result validators compare against expected\n   row counts, replication would change expected counts at high SF.\n\nOutput: recommend one of:\n(a) Implement replication strategy (specify which) - with implementation sketch\n(b) Accept the ceiling - warn and document only (current deferred item d1 approach)\n(c) Hybrid - warn at ceiling but offer an opt-in --benchmark-option replicate=true flag\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research FlightData ceiling - evaluate whether synthetic replication can extend scaling beyond SF≈11",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "notes": "In benchbox/core/flightdata/downloader.py, add a logger.warning() when the computed months\nvalue hits the 456 ceiling. Message should explain: the BTS corpus is exhausted, actual\ndata size will be capped at ~10.7 GB regardless of SF. Also update the generator docstring.\nIf w3 recommends a replication strategy, implement it here. If w3 recommends ceiling-only,\nthis is just the warning + docs.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "FlightData - add warning log when month ceiling is hit (and apply w3 findings)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "notes": "The NYC Taxi benchmark recently expanded to support three taxi types: Yellow (default),\nGreen (LPEP), and HVFHV (Uber/Lyft). Each type has its own downloader class with an\nindependent sample_rate = min(1.0, SF / SCALE_FACTOR_SAMPLE_DIVISOR) calculation.\n\nResearch questions:\n1. What is the total data volume for each taxi type at sample_rate=1.0?\n   - Yellow: ~9.6 GB (known). Green and HVFHV: unknown - measure or estimate.\n2. When all three types are enabled (taxi_types=yellow,green,hvfhv), what is the\n   combined corpus size? If Green adds ~2 GB and HVFHV adds ~25 GB (rough estimate\n   from fallback row counts in downloader), the combined ceiling could be ~37 GB.\n3. Could the SCALE_FACTOR_SAMPLE_DIVISOR be adjusted per taxi type or globally to\n   account for the larger combined corpus? E.g., if combined corpus is ~37 GB, then\n   SF=1 should still target ~1 GB total across all types, but SF≥37 would saturate\n   instead of SF≥10.\n4. Does the current SF=1 baseline (~1 GB) hold when multiple taxi types are enabled?\n   Each downloader independently samples at SF/10, so enabling all three at SF=1\n   would produce ~1 GB + ~0.2 GB + ~2.5 GB ≈ ~3.7 GB. Is this the intended behavior\n   or should the sample rate be divided across active types?\n5. Review the --benchmark-option taxi_types=yellow,green,hvfhv interaction with SF.\n\nOutput: document findings and recommend whether to:\n(a) Keep current behavior (each type has independent sample_rate, ceiling varies by config)\n(b) Adjust SCALE_FACTOR_SAMPLE_DIVISOR to account for multi-type combined corpus\n(c) Leave as-is but document the different ceilings per configuration\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research NYC Taxi expanded data - evaluate whether Green/HVFHV corpus extends the saturation ceiling",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "notes": "In benchbox/core/nyctaxi/downloader.py, add a logger.warning() in all 3 downloader classes\nwhen sample_rate clamps to 1.0 (SF≥10). Message should explain: the full dataset is being\nused, no additional scaling possible beyond SF=10.\nApply any findings from w5 - if the expanded corpus (Green/HVFHV) changes the saturation\nceiling or the SCALE_FACTOR_SAMPLE_DIVISOR, incorporate those changes here.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "NYC Taxi - add warning log when sample_rate saturates at 1.0",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "notes": "docs/benchmarks/coffeeshop.md lines 231-237. The table assumes 3 order lines per order but\nthe generator produces 1.56 lines/order (per benchmark_specs.py deterministic pattern).\nRecalculate all order_lines values in the table.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix CoffeeShop doc table - order_lines counts ~2× overstated",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "notes": "docs/benchmarks/tsbs-devops.md lines 354-360. Fix: (1) SF=0.01/0.1 duration should be\n1 day not 2, (2) SF=100 hosts should be 10,000 not 1,000, (3) all data size projections\nshould reflect the post-w2 linear formula. Wait for w2 to know the final formula.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix TSBS DevOps doc table - 3 errors in scale factor projections",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "harmonize-large-scale-factor-behavior",
+        "notes": "docs/benchmarks/nyctaxi.md lines 254-260. SF=100 row claims ~960M trips / ~96 GB but\ncode saturates at SF=10. Update table to show ceiling and reference the saturation warning.\nApply w5 research findings - if expanded corpus changes the ceiling, reflect that here.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix NYC Taxi doc table - SF=100 projection impossible due to saturation",
+        "wid": "w9"
+      }
+    ]
+  }
+}

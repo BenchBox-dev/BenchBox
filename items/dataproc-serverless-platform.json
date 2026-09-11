@@ -1,0 +1,16 @@
+{
+  "description": "Add GCP Dataproc Serverless platform adapter. Serverless variant provides\nfully managed Spark with no cluster management and auto-scaling.\n\nImplementation shares 80% code with Dataproc cluster adapter. Uses Batch\nController API instead of Jobs API.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "dataproc-serverless-platform",
+        "needs_item": "gcp-dataproc-platform"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2025-12-24T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

@@ -1,0 +1,302 @@
+{
+  "context": "Implement in thin dependency order: formalize record/disposition and retrieval contracts; refine generators without copying sensitive or unbounded source prose; add deterministic project-aware retrieval over the actual candidate fixtures; make the behavioral runner consume retrieval output and blind the arm; revise scoring for required-subset authority and verification semantics, accepted decision alternatives, and a monotonic completion lattice; add structural, retrieval, privacy, mutation, and paired-efficiency tests; regenerate isolated fixtures and publish a v3 readiness report. Stop before fresh model sessions or live promotion unless their separate gates are explicitly authorized.",
+  "description": "Replace the failed all-or-nothing memory treatment and synthetic pre-pasted behavioral comparison with an incremental, evidence-preserving candidate and a retrieval-aware evaluation. Build a four-layer fixture model (small durable core, project retrieval index, historical evidence archive, generated views), retain semantic titles and provenance, classify every sampled record by lifecycle disposition, exercise the actual generated Codex and Claude fixtures through deterministic retrieval before behavior prompts, and score observable unsafe outcomes separately from defensible judgment variation. Efficiency gates must measure incremental memory payload separately from fixed session overhead and tool amplification. This item must not mutate live Codex or Claude memory or authorize promotion.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "evaluate handwritten baseline and treatment snippets instead of generated candidates",
+        "instead": "retrieve from the actual generated fixture tree with the same loader contract used by the evaluator",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "why": "that measures fixture authorship and bypasses retrieval"
+      },
+      {
+        "dont": "promote or mutate live memory from this item",
+        "instead": "produce isolated fixtures and a readiness report for a separately authorized behavioral run",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "why": "the v2 candidate has a final no-promote decision"
+      },
+      {
+        "dont": "replace useful memory with metadata-only hashes and opaque identifiers",
+        "instead": "retain concise semantic titles, scoped claims, provenance pointers, freshness policy, and retrieval terms",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "why": "evidence remains auditable but relevant facts become undiscoverable"
+      },
+      {
+        "dont": "require a percentage reduction in total session context",
+        "instead": "gate incremental injected memory bytes or tokens and report total context and tool amplification separately",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "why": "fixed platform overhead and retry amplification dominate the denominator"
+      },
+      {
+        "dont": "treat every oracle-label mismatch as a categorical safety failure",
+        "instead": "reserve categorical failures for observable unsafe behavior and score required subsets, alternatives, and completion overclaim monotonically",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "why": "harmless extra authority, conservative completion, and defensible decisions become false failures"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "needs_item": "claude-memory-scoping-privacy-and-index-treatment"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "needs_item": "codex-memory-provenance-cursor-and-summary-treatment"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Superseded before completion: verification rung 4 incorrectly used git diff with absolute paths outside a repository. The legacy hosted tracker cannot amend verification rows; use memory-refinement-v3-retrieval-evaluation-corrected. No live memory was changed.",
+      "category": "memory-evaluation",
+      "created_at": "2026-07-28T16:58:48Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Drift-prone state is marked for live verification and cannot become a standing mandate",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation"
+      },
+      {
+        "behavior": "Durable preferences require explicit provenance and project facts remain project-scoped",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation"
+      },
+      {
+        "behavior": "Historical evidence remains recoverable without automatic injection of unbounded source prose",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation"
+      },
+      {
+        "behavior": "Live Codex and Claude memories, settings, sessions, transcripts, history, and credentials remain byte-unchanged",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation"
+      },
+      {
+        "behavior": "Privacy scans never print or commit sensitive source content",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "isolated behavioral execution harness",
+        "decision": "extend",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "path": "evaluation_runs/behavioral/src/memory_tooling/runner.py"
+      },
+      {
+        "concept": "independent outcome oracle and promotion gates",
+        "decision": "extend",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "path": "evaluation_runs/behavioral/src/memory_tooling/score.py"
+      },
+      {
+        "concept": "deterministic Claude fixture generation",
+        "decision": "extend",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "path": "memory_tooling/claude/src/memory_tooling/generator.py"
+      },
+      {
+        "concept": "deterministic Codex fixture generation",
+        "decision": "extend",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "path": "memory_tooling/codex/src/memory_tooling/generator.py"
+      },
+      {
+        "concept": "v2 no-promotion evidence and failure analysis",
+        "decision": "supersede",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "path": "reports/promotion-decision.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "kind": "only_modify",
+        "path_glob": "docs/claude-memory/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "kind": "only_modify",
+        "path_glob": "docs/codex-memory/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --project memory_tooling -- python -m pytest memory_tooling/tests -q && uv run --project memory_tooling/codex -- python -m pytest memory_tooling/codex/tests -q && uv run --project memory_tooling/claude -- python -m pytest memory_tooling/claude/tests -q && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers -q",
+        "description": "All memory tooling and scorer tests pass",
+        "expected": "all suites exit 0 without cross-package collection collisions",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project memory_tooling -- python -m memory_tooling.audit --strict",
+        "description": "Generated fixtures are deterministic and privacy-safe",
+        "expected": "zero schema, provenance, reference, identity, duplicate, privacy, or determinism failures",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project memory_tooling -- python -m memory_tooling.scoring --strict",
+        "description": "Retrieval scenarios meet precision and recall thresholds",
+        "expected": "project isolation and safety dimensions are perfect; relevant retrieval meets the documented threshold",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --exit-code -- /Users/joe/.codex/memories /Users/joe/.claude/projects",
+        "description": "Live memory remains unchanged",
+        "expected": "no live-memory change attributable to this item",
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Define v3 record, lifecycle, retrieval, authority, freshness, and efficiency contracts",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Refine Codex and Claude generators into evidence-preserving semantic fixtures",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement project-aware deterministic retrieval against actual generated fixtures",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Route blinded behavioral prompts through retrieved candidate context instead of synthetic arm prose",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revise outcome scoring and split memory payload from fixed context and tool amplification",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-refinement-v3-real-retrieval-and-incremental-evaluation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add mutation tests, regenerate fixtures, and publish the v3 readiness decision",
+        "wid": "w5"
+      }
+    ]
+  }
+}

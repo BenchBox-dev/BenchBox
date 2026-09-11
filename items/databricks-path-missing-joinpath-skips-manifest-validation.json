@@ -1,0 +1,43 @@
+{
+  "context": "Add joinpath/stat/suffix to DatabricksPath mirroring CloudStagingPath, then confirm what manifest validation now does on a Databricks run that previously skipped it -- it may surface pre-existing manifest gaps. Decide whether the guard at runner.py:1323 should stay (defensive) or become an assertion once both wrapper types support joinpath.",
+  "description": "create_path_handler passes DatabricksPath through unchanged, so a Databricks run's benchmark.output_dir IS a DatabricksPath. That class has no joinpath (it exposes as_posix/exists/glob/is_dir/is_file/iterdir/mkdir/name/parent/parts/resolve only). Two consequences in benchbox/core/runner/runner.py: (1) line ~1323 guards with 'if output_dir is None or not hasattr(output_dir, \"joinpath\"): return {}' -- so datagen manifest validation is skipped SILENTLY for every Databricks run, with no warning that a check was dropped; (2) line ~181 calls output_dir.joinpath('_datagen_manifest.json') unguarded, which is a latent AttributeError if that path is reached with a DatabricksPath. Found while fixing cloud-staging-path-rewrap-drops-cloud-target (PR #1304), which added joinpath/stat/suffix to the sibling CloudStagingPath for exactly this reason. DatabricksPath was deliberately left alone there because adding joinpath flips the hasattr guard from skip to run, changing what Databricks runs actually validate -- that needs its own verification rather than riding along.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-07-25T15:42:29Z",
+      "completed_pr": 1305,
+      "created_at": "2026-07-25T15:13:56Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Databricks dbfs:// upload behaviour is unchanged; this is about the local staging proxy surface only",
+        "item_id": "databricks-path-missing-joinpath-skips-manifest-validation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "databricks-path-missing-joinpath-skips-manifest-validation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/cloud_storage.py"
+      },
+      {
+        "item_id": "databricks-path-missing-joinpath-skips-manifest-validation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.utils.cloud_storage import DatabricksPath as D; p=D('/tmp','dbfs:/Volumes/c/s/v'); assert all(hasattr(p,a) for a in ['exists','glob','is_dir','joinpath','mkdir','parent','resolve','stat','suffix']); print('ok')\"",
+        "description": "DatabricksPath exposes the same attributes the runner reads off output_dir",
+        "expected": "prints ok, exit 0",
+        "item_id": "databricks-path-missing-joinpath-skips-manifest-validation",
+        "last_result": "pass",
+        "last_run": "2026-07-25T15:39:22Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,253 @@
+{
+  "context": "Page in SQL with LIMIT/OFFSET rather than rendering then hiding, so cold-load transfer is not disturbed. Add a free-text filter over platform, version and public ID. Support cross-page selection through the picking owner. State export scope in the UI and in the QA doc. Decide the scratchpad's treatment explicitly and record it.",
+  "description": "Query currently renders TABLE_RENDER_LIMIT (200) rows with a 'Show more results' control (Query.tsx:233-240, 936-945) and reaches 13,970px at desktop, 14,386px at 390px. It is progressive rather than unbounded - Compare is the unbounded one - but it is still browsed by scrollbar and has no free-text search.\n\nTwo scope decisions must be made explicitly rather than left implicit: what CSV/JSON export covers once the table is paged (today it exports 'visible columns'), and whether the SQL scratchpad's own client-rendered table (Query.tsx:951-1013) is bounded here or declared out of scope.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assert a paging or scale improvement using the default browser fixture",
+        "instead": "gate the claim on the purpose-built larger fixture (rx-ux-13)",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "why": "the standard fixture is 11 results and cannot exercise large-corpus behaviour"
+      },
+      {
+        "dont": "cite e2e/capability/range-read-budget.spec.ts as scale or cold-load evidence",
+        "instead": "assert document height and rendered row count at 1440px and 390px",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "why": "that spec is test.skip'ed at range-read-budget.spec.ts:56 and does not run"
+      },
+      {
+        "dont": "claim a scale improvement using the default 11-result fixture",
+        "instead": "verify with the large fixture from rx-ux-13",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "why": "the default fixture cannot produce the condition"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "leave export scope implicit under paging",
+        "instead": "state whether export covers the page, the filter, or the whole corpus",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "why": "'visible columns' becomes ambiguous the moment rows are paged"
+      },
+      {
+        "dont": "render all rows then hide them with CSS",
+        "instead": "page in SQL with LIMIT/OFFSET",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "why": "rendering-then-hiding keeps the document tall and defeats the purpose"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "needs_item": "rx-ux-00-phase0-contract-decisions"
+      },
+      {
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "needs_item": "rx-ux-13-large-corpus-fixture"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-24T06:56:26Z",
+      "completed_pr": 1841,
+      "created_at": "2026-08-22T14:49:45Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "CSV/JSON export remaining available; its scope is defined, not removed",
+        "item_id": "rx-ux-17-query-paging-and-search"
+      },
+      {
+        "behavior": "Read-model version 7 pin in _project/scripts/explorer_pipeline/contract.py and results-explorer/src/db.ts (EXPECTED_READ_MODEL_VERSION), guarded by db-remediation-pin.test.ts.",
+        "item_id": "rx-ux-17-query-paging-and-search"
+      },
+      {
+        "behavior": "The cold-snapshot retry window in db.ts",
+        "item_id": "rx-ux-17-query-paging-and-search"
+      },
+      {
+        "behavior": "The facet rail behaviour and its live counts",
+        "item_id": "rx-ux-17-query-paging-and-search"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/results-explorer-qa.md"
+      },
+      {
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/**"
+      },
+      {
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Query.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "last_result": "pass",
+        "last_run": "2026-08-24T06:48:55Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium",
+        "description": "Chromium browser suite passes against a fresh build",
+        "expected": "fixtures verified, build succeeds, chromium suite green",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "last_result": "pass",
+        "last_run": "2026-08-24T16:59:53Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'query paging scale'",
+        "description": "Query document height bounded at both widths with the large fixture",
+        "expected": "document height under three viewports at 1440x1000 and 390x844",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "last_result": "pass",
+        "last_run": "2026-08-23T16:48:02Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium e2e/performance.spec.ts",
+        "description": "Perceived-latency budgets still met",
+        "expected": "P50 and P95 within recorded budgets; report the numbers",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "last_result": "pass",
+        "last_run": "2026-08-23T16:48:26Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'cross-page selection'",
+        "description": "Selection survives a page change",
+        "expected": "runs picked on page 1 remain selected on page 2",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "last_result": "pass",
+        "last_run": "2026-08-23T16:48:42Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "needs_wid": "w1",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "cd results-explorer && npm run typecheck && npm run test -- src/pages/__tests__/Query.test.tsx; SQL LIMIT/OFFSET assertions pass",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "notes": null,
+        "started_at": "2026-08-23T11:52:19Z",
+        "started_branch": "feat/rx-ux-17-query-paging-search",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-17-query-paging-search",
+        "status": "done",
+        "summary": "SQL LIMIT/OFFSET paging replacing the render limit",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Query.test.tsx: search platform/version/public ID SQL parameters and URL q state pass",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "notes": null,
+        "started_at": "2026-08-23T12:40:24Z",
+        "started_branch": "feat/rx-ux-17-query-paging-search",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-17-query-paging-search",
+        "status": "done",
+        "summary": "Free-text filter over platform, version, public ID",
+        "wid": "w2"
+      },
+      {
+        "evidence": "npx playwright test --project=chromium --grep 'query paging scale'; cross-page selection remains in Query-owned selected-row map",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "notes": null,
+        "started_at": "2026-08-23T12:40:50Z",
+        "started_branch": "feat/rx-ux-17-query-paging-search",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-17-query-paging-search",
+        "status": "done",
+        "summary": "Cross-page selection through the picking owner",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Query UI and QA S7.5 define CSV/JSON as all filtered+searched rows within the selected cap, across pages, visible columns only",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "notes": null,
+        "started_at": "2026-08-23T12:40:55Z",
+        "started_branch": "feat/rx-ux-17-query-paging-search",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-17-query-paging-search",
+        "status": "done",
+        "summary": "Define and surface export scope under paging",
+        "wid": "w4"
+      },
+      {
+        "evidence": "docs/operations/results-explorer-qa.md S7.6 records separate 200-row scratchpad renderer and transient in-memory tables",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "notes": null,
+        "started_at": "2026-08-23T12:40:29Z",
+        "started_branch": "feat/rx-ux-17-query-paging-search",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-17-query-paging-search",
+        "status": "done",
+        "summary": "Decide and record SQL scratchpad table treatment",
+        "wid": "w5"
+      },
+      {
+        "evidence": "npx playwright test --project=chromium --grep 'query paging scale' passed at 1440x1000 and 390x844 with 24 rows/page and document height under 3 viewports",
+        "item_id": "rx-ux-17-query-paging-and-search",
+        "notes": null,
+        "started_at": "2026-08-23T12:41:00Z",
+        "started_branch": "feat/rx-ux-17-query-paging-search",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-17-query-paging-search",
+        "status": "done",
+        "summary": "Document-height and row-count assertions with the large fixture",
+        "wid": "w6"
+      }
+    ]
+  }
+}

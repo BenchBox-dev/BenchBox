@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #208 of migrate-remaining-adapters-to-csv-resolver-pipeline.\nDeferred: Migrate adapters not listed in this TODO that already use DataSourceResolver but do not construct CSV/TBL options themselves.\nReason deferred: This item targets concrete resolver bypasses evidenced by current grep results; unrelated adapters should be audited separately to avoid scope creep.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:39Z",
+      "worktree": "main"
+    }
+  }
+}

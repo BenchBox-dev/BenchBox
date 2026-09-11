@@ -1,0 +1,147 @@
+{
+  "context": "Extend SourceConfig parsing and GitSource resolution with an optional safe relative subdir; reject absolute paths and traversal; include the subdir in provenance; add source and manifest tests plus docs; build, lint, typecheck, and test; publish through a focused PR to skill-sync main.",
+  "description": "BenchBox must stop materializing governance skills from the mutable dirty ~/.skill-sync checkout. skill-sync supports pinned Git refs but assumes each skill is at repository root; skill-sync-skills stores them under skills/. Add a validated optional subdir field for Git sources so BenchBox can source the exact canonical commit without local-WIP leakage.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Join an unchecked subdir directly to the clone path",
+        "instead": "Validate it as a normalized repository-relative path",
+        "item_id": "skill-sync-git-source-subdir",
+        "why": "Traversal could resolve skills outside the cloned repository"
+      },
+      {
+        "dont": "Teach BenchBox to depend on a mutable local checkout",
+        "instead": "Add the missing general Git-source capability",
+        "item_id": "skill-sync-git-source-subdir",
+        "why": "Local WIP must not determine committed agent governance"
+      }
+    ],
+    "item_meta": {
+      "category": "Agent infrastructure",
+      "completed_at": "2026-07-28T14:32:33Z",
+      "completed_pr": 9,
+      "created_at": "2026-07-28T14:19:48Z",
+      "worktree": "skill-sync"
+    },
+    "preserves": [
+      {
+        "behavior": "A subdir cannot escape the cloned repository",
+        "item_id": "skill-sync-git-source-subdir"
+      },
+      {
+        "behavior": "Existing Git sources without subdir behave identically",
+        "item_id": "skill-sync-git-source-subdir"
+      },
+      {
+        "behavior": "Source provenance records enough information to reproduce the resolved skill location",
+        "item_id": "skill-sync-git-source-subdir"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "skill-sync-git-source-subdir",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "skill-sync-git-source-subdir",
+        "kind": "only_modify",
+        "path_glob": "dist/**"
+      },
+      {
+        "item_id": "skill-sync-git-source-subdir",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "skill-sync-git-source-subdir",
+        "kind": "only_modify",
+        "path_glob": "src/**"
+      },
+      {
+        "item_id": "skill-sync-git-source-subdir",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "npm test -- --run tests/unit/sources/git.test.ts",
+        "description": "Git source unit tests pass",
+        "expected": "exit 0",
+        "item_id": "skill-sync-git-source-subdir",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "npm run check",
+        "description": "Typecheck passes",
+        "expected": "exit 0",
+        "item_id": "skill-sync-git-source-subdir",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "npm run test:run",
+        "description": "Full test suite passes",
+        "expected": "exit 0",
+        "item_id": "skill-sync-git-source-subdir",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "skill-sync-git-source-subdir",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "skill-sync-git-source-subdir",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "feat/git-source-subdir: SourceConfig/GitSource support validated normalized subdir; traversal, absolute, Windows-style, and non-git use rejected; targeted 40 tests pass",
+        "item_id": "skill-sync-git-source-subdir",
+        "notes": null,
+        "started_at": "2026-07-28T14:22:42Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add and validate optional Git source subdir in manifest and source resolution",
+        "wid": "w1"
+      },
+      {
+        "evidence": "README/docs updated; provenance includes subdir; manifest round-trip and factory/source regression tests added; npm lint, tsc, and full 401-test suite pass",
+        "item_id": "skill-sync-git-source-subdir",
+        "notes": null,
+        "started_at": "2026-07-28T14:24:11Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add regression tests, provenance coverage, and user documentation",
+        "wid": "w2"
+      },
+      {
+        "evidence": "skill-sync PR #8 merged as 923b669 (Git subdir); PR #9 merged as 7e8926a (metadata-only lock refresh). npm lint/typecheck pass; full suite 405 passed.",
+        "item_id": "skill-sync-git-source-subdir",
+        "notes": null,
+        "started_at": "2026-07-28T14:32:28Z",
+        "started_branch": "chore/agent-instruction-todos",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Run full verification and merge a focused skill-sync PR",
+        "wid": "w3"
+      }
+    ]
+  }
+}

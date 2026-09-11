@@ -1,0 +1,217 @@
+{
+  "context": "Build into a same-filesystem temporary sibling, close/checkpoint it, reject any remaining WAL, validate a DB-only copy through the same queries the browser needs, and atomically replace the public snapshot only after success. Add deterministic interruption tests around process termination and prior-artifact preservation without relying on timing-sensitive WAL sampling.",
+  "description": "Fault injection proved that the current invariant can open a 12 KB results.duckdb with a sibling WAL and report success even though the DB copied alone has no results table. A normal production-shaped build closed and checkpointed cleanly, so this is defense in depth rather than a current launch blocker. Make DB-only portability an explicit artifact contract and preserve the last known-good snapshot across interruption.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "merely call CHECKPOINT before the existing invariant",
+        "instead": "validate an isolated DB-only artifact and atomically promote it",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "why": "the invariant would still be capable of replaying a sidecar and artifact publication would remain non-atomic"
+      },
+      {
+        "dont": "use a sleep-and-kill timing assertion as the only regression",
+        "instead": "unit-test promotion boundaries and add one bounded process-interruption integration case",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "why": "WAL timing varies by DuckDB version and host"
+      },
+      {
+        "dont": "write directly over public/data/results.duckdb",
+        "instead": "build and validate a same-directory temporary snapshot before os.replace",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "why": "a killed process can expose a partial replacement"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Reliability",
+      "completed_at": "2026-08-02T14:15:09Z",
+      "completed_pr": 1483,
+      "created_at": "2026-08-02T04:28:12Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A failed or interrupted rebuild cannot replace or delete the last known-good published snapshot.",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate"
+      },
+      {
+        "behavior": "Successful normal builds retain current table/view contents, row counts, read_model_version, and critical-path query performance.",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate"
+      },
+      {
+        "behavior": "Temporary files are created beside the target for atomic replacement and are cleaned only by exact validated path.",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate"
+      },
+      {
+        "behavior": "The browser continues to fetch one results.duckdb URL and never depends on a WAL or extra database sidecar.",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate"
+      },
+      {
+        "behavior": "The invariant validates the serialized artifact the browser receives, not an in-process connection or sibling sidecar state.",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Keep publication ordered build then invariant then frontend assembly; add no parallel artifact path.",
+        "decision": "reuse",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "path": ".github/workflows/docs.yml"
+      },
+      {
+        "concept": "Retain the existing connection lifecycle but redirect output to a temporary publish candidate.",
+        "decision": "extend",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "path": "_project/scripts/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "concept": "Strengthen the existing schema/content gate with DB-only portability and no-WAL assertions.",
+        "decision": "extend",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "path": "_project/scripts/results_explorer_snapshot_invariants.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/pipeline.py"
+      },
+      {
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      },
+      {
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c 'from pathlib import Path; t=Path(\"_project/scripts/results_explorer_snapshot_invariants.py\").read_text(); assert \".wal\" in t.lower()'",
+        "description": "Snapshot invariant explicitly rejects WAL sidecars",
+        "expected": "Fails on the unfixed tree; exits 0 when the invariant contains an explicit no-WAL artifact check.",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "last_result": "pass",
+        "last_run": "2026-08-02T14:14:27Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline tests/unit/scripts -q",
+        "description": "Builder and snapshot-invariant regressions pass",
+        "expected": "Normal, isolated-copy, WAL-assisted, and interrupted-promotion cases all pass.",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "last_result": "pass",
+        "last_run": "2026-08-02T14:14:45Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_explorer_smoke.py tests/unit/scripts/test_explorer_build_contract.py -q",
+        "description": "The full Explorer pipeline and smoke test consume the promoted DB alone",
+        "expected": "The browser-facing artifact passes without any sibling WAL and retains the expected model version.",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "last_result": "pass",
+        "last_run": "2026-08-02T14:14:51Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Code audit confirmed direct public DB unlink/write and WAL-replaying invariant. Contract: browser receives one self-contained results.duckdb; candidate DB and bundle files are staged beside target, old DB remains active until final atomic promotion.",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "notes": "Define candidate naming, close/checkpoint requirements, forbidden sidecars, DB-only validation, atomic replacement, previous-artifact retention, cleanup ownership, Windows/POSIX replacement behavior, and maximum interruption-test runtime.",
+        "started_at": "2026-08-02T14:08:43Z",
+        "started_branch": "fix/results-explorer-snapshot-portability-wal",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Specify the self-contained snapshot and atomic-promotion contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1483 commit ba08d744a makes DuckDBSnapshotBuilder build into same-directory UUID temp files and os.replace only after connection close; exact candidate and WAL siblings are cleaned on failure.",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "notes": "Create the candidate beside the target, close DuckDB, fail if a WAL remains, copy/open the DB in isolation, and run schema, metadata, row-count, and required-view probes. Do not touch the target until all checks pass.",
+        "started_at": "2026-08-02T14:14:05Z",
+        "started_branch": "fix/results-explorer-snapshot-portability-wal",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Build and validate a temporary DB-only publish candidate",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1483 stages bundles and DB under a sibling temp directory, validates the candidate, atomically publishes bundle files and results.duckdb, and cleans stale generated artifacts only after promotion.",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "notes": "Use an atomic same-filesystem replacement after validation, retain or restore the previous artifact on any failure, and clean only the exact candidate/WAL paths created by this run. Record candidate and final sizes without logging corpus-sensitive values.",
+        "started_at": "2026-08-02T14:14:11Z",
+        "started_branch": "fix/results-explorer-snapshot-portability-wal",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Atomically promote the candidate and preserve rollback",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1483 adds WAL-sidecar rejection and failed-rebuild preservation tests; 17 focused tests, 312 explorer-pipeline tests, 1392 unit/scripts tests, 23 smoke/build-contract tests all passed.",
+        "item_id": "results-explorer-snapshot-portability-and-wal-gate",
+        "notes": "Prove a normal build publishes one self-contained DB, a deliberately WAL-assisted tiny DB is rejected, and killing a bounded child before promotion leaves the previous DB byte-identical and never presents the candidate at the public path.",
+        "started_at": "2026-08-02T14:14:17Z",
+        "started_branch": "fix/results-explorer-snapshot-portability-wal",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Add normal, WAL-assisted, and interrupted-build regressions",
+        "wid": "w3"
+      }
+    ]
+  }
+}

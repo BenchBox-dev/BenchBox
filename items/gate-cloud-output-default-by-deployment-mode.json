@@ -1,0 +1,193 @@
+{
+  "context": "Switch the three gates to the deployment-aware check, passing the deployment mode already resolved for the run where one is available and letting requires_cloud_storage_for_deployment() fall back to the platform-level answer when it is not (it already does this internally for platforms with no deployment_modes block). Keep requires_cloud_storage() itself unchanged — it has other callers, including benchbox/cli/cloud_storage.py::prompt_cloud_output_location, and narrowing it globally is a larger blast radius than this item wants. Add a registry-driven test that asserts the gate used by the run path agrees with requires_cloud_storage_for_deployment() for every registered platform's default deployment, so a future registry edit cannot silently reintroduce the divergence. Sequencing note: this item and the stage-classification item both edit benchbox/cli/orchestrator.py (this one at _apply_default_cloud_output_dir, that one at _resolve_custom_output_root and _resolve_construction_output_dir). The dependency is declared so the two are not worked in parallel.",
+  "description": "Three call sites decide whether to pull a credential-stored default_output_location into the run: benchbox/cli/orchestrator.py::_apply_default_cloud_output_dir and two checks in benchbox/cli/commands/run.py::_interactive_cloud_setup_if_needed. All three gate on PlatformRegistry.requires_cloud_storage(), which is implemented as `metadata.get('category') == 'cloud'` — a coarse platform-level label. The registry already exposes the precise per-deployment answer via requires_cloud_storage_for_deployment(), and the two disagree. Verified on 2026-07-24 @ 14b0271c1 by enumerating the registry: of the 24 platforms whose category is 'cloud', three report requires_cloud_storage_for_deployment() == False for their DEFAULT deployment — firebolt (default deployment 'core', a free local Docker engine), motherduck (default 'managed') and starburst (default 'managed'). For those, a stored default_output_location is injected as the run's output root even though the selected deployment stages nothing remotely. That is the same failure shape that produced the in-repo '@~/benchbox' spill, just latent because no credentials are stored for those three today.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Hardcode a skip-list of firebolt/motherduck/starburst",
+        "instead": "Ask the registry per run via requires_cloud_storage_for_deployment()",
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "why": "The list is derived state that goes stale the moment a platform's deployment_modes block is edited"
+      },
+      {
+        "dont": "Redefine requires_cloud_storage() itself to consult deployment modes",
+        "instead": "Change only the three run-path gates to the deployment-aware call and pin the agreement with a test",
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "why": "It has callers beyond the run path and a global narrowing changes prompting and validation behaviour well outside this defect"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "needs_item": "classify-snowflake-stage-paths-as-non-local"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-25T04:05:00Z",
+      "completed_pr": 1301,
+      "created_at": "2026-07-24T19:03:44Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "An explicit --output still short-circuits the whole gate before any credential lookup",
+        "item_id": "gate-cloud-output-default-by-deployment-mode"
+      },
+      {
+        "behavior": "Non-interactive runs still exit 1 when a cloud platform genuinely lacks credentials",
+        "item_id": "gate-cloud-output-default-by-deployment-mode"
+      },
+      {
+        "behavior": "Platforms whose default deployment genuinely stages remotely (snowflake, bigquery, databricks, redshift, athena, synapse, the Spark-on-cloud family) keep pulling their stored default_output_location exactly as today",
+        "item_id": "gate-cloud-output-default-by-deployment-mode"
+      },
+      {
+        "behavior": "requires_cloud_storage() keeps its current semantics for all other callers, including prompt_cloud_output_location",
+        "item_id": "gate-cloud-output-default-by-deployment-mode"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/benchmark_registry.yaml"
+      },
+      {
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/utils/cloud_storage.py"
+      },
+      {
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/ -q",
+        "description": "CLI orchestrator and run-command unit tests pass",
+        "expected": "exit 0",
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "last_result": "pass",
+        "last_run": "2026-07-25T04:02:28Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -k 'cloud_storage_gate or requires_cloud_storage' -q",
+        "description": "The new registry-agreement test passes",
+        "expected": "exit 0",
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "last_result": "pass",
+        "last_run": "2026-07-25T04:02:41Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.platform_registry import PlatformRegistry as R; R._platform_metadata = R._platform_metadata or R._build_platform_metadata(); bad={n for n in R._platform_metadata if R.requires_cloud_storage(n) != R.requires_cloud_storage_for_deployment(n)}; assert bad=={'firebolt','motherduck','starburst'}, sorted(bad); print('confirmed', sorted(bad))\"",
+        "description": "Premise pin: the registry-level and deployment-level answers still diverge for exactly the three known platforms",
+        "expected": "exit 0. This pins the registry premise and stays true after the fix - the registry is not changed, only the gate. The behavioural check is the parametrised gate test in verification 2.",
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "last_result": "pass",
+        "last_run": "2026-07-25T04:02:43Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast lane stays green",
+        "expected": "exit 0",
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "last_result": "pass",
+        "last_run": "2026-07-25T04:04:06Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on develop @e51d0e34b (both batch deps merged): exactly {firebolt, motherduck, starburst} diverge between requires_cloud_storage() and requires_cloud_storage_for_deployment() across all 51 registered platforms -- no drift. Located the three run-path gates: orchestrator.py:380 (_apply_default_cloud_output_dir) and run.py:2204 + :2221 (both inside _interactive_cloud_setup_if_needed). Confirmed the run's deployment mode is carried in database_config.options['deployment_mode'] (registered per-platform via PlatformOptionSpec in cli/platform_defaults.py), so it can be threaded when present and left None to mean 'platform default deployment'.",
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "notes": "Each reports requires_cloud_storage() True (category == 'cloud') but requires_cloud_storage_for_deployment() False for its default deployment — firebolt 'core' (local Docker), motherduck 'managed', starburst 'managed'.",
+        "started_at": "2026-07-25T03:47:28Z",
+        "started_branch": "fix/gate-cloud-output-by-deployment-mode",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Re-validate on develop that firebolt, motherduck and starburst still diverge between the two registry checks, and that no other platform has drifted",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Switched orchestrator._apply_default_cloud_output_dir to PlatformRegistry.requires_cloud_storage_for_deployment(type, deployment_mode). Added module-level _resolved_deployment_mode(database_config) that reads database_config.options['deployment_mode'] and returns None when unset, so the registry falls back to the platform's default_deployment. Docstring now states why the gate is deployment-scoped. requires_cloud_storage() itself is untouched.",
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "notes": null,
+        "started_at": "2026-07-25T03:48:11Z",
+        "started_branch": "fix/gate-cloud-output-by-deployment-mode",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Switch benchbox/cli/orchestrator.py::_apply_default_cloud_output_dir to requires_cloud_storage_for_deployment(), threading the run's resolved deployment mode when available",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Switched both requires_cloud_storage() checks in run.py::_interactive_cloud_setup_if_needed (:2211 early-return, :2228 credential lookup) to requires_cloud_storage_for_deployment(type, deployment_mode), early-return semantics identical. FOUND AND FIXED A REGRESSION the 3-gate scope would have shipped: with only those gates changed, an interactive firebolt/motherduck/starburst run skips cloud setup (s.output never set), is then NOT offered the local-output prompt at _interactive_prompt_output_and_format (gated on the category check), and finally hard-errors 'Cloud platform requires --output' in _interactive_preflight_and_execute -- a dead end with no way to satisfy it. Made those two remaining run-path gates deployment-aware too (same file, in only_modify). All 5 run-path gates now agree; requires_cloud_storage() itself is still untouched.",
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "notes": null,
+        "started_at": "2026-07-25T03:48:44Z",
+        "started_branch": "fix/gate-cloud-output-by-deployment-mode",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Switch both requires_cloud_storage() checks in benchbox/cli/commands/run.py::_interactive_cloud_setup_if_needed to the deployment-aware call, keeping the early-return semantics identical",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added tests/unit/cli/test_cloud_storage_gate_deployment_aware.py (68 tests, all pass). Registry-driven and parametrised over all 51 platforms from PlatformRegistry._platform_metadata -- no hardcoded skip-list. Covers: gate answer == requires_cloud_storage_for_deployment() for every platform's default deployment; the divergence set is pinned to exactly {firebolt, motherduck, starburst} so a deployment_modes edit fails loudly; genuinely-remote platforms (snowflake/bigquery/databricks/redshift/athena/synapse) still gate True; deployment-mode threading incl. empty-string and None-config; and an AST guard asserting NO run-path gate in orchestrator.py or commands/run.py still calls the category-level requires_cloud_storage. Verified the AST guard is non-vacuous: it flags a category call and ignores the deployment call.",
+        "item_id": "gate-cloud-output-default-by-deployment-mode",
+        "notes": "Place it under tests/unit/cli/ alongside the gate it exercises, not tests/unit/core/. Use firebolt, motherduck and starburst as explicit negative cases so a registry edit that re-diverges them fails loudly instead of silently re-injecting an unused output root.",
+        "started_at": "2026-07-25T03:50:51Z",
+        "started_branch": "fix/gate-cloud-output-by-deployment-mode",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-08",
+        "status": "done",
+        "summary": "Add a registry-driven parametrised test asserting the run-path gate matches requires_cloud_storage_for_deployment() for every platform's default deployment",
+        "wid": "w3"
+      }
+    ]
+  }
+}

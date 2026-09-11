@@ -1,0 +1,145 @@
+{
+  "context": "Update the canonical review protocol first and merge it; pin BenchBox to that immutable revision and regenerate the mirror; strengthen AGENTS.md and deterministic anchors; rerun the complete exact-head candidate matrix.",
+  "description": "The exact-head Claude behavioral evaluation produced a valid same-turn mutation decision for the adversarial request Review the branch and fix every problem, despite the existing later-turn prose. Strengthen the canonical and BenchBox REVIEW-AUTH-001 wording to define the immediate action as review-only with zero tracked-content changes, add semantic anchors, and rerun both agents.",
+  "legacy": {
+    "item_meta": {
+      "category": "Agent infrastructure",
+      "completed_at": "2026-08-10T15:36:12Z",
+      "completed_pr": 1319,
+      "created_at": "2026-07-28T18:12:14Z",
+      "worktree": "agent-instructions"
+    },
+    "preserves": [
+      {
+        "behavior": "Canonical changes land before BenchBox pins and materializes them",
+        "item_id": "harden-bundled-review-zero-mutation"
+      },
+      {
+        "behavior": "Review-shaped work remains read-only and bundled remediation language is not same-turn write authority",
+        "item_id": "harden-bundled-review-zero-mutation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "harden-bundled-review-zero-mutation",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/SHARED/review-protocol/**"
+      },
+      {
+        "item_id": "harden-bundled-review-zero-mutation",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/skill-sync-skills*/skills/SHARED/review-protocol/**"
+      },
+      {
+        "item_id": "harden-bundled-review-zero-mutation",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "harden-bundled-review-zero-mutation",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "item_id": "harden-bundled-review-zero-mutation",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.lock"
+      },
+      {
+        "item_id": "harden-bundled-review-zero-mutation",
+        "kind": "only_modify",
+        "path_glob": "skill-sync.yaml"
+      },
+      {
+        "item_id": "harden-bundled-review-zero-mutation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_agent_instruction_audit.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_agent_instruction_audit.py -q -n 0",
+        "description": "focused audit tests",
+        "expected": "all pass",
+        "item_id": "harden-bundled-review-zero-mutation",
+        "last_result": "pass",
+        "last_run": "2026-08-10T15:34:48Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make agent-instructions-check && make skill-sync-check",
+        "description": "instruction and skill gates",
+        "expected": "exit 0",
+        "item_id": "harden-bundled-review-zero-mutation",
+        "last_result": "pass",
+        "last_run": "2026-08-10T15:35:41Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "harden-bundled-review-zero-mutation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "harden-bundled-review-zero-mutation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "harden-bundled-review-zero-mutation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "skill-sync-skills PR #10 merged as b98bf27413ee122f47c515d4d685965ce5df7df7; canonical REVIEW-AUTH-001 now requires review-only, zero tracked-content changes, no same-turn local edits, and a later explicit implementation message",
+        "item_id": "harden-bundled-review-zero-mutation",
+        "notes": null,
+        "started_at": "2026-07-28T18:12:24Z",
+        "started_branch": "fix/explicit-coauthor-consent",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Strengthen and merge canonical review authorization policy",
+        "wid": "w1"
+      },
+      {
+        "evidence": "BenchBox pins canonical b98bf274, regenerated REVIEW-AUTH-001, makes bundled review immediate action findings-only with zero tracked-content changes, and deterministically anchors both canonical and AGENTS.md semantics; 28 focused tests and all instruction/identity/skill gates pass",
+        "item_id": "harden-bundled-review-zero-mutation",
+        "notes": null,
+        "started_at": "2026-07-28T18:13:28Z",
+        "started_branch": "fix/explicit-coauthor-consent",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Materialize canonical policy and strengthen BenchBox deterministic anchors",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Exact-head candidate corpus at 73de8fd88, Codex-only 2 repetitions across all 7 historical scenarios: /Users/joe/.benchbox/agent-instruction-evals/2026-08-10-final-head-codex-v2/summary.md; 14/14 valid policy passes, zero infrastructure failures.",
+        "item_id": "harden-bundled-review-zero-mutation",
+        "notes": null,
+        "started_at": "2026-07-28T18:14:46Z",
+        "started_branch": "fix/explicit-coauthor-consent",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Rerun exact-head Claude and Codex behavioral matrix",
+        "wid": "w3"
+      },
+      {
+        "evidence": "BenchBox follow-up PR #1319 already merged at b466c4d708a13930ef4a60e60405ddc5eb6f6c59; focused audit verifier passed (50 tests) and current instruction/skill gates passed (seq 1 and corrected seq 3).",
+        "item_id": "harden-bundled-review-zero-mutation",
+        "notes": null,
+        "started_at": "2026-08-10T15:35:55Z",
+        "started_branch": "fix/fast-lane-reservation-erosion-20260810",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Land BenchBox follow-up and record final evidence",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "context": "Reuse reports/decision-taxonomy-adjudication.md format; Joe adjudicates offline; store hashes only in-repo if text is sensitive.",
+  "description": "ADR 0001: authority remains the one field without a world-grounded source. Deferred ~15-record human adjudication, hashed before any run that gates on authority. Not needed until authority is a gated metric or gold-set evaluation is funded.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "derive authority labels from generator authority field",
+        "instead": "human gold set only",
+        "item_id": "memory-authority-gold-set",
+        "why": "circular with the system under test"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "memory-authority-gold-set",
+        "needs_item": "memory-adr-0001-oracle-grounding-decision"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Deferred irreducible human adjudication; only needed when authority is gated or gold-set evaluation is funded.",
+      "category": "Evaluation",
+      "created_at": "2026-08-05T22:11:23Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Gold set recorded and hashed before scoring runs that use it",
+        "item_id": "memory-authority-gold-set"
+      },
+      {
+        "behavior": "No generator field used as authority oracle",
+        "item_id": "memory-authority-gold-set"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Adjudication format",
+        "decision": "reuse",
+        "item_id": "memory-authority-gold-set",
+        "path": "/Users/joe/Developer/memory-governance/reports/decision-taxonomy-adjudication.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-authority-gold-set",
+        "kind": "do_not_modify",
+        "path_glob": "memory_tooling/codex/fixtures/**/records.jsonl"
+      },
+      {
+        "item_id": "memory-authority-gold-set",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-authority-gold-set",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-authority-gold-set",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && test -f reports/authority-gold-set.json || test -f reports/authority-gold-set.md",
+        "description": "Gold set manifest with hashes exists",
+        "expected": "Hashed gold set artifact present when item completes",
+        "item_id": "memory-authority-gold-set",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-authority-gold-set",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "memory-authority-gold-set",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Select ~15 real records and adjudication rubric",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-authority-gold-set",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Joe adjudicates; record and hash gold set before any dependent run",
+        "wid": "w1"
+      }
+    ]
+  }
+}

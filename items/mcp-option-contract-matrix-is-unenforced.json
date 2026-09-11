@@ -1,0 +1,65 @@
+{
+  "context": "For (1), extend the existing parity test past preparation rather than adding a parallel one: for each allow-listed platform, feed the prepared options into the real adapter class (from_config for SQL adapters, the constructor for dataframe adapters, which have no from_config) and assert the value is observable on the constructed object. Adapters whose dependencies are absent should xfail/skip loudly, not pass silently -- a skipped platform is how this class of defect hides. Deriving the observable attribute from the contract's `consumer` string is the ideal, but a small explicit option->attribute map is acceptable and still catches a dropped pass-through key. For (2), write the classification rule down in docs/development/mcp-platform-option-contract.md first ('connection' = the option can change which endpoint the server talks to), then reclassify whatever does not match and let the fix for the velox item follow the corrected rule. Do not reclassify velox.deployment down to 'execution' to make the rule fit -- that inverts the finding.",
+  "description": "MCP_PLATFORM_OPTION_CONTRACT records, per option, a `consumer` string and a `security_class`. Nothing verifies either, so both drift silently. Two concrete instances found during the adversarial review of the mcp-v2-platform-options batch (develop 4836e3988d):\n\n1. THE PARITY TEST STOPS ONE RUNG SHORT OF THE DEFECT CLASS IT WAS WRITTEN FOR.\n   tests/unit/mcp/test_benchmark_tools.py:412 test_every_matrix_option_reaches_effective_preparation asserts on the OUTPUT of _prepare_adapter_platform_options. The DuckDB defect that motivated it (#1514) lived one rung further out, in DuckDBAdapter.from_config, which dropped `thread_limit` from its pass-through list. For duckdb the test asserts `prepared == {'thread_limit': value}` -- which was already true BEFORE the fix, since the rename always worked and only the from_config forwarding was broken. The original item said as much: 'Forwarding test passes, setting never applies.' So the systemic test cannot catch the systemic defect; only the duckdb-specific TestMCPThreadsReachTheEffectiveSetting does, for duckdb alone.\n   I walked the remaining rung by hand this session for all 14 allow-listed platforms and every option does survive from_config today (the one apparent miss, clickhouse-server.connection_profile -> port, forwards via ClickHouseServerAdapter's parent). Nothing pins that.\n\n2. security_class IS ASSIGNED INCONSISTENTLY.\n   `velox.deployment` is classified 'connection' and `clickhouse.deployment_mode` is classified 'execution', yet both flip an in-process engine to a network client. Whichever is right, the matrix's security_class is currently not a reliable review signal -- and the ClickHouse remediation's rule ('connection-class options must name a server-owned destination') is only as good as the classification it keys off. See [mcp-velox-remote-destination-boundary].\n\nIdentified 2026-08-04 during the adversarial review of the mcp-v2-platform-options batch.",
+  "legacy": {
+    "item_meta": {
+      "category": "testing",
+      "created_at": "2026-08-04T23:26:08Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "The existing fail-closed behaviour of validate_platform_options is unchanged; this item adds coverage and corrects classification, it does not widen or narrow the allow-list",
+        "item_id": "mcp-option-contract-matrix-is-unenforced"
+      },
+      {
+        "behavior": "test_every_allowlisted_option_has_an_explicit_contract keeps enforcing allow-list/contract key parity",
+        "item_id": "mcp-option-contract-matrix-is-unenforced"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-option-contract-matrix-is-unenforced",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "mcp-option-contract-matrix-is-unenforced",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-option-contract-matrix-is-unenforced",
+        "kind": "only_modify",
+        "path_glob": "docs/development/mcp-platform-option-contract.md"
+      },
+      {
+        "item_id": "mcp-option-contract-matrix-is-unenforced",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "bash -c 'set -e; f=benchbox/platforms/duckdb.py; cp $f $f.bak; trap \"mv $f.bak $f\" EXIT; python - <<EOF\nimport re,pathlib\np=pathlib.Path(\"$f\"); s=p.read_text()\np.write_text(s.replace(\"            \\\"thread_limit\\\",\\n\", \"\", 1))\nEOF\n! PYTHONPATH=. uv run -- pytest tests/unit/mcp/test_benchmark_tools.py -q -n 0 -k every_matrix_option'",
+        "description": "The parity test fails when an adapter stops forwarding an allow-listed option",
+        "expected": "exits 1 today because the parity test passes with thread_limit removed from from_config; exits 0 once the test reaches the constructed adapter",
+        "item_id": "mcp-option-contract-matrix-is-unenforced",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/mcp/test_schemas.py -q -n 0 -k contract",
+        "description": "Every security_class assignment matches the written rule",
+        "expected": "exits 0, with a new case asserting that every option able to change the server's network destination is classified 'connection'",
+        "item_id": "mcp-option-contract-matrix-is-unenforced",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "context": "Anti-patterns: no shared writable mounts between concurrent worktree containers; do not document container machine or any feature GATE 1 struck; do not promise Claude Desktop parity anywhere.",
+  "description": "Ship docs/desktop-codex.md: the verified end-to-end flow (setup-ssh.sh -> agent-run.sh --agent codex --persistent -> codex login device-auth inside container -> Codex App Settings/Connections -> select /projects/<repo> -> app-server session), including alpha caveat and apple/container#919 caveat. Ship docs/claude-remote.md scoped per GATE 1: Claude Code Desktop has no SSH remotes; documented paths are VS Code Remote-SSH against the same Host entry plus the Claude extension, or ssh -t agentbox-<proj> claude. Add --worktree <branch> sugar = separate project dir + separate persistent container with its own port and host key. GUARDRAIL: every documented step must have been executed on the Mini during this item - no aspirational steps; screenshots or transcripts for both the Codex Desktop session and the VS Code claude session are the completion evidence.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "agentbox-phase4-desktop-integration-docs",
+        "needs_item": "agentbox-gate1-desktop-feature-preflight"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-07T07:05:02Z",
+      "created_at": "2026-08-07T00:02:40Z",
+      "worktree": "agent-container"
+    },
+    "preserves": [
+      {
+        "behavior": "Ephemeral and persistent CLI modes unchanged by doc/sugar work",
+        "item_id": "agentbox-phase4-desktop-integration-docs"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agentbox-phase4-desktop-integration-docs",
+        "kind": "do_not_modify",
+        "path_glob": "LICENSE"
+      },
+      {
+        "item_id": "agentbox-phase4-desktop-integration-docs",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/gradle-warmup.sh"
+      }
+    ],
+    "verifications": [
+      {
+        "command": null,
+        "description": "Codex Desktop session drove a real build inside the sandboxed container (manual, evidence linked in docs/desktop-codex.md)",
+        "expected": null,
+        "item_id": "agentbox-phase4-desktop-integration-docs",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "VS Code Remote-SSH claude session verified (manual, evidence linked in docs/claude-remote.md)",
+        "expected": null,
+        "item_id": "agentbox-phase4-desktop-integration-docs",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": " cd ~/Developer/agent-container && grep -qE \"Include discovery: (WORKS|FAILS)\" docs/desktop-codex.md",
+        "description": "Include-based alias discoverability tested and recorded ",
+        "expected": null,
+        "item_id": "agentbox-phase4-desktop-integration-docs",
+        "last_result": "pass",
+        "last_run": "2026-08-07T06:46:53Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agentbox-phase4-desktop-integration-docs",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "agentbox-phase4-desktop-integration-docs",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "docs/desktop-codex.md from live runs; Include-discovery experiment; emit-ssh-block.sh fallback; commits cc212ab+e4ec85c",
+        "item_id": "agentbox-phase4-desktop-integration-docs",
+        "notes": null,
+        "started_at": "2026-08-07T06:46:48Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "docs/desktop-codex.md written from a live verified run",
+        "wid": "w1"
+      },
+      {
+        "evidence": "docs/claude-remote.md rewritten after review refuted the no-SSH-remote premise (Claude.app v1.25927.0 HAS ssh session kind); real blocker UserKnownHostsFile vs ssh-keygen -F found and fixed with opt-in --trust-host-key",
+        "item_id": "agentbox-phase4-desktop-integration-docs",
+        "notes": null,
+        "started_at": "2026-08-07T06:46:51Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "docs/claude-remote.md written from a live verified run",
+        "wid": "w2"
+      },
+      {
+        "evidence": "--worktree flag: repo-worktree-sha8 derivation in lib/common.sh, unconditional hash suffix prevents collisions (proven: 'team ops' vs 'team-ops' -> distinct); scripts/test-worktree-mode.sh 10 checks, 5 A/B-verified, 4 honestly declared not-independently-A/B-able; commit 69e7b21",
+        "item_id": "agentbox-phase4-desktop-integration-docs",
+        "notes": null,
+        "started_at": "2026-08-07T07:04:59Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "--worktree flag sugar with per-worktree port and host-key isolation",
+        "wid": "w3"
+      }
+    ]
+  }
+}

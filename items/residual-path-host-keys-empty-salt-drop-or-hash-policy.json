@@ -1,0 +1,120 @@
+{
+  "context": "Inventory live key occurrences on capture and corpus. For each: drop (no consumer), keep-hash (operational value), or retain plaintext only if non-sensitive local defaults. Prefer drop for pure local filesystem keys with no reader; keep hashing for remote endpoint-like host fields if any consumer appears. Document in ADR amendment.",
+  "description": "After #1578 drop set and #1590 aliases (workdir/datadir/pythonexecutable), many path_keys still mint path_ under empty salt (outputdir, logpath, filepath, sslrootcert, generic path, …) and host/hostname/server still mint host_. No Explorer consumers identified for most of these; residual confirmation oracle remains for any producer that emits them. Not in scope of the six-field ADR drop without an explicit follow-up decision.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy",
+        "needs_item": "public-identifier-drop-alias-path-keys"
+      }
+    ],
+    "item_meta": {
+      "category": "privacy",
+      "completed_at": "2026-08-05T23:57:13Z",
+      "completed_pr": 1609,
+      "created_at": "2026-08-05T22:22:10Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No recovered plaintext in commits or PR bodies",
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy"
+      },
+      {
+        "behavior": "Retained fields endpoint database_name submission_path still publish under canonical keys",
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization_specs.yaml"
+      },
+      {
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/**"
+      },
+      {
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy",
+        "kind": "only_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/golden/results/environment_capture_schema_cases.json"
+      },
+      {
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py -q -k drop",
+        "description": "Unit coverage for any newly dropped keys",
+        "expected": null,
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventory (tip results-data/): compact forms outputdir|outputdirectory|outputpath|outputlocation|resultdir|resultpath|logpath|logfile|filepath|path|sourceroot|credentialfile appear as object keys in 0 of 203 primary bundles. path_keys already listed these; only public_drop_keys expansion was missing. Capture/code uses local output/log/credential path keys; Athena fixture uses s3 output_location (no public consumer — drop with peers). KEEP HASH already applied for sslrootcert, staging*/httppath, host/hostname/server, endpoint/database_name/submission_path.",
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy",
+        "notes": null,
+        "started_at": "2026-08-05T23:57:00Z",
+        "started_branch": "fix/residual-path-host-drop-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Inventory residual path/host keys in capture paths and corpus",
+        "wid": "w0"
+      },
+      {
+        "evidence": "ADR residual path/host keys table added to docs/development/adr/adr-published-identifier-field-set.md (2026-08-05 amendment): drop pure local-FS residual compact keys; keep hash for sslrootcert, staging/http path keys, host aliases, retained consumers. Status line updated.",
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy",
+        "notes": null,
+        "started_at": "2026-08-05T23:57:05Z",
+        "started_branch": "fix/residual-path-host-drop-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "ADR decision table drop vs hash per key class",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Implemented public_drop_keys expansion in anonymization_specs.yaml; unit tests for residual drops + keep-hash; environment export omits credential_file; golden serverless_athena public_export treats output_location as absent_keys. Corpus fixed-point: 0 bundles changed; no re-derive. PR #1609. Verify: 109+ anonymization unit tests, full fast lane 27244 passed.",
+        "item_id": "residual-path-host-keys-empty-salt-drop-or-hash-policy",
+        "notes": null,
+        "started_at": "2026-08-05T23:57:09Z",
+        "started_branch": "fix/residual-path-host-drop-policy",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-09",
+        "status": "done",
+        "summary": "Implement drop list expansion or semantic rules + tests",
+        "wid": "w2"
+      }
+    ]
+  }
+}

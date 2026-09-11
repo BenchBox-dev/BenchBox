@@ -1,0 +1,251 @@
+{
+  "context": "After all dependent remediation and conformance items finish, revalidate their exact heads and verification evidence, run the focused MCP suite plus the broader acceptance/preflight required by the implementation worktree, inspect PR status and review state, and publish only a redacted evidence handoff. Do not remediate runtime code from this gate; return failures to the owning TODO.",
+  "description": "Final no-publish gate for the adversarial review of the newly implemented MCP v2 PRs. Re-audit the exact current revision and dependent TODO evidence, confirm all option-to-consumer, resource-envelope, deployment-choice, conformance, and capability findings are fixed without unsafe allowlist drift, and keep publication fail-closed until external deployment acceptance is complete. The external acceptance dependency must remain incomplete until mcp-adversarial-review-runtime-remediation-20260813 PR #1716 is merged, rebuilt by immutable registry digest, and included in the bound deployed-endpoint matrix; this transitive gate prevents the release work from advancing on local remediation alone. Focused green tests alone are insufficient.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not declare complete from focused tests while dependent TODOs, CI, review threads, or deployment acceptance remain open",
+        "instead": "Require every dependency and external acceptance gate to be complete",
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "why": "A narrow green suite cannot establish release readiness"
+      },
+      {
+        "dont": "Do not merge or publish against an open conformance PR with missing checks or stale baseline evidence",
+        "instead": "Keep the gate fail closed and return the gap to conformance work",
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "why": "Missing status evidence leaves the release decision unproven"
+      },
+      {
+        "dont": "Do not use an implicit local tracker fallback",
+        "instead": "Use the explicit hosted backend and record only redacted evidence",
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "why": "Local state can diverge from the authoritative hosted plan"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "needs_item": "mcp-stateless-external-deployment-acceptance-v2-4"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "needs_item": "mcp-v2-clickhouse-option-security-boundary-v3"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "needs_item": "mcp-v2-conformance-baseline-capability-gate-v3"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "needs_item": "mcp-v2-dask-resource-envelope-v3"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "needs_item": "mcp-v2-databricks-clustering-options-v3"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "needs_item": "mcp-v2-duckdb-threads-effective-setting-v3"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "needs_item": "mcp-v2-modin-engine-choice-v3"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "needs_item": "mcp-v2-platform-option-contract-matrix-v3"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "needs_item": "mcp-v2-velox-deployment-choice-v3"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Fail-closed after PR #1716 merged as 3ffa5ba0265e065805e28aab6f092682d3039f2a: external acceptance mcp-stateless-external-deployment-acceptance-v2-4 remains incomplete. A corrected immutable image must be built and deployed by an approved external operator, the complete production matrix must pass in one bound redacted transcript, and a named approver must approve it before release-gate w0 may start.",
+      "category": "operations",
+      "created_at": "2026-08-02T20:26:49Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "No credentials, endpoints, raw logs, or generated binary artifacts are written to source or tracker prose.",
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3"
+      },
+      {
+        "behavior": "No deployment or publication occurs while the external acceptance TODO is incomplete or evidence is stale.",
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3"
+      },
+      {
+        "behavior": "Runtime remediation stays in the owning dependent TODO; this gate records evidence and disposition only.",
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "existing external deployment acceptance and release evidence",
+        "decision": "extend",
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "path": "docs/operations/mcp-production-readiness.md"
+      },
+      {
+        "concept": "MCP remote security and no-publish boundary",
+        "decision": "extend",
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "path": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "concept": "conformance and capability gate dependency",
+        "decision": "extend",
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "path": "mcp-v2-conformance-baseline-capability-gate-v3"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "kind": "do_not_modify",
+        "path_glob": "deploy/**"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "kind": "do_not_modify",
+        "path_glob": "docker/**"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/verify_mcp_conformance.py"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp-production-readiness.md"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd \"$(git rev-parse --show-toplevel)\" && uv run -- python -m pytest tests/unit/mcp tests/integration/mcp -q",
+        "description": "Focused MCP suite is green from the worktree root",
+        "expected": "exits 0 after dependent MCP fixes pass",
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd \"$(git rev-parse --show-toplevel)\" && uv run -- ruff check benchbox/mcp tests/unit/mcp tests/integration/mcp scripts/verify_mcp_conformance.py",
+        "description": "MCP implementation lint is clean from the worktree root",
+        "expected": "exits 0 after scoped checks pass",
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f \"$(git rev-parse --show-toplevel)/docs/operations/mcp-production-readiness.md\"",
+        "description": "Readiness policy document exists from the worktree root",
+        "expected": "exits 0 when the readiness policy document is present; external evidence remains a separate gate",
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Revalidate dependent TODO states, exact source revision, PR/review state, and deployment acceptance evidence.",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run focused MCP tests, option-matrix drift checks, and conformance evidence review",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run broader MCP acceptance and implementation-worktree preflight, recording failures against owning items",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "mcp-v2-adversarial-remediation-release-gate-v3",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Publish a redacted fail-closed handoff only when every dependency and required check is complete",
+        "wid": "w3"
+      }
+    ]
+  }
+}

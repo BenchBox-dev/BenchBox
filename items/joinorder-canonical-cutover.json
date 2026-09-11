@@ -1,0 +1,901 @@
+{
+  "context": "This TODO is the visible cutover. The foundation TODO did the\ninvisible work; here we land everything in one PR so users see a\ncoherent change.\n\nSequence rationale:\n  1. w2 (git mv) → w3 (split benchmark.py) → w4 (registry +\n     docstring) is the rename chain; do first so canonical edits\n     do not race files being moved to the synthetic module\n  2. w1 (wire canonical) follows w4 and creates the canonical\n     runtime files in their final locations\n  3. w5 onwards are mostly parallelizable after w1+w4\n  4. w8 (import) → w9 (DuckDB smoke) → w10 (per-engine triage)\n     is the query-coverage chain\n  5. w13 (DATA-LICENSE) and w14 (docs) come after structure\n     settles\n  6. w15 (bundle migration) — DRY-RUN review gate, then atomic\n     single-commit apply; mechanical once w4 lands\n  7. w16 (CHANGELOG) requires the full picture\n  8. w17 (UAT smoke) gates everything visible\n  9. w18 (promote Release) is a one-liner; gate on UAT\n  10. w19 (open PR) closes the work\n\nCritical detail: the GitHub Release stays DRAFT until UAT\npasses. If UAT reveals a bug in the data or pipeline that\nrequires rebuilding the archive, we don't have a public bad\nversion to retract — we just rebuild and re-stage the draft.\nPromotion is a deliberate gate, not a side-effect.\n\nPer Joe's CLAUDE.md: write work on a worktree ends at make pr-open,\nnot at git push. This TODO ends at w19 (PR open); reviewing /\nmerging the PR is a separate action.\n",
+  "description": "Step 1 of the dual-track JOB strategy for issue #289\n(https://github.com/joeharris76/BenchBox/issues/289). Part 2 of 2.\nConsumes artifacts from `joinorder-canonical-foundation` and lands\nthe user-visible cutover in a single PR against `develop`.\n\nThis TODO does five things in order:\n  1. Wires `joinorder` to canonical IMDb 2013 Parquet via the\n     reusable data_fetch infrastructure produced by the foundation TODO.\n  2. Renames the existing synthetic generator to `joinorder_synthetic`\n     and registers it with `surface: internal` so it is hidden from\n     the result explorer (per Joe's constraint: must not be visible).\n  3. Adds the 100 missing SQL queries to bring coverage to canonical\n     113. DataFrame mode stays at 13 (Track-2 follow-up TODO seeded).\n  4. Updates documentation, ships DATA-LICENSE.md, migrates existing\n     published bundles, lands CHANGELOG entry.\n  5. Promotes the DRAFT GitHub Release to published, runs UAT smoke\n     on at least 2 platforms, opens PR.\n\nDecisions locked in (from planning, repeated for context):\n  - Hard rename: `joinorder` invocations targeting the synthetic\n    generator break with a clear error pointing at `joinorder_synthetic`.\n    Beta-appropriate; clean break.\n  - Existing 10 published bundles re-tagged in place\n    (joinorder_sf1_* → joinorder_synthetic_sf1_*); explorer filter\n    hides them via the `surface: internal` registry field. No UI\n    changes.\n  - Auto-download UX: silent first-run with progress bar; license\n    surfaced in DATA-LICENSE.md and `--help`, NOT a click-through.\n  - SQL coverage to all 113; DataFrame stays at 13.\n  - Bundle migration is in-PR (atomic with the surface-field change).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add UI changes to the result explorer to hide synthetic bundles",
+        "instead": "the surface: internal registry field filters at the result-publisher layer; explorer reads only filtered data",
+        "item_id": "joinorder-canonical-cutover",
+        "why": "Joe explicitly said no explorer complexity"
+      },
+      {
+        "dont": "add a click-through license acceptance",
+        "instead": "DATA-LICENSE.md is sufficient",
+        "item_id": "joinorder-canonical-cutover",
+        "why": "this matches no other JOB ecosystem mirror (gregrahn, CWI, CedarDB) and adds friction without legal upside"
+      },
+      {
+        "dont": "amend the existing joinorder bundles' source data hashes when re-tagging",
+        "instead": "the original data hash stays for forensic value",
+        "item_id": "joinorder-canonical-cutover",
+        "why": "those bundles' results are bound to the synthetic data they were run against; re-tagging only changes the directory name and benchmark_id field"
+      },
+      {
+        "dont": "expose unimplemented DataFrame queries through default query selection",
+        "instead": "advertise/query only the implemented 13 until Track-2 DataFrame coverage lands",
+        "item_id": "joinorder-canonical-cutover",
+        "why": "users would see broad NotImplementedError failures instead of a clear SQL-only canonical cutover"
+      },
+      {
+        "dont": "publish the Release without verifying takedown contact email is in DATA-LICENSE.md",
+        "instead": "verify in w18 before promotion",
+        "item_id": "joinorder-canonical-cutover",
+        "why": "that is the BenchBox-side commitment to the license posture and must be reachable"
+      },
+      {
+        "dont": "rebuild the canonical archive in this TODO",
+        "instead": "only the URL pointer changes (draft → published)",
+        "item_id": "joinorder-canonical-cutover",
+        "why": "the foundation TODO already did the build with provenance"
+      },
+      {
+        "dont": "run UAT smoke against ClickHouse-Cloud or other paid tiers",
+        "instead": "paid platform fallout (if any) is a follow-up",
+        "item_id": "joinorder-canonical-cutover",
+        "why": "the cost is not justified for Step 1; DuckDB + one OSS engine is sufficient"
+      },
+      {
+        "dont": "skip the UAT smoke before promoting the GitHub Release",
+        "instead": "the draft-then-promote sequence is the gate",
+        "item_id": "joinorder-canonical-cutover",
+        "why": "once the URL is public, retraction is messy and confusing for any user who downloaded during the window"
+      },
+      {
+        "dont": "translate the 100 missing DataFrame queries in this TODO",
+        "instead": "file Track-2 follow-up TODO instead",
+        "item_id": "joinorder-canonical-cutover",
+        "why": "that is significant scope and not required by issue #289 (SQL is the canonical surface)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-canonical-cutover",
+        "id": 413,
+        "reason": "Track-2 follow-up. Issue #289 is about SQL canonical fidelity; DataFrame parity is a separate axis. Seeded as track2-joinorder-dataframe-coverage.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Seeded successor item track2-joinorder-dataframe-coverage is now in _project/DONE; the missing-queries work was completed there.",
+        "summary": "Translate the 100 missing DataFrame queries"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-canonical-cutover",
+        "id": 414,
+        "reason": "Engines not advertised as canonical-ready can get per-engine follow-up TODOs. Step 1 ships only with DuckDB plus at least one OSS engine fully passing the advertised canonical surface.",
+        "resolution": "promoted",
+        "resolved_item": "per-engine-sql-dialect-translation-for-the-113-queries-on-no",
+        "resolved_reason": null,
+        "summary": "Per-engine SQL dialect translation for the 113 queries on non-DuckDB engines"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-canonical-cutover",
+        "id": 415,
+        "reason": "Step 2 (Track 2) — see joinorder-track2-groundwork TODO.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Spot-checked: statistics-as-phase support was implemented and shipped via track2-joinorder-stats-phase (status: Completed).",
+        "summary": "Statistics-as-phase support in benchmark phase model"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-canonical-cutover",
+        "id": 416,
+        "reason": "The published-results branch is the community submission target; bundle re-tagging there requires a separate PR with curation review. This TODO only renames in develop's results-data/bundles/ tree.",
+        "resolution": "promoted",
+        "resolved_item": "re-tagging-bundles-in-published-results-branch",
+        "resolved_reason": null,
+        "summary": "Re-tagging bundles in published-results branch"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-canonical-cutover",
+        "id": 417,
+        "reason": "Decision deferred. Joe stated no specific deprecation contract. Likely retained as Track-2 testbed; remove decision deferred to post-Step-2.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Removing joinorder_synthetic in a future release"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_item": "joinorder-canonical-foundation"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-11T00:00:00Z",
+      "created_at": "2026-05-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DataFrame mode for the 13 already-translated queries — they continue to work on canonical data because they are schema-correct",
+        "item_id": "joinorder-canonical-cutover"
+      },
+      {
+        "behavior": "DataFrame query API surface: per-query `q<id>_expression_impl` / `q<id>_pandas_impl` functions registered through the module-level `get_dataframe_queries() -> QueryRegistry`. w11 adds 100 stub pairs that raise NotImplementedError — do NOT introduce a new `query_<id>(ctx)` shape; benchmark.py:315 imports `get_dataframe_queries` and that contract stays",
+        "item_id": "joinorder-canonical-cutover"
+      },
+      {
+        "behavior": "DataFrame query selection defaults must expose only implemented queries until the 100 untranslated queries are translated",
+        "item_id": "joinorder-canonical-cutover"
+      },
+      {
+        "behavior": "Existing joinorder bundle filenames in published-results branch — those are on the published-results branch, NOT touched here; this TODO only re-tags bundle FILES (paired result + manifest) in the develop tree's results-data/bundles/",
+        "item_id": "joinorder-canonical-cutover"
+      },
+      {
+        "behavior": "Existing test suite at fast tier — runs in same time bounds (verbosity tests now hit joinorder_synthetic which generates at sf=0.01 just as before)",
+        "item_id": "joinorder-canonical-cutover"
+      },
+      {
+        "behavior": "JoinOrderQueryManager public API surface (get_query, get_all_queries, get_query_ids, get_query_count, get_queries_by_complexity, get_queries_by_pattern). w8 expands the embedded query dict from 13 to 113 entries; do NOT replace the manager class with a module-level QUERY_TEMPLATES dict — 9+ call sites depend on the current API (benchbox/core/joinorder/benchmark.py:89..217, benchbox/joinorder.py:12, tests/unit/core/test_concurrency_executor_and_joinorder.py)",
+        "item_id": "joinorder-canonical-cutover"
+      },
+      {
+        "behavior": "MCP run_benchmark API signature — do not add dataset-location flags or benchmark-specific env vars; reuse the existing BENCHBOX_OUTPUT_DIR/datagen convention",
+        "item_id": "joinorder-canonical-cutover"
+      },
+      {
+        "behavior": "Other benchmarks (tpch, tpcds, etc.) — no behavior change; their scale_options remain unchanged",
+        "item_id": "joinorder-canonical-cutover"
+      },
+      {
+        "behavior": "Result-explorer UI — zero changes; the surface: internal field filters at data layer only",
+        "item_id": "joinorder-canonical-cutover"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/benchmark_registry.py:264 (joinorder entry) — extend: registry already declares scale_options=[1.0] and num_queries=113; cutover adds the new joinorder_synthetic entry alongside it and sets joinorder's `surface: public` + `data_manifest` (foundation TODO seeds the surface field)",
+        "decision": "extend",
+        "item_id": "joinorder-canonical-cutover",
+        "path": "benchbox/core/benchmark_registry.py:264"
+      },
+      {
+        "concept": "benchbox/core/data_fetch (foundation TODO) — reuse: cutover w1 calls fetch_data() and get_datagen_path() with no new env vars or CLI flags",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-cutover",
+        "path": "benchbox/core/data_fetch"
+      },
+      {
+        "concept": "benchbox/core/joinorder/benchmark.py:315 (`from benchbox.core.joinorder.dataframe_queries import get_dataframe_queries`) — reuse: dataframe_queries module retains this entrypoint; w11 only adds 100 stub q<id>_*_impl pairs, registered through the same QueryRegistry",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-cutover",
+        "path": "benchbox/core/joinorder/benchmark.py:315"
+      },
+      {
+        "concept": "benchbox/core/joinorder/{generator.py,queries.py,dataframe_queries.py} — supersede location: w2 git-mvs these into benchbox/core/joinorder_synthetic/ to free the canonical name; existing class APIs (JoinOrderGenerator, JoinOrderQueryManager, get_dataframe_queries) stay intact at the new location",
+        "decision": "supersede",
+        "item_id": "joinorder-canonical-cutover",
+        "path": "benchbox/core/joinorder/{generator.py,queries.py,dataframe_queries.py}"
+      },
+      {
+        "concept": "benchbox/core/joinorder_synthetic surface: internal precedent (created by w4 here) — supersede: future internal benchmarks register surface=internal to opt out of the public explorer surface without explorer UI changes",
+        "decision": "supersede",
+        "item_id": "joinorder-canonical-cutover",
+        "path": "benchbox/core/joinorder_synthetic"
+      },
+      {
+        "concept": "benchbox/core/publishing/bundle_publisher.py:176-177 — extend: insert dataset_version/manifest_hash/data_archive_hash fields next to existing manifest fields",
+        "decision": "extend",
+        "item_id": "joinorder-canonical-cutover",
+        "path": "benchbox/core/publishing/bundle_publisher.py:176-177"
+      },
+      {
+        "concept": "benchbox/joinorder.py:12 (top-level facade) — reuse: facade keeps importing JoinOrderBenchmark and forwarding the manager API; no facade rewrite",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-cutover",
+        "path": "benchbox/joinorder.py:12"
+      },
+      {
+        "concept": "results-data/bundles/joinorder_sf1_*.{json,manifest.json} — pattern reuse: bundles live as paired files at the bundles root (verified at TODO-creation: 5 result + 5 manifest = 10 files; 0 directories); migration script renames file pairs, not subdirectories",
+        "decision": "reuse",
+        "item_id": "joinorder-canonical-cutover",
+        "path": "results-data/bundles/joinorder_sf1_*.{json,manifest.json}"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "do_not_modify",
+        "path_glob": "Any explorer UI / frontend code (zero UI changes per Joe)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "do_not_modify",
+        "path_glob": "Other benchmarks' code paths (tpch, tpcds, etc.) — only their registry default `surface: public` is added by the foundation TODO"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "do_not_modify",
+        "path_glob": "_project/joinorder/reference_cardinalities.json (foundation TODO produced)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/data_fetch/ (foundation TODO finalized this — only consume here)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/joinorder/data_manifest.toml (foundation TODO produced; only consume unless w18 proves the public URL differs from the draft URL, in which case update in a small explicit follow-up commit)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "do_not_modify",
+        "path_glob": "published-results branch (separate branch; bundle re-tagging here is on develop only)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "do_not_modify",
+        "path_glob": "tests/fixtures/joinorder_canonical_tiny/ (foundation TODO produced)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "do_not_modify",
+        "path_glob": "tests/unit/generators/test_scale_factor_harmonization.py (already pinned to sf=1 for joinorder; no change needed)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "README.md, CHANGELOG.md, docs/benchmarks/join-order.md"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml (new seed)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "_project/design/data-fetch-infra-reuse-guide.md — ONLY the '## DATA-LICENSE.md template' section. The other sections (When to use, Step-by-step, Common pitfalls, Infrastructure components reused) are owned by track2-groundwork w5; do not edit them here"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/migrate_joinorder_bundles.py (new)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/* and benchbox/mcp/tools/benchmark.py (joinorder sf=1, first-run download, BENCHBOX_OUTPUT_DIR/datagen help text)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py (joinorder + joinorder_synthetic entries)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/DATA-LICENSE.md (new)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/benchmark.py (canonical wiring; preserves existing JoinOrderQueryManager + get_dataframe_queries imports — see must_preserve)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/dataframe_queries.py (add 100 stub q<id>_expression_impl/q<id>_pandas_impl pairs that raise NotImplementedError; register through existing QueryRegistry block)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/queries.py (expand JoinOrderQueryManager._load_embedded_queries from 13 → 113 entries; preserve class API)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder_synthetic/ (new module — receives moved files via git mv)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/publishing/bundle_publisher.py (dataset_version field)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/joinorder_sf1_*.json + .manifest.json file pairs → joinorder_synthetic_sf1_*.json + .manifest.json (paired-file rename + benchmark_id field edit inside each .manifest.json — bundles live as flat files at the bundles root, NOT subdirectories)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "tests/conftest.py (joinorder_canonical_tiny fixture)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/joinorder/ (canonical query coverage test)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/joinorder/test_dataframe_query_capabilities.py (new)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/joinorder_synthetic/ (moved synthetic tests)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/publishing/test_dataset_version_field.py (new)"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_core_verbosity.py, test_core_quiet.py (3 line changes — synthetic import)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_scale_factor_validation.py::test_joinorder_rejects_non_unit_scale -q",
+        "description": "joinorder rejects sf!=1 with a clear error",
+        "expected": "1 passed",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_core_verbosity.py tests/unit/core/test_core_quiet.py -q",
+        "description": "joinorder_synthetic accepts sf=0.01 (back-compat for verbosity tests)",
+        "expected": "all 3 tests pass",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'from benchbox.core.joinorder.queries import JoinOrderQueryManager; print(JoinOrderQueryManager().get_query_count())'",
+        "description": "All 113 SQL queries registered for joinorder via JoinOrderQueryManager",
+        "expected": "113",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/joinorder/test_canonical_queries.py -q",
+        "description": "Tiny fixture preserves canonical predicate oracle for all 113 queries",
+        "expected": "113 passed",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'from benchbox.core.joinorder.dataframe_queries import q13a_expression_impl; q13a_expression_impl(None)' 2>&1 | grep -c '_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml'",
+        "description": "DataFrame queries fail loudly for an untranslated query (q13a_expression_impl raises NotImplementedError pointing at Track-2 seed)",
+        "expected": ">= 1",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/joinorder/test_dataframe_query_capabilities.py -q",
+        "description": "DataFrame default query list exposes only implemented queries",
+        "expected": "implemented-only DataFrame capability tests pass",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/test_registry_surface_field.py::test_joinorder_synthetic_hidden -q",
+        "description": "joinorder_synthetic is hidden from the result-publisher's public surface",
+        "expected": "1 passed",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "find results-data/bundles -maxdepth 1 -name 'joinorder_sf1_*' -type f | wc -l | tr -d ' '",
+        "description": "Bundle migration completed: no joinorder_sf1_* files remain at the bundles root",
+        "expected": "0",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "find results-data/bundles -maxdepth 1 -name 'joinorder_synthetic_sf1_*' -type f | wc -l | tr -d ' '",
+        "description": "Bundle migration: 10 joinorder_synthetic_sf1_* files present (5 result + 5 manifest)",
+        "expected": "10",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "find results-data/bundles -maxdepth 1 -name 'joinorder_synthetic_sf1_*.json' -not -name '*.manifest.json' -type f | while read f; do test -f \"${f%.json}.manifest.json\" || echo MISSING; done | grep -c MISSING",
+        "description": "Each renamed result file has a matching .manifest.json sibling",
+        "expected": "0",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 10,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f benchbox/core/joinorder/DATA-LICENSE.md && grep -qE 'Information courtesy of IMDb' benchbox/core/joinorder/DATA-LICENSE.md && grep -qE 'Harvard Dataverse|10\\.7910/DVN/2QYZBT' benchbox/core/joinorder/DATA-LICENSE.md && grep -qi 'takedown' benchbox/core/joinorder/DATA-LICENSE.md && ! grep -qE '<email TBD|TBD by Joe|joe@example' benchbox/core/joinorder/DATA-LICENSE.md",
+        "description": "DATA-LICENSE.md exists for joinorder with required sections and final takedown contact",
+        "expected": "required sections present and no placeholder takedown contact remains",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 11,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/publishing/test_dataset_version_field.py -q",
+        "description": "Result bundle manifests record dataset identity fields for joinorder; null for tpch",
+        "expected": "all tests pass",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 12,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh release view data/joinorder-imdb-2013-v1 --json isDraft --jq .isDraft",
+        "description": "GitHub Release is published (not draft)",
+        "expected": "false",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 13,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "curl -sSL -o /dev/null -w '%{http_code}' \"$(gh release view data/joinorder-imdb-2013-v1 --json assets --jq '.assets[0].url')\"",
+        "description": "Release asset is publicly downloadable",
+        "expected": "200",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 14,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_DATA_CACHE=\"$(mktemp -d)\" make uat-cell PLATFORM=duckdb BENCHMARK=joinorder SCALE=1",
+        "description": "Fresh-cache public download smoke succeeds after release publication",
+        "expected": "download succeeds without auth, sha256 matches, all 113 queries execute",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 15,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh pr list --base develop --head feat/joinorder-canonical-imdb-2013 --json title,body --jq '.[] | select(.body | contains(\"#289\")) | .title'",
+        "description": "PR opened against develop with #289 reference",
+        "expected": "feat(joinorder)...",
+        "item_id": "joinorder-canonical-cutover",
+        "last_result": null,
+        "last_run": null,
+        "seq": 16,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w4",
+        "wid": "w1"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w1",
+        "wid": "w11"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w8",
+        "wid": "w11"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w1",
+        "wid": "w12"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w1",
+        "wid": "w13"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w4",
+        "wid": "w14"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w12",
+        "wid": "w15"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w4",
+        "wid": "w15"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w14",
+        "wid": "w16"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w15",
+        "wid": "w16"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w1",
+        "wid": "w17"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w10",
+        "wid": "w17"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w11",
+        "wid": "w17"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w12",
+        "wid": "w17"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w13",
+        "wid": "w17"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w14",
+        "wid": "w17"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w15",
+        "wid": "w17"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w16",
+        "wid": "w17"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w4",
+        "wid": "w17"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w5",
+        "wid": "w17"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w6",
+        "wid": "w17"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w7",
+        "wid": "w17"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w17",
+        "wid": "w18"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w18",
+        "wid": "w19"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w8",
+        "wid": "w7"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "joinorder-canonical-cutover",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "File: `benchbox/core/joinorder/benchmark.py`\nReplace generator-based ingestion with:\n  from benchbox.cli import config\n  from benchbox.core.data_fetch import fetch_data\n  output_dir = config.get_datagen_path(\"joinorder\", 1.0)\n  data_dir = fetch_data(\"joinorder\", registry, output_dir=output_dir)\n  # 21 Parquet files at known paths under data_dir\n  for table in TABLES:\n    platform.load_parquet(table, data_dir / f\"{table}.parquet\")\n\nDo not add a new dataset-location flag or benchmark-specific env var.\nAir-gapped users pre-populate the existing datagen directory\n(`BENCHBOX_OUTPUT_DIR` / `benchmark_runs/datagen/joinorder_1.0/`);\n`fetch_data()` verifies the manifest checksum through the same\ncode path used after an auto-download.\n\nAfter w2 has moved the synthetic DataFrame file out of the way,\ncreate/update the canonical DataFrame surface\n(`benchbox/core/joinorder/dataframe_queries.py`)\nto read Parquet directly via `ctx.read_parquet(...)`. The 13\nexisting translations work as-is on canonical data because\nthey were schema-correct; only data source changes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire joinorder benchmark to canonical Parquet ingestion via data_fetch",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "Run the 113-query sweep on each non-DuckDB engine that\ncurrently supports joinorder (e.g., starrocks, spark,\nclickhouse-local, postgres-platform if registered).\n\nFor each engine:\n  - Record per-query PASS/FAIL/SKIP (skip = engine doesn't\n    support a SQL feature or the platform does not yet support\n    canonical joinorder; fail = unexpected error on an\n    advertised-supported surface)\n  - If failure rate > 0%: file a per-engine follow-up TODO at\n    `_project/TODO/main/planning/joinorder-<engine>-dialect.yaml`\n    (status: Identified, summary: \"Per-engine dialect gaps\n     for canonical 113 queries on <engine>\"; not blocking\n     the cutover PR)\n\nAny platform advertised as supporting canonical joinorder must\npass all 113 queries or be explicitly marked unsupported/skipped\nfor canonical joinorder in registry/docs before cutover. The\ncutover gate is DuckDB plus at least one non-DuckDB OSS engine\npassing all advertised canonical joinorder queries. Per-engine\ndialect cleanup lands in follow-up PRs only for platforms not\nadvertised as canonical-ready.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Triage non-DuckDB engine query failures; route to per-engine follow-up TODOs",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "File: `benchbox/core/joinorder/dataframe_queries.py`\n\nExisting API surface (PRESERVE — do not restructure):\n  - Per-query implementation pair functions named\n    `q<id>_expression_impl(ctx)` and `q<id>_pandas_impl(ctx)`\n  - Module-level `get_dataframe_queries() -> QueryRegistry`\n    that registers each query via\n    `register(... expression_impl=..., pandas_impl=...)`\n  - Caller today: benchbox/core/joinorder/benchmark.py:315\n    (`from benchbox.core.joinorder.dataframe_queries import\n      get_dataframe_queries`)\n\nFor each of the 100 queries NOT YET DataFrame-translated, add\na stub pair following the existing naming convention:\n\n  def q<id>_expression_impl(ctx: DataFrameContext) -> Any:\n      raise NotImplementedError(\n        f\"DataFrame translation for query <id> not yet \"\n        f\"available. Track-2 TODO: \"\n        f\"_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml\"\n      )\n\n  def q<id>_pandas_impl(ctx: DataFrameContext) -> Any:\n      raise NotImplementedError(... same message ...)\n\nRegister each stub pair through the existing `register(...)`\nblock at the bottom of the module (mirrors how the 13\nalready-translated pairs are registered today).\n\nDataFrame default query selection (must_preserve): the\nQueryRegistry default-queries list must continue to expose\nONLY the 13 already-translated query ids until Track-2\nDataFrame coverage lands. Stubs are registered (so the API\nsurface stays uniform) but excluded from default selection\nvia the registry's existing implemented/unimplemented mark.\n\nSeed the follow-up TODO file. NOTE: the Track-2 groundwork\nTODO seeds two OTHER Track-2 items (stats-phase and scaling-\nstrategy); this dataframe-coverage seed is the cutover's own\nbecause the gap is discovered here.\n  _project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml\n  (status: Identified, priority: Medium, summary only)\nThe seed file is a stub — minimal description, no detailed\nwork units. Whoever picks up Track-2 dataframe coverage will\nflesh it out at that time.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "DataFrame mode: NotImplementedError for the 100 untranslated queries (preserve existing q<id>_expression_impl / q<id>_pandas_impl + QueryRegistry API); seed Track-2 TODO",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "File: `benchbox/core/publishing/bundle_publisher.py:176-177`\n\nAdd `dataset_version` field to bundle manifest:\n  - For benchmarks with `data_manifest`: copy the logical\n    `dataset_version`, `manifest_hash`, and `data_archive_hash`\n    fields from the manifest\n  - For purely-generated benchmarks (tpch, tpcds): all three\n    fields are null\n\nBundle reader: surface for forensic comparison only — NO\nexplorer UI changes (per Joe's constraint).\n\nTest: `tests/unit/core/publishing/test_dataset_version_field.py`\n  - joinorder bundles record correct dataset_version,\n    manifest_hash, and data_archive_hash\n  - tpch bundles record null values for all three fields\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire dataset_version into result bundle manifests",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "File: `benchbox/core/joinorder/DATA-LICENSE.md`\n\nSections (template shape, reusable for future benchmarks):\n  1. Dataset provenance: Harvard Dataverse DOI:10.7910/DVN/2QYZBT,\n     May 2013 IMDb plain-text \"list files\" snapshot, parsed via\n     imdbpy into 21-table relational schema, converted to Parquet\n     by BenchBox.\n  2. IMDb attribution string verbatim:\n     \"Information courtesy of IMDb (https://www.imdb.com).\n      Used with permission.\"\n  3. Boncz-style scope clause (research/optimizer use only).\n  4. BenchBox redistribution disclaimer:\n     \"BenchBox redistributes a derivative form of this dataset\n      as a convenience for benchmark reproducibility. BenchBox\n      makes no claim of ownership over the underlying IMDb\n      data and will honor takedown requests.\"\n  5. Takedown contact: <email TBD by Joe before publish>.\n\nDocument the template shape in\n`_project/design/data-fetch-infra-reuse-guide.md` — cutover w13\nOWNS section \"## DATA-LICENSE.md template\" of that file. The\nsibling track2-groundwork TODO (w5) owns the other sections\n(\"## When to use\", \"## Step-by-step\", \"## Common pitfalls\",\n\"## Infrastructure components reused\"). This split is recorded\nin both TODOs' scope_limit; merge conflicts on this file are\ncontained to disjoint sections.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write DATA-LICENSE.md for joinorder (reusable per-benchmark template)",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "Files:\n  - README.md: clarify joinorder = canonical IMDb 2013, one-time\n    ~1.2 GB download, sf=1 only, and existing\n    `BENCHBOX_OUTPUT_DIR` / `benchmark_runs/datagen/` pre-population\n    convention\n  - docs/benchmarks/join-order.md: full rewrite — retract\n    \"realistic data distributions / preserving join characteristics\";\n    new flow; sf=1 explanation; citation; license; datagen directory\n    pre-population for air-gapped environments\n  - benchbox/core/joinorder_synthetic/generator.py docstring:\n    retract fidelity claims (already done in w2); link to\n    canonical joinorder\n  - benchbox/mcp/tools/benchmark.py:140-174: run_benchmark\n    docstring mentions sf=1 enforcement for joinorder + first-run\n    download\n  - CLI help text in run_benchmark equivalent\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update documentation: README, docs/benchmarks/join-order.md, MCP/CLI help",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "Script: `_project/scripts/migrate_joinorder_bundles.py`\n\nInventory model (verified at TODO-creation time): bundles in\n`results-data/bundles/` live as **paired files** at the directory\nroot, NOT as per-bundle subdirectories. For each bundle there is\na result file `joinorder_sf1_<engine>_sql_<ts>_<hash>.json` and a\nsidecar `joinorder_sf1_<engine>_sql_<ts>_<hash>.manifest.json`.\nCurrent count: 5 result files + 5 manifest files = 10 files\nacross {clickhouse_local, duckdb, spark, sqlite, starrocks}.\n\nTwo-phase execution:\n\nPhase 1 — DRY RUN (mandatory, manual review gate):\n  Run `python _project/scripts/migrate_joinorder_bundles.py\n       --dry-run --output _project/joinorder/migration-plan.md`\n  Output: a markdown report listing each (result, manifest)\n  file pair to rename, each manifest field change, and any\n  anomalies (orphaned files, unpaired result/manifest,\n  schema-version conflicts).\n  REVIEW the plan before proceeding to phase 2.\n\nPhase 2 — APPLY (single atomic commit):\n  Run `python _project/scripts/migrate_joinorder_bundles.py\n       --apply`\n  For each `results-data/bundles/joinorder_sf1_*.json` and its\n  sibling `*.manifest.json`:\n    - `git mv` the file to its `joinorder_synthetic_sf1_*`\n      counterpart (rename both the result and the manifest;\n      keep the engine/timestamp/hash suffix unchanged)\n    - Update the manifest JSON contents:\n        benchmark_id: joinorder → joinorder_synthetic\n        (preserve all other metadata)\n    - Bump bundle schema version if applicable\n  ALL renames + manifest edits land in a single commit\n  titled `chore(joinorder): re-tag synthetic results bundles\n  (10 files / 5 bundles)`. Single-commit policy = single-revert\n  if the cutover regresses post-merge.\n\nSince `joinorder_synthetic` has `surface: internal` (w4),\nthese bundles are filtered out of the explorer view at the\nresult-publisher layer — no explorer UI changes needed.\n\nFailure handling: the script must be transactional. It should\nstage its intended operations in a temp plan, apply all renames\nand manifest edits, validate the exact expected before/after\npaths, and fail before committing if any step is incomplete.\nIf an unexpected partial state remains, stop and inspect the\nexplicit paths from the migration plan; do not use broad\ndestructive commands. Recovery must be an explicit-path inverse\nscript or `git restore --staged/--worktree` limited to the\nmigration plan paths after confirming no unrelated changes are\npresent.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate existing 10 published bundle files: rename joinorder_sf1_* → joinorder_synthetic_sf1_*",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "File: `CHANGELOG.md`\n\nEntry shape (under next unreleased version):\n  ### Breaking\n  - `joinorder` benchmark now uses canonical IMDb 2013 Parquet\n    archive (sf=1 only). First-run downloads ~1.2 GB from\n    GitHub Release into `benchmark_runs/datagen/joinorder_1.0/`;\n    air-gapped users can pre-populate that datagen directory.\n    (#289)\n  - The previous uniformly-random synthetic generator has been\n    renamed to `joinorder_synthetic` and is internal-only\n    (hidden from result explorer).\n  - Existing `joinorder_sf1_*` published bundles have been\n    re-tagged as `joinorder_synthetic_sf1_*` to reflect their\n    actual provenance.\n\n  ### Added\n  - Reusable `benchbox.core.data_fetch` infrastructure for\n    benchmarks with canonical real-world datasets.\n  - DATA-LICENSE.md per benchmark for real-data provenance.\n  - Reference cardinalities for all 113 canonical JOB queries.\n\nPer Joe's preference: terse user-facing bullets; no\nretrospective edits to prior releases.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "CHANGELOG entry",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "Pre-flight:\n  make pr-preflight\n\nUAT smoke (full canonical joinorder, sf=1, end-to-end):\n  make uat-cell PLATFORM=duckdb BENCHMARK=joinorder SCALE=1\n  make uat-cell PLATFORM=<second_engine> BENCHMARK=joinorder SCALE=1\n\nSecond engine choice: pick from already-supported list with\nParquet ingestion (e.g., starrocks, spark, clickhouse-local).\nThe choice doesn't matter for cutover correctness as long as\none non-DuckDB engine succeeds end-to-end.\n\nVerify:\n  - data_fetch downloads from DRAFT Release URL (with auth\n    token; the URL is fetchable while draft)\n  - All 113 SQL queries execute and preserve canonical predicate\n    oracle semantics\n  - Result bundle records correct dataset_version, manifest_hash,\n    and data_archive_hash\n  - Cardinalities match reference_cardinalities.json on full\n    canonical (key gate before publishing)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pre-flight + UAT smoke on DuckDB + 1 other engine end-to-end",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "Only after UAT smoke passes:\n  gh release edit data/joinorder-imdb-2013-v1 --draft=false\n\nVerify the asset is publicly downloadable without auth:\n  curl -sSL --head <release-asset-url> | head -1\n  # expect: HTTP/2 200\n\nThen run a fresh-cache public download smoke without GitHub\nauth headers or an existing local cache:\n  BENCHBOX_DATA_CACHE=\"$(mktemp -d)\" \\\n    make uat-cell PLATFORM=duckdb BENCHMARK=joinorder SCALE=1\nVerify the fetched tarball sha256 matches data_manifest.toml,\nall 113 queries execute, and result bundle identity fields\nmatch dataset_version, manifest_hash, and data_archive_hash.\n\nIf the published URL differs from the draft URL, stop and\ncreate a small follow-up commit that updates\n`benchbox/core/joinorder/data_manifest.toml`, reruns the\nfresh-cache smoke, and records the changed URL in the PR body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Promote DRAFT GitHub Release to published",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "Branch: `feat/joinorder-canonical-imdb-2013` (the cutover\nworktree branch — claim via `make worktree-claim\nBRANCH=feat/joinorder-canonical-imdb-2013` at the start of\nthis TODO's implementation).\n\nmake pr-open\n\nPR title: \"feat(joinorder): canonical IMDb 2013 dataset; rename synthetic\"\n\nPR body sections (use HEREDOC):\n  ## Summary\n  - Closes #289\n  - `joinorder` now uses canonical IMDb 2013 Parquet\n    (sf=1 only; first-run downloads from GitHub Release)\n  - Synthetic generator renamed to `joinorder_synthetic`,\n    hidden from explorer (surface: internal)\n  - SQL coverage extended from 13 → 113 canonical queries\n  - Reusable data_fetch infrastructure added\n\n  ## Breaking\n  - User scripts invoking joinorder at sf!=1 will fail with\n    ScaleFactorNotSupportedError pointing at joinorder_synthetic\n  - Existing joinorder_sf1_* bundles re-tagged\n\n  ## Test plan\n  - [x] make pr-preflight\n  - [x] UAT smoke: DuckDB joinorder sf=1 end-to-end\n  - [x] UAT smoke: <second engine> joinorder sf=1 end-to-end\n  - [x] All 113 query reference cardinalities match\n        against full canonical via Postgres oracle\n  - [x] Tiny fixture preserves all 113 query predicate oracle counts\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Open PR via make pr-open",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "Use `git mv` to preserve file history:\n  benchbox/core/joinorder/generator.py\n    → benchbox/core/joinorder_synthetic/generator.py\n  benchbox/core/joinorder/queries.py\n    (the 13 currently embedded queries — keep these AS the\n     synthetic surface's query set since canonical 113 lives\n     on joinorder)\n    → benchbox/core/joinorder_synthetic/queries.py\n  benchbox/core/joinorder/dataframe_queries.py\n    (synthetic-shape DataFrame queries — kept for\n     joinorder_synthetic surface)\n    → benchbox/core/joinorder_synthetic/dataframe_queries.py\n\nAdd `benchbox/core/joinorder_synthetic/__init__.py` exporting\nthe same names as the original joinorder module did.\n\nCommit at this work-unit boundary as a single move-only\ncommit (no content changes); makes the rename auditable in\ngit log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "git mv synthetic files into new joinorder_synthetic module",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "The original `benchbox/core/joinorder/benchmark.py` mixes\nsynthetic-generation orchestration with the benchmark phase\ndriver. Split:\n  - Canonical version: stays at benchbox/core/joinorder/benchmark.py\n    (will be wired to data_fetch in w1; here just remove\n     synthetic-generator imports/calls)\n  - Synthetic version: NEW at\n    benchbox/core/joinorder_synthetic/benchmark.py\n    (re-exports synthetic-generation orchestration on the\n     internal-surface module)\n\nThe two share no runtime state. Complete the move/split chain\nbefore w1 canonical wiring so canonical edits do not race files\nthat are about to be moved to `joinorder_synthetic`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Split benchmark.py: canonical stays at original path, synthetic gets its own",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "Register `joinorder_synthetic` in `benchbox/core/benchmark_registry.py`:\n  \"joinorder_synthetic\": {\n    \"scale_options\": [0.01, 0.1, 0.5, 1.0, 2.0, ...],\n    \"default_scale\": 1.0,\n    \"surface\": \"internal\",   # hidden from explorer\n    \"data_source\": \"synthetic\",\n  }\nUpdate joinorder entry to:\n  \"joinorder\": {\n    \"scale_options\": [1.0],\n    \"default_scale\": 1.0,\n    \"surface\": \"public\",\n    \"data_source\": \"canonical\",\n    \"data_manifest\": \"benchbox/core/joinorder/data_manifest.toml\",\n  }\n\nUpdate synthetic generator docstring (now in\nbenchbox/core/joinorder_synthetic/generator.py) to retract\nfidelity claims:\n  Replace: \"creates realistic synthetic data that preserves\n            the join patterns and selectivity characteristics\"\n  With:    \"creates synthetic data with uniformly-random\n            distributions for joinorder schema smoke testing\n            only. NOT a substitute for canonical JOB — see\n            benchbox/core/joinorder/ for the canonical\n            IMDb 2013 implementation.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register joinorder_synthetic + update joinorder registry entry + retract docstrings",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "Affected tests use `JoinOrderGenerator(scale_factor=0.01)` for\nlog-capture speed (not semantics):\n  tests/unit/core/test_core_verbosity.py:15\n  tests/unit/core/test_core_verbosity.py:26\n  tests/unit/core/test_core_quiet.py:15\n\nUpdate each to import from `benchbox.core.joinorder_synthetic`\ninstead of `benchbox.core.joinorder`. No semantic change to\nthe tests; they exercise the verbosity/quiet machinery, not\nthe data.\n\nAlso move generator unit tests:\n  tests/unit/core/joinorder/test_joinorder_generator.py\n    → tests/unit/core/joinorder_synthetic/test_joinorder_generator.py\n  tests/unit/core/joinorder/test_dataframe_queries.py\n    (the synthetic-13-query test)\n    → tests/unit/core/joinorder_synthetic/test_dataframe_queries.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate three speed-sensitive tests to use joinorder_synthetic at sf=0.01",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "The foundation TODO checked in `tests/fixtures/joinorder_canonical_tiny/`\nwith 21 Parquets. This work unit adds the test helper:\n  tests/conftest.py:\n    @pytest.fixture\n    def joinorder_canonical_tiny(tmp_path):\n      # copy fixture to tmp, return path\n      ...\n\nDocument the fixture's predicate oracle property: every\nnon-known-zero embedded canonical query has >=1 underlying row\nagainst this fixture, while `2c`, `5a`, `5b`, `10b`, and `32a`\npreserve zero underlying rows.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tiny canonical fixture loader for unit tests",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "File: `tests/unit/core/joinorder/test_canonical_queries.py`\n\nFor each of 113 canonical JOB queries:\n  - Load tiny fixture into DuckDB\n  - Run query, assert one aggregate result row\n  - Assert non-known-zero queries have >=1 underlying row and\n    known-zero queries preserve 0 underlying rows\n  - Cross-check row count against\n    `_project/joinorder/reference_cardinalities.json`'s tiny\n    fixture entries (NB: foundation TODO produced reference\n    cardinalities for full canonical; this test uses a separate\n    tiny-fixture cardinalities file with the same schema —\n    generated by the foundation TODO's tiny-fixture build step\n    (foundation w14).\n\nThis is the validator Joe asked for: \"ensure all queries\nactually work,\" with canonical zero-underlying aggregate-query\nsemantics preserved.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit test: canonical queries preserve tiny-fixture oracle",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "Source: foundation TODO produced\n`_project/joinorder/build-inputs/queries/{1a,...,33c}.sql`\n(foundation w10). This work unit consumes those into the\nruntime module.\n\nFile: `benchbox/core/joinorder/queries.py`\nExisting API surface (PRESERVE — do not restructure):\n  class JoinOrderQueryManager\n    .get_query(query_id) -> str\n    .get_all_queries() -> dict[str, str]\n    .get_query_ids() -> list[str]\n    .get_query_count() -> int\n    .get_queries_by_complexity() -> ...\n    .get_queries_by_pattern() -> ...\n\nCallers today (preserved as-is):\n  - benchbox/core/joinorder/benchmark.py:89,169,171,177,185,193,201,209,217\n  - benchbox/joinorder.py:12 (via JoinOrderBenchmark)\n  - tests/unit/core/test_concurrency_executor_and_joinorder.py\n\nImplementation: expand `_load_embedded_queries` from 13\n`queries[\"1a\"] = \"...\"` assignments to all 113 (1a-33c).\nSource SQL is the gregrahn upstream text imported by\nfoundation w10. Postgres dialect; engine-specific\ntranslations happen at runtime via existing dialect infra.\n\nTest: `tests/unit/core/joinorder/test_query_coverage.py`\n  - JoinOrderQueryManager().get_query_count() == 113\n  - get_query_ids() match canonical id regex ^\\d+[a-z]$\n  - Each query is parseable as SQL via sqlglot\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Import 113 canonical JOB queries from foundation build-inputs into joinorder/queries.py (preserve JoinOrderQueryManager API)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-cutover",
+        "notes": "Smoke test: load tiny canonical fixture (foundation w14),\nexecute every one of the 113 queries via DuckDB. Assert:\n  - All 113 execute without parse/runtime error\n  - All 113 return one aggregate result row\n  - Non-known-zero queries have >=1 underlying row in the tiny\n    fixture; `2c`, `5a`, `5b`, `10b`, and `32a` preserve zero\n    underlying rows\n\nDuckDB is the default runtime smoke engine, not the reference\noracle. PostgreSQL cardinalities from foundation w11 remain the\noracle. If a query fails on DuckDB, that is a blocker for the\nDuckDB-supported public surface unless the benchmark marks DuckDB\nunsupported, which is not acceptable for this cutover.\n\nTest: extends test_canonical_queries.py from w7 with the\nDuckDB execution sweep.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify all 113 queries execute against DuckDB on tiny canonical fixture",
+        "wid": "w9"
+      }
+    ]
+  }
+}

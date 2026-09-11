@@ -1,0 +1,200 @@
+{
+  "context": "Reuse the qualify-the-outer-table discipline from the merged self-binding fix.\nFor DataFrame variants, the analogous fix is correlating on the outer frame's\nkey, not the inner aggregate. Confirm every fix against canonical TPC-H/TPC-DS\nat small SF. Build the static detector last, informed by the concrete cases\nfound, so its heuristics match real instances.\n",
+  "description": "PR #756 fixed three TPC-Havoc SQL variants where a correlated subquery's\nUNQUALIFIED correlation column silently bound to the INNER alias instead of\nthe outer table, degenerating the intended correlation into an uncorrelated\nscan. That sweep covered the SQL variant_sets only, by hand. Two reachable\nsurfaces were never checked, and the manual sweep is not a durable guard.\n\nScope of this audit:\n\n1. TPC-Havoc DataFrame variants (benchbox/core/tpchavoc/dataframe_queries/).\n   The DataFrame implementations of the correlated queries (Q2 min-cost,\n   Q11 threshold, Q17 per-part avg, Q20, Q21, Q22) must encode the SAME outer\n   correlation as the canonical query. DataFrame code does not \"self-bind\" the\n   same way, but the equivalent mistake - joining/filtering on the inner frame\n   instead of the outer row - is possible and equally silent.\n\n   Review evidence (PR #770): the DataFrame variants are INDEPENDENT designs,\n   not mirrors of the SQL variants - e.g. DataFrame q9_v10 is an algebraic\n   reformulation while SQL q9_v10 had nation-bucketing/clamping defects. None\n   of the 24 SQL-side divergences PR #770 fixed has a mirrored DataFrame\n   analog, but the same variant ID means a DIFFERENT transformation per\n   surface, so the SQL equivalence gate proves nothing about this surface.\n\n   NOTE: broad DataFrame result-equivalence vs canonical TPC-H is now owned by\n   its own work item, tpchavoc-dataframe-variant-equivalence-gate. THIS audit's\n   DataFrame scope is the narrower, targeted self-binding / inner-frame-\n   correlation check on the correlated queries (Q2, Q11, Q17, Q20, Q21, Q22);\n   run it alongside, or fold it into, that gate rather than duplicating the\n   harness.\n\n2. Other SQL benchmarks with correlated subqueries: TPC-DS, SSB, join-order,\n   read-primitives (subquery category), and write-primitives\n   (update_with_subquery). Grep evidence already shows correlated patterns and\n   a \"self-join pattern\" comment in tpcds/dataframe_queries. Apply the same\n   qualify-the-outer-correlation audit.\n\n3. A DURABLE detector so this class cannot silently reappear: a static check\n   (sqlglot-backed) that flags a correlated subquery whose correlation\n   predicate has an unqualified column also present in an inner aliased\n   relation. A binder-level check is hard to make exact, so a conservative\n   lint that surfaces candidates for human confirmation is acceptable.\n\nProvenance question worth answering during the audit: how were these variants\nauthored? If LLM-generated or mechanically transformed, self-binding is likely\na SYSTEMATIC generation artifact, implying more instances and a generator that\nneeds a correctness contract rather than per-instance patches.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "restructure variant/query shapes",
+        "instead": "only correct the correlation binding.",
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "why": "identity is the shape"
+      },
+      {
+        "dont": "ship a noisy static check as a hard CI blocker",
+        "instead": "start as an advisory candidate list.",
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "why": "false positives will erode trust"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "correlated-subquery-self-binding-cross-surface-audit",
+        "id": 127,
+        "reason": "Depends on the provenance finding in w0/w1; only worth it if the pattern proves systematic across surfaces.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Audit w0-w2 (DONE) found self-binding was NOT systematic: 0 real candidates outside 2 TPC-DS false positives. Stated promotion condition failed.",
+        "summary": "Author a correctness contract for the variant generator"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-06-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Each variant keeps its declared structural identity; only the correlation binding is corrected.",
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit"
+      },
+      {
+        "behavior": "Existing DataFrame and SQL benchmark results that are already correct are unchanged.",
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/planning/tpchavoc-correlated-subquery-self-binding.yaml - the SQL-variant fix this audit extends; reuse its qualify-the-outer-table pattern",
+        "decision": "reuse",
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "path": "_project/TODO/main/planning/tpchavoc-correlated-subquery-self-binding.yaml"
+      },
+      {
+        "concept": "benchbox/core/tpcds/dataframe_queries/queries.py:2814 - existing 'self-join pattern' comment for correlated subquery implementation; an explicit audit target",
+        "decision": "reuse",
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "path": "benchbox/core/tpcds/dataframe_queries/queries.py:2814"
+      },
+      {
+        "concept": "benchbox/core/tpchavoc/dataframe_queries/_delegating_variants.py - notes that Q16-Q22 delegate the core correlated/anti-join shape; verify those delegations are faithful",
+        "decision": "reuse",
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "path": "benchbox/core/tpchavoc/dataframe_queries/_delegating_variants.py"
+      },
+      {
+        "concept": "benchbox/sql_compat/rules/ and benchbox/platforms/*_query_transformer.py - existing places SQL is rewritten; a static check could live near these",
+        "decision": "reuse",
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "path": "benchbox/sql_compat/rules/"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/"
+      },
+      {
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/"
+      },
+      {
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/ssb/"
+      },
+      {
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpchavoc/dataframe_queries/"
+      },
+      {
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/"
+      },
+      {
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "compare each audited query to its canonical benchmark answer on DuckDB small SF",
+        "description": "Audited correlated DataFrame/SQL queries match canonical results at small SF",
+        "expected": "set-equal results (modulo declared exceptions)",
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "run the detector over variant_sets with a #756 fix reverted",
+        "description": "Static detector flags the known historical self-binding cases when reverted",
+        "expected": "the reverted variant is flagged",
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "needs_wid": "w0",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "notes": "Done via the detector (w3) used as an enumerator. SQL surfaces swept at\nSF=1, DuckDB dialect: TPC-Havoc 220 variants, TPC-DS 99, SSB 13,\nread-primitives 153, write-primitives 109, join-order 113. Only TPC-DS\nflagged anything (2, both false positives - see w2).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-confirm the audit surfaces still exist and enumerate correlated-subquery sites",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "notes": "Covered by the merged DataFrame equivalence gate (PR #785,\nbenchbox/core/tpchavoc/dataframe_equivalence.py): it compares every\nDataFrame variant to canonical TPC-H at SF=0.1 and is green (0 divergent).\nAn inner-frame-correlation self-bind would change results and therefore\nsurface as a divergence there, so the DataFrame surface is guarded against\nthis class without a separate per-variant check. No DataFrame drift found.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit TPC-Havoc DataFrame variants for outer-correlation faithfulness and fix any drift",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "notes": "Swept with the detector. SSB, join-order, read-primitives, write-primitives:\n0 candidates. The detector analyzes UPDATE/DELETE subqueries (the DML\ntarget/USING tables are treated as the outer correlation source), so the\nwrite-primitives \"clean\" result is verified, not a skipped-DML blind spot.\nTPC-DS: 2 candidates (q14, q54), both HUMAN-CONFIRMED FALSE\nPOSITIVES - they are derived-table column aliases that reuse a base-table\ncolumn name (q14 `item.i_item_sk AS ss_item_sk`; q54\n`ws_bill_customer_sk AS customer_sk`), so the bare column binds correctly.\nThese are official TPC-DS spec queries and were NOT modified (conformance).\nNo real self-binds found outside the already-fixed #756 TPC-Havoc cases.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit other SQL benchmarks (TPC-DS, SSB, join-order, read/write-primitives) for the self-binding pattern and fix any found",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "correlated-subquery-self-binding-cross-surface-audit",
+        "notes": "Implemented: _project/scripts/detect_self_binding.py (sqlglot-backed,\ncatalog-aware via the benchmark's own CREATE TABLE DDL). Flags a bare\ncolumn in a subquery comparison only when (a) the other operand is a column\nqualified by an inner source alias (correlation shape), and (b) the bare\ncolumn is provided by both an inner and an outer source (ambiguous bind).\nRecognizes derived-table/CTE output columns, so CTE correlation targets\n(the #756 Q17 case) are covered. Locked in by\ntests/unit/test_self_binding_detector.py: it flags all three #756 cases\nwhen reverted, stays clean on the fixed variants and all 220 shipped\nvariants, and ignores plain filters / fully-qualified correlations.\nAdvisory only (not a hard CI blocker), per the anti-pattern guidance.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Durable static detector for unqualified self-binding correlations",
+        "wid": "w3"
+      }
+    ]
+  }
+}

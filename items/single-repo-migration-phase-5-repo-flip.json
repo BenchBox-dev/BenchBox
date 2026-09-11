@@ -1,0 +1,309 @@
+{
+  "description": "Switch the development locus from /Users/joe/Developer/BenchBox (private\nclone) to ~/Developer/benchbox-public (public clone). Archive\njoeharris76/benchbox-private on GitHub. No GitHub-side rename, no\nvisibility flip — under Option B the existing public repo\n(joeharris76/BenchBox) stays canonical with its URL unchanged.\n\nPre-conditions:\n- Phase 4 succeeded: v0.3.0 on PyPI, _project/** history visible on public\n  via filter-merge\n- All in-flight work on private branches has been merged to private main\n  and synced to public via the curated flow (or cherry-picked manually\n  onto public branches)\n- Local mirror backup of benchbox-private exists\n\nMost steps are reversible. The only step worth pausing for is GitHub-side\narchival of benchbox-private (reversible via \"unarchive\", but worth\nthinking once).\n\nPlan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 5).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the canonical repo URL or rename joeharris76/BenchBox",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "why": "that triggers an irreversible visibility-event chain that Option B specifically avoided (vs. Option A which did rename)."
+      },
+      {
+        "dont": "delete benchbox-private from GitHub at the end of this phase",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "why": "external links, forks, and stars (if any) point to it; archiving preserves them with read-only access. Deletion is Phase 9 (optional)."
+      },
+      {
+        "dont": "delete the renamed local clone (BenchBox.retired-YYYYMMDD/) at the end of this phase",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "why": "it is the ultimate \"did I lose any in-flight work\" reference for 60+ days."
+      },
+      {
+        "dont": "enable branch-protection's linear-history rule before Phase 4 w6 lands",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "why": "that merge commit is a non-linear one-time event; the rule applies from-this-point-forward, not retroactively."
+      },
+      {
+        "dont": "push commits to public main from the retired private clone after w5",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "why": "the retired clone has stale knowledge of public's history (curated mirror, before the migration commits) and any push from there would create divergent history. Only push from ~/Developer/benchbox-public going forward."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "needs_item": "single-repo-migration-phase-4-test-release-with-new-flow"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-04-27T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All git history on joeharris76/BenchBox is preserved untouched (no rewrites, no force-pushes).",
+        "item_id": "single-repo-migration-phase-5-repo-flip"
+      },
+      {
+        "behavior": "All git history on joeharris76/benchbox-private is preserved (archive is read-only but full history accessible).",
+        "item_id": "single-repo-migration-phase-5-repo-flip"
+      },
+      {
+        "behavior": "PyPI wheels for previously-published versions remain installable (PyPI is independent of repo state).",
+        "item_id": "single-repo-migration-phase-5-repo-flip"
+      },
+      {
+        "behavior": "The _project/** filter-merge from Phase 4 remains intact (the merge commit and its preserved sub-commits).",
+        "item_id": "single-repo-migration-phase-5-repo-flip"
+      },
+      {
+        "behavior": "The mirror backup from w1 is retained for at least 90 days as the ultimate fallback.",
+        "item_id": "single-repo-migration-phase-5-repo-flip"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox"
+      },
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "kind": "only_modify",
+        "path_glob": "~/Developer/benchbox-public/.git/config"
+      },
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "kind": "only_modify",
+        "path_glob": "~/Developer/benchbox-public/AGENTS.md"
+      },
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "kind": "only_modify",
+        "path_glob": "~/Developer/benchbox-public/CLAUDE.md"
+      },
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "kind": "only_modify",
+        "path_glob": "~/Developer/benchbox-public/MIGRATION-NOTES.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh repo view joeharris76/benchbox-private --json isArchived --jq .isArchived",
+        "description": "Private repo is archived on GitHub",
+        "expected": "true",
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "curl -sSf -o /dev/null https://github.com/joeharris76/BenchBox && echo OK",
+        "description": "Public repo URL unchanged and accessible",
+        "expected": "OK",
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "ls -d /Users/joe/Developer/BenchBox.retired-*",
+        "description": "Retired private clone exists at expected path",
+        "expected": "matching directory exists",
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd ~/Developer/benchbox-public && uv run -- python -m pytest -m fast --collect-only -q | tail -1",
+        "description": "Public clone is functional",
+        "expected": "non-zero test count, no collection errors",
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'Git Remotes - CRITICAL\\|two-remote' ~/Developer/benchbox-public/CLAUDE.md",
+        "description": "CLAUDE.md no longer mentions the two-remote rule (after w9 merges)",
+        "expected": "0",
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "notes": "git clone --mirror git@github.com:joeharris76/benchbox-private.git \\\n  /tmp/benchbox-private-backup-$(date +%Y%m%d).git\nVerify the clone size matches GitHub's reported repo size. Keep\nthis backup until at least Phase 8 ships green and 60-day soak passes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create local mirror backup of benchbox-private before archival",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "notes": "Brief note for any external visitors:\n  \"BenchBox absorbed development from a private fork on YYYY-MM-DD.\n  _project/** retains the original commit history; other paths\n  arrived as a single squashed migration commit. The previous\n  private repo (joeharris76/benchbox-private) has been archived.\"\nRemove in Phase 9.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "(Optional) Pin a MIGRATION-NOTES.md at repo root for 60-90 days",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "notes": "cd ~/Developer/benchbox-public\ngit status                     # must be clean\ngit log -1 --oneline           # confirm v0.3.0 release commit present\ngit log --oneline -- _project/TODO/ | head -3  # confirm filter-merge worked\n\ncd /Users/joe/Developer/BenchBox\ngit status                     # must be clean\ngit branch -a                  # review feature branches\ngit stash list                 # nothing important stashed\n# For each non-merged feature branch on private:\n#   - merge to private main and sync via curated flow, OR\n#   - cherry-pick onto a public branch via gh\nStop here if anything is dirty or unmerged.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm pre-conditions: clean public clone, no in-flight private branches with valuable work",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "notes": "cd ~/Developer/benchbox-public\nuv sync     # set up venv if not already\nuv run -- python -m pytest -m fast\nuv run ruff check .\nuv run ty check\n# All green. If any test or lint fails: it is the responsibility of\n# the migration to fix before retiring the private clone — once\n# retired, you are in single-repo mode.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify the public clone is fully functional as the new dev locus",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "notes": "GitHub UI: Settings on joeharris76/benchbox-private -> Danger zone ->\n\"Archive this repository\". Confirm.\nThe repo becomes read-only. Existing collaborators (just you) lose\nwrite access. URL still resolves; clones still work.\nReversible via \"Unarchive\" if needed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Archive joeharris76/benchbox-private on GitHub",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "notes": "mv /Users/joe/Developer/BenchBox \\\n   /Users/joe/Developer/BenchBox.retired-$(date +%Y%m%d)\nThe retired path remains as a reference for 60+ days. Renaming\nprevents shell muscle-memory from accidentally `cd`-ing into it\nand committing/pushing somewhere stale.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retire the local private clone (rename, do not delete)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "notes": "Two options — pick whichever:\n- mv ~/Developer/benchbox-public /Users/joe/Developer/BenchBox\n  (rename the public clone to the canonical path)\n- ln -s ~/Developer/benchbox-public /Users/joe/Developer/BenchBox\n  (symlink — existing IDE/shell sessions keep working)\nOr do nothing — keep the public clone at ~/Developer/benchbox-public\nand update muscle memory.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "(Optional) Reclaim /Users/joe/Developer/BenchBox path for the public clone",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "notes": "GitHub UI: Settings -> Branches -> Add rule for main:\n  - Require pull request before merging\n  - Require status checks: select the CI workflow from Phase 2\n  - Require linear history    [add ONLY AFTER Phase 4 w6 merge commit lands]\n  - Allow squash-merge ONLY (uncheck merge commits and rebase-merge\n    in repo Settings -> General)\n  - Block force pushes\n  - Block deletions\nDo NOT require approving review (solo maintainer would self-block).\nTest by opening a no-op PR and squash-merging it.\n\nNote: the linear-history rule conflicts with the Phase 4 _project/**\nfilter-merge commit. That merge is a one-time exception; enable\nlinear-history AFTER it has landed and from this point forward all\nsubsequent merges are squash-only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set up branch protection on joeharris76/BenchBox main",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "notes": "PyPI Homepage already points at https://github.com/joeharris76/BenchBox,\nwhich is unchanged under Option B (no rename happened). Verify by\nvisiting https://pypi.org/project/benchbox/ and checking the Homepage\nlink resolves.\nUpdate only if it currently points elsewhere or if other URL fields\n(issues, source) need correction.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify PyPI project URLs (no change needed under Option B)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-5-repo-flip",
+        "notes": "Open a PR on public to remove the \"Git Remotes - CRITICAL\" section\nin CLAUDE.md and the equivalent in AGENTS.md so future sessions\nstop pushing to the wrong (now non-existent) remote. Replace with a\none-line placeholder:\n  \"Single repo, single origin (joeharris76/BenchBox).\n  See docs/operations/release-guide.md.\"\nThe rest of the docs cleanup is Phase 7. This step is the minimum\nto prevent foot-guns in subsequent commits.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Strip two-remote-rule sections from CLAUDE.md and AGENTS.md (interim - full update in Phase 7)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

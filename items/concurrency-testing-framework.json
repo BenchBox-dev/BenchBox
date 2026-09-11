@@ -1,0 +1,10 @@
+{
+  "description": "Multi-threaded query execution testing with queueing analysis and\nresource monitoring.",
+  "legacy": {
+    "item_meta": {
+      "category": "Enterprise Operations",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "enterprise-ops-concurrency"
+    }
+  }
+}

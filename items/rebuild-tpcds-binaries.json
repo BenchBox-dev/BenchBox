@@ -1,0 +1,17 @@
+{
+  "description": "After patching the TPC-DS source files to fix stdout data generation,\nrebuild all platform binaries in _binaries/tpc-ds/.\n\nCompleted platforms:\n- darwin-arm64 (macOS Apple Silicon) - DONE\n- darwin-x86_64 (macOS Intel) - DONE\n- linux-arm64 (Linux ARM) - DONE\n- linux-x86_64 (Linux x86) - DONE\n- windows-arm64 (Windows ARM) - Skipped (no binaries existed, needs native CI)\n- windows-x86_64 (Windows x86) - Skipped (no binaries existed, needs native CI)\n\nAdditional fixes made during build:\n- Added MAXINT definition for LINUX in porting.h\n- Added -fcommon flag to LINUX_CFLAGS in makefile (GCC 10+ compatibility)",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "rebuild-tpcds-binaries",
+        "needs_item": "patch-tpcds-source-stdout"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-15T00:00:00Z",
+      "created_at": "2026-01-15T00:00:00Z",
+      "worktree": "tpcds-stdout-fix"
+    }
+  }
+}

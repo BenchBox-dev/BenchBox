@@ -1,0 +1,16 @@
+{
+  "description": "Create PySparkSQLAdapter extending PlatformAdapter base class.\nImplements all required abstract methods for SQL benchmark execution.\n\nThis adapter enables running TPC-H/TPC-DS benchmarks via Spark SQL syntax,\ncomplementing the existing DataFrame adapter for a dual-mode platform.\n\nRequired abstract method implementations:\n| Method | Implementation |\n|--------|----------------|\n| create_connection() | Return SparkSession from shared manager |\n| create_schema() | Execute translated CREATE TABLE statements |\n| load_data() | Read files -> DataFrame -> saveAsTable() |\n| execute_query() | spark.sql(query).collect() with timing |\n| get_target_dialect() | Return \"spark\" |\n| configure_for_benchmark() | Set OLAP optimizations |",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pyspark-sql-adapter-core",
+        "needs_item": "pyspark-sql-session-manager"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2025-12-07T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

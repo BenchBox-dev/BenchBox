@@ -1,0 +1,168 @@
+{
+  "description": "The Results Explorer retheme moved every public surface to CSS-variable\ntokens defined in `results-explorer/src/index.css`. PR #268 introduced new\nliteral-color sections in Result Detail and Compare during the same window\nPR #269 was finalizing its release-readiness report; the squash merge of\n#269 silently kept the literals because both the per-PR token scan and the\nrelease-final capture were generated against the PR branch, not the\npost-merge develop tree.\n\nThe post-merge tokenization gap was closed by\n`results-explorer-retheme-result-and-compare-postmerge`. This TODO adds a\ndurable gate so the same class of regression is caught at PR time:\n\n1. A repository check that fails when raw Tailwind palette literals\n   (text-/bg-/border-/divide-/ring-/placeholder-/fill-/stroke-/outline-/shadow-)\n   for slate/gray/zinc/neutral/stone/red/orange/amber/yellow/lime/green/\n   emerald/teal/cyan/sky/blue/indigo/violet/purple/fuchsia/pink/rose at\n   stops 50-950 appear inside `results-explorer/src` outside an explicit\n   allowlist.\n2. An allowlist mechanism (e.g. a JSON file or inline `// allow: <reason>`\n   marker) so intentional uses (legacy badge aliases in `index.css`,\n   pre-existing inline-SVG `stroke=\"#xxxxxx\"` attributes flagged for the\n   next chart-token follow-up) do not block the gate.\n3. A CI hook that runs on every PR touching `results-explorer/src`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add the gate without an allowlist mechanism",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "why": "legitimate inline-SVG and legacy badge aliases will need explicit exemption."
+      },
+      {
+        "dont": "silently extend the gate to other projects until at least one other consumer of the token system asks for it.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "needs_item": "results-explorer-retheme-result-and-compare-postmerge"
+      }
+    ],
+    "item_meta": {
+      "category": "Quality",
+      "completed_at": "2026-05-08T00:00:00Z",
+      "created_at": "2026-05-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "CI required-result aggregator path-filter behavior.",
+        "item_id": "results-explorer-token-scan-ci-gate"
+      },
+      {
+        "behavior": "Existing pre-commit hooks and `make lint` umbrella target.",
+        "item_id": "results-explorer-token-scan-ci-gate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/"
+      },
+      {
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/"
+      },
+      {
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/.eslintrc.*"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "bash -lc 'set -e; tmp=$(mktemp results-explorer/src/_gate_test_XXXXX.tsx); echo \"<div class=\\\"text-gray-700\\\" />\" > \"$tmp\"; trap \"rm -f $tmp\" EXIT; ! make lint-explorer-tokens'",
+        "description": "Gate fails on a planted literal under results-explorer/src",
+        "expected": "non-zero exit (gate caught the literal)",
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make lint-explorer-tokens",
+        "description": "Gate passes on the current results-explorer/src tree",
+        "expected": "exit 0",
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "notes": "Bash grep is fastest to ship and matches what the audit already runs\nmanually. ESLint via `no-restricted-syntax` keeps the rule next to other\nJSX checks but needs custom AST handling for `class={...}` template\nliterals. Stylelint targets CSS only and would miss JSX classnames.\nRecommend bash grep for v1, with a TODO to graduate to ESLint once the\nResults Explorer adopts a shared lint config that other projects can\nreuse.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pick the gate implementation: bash grep, ESLint rule, or stylelint plugin",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "notes": "Initial allowlist:\n  - `results-explorer/src/index.css` legacy `.badge-{blue,green,yellow,red,gray}`\n    token aliases (each defined once, deliberately).\n  - PercentileLadder inline `stroke=\"#...\"` SVG attributes are inline\n    SVG presentation attributes, not Tailwind classes; the scan should\n    only target class-attribute substrings, so these are out of scope.\nOut of scope for v1: literal hex strings inside chartTheme.ts and\npalette.ts (those will be migrated when ASCII chart parity is reopened).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the scan and define the allowlist contract",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "notes": "Pre-commit: `make lint-explorer-tokens` (or equivalent) invoked from the\n`make lint` umbrella target so local `make pr-preflight` catches\nviolations before push. CI: a path-aware job mirroring `ci-paths` so\nonly PRs touching `results-explorer/src` run the gate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire the scan into pre-commit and CI",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-token-scan-ci-gate",
+        "notes": "Update `docs/operations/results-explorer-qa.md` (or the closest\ncontributor-facing doc) with the gate command, the allowlist contract,\nand a short rationale referencing the PR #268/#269 squash race that\nmotivated this work.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the gate and the allowlist mechanism",
+        "wid": "w4"
+      }
+    ]
+  }
+}

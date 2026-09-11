@@ -1,0 +1,146 @@
+{
+  "context": "Sequence deliberately; do not bulk-regenerate.\n\n1. Write the remaining-gap target matrix into results-data/REGENERATION.md (keep the 2026-07-16 tuned-drop history, add a 2026-08-23 restore section). Record live already-OK cohorts as done, and list remaining zero-coverage local cells to restore to the >=3-platform floor.\n\n2. Realign seed-corpus.yml to the cells actually wanted: live comparable local cells plus remaining-gap cells that belong on the lane. Do not add cloud-vendor signups.\n\n3. Admit only remaining zero-coverage local cohorts, each to the >=3-platform floor, using existing local platforms. Skip expensive SF10 expansion. Do not re-admit already-OK cohorts.\n\n4. Regenerate inventory and confirm validate_corpus.py still passes, including its recency report if present.\n\nEvery restored bundle must be a real run with the validation phase actually executed. Do not commit a bundle produced by `benchbox submit` unless a community sidecar is genuinely wanted.",
+  "description": "Consequence of the 2026-08-28 trust cut (PRs #1939 develop, #1940 published-results), which withdrew every result run before 2026-08-23. Not a defect -- the withdrawal was intended -- but the coverage it removed has to be rebuilt.\n\nREVALIDATED 2026-09-04 from live results-data/corpus-inventory.json (generated_at 2026-09-01) and results-data/validate_corpus.py (exit 0). The 9-bundle post-cut state is no longer current. Live corpus: 199 bundles, 10 benchmarks, 27 cohorts, all at the >=3-identity floor (DuckDB version-matrix cohorts count version identities). Restored since the cut: amplab, clickbench, coffeeshop, h2odb, joinorder, read_primitives, ssb, tpcds, tpch, tpch_skew.\n\nRemaining zero-coverage benchmarks: datavault, flightdata, metadata_primitives, nyctaxi, star_schema, tpcdi, tpcds_obt, tpchavoc, write_primitives.\n\nresults-data/REGENERATION.md still documents the 2026-07-16 tuned drop, not the post-2026-08-23 remaining-gap matrix. .github/workflows/seed-corpus.yml now has a monthly schedule plus TPC-H SF 0.01/0.1/1.0, TPC-DS SF1, and SSB SF 0.01/0.1, but it still does not describe the live restored matrix or the remaining zero-coverage cells.\n\nDo not re-run already-OK cohorts. Do not restore withdrawn bundles from git history. Every restored bundle must be a real run with validation actually executed.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-09-04T20:20:33Z",
+        "from_item": "restore-corpus-coverage-after-20260823-trust-cut",
+        "id": 726,
+        "reason": "Only DuckDB and DataFusion have summary.validation=passed locally. ClickHouse Local is incompatible (ACL privilege requirements). Fresh SQLite run 2026-09-04 failed all 51 queries (PARTIAL). Needs a third validation-passed local platform before corpus admission.",
+        "resolution": "promoted",
+        "resolved_item": "restore-corpus-coverage-after-20260823-trust-cut-def726",
+        "resolved_reason": null,
+        "summary": "Defer metadata_primitives >=3-platform admission"
+      },
+      {
+        "created_at": "2026-09-04T20:20:42Z",
+        "from_item": "restore-corpus-coverage-after-20260823-trust-cut",
+        "id": 727,
+        "reason": "Only DuckDB has summary.validation=passed locally across SF 0.01/0.1/1.0. Fresh DataFusion SF 0.01 failed missing write-ops tables; ClickHouse Local SF 0.01 failed schema NOT NULL on operation_id. SQLite/Spark/Polars local attempts remain partial. Needs two more validation-passed local platforms.",
+        "resolution": "promoted",
+        "resolved_item": "restore-corpus-coverage-after-20260823-trust-cut-def727",
+        "resolved_reason": null,
+        "summary": "Defer write_primitives >=3-platform admission"
+      }
+    ],
+    "item_meta": {
+      "category": "results",
+      "completed_at": "2026-09-10T23:07:05Z",
+      "completed_pr": 2051,
+      "created_at": "2026-08-29T12:11:34Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Sidecar-absence => maintainer-run trust derivation in scripts/generate_corpus_inventory.py::_bundle_trust_label",
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut"
+      },
+      {
+        "behavior": "The 2026-08-23 trust line: do not restore any withdrawn bundle from git history, only fresh runs",
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut"
+      },
+      {
+        "behavior": "The >=3-platform floor in results-data/validate_corpus.py (MINIMUM_PLATFORMS_PER_COHORT)",
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/seed-corpus.yml"
+      },
+      {
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut",
+        "kind": "only_modify",
+        "path_glob": "results-data/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python results-data/validate_corpus.py",
+        "description": "Corpus floor holds",
+        "expected": "all cohorts >=3 platforms",
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/ && uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb",
+        "description": "Read model builds and passes the deploy gate",
+        "expected": "passes",
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Wrote post-2026-08-23 remaining-gap restore section into results-data/REGENERATION.md. Kept 2026-07-16 tuned-drop history. Recorded live already-OK cohorts (amplab, clickbench, coffeeshop, h2odb, joinorder, read_primitives, ssb, tpcds, tpch, tpch_skew) as do-not-rerun. Listed remaining zero-coverage cells; documented star_schema as ssb alias (not duplicated).",
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut",
+        "notes": null,
+        "started_at": "2026-09-04T20:11:37Z",
+        "started_branch": "feat/corpus-coverage-restore",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-corpus-coverage-restore",
+        "status": "done",
+        "summary": "Write the remaining-gap target matrix into results-data/REGENERATION.md: keep the 2026-07-16 history, record live already-OK cohorts, and list remaining zero-coverage local cells",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Realigned .github/workflows/seed-corpus.yml: preserved monthly cron 0 7 1 * *; kept optional clickhouse-cloud skip-when-secrets-absent; expanded matrix beyond stale TPC-H/SSB-only cells to live comparable local cells (amplab/coffeeshop/h2odb/read_primitives/tpch_skew SF0.01, clickbench/joinorder SF1, plus existing tpch/tpcds/ssb) and remaining-gap cells (datavault/flightdata/nyctaxi/tpcdi/tpchavoc SF0.01, tpcds_obt/metadata_primitives SF1, write_primitives SF0.01). No Databricks/Snowflake/BigQuery. Nested staging paths unchanged. seed workflow unit tests: 64 passed.",
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Realign seed-corpus.yml to live comparable local cells plus remaining-gap cells that belong on the lane; do not add cloud-vendor signups",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Admitted 45 fresh post-2026-08-23 validation-passed primary bundles (no community sidecars; trust remains maintainer-run via sidecar absence) into results-data/bundles/ for cohorts: datavault SF0.01/0.1; flightdata SF0.01/0.1/1.0; nyctaxi SF0.01/0.1/1.0; tpcdi SF0.01/0.1/1.0; tpcds_obt SF1.0; tpchavoc SF0.01/0.1/1.0 — each with DuckDB+DataFusion+ClickHouse Local. Already-OK cohorts untouched. star_schema not duplicated (ssb alias). Deferred metadata_primitives and write_primitives (no third validation-passed local platform after fresh attempts). Skipped datavault SF1.0 (no full-suite DataFusion). No SF10 expansion; no cloud signup.",
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Admit only remaining zero-coverage local cohorts to the >=3-platform floor; do not re-run already-OK cohorts; skip expensive SF10 expansion and any cloud signup",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Regenerated results-data/corpus-inventory.json (244 bundles, 16 benchmarks, 42 cohorts, all trust_label=maintainer-run). python results-data/validate_corpus.py exit 0 — all cohorts >=3 identities. Temp explorer build: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output /tmp/corpus-coverage-restore-explorer-data/ processed 244 results / 42 cohorts; make explorer-snapshot-check SNAPSHOT=/tmp/.../results.duckdb passed. Did not commit results-explorer/public/data. Inventory unit tests 22 passed; seed workflow tests 64 passed.",
+        "item_id": "restore-corpus-coverage-after-20260823-trust-cut",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate inventory and confirm validate_corpus.py (including recency report if present) and snapshot invariants pass",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,169 @@
+{
+  "context": "Capture a real `psutil.virtual_memory().available` reading from a host that is actually starved enough to make container VMs fail -- ideally during the pending UAT stage-2/stage-3 mocker re-runs, which are the workload that produced the original incident. Record total/available/free/swap together so the metrics can be related rather than guessed at.\n\nSet the floor from that measurement and replace the placeholder comment with the dated observation. Only then decide the sampling question: if the observed `.available` trace is noisy near the floor, add averaging or a confirm-twice rule; if it is not, record that it was checked and leave the single sample alone.\n\nDo not tune the floor from a synthetic starvation test -- allocating a balloon process produces a very different `.available` profile from real container VMs plus a loaded database.",
+  "description": "Deferred out of uat-container-readiness-and-memory-headroom-gate-20260805 during review, deliberately rather than silently.\n\nThe UAT preflight free-memory gate reads `psutil.virtual_memory().available` -- which is the correct choice; a `.free`-based gate would refuse to run on a healthy machine (measured on this host: .available 6.888 GiB vs .free 1.076 GiB against a 2.0 GiB floor).\n\nBut the incident that motivated the 2.0 GiB floor reported \"72 MB free of 16 GB\", which is a macOS *free*-style figure, not `.available`. On this host those two metrics differ by roughly 6.4x. Nobody recorded the incident host's `.available` reading, so it is entirely possible that host was above the 2.0 GiB floor and the gate would not have fired on the very failure it was written for.\n\nThe floor is currently marked in-code as a placeholder pending a real `.available` measurement, so it is not masquerading as data. This item is to replace it with one.\n\nSecond, related question deferred with it: the gate aborts a multi-hour sweep on a single instantaneous sample with no retry or averaging. The disk gate has the same shape, but disk free space does not fluctuate on second timescales the way `.available` memory does. Averaging changes WHEN the gate fires, so tuning it on top of an uncalibrated threshold compounds two unknowns -- calibrate first, then decide whether sampling noise is a real problem.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add averaging or retry before the floor is calibrated",
+        "instead": "Calibrate the floor first, then evaluate the sampling question against the observed trace.",
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "why": "Sampling policy changes when the gate fires. Layering it on an uncalibrated threshold means two unknowns interacting, and a false pass would look identical to a correctly-tuned one."
+      },
+      {
+        "dont": "Delete the placeholder comment once a number is chosen",
+        "instead": "Replace it with the dated measurement and the host it came from.",
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "why": "The comment records that the floor and the motivating incident are in different metrics. That provenance is the whole reason this item exists and is what stops the confusion recurring."
+      },
+      {
+        "dont": "Pick a new floor by reasoning about the 6.4x ratio between .available and .free on some host",
+        "instead": "Measure .available on a host that actually fails, during the workload that actually fails.",
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "why": "That is arithmetic on two numbers measured on different machines under different load. It would replace an honest placeholder with a fabricated measurement, which is strictly worse -- the placeholder at least announces that it is one."
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Cannot execute w0 in this session: no Docker/Mocker container-VM workload is available, and the TODO explicitly forbids synthetic starvation or substituting another host. The existing .available metric and 2.0 GiB placeholder remain unchanged; focused memory gate tests pass (8 passed). Reopen only with a real failing host/sweep trace containing total, available, free, and swap.",
+      "category": "correctness",
+      "claimed_at": "2026-08-12T12:46:37Z",
+      "claimed_by": "joe@joe-mac-mini.local",
+      "created_at": "2026-08-06T01:21:40Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The gate keeps reading .available, not .free -- that choice was verified correct and is not what this item revisits.",
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805"
+      },
+      {
+        "behavior": "The gate stays scoped to docker-managed platforms; a native sweep is unaffected.",
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805"
+      },
+      {
+        "behavior": "free_memory_min_gib: 0 still disables the gate, and still prints the disabled warning.",
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "preflight.free_memory_min_gib, default 2.0, 0 disables",
+        "decision": "extend",
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "path": "tests/uat/config.py"
+      },
+      {
+        "concept": "the disk gate's single-sample shape, which the memory gate deliberately mirrors",
+        "decision": "reuse",
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "path": "tests/uat/phases/preflight.py"
+      },
+      {
+        "concept": "check_memory_headroom / format_memory_headroom_failure and the placeholder floor comment",
+        "decision": "extend",
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "path": "tests/uat/preflight_budget.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/config.py"
+      },
+      {
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/preflight_budget.py"
+      },
+      {
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_config.py"
+      },
+      {
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_preflight_budget.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -q 'CALIBRATION PROVENANCE' tests/uat/config.py",
+        "description": "The floor still carries the CALIBRATION PROVENANCE marker saying it is uncalibrated",
+        "expected": "FAILS (exit 1) on the unfixed tree: the marker is present precisely because the floor has never been calibrated against a real .available reading. Exits 0 once a dated measurement replaces it. Depends on branch fix/uat-readiness-and-memory-gate landing first, since the marker ships with the memory gate itself.",
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run pytest tests/uat/test_preflight_budget.py -q -p no:cacheprovider -n 0 -k memory",
+        "description": "The gate still reads .available rather than .free, and still refuses below the floor",
+        "expected": "Green before and after -- a regression guard, not a red rung. It exists so recalibration cannot quietly switch the metric back to .free, which would refuse to run on a healthy machine (measured: .available 6.888 GiB vs .free 1.076 GiB against a 2.0 GiB floor).",
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Capture total/available/free/swap from a host that genuinely fails to start container VMs, during a real mocker sweep, and record the reading with its date and host",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Set free_memory_min_gib from that measurement and replace the placeholder comment with the dated observation",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-memory-floor-calibrated-against-the-wrong-metric-20260805",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide the sampling question against the observed trace: add averaging or a confirm-twice rule only if the trace is actually noisy near the floor, and record the decision either way",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,137 @@
+{
+  "description": "During the 2026-06-08 prioritization pass the develop branch tip was PR #748.\nBy the time the follow-up TODO files were authored, PRs #749-#759 had also\nlanded, including at least three that directly close or partially close open\nTODO items:\n\n- PR #748: wired query plan capture for PostgreSQL, Redshift, DataFusion,\n  SQLite, MotherDuck — likely completes query-plan-capture-datafusion-sqlite\n  (High) and query-plan-capture-postgresql-family (High), partially addresses\n  motherduck-cloud-features\n- PR #756: fix(tpchavoc): qualify correlated-subquery self-binding —\n  likely completes tpchavoc-correlated-subquery-self-binding (Medium-High)\n- PR #759: propagate benchmark output roots before generators are built —\n  likely completes benchmark-runs-output-root-propagation (Critical)\n\nAudit each affected TODO against the actual PR diffs, update statuses, move\nfully-completed items to the DONE tree, and adjust priorities for items where\nthe scope has changed. High/Critical items that are actually done inflate\nperceived backlog urgency and distort prioritization.",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-06-14T00:00:00Z",
+      "created_at": "2026-06-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cross-item deps that reference audited items remain consistent after moves to DONE",
+        "item_id": "todo-post-748-capture-status-audit"
+      },
+      {
+        "behavior": "Items only partially addressed by these PRs remain open with updated description",
+        "item_id": "todo-post-748-capture-status-audit"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "TODO/main/planning/benchmark-runs-output-root-propagation.yaml: check against PR #759",
+        "decision": "reuse",
+        "item_id": "todo-post-748-capture-status-audit",
+        "path": "TODO/main/planning/benchmark-runs-output-root-propagation.yaml"
+      },
+      {
+        "concept": "TODO/main/planning/tpchavoc-correlated-subquery-self-binding.yaml: check against PR #756",
+        "decision": "reuse",
+        "item_id": "todo-post-748-capture-status-audit",
+        "path": "TODO/main/planning/tpchavoc-correlated-subquery-self-binding.yaml"
+      },
+      {
+        "concept": "TODO/platform-expansion/planning/query-plan-capture-*.yaml: the cluster to audit",
+        "decision": "reuse",
+        "item_id": "todo-post-748-capture-status-audit",
+        "path": "TODO/platform-expansion/planning/query-plan-capture-*.yaml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo list --state planning --json | uv run -- python -c 'import json,sys; blocked={\"query-plan-capture-datafusion-sqlite\",\"query-plan-capture-postgresql-family\",\"tpchavoc-correlated-subquery-self-binding\",\"benchmark-runs-output-root-propagation\"}; assert blocked.isdisjoint(x[\"id\"] for x in json.load(sys.stdin))'",
+        "description": "Resolved capture items are absent from current planning state",
+        "expected": "exit 0",
+        "item_id": "todo-post-748-capture-status-audit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-post-748-capture-status-audit",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-post-748-capture-status-audit",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "todo-post-748-capture-status-audit",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "todo-post-748-capture-status-audit",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "todo-post-748-capture-status-audit",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "todo-post-748-capture-status-audit",
+        "notes": "Reviewed via GitHub MCP pull_request_read (get_files) on the actual merged\ndiffs rather than titles.\nPR #748 (e9999563): wired get_query_plan()/get_query_plan_parser() + capture\n  into DataFusion, SQLite, PostgreSQL, Redshift, MotherDuck; added\n  DataFusion/SQLite/PostgreSQL/Redshift plan-capture unit tests incl. a\n  PostgreSQL subclass-inheritance test. Fully completes\n  query-plan-capture-datafusion-sqlite and the wiring (w1-w7) of\n  query-plan-capture-postgresql-family; supplies the MotherDuck portion\n  (w1/w2) of query-plan-capture-misc-platforms. Did NOT touch the\n  motherduck-cloud-features credential-wizard/upload/cache work.\nPR #756 (82ff4aa5): qualified q11_v1, q17_v8, and (via sweep) q2_v8 to the\n  outer table; added a DuckDB regression test. Fully completes\n  tpchavoc-correlated-subquery-self-binding.\nPR #759 (fa0f7898): benchmark output-root propagation — the item was already\n  moved to _project/DONE/main/benchmark-runs-output-root-propagation.yaml.\nSupplementary: PR #777 (7b06b7db) added a live PostgreSQL CI container +\n  plan-capture integration tests, completing postgresql-family w8.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Review PRs #748, #756, #759 diffs and commit messages for scope",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-post-748-capture-status-audit",
+        "notes": "Audit outcome per cross-referenced file:\n  - query-plan-capture-datafusion-sqlite: Not Started -> Completed (PR #748).\n  - query-plan-capture-postgresql-family: In Progress -> Completed\n    (PR #748 wiring + #777 live UAT; w7/w8 confirmed done).\n  - motherduck-cloud-features: unchanged (Blocked). PR #748 added plan\n    capture, NOT the credential-wizard/cloud-upload/cache-control features\n    this item tracks — confirmed via diff, contradicting the title-level guess.\n  - query-plan-capture-clickhouse-family: already status Completed\n    (landed via PR #775, outside #748-759); left for the dedicated\n    todo-sweep-completed-items-from-open-tree task.\n  - query-plan-capture-presto-trino-family: already status Completed; same\n    handling as clickhouse (not touched by #748-759).\n  - query-plan-capture-spark-databricks: already status Completed (PR #778);\n    same handling.\n  - query-plan-capture-misc-platforms: stays In Progress. MotherDuck (w1/w2)\n    done by #748; Databend/QuestDB/Velox/Doris/SingleStore/cuDF + tests (w9)\n    remain pending. Notes refreshed to cite PR #748.\n  - tpchavoc-correlated-subquery-self-binding: Not Started -> Completed (#756).\n  - benchmark-runs-output-root-propagation: already in _project/DONE\n    (PR #759 / #780). No action.\nFiles originally listed:\n  TODO/platform-expansion/planning/query-plan-capture-datafusion-sqlite.yaml\n  TODO/platform-expansion/planning/query-plan-capture-postgresql-family.yaml\n  TODO/platform-expansion/active/motherduck-cloud-features.yaml\n  TODO/platform-expansion/planning/query-plan-capture-clickhouse-family.yaml\n  TODO/platform-expansion/planning/query-plan-capture-presto-trino-family.yaml\n  TODO/platform-expansion/planning/query-plan-capture-cloud-saas.yaml\n  TODO/platform-expansion/planning/query-plan-capture-spark-databricks.yaml\n  TODO/platform-expansion/planning/query-plan-capture-misc-platforms.yaml\n  TODO/main/planning/tpchavoc-correlated-subquery-self-binding.yaml\n  TODO/main/planning/benchmark-runs-output-root-propagation.yaml\nFor each: status correct? scope still valid? work units still pending?\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cross-reference affected TODOs against PR scopes",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-post-748-capture-status-audit",
+        "notes": "Moved to _project/DONE preserving directory structure:\n  - DONE/platform-expansion/planning/query-plan-capture-datafusion-sqlite.yaml\n  - DONE/platform-expansion/planning/query-plan-capture-postgresql-family.yaml\n  - DONE/main/planning/tpchavoc-correlated-subquery-self-binding.yaml\nEach gained completed_date, commits, and an Implementation Summary section.\nNo deps.needs reference these ids (only prior_art free-text mentions), so\ndependency resolution stays consistent after the moves.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update status and move Completed items to DONE tree",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-post-748-capture-status-audit",
+        "notes": "query-plan-capture-misc-platforms remains In Progress; its MotherDuck work\nunits (w1/w2) were refreshed to cite PR #748 as the landing PR while the\nremaining platforms stay open. No priority changes were warranted — the\npartially-addressed items keep their existing priorities.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update priority or description for items with changed scope",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-post-748-capture-status-audit",
+        "notes": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all\nuv run _project/scripts/generate_indexes.py\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run validate_todo.py --all and regenerate indexes",
+        "wid": "w4"
+      }
+    ]
+  }
+}

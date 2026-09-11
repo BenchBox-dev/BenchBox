@@ -1,0 +1,288 @@
+{
+  "context": "w1: Add 8 entries to pyproject.toml [tool.benchbox.complexity] exclude_functions\nfollowing the existing format: \"file:function\",  # CC - rationale\n\nw2-w9: For each refactoring:\n1. Read the function and its callers/tests\n2. Extract private helper methods in the same module\n3. Run focused tests + lint after each extraction\n4. Verify CC reduced via: uv run -- python scripts/check_complexity.py 2>&1 | grep function_name\n5. Commit per work unit\n",
+  "description": "After resolving all CC ≥20 violations, 16 functions remain at CC 14 (the new\nceiling). Each was evaluated by reading the implementation and classifying\ncomplexity as inherent (driven by domain semantics - type dispatch, protocol\nsteps, format combinations) or accidental (refactorable via extraction or\ndata-driven patterns).\n\n8 functions have inherent complexity and should be added to exclude_functions.\n8 functions have accidental complexity and should be refactored to CC ≤10.\n\nGoal: lower the complexity ceiling from 14 to ≤13, with no regressions.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add new abstractions (base classes, protocols)",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc14-complexity-cluster",
+        "why": "extraction alone achieves the CC target"
+      },
+      {
+        "dont": "change public API signatures",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc14-complexity-cluster",
+        "why": "all targets are internal functions"
+      },
+      {
+        "dont": "move code to new files",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc14-complexity-cluster",
+        "why": "helpers share private state with the parent function"
+      },
+      {
+        "dont": "refactor functions classified as inherent",
+        "instead": "(not specified)",
+        "item_id": "reduce-cc14-complexity-cluster",
+        "why": "their complexity reflects domain reality; use exclude_functions instead"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality",
+      "completed_at": "2026-03-12T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All refactored functions must produce identical behavior - no semantic changes",
+        "item_id": "reduce-cc14-complexity-cluster"
+      },
+      {
+        "behavior": "Excluded functions from prior complexity work remain untouched",
+        "item_id": "reduce-cc14-complexity-cluster"
+      },
+      {
+        "behavior": "Existing tests must continue to pass without modification",
+        "item_id": "reduce-cc14-complexity-cluster"
+      },
+      {
+        "behavior": "exclude_functions entries must include CC score and rationale comment",
+        "item_id": "reduce-cc14-complexity-cluster"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/visualization.py"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "kind": "only_modify",
+        "path_glob": "benchbox/monitoring/report.py"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/datafusion_write_transformer.py"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/data_validation.py"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/database_naming.py"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/format_converters/vortex_converter.py"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make complexity-check",
+        "description": "Complexity check passes",
+        "expected": "PASSED: all functions within complexity limit of 20",
+        "item_id": "reduce-cc14-complexity-cluster",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/check_complexity.py --no-fail 2>&1 | head -5",
+        "description": "No new functions at CC 14 (ceiling should be ≤13)",
+        "expected": "Top functions should be CC ≤13",
+        "item_id": "reduce-cc14-complexity-cluster",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "No regressions in fast suite",
+        "expected": "All fast tests pass",
+        "item_id": "reduce-cc14-complexity-cluster",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check .",
+        "description": "Lint passes",
+        "expected": "All checks passed",
+        "item_id": "reduce-cc14-complexity-cluster",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "reduce-cc14-complexity-cluster",
+        "needs_wid": "w1",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "reduce-cc14-complexity-cluster",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Exclude 8 inherent-complexity CC 14 functions in pyproject.toml",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc14-complexity-cluster",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _format_property_diff (CC 14→~4) - dict dispatch replacing if/elif chain",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc14-complexity-cluster",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _populate_dataframe_query_details (CC 14→~6) - extract impl resolution",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc14-complexity-cluster",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor generate_ascii_chart (CC 14→~5) - extract resampling and grid building",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc14-complexity-cluster",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _rewrite_bulk_load_sql (CC 14→~4) - extract per-pattern rewrite helpers",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc14-complexity-cluster",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _validate_with_manifest (CC 14→~6) - extract shared entry validation",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc14-complexity-cluster",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor _create_enhanced_schema_creation_phase (CC 14→~5) - extract table name resolution",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc14-complexity-cluster",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor parse_database_name (CC 14→~6) - data-driven keyword extraction",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "reduce-cc14-complexity-cluster",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor convert (vortex) (CC 14→~7) - extract writer dispatch",
+        "wid": "w9"
+      }
+    ]
+  }
+}

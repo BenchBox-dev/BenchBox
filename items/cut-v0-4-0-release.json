@@ -1,0 +1,201 @@
+{
+  "context": "Ship the release on the gate definition that exists today rather than widening the gate first. Land the CLI URL fixes and the docs audit before the cut so the release carries visible user-facing value, not only internal refactors. Add the cloud release-gate group afterwards, under first-live-cloud-benchmark-run-and-publish w6.",
+  "description": "REVALIDATED 2026-08-20. Last PyPI release is v0.3.1 (2026-07-09). This clone is 1,247 commits ahead of that tag; PyPI last-month downloads 142; 11 stars / 0 forks.\n\nThis cut is the customer-visible lever, not changelog theater:\n- docs.yml deploys GitHub Pages only on push to release, so cutting v0.4.0 is how https://benchbox.dev/results/ stops 404ing.\n- Amendment 2026-08-13 + PR #1712 already made Results Explorer a curated-preview publication surface on release. The software is intended to ship with this cut.\n- Isolated CLI first-60-seconds fix (docs.benchbox.dev NXDOMAIN; advertised `run -p` fails) should land in this wheel. It already exists as a98d20ca0 on docs/audit-v0-4-0; do not wait for the 94-file docs audit.\n\nStale planning: _project/planning/v0.4.0-release-readiness.md still says Results Explorer OUT OF SCOPE (2026-07-31). Reconcile that during w1.\n\nCustomer proof after w3: `pip install benchbox==0.4.0` works AND https://benchbox.dev/results/ returns 200. Release-gate configs do not substitute for those two checks. Cloud PLATFORM_GROUPS is not a gate for this cut.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Cut the release without a fresh qualifying release canary",
+        "instead": "INSTEAD require a green canary artifact bound to an ancestor of the release head",
+        "item_id": "cut-v0-4-0-release",
+        "why": "docs/operations/release-guide.md makes canary freshness and ancestry blocking while UAT is advisory"
+      },
+      {
+        "dont": "Ship a wheel in which benchbox compare run mode still exits 0 on a fabricated 1.00x result",
+        "instead": "INSTEAD land compare-run-mode-reports-false-success first",
+        "item_id": "cut-v0-4-0-release",
+        "why": "the first thing a new user does is compare two engines"
+      },
+      {
+        "dont": "treat CHANGELOG triage or UAT release-gate evidence as the ship criterion",
+        "instead": "INSTEAD require pip install of 0.4.0 and live /results/ 200",
+        "item_id": "cut-v0-4-0-release",
+        "why": "customers see PyPI and benchbox.dev, not those artifacts"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "cut-v0-4-0-release",
+        "needs_item": "compare-run-mode-reports-false-success"
+      },
+      {
+        "item_id": "cut-v0-4-0-release",
+        "needs_item": "explorer-execution-mode-facet-null-for-every-bundle"
+      },
+      {
+        "item_id": "cut-v0-4-0-release",
+        "needs_item": "fix-customer-facing-cli-url-and-help-defects"
+      }
+    ],
+    "item_meta": {
+      "category": "release",
+      "completed_at": "2026-08-29T12:39:58Z",
+      "completed_pr": 1933,
+      "created_at": "2026-08-17T23:29:04Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "cut-v0-4-0-release",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "cut-v0-4-0-release",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "cut-v0-4-0-release",
+        "kind": "only_modify",
+        "path_glob": "_project/planning/v0.4.0-release-readiness.md"
+      },
+      {
+        "item_id": "cut-v0-4-0-release",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "cut-v0-4-0-release",
+        "kind": "only_modify",
+        "path_glob": "release/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "curl -fsS -o /dev/null -w '%{http_code}' https://benchbox.dev/results/",
+        "description": "Live Explorer is served after the cut",
+        "expected": "HTTP 200",
+        "item_id": "cut-v0-4-0-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "python -m venv \"$JCODE_SCRATCH_DIR/benchbox-v040-install\" && \"$JCODE_SCRATCH_DIR/benchbox-v040-install/bin/pip\" install benchbox==0.4.0 && \"$JCODE_SCRATCH_DIR/benchbox-v040-install/bin/python\" -c 'import benchbox; print(benchbox.__version__)'",
+        "description": "Clean install of the published wheel works",
+        "expected": "prints 0.4.0 and exits 0",
+        "item_id": "cut-v0-4-0-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output \"$JCODE_SCRATCH_DIR/benchbox-v040-explorer-data\" && SNAPSHOT=\"$JCODE_SCRATCH_DIR/benchbox-v040-explorer-data/results.duckdb\" uv run -- python -c \"import os,duckdb;c=duckdb.connect(os.environ['SNAPSHOT'],read_only=True);print(c.execute('select count(*) from results where is_ranking_eligible').fetchone(), c.execute('select count(*) from results where execution_mode is null').fetchone())\"",
+        "description": "The shipped snapshot is not the known-bad one",
+        "expected": "build exits 0, ranking-eligible is the large majority, and NULL execution_mode is zero",
+        "item_id": "cut-v0-4-0-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "cut-v0-4-0-release",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "cut-v0-4-0-release",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "cut-v0-4-0-release",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "cut-v0-4-0-release",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "cut-v0-4-0-release",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Live revalidation on 2026-08-26: origin/develop is cf1f799ad79469eb3b4309102bb12d141fddc46a; PR #1919 merged as 713618943f955091daa03699c87a78956b00ce13, PR #1909 merged as ca08895fdc7816495ae5b7c5f16d140f1b0f326b, and corpus mirror PR #1923 merged as fddf209e7d227658dac4b3a6432a9fb1e62c4691. Current develop corpus validation passed 138 bundles/34 cohorts, inventory check passed, submission validation passed, and rebuilt Explorer snapshot invariants passed. Latest scheduled Release Canary 32948680440 is green on ancestor 051f79ce; latest scheduled Nightly 32938091841 is red, and fresh UAT Stage 1 is running on cf1.",
+        "item_id": "cut-v0-4-0-release",
+        "notes": null,
+        "started_at": "2026-08-26T20:19:54Z",
+        "started_branch": "chore/v0-4-0-non-uat-integration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-v0-4-0-non-uat-integration",
+        "status": "done",
+        "summary": "Revalidate",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1933 and PR #1935 reconciled CHANGELOG.md and v0.4.0-release-readiness.md with curated preview announcement",
+        "item_id": "cut-v0-4-0-release",
+        "notes": null,
+        "started_at": "2026-08-27T22:03:32Z",
+        "started_branch": "chore/v0-4-0-release-operator-20260827",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-v0-4-0-release-20260827",
+        "status": "done",
+        "summary": "Reconcile CHANGELOG and _project/planning/v0.4.0-release-readiness.md (replace Explorer OUT OF SCOPE with Curated Preview) and announce https://benchbox.dev/results/",
+        "wid": "w1"
+      },
+      {
+        "evidence": "make release-cut and make release-finalize preflights passed during v0.4.0 cut",
+        "item_id": "cut-v0-4-0-release",
+        "notes": null,
+        "started_at": "2026-08-27T22:03:35Z",
+        "started_branch": "chore/v0-4-0-release-operator-20260827",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-v0-4-0-release-20260827",
+        "status": "done",
+        "summary": "Run release-guide-required preflight only; this is not the customer-visible proof of the cut",
+        "wid": "w2"
+      },
+      {
+        "evidence": "PR #1933 merged, tag v0.4.0 pushed, wheel published to PyPI, clean pip install verified benchbox==0.4.0",
+        "item_id": "cut-v0-4-0-release",
+        "notes": null,
+        "started_at": "2026-08-29T12:39:49Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Cut and publish v0.4.0, then verify a clean pip install and import",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Confirmed live https://benchbox.dev/ (200) and https://benchbox.dev/results/ (200)",
+        "item_id": "cut-v0-4-0-release",
+        "notes": null,
+        "started_at": "2026-08-29T12:39:51Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "After release-finalize, confirm live https",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Maintainer approved SHIP for v0.4.0. Live origin/develop 051f79ce contains three TPC-DS SF1 bundles (DataFusion, DuckDB, Spark), each with summary.validation=passed and 309/309 queries passed; verified from the committed bundle JSON at 2026-08-26. These bundles are already landed in results-data before the release cut.",
+        "item_id": "cut-v0-4-0-release",
+        "notes": null,
+        "started_at": "2026-08-26T15:06:46Z",
+        "started_branch": "chore/v0-4-0-non-uat-integration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-v0-4-0-non-uat-integration",
+        "status": "done",
+        "summary": "DECISION GATE - land TPC-DS SF1 in results-data before this cut, or accept it will not reach the live site until the next release; record the choice",
+        "wid": "w5"
+      }
+    ]
+  }
+}

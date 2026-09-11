@@ -1,0 +1,124 @@
+{
+  "context": "Move auto-merge enablement off PR creation. Candidates: enable on ready_for_review rather than opened, so make pr-open creates a draft and the author flips it when the work is actually complete; or have make pr-open enable auto-merge only when explicitly asked (--auto), defaulting off; or keep enablement at open but have auto-merge-on-open.yml withhold until a marker is cleared. Weigh against the must-preserve from pr-open-auto-merge-partial-stack-race-20260804: an ordinary finished PR should still merge hands-free without extra ceremony. Draft-by-default is likely the smallest change that removes the exposure while keeping the hands-free path for finished work.",
+  "description": "Detection is not enough. make pr-open enables squash auto-merge at PR creation, so any PR that later receives a commit - a review fix, a second unit of work - can merge carrying only its first commit while the rest is still being pushed. Three occurrences in one session: #1503 lost the browser gate job its own PR body described; #1521 and #1531 then each lost the very commit that addressed their Codex review findings, and neither fix reached develop. PR #1521 added per-push orphan detection and PR #1534 re-landed the strandings, but detection is after the fact - #1534 exists only because the detector was run by hand. The exposure is structural: every PR that gets review feedback is a candidate, and review feedback is the normal case.",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-05T13:27:03Z",
+      "completed_pr": 1567,
+      "created_at": "2026-08-04T13:04:19Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A finished PR still merges hands-free once declared complete - the fix must not add ceremony to the common case",
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804"
+      },
+      {
+        "behavior": "Soundness-path PRs keep their existing withhold-and-revoke behaviour",
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/workflows -q -k auto_merge_enablement_point",
+        "description": "A PR cannot auto-merge before it is declared complete",
+        "expected": "Exits 1 on the unfixed tree, where make pr-open enables auto-merge at creation so a later commit can be outrun, and exits 0 once enablement moves. Write the test in w2 so this rung becomes runnable.",
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-05T13:25:47Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit -q -k auto_merge",
+        "description": "Existing auto-merge predicate tests still pass",
+        "expected": "No regression in soundness withholding or revocation",
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-05T13:26:06Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "DECIDED by Joe 2026-08-04: pr-open withholds, pr-ready arms. Established first that no local check can prevent this - in all three strandings (#1503, #1521, #1531) the working tree was clean at pr-open time and the extra commit came later from review feedback, and auto-merge-on-open.yml reacts to synchronize but the merge can complete before that push exists. So the only real prevention is to stop arming at creation. Hands-free is preserved two ways: 'make pr-ready' for a branch declared final, and 'make pr-open READY=1' to open and arm in one step. Rejected: HOLD=1 opt-out (prevents nothing by default, and only helps when you already know you are mid-work - exactly what I got wrong all three times) and detection-only (leaves the recovery cost in place).",
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804",
+        "notes": null,
+        "started_at": "2026-08-05T13:25:25Z",
+        "started_branch": "fix/auto-merge-enablement-point-20260804",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Pick the enablement point and confirm it keeps finished PRs hands-free",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Makefile: pr-open no longer calls gh pr merge; it prints how to arm. New pr-arm-auto-merge holds the single arming implementation, consulted by both entry points, so the soundness withhold cannot drift between copies - verified 'gh pr merge --auto --squash' appears exactly once in the Makefile. New pr-ready delegates to it. Both targets added to .PHONY and confirmed to resolve via make -n. docs/operations/dev-loop-worktree-pool.md and repo-admin-settings.md updated so the documented flow matches.",
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804",
+        "notes": null,
+        "started_at": "2026-08-05T13:25:31Z",
+        "started_branch": "fix/auto-merge-enablement-point-20260804",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement it",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/workflows/test_auto_merge_enablement_point.py: 4 tests - pr-open does not arm directly, a hands-free path still exists (pr-ready plus READY=1), exactly one arming implementation, and (must-preserve) the arming path consults auto_merge_soundness_paths.py BEFORE arming so soundness withholding survives the move. Falsified against the pre-change Makefile: 3 of 4 fail, including 'pr-open arms auto-merge directly, so a PR can merge before a later commit is pushed'. tests/unit -k auto_merge: 47 passed; tests/unit/workflows: 138 passed.",
+        "item_id": "pr-open-auto-merge-prevent-not-just-detect-20260804",
+        "notes": null,
+        "started_at": "2026-08-05T13:25:37Z",
+        "started_branch": "fix/auto-merge-enablement-point-20260804",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Cover it with a test that a PR cannot auto-merge before it is declared complete",
+        "wid": "w2"
+      }
+    ]
+  }
+}

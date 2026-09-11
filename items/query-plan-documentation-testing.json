@@ -1,0 +1,11 @@
+{
+  "description": "Comprehensive documentation for query plan capture and comparison feature,\nincluding user guide, API documentation, platform-specific notes, and\nintegration tests. Covers all three comparison scenarios with examples.\n\n**Documentation Scope**:\n- User guide: How to capture and compare plans\n- API documentation: For programmatic use\n- Platform guide: Platform-specific EXPLAIN behaviors\n- Performance guide: Optimization and troubleshooting",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2025-11-23T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-docs"
+    }
+  }
+}

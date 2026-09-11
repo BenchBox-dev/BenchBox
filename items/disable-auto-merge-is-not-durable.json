@@ -1,0 +1,102 @@
+{
+  "context": "Make the synchronize evaluation union the base-ref predicate with the PR's own, so a widening protects the PR that introduces it. Have green_unmerged_sweep.py treat an explicitly-disabled auto-merge as a signal to leave alone rather than re-arm - a marker label or a check of who last disabled it. Document that draft is the durable hold. Both files are self-protected, so this lands under owner review.",
+  "description": "Observed twice in one session. Disabling auto-merge on a PR does not hold: (1) .github/workflows/auto-merge-on-open.yml triggers on 'synchronize', so ANY later push to the branch re-enables it - that is how PR #1528, a privacy change, merged with no review after auto-merge had been explicitly disabled; and (2) nightly.yml runs green_unmerged_sweep.py --apply on a schedule, which re-enables auto-merge on green non-soundness PRs, so a disabled PR silently re-arms overnight even with no pushes. The synchronize re-evaluation uses the BASE-REF copy of the predicate, so a soundness widening still in flight cannot protect the PR that introduces it - which is the specific hole #1529 walked through. The only durable hold today is draft status, which both paths honour (auto-merge-on-open.yml gates on draft == false; green_unmerged_sweep.py requires 'not draft'). That is not discoverable from either workflow's documentation.",
+  "legacy": {
+    "item_meta": {
+      "category": "governance",
+      "created_at": "2026-08-04T17:17:15Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Drafts continue to be skipped by both paths",
+        "item_id": "disable-auto-merge-is-not-durable"
+      },
+      {
+        "behavior": "The gate machinery stays self-protecting",
+        "item_id": "disable-auto-merge-is-not-durable"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "disable-auto-merge-is-not-durable",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/auto-merge-on-open.yml"
+      },
+      {
+        "item_id": "disable-auto-merge-is-not-durable",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/green_unmerged_sweep.py"
+      },
+      {
+        "item_id": "disable-auto-merge-is-not-durable",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "disable-auto-merge-is-not-durable",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py -q",
+        "description": "auto-merge machinery still self-protects",
+        "expected": "Existing suite must stay green",
+        "item_id": "disable-auto-merge-is-not-durable",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "disable-auto-merge-is-not-durable",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "disable-auto-merge-is-not-durable",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "disable-auto-merge-is-not-durable",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Union the base-ref and PR-copy predicates on synchronize",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "disable-auto-merge-is-not-durable",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Stop the nightly sweep re-arming an explicitly disabled auto-merge",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "disable-auto-merge-is-not-durable",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document draft status as the durable hold",
+        "wid": "w2"
+      }
+    ]
+  }
+}

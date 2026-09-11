@@ -1,0 +1,398 @@
+{
+  "context": "Extend benchbox.utils.printing as the canonical output API and forbid new direct Console()/print() usage\nin runtime modules. Replace command-local Console() instances with benchbox.cli.shared.console.\nFor core execution paths that can be called by CLI and MCP, route output through verbosity-aware logger\nor centralized helpers; use silence_output only as a compatibility boundary where upstream third-party\nwrites cannot be controlled directly. Add targeted tests for quiet behavior in CLI and MCP tool execution.\n",
+  "description": "Audit findings show multiple user-visible output paths bypassing the centralized output mechanism:\n- direct Console() instances in CLI commands\n- raw print() in core execution/data-generation flows\n- mixed output channels in interactive shell paths\n- transitive leak risk for MCP tools that invoke core code paths\n\nThis item consolidates all user-facing output behind a central output module and enforces quiet-mode\nguarantees across CLI and MCP execution paths.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "keep command-local Console() singletons",
+        "instead": "use benchbox.cli.shared.console or injected quiet-aware console",
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "why": "they bypass shared quiet policy"
+      },
+      {
+        "dont": "rely only on call-site silence_output wrappers",
+        "instead": "route runtime output through centralized helpers/logging",
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "why": "transitive core calls can still leak output in other entrypoints"
+      },
+      {
+        "dont": "use bare print() in runtime execution paths",
+        "instead": "use centralized printing/logging helpers",
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "why": "it bypasses quiet controls and MCP stdout constraints"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-02-18T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing non-quiet CLI UX (tables/panels/help text) remains functionally unchanged",
+        "item_id": "centralize-output-control-and-eliminate-print-leaks"
+      },
+      {
+        "behavior": "MCP server stdout remains reserved for JSON-RPC messages only",
+        "item_id": "centralize-output-control-and-eliminate-print-leaks"
+      },
+      {
+        "behavior": "benchbox run --quiet produces no user-visible stdout/stderr output while still returning correct exit codes",
+        "item_id": "centralize-output-control-and-eliminate-print-leaks"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "do_not_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/compare_plans.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/plan_history.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/report.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/results.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/shell.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/show_plan.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/shared.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/config_utils.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/display.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/runner.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/benchmark/runner.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/generator/filesystem.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/generator/manager.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/generator/runner.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/generator/streaming.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/server.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/printing.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_quiet_mode.py"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_mcp_benchmark_stdout_suppression.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_quiet_mode.py -q",
+        "description": "Quiet-mode unit tests pass for CLI output suppression",
+        "expected": "all tests pass",
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -q",
+        "description": "MCP tools do not emit non-JSON output to stdout during benchmark execution paths",
+        "expected": "all tests pass with no stdout protocol violations",
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n '^\\s*print\\(' benchbox/cli/commands/run.py benchbox/cli/commands/results.py benchbox/cli/commands/report.py benchbox/cli/commands/show_plan.py benchbox/cli/commands/compare_plans.py benchbox/cli/commands/plan_history.py benchbox/cli/commands/shell.py benchbox/core/runner/runner.py benchbox/core/tpcds/generator/manager.py benchbox/core/tpcds/generator/streaming.py benchbox/core/tpcds/generator/filesystem.py benchbox/core/tpcds/generator/runner.py benchbox/core/tpcds/benchmark/runner.py benchbox/core/results/display.py benchbox/core/config_utils.py benchbox/mcp/tools/benchmark.py",
+        "description": "No direct runtime print leaks remain in CLI/core runtime modules",
+        "expected": "no matches",
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "needs_wid": "w6",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create canonical output policy and API in a central module",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full verification suite and close remaining output-control gaps",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate CLI commands (results/report/show-plan/compare-plans/plan-history) from Console() to shared quiet-aware console",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize shell command output by removing raw print() paths and using centralized console helpers",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace raw print() in core runner/config/results display modules with centralized output/logging",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace raw print() in TPC-DS generator and benchmark runtime modules with centralized output/logging",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wrap MCP benchmark execution/generation entrypoints with stdout/stderr suppression boundaries",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add static output-leak enforcement checks for runtime modules",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Expand CLI quiet-mode tests to cover consolidated output channels",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "centralize-output-control-and-eliminate-print-leaks",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add MCP regression tests asserting no non-JSON stdout leakage in benchmark tool paths",
+        "wid": "w9"
+      }
+    ]
+  }
+}

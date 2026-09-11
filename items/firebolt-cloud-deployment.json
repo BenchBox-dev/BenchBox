@@ -1,0 +1,443 @@
+{
+  "description": "Ensure full support for Firebolt Cloud deployment mode via the firebolt:cloud\nsyntax, completing the Firebolt platform family alongside the existing\nfirebolt:core (local Docker container) mode.\n\nWhile the Firebolt adapter already has mode awareness, this TODO ensures\ncloud mode is fully integrated with the new deployment registry architecture\nand has comprehensive credential/connection handling.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "break existing Firebolt Core Docker mode",
+        "instead": "ensure firebolt:core continues to work without cloud credentials",
+        "item_id": "firebolt-cloud-deployment",
+        "why": "it is the default development mode"
+      },
+      {
+        "dont": "remove firebolt_mode config support",
+        "instead": "support both firebolt_mode and deployment_mode with deprecation warning",
+        "item_id": "firebolt-cloud-deployment",
+        "why": "existing users have configs with it"
+      },
+      {
+        "dont": "require cloud credentials for core mode",
+        "instead": "gate cloud auth behind deployment mode checks",
+        "item_id": "firebolt-cloud-deployment",
+        "why": "core mode runs locally via Docker"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "firebolt-cloud-deployment",
+        "id": 580,
+        "reason": "Requires Firebolt Cloud account with provisioned engine",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Requires a provisioned Firebolt Cloud account/engine, unavailable to agents; blocked pending infra/credentials.",
+        "summary": "Live integration tests and benchmarks on Firebolt Cloud (w21-w23)"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-16T00:00:00Z",
+      "created_at": "2026-01-14T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "firebolt-cloud-deployment"
+      },
+      {
+        "behavior": "Existing firebolt:core mode unchanged",
+        "item_id": "firebolt-cloud-deployment"
+      },
+      {
+        "behavior": "Platform registry autodiscovery continues working for all existing platforms",
+        "item_id": "firebolt-cloud-deployment"
+      },
+      {
+        "behavior": "firebolt:core backward compatibility maintained with both firebolt_mode and deployment_mode config keys",
+        "item_id": "firebolt-cloud-deployment"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/credentials/firebolt_cloud.py"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/firebolt.py"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_firebolt_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.credentials.firebolt_cloud import *; print('import OK')\"",
+        "description": "Cloud credentials module imports correctly",
+        "expected": "import OK",
+        "item_id": "firebolt-cloud-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_firebolt_adapter.py -v --tb=short",
+        "description": "Firebolt adapter unit tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "firebolt-cloud-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "Existing platform tests unaffected",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "firebolt-cloud-deployment",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "needs_wid": "w10",
+        "wid": "w12"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "needs_wid": "w10",
+        "wid": "w13"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "needs_wid": "w16",
+        "wid": "w17"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "needs_wid": "w16",
+        "wid": "w18"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "firebolt-cloud-deployment",
+        "needs_wid": "w1",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Firebolt deployment metadata to registry",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support environment variables",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "FIREBOLT_CLIENT_ID",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "FIREBOLT_CLIENT_SECRET",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "FIREBOLT_ACCOUNT",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement engine selection/auto-detection",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Handle engine start/stop lifecycle",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement cloud storage staging for data loading",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support S3 staging location",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement COPY FROM S3 pattern",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Configure result caching behavior",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define 'core' deployment (Docker, no credentials)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Unit tests for cloud authentication",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integration tests with Firebolt Cloud (requires account)",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test TPC-H benchmark at scale 0.1",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Compare results with Firebolt Core",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Test firebolt:core and firebolt:cloud syntax",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define 'cloud' deployment (managed, credentials required)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set 'core' as default deployment",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define auth_methods=['oauth', 'service_account']",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate firebolt_mode to deployment_mode config key",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement OAuth authentication for Firebolt Cloud",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement service account authentication",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "firebolt-cloud-deployment",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add credential setup wizard for Firebolt Cloud",
+        "wid": "w9"
+      }
+    ]
+  }
+}

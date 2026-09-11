@@ -1,0 +1,124 @@
+{
+  "context": "Wire the existing standalone update implementation through the wrapper CLI rather than reimplementing; mirror standalone update test coverage in the wrapper tests.",
+  "description": "F3 of the 2026-08-05 tracker-simplification adjudication. Standalone todo-db >= 0.3 has an audited update verb (commit c01cda1) but the project wrapper does not expose it, so corrections happen via drop+recreate (24.6% of native items share a normalised title; 21.2% native drop rate vs 0.2% legacy) or via the unaudited standalone side door (9 update events already appear in the event log). Expose update through _project/scripts/todo with the standalone semantics: one chained audit event with from/to diffs; id, state, and identity immutable. Open item wrapper-update-verb-capability-declaration-handoff is the follow-on (moves update out of standalone_only_commands in the skill sidecar) and depends on this landing.",
+  "legacy": {
+    "item_meta": {
+      "category": "tracker-simplification",
+      "completed_at": "2026-08-05T22:02:15Z",
+      "completed_pr": 1581,
+      "created_at": "2026-08-05T18:35:09Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Lifecycle verbs and audit-event chain semantics unchanged; state moves only through lifecycle verbs, never through update",
+        "item_id": "expose-update-verb-in-project-wrapper"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "kind": "do_not_modify",
+        "path_glob": "_project/todo-db-export/*"
+      },
+      {
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "kind": "only_modify",
+        "path_glob": ".antigravity/skills/todo-db/*"
+      },
+      {
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/todo-db/*"
+      },
+      {
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "kind": "only_modify",
+        "path_glob": ".codex/skills/todo-db/*"
+      },
+      {
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "kind": "only_modify",
+        "path_glob": ".gemini/skills/todo-db/*"
+      },
+      {
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db_standalone_compat.py"
+      },
+      {
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/todo-db-tracker.md"
+      },
+      {
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/*.py"
+      },
+      {
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_todo_wrapper.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo update --help >/dev/null",
+        "description": "Wrapper advertises the update subcommand",
+        "expected": "update --help exits 0 from the project wrapper",
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run pytest tests/unit/scripts/test_todo_wrapper.py -q",
+        "description": "Wrapper test suite passes",
+        "expected": "all wrapper tests green",
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1581: update_item + CLI + tests",
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "notes": null,
+        "started_at": "2026-08-05T20:50:39Z",
+        "started_branch": "fix/expose-update-verb",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/expose-update-verb",
+        "status": "done",
+        "summary": "Wire standalone update through the wrapper CLI",
+        "wid": "w1"
+      },
+      {
+        "evidence": "tests/unit/scripts/test_todo_db_update.py mirrors standalone update contract",
+        "item_id": "expose-update-verb-in-project-wrapper",
+        "notes": null,
+        "started_at": "2026-08-05T20:56:12Z",
+        "started_branch": "fix/expose-update-verb",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/expose-update-verb",
+        "status": "done",
+        "summary": "Mirror standalone update coverage in wrapper tests",
+        "wid": "w2"
+      }
+    ]
+  }
+}

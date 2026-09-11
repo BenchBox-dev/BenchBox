@@ -1,0 +1,193 @@
+{
+  "context": "Give the fallback one home. Export a single resolver from benchbox/mcp/schemas.py -- resolve_platform_policy_key(platform) -> str -- and have both validate_platform_options and _prepare_adapter_platform_options call it, so the rule can only ever be changed in one place. Keep the CONDITIONAL form as the surviving semantic: allow-list membership must win over suffix stripping, otherwise a future 'foo-df' entry could never have its own policy at all. Then pin it: a test that inserts a '-df'-suffixed key into the allow-list and asserts both call sites resolve to that key rather than to its base. Note the sequencing against one-engine-mcp-run-service-adoption, whose rung 1 deletes _prepare_adapter_platform_options -- if that lands first, the second call site moves and this item must be re-pointed at wherever option translation ends up; the resolver in schemas.py survives either way, which is why it is the right place to put it.",
+  "description": "The MCP option layer decides twice which platform's policy a '-df' request falls back to, using two different rules:\n\n  benchbox/mcp/schemas.py:513   if platform_name not in MCP_PLATFORM_OPTION_ALLOWLIST and platform_name.endswith('-df'):\n                                    policy_name = platform_name[:-3]      <- CONDITIONAL strip\n  benchbox/mcp/tools/benchmark.py:101   platform_name = platform.lower().removesuffix('-df')   <- UNCONDITIONAL strip\n\nAdmission strips '-df' only when the full name is absent from the allow-list; preparation strips it always. The two agree today for exactly one reason: no key in MCP_PLATFORM_OPTION_ALLOWLIST ends in '-df'. Nothing states that, and nothing tests it. Add a '-df'-suffixed allow-list key -- a plausible thing to do when a dataframe surface needs options its SQL sibling does not -- and admission validates against that key's own specs, contract matrix and cross-field rules while preparation translates using the BASE platform's rules. That is the 'schema half closed, adapter half open' shape the whole mcp-v2 batch existed to close, sitting one allow-list entry away.\n\nNot exploitable today and not a latent bug in current behaviour; it is an unstated coincidence guarding the exact defect class. Verified still present on develop bc5f2b0f4a.\n\nIdentified 2026-08-04 during the adversarial review of the mcp-v2-platform-options batch. It was the one review finding that did not make it into an item at the time; the three nits in mcp-option-policy-hardening-nits are log amplification, bare asserts under -O, and the duplicate profile-name regex -- not this.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "close this by adding a test that merely asserts the two expressions produce equal results for today's platform names",
+        "instead": "delete one of the two expressions, and pin the survivor with a case that actually inserts a '-df'-suffixed allow-list key",
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "why": "that pins the coincidence rather than removing it: it passes for every current name and still passes on the day someone adds a '-df' allow-list key, because the test never exercises one"
+      },
+      {
+        "dont": "leave the second call site in place with a comment saying it must be kept in sync",
+        "instead": "one exported resolver, two callers, no second expression",
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "why": "a comment is not an invariant; the duplicated ClickHouse/DuckDB/Databricks halves this batch fixed were all documented and still drifted"
+      },
+      {
+        "dont": "make admission unconditional to match preparation, since that is the smaller diff",
+        "instead": "keep the conditional form -- allow-list membership wins over suffix stripping -- and make preparation adopt it",
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "why": "it would permanently prevent any '-df' platform from carrying its own option policy, silently routing a future dataframe surface's options through its SQL sibling's rules"
+      }
+    ],
+    "item_meta": {
+      "category": "MCP",
+      "completed_at": "2026-08-08T18:10:05Z",
+      "created_at": "2026-08-05T15:17:08Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "Current resolution for every platform name in use today is byte-for-byte unchanged: no allow-list key ends in '-df', so the conditional and unconditional rules already agree and must keep agreeing",
+        "item_id": "mcp-df-policy-key-single-resolver"
+      },
+      {
+        "behavior": "clickhouse-df still inherits the clickhouse cross-field policy, including the deployment_mode='server' requirement for a connection profile",
+        "item_id": "mcp-df-policy-key-single-resolver"
+      },
+      {
+        "behavior": "validate_platform_options remains the single admission chokepoint reached by sync run_benchmark, durable start_benchmark, and durable worker replay",
+        "item_id": "mcp-df-policy-key-single-resolver"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "the conditional policy-key fallback added during #1510 after the clickhouse-df alias was found bypassing the new cross-field rules",
+        "decision": "extend",
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "path": "benchbox/mcp/schemas.py:508-516"
+      },
+      {
+        "concept": "the unconditional removesuffix that is the second, independent copy of the same decision",
+        "decision": "supersede",
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "path": "benchbox/mcp/tools/benchmark.py:101"
+      },
+      {
+        "concept": "test_dataframe_alias_fallback_does_not_bypass_the_policy already covers the clickhouse-df case from the admission side only",
+        "decision": "extend",
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "path": "tests/unit/mcp/test_schemas.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/**"
+      },
+      {
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/**"
+      },
+      {
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "bash -c '! grep -rn \"removesuffix(.-df.)\\|endswith(.-df.)\" benchbox/mcp/tools/'",
+        "description": "Only one expression in the MCP layer strips the -df suffix",
+        "expected": "exits 1 on the unfixed tree because benchmark.py:101 still carries its own removesuffix; exits 0 once preparation calls the shared resolver and the second expression is gone",
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/mcp -q -n 0 -k 'policy_key or dataframe_alias'",
+        "description": "A -df-suffixed allow-list key resolves to itself on both sides",
+        "expected": "exits 0 with a new case that inserts a '-df' key into the allow-list and asserts admission and preparation both use it, rather than the base platform",
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "PYTHONPATH=. uv run -- pytest tests/unit/mcp -q -n 0",
+        "description": "Existing alias behaviour is unchanged",
+        "expected": "exits 0",
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-verified at HEAD 5fa25bb25a: schemas.py 513 conditional strip, benchmark.py 101 unconditional removesuffix, no allow-list key ends in -df today; confirmed via grep -rn.",
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "notes": null,
+        "started_at": "2026-08-08T18:09:55Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-verify both call sites at HEAD and confirm no allow-list key ends in '-df' today",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Exported resolve_platform_policy_key from schemas.py and routed validate_platform_options through it at 5fa25bb25a; keeps conditional form (allow-list wins).",
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "notes": null,
+        "started_at": "2026-08-08T18:09:58Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Export resolve_platform_policy_key from schemas.py and route validate_platform_options through it",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Replaced removesuffix in _prepare_adapter_platform_options with shared resolver at 5fa25bb25a; verified bash -c '! grep -rn \"removesuffix(.-df.)|endswith(.-df.)\" benchbox/mcp/tools/' exits 0.",
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "notes": null,
+        "started_at": "2026-08-08T18:10:00Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Replace the removesuffix in _prepare_adapter_platform_options with the shared resolver",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added test_df_suffixed_allowlist_key_resolves_to_itself inserting synthetic -df key asserting both admission and preparation resolve to it; PYTHONPATH=/pool-03 pytest -k dataframe_alias exits 0, full mcp 689 passed.",
+        "item_id": "mcp-df-policy-key-single-resolver",
+        "notes": null,
+        "started_at": "2026-08-08T18:10:03Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Pin with a test that inserts a '-df'-suffixed allow-list key and asserts both sites resolve to it",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,152 @@
+{
+  "description": "`psycopg2-binary` is a legacy PostgreSQL driver with known packaging\nfragility (ships pre-compiled C extensions in a binary wheel, no async\nsupport, soft-deprecated in many CI environments). `psycopg3` (package:\n`psycopg[binary]`) is the successor — async-compatible, PEP 249 v3 compliant,\nand actively maintained.\n\nSurfaced as a deferred item in the DONE file for `tighten-dependencies-phase-plan`\n(completed 2026-04-15): \"Migration off psycopg2-binary to psycopg3 — driver\nmodernization — out of scope for an *elimination* audit. File separately when\nproduct is ready.\"\n\nThis is not an elimination audit item — it is a deliberate driver swap that\nmay require updating connection-string parameters, cursor usage, and any\ncode that imports psycopg2 directly. Scope must be confirmed before\ncommitting to the swap.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "mix psycopg2 and psycopg3 imports across modules",
+        "instead": "(not specified)",
+        "item_id": "dependency-migration-psycopg3",
+        "why": "pick one and complete the migration fully"
+      },
+      {
+        "dont": "use psycopg3 async API in the synchronous adapter path without a separate design decision",
+        "instead": "(not specified)",
+        "item_id": "dependency-migration-psycopg3",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "dependency-migration-psycopg3",
+        "id": 310,
+        "reason": "Async usage is additive and out of scope for the synchronous driver swap; file as a follow-on if async PostgreSQL connections are desired.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Async psycopg3 interface filed as optional follow-on 'if desired'; no evidence of demand or a concrete plan.",
+        "summary": "Migrate to psycopg3 async interface for concurrent query paths"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-07-16T00:00:00Z",
+      "created_at": "2026-07-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All Redshift and PostgreSQL benchmark runs produce identical results before and after the swap",
+        "item_id": "dependency-migration-psycopg3"
+      },
+      {
+        "behavior": "Connection factory interface remains unchanged for any callers outside benchbox/platforms/",
+        "item_id": "dependency-migration-psycopg3"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/postgres*.py, benchbox/platforms/redshift*.py — likely primary psycopg2 consumers",
+        "decision": "reuse",
+        "item_id": "dependency-migration-psycopg3",
+        "path": "benchbox/platforms/postgres*.py"
+      },
+      {
+        "concept": "pyproject.toml — replace psycopg2-binary here",
+        "decision": "reuse",
+        "item_id": "dependency-migration-psycopg3",
+        "path": "pyproject.toml"
+      },
+      {
+        "concept": "tighten-dependencies-phase-plan DONE file — deferred this item explicitly",
+        "decision": "reuse",
+        "item_id": "dependency-migration-psycopg3",
+        "path": "tighten-dependencies-phase-plan"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -rn 'import psycopg2' benchbox/ | wc -l",
+        "description": "No psycopg2 imports remain after migration",
+        "expected": "0",
+        "item_id": "dependency-migration-psycopg3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'redshift or postgres' -q",
+        "description": "PostgreSQL/Redshift unit tests pass",
+        "expected": "all tests pass",
+        "item_id": "dependency-migration-psycopg3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dependency-migration-psycopg3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "dependency-migration-psycopg3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dependency-migration-psycopg3",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dependency-migration-psycopg3",
+        "notes": "grep -rn 'psycopg2\\|import psycopg' benchbox/ tests/\nClassify each site: direct import, connection factory, cursor type\nassumption, exception type catch. Estimate the change surface.\nAlso check if any tests mock psycopg2 internals that would need updating.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit all psycopg2 import sites and connection usage patterns",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "dependency-migration-psycopg3",
+        "notes": "psycopg3 is largely API-compatible with psycopg2 for synchronous use, but\nthere are known differences: parameter placeholders (%s vs %(name)s vs ?),\ncopy API, server-side cursors, and exception hierarchy. For each call site\nfound in w0, note whether it works unchanged or needs updating.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Assess psycopg3 API compatibility at each identified call site",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dependency-migration-psycopg3",
+        "notes": "In pyproject.toml, replace psycopg2-binary with psycopg[binary] (or\npsycopg[c] for the C extension build). Update any `import psycopg2` to\n`import psycopg`. Keep a compatibility shim if the change surface from w1\nis large — prefer a single incremental swap over a big-bang refactor.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Swap psycopg2-binary for psycopg[binary] in pyproject.toml and update imports",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dependency-migration-psycopg3",
+        "notes": "uv run -- python -m pytest tests/ -k 'redshift or postgres or postgresql' -q\nAlso run the full unit suite to catch any indirect psycopg2 dependency\nvia transitive imports. Fix any failures before marking this done.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the full Redshift/PostgreSQL test suite and confirm zero regressions",
+        "wid": "w3"
+      }
+    ]
+  }
+}

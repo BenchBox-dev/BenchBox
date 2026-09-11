@@ -1,0 +1,93 @@
+{
+  "description": "The 2026-06-08 TODO prioritization pass discovered that\n`uat-clickhouse-server-rc1-recovery` has `status: Completed` but still\nlives in `TODO/main/planning/`. Subsequent PRs #756 and #759 landed fixes\nfor `tpchavoc-correlated-subquery-self-binding` and\n`benchmark-runs-output-root-propagation` respectively — both items may now\nbe Completed as well. The w0 re-validate step must be run first to get the\ncurrent count before moving anything.\n\nItems left in planning/ or active/ after completion bloat the open count,\ndistort priority distributions, and can mislead automated or human triage.\nSweep all planning/ and active/ directories for Completed items and move\nthem to the appropriate DONE tree.",
+  "legacy": {
+    "item_meta": {
+      "category": "Repository Maintenance",
+      "created_at": "2026-06-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cross-item deps.needs references that point to moved items must still resolve",
+        "item_id": "todo-sweep-completed-items-from-open-tree"
+      },
+      {
+        "behavior": "Moved files retain their original id field (the slug)",
+        "item_id": "todo-sweep-completed-items-from-open-tree"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/: examine existing entries for the move-to-DONE convention",
+        "decision": "reuse",
+        "item_id": "todo-sweep-completed-items-from-open-tree",
+        "path": "_project/DONE/"
+      },
+      {
+        "concept": "todo_cli.py list --status=completed — use this to find any additional cases",
+        "decision": "reuse",
+        "item_id": "todo-sweep-completed-items-from-open-tree",
+        "path": "todo_cli.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo show todo-sweep-completed-items-from-open-tree --json | uv run -- python -c 'import json,sys; assert json.load(sys.stdin)[\"state\"] == \"done\"'",
+        "description": "This migrated item is terminal in the current tracker",
+        "expected": "exit 0",
+        "item_id": "todo-sweep-completed-items-from-open-tree",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-sweep-completed-items-from-open-tree",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-sweep-completed-items-from-open-tree",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "todo-sweep-completed-items-from-open-tree",
+        "notes": "Run: uv run --project _project/scripts -- python _project/scripts/todo_cli.py list --status=completed\nCapture output. As of 2026-06-08 at authoring time: uat-clickhouse-server-rc1-recovery\nwas the only confirmed case, but PRs #756 (tpchavoc self-binding fix) and\n#759 (output-root propagation) have since landed and may have added more.\nAlso check: tpchavoc-correlated-subquery-self-binding and\nbenchmark-runs-output-root-propagation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-validate: confirm which items have status: Completed in the open tree",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-sweep-completed-items-from-open-tree",
+        "notes": "Check _project/DONE/ structure for the destination convention.\nAdd a completed_date to each moved file matching status-change evidence\nwhere available.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Move each confirmed-Completed item to the DONE tree",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-sweep-completed-items-from-open-tree",
+        "notes": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all\nThen: make todo-reindex\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run validate_todo.py --all; regenerate indexes",
+        "wid": "w2"
+      }
+    ]
+  }
+}

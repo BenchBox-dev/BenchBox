@@ -1,0 +1,215 @@
+{
+  "context": "The trust field already flows through the manifest. This TODO is\nentirely about rendering - no data pipeline changes. Build the badge\nfirst as an isolated component (snapshot-tested), then drop it into\nthree places (QueryHeatmap, BenchmarkIndex list view, Compare header).\n\nFilter chips use the same pattern as existing filter controls on\nBenchmarkIndex; reuse that UI vocabulary so trust filtering looks\nnative rather than bolted on.\n",
+  "description": "The original strategy proposal suggested defaulting the leaderboard to\n`trust: maintainer-run` and hiding community results unless explicitly\nopted in. The 2026-04-15 adversarial review rejected this: hiding\ncommunity results by default **defeats the entire value of BenchBox's\ntrust model**. The right pattern is to show everything and render the\ntrust tier as a visible per-row badge, with trust as an optional filter.\n\nThis TODO:\n\n1. Adds a Trust column to QueryHeatmap rows and the list-view fallback,\n   rendered as a small colored badge (maintainer = green, community =\n   blue, unknown/CI/local = neutral gray).\n\n2. Adds a trust filter control to BenchmarkIndex that defaults to \"All\"\n   (shows every tier) with chips for each tier a user can deselect.\n\n3. Sorts rows by primary metric within the default \"All\" view, not by\n   trust tier - the trust model is informational, not a sort key.\n\n4. Propagates trust_label through to the Compare page header so trust\n   disparities in a comparison are also visible there.\n\nExplicitly rejected: defaulting to \"maintainer-run only\" or visually\nde-emphasizing community results via reduced opacity. BenchBox's\ndifferentiator is the explicit trust model - make it pop.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "default to hiding community results",
+        "instead": "default to showing everything with visible tier labels",
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "why": "that defeats the trust model"
+      },
+      {
+        "dont": "invent new trust vocabulary",
+        "instead": "render whatever the manifest provides, fall back gracefully on unknown values",
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "why": "the existing manifest values are the source of truth"
+      },
+      {
+        "dont": "sort by trust tier",
+        "instead": "trust is informational, not a sort key",
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "why": "metric-based ranking is the leaderboard's core value"
+      },
+      {
+        "dont": "use opacity or gray-out to de-emphasize non-maintainer tiers",
+        "instead": "use explicit badge colors instead",
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "why": "that reads as 'don't trust this' rather than 'here's the tier'"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "needs_item": "explorer-emit-benchmark-summary-artifact"
+      },
+      {
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "needs_item": "explorer-matrix-leaderboard-view"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-15T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Default view shows all trust tiers - never hide community results by default",
+        "item_id": "explorer-surface-trust-tiers-as-badges"
+      },
+      {
+        "behavior": "Existing trust_label values in manifest.json - do not reshape the vocabulary",
+        "item_id": "explorer-surface-trust-tiers-as-badges"
+      },
+      {
+        "behavior": "Trust tier does not affect row ordering within the leaderboard - ranking stays metric-based",
+        "item_id": "explorer-surface-trust-tiers-as-badges"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TrustBadge.tsx"
+      },
+      {
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/TrustBadge.test.tsx"
+      },
+      {
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'export default' results-explorer/src/components/TrustBadge.tsx",
+        "description": "TrustBadge component exists and exports default",
+        "expected": "default export present",
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "TypeScript compiles",
+        "expected": "no errors",
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- TrustBadge",
+        "description": "Snapshot tests pass for all known tiers",
+        "expected": "all tests pass",
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -nE 'default.*maintainer|trust.*!==.*community' results-explorer/src/pages/BenchmarkIndex.tsx",
+        "description": "BenchmarkIndex does not default-hide community results",
+        "expected": "no matches (no default hide)",
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "needs_wid": "w1",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "notes": "Props: tier (string). Renders a small pill with tier-specific\nbackground and tooltip. Colors: maintainer = emerald-500,\ncommunity = sky-500, ci = slate-400, local/unknown = slate-300.\nAll colors must meet WCAG AA contrast for the foreground text.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add TrustBadge component at src/components/TrustBadge.tsx",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "notes": "Column is sticky left-side (part of the fixed-column group) so it\nstays visible during horizontal scroll. Uses TrustBadge.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add sticky Trust column to QueryHeatmap between Platform and primary metric",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "notes": "All tiers selected by default. Deselecting a tier hides those rows\nclient-side (no refetch). Render selected count: 'Trust: all' or\n'Trust: maintainer, community'.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add trust tier filter chips to BenchmarkIndex filter bar",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "notes": "If selected results span multiple trust tiers, show a muted note\n'Comparing across trust tiers: maintainer, community' (not a\nwarning - just transparency).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add trust comparability indicator to Compare.tsx header",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-surface-trust-tiers-as-badges",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write snapshot tests for TrustBadge with all tiers and axe-core contrast check",
+        "wid": "w5"
+      }
+    ]
+  }
+}

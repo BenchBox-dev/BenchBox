@@ -1,0 +1,135 @@
+{
+  "context": "w1 is a decision + implementation: either flip the exporters to anonymize=True, or document why raw payloads are acceptable for a local MCP client and scope the fix to error text. w2 scrubs exception messages with the same secret-assignment regex family used by anonymization's _sanitize_public_message. Do not build a new redactor; reuse the existing one.",
+  "description": "Found 2026-07-31 during the credential-egress review. Both MCP export paths construct ResultExporter(anonymize=False) - benchbox/mcp/tools/benchmark.py:289 and analytics.py:346 - and benchmark.py returns the entire un-anonymized result payload to the MCP client (:428, :441), including platform.config (which schema.py:526 extracts with no secret filtering). Additionally, every MCP error response embeds details['exception_message'] = str(exception) verbatim (benchbox/mcp/errors.py:338, reached from e.g. benchmark.py:443-456), so a driver error carrying 'motherduck_token=...' or a DSN reaches the client and its logs; driven proof: json.dumps(make_execution_error('x', exception=Exception('motherduck_token=SENT-123'))) contains the sentinel. MCP has no tool argument for platform options, so credentials reach it only from env/saved config - but they do reach it. Decide deliberately per surface: local-analysis payloads may legitimately stay un-anonymized, but exception text must at minimum have secret-assignment patterns scrubbed.",
+  "legacy": {
+    "item_meta": {
+      "category": "security",
+      "completed_at": "2026-08-01T17:12:03Z",
+      "completed_pr": 1395,
+      "created_at": "2026-07-31T23:34:33Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Benchmark execution behavior unchanged - this is output handling only",
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions"
+      },
+      {
+        "behavior": "MCP tool responses keep their shape (fields/keys) for existing clients",
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import json;from benchbox.mcp.errors import make_execution_error as f;assert 'SENT-123' not in json.dumps(f('x', exception=Exception('motherduck_token=SENT-123')),default=str)\"",
+        "description": "MCP error responses no longer carry a raw secret-assignment sentinel",
+        "expected": "exits 1 on an unfixed tree (verified 2026-07-31), 0 once w2 lands",
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -rn 'anonymize=False' benchbox/mcp/tools/ | grep -v 'egress-reviewed:'",
+        "description": "no undocumented anonymize=False remains in MCP tools",
+        "expected": "exits 1 on an unfixed tree (verified 2026-07-31: two call sites, no justification markers); exits 0 once each site is either flipped or carries an 'egress-reviewed:' justification comment per w1's decision",
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -q",
+        "description": "MCP suite still green",
+        "expected": "all pass before and after - regression guard",
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on develop 600606040 2026-08-01: 2 anonymize=False sites (benchmark.py:289, analytics.py:346), make_execution_error echoed motherduck_token=SENT-123 verbatim (driven)",
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions",
+        "notes": null,
+        "started_at": "2026-08-01T13:24:13Z",
+        "started_branch": "fix/mcp-output-egress-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Re-validate both behaviors on current develop (grep the anonymize=False call sites; drive make_execution_error)",
+        "wid": "w0"
+      },
+      {
+        "evidence": "DECISION: documented exemption. MCP serves a local same-trust-boundary agent needing real paths; secrets are already redacted at capture by sanitize_platform_options; platform.config gets filtered upstream by platform-config-extraction-lacks-secret-filtering. Both call sites carry egress-reviewed inline markers + block-comment rationale",
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions",
+        "notes": null,
+        "started_at": "2026-08-01T13:24:19Z",
+        "started_branch": "fix/mcp-output-egress-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Decide and implement payload anonymization for MCP exports (or a documented, justified exemption)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "mcp/errors.py scrub_secret_material: secret-assignment patterns (password/token/secret/api_key/... = or :) and URL userinfo masked in exception_message; rung 1 exits 0",
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions",
+        "notes": null,
+        "started_at": "2026-08-01T13:24:25Z",
+        "started_branch": "fix/mcp-output-egress-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Scrub secret-assignment patterns from exception_message in MCP error responses",
+        "wid": "w2"
+      },
+      {
+        "evidence": "TestExceptionSecretScrubbing (4 tests: assignment, URL userinfo, colon form, plain text untouched); tests/unit/mcp 500 passed; rung 2 exits 0",
+        "item_id": "mcp-output-bypasses-anonymization-and-echoes-raw-exceptions",
+        "notes": null,
+        "started_at": "2026-08-01T13:24:32Z",
+        "started_branch": "fix/mcp-output-egress-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Tests for the chosen payload policy and the error scrubbing",
+        "wid": "w3"
+      }
+    ]
+  }
+}

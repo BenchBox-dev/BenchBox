@@ -1,0 +1,118 @@
+{
+  "description": "From the 2026-07-12 tuning review, finding R2 (evidence pinned to commit acfb8992).\n\nbenchbox/core/tuning/generators/ ships questdb.py, pg_duckdb.py, pg_mooncake.py\n(exported in generators/__init__.py, each with dedicated unit tests) but\nget_ddl_generator's mapping (benchbox/core/tuning/ddl_generator.py:653-681)\nhas no entries for them; unknown platforms silently receive NoOpDDLGenerator\n(line 689). StarRocks has no generator at all. Consumers today: dry-run\npreview (core/dryrun.py:1066-1101) and cloud_spark mixins - so the symptom is\na silently-empty tuning preview on platforms whose generators exist and pass\ntests.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "raise for unknown platforms",
+        "instead": "(not specified)",
+        "item_id": "tuning-generator-registry-completeness-20260712",
+        "why": "dry-run must keep working everywhere"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "tuning-generator-registry-completeness-20260712",
+        "id": 283,
+        "reason": "Renderer direction is gated on ADR-3; writing a new generator before the consolidation decision risks throwaway work",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: A StarRocks DDL generator is exactly what the open tuning-starrocks-ddl-generator-20260716 item already tracks.",
+        "summary": "A StarRocks DDL generator"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-12T00:00:00Z",
+      "created_at": "2026-07-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "NoOp fallback behavior for genuinely unsupported platforms (no exceptions from get_ddl_generator)",
+        "item_id": "tuning-generator-registry-completeness-20260712"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-generator-registry-completeness-20260712",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/ddl_generator.py"
+      },
+      {
+        "item_id": "tuning-generator-registry-completeness-20260712",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning -q -k registry",
+        "description": "Registry test enforces completeness",
+        "expected": "New completeness test passes; fails if a generator module is added without registration",
+        "item_id": "tuning-generator-registry-completeness-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning -q",
+        "description": "Existing generator tests stay green",
+        "expected": "All passing",
+        "item_id": "tuning-generator-registry-completeness-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-generator-registry-completeness-20260712",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-generator-registry-completeness-20260712",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-generator-registry-completeness-20260712",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Register questdb, pg_duckdb, pg_mooncake in the get_ddl_generator mapping",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-generator-registry-completeness-20260712",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Log a warning when NoOpDDLGenerator is returned for a platform the CLI registry knows (silent fallback only for genuinely tuning-free platforms like sqlite)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-generator-registry-completeness-20260712",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add registry-completeness unit test: every module in core/tuning/generators/ exporting a BaseDDLGenerator subclass must be reachable via get_ddl_generator under at least one platform key",
+        "wid": "w3"
+      }
+    ]
+  }
+}

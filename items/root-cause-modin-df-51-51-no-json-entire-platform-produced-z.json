@@ -1,0 +1,27 @@
+{
+  "description": "Promoted from deferral #285 of uat-cross-engine-dataframe-defects.\nDeferred: Root-cause modin-df 51/51 NO_JSON (entire platform produced zero result JSONs in the 2026-05-29 run)\nReason deferred: No error text was captured (per-cell logs held only the command header; tee log was 0 bytes). Cannot be triaged until stderr persistence lands in uat-artifact-integrity-and-failure-capture (w2). Re-run one modin-df cell after that to recover the cause, then decide whether the fix belongs in this item or its own.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-22T16:53:52Z",
+        "from_item": "root-cause-modin-df-51-51-no-json-entire-platform-produced-z",
+        "id": 718,
+        "reason": "The bounded SF0.01 rerun now emits a result bundle, closing the NO_JSON root cause. The remaining 12/66 measurement failures are query-level correctness defects (Q17 list index out of range; Q7 excessive pickle recursion; Q8/Q9 failures) and require a separate query-focused scope.",
+        "resolution": "promoted",
+        "resolved_item": "modin-tpch-query-failures-after-ray-worker-fix",
+        "resolved_reason": null,
+        "summary": "Fix Modin TPCH Q7/Q8/Q9/Q17 query failures after Ray workers start"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Root cause fixed and committed at 579fcd4f4; a bounded SF0.01 rerun produced a result bundle (54/66 measurement queries passed), replacing the prior entire-platform NO_JSON. Publication is blocked by the batch gate snapshot: unrelated existing fast-test failure tests/unit/scripts/explorer_pipeline/test_privacy_rejection.py::test_privacy_rejection_makes_the_publish_command_exit_non_zero.",
+      "claim_token": "ae37335868e0421561c2c60c0953c8a1",
+      "claimed_at": "2026-08-22T16:37:46Z",
+      "claimed_branch": "fix/uat-modin-no-json-root-cause",
+      "claimed_by": "joe@joe-mac-mini.local",
+      "claimed_worktree": "/Users/joe/Developer/BenchBox.wt-uat-modin-no-json-root-cause",
+      "created_at": "2026-07-19T12:35:19Z",
+      "worktree": "main"
+    }
+  }
+}

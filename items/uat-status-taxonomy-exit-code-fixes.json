@@ -1,0 +1,270 @@
+{
+  "context": "Small, surgical PR. w1 is a two-line guard. w2 changes one method plus\ntests. w3/w4 change the terminal_state fall-through and the package input\nfilter together since both concern \"failed cells must not look\nsubmittable\". w5 touches the JSONL writer, the reader in _cli.py, and the\nTSV header + fixture. w6 is isolated to timeouts.py. Update\ntests/uat/test_report_accounting.py, test_runner.py, test_phases.py\nalongside each unit.\n",
+  "description": "Four verified correctness defects in the UAT cell status taxonomy and exit\ncodes, plus one portability crash. All verified on develop @ fc31f3604\n(2026-07-10); base 0db7299f3 has no tests/uat changes since.\n\n1. TIMED-OUT OVERWRITTEN BY FAILED (tests/uat/runner.py:270-277): the\n   official/throughput validation block sets `status = \"failed\"`\n   unconditionally after `_classify()`, with no `if status == \"passed\"`\n   guard (contrast the correctly-guarded submit downgrade at\n   runner.py:258). A timed-out official cell that exported no result JSON\n   ends with status=\"failed\", exit_code=124 -- report counts it in\n   fail_count not timeout_count (phases/report.py:212-213), cells.jsonl\n   records `timed_out: false` (orchestrator.py:592), while\n   terminal_state() still derives \"timeout\" from exit 124\n   (phases/report.py:120). One cell, three artifacts, three verdicts.\n\n2. ALL-UNREACHABLE EXECUTE EXITS 0 (tests/uat/phases/execute.py:64-67):\n   `ExecuteOutcome.exit_code()` is `all(r.status == \"passed\" for r in\n   self.results)` -- `all([])` is True. Every platform down (or every\n   managed compose-up failing, which routes cells into skipped_unreachable\n   by design, execute.py:176-186) means zero cells run and\n   `make uat-execute` exits 0. Only configs that include the report phase\n   catch it (ReportSummary.exit_code checks unreachable_count).\n\n3. FAILED CELLS LABELED submittable (tests/uat/phases/report.py:128-129):\n   terminal_state() falls through to `cell.submit_terminal_state` (default\n   \"submittable\") for any failed cell with a resolved result_path.\n   Operators triaging by terminal_state misread failures as\n   submission-ready. Relatedly the package phase submits result JSONs from\n   failed cells: orchestrator.py:422 filters only on result_path presence,\n   and official cells resolve result paths regardless of exit code\n   (runner.py:246-251 comment says so explicitly).\n\n4. throughput_check NEVER PERSISTED: CellResult.throughput_check\n   (runner.py:59-63) -- the one diagnostic the #1094 stream-count guard\n   exists to surface -- is not serialized by _write_cells_jsonl\n   (orchestrator.py:583-603), is not a REPORT_HEADER column\n   (phases/report.py:53-58), and is produced after the cell log closes so\n   the failure tail cannot contain it. A stream-count failure leaves\n   durable artifacts saying only failed/exit 1.\n\n5. WINDOWS TIMEOUT CRASH (tests/uat/timeouts.py:104): `os.killpg` does not\n   exist on win32; spawn handles the platform (`preexec = os.setsid if\n   sys.platform != \"win32\" else None`) but the kill path calls\n   `os.killpg` unconditionally and AttributeError is not in the\n   `(ProcessLookupError, PermissionError)` catch -- a per-cell timeout\n   crashes the whole execute phase instead of classifying the cell\n   timed-out. The covering test is skipif-win32 so nothing catches it.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "make the throughput block skip validation for timed-out cells silently",
+        "instead": "(not specified)",
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "why": "record throughput_check reason ('not validated: cell timed out') so artifacts explain themselves."
+      },
+      {
+        "dont": "rename existing status strings (passed/failed/timed-out)",
+        "instead": "(not specified)",
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "why": "downstream artifacts and fixtures parse them; add guards and new tokens only."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-status-taxonomy-exit-code-fixes",
+        "id": 627,
+        "reason": "Behavioral judgement call pinned by an intentional test from #730; needs a heuristic design (e.g. stderr-pattern allowlist) not a bug fix. Revisit if operators hit undiagnosable --quiet failures.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Stderr-noise suppression heuristic explicitly deferred until operators hit undiagnosable --quiet failures; no evidence that trigger has occurred.",
+        "summary": "Diagnostic re-run suppression on unrelated stderr noise (runner.py:215 gate cannot distinguish 'stderr has the error' from 'stderr has uv wrapper noise'; test_runner.py:251 pins the suppression)"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-status-taxonomy-exit-code-fixes",
+        "id": 628,
+        "reason": "Resume machinery is deleted wholesale by uat-resume-retirement-artifact-durability; renaming a key inside it first is wasted motion.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Spot-checked: resume machinery (including this key) was deleted wholesale by uat-resume-retirement-artifact-durability (status: Completed).",
+        "summary": "resume.json 'terminal_state' key actually holds a raw status (orchestrator.py:200) -- same key name, different value domain from cells.jsonl"
+      }
+    ],
+    "item_meta": {
+      "category": "Bug Fix / Correctness",
+      "completed_at": "2026-07-11T00:00:00Z",
+      "created_at": "2026-07-11T00:00:00Z",
+      "worktree": "uat-hardening"
+    },
+    "preserves": [
+      {
+        "behavior": "Exit-code contract: 0 success, 1 cell failures, 2 aborted, 124 timeout at the cell level.",
+        "item_id": "uat-status-taxonomy-exit-code-fixes"
+      },
+      {
+        "behavior": "REPORT_HEADER column order changes only by appending; existing columns keep their positions (external TSV consumers parse positionally, spec Section 6).",
+        "item_id": "uat-status-taxonomy-exit-code-fixes"
+      },
+      {
+        "behavior": "The submit-classification downgrade semantics at runner.py:256-260 (passed -> failed on refusal) stay exactly as-is.",
+        "item_id": "uat-status-taxonomy-exit-code-fixes"
+      },
+      {
+        "behavior": "cells.jsonl remains line-delimited JSON readable by the existing _cli.py report path; new fields are additive.",
+        "item_id": "uat-status-taxonomy-exit-code-fixes"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "tests/uat/phases/report.py:112-130 terminal_state() -- extend the existing derivation chain rather than adding a parallel classifier. Extend.",
+        "decision": "extend",
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "path": "tests/uat/phases/report.py:112-130"
+      },
+      {
+        "concept": "tests/uat/runner.py:256-260 -- the correctly-guarded submit-classification downgrade; mirror its `if status == 'passed'` guard for the throughput block. Reuse.",
+        "decision": "reuse",
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "path": "tests/uat/runner.py:256-260"
+      },
+      {
+        "concept": "tests/uat/timeouts.py:107 -- existing SIGTERM->SIGKILL ladder; the win32 fix is a guard inside it, not a new wrapper. Extend.",
+        "decision": "extend",
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "path": "tests/uat/timeouts.py:107"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/_cli.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/fixtures/"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/orchestrator.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/report.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/runner.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_cli_dispatch.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_orchestrator.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_package.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_replay_2026_05_02.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_report.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_report_accounting.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_runner.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_timeouts.py"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/timeouts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/ -m fast -q",
+        "description": "Full UAT unit suite passes with the new taxonomy tests",
+        "expected": "all pass, including new regression tests for findings 1-5",
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_replay_2026_05_02.py -q -m slow",
+        "description": "Replay header parity still holds after the TSV column addition",
+        "expected": "pass with updated fixture",
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "needs_wid": "w1",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "notes": "tests/uat/runner.py run_cell(): both status=\"failed\" rewrites in the\nofficial/throughput block (successful-read-but-not-ok, and\nmissing/unresolved result_path) are now guarded by `status == \"passed\"`,\nmirroring the existing submit-classification guard a few lines above.\nA timed-out cell with no result JSON now records\nthroughput_check=\"not validated: cell timed out\" instead of the generic\n\"no result JSON resolved...\" message, and its status/exit_code are left\nuntouched (stays \"timed-out\"/124). Added 4 regression tests to\ntests/uat/test_runner.py: timeout-preserves-status, missing-result\ndowngrades a passed cell, an already-failed cell keeps its own exit\ncode, and the existing downgrade-on-real-throughput-failure behavior is\nstill exercised (stream-count mismatch on a passed cell).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Guard the official/throughput status rewrite so timed-out (and any non-passed status) is preserved; only downgrade passed cells",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "notes": "tests/uat/phases/execute.py ExecuteOutcome.exit_code(): added an\nexplicit `if not self.results: return 1` guard before the\n`all(status == \"passed\" ...)` check, since `all([])` is vacuously True.\nExtended the existing test_execute_skips_unreachable_platform with an\n`exit_code() == 1` assertion (all-unreachable path, zero cells run),\nand added test_execute_outcome_exit_code_nonzero_when_every_compose_up_fails\n(single-platform sweep whose only managed compose-up fails -> empty\nresults) plus a direct-construction sanity test\n(test_execute_outcome_exit_code_zero_only_when_all_passed) covering\nall-passed/one-failed/no-results in tests/uat/test_phases.py.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "ExecuteOutcome.exit_code() returns nonzero when results is empty or nothing passed; regression tests for the all-unreachable and compose-up-all-failed paths",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "notes": "tests/uat/phases/report.py terminal_state(): inserted\n`if cell.status == \"failed\": return f\"failed:{cell.submit_terminal_state}\"`\nbetween the result_path-is-None branch and the pre-existing\nsubmit_terminal_state fall-through. Chose the recommended\n\"failed:<submit_state>\" prefix form -- preserves the submit-\nclassification detail (e.g. \"failed:query_failure\") and is\nunambiguous with any real submit-ready state; the default case with no\nsubmit-refusal now reads \"failed:submittable\" instead of bare\n\"submittable\". timed-out cells are unaffected (caught earlier in the\nfunction by the existing status==\"timed-out\" check). No existing\nfixture pinned the old \"submittable\"-for-failed-cell behavior (checked\nreport-accounting-skipped-unreachable-cells.jsonl -- its failed row has\nresult_path=null so it never reached this branch), so no fixture edit\nwas needed; added new coverage instead: 5 tests in\ntests/uat/test_report.py (terminal_state() directly + a write_report\nrow-content check) and one CLI round-trip regression in\ntests/uat/test_report_accounting.py exercising the cells.jsonl ->\n_handle_report path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Stop terminal_state falling through to submit_terminal_state for failed cells: give them an explicit failed-state token; update fixtures and test_report_accounting",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "notes": "tests/uat/orchestrator.py: the package-phase `result_paths` list\ncomprehension now filters on `r.result_path and r.status == \"passed\"`\n(was `r.result_path` only). Left the validate-phase filter at line 383\nuntouched -- out of scope (that phase reasonably still validates every\nresolved result JSON, passed or not). Added\ntest_package_phase_excludes_failed_cells_result_paths to\ntests/uat/test_orchestrator.py: a two-cell execute outcome (one passed,\none failed, both with result_path set) asserts run_package receives\nonly the passed cell's path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Filter package-phase inputs to passed cells only (orchestrator.py:422); add a test that a failed official cell's exported JSON is not submitted",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "notes": "Wiring (jsonl write side landed with w4's commit since both touched\norchestrator.py; completed here): tests/uat/orchestrator.py\n_write_cells_jsonl() now writes \"throughput_check\": cell.throughput_check.\ntests/uat/_cli.py _handle_report()'s CellResult reconstruction reads it\nback via payload.get(\"throughput_check\") (defaults to None for older\nartifacts predating the field). tests/uat/phases/report.py:\nREPORT_HEADER gained \"throughput_check\" as the LAST column (must_preserve:\nexisting columns keep their positions) and render_row() appends\ncell.throughput_check or ''. Bumped\ntests/uat/fixtures/uat-2026-05-02-matrix-summary-header.tsv to match.\nTests: tests/uat/test_orchestrator.py\n(test_write_cells_jsonl_persists_throughput_check),\ntests/uat/test_report.py (header-shape + render_row column-position\ntests), tests/uat/test_report_accounting.py (CLI round-trip with and\nwithout the field present). Verification command 2\n(test_replay_2026_05_02.py -m slow) passes against the bumped fixture.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Persist throughput_check in cells.jsonl and as an appended REPORT_HEADER column; bump the matrix-summary header fixture and replay header test in the same PR",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-status-taxonomy-exit-code-fixes",
+        "notes": "tests/uat/timeouts.py _kill_process_group(): changed its parameter\nfrom a bare `pid: int` to the `proc: subprocess.Popen` object (updated\nits one call site in run_with_timeout accordingly) so the win32\nfallback has something to call `.kill()` on. Both `os.killpg` calls\n(SIGTERM and SIGKILL stages) now catch `AttributeError` in addition to\nthe existing `(ProcessLookupError, PermissionError)` and fall back to\n`proc.kill()`. Added two tests to tests/uat/test_timeouts.py:\ntest_kill_process_group_falls_back_to_proc_kill_without_os_killpg\n(monkeypatch.delattr(timeouts.os, \"killpg\") -- no skipif, runs on\nevery CI platform) and a sanity check that the ordinary POSIX\nSIGTERM->SIGKILL ladder is unchanged when os.killpg is present.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Guard _kill_process_group for win32 (fall back to proc.kill() at minimum); add a non-skipif unit test with a mocked platform",
+        "wid": "w6"
+      }
+    ]
+  }
+}

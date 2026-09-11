@@ -1,0 +1,186 @@
+{
+  "description": "Optional final cleanup. After enough time has passed (60-90 days post\nPhase 5) that you are confident no external link, fork, or PyPI\nconsumer depends on the archived joeharris76/benchbox-private repo, and\nno in-flight work is hiding in the retired local clone, the archive can\nbe deleted and the local clone removed.\n\nThis is intentionally low priority and deferred. The archive costs\nnothing to keep; deleting it is irreversible. Default action is to\nleave it forever as a historical reference - this TODO exists only\nin case you want to clean up later.\n\nNote: under Option B there is no joeharris76/BenchBox-archive (no rename\nhappened); the archive being decommissioned here is\njoeharris76/benchbox-private (the original private repo).\n\nPlan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 9).\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete the archive if forks of benchbox-private exist (unlikely for a private repo)",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "why": "users who forked from the old URL will lose their fork's upstream."
+      },
+      {
+        "dont": "delete the retired private clone before w2 confirms no uncommitted/unpushed work exists",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "why": "that work is irrecoverable if the GitHub-side archive has also been deleted."
+      },
+      {
+        "dont": "rush this",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "why": "the archive costs nothing to keep, and deletion is irreversible. The default action is to do nothing."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "needs_item": "single-repo-migration-phase-8-first-post-migration-release"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "imported from YAML status: Blocked",
+      "category": "Release Tooling",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All git history on the canonical joeharris76/BenchBox repo is preserved (Option B never touched it; this phase doesn't either).",
+        "item_id": "single-repo-migration-phase-9-decommission-archive"
+      },
+      {
+        "behavior": "Any external bookmarks to joeharris76/BenchBox continue to work (URL unchanged throughout the migration).",
+        "item_id": "single-repo-migration-phase-9-decommission-archive"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/Developer/BenchBox.retired-20260427/"
+      },
+      {
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "kind": "only_modify",
+        "path_glob": "MIGRATION-NOTES.md"
+      },
+      {
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/single-repo-migration.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -c 'phase 9\\|archive' _project/decisions/single-repo-migration.md",
+        "description": "Decision recorded in decisions doc",
+        "expected": "at least 1",
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test ! -f MIGRATION-NOTES.md && echo OK",
+        "description": "MIGRATION-NOTES.md removed if it existed",
+        "expected": "OK",
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh pr view <phase-9-pr> --json body --jq '.body' | grep -c '## API surface diff'",
+        "description": "Any Phase 9 PR includes the migration API surface diff gate",
+        "expected": ">= 1, or this TODO records that no PR was opened",
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "needs_wid": "w4",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "notes": "Calendar gate. Phase 5 sets the clock. Confirm by checking the\nPhase 5 completed_date when this item moves to in_progress.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wait at least 60 days from Phase 5 (dev locus migration) before considering deletion",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "notes": "cd /Users/joe/Developer/BenchBox.retired-20260427\ngit status                        # any unstaged or staged work?\ngit stash list                    # any stashed work?\ngit branch -vv                    # any branch with [ahead N] vs upstream?\nAnything found here is potentially valuable lost work. Cherry-pick\nforward into the new dev locus before considering deletion.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Audit the retired private clone for any uncommitted/unpushed work",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "notes": "Search for old repo URL patterns in places you control:\nblog posts, slides, papers, social profiles, talks, READMEs of\nother projects, etc.\nPatterns to check:\n  - github.com/joeharris76/benchbox-private  (was the private)\nUpdate each to point at github.com/joeharris76/BenchBox.\nNote: Option B left joeharris76/BenchBox unchanged, so the public\nURL was always correct — only references to benchbox-private (which\nshould not exist externally since the repo was private) need attention.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Audit external references to old URLs",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "notes": "Two reasonable choices:\n- DELETE: GitHub UI -> Settings on joeharris76/benchbox-private ->\n  Danger zone -> Delete this repository. Irreversible. Frees the\n  repo name from your account.\n- KEEP: do nothing. The archive sits there forever as a frozen\n  historical artefact. Costs zero.\nDefault to KEEP unless there is a specific reason to delete (e.g.,\nembarrassing content discovered post-archive, or repo-name\nreclamation needed).\nRecord the decision in _project/decisions/single-repo-migration.md\nas the final entry.\n\nIf this phase opens a PR, the PR body must include the API surface\ndiff section from `_project/specs/migration-api-surface-gate.md`\nbefore this work unit can be marked done. Use explicit `none` rows\nwhen the phase introduces no commands, console scripts, public Python\nimports, or file-system conventions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide: delete the archived benchbox-private GitHub repo, or keep it",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "notes": "rm -rf /Users/joe/Developer/BenchBox.retired-20260427\nDefault action: delete after w2 confirms no lost work. Costs disk\nspace; serves no purpose once the archive is verified.\nSkip if disk space is fine and you want a permanent local snapshot.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide: delete the retired private clone, or keep it",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-9-decommission-archive",
+        "notes": "If Phase 5 added a MIGRATION-NOTES.md, remove it now. The\nmigration is no longer \"recent\" and the note clutters the repo\nroot. Open a PR with the deletion.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Remove MIGRATION-NOTES.md from repo root if it was added in Phase 5",
+        "wid": "w6"
+      }
+    ]
+  }
+}

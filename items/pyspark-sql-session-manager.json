@@ -1,0 +1,10 @@
+{
+  "description": "Extract SparkSession management from pyspark_df.py into a shared module\nthat can be used by both DataFrame and SQL adapters.\n\nThis enables the dual-mode PySpark platform architecture where both SQL\nand DataFrame modes share a single SparkSession (required by JVM constraint\nof one SparkSession per process).\n\nKey responsibilities of SparkSessionManager:\n- Singleton pattern respecting one SparkSession per JVM\n- Shared configuration: master, memory, executor settings, AQE\n- Java version detection with clear error messages (17/21 required, 23+ rejected)\n- Graceful shutdown handling",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2025-12-07T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

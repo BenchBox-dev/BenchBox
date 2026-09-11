@@ -1,0 +1,10 @@
+{
+  "description": "Integrate the full tuning configuration directly into benchmark result output files.\n\nCurrently, benchmark results reference the tuning file path but do not capture the\nactual tuning configuration content. This is problematic because:\n- The tuning file could be modified by subsequent runs\n- Results become non-reproducible without the exact tuning config used\n- Comparing results across different tuning configs becomes unreliable\n\nUnlike query text (which is deterministically generated from benchmark definitions),\ntuning configurations are user-defined and can vary between runs. The actual tuning\ncontent must be captured at execution time to ensure result reproducibility.\n\nSolution: Embed the complete tuning configuration (clauses, indexes, constraints,\netc.) directly in the result output, either inline or as a companion file.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-08T00:00:00Z",
+      "worktree": "result-object-migration"
+    }
+  }
+}

@@ -1,0 +1,156 @@
+{
+  "context": "Enumerate the unsupported set from engine capability docs and the engine's\nown errors that are model-level (e.g. clickhouse-local has no multi-statement\ntransaction semantics; datafusion has no row-level DML). Add benchmark_gate\nrules mirroring the existing docker rules. Leave anything ambiguous OUT of\npruning and route it to the defect TODOs so it gets fixed.\n",
+  "description": "In the 2026-05-28 native SQL sweep, write/transaction/ai/vector-family\ncells on read-only engines (datafusion, clickhouse-local) were ATTEMPTED\nand FAILED rather than compatibility-pruned, inflating the failure count\nwith cells that policy should never have run. Examples from resume.json:\ndatafusion|write_primitives|*, datafusion|transaction_primitives|*,\ndatafusion|vector_search|*, clickhouse-local|write_primitives|*,\nclickhouse-local|transaction_primitives|* — all \"failed\". The dataframe\nsweep had the same shape (e.g. transaction_primitives NO_JSON across\npandas/polars/pyspark; polars tpcdi correctly self-reported \"requires\ntransactional maintenance capabilities\").\n\nCorrectness note from code reading: the pruning *machinery* already works\nfor every mode — tests/uat/phases/enumerate.py emits compatibility_pruned\nrows from rules in tests/uat/compatibility.py. The reason native/dataframe\nruns produced no native/dataframe prunes is that compatibility.py only\ncarries rules for docker platforms (pg-duckdb, pg-mooncake, timescaledb,\nlakesail, questdb) plus one generic dataframe rule. The gap is MISSING\nRULES, not missing emission. Do not rebuild emission.\n\nEvidence pin: \"compatibility.py carries rules only for docker platforms +\none generic dataframe rule\" is confirmed against commit da6a33c14\n(`grep -oE 'uat\\.compat\\.[a-z0-9-]+' tests/uat/compatibility.py | sort -u`).\nRe-confirm before authoring rules in case coverage has since expanded.\n\nAdd rules so genuinely-unsupported engine x benchmark-family cells are\nPRUNED (status compatibility-pruned, with rule_id + reason + evidence),\nnot counted as FAIL.\n\nCRITICAL distinction (this is the adversarial trap): prune only what is\ngenuinely unsupported by the engine's model (e.g. row-level DML /\ntransactions on a read-only OLAP engine). DO NOT prune cells that failed\nbecause of a BenchBox defect — those belong in the defect TODOs\n(uat-cross-engine-dataframe-defects, uat-duckdb-reference-triage), where\nthey get fixed, not hidden. A prune rule must cite engine-model evidence,\nnot \"it errored last run\".",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add runtime SQL-rewrite logic here",
+        "instead": "UAT rules only explain why a cell is not attempted.",
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "why": "that lives in benchbox/sql_compat/"
+      },
+      {
+        "dont": "prune a cell just because it failed last run",
+        "instead": "prune only model-level gaps with cited evidence.",
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "why": "that hides BenchBox defects (e.g. datafusion positional f0/f1 columns is a loader bug, not an engine limit)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "needs_item": "uat-cross-engine-dataframe-defects"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Early-stop pruning stays separate from compatibility pruning; neither is reported as a pass.",
+        "item_id": "uat-native-dataframe-compatibility-rules"
+      },
+      {
+        "behavior": "Existing docker prune rules are unchanged.",
+        "item_id": "uat-native-dataframe-compatibility-rules"
+      },
+      {
+        "behavior": "candidate_count == len(cells) + len(compatibility_pruned) invariant (test_phases.py) holds.",
+        "item_id": "uat-native-dataframe-compatibility-rules"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "tests/uat/compatibility.py — existing pg-duckdb/pg-mooncake/timescaledb/lakesail/questdb *.benchmark_gate rules; add datafusion/clickhouse-local/dataframe rules in the same shape",
+        "decision": "reuse",
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "path": "tests/uat/compatibility.py"
+      },
+      {
+        "concept": "tests/uat/phases/enumerate.py:_pruned_rows_for_rule — reuse as-is; it already emits compatibility_pruned.jsonl for any mode",
+        "decision": "reuse",
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "path": "tests/uat/phases/enumerate.py:_pruned_rows_for_rule"
+      },
+      {
+        "concept": "uat_complete_docker_non_oltp_20260528 compatibility_pruned.jsonl — reference for the rule_id / rule_status / reason / evidence schema",
+        "decision": "reuse",
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "path": "uat_complete_docker_non_oltp_20260528"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/sql_compat/"
+      },
+      {
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/compatibility.py"
+      },
+      {
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_matrix.py"
+      },
+      {
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_phases.py tests/uat/test_matrix.py -q",
+        "description": "Compatibility + enumeration + matrix tests pass",
+        "expected": "all pass, including pruned-accounting assertions",
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_phases.py -k 'pruned and (datafusion or clickhouse or dataframe)' -q",
+        "description": "A native sweep config enumerates datafusion/clickhouse write+transaction cells as pruned",
+        "expected": "cells appear in compatibility_pruned with .benchmark_gate rule_id",
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "notes": "For datafusion + clickhouse-local: write_primitives, transaction_primitives,\nand any maintenance/DML-only families that the SQL operation executor\ncannot run on a read-only engine. For dataframe engines: transaction/\nwrite/maintenance families that are policy-incompatible (cf. polars\ntpcdi self-report). Each entry needs a one-line model-level reason, not\na stack trace.\nCatalogued native datafusion/clickhouse-local AI/write/transaction/vector\ngates and DataFrame transaction/TPC-DI/write-manager gaps with source-file\nevidence.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Catalogue genuinely-unsupported engine x benchmark-family pairs with engine-model evidence",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "notes": "Added UAT-local benchmark_gate rules in tests/uat/compatibility.py while\npreserving the existing registry-backed docker/platform gates.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add the rules to compatibility.py with rule_id, status=blocked, reason, evidence",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-native-dataframe-compatibility-rules",
+        "notes": "Extend tests/uat/test_phases.py and tests/uat/test_matrix.py candidate/\nexecuted/pruned accounting so a regression that drops a rule (and lets\nthe cell fail instead) is caught.\nAdded phase enumeration tests for native/dataframe prunes and matrix\ncoverage tests for all UAT DataFrame selectors.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Assert in tests that these cells enumerate as compatibility-pruned, not as executable",
+        "wid": "w3"
+      }
+    ]
+  }
+}

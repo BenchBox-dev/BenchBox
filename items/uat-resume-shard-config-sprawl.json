@@ -1,0 +1,174 @@
+{
+  "context": "Classify first, write the lifecycle policy, then relocate/mark. Treat the 17\nshards as evidence residue until proven disposable — relocate rather than\ndelete unless w0 confirms they are pure scratch.\n",
+  "description": "Outcome of a 4-round adversarial architecture review of the UAT layer. The\nreview (and the rebuttal) agree: 17 uat-tuned-followup-resume-*-20260505.yaml\nfiles (one per platform, from a single 2026-05-05 followup sweep) sit in\ntests/uat/configs/ alongside 31 total configs. These are generated\noperational scratch / evidence residue, not reusable config design.\n\nThe spec defines resume.json as the ephemeral resume mechanism\n(_project/specs/uat-framework.md:268-277). The 17 shards conflate four\ndistinct things that currently all live together:\n  - reusable templates (starting points)\n  - historical evidence (intentionally retained)\n  - generated rerun shards (operational scratch)\n  - ephemeral resume state (resume.json per spec)\n\nThis is the \"config lifecycle muddy\" blind spot the rebuttal itself named.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bulk-delete the 17 shards without classifying them",
+        "instead": "(not specified)",
+        "item_id": "uat-resume-shard-config-sprawl",
+        "why": "some may be retained evidence"
+      },
+      {
+        "dont": "leave generated rerun shards in the reusable-template directory",
+        "instead": "(not specified)",
+        "item_id": "uat-resume-shard-config-sprawl",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-resume-shard-config-sprawl",
+        "id": 509,
+        "reason": "Tooling automation is a follow-up; the lifecycle policy + relocation is the fix.",
+        "resolution": "promoted",
+        "resolved_item": "auto-expire-or-auto-archive-generated-rerun-shards",
+        "resolved_reason": null,
+        "summary": "Auto-expire or auto-archive generated rerun shards"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-31T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Any shard intentionally retained as evidence remains retrievable (relocated, not deleted, unless confirmed disposable)",
+        "item_id": "uat-resume-shard-config-sprawl"
+      },
+      {
+        "behavior": "resume.json runtime behavior per spec lines 268-277 is unchanged",
+        "item_id": "uat-resume-shard-config-sprawl"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/specs/uat-framework.md:646-688 — reuse/clarify the historical-vs-template policy instead of inventing a parallel taxonomy",
+        "decision": "reuse",
+        "item_id": "uat-resume-shard-config-sprawl",
+        "path": "_project/specs/uat-framework.md:646-688"
+      },
+      {
+        "concept": "docs/operations/uat-framework.md historical config section — extend with generated scratch and runtime resume-state categories",
+        "decision": "extend",
+        "item_id": "uat-resume-shard-config-sprawl",
+        "path": "docs/operations/uat-framework.md"
+      },
+      {
+        "concept": "tests/uat/configs/uat-2026-05-02.yaml — preserve as historical evidence pattern, not as a scratch shard template",
+        "decision": "reuse",
+        "item_id": "uat-resume-shard-config-sprawl",
+        "path": "tests/uat/configs/uat-2026-05-02.yaml"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-resume-shard-config-sprawl",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/*.py (resume.json runtime behavior unchanged)"
+      },
+      {
+        "item_id": "uat-resume-shard-config-sprawl",
+        "kind": "only_modify",
+        "path_glob": ".gitignore (if shards are gitignored)"
+      },
+      {
+        "item_id": "uat-resume-shard-config-sprawl",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md (config-lifecycle policy)"
+      },
+      {
+        "item_id": "uat-resume-shard-config-sprawl",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "find tests/uat/configs -maxdepth 1 -name '*resume-*20260505*.yaml' | wc -l | tr -d ' '",
+        "description": "tests/uat/configs/ no longer mixes generated shards with reusable templates",
+        "expected": "0",
+        "item_id": "uat-resume-shard-config-sprawl",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rni 'historical configs are evidence' docs/operations/uat-framework.md _project/specs/uat-framework.md",
+        "description": "Config-lifecycle policy documented",
+        "expected": "policy present and references the four config classes",
+        "item_id": "uat-resume-shard-config-sprawl",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-resume-shard-config-sprawl",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-resume-shard-config-sprawl",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-resume-shard-config-sprawl",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-resume-shard-config-sprawl",
+        "notes": "Confirm exactly 17 uat-tuned-followup-resume-*-20260505.yaml shards out of\n31 configs. Classify each of the 31 into: reusable template / historical\nevidence / generated rerun shard / ephemeral resume state. Record a compact\nsummary.\n\nRE-VALIDATION (2026-07-16): the cleanup has already landed. This item was\nmisfiled in DONE with a stale `status: Not Started` field and restored to\nplanning on that basis (PR #1181); the work was executed. Evidence:\n  - Zero shards remain at the configs root:\n    `find tests/uat/configs -maxdepth 1 -name '*resume-*20260505*.yaml'`\n    -> 0. Root config count is now 15 (down from 31).\n  - All 17 shards were RELOCATED (not deleted) to\n    tests/uat/configs/generated-rerun-shards/, each carrying a lifecycle\n    header (\"# GENERATED rerun shard (frozen historical) ... NOT an\n    editable template; see README.md\") plus a directory README.md.\n  - The four-way classification collapsed to three live classes because\n    the resume mechanism itself was RETIRED (see w3): reusable template /\n    historical evidence / generated rerun shard.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the shard count and classify every file in tests/uat/configs/",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-resume-shard-config-sprawl",
+        "notes": "Write the policy distinguishing the four categories and where each lives\n(tracked reusable dir vs evidence/archive path vs gitignored scratch vs\nruntime-only resume.json). Align with spec lines 268-277.\n\nDONE: docs/operations/uat-framework.md has a \"Config lifecycle (three\nclasses)\" section (reusable template / historical evidence / generated\nrerun shard); \"Historical configs are evidence\" is stated. Three classes\nnot four because resume state ceased to be a config class when resume was\nretired (w3).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the config-lifecycle policy",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-resume-shard-config-sprawl",
+        "notes": "Move them out of the tracked reusable-config directory (gitignore or an\nevidence/archive path), OR mark them generated/frozen-historical with an\nexplicit lifecycle header. Do not leave them masquerading as reusable\ntemplates.\n\nDONE: all 17 relocated to tests/uat/configs/generated-rerun-shards/ (both\napproaches applied) — moved out of the reusable-config root AND each file\nstamped with a frozen-historical lifecycle header, alongside a README.md.\nRelocated, not deleted, preserving evidence retrievability.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Relocate or mark the 17 resume shards per the policy",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-resume-shard-config-sprawl",
+        "notes": "Make clear in docs/operations and/or the spec that resume.json is the\nephemeral resume mechanism; resume *configs* are not a reusable artifact\nclass.\n\nDONE (superseded upstream): the resume mechanism was RETIRED entirely\n(_project/specs/uat-framework.md:295 \"Resume (retired)\"; the\n`--resume <manifest>`/resume.json path was removed under\n[[uat-resume-retirement-artifact-durability]]). This eliminates the\n\"resume config\" ambiguity at the root rather than merely documenting it,\nso no reusable \"resume config\" artifact class can exist.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document resume.json as ephemeral resume state and remove any 'resume config' ambiguity",
+        "wid": "w3"
+      }
+    ]
+  }
+}

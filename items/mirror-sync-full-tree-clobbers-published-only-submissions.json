@@ -1,0 +1,144 @@
+{
+  "context": "Change sync-results-data-to-published directory apply to union-merge rather than wipe-replace for results-data/bundles (overlay develop changes, preserve published-only paths), OR detect published-only paths and refuse/auto-split the mirror, OR mirror only the develop-ahead path list. Keep draft PR + human review. Canary should refuse to recommend a destructive full mirror whenever published-only paths are non-empty, even if develop-ahead is also non-empty. Tests with fixtures that include both develop-ahead and published-only bundles.",
+  "description": "corpus-drift-canary-direction-and-leak-check (#1584) correctly refuses to recommend a full mirror when drift is published-only only. But when develop is also ahead, the canary still recommends gh workflow run sync-results-data-to-published. That workflow (Build mirror branch) starts from published-results then git rm -rf results-data/bundles and checkouts develop's tree — so any community submission present only on published-results is removed even while applying a legitimate develop tip hygiene change. Residual defect after #1584: direction-aware advice without a non-destructive mirror apply path. Related: post-#1578 tip mirror #1583 used the same wipe.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "needs_item": "corpus-drift-canary-direction-and-leak-check"
+      }
+    ],
+    "item_meta": {
+      "category": "privacy",
+      "completed_at": "2026-08-05T23:53:56Z",
+      "completed_pr": 1608,
+      "created_at": "2026-08-05T23:16:42Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "A recommendation must never be an action that deletes public community content",
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions"
+      },
+      {
+        "behavior": "Canary stays report-only without write access to published-results",
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions"
+      },
+      {
+        "behavior": "Mirror PR stays draft until human review",
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions"
+      },
+      {
+        "behavior": "published-results history is not force-rewritten",
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/corpus-drift-check.yml"
+      },
+      {
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/sync-results-data-to-published.yml"
+      },
+      {
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'published-only|Do NOT run a full mirror' .github/workflows/corpus-drift-check.yml",
+        "description": "Canary does not recommend full mirror when published-only paths exist",
+        "expected": null,
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "last_result": "pass",
+        "last_run": "2026-08-05T23:23:55Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'published-only|union|overlay|git rm -rf' .github/workflows/sync-results-data-to-published.yml",
+        "description": "Sync apply path has non-wipe strategy or published-only guard",
+        "expected": null,
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "last_result": "pass",
+        "last_run": "2026-08-05T23:24:00Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "WIP: prove via unit test that git-rm-then-checkout of results-data/bundles deletes published-only community paths when develop-ahead also present (test_sync_results_union_overlay). Decision w1=union-overlay already specified in work order.",
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "notes": null,
+        "started_at": "2026-08-05T23:19:52Z",
+        "started_branch": "fix/mirror-sync-preserve-published-only",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Prove wipe deletes published-only when develop-ahead is also present",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Chose union-overlay for results-data/bundles: no wipe; checkout develop paths over published; leave published-only intact. Rejected refuse-when-published-only (blocks sanitization mirror) and pure path-list (misses nested tree adds).",
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "notes": null,
+        "started_at": "2026-08-05T23:20:44Z",
+        "started_branch": "fix/mirror-sync-preserve-published-only",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Choose union-merge vs refuse-when-published-only vs path-list apply",
+        "wid": "w1"
+      },
+      {
+        "evidence": "sync: union overlay for results-data/bundles (no git rm -rf); canary mixed branch forbids wipe-based full mirror and documents overlay",
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "notes": null,
+        "started_at": "2026-08-05T23:20:54Z",
+        "started_branch": "fix/mirror-sync-preserve-published-only",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Implement sync workflow change + canary recommendation gate",
+        "wid": "w2"
+      },
+      {
+        "evidence": "tests/unit/test_sync_results_workflow.py (wipe proof + overlay preserve + static no-wipe); tests/unit/scripts/test_corpus_drift_canary.py (mixed fixture + recommendation gate). 12 passed.",
+        "item_id": "mirror-sync-full-tree-clobbers-published-only-submissions",
+        "notes": null,
+        "started_at": "2026-08-05T23:23:43Z",
+        "started_branch": "fix/mirror-sync-preserve-published-only",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Tests with mixed develop-ahead and published-only fixtures",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,256 @@
+{
+  "context": "Reproduce the failure shape locally before changing kill logic. Prefer a\nsmall, portable subprocess-tree fixture in tests over relying on a slow real\nbenchmark. Keep report changes additive so existing parsers can still read old\nfields.\n",
+  "description": "The 2026-05-12 enabled-platform UAT config set `per_cell_timeout_s: 600`, but\nthe run notes indicate timeout enforcement did not reliably stop long cells.\nThe artifact matrix reported no timed-out cells even though the full command\nran for 1036.4s and execution did not cover the full enumerated matrix.\n\nCurrent unit coverage exercises a simple child process timeout. The UAT cell\npath runs `uv run -- benchbox ...`, which can create a larger process tree and\nbuffered stdout/stderr behavior. Add targeted regression coverage and harden\ntimeout handling so a per-cell timeout kills the whole cell process tree and\nis reported unambiguously as timed out.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add sleeps long enough to slow the fast suite materially",
+        "instead": "(not specified)",
+        "item_id": "uat-timeout-enforcement-hardening",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "infer the exact timeout root cause solely from the 2026-05-12 artifacts; write a reproducer first",
+        "instead": "(not specified)",
+        "item_id": "uat-timeout-enforcement-hardening",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "treat timeouts as ordinary failed cells in summaries",
+        "instead": "(not specified)",
+        "item_id": "uat-timeout-enforcement-hardening",
+        "why": "(unstated)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "uat-timeout-enforcement-hardening",
+        "id": 615,
+        "reason": "The immediate defect is per-cell kill/report behavior; platform-level scheduling policy is separate.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: A 'global runtime scheduler redesign' is a vague, large, speculative redesign with no concrete driver; the load-bearing per-cell timeout/kill fix landed in the from-item. No defined need or trigger.",
+        "summary": "Global runtime scheduler redesign"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "uat-enabled-platforms-remediation"
+    },
+    "preserves": [
+      {
+        "behavior": "A timed-out cell cannot leave child processes running after the test or UAT phase exits",
+        "item_id": "uat-timeout-enforcement-hardening"
+      },
+      {
+        "behavior": "Non-timeout failures retain their original return code and stderr context",
+        "item_id": "uat-timeout-enforcement-hardening"
+      },
+      {
+        "behavior": "Timeout tests remain fast and do not require live Docker or cloud credentials",
+        "item_id": "uat-timeout-enforcement-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/uat-enabled-today-platforms-20260512.yaml -- observed config with `per_cell_timeout_s: 600`",
+        "decision": "reuse",
+        "item_id": "uat-timeout-enforcement-hardening",
+        "path": "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/uat-enabled-today-platforms-20260512.yaml"
+      },
+      {
+        "concept": "tests/uat/phases/execute.py -- execution phase consumes timeout settings and aggregates cell results",
+        "decision": "reuse",
+        "item_id": "uat-timeout-enforcement-hardening",
+        "path": "tests/uat/phases/execute.py"
+      },
+      {
+        "concept": "tests/uat/runner.py:123-166 -- `run_cell()` invokes `benchbox_run_argv()` and maps timeout status into `CellResult`",
+        "decision": "reuse",
+        "item_id": "uat-timeout-enforcement-hardening",
+        "path": "tests/uat/runner.py:123-166"
+      },
+      {
+        "concept": "tests/uat/test_timeouts.py -- existing unit tests cover simple timeout behavior but not benchbox-like process trees",
+        "decision": "reuse",
+        "item_id": "uat-timeout-enforcement-hardening",
+        "path": "tests/uat/test_timeouts.py"
+      },
+      {
+        "concept": "tests/uat/timeouts.py:29-89 -- `run_with_timeout()` currently uses `subprocess.Popen`, process groups, and timeout handling",
+        "decision": "reuse",
+        "item_id": "uat-timeout-enforcement-hardening",
+        "path": "tests/uat/timeouts.py:29-89"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/orchestrator.py"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/report.py"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/runner.py"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_orchestrator.py"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_runner.py"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_timeouts.py"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/timeouts.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_timeouts.py tests/uat/test_runner.py -m fast -q",
+        "description": "Timeout and runner unit coverage passes",
+        "expected": "passes with process-tree timeout coverage",
+        "item_id": "uat-timeout-enforcement-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-sweep CONFIG=tests/uat/configs/uat-synthetic-timeout-smoke.yaml",
+        "description": "Targeted UAT timeout smoke records a timed-out cell",
+        "expected": "`cells.jsonl` and `matrix_summary.tsv` mark the synthetic cell as timed out with no surviving child process",
+        "item_id": "uat-timeout-enforcement-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/uat/test_matrix.py tests/uat/test_phases.py -m fast -q",
+        "description": "Existing UAT matrix coverage still passes",
+        "expected": "passes",
+        "item_id": "uat-timeout-enforcement-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-timeout-enforcement-hardening",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "uat-timeout-enforcement-hardening",
+        "notes": "Build a local synthetic command that mimics `uv run -- benchbox` spawning\ndescendants and sleeping beyond a tiny timeout. Record a compact summary\nof process tree, command, exit status, and whether descendants survived.\n\nCompleted with fast regression coverage in\n`tests/uat/test_timeouts.py`: a parent process spawns a sleeping\ngrandchild, the wrapper times out at 1s, returns exit 124, and the child\nPID is gone before the assertion completes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce timeout behavior with a benchbox-like process tree",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-timeout-enforcement-hardening",
+        "notes": "Extend timeout/runner tests beyond a one-process `time.sleep`. Cover a\nchild that spawns a grandchild, a command that writes output, and the\n`run_cell()` status mapping. Tests must be deterministic and fast.\n\nAdded process-tree, noisy-pipe, and `run_cell()` timeout marker tests.\nThe timeout/runner verification command passed: 21 tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add process-tree timeout regression tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-timeout-enforcement-hardening",
+        "notes": "Ensure timeout handling terminates the process group or process tree,\nescalates if needed, drains output safely, and returns a stable timeout\ncode/status that matrix and report phases classify as timed out rather\nthan failed or missing.\n\n`run_with_timeout()` now uses `communicate(timeout=...)` so stdout/stderr\npipes are drained while the timeout is enforced. Timeout classification\nremains stable at exit 124 with `timed_out=True`, and `run_cell()` writes\na compact `UAT_TIMEOUT` marker into the cell log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Harden timeout kill and reporting semantics",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "uat-timeout-enforcement-hardening",
+        "notes": "Make timed-out cells visible in `cells.jsonl`, `matrix_summary.tsv`, and\nreports. Include enough command/status context to debug future timeouts\nwithout committing raw logs.\n\n`cells.jsonl` now includes a boolean `timed_out` field. Existing report\noutput already counted timed-out cells separately; the synthetic timeout\nsmoke confirmed `failed=0 timed_out=1`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Expose timeout accounting in matrix and report outputs",
+        "wid": "w3"
+      }
+    ]
+  }
+}

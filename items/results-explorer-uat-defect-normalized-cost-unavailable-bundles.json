@@ -1,0 +1,98 @@
+{
+  "description": "W5 full-package validation rejected many bundles because `cost.total_usd` was\npresent while `cost_status` was `unavailable`. The validation log reported 134\noccurrences of this normalized-cost contract error. These bundles were excluded\nfrom the validator-clean Explorer UAT subset.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "set unavailable costs to 0 USD",
+        "instead": "omit totals or mark them using the explicit unavailable payload.",
+        "item_id": "results-explorer-uat-defect-normalized-cost-unavailable-bundles",
+        "why": "that creates false leaderboard semantics"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-03T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Local results remain visibly cost-unavailable rather than pretending to be zero-cost cloud runs.",
+        "item_id": "results-explorer-uat-defect-normalized-cost-unavailable-bundles"
+      },
+      {
+        "behavior": "Normalized cost remains present for genuinely normalized cloud-cost results.",
+        "item_id": "results-explorer-uat-defect-normalized-cost-unavailable-bundles"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/validate_submission.py results-data/bundles",
+        "description": "Submission validator accepts a local no-cost bundle without cost totals.",
+        "expected": "no normalized-cost unavailable errors",
+        "item_id": "results-explorer-uat-defect-normalized-cost-unavailable-bundles",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast tests remain green.",
+        "expected": "all selected tests pass",
+        "item_id": "results-explorer-uat-defect-normalized-cost-unavailable-bundles",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-uat-defect-normalized-cost-unavailable-bundles",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-uat-defect-normalized-cost-unavailable-bundles",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-normalized-cost-unavailable-bundles",
+        "notes": "W1 trace result (2026-05-03):\n  - Cost calculation is already producing the correct unavailable\n    normalized-cost payload. `CostCalculator.calculate_normalized_benchmark_cost`\n    returns `cost_status=\"unavailable\"` and omits\n    `normalized_cost_usd` when cloud pricing metadata is defaulted or\n    missing; this is covered in\n    `tests/unit/core/cost/test_calculator.py` and\n    `tests/unit/core/cost/test_integration.py`.\n  - The incompatible direct total is added during schema-v2 export.\n    `benchbox/core/results/schema.py::_add_cost_section()` copies\n    `result.cost_summary[\"total_cost\"]` into `payload[\"cost\"][\"total_usd\"]`\n    without checking normalized-cost availability. The hosted\n    validator rejects that shape when `normalized_cost.cost_status`\n    is `unavailable`.\n  - W2 owned implementation file:\n    `benchbox/core/results/schema.py`.\n  - W3 owned test file:\n    `tests/unit/test_results_exporter.py`.\n  - Validator behavior should remain unchanged in\n    `scripts/validate_submission.py`; it is correctly rejecting the\n    invalid shape and is not owned by this fix.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Trace normalized-cost emission for local and unavailable-cost results",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-normalized-cost-unavailable-bundles",
+        "notes": "Implemented in `benchbox/core/results/schema.py`.\n`_add_cost_section()` now emits the legacy direct `cost.total_usd`\nonly when normalized-cost metadata has an available value and an\naccepted status (`normalized` or `not_applicable_local`). Bundles\nwith `normalized_cost.cost_status=\"unavailable\"` retain the explicit\nunavailable normalized-cost block but no longer emit an incompatible\ndirect cost total.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align bundle export with the hosted-results cost contract",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-uat-defect-normalized-cost-unavailable-bundles",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add export/submission validation regression coverage",
+        "wid": "w3"
+      }
+    ]
+  }
+}

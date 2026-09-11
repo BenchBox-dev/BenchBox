@@ -1,0 +1,10 @@
+{
+  "description": "- Implemented real SQL execution and capture for TPC-DS Power, Throughput, and Maintenance tests when running in CLI dry-run mode via platform adapter wrappers.\n- \"Added context-aware labeling for captured SQL:\"\n- DryRunExecutor now prefers labeled outputs from test classes for accurate preview titles and grouping.\n- Tests added to validate labeled outputs for each mode.\n- \"Impact: Dry-run preview now reflects the precise execution sequence and SQL users can expect, improving debuggability and trust in the CLI.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

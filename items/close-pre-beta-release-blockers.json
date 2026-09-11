@@ -1,0 +1,441 @@
+{
+  "context": "Use the 2026-04-01 review findings as the input set, but ground every change\nin existing local decisions:\n- `move-duckdb-to-optional-extras`\n- `isolate-experimental-core-subsystems`\n- `remove-release-tooling-from-wheel`\n\nResolve policy/documentation questions first, then implement any packaging\nboundary changes, then clean the targeted `ty` diagnostics, then ratchet\nregression tests. Prefer extending existing release/version/package tests over\ninventing one-off scripts.\n",
+  "description": "The 2026-04-01 whole-project pre-Beta review found four release-surface gaps\nthat should be closed before BenchBox is presented as Beta software:\n\n1. Package metadata already says Beta, but public docs still say Alpha.\n2. Install docs contradict the actual dependency model after DuckDB moved to\n   optional extras.\n3. The default wheel still ships the unsupported `benchbox.experimental`\n   namespace without a fully explicit Beta packaging/support policy.\n4. `uv run ty check` has too much standing noise to act as a meaningful\n   release gate, including warnings on the final execution path in\n   `benchbox/cli/commands/run.py`.\n\nThis item is about release coherence, not runtime break/fix work. Lint, fast\ntests, the wheel/sdist build, and CLI help/version commands are already\npassing. The remaining blockers are policy drift, packaging ambiguity, and\nrelease-critical static-analysis noise.\n\nThe work must reconcile two completed historical decisions with the current\nBeta goal:\n\n- `move-duckdb-to-optional-extras` intentionally made DuckDB non-default.\n- `isolate-experimental-core-subsystems` intentionally moved prototypes into\n  `benchbox.experimental` but kept them importable from the source tree.\n\nThe outcome of this item must be a single coherent Beta support contract\nacross `pyproject.toml`, canonical docs, built artifacts, and release\nverification commands.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add `benchbox.experimental` to public exports or benchmark registries to make the packaging policy feel simpler",
+        "instead": "keep it explicitly unsupported or explicitly out of the default wheel.",
+        "item_id": "close-pre-beta-release-blockers",
+        "why": "that would silently expand the supported Beta surface"
+      },
+      {
+        "dont": "claim DuckDB is part of the default install unless `[project.dependencies]` actually says so",
+        "instead": "either change packaging or change docs, but not one without the other.",
+        "item_id": "close-pre-beta-release-blockers",
+        "why": "users will hit import/runtime mismatches"
+      },
+      {
+        "dont": "try to zero the entire repository-wide `ty` backlog inside this item",
+        "instead": "ratchet the release-critical entrypoints first and open follow-up work for the rest.",
+        "item_id": "close-pre-beta-release-blockers",
+        "why": "that turns a focused release blocker into an unbounded cleanup"
+      },
+      {
+        "dont": "update only `README.md`",
+        "instead": "update all canonical current-state docs in the same pass.",
+        "item_id": "close-pre-beta-release-blockers",
+        "why": "the FAQ, installation guide, and version-reporting surfaces will drift again"
+      },
+      {
+        "dont": "use `MANIFEST.in` as the mechanism for wheel package exclusion",
+        "instead": "update `pyproject.toml` packaging config instead.",
+        "item_id": "close-pre-beta-release-blockers",
+        "why": "wheels are controlled by setuptools package discovery/package-data"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "close-pre-beta-release-blockers",
+        "id": 118,
+        "reason": "Useful follow-up work, but larger than a Beta-release blocker once the critical gate is ratcheted.",
+        "resolution": "promoted",
+        "resolved_item": "burn-down-the-full-repository-wide-ty-backlog-outside-releas",
+        "resolved_reason": null,
+        "summary": "Burn down the full repository-wide `ty` backlog outside release-critical entrypoints"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "close-pre-beta-release-blockers",
+        "id": 119,
+        "reason": "Potential long-term architecture change; only do this after the immediate Beta packaging policy is stabilized.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Conditional on the default-wheel boundary 'remaining contentious'; Beta packaging policy has since stabilized (item done).",
+        "summary": "Extract benchbox.experimental into a separate distribution if the default-wheel boundary remains contentious"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "close-pre-beta-release-blockers",
+        "id": 120,
+        "reason": "Current-state docs and package artifacts are the immediate Beta blocker; historical content can follow.",
+        "resolution": "promoted",
+        "resolved_item": "audit-blog-posts-and-historical-release-summaries-for-outdat",
+        "resolved_reason": null,
+        "summary": "Audit blog posts and historical release summaries for outdated Alpha/install language"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Readiness",
+      "completed_at": "2026-04-01T00:00:00Z",
+      "created_at": "2026-04-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The completed `move-duckdb-to-optional-extras` rationale is not accidentally reversed by docs-only edits; packaging and docs must agree.",
+        "item_id": "close-pre-beta-release-blockers"
+      },
+      {
+        "behavior": "`benchbox.experimental` stays out of `benchbox.__all__` and benchmark registries regardless of whether it remains in or leaves the default wheel.",
+        "item_id": "close-pre-beta-release-blockers"
+      },
+      {
+        "behavior": "`benchbox.release` remains excluded from the default wheel.",
+        "item_id": "close-pre-beta-release-blockers"
+      },
+      {
+        "behavior": "`uv run -- benchbox --help`, `uv run -- benchbox --version`, and `uv run -- benchbox run --help` continue to exit 0 and expose the current command set.",
+        "item_id": "close-pre-beta-release-blockers"
+      },
+      {
+        "behavior": "`uv run -- python -m pytest -m fast -q` remains green after any release-surface cleanup.",
+        "item_id": "close-pre-beta-release-blockers"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "do_not_modify",
+        "path_glob": "Benchmark query corpora under `benchbox/core/*/queries*` and `benchbox/core/*/dataframe_queries*`"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "do_not_modify",
+        "path_glob": "Benchmark result schema and exported result format contracts"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "do_not_modify",
+        "path_glob": "Platform adapter behavior unrelated to packaging/status/install/typecheck cleanup"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "do_not_modify",
+        "path_glob": "Supported benchmark registry membership for non-experimental benchmarks"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "benchbox/__init__.py"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "benchbox/base.py"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "benchbox/experimental/"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "docs/README.md"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/duckdb.md"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "docs/platforms/platform-selection-guide.md"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "docs/usage/faq.md"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "docs/usage/getting-started.md"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "docs/usage/installation.md"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_package_exports.py"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_version_command.py"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_exclusion_invariants.py"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_version_management.py"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/test_version_markers.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n \"Status-Alpha|alpha software|Alpha Software|works with DuckDB out of the box|automatically installed as a dependency\" README.md docs/README.md docs/usage/faq.md docs/usage/installation.md docs/platforms/platform-selection-guide.md docs/platforms/duckdb.md",
+        "description": "Current-state docs no longer contain stale Alpha/default-DuckDB claims",
+        "expected": "No matches for stale current-state status/install claims",
+        "item_id": "close-pre-beta-release-blockers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ty check benchbox/cli/commands/run.py benchbox/base.py benchbox/__init__.py",
+        "description": "Release-critical entrypoints are clean under ty",
+        "expected": "Found 0 diagnostics",
+        "item_id": "close-pre-beta-release-blockers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_cli_package_exports.py tests/unit/cli/test_cli_version_command.py tests/unit/test_version_management.py tests/unit/utils/test_version_markers.py tests/unit/test_release_exclusion_invariants.py tests/unit/test_release_infrastructure.py -q",
+        "description": "Version/package/release regression tests pass",
+        "expected": "All selected tests pass",
+        "item_id": "close-pre-beta-release-blockers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv build --sdist --wheel && unzip -l dist/benchbox-*.whl | rg 'benchbox/(experimental|release)/'",
+        "description": "Default distribution contents match the documented Beta support policy",
+        "expected": "`benchbox/release` absent; `benchbox/experimental` presence or absence matches the documented policy and its tests",
+        "item_id": "close-pre-beta-release-blockers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q && uv run -- benchbox --help && uv run -- benchbox --version && uv run -- benchbox run --help",
+        "description": "Overall smoke gate remains green",
+        "expected": "Fast suite passes and all CLI help/version commands exit 0",
+        "item_id": "close-pre-beta-release-blockers",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "close-pre-beta-release-blockers",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "close-pre-beta-release-blockers",
+        "notes": "Inventory every current-state claim in:\n- `pyproject.toml`\n- `README.md`\n- `docs/README.md`\n- `docs/usage/faq.md`\n- `docs/usage/installation.md`\n- `docs/platforms/platform-selection-guide.md`\n- `docs/platforms/duckdb.md`\n- `uv run -- benchbox --version`\n- `uv run -- benchbox --help`\n\nCapture, in one working matrix, the current answers to:\n- Is BenchBox Alpha or Beta right now?\n- What benchmark/platform counts are publicly claimed?\n- Does plain `uv add benchbox` imply DuckDB support?\n- Is `benchbox.experimental` part of the default wheel contract?\n- Which existing tests already guard these claims?\n\nThis is the source-of-truth step. No subsequent work unit should invent\npolicy independently.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build a canonical Beta release matrix for status, install surface, scope counts, and wheel boundaries",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "close-pre-beta-release-blockers",
+        "notes": "Run and capture the final gate:\n- `uv run ruff check .`\n- `uv run ty check benchbox/cli/commands/run.py benchbox/base.py benchbox/__init__.py`\n- `uv run -- python -m pytest -m fast -q`\n- `uv build --sdist --wheel`\n- wheel inspection for `benchbox/release` and `benchbox/experimental`\n- `uv run -- benchbox --help`\n- `uv run -- benchbox --version`\n- `uv run -- benchbox run --help`\n\nClose this item only when public docs, metadata, wheel contents, and\ntargeted type checking all agree with the chosen Beta support policy.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the final pre-Beta verification matrix and record the release decision",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "close-pre-beta-release-blockers",
+        "notes": "Align release status and scope wording across:\n- `pyproject.toml` classifier(s)\n- README badge, status section, and contribution/release language\n- `docs/README.md`\n- `docs/usage/faq.md`\n- any other current-state entry docs found in w1\n\nRemove stale Alpha wording and outdated benchmark/platform count claims.\nLimit follow-on doc edits to canonical current-state entry points, not\nhistorical release notes, blog posts, or archived announcements.\nIf the repo should stay Alpha until the final verification pass, revert\nall surfaces together first and flip all surfaces together at the end.\nMixed Alpha/Beta state is not acceptable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve alpha/beta and benchmark/platform-count drift across metadata and canonical docs",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "close-pre-beta-release-blockers",
+        "notes": "Reconcile all install guidance with the completed\n`move-duckdb-to-optional-extras` decision.\n\nAudit and fix contradictory wording in:\n- `README.md`\n- `docs/usage/faq.md`\n- `docs/usage/installation.md`\n- `docs/platforms/platform-selection-guide.md`\n- `docs/platforms/duckdb.md`\n- quick-start/getting-started pages surfaced by w1 if they are canonical\n  current-state install entry points under `docs/` or `README.md`\n\nDecide explicitly between:\n- keeping DuckDB optional and documenting `--extra duckdb` clearly, or\n- intentionally restoring DuckDB to the default dependency surface and\n  updating packaging/tests accordingly.\n\nDo not ship hybrid wording such as \"works out of the box\" while\n`pyproject.toml` still keeps DuckDB optional.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Repair install documentation to match the extras-based DuckDB model or intentionally change the dependency surface",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "close-pre-beta-release-blockers",
+        "notes": "Revisit the current outcome of\n`isolate-experimental-core-subsystems` and choose one Beta-safe contract:\n\n- Option A: `benchbox.experimental` remains in the default wheel as an\n  explicitly unsupported namespace, documented as outside the supported\n  product surface.\n- Option B: `benchbox.experimental` is removed from the default wheel or\n  otherwise moved behind an explicit opt-in distribution/install path.\n\nThe chosen contract must cover source-tree imports, wheel installs,\npackage exports, benchmark registries, docs, and regression tests. This\nwork unit is the decision point only: record the chosen contract, why the\nother option was rejected, and the concrete implementation surfaces that\nmust change next.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose the Beta packaging and support contract for benchbox.experimental",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "close-pre-beta-release-blockers",
+        "notes": "Update only the canonical release surfaces implicated by the w4 decision\nso the support boundary is explicit before packaging/test changes land.\n\nCandidate surfaces:\n- `README.md`\n- `docs/README.md`\n- `docs/usage/faq.md`\n- `pyproject.toml` classifiers or package metadata comments if they are\n  the canonical place to express the support contract\n\nDo not widen this into a repo-wide prose sweep. The goal is a documented,\ncurrent-state Beta contract for the shipped package.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the chosen benchbox.experimental contract on canonical release surfaces",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "close-pre-beta-release-blockers",
+        "notes": "If Option B is chosen, update setuptools package discovery in\n`pyproject.toml` and any wheel/package tests. Do not use `MANIFEST.in`\nfor wheel exclusion; wheel content is controlled by setuptools package\ndiscovery/package-data, not MANIFEST pruning.\n\nIf Option A is chosen, make the support boundary explicit in docs and\ntests so the shipped namespace is clearly unsupported but intentionally\npresent.\n\nIn both cases:\n- keep `benchbox.release` excluded from the default wheel\n- ensure `benchbox.experimental` does not leak into `benchbox.__all__`\n  or benchmark registries\n- verify wheel contents match the documented policy\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the experimental-boundary packaging decision and add wheel-level invariants",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "close-pre-beta-release-blockers",
+        "notes": "Make `ty` actionable on release-critical source files by cleaning the\ndiagnostics in:\n- `benchbox/cli/commands/run.py`\n- `benchbox/base.py`\n- `benchbox/__init__.py`\n\nRequired outcomes:\n- no possibly-unresolved `database_config` / `benchmark_config` flow in\n  the final orchestration/export/save path\n- no unused blanket `type: ignore` suppressions in these files\n- control flow in `run.py` is statically obvious enough to support a\n  targeted release gate\n\nThis is not a mandate to fix all 1200+ repository diagnostics in one\nitem. The immediate goal is zero noise on release-critical entrypoints.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reduce ty diagnostics to zero for Beta-critical entrypoints",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "close-pre-beta-release-blockers",
+        "notes": "Extend existing tests before adding new one-off scripts.\nCandidate targets:\n- `tests/unit/cli/test_cli_package_exports.py`\n- `tests/unit/cli/test_cli_version_command.py`\n- `tests/unit/test_version_management.py`\n- `tests/unit/utils/test_version_markers.py`\n- `tests/unit/test_release_exclusion_invariants.py`\n- `tests/unit/test_release_infrastructure.py`\n\nAdd assertions for:\n- consistent status wording across metadata/canonical docs\n- install docs not claiming default DuckDB unless packaging says so\n- wheel contents matching the chosen `benchbox.experimental` policy\n- public package exports matching the documented support boundary\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Ratchet regression tests so status/install/packaging drift cannot recur",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "close-pre-beta-release-blockers",
+        "notes": "Keep the release-critical typecheck gate small, explicit, and durable.\n\nCandidate targets:\n- extend an existing release-infrastructure test if it already shells out\n  to project verification commands\n- otherwise add a narrowly scoped regression test that asserts the\n  release-critical `ty` invocation stays clean on:\n  - `benchbox/cli/commands/run.py`\n  - `benchbox/base.py`\n  - `benchbox/__init__.py`\n\nDo not expand this into a repository-wide typecheck policy change.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a targeted ty regression gate for the Beta-critical entrypoints",
+        "wid": "w9"
+      }
+    ]
+  }
+}

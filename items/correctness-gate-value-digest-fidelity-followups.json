@@ -1,0 +1,298 @@
+{
+  "context": "Treat this as fidelity hardening of an already-shipped, CI-enforced oracle, not a\nrebuild. Sequence: (w1) quantify the precision floor as a test and decide\nabsolute-vs-relative; (w2) make the digest type-stable (prerequisite for\nindependence); (w3) replace the hand-copy with an idempotent regeneration target;\n(w4) document the regression-snapshot nature so green cells are not over-read;\n(w5) decide whether a cross-engine agreement check is worth it now; (w6) cover the\nNone-safe sort path the gate never hits. Any change to normalization MUST\nregenerate the 18 reference digests in the same change and prove two-run\ndeterminism, or the gate will go RED on a correct tree.\n",
+  "description": "An adversarial falsification review of the value-digest oracle (PR #867,\nreviewed on develop @ e4a04484 — confirmed an ancestor of origin/develop, all\n18 stored digests reproduced by running `make test-correctness-gate` on the\npinned DuckDB 1.3.2) confirmed the headline win is REAL: a wrong-but-same-\ncardinality TPC-H answer at SF=1 now turns the gate RED, the check is CI-wired\nas a hard blocker (.github/workflows/pr.yml correctness-gate job; the aggregator\nrequires CORRECTNESS_RESULT == success for any code PR), and #867's CI ran it\ngreen for ~11.5 min (not skipped). The strict arming\n(`digest_evaluated == digest_reference_count`) was reproduced locally to require\nall 18 digests to evaluate and match, so a missing digest disarms RED not green.\n\nThe same review reproduced four residual fidelity gaps that the AI-implemented,\nAI-reviewed, AI-merged chain did not surface. None is a correctness regression;\neach narrows what \"value-level\" actually proves and should be either fixed or\nhonestly documented:\n\n- PRECISION FLOOR IS ABSOLUTE, NOT RELATIVE (MEDIUM). The digest normalizes real\n  numbers with `f\"{value:.4f}\"` (benchbox/core/results/result_digest.py\n  _format_real, _DIGEST_FLOAT_PRECISION=4). Reproduced: an error <5e-5 ABSOLUTE\n  in any single cell is invisible regardless of column magnitude\n  (delta=4.9e-5 -> identical digest; 5.0e-5 -> differs). On large-magnitude\n  columns (TPC-H revenue ~1e10) 5e-5 absolute is ~1e-15 relative — effectively\n  perfect. But on small-magnitude averaged ratio columns it is coarse: Q1's\n  `avg_disc` is ~0.049985 (a float), so a sub-5e-5-absolute (~0.1% relative)\n  aggregate/rounding bug on that column survives the gate\n  (compute_result_digest([(0.05,)]) == compute_result_digest([(0.05004,)])).\n\n- DIGEST CONFLATES VALUE WITH TYPE REPRESENTATION (LOW). _normalize_cell renders\n  int exactly (\"1478493\") but float/Decimal at fixed precision\n  (\"37734107.0000\"). The SAME numeric value with a different Python type hashes\n  DIFFERENTLY. Stable today on pinned DuckDB 1.3.2, but it means the digest is a\n  value+type-rendering digest, and it is the blocker for any cross-engine reuse.\n\n- EMISSION IS ENGINE-WIDE BUT THE ORACLE IS DUCKDB-ONLY (LOW). compute_result_digest\n  is called both in benchbox/platforms/duckdb.py:999 AND in the shared DBAPI\n  helper benchbox/platforms/base/sql_execution.py:80 (sqlite/postgres/datafusion/\n  ...). It is harmless today — `_stored_value_digest` only returns a reference for\n  tpch SF=1, so a non-DuckDB digest is computed-but-never-compared — but combined\n  with the type-sensitivity above it is a latent trap for the cross-engine\n  independence work below, and it sits outside the original TODO's scope_limit\n  (benchbox/platforms/) by the implementer's own admission.\n\n- THE VALUE REFERENCE IS A SELF-SNAPSHOT, NOT AN INDEPENDENT ORACLE, AND HAS NO\n  AUTOMATED REGENERATION (MEDIUM). The 18 reference digests in\n  benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json\n  were produced by running benchbox-on-DuckDB-1.3.2 and HAND-COPYING the emitted\n  digests (provenance note says exactly this; no script/make target writes the\n  file — grep confirms only loader.py reads it). So the oracle detects CHANGE\n  from the frozen baseline (a genuine regression tripwire) but NOT correctness vs\n  an authority outside benchbox: a conceptual value bug present at freeze time is\n  enshrined, never caught. This is the same hand-curated-answer-key fragility the\n  effort claimed to avoid, one level down. There is also no one-button\n  regeneration, so a legitimate DuckDB bump means a manual re-copy.\n\n- THE NONE-SAFE SORT PATH IS UNTESTED BY THE GATE (LOW). calculate_checksum sorts\n  rows by the None-safe `_row_sort_key`. Reproduced: 0 of the 18 SF=1 gate result\n  sets contain a NULL or mixed-type column, so for the gate's inputs the None-safe\n  surrogate is order-identical to a plain sort and its NULL/mixed-type branch\n  never fires in the gate. (Note: the None-safe sort PREDATES #867 — it existed at\n  parent ce999bd7 — so #867 only promoted the helper to module level; this is a\n  coverage gap, not a #867 regression.)\n\nThis item fixes or honestly documents each gap. It is the fidelity complement to\nthe value axis shipped in bounded-correctness-gate-value-oracle (#867, DONE); it\ndoes NOT re-do the digest emission, the strict arming, or the row-count work.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a second hash or a per-engine digest variant",
+        "instead": "extend the single primitive.",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "why": "calculate_checksum is the one shared definition the TPC-Havoc gates also use"
+      },
+      {
+        "dont": "describe the value digest as proving 'correctness'",
+        "instead": "call it that everywhere it is documented.",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "why": "it is a regression snapshot vs a DuckDB baseline"
+      },
+      {
+        "dont": "enable cross-engine digest comparison before w2",
+        "instead": "make the digest type/engine-stable first.",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "why": "the int-vs-Decimal-vs-float and date/NULL rendering differences guarantee spurious mismatches"
+      },
+      {
+        "dont": "leave the reference regenerable only by hand-copy",
+        "instead": "ship a deterministic writer.",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "why": "an oracle no one can reproduce is the fragility this effort claimed to remove"
+      },
+      {
+        "dont": "switch to relative precision without re-verifying cross-build stability at the pinned seed and regenerating the reference",
+        "instead": "verify in w1, regenerate in the same change.",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "why": "a naive relative rounding near zero can be LESS stable than absolute"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "correctness-gate-value-digest-fidelity-followups",
+        "id": 363,
+        "reason": "Out of scope; breadth is owned by benchmark-correctness-oracle-coverage-map. This item is about the FIDELITY of the existing tpch SF=1 value oracle, not its breadth.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Reason explicitly says breadth beyond tpch SF=1 is owned by benchmark-correctness-oracle-coverage-map, which is open (active).",
+        "summary": "Backfill value digests for benchmarks beyond tpch, or for scales above SF=1."
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "correctness-gate-value-digest-fidelity-followups",
+        "id": 364,
+        "reason": "w5 decides whether to add ONE bounded cross-engine agreement check or defer; a full matrix is a separate, larger effort (cf. tpchavoc-*-engine-equivalence-sampling).",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: correctness-gate-value-digest-fidelity-followups and the tpchavoc cross-dialect/third-engine sampling items are DONE (bounded checks shipped). A full cross-engine matrix is the expansive path the project deliberately avoids; per-benchmark differential oracles owned by the coverage-map item. (tracked by benchmark-correctness-oracle-coverage-map)",
+        "summary": "A full cross-engine value-equivalence matrix across all CI engines."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-06-30T00:00:00Z",
+      "created_at": "2026-06-24T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The #867 value axis is unchanged: digest emission behind BENCHBOX_EMIT_RESULT_DIGEST, the strict arming (digest_evaluated == digest_reference_count), and the additive row-count check keep working exactly as today.",
+        "item_id": "correctness-gate-value-digest-fidelity-followups"
+      },
+      {
+        "behavior": "The TPC-Havoc gates that share calculate_checksum stay green — reuse the one digest definition, never fork it.",
+        "item_id": "correctness-gate-value-digest-fidelity-followups"
+      },
+      {
+        "behavior": "`benchbox run` default behavior, payload shape, and cost stay unchanged when the digest flag is unset (digest emission stays gate-only).",
+        "item_id": "correctness-gate-value-digest-fidelity-followups"
+      },
+      {
+        "behavior": "`make test-correctness-gate` stays green on a correct tree and on the required PR path after any normalization change (regenerate the reference in the same change).",
+        "item_id": "correctness-gate-value-digest-fidelity-followups"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Makefile:test-correctness-gate (BENCHBOX_EMIT_RESULT_DIGEST=1, pinned seed 17039360, SF=1, 18 query ids) — the exact run whose stream-0 digests become the reference; the regeneration target must reuse this configuration, not duplicate it.",
+        "decision": "reuse",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "path": "Makefile:test-correctness-gate"
+      },
+      {
+        "concept": "_project/DONE/main/planning/bounded-correctness-gate-value-oracle.yaml — the effort this hardens; w3 already proved sensitivity to gross mutations, w1 chose absolute rounding as a non-gating open question. This item revisits that choice with the reproduced floor quantified.",
+        "decision": "reuse",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "path": "_project/DONE/main/planning/bounded-correctness-gate-value-oracle.yaml"
+      },
+      {
+        "concept": "_project/analysis/REVIEW-PROTOCOL.md — where the self-snapshot-vs-independent-oracle distinction should be documented so a future reviewer does not over-read a green value gate.",
+        "decision": "reuse",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "path": "_project/analysis/REVIEW-PROTOCOL.md"
+      },
+      {
+        "concept": "benchbox/core/expected_results/loader.py:load_tpch_value_digests — the only reader of the JSON today; a regeneration writer should live near it or as a _project/scripts tool.",
+        "decision": "reuse",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "path": "benchbox/core/expected_results/loader.py:load_tpch_value_digests"
+      },
+      {
+        "concept": "benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json — the hand-copied reference; the regeneration target must WRITE this file deterministically from a gate run, replacing the manual copy described in its provenance note.",
+        "decision": "reuse",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "path": "benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json"
+      },
+      {
+        "concept": "benchbox/core/results/result_digest.py:_format_real/_normalize_cell/_DIGEST_FLOAT_PRECISION — the absolute-precision normalization to revisit for the precision-floor and type-stability work; extend, do not fork.",
+        "decision": "extend",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "path": "benchbox/core/results/result_digest.py:_format_real/_normalize_cell/_DIGEST_FLOAT_PRECISION"
+      },
+      {
+        "concept": "benchbox/core/tpchavoc/validation.py:calculate_checksum/_row_sort_key — the promoted single-result digest primitive and its None-safe sort; reuse for the None-coverage test, do not add a second hash.",
+        "decision": "reuse",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "path": "benchbox/core/tpchavoc/validation.py:calculate_checksum/_row_sort_key"
+      },
+      {
+        "concept": "benchbox/platforms/base/sql_execution.py:80 + benchbox/platforms/duckdb.py:999 — the two emission sites; the engine-scope and cross-engine-independence decisions touch both.",
+        "decision": "reuse",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "path": "benchbox/platforms/base/sql_execution.py:80"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "kind": "only_modify",
+        "path_glob": "_project/"
+      },
+      {
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/expected_results/"
+      },
+      {
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpchavoc/"
+      },
+      {
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make test-correctness-gate",
+        "description": "Bounded gate stays green and the digest assertion still arms for all 18 queries after any normalization change",
+        "expected": "1 passed, ran=1 skipped=0; row-count and value-digest checks evaluated for all 18 queries",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_correctness_gate_value_oracle.py -q",
+        "description": "The precision-floor test pins the exact sensitivity boundary",
+        "expected": "tests pass; an error just below the floor is uncaught and just above is caught, per the pinned assertion",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make correctness-gate-digests-regen && git diff --exit-code benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json",
+        "description": "The regeneration target is idempotent on a clean tree",
+        "expected": "no diff (regeneration reproduces the committed reference byte-for-byte)",
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "notes": "Pin the reproduced floor as a test and make an explicit keep-or-change\ndecision. The floor is 5e-5 ABSOLUTE per cell: invisible below, visible at/above\n(modulo round-half-even at the exact midpoint). Quantify it per gate column\nclass — large Decimals (revenue) are effectively perfect; small floats\n(Q1 avg_disc ~0.05) are only ~0.1%-relative protected. Decide between:\n(a) keep absolute 4dp and DOCUMENT the small-ratio blind spot with the worst\nexposed column named; or (b) switch to N significant figures / a hybrid\nmax(absolute, relative) so sensitivity is uniform in relative terms, then\nre-verify cross-build stability at the pinned seed and regenerate the reference\n(w4). Record the decision and its rationale next to _format_real.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Quantify the precision floor and decide absolute vs relative/significant-figure normalization",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "notes": "Decide and implement: either canonicalize integer-valued numerics to one\nrepresentation before hashing (so int 37734107, Decimal('37734107.00'), and\nfloat 37734107.0 hash identically) and likewise normalize dates/strings of\nequal logical value, OR explicitly document that the digest is a value+type\ndigest and is therefore DuckDB-pinned. Type-stability is a prerequisite for the\ncross-engine independence option in w5; if w5 is deferred, document instead.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make the digest stable across numeric TYPE representation (int vs float vs Decimal of equal value)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "notes": "Replace the hand-copy described in the JSON provenance note with a script /\nmake target (e.g. `make correctness-gate-digests-regen`) that runs the gate\nconfiguration (BENCHBOX_EMIT_RESULT_DIGEST=1, seed 17039360, SF=1, the 18 query\nids) and writes the digests + provenance block back to the JSON deterministically.\nReuse the Makefile:test-correctness-gate configuration rather than duplicating\nthe seed/scale/query-id list. The target must be idempotent on a clean tree\n(regenerate -> no diff) and must stamp the DuckDB version it ran under.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add an auditable, one-command regeneration path that WRITES tpch_value_digests_sf1.json",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "notes": "The Makefile note, tests/README, the JSON provenance, and REVIEW-PROTOCOL.md\nshould state plainly that the value digest detects CHANGE from a benchbox-on-\nDuckDB baseline (a regression tripwire), not correctness against an external\nauthority, and that a conceptual value bug present at freeze time is enshrined,\nnot caught. This closes the over-trust gap a reader of a green \"value+cardinality\"\ncell would otherwise fall into. Coordinate the wording with the\nreference-independence axis in oracle-coverage-map-reference-independence-disclosure\nso the gate docs and the coverage map tell one consistent story.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the oracle as a regression snapshot (not an independent correctness oracle) wherever it is described",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "notes": "The strongest available independence upgrade: once the digest is type-stable\n(w2), assert that a SECOND SQL engine already in CI (postgres or datafusion)\nproduces the SAME stream-0 digests as DuckDB at SF=1/pinned seed for the 18\nqueries. Two independent engines agreeing on full result values is real\nevidence of value correctness, not a self-snapshot. This requires engine-stable\nrendering (dates, decimals, NULL-as-None vs NaN) and confronts the engine-wide\nemission in sql_execution.py (the F finding). Scope it as either a new\nnon-blocking sample gate or a deferred follow-up; do NOT widen this TODO into\nimplementing a full cross-engine matrix.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide and scope an INDEPENDENT value cross-check (cross-engine digest agreement at SF=1)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "correctness-gate-value-digest-fidelity-followups",
+        "notes": "Reproduced: 0 of 18 SF=1 gate result sets contain NULL or mixed-type columns,\nso calculate_checksum's None-safe `_row_sort_key` branch is untested by the\ngate. Add (or confirm existing) unit coverage in the tpchavoc validation tests\nthat a NULL-bearing and a mixed-type column hash deterministically and never\nraise, so a latent ordering bug in None handling cannot hide behind the gate's\nNULL-free inputs. Pure test addition — no production change.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover the None-safe / mixed-type sort path that the gate never exercises",
+        "wid": "w6"
+      }
+    ]
+  }
+}

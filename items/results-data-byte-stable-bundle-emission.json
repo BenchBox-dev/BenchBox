@@ -1,0 +1,233 @@
+{
+  "context": "Treat bundle and companion files as a binary contract. The `bundle_hash` and\n`companion_hashes` fields commit the writer to byte-stable output; honour\nthat by emitting primary and companion JSON through a single canonical\nserializer and hashing the post-serialization bytes. Land in two PRs if\nneeded: the writer/hash canonicalization first (W1-W3), then the pre-commit\nexclusion removal (W4) once the writer is in place and any in-flight bundles\nhave been re-emitted or grandfathered.\n",
+  "description": "The bundle emitter (`benchbox/core/results/exporter.py`) writes the primary\nresult JSON and companion `.plans.json` / `.tuning.json` files without a\ncanonical trailing-newline / whitespace policy. The submit manifest writer\n(`benchbox/cli/commands/submit.py`) then records SHA-256 hashes for the\nemitted bundle and companions. Tools that round-trip the file —\npre-commit's `end-of-file-fixer` and `trailing-whitespace` hooks, GitHub's\nrich JSON viewer, editors that auto-save with a final newline — change\nbytes the manifest's `bundle_hash` SHA-256 was computed against.\n\nThe W3 corpus-integration PR\n(`results-explorer-uat-corpus-integrate-validated-bundles`) hit this when\nstaging 188 community-submission bundles into `results-data/bundles/`: the\nEOF-fixer added trailing newlines and broke every hash. The PR landed by\nexcluding `results-data/bundles/*.json` from those hooks\n(`.pre-commit-config.yaml:106-118`). That fix is correct but it is a\nband-aid: any future submitter running a different tool, GitHub PR review\nflow, or editor that touches the bytes will hit the same wall, and the\nexclusion does not protect them.\n\nThe durable fix is to emit the primary bundle and companion JSON files in a\ncanonical byte-stable form (single serializer with a fixed trailing-newline\npolicy and stable key ordering) AND compute `bundle_hash` and\n`companion_hashes` against that canonical form, so EOF-fixing /\npretty-printing within the canonical form is a no-op.\n\nOriginating blind-spot finding:\n`_project/blind-spots/2026-05-03-090105-mixed-tooling-data-pr-review-gap.md`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "canonicalize already-checked-in bundles without also updating their per-bundle manifest hashes",
+        "instead": "(not specified)",
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "why": "the manifest SHA-256 contract is byte-exact."
+      },
+      {
+        "dont": "canonicalize the primary bundle while leaving `.plans.json` or `.tuning.json` companions vulnerable",
+        "instead": "(not specified)",
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "why": "`companion_hashes` are validated by the same manifest path."
+      },
+      {
+        "dont": "change the manifest's hash function or schema",
+        "instead": "only change the writer side, then keep the same SHA-256 contract.",
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "why": "external submitters may already have manifests on disk"
+      },
+      {
+        "dont": "just restore the pre-commit exclusion as 'good enough'",
+        "instead": "the durable fix is byte-stable emission.",
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "why": "every future tool that touches bundle bytes will re-trip the hash mismatch"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-08T00:00:00Z",
+      "created_at": "2026-05-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All currently checked-in bundles in `results-data/bundles/` continue to validate against `validate_submission.py` before and after the canonicalization rollout.",
+        "item_id": "results-data-byte-stable-bundle-emission"
+      },
+      {
+        "behavior": "Per-bundle manifest schema (PR #95) is not changed — only the hash-input bytes change.",
+        "item_id": "results-data-byte-stable-bundle-emission"
+      },
+      {
+        "behavior": "Primary bundles, plans companions, and tuning companions are treated consistently.",
+        "item_id": "results-data-byte-stable-bundle-emission"
+      },
+      {
+        "behavior": "`bundle_hash` and `companion_hashes` remain SHA-256 hex digests over file bytes; only the emitted bytes are made canonical.",
+        "item_id": "results-data-byte-stable-bundle-emission"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/validate_submission.py"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "only_modify",
+        "path_glob": ".pre-commit-config.yaml"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "only_modify",
+        "path_glob": "Ruff PLW1514 encoding-only cleanup in the small Python read/write sites listed in `completion_notes`"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/planning/results-data-byte-stable-bundle-emission.yaml"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-data-byte-stable-bundle-emission.yaml"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/submit.py"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/submit_service.py"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "only_modify",
+        "path_glob": "hook-normalized EOF/trailing-whitespace collateral under `.github/`, `COPYRIGHT.md`, `benchbox/data/coffeeshop/`, `docs/`, `examples/`, `landing/`, and test documentation/fixture files"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_submit.py"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_submit_service.py"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_results_exporter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_results_exporter.py -k canonical_bundle -v",
+        "description": "Bundle hash survives a no-op normalization round-trip.",
+        "expected": "All canonical-bundle hash-stability tests pass.",
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -k 'canonical or manifest or companion' -v",
+        "description": "Submit manifest primary and companion hashes survive no-op normalization.",
+        "expected": "All canonical submit-manifest hash tests pass.",
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/validate_submission.py results-data/bundles/",
+        "description": "Existing checked-in bundles still validate after canonical writer changes.",
+        "expected": "Validated bundles report zero errors.",
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- pre-commit run --all-files",
+        "description": "Pre-commit no longer needs the bundles exclusion.",
+        "expected": "No `results-data/bundles/*.json` files modified by EOF or trailing-whitespace hooks.",
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "notes": "Search with `rg` for `json.dump` / `json.dumps`, `write_text`,\n`bundle_hash`, and `companion_hashes` under:\n  - `benchbox/core/results/`\n  - `benchbox/cli/commands/submit.py`\n  - `tests/unit/test_results_exporter.py`\n  - `tests/unit/cli/commands/test_submit.py`\n\nDecide a single canonical JSON byte form for primary bundles, plans\ncompanions, tuning companions, and generated manifests. Probable:\n`json.dumps(d, indent=2, sort_keys=True, ensure_ascii=False) + \"\\n\"`.\nDocument the chosen form and rationale in implementation notes or focused\ntest names. Do not make code changes in this work unit.\n\nImplementation note: chosen canonical form is\n`json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + \"\\n\"`,\ncentralized in `benchbox/core/results/canonical_json.py`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Survey current bundle, companion, and manifest hash paths; define canonical form",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "notes": "Add or reuse a single canonical serializer in `benchbox/core/results/`.\nUse it for:\n  - primary result bundle JSON in `ResultExporter._export_json_v2`;\n  - `.plans.json` companion output;\n  - `.tuning.json` companion output.\n\nAdd `tests/unit/test_results_exporter.py` coverage proving emitted primary\nand companion files include exactly one final newline, have stable key\norder, and are unchanged by an EOF-fixer-equivalent transform\n(`bytes.rstrip(b\"\\n\") + b\"\\n\"`).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Adopt the canonical form for primary and companion JSON emission",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "notes": "Update `benchbox/cli/commands/submit.py` so `bundle_hash` and every entry\nin `companion_hashes` are computed from the exact canonical bytes that the\nsubmit flow copies or emits. Do not change the manifest schema or hash\nalgorithm.\n\nAdd `tests/unit/cli/commands/test_submit.py` coverage for:\n  - primary `bundle_hash` surviving the EOF-fixer-equivalent transform;\n  - `companion_hashes` for `.plans.json` and `.tuning.json` surviving the\n    same transform;\n  - hosted and PR-based manifest builders continuing to agree on the hash\n    contract where applicable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align submit manifest hashes with canonical primary and companion bytes",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-data-byte-stable-bundle-emission",
+        "notes": "Once W2 and W3 land, the bundle exclusion in `.pre-commit-config.yaml`\nbecomes unnecessary. Remove it from both hooks:\n  - `end-of-file-fixer` exclude at `.pre-commit-config.yaml:106-115`;\n  - `trailing-whitespace` exclude at `.pre-commit-config.yaml:116-118`.\n\nVerify by running both hooks through `uv run -- pre-commit run ...` against\nat least one known-clean primary bundle and its `.manifest.json` sidecar.\nRe-run `scripts/validate_submission.py` against `results-data/bundles/`\nafter the pre-commit dry-run; it must still report zero errors.\n\nCompleted after explicit 2026-05-08 approval to rewrite existing\nhash-pinned corpus bytes. Rewrote 525 primary bundle JSON files into the\ncanonical form and updated 513 per-bundle manifest `bundle_hash` values.\nNo `.plans.json` or `.tuning.json` companions were present in this corpus\nsnapshot. Removed the `results-data/bundles/*.json` pre-commit exclusion.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove the pre-commit `results-data/bundles/*.json` exclusion",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,305 @@
+{
+  "context": "Start by tracing the actual DDL generation paths for the four affected\nbenchmark families. Then implement the smallest platform-compatible policy:\nMergeTree tables get deterministic ordering, and TIME columns are either\nexplicitly enabled or rewritten with matching load/query semantics. Prefer a\nportable type remap over opting into experimental ClickHouse TIME support\nunless remapping loses semantics. Validate with unit DDL tests and live server\ncells. Separately, clean up the orphaned setup config without restoring the\nremoved session settings.\n",
+  "description": "The post-PR #738 clickhouse-server corpus proves platform lifecycle is fixed,\nbut several cells fail before load/query execution because benchmark DDL is\nnot valid for a real ClickHouse server. A follow-up review also found\n`max_server_memory_usage_ratio` is now orphaned/dead setup config after the\nunsupported ClickHouse session settings were removed; track that cleanup\nalongside the DDL fix rather than reintroducing the removed settings.\n\nCorpus evidence:\n  - Matrix: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/matrix_summary.tsv`\n  - Cells: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/cells.jsonl`\n\nRepresentative failures:\n  - `clickhouse-server_write_primitives_0.01_20260601_122913.log`: `Code: 42. DB::Exception: ORDER BY or PRIMARY KEY clause is missing... storage MergeTree requires ... ORDER BY expr`.\n  - `clickhouse-server_tpcdi_0.01_20260601_121925.log`: `Code: 44. DB::Exception: Cannot create column with type 'Time' because Time type is not allowed. Set setting enable_time_time64_type = 1`.\n\nObserved impact from the corpus classifier:\n  - MergeTree ORDER BY / PRIMARY KEY missing: write_primitives and transaction_primitives at SF=0.01/0.1/1.0.\n  - TIME type disabled: TPC-DI and CoffeeShop at SF=0.01/0.1/1.0.\n  - Orphaned config cleanup: `benchbox/platforms/clickhouse/setup.py` still\n    reads `max_server_memory_usage_ratio`, but no live setting now consumes it.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "assume the TIME setting persists across sessions without proving load and query sessions inherit it.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "bypass the DDL optimizer inventory drift checks when adding platform CREATE TABLE rules.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "globally swap to a different DDL generation strategy in this TODO; keep the change bounded to the affected ClickHouse path.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make ORDER BY random or data-dependent; benchmark reproducibility matters.",
+        "instead": "(not specified)",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "needs_item": "uat-clickhouse-server-rc1-recovery"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-08-09T15:09:06Z",
+      "completed_pr": 1658,
+      "created_at": "2026-06-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not add benchmark-name-only DDL hacks where a platform-level ClickHouse rule is appropriate.",
+        "item_id": "uat-clickhouse-server-ddl-compatibility"
+      },
+      {
+        "behavior": "Do not break clickhouse-local or clickhouse-cloud by changing shared ClickHouse behavior without mode coverage.",
+        "item_id": "uat-clickhouse-server-ddl-compatibility"
+      },
+      {
+        "behavior": "Do not reintroduce the removed unsupported ClickHouse session settings just to consume `max_server_memory_usage_ratio`.",
+        "item_id": "uat-clickhouse-server-ddl-compatibility"
+      },
+      {
+        "behavior": "Use existing SQL compatibility governance for CREATE TABLE rewrites when the affected path goes through DDL optimize.",
+        "item_id": "uat-clickhouse-server-ddl-compatibility"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml: prior query-level CoffeeShop ClickHouse override context",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "path": "_project/DONE/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml"
+      },
+      {
+        "concept": "_project/DONE/platform-expansion/planning/clickhouse-tpcdi-dialect-overrides.yaml: prior query-level TPC-DI ClickHouse override context",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "path": "_project/DONE/platform-expansion/planning/clickhouse-tpcdi-dialect-overrides.yaml"
+      },
+      {
+        "concept": "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml: records the corpus artifact paths and fixed lifecycle root cause",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "path": "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml"
+      },
+      {
+        "concept": "benchbox/platforms/clickhouse/setup.py: orphaned `max_server_memory_usage_ratio` config currently remains after session-setting cleanup",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "path": "benchbox/platforms/clickhouse/setup.py"
+      },
+      {
+        "concept": "benchbox/sql_compat/README.md: DDL optimizer and inventory drift expectations",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "path": "benchbox/sql_compat/README.md"
+      },
+      {
+        "concept": "benchbox/sql_compat/rules/ddl_optimize/: adapter DDL rewrite governance lives here",
+        "decision": "reuse",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "path": "benchbox/sql_compat/rules/ddl_optimize/"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/uat-clickhouse-server-ddl-compatibility.yaml"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "kind": "only_modify",
+        "path_glob": "_project/compat/inventory.jsonl"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/coffeeshop/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transaction_primitives/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/rules/ddl_optimize/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_clickhouse_adapter.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/sql_compat/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py -q && uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift",
+        "description": "DDL compatibility unit tests and inventory checks pass",
+        "expected": "tests and DDL inventory check pass",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=write_primitives SCALE=0.01",
+        "description": "Write primitives small cell creates MergeTree tables",
+        "expected": "cell does not fail with missing ORDER BY or PRIMARY KEY during DDL",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=transaction_primitives SCALE=0.01",
+        "description": "Transaction primitives small cell creates MergeTree tables",
+        "expected": "cell does not fail with missing ORDER BY or PRIMARY KEY during DDL",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpcdi SCALE=0.01",
+        "description": "TPC-DI small cell creates TIME-bearing schema",
+        "expected": "cell does not fail with `Cannot create column with type 'Time'`",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=coffeeshop SCALE=0.01",
+        "description": "CoffeeShop small cell creates TIME-bearing schema",
+        "expected": "cell does not fail with `Cannot create column with type 'Time'`",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "needs_wid": "w0",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Confirmed DDL signatures: MergeTree ORDER BY missing in write_primitives/transaction_primitives, TIME type disabled in tpcdi/coffeeshop; verified orphaned max_server_memory_usage_ratio in setup.py:39,60 with no consumer",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "notes": "Generate or inspect representative ClickHouse-server DDL for one TIME\nschema and one MergeTree schema, then grep setup/tuning for\n`max_server_memory_usage_ratio`. Preserve a compact command/result\nsummary here; keep raw output in `/tmp` or `BENCHBOX_OUTPUT_DIR`.\n",
+        "started_at": "2026-08-09T14:10:44Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-confirm DDL signatures and orphaned setup config on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Mapped DDL paths: write_primitives/transaction_primitives via workload._optimize_table_definition, coffeeshop/tpcdi via _column_type_for_dialect clickhouse String",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "notes": "Determine whether write_primitives, transaction_primitives, TPC-DI, and\nCoffeeShop go through the shared DDL optimizer or a local schema path.\nThe fix should be in the path each benchmark actually uses.\n",
+        "started_at": "2026-08-09T15:08:23Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Map the DDL path for affected benchmarks",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Workload adds ENGINE=MergeTree ORDER BY tuple()/PK verified write_ops_log PR 1658",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "notes": "Real ClickHouse MergeTree tables need ORDER BY or PRIMARY KEY. Choose a\ndeterministic, low-cost ordering policy that preserves benchmark\nsemantics and does not assume every benchmark has an obvious primary key.\n",
+        "started_at": "2026-08-09T15:08:36Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add ClickHouse DDL rewrite or adapter setup for MergeTree ordering",
+        "wid": "w2"
+      },
+      {
+        "evidence": "TIME->String for clickhouse in coffeeshop/tpcdi schema + workload platform remap PR 1658",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "notes": "Decide from current ClickHouse behavior whether to enable\n`enable_time_time64_type = 1` for DDL/load/query sessions or rewrite\nTIME columns to a supported type. The choice must account for existing\nCoffeeShop and TPC-DI query overrides that may wrap time values.\n",
+        "started_at": "2026-08-09T15:08:45Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Resolve TIME schema support with explicit policy",
+        "wid": "w3"
+      },
+      {
+        "evidence": "test_clickhouse_adapter 80 passed sql_compat 139 passed inventory DDL drift CLEAN PR 1658; live cells not run (require docker)",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "notes": "Run one small cell for each affected family first, then expand if query\ncompatibility failures appear after DDL succeeds.\n",
+        "started_at": "2026-08-09T15:08:56Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Verify affected DDL cells live against ClickHouse server",
+        "wid": "w4"
+      },
+      {
+        "evidence": "benchbox/platforms/clickhouse/setup.py: removed orphaned max_server_memory_usage_ratio reads (ed02e49860)",
+        "item_id": "uat-clickhouse-server-ddl-compatibility",
+        "notes": "The review found the previous session-level setting removals are correct:\none was server-config-level and the other obsolete. Do not restore those\nsettings. Instead either remove `max_server_memory_usage_ratio` from setup\nor document a real live consumer before keeping it.\n",
+        "started_at": "2026-08-09T14:10:50Z",
+        "started_branch": "fix/flightdata-dataframe-date-params-20260809",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Remove or document the orphaned max_server_memory_usage_ratio config",
+        "wid": "w5"
+      }
+    ]
+  }
+}

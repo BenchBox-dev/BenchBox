@@ -1,0 +1,11 @@
+{
+  "description": "The current Write Primitives DataFrame implementation for PySpark is fundamentally broken.\nThe \"DDL operations\" are just SQL string builders wrapped in Python methods - this is NOT\nDataFrame testing, it's SQL execution with extra steps.\n\nCurrent (WRONG) implementation:\n```python\ndef execute_ddl(self, ddl_statement: str, spark_session: Any = None):\n    spark_session.sql(ddl_statement)  # Just executes raw SQL\n```\n\nCorrect PySpark DataFrame write operations should use the actual DataFrame API:\n- INSERT: df.write.mode(\"append\").parquet(path)\n- BULK_LOAD: spark.read.parquet(src).write.parquet(tgt)\n- UPDATE: DeltaTable.forPath(spark, path).update(condition, set)\n- DELETE: DeltaTable.forPath(spark, path).delete(condition)\n- MERGE: DeltaTable.alias(\"t\").merge(source, cond).whenMatchedUpdate().execute()\n- DDL: Should be REMOVED - DDL is SQL by definition, not DataFrame\n\nKey design decisions (confirmed):\n1. Row-level ops (UPDATE/DELETE/MERGE): Only support with Delta Lake/Iceberg\n   - Plain Parquet gets INSERT/BULK_LOAD only\n2. SparkSession: Require explicit session parameter (consistent with PySparkDataFrameAdapter)",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-25T00:00:00Z",
+      "created_at": "2026-01-25T00:00:00Z",
+      "worktree": "main"
+    }
+  }
+}

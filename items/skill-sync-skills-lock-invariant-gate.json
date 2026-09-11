@@ -1,0 +1,66 @@
+{
+  "context": "Small checker script in the canonical repo validating lock-vs-tree hashes and manifest-vs-lock coverage; wire as a required GitHub Actions check on PRs to main.",
+  "description": "skill-sync-skills invariant (c) (docs/propagation.md) requires skill-sync.lock to be regenerated in the same commit as any skill edit, but nothing enforces it: PRs #9 and #10 merged skill edits (SHARED/commit-framework, SHARED/review-protocol) with stale lock hashes, silently breaking lock integrity on main until PR #11 repaired the instances. The class remains unguarded — the repo has no CI and no pre-commit hook. Add a mechanical gate (GitHub Actions job and/or pre-commit) that recomputes sha256/size for every lock entry against the tree, fails on mismatch, and fails on skills present in skill-sync.yaml but absent from the lock (the accidental-docs-drop class, instance-fixed in PR #11). Discovered 2026-07-29 during the docs-skill restoration.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-29T11:41:24Z",
+      "worktree": "skill-sync-canonical"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing lock format and skill-sync CLI compatibility; Joe's identity on commits",
+        "item_id": "skill-sync-skills-lock-invariant-gate"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "skill-sync-skills-lock-invariant-gate",
+        "kind": "only_modify",
+        "path_glob": "/Users/joe/.skill-sync/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "sh -c 'cd /Users/joe/.skill-sync && python3 -c \"import json,hashlib; from pathlib import Path; lock=json.load(open(chr(115)*0+chr(39)*0 or chr(0) if False else open) if False else json.load(open(chr(39) if False else chr(0)))\"' ; false",
+        "description": "lock hashes match tree on main",
+        "expected": "REPLACED-BELOW",
+        "item_id": "skill-sync-skills-lock-invariant-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "skill-sync-skills-lock-invariant-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "skill-sync-skills-lock-invariant-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Write the lock/manifest consistency checker",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "skill-sync-skills-lock-invariant-gate",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Wire it as CI on PRs to main and document in README",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Vendored the reference dim_locations/dim_products seed tables, updated packaging rules, and refreshed the generator to default to shared datagen directories while resetting per-run state.",
+  "legacy": {
+    "item_meta": {
+      "category": "Pre-Release High Priority Tasks (Should-Fix Before Release)",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "coffeeshop-parity"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Completed comprehensive migration from `uv pip install package` to `uv add package` syntax throughout the entire BenchBox project. This modernizes the project to use uv's declarative package management approach while maintaining backward compatibility documentation. The migration improves reproducibility by ensuring all dependencies are tracked in pyproject.toml and uv.lock.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation and Tooling",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

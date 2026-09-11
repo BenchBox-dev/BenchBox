@@ -1,0 +1,72 @@
+{
+  "context": "Update result-analysis.rst to the surviving four-method surface (get_anonymous_machine_id, anonymize_result_payload, anonymize_tuning_payload, remove_pii) and the surviving config fields (machine_id_salt, pii_patterns, custom_sanitizers). Add a short migration note saying the legacy helpers were removed and why, pointing at the Salt rotation section. Consider whether a doctest-style gate over the Python API examples is worth adding, since nothing currently catches this class of drift.",
+  "description": "Codex P2 on PR #1528 (merged). docs/reference/python-api/result-analysis.rst (around lines 614-625 and 820-850) still constructs AnonymizationConfig with the six fields #1528 deleted - include_machine_id, anonymize_paths, allowed_path_prefixes, include_system_profile, anonymize_hostnames, anonymize_usernames - so following the canonical Sphinx page now raises TypeError. The same indexed page documents and invokes sanitize_path, anonymize_system_profile and validate_anonymization, which now raise AttributeError. #1528 corrected docs/reference/result-formats.md only; this is the page a reader is most likely to land on. Confirms a gap in that PR's own verification: nothing gates Sphinx examples against the live API, which is why deleting public methods went green.",
+  "legacy": {
+    "item_meta": {
+      "category": "docs",
+      "created_at": "2026-08-04T17:16:23Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The four-method public surface and the salted-boundary description stay accurate",
+        "item_id": "python-api-docs-reference-deleted-anonymization-api"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "python-api-docs-reference-deleted-anonymization-api",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/python-api/**"
+      },
+      {
+        "item_id": "python-api-docs-reference-deleted-anonymization-api",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/result-formats.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -qE 'sanitize_path|anonymize_system_profile|validate_anonymization|anonymize_execution_metadata|include_machine_id|anonymize_hostnames' docs/reference/python-api/result-analysis.rst",
+        "description": "no deleted symbol remains in the python-api reference",
+        "expected": "Exits 0 once the page matches the live API",
+        "item_id": "python-api-docs-reference-deleted-anonymization-api",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "python-api-docs-reference-deleted-anonymization-api",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "python-api-docs-reference-deleted-anonymization-api",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Rewrite the anonymization sections of result-analysis.rst against the live API",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "python-api-docs-reference-deleted-anonymization-api",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Decide whether to gate Sphinx examples against the live API",
+        "wid": "w1"
+      }
+    ]
+  }
+}

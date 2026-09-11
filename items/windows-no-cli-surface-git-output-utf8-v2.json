@@ -1,0 +1,89 @@
+{
+  "context": "Set strict UTF-8 on the narrow Git subprocess helper and add a mocked non-cp1252 byte regression.",
+  "description": "Run 30690807993 emits repeated cp1252 UnicodeDecodeError reader-thread warnings while test_no_cli_surface_drift reads git output in locale text mode, then falsely reports four unchanged modules as surface changes. Pin UTF-8 for committed source bytes and subprocess output while retaining AST decorator/signature comparisons.",
+  "legacy": {
+    "item_meta": {
+      "category": "CI portability",
+      "completed_at": "2026-08-01T15:36:26Z",
+      "completed_pr": 1407,
+      "created_at": "2026-08-01T14:07:16Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Changed-file allowlists remain unchanged.",
+        "item_id": "windows-no-cli-surface-git-output-utf8-v2"
+      },
+      {
+        "behavior": "The guard still rejects new Click decorators and command signature changes.",
+        "item_id": "windows-no-cli-surface-git-output-utf8-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-no-cli-surface-git-output-utf8-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_no_cli_surface_drift.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/uat/test_no_cli_surface_drift.py -q",
+        "description": "CLI surface guard",
+        "expected": "fails with cp1252 decode errors and false surface changes on the unfixed Windows tree; exit 0 after repair",
+        "item_id": "windows-no-cli-surface-git-output-utf8-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-no-cli-surface-git-output-utf8-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-no-cli-surface-git-output-utf8-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Unfixed locale simulation produced mojibake benchbox/cli/commands/Î».py instead of λ.py",
+        "item_id": "windows-no-cli-surface-git-output-utf8-v2",
+        "notes": null,
+        "started_at": "2026-08-01T15:30:33Z",
+        "started_branch": "fix/windows-no-cli-git-utf8",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Add a locale-independent Git output decoding regression",
+        "wid": "w0"
+      },
+      {
+        "evidence": "_git now passes encoding=utf-8; locale simulation preserves λ path",
+        "item_id": "windows-no-cli-surface-git-output-utf8-v2",
+        "notes": null,
+        "started_at": "2026-08-01T15:31:05Z",
+        "started_branch": "fix/windows-no-cli-git-utf8",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Pin UTF-8 in the Git subprocess helper",
+        "wid": "w1"
+      },
+      {
+        "evidence": "uv run -- python -m pytest -n 0 tests/uat/test_no_cli_surface_drift.py -q: 7 passed; Ruff, format, ty clean",
+        "item_id": "windows-no-cli-surface-git-output-utf8-v2",
+        "notes": null,
+        "started_at": "2026-08-01T15:31:30Z",
+        "started_branch": "fix/windows-no-cli-git-utf8",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-ci-batch",
+        "status": "done",
+        "summary": "Run CLI-surface guard tests",
+        "wid": "w2"
+      }
+    ]
+  }
+}

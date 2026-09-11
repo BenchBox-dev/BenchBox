@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #629 of scd2-doc-count-hygiene.\nDeferred: Add DuckDB test asserting SCD2 ops SUCCESS + legacy MERGE INTO ops SKIPPED under platform_key='duckdb', plus a no-reset sequential dim-restored-to-seed test.\nReason deferred: Genuine coverage gap for the #931 shipped skip path and the production no-reset cleanup path, but larger than this hygiene fix; deferred as its own follow-up.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:37:20Z",
+      "worktree": "write-primitives-scd2-followup"
+    }
+  }
+}

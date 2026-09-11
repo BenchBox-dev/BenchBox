@@ -1,0 +1,10 @@
+{
+  "description": "Reworked TPC-DS query and stream tests to rely on deterministic fakes, giving quick feedback without compiled tools.",
+  "legacy": {
+    "item_meta": {
+      "category": "Test Infrastructure",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

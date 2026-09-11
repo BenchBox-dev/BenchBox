@@ -1,0 +1,113 @@
+{
+  "context": "Add explicit columns for the legacy optional frontmatter, or document a one-to-one mapping into existing columns, BEFORE the importer is written against this spec. Cross-check the full legacy corpus for any other optional key that lacks a home.",
+  "description": "chatgpt-codex-connector review finding on merged PR #1271 (P2, _project/specs/findings-domain.md:95). Deferred from the PR-review sweep in PR #1292 because defining where these fields live IS the migration contract, and picking it unilaterally pre-empts the domain design; tracked in GitHub issue #1293.\n\nThe proposed findings / finding_evidence schema has no lossless home for existing optional frontmatter such as related_paths and suggested_sweep (allowed today by _project/blind-spots/README.md:61-63 and used throughout the legacy corpus), yet phase 5 promises every frontmatter field is preserved. When the importer is implemented against this work order, those fields will be dropped or squeezed into unrelated text/evidence rows, so the parity gate cannot pass.\nThread: https://github.com/joeharris76/BenchBox/pull/1271#discussion_r3634254555",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "squeeze related_paths or suggested_sweep into a free-text/evidence row",
+        "instead": "add explicit columns or document an exact one-to-one mapping",
+        "item_id": "findings-schema-legacy-frontmatter-mapping-20260724",
+        "why": "the phase-5 parity gate promises field-level preservation, which free text cannot satisfy"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-07-29T17:02:43Z",
+      "completed_pr": 1341,
+      "created_at": "2026-07-24T16:23:26Z",
+      "worktree": "findings-domain"
+    },
+    "preserves": [
+      {
+        "behavior": "Every optional frontmatter key in the legacy corpus round-trips losslessly under the documented mapping",
+        "item_id": "findings-schema-legacy-frontmatter-mapping-20260724"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "findings-schema-legacy-frontmatter-mapping-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "findings-schema-legacy-frontmatter-mapping-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "findings-schema-legacy-frontmatter-mapping-20260724",
+        "kind": "only_modify",
+        "path_glob": "_project/blind-spots/README.md"
+      },
+      {
+        "item_id": "findings-schema-legacy-frontmatter-mapping-20260724",
+        "kind": "only_modify",
+        "path_glob": "_project/specs/findings-domain.md"
+      },
+      {
+        "item_id": "findings-schema-legacy-frontmatter-mapping-20260724",
+        "kind": "only_modify",
+        "path_glob": "docs/development/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -rhoE '^(related_paths|suggested_sweep):' _project/blind-spots/*.md | sort -u",
+        "description": "Every optional key in the legacy corpus has a documented home",
+        "expected": "each listed key appears in the mapping table in _project/specs/findings-domain.md",
+        "item_id": "findings-schema-legacy-frontmatter-mapping-20260724",
+        "last_result": "pass",
+        "last_run": "2026-07-29T16:42:42Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "findings-schema-legacy-frontmatter-mapping-20260724",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "findings-schema-legacy-frontmatter-mapping-20260724",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Inventoried the live 65-record corpus: 13 validator-accepted frontmatter keys, 8 distinct body headings. Measured loss under parse_draft: 65/65 records; related_paths 170 entries, suggested_sweep 11,559 chars, todo_id 36 records (19 unique targets, 0 dangling), 8 stray sections 5,779 chars.",
+        "item_id": "findings-schema-legacy-frontmatter-mapping-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T16:42:24Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Inventory every optional frontmatter key used across the legacy _project/blind-spots corpus and check each against the proposed schema",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Documented an exact one-to-one mapping in _project/specs/findings-domain.md 'Legacy field mapping (schema v4)': explicit related_paths/suggested_sweep columns plus a finding_sections table (owner decision 2026-07-29), and todo_id -> finding_links with kind by status (32 promoted-to, 4 resolved-by). No free-text/evidence-row fold.",
+        "item_id": "findings-schema-legacy-frontmatter-mapping-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T16:42:26Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add explicit columns or a documented one-to-one mapping so every key round-trips losslessly",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added a falsifiable parity criterion to the spec (round-trip reproduces every key with list order, every section byte-for-byte, each triage-log line as one finding_events row; unmapped-key and unmapped-section counts must both be zero) and wired it into the phase-5 gate list.",
+        "item_id": "findings-schema-legacy-frontmatter-mapping-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T16:42:29Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "State the parity-gate criterion in the spec so the importer can be checked against it",
+        "wid": "w3"
+      }
+    ]
+  }
+}

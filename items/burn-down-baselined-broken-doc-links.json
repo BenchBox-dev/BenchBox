@@ -1,0 +1,235 @@
+{
+  "description": "PR #683 (`dry-run-followup-broken-getting-started-link`) added\n`scripts/check_doc_relative_links.py` — a repo-local Markdown\nrelative-link checker wired into the blocking `make docs-validate`\ngate. Running it surfaced **42 pre-existing broken relative links**\nacross ~20 docs files (the originating dry-run knew of only one,\n`getting-started.rst`, already fixed). Those 42 were recorded in\n`scripts/doc_relative_link_baseline.txt` so the gate blocks *new*\nbreakage immediately without forcing a same-PR mass cleanup.\n\nThis TODO is that cleanup: fix or remove every baselined link and\ndrive the baseline to zero data entries, so the gate enforces\n\"no broken repo-local relative links\" repo-wide rather than only\n\"no new ones\".\n\nTarget groups in the baseline as of 2026-05-26 (regenerate to\nconfirm before starting — counts may shift as docs change):\n  - `../benchmarks/tpch.md`  x7  -> `../benchmarks/tpc-h.md` (target exists)\n  - `../benchmarks/tpcds.md` x4  -> `../benchmarks/tpc-ds.md` (target exists)\n  - `../reference/cli-reference.md` x5 + `../../reference/cli-reference.md` x2\n    -> no `docs/reference/cli-reference.md`; locate the real CLI reference\n    doc and repoint, or rewrite the links\n  - `README.md` x3 (from `docs/benchmarks/*`) -> likely `index.md`\n  - `../reference/result_schema_v1.md` x2, `../reference/results-schema.md` x1\n    -> schema-doc references; find the canonical schema doc\n  - singles: `synapse.md`, `pyspark.md`, `glue.md`,\n    `platform-development.md`, `python-api/results.md`,\n    `getting-started.md` / `examples.md` / `configuration.md`\n    (from `docs/reference/api-reference.md`),\n    `benchmarks/tpc-ds.md` (wrong relative depth from `guides/tpc/`),\n    `../advanced/tuning.md`, `../advanced/cost-optimization.md`,\n    `../api/query-plan-models.md`, `../performance/index.md`,\n    `../usage/result-analysis.md`, `../getting-started/quick-start.md`,\n    `./profiling.md`, `./duplication-inventory.csv`,\n    `./unified_frame_any_survey.csv`\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create empty stub docs solely to satisfy a link",
+        "instead": "prefer REPOINT or REMOVE when the target was never meant to exist.",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "why": "a stub is worse than an honest rewrite/removal"
+      },
+      {
+        "dont": "delete or blank the baseline file to make the check pass",
+        "instead": "drive the broken COUNT to zero by fixing links.",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "why": "that disables the regression gate"
+      },
+      {
+        "dont": "re-add entries to the baseline to silence the count",
+        "instead": "(not specified)",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "why": "the baseline is debt being burned down, not a suppression list."
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-09-06T20:42:52Z",
+      "completed_pr": 2062,
+      "created_at": "2026-05-26T00:00:00Z",
+      "worktree": "/Users/joe/Developer/BenchBox.wt-publication-accuracy-residuals"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing relative links in docs/ that currently resolve continue to resolve (no collateral breakage).",
+        "item_id": "burn-down-baselined-broken-doc-links"
+      },
+      {
+        "behavior": "External-link handling is unchanged — http/https links remain the Sphinx linkcheck's responsibility, not this checker's.",
+        "item_id": "burn-down-baselined-broken-doc-links"
+      },
+      {
+        "behavior": "The checker's baseline + anti-rot mechanism stays intact — do not weaken `check_doc_relative_links.py` to pass; fix the links.",
+        "item_id": "burn-down-baselined-broken-doc-links"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "docs/benchmarks/tpc-h.md, docs/benchmarks/tpc-ds.md — existing canonical targets for the tpch/tpcds rename cluster (REUSE; do not create new benchmark pages).",
+        "decision": "reuse",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "path": "docs/benchmarks/tpc-h.md"
+      },
+      {
+        "concept": "scripts/check_doc_relative_links.py — the checker introduced in PR #683; REUSE its `--update-baseline` to regenerate the baseline after each batch of fixes.",
+        "decision": "reuse",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "path": "scripts/check_doc_relative_links.py"
+      },
+      {
+        "concept": "scripts/doc_relative_link_baseline.txt — the 42-entry baseline this TODO empties; the input artifact, not new infrastructure.",
+        "decision": "reuse",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "path": "scripts/doc_relative_link_baseline.txt"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/check_doc_relative_links.py"
+      },
+      {
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "kind": "only_modify",
+        "path_glob": "scripts/doc_relative_link_baseline.txt"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/check_doc_relative_links.py",
+        "description": "No broken repo-local relative links remain",
+        "expected": "exit 0 with 'broken total  : 0'",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "last_result": "pass",
+        "last_run": "2026-09-06T20:42:49Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test \"$(grep -cvE '^#|^$' scripts/doc_relative_link_baseline.txt)\" = 0",
+        "description": "Baseline has no data entries (only header comments)",
+        "expected": "exit 0 (no data rows remain)",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "last_result": "pass",
+        "last_run": "2026-09-06T20:42:49Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n 'benchmarks/tpch\\.md|benchmarks/tpcds\\.md' docs/",
+        "description": "Spot-check: the wrong-name benchmark links are gone (full gate is check 1)",
+        "expected": "no matches",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "last_result": "pass",
+        "last_run": "2026-09-06T20:42:50Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make docs-validate",
+        "description": "Docs validation gate passes end to end",
+        "expected": "exit 0",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "last_result": "pass",
+        "last_run": "2026-09-06T20:42:51Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Re-validated on develop (commit d1accbb6ec4706664fcf33ba58f275d667982050) in worktree BenchBox.wt-publication-accuracy-residuals: scanned 330 files, baseline size 42, broken total 42. Count is stable across all 42 entries.",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "notes": "Bind the cited evidence before editing. On the implementation branch run\n`uv run -- python scripts/check_doc_relative_links.py --update-baseline`\nand `git diff scripts/doc_relative_link_baseline.txt`. Record in the PR\ndescription: the develop SHA, the regenerated data-entry count, and any\ndrift from the 42 captured 2026-05-26 (the per-target counts in this\nTODO's description are that snapshot). If the count shifted materially,\nre-derive the w2-w4 groupings before proceeding.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the baseline count against current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Triaged all 42 baselined broken links: 12 RENAME (tpch.md->tpc-h.md x7, tpcds.md->tpc-ds.md x4, platform-development.md->.rst x1), 27 REPOINT (cli-reference.md x7, README.md x3, tpc-ds.md depth x1, result-schema-v1.md x2, results-schema.md x1, performance/index.md x1, result-analysis.md x1, profiling.md x1, tuning.md x1, glue.md->aws-glue.md x1, pyspark.md->pyspark-dataframe.md x1, synapse.md->azure-platforms.md x1, api-reference.md sublinks x3, python-api/results.rst x1, quick-start.md x1, query-plan-models.md x1), and 3 REMOVE (cost-optimization.md unwritten, duplication-inventory.csv and unified_frame_any_survey.csv removed CSVs).",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "notes": "For each (source, target) pair in the regenerated baseline assign one\ndisposition:\n  - RENAME: target exists under a corrected name/path (fix the link).\n  - REPOINT: the intended doc exists elsewhere (rewrite the link).\n  - REMOVE: the referenced doc was never written / has been deleted and\n    has no successor (delete the link, keep the surrounding prose sane).\n  - CREATE: a genuinely-missing doc that *should* exist (rare; prefer\n    REPOINT/REMOVE — do not stub empty files just to satisfy the gate).\nRecord the table in the PR description; it is the audit trail for w2-w4.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Triage all baselined links into a disposition table",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Applied unambiguous benchmark filename renames across 8 files: 7 refs of tpch.md -> tpc-h.md, 4 refs of tpcds.md -> tpc-ds.md, and corrected relative depth in tpc-ds-official-guide.md from benchmarks/tpc-ds.md to ../../benchmarks/tpc-ds.md. All targets exist.",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "notes": "The high-confidence cluster (targets already exist):\n  - `../benchmarks/tpch.md`  -> `../benchmarks/tpc-h.md`  (7 refs)\n  - `../benchmarks/tpcds.md` -> `../benchmarks/tpc-ds.md` (4 refs)\n  - `docs/guides/tpc/*` `benchmarks/tpc-ds.md` -> correct relative depth\n    to the real `docs/benchmarks/tpc-ds.md`.\nAfter editing, regenerate the baseline and confirm these entries drop\nout (the checker reports a stale-baseline error until you do).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the unambiguous benchmark-filename renames",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Repointed all 7 occurrences of cli-reference.md to cli/index.md (docs/reference/cli/index.md), resolving the entire cli-reference cluster across benchmarks, guides, and usage docs.",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "notes": "`docs/reference/cli-reference.md` does not exist. Find the actual CLI\nreference doc (search `docs/reference/` and the toctree in\n`docs/index.rst`) and repoint all 7 references, or rewrite them if the\nCLI is documented under a different page. Regenerate the baseline.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve the cli-reference.md cluster (7 refs)",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Resolved all remaining single-target broken links across 18 files (README links to index.md/index.rst, result-schema-v1.md, platform-development.rst, query-plans.md, understanding-results.md, dataframe-benchmarks.md, performance-tuning.rst, aws-glue.md, pyspark-dataframe.md, azure-platforms.md, cli-quick-start.md, python-api/results.rst, and removed unwritten cost-optimization.md / unversioned CSV links). check_doc_relative_links.py reports broken total : 0.",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "notes": "Work through the remaining entries per their w1 disposition: README ->\nindex, schema-doc references, platform cross-links (synapse/pyspark/\nglue/platform-development), api-reference.md's getting-started/examples/\nconfiguration links, the advanced/performance/usage/api targets, and the\ntwo `.csv` data-file links (confirm whether the CSVs were removed and\nremove or repoint accordingly). Fix local links only; leave external\n(http/https) links to the Sphinx linkcheck. Regenerate the baseline.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve the remaining single-target broken links",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Ran python scripts/check_doc_relative_links.py --update-baseline: reduced scripts/doc_relative_link_baseline.txt to 0 data entries. Ran verification commands: (1) python scripts/check_doc_relative_links.py: broken total 0, exit 0. (2) grep -vE '^(#|$)' scripts/doc_relative_link_baseline.txt: 0 rows. (3) git grep -E '\\.\\./benchmarks/tpch\\.md|\\.\\./benchmarks/tpcds\\.md' docs/: 0 matches. (4) make docs-validate: all checks passed. (5) make docs-build: build succeeded, exit 0.",
+        "item_id": "burn-down-baselined-broken-doc-links",
+        "notes": "Final `--update-baseline` should leave zero data entries. Run\n`uv run -- python scripts/check_doc_relative_links.py` (reports\n`broken total  : 0`, exit 0) and `make docs-validate` (exit 0). The goal\nis an empty data set. Note `--update-baseline` rewrites the file as the\nfixed header comments plus sorted entries — it does NOT preserve\nper-entry inline comments, so a genuinely-intentional exception must be\nfixed/removed rather than annotated in place (or hand-added below the\nheader and never regenerated over). Standard cycle:\n`make lint format typecheck`, `make pr-preflight`, `make pr-open`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Drive the baseline to zero and confirm the gate is green",
+        "wid": "w5"
+      }
+    ]
+  }
+}

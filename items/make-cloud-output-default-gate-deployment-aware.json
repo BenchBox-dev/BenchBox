@@ -1,0 +1,190 @@
+{
+  "context": "Switch the three gates to the deployment-aware check, passing the deployment mode already resolved for the run where one is available and letting requires_cloud_storage_for_deployment() fall back to the platform-level answer when it is not (it already does this internally for platforms with no deployment_modes block). Keep requires_cloud_storage() itself unchanged — it has other callers, including benchbox/cli/cloud_storage.py::prompt_cloud_output_location, and narrowing it globally is a larger blast radius than this item wants. Add a registry-driven test that asserts the gate used by the run path agrees with requires_cloud_storage_for_deployment() for every registered platform's default deployment, so a future registry edit cannot silently reintroduce the divergence.",
+  "description": "Three call sites decide whether to pull a credential-stored default_output_location into the run: benchbox/cli/orchestrator.py::_apply_default_cloud_output_dir and two checks in benchbox/cli/commands/run.py::_interactive_cloud_setup_if_needed. All three gate on PlatformRegistry.requires_cloud_storage(), which is implemented as `metadata.get('category') == 'cloud'` — a coarse platform-level label. The registry already exposes the precise per-deployment answer via requires_cloud_storage_for_deployment(), and the two disagree. Verified on 2026-07-24 @ 14b0271c1 by enumerating the registry: of the 24 platforms whose category is 'cloud', three report requires_cloud_storage_for_deployment() == False for their DEFAULT deployment — firebolt (default deployment 'core', a free local Docker engine), motherduck (default 'managed') and starburst (default 'managed'). For those, a stored default_output_location is injected as the run's output root even though the selected deployment stages nothing remotely. That is the same failure shape that produced the in-repo '@~/benchbox' spill, just latent because no credentials are stored for those three today.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Hardcode a skip-list of firebolt/motherduck/starburst",
+        "instead": "Ask the registry per run via requires_cloud_storage_for_deployment()",
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "why": "The list is derived state that goes stale the moment a platform's deployment_modes block is edited"
+      },
+      {
+        "dont": "Redefine requires_cloud_storage() itself to consult deployment modes",
+        "instead": "Change only the three run-path gates to the deployment-aware call and pin the agreement with a test",
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "why": "It has callers beyond the run path and a global narrowing changes prompting and validation behaviour well outside this defect"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-24T18:59:45Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "An explicit --output still short-circuits the whole gate before any credential lookup",
+        "item_id": "make-cloud-output-default-gate-deployment-aware"
+      },
+      {
+        "behavior": "Non-interactive runs still exit 1 when a cloud platform genuinely lacks credentials",
+        "item_id": "make-cloud-output-default-gate-deployment-aware"
+      },
+      {
+        "behavior": "Platforms whose default deployment genuinely stages remotely (snowflake, bigquery, databricks, redshift, athena, synapse, the Spark-on-cloud family) keep pulling their stored default_output_location exactly as today",
+        "item_id": "make-cloud-output-default-gate-deployment-aware"
+      },
+      {
+        "behavior": "requires_cloud_storage() keeps its current semantics for all other callers, including prompt_cloud_output_location",
+        "item_id": "make-cloud-output-default-gate-deployment-aware"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/benchmark_registry.yaml"
+      },
+      {
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/utils/cloud_storage.py"
+      },
+      {
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/orchestrator.py"
+      },
+      {
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/ -q",
+        "description": "CLI orchestrator and run-command unit tests pass",
+        "expected": "exit 0",
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -k 'cloud_storage_gate or requires_cloud_storage' -q",
+        "description": "The new registry-agreement test passes",
+        "expected": "exit 0",
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.platform_registry import PlatformRegistry as R; R._platform_metadata = R._platform_metadata or R._build_platform_metadata(); bad=[n for n in R._platform_metadata if R.requires_cloud_storage(n) != R.requires_cloud_storage_for_deployment(n)]; print(sorted(bad))\"",
+        "description": "No platform's default deployment disagrees with the run-path gate",
+        "expected": "prints the three known divergences before the fix and is used to assert the gate follows the deployment-aware value after",
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast lane stays green",
+        "expected": "exit 0",
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "notes": "Each reports requires_cloud_storage() True (category == 'cloud') but requires_cloud_storage_for_deployment() False for its default deployment — firebolt 'core' (local Docker), motherduck 'managed', starburst 'managed'.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-validate on develop that firebolt, motherduck and starburst still diverge between the two registry checks, and that no other platform has drifted",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Switch benchbox/cli/orchestrator.py::_apply_default_cloud_output_dir to requires_cloud_storage_for_deployment(), threading the run's resolved deployment mode when available",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Switch both requires_cloud_storage() checks in benchbox/cli/commands/run.py::_interactive_cloud_setup_if_needed to the deployment-aware call, keeping the early-return semantics identical",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "make-cloud-output-default-gate-deployment-aware",
+        "notes": "Use firebolt, motherduck and starburst as explicit negative cases so a registry edit that re-diverges them fails loudly instead of silently re-injecting an unused output root.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a registry-driven parametrised test asserting the run-path gate matches requires_cloud_storage_for_deployment() for every platform's default deployment",
+        "wid": "w3"
+      }
+    ]
+  }
+}

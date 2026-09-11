@@ -1,0 +1,216 @@
+{
+  "context": "Add viewport-fit=cover, then work outward from the edges. Give the app shell horizontal and top safe-area padding as well as bottom, since cover exposes all four insets. Re-check every route at notched-device dimensions in both orientations, and confirm the trays' inset padding now resolves to a real value. Landscape is the case most likely to break: left and right insets become non-zero and the facet rail and wide tables sit against them.",
+  "description": "Implements Phase 0 decision D6, recorded on rx-ux-00.\n\nToday index.html:23 declares `<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">` with no `viewport-fit=cover`, so env(safe-area-inset-*) resolves to 0 everywhere and the fixed selection trays cannot overlap an iOS home indicator. rx-ux-01 therefore installs the --bb-inset-bottom seam but deliberately leaves it inert, and its scope rules forbid touching index.html.\n\nD6 decided to adopt viewport-fit=cover. That is a change to the layout viewport for EVERY route, not a tray fix: content can extend under the status bar, the home indicator and the rounded corners, so the header, the Explorer sub-nav, the facet rail, every table container and the footer all need re-checking. This item owns that change and its consequences; rx-ux-01 keeps its inert-seam scope unchanged.\n\nThe owner accepted the stated risk: a global layout change to fix one overlay defect.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add viewport-fit=cover and only pad the tray",
+        "instead": "pad the app shell on all four edges and re-check every route",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "why": "cover exposes left, right and top insets too; a tray-only fix leaves content under the notch and the rounded corners"
+      },
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "hard-code pixel values for the insets",
+        "instead": "use env() with a max() fallback",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "why": "inset sizes differ per device and change between OS versions"
+      },
+      {
+        "dont": "test only in portrait",
+        "instead": "check both orientations",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "why": "landscape is where left/right insets become non-zero and the facet rail and wide tables sit against them"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "needs_item": "rx-ux-01-overlay-clearance-and-print-suppression"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T23:44:22Z",
+      "completed_pr": 1832,
+      "created_at": "2026-08-22T15:36:31Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing desktop layout at >= 48rem must be visually unchanged; cover affects mobile viewports",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover"
+      },
+      {
+        "behavior": "The @media print rules added by rx-ux-01 and rx-ux-20",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover"
+      },
+      {
+        "behavior": "The site header contract shared with the wider BenchBox site (components/headerContract.ts)",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover"
+      },
+      {
+        "behavior": "rx-ux-01's --bb-inset-bottom token and its measured last-row clearance mechanism",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/components/headerContract.ts"
+      },
+      {
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/chartMath.ts"
+      },
+      {
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/**"
+      },
+      {
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/index.html"
+      },
+      {
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/Layout.tsx"
+      },
+      {
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "last_result": "pass",
+        "last_run": "2026-08-22T23:38:40Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium",
+        "description": "Chromium browser suite passes against a fresh build",
+        "expected": "fixtures verified, build succeeds, chromium suite green",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "last_result": "pass",
+        "last_run": "2026-08-22T23:43:56Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium --grep 'safe area'",
+        "description": "No route places content under a simulated inset in either orientation",
+        "expected": "header, sub-nav, facet rail, tables, footer and tray all clear simulated insets in portrait and landscape",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "last_result": "pass",
+        "last_run": "2026-08-22T23:44:19Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -c 'viewport-fit=cover' results-explorer/index.html",
+        "description": "viewport-fit is declared exactly once",
+        "expected": "1",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "last_result": "pass",
+        "last_run": "2026-08-22T23:44:20Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "results-explorer/index.html declares viewport-fit=cover exactly once.",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "notes": null,
+        "started_at": "2026-08-22T23:15:26Z",
+        "started_branch": "feat/rx-ux-24-viewport-fit-cover",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-24-viewport-fit-cover",
+        "status": "done",
+        "summary": "Add viewport-fit=cover to the viewport meta",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Layout uses bb-app-shell with top/right/bottom/left safe-area tokens; sticky header top and fixed tray horizontal/bottom padding honor the same overridable tokens; print resets shell padding.",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "notes": null,
+        "started_at": "2026-08-22T23:16:40Z",
+        "started_branch": "feat/rx-ux-24-viewport-fit-cover",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-24-viewport-fit-cover",
+        "status": "done",
+        "summary": "Apply safe-area padding to the app shell on all four edges",
+        "wid": "w2"
+      },
+      {
+        "evidence": "E2E_PORT=4526 Playwright safe-area suite: 7 passed, covering every registered route, landscape facets/tables, trays in both orientations, the fixed mobile facet dialog, and unchanged conventional desktop.",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "notes": null,
+        "started_at": "2026-08-22T23:19:35Z",
+        "started_branch": "feat/rx-ux-24-viewport-fit-cover",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-24-viewport-fit-cover",
+        "status": "done",
+        "summary": "Re-check every route at notched dimensions, portrait and landscape",
+        "wid": "w3"
+      },
+      {
+        "evidence": "E2E_PORT=4524 Playwright safe-area tray tests: two-result tray content clears 44px side insets and computed bottom padding is at least 34px in both orientations.",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "notes": null,
+        "started_at": "2026-08-22T23:19:41Z",
+        "started_branch": "feat/rx-ux-24-viewport-fit-cover",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-24-viewport-fit-cover",
+        "status": "done",
+        "summary": "Confirm tray inset now resolves to a real value and clearance still holds",
+        "wid": "w4"
+      },
+      {
+        "evidence": "E2E_PORT=4524 Playwright conventional desktop test: 1440px app-shell padding is 0px on every edge and global header remains x=0,width=1440.",
+        "item_id": "rx-ux-24-adopt-viewport-fit-cover",
+        "notes": null,
+        "started_at": "2026-08-22T23:19:46Z",
+        "started_branch": "feat/rx-ux-24-viewport-fit-cover",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-24-viewport-fit-cover",
+        "status": "done",
+        "summary": "Confirm desktop layout at >= 48rem is unchanged",
+        "wid": "w5"
+      }
+    ]
+  }
+}

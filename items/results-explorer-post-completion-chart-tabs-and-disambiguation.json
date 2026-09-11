@@ -1,0 +1,255 @@
+{
+  "context": "Fix the tab-state bug before changing labels so test failures are easier to\nlocalize. Reuse the existing RunIdentity helpers rather than rebuilding label\nstrings in every chart component. Treat the duplicate Per-query heatmap as a\nscope problem, not a styling problem.\n",
+  "description": "The 2026-05-09 post-completion review on develop dbac33ee1 found remaining\nchart-panel defects: the TPC-H Charts Rank tab does not activate from the\ndefault Overview state, the Per-query Heatmap again duplicates the primary\nbenchmark matrix, and Distribution box-plot labels still truncate repeated\nrun identities in a way that leaves multiple indistinguishable DataFusion,\nPolars, PySpark, Spark, and SQLite labels.\n\nThis item addresses review findings #5, #6, and #7 recorded in\n_project/audits/results-explorer-post-completion-review-2026-05-09.md.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "keep two identical matrices on the same benchmark detail page.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make Rank accessible only after another tab is clicked first.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "truncate all differentiators away from repeated run labels.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "needs_item": "results-explorer-post-completion-compare-summary-semantics"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend UX",
+      "completed_at": "2026-05-10T00:00:00Z",
+      "created_at": "2026-05-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All chart tabs that contain distinct data remain reachable.",
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation"
+      },
+      {
+        "behavior": "Chart labels stay compact enough to fit at desktop width.",
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation"
+      },
+      {
+        "behavior": "Full run identity remains available through title/tooltip or accessible label.",
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-post-completion-chart-tabs-and-disambiguation/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/DistributionBox.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RankTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/SparklineTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TimeSeries.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartRegistry.ts"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/runIdentity.ts"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/RankTable.test.tsx src/components/__tests__/DistributionBox.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx",
+        "description": "Chart component tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual/browser: on /results/tpch/, every chart tab activates; Per-query does not duplicate the primary matrix; duplicate runs have visible disambiguators'",
+        "description": "Manual chart browser check passes",
+        "expected": "manual evidence captured in PR notes or verification log",
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "notes": "On current develop, open /results/tpch/, scroll Charts into view, and\nclick Overview, Per-query, Distribution, Trend, and Rank from a fresh\npage load. Capture selected tab state, visible panel text, table/svg\nlabels, and whether the Per-query panel duplicates the benchmark matrix\nto _project/verification-logs/results-explorer-post-completion-chart-tabs-and-disambiguation/w0.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate chart tab activation and duplicate chart scope",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "notes": "Fix ChartPanel tab selection so clicking Rank from default Overview,\nDistribution, Trend, and Per-query states sets Rank aria-selected=true\nand renders the Rank table. Add a regression test that clicks Rank first\nafter initial render and asserts that Overview content is gone.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make the Rank chart tab activate from every chart state",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "notes": "On benchmark detail pages, do not render a Charts > Per-query > Heatmap\npanel that repeats the page-level benchmark matrix directly above it.\nEither exclude query_heatmap while the primary matrix is visible or\nreplace it with a genuinely different per-query chart. Preserve the\nhistogram if it is the only non-duplicate per-query chart.\n\nPrior art: PR #300 already added matrix-view dedup at\n`results-explorer/src/pages/BenchmarkIndex.tsx`\n(`excludeChartIds={[\"query_heatmap\"]}` while `viewMode === \"matrix\"`).\nIf w0 reproduces finding #6 against the current develop tip, the work\nis to extend the same exclusion to the view modes still showing the\nduplicate (or to investigate a regression). If w0 cannot reproduce,\nrecord the stale finding in the w0 log and skip implementation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove or rescope the benchmark-detail duplicate Per-query heatmap",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "notes": "Cohort-aware label formatting already ships via\n`results-explorer/src/lib/runIdentity.ts` and is consumed by\nDistribution, Rank, Trend, and Overview chart components (PR #286 +\n#309). Finding #7 is that the *post-formatter* truncation step still\ncollapses repeated platforms to identical prefixes (e.g. four\n\"DataFusion v53.0.0 ...\" rows).\n\nScope of this work unit is the truncation budget and ordering only:\nensure the disambiguating qualifier (date + short result id) survives\nthe truncation, e.g. \"DataFusion 05-06 3b8bbc42\" rather than the\ntruncated platform/version prefix. Keep full RunIdentity in title or\ntooltip text. Do not re-apply the formatter; that work is closed in\n`_project/DONE/main/planning/results-explorer-run-identity-disambiguation.yaml`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tighten chart run-label truncation so disambiguated suffixes survive",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-chart-tabs-and-disambiguation",
+        "notes": "Extend ChartPanel, RankTable, DistributionBox, and BenchmarkIndex tests\nto cover tab activation, per-query heatmap exclusion, and duplicate-run\nlabel disambiguation. Add or update a browser fixture that clicks every\nchart tab and records the active panel.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add chart-panel browser and unit coverage",
+        "wid": "w4"
+      }
+    ]
+  }
+}

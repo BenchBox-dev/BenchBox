@@ -1,0 +1,133 @@
+{
+  "context": "Decide per symbol rather than uniformly. For each of the three, either (a) promote to a public name -- drop the underscore, give it a docstring stating its contract, and add a row to docs/reference/public-contracts.md if it is genuinely part of the core surface MCP and CLI both depend on -- or (b) keep it private, remove it from __all__, and give the surfaces a public wrapper that expresses the intended seam. _resolve_mode_with_registry is the one with a live cross-package consumer, so it is the strongest candidate for promotion. Note the whole-program layering stays green either way; this is about naming honesty, not import structure.",
+  "description": "Verified at develop 29380ce9e. benchbox/core/run_service.py declares __all__ containing three private names: _translate_platform_options_for_adapter, _resolve_mode_with_registry, and _map_phases_to_execution_type. The underscore says internal; membership in __all__ says public API. Both cannot be true, and the contradiction is load-bearing rather than cosmetic: benchbox/mcp/tools/benchmark.py:274 does 'from benchbox.core.run_service import _resolve_mode_with_registry', a cross-package import of a private symbol. This is how the MCP run-service adoption was made to work -- by widening the seam to expose the helpers MCP needed instead of promoting them to real public names with a considered signature. The adoption itself is genuine and verified (execute_run is called at benchmark.py:483, the three MCP-side translators are gone, run_with_platform is no longer used, lint-imports reports 3 contracts kept and 0 broken, and the cross-surface equivalence rung passes). The risk is to the NEXT extraction rather than to current behavior: the module no longer states which of its symbols carry a stability promise, so a future change cannot tell what it is allowed to break. docs/reference/public-contracts.md is the repository's mechanism for exactly this question and does not currently cover these names.",
+  "legacy": {
+    "item_meta": {
+      "category": "cleanup",
+      "completed_at": "2026-08-17T04:30:24Z",
+      "completed_pr": 1758,
+      "created_at": "2026-08-14T00:54:27Z",
+      "worktree": "one-engine"
+    },
+    "preserves": [
+      {
+        "behavior": "Cross-surface run-plan equivalence keeps passing (tests/unit/test_run_service_surface_equivalence.py).",
+        "item_id": "run-service-all-exports-private-names"
+      },
+      {
+        "behavior": "MCP keeps executing through execute_run; this is a rename and contract-documentation change, not a re-plumbing of the adoption.",
+        "item_id": "run-service-all-exports-private-names"
+      },
+      {
+        "behavior": "lint-imports stays green: core still imports neither platforms nor cli, and mcp still never imports cli.",
+        "item_id": "run-service-all-exports-private-names"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "run-service-all-exports-private-names",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "run-service-all-exports-private-names",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/**"
+      },
+      {
+        "item_id": "run-service-all-exports-private-names",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/run_service.py"
+      },
+      {
+        "item_id": "run-service-all-exports-private-names",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "run-service-all-exports-private-names",
+        "kind": "only_modify",
+        "path_glob": "docs/**"
+      },
+      {
+        "item_id": "run-service-all-exports-private-names",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! grep -A20 '^__all__' benchbox/core/run_service.py | grep -q '\"_'",
+        "description": "No private name is advertised as public",
+        "expected": "__all__ contains no underscore-prefixed entries.",
+        "item_id": "run-service-all-exports-private-names",
+        "last_result": "pass",
+        "last_run": "2026-08-17T04:30:18Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! grep -rn 'from benchbox.core.run_service import _' benchbox/mcp/ benchbox/cli/",
+        "description": "No surface imports a private core symbol",
+        "expected": "Surfaces import only public names.",
+        "item_id": "run-service-all-exports-private-names",
+        "last_result": "pass",
+        "last_run": "2026-08-17T04:30:19Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- lint-imports",
+        "description": "Layering and equivalence hold",
+        "expected": "3 contracts kept, 0 broken.",
+        "item_id": "run-service-all-exports-private-names",
+        "last_result": "pass",
+        "last_run": "2026-08-17T04:30:21Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "run-service-all-exports-private-names",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Confirmed at 6a9a6dc76: __all__ listed 3 underscore names. All three have production cross-package consumers, not just the one cited at filing: _resolve_mode_with_registry (mcp/tools/benchmark.py:274), _map_phases_to_execution_type (mcp:361 and cli/commands/run.py:528), _translate_platform_options_for_adapter (mcp:362). Finding stands, wider than filed.",
+        "item_id": "run-service-all-exports-private-names",
+        "notes": null,
+        "started_at": "2026-08-17T03:08:56Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Re-validate at HEAD",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Judged per symbol; all three converged on promote. Decisive local evidence: all sit in the block commented 'Helpers migrated from MCP for one-engine (w1)', and build_databricks_clustering_intent in that same block with the same role and a cross-package consumer was already public. Underscore was a migration artifact from when they were module-private in benchmark.py. Public wrappers rejected: no intra-module use needs a different binding.",
+        "item_id": "run-service-all-exports-private-names",
+        "notes": null,
+        "started_at": "2026-08-17T03:09:01Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Decide each symbol separately",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1758 (3 commits on chore/run-service-public-exports, auto-merge armed, base develop). d7809c540 promotes the three names across 12 files; befc236b9 adds the five missing public exports (3 used by cli/commands/run_official.py), sorts __all__, and adds TestTheExportedSurface guarding both directions; 535e4e72a adds the Public Surface Map row, tier internal. Anti-tautology checked: 3 of the 4 new tests fail against the pre-fix tree, the 4th is a forward guard. make pr-preflight exit 0, 27849 passed, lint-imports 3 kept 0 broken.",
+        "item_id": "run-service-all-exports-private-names",
+        "notes": null,
+        "started_at": "2026-08-17T03:11:41Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Apply the decisions, update MCP and CLI call sites, and add public-contracts.md rows for anything promoted.",
+        "wid": "w2"
+      }
+    ]
+  }
+}

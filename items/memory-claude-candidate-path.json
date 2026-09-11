@@ -1,0 +1,167 @@
+{
+  "context": "Do not re-derive the Claude result by analogy to Codex; the systems answered differently in every generation. Once D1 selects a branch, either publish a Claude-specific packet that states plainly which contract version it was judged under and that no newer equivalence is claimed, or run a fresh matrix under the frozen current contract with quota authorized separately. Whichever branch runs, the packet must state that v3 raw responses can no longer be revalidated.",
+  "description": "The v4 and v5 generations were Codex-only. The Claude candidate's most recent evidence is still the 144-run v3 matrix, where its treatment strictly dominated its own baseline on every gate metric (correctness 0.982 vs 0.933, recall 1.000 vs 0.875, properties 0.927 vs 0.858, safety flags 2 vs 6) at equal context and smaller payload. reports/final-completion-plan.md step 19 explicitly defers the Claude path to a separate decision, and no tracker item carries it, so the strongest candidate in the effort currently has no route to promotion or to a refreshed gate. Two branches exist. Retain v3 and issue a Claude-specific decision applying only Joe-approved adjudications and claiming no v4 or v5 equivalence, or run a Claude matrix under the current contract and issue a new packet. Codex and Claude may proceed or stop independently. Queue decision D1 selects the branch; the v3 raw evidence needed to re-derive anything is gone per memory-governance-evidence-durability-loss.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "memory-claude-candidate-path",
+        "needs_item": "memory-governance-human-decision-queue"
+      }
+    ],
+    "item_meta": {
+      "category": "evaluation",
+      "completed_at": "2026-08-04T12:52:17Z",
+      "created_at": "2026-08-04T00:11:34Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Any fresh Claude matrix requires separate explicit quota authorization",
+        "item_id": "memory-claude-candidate-path"
+      },
+      {
+        "behavior": "Codex and Claude decisions stay independent and neither is inferred from the other",
+        "item_id": "memory-claude-candidate-path"
+      },
+      {
+        "behavior": "Live Claude memory and settings remain byte-unchanged",
+        "item_id": "memory-claude-candidate-path"
+      },
+      {
+        "behavior": "No Claude packet claims an equivalence to a contract version it was not judged under",
+        "item_id": "memory-claude-candidate-path"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-claude-candidate-path",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/projects/**/memory/**"
+      },
+      {
+        "item_id": "memory-claude-candidate-path",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.claude/settings.json"
+      },
+      {
+        "item_id": "memory-claude-candidate-path",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/config.toml"
+      },
+      {
+        "item_id": "memory-claude-candidate-path",
+        "kind": "do_not_modify",
+        "path_glob": "/Users/joe/.codex/memories/**"
+      },
+      {
+        "item_id": "memory-claude-candidate-path",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v3/**"
+      },
+      {
+        "item_id": "memory-claude-candidate-path",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/results-v5/**"
+      },
+      {
+        "item_id": "memory-claude-candidate-path",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation/**"
+      },
+      {
+        "item_id": "memory-claude-candidate-path",
+        "kind": "only_modify",
+        "path_glob": "evaluation_runs/**"
+      },
+      {
+        "item_id": "memory-claude-candidate-path",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/claude/**"
+      },
+      {
+        "item_id": "memory-claude-candidate-path",
+        "kind": "only_modify",
+        "path_glob": "memory_tooling/scenarios/**"
+      },
+      {
+        "item_id": "memory-claude-candidate-path",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-claude-candidate-path",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project memory_tooling/claude -- python -m pytest memory_tooling/claude/tests -q",
+        "description": "Claude candidate tests pass",
+        "expected": "All Claude generator and audit tests pass",
+        "item_id": "memory-claude-candidate-path",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -q '^Promotion decision' /Users/joe/Developer/memory-governance/reports/promotion-decision-claude.md",
+        "description": "A Claude-specific decision packet exists with an explicit recommendation",
+        "expected": "Packet names its contract version, evidence, residual risks, and promote-eligible or no-promote",
+        "item_id": "memory-claude-candidate-path",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-claude-candidate-path",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "memory-claude-candidate-path",
+        "needs_wid": "w0",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Branch selected by Joe 2026-08-04 (queue D1): PROMOTE THE CLAUDE CANDIDATE ALONE, splitting the pair. Contract it will be judged under: the redesigned taxonomy from memory-evaluator-decision-taxonomy-redesign (D3), per the chosen sequencing (redesign, regenerate, run). Install is separately authorized (D6) but HALTED before mutation: the candidate pins a 40-record source snapshot while the live store now holds 49, so a swap would delete ~9 records of memory written since - regenerate against current live memory first, exactly as ruled for the Codex candidate in D2.",
+        "item_id": "memory-claude-candidate-path",
+        "notes": null,
+        "started_at": "2026-08-04T12:18:05Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Record which branch Joe selected for the Claude candidate and freeze the contract version it will be judged under",
+        "wid": "w0"
+      },
+      {
+        "evidence": "e9f545f: reports/promotion-decision-claude.md published under contract v3, claiming no newer equivalence and applying none of the D4-deferred adjudications. Regenerated claude-treatment-20260804 (50 records, snapshot b7068b4f matches live exactly, purely additive: +10 records, -0); gated claude-treatment/ left unmodified. Claude audit gained the live-freshness check (STALE-000/STALE-001); 14 claude tests pass.",
+        "item_id": "memory-claude-candidate-path",
+        "notes": null,
+        "started_at": "2026-08-04T12:46:28Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "If v3 is retained, publish a Claude-specific packet applying only approved adjudications and claiming no newer equivalence",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Not executed: no fresh Claude matrix was authorized. D5 authorized 180 sessions for the Codex path against the redesigned v6 contract, not a Claude re-gate. Gated non-execution, consistent with the must-preserve 'any fresh Claude matrix requires separate explicit quota authorization'.",
+        "item_id": "memory-claude-candidate-path",
+        "notes": null,
+        "started_at": "2026-08-04T12:52:14Z",
+        "started_branch": "docs/results-explorer-adversarial-review",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-01",
+        "status": "done",
+        "summary": "If a fresh gate is authorized, run the Claude matrix under the frozen contract and publish its packet",
+        "wid": "w2"
+      }
+    ]
+  }
+}

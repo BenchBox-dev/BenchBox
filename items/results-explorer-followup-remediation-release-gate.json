@@ -1,0 +1,365 @@
+{
+  "context": "Treat this as a release gate and bookkeeping item, not an implementation\ntask. It proves that the follow-up remediation is complete on one checked\ntree and prevents stale TODO completion from masking unresolved defects.\n",
+  "description": "This is the final gate for the follow-up Results Explorer remediation plan.\nIt must run after the data-contract, compare-flow, disabled-state,\nleaderboard/rank, leaderboard-scope, chart-label, chart-dataset,\nmetric-formatting, warning-affordance, theme/density, and route/copy TODOs\nare implemented. The gate blocks completion if any P0/P1 issue from the\nlatest review still reproduces or if the new checks lack evidence.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "approve based on PR merge status alone.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "fix newly discovered issues inside this gate; create focused follow-up TODOs unless the fix is trivial copy in the gate artifact.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "move TODOs to DONE before snapshot, automated, and browser gates pass.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "rely on screenshots without route, SHA, and data snapshot evidence.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_item": "results-explorer-chart-dataset-eligibility-contract"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_item": "results-explorer-chart-run-identity-label-contract"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_item": "results-explorer-compare-disabled-recovery-states"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_item": "results-explorer-compare-entrypoint-happy-path-gates"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_item": "results-explorer-compare-warning-affordance-contract"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_item": "results-explorer-comparison-eligibility-contract-repair"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_item": "results-explorer-direct-route-and-copy-hardening"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_item": "results-explorer-leaderboard-rank-evidence-semantics"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_item": "results-explorer-leaderboard-scope-filter-contract"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_item": "results-explorer-metric-formatting-contract"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_item": "results-explorer-result-detail-metric-formatting-regression"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_item": "results-explorer-surface-theme-and-density-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "results-explorer-followup-todo-review"
+    },
+    "preserves": [
+      {
+        "behavior": "A P0/P1 browser-visible defect blocks this release gate.",
+        "item_id": "results-explorer-followup-remediation-release-gate"
+      },
+      {
+        "behavior": "No dependent TODO is marked complete without evidence from its own verification section.",
+        "item_id": "results-explorer-followup-remediation-release-gate"
+      },
+      {
+        "behavior": "TODO movement to DONE happens only after validation and graph checks pass.",
+        "item_id": "results-explorer-followup-remediation-release-gate"
+      },
+      {
+        "behavior": "The audit names the exact checked SHA and data snapshot.",
+        "item_id": "results-explorer-followup-remediation-release-gate"
+      },
+      {
+        "behavior": "Unrelated source, TODO, DONE, and lock files are not modified.",
+        "item_id": "results-explorer-followup-remediation-release-gate"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/planning/results-explorer-contract-release-gate.yaml is the prior release gate pattern.",
+        "decision": "reuse",
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "path": "_project/DONE/main/planning/results-explorer-contract-release-gate.yaml"
+      },
+      {
+        "concept": "_project/scripts/results_explorer_snapshot_invariants.py should own snapshot contract checks.",
+        "decision": "reuse",
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "path": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "concept": "_project/scripts/todo_cli.py validates TODO schema, dependency graph, and indexes.",
+        "decision": "reuse",
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "path": "_project/scripts/todo_cli.py"
+      },
+      {
+        "concept": "results-explorer/e2e/ should contain route-level browser tests introduced by the dependent TODOs.",
+        "decision": "reuse",
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "path": "results-explorer/e2e/"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/results-explorer-followup-todo-review/planning/"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-chart-dataset-eligibility-contract.yaml"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-chart-run-identity-label-contract.yaml"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-compare-disabled-recovery-states.yaml"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-compare-entrypoint-happy-path-gates.yaml"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-compare-warning-affordance-contract.yaml"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-comparison-eligibility-contract-repair.yaml"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-direct-route-and-copy-hardening.yaml"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-followup-remediation-release-gate.yaml"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-leaderboard-rank-evidence-semantics.yaml"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-leaderboard-scope-filter-contract.yaml"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-metric-formatting-contract.yaml"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-surface-theme-and-density-contract.yaml"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/results-explorer-followup-remediation-release-gate-*.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO schema and graph validate",
+        "expected": "both commands exit 0",
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb",
+        "description": "Snapshot invariants pass",
+        "expected": "exit 0 with nonzero comparable rows and no contradictory leaderboard/rank states",
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run && npm run typecheck && npm run build",
+        "description": "Results Explorer frontend verification passes",
+        "expected": "all frontend checks pass",
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"Leaderboards|Benchmark|Platform|Query Workbench|Compare|Result detail|PASS|FAIL\" _project/audits/results-explorer-followup-remediation-release-gate-*.md",
+        "description": "Browser acceptance evidence exists",
+        "expected": "audit includes route acceptance evidence",
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "notes": "Run `todo_cli.py show` or equivalent for each dependency on the checked git\nSHA and verify every work unit is done, every verification item has output,\nand no dependency remains in `_project/TODO`. Capture raw output outside\ngit and summarize the dependency state in the release-gate audit.\nDecision gate: if any dependency lacks evidence, stop and return it to the\nimplementation owner.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm dependency TODOs are complete with verification evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "notes": "Regenerate or confirm the current Results Explorer DuckDB snapshot, then\nrun snapshot invariants plus SQL that reports:\n  - compare-eligible row count;\n  - cohorts with 2+ compare-eligible rows;\n  - comparison exclusion reasons;\n  - missing/unranked/ranked leaderboard states;\n  - leaderboard benchmark/platform/tuning scope counts;\n  - duplicate chart labels if the formatter exposes a check;\n  - chart dataset eligibility counts by chart class;\n  - metric-formatting samples for large scores, latency, coverage, and\n    speedup;\n  - compare warning counts and receipt-anchor targets.\nDecision gate: zero compare-eligible rows, false `No run` badge states,\nunexplained leaderboard scope counts, duplicate chart labels, invalid chart\ndatasets, misleading metric formatting, or inert warning affordances block\nrelease.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run regenerated snapshot invariants and compare SQL smoke",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "notes": "Run the targeted backend explorer pipeline tests, Results Explorer unit\ntests, typecheck, build, and e2e/browser tests introduced by dependent\nTODOs. Capture command status and failure tails under this gate's\nverification log directory.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run automated backend and frontend suites",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "notes": "Restart the local dev server from the checked tree and exercise:\n  - `/results/`;\n  - `/results/<benchmark>/` Matrix, Ranks, List, and chart subtabs;\n  - `/results/p/<platform>/` filters and compare selection;\n  - `/results/query` filters, visible columns, SQL disclosure, exports,\n    and compare selection;\n  - `/results/compare` empty builder and explicit IDs;\n  - one result detail page and `Compare this result`.\nClick every visible button/link/control at least once unless it performs an\nexternal/destructive action. Record pass/fail evidence for each route,\nincluding leaderboard scope explanations, metric formatting, all chart\ndataset empty/excluded states, and Compare warning anchors.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run comprehensive browser acceptance across all Results Explorer routes",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "notes": "Write `_project/audits/results-explorer-followup-remediation-release-gate-<date>.md`\nwith:\n  - checked SHA;\n  - commands run;\n  - snapshot SQL counts;\n  - route acceptance matrix;\n  - closure status for every known issue;\n  - any new defects with severity, root cause, blind spot, and deeper\n    consideration.\nDecision gate: any unresolved P0/P1 defect blocks moving this gate to DONE.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Produce final defect register and pass/fail closure artifact",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-followup-remediation-release-gate",
+        "notes": "After the audit passes, use the TODO completion workflow to mark this item\nand all dependency items Completed, move them to `_project/DONE`, reindex,\nvalidate, and confirm no completed follow-up item remains in\n`_project/TODO`. If the gate fails, leave items open and create narrowly\nscoped follow-up TODOs for any remaining defects.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move completed TODOs to DONE only after the gate passes",
+        "wid": "w5"
+      }
+    ]
+  }
+}

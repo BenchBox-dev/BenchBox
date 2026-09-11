@@ -1,0 +1,139 @@
+{
+  "context": "Import MAX_COMPARE_SELECTIONS in BenchmarkIndex and mirror PlatformIndex's exact pattern: block selection past the cap and expose the reason through aria-describedby, matching PlatformIndex.tsx:767-768 and :961. Do not invent new copy.",
+  "description": "PlatformIndex (PlatformIndex.tsx:21,384,767) and Query (Query.tsx:29) both import and enforce MAX_COMPARE_SELECTIONS from resultLinks.ts. BenchmarkIndex does not import it at all, so its selection is uncapped while its two siblings cap at 4. A user can select more runs than the comparison surface accepts, and only discovers the limit on navigation.\n\nFound by adversarial review; not in the original findings.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "edit inside the primary clone /Users/joe/Developer/BenchBox",
+        "instead": "make worktree-create BRANCH=... WORKTREE_PATH=... then make agent-write-preflight",
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "why": "AGENTS.md makes the primary clone read-only for agents"
+      },
+      {
+        "dont": "introduce a second cap constant",
+        "instead": "import the existing one",
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "why": "a second constant is exactly the fork this item removes"
+      },
+      {
+        "dont": "put the disabled reason in the accessible name",
+        "instead": "use aria-describedby as the shipped pages do",
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "why": "PlatformIndex.tsx:961 and Query.tsx:900 establish the pattern"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-08-22T16:39:38Z",
+      "completed_pr": 1809,
+      "created_at": "2026-08-22T14:48:48Z",
+      "worktree": "results-explorer-ux"
+    },
+    "preserves": [
+      {
+        "behavior": "Disabled reasons are exposed via aria-describedby (PlatformIndex.tsx:961, Query.tsx:900), not an accessible-name suffix. Follow the shipped pattern.",
+        "item_id": "rx-ux-03-selection-cap-parity"
+      },
+      {
+        "behavior": "MAX_COMPARE_SELECTIONS stays defined once in resultLinks.ts:1",
+        "item_id": "rx-ux-03-selection-cap-parity"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run test",
+        "description": "Explorer unit and component tests pass",
+        "expected": "typecheck clean; all vitest suites pass",
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "last_result": "pass",
+        "last_run": "2026-08-22T16:39:32Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test --project=chromium e2e/capability/accessibility-regressions.spec.ts",
+        "description": "Accessibility regression suite passes",
+        "expected": "no new axe violations",
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "last_result": "pass",
+        "last_run": "2026-08-22T16:39:36Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'MAX_COMPARE_SELECTIONS' results-explorer/src/pages/BenchmarkIndex.tsx results-explorer/src/pages/PlatformIndex.tsx results-explorer/src/pages/Query.tsx",
+        "description": "All three selection owners enforce the same cap",
+        "expected": "all three files reference the constant",
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "last_result": "pass",
+        "last_run": "2026-08-22T16:39:37Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "BenchmarkIndex imports MAX_COMPARE_SELECTIONS from resultLinks.ts, rejects oversized next sets, and marks unselected candidates with the shared limit reason at four selections; typecheck passed",
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "notes": null,
+        "started_at": "2026-08-22T16:21:33Z",
+        "started_branch": "fix/rx-ux-03-selection-cap-parity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-03-selection-cap-parity",
+        "status": "done",
+        "summary": "Import and enforce MAX_COMPARE_SELECTIONS in BenchmarkIndex",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Selection-aware summary feeds the recognized 'Up to 4 runs can be compared.' reason into QueryHeatmap's shipped aria-describedby path; targeted test passed",
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "notes": null,
+        "started_at": "2026-08-22T16:21:38Z",
+        "started_branch": "fix/rx-ux-03-selection-cap-parity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-03-selection-cap-parity",
+        "status": "done",
+        "summary": "Expose the cap reason via aria-describedby",
+        "wid": "w2"
+      },
+      {
+        "evidence": "BenchmarkIndex.test.tsx adds five-run coverage: fifth checkbox disabled, accessible name unchanged, aria-describedby names selection-limit recovery; 35 tests passed",
+        "item_id": "rx-ux-03-selection-cap-parity",
+        "notes": null,
+        "started_at": "2026-08-22T16:21:45Z",
+        "started_branch": "fix/rx-ux-03-selection-cap-parity",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-rx-ux-03-selection-cap-parity",
+        "status": "done",
+        "summary": "Unit test: selecting a 5th run is blocked with a described reason",
+        "wid": "w3"
+      }
+    ]
+  }
+}

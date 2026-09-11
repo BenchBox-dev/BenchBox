@@ -1,0 +1,162 @@
+{
+  "context": "Reuse the MethodologyDisclosure wording. Change only the remaining inaccurate sites so they name a geometric mean of per-query medians.",
+  "description": "Four of five sites describe the default basis as a 'geometric mean of per-query execution times'. That names a reduction with ONE execution time per query, which is not what happens: it is a geometric mean of per-query MEDIANS. BenchmarkIndex.tsx:1086 is the only accurate one, and MethodologyDisclosure.tsx was corrected in explorer-basis-single-run-pass-surfaces.\n\nThree remain: Compare.tsx:799, Home.tsx:592, PlatformIndex.tsx:797.\n\nPromoted from deferral 722 rather than folded into a sibling item because no single item owns all three files: Home and PlatformIndex fall inside explorer-basis-browse-hardware-engine-facets, while Compare falls inside explorer-basis-compare-multi-run-layout. Splitting one wording fix across two items would leave the corpus of copy inconsistent for however long the second one lagged.\n\nNewly reader-visible: explorer-basis-single-run-pass-surfaces added the per-pass view, which is the first surface anywhere in the explorer that shows a query has several executions. Until then the wording was wrong but unfalsifiable from the UI.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "invent a new reduction name or drop the median",
+        "instead": "match MethodologyDisclosure: geometric mean of per-query median execution times",
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "why": "the defect is inconsistent wording, not a new metric"
+      }
+    ],
+    "item_meta": {
+      "category": "explorer-copy",
+      "created_at": "2026-08-30T08:03:44Z",
+      "worktree": "explorer-default-basis-copy-reconciliation"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not change ranking math, basis selection, or measurement-run filtering.",
+        "item_id": "explorer-default-basis-copy-reconciliation"
+      },
+      {
+        "behavior": "Keep the measurement-runs-only qualifier where it is already present.",
+        "item_id": "explorer-default-basis-copy-reconciliation"
+      },
+      {
+        "behavior": "MethodologyDisclosure remains the accurate default-basis definition.",
+        "item_id": "explorer-default-basis-copy-reconciliation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Reuse the already-corrected default-basis sentence.",
+        "decision": "reuse",
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "path": "results-explorer/src/components/MethodologyDisclosure.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/components/MethodologyDisclosure.tsx"
+      },
+      {
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare*"
+      },
+      {
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home*"
+      },
+      {
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/PlatformIndex*"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rg -n 'geometric mean of per-query execution times' results-explorer/src/pages/Compare.tsx results-explorer/src/pages/Home.tsx results-explorer/src/pages/PlatformIndex.tsx && exit 1 || true",
+        "description": "No remaining inaccurate default-basis copy on the three sites",
+        "expected": "Those three files no longer use the one-time-per-query wording.",
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/Compare src/pages/__tests__/Home src/pages/__tests__/PlatformIndex src/components && npm run typecheck",
+        "description": "Focused page tests pass",
+        "expected": "Affected page tests and typecheck pass.",
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Inventory remaining default-basis copy that omits per-query median",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Correct Compare, Home, and PlatformIndex default-basis copy",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-default-basis-copy-reconciliation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update colocated assertions for the corrected wording",
+        "wid": "w2"
+      }
+    ]
+  }
+}

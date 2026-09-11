@@ -1,0 +1,109 @@
+{
+  "description": "`_project/DONE/README.md` documents the canonical placement convention:\n`DONE/{worktree}/{lifecycle-phase}/{slug}.yaml`, preserving the `planning/`\nor `active/` subdirectory from the source TODO tree.\n\nAt least one file violates this convention as of 2026-06-08:\n\n- `DONE/main/benchmark-runs-output-root-propagation.yaml` — placed flat\n  under `DONE/main/` with no lifecycle subdirectory. Per the README it\n  should be `DONE/main/planning/benchmark-runs-output-root-propagation.yaml`.\n\n`todo-sweep-completed-items-from-open-tree` needs the convention to be\nconsistently enforced before it can reliably move items. `todo_cli.py` may\nalso miscount items if some live outside the documented path structure.\n\nAudit the DONE tree for all flat-placed items, normalize them to the\ndocumented convention, and confirm `todo_cli.py` still resolves them\ncorrectly after the move.\n",
+  "legacy": {
+    "item_meta": {
+      "category": "Repository Maintenance",
+      "created_at": "2026-06-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cross-item deps.needs references that point to DONE items remain resolvable",
+        "item_id": "todo-done-tree-location-convention"
+      },
+      {
+        "behavior": "Existing DONE items remain findable by todo_cli.py after any renaming",
+        "item_id": "todo-done-tree-location-convention"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/README.md: already documents the {worktree}/{phase}/{slug} convention",
+        "decision": "reuse",
+        "item_id": "todo-done-tree-location-convention",
+        "path": "_project/DONE/README.md"
+      },
+      {
+        "concept": "_project/scripts/todo_cli.py: check path assumptions before moving any files",
+        "decision": "reuse",
+        "item_id": "todo-done-tree-location-convention",
+        "path": "_project/scripts/todo_cli.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "find _project/DONE -name '*.yaml' | grep -vE '/(planning|active|_indexes)/' | grep -v README",
+        "description": "No flat-placed .yaml items remain directly under a worktree directory",
+        "expected": "Empty (all items in planning/ or active/ subdirectories)",
+        "item_id": "todo-done-tree-location-convention",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-done-tree-location-convention",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-done-tree-location-convention",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "todo-done-tree-location-convention",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "todo-done-tree-location-convention",
+        "notes": "Run: find _project/DONE -name \"*.yaml\" | grep -vE \"/(planning|active|_indexes)/\" | grep -v README\nKnown violator: DONE/main/benchmark-runs-output-root-propagation.yaml\nCheck all worktree subdirs for additional flat items.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Audit DONE tree for all flat-placed items (not in planning/ or active/)",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-done-tree-location-convention",
+        "notes": "grep -n \"DONE\\|planning\\|active\" _project/scripts/todo_cli.py | head -20\nConfirm the CLI uses the documented {worktree}/{phase}/ structure and\nwill find items after they are moved.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify todo_cli.py path assumptions before moving files",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-done-tree-location-convention",
+        "notes": "Known case:\n  git mv _project/DONE/main/benchmark-runs-output-root-propagation.yaml \\\n         _project/DONE/main/planning/benchmark-runs-output-root-propagation.yaml\nUse git mv so history is preserved. Repeat for any additional violators\nfound in w0.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Move all flat-placed items to their correct {worktree}/{phase}/ location",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-done-tree-location-convention",
+        "notes": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all\nuv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph\nmake todo-reindex\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run validate_todo.py --all and todo_cli.py check-graph; regenerate indexes",
+        "wid": "w3"
+      }
+    ]
+  }
+}

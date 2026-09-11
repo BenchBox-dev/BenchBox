@@ -1,0 +1,42 @@
+{
+  "description": "Adversarial review finding (2026-07-02, joinorder Track-2 review), Nit --\njudgment call (a). The completed item\n_project/DONE/main/planning/joinorder-trino-primary-key-ddl.yaml:62 still has\nits own `validate` command point at the pre-move\n`_project/TODO/main/planning/joinorder-trino-primary-key-ddl.yaml` path\n(orphaned by an auto-merge race). Running that command now fails because the\nfile lives under DONE/. It is cosmetic -- no gate depends on it and check-graph\npasses -- and ~20% of DONE items (51/248) share the stale-TODO-path convention,\nso this is a consistency tidy, not a correctness fix. Captured per the review\nrequest to record every finding; safe to batch with other low-priority tidies.",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-07-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "joinorder-trino-pk-ddl-validate-path-fix",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/main/planning/joinorder-trino-primary-key-ddl.yaml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/todo show joinorder-trino-primary-key-ddl --json > /dev/null",
+        "description": "The corrected JoinOrder item is readable from the current tracker",
+        "expected": "exit 0",
+        "item_id": "joinorder-trino-pk-ddl-validate-path-fix",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-trino-pk-ddl-validate-path-fix",
+        "notes": "Edit joinorder-trino-primary-key-ddl.yaml:62 (and the matching\nfiles_affected entry at :89) to reference\n_project/DONE/main/planning/joinorder-trino-primary-key-ddl.yaml, then\nvalidate the file.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Repoint the DONE item's validate command (and files_affected path) to the DONE/ location",
+        "wid": "w1"
+      }
+    ]
+  }
+}

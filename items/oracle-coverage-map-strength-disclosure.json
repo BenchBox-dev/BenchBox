@@ -1,0 +1,240 @@
+{
+  "context": "Keep the generator the single source of truth and derive both new axes from live\nsources (provider ValidationMode + available scales; comparator identity + bounded\nSF) so they cannot be faked. Sequence: (w1) strength-type column; (w2) scale\ncolumn; (w3) provenance + protocol, carefully kept out of the drift-compared body;\n(w4) a truth test for the new labels. Coordinate naming with\ncross-surface-oracle-remediation w9 rather than competing with it.\n",
+  "description": "An adversarial review of the oracle coverage map (#834, reviewed on develop)\nfound the map collapses very different guarantees into a single word, \"guarded\".\nThe drift machinery is sound and on the required PR path - it was verified to go\nRED on a mutated artifact and a removed GATES entry - but it protects the map's\nCONSISTENCY with the generator, not the TRUTH of what \"guarded\" implies.\n\nReproduced facts (verified against develop @ 8596ab51):\n\n- `build_coverage_map` / `classify_oracles`\n  (_project/scripts/generate_oracle_coverage_map.py) emit one primary oracle per\n  benchmark and a boolean `guarded`. They do NOT record how STRONG that oracle is\n  or at what SCALE it holds. The rendered map shows e.g.\n  `tpch | expected-results | guarded` with no qualifier.\n- The guaranteed strengths differ enormously and are not distinguished:\n    * expected-results (tpch, tpcds): ROW-COUNT only today, and ONLY at SF=1\n      (loader raises for other scales). Cardinality, one scale.\n    * cross-surface (ssb, amplab, coffeeshop): VALUE-level (validate_results_exact\n      sorts full result sets and compares cell-by-cell with tol 1e-10,\n      benchbox/core/tpchavoc/validation.py), but self-referential (SQL is the\n      reference for its own DataFrame surface) at the bounded SF=0.1.\n    * variant-equivalence (tpchavoc): value-level vs canonical TPC-H.\n- A reviewer reading a green \"guarded\" cell reasonably infers \"correctness is\n  proven\" and may skip manual value inspection. That is the coverage-theater risk\n  the map was meant to remove, re-introduced one abstraction up: the map is honest\n  about its DENOMINATOR (6/23 guarded, 17 named UNGUARDED) but not about the\n  QUALITY of each guarded cell.\n\nThis item adds two disclosure axes to the generated map - oracle STRENGTH-TYPE\n(value-level / cardinality-only / structural) and SCALE coverage - plus a\nclassifier-correctness test so the new axes cannot silently regress, and an\nartifact-provenance note that addresses the review-staleness failure mode.\n\nSCOPE BOUNDARY (do not duplicate): a separate, higher-priority axis -\n\"gate-registered vs verified-green\" - is already owned by\ncross-surface-oracle-remediation w9. This item owns the orthogonal STRENGTH-TYPE\n+ SCALE + provenance axes and must layer onto whatever naming w9 lands.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate the 'registered vs verified-green' axis from cross-surface-oracle-remediation w9",
+        "instead": "(not specified)",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "why": "coordinate with it."
+      },
+      {
+        "dont": "embed a volatile git SHA in the drift-compared region of the coverage map",
+        "instead": "put provenance where the drift comparison ignores it.",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "why": "`--check` would fail on every commit"
+      },
+      {
+        "dont": "hard-code the strength/scale per benchmark",
+        "instead": "derive from the provider/comparator/loader.",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "why": "it would rot exactly like a hand-maintained doc"
+      },
+      {
+        "dont": "widen scope into closing UNGUARDED benchmarks",
+        "instead": "(not specified)",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "why": "that is benchmark-correctness-oracle-coverage-map; this is disclosure quality only."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "oracle-coverage-map-strength-disclosure",
+        "id": 442,
+        "reason": "Owned by cross-surface-oracle-remediation w9; this item layers strength-TYPE + scale onto whatever naming that lands, and must not duplicate it.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Landed: oracle-coverage-map.md now has an Enforced column ('enforced (CI-blocking)' vs 'staged (NOT CI-enforced)') and prose distinguishing oracle-REGISTERED vs currently-green plus Strength/Scale/Independence columns.",
+        "summary": "A 'gate-registered vs verified-green' strength signal in the map."
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "oracle-coverage-map-strength-disclosure",
+        "id": 443,
+        "reason": "Owned by benchmark-correctness-oracle-coverage-map w1/w2 (breadth). This item improves disclosure of the already-guarded cells.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Exact match: open item benchmark-correctness-oracle-coverage-map explicitly targets closing the unguarded benchmarks.",
+        "summary": "Closing the 17 UNGUARDED benchmarks."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-06-23T00:00:00Z",
+      "created_at": "2026-06-23T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The drift check (`make oracle-coverage-map-check`) stays green on a clean tree and on the required PR path; new columns must regenerate deterministically.",
+        "item_id": "oracle-coverage-map-strength-disclosure"
+      },
+      {
+        "behavior": "The existing summary semantics (N guarded / M UNGUARDED, the UNGUARDED dispatch lists) are preserved; strength/scale are additive columns.",
+        "item_id": "oracle-coverage-map-strength-disclosure"
+      },
+      {
+        "behavior": "The map stays GENERATED from live sources - no hand-maintained classification - so it cannot drift from reality.",
+        "item_id": "oracle-coverage-map-strength-disclosure"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/active/cross-surface-oracle-remediation.yaml:w9 - owns 'registered vs verified-green'; coordinate, do NOT duplicate that axis here.",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "path": "_project/TODO/main/active/cross-surface-oracle-remediation.yaml:w9"
+      },
+      {
+        "concept": "_project/TODO/main/planning/benchmark-correctness-oracle-coverage-map.yaml - owns coverage BREADTH (closing the 17 UNGUARDED); this item is about disclosure QUALITY of the guarded cells, not breadth.",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "path": "_project/TODO/main/planning/benchmark-correctness-oracle-coverage-map.yaml"
+      },
+      {
+        "concept": "_project/scripts/generate_oracle_coverage_map.py:classify_oracles/build_coverage_map/render_markdown - the generator to extend with strength + scale columns; keep it derived from live sources, no hand-maintained doc.",
+        "decision": "extend",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "path": "_project/scripts/generate_oracle_coverage_map.py:classify_oracles/build_coverage_map/render_markdown"
+      },
+      {
+        "concept": "benchbox/core/equivalence/cross_surface.py:GATES + tpchavoc/validation.py:validate_results_exact - the value-level comparator backing cross-surface/variant gates; the source of the 'value-level' strength label and the SF=0.1 scale label.",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "path": "benchbox/core/equivalence/cross_surface.py:GATES"
+      },
+      {
+        "concept": "benchbox/core/expected_results/loader.py - raises for non-SF=1 TPC-H/TPC-DS; the source of the 'SF=1 only' scale label.",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "path": "benchbox/core/expected_results/loader.py"
+      },
+      {
+        "concept": "benchbox/core/expected_results/models.py - ValidationMode (EXACT/RANGE/LOOSE) and the row-count-only nature of the expected-results oracle; the source of the 'cardinality-only' strength label for tpch/tpcds.",
+        "decision": "reuse",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "path": "benchbox/core/expected_results/models.py"
+      },
+      {
+        "concept": "tests/unit/test_oracle_coverage_map.py - the existing drift/completeness/exemplar tests to extend with strength/scale classifier assertions.",
+        "decision": "extend",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "path": "tests/unit/test_oracle_coverage_map.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "kind": "only_modify",
+        "path_glob": "_project/"
+      },
+      {
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      },
+      {
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/generate_oracle_coverage_map.py"
+      },
+      {
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_oracle_coverage_map.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make oracle-coverage-map && make oracle-coverage-map-check",
+        "description": "Map shows strength + scale and is internally consistent",
+        "expected": "regenerates with strength/scale columns; --check reports up to date",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_oracle_coverage_map.py -q",
+        "description": "Classifier-truth test catches a mislabeled oracle",
+        "expected": "tests pass; flipping a known oracle's strength label fails the new assertion",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make oracle-coverage-map-check  (on two successive commits without registry/gate changes)",
+        "description": "Provenance does not make the drift check churn",
+        "expected": "up to date both times",
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "notes": "Extend classify_oracles/build_coverage_map to attach a strength-type to each\noracle, derived from live sources: expected-results -> cardinality-only (read\nthe provider's ValidationMode; it is row-count regardless of EXACT/LOOSE);\ncross-surface and variant-equivalence -> value-level (they use\nvalidate_results_exact). Render it as a distinct column in\noracle-coverage-map.md and a field in the .json so a reader sees\n`tpch | expected-results | cardinality-only` vs\n`ssb | cross-surface | value-level`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Classify and render oracle STRENGTH-TYPE per benchmark (value-level / cardinality-only / structural)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "notes": "Add a scale-coverage signal to each guarded row: expected-results guard only\nat SF=1 (loader raises otherwise); cross-surface/variant gates run at the\nbounded SF (0.1). Derive from the same live sources where possible (probe the\nprovider's available scales; read the gate's bounded scale). Render it so a\nreader cannot mistake \"guarded\" for \"guarded at the scale I run\".\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Disclose SCALE coverage per oracle (e.g. expected-results = SF=1 only)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "notes": "The review went stale because it was run against a develop SHA that advanced\nunderneath it (a parallel second-opinion hit the same trap). Two concrete,\nconflict-free fixes:\n  - Provenance: stamp _project/analysis correctness artifacts that are read\n    out-of-band (the divergence analyses, and a non-drift-compared header of\n    the coverage map) with the generation date and git SHA, so a reader can\n    tell when an artifact predates current develop.\n  - Protocol: document in the relevant README / review-protocol note that an\n    adversarial correctness review MUST pin the reviewed SHA and re-run\n    `git merge-base --is-ancestor <reviewed-sha> origin/develop` at write\n    time, or review against a tag.\nCRITICAL DESIGN CONSTRAINT: the coverage map's drift check requires committed\n== regenerated byte-for-byte. A volatile SHA inside the drift-compared region\nwould make `--check` fail on every commit. Put provenance in a region the\ndrift check ignores (or normalizes), never in the compared body.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Stamp analysis-artifact provenance and document the review-reproducibility protocol",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "oracle-coverage-map-strength-disclosure",
+        "notes": "The existing drift test only proves committed == regenerated (consistency,\nnot truth). Add assertions that pin the TRUTH of the new axes for known\noracles: tpch/tpcds are cardinality-only + SF=1; ssb/amplab/coffeeshop/\ntpchavoc are value-level. This is the truth check the drift check lacks, and\nit guards the strength dimension itself.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a classifier-correctness test so strength/scale labels cannot silently regress",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,361 @@
+{
+  "context": "Introduce the helper first, then migrate consumers in narrow slices. Tests\nshould pin behavior before broad visual refactoring. Keep policy decisions\nout of components; components should ask whether a row is displayable,\nrankable, or comparable and render the supplied reason.\n",
+  "description": "After the read model exposes explicit display, ranking, and comparison\neligibility, the frontend must stop applying local, inconsistent rules.\nToday, zero timings and no-timing rows are interpreted differently by\nheatmaps, compare summaries, diff tables, box plots, CDFs, sparklines, rank\ntables, and meta leaderboards.\n\nThis TODO adds a shared frontend eligibility layer and migrates display\ncomponents to consume it before any page-specific visual cleanup proceeds.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "disable selection only visually",
+        "instead": "use real disabled state and accessible reason copy.",
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "why": "screen-reader and keyboard users could still activate it"
+      },
+      {
+        "dont": "keep `value > 0` or `value >= 0` checks scattered across components",
+        "instead": "route through the shared helper.",
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "why": "the current bug is inconsistent local predicates"
+      },
+      {
+        "dont": "make charts silently drop rows without an excluded-count or reason",
+        "instead": "expose the reason near the surface.",
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "why": "users need to know why rows disappeared"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "needs_item": "results-explorer-read-model-eligibility-contract"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing chart components still render valid rankable cohorts.",
+        "item_id": "results-explorer-frontend-eligibility-normalization"
+      },
+      {
+        "behavior": "High-contrast/reduced-color chart paths continue to work.",
+        "item_id": "results-explorer-frontend-eligibility-normalization"
+      },
+      {
+        "behavior": "Keyboard navigation and row selection behavior remain accessible for comparable rows.",
+        "item_id": "results-explorer-frontend-eligibility-normalization"
+      },
+      {
+        "behavior": "Result receipt/detail links remain available for excluded provenance rows.",
+        "item_id": "results-explorer-frontend-eligibility-normalization"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/src/components/QueryHeatmap.tsx:matrix sorting and selection — extend with eligibility helper.",
+        "decision": "extend",
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "path": "results-explorer/src/components/QueryHeatmap.tsx:matrix"
+      },
+      {
+        "concept": "results-explorer/src/components/StatusBadge.tsx:badge primitive — preserve as passive metadata only.",
+        "decision": "reuse",
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "path": "results-explorer/src/components/StatusBadge.tsx:badge"
+      },
+      {
+        "concept": "results-explorer/src/lib/chartMath.ts:valid-value filters — supersede ad hoc filtering with policy-backed helpers.",
+        "decision": "supersede",
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "path": "results-explorer/src/lib/chartMath.ts:valid-value"
+      },
+      {
+        "concept": "results-explorer/src/lib/compareSummary.ts:query record and percentiles — migrate to shared timing predicate.",
+        "decision": "reuse",
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "path": "results-explorer/src/lib/compareSummary.ts:query"
+      },
+      {
+        "concept": "results-explorer/src/lib/duckdbQueries.ts:typed read-model access — consume new read-model fields from the backend TODO.",
+        "decision": "reuse",
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "path": "results-explorer/src/lib/duckdbQueries.ts:typed"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "do_not_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/results.duckdb"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/results-explorer-frontend-eligibility-normalization.yaml"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/chartMath.scale.test.ts"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CDFChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CompareSummary.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/DistributionBox.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryDiffTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/SparklineTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/CompareSummary.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/DistributionBox.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/NormalizedSpeedupChart.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryDiffTable.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartMath.ts"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/compareSummary.ts"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayEligibility.ts"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/types.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/DistributionBox.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/components/__tests__/QueryHeatmap.test.tsx src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/QueryDiffTable.test.tsx src/lib/__tests__/compareSummary.test.ts src/lib/__tests__/duckdbQueries.test.ts src/__tests__/chartMath.scale.test.ts",
+        "description": "Frontend unit tests for eligibility consumers pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "notes": "Create a small shared helper, for example\n`results-explorer/src/lib/displayEligibility.ts`, that wraps the read-model\nfields and policy decisions. It should provide functions such as:\n  - `isTimingDisplayable(row)`;\n  - `isRankable(row)`;\n  - `isComparable(row)`;\n  - `validTimingValues(values)`;\n  - `formatTimingExclusion(row)`;\n  - `formatCohortExclusion(summary)`.\nThe helper must not recompute policy from scratch when a read-model field\nexists.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a shared frontend eligibility and timing helper",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "notes": "Migrate `DistributionBox`, `CDFChart`, `NormalizedSpeedupChart`,\n`ChartPanel`, `SparklineTable`, and related chart math consumers to the\nshared valid-timing rule. The same input row must either be included or\nexcluded consistently across chart types, with the same explanation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace local zero/null timing predicates in chart math consumers",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "notes": "Update matrix, rank, and mobile-card rendering so no-timing rows are not\nshown as normal evidence. If rows remain visible for provenance, render\nthem as excluded with an explicit reason and prevent them from influencing\nsort/rank/heatmap semantics.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace local eligibility checks in QueryHeatmap and RankTable",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "notes": "Make Compare use the same valid-timing predicate for:\n  - primary metric winner selection;\n  - comparable query counts;\n  - query wins/ties/losses;\n  - diff table ratios;\n  - percentiles and tail shape;\n  - cost/performance summary.\nCompare must not include zero timings in one section and exclude them in\nanother unless the policy explicitly says why.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace local eligibility checks in CompareSummary and QueryDiffTable",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "notes": "Update `types.ts`, DuckDB query helpers, and component test fixtures so\nnew eligibility fields are present everywhere. Test fixtures must include:\n  - normal rankable row;\n  - public but unrankable row;\n  - no-timing row;\n  - zero-timing row;\n  - excluded compare candidate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update typed query models and tests for eligibility fields",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-frontend-eligibility-normalization",
+        "notes": "Add targeted tests proving the same row is treated consistently by heatmap,\nrank table, box plot, CDF, compare summary, and query diff. Include an\nAMPLab-shaped fixture where 7/8 queries are zero or excluded and assert\nthat Compare suppresses unsupported winner language.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add frontend regression tests for inconsistent timing semantics",
+        "wid": "w6"
+      }
+    ]
+  }
+}

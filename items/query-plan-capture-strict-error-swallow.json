@@ -1,0 +1,160 @@
+{
+  "context": "This is the same restructure already applied to Athena/ClickHouse/Spark/Databricks in\nPRs #775/#778: pull the capture call out of the try so PlanCaptureError propagates in\nstrict mode. Each adapter change is a small relocation plus one test.\n\nNOTE: query-plan-capture-isolation-phase-design proposes moving plan capture into a\nseparate post-measurement phase entirely. If that lands first, the capture call leaves\nexecute_query and this bug disappears at the source — coordinate so this fix is not done\ntwice. See open_questions.\n",
+  "description": "PR #769 factored plan capture into ResultCaptureMixin._merge_plan_capture_into_result()\nand capture_query_plan() re-raises PlanCaptureError when strict_plan_capture=True\n(benchbox/platforms/base/result_capture.py:682, 720). DuckDB and the adapters wired in\nPRs #773/#775/#778 are safe: they either have `except PlanCaptureError: raise` before\nthe general handler, or call the helper OUTSIDE the execute_query try block.\n\nSQLite and MotherDuck are NOT safe. They call _merge_plan_capture_into_result() INSIDE\nthe execute_query try whose tail is a broad `except Exception`, with no PlanCaptureError\nre-raise:\n  - SQLite      benchbox/platforms/sqlite.py:569  (merge), :573 (except Exception)\n  - MotherDuck  benchbox/platforms/motherduck.py:314 (merge), :317 (except Exception)\n\nConsequently, when strict_plan_capture=True and plan capture fails (parser error,\nEXPLAIN failure, timeout), the PlanCaptureError is caught by the broad except and the\nquery is reported as status=FAILED even though the SQL executed successfully. This both\nhides the real (capture) error behind a misleading query failure and corrupts benchmark\nresults by marking a successful query as failed.\n\nThe fix mirrors the canonical pattern: move the capture call OUTSIDE the try (after the\nexcept/finally) so a strict PlanCaptureError propagates, matching PostgreSQL,\nPrestoTrinoAdapterBase, Athena, ClickHouse, Spark, and Databricks.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add `except PlanCaptureError: raise` as a second except clause when the simpler fix is to move capture outside the try",
+        "instead": "relocate the call instead.",
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "why": "the project's other adapters standardized on the outside-the-try placement"
+      },
+      {
+        "dont": "change the non-strict behavior",
+        "instead": "only the strict-mode propagation path changes.",
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "why": "benchmarks rely on capture being a silent best-effort by default"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-06-11T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "A genuine query-execution failure must still be caught and returned as status=FAILED.",
+        "item_id": "query-plan-capture-strict-error-swallow"
+      },
+      {
+        "behavior": "With strict_plan_capture=False, plan capture failure must remain silent and the query must report SUCCESS.",
+        "item_id": "query-plan-capture-strict-error-swallow"
+      },
+      {
+        "behavior": "execute_query result dict shape must not change for non-plan fields.",
+        "item_id": "query-plan-capture-strict-error-swallow"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/platforms/athena.py — capture placed after try/except/finally so strict errors propagate",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "path": "benchbox/platforms/athena.py"
+      },
+      {
+        "concept": "benchbox/platforms/base/result_capture.py:682 — capture_query_plan re-raises PlanCaptureError in strict mode",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "path": "benchbox/platforms/base/result_capture.py:682"
+      },
+      {
+        "concept": "benchbox/platforms/duckdb.py — `except PlanCaptureError: raise` before the general except (safe pattern)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "path": "benchbox/platforms/duckdb.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/motherduck.py"
+      },
+      {
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/sqlite.py"
+      },
+      {
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_motherduck_plan_capture.py"
+      },
+      {
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_sqlite_plan_capture.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_sqlite_plan_capture.py -k strict -v",
+        "description": "SQLite strict-mode capture failure propagates",
+        "expected": "PlanCaptureError propagates from execute_query; non-strict stays SUCCESS",
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_motherduck_plan_capture.py -k strict -v",
+        "description": "MotherDuck strict-mode capture failure propagates",
+        "expected": "PlanCaptureError propagates from execute_query; non-strict stays SUCCESS",
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -q",
+        "description": "Full platform suite green",
+        "expected": "0 failures, 0 errors",
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "notes": "In benchbox/platforms/sqlite.py execute_query(), stop calling the merge helper at\nline 569 inside the try. Build/return result on the success path, then call\nself._merge_plan_capture_into_result(result, connection, query, query_id) after the\ntry/except, returning result. The validation-failed early-return path (if any) must\nstill short-circuit before the post-try capture.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "SQLite: move _merge_plan_capture_into_result outside the execute_query try",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "notes": "Same change in benchbox/platforms/motherduck.py: relocate the merge call at line 314\nto after the try/except so result_dict is captured outside the broad except. result_dict\nstatus is SUCCESS at that point on the success path.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "MotherDuck: move _merge_plan_capture_into_result outside the execute_query try",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-strict-error-swallow",
+        "notes": "In tests/unit/platforms/test_sqlite_plan_capture.py and test_motherduck_plan_capture.py,\nadd a test that constructs the adapter with strict_plan_capture=True, monkeypatches\ncapture_query_plan to raise PlanCaptureError, and asserts the error PROPAGATES from\nexecute_query (pytest.raises) rather than being swallowed into a status=FAILED dict.\nAlso assert that with strict_plan_capture=False the same failure is silent (status=SUCCESS).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add strict-mode propagation tests for SQLite and MotherDuck",
+        "wid": "w3"
+      }
+    ]
+  }
+}

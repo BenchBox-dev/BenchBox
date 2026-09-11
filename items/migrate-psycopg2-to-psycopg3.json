@@ -1,0 +1,475 @@
+{
+  "context": "Work unit sequencing:\n- w1 (research gate) runs first and may abort the migration if a platform blocker is found.\n- w2 (pyproject.toml + uv.lock) must land before w3-w8 so psycopg3 is available in the env.\n- w3 (psycopg2_mixin.py) is the shared foundation - must be correct before adapters change.\n- w4-w7 (adapters) depend on w3 but are independent of each other; can run in parallel.\n- w8 (scripts) depends only on w2; can run in parallel with w4-w7.\n- w9 (test mocks) runs after w4-w7, since mock targets depend on final import paths.\n- w10 (validation) is the final gate after w8 and w9.\n\nThe copy_expert() rewrite (w4) is the only non-trivial change. Reference:\nhttps://www.psycopg.org/psycopg3/docs/basic/copy.html\n",
+  "description": "psycopg2-binary has been in maintenance-only mode since 2022. psycopg3 (PyPI package:\n`psycopg`) is the designated successor from the same author (Daniele Varrazzo), built on\nthe same libpq foundation with active development, better wheel coverage (consistent\nmacOS ARM64 support), and native async support. psycopg2-binary bundles its own OpenSSL,\ntriggering security-scanner false positives; psycopg3[binary] has the same bundling model\nbut a cleaner, maintained build.\n\nBenchBox uses psycopg2 across one shared mixin, five platform adapters, two dev scripts,\nand four test files:\n\n  Platform adapters:\n    benchbox/platforms/base/psycopg2_mixin.py  - shared connection/cursor mechanics\n    benchbox/platforms/postgresql.py            - most complex: copy_expert() bulk load\n    benchbox/platforms/timescaledb.py           - psycopg2.sql for safe DDL composition\n    benchbox/platforms/questdb.py               - inherits mixin; psycopg2.extras vestigial\n    benchbox/platforms/pg_mooncake.py           - psycopg2.sql for GUC/DDL composition\n    benchbox/platforms/pg_duckdb.py             - psycopg2.sql for GUC composition\n    benchbox/platforms/redshift.py              - psycopg2 as fallback when redshift-connector absent\n\n  pyproject.toml dependency declarations (4 sites):\n    line 112: \"psycopg2-binary>=2.9.0\"  (extras:all)\n    line 170: postgresql = [\"psycopg2-binary>=2.9.0\"]\n    line 171: questdb = [\"psycopg2-binary>=2.9.0\", \"requests>=2.28.0\"]\n    line 464: \"psycopg2-binary>=2.9.0\"  (dev group)\n\n  Scripts: scripts/probe_mooncake_types.py, scripts/benchmark_mooncake_migration.py\n\n  Tests:\n    tests/unit/platforms/test_postgresql_adapter.py\n    tests/unit/platforms/test_psycopg2_mixin.py\n    tests/unit/core/test_platform_registry.py\n    tests/integration/platforms/common.py\n\nThe only non-trivial code change is postgresql.py's two `cursor.copy_expert()` calls\n(lines 500 and 505), which must be rewritten to use psycopg3's `cursor.copy()` context\nmanager. The psycopg.sql module (sql.SQL, sql.Identifier, sql.Literal) has an IDENTICAL\nAPI to psycopg2.sql - no usage sites change beyond the import path.\n\nThis item was deferred from the `tighten-dependencies-phase-plan` audit as\n\"driver modernization - out of scope for an elimination audit. File separately when\nproduct is ready.\"",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change the COPY SQL statement format or delimiter handling",
+        "instead": "(not specified)",
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "why": "copy_expert() and cursor.copy() accept identical COPY FROM STDIN SQL; only the Python call pattern changes."
+      },
+      {
+        "dont": "skip w1 (research gate)",
+        "instead": "(not specified)",
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "why": "QuestDB pg_wire compatibility and psycopg2.extras vestigial status must be confirmed before committing to the migration path."
+      },
+      {
+        "dont": "use bare psycopg (without [binary]) as the dependency",
+        "instead": "(not specified)",
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "why": "that requires system-installed libpq headers, breaking installs on systems without PostgreSQL dev tools."
+      },
+      {
+        "dont": "use copy.write(f.read()) (whole-file read) in the copy_expert() replacement",
+        "instead": "always stream in 64KB chunks.",
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "why": "TPC-H lineitem at SF>=1 can exceed available RAM"
+      },
+      {
+        "dont": "use psycopg2-binary as a compatibility shim or alias after migration",
+        "instead": "drop it completely.",
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "why": "that reintroduces the package being replaced and confuses future audits"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "migrate-psycopg2-to-psycopg3",
+        "id": 204,
+        "reason": "Cosmetic-only. Internal alias name has zero behavioral impact. Deferring avoids extra diff noise during the migration.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Cosmetic alias rename with zero behavioral impact; explicitly deferred to avoid diff noise, not worth a standalone TODO.",
+        "summary": "Rename psycopg2_sql alias → psycopg_sql in pg_mooncake.py and pg_duckdb.py"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "migrate-psycopg2-to-psycopg3",
+        "id": 205,
+        "reason": "Live platform tests require external infrastructure not available in standard CI. The unit suite with mocks is sufficient for the migration gate.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Live integration tests against real PostgreSQL/TimescaleDB/QuestDB instances post-migration"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "migrate-psycopg2-to-psycopg3",
+        "id": 206,
+        "reason": "Key rename in platform_info dict (w4 Change 4) may require coordinated update to explorer pipeline transformer/models if the key is in the schema. Investigate scope before deciding whether to rename or add an alias.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Spot-checked repo: no psycopg2_version key remains anywhere in benchbox code (only an unrelated vendored sqlalchemy dialect file); investigation moot.",
+        "summary": "Investigate pipeline consumption of psycopg2_version key before renaming to psycopg_version"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "migrate-psycopg2-to-psycopg3",
+        "id": 207,
+        "reason": "BenchBox is fully synchronous today. psycopg3 native async is available but requires a separate architectural decision.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: psycopg async adoption requires a separate architectural decision (sync-to-async) that hasn't been made; BenchBox remains fully synchronous.",
+        "summary": "Adopt psycopg.AsyncConnection for parallel benchmark execution"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-16T00:00:00Z",
+      "created_at": "2026-04-15T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All test fixtures remain functionally equivalent: mock.Mock() stubs must target the new import name (psycopg) and match the actual module structure post-migration.",
+        "item_id": "migrate-psycopg2-to-psycopg3"
+      },
+      {
+        "behavior": "PostgreSQL COPY bulk load correctness: same rows loaded, no data truncation or loss. The copy_expert() → cursor.copy() rewrite must produce identical database state.",
+        "item_id": "migrate-psycopg2-to-psycopg3"
+      },
+      {
+        "behavior": "Redshift fallback branch: psycopg3 replaces psycopg2 in the fallback only; the redshift-connector primary path is unchanged.",
+        "item_id": "migrate-psycopg2-to-psycopg3"
+      },
+      {
+        "behavior": "Streaming behavior for large TPC-H files: use 64KB chunk reads in cursor.copy() context manager, NOT whole-file f.read(), to preserve memory profile at high scale factors.",
+        "item_id": "migrate-psycopg2-to-psycopg3"
+      },
+      {
+        "behavior": "connection.autocommit = True pattern in postgresql.py and redshift.py: this property is still writeable in psycopg3 - do NOT replace with psycopg.connect(autocommit=True) unless doing a full connection-creation refactor.",
+        "item_id": "migrate-psycopg2-to-psycopg3"
+      },
+      {
+        "behavior": "psycopg2.sql-based safe identifier quoting in TimescaleDB, pg_mooncake, pg_duckdb: sql.Identifier() and sql.SQL() calls MUST remain - they are SQL injection guards.",
+        "item_id": "migrate-psycopg2-to-psycopg3"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "do_not_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/psycopg2_mixin.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_duckdb.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_mooncake.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/postgresql.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/questdb.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/redshift.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/timescaledb.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "scripts/benchmark_mooncake_migration.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "scripts/probe_mooncake_types.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/common.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_platform_registry.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_postgresql_adapter.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_psycopg2_mixin.py"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -rn 'import psycopg2\\|from psycopg2' benchbox/ scripts/ && echo 'FAIL: psycopg2 imports remain' || echo 'OK: no psycopg2 imports'",
+        "description": "No psycopg2 imports remain in shipped source or scripts",
+        "expected": "OK: no psycopg2 imports",
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -rn 'copy_expert' benchbox/ && echo 'FAIL: copy_expert still present' || echo 'OK: copy_expert gone'",
+        "description": "copy_expert() removed from all platform code",
+        "expected": "OK: copy_expert gone",
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import tomllib, pathlib; text = pathlib.Path('pyproject.toml').read_text(); assert 'psycopg2-binary' not in text, 'psycopg2-binary still in pyproject.toml'; data = tomllib.loads(text); core = ' '.join(data['project']['dependencies']); assert 'psycopg' in core; print('OK: deps correct')\"",
+        "description": "psycopg[binary]>=3.1 declared, psycopg2-binary absent from pyproject.toml",
+        "expected": "OK: deps correct",
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import psycopg; v = tuple(int(x) for x in psycopg.__version__.split('.')[:2]); assert v >= (3,1), f'psycopg too old: {psycopg.__version__}'; print(f'OK: psycopg {psycopg.__version__}')\"",
+        "description": "psycopg3 importable and version >= 3.1",
+        "expected": "OK: psycopg 3.",
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast test suite passes",
+        "expected": "no failures",
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/ -q",
+        "description": "Full unit suite passes",
+        "expected": "no failures",
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "needs_wid": "w4",
+        "wid": "w9"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "needs_wid": "w7",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "notes": "Step 1 - Audit selection history:\n  git log -S \"psycopg2\" --oneline | head -20\n  git log --all --oneline --follow -- benchbox/platforms/postgresql.py | tail -20\n  grep -rn \"psycopg2\" docs/ benchbox/ | grep -i \"reason\\|chose\\|because\\|requires\\|must\\|only\\|note\"\n\nStep 2 - Verify psycopg2.extras is unused (not just unimported):\n  grep -rn \"extras\\.\" benchbox/platforms/postgresql.py benchbox/platforms/questdb.py\n  Expected: no output. Both files import psycopg2.extras but do not use it - confirmed\n  vestigial by the pre-migration audit.\n\nStep 3 - Platform compatibility verification:\n  - PostgreSQL: psycopg3 is the canonical driver - no blocker expected\n  - QuestDB: uses PostgreSQL wire protocol; confirm psycopg3 wire compatibility\n    (QuestDB pg_wire docs: https://questdb.io/docs/develop/connect/)\n  - TimescaleDB: standard PostgreSQL; confirm create_hypertable() / add_compression_policy()\n    are plain SQL calls requiring no psycopg2-specific cursor extensions (they are)\n  - pg_mooncake: verify GUC-setting via SET and ALTER TABLE ... SET ACCESS METHOD columnar\n    work unchanged via psycopg3 (they are plain SQL)\n  - pg_duckdb: verify SET duckdb.motherduck_token = ... GUC pattern; check pg_duckdb docs\n    for any driver compatibility notes\n  - Redshift: fallback path only (redshift-connector is preferred); psycopg3 is\n    wire-compatible with Redshift's pg-protocol endpoint\n\nStep 4 - Wheel availability check:\n  Confirm pre-built wheels exist for darwin-arm64, darwin-x86_64, linux-x86_64,\n  windows-amd64 in psycopg[binary] on PyPI (psycopg 3.1+ has all four).\n\nStep 5 - Check explorer pipeline consumption of psycopg2_version key:\n  grep -rn \"psycopg2_version\\|psycopg_version\" benchbox/core/explorer_pipeline/\n  Expected: no hits (key is platform metadata, not pipeline schema).\n  If found in models.py or transformer.py: expand scope_limit.only_modify to include\n  those files and coordinate the rename there, OR defer the key rename and leave\n  psycopg2_version unchanged post-migration. Do NOT proceed into w4 Change 4 without\n  resolving this.\n\nGATE PASS criteria:\n  - No selection rationale found that still applies\n  - All 5 platforms confirmed wire-compatible with psycopg3\n  - psycopg[binary] wheels confirmed for CI platforms\n  - psycopg2.extras confirmed vestigial (zero usage sites)\n  - psycopg2_version key confirmed absent from explorer pipeline schema (or scope expanded)\n\nIf any platform-specific blocker is found, stop and add it to deferred[] rather\nthan proceeding.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "RESEARCH GATE: verify psycopg2 selection rationale and psycopg3 wire-protocol compatibility for all 5 affected platforms before touching any code.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "notes": "1. No psycopg2 imports remain in shipped source:\n   grep -rn \"import psycopg2\\|from psycopg2\" benchbox/ scripts/ && echo \"FAIL: psycopg2 imports remain\" || echo \"OK: no psycopg2 imports\"\n\n2. copy_expert() removed:\n   grep -rn \"copy_expert\" benchbox/ && echo \"FAIL: copy_expert still present\" || echo \"OK: copy_expert gone\"\n\n3. psycopg[binary] declared, psycopg2-binary absent:\n   uv run -- python -c \"import tomllib, pathlib; text = pathlib.Path('pyproject.toml').read_text(); assert 'psycopg2-binary' not in text, 'psycopg2-binary still in pyproject.toml'; data = tomllib.loads(text); core = ' '.join(data['project']['dependencies']); assert 'psycopg' in core; print('OK: deps correct')\"\n\n4. psycopg3 importable and version >= 3.1:\n   uv run -- python -c \"import psycopg; v = tuple(int(x) for x in psycopg.__version__.split('.')[:2]); assert v >= (3,1), f'psycopg too old: {psycopg.__version__}'; print(f'OK: psycopg {psycopg.__version__}')\"\n\n5. Fast test suite:\n   uv run -- python -m pytest -m fast -q\n\n6. Full unit suite:\n   uv run -- python -m pytest tests/unit/ -q\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Full validation pass: grep for zero psycopg2 references, confirm copy_expert gone, verify dep declarations, run fast+unit test suites.",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "notes": "Lines to change in pyproject.toml:\n  112: \"psycopg2-binary>=2.9.0\"  →  \"psycopg[binary]>=3.1\"  (extras:all)\n  170: postgresql = [\"psycopg2-binary>=2.9.0\"]  →  postgresql = [\"psycopg[binary]>=3.1\"]\n  171: questdb = [\"psycopg2-binary>=2.9.0\", ...]  →  questdb = [\"psycopg[binary]>=3.1\", ...]\n  464: \"psycopg2-binary>=2.9.0\"  →  \"psycopg[binary]>=3.1\"  (dev group)\n\nUse psycopg[binary], NOT bare psycopg. The [binary] extra ships pre-compiled libpq -\nsame install model as psycopg2-binary. Bare psycopg requires a system libpq.\n\nAfter editing: uv lock\nVerify: uv run -- python -c \"import psycopg; print('psycopg', psycopg.__version__)\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update pyproject.toml: replace psycopg2-binary>=2.9.0 with psycopg[binary]>=3.1 at all 4 declaration sites (lines 112, 170, 171, 464). Run uv lock.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "notes": "Import block (lines 38-47):\n  Before:\n    try:\n        import psycopg2\n        from psycopg2 import sql as psql\n    except ImportError:\n        psycopg2 = None\n        psql = None\n  After:\n    try:\n        import psycopg\n        from psycopg import sql as psql\n    except ImportError:\n        psycopg = None\n        psql = None\n\nAll `psycopg2` identifier references throughout the file → `psycopg`.\n\nClass rename: `Psycopg2ConnectionMixin` → `PsycopgConnectionMixin` leaks the old version\nin the public class name. Rename it here and update all six subclass declarations\n(postgresql.py, timescaledb.py, questdb.py, pg_mooncake.py, pg_duckdb.py). All six\nsubclass files are in scope_limit.only_modify and are updated in this same migration -\nno backward-compat alias is needed.\n\nFile rename: psycopg2_mixin.py is NOT being renamed - only the class inside it.\nThe filename stays benchbox/platforms/base/psycopg2_mixin.py to minimize diff scope.\n\nVerify:\n  uv run -- python -c \"from benchbox.platforms.base.psycopg2_mixin import Psycopg2ConnectionMixin; print('OK')\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate psycopg2_mixin.py: rename import psycopg2 → psycopg, update sql alias, consider renaming Psycopg2ConnectionMixin to PsycopgConnectionMixin.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "notes": "Change 1 - Import block (lines 46-49): drop psycopg2.extras (vestigial per w1), rename:\n  try:\n      import psycopg\n  except ImportError:\n      psycopg = None\n\nChange 2 - All psycopg2.connect() call sites (~lines 269, 302, 335, 703):\n  psycopg2.connect(**params) → psycopg.connect(**params)\n  Connection parameter keys (host, port, dbname, user, password, sslmode,\n  connect_timeout, options) are identical in psycopg3 - no changes to param dict.\n\nChange 3 - COPY bulk load rewrite (lines 500 and 505):\n  cursor.copy_expert() does not exist in psycopg3. Replace with cursor.copy() context\n  manager. Both source paths open in text mode (mode=\"rt\" or encoding=\"utf-8\") so\n  chunk is str; psycopg3 copy.write() accepts str for text-format COPY.\n  Use 64KB chunk reads - NOT f.read() whole-file - to preserve memory profile for\n  large TPC-H data files (lineitem at SF>=1 can exceed available RAM).\n\n  Before (line 500, io.StringIO path):\n    cursor.copy_expert(\n        f\"COPY {qualified_table} FROM STDIN WITH (FORMAT csv, DELIMITER '{delimiter}')\",\n        data_buffer,\n    )\n  After:\n    with cursor.copy(\n        f\"COPY {qualified_table} FROM STDIN WITH (FORMAT csv, DELIMITER '{delimiter}')\"\n    ) as copy:\n        while chunk := data_buffer.read(65536):\n            copy.write(chunk)\n\n  Before (line 505, file object path):\n    cursor.copy_expert(\n        f\"COPY {qualified_table} FROM STDIN WITH (FORMAT csv, DELIMITER '{delimiter}')\",\n        f,\n    )\n  After:\n    with cursor.copy(\n        f\"COPY {qualified_table} FROM STDIN WITH (FORMAT csv, DELIMITER '{delimiter}')\"\n    ) as copy:\n        while chunk := f.read(65536):\n            copy.write(chunk)\n\nChange 4 - Version references (lines 694-695 and 807-808):\n  psycopg2.__version__ → psycopg.__version__\n  Key \"psycopg2_version\" in platform_info dict → \"psycopg_version\"\n  (Pipeline consumption was confirmed absent in w1 Step 5; proceed with rename.)\n\nChange 5 - All `if psycopg2:` guards → `if psycopg:`\n\nVerify:\n  uv run -- python -m pytest tests/unit/platforms/test_postgresql_adapter.py -q\n  uv run -- python -c \"from benchbox.platforms.postgresql import PostgreSQLPlatform; print('OK')\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate postgresql.py: rename imports, rewrite copy_expert() → cursor.copy() with 64KB streaming, update version key and guard checks.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "notes": "Import block (lines 37-42):\n  Before:\n    try:\n        import psycopg2\n        from psycopg2 import sql as psql\n    except ImportError:\n        psycopg2 = None\n        psql = None\n  After:\n    try:\n        import psycopg\n        from psycopg import sql as psql\n    except ImportError:\n        psycopg = None\n        psql = None\n\nThe psycopg.sql API (sql.SQL, sql.Identifier, sql.Literal, sql.Composed) is IDENTICAL\nto psycopg2.sql. All psql.* call sites (lines ~428, 450-463, 513-541, 575) require\nZERO changes beyond the import.\n\nAll psycopg2.connect() call sites → psycopg.connect()\nAll `if psycopg2:` guards → `if psycopg:`\nUpdate parent class reference if class was renamed in w3.\n\nVerify:\n  uv run -- python -c \"from benchbox.platforms.timescaledb import TimescaleDBPlatform; print('OK')\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate timescaledb.py: rename import psycopg2/sql → psycopg/sql. The psql alias and all sql.SQL/Identifier/Literal call sites are API-identical - zero logic changes.",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "notes": "questdb.py (lines 52-55): drop psycopg2.extras (vestigial per w1):\n  try:\n      import psycopg\n  except ImportError:\n      psycopg = None\n  All `psycopg2` references → `psycopg`. Update parent class if renamed in w3.\n\npg_mooncake.py (lines 37-41):\n  Before: import psycopg2; from psycopg2 import sql as psycopg2_sql\n  After:  import psycopg; from psycopg import sql as psycopg2_sql\n  Keep the `psycopg2_sql` alias name - it's internal-only and renaming adds diff\n  noise with no behavioral benefit (deferred to a follow-up cleanup pass).\n  Update guard: psycopg2 = None → psycopg = None\n\npg_duckdb.py (lines 34-38): same pattern as pg_mooncake.py.\n\nVerify:\n  uv run -- python -c \"from benchbox.platforms.questdb import QuestDBPlatform; from benchbox.platforms.pg_mooncake import PgMooncakePlatform; from benchbox.platforms.pg_duckdb import PgDuckDBPlatform; print('OK')\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate questdb.py, pg_mooncake.py, pg_duckdb.py in one commit: import renames only. Drop vestigial psycopg2.extras from questdb.py; keep psycopg2_sql alias in mooncake/duckdb files.",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "notes": "Nested import (lines 39-48):\n  Before:\n    try:\n        import redshift_connector\n    except ImportError:\n        try:\n            import psycopg2\n            redshift_connector = None\n        except ImportError:\n            psycopg2 = None\n            redshift_connector = None\n  After:\n    try:\n        import redshift_connector\n    except ImportError:\n        try:\n            import psycopg\n            redshift_connector = None\n        except ImportError:\n            psycopg = None\n            redshift_connector = None\n\nLine 776: psycopg2.connect(**connect_kwargs) → psycopg.connect(**connect_kwargs)\nLine 954: connection.autocommit = True - NO change needed (still writeable in psycopg3)\nAll psycopg2 guard checks in fallback branches → psycopg.\n\nVerify:\n  uv run -- python -c \"from benchbox.platforms.redshift import RedshiftPlatform; print('OK')\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate redshift.py fallback branch: rename psycopg2 → psycopg in the nested ImportError fallback only. Primary redshift-connector path is unchanged.",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "notes": "scripts/probe_mooncake_types.py (lines 444-456, 464):\n  import psycopg2 → import psycopg\n  psycopg2.connect(...) → psycopg.connect(...)\n\nscripts/benchmark_mooncake_migration.py (line 189):\n  from psycopg2 import sql → from psycopg import sql\n  Usage on line 191 (sql.SQL / sql.Identifier) - API identical, no changes needed.\n\nVerify:\n  uv run -- python -c \"import ast, pathlib; [ast.parse(p.read_text()) for p in pathlib.Path('scripts').glob('*.py')]; print('OK: scripts parse cleanly')\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate dev scripts: probe_mooncake_types.py and benchmark_mooncake_migration.py - import renames only, no logic changes.",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-psycopg2-to-psycopg3",
+        "notes": "tests/unit/platforms/test_postgresql_adapter.py (lines 26-32):\n  Before:\n    mock_psycopg2 = Mock()\n    mock_psycopg2.__version__ = \"2.9.9\"\n    mock_psycopg2.extras = Mock()\n    monkeypatch.setattr(postgresql_module, \"psycopg2\", mock_psycopg2)\n  After:\n    mock_psycopg = Mock()\n    mock_psycopg.__version__ = \"3.1.0\"\n    monkeypatch.setattr(postgresql_module, \"psycopg\", mock_psycopg)\n    (drop mock_psycopg.extras - extras import was removed from postgresql.py in w4)\n  Rename mock_psycopg2 → mock_psycopg throughout this file.\n\ntests/unit/platforms/test_psycopg2_mixin.py:\n  File is NOT being renamed (psycopg2_mixin.py source file was not renamed in w3).\n  Update the import: Psycopg2ConnectionMixin → PsycopgConnectionMixin.\n  Update any string literals used as patch targets to match the new class name.\n\ntests/unit/core/test_platform_registry.py (lines 110-113):\n  lib_spec dict: \"name\": \"psycopg2\" → \"name\": \"psycopg\"\n  \"import_name\": \"psycopg2\" → \"import_name\": \"psycopg\"\n  mock_import assertion: assert_called_once_with(\"psycopg2\") → (\"psycopg\")\n\ntests/integration/platforms/common.py (lines 2257-2270):\n  Stub exception classes use plain names (OperationalError, ProgrammingError) -\n  unaffected. Confirm no \"psycopg2\" string references remain after w4-w7 changes.\n\nVerify:\n  uv run -- python -m pytest tests/unit/platforms/ -q\n  uv run -- python -m pytest tests/unit/core/test_platform_registry.py -q\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update test mocks: retarget monkeypatch.setattr from psycopg2 → psycopg module name in 4 test files. Update version string from 2.9.9 → 3.1.0.",
+        "wid": "w9"
+      }
+    ]
+  }
+}

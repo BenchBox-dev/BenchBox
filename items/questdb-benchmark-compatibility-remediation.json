@@ -1,0 +1,442 @@
+{
+  "context": "Phase 1 (w1-w6): stabilize without any SQL rewriting. Gate the 6 benchmarks\nthat will always fail due to structural incompatibilities. Fix the 3 BenchBox\nadapter bugs (PK stripping, write_primitives path, tpcds_obt chunk size) so\nthat schema-failing benchmarks can load and the adapter bugs don't confuse\nfuture debugging.\n\nPhase 2 (w7-w13): expand SQL coverage via a dedicated dialect rewriter in\nquestdb_rewriter.py. Use SQLGlot AST (already a project dependency) for the\ncomma-JOIN rewrite - split across w8 (foundation, 2-table case) and w9\n(multi-way/aliased/nested cases) - and regex for the simpler rewrites in w10\n(INTERVAL, SUBSTRING, CTE column list). Wire the rewriter into\nQuestDBAdapter.execute_query() in w11 as the last pre-execution step.\n\nThe research gate (w1) is non-negotiable before writing any gating code (w2)\nso the mechanism fits the existing CLI architecture rather than introducing a\nnew pattern that diverges from how supports_dataframe is enforced.\n",
+  "description": "Systematic remediation of QuestDB benchmark failures uncovered by a live compatibility\naudit conducted on 2026-04-16 against QuestDB 9.3.4 (Docker, PostgreSQL wire protocol).\n\n## Audit findings (22 benchmarks tested)\n\n**CLEAN (8 benchmarks)** - No fixes needed:\n  tpcdi, ai_primitives, clickbench, h2odb, coffeeshop, amplab, nyctaxi, flightdata\n\n**BROKEN - SQL dialect (5 benchmarks)** - All queries fail due to comma-JOIN syntax:\n  tpch (22/22 fail), tpcds (99/99 fail), ssb (13/13 fail),\n  tpchavoc (220/220 fail - 10 iterations × 22 queries), tpch_skew (22/22 fail)\n  Root cause: QuestDB 9.3.4 does NOT support implicit comma-JOIN syntax\n  (FROM a, b WHERE a.x = b.y) despite docs claiming it works. Additionally\n  INTERVAL arithmetic (CAST(x AS DATE) + INTERVAL '…') fails; use dateadd().\n\n**SCHEMA FAIL (5 benchmarks)** - DDL rejected before any query runs:\n  metadata_primitives, joinorder, tsbs_devops, datavault, vector_search\n  Root causes:\n    - PRIMARY KEY constraints: `_strip_fk_constraints()` strips FK but NOT PK.\n      QuestDB rejects `PRIMARY KEY (col)` as \"unsupported column type: KEY\".\n      Affected: metadata_primitives, joinorder, tsbs_devops, datavault.\n    - VECTOR column type: QuestDB has no VECTOR type.\n      Affected: vector_search (schema stage fails immediately).\n\n**PARTIAL (1 benchmark)**:\n  read_primitives - 89/153 queries fail across runs. Failure categories:\n    - Correlated subqueries: outer-scope column references not resolved\n      (EXISTS, correlated IN, scalar subquery all fail)\n    - Type mismatch: `DECIMAL >` comparison fails with\n      \"there is no matching operator `>`\"\n    - GROUP BY strictness: expressions in SELECT not in GROUP BY\n    - SUBSTRING FROM/FOR syntax: \"dangling literal\"\n    - Unsupported functions: assorted gaps\n\n**BENCHBOX BUG (2 benchmarks)** - Adapter code bugs, not QuestDB SQL issues:\n  write_primitives: \"argument should be a str or an os.PathLike object where\n    __fspath__ returns a str, not 'list'\" during staging file load\n  tpcds_obt: \"Connection reset by peer\" during large parquet chunk load\n    (parquet file likely exceeds QuestDB REST API single-request limit)\n\n**DATA SETUP ISSUE (1 benchmark)**:\n  transaction_primitives - txn_orders, txn_lineitem, txn_customer tables created\n  but remain empty (0 rows). Validation halts execution before queries run.\n  Unclear whether data loading is not implemented for QuestDB or intentionally\n  deferred (txn_* tables are populated by the benchmark itself).\n\n## BenchBox bug fixed during audit\n`benchbox/platforms/base/sql_execution.py` - `execute_sql_query()` called\n`connection.cursor()` even when passed a pre-created psycopg2 cursor (produced\nby `_make_stream_cursor()` in the TPC-DS power-test path). Fixed 2026-04-16:\nnow checks `callable(getattr(connection, \"cursor\", None))` before creating a\ncursor, and only closes the cursor if it created it.\n\n## Remediation plan (two phases)\n\n**Phase 1** - stabilize the platform: disable always-failing benchmarks so\nstress test runs don't pollute results with predictable failures, fix the two\nBenchBox adapter bugs, and fix the PRIMARY KEY stripping so schema-failing\nbenchmarks can load data.\n\n**Phase 2** - expand coverage: implement a QuestDB-specific SQL dialect rewriter\nthat converts comma-JOIN syntax to explicit JOINs and rewrites INTERVAL\narithmetic to dateadd(), unblocking TPC-H, TPC-DS, SSB and their variants.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add the dialect rewriter as a new SQLGlot dialect",
+        "instead": "implement as a lightweight post-processing function, not a full dialect",
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "why": "QuestDB is not a supported SQLGlot target and the rewriter only covers ~4 patterns"
+      },
+      {
+        "dont": "gate write_primitives or tpcds_obt as permanently incompatible",
+        "instead": "fix the bugs in Phase 1 before deciding if they need gating",
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "why": "these are BenchBox adapter bugs, not QuestDB SQL limitations"
+      },
+      {
+        "dont": "implement the rewriter inside execute_sql_query() in sql_execution.py",
+        "instead": "put it in questdb.py or questdb_rewriter.py and call it only from QuestDBAdapter.execute_query()",
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "why": "that file is shared across all platforms"
+      },
+      {
+        "dont": "rewrite comma JOINs with regex",
+        "instead": "use SQLGlot AST traversal which understands query structure",
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "why": "TPC-DS has deeply nested and aliased subqueries where regex will produce incorrect SQL"
+      },
+      {
+        "dont": "strip ALL constraints blindly",
+        "instead": "(not specified)",
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "why": "datavault uses both FK and PK, and stripping them correctly (without altering column definitions) requires careful regex targeting the constraint clause, not the column list"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "questdb-benchmark-compatibility-remediation",
+        "id": 228,
+        "reason": "read_primitives is PARTIAL at ~58% pass rate, not 100% failure.\nCorrelated subqueries are a fundamental QuestDB limitation (outer-scope\ncolumn reference resolution not supported) - fixing requires either\nsubquery unnesting (complex AST transformation) or accepting the failure rate.\nDefer until Phase 2 rewriter is complete and the remaining failure rate is\nre-measured.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] superseded: Phase-2 rewriter (questdb_rewriter.py) landed but only does comma-JOIN; correlated-subquery unnesting is a fundamental QuestDB engine limit. Project accepts read_primitives PARTIAL ~58% as expected (not gated). AST-unnesting fix disproportionate; effectively resolved-by-acceptance.",
+        "summary": "Fix read_primitives correlated subquery failures"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "questdb-benchmark-compatibility-remediation",
+        "id": 229,
+        "reason": "QuestDB 9.3.4 has no VECTOR column type. If QuestDB adds vector support\nin a future version, the schema adapter will need updating. Tracking\nseparately from this item.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Explicitly conditional on QuestDB adding VECTOR column support upstream; QuestDB 9.3.4 still lacks it.",
+        "summary": "Enable vector_search via pgvector-compatible extension"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "questdb-benchmark-compatibility-remediation",
+        "id": 230,
+        "reason": "`there is no matching operator '>'` for DECIMAL comparison is a QuestDB\ntype-system limitation. Workaround requires explicit CASTs in query\nrewriter - defer until Phase 2 rewriter scope is clarified.\n",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: QuestDB DECIMAL comparison fix explicitly deferred until Phase 2 query-rewriter scope is clarified; no open item shows that scope decided.",
+        "summary": "Fix read_primitives type mismatch (DECIMAL > operator)"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Support",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All currently-passing benchmarks continue to pass: clickbench, h2odb, coffeeshop, amplab, nyctaxi, flightdata, tpcdi, ai_primitives",
+        "item_id": "questdb-benchmark-compatibility-remediation"
+      },
+      {
+        "behavior": "FK constraint stripping still works after PK stripping is added (datavault uses both)",
+        "item_id": "questdb-benchmark-compatibility-remediation"
+      },
+      {
+        "behavior": "No changes to non-QuestDB platform adapters - scope is strictly questdb.py, questdb_rewriter.py, sql_execution.py",
+        "item_id": "questdb-benchmark-compatibility-remediation"
+      },
+      {
+        "behavior": "QuestDB REST API loading continues working for all tables that currently load (TPC-H 8 tables)",
+        "item_id": "questdb-benchmark-compatibility-remediation"
+      },
+      {
+        "behavior": "execute_sql_query() fix from 2026-04-16 remains in place (cursor vs connection check)",
+        "item_id": "questdb-benchmark-compatibility-remediation"
+      },
+      {
+        "behavior": "read_primitives pass rate does not regress below current ~58% baseline",
+        "item_id": "questdb-benchmark-compatibility-remediation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "Any non-QuestDB platform adapter"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/ssb/"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpch/"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/connection_wrappers.py"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/questdb-benchmark-compatibility-remediation.yaml"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/sql_execution.py"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/questdb.py"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/questdb_rewriter.py"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "scripts/local_stress_test.sh"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_questdb_rewriter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run benchbox run --platform questdb --benchmark tpch --scale 0.01 --platform-option http_port=19000 2>&1 | grep -E 'incompatible|unsupported|gated'",
+        "description": "Phase 1: always-failing benchmarks gate cleanly",
+        "expected": "Clear error message stating tpch is incompatible with QuestDB pending Phase 2 dialect rewriter",
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox run --platform questdb --benchmark metadata_primitives --scale 1 --platform-option http_port=19000 --phases load 2>&1 | grep -E 'Schema|schema|error|Error'",
+        "description": "Phase 1: PK stripping fix allows metadata_primitives schema to load",
+        "expected": "No 'unsupported column type: KEY' errors; schema creates successfully",
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox run --platform questdb --benchmark clickbench --scale 1 --platform-option http_port=19000 --quiet 2>&1 | tail -3",
+        "description": "Phase 1: baseline clean benchmarks still pass",
+        "expected": "Benchmark completed: PASSED",
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox run --platform questdb --benchmark tpch --scale 0.1 --platform-option http_port=19000 --queries 1,6 2>&1 | grep -E 'FAILED|completed in'",
+        "description": "Phase 2: TPC-H Q1, Q6 pass after INTERVAL rewrite",
+        "expected": "Q1 and Q6 both complete without FAILED",
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox run --platform questdb --benchmark ssb --scale 0.1 --platform-option http_port=19000 2>&1 | tail -5",
+        "description": "Phase 2: SSB all 13 queries pass after comma-JOIN rewrite",
+        "expected": "Benchmark completed: PASSED (or high pass rate)",
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_questdb_rewriter.py -v",
+        "description": "Phase 2: Dialect rewriter unit tests pass",
+        "expected": "All tests pass - comma JOIN, INTERVAL, SUBSTRING, CTE column list rewrites verified",
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run benchbox run --platform questdb --benchmark h2odb --scale 1 --platform-option http_port=19000 --quiet 2>&1 | tail -3",
+        "description": "Phase 2: No regression on currently-clean benchmarks",
+        "expected": "Benchmark completed: PASSED",
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "needs_wid": "w10",
+        "wid": "w11"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "needs_wid": "w9",
+        "wid": "w11"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "needs_wid": "w11",
+        "wid": "w13"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "needs_wid": "w2",
+        "wid": "w13"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "notes": "Before gating broken benchmarks, confirm the correct mechanism exists or\ndesign the minimal one needed. Research questions:\n\n1. Does `benchmark_registry.py` or `platform_registry.py` already support\n   a per-platform `excluded_benchmarks` or `unsupported_benchmarks` list?\n   Search: `grep -n \"excluded\\|unsupported\\|incompatible\" benchbox/core/benchmark_registry.py`\n\n2. Does the CLI (`benchbox/cli/main.py`) enforce benchmark+platform\n   compatibility before starting a run? Trace the benchmark selection path\n   from argument parsing to execution to find the right insertion point.\n\n3. How does `supports_dataframe` enforcement work? Use it as the model:\n   find where it is checked and how the user-facing error/warning is emitted.\n   This is the pattern to follow for benchmark exclusions.\n\n4. Does `QuestDBAdapter` have a hook like `get_unsupported_benchmarks()` or\n   `validate_benchmark_selection(benchmark_name)` that can be called before\n   execution begins? Check `benchbox/platforms/base/__init__.py` for the\n   abstract method surface.\n\n5. What is the desired UX when a user runs a gated benchmark?\n   Options: hard error (refuse to run), warning + proceed, skip with note.\n   Confirm the right choice matches how `supports_dataframe` is handled.\n\nOutput of this work unit: a written decision (added as a note to w2) stating\nthe chosen mechanism, the file(s) to modify, and the specific insertion point.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Research gate - determine mechanism for disabling benchmarks per platform",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "notes": "These are regex-safe rewrites (syntactically fixed patterns).\n\n**INTERVAL rewrite**:\n  Pattern: `CAST('YYYY-MM-DD' AS DATE) [+|-] INTERVAL '\\d+' DAY`\n  Also: `timestamp_col [+|-] INTERVAL '\\d+' [DAY|MONTH|YEAR]`\n  Target: `dateadd('d', [+|-]N, CAST('YYYY-MM-DD' AS DATE))`\n  Unit map: DAY→'d', MONTH→'M', YEAR→'y'\n\n  TPC-H queries affected: Q1, Q4, Q6 (at minimum). Verify against all 22.\n\n**SUBSTRING rewrite**:\n  Pattern: `SUBSTRING(expr FROM start_int FOR length_int)`\n  Target: `substring(expr, start_int, length_int)`\n\n  Note: `FROM int` without `FOR` also exists - handle both forms.\n\n**CTE column list**:\n  Pattern: `WITH name (col1, col2, ...) AS (`\n  Target: `WITH name AS (`\n  Note: TPC-H Q15 uses the 15a.sql CTE variant; verify this actually hits.\n\nAdd to `tests/unit/platforms/test_questdb_rewriter.py`:\n  - Each pattern with boundary variants (leading space, newlines, trailing comma)\n  - Passthrough test for queries with none of these patterns\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement INTERVAL arithmetic and SUBSTRING FROM/FOR rewrites",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "notes": "Wire the rewriter into `QuestDBAdapter.execute_query()` as a pre-execution step.\nThe rewriter must be idempotent (safe to call on already-rewritten SQL).\n\nThen run TPC-H end-to-end and measure coverage improvement:\n  `uv run benchbox run --platform questdb --benchmark tpch \\\n    --scale 0.1 --platform-option http_port=19000`\n\nTarget: ≥18/22 queries succeed (Q15 and any remaining hard cases may need\nadditional rewrites). Document each still-failing query with its specific error.\n\nAlso validate SSB and tpch_skew (both use the same comma-JOIN pattern):\n  `uv run benchbox run --platform questdb --benchmark ssb \\\n    --scale 0.1 --platform-option http_port=19000`\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire dialect rewriter into QuestDB adapter and run full TPC-H validation",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "notes": "Ran sample: Q1,2,3,10,20,50,70,90 at SF1 (http_port=19000). Results: 3/8 pass (Q2, Q3, Q50).\nDuring validation, found and fixed three rewriter gaps:\n  - CTE bodies (exp.CTE) not traversed by find_all(Subquery)\n  - EXISTS predicates (exp.Exists) not traversed\n  - Mixed qualified+unqualified join predicates not matched by _is_join_pred_between\nAll three fixes were implemented and covered by unit tests.\n\nRemaining failures classified:\n  Q1:  B - correlated subquery referencing outer CTE alias (QuestDB limitation)\n  Q10: B - correlated EXISTS referencing outer query column (QuestDB limitation)\n  Q20: A/C - CAST(date) + integer arithmetic; SQLGlot adds \"AS days\" alias inside BETWEEN\n  Q70: B - ROLLUP/GROUPING SETS not supported; BETWEEN with arithmetic expression\n  Q90: C - compound join (web_sales, hd JOIN time_dim ON hd.col) - join predicate already\n           moved to explicit JOIN ON clause by SQLGlot; no WHERE predicate to promote\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full TPC-DS validation after dialect rewriter",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "notes": "Update `scripts/local_stress_test.sh` with a comment block documenting the\nQuestDB benchmark compatibility status so operators know which benchmarks to\nexpect to pass without running the full audit again.\n\nAdd a comment near the `questdb` entry in the platform lists documenting:\n  - CLEAN benchmarks (safe to run)\n  - GATED benchmarks (will fail fast with a clear error)\n  - PARTIAL benchmarks (read_primitives: expect ~58% pass rate)\n  - Not yet validated (anything uncovered)\n\nNo code changes needed - documentation only in the script header/comments.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update local_stress_test.sh with Phase 1 + Phase 2 gating information",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "notes": "Using the mechanism identified in w1, declare the following benchmarks as\nincompatible with QuestDB and surface a clear error/warning before any\nexecution starts:\n\nCOMMA_JOIN_BROKEN (100% query failure, not fixable without dialect rewriter):\n  tpch, tpcds, ssb, tpchavoc, tpch_skew\n\nSCHEMA_INCOMPATIBLE (DDL fails, fixable but not yet fixed in Phase 1):\n  vector_search - VECTOR column type, not fixable at all\n\nFor tpch/tpcds/ssb/tpchavoc/tpch_skew: gate should say \"requires Phase 2\ndialect rewriter (see questdb-benchmark-compatibility-remediation)\" so users\nknow work is underway, not abandoned.\n\nFor vector_search: gate should say \"QuestDB has no VECTOR column type\".\n\nDo NOT gate: metadata_primitives, joinorder, tsbs_devops, datavault -\nthese will be fixed in w3 (PK stripping) and should pass after that.\nDo NOT gate: write_primitives, tpcds_obt - these will be fixed in w4/w5.\nDo NOT gate: transaction_primitives - investigate in w6 first.\nDo NOT gate: read_primitives - PARTIAL is acceptable, not 100% failure.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Gate always-failing benchmarks in QuestDB adapter (prevents predictable failures)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "notes": "File: `benchbox/platforms/questdb.py`\n\nCurrent code (around line 481):\n  `self.log_verbose(\"Stripped foreign key constraints from CREATE TABLE (unsupported by QuestDB)\")`\n\nThe `_strip_fk_constraints()` method (or the equivalent inline DDL fixup)\nstrips FOREIGN KEY constraints but does NOT strip PRIMARY KEY constraints.\nQuestDB 9.3.4 DDL parser rejects `PRIMARY KEY (col)` with error:\n  `Schema statement failed: unsupported column type: KEY`\n\nFix: before executing any CREATE TABLE statement in QuestDB, apply a regex\nthat removes:\n  `, PRIMARY KEY (col_list)` - trailing PK clause\n  `, CONSTRAINT name PRIMARY KEY (col_list)` - named constraint form\nBoth single-column and multi-column variants must be handled.\n\nAfter the fix, these benchmarks should successfully create schema:\n  metadata_primitives, joinorder, tsbs_devops, datavault\n\nNote: datavault also has FK constraints - ensure FK stripping still works\nafter adding PK stripping. Run datavault schema load to verify.\n\nTest command (fast check):\n  `uv run benchbox run --platform questdb --benchmark metadata_primitives \\\n    --scale 1 --platform-option http_port=19000 --phases load`\nExpected: schema creates successfully (no \"unsupported column type: KEY\")\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix PRIMARY KEY stripping in QuestDB DDL handler",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "notes": "Error observed: \"argument should be a str or an os.PathLike object where\n__fspath__ returns a str, not 'list'\" during write_primitives staging file load.\n\nTrace: `uv run benchbox run --platform questdb --benchmark write_primitives\n  --scale 1 --platform-option http_port=19000 --force datagen -vv`\n\nThe error occurs after data generation succeeds (orders_stage.tbl and\nlineitem_stage.tbl are generated) during the REST API load of staging files.\n\nInvestigation: find the call site in `benchbox/platforms/questdb.py` where\nthe REST API load is invoked for write_primitives staging tables. Look for\nany place where a list is passed where a path string is expected.\nCompare with how TPC-H tables are loaded (those work correctly) to spot\nthe divergence.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix write_primitives adapter path bug in QuestDB",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "notes": "Error: \"Failed to load tpcds_sales_returns_obt chunk tpcds_sales_returns_obt.parquet:\n  ('Connection aborted.', ConnectionResetError(54, 'Connection reset by peer'))\"\n\nThe tpcds_obt benchmark uses a single wide OBT (One Big Table) derived from\nTPC-DS. The parquet chunk is likely too large for QuestDB's REST API to accept\nin a single /imp request (QuestDB has a default upload size limit).\n\nInvestigation path:\n  1. Check the parquet file size: `ls -lh benchmark_runs/datagen/tpcds_*/tpcds_sales_returns_obt.parquet`\n  2. Check QuestDB REST API upload limit (QDB_HTTP_MAX_RECV_BUF_SIZE env var,\n     default ~128MB). Review docker/questdb/docker-compose.yml - the env var\n     is not currently set.\n  3. Check `_load_table_via_rest_api()` in questdb.py for chunk size parameter.\n     Verify chunked upload is being used (not a single-shot request).\n\nFix options (in order of preference):\n  A. Add chunked CSV loading for large tables (split parquet → multiple CSV uploads)\n  B. Increase QDB_HTTP_MAX_RECV_BUF_SIZE in docker-compose.yml\n  C. Convert large parquet to CSV + use QuestDB's ILP or chunked REST\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix tpcds_obt parquet load ConnectionResetError in QuestDB",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "notes": "Observed: txn_orders, txn_lineitem, txn_customer tables exist (schema created)\nbut have 0 rows. Validation halts with \"Empty tables detected\".\n\nQuestions to resolve:\n  1. How does the transaction_primitives benchmark expect tables to be loaded?\n     Read `benchbox/core/transaction_primitives/` to understand data loading path.\n  2. Does any other platform successfully load transaction_primitives?\n     `uv run benchbox run --platform duckdb --benchmark transaction_primitives --scale 0.1`\n  3. Is this a QuestDB-specific loading gap or a BenchBox bug affecting all platforms?\n  4. If QuestDB-specific: add the missing load logic in the QuestDB adapter\n     (txn_* tables are TPC-H derived, so the data source exists).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Investigate and fix transaction_primitives data loading for QuestDB",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "notes": "Before implementing, design the rewriter so it is:\n  - Focused: only rewrites patterns actually needed for QuestDB compatibility\n  - Testable: each rewrite rule has a test with before/after SQL\n  - Non-destructive: doesn't silently alter query semantics\n  - Positioned correctly: runs after SQLGlot translation, before execution\n\nCurrent translation chain for TPC-H:\n  qgen template → _clean_sql() in queries.py → translate_sql_query()\n    (SQLGlot, netezza→postgres) → QuestDBAdapter.execute_query()\n\nThe rewriter should slot in after SQLGlot (which already handles some syntax\nconversion) as a QuestDB-specific post-processing step. Consider adding it\nas `_questdb_rewrite_sql(query: str) -> str` called inside\n`QuestDBAdapter.execute_query()` before delegation to `execute_sql_query()`.\n\nRewrites needed (in order of query coverage impact):\n\n1. **Comma JOIN → explicit JOIN** (blocks all 5 SQL benchmarks):\n   `FROM a, b, c WHERE a.x = b.x AND b.y = c.y`\n   → `FROM a JOIN b ON a.x = b.x JOIN c ON b.y = c.y`\n   This is structurally complex - subqueries, aliases, and multi-table\n   comma JOINs all need to be handled. Consider using SQLGlot's AST\n   (already a dependency) rather than regex. SQLGlot can parse the query,\n   walk the FROM clause, and emit explicit JOINs.\n\n2. **INTERVAL arithmetic → dateadd()** (blocks TPC-H Q1, Q4, Q6, Q17, etc.):\n   `CAST('1998-12-01' AS DATE) - INTERVAL '90' DAY`\n   → `dateadd('d', -90, CAST('1998-12-01' AS DATE))`\n   Pattern is consistent - regex is sufficient.\n\n3. **SUBSTRING FROM/FOR → substring(str, pos, len)** (blocks TPC-H Q22):\n   `SUBSTRING(col FROM 1 FOR 2)` → `substring(col, 1, 2)`\n\n4. **CTE column list** (blocks TPC-H Q15 - already using 15a.sql variant):\n   `WITH name (col1, col2) AS (…)` → `WITH name AS (…)`\n   (column list is optional syntax that QuestDB doesn't support)\n\nVerify which SQLGlot 25.x dialect handles automatically - don't reimplement\nwhat SQLGlot already does. Check: `sqlglot.transpile(sql, read='postgres', write='questdb')`\n\nDeliverable: design doc comment in a new `benchbox/platforms/questdb_rewriter.py`\nfile listing all rewrite rules, their test cases, and the SQLGlot approach\nfor comma-JOIN expansion.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Design QuestDB SQL dialect rewriter architecture",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "notes": "Foundation slice - get the AST walking framework working on the simplest case.\nSplit from original w8 to keep the work unit within the 1-4 hour target.\n\nImplementation:\n  1. Parse query with `sqlglot.parse_one(query, dialect='postgres')`\n  2. Walk all FROM clauses looking for comma-separated table references\n     (SQLGlot AST node: `From` with multiple `Table` children)\n  3. For the 2-table case: extract the single equality predicate from WHERE\n     that references both tables, split remaining predicates as true filters,\n     reconstruct as a single JOIN … ON node\n  4. Re-emit with `sqlglot.generate(ast, dialect='postgres')`\n  5. Verify passthrough: queries without comma JOINs emit unchanged\n\nTest fixtures (create in `tests/unit/platforms/test_questdb_rewriter.py`):\n  - Single 2-table comma JOIN (TPC-H Q20 simplified form)\n  - Unaliased tables: `FROM lineitem, part WHERE l_partkey = p_partkey`\n  - No comma JOIN (verify passthrough, no AST rewrite)\n  - Filter + join predicate in same WHERE (verify split)\n\nDeferred to w9: multi-way joins, aliased tables, mixed explicit+implicit,\nsubqueries in FROM.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement comma-JOIN AST walker and 2-table rewrite (SQLGlot foundation)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-benchmark-compatibility-remediation",
+        "notes": "Builds on the w8 foundation to handle the harder cases TPC-H and TPC-DS\nactually produce.\n\nCases to handle (add one at a time, test after each):\n  - Multi-way joins: FROM a, b, c with three equality predicates\n    (TPC-H Q9 has 6-table comma JOIN)\n  - Aliased tables: FROM lineitem l, part p WHERE l.l_partkey = p.p_partkey\n  - Mixed explicit+implicit: FROM a JOIN b ON … , c WHERE c.x = b.y\n  - Subqueries in FROM with aliases\n  - Nested: WHERE clause of an outer query contains a subquery that itself\n    has comma JOINs - recurse into subqueries during AST walk\n\nJoin-order heuristic: when multiple join predicates exist, the rewriter\nmust pick an ordering that keeps each JOIN connected to already-joined\ntables. Use a simple greedy walk (start with first table, join each\nsubsequent table via whichever predicate connects it to the current set).\n\nAdditional test fixtures:\n  - 3-table comma JOIN (TPC-H Q9)\n  - 6-table comma JOIN (TPC-H Q9 full)\n  - Aliased tables in TPC-DS form\n  - Mixed explicit + implicit JOIN\n  - Subquery containing comma JOIN\n  - Nested comma JOINs (outer + subquery)\n\nVerify against live QuestDB after each fixture passes the unit test.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend comma-JOIN rewriter to multi-way joins, aliases, and subqueries",
+        "wid": "w9"
+      }
+    ]
+  }
+}

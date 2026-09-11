@@ -1,0 +1,85 @@
+{
+  "context": "Query the active git branch at the start of `cleanup()` inside `todo_cli.py`. If it matches `develop` or `main`, and `dry_run` is False, abort execution before staging or committing any files.\n",
+  "description": "The `todo_cli.py cleanup` command validates and automatically commits local TODO/DONE files.\nHowever, it lacks branch safeguards, allowing direct commits on long-lived branches (like `develop` and `main`)\neven when run inside the main clone. Durable commits in BenchBox require that all changes go through a\nworktree branch and be submitted as a PR to `develop`.\n\nThis TODO adds a branch safety gate inside `todo_cli.py cleanup` to abort execution when a non-dry-run cleanup is triggered directly on `develop` or `main`.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bypass branch checks using environment overrides or flags within the CLI",
+        "instead": "(not specified)",
+        "item_id": "guard-todo-cleanup-direct-commits",
+        "why": "keep the safeguard simple and strict."
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-05-30T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not affect `--dry-run` behavior. Dry-running cleanup on any branch should always be allowed for read-only validation checks.",
+        "item_id": "guard-todo-cleanup-direct-commits"
+      },
+      {
+        "behavior": "Keep output messages clear and helpful to instruct developers to claim a worktree.",
+        "item_id": "guard-todo-cleanup-direct-commits"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "guard-todo-cleanup-direct-commits",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/guard-todo-cleanup-direct-commits.yaml"
+      },
+      {
+        "item_id": "guard-todo-cleanup-direct-commits",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_cli.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py -q -k cleanup && _project/scripts/todo audit verify",
+        "description": "Legacy cleanup is unavailable and current tracker integrity remains valid",
+        "expected": "focused wrapper test passes and audit chain is valid",
+        "item_id": "guard-todo-cleanup-direct-commits",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "guard-todo-cleanup-direct-commits",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "guard-todo-cleanup-direct-commits",
+        "notes": "Modify `cleanup` method in `_project/scripts/todo_cli.py` to:\n  1. Detect the current branch name (using `git rev-parse --abbrev-ref HEAD`).\n  2. If the current branch is `develop` or `main` and `dry_run` is False, print a clear, helpful error and raise SystemExit(1).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add branch safety assertions in todo_cli.py cleanup",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "guard-todo-cleanup-direct-commits",
+        "notes": "Verify that:\n  - Running cleanup with `--dry-run` on any branch still works correctly.\n  - Running cleanup (real) on a feature/chore branch works correctly.\n  - Running cleanup (real) on `develop` or `main` is blocked and returns a non-zero exit code.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify the safety gate locally",
+        "wid": "w2"
+      }
+    ]
+  }
+}

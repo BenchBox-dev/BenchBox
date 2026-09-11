@@ -1,0 +1,405 @@
+{
+  "context": "Use wave-by-wave, file-targeted unit tests first, refactoring production code\nonly when required for testability. For each wave:\n  1) identify exact uncovered branches from term-missing output,\n  2) add focused tests in tests/unit matching existing patterns,\n  3) run targeted pytest selection,\n  4) run coverage-per-file and record deltas.\nFavor mocks/fakes over integration setup. Keep each wave independently\ncommittable with explicit module-level coverage deltas.\n",
+  "description": "Coverage snapshot from coverage.json (generated 2026-02-09) still shows 75\nbenchbox/*.py modules below 50% line coverage. This TODO defines a detailed,\nwave-based implementation plan to bring each of those modules to >=50% while\npreserving fast, deterministic unit-test execution.\n\nPlanning basis:\n  - Source report: coverage.json + scripts/check_per_file_coverage.py\n  - Current low-water marks include 0%-20% in reporting/query helpers,\n    TPC-DS/TPC-H dataframe query modules, legacy ETL modules, and selected\n    CLI/platform adapters.\n\nCompletion target:\n  - No benchbox/*.py module below 50% in the standard coverage-per-file run\n  - keep per-module gate reproducible in CI/local\n  - preserve existing CLI/platform behavior",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add broad deferred exclusions",
+        "instead": "either test or refactor for testability",
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "why": "this repeats temporary-split debt"
+      },
+      {
+        "dont": "add slow/live integration tests for coverage points",
+        "instead": "use deterministic unit tests",
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "why": "CI must stay fast/offline"
+      },
+      {
+        "dont": "assert exact SQL formatting when intent-level checks suffice",
+        "instead": "assert structure and behavior",
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "why": "formatting churn creates flaky tests"
+      },
+      {
+        "dont": "lower thresholds or weaken the checker",
+        "instead": "close missing branches with tests",
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "why": "that hides quality gaps"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "coverage-below-50-modules-wave-plan",
+        "id": 128,
+        "reason": "Goal is full closure of currently below-50 modules, not further scope deferral",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: This is a negative scope note ('do not add new deferred entries in this campaign'), not an actionable deferred task.",
+        "summary": "Do not add new permanent deferred coverage list entries in this campaign"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-02-10T00:00:00Z",
+      "created_at": "2026-02-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Current CLI command contracts, option names, and help output semantics remain unchanged",
+        "item_id": "coverage-below-50-modules-wave-plan"
+      },
+      {
+        "behavior": "Existing fast/unit suite remains deterministic and does not require cloud credentials",
+        "item_id": "coverage-below-50-modules-wave-plan"
+      },
+      {
+        "behavior": "No destructive changes to benchmark query semantics or result schemas",
+        "item_id": "coverage-below-50-modules-wave-plan"
+      },
+      {
+        "behavior": "TPC-DI SQL/DataFrame ETL parity and adapter behavior remain intact",
+        "item_id": "coverage-below-50-modules-wave-plan"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "kind": "do_not_modify",
+        "path_glob": "_binaries/"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "kind": "only_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "kind": "only_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit -m fast --tb=short",
+        "description": "Targeted module wave tests pass",
+        "expected": "0 failures",
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make coverage-per-file",
+        "description": "Per-file coverage gate passes with no module below 50%",
+        "expected": "No active-scope files below threshold",
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make ci-test",
+        "description": "CI-oriented fast checks still green",
+        "expected": "all configured checks pass",
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w5",
+        "wid": "w10"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w8",
+        "wid": "w10"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w6",
+        "wid": "w11"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w7",
+        "wid": "w11"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w8",
+        "wid": "w11"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w10",
+        "wid": "w12"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w9",
+        "wid": "w12"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w12",
+        "wid": "w13"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w13",
+        "wid": "w14"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Generate canonical backlog artifact of all <50% modules from coverage.json",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wave H: TPC-DS/TPC-H large dataframe query modules and reporting modules to >=50%",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wave I: remaining analytics/concurrency/cloud-storage low modules to >=50%",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full make coverage-per-file and capture zero-failure report artifact",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Address stragglers from final run, commit by wave, and keep per-wave before/after module snapshots",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Close TODO when all modules reach >=50%, validate TODO metadata, and move to DONE",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Classify backlog into effort tiers: tiny (<120 stmts), medium (120-400), large (>400)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wave A: lift tiny 0%-20% helper/entry files to >=50% with focused import+error-path tests",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wave B: lift tiny 20%-49% files (results/runner/query parser helpers) with branch-targeted tests",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wave C: core benchmark wrappers (amplab/ssb/h2odb/clickbench/nyctaxi) to >=50%",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wave D: CLI low-coverage commands (results/run/plot/exceptions) to >=50%",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wave E: platform adapters below 50% (fabric_warehouse, influxdb client/setup, redshift, databricks, bigquery, clickhouse workload)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wave F: metadata/read/write primitives modules below 50%",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-below-50-modules-wave-plan",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wave G: TPC-DI low modules (etl pipeline/batch/transformations/source_generators/scd + remaining generators) to >=50%",
+        "wid": "w9"
+      }
+    ]
+  }
+}

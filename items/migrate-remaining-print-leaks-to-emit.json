@@ -1,0 +1,706 @@
+{
+  "context": "For each work unit:\n1. Read each file in the cluster to identify all raw print() call sites.\n2. For each site, replace print(\"...\") with emit(\"...\") - the signatures are\n   identical for simple string output.\n3. For f-string or multi-arg print() calls, preserve formatting: emit() accepts\n   any Rich renderable or plain string, so f-strings pass through unchanged.\n4. Add `from benchbox.utils.printing import emit` to the imports if not present.\n   Remove any now-unused imports (e.g., `from rich.console import Console` if\n   the Console instance was only used for print-equivalent calls).\n5. After completing the cluster, remove those file paths from _PENDING_MIGRATION\n   in tests/unit/cli/test_output_control_static.py.\n6. Run the static guardrail test to confirm: `uv run -- python -m pytest\n   tests/unit/cli/test_output_control_static.py -v`.\n7. Commit the cluster migration + _PENDING_MIGRATION removal atomically.\n\nImportant notes:\n- Some files may use print() for debug/development output that should simply\n  be removed rather than migrated (e.g., worker_pool_examples.py which is\n  example/demo code). Evaluate each site: if it's debug output with no\n  user-facing value, delete it; if it's user-facing status, migrate to emit().\n- Tuning generators (w8) likely use print() for DDL output that users pipe to\n  files.  These may need emit() with appropriate formatting, or may need a\n  separate stdout-clean path.  Read each generator before deciding.\n- TPC-DI worker_pool_examples.py is almost certainly example/demo code; its\n  print() calls may be intentional and should be evaluated for removal vs migration.\n",
+  "description": "The centralize-output-control effort (completed 2026-02-18) migrated the high-traffic\nCLI/core/TPC-DS/MCP paths to emit() and added a global ratchet test that prevents new\nprint() leaks.  However, the ratchet discovered 68 pre-existing files that were out of\nscope for that effort and placed in _PENDING_MIGRATION.\n\nThis TODO drives the migration of all 68 files, subsystem by subsystem, until\n_PENDING_MIGRATION is empty and the global guardrail covers the entire codebase.\n\nFiles are grouped into 12 work units by subsystem to keep each session focused:\n  w1  - utils layer         (5 files)\n  w2  - CLI help            (1 file)\n  w3  - analysis + comparison  (5 files)\n  w4  - cost + misc core    (8 files)\n  w5  - dataframe cluster   (5 files)\n  w6  - TPC-DI cluster      (7 files)\n  w7  - TPC-DS misc + TPC-H skew  (5 files)\n  w8  - tuning generators   (11 files)\n  w9  - publishing cluster  (4 files)\n  w10 - monitoring cluster  (5 files)\n  w11 - platforms cluster   (8 files)\n  w12 - release + primitives                (4 files)\n  w13 - remove all entries from _PENDING_MIGRATION, verify clean\n\nAfter w13 the ratchet test enforces zero tolerance automatically - no future\nmaintenance required.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add silence_output() wrappers to cover print() calls",
+        "instead": "replace the print() calls directly",
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "why": "silence_output() is an MCP boundary tool, not a migration shortcut"
+      },
+      {
+        "dont": "batch-replace all print() calls blindly",
+        "instead": "read each file and decide per site",
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "why": "some files use print() for intentional stdout output (DDL generators, examples)"
+      },
+      {
+        "dont": "forget to remove migrated files from _PENDING_MIGRATION",
+        "instead": "remove each file from the set as part of the same commit",
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "why": "test_pending_migration_set_contains_no_stale_entries will fail if you don't"
+      },
+      {
+        "dont": "use Console() directly in migrated files",
+        "instead": "use emit() for plain output, or get_console() / quiet_console if Rich renderables are needed",
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "why": "that bypasses quiet-mode control"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-18T00:00:00Z",
+      "created_at": "2026-02-18T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "MCP server stdout remains reserved for JSON-RPC messages only - migrated files must not re-introduce print() on MCP code paths",
+        "item_id": "migrate-remaining-print-leaks-to-emit"
+      },
+      {
+        "behavior": "benchbox run --quiet produces no user-visible stdout/stderr output while still returning correct exit codes",
+        "item_id": "migrate-remaining-print-leaks-to-emit"
+      },
+      {
+        "behavior": "emit() quiet-mode suppression: when set_quiet(True) is active, no output should reach stdout from any migrated file",
+        "item_id": "migrate-remaining-print-leaks-to-emit"
+      },
+      {
+        "behavior": "test_no_new_raw_print_in_benchbox_runtime continues to pass throughout the migration",
+        "item_id": "migrate-remaining-print-leaks-to-emit"
+      },
+      {
+        "behavior": "test_pending_migration_set_contains_no_stale_entries passes after each work unit (remove migrated files from the set)",
+        "item_id": "migrate-remaining-print-leaks-to-emit"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "do_not_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/shared.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/config_utils.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/display.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/benchmark/"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tpcds/generator/"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/utils/printing.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/help.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/ai_primitives/dataframe_operations.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/__init__.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/comparison.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/insights.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/ranking.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/comparison/suite.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/cost/optimizer.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/cost/tco.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/capabilities.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/profiling.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/tuning/__init__.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/tuning/loader.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/validation.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/joinorder/queries.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/metadata_primitives/benchmark.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/pg_extension_comparison.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/publishing/__init__.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/publishing/artifacts.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/publishing/permalink.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/publishing/publisher.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/normalizer.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpc_validation.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/etl/batch.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/generator/facts.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/metrics.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/queries.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/specification_validator.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/validation.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/worker_pool_examples.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/dist_parser.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/reporting.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch_skew/benchmark.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transaction_primitives/dataframe_operations.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/ddl_generator.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/azure_synapse.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/bigquery.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/clickhouse.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/duckdb.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/firebolt.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/postgresql.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/redshift.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/snowflake.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/spark_family.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/trino.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/upload_validation.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/monitoring/__init__.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/monitoring/bottleneck.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/monitoring/performance.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/monitoring/profiler.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/monitoring/report.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/aws/glue_adapter.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/cloud_spark/session.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/cloud_spark/staging.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/workload.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/expression_family.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/pandas_family.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/release/content_validation.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/release/sync.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/tpch_skew.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/tpchavoc.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/compression_mixin.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/data_validation.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/dependency_validation.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/resource_limits.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "benchbox/utils/timeout_manager.py"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_output_control_static.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_output_control_static.py -v",
+        "description": "Static print-leak guardrail passes after each work unit",
+        "expected": "all 3 tests pass, 0 failures",
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_quiet_mode.py tests/unit/mcp/test_mcp_benchmark_stdout_suppression.py -v",
+        "description": "Quiet-mode unit tests still pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Full fast test suite passes",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_output_control_static.py -v",
+        "description": "_PENDING_MIGRATION is empty after w13 (stale-entry test passes trivially on empty set)",
+        "expected": "3 passed, 0 failed",
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "needs_wid": "w1",
+        "wid": "w13"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "needs_wid": "w10",
+        "wid": "w13"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "needs_wid": "w11",
+        "wid": "w13"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "needs_wid": "w12",
+        "wid": "w13"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "needs_wid": "w2",
+        "wid": "w13"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "needs_wid": "w3",
+        "wid": "w13"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "needs_wid": "w4",
+        "wid": "w13"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "needs_wid": "w5",
+        "wid": "w13"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "needs_wid": "w6",
+        "wid": "w13"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "needs_wid": "w7",
+        "wid": "w13"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "needs_wid": "w8",
+        "wid": "w13"
+      },
+      {
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "needs_wid": "w9",
+        "wid": "w13"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate utils layer: compression_mixin, data_validation, dependency_validation, resource_limits, timeout_manager (5 files)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate monitoring cluster: monitoring/__init__, bottleneck, performance, profiler, report (5 files)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate platforms cluster: aws/glue_adapter, base/cloud_spark/session+staging, bigquery, clickhouse/workload, dataframe/expression_family+pandas_family, duckdb (8 files)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate release + top-level + primitives: release/content_validation, release/sync + ai_primitives/dataframe_operations, transaction_primitives/dataframe_operations (4 files)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove all 68 entries from _PENDING_MIGRATION in test_output_control_static.py, run full static test suite to confirm zero violations",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate CLI help: benchbox/cli/help.py (1 file)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate analysis cluster: core/analysis/__init__, comparison, insights, ranking + core/comparison/suite (5 files)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate cost + misc core: core/cost/optimizer, tco + core/joinorder/queries, metadata_primitives/benchmark, pg_extension_comparison, results/normalizer, tpc_validation, upload_validation (8 files)",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate dataframe cluster: core/dataframe/capabilities, profiling, tuning/__init__, tuning/loader, validation (5 files)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "notes": "worker_pool_examples.py is example/demo code - evaluate each print() site for delete vs migrate rather than blanket replacement",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate TPC-DI cluster: core/tpcdi/etl/batch, generator/facts, metrics, queries, specification_validator, validation, worker_pool_examples (7 files)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate TPC-DS misc + TPC-H skew: core/tpcds/dist_parser, reporting + core/tpch_skew/benchmark + benchbox/tpch_skew.py, benchbox/tpchavoc.py (5 files)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "notes": "DDL generators may use print() to emit SQL that users pipe to files - read each generator before migrating; stdout-destined DDL output may need a dedicated --output flag rather than emit()",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate tuning generators: core/tuning/ddl_generator + generators for azure_synapse, bigquery, clickhouse, duckdb, firebolt, postgresql, redshift, snowflake, spark_family, trino (11 files)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-print-leaks-to-emit",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate publishing cluster: core/publishing/__init__, artifacts, permalink, publisher (4 files)",
+        "wid": "w9"
+      }
+    ]
+  }
+}

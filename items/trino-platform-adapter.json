@@ -1,0 +1,11 @@
+{
+  "description": "Implement Trino platform adapter to support the most popular open-source distributed SQL query engine (20K+ GitHub stars, used by Netflix, Airbnb, Lyft).",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2025-11-28T00:00:00Z",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "platform-expansion-trino"
+    }
+  }
+}

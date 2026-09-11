@@ -1,0 +1,315 @@
+{
+  "context": "Treat this as a contract-first workflow change. Document the release-required\nguarantee, implement the minimal workflow jobs to enforce it for `main` PRs,\nthen add fast workflow-shape tests. Keep the ruleset update explicit because\nGitHub rulesets are external state.\n",
+  "description": "Current release confidence depends on `main` PR rules that require lint plus\nthe fast `test` job. Non-fast suites are optional, scheduled, post-merge, or\nmanual. The release review concluded that this is not enough for a meaningful\nrelease guarantee.\n\nThis TODO defines and wires the minimum mandatory release contract for\nrelease branches accepted by `validate-main-pr.yml` targeting `main`. The\ncontract must be explicit, named, auditable from the repository, and suitable\nfor GitHub ruleset enforcement.\n\nTarget guarantee after completion:\n  - Release PRs from branches matching the `validate-main-pr.yml` release\n    regex cannot merge unless the fast test lane, the explicitly named\n    integration-not-slow suite (`tests/integration -m \"integration and not\n    slow and not stress\"`), dependency bounds, package build/install smoke,\n    and release curation checks have passed on the PR branch.\n  - The required check name is stable and documented for the\n    `main-release-only` ruleset.\n  - Optional/advisory lanes remain visible but are not confused with the\n    release-required contract.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "claim live ruleset enforcement unless the implementer verified or updated the live GitHub ruleset.",
+        "instead": "(not specified)",
+        "item_id": "release-required-main-pr-test-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "count push-to-main integration as pre-release evidence",
+        "instead": "(not specified)",
+        "item_id": "release-required-main-pr-test-contract",
+        "why": "`release-finalize` tags before it can complete."
+      },
+      {
+        "dont": "require many unstable matrix job names in the ruleset if a single aggregator can preserve a stable context.",
+        "instead": "(not specified)",
+        "item_id": "release-required-main-pr-test-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use the `run-integration` label as the release mechanism",
+        "instead": "use the release branch pattern.",
+        "item_id": "release-required-main-pr-test-contract",
+        "why": "labels are manual discipline, not enforcement"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "release-required-main-pr-test-contract",
+        "id": 467,
+        "reason": "Out of scope for the first mandatory release contract; handle with canary/ruleset drift TODO and explicit cloud-credential policy.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Make all live cloud and stress suites release-blocking"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "needs_item": "release-test-command-ratchet-alignment"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-05-25T00:00:00Z",
+      "created_at": "2026-05-25T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Develop PR path-aware `ci-required-result` behavior remains unchanged unless explicitly modified by a separate TODO.",
+        "item_id": "release-required-main-pr-test-contract"
+      },
+      {
+        "behavior": "GitHub Pages/docs workflows are not accidentally added to the release-required contract unless explicitly justified.",
+        "item_id": "release-required-main-pr-test-contract"
+      },
+      {
+        "behavior": "Post-publish `release.yml` still publishes from tags and still runs install smoke after publication.",
+        "item_id": "release-required-main-pr-test-contract"
+      },
+      {
+        "behavior": "Release branches remain the only allowed PR source for `main` as enforced by `validate-main-pr.yml`.",
+        "item_id": "release-required-main-pr-test-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/pr.yml:ci-required-result — reuse aggregator pattern for a stable required check",
+        "decision": "reuse",
+        "item_id": "release-required-main-pr-test-contract",
+        "path": ".github/workflows/pr.yml:ci-required-result"
+      },
+      {
+        "concept": ".github/workflows/release.yml:test-installation — reuse post-publish smoke intent but move PR-time install smoke before publication",
+        "decision": "reuse",
+        "item_id": "release-required-main-pr-test-contract",
+        "path": ".github/workflows/release.yml:test-installation"
+      },
+      {
+        "concept": ".github/workflows/test.yml:integration — extend existing integration job instead of adding duplicate integration commands",
+        "decision": "extend",
+        "item_id": "release-required-main-pr-test-contract",
+        "path": ".github/workflows/test.yml:integration"
+      },
+      {
+        "concept": "docs/operations/repo-admin-settings.md:branch ruleset runbook — extend as the repository-visible ruleset source of truth",
+        "decision": "extend",
+        "item_id": "release-required-main-pr-test-contract",
+        "path": "docs/operations/repo-admin-settings.md:branch"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "kind": "only_modify",
+        "path_glob": ".github/RELEASE_PR_TEMPLATE.md"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/validate-main-pr.yml"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/release-required-main-pr-test-contract.yaml"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/release-guide.md"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/repo-admin-settings.md"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_release_infrastructure.py"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_release_infrastructure.py tests/unit/workflows/test_pr_workflow_path_classifier.py -q\n",
+        "description": "Workflow/ruleset contract tests pass",
+        "expected": "all tests pass",
+        "item_id": "release-required-main-pr-test-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python - <<'PY'\nfrom pathlib import Path\nimport yaml\nfor file in ['.github/workflows/test.yml', '.github/workflows/release.yml', '.github/workflows/validate-main-pr.yml']:\n    yaml.safe_load(Path(file).read_text())\nprint('workflow yaml ok')\nPY\n",
+        "description": "Release workflow YAML parses",
+        "expected": "workflow yaml ok",
+        "item_id": "release-required-main-pr-test-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "for file in docs/operations/release-guide.md docs/operations/repo-admin-settings.md .github/RELEASE_PR_TEMPLATE.md; do grep -q \"release-required-result\" \"$file\" || exit 1; done\n",
+        "description": "Release docs mention the required check context",
+        "expected": "release-required-result is present in every release operations surface",
+        "item_id": "release-required-main-pr-test-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/release-required-main-pr-test-contract.yaml\n",
+        "description": "TODO graph remains valid",
+        "expected": "exit 0",
+        "item_id": "release-required-main-pr-test-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "release-required-main-pr-test-contract",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "release-required-main-pr-test-contract",
+        "notes": "Capture raw output under `/tmp/release-required-main-pr-w0/` and commit\nonly a compact summary in the PR body or TODO notes.\n\nRequired commands:\n  - `git status --short --branch`\n  - `grep -n \\\"name:\\\\|pull_request:\\\\|push:\\\\|integration:\\\\|test-package:\\\\|test (ubuntu\\\" .github/workflows/test.yml`\n  - `grep -n \\\"ruleset\\\\|main-release-only\\\\|Required status\\\" docs/operations/repo-admin-settings.md docs/operations/release-guide.md Makefile`\n  - `uv run -- python -m pytest tests/unit/test_release_infrastructure.py -q`\n\nOptional live verification, if the implementer has `gh` auth and the\nuser authorizes checking live admin state:\n  - `gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | {id, name, target}'`\n  - Inspect the main ruleset required status contexts and record only the\n    compact context list.\n\nDecision gate:\n  - If live ruleset state differs from the local runbook, update the\n    runbook and PR body before changing required check names.\n  - If live ruleset inspection is unavailable, proceed with repository\n    workflow changes but leave ruleset update as an explicit manual\n    action in the PR checklist.\n\nImplementation evidence, 2026-05-25 on branch\n`todo/release-required-main-pr-contract`:\n  - `test.yml` still label-gated full integration with `run-integration`\n    before this change.\n  - Local runbook/docs still described `main-release-only` as lint/test\n    based before this change.\n  - Live ruleset inspection/update was not performed in this batch; the\n    repository runbook now records the exact required contexts and a\n    manual verification command.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate current main PR workflow and documented ruleset assumptions",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-required-main-pr-test-contract",
+        "notes": "Update the maintainer release docs to name the exact pre-merge release\nguarantee and the exact check context the main ruleset must require.\n\nRequired content:\n  - What a successful release PR guarantees.\n  - What it still does NOT guarantee (live cloud credentials, stress\n    suites, long-running UAT unless separately invoked).\n  - Required check context name, for example `release-required-result`.\n  - Manual ruleset update steps if the check context changes.\n\nDecision gate:\n  - Do not edit `.github/workflows/test.yml` until the contract text\n    exists. The workflow should implement the documented contract, not\n    invent it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the release-required contract in docs before changing workflow logic",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-required-main-pr-test-contract",
+        "notes": "Change `.github/workflows/test.yml` so the `integration` job runs for\nevery PR targeting `main`, in addition to existing push-to-main behavior.\nThis workflow already only receives `pull_request` events for `main`, and\n`validate-main-pr.yml` owns the exact release-branch regex. Do not add a\nsecond approximate release-branch matcher here.\n\nCandidate condition:\n  `github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'main')`.\n\nDecision gate:\n  - If main PR volume makes running integration on every main PR too\n    expensive, first extract a single reusable release-branch classifier\n    from `validate-main-pr.yml`; do not use a broad `startsWith('v')`\n    approximation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Force integration-not-slow to run on release PRs without relying on a label",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-required-main-pr-test-contract",
+        "notes": "Add an always-running aggregator in `.github/workflows/test.yml` for PRs\ntargeting `main`. It must fail unless all release-required jobs succeeded\nor, for jobs intentionally out of scope, were skipped for a documented\nreason.\n\nMinimum required inputs:\n  - `test (ubuntu-latest, 3.12)` fast job\n  - release PR integration job from w2\n  - package build/install job\n  - dependency bounds / curation checks, either by reusing existing jobs\n    or adding a small release-readiness job in the same workflow\n\nDecision gate:\n  - Do not make `release-required-result` depend on jobs from another\n    workflow; GitHub Actions cannot express cross-workflow `needs`.\n    Duplicate or move the release-readiness checks into this workflow if\n    they must be aggregated.\n  - Prefer one stable required context over requiring many individual job\n    names in the GitHub ruleset. If individual contexts are selected\n    instead, update `repo-admin-settings.md` with every exact context.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a stable `release-required-result` aggregator job for main PRs",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-required-main-pr-test-contract",
+        "notes": "The current tag workflow publishes before cross-platform install smoke.\nFor PR-time release confidence, add or reuse a package smoke job that:\n  - builds exactly one wheel from the PR branch,\n  - installs it from a temp cwd with `uv run --isolated --no-project --with <wheel>`,\n  - imports `benchbox` and runs `benchbox --help`,\n  - does not use the project checkout as import fallback.\n\nDecision gate:\n  - Do not rely on post-publish `release.yml:test-installation` as a\n    pre-release gate. It remains useful as post-publish verification but\n    cannot block publication.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move pre-publish wheel install smoke before publication in the release contract",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-required-main-pr-test-contract",
+        "notes": "Add or update fast tests proving:\n  - main PRs accepted by the `validate-main-pr.yml` release regex trigger\n    integration without a label,\n  - `release-required-result` aggregates the intended jobs,\n  - release PR documentation names the same required context as the\n    workflow,\n  - `release.yml` still has no pytest and remains a publish workflow, not\n    the pre-release correctness gate.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update tests that assert release workflow and ruleset contract shape",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-required-main-pr-test-contract",
+        "notes": "Update `docs/operations/repo-admin-settings.md` so main ruleset state is\nno longer opaque:\n  - exact ruleset name,\n  - required status contexts,\n  - strict-base setting,\n  - bypass actors,\n  - verification command.\n\nIf the user authorizes live admin changes, update the ruleset to require\n`release-required-result` and record the compact before/after context list.\nIf not authorized, leave a precise manual checklist and do not claim the\nrelease gate is enforced live.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document and, if authorized, verify the main ruleset update",
+        "wid": "w6"
+      }
+    ]
+  }
+}

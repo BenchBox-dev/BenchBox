@@ -1,0 +1,10 @@
+{
+  "description": "Automated pipeline to publish results to cloud storage, generate permalinks,\nand manage benchmark artifacts.",
+  "legacy": {
+    "item_meta": {
+      "category": "Supporting Infrastructure",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "infrastructure-publishing"
+    }
+  }
+}

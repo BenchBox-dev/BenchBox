@@ -1,0 +1,244 @@
+{
+  "context": "Run each cloud verification in its own work unit / PR — failures on\none engine shouldn't block the others. For each engine: get creds\nset up, run the supported sketch-op set, observe results, reconcile any\ndiscrepancies, commit the corrected overrides and per-engine\ntolerance bounds.\n\nTolerance bounds may need to be re-tuned per engine — this is the\nsame methodology used in the original PR #112 w5 (empirical\nobservation + wide-enough-to-not-false-fail, tight-enough-to-catch-\nno-op). Document the engine name alongside the observed value in\nthe inline comment.\n\nFunction-signature corrections are landing-blockers for that engine\n(the override is wrong if it doesn't run); document them prominently\nin the PR.\n",
+  "description": "## BLOCKED — additional finding 2026-05-02 (PR #133, PR #134)\n\nThis TODO is blocked on TWO things, only one of which is the\noriginally-stated cloud-credential gap:\n\n**(1) Cloud credentials still missing** — the original blocker.\nSnowflake / BigQuery / Databricks / Redshift creds have not become\navailable locally yet.\n\n**(2) validation_query no-per-platform-override architectural gap.**\nSurfaced during the ClickHouse implementation attempt 2026-05-02:\n\n  - `_project/blind-spots/2026-05-02-155448-validation-query-no-per-platform-override.md`\n\nThe existing 3 ★ headline sketch ops use DuckDB-only `datasketch_*`\nsyntax in their `validation_query` bodies. Even when cloud creds\narrive, the cloud `write_sql` overrides will succeed on the cloud\nengines — but the validation_query that runs immediately after will\nraise an \"unknown function\" exception because the DuckDB sketch\nfunction names don't exist on Snowflake / BigQuery / Databricks /\nRedshift. The op will be marked FAILED despite the persist+merge\nhaving actually worked. Cloud verification cannot give a clean\nsignal until validation_query supports per-platform overrides.\n\nPer-engine scope additions also needed:\n\n  - **Redshift**: PR #134 added 4 HLL-substitution overrides for\n    Redshift (DDL, theta-style insert, theta-style merge, drop).\n    These weren't in the original cloud-verification scope but\n    should be picked up here when creds become available.\n    Tolerance bounds for the merged HLL distinct estimate were\n    authored against DataSketches Theta and may need re-tuning to\n    absorb HLL++ bias — see PR #134 description for the\n    conservative starting bounds.\n  - **ClickHouse Cloud / Snowflake**: same fix-class TODO that\n    unblocks the validation_query gap will also unblock the\n    ClickHouse-native `-State`/`-Merge` overrides (TODO\n    `write-primitives-sketch-clickhouse-and-storage-metrics`),\n    and that TODO's overrides should land before this one runs\n    end-to-end on ClickHouse Cloud.\n\nResolution path:\n  1. Fix-class TODO for validation_query.platform_overrides lands.\n  2. Cloud creds for at least one of the four cloud engines\n     become available.\n  3. This TODO runs on each available engine, expanding to cover\n     Redshift's new HLL ops and (once their TODO lands)\n     ClickHouse-native variants.\n\n## Original description\n\nThe merged write_primitives sketch category shipped with\n`platform_overrides` for Snowflake, BigQuery, and Databricks\nwritten from documented function names but **never executed against\nreal cloud engines**. Cloud credentials weren't available locally\nduring the original implementation, and the hard-block protocol\npermitted DuckDB-with-extension coverage as the merge-test\nacceptance criterion.\n\nThis TODO is the verification follow-up: when cloud credentials\nbecome available, run each sketch op against each cloud engine and\nreconcile any discrepancies between the documented function names\n/ signatures and the actual engine behavior.\n\nImplicitly **blocked on credential availability** — this is not\nready-to-implement until BenchBox has working credentials for at\nleast one of Snowflake / BigQuery / Databricks. Captured here so the\nfollow-up is tracked and the verification plan is preserved.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle multi-engine verification into a single PR",
+        "instead": "one PR per engine, each with its own w1/w2/w3 work unit.",
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "why": "failures on one engine should not block the others"
+      },
+      {
+        "dont": "keep DuckDB-derived expected_value bounds for cloud engines that produce meaningfully different estimates",
+        "instead": "re-tune per engine and document the per-engine values inline.",
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "why": "that would false-fail healthy cloud sketches"
+      },
+      {
+        "dont": "loosen DuckDB bounds to accommodate cloud bias",
+        "instead": "keep DuckDB bounds tight and add per-engine bounds as separate annotations.",
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "why": "DuckDB's tighter bounds are a real correctness signal"
+      },
+      {
+        "dont": "silently drop overrides that fail",
+        "instead": "fix the override or remove it with a documented `# verified missing on $engine` comment.",
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "why": "the failure indicates a function-signature drift that future readers should know about"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "needs_item": "write-primitives-architecture-fixes"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "imported from YAML status: Blocked",
+      "category": "Verification",
+      "created_at": "2026-05-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ClickHouse sketch ops (added by `write-primitives-sketch-clickhouse-and-storage-metrics` if landed first) continue to pass — cloud verification doesn't touch ClickHouse.",
+        "item_id": "write-primitives-sketch-cloud-verification"
+      },
+      {
+        "behavior": "Existing DuckDB sketch ops continue to pass with their current scalar-bounds validation contracts (cloud-tuning re-tunes per-engine bounds, not the DuckDB ones).",
+        "item_id": "write-primitives-sketch-cloud-verification"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/"
+      },
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/schema.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/write-primitives-sketch-functions.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- benchbox run --platform snowflake --benchmark write_primitives --scale 0.01 --queries sketch_ddl_create_persistent_table,sketch_insert_theta_per_partition,sketch_insert_kll_per_partition,sketch_insert_topk_per_shard,sketch_query_theta_union_merge,sketch_query_kll_quantiles_merge,sketch_query_topk_combine,sketch_drop_persistent_table",
+        "description": "Snowflake: 8 sketch ops execute end-to-end with engine-tuned tolerance bounds",
+        "expected": "8/8 pass; per-engine bounds enforced",
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform bigquery --benchmark write_primitives --scale 0.01 --queries sketch_ddl_create_persistent_table,sketch_insert_theta_per_partition,sketch_insert_kll_per_partition,sketch_query_theta_union_merge,sketch_query_kll_quantiles_merge,sketch_drop_persistent_table",
+        "description": "BigQuery: 6 sketch ops execute (skip topk pair which is null on bigquery)",
+        "expected": "6/6 pass",
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform databricks --benchmark write_primitives --scale 0.01 --queries sketch_ddl_create_persistent_table,sketch_insert_theta_per_partition,sketch_insert_kll_per_partition,sketch_insert_topk_per_shard,sketch_query_theta_union_merge,sketch_query_kll_quantiles_merge,sketch_query_topk_combine,sketch_drop_persistent_table",
+        "description": "Databricks: 8 sketch ops execute end-to-end on a small DBR",
+        "expected": "8/8 pass (or topk ops skip cleanly if DBR < Spark 4.1)",
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform redshift --benchmark write_primitives --scale 0.01 --queries sketch_ddl_create_persistent_table,sketch_insert_theta_per_partition,sketch_query_theta_union_merge,sketch_drop_persistent_table",
+        "description": "Redshift: 4 HLL-substitution sketch ops execute end-to-end",
+        "expected": "4/4 pass; merged HLL estimate within Redshift-tuned bounds",
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "notes": "Run sketch ops on a small Snowflake warehouse (XS or smaller is\nfine for SF=0.01). Confirm 8/8 pass with the existing override\nSQL. If DATASKETCHES_THETA_* function names diverge from current\nSnowflake docs, update the override and document the corrected\nsignature in the cross-platform doc.\n\nCritical-path checks:\n  - APPROX_TOP_K_ACCUMULATE(l_shipmode, 1024) produces a sketch\n    that combines correctly via APPROX_TOP_K_COMBINE.\n  - DATASKETCHES_THETA_ACCUMULATE handles the INTEGER cast for\n    l_extendedprice without precision loss.\n  - kll_sketch_agg's quantile-estimate handles the merged\n    sketch correctly (Snowflake uses different KLL bindings\n    than the C++ DataSketches library).\n\nOutput: per-op result JSON committed somewhere appropriate\n(or summarised in the PR description); inline tolerance comments\nupdated with Snowflake observations.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Snowflake: live verification of all 8 sketch ops; reconcile any function-signature discrepancies",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "notes": "Run 6 sketch ops (skip the 2 topk ops which have `bigquery: null`)\non a real BigQuery project. Confirm HLL_COUNT.INIT / .MERGE\nsemantics produce the expected distinct count via the persist+\nmerge loop.\n\nCritical-path checks:\n  - HLL_COUNT.INIT(x) produces a BYTES sketch that round-trips\n    through table storage.\n  - HLL_COUNT.MERGE(sketch_column) implicitly merges across rows\n    (no separate ACCUMULATE step needed in BigQuery — verify\n    this matches our override structure).\n  - KLL_QUANTILES.INIT_INT64 + MERGE_POINT_INT64 produces the\n    expected median for l_extendedprice (note the INT64 cast —\n    may lose decimal precision; confirm the median is still\n    meaningful).\n\nAlso revisit: is there actually a top-K accumulator in BigQuery\nthat we missed? APPROX_TOP_COUNT is documented as one-shot, but\ncheck for any newer functions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "BigQuery: live verification of 6 sketch ops (skip topk pair); confirm HLL substitution behavior",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "notes": "Run sketch ops on a small Databricks warehouse / SQL endpoint\n/ cluster. Critical-path checks:\n  - theta_sketch_agg vs hll_sketch_agg: Databricks' DataSketches\n    integration may default to one or the other; confirm the\n    override matches the function actually available in the\n    target DBR.\n  - approx_top_k_accumulate availability depends on DBR Spark\n    version; if DBR is < Spark 4.1 equivalent, the topk ops will\n    fail with \"function not found\" — guard with a runtime\n    version check or accept the fail and skip.\n  - Photon path: are sketch UDAFs Photonised? If not, expect\n    slower latency than the SQL claims would suggest.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Databricks: live verification of all 8 sketch ops on Databricks Runtime",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "notes": "Run the 4 Redshift HLL-substitution ops added by PR #134:\n\n  - sketch_ddl_create_persistent_table\n  - sketch_insert_theta_per_partition\n  - sketch_query_theta_union_merge\n  - sketch_drop_persistent_table\n\nCritical-path checks:\n  - HLL_CREATE_SKETCH returns HLLSKETCH values that persist to\n    table storage and merge via HLL_COMBINE.\n  - HLL_CARDINALITY(HLL_COMBINE(...)) lands inside the tightened\n    starting tolerance [14500, 15500] for SF=0.01's 15000\n    distinct l_orderkeys, or the bounds are re-tuned with\n    observed live values documented inline.\n  - HLLSKETCH columns are not used as DISTKEY / SORTKEY, and do\n    not appear in GROUP BY / ORDER BY / DISTINCT positions.\n\nOutput: Redshift runtime version, driver version, observed HLL\ncardinality, and any DDL restriction drift documented in\noperations.yaml comments and the cross-platform sketch doc.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Redshift: live verification of 4 HLL-substitution sketch ops",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "notes": "For each engine that completed verification, append a one-line\ncomment to its platform_overrides block noting the runtime\nversion and date verified (e.g. \"# Snowflake: verified\n2026-MM-DD against driver 3.x.y, function names confirmed\").\n\nThis makes future regressions easier to triage — if an op breaks\nafter a Snowflake driver upgrade, the comment shows when it\nlast worked.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update operations.yaml inline comments with verified-against-runtime-version notes",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "notes": "Replace the current \"untested cloud overrides\" footnote in\n`docs/benchmarks/write-primitives-sketch-functions.md` with a\nper-engine status: which engines verified, which dates, which\nfunction-name discrepancies were corrected, which expected_value\nbounds were re-tuned per engine.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update cross-platform sketch docs per-engine verification matrix",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-cloud-verification",
+        "notes": "Terse user-facing bullet:\n\"write_primitives sketch: verified against {Snowflake,\nBigQuery, Databricks, Redshift} in cloud — reconciled function-signature\ndrift and re-tuned expected_value bounds per engine. See docs.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add changelog entry under unreleased",
+        "wid": "w7"
+      }
+    ]
+  }
+}

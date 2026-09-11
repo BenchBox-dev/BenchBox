@@ -1,0 +1,10 @@
+{
+  "description": "Promoted from deferral #137 of cross-surface-oracle-remediation.\nDeferred: A dedicated DTYPE-asserting cross-surface gate cell (compare each loaded column's dtype, not just its values, against the SQL reference).\nReason deferred: Additive enhancement beyond w6's acceptance and M4's core concern (which is resolved: the gate drives the real production loader and already caught the TEXT->null / TIMESTAMP->string dtype bugs via value comparison). Designing an acceptable cross-engine dtype-equivalence map is a separable piece.",
+  "legacy": {
+    "item_meta": {
+      "blocked_reason": "Underspecified follow-up: no work units, scope, verification ladder, or accepted cross-engine dtype-equivalence policy exists. Do not invent a dtype map or duplicate the completed value-parity gate; reopen with an explicit contract and independent reference policy.",
+      "created_at": "2026-07-19T12:34:04Z",
+      "worktree": "main"
+    }
+  }
+}

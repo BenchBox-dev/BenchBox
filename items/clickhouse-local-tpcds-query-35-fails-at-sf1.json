@@ -1,0 +1,120 @@
+{
+  "context": "Run TPC-DS query 35 alone against ClickHouse Local at SF1 and capture the engine error. Decide whether it needs a sql_compat rewrite rule, a dialect translation fix, or is an upstream chDB limitation to document. If it is genuinely unsupported, record it as a known incompatibility rather than leaving the platform silently absent from the TPC-DS cohort.",
+  "description": "Found 2026-08-17 while assembling a TPC-DS cohort. Bundle tpcds_sf1_clickhouse_local_sql_20260813_184214_7bbbfc5c reports summary.queries = {passed: 306, failed: 3, total: 309} and summary.validation = 'partial'. All three failures are the same query - id 35 - failing on each of its 3 iterations; every other TPC-DS query passes. scripts/validate_submission.py correctly refuses the bundle ('summary.validation must be passed for public submissions, got partial'), so ClickHouse Local cannot join the published TPC-DS cohort until query 35 works. This is a genuine SQL-compatibility gap, not a validation artifact, and it is distinct from the two existing ClickHouse items: uat-clickhouse-server-query-compatibility concerns ClickHouse SERVER error routing, and uat-clickhouse-tpcds-sf001-runtime-performance concerns a runtime cap at SF0.01. Neither covers a query failure on ClickHouse LOCAL at SF1.\n\nRECONCILED 2026-08-23: PR #1840 merged into develop at 4dd4673af5. The documented ClickHouse Local limitation path is now integrated: Q35 translation succeeds, but chDB still fails at the 8 GiB local envelope. Work unit w3 (clean SF1 cohort validation) remains unverified; preserve open deferral #719 and do not mark this TODO complete.\n\nREVALIDATED 2026-09-04. Do not steal the live claim held by joe@joe-mac-mini.local. Public bundle results-data/bundles/tpcds_sf1_clickhouse_local_sql_20260826_112830_c250741b.json has summary.validation=passed, queries passed 309/309, and query 35 SUCCESS on warmup plus three measurement iterations (52.0/52.7/43.8/48.0 ms). ClickHouseAdapter.KNOWN_INCOMPATIBLE_QUERIES['tpcds'] is [14, 30, 81] and tests/unit/platforms/test_clickhouse_adapter.py asserts 35 is not listed. Live corpus tpcds SF1 includes ClickHouse Local (7 identities). The 2026-08-23 blocked reason is stale relative to this bundle. Claim holder should progress or finish w3 against this evidence; this topic will not take the claim.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-23T14:37:32Z",
+        "from_item": "clickhouse-local-tpcds-query-35-fails-at-sf1",
+        "id": 719,
+        "reason": "The required full-cohort verification reproduced 306/309 passed with TPC-DS Q35 failing at chDBs 8 GiB MEMORY_LIMIT_EXCEEDED ceiling. PR #1840 documents and pins the limitation; w3 remains unresolved until Q35 is optimized, the local memory envelope is raised, or the upstream engine behavior changes.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Documented the Q35 known incompatibility, but the clean SF1 cohort remains deferred"
+      }
+    ],
+    "item_meta": {
+      "category": "platform",
+      "claim_token": "011c7fccf689b69a3568ed39baa31806",
+      "claimed_at": "2026-08-23T14:24:05Z",
+      "claimed_branch": "develop",
+      "claimed_by": "joe@joe-mac-mini.local",
+      "claimed_worktree": "/Users/joe/Developer/BenchBox",
+      "created_at": "2026-08-18T21:32:39Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "clickhouse-local-tpcds-query-35-fails-at-sf1",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/**"
+      },
+      {
+        "item_id": "clickhouse-local-tpcds-query-35-fails-at-sf1",
+        "kind": "only_modify",
+        "path_glob": "benchbox/sql_compat/**"
+      },
+      {
+        "item_id": "clickhouse-local-tpcds-query-35-fails-at-sf1",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "PYTHONPATH=. \"$PWD/.venv/bin/pytest\" -n 0 tests/unit/platforms/test_clickhouse_adapter.py -q",
+        "description": "Known ClickHouse Local Q35 memory limitation remains documented and pinned",
+        "expected": "passed",
+        "item_id": "clickhouse-local-tpcds-query-35-fails-at-sf1",
+        "last_result": "pass",
+        "last_run": "2026-08-23T14:36:27Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-local-tpcds-query-35-fails-at-sf1",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "clickhouse-local-tpcds-query-35-fails-at-sf1",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "clickhouse-local-tpcds-query-35-fails-at-sf1",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated /Users/joe/Developer/benchmark_runs/results/tpcds_sf1_clickhouse_local_sql_20260813_184214_7bbbfc5c.json: query 35 fails with ClickHouse Code 241 MEMORY_LIMIT_EXCEEDED at the 8.00 GiB chDB limit; translation status is success and the bundle reports 306/309 passed with validation partial.",
+        "item_id": "clickhouse-local-tpcds-query-35-fails-at-sf1",
+        "notes": null,
+        "started_at": "2026-08-23T14:26:11Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Revalidate",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Failure classification: generated SQL translation completed successfully; the reproducible failure is chDB/ClickHouse local resource exhaustion on TPC-DS Q35 at the configured 8 GiB memory ceiling, not a dialect translation or sql_compat defect.",
+        "item_id": "clickhouse-local-tpcds-query-35-fails-at-sf1",
+        "notes": null,
+        "started_at": "2026-08-23T14:26:16Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Classify the failure - dialect translation, sql_compat rule, or upstream limitation",
+        "wid": "w1"
+      },
+      {
+        "evidence": "benchbox/platforms/clickhouse/adapter.py documents Q35 as a ClickHouse Local SF1 memory limitation and pins it in tests/unit/platforms/test_clickhouse_adapter.py; verification seq 4 passed (88 tests). Live seq 3 reproduced the limitation: 306/309 passed and Q35 hit MEMORY_LIMIT_EXCEEDED at 8 GiB.",
+        "item_id": "clickhouse-local-tpcds-query-35-fails-at-sf1",
+        "notes": null,
+        "started_at": "2026-08-23T14:26:22Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Fix it, or document it as a known incompatibility with a test pinning the behaviour",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-local-tpcds-query-35-fails-at-sf1",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Re-run the full TPC-DS cohort on ClickHouse Local and confirm validation=passed",
+        "wid": "w3"
+      }
+    ]
+  }
+}

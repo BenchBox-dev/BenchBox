@@ -1,0 +1,10 @@
+{
+  "description": "Add advanced features for power users: enhanced visualization, automated\nquery insights from plans, historical trend analysis, and plan-based\nrecommendations. These are P3 features for future enhancement.\n\n**Nice-to-Have Features** (not critical for production):\n- Interactive plan visualization\n- Automated anti-pattern detection\n- Query complexity scoring\n- Plan-based optimization suggestions\n- Time-series plan evolution tracking\n- Integration with external tools",
+  "legacy": {
+    "item_meta": {
+      "category": "Enhancement",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-remediation"
+    }
+  }
+}

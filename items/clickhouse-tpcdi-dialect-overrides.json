@@ -1,0 +1,132 @@
+{
+  "description": "21/114 query failures on ClickHouse in TPC-DI benchmark across 7 unique queries:\n- AQ6: SUM(SUM(x)) OVER () nested window aggregate unsupported in ClickHouse\n- AQ7, AQ8, AQ10: JULIANDAY() SQLite function not portable\n- EQ7: FROM (VALUES (0)) not supported in ClickHouse FROM clause\n- EQ3: Double-nested COUNT scalar subquery (always returns 1, not actual count)\n\nFixes applied:\n- AQ6: Full query override with CROSS JOIN pre-computed grand total\n- AQ7/AQ8/AQ10: JULIANDAY(x)-JULIANDAY(y) → dateDiff('day', y, x), DATE('now') → today()\n- EQ7: FROM VALUES (N) AS alias → FROM (SELECT N) AS alias (post-SQLGlot regex)\n- EQ3: Flatten double-nested COUNT(*) FROM (SELECT COUNT(*) ...) (pre-SQLGlot regex)\n\nKey insight: JULIANDAY replacements applied AFTER SQLGlot translation because SQLGlot\nreorders dateDiff() argument order when parsing from netezza dialect.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "apply JULIANDAY→dateDiff before SQLGlot translation",
+        "instead": "apply after SQLGlot",
+        "item_id": "clickhouse-tpcdi-dialect-overrides",
+        "why": "SQLGlot reorders dateDiff() arguments"
+      },
+      {
+        "dont": "modify the base query_analytics.py queries",
+        "instead": "create ClickHouse overrides instead",
+        "item_id": "clickhouse-tpcdi-dialect-overrides",
+        "why": "other platforms use them correctly"
+      },
+      {
+        "dont": "use JULIANDAY() in ClickHouse overrides",
+        "instead": "use dateDiff('day', ...) instead",
+        "item_id": "clickhouse-tpcdi-dialect-overrides",
+        "why": "it is a SQLite-only function"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-04-08T00:00:00Z",
+      "created_at": "2026-04-08T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "Base query_analytics.py queries unchanged - other platforms use standard SQL JULIANDAY/NULLIF/FILTER syntax",
+        "item_id": "clickhouse-tpcdi-dialect-overrides"
+      },
+      {
+        "behavior": "Override queries return identical column names, types, and row semantics",
+        "item_id": "clickhouse-tpcdi-dialect-overrides"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tpcdi/test_tpcdi_clickhouse_overrides.py -v",
+        "description": "ClickHouse TPC-DI overrides load and use native syntax",
+        "expected": "11 passed",
+        "item_id": "clickhouse-tpcdi-dialect-overrides",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-tpcdi-dialect-overrides",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "clickhouse-tpcdi-dialect-overrides",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "clickhouse-tpcdi-dialect-overrides",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "clickhouse-tpcdi-dialect-overrides",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "clickhouse-tpcdi-dialect-overrides",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create ClickHouse overrides for AQ7, AQ8, AQ10 - replace JULIANDAY/DATE('now') with dateDiff/today()",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-tpcdi-dialect-overrides",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create ClickHouse override for AQ5 - rewrite NULLIF inside aggregates to if() expressions",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-tpcdi-dialect-overrides",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create ClickHouse override for AQ6 - replace SUM(SUM()) OVER () with CROSS JOIN total",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-tpcdi-dialect-overrides",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Investigate and create ClickHouse overrides for EQ3, EQ7 - VALUES and double-nested COUNT",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "clickhouse-tpcdi-dialect-overrides",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify all overrides load and pass syntax validation",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,155 @@
+{
+  "context": "Group 1 needs a decision before code: does BenchBox claim Windows support for the MCP durable-job surface? pyproject declares no Operating System classifier and the README references Windows only for installation. If yes, debug the job lifecycle on Windows -- the ExceptionGroup at jobs.py:771 is the entry point. If no, scope those tests to POSIX with the reason recorded, the way PR #1853 did for the make-target tests. Group 2 needs a Windows box or a self-hosted runner; until then leave both failing rather than skipping blind.",
+  "description": "MEASURED 2026-08-24 from nightly run 32684255652 (workflow_dispatch on develop). 18 of 24 jobs pass. PR #1858 addresses two of the six failures (ubuntu-3.10 tomllib, scheduled-workflow-liveness). These three remain, all Windows:\n\n  test (windows-latest, 3.10)\n  test (windows-latest, 3.12)\n  integration-smoke (windows-latest, 3.12)\n\nGROUP 1 -- MCP durable jobs, the only genuinely product-facing part. Seven tests across tests/integration/mcp/test_durable_jobs.py, tests/integration/mcp/test_multiworker_acceptance.py and tests/unit/mcp/test_durable_jobs.py. Jobs never reach 'completed': assertions read 'queued' == 'completed' or 'failed' == 'completed', with an ExceptionGroup at benchbox/mcp/jobs.py:771. One test additionally hits MCPError(-32004, 'Request rate limit exceeded'). This is shipped-product behaviour on a platform the README documents for install, so it needs a decision, not a skip.\n\nGROUP 2 -- two failures I deliberately did NOT touch in PR #1853 because they are not honestly diagnosable from a log without a Windows machine:\n  tests/unit/scripts/test_check_makefile_inventory.py::test_semantic_assignment_reorder_fails_and_changes_gnu_make_evaluation -- AttributeError: 'NoneType' object has no attribute 'splitlines'. subprocess.run there uses capture_output=True and text=True, which should guarantee a str, so the cause is not visible from the message alone.\n  tests/unit/scripts/test_check_release_curation.py::test_curated_release_removes_dangling_project_test_and_runs_retained_tests -- a PytestBenchmarkWarning about xdist surfacing as a failure.\n\nGuessing at either from a log line is how a skip lands on a test that would have passed, which is the mistake PR #1853 was written to avoid.\n\nBlocks nightly-red-blocks-release-evidence w4 (consecutive green runs), which blocks w5 (the committed UAT evidence release-guide.md requires for v0.4.0).",
+  "legacy": {
+    "item_meta": {
+      "category": "ci",
+      "completed_at": "2026-08-25T00:33:28Z",
+      "completed_pr": 1887,
+      "created_at": "2026-08-24T12:15:01Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": ".gitattributes"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_configuration_guidance.py"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/runner/test_clickhouse_load_failure.py"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_durable_jobs.py"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_check_makefile_inventory.py"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_check_release_curation.py"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_worktree_identity.py"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/utils/test_bundled_tpc_checksums.py"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/test_validate_submission_changed_bundles.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "gh workflow run nightly.yml --ref develop",
+        "description": "Nightly Windows jobs pass",
+        "expected": "test (windows-latest, 3.10 and 3.12) and integration-smoke (windows-latest, 3.12) all green",
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "last_result": "pass",
+        "last_run": "2026-08-25T00:33:27Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "DECISION 2026-08-25: MCP durable-job surface claims Windows support. Nightly explicitly runs the unit and integration surfaces on windows-latest (3.10 and 3.12) and the feature has no Windows exclusion. Handoff diagnoses the durable flush failure (os.open directory) and rate-limit polling as product defects, not platform limits. Fix Windows rather than scoping tests away. Recorded in PR fix/windows-nightly-portability.",
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "notes": null,
+        "started_at": "2026-08-25T00:19:57Z",
+        "started_branch": "fix/windows-nightly-portability",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-windows-nightly-portability",
+        "status": "done",
+        "summary": "DECISION GATE - decide whether the MCP durable-job surface claims Windows support, and record the reason",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1887 ba448ae: Windows MCP durable flush skips directory fsync on win32; integration polling fails immediately on failed/cancelled with error_code; fixes published",
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "notes": null,
+        "started_at": "2026-08-25T00:20:07Z",
+        "started_branch": "fix/windows-nightly-portability",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-windows-nightly-portability",
+        "status": "done",
+        "summary": "Act on w0 - debug the Windows job lifecycle, or scope those seven tests to POSIX",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1887 ba448ae: seven portability fixes for non-MCP failures: clickhouse path derivation, utf-8 read/subprocess, xdist isolation, Git-config-safe include, .gitattributes binary pinning, POSIX annotation paths",
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "notes": null,
+        "started_at": "2026-08-25T00:20:09Z",
+        "started_branch": "fix/windows-nightly-portability",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-windows-nightly-portability",
+        "status": "done",
+        "summary": "Diagnose the makefile-inventory NoneType.splitlines failure on a real Windows environment",
+        "wid": "w2"
+      },
+      {
+        "evidence": "2026-08-25 secondary NoneType.splitlines and benchmark/xdist defects diagnosed as portability issues fixed in PR #1887: makefile inventory utf-8 decode and release-curation xdist isolation",
+        "item_id": "nightly-windows-mcp-durable-jobs-and-two-undiagnosed",
+        "notes": null,
+        "started_at": "2026-08-25T00:31:31Z",
+        "started_branch": "fix/windows-nightly-portability",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-windows-nightly-portability",
+        "status": "done",
+        "summary": "Diagnose the release-curation pytest-benchmark warning surfacing as a failure",
+        "wid": "w3"
+      }
+    ]
+  }
+}

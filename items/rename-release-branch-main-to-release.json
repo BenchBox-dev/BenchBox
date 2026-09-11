@@ -1,0 +1,225 @@
+{
+  "description": "BRANCHING-STRATEGY REVIEW (2026-07-06, session on PR #993). `main` is already\nrelease-only: validate-main-pr.yml rejects any PR whose head is not a vX.Y.Z\nbranch, release-finalize fast-forwards+tags it, and its HEAD is always the\nexact latest-release commit. `release` is the accurate name.\n\nThis is Decision B — deliberately separated from the low-risk default-branch\nswitch (Decision A, branch-default-switch-to-develop). Unlike A, B has real\nfunctional blast radius: it touches the release-publish gate, so it is its\nown change, sequenced AFTER A (per the session's branch-rename runbook draft,\nsaved outside the tree).\n\nThis item captures the full surface discovered on develop, which is larger\nthan the curated main branch shows. NO behavioral gain — this is naming\nclarity — so priority is Medium.\n\nVerified safe / unchanged (do not touch): PyPI trusted publishing (keyed on\nrepo + workflow filename release.yml + environment pypi, never a branch);\nGitHub Pages (deploy-pages, source = GitHub Actions). README badges pin no\nbranch.\n\nSTATUS 2026-07-10 (reconciliation): the in-repo work (w1-w5) landed on\nbranch claude/git-branching-strategy-58vxjs as PR #1114 (awaiting Code Owner\nreview; touches release.yml). A parallel duplicate attempt, PR #1027, was\nclosed as superseded — #1114 is a strict superset of its file set and folded\nin its two correct findings. Two refinements discovered during execution:\n(a) default-branch-vs-release-branch classification — RELEASE_CANARY_BRANCH\nand seed-corpus.yml's PR base are DEFAULT-branch semantics and go to\n`develop`, NOT `release` (the canary fires from the default branch; seed\ncorpus carries curated-off results-data with a chore/ head); (b) the\nprotected-branch guards keep `main` blocked during the migration window\n(`develop|main|release`), because a stale local `main` can still exist until\nthe GitHub rename. Only w6 (admin) remains.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "rename the branch (w6) before w1-w5 merge",
+        "instead": "land the in-repo edits and the branch rename in one coordinated step.",
+        "item_id": "rename-release-branch-main-to-release",
+        "why": "a half-applied state leaves release-cut opening PRs against a release branch that does not exist"
+      },
+      {
+        "dont": "sed main->release blindly across repo-admin-settings.md",
+        "instead": "a token swap there produces wrong docs.",
+        "item_id": "rename-release-branch-main-to-release",
+        "why": "its scheduling/default-branch section encodes GitHub mechanics (scheduled workflows run from the DEFAULT branch) whose truth changes with Decision A"
+      },
+      {
+        "dont": "touch the MAIN_CLONE / 'main clone' worktree-pool concept in the Makefile",
+        "instead": "(not specified)",
+        "item_id": "rename-release-branch-main-to-release",
+        "why": "it is the primary-checkout notion, unrelated to the branch name."
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-08-29T12:40:40Z",
+      "completed_pr": 1933,
+      "created_at": "2026-07-06T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "PyPI trusted publishing, the pypi/test-pypi/github-pages environments, and the release.yml filename — all branch-independent; unchanged.",
+        "item_id": "rename-release-branch-main-to-release"
+      },
+      {
+        "behavior": "The legitimate release flow (release-cut / release-finalize) keeps working end-to-end after the rename — every main reference in those targets moves atomically.",
+        "item_id": "rename-release-branch-main-to-release"
+      },
+      {
+        "behavior": "release.yml verify-tag-on-* gate and the tag-shaped-ref publish condition — the rename must not loosen the publish gate; only retarget main->release.",
+        "item_id": "rename-release-branch-main-to-release"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/active/tag-and-pypi-environment-admin-hardening.yaml — reuse the agent-does-code/docs plus admin-does-GitHub-action split for w6 (the branch rename + ruleset recreate are admin-only).",
+        "decision": "reuse",
+        "item_id": "rename-release-branch-main-to-release",
+        "path": "_project/TODO/main/active/tag-and-pypi-environment-admin-hardening.yaml"
+      },
+      {
+        "concept": "_project/decisions/single-repo-migration.md — the architecture record for the two-branch flow; the branching-strategy decision (A+B) should be recorded here or as a sibling decision doc (w5).",
+        "decision": "reuse",
+        "item_id": "rename-release-branch-main-to-release",
+        "path": "_project/decisions/single-repo-migration.md"
+      },
+      {
+        "concept": "docs/operations/branch-rename-runbook.md — COMMITTED in PR #1114 (w4); enumerates the full admin sequence, ordering/no-gap reasoning, verification, and rollback. This is the runbook for w6.",
+        "decision": "reuse",
+        "item_id": "rename-release-branch-main-to-release",
+        "path": "docs/operations/branch-rename-runbook.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "rename-release-branch-main-to-release",
+        "kind": "only_modify",
+        "path_glob": ".github/RELEASE_PR_TEMPLATE.md"
+      },
+      {
+        "item_id": "rename-release-branch-main-to-release",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "rename-release-branch-main-to-release",
+        "kind": "only_modify",
+        "path_glob": "CONTRIBUTING.md"
+      },
+      {
+        "item_id": "rename-release-branch-main-to-release",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "rename-release-branch-main-to-release",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/"
+      },
+      {
+        "item_id": "rename-release-branch-main-to-release",
+        "kind": "only_modify",
+        "path_glob": "docs/blog/"
+      },
+      {
+        "item_id": "rename-release-branch-main-to-release",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/"
+      },
+      {
+        "item_id": "rename-release-branch-main-to-release",
+        "kind": "only_modify",
+        "path_glob": "landing/index.html"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -rn 'refs/heads/main' .github/workflows; grep -rn -- '--base main' Makefile",
+        "description": "No residual main-branch trigger/gate references after w1-w3",
+        "expected": "no output (all release)",
+        "item_id": "rename-release-branch-main-to-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'base release' Makefile",
+        "description": "Release flow targets release",
+        "expected": "release-cut and release-finalize both present",
+        "item_id": "rename-release-branch-main-to-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | {name, target}'",
+        "description": "Renamed branch exists, ruleset targets it",
+        "expected": "a ruleset targeting refs/heads/release; none targeting refs/heads/main",
+        "item_id": "rename-release-branch-main-to-release",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "rename-release-branch-main-to-release",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "rename-release-branch-main-to-release",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "rename-release-branch-main-to-release",
+        "needs_wid": "w3",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "rename-release-branch-main-to-release",
+        "notes": "Triggers main->release: lint.yml, test.yml, perf-smoke.yml, docs.yml\n(incl. Pages deploy gate refs/heads/main). Dev-only\nresults-explorer-browser.yml (branches [main] / [main, develop]).\nFUNCTIONAL: release.yml verify-tag-on-main job — rename job +\nrefs/heads/main ancestor check to release (this gates PyPI publish;\nkeep the tag-shaped-ref publish condition intact). test.yml\nbase_ref == 'main' / != 'main' release-gating conditionals (~6:\ncompat-test, integration-smoke, integration-table-formats,\ncheck-test-patterns, security, plus the credential-free lanes near\nlines 238/263/344/414). Rename validate-main-pr.yml ->\nvalidate-release-pr.yml and its strings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename in-repo across workflows (incl. the functional publish gate)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-release-branch-main-to-release",
+        "notes": "release-cut / release-finalize base branch (--base main), checkout/pull\nrelease, generate_changelog_entry --since-ref origin/main,\nRELEASE_REQUIRED_CONTEXTS / ruleset-name references, help text, and the\nbranch-protection guards (pr-open develop|main; worktree sweep/refresh\ndevelop|main|\"\"; pool-release and force-clean develop|main). Leave the\nMAIN_CLONE / \"main clone\" worktree-pool concept untouched (unrelated).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename in-repo across Makefile",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-release-branch-main-to-release",
+        "notes": "release-guide.md, RELEASE_PR_TEMPLATE.md, CONTRIBUTING.md, and — CAREFUL,\nNON-MECHANICAL — repo-admin-settings.md (its scheduling section logic\ndepends on which branch is default; coordinate with Decision A's w3).\nlanding/index.html footer blob/main -> blob/release. Blog blob/main\nlinks -> pin to the matching release TAG (duckdb-tpch 2026-03-03 ->\nv0.1.4; the two v0.2.1 posts -> v0.2.1) — verified to resolve with\n`git cat-file -e <tag>:<path>`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rename in docs/templates + pin external URLs",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-release-branch-main-to-release",
+        "notes": "Land docs/operations/branch-rename-runbook.md (recreate from the session\nscratchpad patch): default-branch switch, branch rename, ruleset\nrecreate, ordering/no-real-gap reasoning, verification, rollback, and the\nverified-safe notes (PyPI/Pages branch-independence).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add the migration runbook doc",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "rename-release-branch-main-to-release",
+        "notes": "Capture the decision + rationale in _project/decisions/ (new sibling to\nsingle-repo-migration.md, or an amendment): why release is the accurate\nname, the A-before-B sequencing, and the verified-safe publish/Pages\nfacts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Record the branching-strategy decision (A+B)",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Branch release active on origin, release ruleset verified, PR #1933 targeted release",
+        "item_id": "rename-release-branch-main-to-release",
+        "notes": "`gh api -X POST repos/joeharris76/BenchBox/branches/main/rename\n-f new_name=release` (GitHub redirects old URLs, retargets open PRs).\nRecreate the main-release-only ruleset as release-only on\nrefs/heads/release, preserving required checks (lint + the release test\ncontexts), linear history, non-fast-forward, no direct push, deletion\nblocked, no bypass_actors. Update ruleset-id references in\nrepo-admin-settings.md. Do this together with merging PR #1114 (w1-w5)\n(no orphaned -release window; the release branch only receives pushes via\nrelease-finalize, which is maintainer-controlled, so no real CI gap).\nFull step-by-step: docs/operations/branch-rename-runbook.md.\n",
+        "started_at": "2026-08-29T12:40:37Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "ADMIN: rename branch + recreate ruleset",
+        "wid": "w6"
+      }
+    ]
+  }
+}

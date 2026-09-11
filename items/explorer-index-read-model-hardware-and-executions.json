@@ -1,0 +1,242 @@
+{
+  "context": "Prefer one DuckDB-WASM query that joins existing result_environment and query_executions. Do not bump the read-model version or edit explorer_pipeline unless those tables are absent from the live snapshot.",
+  "description": "Two blocked pieces of explorer-basis-browse-hardware-engine-facets share one root cause: the read model's cohort index tables carry neither hardware identity nor per-execution data, so the index pages cannot show either.\n\nVERIFIED against a read-model-v8 snapshot:\n  - benchmark_rankings carries no hardware column at all\n  - platform_index_rows carries only driver_version / platform_version\n  - arch, cpu_family and cpu_model live in result_environment and result_detail_metrics, which are per-result detail tables neither index page queries\n  - the only executions accessor is getQueryExecutions(resultId), one result per call\n\nBLOCKED PIECE 1 (deferral #723) - architecture and CPU columns on BenchmarkIndex and PlatformIndex.\n\nBLOCKED PIECE 2 (deferral #724) - the median-or-min basis control on the index pages. NOT blocked by data volume: the largest cohort is 12 runs / 972 execution rows, whole corpus 22136 rows, native DuckDB fetch 3 ms, against interaction budgets of 500 ms p50 / 1000 ms p95. It is blocked by query SHAPE - a non-default basis for a cohort is N queries where N is the run count, growing with the corpus.\n\nBoth fixes live outside that item's allowlist: adding columns means _project/scripts/explorer_pipeline/ (plus a read-model version bump), and a bulk executions accessor means results-explorer/src/lib/duckdbQueries.ts.\n\nNeither was worked around client-side on purpose. Looping the per-result accessor is exactly the N-query shape the performance budget is at risk from.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "loop getQueryExecutions per index row",
+        "instead": "issue one bulk query for the cohort",
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "why": "the original block was the N-query shape, not missing client joins"
+      },
+      {
+        "dont": "rewrite explorer_pipeline or bump the read-model version first",
+        "instead": "join result_environment and query_executions already in the snapshot",
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "why": "this topic forbids pipeline edits unless those tables are absent"
+      }
+    ],
+    "item_meta": {
+      "category": "explorer-read-model",
+      "created_at": "2026-08-30T09:02:50Z",
+      "git_baseline": "25002c8be18da0dd9f4f260921ca5313d158a857",
+      "worktree": "explorer-index-read-model-hardware-and-executions"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not bump EXPLORER_READ_MODEL_VERSION unless a required column is absent from the live snapshot.",
+        "item_id": "explorer-index-read-model-hardware-and-executions"
+      },
+      {
+        "behavior": "Existing engine-version browse behavior on index pages remains intact.",
+        "item_id": "explorer-index-read-model-hardware-and-executions"
+      },
+      {
+        "behavior": "Index pages must not issue one getQueryExecutions() call per row.",
+        "item_id": "explorer-index-read-model-hardware-and-executions"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Reuse result_environment and query_executions already published in the snapshot.",
+        "decision": "reuse",
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "path": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "concept": "Extend getQueryExecutions with a bulk cohort accessor rather than adding a second per-result API.",
+        "decision": "extend",
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "path": "results-explorer/src/lib/duckdbQueries.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/components/MethodologyDisclosure.tsx"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/**"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/PlatformIndex.constantColumns.test.tsx"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/**"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex*"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Leaderboard.test.tsx"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/PlatformIndex*"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/lib src/pages/__tests__/BenchmarkIndex src/pages/__tests__/PlatformIndex && npm run typecheck",
+        "description": "Focused DuckDB accessor and index page tests pass",
+        "expected": "Accessor and index tests plus typecheck pass.",
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --name-only origin/develop...HEAD | rg -q '_project/scripts/explorer_pipeline|.github/workflows' && exit 1 || true",
+        "description": "No pipeline or workflow files changed",
+        "expected": "The branch does not touch explorer_pipeline or GitHub workflows.",
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Probed the live read-model-v10 snapshot (results-explorer/public/data/results.duckdb, copied read-only) with native duckdb 1.4.4.\n\nTables present and sufficient: result_environment (244 rows, arch non-null 201, cpu_family 199, cpu_model 199), query_executions (41812 rows), result_basis_availability (244 rows = full coverage of all 244 benchmark_rankings rows).\n\nPROOF 1 - hardware attaches in one query: benchmark_rankings LEFT JOIN result_environment USING (result_id) for the tpch/sf0.01/power cohort returns 15/15 rows in 8 ms (12 with arch, 15 with cpu_model). Whole ranking table joined in 1 ms: 166 ranking-eligible rows, 164 arch, 130 cpu_family/cpu_model. No pipeline change or read-model bump needed.\n\nPROOF 2 - cohort executions in one query: SELECT ... FROM query_executions WHERE result_id IN (cohort subquery) returns 1236 rows / 15 runs for the largest cohort (tpch sf0.01 power) in 2 ms. Across all cohorts exec volume is min 192 / median 440 / max 4536 rows; whole-corpus count 41812 in <1 ms native. That is one query, not N, and far inside the 500 ms p50 / 1000 ms p95 interaction budget.\n\nPROOF 3 - a non-default basis is a real choice here, not a collapsed one: run_type/status vocabulary is measurement|pass 31085, warmup|pass 10362, measurement|fail 274, warmup|fail 91; every result records exactly 3 passing measurement passes (min 3 / median 3 / max 3 distinct iters), so min and median reduce genuinely different samples.\n\nPROOF 4 - hardware columns are informative rather than constant: 2 distinct arch (x86_64, arm64), 3 cpu_family (apple_silicon, amd_epyc, intel_xeon), 5 cpu_model; 6 cohorts contain more than one distinct arch and the same 6 contain more than one cpu_family, so a per-row hardware column carries real signal.",
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Prove one snapshot query can attach hardware and cohort executions",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added RESULT_HARDWARE_COLUMNS projection (joining bench.result_detail_metrics for arch and cpu_family) in listResults. Extended getQueryExecutions and getQueryDisplayTimings to accept string | readonly string[] with short-circuit on empty array and single WHERE result_id IN (...) clause. Added getCohortBasisDetails bulk accessor that retrieves executions in one query and maps them to DetailResult objects.",
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add bulk hardware and executions accessors in duckdbQueries",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added arch and cpu_family to BenchmarkListSortKey, compareListRows, and ListTable headers and BenchmarkRow cells on BenchmarkIndex. Appended arch and cpu_family to PLATFORM_TABLE_COLUMNS (preserving aria-colindex 7/8 for power score), PlatformSortKey, sorting comparator, table headers, and PlatformRow cells on PlatformIndex.",
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Show architecture and CPU on BenchmarkIndex and PlatformIndex",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Replaced the per-row getDetailResult loop in PlatformIndex with getCohortBasisDetails(uncachedIds) and basisCache, resolving cohort basis in a single query and reusing previously loaded runs on subsequent basis changes.",
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Drive non-default index basis from the bulk executions accessor",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Added unit tests in duckdbQueries.test.ts for bulk getQueryExecutions and getQueryDisplayTimings (empty array short-circuit, single IN (?) query) and getCohortBasisDetails grouped executions. Added sorting and cell rendering tests for Arch and CPU in PlatformIndex.test.tsx and BenchmarkIndex.test.tsx. Updated PlatformIndex.constantColumns.test.tsx aria-colcount expectations (11 and 12) while verifying power column index remains 7 and 8. Updated PlatformIndex measurement basis tests to verify getCohortBasisDetails is invoked once with cohort IDs. Verified with vitest (513 tests passing across 40 files) and npm run typecheck.",
+        "item_id": "explorer-index-read-model-hardware-and-executions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add focused tests for one-query shape and hardware columns",
+        "wid": "w4"
+      }
+    ]
+  }
+}

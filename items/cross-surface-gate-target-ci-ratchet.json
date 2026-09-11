@@ -1,0 +1,83 @@
+{
+  "description": "A benchmark can be enforced in code (registered in cross_surface.GATES) yet not\npinned in the Make/CI surface - the standardized-command test does not assert that\nevery gate has a corresponding *-cross-surface-equivalence-report Make target and\na pr.yml correctness-gate step. The newer gates (ClickBench, JoinOrder-synthetic,\nH2O-DB) are exposed to exactly this drift: enforced in GATES, but their\nMake/CI pinning is maintained by hand and can fall out of sync.\n\nAdd a check that DERIVES the expected Make targets and pr.yml steps from the live\nGATES registry and fails when a gate lacks its target or CI step. This closes the\nsame drift class as the mutation-target guard (set(_TARGETS)==set(GATES)), one\nlayer up at the Make/CI boundary.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hand-maintain a second list of expected gate names",
+        "instead": "(not specified)",
+        "item_id": "cross-surface-gate-target-ci-ratchet",
+        "why": "derive from GATES, or the guard itself drifts."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-06-28T00:00:00Z",
+      "created_at": "2026-06-28T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No change to gate behavior; this is a drift guard over the Make/CI surface.",
+        "item_id": "cross-surface-gate-target-ci-ratchet"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': '.github/workflows/pr.yml:404', 'note': 'The per-gate correctness-gate steps (ssb/amplab/coffeeshop/clickbench/joinorder/h2odb) that must be derivable from GATES.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-gate-target-ci-ratchet",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'benchbox/core/equivalence/cross_surface.py (GATES)', 'note': 'The single source of truth the check derives from.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-gate-target-ci-ratchet",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'tests/integration/test_cross_surface_mutation_sensitivity.py:332', 'note': 'test_targets_cover_every_enforced_gate is the precedent: assert a registry-derived set equals the live GATES set. Mirror it for Make/CI targets.'}",
+        "decision": "reuse",
+        "item_id": "cross-surface-gate-target-ci-ratchet",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': 'tests/unit/test_standardized_test_commands.py', 'note': 'Existing standardized-command test; extend it (or add a sibling) to derive expectations from GATES rather than a hand-maintained list.'}",
+        "decision": "extend",
+        "item_id": "cross-surface-gate-target-ci-ratchet",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cross-surface-gate-target-ci-ratchet",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_standardized_test_commands.py -q",
+        "description": "Adding a gate without its target/step fails the guard",
+        "expected": "passes for current GATES; fails if a GATES entry lacks a Make target or pr.yml correctness-gate step",
+        "item_id": "cross-surface-gate-target-ci-ratchet",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "cross-surface-gate-target-ci-ratchet",
+        "notes": "Add a test that, for each name in cross_surface.GATES, asserts a\n`<name>-cross-surface-equivalence-report` Make target exists AND a\ncorresponding step is present in pr.yml's correctness-gate job. Parse the\nMakefile and pr.yml as text/data; key off GATES so adding a gate without its\ntarget/step fails. Account for the name normalization already used\n(joinorder_synthetic -> joinorder-synthetic-...).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Assert every GATES entry has a Make target and a pr.yml correctness-gate step",
+        "wid": "w1"
+      }
+    ]
+  }
+}

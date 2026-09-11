@@ -1,0 +1,242 @@
+{
+  "context": "The pipeline-widening item is the enabling dependency; this item\nis pure frontend wiring on top of the widened MetaRank. Extend in\nplace rather than introducing a sibling MasterLeaderboard component\n(per plan) since the data shape already carries everything\nneeded. Reuse chartMath.colorForCell and QueryHeatmap's a11y\npattern - no new primitives. Default render mode on first visit:\nTimes, so the user immediately sees absolute values (the missing\nsurface this phase exists to restore).\n",
+  "description": "Phase B of the Results Explorer strategy revision\n(plans/purring-jingling-petal-ultraplan).\n\nReplace the current Home page's rank-only `MetaLeaderboard` with a\nClickBench-style Platform × Cohort matrix of absolute values, with\ntoggles for Ranks and Speedup-vs-cohort-best, chip-based filters\n(benchmark family, SF, phase, tuning, trust tier, date window), and\nURL-synced state so views are shareable.\n\nThe \"Recent Results\" list stays (or moves below the matrix) - the\ngap being filled is the lack of a cross-benchmark, cross-platform\nhigh-level view with absolute values. This is the first thing a\nuser should see.\n\nDepends on:\n  - explorer-pipeline-meta-leaderboard-widening (MetaRank must carry\n    metric_value, speedup_vs_best, primary_metric, primary_order)\n  - explorer-url-synced-filter-state (useUrlState hook)",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fork MetaLeaderboard into a separate component",
+        "instead": "extend in place",
+        "item_id": "explorer-master-leaderboard-home",
+        "why": "the shapes are the same post-widening"
+      },
+      {
+        "dont": "introduce a new color function",
+        "instead": "call it",
+        "item_id": "explorer-master-leaderboard-home",
+        "why": "colorForCell is the shared log-scale palette"
+      },
+      {
+        "dont": "push filter state to a global store",
+        "instead": "keep it local",
+        "item_id": "explorer-master-leaderboard-home",
+        "why": "per-page useUrlState is sufficient"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "needs_item": "explorer-pipeline-meta-leaderboard-widening"
+      },
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "needs_item": "explorer-url-synced-filter-state"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-17T00:00:00Z",
+      "created_at": "2026-04-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing MetaLeaderboard consumers (if any outside Home) continue to work - render-mode toggle defaults to current behavior (Ranks)",
+        "item_id": "explorer-master-leaderboard-home"
+      },
+      {
+        "behavior": "Recent Results data surface remains accessible on Home (just demoted below the matrix)",
+        "item_id": "explorer-master-leaderboard-home"
+      },
+      {
+        "behavior": "colorForCell remains the single log-scale color source shared with QueryHeatmap - no duplicate palettes",
+        "item_id": "explorer-master-leaderboard-home"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+      },
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      },
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/types.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test",
+        "description": "Explorer typecheck + Vitest suites green",
+        "expected": "all green, including MetaLeaderboard.a11y and filter wiring tests",
+        "item_id": "explorer-master-leaderboard-home",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run dev",
+        "description": "End-to-end smoke on /results/",
+        "expected": "/results/ shows master matrix; Times/Ranks/Speedup toggle works; applying benchmark + SF chips narrows columns/rows; URL round-trips; clicking a cohort header goes to /results/{benchmark}/?sf=X&phase=Y; row click goes to /results/p/{platform_id}/",
+        "item_id": "explorer-master-leaderboard-home",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "explorer-master-leaderboard-home",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-master-leaderboard-home",
+        "notes": "results-explorer/src/components/MetaLeaderboard.tsx - extend in\nplace (per plan: data shape already carries what each mode needs\nafter the pipeline widening). Modes:\n  - Times: metric_value formatted via fmtGeomean (asc) / fmtScore (desc)\n  - Ranks: current behavior (rank / total)\n  - Speedup: speedup_vs_best, cohort best = 1.0×\nLog-scale color shading via existing colorForCell from\nsrc/lib/chartMath.ts (single source of truth, shared with\nQueryHeatmap).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend MetaLeaderboard component with render-mode toggle (Times/Ranks/Speedup)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-master-leaderboard-home",
+        "notes": "results-explorer/src/types.ts - add metric_value,\nspeedup_vs_best, primary_metric, primary_order to MetaRank.\nAll optional so the type survives older artifacts.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Widen MetaRank frontend type in types.ts",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-master-leaderboard-home",
+        "notes": "Filters: Benchmark family (multi), SF (multi), Phase\n(power/standard/throughput), Tuning mode, Trust tier, Date\nwindow. Each backed by useUrlState with a suitable serde\n(arraySerde for multis, stringSerde for singles).\nFilter state feeds both the visible cohort columns and the\nvisible platform rows.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Sticky filter chip row backed by useUrlState",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-master-leaderboard-home",
+        "notes": "results-explorer/src/pages/Home.tsx - make the matrix the\nprimary content surface. Do not wire cohort/row navigation yet\n(w6 handles that). Do not change the Recent Results position\nyet (w5 handles that). Scope: layout only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Scaffold Home.tsx around the extended MetaLeaderboard as primary content",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-master-leaderboard-home",
+        "notes": "Keep the Recent Results component and data surface; move its\nrender position below the matrix on Home.tsx. No behavioral\nchange to the list itself.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Demote Recent Results list below the matrix",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-master-leaderboard-home",
+        "notes": "Cohort headers → /results/{benchmark}/?sf=X&phase=Y (preserve\nthe relevant slice of filter state via useUrlState's serde).\nRow click → /results/p/{platform_id}/.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire cohort header links and row-click navigation with preserved filter state",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-master-leaderboard-home",
+        "notes": "The new master matrix is structurally similar to QueryHeatmap -\nreuse the same a11y scaffolding (role=grid, aria-rowindex/col,\nroving tabindex). Existing tests like\nQueryHeatmap.a11y should continue to pass; author a sibling\nMetaLeaderboard.a11y test covering the equivalent contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Accessibility: reuse QueryHeatmap's role=grid + roving tabindex pattern",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-master-leaderboard-home",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Vitest coverage for render-mode toggle, filter→matrix wiring, cohort-link state preservation",
+        "wid": "w8"
+      }
+    ]
+  }
+}

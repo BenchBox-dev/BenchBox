@@ -1,0 +1,311 @@
+{
+  "context": "Both surfaces consume the basis model; neither re-derives values. The within-run route is a distinct path under compare so its URL grammar can carry a list of bases, which the cross-run grammar deliberately cannot.\n\nMake the not-a-platform-comparison framing structural rather than a caption: the route is separate, the page states it, and the figures are excluded from any ranking or leaderboard surface by construction rather than by convention.\n\nOn Result Detail, keep the existing Individual samples table and add the per-pass view beside it, so nothing currently visible is removed.",
+  "description": "Nothing in the explorer shows what happened inside a run. `ResultDetail.tsx` renders an Individual samples table of Query, Duration and Status only; `run_type`, `iter` and `stream` are read and typed in `duckdbQueries.ts` but rendered nowhere. `run.iterations` and `run.streams` are not ingested at all. The single iteration signal anywhere in the UI is a `sample_count` column. The only surface exposing pass provenance is a starter SQL snippet in `starterQueries.ts`.\n\nThat leaves two questions unanswerable in the product: how stable were the passes, and how much does the warmup pass actually cost. The second one matters because 'warmup is excluded because a cold pass would dominate' is the justification for the entire display contract, and today the UI asserts it without evidence.\n\nThis item adds both single-run surfaces from the approved design:\n  - Result Detail gains a per-query pass view showing each execution on a per-row scale, the warm median marker, warm min, spread and warmup penalty.\n  - A within-run compare route takes one run and two to four measurement bases as columns, each with its own statistic and a chosen reference column.\n\nThe within-run route is the ONLY place a statistic may vary between series, and the only honest home for a min-versus-median comparison. Because engine and hardware are fixed by construction there, nothing is confounded -- but for the same reason its figures are not platform results and must never enter a leaderboard.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Allow the within-run route to accept two different run ids.",
+        "instead": "Keep it single-run by construction and send multi-run selections to the cross-run route.",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "why": "Varying statistic across runs is exactly the confound the basis rule exists to prevent; a route that accepts two runs would reintroduce it through the back door."
+      },
+      {
+        "dont": "Describe an average across queries as a median, or a median as an average.",
+        "instead": "Name the reduction that was actually computed.",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "why": "The design prototype shipped a tile computing an arithmetic mean while its caption said median; the whole point of this work is that the page states its own reduction correctly."
+      },
+      {
+        "dont": "Present within-run figures with the same visual weight and framing as a platform comparison.",
+        "instead": "Give the route its own framing that states no engine or hardware varies, and keep its figures out of every ranking surface.",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "why": "A reader who screenshots a min-versus-median result and reads it as a platform win has been misled by the page's own design."
+      },
+      {
+        "dont": "Replace the Individual samples table with the new per-pass view because it is a superset.",
+        "instead": "Add the per-pass view alongside it.",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "why": "The samples table is the raw evidence surface; consolidating it into a derived view removes the reader's ability to check the derivation."
+      },
+      {
+        "dont": "Report a warmup penalty for runs with no recorded warmup by treating the first measurement pass as the warmup.",
+        "instead": "Say warmup was not recorded for that run.",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "why": "The penalty figure is the stated evidence for excluding warmup from rankings. Fabricating it would make the justification circular and false."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-08-30T07:35:34Z",
+        "from_item": "explorer-basis-single-run-pass-surfaces",
+        "id": 722,
+        "reason": "w0 found 4 of 5 sites describe the default basis as a 'geometric mean of per-query execution times', which is a reduction with one time per query and not what happens -- it is a geomean of per-query MEDIANS. BenchmarkIndex is the only accurate one. MethodologyDisclosure.tsx is in this item's scope and is fixed here. The other three (Compare.tsx, Home.tsx, PlatformIndex.tsx) are not: Compare.tsx is do_not_modify for this item, and Home/PlatformIndex are outside its only_modify allowlist. Home.tsx and PlatformIndex.tsx are both in explorer-basis-browse-hardware-engine-facets's scope; Compare.tsx is in explorer-basis-compare-multi-run-layout's. The inaccuracy is newly reader-visible because this item is what first shows a query has several executions.",
+        "resolution": "promoted",
+        "resolved_item": "explorer-default-basis-copy-reconciliation",
+        "resolved_reason": null,
+        "summary": "Reconcile the remaining three 'measurement runs only' copy sites to name the per-query median"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "needs_item": "explorer-basis-frontend-model-and-invariant"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-08-30T08:13:47Z",
+      "completed_pr": 1959,
+      "created_at": "2026-08-29T19:12:43Z",
+      "worktree": "explorer-measurement-basis"
+    },
+    "preserves": [
+      {
+        "behavior": "A run with no warmup recorded must render the per-pass view without a warmup marker and say warmup was not recorded, rather than hiding the view.",
+        "item_id": "explorer-basis-single-run-pass-surfaces"
+      },
+      {
+        "behavior": "A single-pass column must collapse its statistic and say so, exactly as on the cross-run surfaces.",
+        "item_id": "explorer-basis-single-run-pass-surfaces"
+      },
+      {
+        "behavior": "Every column on the within-run route must compute its geomean over the same query set; a query missing a pass in any column is excluded from all of them and shown as unrecorded.",
+        "item_id": "explorer-basis-single-run-pass-surfaces"
+      },
+      {
+        "behavior": "Result Detail's headline figures must keep using the default basis and must keep matching published values.",
+        "item_id": "explorer-basis-single-run-pass-surfaces"
+      },
+      {
+        "behavior": "The 'measurement runs only' methodology copy must stay accurate on every page that shows it once the per-pass evidence is visible.",
+        "item_id": "explorer-basis-single-run-pass-surfaces"
+      },
+      {
+        "behavior": "The existing Individual samples table on ResultDetail must remain; the per-pass view is additive.",
+        "item_id": "explorer-basis-single-run-pass-surfaces"
+      },
+      {
+        "behavior": "The warmup penalty must be computed from recorded warmup executions only, never estimated from a first measurement pass.",
+        "item_id": "explorer-basis-single-run-pass-surfaces"
+      },
+      {
+        "behavior": "Within-run figures must never enter a leaderboard, ranking, meta-leaderboard or any cross-run standing, by construction rather than by caption.",
+        "item_id": "explorer-basis-single-run-pass-surfaces"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Existing per-platform box-and-whisker with a log axis. Reuse its axis and mark conventions for the per-query pass strip rather than inventing a second distribution visual.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "path": "results-explorer/src/components/DistributionBox.tsx"
+      },
+      {
+        "concept": "Owns the 'measurement runs only' copy asserted across Compare, BenchmarkIndex, Home and PlatformIndex. Its claim now has evidence; reconcile the wording with what the per-pass view shows.",
+        "decision": "extend",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "path": "results-explorer/src/components/MethodologyDisclosure.tsx"
+      },
+      {
+        "concept": "Owns compare URL construction and result-detail hrefs. Extend with the within-run route so link building stays in one place.",
+        "decision": "extend",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "path": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "concept": "Already contains the canonical SQL for reading iter, stream and run_type from bench.query_executions -- the shape this UI now renders. Reuse it as the documented escape hatch and keep it consistent with the new surface.",
+        "decision": "reuse",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "path": "results-explorer/src/lib/starterQueries.ts"
+      },
+      {
+        "concept": "Existing single-run page with the Individual samples table and sample_count column. Extend with the per-pass view rather than replacing the samples table.",
+        "decision": "extend",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "path": "results-explorer/src/pages/ResultDetail.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/measurementBasis.ts"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/explorer-basis-single-run-pass-surfaces/**"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/**"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/App.tsx"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MeasurementBasisBar.tsx"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MethodologyDisclosure.tsx"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/PassStrip.tsx"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/**"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/**"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/resultLinks.ts"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/CompareWithinRun.tsx"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test",
+        "description": "Explorer unit and page tests pass, including within-run intersection and absent-warmup cases",
+        "expected": null,
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "last_result": "pass",
+        "last_run": "2026-08-30T08:08:04Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npx vitest run src/pages/__tests__/",
+        "description": "Result Detail and within-run pages typecheck and pass accessibility checks",
+        "expected": null,
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "last_result": "pass",
+        "last_run": "2026-08-30T08:08:12Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --workers=1 e2e/routes/",
+        "description": "The within-run route resolves and refuses a two-run selection",
+        "expected": null,
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "last_result": "pass",
+        "last_run": "2026-08-30T08:13:45Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cat _project/verification-logs/explorer-basis-single-run-pass-surfaces/w0.log",
+        "description": "Methodology copy was re-read against current source and reconciled",
+        "expected": null,
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "last_result": "pass",
+        "last_run": "2026-08-30T08:13:45Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "w0.log - 5 sites assert 'measurement runs only', 4 of 5 omit 'median' and are inaccurate; measured warmup penalty across 5443 query/run pairs: p50 1.01x, 32% FASTER than warm median, only 3% >2x slower, max 61.5x - the exclusion is justified by the tail, not a systematic penalty; run_type/iter/stream reach the page but render nowhere",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "notes": "Re-read `results-explorer/src/components/MethodologyDisclosure.tsx` and every page that renders the 'measurement runs only' assertion -- Compare, BenchmarkIndex, Home, PlatformIndex -- as they stand today. Diff the current wording against what the per-pass view will now let a reader verify, and record any statement that becomes inaccurate or unsupported once warmup data is visible. Do not rely on this item's summary of that copy.\n\nCapture current ResultDetail behaviour, including the Individual samples table columns and headline figures, in `_project/verification-logs/explorer-basis-single-run-pass-surfaces/w0.log`.\n\nDECISION GATE: if the existing methodology copy would become inaccurate, fix the copy in this item. If fixing it would change a published claim about how results are computed, stop and raise it rather than editing the claim unilaterally.",
+        "started_at": "2026-08-30T07:27:15Z",
+        "started_branch": "feat/explorer-basis-single-run-pass-surfaces",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-single-run-passes",
+        "status": "done",
+        "summary": "Re-read the methodology copy and pin current ResultDetail behaviour",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PassStrip: per-query warm median/min/spread/warmup + ratio, all computed; warmup ratio absent (never estimated) with no warmup; caption names the reduction rather than promising a penalty, per w0's measured p50 of 1.01x. Reconciled the 4 inaccurate 'measurement runs only' copy sites to say 'median'. 16 tests; suite 1085 passed",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "notes": "Add the per-pass view: one row per unique query, each execution placed on a per-row scale, the warm median marked, plus warm min, spread and warmup penalty columns.\n\nEvery summary figure on this view must be computed, not hardcoded, and its caption must name the reduction it actually performed. Runs with no recorded warmup render without a warmup marker and say so.\n\nKeep the Individual samples table in place.",
+        "started_at": "2026-08-30T07:35:11Z",
+        "started_branch": "feat/explorer-basis-single-run-pass-surfaces",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-single-run-passes",
+        "status": "done",
+        "summary": "Per-query pass view on Result Detail",
+        "wid": "w1"
+      },
+      {
+        "evidence": "CompareWithinRun route at /results/r/:resultId/passes registered before the detail route; bases+ref URL grammar via the model's basesSerde; reference clamped not reset; page states no engine/hardware varies and figures are structurally unrankable; ResultDetail entry point per the decision gate",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "notes": "Add the route with its own path and URL grammar carrying a list of bases and a reference column index. Register it in App.tsx and build its links through resultLinks.\n\nColumns: two to four bases, each with its own pass selection and statistic, one marked reference. Adding and removing columns must keep the reference valid.\n\nThe page must state that no engine or hardware varies, and its figures must be structurally excluded from ranking surfaces.\n\nDECISION GATE on entry points: add the Result Detail entry point in this item. Do not add entry points on Home, PlatformIndex or BenchmarkIndex unless a later message asks for them.",
+        "started_at": "2026-08-30T07:50:49Z",
+        "started_branch": "feat/explorer-basis-single-run-pass-surfaces",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-single-run-passes",
+        "status": "done",
+        "summary": "The within-run compare route",
+        "wid": "w2"
+      },
+      {
+        "evidence": "buildWithinRunRows enforces the intersected query set across columns; 13 tests incl. the 1.18x prototype shape (a query unanswerable in one column leaves EVERY column's denominator), unavailable-not-substituted, and reference validity",
+        "item_id": "explorer-basis-single-run-pass-surfaces",
+        "notes": "Enforce the intersected query set across columns and state its size on the page. A query missing a pass in any column is shown as unrecorded in that column and excluded from every column's geomean.\n\nAdd tests pinning:\n  - a query missing one pass changes every column's geomean denominator identically;\n  - the stated query-set size matches the denominator actually used;\n  - a column whose basis the run cannot answer reports unavailable rather than substituting;\n  - the warmup penalty is absent, not estimated, when no warmup was recorded.\n\nThis is the case that produced a wrong 1.18x reading in the design prototype before the intersection was applied; the test must fail if the intersection is removed.",
+        "started_at": "2026-08-30T07:50:51Z",
+        "started_branch": "feat/explorer-basis-single-run-pass-surfaces",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-single-run-passes",
+        "status": "done",
+        "summary": "Same-query-set discipline and unrecorded columns",
+        "wid": "w3"
+      }
+    ]
+  }
+}

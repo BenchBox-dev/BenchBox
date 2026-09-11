@@ -1,0 +1,277 @@
+{
+  "context": "First decide the visual and responsive contract. Then either update tests to\nmatch documented intent or change the layout to meet the existing contract.\nKeep the changes home-scoped unless the chosen theme contract explicitly\napplies to all Results Explorer routes.\n",
+  "description": "Supersession note (2026-05-14): the mixed dark chrome plus light analytical\nworkspace decision recorded by this completed TODO was superseded by\n`benchbox-light-dark-theme-system`. The active product contract is now a\nshared `system` / `light` / `dark` theme choice across landing, docs/blog,\nand Results Explorer. This DONE item remains historical evidence and should\nnot be rewritten as if it had made the later decision.\n\nThe home leaderboard page now mixes dark chrome/filter controls with a light\nanalytical workspace. The CSS documents that this is intentional, but review\nfeedback and tests still treat it as a possible theme regression. The same\nroute also fails a responsive budget because the first leaderboard row sits\nbelow the 1200 px mobile smoke threshold after the filter/summary block grew.\nSeparately, a smoke test still expects copy such as `Corpus summary` and\n`PR-validated corpus` that no longer appears in the UI.\n\nThis TODO requires the team to make explicit product decisions instead of\napplying spot CSS or test edits: either codify the mixed dark/light analytical\nworkspace, or move the route to a coherent full-dark theme; either restore a\ncorpus-summary affordance, or update the tests and copy contract; and either\ncompact the mobile filter stack, or revise the responsive budget with a\ndocumented reason.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "darken only one section to satisfy a screenshot comment without checking table/chart contrast.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "delete responsive assertions just because the row-position test is currently failing.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hide primary filters or compare entrypoints on mobile.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "restore obsolete corpus-summary copy if its counts conflict with the current scope model.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "needs_item": "results-explorer-metric-display-precision-and-scope-copy"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "results-explorer-contract-followup"
+    },
+    "preserves": [
+      {
+        "behavior": "Mobile compaction must not remove benchmark, scale, phase, trust, tuning, date, or comparison entry controls.",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract"
+      },
+      {
+        "behavior": "No layout change should hide the first comparison entrypoint behind horizontal scroll.",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract"
+      },
+      {
+        "behavior": "Tests must encode product intent, not old screenshots.",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract"
+      },
+      {
+        "behavior": "Theme changes must maintain contrast for numeric tables, heat cells, selected filters, and disabled controls.",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/results-explorer-followup-todo-review/planning/results-explorer-surface-theme-and-density-contract.yaml addressed earlier theme/density issues.",
+        "decision": "reuse",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "path": "_project/DONE/results-explorer-followup-todo-review/planning/results-explorer-surface-theme-and-density-contract.yaml"
+      },
+      {
+        "concept": "results-explorer/e2e/responsive.spec.ts contains the mobile row-position smoke expectation.",
+        "decision": "reuse",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "path": "results-explorer/e2e/responsive.spec.ts"
+      },
+      {
+        "concept": "results-explorer/e2e/routes/home.spec.ts or equivalent smoke tests contain the stale corpus-summary expectations.",
+        "decision": "reuse",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "path": "results-explorer/e2e/routes/home.spec.ts"
+      },
+      {
+        "concept": "results-explorer/src/index.css documents the current dark chrome plus light analytical workspace contract.",
+        "decision": "reuse",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "path": "results-explorer/src/index.css"
+      },
+      {
+        "concept": "results-explorer/src/pages/Home.tsx renders the leaderboard hero, filter shell, summary copy, and table.",
+        "decision": "reuse",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "path": "results-explorer/src/pages/Home.tsx"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-home-theme-and-responsive-density-contract/"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/responsive.spec.ts"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/home.spec.ts"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/pages/__tests__/Home.test.tsx",
+        "description": "Home route tests pass",
+        "expected": "home theme, copy, and density unit/component tests pass",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test tests/e2e/responsive.spec.ts --project=chromium",
+        "description": "Responsive e2e smoke passes",
+        "expected": "responsive smoke passes with documented row-position budget",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx playwright test tests/e2e/home.spec.ts --project=chromium",
+        "description": "Home smoke/e2e passes",
+        "expected": "home smoke reflects the chosen corpus-summary contract",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"PASS|FAIL|theme|corpus|first row|mobile|density\" _project/verification-logs/results-explorer-home-theme-and-responsive-density-contract/",
+        "description": "Browser evidence confirms desktop and mobile home layout",
+        "expected": "verification log includes desktop and mobile evidence",
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "notes": "Capture screenshots and DOM evidence for `/results/` at desktop width and\nmobile widths used by the e2e suite. Record:\n  - body/chrome/filter/table background tokens;\n  - whether `Corpus summary` or `PR-validated corpus` appears;\n  - first visible leaderboard row y-position;\n  - filter block height and which controls are above the row;\n  - the current test expectations that fail.\nStore findings in\n`_project/verification-logs/results-explorer-home-theme-and-responsive-density-contract/w0.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate home theme, corpus summary, and mobile row position",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "notes": "Decide one of:\n  - mixed contract: dark marketing/chrome and dark filter shell with light\n    analytical tables/charts are intentional for scanability;\n  - full-dark contract: tables, charts, cards, empty states, and exports\n    must use dark tokens throughout Results Explorer;\n  - route-specific contract: home is mixed, but detail/query/compare pages\n    follow a different named surface contract.\nDecision gate: do not change background colors or tests until the chosen\ncontract is documented in the implementation PR and encoded in token or\nvisual tests.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Choose the theme contract for analytical explorer surfaces",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "notes": "Decide whether the page should restore a compact corpus-summary region or\nwhether the stale smoke test should be updated. If restored, the section\nmust use current scope terms from the metric/scope TODO and fit the density\nbudget. If removed, tests must assert the current intentional summary copy\ninstead of legacy strings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Resolve corpus-summary test and copy contract",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "notes": "Define a concrete mobile acceptance rule, such as `first leaderboard row is\nvisible by y <= 1200 at the canonical mobile viewport` or a new documented\nthreshold. Then implement the smallest layout change needed:\n  - collapse advanced filters behind a disclosure on mobile;\n  - reduce duplicated summary rows;\n  - make date/trust/tuning controls wrap more tightly;\n  - keep `Start a comparison` reachable without pushing the table too far\n    down.\nDecision gate: if the team chooses a threshold above 1200 px, document why\nthe extra scroll is acceptable for database engineers comparing results.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Set and implement the mobile density budget",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-home-theme-and-responsive-density-contract",
+        "notes": "Add tests that assert:\n  - the chosen theme contract on home and one detail route;\n  - the presence or intentional absence of corpus-summary copy;\n  - first leaderboard row mobile y-position under the accepted budget;\n  - filter controls remain reachable and labelled after compaction.\nBrowser-check desktop and mobile home after implementation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add visual/token and responsive regression tests",
+        "wid": "w4"
+      }
+    ]
+  }
+}

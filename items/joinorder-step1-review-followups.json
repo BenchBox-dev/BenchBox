@@ -1,0 +1,100 @@
+{
+  "description": "Follow-up cleanup from the post-Step-1 review of GitHub issue #289.\nThe review found no Step-1 blockers, but identified internal-surface,\nestimate, stale-comment, and manifest-clarity cleanup items. This\ncompleted record tracks the fixes landed after the canonical\nfoundation/cutover work.",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "fix-joinorder-step1-followups"
+    },
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_benchmark_selection.py tests/unit/cli/test_benchmark_manager_behavioral.py tests/unit/core/test_registry_surface_field.py -q",
+        "description": "Targeted CLI and registry tests pass",
+        "expected": null,
+        "item_id": "joinorder-step1-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/joinorder tests/unit/core/test_joinorder_benchmark.py -q",
+        "description": "JoinOrder canonical tests pass",
+        "expected": null,
+        "item_id": "joinorder-step1-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite passes",
+        "expected": null,
+        "item_id": "joinorder-step1-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-step1-review-followups",
+        "notes": "Keep `joinorder_synthetic` directly runnable by ID for internal smoke\nworkflows, but exclude `surface: internal` benchmarks from benchmark\nlist/filter/category wizard displays.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Hide internal joinorder_synthetic from public interactive CLI surfaces",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-step1-review-followups",
+        "notes": "Update JoinOrder memory/runtime estimates for the fixed 74M-row canonical\ndataset and add explicit joinorder_synthetic estimates.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refresh canonical JoinOrder interactive estimates",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-step1-review-followups",
+        "notes": "Canonical `joinorder` fetches verified Parquet files; CSV null-marker\nfallback comments belong only to `joinorder_synthetic`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove stale CSV dialect comments from canonical JoinOrder",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-step1-review-followups",
+        "notes": "Distinguish `data_archive_hash` as the logical per-table aggregate hash\nfrom `archive_sha256` as the downloadable tar.zst transport hash. This\nis a metadata-only manifest clarification, so the pinned manifest hash\nand reference-cardinality manifest hash were updated together.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Clarify JoinOrder manifest hash fields",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-step1-review-followups",
+        "notes": "Main clone remained stale with unrelated `skill-sync.lock` changes, so\nfollow-up fixes were made from `/Users/joe/Developer/BenchBox.pool-07`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Work from current origin/develop in a clean pool worktree",
+        "wid": "w5"
+      }
+    ]
+  }
+}

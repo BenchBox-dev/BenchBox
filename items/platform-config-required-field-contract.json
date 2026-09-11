@@ -1,0 +1,81 @@
+{
+  "description": "get_platform_config still flattens DatabaseConfig extras into a dict; each PlatformAdapter.from_config hand-picks constructor keys. Tuning keys have a shared forwarding list, but there is no producer/consumer contract distinguishing intentionally ignored metadata from a semantically required new field. Inventory from_config implementations, classify producer keys, and add a focused test so a required producer field cannot be silently omitted. Preserve platform-specific filtering. Do not fold in the DuckDB max_temp_directory_size pass-through (duckdb-from-config-drops-constructor-read-keys).",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-17T15:07:10Z",
+      "completed_pr": 1765,
+      "created_at": "2026-08-17T13:16:01Z",
+      "worktree": "adapter-architecture"
+    },
+    "scope_rules": [
+      {
+        "item_id": "platform-config-required-field-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "platform-config-required-field-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/platform_config.py"
+      },
+      {
+        "item_id": "platform-config-required-field-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "platform-config-required-field-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/**"
+      },
+      {
+        "item_id": "platform-config-required-field-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit -k 'from_config and required' -q",
+        "description": "Focused contract test fails before the guard and passes after",
+        "expected": "exit 0 after implementation",
+        "item_id": "platform-config-required-field-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-config-required-field-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Classified producer keys in platform_config.REQUIRED_FROM_CONFIG_KEYS; stripped metadata vs required tuning keys vs adapter extras.",
+        "item_id": "platform-config-required-field-contract",
+        "notes": null,
+        "started_at": "2026-08-17T15:01:13Z",
+        "started_branch": "fix/platform-config-required-field-contract",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-platform-config-required-field-contract",
+        "status": "done",
+        "summary": "Inventory from_config implementations and classify producer keys as consumed, ignored metadata, or required-but-dropped",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Contract test pins REQUIRED_FROM_CONFIG_KEYS as a subset of TUNING_FORWARD_KEYS and asserts build_adapter_config forwards them.",
+        "item_id": "platform-config-required-field-contract",
+        "notes": null,
+        "started_at": "2026-08-17T15:03:41Z",
+        "started_branch": "fix/platform-config-required-field-contract",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-platform-config-required-field-contract",
+        "status": "done",
+        "summary": "Add a contract or focused test for semantically required producer fields",
+        "wid": "w1"
+      }
+    ]
+  }
+}

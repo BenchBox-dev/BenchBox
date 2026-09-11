@@ -1,0 +1,42 @@
+{
+  "description": "Promoted from deferral #687 of explorer-pipeline-duplicate-result-id-guard-20260804.\nDeferred: Privacy rejections are silently downgraded to skipped bundles\nReason deferred: The publication loop's per-bundle 'except (JSONDecodeError, KeyError, ValueError, TypeError)' also catches the privacy ValueError raised by _public_bundle_data and _public_applied_receipt, so a bundle failing the fail-closed privacy check is dropped with a logger.warning while the build still succeeds. Safe in that the bundle is not published, but silent: the corpus quietly loses a result and only skipped_bundles moves. Decide whether a privacy rejection should abort the build like the duplicate guard now does, or at minimum be surfaced distinctly from ordinary parse errors. Out of scope for the duplicate-id guard.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-05T15:06:44Z",
+      "completed_pr": 1569,
+      "created_at": "2026-08-04T12:11:50Z",
+      "worktree": "main"
+    },
+    "work_needs": [
+      {
+        "item_id": "explorer-privacy-rejection-fails-open-silently-20260804",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "DECISION (Joe, 2026-08-05): a privacy rejection ABORTS the build.\n\nChosen over two alternatives that were put to him explicitly:\n- Publish the clean bundles and exit non-zero with a distinct summary. Rejected: it means a red build can still deploy a snapshot, and it is more machinery for the same safety property.\n- Keep the skip but escalate logging and record rejections in the manifest. Rejected: the corpus still silently loses results, which is the defect itself.\n\nAborting matches the precedent already in this file. DuplicateResultIdError (pipeline.py:52) was made deliberately NOT a ValueError for exactly this reason, and its docstring states the rule: something a human must resolve in the corpus is not a bundle to drop. A privacy rejection is the same class - the detector fired, so a human needs to look.\n\nSITES FOUND - three, all in pipeline.py, and the third behaves differently from the other two:\n- 217, in _public_applied_receipt: leaking applied receipt.\n- 230, in _public_bundle_data: leaking bundle.\n- 738, in the plans companion block: leaking plans sidecar. This one is caught by its OWN inner handler at 746, not the loop handler at 766, so today it drops the plans companion and publishes the bundle anyway. Same silent-detector-fired condition, different blast radius.\n\nAll three currently raise ValueError, which the loop catches at 766 alongside JSONDecodeError, KeyError and TypeError, and downgrades to 'skipped_bundles += 1' plus a logger.warning.\n\nCONFIRMED NO BROADER SWALLOW: pipeline.py and build_results_explorer_snapshot.py contain no 'except Exception' or 'except BaseException', so a non-ValueError propagates out of the build rather than being caught further up.\n\nEXPLICITLY OUT OF SCOPE: pipeline.py:216 raises ValueError when the applied receipt cannot be sanitized at all. That is a malformed-input condition rather than a privacy rejection, so it keeps the skip. Worth its own look - an unsanitizable receipt is arguably the same state a leaky one is in - but changing it is a different decision and is not covered by this item's premise.",
+        "item_id": "explorer-privacy-rejection-fails-open-silently-20260804",
+        "notes": null,
+        "started_at": "2026-08-05T15:00:13Z",
+        "started_branch": "fix/corpus-eol-attribute-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Decide whether a privacy rejection aborts the build or is surfaced distinctly from parse errors",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Implemented in f96d546262, PR #1569.\n\nCHANGE: PrivacyRejectionError(Exception) - deliberately not a ValueError - raised at all three find_public_path_leaks sites (pipeline.py 217/230/738). It escapes both the plans block's own handler at 746 and the per-bundle handler at 766, so the build stops.\n\nSCOPE HELD: pipeline.py:232 still raises ValueError when an applied receipt cannot be sanitized at all. That is malformed input rather than a privacy rejection, and promoting it would turn every corrupt sidecar into a build outage. A must-preserve test pins that a malformed companion is still only a warning.\n\nEND-TO-END: _project/scripts/explorer_publish.py wraps pipeline.run in 'except Exception' and converts it to SystemExit(1), so the rejection reaches a non-zero exit rather than being reported and swallowed. That handler is the last place this fix could be softened back into a warning with no type-level test noticing, so there is a test on the exit code itself.\n\nFALSIFIED PROPERLY: flipping only the base class to ValueError leaves the symbol importable, so the tests fail on behaviour rather than on ImportError - the weak falsification mode I hit three times earlier in this effort. 5 of 7 fail; the 2 that pass are the must-preserve pair, which is correct. The captured log reproduces the original defect verbatim: 'WARNING Skipping plans companion .../clean.plans.json - PrivacyRejectionError: public plans privacy check failed for fields: per_path_timings.<key>'.\n\nLEAK SHAPE: tests plant a private path as a mapping KEY, the shape find_public_path_leaks' docstring records as occurring in practice. Verified empirically that value-shaped paths in config/summary/phases are all scrubbed by anonymize_result_payload and produce no leak, so a test built on one would have passed for the wrong reason.\n\nSUITES: tests/unit/scripts/explorer_pipeline 331 passed; tests/unit/scripts 1499 passed. No caller outside pipeline.py and tests references the changed helpers or the new exception, so nothing was relying on catching ValueError from them.\n\nCHECK-SCOPE: reports SCOPE_UNCHECKED - this item was created without scope rules, so the 2 changed files were not machine-checked. Both are the pipeline module and its new test.",
+        "item_id": "explorer-privacy-rejection-fails-open-silently-20260804",
+        "notes": null,
+        "started_at": "2026-08-05T15:06:41Z",
+        "started_branch": "fix/privacy-rejection-aborts-build-20260805",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Implement the chosen behaviour and cover it with a test",
+        "wid": "w1"
+      }
+    ]
+  }
+}

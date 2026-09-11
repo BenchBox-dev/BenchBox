@@ -1,0 +1,105 @@
+{
+  "description": "Source: results-explorer/publication remediation re-review (2026-07-06),\nDefect #5 (de-escalated to cosmetic).\n\nresults-explorer/index.html:15 sets the CSP via `<meta http-equiv=\n\"Content-Security-Policy\">`, and its content includes `frame-ancestors 'none'`.\nPer the CSP spec, `frame-ancestors` is IGNORED when the policy is delivered in\na <meta> element — it is only honoured as an HTTP response header. So that\ndirective provides no clickjacking protection today; it reads as a control\nthat does not exist.\n\nThis is cosmetic, NOT a security hole: the load-bearing directive\n`connect-src 'self'` (which confines all network egress and closes the\nduckdb-wasm remote-fetch/exfil channel) DOES work in a meta CSP, and it is\npresent. The only issue is the misleading inert `frame-ancestors` line.\n\nFix: drop the inert directive and replace it with a comment stating that\nframing/clickjacking protection must be applied as an HTTP response header\n(`X-Frame-Options: DENY` or a header-delivered `frame-ancestors`) at the\nhosting/CDN layer (GitHub Pages), because meta CSP cannot express it.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "try to make frame-ancestors work by keeping it in meta",
+        "instead": "(not specified)",
+        "item_id": "explorer-csp-frame-ancestors-meta-cleanup",
+        "why": "the CSP spec ignores it there; the fix is a header at the host layer, out of this file's scope."
+      }
+    ],
+    "item_meta": {
+      "category": "Security",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-06T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The duckdb-wasm-compatible directives (script-src 'wasm-unsafe-eval', worker-src blob:) — removing these would break the explorer.",
+        "item_id": "explorer-csp-frame-ancestors-meta-cleanup"
+      },
+      {
+        "behavior": "connect-src 'self' — the load-bearing egress confinement; must not change.",
+        "item_id": "explorer-csp-frame-ancestors-meta-cleanup"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/planning/remediate-explorer-csp-hardening.yaml — the item that added the CSP; SUPERSEDE its noted 'frame-ancestors inert in meta' caveat by actually removing the directive.",
+        "decision": "supersede",
+        "item_id": "explorer-csp-frame-ancestors-meta-cleanup",
+        "path": "_project/DONE/main/planning/remediate-explorer-csp-hardening.yaml"
+      },
+      {
+        "concept": "results-explorer/index.html:6-15 — the existing CSP meta + head comment; EDIT in place, preserve all non-frame-ancestors directives.",
+        "decision": "reuse",
+        "item_id": "explorer-csp-frame-ancestors-meta-cleanup",
+        "path": "results-explorer/index.html:6-15"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-csp-frame-ancestors-meta-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "explorer-csp-frame-ancestors-meta-cleanup",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/"
+      },
+      {
+        "item_id": "explorer-csp-frame-ancestors-meta-cleanup",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/index.html"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -oE 'content=\"default-src[^\"]*\"' results-explorer/index.html | grep -c 'frame-ancestors'",
+        "description": "frame-ancestors is gone from the CSP content= directive string (a comment mentioning it is fine)",
+        "expected": "0 (the directive is removed from the meta content string)",
+        "item_id": "explorer-csp-frame-ancestors-meta-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -oE 'content=\"default-src[^\"]*\"' results-explorer/index.html | grep -c \"connect-src 'self'\"",
+        "description": "the load-bearing connect-src 'self' directive is preserved",
+        "expected": "1 (egress confinement unchanged)",
+        "item_id": "explorer-csp-frame-ancestors-meta-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium 2>&1 | tail -5",
+        "description": "the explorer still builds and the browser e2e suite passes (no CSP regression; connect-src still enforced)",
+        "expected": "all specs pass — removing an inert directive is behaviorally a no-op, so this confirms nothing else broke",
+        "item_id": "explorer-csp-frame-ancestors-meta-cleanup",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-csp-frame-ancestors-meta-cleanup",
+        "notes": "In results-explorer/index.html: remove `frame-ancestors 'none'` from the\n`<meta http-equiv=\"Content-Security-Policy\">` content string, leaving every\nother directive byte-identical (default-src, script-src incl.\n'wasm-unsafe-eval', worker-src blob:, connect-src 'self', style-src,\nimg-src, font-src, object-src 'none', base-uri 'self'). Add an HTML comment\nnear the tag noting that clickjacking protection needs an HTTP response\nheader at the host/CDN because meta CSP ignores frame-ancestors. If the head\ncomment (index.html:6-7) implies framing is covered, correct it too.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Drop the inert frame-ancestors from the meta CSP; document the header-layer requirement",
+        "wid": "w1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "description": "The strategy doc explicitly defers Phase 3 (hosted submission API) until\nPhase 2 PR volume justifies the operational cost. It cites indicators\n(\"submission volume exceeds ~50/month sustained\", \"maintainer review\nbecomes a sustained bottleneck\", etc.) but no one is currently measuring\nthose indicators, and there is no decision moment where someone is asked\nto look.\n\nWithout measurement and a forcing function, the Phase 3 promotion\ndecision will be made by whoever feels frustrated first - which is\nexactly the kind of ad-hoc engineering decision the strategy doc is\ntrying to prevent. This item operationalizes the trigger: pick the\nmetrics, build the cheapest possible dashboard, and put a review on\nsomeone's calendar.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "pick metrics that can't be measured cheaply",
+        "instead": "(not specified)",
+        "item_id": "define-phase-3-promotion-metrics",
+        "why": "a dashboard nobody can build is the same as no dashboard; favor `gh` CLI queries and a flat notes file over building a metrics service."
+      },
+      {
+        "dont": "set the thresholds so low that they trip on noise",
+        "instead": "(not specified)",
+        "item_id": "define-phase-3-promotion-metrics",
+        "why": "false promotion of Phase 3 wastes the largest engineering investment in the project."
+      },
+      {
+        "dont": "start any Phase 3 implementation work as part of this TODO",
+        "instead": "(not specified)",
+        "item_id": "define-phase-3-promotion-metrics",
+        "why": "that defeats the deferral the strategy doc explicitly requires; this is measurement and decision plumbing only."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "define-phase-3-promotion-metrics",
+        "needs_item": "implement-pr-based-result-submission-workflow"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-27T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing Phase 3 planning TODOs (`design-results-ingest-storage-and-derived-read-model`, `integrate-benchbox-cli-submit-and-service-auth`, `operate-results-platform-security-observability-and-abuse-controls`) remain Not Started until a review explicitly promotes them.",
+        "item_id": "define-phase-3-promotion-metrics"
+      },
+      {
+        "behavior": "Strategy doc's deferral of Phase 3 - this TODO measures the trigger, doesn't pull it.",
+        "item_id": "define-phase-3-promotion-metrics"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "define-phase-3-promotion-metrics",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/phase-3-promotion-metrics.md"
+      },
+      {
+        "item_id": "define-phase-3-promotion-metrics",
+        "kind": "only_modify",
+        "path_glob": "_project/handoffs/phase-3-review-baseline-*.md"
+      },
+      {
+        "item_id": "define-phase-3-promotion-metrics",
+        "kind": "only_modify",
+        "path_glob": "_project/notes/phase-2-requests.md"
+      },
+      {
+        "item_id": "define-phase-3-promotion-metrics",
+        "kind": "only_modify",
+        "path_glob": "scripts/phase2_metrics.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/analysis/phase-3-promotion-metrics.md && grep -c 'threshold' _project/analysis/phase-3-promotion-metrics.md",
+        "description": "Promotion metrics doc exists with concrete thresholds",
+        "expected": ">= 4",
+        "item_id": "define-phase-3-promotion-metrics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run python scripts/phase2_metrics.py",
+        "description": "Metrics script runs and produces a report",
+        "expected": "exit 0, markdown output with one section per metric",
+        "item_id": "define-phase-3-promotion-metrics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "define-phase-3-promotion-metrics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "define-phase-3-promotion-metrics",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "define-phase-3-promotion-metrics",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "define-phase-3-promotion-metrics",
+        "notes": "From the strategy doc indicators, choose 4-6 measurable signals.\nSuggested starting set:\n  - Merged community submissions / month (threshold 50 sustained)\n  - Median PR review latency in hours (threshold 72h)\n  - PR backlog (open >7 days) (threshold 5 sustained)\n  - Requests for private/unlisted results (threshold 3 distinct\n    requests)\n  - Submissions blocked by maintainer-only constraints (threshold 5)\n  - Org-account / team-space requests (threshold 3 distinct)\nDocument each metric with: query/source, threshold, what it implies\nif breached. Save as\n`_project/analysis/phase-3-promotion-metrics.md`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pick concrete promotion metrics and thresholds",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "define-phase-3-promotion-metrics",
+        "notes": "Inputs:\n  - GitHub API (PRs against `published-results`, labels, merge dates,\n    review timestamps) via `gh` CLI subprocess or PyGithub.\n  - Optional: user-feedback file `_project/notes/phase-2-requests.md`\n    for the qualitative metrics.\nOutput: markdown report to stdout (or `--output FILE`), one section\nper metric, current value vs threshold, simple Y/N \"breached?\" flag.\nRead-only; no API writes; no auth beyond `gh auth status`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build a minimal `scripts/phase2_metrics.py` that computes the metrics",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "define-phase-3-promotion-metrics",
+        "notes": "Add to `_project/analysis/phase-3-promotion-metrics.md`:\n  - Review cadence: quarterly (first Monday of each quarter).\n  - Owner: BenchBox maintainer rotation.\n  - Procedure: run `phase2_metrics.py`, paste output to handoff file\n    `_project/handoffs/phase-3-review-<date>.md`, decide whether any\n    threshold breach justifies promoting\n    `design-results-ingest-storage-and-derived-read-model` and\n    `integrate-benchbox-cli-submit-and-service-auth` to Active.\nAdd a calendar reminder (or repo-level reminder issue) for the next\nreview date. Calendar = source of truth; this TODO doesn't try to\ninvent a scheduler.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Schedule a quarterly review and document the promotion procedure",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "define-phase-3-promotion-metrics",
+        "notes": "Run the script today against the (currently small) Phase 2 dataset\nand commit the baseline report to\n`_project/handoffs/phase-3-review-baseline-<date>.md`. Even if all\nthresholds are far from breached, the baseline shows the trajectory\nover time.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run the first baseline review and capture the starting state",
+        "wid": "w4"
+      }
+    ]
+  }
+}

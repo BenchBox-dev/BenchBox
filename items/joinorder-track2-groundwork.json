@@ -1,0 +1,256 @@
+{
+  "context": "Pure documentation effort. No code changes; no test changes.\nOutputs are markdown design docs and YAML TODO seeds.\n\nParallelize freely after the foundation TODO is done. The\nthree deliverables are independent of each other:\n  - Phase-model survey (w1, w2) is independent\n  - Scaling-strategy (w3, w4) is independent\n  - Reuse guide (w5) is independent and consumes foundation\n    outputs\n\nRecommendation depth: each design doc should be at \"principal\nengineer evaluation\" depth — multiple options, tradeoffs,\nevidence, recommendation. Not deep enough to make final\ndecisions for Track 2, but deep enough that whoever picks up\nTrack 2 has a clear starting point.\n\nTODO seeds (w2, w4) stay in planning/ with status Identified.\nThey do not block on Track 1 closing; they document Track-2\nintent.\n",
+  "description": "Step 2 prep work for the dual-track JOB strategy (issue #289\nhttps://github.com/joeharris76/BenchBox/issues/289). Track 1\nrestores `joinorder` as canonical IMDb 2013. Track 2 is the\nfuture evaluation of \"scaled JOB likely for evaluating the\ninterplay of statistics maintenance and predicate selectivity.\"\n\nThis TODO produces design artifacts and seeds future TODOs.\nNo code changes. Lays groundwork so when Track 2 is picked up\n(months from now), the starting point is concrete.\n\nThree deliverables:\n  1. Phase-model survey + statistics-as-phase gap analysis.\n     Without separating \"compute statistics\" from load and\n     query phases, Track 2 cannot measure what it set out to\n     measure. Surveys current phase model, identifies the gap,\n     sketches the change, files Track-2 TODO seed.\n  2. Scaling-strategy options analysis. Track 2 wants scaled\n     JOB. The plan-deepening question is \"scaled how?\" —\n     correlated synthetic, sampled-from-real, real with\n     multiple snapshots, etc. Document options + tradeoffs.\n  3. Reusable data-fetch infrastructure reuse guide. The\n     foundation TODO built reusable infra for joinorder.\n     Document how a future benchmark (ClickBench, Wikipedia,\n     GitHub Archive) instantiates it.\n\nParallelizable with `joinorder-canonical-cutover` once\n`joinorder-canonical-foundation` is done. The reuse guide (3)\nconsumes foundation outputs; the other two are independent.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "block Track 1 (cutover) on this TODO's completion",
+        "instead": "this TODO is parallel",
+        "item_id": "joinorder-track2-groundwork",
+        "why": "docs effort can stretch arbitrarily and Track 1 has user-visible value"
+      },
+      {
+        "dont": "make implementation decisions for Track 2 in this TODO",
+        "instead": "present options with tradeoffs, recommend the leading candidate, but do not lock in",
+        "item_id": "joinorder-track2-groundwork",
+        "why": "Track 2 is months away and context will shift"
+      },
+      {
+        "dont": "propose a phase-model change that requires changes to in-flight result bundles",
+        "instead": "the migration strategy section must preserve old bundles' interpretability",
+        "item_id": "joinorder-track2-groundwork",
+        "why": "that would invalidate historical comparisons unnecessarily"
+      },
+      {
+        "dont": "write the Track-2 TODOs at full implementation detail",
+        "instead": "keep them at status: Identified with summary work units only",
+        "item_id": "joinorder-track2-groundwork",
+        "why": "they are seeds, not implementation plans"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-track2-groundwork",
+        "id": 429,
+        "reason": "Track 2 work — captured in track2-joinorder-stats-phase TODO seeded by this work.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: track2-joinorder-stats-phase (DONE) fully implemented the statistics phase; w1-w4 all done and verified end-to-end on DuckDB.",
+        "summary": "Implement the new statistics phase in benchmark phase model"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-track2-groundwork",
+        "id": 430,
+        "reason": "Track 2 work, AND only one of the scaling-strategy options (A) — final choice deferred to Track 2 kick-off.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Correlated synthetic generator is Track-2 scaling-strategy implementation work, owned by the still-open track2-joinorder-scaling-strategy item.",
+        "summary": "Build a correlated synthetic generator"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "joinorder-track2-groundwork",
+        "id": 431,
+        "reason": "Existing benchmark-expansion TODOs cover these; the data-fetch reuse guide produced here unblocks them but does not implement.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: GitHub Archive and Wikipedia are open items (github-archive-benchmark, wikipedia-pageviews-benchmark); ClickBench covered by add-third-benchmark-cohort-to-corpus.",
+        "summary": "Add ClickBench / Wikipedia / GitHub Archive benchmarks"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "created_at": "2026-05-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All Track 1 work (foundation + cutover TODOs) is unblocked by this TODO — this is a parallel-track docs effort, not a gate",
+        "item_id": "joinorder-track2-groundwork"
+      },
+      {
+        "behavior": "Existing TODO numbering and slug conventions — new Track-2 TODOs follow the existing track2-<area>-<topic> pattern",
+        "item_id": "joinorder-track2-groundwork"
+      },
+      {
+        "behavior": "Foundation TODO outputs (data_fetch module, registry surface field, etc.) are not modified here, only documented",
+        "item_id": "joinorder-track2-groundwork"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-track2-groundwork",
+        "kind": "do_not_modify",
+        "path_glob": "Any code under benchbox/"
+      },
+      {
+        "item_id": "joinorder-track2-groundwork",
+        "kind": "do_not_modify",
+        "path_glob": "Any test files under tests/"
+      },
+      {
+        "item_id": "joinorder-track2-groundwork",
+        "kind": "do_not_modify",
+        "path_glob": "Existing benchmarks' phase-model implementation (deferred to Track 2)"
+      },
+      {
+        "item_id": "joinorder-track2-groundwork",
+        "kind": "do_not_modify",
+        "path_glob": "Track-1 design doc (_project/design/joinorder-step1-foundations.md)"
+      },
+      {
+        "item_id": "joinorder-track2-groundwork",
+        "kind": "do_not_modify",
+        "path_glob": "joinorder-canonical-foundation or joinorder-canonical-cutover TODO files"
+      },
+      {
+        "item_id": "joinorder-track2-groundwork",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/track2-joinorder-scaling-strategy.yaml (new seed)"
+      },
+      {
+        "item_id": "joinorder-track2-groundwork",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/track2-joinorder-stats-phase.yaml (new seed)"
+      },
+      {
+        "item_id": "joinorder-track2-groundwork",
+        "kind": "only_modify",
+        "path_glob": "_project/design/data-fetch-infra-reuse-guide.md — fill ONLY these sections: '## When to use', '## Step-by-step: instantiating for a new benchmark', '## Common pitfalls (from joinorder Step 1)', '## Infrastructure components reused'. Do NOT touch the '## DATA-LICENSE.md template' section — that section is owned by cutover w13"
+      },
+      {
+        "item_id": "joinorder-track2-groundwork",
+        "kind": "only_modify",
+        "path_glob": "_project/design/track2-joinorder-scaling-strategy.md (new)"
+      },
+      {
+        "item_id": "joinorder-track2-groundwork",
+        "kind": "only_modify",
+        "path_glob": "_project/design/track2-joinorder-stats-as-phase.md (new)"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f _project/design/track2-joinorder-stats-as-phase.md && grep -cE '^## (Current phase model|Why this matters|Proposed change|Migration strategy|Open design questions)' _project/design/track2-joinorder-stats-as-phase.md",
+        "description": "Phase-model survey doc exists with all five sections",
+        "expected": ">= 5",
+        "item_id": "joinorder-track2-groundwork",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f _project/TODO/main/planning/track2-joinorder-stats-phase.yaml && uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/track2-joinorder-stats-phase.yaml",
+        "description": "Track-2 stats-phase TODO seeded",
+        "expected": "validation passes",
+        "item_id": "joinorder-track2-groundwork",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE '^### Option [A-E]' _project/design/track2-joinorder-scaling-strategy.md",
+        "description": "Scaling-strategy doc enumerates all five options with tradeoffs",
+        "expected": "5",
+        "item_id": "joinorder-track2-groundwork",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f _project/TODO/main/planning/track2-joinorder-scaling-strategy.yaml && uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/track2-joinorder-scaling-strategy.yaml",
+        "description": "Track-2 scaling-strategy TODO seeded",
+        "expected": "validation passes",
+        "item_id": "joinorder-track2-groundwork",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -cE '^## (When to use|Step-by-step|DATA-LICENSE|Common pitfalls|Infrastructure components)' _project/design/data-fetch-infra-reuse-guide.md",
+        "description": "Data-fetch infra reuse guide has step-by-step instantiation section",
+        "expected": ">= 5",
+        "item_id": "joinorder-track2-groundwork",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-track2-groundwork",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-track2-groundwork",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-track2-groundwork",
+        "notes": "Output: `_project/design/track2-joinorder-stats-as-phase.md`\n\nSections:\n    1. Current phase model\n       - Survey benchbox/core/runner/runner.py,\n         benchbox/cli/commands/run.py, benchbox/cli/orchestrator.py,\n         benchbox/core/results/, and platform-specific load/analyze\n         hooks. Document each phase, its boundary (what counts as\n         \"in\" vs \"out\"), and how its time is measured.\n     - Specifically: where does ANALYZE / COMPUTE STATISTICS /\n       auto-statistics gathering land today? Likely rolled\n       into either load (if the engine auto-analyzes after\n       COPY) or query (if first-query triggers stats). Document\n       which engines do which.\n  2. Why this matters for Track 2\n     - Track 2 wants to evaluate \"interplay of statistics\n       maintenance and predicate selectivity.\" If stats time\n       is silently rolled into load or query, the measurement\n       is invalid before it starts.\n     - Specific failure mode: an engine with sophisticated\n       auto-stats that takes 30s to build looks 30s slower at\n       load OR 30s slower at first-query — neither attribution\n       is correct.\n  3. Proposed change\n     - New phase between load and query: \"statistics\" (or\n       similar name).\n     - Per-engine knob: explicit ANALYZE / COMPUTE STATISTICS\n       call in this phase; if engine auto-analyzes during\n       load, document and don't double-build.\n     - Phase ordering: load → statistics → query.\n     - Result-bundle manifest carries per-phase timing\n       separately.\n  4. Migration strategy\n     - Backwards compat: existing benchmarks default to no\n       explicit statistics phase (legacy load-includes-stats\n       behavior).\n     - Opt-in: joinorder, tpch, tpcds enable the new phase\n       once Track 2 is implemented.\n     - Existing result bundles: dataset_version + benchmark\n       schema version distinguish pre- vs post-phase-model.\n  5. Open design questions\n     - Should auto-analyze be detected and disabled, or just\n       documented? (My lean: documented, not disabled —\n       auto-analyze IS what production engines do, so\n       measuring it is realistic.)\n     - Per-table vs whole-database ANALYZE — JOB has 21\n       tables; do we measure each, or aggregate?\n     - When stats are persisted between runs, does subsequent\n       query phase see them or not? (Cold-stats vs warm-stats\n       modes.)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Phase-model survey: document current phase boundaries and stats-as-phase gap",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-track2-groundwork",
+        "notes": "File: `_project/TODO/main/planning/track2-joinorder-stats-phase.yaml`\nStatus: Identified\nPriority: Medium (becomes Track-2's leading work)\n\nContents:\n  - Reference w1's design doc as the implementation spec\n  - Initial work units: phase-model schema change, per-engine\n    ANALYZE knob, result-bundle field, opt-in mechanism\n  - deps.needs: joinorder-canonical-cutover (because the\n    phase model change touches joinorder benchmark.py;\n    should land after the rename + canonical wiring)\n  - Acknowledge this is a Track-2 (future) TODO; stays in\n    planning/ with status Identified\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Seed Track-2 TODO: stats-as-phase implementation",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-track2-groundwork",
+        "notes": "Output: `_project/design/track2-joinorder-scaling-strategy.md`\n\nGoal: enumerate options for \"scaled JOB\" with tradeoffs.\nTrack 2 plan-deepening before the work is picked up.\n\nOptions to evaluate:\n  A) Correlated synthetic generator\n     - Add Zipf / power-law / cross-table correlations to\n       the synthetic generator (joinorder_synthetic gets a\n       new mode; or new benchmark joinorder_correlated)\n     - Tradeoff: scalable, license-clean, but the\n       correlations are GUESSES — not the real correlations\n       JOB measures\n  B) Sampled-from-real (downsample canonical)\n     - Take a fraction of canonical IMDb 2013, preserve\n       all referential integrity\n     - Tradeoff: real correlations preserved on a smaller\n       scale; but cardinality distributions may shift\n       unevenly\n  C) Real with multiple snapshots (current IMDb)\n     - Use datasets.imdbws.com (post-2017 format) with\n       different snapshot dates as scale axis\n     - Tradeoff: real, growing data; but not the JOB-paper\n       dataset, so query results diverge from literature\n  D) Real with augmentation (canonical + synthetic\n     additions)\n     - Start from canonical, layer synthetic correlated\n       rows on top\n     - Tradeoff: preserves real backbone; synthetic part is\n       still a guess\n  E) Skip scaling; focus on stats-maintenance interplay at\n     sf=1 only\n     - Track 2 reframed: not \"scaled JOB\" but\n       \"stats-maintenance JOB\" at canonical scale\n     - Tradeoff: simpler scope; loses the scaling axis but\n       gains correctness\n\nDecision matrix dimensions:\n  - Real-data fidelity (correlations, skew)\n  - Scalability axis available\n  - License posture\n  - Implementation complexity\n  - Comparability with existing JOB literature\n\nOutput: a SPECIFIC leading candidate (one of A-E) with\nreasoning tied to the 5 scoring dimensions. NOT a final\ndecision — the lock-in happens when Track 2 is picked up —\nbut the recommendation in this doc must be unambiguous.\nMulti-option \"we'll see\" framings are not acceptable\noutput; pick one and defend it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Scaling-strategy options for Track 2",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-track2-groundwork",
+        "notes": "File: `_project/TODO/main/planning/track2-joinorder-scaling-strategy.yaml`\nStatus: Identified\nPriority: Medium\n\nStub TODO with the analysis from w3 as context. Final\ndesign picked when Track 2 starts; this is a placeholder\nso the work is tracked.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Seed Track-2 TODO: scaling-strategy work",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-track2-groundwork",
+        "notes": "PRECONDITION: this is the only work unit in this TODO that\nconsumes foundation outputs. Do not start w5 until\n`joinorder-canonical-foundation` is Completed (foundation w1\ncreates the stub file at the path below; w5 fills in\nstep-by-step / template / pitfalls sections). w1-w4 above are\nindependent of foundation and may proceed in parallel.\n\nOutput: `_project/design/data-fetch-infra-reuse-guide.md`\n(foundation TODO created the file as a stub; this work unit\nfills the per-benchmark instantiation guidance)\n\nFrame the reusable infrastructure as a manifest-driven\nverification step on top of BenchBox's existing datagen path\nconvention (`resolve_benchmark_runs_dir()` +\n`get_datagen_path(benchmark, sf)`). Do not describe it as a\nseparate storage root with its own location policy.\n\nSections:\n  1. When to use this infrastructure\n     - Real-data benchmarks with stable upstream data sources\n     - Datasets larger than what is reasonable to commit to\n       git (~50 MB+)\n     - Datasets where provenance / license attribution matter\n  2. Step-by-step: instantiating for a new benchmark\n     a. Decide canonical source (DOI, archived snapshot URL)\n     b. Build offline conversion pipeline (script in\n        _project/scripts/build_<benchmark>_data.py)\n     c. Compute reference cardinalities via independent\n        oracle (Postgres for SQL workloads)\n     d. Package archive: per-table Parquet + manifest +\n        checksums + DATA-LICENSE.md + reference cardinalities\n     e. Stage as DRAFT GitHub Release; publish only after UAT\n     f. Add data_manifest.toml in benchbox/core/<benchmark>/\n     g. Wire benchmark to `get_datagen_path(benchmark, sf)` +\n        `fetch_data(..., output_dir=...)` in benchmark.py\n     h. Add DATA-LICENSE.md (use joinorder's as template)\n     i. Add per-benchmark CHANGELOG entry\n  3. DATA-LICENSE.md template\n     OWNED BY: cutover w13 (NOT this work unit). Cutover writes\n     this section as part of authoring joinorder's\n     DATA-LICENSE.md. Track2 w5 must NOT touch the\n     \"## DATA-LICENSE.md template\" section of the reuse guide.\n     If cutover has not landed yet when w5 runs, leave this\n     section as the foundation-stub placeholder and let cutover\n     fill it later — section-level merge contract.\n  4. Common pitfalls (from joinorder Step 1)\n     - Encoding round-trip gates needed (NFC/NFD silent\n       normalization)\n     - Predicate-domain validation needed (queries-empty-by-\n       construction defect)\n     - Reference cardinalities via independent oracle, not\n       same engine that will be benchmarked\n     - DRAFT-then-promote sequence for the GitHub Release\n  5. Infrastructure components reused\n     - Existing datagen path convention (`BENCHBOX_OUTPUT_DIR`\n       / `benchmark_runs/datagen/<benchmark>_<sf>/`)\n     - benchbox.core.data_fetch (manifest parsing, downloader,\n       manager, errors, SHA256 verification)\n     - benchmark_registry surface field (public/internal)\n     - bundle_publisher dataset_version field\n     - scale_factor enforcement gate\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reusable data-fetch infrastructure reuse guide",
+        "wid": "w5"
+      }
+    ]
+  }
+}

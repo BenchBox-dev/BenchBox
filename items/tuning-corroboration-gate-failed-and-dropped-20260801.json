@@ -1,0 +1,243 @@
+{
+  "context": "Tests first (they must fail against current code), then the narrowest gate change in corroborate() and overall_status(), then the doc update in the same PR. Add a new blocking verdict constant (e.g. FAILED_STATEMENT) or reuse UNVERIFIABLE with a distinct reason for failed ddl/post_load statements; add a receipt-level dropped section (or per-dropped-intent entries) so the block is visible in the receipt, not just implicit. Keep applied_ledger_hash semantics untouched: it stays a hash over EXECUTED statements only, per ADR-001 (the hash is physical identity; the gate is trust).",
+  "description": "From the 2026-07-31 adversarial review of the tuning subsystem (executable proofs, not speculation).\n\nDefect 1 (C1, false applied_verified): corroborate() iterates ledger.executed_statements only (benchbox/core/tuning/introspection.py:481), so a STATEMENT_FAILED entry neither blocks the upgrade nor appears in the receipt. Reachable sequence: Snowflake run tuning two tables; table A's ALTER TABLE ... CLUSTER BY executes and corroborates, table B's fails and is swallowed with a warning (benchbox/platforms/snowflake.py:1743-1744); overall_status derives applied_unverified; _corroborate_applied_ledger (benchbox/platforms/base/adapter.py:1129-1130) upgrades to applied_verified while the same .applied.json carries B's failed entry. Reproduced with a constructed ledger: corroborated=True.\n\nDefect 2 (R1): corroborate() never reads ledger.dropped, so a capability-filtered intent (record_dropped) leaves no receipt entry and a sibling corroborated statement mints applied_verified for a run whose requested tuning was knowingly not applied.\n\nDefect 3 (R3): overall_status (benchbox/core/tuning/applied_ledger.py:228-232) returns applied_unverified when ANY statement executed, including PHASE_SESSION cache hygiene (e.g. Snowflake ALTER SESSION SET USE_CACHED_RESULT, recorded at base/adapter.py:916). A tuned run whose every ddl/post_load statement failed still reports applied_unverified instead of failed. Reproduced.\n\nThe trust rule (docs/development/tuning-introspection-receipts.md:17-33) is silent on failed statements and dropped intents; nothing authorizes ignoring them, and the review invariant is 'record LESS, never over-certify'. Semantics to implement: (a) a failed ddl/post_load statement blocks the upgrade and appears in the receipt with a blocking verdict; (b) any dropped intent blocks the upgrade and is surfaced in the receipt payload; (c) session-phase failures stay non-blocking for the upgrade (transient class) but see (d): overall_status returns failed when ddl/post_load statements were attempted and ALL failed, regardless of session-phase successes; a session-SET-only ledger keeps today's applied_unverified semantics.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Do not derive failure semantics from statement text or mechanism strings",
+        "instead": "gate on AppliedStatement.status and phase only",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "why": "phase and status are the only trustworthy classification inputs the ledger records at execute time"
+      },
+      {
+        "dont": "Do not fix this by filtering failed statements out of the ledger or the .applied.json companion",
+        "instead": "keep failed statements recorded and make the gate read them",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "why": "the companion is the honest record; hiding failures recreates the over-certification one layer down"
+      },
+      {
+        "dont": "Do not make dropped intents a warning-only receipt note",
+        "instead": "treat any dropped intent as blocking for the upgrade",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "why": "known-not-applied tuning is strictly stronger evidence against verification than an unknown statement shape, which already blocks"
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness",
+      "completed_at": "2026-08-01T15:02:22Z",
+      "completed_pr": 1403,
+      "created_at": "2026-08-01T12:28:46Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Capture never breaks a run: every record/derive/corroborate path stays non-raising and degrades to debug logs.",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801"
+      },
+      {
+        "behavior": "Existing receipt payload fields keep their names and shapes; additions only (explorer ingests the receipt verbatim).",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801"
+      },
+      {
+        "behavior": "Session SET/PRAGMA statements remain transient: they neither earn nor block verification, and a session-only ledger still derives applied_unverified.",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801"
+      },
+      {
+        "behavior": "applied_ledger_hash stays a hash over ordered EXECUTED statements only (ADR-001 physical identity) - failed statements must NOT enter the hash.",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801"
+      },
+      {
+        "behavior": "applied_verified remains reachable ONLY via corroborate() from applied_unverified; overall_status never returns it.",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/result_capture.py"
+      },
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/applied_ledger.py"
+      },
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/introspection.py"
+      },
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/development/tuning-adr-001-trust-and-hash-semantics.md"
+      },
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "kind": "only_modify",
+        "path_glob": "docs/development/tuning-introspection-receipts.md"
+      },
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_clickhouse_applied_ledger_live.py"
+      },
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/**"
+      },
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from benchbox.core.tuning.applied_ledger import PHASE_DDL, PHASE_POST_LOAD, STATEMENT_FAILED, AppliedTuningLedger; from benchbox.core.tuning.introspection import IntrospectedObject, IntrospectedState, KIND_SORT_KEY, corroborate; led=AppliedTuningLedger(); led.record('CREATE TABLE t (x Int32) ENGINE=MergeTree ORDER BY (a)', PHASE_DDL); led.record('ALTER TABLE u CLUSTER BY (b)', PHASE_POST_LOAD, status=STATEMENT_FAILED, error='boom'); st=IntrospectedState(platform='x', objects=[IntrospectedObject(kind=KIND_SORT_KEY, table='t', columns=('a',))]); assert not corroborate(led, st).corroborated\"",
+        "description": "Failed ddl/post_load statement blocks the upgrade (post-fix probe)",
+        "expected": "exit 0: a failed post_load statement refuses the upgrade even though the sibling statement corroborates",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T13:51:06Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.tuning.applied_ledger import PHASE_DDL, AppliedTuningLedger; from benchbox.core.tuning.introspection import IntrospectedObject, IntrospectedState, KIND_SORT_KEY, corroborate; led=AppliedTuningLedger(); led.record('CREATE TABLE t (x Int32) ENGINE=MergeTree ORDER BY (a)', PHASE_DDL); led.record_dropped('clustering:orders', 'capability filtered'); st=IntrospectedState(platform='x', objects=[IntrospectedObject(kind=KIND_SORT_KEY, table='t', columns=('a',))]); assert not corroborate(led, st).corroborated\"",
+        "description": "Dropped intent blocks the upgrade (post-fix probe)",
+        "expected": "exit 0: any dropped intent refuses the upgrade",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T13:51:09Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.core.tuning.applied_ledger import PHASE_POST_LOAD, PHASE_SESSION, STATEMENT_FAILED, AppliedTuningLedger; led=AppliedTuningLedger(); led.record('SET x=1', PHASE_SESSION); led.record('ALTER TABLE t CLUSTER BY (a)', PHASE_POST_LOAD, status=STATEMENT_FAILED, error='x'); assert led.overall_status(tuning_enabled=True, has_config=True)=='failed'\"",
+        "description": "All-physical-failed run derives failed, not applied_unverified (post-fix probe)",
+        "expected": "exit 0: session-phase successes cannot mask a fully-failed physical tuning",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T13:51:11Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning tests/unit/platforms/test_clickhouse_introspection.py tests/unit/platforms/test_snowflake_introspection.py tests/integration/test_clickhouse_applied_ledger_live.py -q",
+        "description": "Tuning unit suites and live chDB corroboration tests stay green",
+        "expected": "all pass, including the pre-existing verified-upgrade paths",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T13:56:39Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast suite green",
+        "expected": "no regressions",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "last_result": "pass",
+        "last_run": "2026-08-01T13:55:00Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added regression tests in test_applied_ledger.py and test_introspection.py; all three exact post-fix probes exited 1 before implementation (expected red). Pytest invocation was mechanically blocked by active shared lock pid 21954, not bypassed.",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "notes": "Add regression tests that FAIL against current code: (a) executed+corroborated statement plus STATEMENT_FAILED ddl/post_load statement -> corroborate().corroborated must be False; (b) executed+corroborated statement plus one record_dropped intent -> corroborated must be False; (c) ledger with all ddl/post_load statements failed plus one executed PHASE_SESSION SET -> overall_status must be 'failed'; (d) session-SET-only ledger -> overall_status stays 'applied_unverified'.",
+        "started_at": "2026-08-01T13:36:05Z",
+        "started_branch": "fix/tuning-corroboration-gate-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Add failing regression tests: failed ddl/post_load statement, dropped intent, and all-physical-failed + session-SET ledgers must block/demote; session-only ledger stays applied_unverified",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Implemented status/phase gate over all ledger statements; exact failed-statement probe passes and receipt includes blocking unverifiable entry with failure reason; failed session regression remains transient.",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "notes": "Block the upgrade on failed ddl/post_load statements: corroborate() must consider ledger.statements (not just executed_statements) for gating, emit a receipt entry with a blocking verdict and the failure reason for each failed ddl/post_load statement, and keep session-phase failures non-blocking.",
+        "started_at": "2026-08-01T13:38:14Z",
+        "started_branch": "fix/tuning-corroboration-gate-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "corroborate(): failed ddl/post_load statements block the upgrade and get blocking receipt entries; session-phase failures stay non-blocking",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Receipt now adds dropped intent payload and corroborated is forced false whenever ledger.dropped is non-empty; exact dropped-intent probe passes.",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "notes": "Block the upgrade on dropped intents: corroborate() reads ledger.dropped, surfaces each dropped intent in the receipt payload, and refuses corroborated=True when any exist.",
+        "started_at": "2026-08-01T13:38:17Z",
+        "started_branch": "fix/tuning-corroboration-gate-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "corroborate(): any dropped intent blocks the upgrade and is surfaced in the receipt payload",
+        "wid": "w3"
+      },
+      {
+        "evidence": "overall_status now evaluates ddl/post_load attempts before session successes; exact all-physical-failed probe passes while explicit session-only regression preserves applied_unverified.",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "notes": "overall_status: return FAILED when >=1 ddl/post_load statement was attempted and all of them failed, regardless of executed session-phase statements; preserve noop/not_applicable branches and the session-only applied_unverified case.",
+        "started_at": "2026-08-01T13:38:20Z",
+        "started_branch": "fix/tuning-corroboration-gate-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "overall_status: failed when all attempted ddl/post_load statements failed regardless of session successes; preserve noop and session-only semantics",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Updated receipts trust rule/classification table and ADR-001 status vocabulary for failed physical statements, dropped intents, transient session failures, and all-physical-failed derivation.",
+        "item_id": "tuning-corroboration-gate-failed-and-dropped-20260801",
+        "notes": "Update the trust rule in docs/development/tuning-introspection-receipts.md (rules 1-3 plus a new explicit failed/dropped clause and classification-table rows) and the ADR-001 status-vocabulary notes so docs and gate agree.",
+        "started_at": "2026-08-01T13:40:10Z",
+        "started_branch": "fix/tuning-corroboration-gate-20260801",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-03",
+        "status": "done",
+        "summary": "Update trust rule in receipts design note and ADR-001 vocabulary notes to include failed/dropped blocking",
+        "wid": "w5"
+      }
+    ]
+  }
+}

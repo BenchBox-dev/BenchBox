@@ -1,0 +1,296 @@
+{
+  "context": "Design from the default public workflow first, then reinsert power features as\nadvanced controls. Reuse existing query/facet metadata instead of hard-coding\nad hoc labels. Keep URL and export contracts under test while changing visual\nhierarchy.\n",
+  "description": "PR #246 found that Query Workbench is functionally useful but still reads like\nan internal schema/debugging surface. Visible Columns is too prominent,\nmobile filters do not present as a predictable drawer workflow, raw schema\nnames and values leak into public display, and numeric/date/null formatting\ndiverges from the browse pages.\n\nThis TODO converts those findings into a public-workbench remediation plan.\nThe end state should preserve power-user filtering, SQL, URL state, and\nexports while making the default path straightforward: filter results,\ninspect rows, open details, and export selected visible fields.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "break mobile drawer focus trapping or URL state while retheming filters.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "expose raw schema labels in default public table/filter UI when display metadata exists.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make Visible Columns the first desktop analysis surface.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "remove SQL/export power features; make them subordinate to the browse workflow.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "solve mobile overflow by hiding important row actions.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "needs_item": "results-explorer-retheme-theme-system-foundation"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "CSV and JSON exports use exactly the user-visible selected columns.",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation"
+      },
+      {
+        "behavior": "Hidden `result_id` remains available for row View links.",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation"
+      },
+      {
+        "behavior": "Query Workbench route `/results/query`.",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation"
+      },
+      {
+        "behavior": "SQL scratchpad remains read-only against the browser snapshot.",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation"
+      },
+      {
+        "behavior": "Schema-driven visible column list.",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation"
+      },
+      {
+        "behavior": "Shareable facet URL state.",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "_project/audits/"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/FacetRail.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/FacetRail.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/facetDisplay.ts"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/facetModel.ts"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/format.ts"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/queryFilters.ts"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/queryLabels.ts"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Query.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- src/pages/__tests__/Query.test.tsx src/components/__tests__/FacetRail.test.tsx",
+        "description": "Query page and facet tests pass",
+        "expected": "all targeted Query tests pass",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --grep query",
+        "description": "Query browser smoke passes",
+        "expected": "Chromium query route smoke passes",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: recapture /results/query at 390, 768, 1280, 1600 plus mobile filter drawer and compare against PR #246 screenshots'",
+        "description": "Manual PR #246 Query recapture is clean",
+        "expected": "manual evidence shows VH-5, U-4, and DQ-6 resolved or explicitly deferred",
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "notes": "Make the default workflow explicit:\n  - result count and active filters;\n  - filter controls;\n  - result rows;\n  - row limit;\n  - row detail action;\n  - CSV/JSON export.\n\nMove schema and power-user controls behind secondary affordances:\n  - Visible Columns;\n  - SQL scratchpad;\n  - Build SQL From Filters;\n  - starter SQL queries.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define the Query Workbench public workflow and subordinate advanced controls",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "notes": "The `query-1280.png` evidence shows Visible Columns above the table in\nthe main desktop column. Move it below the table, into a disclosure, or\ninto a compact configuration popover. Preserve schema-driven columns,\nURL/export behavior, and hidden `result_id` for row View links.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Move Visible Columns out of the first desktop data slot",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "notes": "The `query-mobile-filter-drawer-390.png` evidence does not show a clear\nopened drawer state and leaves focus on `Build SQL From Filters`. Make\nthe mobile filter trigger an explicit button with count/state. When open,\nthe drawer must have a clear header, reset/apply controls, close action,\nfocus trap, Escape behavior, and reachable checkbox targets.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Redesign mobile filters as an explicit drawer workflow",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "notes": "Replace raw schema-facing labels such as `scale_factor`, `geomean_ms`,\n`star_schema`, and `community-submission` in public table/filter contexts\nwith display names from query/facet metadata. Raw schema names may remain\nin advanced SQL-only contexts, but the default result table and filters\nshould read as product UI.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply public display labels to query columns and facet values",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "notes": "Align Query table formatting with browse pages:\n  - ms values and seconds values use deliberate units;\n  - power score and geomean values use consistent precision;\n  - dates avoid awkward wrapping at desktop width;\n  - null, missing, no-run, and not-recorded values have distinct display;\n  - metric direction is visible where benchmark values appear.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize numeric, unit, date, null, and missing-value formatting",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "notes": "Keep CSV/JSON export and SQL functionality, but make them subordinate to\nthe primary browse path. Export actions should state selected-visible\ncolumn behavior. Row limit controls should be predictable on mobile and\ndesktop. Advanced SQL errors and result tables should use the same table\nand state primitives as the rest of the Explorer.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Retheme exports, row limit, advanced SQL, and starter queries",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-pr246-query-workbench-evidence-remediation",
+        "notes": "Add tests for facet URL round trip, drawer open/focus/close behavior,\nvisible-column placement/export behavior, display labels, numeric/date\nformatting, hidden `result_id`, and SQL/export preservation. Recapture\n`/results/query` at 390px, 768px, 1280px, and 1600px, including the\nmobile filter drawer.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Query Workbench regression tests and recapture PR #246 evidence",
+        "wid": "w7"
+      }
+    ]
+  }
+}

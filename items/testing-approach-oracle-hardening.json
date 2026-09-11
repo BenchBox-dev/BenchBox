@@ -1,0 +1,418 @@
+{
+  "context": "Start with evidence refresh so the follow-up is tied to current `develop`,\nnot a stale review transcript. Then harden the current bounded gate in place:\nchoose a discriminating answer-backed query subset, make strict mode fail\nwhen the subset does not validate, and make the Makefile target fail on a\nselected skip. After the gate is sound, triage medium-only tests by product\nrisk and promote only the clusters that carry correctness obligations.\nFinish by repairing stale documentation and recording the remaining\nrow-value-validation limit as deferred work.\n",
+  "description": "Follow-up review of `testing-approach-correctness-gates` found that #737\nadded valuable CI plumbing but left important correctness gaps in the\nbounded real-result gate. The rebuttal agrees with the architectural shape:\na single bounded DuckDB/TPC-H cell is acceptable for routine develop PRs,\nand `medium` does not automatically need to become a full CI lane. The\nvalid defects are narrower and more actionable:\n\n  - the current gate validates only row counts, and the configured query\n    subset `6,14,15,17,19` has SF=1 expected cardinality of exactly one row\n    for every query, making it weak against wrong joins, filters, or\n    aggregate values that still emit one row;\n  - strict expected-result enforcement can still be silently disarmed by\n    scale/benchmark drift because the hard assertion is guarded by\n    `benchmark_name == \"tpch\" and scale_factor >= 1.0`;\n  - the Makefile target can pass if the selected pytest node is skipped;\n  - `tests/README.md` still references nonexistent `tests/specialized/`\n    files, while the prior TODO claims that reference was removed;\n  - the `medium` marker policy is documented, but the large medium-only\n    population needs an explicit product-risk triage rather than an\n    assumption that every medium test is either CI-worthy or irrelevant.\n\nCorrect the testing approach by keeping the bounded-gate design, making the\noracle materially discriminating, proving strict mode fails when disarmed,\nadding a skip-as-failure guard for the selected node, repairing stale docs,\nand converting the medium-marker debate into a concrete triage decision.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add all medium tests to CI as a bulk fix",
+        "instead": "inventory and promote correctness-relevant clusters explicitly.",
+        "item_id": "testing-approach-oracle-hardening",
+        "why": "the marker is heterogeneous"
+      },
+      {
+        "dont": "choose only scalar one-row aggregate queries",
+        "instead": "include high-cardinality answer-backed queries.",
+        "item_id": "testing-approach-oracle-hardening",
+        "why": "row-count validation then cannot discriminate many wrong answers"
+      },
+      {
+        "dont": "frame a one-cell bounded gate as the defect",
+        "instead": "improve the oracle inside that cell instead.",
+        "item_id": "testing-approach-oracle-hardening",
+        "why": "bounded routine PR feedback is intentional"
+      },
+      {
+        "dont": "leave strict enforcement behind benchmark/scale assumptions",
+        "instead": "fail whenever a configured strict subset produces missing/SKIP validations.",
+        "item_id": "testing-approach-oracle-hardening",
+        "why": "future CI speedups can silently disarm the oracle"
+      },
+      {
+        "dont": "rely on pytest exit 0 for a selected node",
+        "instead": "add an explicit no-skip/ran-count guard.",
+        "item_id": "testing-approach-oracle-hardening",
+        "why": "selected skips currently pass"
+      },
+      {
+        "dont": "rewrite the prior TODO as if #737 never helped",
+        "instead": "(not specified)",
+        "item_id": "testing-approach-oracle-hardening",
+        "why": "preserve genuine wins and correct only the false or incomplete claims."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "testing-approach-oracle-hardening",
+        "id": 493,
+        "reason": "High-cardinality row counts are a cheap hardening step, but value-level comparison is a broader result-model change that needs its own design and runtime budget.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Value-level answer-set validation breadth for TPC-H falls under the open oracle-coverage-map item's mandate to close unguarded/under-guarded cells. (tracked by benchmark-correctness-oracle-coverage-map)",
+        "summary": "Add value-level answer-set validation for selected TPC-H queries"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "testing-approach-oracle-hardening",
+        "id": 494,
+        "reason": "The medium population is large and heterogeneous; promote correctness-relevant clusters explicitly instead of adding an expensive uncurated lane.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: An explicit alternative was adopted instead ('promote correctness-relevant clusters explicitly' rather than blanket medium-test CI promotion).",
+        "summary": "Promote every medium test into CI"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "testing-approach-oracle-hardening",
+        "id": 495,
+        "reason": "The accepted architecture is a bounded real-result gate for routine PRs, with full stress/UAT evidence kept opt-in or release-scoped.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicit accepted architecture decision (bounded gate for routine PRs, full stress/UAT opt-in only); not deferred work awaiting execution.",
+        "summary": "Run the full local stress matrix on every develop PR"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-06-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Databricks coverage-theater fixes from #737 remain intact; do not reintroduce constructor-bypass tests or `_build_query_result_with_validation` stubs.",
+        "item_id": "testing-approach-oracle-hardening"
+      },
+      {
+        "behavior": "Default non-strict stress matrix behavior continues to skip unsupported expected-results validation rather than failing unrelated opt-in matrix cases.",
+        "item_id": "testing-approach-oracle-hardening"
+      },
+      {
+        "behavior": "Develop PR feedback remains bounded; do not run the full stress matrix on every routine PR.",
+        "item_id": "testing-approach-oracle-hardening"
+      },
+      {
+        "behavior": "Main/release and develop workflow aggregators continue to require the correctness gate for code-impacting paths where they do today.",
+        "item_id": "testing-approach-oracle-hardening"
+      },
+      {
+        "behavior": "Strict gate mode fails when configured expected-results checks do not actually evaluate.",
+        "item_id": "testing-approach-oracle-hardening"
+      },
+      {
+        "behavior": "`make test-correctness-gate` still executes a real DuckDB/TPC-H benchmark through generate, load, and power phases.",
+        "item_id": "testing-approach-oracle-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/pr.yml:correctness-gate - preserve code-impacting develop PR aggregation",
+        "decision": "reuse",
+        "item_id": "testing-approach-oracle-hardening",
+        "path": ".github/workflows/pr.yml:correctness-gate"
+      },
+      {
+        "concept": ".github/workflows/test.yml:correctness-gate - preserve main/release aggregation",
+        "decision": "reuse",
+        "item_id": "testing-approach-oracle-hardening",
+        "path": ".github/workflows/test.yml:correctness-gate"
+      },
+      {
+        "concept": "Makefile:test-correctness-gate - extend the existing bounded gate rather than adding a full stress lane",
+        "decision": "extend",
+        "item_id": "testing-approach-oracle-hardening",
+        "path": "Makefile:test-correctness-gate"
+      },
+      {
+        "concept": "_project/TODO/main/planning/testing-approach-correctness-gates.yaml - correct stale completion notes without rewriting unrelated history",
+        "decision": "reuse",
+        "item_id": "testing-approach-oracle-hardening",
+        "path": "_project/TODO/main/planning/testing-approach-correctness-gates.yaml"
+      },
+      {
+        "concept": "benchbox/core/expected_results/tpch_results.py:get_tpch_expected_results - reuse SF=1 answer-backed row counts for gate-query ratchets",
+        "decision": "reuse",
+        "item_id": "testing-approach-oracle-hardening",
+        "path": "benchbox/core/expected_results/tpch_results.py:get_tpch_expected_results"
+      },
+      {
+        "concept": "benchbox/core/validation/query_validation.py:QueryValidator.validate_query_result - preserve row-count validation semantics outside strict gate mode",
+        "decision": "reuse",
+        "item_id": "testing-approach-oracle-hardening",
+        "path": "benchbox/core/validation/query_validation.py:QueryValidator.validate_query_result"
+      },
+      {
+        "concept": "tests/README.md:Automated Gate Contract - update the documented contract after implementation",
+        "decision": "reuse",
+        "item_id": "testing-approach-oracle-hardening",
+        "path": "tests/README.md:Automated"
+      },
+      {
+        "concept": "tests/integration/test_local_platform_benchmark_matrix.py:_validate_against_expected_results - extend strict-mode failure behavior",
+        "decision": "extend",
+        "item_id": "testing-approach-oracle-hardening",
+        "path": "tests/integration/test_local_platform_benchmark_matrix.py:_validate_against_expected_results"
+      },
+      {
+        "concept": "tests/unit/test_standardized_test_commands.py - extend command/workflow ratchets for query quality, strict arming, and no-skip behavior",
+        "decision": "extend",
+        "item_id": "testing-approach-oracle-hardening",
+        "path": "tests/unit/test_standardized_test_commands.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/testing-approach-correctness-gates.yaml"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/testing-approach-oracle-hardening.yaml"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/README.md"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/test_local_platform_benchmark_matrix.py"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_marker_strategy.py"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_standardized_test_commands.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_standardized_test_commands.py -q",
+        "description": "Command/workflow ratchets pass after gate hardening",
+        "expected": "all tests pass",
+        "item_id": "testing-approach-oracle-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_marker_strategy.py -q",
+        "description": "Marker strategy remains explicit",
+        "expected": "all tests pass",
+        "item_id": "testing-approach-oracle-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make test-correctness-gate",
+        "description": "The hardened bounded correctness gate proves real-result execution and fails on missing configured expected checks",
+        "expected": "passes with exactly the intended node run and zero selected skips",
+        "item_id": "testing-approach-oracle-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make pr-preflight",
+        "description": "Broad pre-PR gate passes before publishing the implementation",
+        "expected": "passes",
+        "item_id": "testing-approach-oracle-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/todo show testing-approach-oracle-hardening --json > /dev/null && _project/scripts/todo audit verify",
+        "description": "The completed item is readable and tracker history is intact",
+        "expected": "exit 0",
+        "item_id": "testing-approach-oracle-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "needs_wid": "w0",
+        "wid": "w5"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "testing-approach-oracle-hardening",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "testing-approach-oracle-hardening",
+        "notes": "Evidence refreshed on develop @ f6761668 (after #744 landed). KEY FINDING:\nthe TODO premise is partly stale -- PR #744 (2026-06-01, same day) already\nbroadened the gate query set from the near-vacuous `6,14,15,17,19` to the\n18-query set `1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22` AND pinned the\nreference qgen seed for EXACT validation.\n  - SF=1 expected counts for the 18-query gate set: Q9=175, Q2=100, Q21=100,\n    Q13=42, Q10=20, Q3=10, Q22=7, Q4/Q5/Q7/Q8/Q1/Q12 in 2..5, and 5 one-row\n    (Q6,Q14,Q15,Q17,Q19). Three queries >=100; not one-row-dominated.\n  - The TODO's suggested adds (Q11=1048, Q16=18314, Q20=186) are DELIBERATELY\n    excluded by #744 as dbgen-build-unstable (threshold/HAVING cardinality).\n    Empirically all 22 pass on this Linux build + pinned seed, but #744 added\n    the seed-pinning and the exclusion together, so the cross-dbgen-build\n    concern stands -- did NOT add them (would fight a deliberate decision and\n    risk cross-platform CI flake). See success_metrics reconciliation below.\n  - medium-only count: 990 (`medium and not fast and not integration and not\n    (slow or stress or resource_heavy or live_integration)`).\n  - Confirmed strict block was still gated behind `tpch && scale_factor>=1.0`\n    (w2 defect real); Makefile gate had no no-skip guard (w3 defect real).\n  - Confirmed stale `tests/specialized/` reference in tests/README.md (dir\n    absent; only `tests/unit/tpcds/test_minimal_queries.py` exists) and the\n    false \"removed\" claim in testing-approach-correctness-gates.yaml w4.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refresh and pin the review evidence against current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "testing-approach-oracle-hardening",
+        "notes": "RECONCILED with current develop: the query-set broadening this item asked\nfor was already done by #744 (see w0). The specific adds suggested here\n(Q16/Q11/Q20) are the dbgen-build-unstable queries #744 deliberately\nexcluded, so the remaining deliverable is the RATCHET, plus codifying the\nexclusion so the two decisions cannot silently diverge.\n\nAdded `TestCorrectnessGateOracle` in\n`tests/unit/test_standardized_test_commands.py`:\n  - `test_gate_query_set_is_answer_backed_and_discriminating`: parses the\n    configured ids from the Makefile, loads SF=1 answer counts, and fails\n    if the set is not answer-backed, becomes one-row-dominated, or drops\n    below two queries with cardinality >=100.\n  - `test_gate_excludes_dbgen_unstable_threshold_queries`: fails if\n    Q11/Q16/Q18/Q20 are reintroduced.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace the near-vacuous gate query subset with a discriminating row-count mix",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "testing-approach-oracle-hardening",
+        "notes": "Hoisted the strict-mode assertion in\n`tests/integration/test_local_platform_benchmark_matrix.py`\n`_validate_against_expected_results` out from behind\n`benchmark_name == \"tpch\" and scale_factor >= 1.0`. Strict mode now fails\nwhenever a non-empty configured subset does not fully evaluate (every\nconfigured query must produce a non-SKIP validation), regardless of\nbenchmark/scale. Non-strict callers are untouched (still skip unsupported\nvalidation), preserving the must_preserve contract.\n\nHelper-level tests in `TestCorrectnessGateOracle`:\n`test_strict_mode_fails_on_scale_drift` (tpch SF=0.1 -> all SKIP -> fail),\n`test_strict_mode_fails_on_benchmark_drift` (unknown benchmark -> fail),\n`test_strict_mode_passes_when_all_configured_queries_evaluate`, and\n`test_non_strict_mode_tolerates_unsupported_validation`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make strict expected-results mode fail when configured checks are disarmed",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "testing-approach-oracle-hardening",
+        "notes": "`make test-correctness-gate` now writes a JUnit report to a private `mktemp`\nfile (not the repo-root `test-results.xml` that pytest-ci.ini also writes),\nand a guard parses it (ElementTree, not stdout scraping), failing unless\nexactly one node ran with zero skipped/failed/errored; the report is removed\nafter parsing and both the pytest and guard exit statuses are propagated.\nVerified: real gate run -> guard prints `ran=1 skipped=0 failures=0 errors=0`,\nexit 0; a synthetic skipped=1 report -> guard exits 1.\n\nRatchets in `TestCorrectnessGateOracle`:\n`test_gate_target_enforces_no_skip` (target must emit JUnit + assert skip\ncount) and `test_gate_node_is_in_stable_matrix` (tpch-duckdb must stay in\n`LOCAL_SQL_STABLE_MATRIX`). Node-id drift is already covered by the existing\n`test_correctness_gate_nodeid_collects_under_stress`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fail the correctness-gate target when the selected node is skipped",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "testing-approach-oracle-hardening",
+        "notes": "Compact inventory (990 medium-only tests, by top directory):\n  tests/unit/core 287, tests/unit (root) 160, tests/unit/platforms 71,\n  tests/unit/utils 70, tests/validation 44, tests/unit/tpch 41,\n  tests/e2e 31, tests/unit/cli 28, tests/unit/examples 25,\n  tests/examples 21, tests/unit/monitoring 10, tests/unit/mcp 9,\n  tests/unit/visualization 6, tests/unit/benchmarks 4, smaller tails.\n\nRouting decisions:\n  - Correctness-gate oracle cluster (the new `TestCorrectnessGateOracle`\n    + the pre-existing gate ratchets in\n    `tests/unit/test_standardized_test_commands.py`): KEPT at medium.\n    Rationale: the gate itself is a dedicated REQUIRED CI job\n    (`correctness-gate` in pr.yml / test.yml) that runs the real oracle on\n    every code-impacting PR, so these meta-guards do not also need the fast\n    lane; they prevent local config regression and run via the medium lane\n    and the explicit gate verification. The marker policy\n    (test_marker_strategy.py) enforces a single module-level speed marker\n    and bans per-test fast/medium decorators, so a within-module subset\n    promotion is intentionally not available -- promoting would mean\n    flipping the whole module, which would sweep the subprocess-collection\n    ratchet into the fast lane (undesirable cost).\n  - Recommended follow-up promotions (OUT of this TODO's file scope, hence\n    recorded not executed): `tests/unit/tpch` answer/cardinality tests and\n    `tests/validation` result-validation tests are the most\n    correctness-relevant clusters and are candidates for `fast` or an\n    integration workflow; each needs its own module-level marker change.\n  - Left local-only (medium): broad `tests/examples`, `tests/unit/examples`,\n    `tests/unit/visualization`, `tests/unit/monitoring`, and most\n    `tests/unit/utils` -- developer-facing / non-result-correctness suites\n    whose CI cost outweighs the marginal blocking value.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Triage medium-only tests into explicit automated routing decisions",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "testing-approach-oracle-hardening",
+        "notes": "Removed the stale \"Minimal tests have been moved to the `specialized/`\ndirectory\" note (and its two nonexistent file references) from\n`tests/README.md`. Corrected\n`testing-approach-correctness-gates.yaml` w4 so it no longer claims the\n`specialized/` reference was removed there; it now points to this TODO's\nw5. Databricks coverage-theater and other genuine cleanup notes left\nintact.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Repair stale testing docs and the false prior completion claim",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "testing-approach-oracle-hardening",
+        "notes": "Expanded the \"Automated Gate Contract\" section of `tests/README.md` to\nstate exactly what the gate proves -- discriminating answer-backed subset,\nstrict arming (fails when any configured check SKIPs, not gated on\nbenchmark/scale), and the no-skip JUnit guard -- and what it still does not\nprove: result-value correctness (cardinality only) and the high-cardinality\nthreshold queries (Q11/Q16) excluded for dbgen-build stability. Value-level\ncomparison remains the recorded `deferred` follow-up.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the corrected gate contract and residual oracle limits",
+        "wid": "w6"
+      }
+    ]
+  }
+}

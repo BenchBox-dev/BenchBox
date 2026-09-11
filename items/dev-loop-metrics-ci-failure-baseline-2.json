@@ -1,0 +1,176 @@
+{
+  "context": "Extend the existing dev-loop-metrics script rather than adding a new tool; use gh/GitHub API run history keyed by head branch; snapshot to _project/analysis/ci-failure-baseline-<date>.md with the exact query commands recorded for reproducibility. Actions-API queries need gh/network: degrade gracefully (skip with a notice, never fail the target) when unavailable, e.g. in remote sessions.",
+  "description": "WS9 of _project/planning/ci-failure-reduction-plan.md (branch claude/ci-failures-merge-blockers-sitg7a). Because every dev PR lands via squash auto-merge once green, head-SHA check runs are green by construction; the real failure cost is fix-forward pushes, guard-file conflicts, and post-merge develop breaks. Before landing WS1-WS4 we need a baseline so a 2-week review can arbitrate outcomes (especially whether the merge-queue trial tracked by dev-loop-step-6-queue-decision-gate is justified).\n\nExtend `make dev-loop-metrics` to compute, per merged develop PR over a trailing window: (a) pushes-after-open (fix-forward count, via commits on the head branch after PR open); (b) open-to-merge wall time; (c) whether _project/config/fast_test_lane_policy.json was touched; (d) first-pass required-lane green rate, derived from Actions run history per head branch (NOT head-SHA check runs, which are always green). Capture a dated baseline snapshot under _project/analysis/.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Derive first-pass green rate from head-SHA check runs",
+        "instead": "Use Actions workflow-run history per head branch across all pushes",
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "why": "Auto-merge guarantees heads are green, so that measure reads 100% and hides every fix-forward round trip"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-23T19:05:48Z",
+        "from_item": "dev-loop-metrics-ci-failure-baseline-2",
+        "id": 643,
+        "reason": "MCP actions_list payloads ~400K chars at 30 rows make a full-window sample impractical in-session; needs a cheaper query shape or many small paginated calls. Attach to the first WS1-WS4 re-measure (2-week cadence documented in the snapshot header).",
+        "resolution": "promoted",
+        "resolved_item": "ci-baseline-representative-remeasure-sample",
+        "resolved_reason": null,
+        "summary": "Representative (non-recency-biased) 28-day per-PR API sample for the re-measure"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "completed_at": "2026-07-23T19:18:37Z",
+      "completed_pr": 1282,
+      "created_at": "2026-07-23T13:50:48Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing dev-loop-metrics output fields and their meanings (additive change only)",
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2"
+      },
+      {
+        "behavior": "No new required CI check is introduced by this item",
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/**"
+      },
+      {
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make dev-loop-metrics",
+        "description": "dev-loop-metrics runs clean with the new fields",
+        "expected": "exit 0, new per-PR fields present in output",
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "ls _project/analysis/ | grep -c ci-failure-baseline",
+        "description": "Baseline snapshot committed",
+        "expected": ">= 1",
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "MCP check-run sample PRs 1274-1278: 4/5 green at head; 1278 merged with Chromium-blocking check FAILED at head (proves head-SHA color is wrong signal + confirms chromium-blocking-suite-not-in-required-checks gap live). Squash-auto-merge policy confirmed in force.",
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "notes": null,
+        "started_at": "2026-07-23T19:04:33Z",
+        "started_branch": "chore/dev-loop-metrics-ci-baseline",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-baseline",
+        "status": "done",
+        "summary": "Re-validate evidence: confirm squash-auto-merge policy and green-at-head behavior still hold on current develop (re-run the head-SHA check-run sample on 5 recent PRs)",
+        "wid": "w0"
+      },
+      {
+        "evidence": "_project/scripts/dev_loop_pr_metrics.py (stdlib-only; gh->GITHUB_TOKEN urllib->graceful SKIP exit 0; --json). Additive final step in make dev-loop-metrics; original 6 fields preserved; ruff clean",
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "notes": null,
+        "started_at": "2026-07-23T19:04:38Z",
+        "started_branch": "chore/dev-loop-metrics-ci-baseline",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-baseline",
+        "status": "done",
+        "summary": "Extend dev-loop-metrics with the four per-PR measures (fix-forward pushes, open-to-merge time, policy-file touch, first-pass green rate)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "_project/analysis/ci-failure-baseline-2026-07-23.md: 355 merged PRs/28d (deepened clone after catching shallow-clone-at-57 hazard), 16/355=4.5% touched fast_test_lane_policy.json; API sample n~20: open-to-merge median 30.5min, first-pass green 71-83%; limitations section documents recency bias",
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "notes": null,
+        "started_at": "2026-07-23T19:04:47Z",
+        "started_branch": "chore/dev-loop-metrics-ci-baseline",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-baseline",
+        "status": "done",
+        "summary": "Capture and commit the dated baseline snapshot for the trailing 4 weeks",
+        "wid": "w2"
+      },
+      {
+        "evidence": "snapshot header: 2-week re-measure cadence, exact re-measure command, decision hooks for WS1-WS4 review and dev-loop-step-6-queue-decision-gate(-3) input",
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "notes": null,
+        "started_at": "2026-07-23T19:04:51Z",
+        "started_branch": "chore/dev-loop-metrics-ci-baseline",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-baseline",
+        "status": "done",
+        "summary": "Document the 2-week re-measure cadence and decision hooks (WS1-WS4 effectiveness, merge-queue justification) in the snapshot header",
+        "wid": "w3"
+      },
+      {
+        "evidence": "fast-test job wall time from Actions job timings (avg 631s / p95 651s, n=8 in snapshot); --collect-durations local pytest --durations=20 mode implemented (documented as local-machine measure; workflows untouched)",
+        "item_id": "dev-loop-metrics-ci-failure-baseline-2",
+        "notes": null,
+        "started_at": "2026-07-23T19:04:42Z",
+        "started_branch": "chore/dev-loop-metrics-ci-baseline",
+        "started_worktree": "/tmp/claude-0/-home-user-BenchBox/a0b4446b-0b60-58d6-b174-c3d3830808ef/scratchpad/wt-baseline",
+        "status": "done",
+        "summary": "Record the PR fast-test job's wall time and --durations top-20 into dev-loop-metrics (starts the 4-week data clock that gates the fast-lane wall-clock decision, WS1.4)",
+        "wid": "w4"
+      }
+    ]
+  }
+}

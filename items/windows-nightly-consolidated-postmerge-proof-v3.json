@@ -1,0 +1,131 @@
+{
+  "context": "Wait for the bound run, verify its immutable head SHA and conclusion, enumerate every job whose name contains windows-latest, require each conclusion to be success, and route any unrelated platform failure to explicit tracked work before completion.",
+  "description": "Workflow-dispatch run 30720867434 is bound to integrated develop SHA 952986127d5cb2b9ccd2f6867c989967e99fdbd4 after PRs #1445 and #1450 merged. Require the run to complete successfully and inspect every Windows job rather than relying on a failure-count grep.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Count FAILED lines through a vacuous xargs pipeline",
+        "instead": "Read structured run and job conclusions with gh JSON",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3",
+        "why": "Missing run or job IDs can produce a false zero"
+      },
+      {
+        "dont": "Treat an overall workflow failure as a Windows failure without inspecting jobs",
+        "instead": "Separate Windows acceptance from unrelated platform triage",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3",
+        "why": "The previous proof run exposed an independent macOS test race"
+      }
+    ],
+    "item_meta": {
+      "category": "verification",
+      "created_at": "2026-08-01T22:16:37Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No Windows job is omitted by selecting only one Python version",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3"
+      },
+      {
+        "behavior": "The proof stays bound to run 30720867434 and its immutable head SHA",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3"
+      },
+      {
+        "behavior": "Unrelated platform failures are inspected and explicitly routed before completion",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3",
+        "kind": "do_not_modify",
+        "path_glob": "**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test \"$(gh run view 30720867434 --json status,conclusion,headSha --jq '[.status,.conclusion,.headSha] | join(\" \" )')\" = \"completed success 952986127d5cb2b9ccd2f6867c989967e99fdbd4\"",
+        "description": "Bound workflow run completed successfully on the integrated develop SHA",
+        "expected": "passes only after run 30720867434 completes successfully on SHA 952986127d5cb2b9ccd2f6867c989967e99fdbd4",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test \"$(gh run view 30720867434 --json jobs --jq '[.jobs[] | select(.name | test(\"windows-latest\")) | select(.conclusion != \"success\")] | length')\" = 0",
+        "description": "Every Windows Nightly job succeeded",
+        "expected": "passes only when every job whose name contains windows-latest concluded success",
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3",
+        "notes": null,
+        "started_at": "2026-08-01T22:16:47Z",
+        "started_branch": "fix/finish-three-workflow-ci-handoff",
+        "started_worktree": "/Users/joe/Developer/BenchBox.codex-finish-ci-handoff",
+        "status": "in_progress",
+        "summary": "Verify the bound run SHA and wait for completion",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Enumerate every Windows job and require successful conclusions",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Inspect and route any non-Windows failure",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-nightly-consolidated-postmerge-proof-v3",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Record final run and Windows job evidence",
+        "wid": "w3"
+      }
+    ]
+  }
+}

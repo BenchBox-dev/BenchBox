@@ -1,0 +1,219 @@
+{
+  "context": "Do the CHANGELOG/README honesty fix (w2/w3) first since it's low-risk\nand doesn't depend on the recovery release landing. Land the tag-guard\n(w4) as a follow-up in the same PR or a fast-follow. Check with the\nrelease-recovery-v0-3-1 owner before finalizing w2's exact wording so\nthe two TODOs don't produce conflicting CHANGELOG edits — coordinate via\ndeps.needs rather than editing that TODO's scope_limit list.\n",
+  "description": "Release bookkeeping in this repo has drifted from the actual published\nstate, in two independent ways confirmed against the repo and PyPI on\n2026-07-03:\n\n1. `CHANGELOG.md` line 10 has a `## [0.3.1] - 2026-05-30` section written\n   in the same released-version format as every other dated entry (e.g.\n   `## [0.3.0] - 2026-05-16` at line 53), but no `v0.3.1` git tag exists\n   (`git ls-remote --tags origin 'refs/tags/v0.3.*'` returns only\n   `refs/tags/v0.3.0`) and PyPI has never served `0.3.1`\n   (`pip index versions benchbox` lists `0.3.0` as latest). The section\n   reads as shipped when it is not.\n\n2. `README.md:31` says `Current release: v0.2.1`, but that has been stale\n   since `v0.3.0` published; PyPI-latest is `0.3.0`, not `0.2.1`\n   (`pyproject.toml` and `benchbox/__init__.py` also still read `0.2.1`\n   on `develop`, which is expected per the release-cut flow in\n   `Makefile:977-1057` — version bumps happen only on the ephemeral\n   release branch, not on `develop` — but README's human-facing claim\n   needs to reflect the actual latest published release, not develop's\n   working version file).\n\nCompounding both: `v0.3.0` is PyPI-latest but fails a clean import\n(`ModuleNotFoundError: No module named 'pandas'`, reverified live via\n`uv run --isolated --no-project --with 'benchbox==0.3.0' -- python -c\n'import benchbox'` run from outside the repo tree). So the CHANGELOG\ncurrently implies a working, released `0.3.1` fix exists when the\nPyPI-latest install is actually broken.\n\nThis TODO owns the honesty fix to the release bookkeeping (CHANGELOG\nwording/dating, README's current-release line) and a durable guard so a\n`CHANGELOG.md` released-version section can never again claim a version\nwith no corresponding git tag. It does NOT own cutting the real `v0.3.1`\nrelease — that belongs to `release-recovery-v0-3-1`, which is already\nCritical priority and already in flight.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete the 0.3.1 CHANGELOG content outright",
+        "instead": "move/re-date it instead of dropping it.",
+        "item_id": "release-accounting-drift-correction",
+        "why": "it documents real completed work (pandas lazy-loading, Databricks Liquid Clustering, etc.) that will ship in the eventual recovery release"
+      },
+      {
+        "dont": "hardcode a new version string guess into README.md without checking PyPI",
+        "instead": "verify against pip index versions benchbox or the release tag list before writing a version number.",
+        "item_id": "release-accounting-drift-correction",
+        "why": "that recreates the exact drift this TODO fixes"
+      },
+      {
+        "dont": "make the w4 guard block make release-cut's own changelog draft",
+        "instead": "scope the check to already-merged develop/main state, not the release branch mid-flight.",
+        "item_id": "release-accounting-drift-correction",
+        "why": "that draft legitimately claims an untagged version before the tag is pushed"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "release-accounting-drift-correction",
+        "id": 551,
+        "reason": "Owned by release-recovery-v0-3-1 (Critical, already Not Started with w1/w2 done). This TODO only fixes the bookkeeping honesty problem and adds the guard.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: release-recovery-v0-3-1.yaml is already in _project/DONE — the v0.3.1 release was cut.",
+        "summary": "Cutting the real v0.3.1 release"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "release-accounting-drift-correction",
+        "id": 552,
+        "reason": "Out of scope here; if w3's fix still requires a manual version string, a follow-up could add a doc-freshness check similar to the CHANGELOG guard, but that's a separate TODO if desired.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Automated README-sync doc-freshness check explicitly filed as an optional follow-up 'if desired'; no evidence of demand.",
+        "summary": "Automatically keeping README's current-release line in sync via CI"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "release-accounting-drift-correction",
+        "needs_item": "release-recovery-v0-3-1"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "CHANGELOG.md's existing dated-section format for genuinely released versions (0.3.0, 0.2.1, ...) is unchanged.",
+        "item_id": "release-accounting-drift-correction"
+      },
+      {
+        "behavior": "The w4 guard must not block make release-cut itself (which drafts a section before the tag exists) — it should only fail on sections that are already merged to develop/main claiming an untagged version, not on the release branch's own in-progress draft.",
+        "item_id": "release-accounting-drift-correction"
+      },
+      {
+        "behavior": "scripts/generate_changelog_entry.py continues to generate valid changelog entries for make release-cut (see Makefile:986).",
+        "item_id": "release-accounting-drift-correction"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "scripts/generate_changelog_entry.py:_resolve_log_range — reuse the existing git tag-detection logic (git describe --tags --abbrev=0 --match 'v*') rather than reimplementing tag lookup.",
+        "decision": "reuse",
+        "item_id": "release-accounting-drift-correction",
+        "path": "scripts/generate_changelog_entry.py:_resolve_log_range"
+      },
+      {
+        "concept": "tests/unit/release/test_ruleset_review_enforcement.py — reuse the out-of-tree module-loading pattern if the guard lives in _project/scripts rather than scripts/.",
+        "decision": "reuse",
+        "item_id": "release-accounting-drift-correction",
+        "path": "tests/unit/release/test_ruleset_review_enforcement.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "release-accounting-drift-correction",
+        "kind": "do_not_modify",
+        "path_glob": "_project/TODO/main/active/release-recovery-v0-3-1.yaml"
+      },
+      {
+        "item_id": "release-accounting-drift-correction",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/__init__.py"
+      },
+      {
+        "item_id": "release-accounting-drift-correction",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "release-accounting-drift-correction",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "release-accounting-drift-correction",
+        "kind": "only_modify",
+        "path_glob": "README.md"
+      },
+      {
+        "item_id": "release-accounting-drift-correction",
+        "kind": "only_modify",
+        "path_glob": "scripts/generate_changelog_entry.py"
+      },
+      {
+        "item_id": "release-accounting-drift-correction",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/release/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/generate_changelog_entry.py --help >/dev/null && echo 'script still importable'",
+        "description": "No CHANGELOG.md released-version section claims a version without a matching tag",
+        "expected": "script still importable (replace with the actual new guard's check command once w4 lands, e.g. a pytest under tests/unit/release/)",
+        "item_id": "release-accounting-drift-correction",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -n 'Current release' README.md",
+        "description": "README's current-release line matches PyPI-latest",
+        "expected": "version string matches the output of: uv run --isolated --with pip -- python -m pip index versions benchbox | grep LATEST",
+        "item_id": "release-accounting-drift-correction",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/release/ -v",
+        "description": "New unit test for the tag-claim guard passes",
+        "expected": "all tests pass, including the new guard test, 0 failures",
+        "item_id": "release-accounting-drift-correction",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "release-accounting-drift-correction",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "release-accounting-drift-correction",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "release-accounting-drift-correction",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "release-accounting-drift-correction",
+        "notes": "Capture compact evidence (do not commit raw logs):\n  - `git ls-remote --tags origin 'refs/tags/v0.3.*'` -> only v0.3.0\n  - `uv run --isolated --with pip -- python -m pip index versions benchbox`\n    -> LATEST: 0.3.0\n  - `cd /tmp && uv run --isolated --no-project --with 'benchbox==0.3.0' --\n    python -c 'import benchbox'` -> ModuleNotFoundError: pandas\n    (run from outside the repo tree — running from the repo root\n    silently shadows the installed wheel with the local `benchbox/`\n    source directory and gives a false pass)\n  - `grep -n 'Current release' README.md` -> still v0.2.1\nIf any of these have changed (e.g. v0.3.1 has since actually\nshipped), stop and re-scope this TODO against deps.needs before\nediting CHANGELOG/README.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate the cited drift facts before editing",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-accounting-drift-correction",
+        "notes": "Two acceptable outcomes depending on w1's findings; pick one and\nsay which in the PR body:\n  (a) If v0.3.1 has not shipped yet: move the `[0.3.1] - 2026-05-30`\n      content under `## [Unreleased]` (merging with any existing\n      Unreleased content) and drop the specific date, since dated\n      sections are a released-version convention elsewhere in this\n      file (`0.3.0`, `0.2.1`, etc.).\n  (b) If the plan is still to cut a real v0.3.1 imminently: keep the\n      section but re-date it to `TBD` or the actual cut date once\n      known, and do not let a future-dated or past-but-unreleased\n      date sit in a released-version slot.\nEither way, add a short note under the entry (or a new `0.3.0`\naddendum) that `0.3.0` shipped with a broken clean install\n(`ModuleNotFoundError: pandas`) and that the fix is pending release,\nconsistent with the honest state release-recovery-v0-3-1 is working\ntoward.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix CHANGELOG.md so the 0.3.1 section cannot be read as released",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-accounting-drift-correction",
+        "notes": "`README.md:31` currently reads `Current release: v0.2.1`. Update it\nto name the actual PyPI-latest version (`v0.3.0` as of w1, pending\nthe recovery release). Consider phrasing that survives version churn\nwithout needing a manual bump every release (e.g. pointing readers to\n`benchbox --version` or the PyPI project page) — but if you keep an\nexplicit version string, it must match PyPI-latest at merge time.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix README.md's current-release line to match PyPI-latest",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "release-accounting-drift-correction",
+        "notes": "Extend `scripts/generate_changelog_entry.py` (which already knows how\nto detect the latest `v*` tag via `git describe --tags --abbrev=0\n--match 'v*'`, see `_resolve_log_range`) or add a small standalone\ncheck, plus a unit test under `tests/unit/release/` (see the existing\n`tests/unit/release/test_ruleset_review_enforcement.py` for the\nout-of-tree module-loading pattern used for `_project/scripts`\nmodules — decide whether this check belongs in `scripts/` or\n`_project/scripts/` based on where it needs to run: CI content-guard\nvs. one-off release tooling).\n\nThe check: parse `CHANGELOG.md` for `## [X.Y.Z] - <date>` headers\n(excluding `[Unreleased]`) and assert each `X.Y.Z` has a\ncorresponding `vX.Y.Z` tag reachable from `git tag -l` / `git\nls-remote --tags origin`. Wire it into `make pr-preflight` or the\ncontent-guard path (whichever this repo already uses for\nCHANGELOG-adjacent lint) so a future premature dated section fails\nCI instead of silently drifting again.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a guard: a CHANGELOG released-version section requires a matching git tag",
+        "wid": "w4"
+      }
+    ]
+  }
+}

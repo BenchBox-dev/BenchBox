@@ -1,0 +1,252 @@
+{
+  "context": "First, update runtime query producers to emit `execution_time_seconds` using\nmonotonic elapsed measurements. Then update internal consumers (normalizer,\nschema transform, exporters) to treat this key as canonical source.\n\nConvert ms output fields only at serialization boundaries; do not reintroduce\nambiguous producer keys.\n\nEnforce `execution_time_seconds` as float in schema validation boundaries so\nserialization/deserialization does not silently truncate to integer values.\n",
+  "description": "Standardize runtime query timing outputs to one canonical key,\n`execution_time_seconds`, and remove mixed-key result production in benchmark\nexecution paths.\n\nThis item addresses drift between parallel query execution implementations\n(SQL adapters, DataFrame expression family, DataFrame pandas family) and\neliminates compatibility branching required solely because producers emit\ninconsistent timing keys.\n\nThis TODO depends on the centralized clock foundation and applies its\nmonotonic methodology to all benchmark-critical query execution producers.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "allow integer coercion/truncation for execution_time_seconds",
+        "instead": "enforce float validation in schema boundaries",
+        "item_id": "timing-query-contract-unification",
+        "why": "sub-second precision is required for benchmark fidelity"
+      },
+      {
+        "dont": "change external file schemas abruptly without conversion paths",
+        "instead": "convert in normalizer/export layers",
+        "item_id": "timing-query-contract-unification",
+        "why": "export/load compatibility matters"
+      },
+      {
+        "dont": "change query business logic while touching timing keys",
+        "instead": "isolate refactor to timing output and consumption",
+        "item_id": "timing-query-contract-unification",
+        "why": "this item is contract-focused"
+      },
+      {
+        "dont": "keep emitting both execution_time and execution_time_seconds from runtime producers",
+        "instead": "emit only canonical key",
+        "item_id": "timing-query-contract-unification",
+        "why": "it preserves ambiguity"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "timing-query-contract-unification",
+        "needs_item": "timing-clock-foundation-and-correctness"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-02-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DataFrame profiled execution continues to return detailed profile metadata",
+        "item_id": "timing-query-contract-unification"
+      },
+      {
+        "behavior": "Existing benchmark result serialization remains compatible for external consumers",
+        "item_id": "timing-query-contract-unification"
+      },
+      {
+        "behavior": "Query success/failure semantics and row_count behavior remain unchanged",
+        "item_id": "timing-query-contract-unification"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "timing-query-contract-unification",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/query_normalizer.py"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/schemas.py"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/benchmark_mixin.py"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/expression_family.py"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/pandas_family.py"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/dataframe/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/dataframe/ -k 'execution_time or benchmark_mixin' -q",
+        "description": "DataFrame query execution tests validate canonical timing key output",
+        "expected": "Selected tests pass with canonical timing key expectations",
+        "item_id": "timing-query-contract-unification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/ -k 'normalizer or schema or exporter' -q",
+        "description": "Result normalizer and schema conversion tests pass with canonical timing key",
+        "expected": "Selected tests pass",
+        "item_id": "timing-query-contract-unification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast runtime smoke remains green",
+        "expected": "Fast marker tests pass",
+        "item_id": "timing-query-contract-unification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "timing-query-contract-unification",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "timing-query-contract-unification",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "timing-query-contract-unification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate DataFrame expression-family execute paths to monotonic timing and canonical key",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-query-contract-unification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate DataFrame pandas-family execute paths to monotonic timing and canonical key",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-query-contract-unification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Align benchmark mixin summary code to canonical execution_time_seconds",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-query-contract-unification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize base adapter query failure result timing field naming to canonical contract",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-query-contract-unification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enforce execution_time_seconds float validation in schema boundaries",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-query-contract-unification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update query normalizer/schema/exporter to use canonical key as primary source",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "timing-query-contract-unification",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add and update unit tests covering canonical runtime timing contract",
+        "wid": "w7"
+      }
+    ]
+  }
+}

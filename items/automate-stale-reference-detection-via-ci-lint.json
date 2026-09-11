@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #116 of cleanup-project-scratch-directory.\nDeferred: Automate stale-reference detection via CI lint\nReason deferred: A grep-based CI step could catch future cases where docs are created inside\n_project/ and linked from outside. Deferred because it requires writing a\ncheck_project_references.py script and wiring it into the Makefile - small\nenough to add as a follow-up TODO once this cleanup is done.\n",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:33:54Z",
+      "worktree": "main"
+    }
+  }
+}

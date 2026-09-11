@@ -1,0 +1,10 @@
+{
+  "description": "- \"Users can stage data by generating directly to a UC Volume (`--output dbfs:/Volumes/workspace/raw/source/...`) or provide a `staging_root` (e.g., S3/GCS/ADLS/DBFS) for COPY INTO.\"\n- Temporary views and intermediate INSERTs have been removed from the loading path.",
+  "legacy": {
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

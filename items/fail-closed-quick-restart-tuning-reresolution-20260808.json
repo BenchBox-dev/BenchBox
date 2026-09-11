@@ -1,0 +1,195 @@
+{
+  "context": "Reproduce the silent retention with a regression test, then make the failure branch fail closed by abandoning quick restart and returning to the interactive flow, or exiting with a clear error when interaction is unavailable. Keep the diff minimal so the later run-plan refactor can absorb the behavior without rework. Do not attempt to refresh the broader derived state; that repair belongs to the refactor item.",
+  "description": "Confirmed defect three from the 2026-08-08 architecture review evaluation. _interactive_try_quick_restart in benchbox/cli/commands/run.py re-resolves tuning after quick restart overwrites platform, benchmark, and tuning from the saved run, but on ValueError it silently retains the pre-restart resolution via an except-pass, so the recorded canonical tuning mode and provenance can disagree with the executed configuration. This item lands only the narrow fail-closed repair and its regression tests ahead of the systemic replay refactor owned by refactor-to-derive-cli-command-from-resolved-config-objects, whose atomic re-resolution work later absorbs this branch. The broader derived-state replay defect (platform key, phases, tuning flags and files, unified config, and related fields) is explicitly out of scope here.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Expand this fix into the RunRequest and ResolvedRunPlan refactor.",
+        "instead": "Land the narrow fail-closed branch and regression tests only.",
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "why": "The systemic replay repair is owned by refactor-to-derive-cli-command-from-resolved-config-objects."
+      },
+      {
+        "dont": "Keep a silently retained stale TuningResolution when re-resolution fails.",
+        "instead": "Fail closed by abandoning quick restart or exiting with a clear error.",
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "why": "Executed and recorded configuration can disagree without any visible signal."
+      },
+      {
+        "dont": "Re-derive only the displayed canonical mode on the failure branch.",
+        "instead": "Make execution and the canonical record read the same re-resolved state or abort.",
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "why": "The record would match the display while execution still used stale state."
+      }
+    ],
+    "item_meta": {
+      "category": "Correctness and Run Lifecycle",
+      "created_at": "2026-08-08T20:34:17Z",
+      "worktree": "run-lifecycle"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing table-mode precedence behavior during quick restart is unchanged.",
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808"
+      },
+      {
+        "behavior": "Quick restart continues to work unchanged for valid saved configurations.",
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808"
+      },
+      {
+        "behavior": "Recorded canonical tuning mode and provenance agree with the executed configuration on the failure branch.",
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808"
+      },
+      {
+        "behavior": "The interactive configuration flow remains reachable when quick restart is abandoned.",
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Quick-restart re-resolution branch with commented silent retention on ValueError.",
+        "decision": "extend",
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "path": "benchbox/cli/commands/run.py"
+      },
+      {
+        "concept": "Systemic replay refactor that later absorbs this branch into atomic re-resolution.",
+        "decision": "extend",
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "path": "refactor-to-derive-cli-command-from-resolved-config-objects"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "published-results/"
+      },
+      {
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "kind": "do_not_modify",
+        "path_glob": "results/"
+      },
+      {
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_preferences_output.py tests/unit/cli/test_cli_data_load_modes.py -q",
+        "description": "Focused quick-restart preference tests pass",
+        "expected": "Selected quick-restart tests pass including the new failed-re-resolution cases.",
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_run_command_interactive_paths.py -q",
+        "description": "Interactive run-path tests pass",
+        "expected": "Interactive-path tests pass serially.",
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/cli/commands/run.py tests/unit/cli",
+        "description": "Touched CLI paths satisfy Ruff",
+        "expected": "Ruff exits zero.",
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_preferences_output.py -q",
+        "description": "Stale-resolution regression is falsifiable on the unfixed tree",
+        "expected": "This command exits nonzero on the unfixed tree when failed re-resolution silently retains the pre-restart resolution and exits zero after the fail-closed repair.",
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Pin a regression test where resolve_tuning raises ValueError during quick restart and the run silently proceeds with the pre-restart resolution",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Implement fail-closed behavior that abandons quick restart to the interactive flow or exits with a clear error instead of silently retaining the stale resolution",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add regression coverage for the failure fallback, provenance and execution agreement on the failure branch, and unchanged valid-restart behavior",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fail-closed-quick-restart-tuning-reresolution-20260808",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Restore the silent-retention except-pass as a negative control, prove the focused test fails, then restore the fix",
+        "wid": "w3"
+      }
+    ]
+  }
+}

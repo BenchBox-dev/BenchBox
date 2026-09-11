@@ -1,0 +1,111 @@
+{
+  "context": "List .github/workflows with push: develop and no schedule. Classify: safety-critical vs advisory. For safety-critical without schedule, file follow-up TODOs or extend detectors. Document accepted risks in docs/operations.",
+  "description": "develop-post-merge-silently-skips-pushes / PR #1599 bounds push-drop for develop-post-merge.yml only (schedule tip sweep + gap detector). Other workflows that fire only on push to develop (or path-filtered develop push) share the GitHub delivery class: silent missing runs with no scheduled backstop.\n\nBatch residual (overall review nit #6): inventory and decide per workflow whether a schedule backstop, gap detector, or accepted risk note is required. Do not blindly add hourly full suites.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "develop-push-drop-coverage-inventory-20260805",
+        "needs_item": "develop-post-merge-silently-skips-pushes"
+      }
+    ],
+    "item_meta": {
+      "category": "ci-integrity",
+      "completed_at": "2026-08-09T23:54:16Z",
+      "completed_pr": 1632,
+      "created_at": "2026-08-05T23:40:14Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No new workflow permissions beyond existing; cost-conscious schedules (slim gates)",
+        "item_id": "develop-push-drop-coverage-inventory-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "develop-push-drop-coverage-inventory-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "develop-push-drop-coverage-inventory-20260805",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "develop-push-drop-coverage-inventory-20260805",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/**"
+      },
+      {
+        "item_id": "develop-push-drop-coverage-inventory-20260805",
+        "kind": "only_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "develop-push-drop-coverage-inventory-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/workflows/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f docs/operations/develop-post-merge-gaps.md && rg -q \"push-drop|schedule\" docs/operations/develop-post-merge-gaps.md",
+        "description": "Ops inventory exists naming at least develop-post-merge and one other workflow",
+        "expected": null,
+        "item_id": "develop-push-drop-coverage-inventory-20260805",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "develop-push-drop-coverage-inventory-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "develop-push-drop-coverage-inventory-20260805",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Enumerated develop-push workflows from .github/workflows/ (re-verified against develop tip 2026-08-06): develop-post-merge.yml (hourly 17 * * * *), orphaned-commit-detector.yml (bare push, daily 0 7 * * *), submission-validator-drift-check.yml (weekly Mon 0 6 * * 1), sync-results-data-to-published.yml (NO schedule), results-explorer-browser.yml (NO schedule). PR #1632.",
+        "item_id": "develop-push-drop-coverage-inventory-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T14:16:32Z",
+        "started_branch": "docs/develop-push-drop-inventory",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Inventory push-to-develop workflows lacking schedule",
+        "wid": "w0"
+      },
+      {
+        "evidence": "docs/operations/develop-push-drop-inventory.md: inventory table with role (safety-critical vs advisory), residual push-drop risk and disposition per subject; explicit non-entries; related scheduled canaries; cost/policy constraints; manual recovery cheatsheet. Linked from develop-post-merge-gaps.md. PR #1632.",
+        "item_id": "develop-push-drop-coverage-inventory-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T14:16:35Z",
+        "started_branch": "docs/develop-push-drop-inventory",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Classify safety-critical vs accepted risk; write ops inventory table",
+        "wid": "w1"
+      },
+      {
+        "evidence": "No follow-up TODO filed and no new backstop workflows added, by design. Both schedule-less subjects are documented accepted risk with compensating controls: sync-results-data-to-published.yml is bounded by the daily read-only corpus-drift-check.yml canary (deliberately not putting a write-capable public-branch mirror on cron); results-explorer-browser.yml is bounded by the pre-merge required check, with an hourly Playwright suite rejected on cost. Guardrail 'no new workflow permissions; cost-conscious schedules' preserved: PR #1632 changes no workflow files. Drift guard test re-derives the subject set from .github/workflows/ and fails if the table diverges.",
+        "item_id": "develop-push-drop-coverage-inventory-20260805",
+        "notes": null,
+        "started_at": "2026-08-06T14:16:37Z",
+        "started_branch": "docs/develop-push-drop-inventory",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Open follow-up TODOs or implement minimal backstops only for critical gaps",
+        "wid": "w2"
+      }
+    ]
+  }
+}

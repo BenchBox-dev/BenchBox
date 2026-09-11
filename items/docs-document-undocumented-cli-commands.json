@@ -1,0 +1,166 @@
+{
+  "description": "Documentation audit (2026-04-01) found 10 CLI commands with NO documentation\nand 13 flags on `benchbox run` that are undocumented.\n\nUndocumented commands:\n- benchbox visualize (benchbox/cli/commands/visualize.py)\n- benchbox report (benchbox/cli/commands/report.py)\n- benchbox metrics (benchbox/cli/commands/metrics.py)\n- benchbox aggregate (benchbox/cli/commands/aggregate.py)\n- benchbox datagen (benchbox/cli/commands/datagen.py)\n- benchbox download-answers (benchbox/cli/commands/download_answers.py)\n- benchbox plan-history (benchbox/cli/commands/plan_history.py)\n- benchbox show-plan (benchbox/cli/commands/show_plan.py)\n- benchbox setup (benchbox/cli/commands/setup.py)\n- benchbox run-official (benchbox/cli/commands/run_official.py - hidden)\n\nUndocumented `benchbox run` flags:\n--table-mode, --table-format, --presort, --sorted-ingestion-mode,\n--sorted-ingestion-method, --databricks-clustering-strategy,\n--liquid-clustering-columns, --mode, --no-monitoring, --no-progress,\n--ignore-memory-warnings, --global-cache, --plan-config\n\nSome commands may be intentionally hidden (run-official). For those, a brief\ninternal note is sufficient rather than full public docs.",
+  "legacy": {
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-04-01T00:00:00Z",
+      "created_at": "2026-04-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "docs-document-undocumented-cli-commands",
+        "kind": "only_modify",
+        "path_glob": "docs/CLI_REFERENCE.md"
+      },
+      {
+        "item_id": "docs-document-undocumented-cli-commands",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/cli/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "for cmd in visualize report metrics aggregate datagen setup; do [ -f docs/reference/cli/$cmd.md ] && echo \"PASS: $cmd\" || echo \"FAIL: $cmd missing\"; done",
+        "description": "All non-hidden commands have doc pages",
+        "expected": "PASS for all commands",
+        "item_id": "docs-document-undocumented-cli-commands",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'table-mode\\|table-format\\|presort\\|plan-config\\|no-monitoring\\|no-progress\\|ignore-memory-warnings\\|global-cache\\|mode' docs/reference/cli/run.md | xargs -I{} test {} -ge 8 && echo 'PASS: flags documented' || echo 'FAIL: flags missing'",
+        "description": "New run flags documented",
+        "expected": "PASS: flags documented",
+        "item_id": "docs-document-undocumented-cli-commands",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "for cmd in visualize report metrics aggregate datagen setup; do grep -qi $cmd docs/CLI_REFERENCE.md && echo \"PASS: $cmd\" || echo \"FAIL: $cmd missing\"; done",
+        "description": "CLI_REFERENCE.md indexes new commands",
+        "expected": "PASS for all commands",
+        "item_id": "docs-document-undocumented-cli-commands",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "docs-document-undocumented-cli-commands",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "docs-document-undocumented-cli-commands",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "docs-document-undocumented-cli-commands",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "docs-document-undocumented-cli-commands",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "docs-document-undocumented-cli-commands",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "docs-document-undocumented-cli-commands",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "docs-document-undocumented-cli-commands",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document Databricks-specific run flags (5 flags)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-document-undocumented-cli-commands",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document general undocumented run flags (8 flags)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-document-undocumented-cli-commands",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create docs for visualize command",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-document-undocumented-cli-commands",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create docs for report and metrics commands",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-document-undocumented-cli-commands",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create docs for datagen, aggregate, and setup commands",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-document-undocumented-cli-commands",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create docs for plan-history, show-plan, and download-answers",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "docs-document-undocumented-cli-commands",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update CLI_REFERENCE.md and index to list all commands",
+        "wid": "w7"
+      }
+    ]
+  }
+}

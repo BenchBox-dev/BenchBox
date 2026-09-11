@@ -1,0 +1,93 @@
+{
+  "description": "`_load_parquet_via_chunked_csv` sends chunk 1 with `header=True` and all\nsubsequent chunks with `header=False`.  Each chunk is an independent HTTP POST\nto the QuestDB `/imp` REST endpoint with `overwrite=false` (append mode).\n\nThe implicit assumption is: when the target table already exists and\n`overwrite=false` is set, QuestDB maps headerless CSV data by column position\nagainst the existing table schema.\n\nThis assumption is unverified.  If QuestDB instead assigns synthetic column\nnames (`col0`, `col1`, …) to headerless uploads and requires an explicit header\nto identify columns, every chunk after the first would land in the wrong columns\nsilently - the `/imp` response would still report N rows imported, masking the\ncorruption.\n\nThe tpcds_obt benchmark is the only current user of this code path, but any\nfuture large-parquet load will hit the same path.\n\nFlagged during Phase 1 remediation review (2026-04-16).",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Support",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All 6 TestLoadParquetViaChunkedCsv unit tests continue to pass after any code change",
+        "item_id": "questdb-imp-headerless-column-mapping-verify"
+      },
+      {
+        "behavior": "_load_parquet_via_chunked_csv: create_schema always runs before load_data - table exists and is empty at load time",
+        "item_id": "questdb-imp-headerless-column-mapping-verify"
+      },
+      {
+        "behavior": "_load_parquet_via_chunked_csv: overwrite=false on every chunk (must not be changed to true)",
+        "item_id": "questdb-imp-headerless-column-mapping-verify"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/integration/platforms/test_questdb_parquet_load.py -v",
+        "description": "Integration test: two-chunk headerless import produces correct column values",
+        "expected": "All assertions pass - chunk 2 data in correct columns",
+        "item_id": "questdb-imp-headerless-column-mapping-verify",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_questdb_coverage.py::TestLoadParquetViaChunkedCsv -v",
+        "description": "Unit tests: overwrite and header semantics unchanged",
+        "expected": "4 tests pass",
+        "item_id": "questdb-imp-headerless-column-mapping-verify",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "questdb-imp-headerless-column-mapping-verify",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "questdb-imp-headerless-column-mapping-verify",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "questdb-imp-headerless-column-mapping-verify",
+        "notes": "Check QuestDB REST API docs (/imp endpoint) for the interaction between:\n  - `overwrite=false` (append to existing table)\n  - missing header row in the uploaded CSV body\n\nSpecific question: does QuestDB map by header name (requires header on every\nchunk) or by column position (safe without header)?\n\nSources: QuestDB 9.3.4 REST API reference, release notes, GitHub issues.\nAlso check: `curl` test against a running QuestDB instance with a known\nschema - send two chunks, first with header, second without, verify the\nsecond chunk's data lands in the correct columns by querying the table.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Read QuestDB /imp documentation for overwrite=false + no-header behaviour",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-imp-headerless-column-mapping-verify",
+        "notes": "Add a test in `tests/integration/platforms/test_questdb_parquet_load.py`\n(NOT fast-marked - requires a live QuestDB instance).\n\nTest structure:\n  1. Create a table with 3 columns: id INT, name VARCHAR, val DOUBLE\n  2. Upload chunk 1 (header=True, 3 rows) via /imp with overwrite=false\n  3. Upload chunk 2 (header=False, 3 rows) via /imp with overwrite=false\n  4. SELECT * FROM table ORDER BY id\n  5. Assert all 6 rows have correct column values (not shifted)\n\nIf chunk 2 data arrives in wrong columns, the test will catch it here\nrather than in a full tpcds_obt benchmark run.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write a live integration test verifying two-chunk headerless import",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "questdb-imp-headerless-column-mapping-verify",
+        "notes": "Two outcomes:\n\nCASE A - column mapping is positional (assumption holds):\n  Add a one-line comment in `_load_parquet_via_chunked_csv` (questdb.py:~880):\n    # QuestDB /imp maps headerless chunks by position against existing schema\n    # (verified against QuestDB 9.3.4 - see integration test).\n  No behaviour change needed.\n\nCASE B - column mapping requires header on every chunk:\n  Change loop to always send `header=True`, but strip the header row from\n  subsequent chunks before POSTing (or use `skiprows=1` in pandas `to_csv`\n  equivalent).  The simplest safe fix: always include the header.\n  QuestDB /imp with `overwrite=false` + repeated header rows should be\n  idempotent if it ignores the header row for schema inference on append.\n  Verify this assumption too.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update code and docstring based on findings",
+        "wid": "w3"
+      }
+    ]
+  }
+}

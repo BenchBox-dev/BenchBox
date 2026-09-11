@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #162 of explorer-close-chart-type-coverage-gaps.\nDeferred: User-saveable chart configurations / dashboards\nReason deferred: Product feature, not a coverage gap. Address after the chart catalog is complete.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:15Z",
+      "worktree": "main"
+    }
+  }
+}

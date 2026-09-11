@@ -1,0 +1,11 @@
+{
+  "description": "Implement DataFrame versions of Metadata Primitives benchmark operations. This\nbenchmark tests metadata introspection operations: schema discovery, column\nintrospection, table statistics, and query introspection.\n\nDataFrame platforms have metadata capabilities through various APIs:\n\n**PySpark:**\n- spark.catalog.listDatabases(), listTables(), listColumns()\n- spark.sql(\"SHOW TABLES\"), spark.sql(\"DESCRIBE TABLE\")\n- Delta Lake: DESCRIBE HISTORY, DESCRIBE DETAIL\n- Iceberg: metadata tables (snapshots, manifests, files)\n\n**Polars:**\n- df.schema, df.dtypes, df.describe()\n- Limited catalog capabilities (file-based, no central catalog)\n\n**Pandas:**\n- df.dtypes, df.info(), df.describe()\n- No catalog capabilities\n\nThe benchmark should focus on operations that are meaningful across platforms,\nwith platform-specific extensions for lakehouse metadata.",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-31T00:00:00Z",
+      "created_at": "2026-01-25T00:00:00Z",
+      "worktree": "dataframe-benchmarks"
+    }
+  }
+}

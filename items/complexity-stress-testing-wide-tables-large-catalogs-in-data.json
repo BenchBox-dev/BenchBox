@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #385 of df-support-metadata-primitives.\nDeferred: Complexity stress testing (wide tables, large catalogs) in DataFrame mode\nReason deferred: DDL generation (CREATE TABLE with 1000 columns) is SQL-specific. DataFrame equivalent (constructing wide DataFrames) is a separate design problem.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:00Z",
+      "worktree": "main"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Add performance measurement and observability for query plan capture to\nunderstand and control the overhead introduced by plan capture. Implement\nsampling and external storage options to minimize impact on benchmark results.\n\n**Problems Addressed**:\n- No measurement of plan capture overhead (could be 5-20% of query time)\n- Cannot sample captures (all-or-nothing with --capture-plans)\n- Plans embedded in JSON inflate result files unbounded\n- No visibility into which queries have expensive EXPLAIN operations",
+  "legacy": {
+    "item_meta": {
+      "category": "Performance",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-remediation"
+    }
+  }
+}

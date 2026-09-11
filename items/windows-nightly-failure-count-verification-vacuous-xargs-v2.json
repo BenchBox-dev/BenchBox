@@ -1,0 +1,54 @@
+{
+  "context": "After the hosted tracker migrates to todo-db >=0.3, use standalone todo update to replace the rung with a shell sequence that resolves run_id first, resolves job_id from that run, asserts both are non-empty, then counts failures. Do not drop completed evidence or migrate the hosted DB as part of this item.",
+  "description": "windows-nightly-remaining-49-failures rung 1 nests gh run view with a literal xargs placeholder inside command substitution. The shell expands it before xargs, GitHub returns 404 for the placeholder, the pipeline counts zero FAILED lines, and test 0 -lt 62 passes. Observed directly on 2026-07-29 while the latest real Windows job still had 62 failures.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "windows-nightly-failure-count-verification-vacuous-xargs-v2",
+        "needs_item": "migrate-hosted-tracker-db-to-todo-db-0-3-schema"
+      }
+    ],
+    "item_meta": {
+      "created_at": "2026-07-29T13:10:30Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "the corrected rung fails on missing run, job, or log data instead of interpreting it as zero failures",
+        "item_id": "windows-nightly-failure-count-verification-vacuous-xargs-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-nightly-failure-count-verification-vacuous-xargs-v2",
+        "kind": "do_not_modify",
+        "path_glob": "**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "run_id=$(gh run list --repo joeharris76/BenchBox --workflow nightly.yml --limit 1 --json databaseId --jq \".[0].databaseId\"); test -n \"$run_id\"; job_id=$(gh run view \"$run_id\" --repo joeharris76/BenchBox --json jobs --jq \".jobs[]|select(.name==\\\"test (windows-latest, 3.10)\\\")|.databaseId\"); test -n \"$job_id\"; failure_count=$(gh run view \"$run_id\" --repo joeharris76/BenchBox --log-failed --job \"$job_id\" | grep -o \"FAILED tests/[^ ]*\" | sort -u | wc -l | tr -d \" \"); test \"$failure_count\" -gt 0",
+        "description": "Resolved run and job IDs produce a non-empty failed-test inventory",
+        "expected": "exit 0",
+        "item_id": "windows-nightly-failure-count-verification-vacuous-xargs-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-nightly-failure-count-verification-vacuous-xargs-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace the vacuous rung after hosted update support is available",
+        "wid": "w1"
+      }
+    ]
+  }
+}

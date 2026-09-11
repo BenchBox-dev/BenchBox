@@ -1,0 +1,126 @@
+{
+  "description": "Systemic follow-up to required-ci-coverage-deepest-reproducers (#932), which\npromoted three specific holistic-review reproducers (#900 plan-capture planted\ndefect, #901 mutation catch, #909 plan-capture-phase) into the required\ndevelop-PR gate. That item deliberately scoped itself to those three instances\nand deferred the suite-wide sweep.\n\nThe systemic gap: a regression reproducer that proves a fix but is parked in a\nnon-required lane (an env-var gate, a `slow`/`integration`/`medium` marker, or a\ntest.yml-only job) does NOT run in the develop required gate `ci-required-result`,\nso the PR that introduced the fix can self-merge without ever running its own\ndeepest guard — the reproducer only fires one ring out, at the main-release\nboundary. Audit the whole test suite for this pattern and promote the\nload-bearing cells into the required gate via bounded explicit-node steps, the\nsame mechanism #932 used.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a required step without proving it goes red when the fix is reverted.",
+        "instead": "(not specified)",
+        "item_id": "promote-non-required-regression-reproducers-suite-audit",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "promote entire slow/integration suites",
+        "instead": "(not specified)",
+        "item_id": "promote-non-required-regression-reproducers-suite-audit",
+        "why": "promote the specific cells that prove the fixes."
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-22T20:43:53Z",
+      "completed_pr": 1266,
+      "created_at": "2026-07-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Every added step lives in a job already in ci-required-result.needs and is not continue-on-error.",
+        "item_id": "promote-non-required-regression-reproducers-suite-audit"
+      },
+      {
+        "behavior": "No new always-on slow/integration matrix in required CI — promote only the load-bearing cells; keep wall-clock bounded.",
+        "item_id": "promote-non-required-regression-reproducers-suite-audit"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "{'ref': '.github/workflows/pr.yml', 'note': 'ci-required-result.needs and the existing explicit-node drift-guard steps in code-test; reuse the mechanism, do not add continue-on-error jobs.'}",
+        "decision": "reuse",
+        "item_id": "promote-non-required-regression-reproducers-suite-audit",
+        "path": "{'ref'"
+      },
+      {
+        "concept": "{'ref': '_project/DONE/main/planning/required-ci-coverage-deepest-reproducers.yaml', 'note': 'The pattern this generalizes: explicit-node `-m <marker> -n 0 -k <cell>` steps added to a job already in ci-required-result.needs, each proven load-bearing by reverting its fix.'}",
+        "decision": "reuse",
+        "item_id": "promote-non-required-regression-reproducers-suite-audit",
+        "path": "{'ref'"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "promote-non-required-regression-reproducers-suite-audit",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "promote-non-required-regression-reproducers-suite-audit",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "promote-non-required-regression-reproducers-suite-audit",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "revert the underlying fix locally -> the required develop-PR check goes red -> restore (record in PR body)",
+        "description": "Each promoted step is load-bearing",
+        "expected": "every promoted cell fails required CI when its fix is reverted",
+        "item_id": "promote-non-required-regression-reproducers-suite-audit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "promote-non-required-regression-reproducers-suite-audit",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "promote-non-required-regression-reproducers-suite-audit",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Read pr.yml: ci-required-result.needs=[ci-paths,content-guard,code-lint,code-test,correctness-gate,plan-capture-gate,medium-test,explorer-tokens,audit-sha,package-smoke,dependency-audit,parity-check]. Already-promoted explicit-node steps live in code-test job: (1) test_cross_surface_mutation_sensitivity.py::test_targets_cover_every_enforced_gate -m slow; (2) test_standardized_test_commands.py::...test_cross_surface_gates_are_pinned_in_make_and_ci -m medium; (3) test_cross_surface_mutation_sensitivity.py -m slow -k h2odb (#901); (4) test_plan_capture_phase.py -m medium (#909). Confirmed medium-marked tests are ALREADY covered by required medium-test job (make test-medium: -m 'medium and not (slow...)' , no path restriction) and fast-marked tests by code-test's fast-lane step -- so only SLOW-marked (or resource_heavy/live_integration/stress) tests are structurally excluded from every required job unless individually promoted. Confirmed via grep across .github/workflows/*.yml that make test-slow/test-stress are invoked NOWHERE (not even nightly.yml) -- slow-marked tests only run via the pr.yml explicit-node mechanism or never. Enumerated ~70 files carrying pytest.mark.slow; grepped for reproducer/regression/PR-number docstrings across integration+uat+unit slow files. Candidates found with fix references: test_tpcds_power_test.py (#1137/#1144 drain-before-commit, TPCDS side -- file fully slow, ZERO CI coverage anywhere), test_tpch_power_test.py + test_tpch_throughput_test.py (w0 defect: Q11/16/18/20 false-FAILED with custom seed at SF=1, reference_seed_context wiring -- file fully slow, ZERO CI coverage; underlying validator exclusion IS unit-tested in fast-lane test_validation_engine.py but the power_test.py/throughput_test.py CALL-SITE wiring is not), tests/integration/tuning/test_duckdb_fk_load_ordering.py (tuning-fk-load-ordering-fix-20260716, FK-safe table load order -- file fully slow, ZERO CI coverage), test_joinorder_full_archive.py (#1128 regex fix -- redundant: same fix already unit-tested at fast/fixture level in test_canonical_queries.py; full-archive version needs a multi-GB external download, not boundable), test_hosted_submit_validator_contract.py (resource_heavy+slow contract test, not a point-fix reproducer), test_duckdb_table_mode_external.py reused-database test (heavier ~10s full-lifecycle test, fix location not conclusively isolated in time available -- deferred), test_ssb_cross_surface_equivalence.py / test_write_primitives_duckdb.py (medium-marked -- already covered by required medium-test, not gaps), test_tpc_power_tests.py / test_validator_order_aware.py / test_uat_*.py (fast-marked -- already covered).",
+        "item_id": "promote-non-required-regression-reproducers-suite-audit",
+        "notes": "Grep for env-var-gated tests, module/function slow|integration|medium marks,\nand tests that run only in test.yml, and cross-reference which prove a\nspecific merged fix. Produce the candidate list (test id, marker/gate, which\nfix it protects, current lane).\n",
+        "started_at": "2026-07-22T20:19:24Z",
+        "started_branch": "chore/promote-regression-reproducers-required-ci",
+        "started_worktree": "/home/user/bb-wt/promote-ci",
+        "status": "done",
+        "summary": "Enumerate regression reproducers excluded from the required develop gate",
+        "wid": "w1"
+      },
+      {
+        "evidence": "LOAD-BEARING (selected for promotion, each verified via local revert->red->restore->green before touching CI config): (1) tests/integration/test_tpcds_power_test.py::TestTPCDSPowerTest::test_execute_one_query_drains_raw_cursor_before_commit -- guards TPCDSPowerTest._execute_one_query's commit-after-drain ordering (benchbox/core/tpcds/power_test.py L332-341), the ONLY call site run() actually uses (_execute_query/_warm_up_database are dead code, never called from run()); the TPCH analogue of this exact fix (#1137/#1144) IS already required via the fast-marked test_tpc_power_tests.py, but the TPCDS side has a SEPARATE parallel implementation with zero CI coverage anywhere (file is 100% slow-marked; grep confirms make test-slow/test-stress are invoked by no workflow). (2) tests/integration/tuning/test_duckdb_fk_load_ordering.py (all 3 tests, small/bounded, SF=0.01) -- guards TPCHBenchmark.get_table_loading_order's FK-topological-sort fix (benchbox/core/tpch/benchmark.py); reverting to the pre-fix alphabetical fallback zeros out FK-dependent tables under real DuckDB FK enforcement. Zero CI coverage anywhere (file 100% slow-marked). (3) tests/integration/test_tpch_power_test.py -k boundary_query (2 tests) -- guards TPCHPowerTest.run()'s set_reference_seed_context wiring (benchbox/core/tpch/power_test.py L327), the w0-defect fix (Q11/16/18/20 false-FAILED with a custom seed at SF=1.0). The shared validator EXCLUSION logic is already unit-tested in the required fast lane (test_validation_engine.py), but the power_test.py CALL-SITE wiring is not -- these are genuinely separate regression surfaces (breaking the wiring specifically, e.g. via set_reference_seed_context(True) unconditionally, is invisible to the unit test but caught here). Zero CI coverage anywhere (file 100% slow-marked). (4) tests/integration/test_tpch_throughput_test.py -k boundary_query (1 test) -- same w0-defect fix, separate call site in throughput_test.py L507 (benchbox/core/tpch/throughput_test.py); independently load-bearing since it is a distinct production code path from power_test.py. Zero CI coverage anywhere (file 100% slow-marked). REDUNDANT / EXCLUDED (found, not promoted): test_joinorder_full_archive.py #1128 fix -- same regex fix already unit-tested at fixture level (fast lane, test_canonical_queries.py); full-archive version requires a multi-GB external download, violates bounded wall-clock, and is itself designed to skip when the archive is absent (meaningless in CI). test_ssb_cross_surface_equivalence.py, test_write_primitives_duckdb.py, test_plan_capture_combined_divergence.py, test_throughput_session_isolation.py -- medium-marked, already covered by the required medium-test job's blanket -m medium selection (no path filter), not a gap. test_tpc_power_tests.py, test_validator_order_aware.py, tests/uat/test_*.py reproducers -- fast-marked, already covered by code-test's required fast-lane step. test_hosted_submit_validator_contract.py -- resource_heavy+slow contract test, not a point-fix reproducer, out of bounded scope. test_duckdb_table_mode_external.py reused-database test -- ~10s full generate+load lifecycle x2, exact fix call site not conclusively isolated in the time budget; deferred rather than promoted speculatively. tests/unit/test_release_infrastructure.py's two @pytest.mark.slow tests (uv build / ty check subprocess) -- general build-health checks, not fix reproducers, and redundant with already-required package-smoke/code-lint steps. Selected 4-cell bounded promotion set, total added wall-clock ~15-20s (measured locally: 1.7s+5.7s+0.9s+0.9s).",
+        "item_id": "promote-non-required-regression-reproducers-suite-audit",
+        "notes": "A reproducer is load-bearing if reverting its fix would turn it red. Select\nonly those; keep wall-clock bounded (specific cells, never whole slow matrices).\n",
+        "started_at": "2026-07-22T20:30:59Z",
+        "started_branch": "chore/promote-regression-reproducers-required-ci",
+        "started_worktree": "/home/user/bb-wt/promote-ci",
+        "status": "done",
+        "summary": "Classify each candidate as load-bearing vs redundant and select the cells to promote",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Added 3 new steps (4 promoted cells total) to code-test job (already in ci-required-result.needs, no continue-on-error) in .github/workflows/pr.yml, right after the existing #901/#909 promoted steps and before 'Run fast tests': (1) 'Run promoted TPC-DS power-test drain-before-commit reproducer' -k test_execute_one_query_drains_raw_cursor_before_commit; (2) 'Run promoted DuckDB FK tuning load-ordering reproducers' (whole small file, 3 tests); (3) 'Run promoted TPC-H power/throughput boundary-query (w0 defect) reproducers' -- two uv run invocations, -k boundary_query against test_tpch_power_test.py (2 tests) and test_tpch_throughput_test.py (1 test). All use -n 0 and narrow -k/-m selectors, matching the #932 mechanism exactly. Verified: yaml.safe_load parses pr.yml cleanly; all 4 cells pass on the clean (unmodified) tree (1.09s+5.86s+0.81s+0.83s = ~8.6s added wall-clock); todo check-scope reports scope OK (1 changed file: .github/workflows/pr.yml, within scope.only_modify).",
+        "item_id": "promote-non-required-regression-reproducers-suite-audit",
+        "notes": "Add explicit-node steps to a job already in ci-required-result.needs. For each,\nrevert its underlying fix locally, confirm the required step goes red, restore;\nrecord the break/restore evidence in the PR body. No continue-on-error.\n",
+        "started_at": "2026-07-22T20:31:25Z",
+        "started_branch": "chore/promote-regression-reproducers-required-ci",
+        "started_worktree": "/home/user/bb-wt/promote-ci",
+        "status": "done",
+        "summary": "Promote the selected cells via explicit-node steps in a required job and prove each load-bearing",
+        "wid": "w3"
+      }
+    ]
+  }
+}

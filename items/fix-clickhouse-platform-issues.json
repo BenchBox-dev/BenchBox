@@ -1,0 +1,10 @@
+{
+  "description": "- \"**Tasks**:\"\n- \"**Files Affected**:\"\n- \"**Current Behavior**:\"\n- \"**Expected Behavior**:\"\n- \"**Impact**: Eliminates confusing warnings, ensures consistent database naming across platforms, respects user tuning preferences, improves ClickHouse platform reliability\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

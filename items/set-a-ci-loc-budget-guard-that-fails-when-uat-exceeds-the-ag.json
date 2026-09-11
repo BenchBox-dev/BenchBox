@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #507 of uat-loc-budget-reconciliation.\nDeferred: Set a CI LOC-budget guard that fails when UAT exceeds the agreed budget\nReason deferred: A budget guard only makes sense after the budget is reconciled; now that it is, a guard at ~6,500 is a reasonable follow-up.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:39Z",
+      "worktree": "main"
+    }
+  }
+}

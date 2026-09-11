@@ -1,0 +1,372 @@
+{
+  "context": "Treat this as a contract unification, not a mechanical search-and-replace.\nStart by codifying the CsvDialect behavior in tests, then migrate adapters in\ngroups whose load APIs are similar. Prefer small helper functions that accept\nDataSource, table name, file path, and benchmark, and return the engine-native\noption shape. This keeps platform SQL/API construction local while removing\ndialect inference from each adapter.\n\nThe migrated Doris, PostgreSQL, QuestDB, and SingleStore implementations are\nthe reference pattern: resolve files with DataSourceResolver, call\nresolve_csv_dialect() at the point where an engine-specific load statement or\nAPI config needs delimiter/header/null semantics, and add tests that prove\nmanifest metadata beats filename suffixes.\n",
+  "description": "Commit 73f3a582e migrated only the Doris, PostgreSQL, QuestDB, and\nSingleStore data-loading paths from ad-hoc filename heuristics to the shared\nDataSourceResolver + resolve_csv_dialect pipeline. The remaining SQL,\nembedded, cloud warehouse, Databricks, and Spark-family adapters still derive\nCSV/TBL dialect from file extensions, benchmark csv_* attributes, or Spark's\nCSV reader options directly.\n\nThis leaves BenchBox with two competing CSV dialect contracts. The resolver\npath understands manifest-declared dialect metadata, treats null_marker=None\nas a meaningful \"no null marker\" value, avoids mock pollution from raw\ngetattr(mock, \"csv_*\", None), and centralizes fallback logging. The remaining\nadapters can still silently load manifest-described TBL/CSV data using stale\nextension heuristics, especially for converted datasets, compressed files,\nClickBench-style empty strings, or benchmarks that expose dialect metadata\nthrough manifests rather than benchmark attributes.\n\nCurrent evidence from the live codebase:\n- benchbox/platforms/duckdb.py:306,310,815 still uses get_delimiter_for_file()\n  and is_tpc_format() in text loading paths.\n- benchbox/platforms/clickhouse/workload.py:153 still uses is_tpc_format().\n- benchbox/platforms/starrocks/workload.py:276,287 still uses is_tpc_format()\n  and raw getattr(benchmark_instance, \"csv_delimiter\", None).\n- benchbox/platforms/databend/adapter.py:461 still uses get_delimiter_for_file()\n  after resolving files through DataSourceResolver.\n- benchbox/platforms/firebolt.py:744,893 still uses get_delimiter_for_file()\n  in copy/load SQL construction after DataSourceResolver resolution.\n- benchbox/platforms/redshift.py:1351,1388 still uses get_delimiter_for_file()\n  for COPY delimiter selection after DataSourceResolver resolution.\n- benchbox/platforms/bigquery.py:1138 still uses get_delimiter_for_file()\n  for LoadJobConfig field_delimiter.\n- benchbox/platforms/databricks/adapter.py:1439,1458 still uses is_tpc_format()\n  for CSV FORMAT_OPTIONS delimiter inference.\n- benchbox/platforms/base/spark_execution_mixin.py:260 reads\n  getattr(benchmark, \"csv_delimiter\", None) directly. spark.py, velox.py,\n  and lakesail.py delegate to this mixin, so they share a parallel resolver\n  bypass even though the mixin already creates a DataSourceResolver.\n\nThe goal is not just to replace function calls. The goal is to make every\nadapter that builds a CSV/TBL load option consume the same resolved\nCsvDialect object, including manifest table_metadata, benchmark attributes,\nexplicit None null markers, and safe fallback behavior.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "broaden DataSourceResolver responsibilities to generate engine-specific SQL",
+        "instead": "(not specified)",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "why": "adapter load APIs differ; the resolver should describe data, not load it."
+      },
+      {
+        "dont": "change table creation DDL, schema mapping, staging buckets, upload paths, or compression support in this TODO",
+        "instead": "(not specified)",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "why": "the scope is CSV dialect routing only."
+      },
+      {
+        "dont": "infer TPC/TBL dialect from `.tbl`, `.dat`, or compressed suffixes after resolver metadata is available",
+        "instead": "(not specified)",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "why": "converted or manifest-described data may intentionally contradict the suffix."
+      },
+      {
+        "dont": "normalize `null_marker=None` to an empty string, `NULL`, or engine default",
+        "instead": "(not specified)",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "why": "explicit None means no null marker conversion in the shared dialect contract."
+      },
+      {
+        "dont": "pass only dict[str, list[Path]] through new helper layers",
+        "instead": "pass DataSource or table_metadata alongside paths instead.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "why": "that drops resolver table_metadata"
+      },
+      {
+        "dont": "use `getattr(benchmark, \"csv_delimiter\", None)` as a fallback in adapters",
+        "instead": "call resolve_csv_dialect() instead.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "why": "Mock objects and partial benchmark stubs can pollute dialect detection"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "id": 208,
+        "reason": "This item targets concrete resolver bypasses evidenced by current grep results; unrelated adapters should be audited separately to avoid scope creep.",
+        "resolution": "promoted",
+        "resolved_item": "migrate-adapters-not-listed-in-this-todo-that-already-use-da",
+        "resolved_reason": null,
+        "summary": "Migrate adapters not listed in this TODO that already use DataSourceResolver but do not construct CSV/TBL options themselves."
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "id": 209,
+        "reason": "That would over-centralize platform behavior. This migration should keep engine-specific SQL/API construction in adapters and only unify dialect source.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason explicitly rejects centralizing engine-native load configs in the resolver as over-centralization; deliberate architecture decision against.",
+        "summary": "Redesign DataSourceResolver to emit engine-native load configs."
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "id": 210,
+        "reason": "The resolver contract already consumes manifest and benchmark metadata; generator changes are a separate data contract decision.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Reason states the CSV resolver already consumes manifest+benchmark metadata; changing generators to emit different dialect metadata is only warranted if a concrete new requirement arises, which none does. No driver.",
+        "summary": "Change benchmark generators to emit different CSV dialect metadata."
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-04-25T00:00:00Z",
+      "created_at": "2026-04-25T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ClickBench and other CSV-style benchmarks continue preserving empty strings according to their benchmark/manifest dialect.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline"
+      },
+      {
+        "behavior": "DataSourceResolver remains the single source of table/file resolution and format preference selection; do not reimplement manifest walking inside adapters.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline"
+      },
+      {
+        "behavior": "Existing platform upload/staging/compression behavior for Firebolt, Redshift, BigQuery, Databricks, Spark, Velox, and LakeSail remains unchanged.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline"
+      },
+      {
+        "behavior": "SparkDataLoadMixin keeps LakeSail CSV-extension symlink compatibility and Spark compression option handling.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline"
+      },
+      {
+        "behavior": "TPC-H/TPC-DS TBL inputs still load as pipe-delimited, headerless data on every migrated platform.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline"
+      },
+      {
+        "behavior": "null_marker=None remains semantically distinct from a missing null marker; adapters must not replace explicit None with a default string.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline"
+      },
+      {
+        "behavior": "resolve_csv_dialect() precedence remains manifest table_metadata first, then real benchmark csv_* attributes, then file-extension fallback with logging.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/manifest/ - manifest schema and parsing are not part of this migration unless a failing test proves metadata is not exposed."
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/ - runner orchestration should not need changes for CSV dialect routing."
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/utils/file_format.py - keep low-level format helpers for callers outside migrated adapter load paths."
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark generation code - this item consumes existing manifest/dialect metadata; it does not change data generation."
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/data_loading.py"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/base/spark_execution_mixin.py"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/workload.py"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend/adapter.py"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databricks/adapter.py"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/firebolt.py"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/redshift.py"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/starrocks/workload.py"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_csv_dialect.py tests/unit/platforms/test_data_loading.py -n 0 -q",
+        "description": "CsvDialect contract tests pass",
+        "expected": "All tests pass, including manifest metadata precedence and null_marker=None cases.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_duckdb_operations.py tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/test_clickhouse_local.py tests/unit/platforms/test_starrocks_adapter.py tests/unit/platforms/test_starrocks_workload.py tests/unit/platforms/test_databend_adapter.py tests/unit/platforms/test_bigquery_adapter.py tests/unit/platforms/test_redshift_adapter.py tests/unit/platforms/test_firebolt_adapter.py tests/unit/platforms/test_databricks_adapter.py tests/unit/platforms/test_spark_adapter.py tests/unit/platforms/test_lakesail_adapter.py tests/unit/platforms/test_velox_adapter.py -n 0 -q",
+        "description": "Migrated adapter unit tests pass",
+        "expected": "All selected adapter tests pass with no suffix-based delimiter regressions across DuckDB, ClickHouse, StarRocks, Databend, BigQuery, Redshift, Firebolt, Databricks, Spark, LakeSail, and Velox.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_bigquery_adapter_coverage.py tests/unit/platforms/test_redshift_adapter_coverage.py tests/unit/platforms/test_firebolt_coverage.py tests/unit/platforms/test_databricks_adapter_coverage.py tests/unit/platforms/test_spark_coverage.py tests/unit/platforms/test_lakesail_coverage.py -n 0 -q",
+        "description": "Coverage suites for adapters with separate coverage files pass",
+        "expected": "All selected coverage tests pass or only documented pre-existing failures remain.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"import subprocess, sys; paths = ['benchbox/platforms/duckdb.py', 'benchbox/platforms/clickhouse/workload.py', 'benchbox/platforms/starrocks/workload.py', 'benchbox/platforms/databend/adapter.py', 'benchbox/platforms/firebolt.py', 'benchbox/platforms/redshift.py', 'benchbox/platforms/bigquery.py', 'benchbox/platforms/databricks/adapter.py', 'benchbox/platforms/base/spark_execution_mixin.py']; result = subprocess.run(['rg', '-n', r'is_tpc_format|get_delimiter_for_file|getattr\\([^\\n]*csv_(delimiter|null|header)', *paths], text=True, capture_output=True); print(result.stdout, end=''); sys.exit(0 if result.returncode == 1 else result.returncode)\"",
+        "description": "No migrated load path still imports or calls old delimiter heuristics",
+        "expected": "No output; command exits 0 only when rg finds no remaining migrated-path heuristic calls.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m fast -q",
+        "description": "Fast smoke suite remains green",
+        "expected": "All fast tests pass, or failures are confirmed pre-existing and unrelated.",
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "notes": "Read benchbox/platforms/base/data_loading.py:CsvDialect and\nresolve_csv_dialect(), plus the migrated Doris/PostgreSQL/QuestDB/\nSingleStore tests, before editing adapters. Add reusable test helpers or\nfixtures that exercise:\n- manifest table_metadata delimiter wins over file suffix;\n- null_marker=None remains explicit and is not replaced by a default;\n- benchmark csv_* attributes are used only when no manifest metadata exists;\n- plain Mock benchmark objects do not accidentally provide csv_* values.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the unified CSV dialect contract and add a shared adapter test fixture for resolver-backed dialect metadata",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "notes": "Replace get_delimiter_for_file(), is_tpc_format(), and raw\ngetattr(benchmark, \"csv_*\", None) in the listed text load paths with\nresolve_csv_dialect(source, table_name, file_path, benchmark). Reuse the\nDataSource returned by DataSourceResolver where the adapter already has\nit; where a helper currently receives only dict[str, list[Path]], extend\nthe helper signature narrowly so table_metadata stays available. Preserve\nadapter-specific SQL construction and only swap the dialect source.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate local and embedded text loaders: DuckDB, ClickHouse workload, StarRocks workload, and Databend",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "notes": "Thread resolved CsvDialect into Firebolt COPY/external-table load SQL,\nRedshift COPY delimiter/null handling, and BigQuery LoadJobConfig\nfield_delimiter/null_marker handling. Keep staging/upload behavior and\ncompression detection unchanged. Add regression tests that create resolver\ntable_metadata contradicting file suffixes, then assert generated COPY or\nLoadJobConfig settings follow metadata rather than the suffix.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate cloud warehouse loaders: Firebolt, Redshift, and BigQuery",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "notes": "Replace is_tpc_format(base_name) delimiter inference in\nbenchbox/platforms/databricks/adapter.py with resolver-backed dialect\nvalues. Confirm FORMAT_OPTIONS('delimiter'=..., 'header'=...) preserves\nthe existing behavior for TPC-H/TPC-DS TBL inputs while honoring manifest\nmetadata for CSV-like benchmarks.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Migrate Databricks CSV FORMAT_OPTIONS to resolved CsvDialect",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "notes": "SparkDataLoadMixin already constructs DataSourceResolver, but it discards\ntable_metadata when choosing CSV reader options. Change the mixin to\nresolve CsvDialect per table/file before building reader options. Map\ndelimiter/header/null_marker to Spark options deliberately:\n- sep: dialect.delimiter;\n- header: only true when the resolved dialect says headers are present;\n- nullValue: set only when dialect.null_marker is not None;\n- emptyValue and nanValue: preserve existing behavior unless tests prove\n  a resolver-backed change is required.\nKeep LakeSail's CSV-extension symlink compatibility path and Spark\ncompression handling unchanged.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Refactor SparkDataLoadMixin so spark, velox, and lakesail consume CsvDialect instead of direct csv_delimiter getattr",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "notes": "Remove now-unused imports of is_tpc_format and get_delimiter_for_file from\nmigrated adapter files. Add a focused test or project script assertion\nthat rejects new uses of those helpers in adapter load_data/COPY/LOAD\npaths while allowing legitimate uses in low-level file_format utilities\nand tests. The guard should name the approved exception list explicitly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove adapter-local heuristic imports and add a grep-based regression guard for migrated paths",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-remaining-adapters-to-csv-resolver-pipeline",
+        "notes": "Run the targeted unit suites for migrated adapters first, then the fast\nmarker suite. If a platform cannot represent part of CsvDialect exactly\n(for example an engine lacks explicit no-null-marker semantics), document\nthat as a narrow follow-up with engine-specific rationale instead of\nweakening the shared resolver contract.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run targeted adapter tests plus fast smoke, then record any unsupported platform-specific follow-ups",
+        "wid": "w7"
+      }
+    ]
+  }
+}

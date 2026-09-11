@@ -1,0 +1,236 @@
+{
+  "context": "Each fix is independent and can be addressed in any order:\n\nDatabend: Follow the Databricks pattern in benchbox/platforms/databricks/__init__.py\nwhich defines the config builder in __init__.py alongside the lazy adapter import.\n\nLakeSail: Add entry to adapter_factory._get_dataframe_adapter() dict following the\nexisting polars-df and pandas-df entries.\n\nStarRocks: Copy the stub pattern from ClickHouse or Doris integration stubs in\ntests/integration/platforms/common.py.\n\npg_duckdb: Add 'deployment_mode' and 'motherduck_token' to the key passthrough list,\nand narrow the exception handling in create_connection() to specific expected exceptions.\n",
+  "description": "Adversarial code reviews identified runtime paths that will crash or fail silently\nwhen users attempt to use these adapters:\n\n1. **Databend lazy config builder broken** (PR #29): _make_lazy_config_builder calls\n   getattr(module, \"_build_databend_config\") on the package, but the function is only\n   defined in adapter.py and not exported from __init__.py. Will raise AttributeError\n   when benchbox run --platform databend is used via CLI.\n\n2. **LakeSail missing from adapter_factory** (PR #27): _get_dataframe_adapter() mapping\n   in adapter_factory.py doesn't include 'lakesail'. benchbox run --platform lakesail-df\n   via the unified adapter factory will fail with \"Unknown DataFrame platform: lakesail\".\n\n3. **LakeSail missing pyproject.toml extra** (PR #27): No lakesail = [...] extra in\n   pyproject.toml. uv sync --extra lakesail will fail. DEPENDENCY_GROUPS and\n   PLATFORM_TO_EXTRA reference \"lakesail\" but the extra doesn't exist.\n\n4. **StarRocks integration test stubs never merged** (PR #33): test_starrocks_smoke.py\n   imports symbols from common.py that were never added. Integration tests crash with\n   ImportError.\n\n5. **pg_duckdb from_config() doesn't pass deployment_mode or motherduck_token** (PR #32):\n   MotherDuck deployment mode is unreachable via the standard config pipeline. The\n   for key in [...] passthrough loop doesn't include these keys.\n\n6. **pg_duckdb/pg_mooncake silent exception swallowing** (PR #32): create_connection()\n   catches all exceptions and returns connections in potentially aborted transaction state.",
+  "legacy": {
+    "item_meta": {
+      "category": "Platform Expansion",
+      "completed_at": "2026-02-16T00:00:00Z",
+      "created_at": "2026-02-15T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "item_id": "platform-adapter-broken-runtime-paths"
+      },
+      {
+        "behavior": "Existing adapter_factory paths for duckdb, polars-df, pandas-df continue working",
+        "item_id": "platform-adapter-broken-runtime-paths"
+      },
+      {
+        "behavior": "benchbox run --platform duckdb --benchmark tpch still works end-to-end",
+        "item_id": "platform-adapter-broken-runtime-paths"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner.py"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/duckdb.py"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/adapter_factory.py"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend/__init__.py"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend/adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/lakesail.py"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_duckdb.py"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/pg_mooncake.py"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/platforms/common.py"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_databend_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_pg_duckdb_adapter.py"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_pg_mooncake_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short",
+        "description": "All platform adapter tests pass",
+        "expected": "all tests pass",
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.databend import DatabendAdapter; print('OK')\"",
+        "description": "Databend config builder resolves",
+        "expected": "OK",
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c \"from benchbox.platforms.adapter_factory import get_adapter; print('OK')\"",
+        "description": "LakeSail DF adapter is discoverable",
+        "expected": "OK",
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "notes": "Follow Databricks pattern: move builder to __init__.py, remove eager registration from adapter.py:912-918",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix Databend config builder - export _build_databend_config from __init__.py or move to __init__.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "notes": "adapter_factory.py:232-240 - add 'lakesail' entry matching pattern of other DF platforms",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add LakeSail to adapter_factory._get_dataframe_adapter() mapping",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "notes": "Add lakesail = [\"pyspark>=3.4.0\"] to [project.optional-dependencies]",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add lakesail extra to pyproject.toml",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "notes": "Add StarRocksStubState, _StarRocksCursor, _StarRocksConnection, install_starrocks_stub",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add StarRocks stub implementation to tests/integration/platforms/common.py",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "notes": "pg_duckdb.py:116-165 - add keys to the passthrough loop or extract explicitly",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix pg_duckdb from_config() to pass deployment_mode and motherduck_token",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "notes": "pg_duckdb.py:261-265, pg_mooncake.py:171-175 - silently returning aborted connections corrupts results",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix pg_duckdb/pg_mooncake create_connection() exception handling - re-raise or narrow catch",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "platform-adapter-broken-runtime-paths",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests verifying all fixed runtime paths work",
+        "wid": "w7"
+      }
+    ]
+  }
+}

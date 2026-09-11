@@ -1,0 +1,58 @@
+{
+  "description": "Completes three deferred MotherDuck adapter features that were originally\nscoped in motherduck-platform-adapter (completed 2026-02-14) but deferred\nbecause they require a live MotherDuck account for development and testing.\n\nThese are adapter features, not test infrastructure - split from\ncloud-integration-test-infrastructure.yaml for clarity.\n\n1. Interactive credential setup wizard for MOTHERDUCK_TOKEN\n2. Cloud storage upload path via MotherDuck's native API\n3. Result cache bypass/invalidation for benchmark reproducibility\n",
+  "legacy": {
+    "item_meta": {
+      "blocked_reason": "imported from YAML status: Blocked",
+      "category": "Platform Expansion",
+      "created_at": "2026-03-28T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "work_needs": [
+      {
+        "item_id": "motherduck-cloud-features",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "motherduck-cloud-features",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "motherduck-cloud-features",
+        "notes": "Interactive CLI flow: check env var → prompt for token → validate by\nattempting connection → print success/failure. Should be invocable via\n`benchbox setup motherduck` or similar.\nEnv var: MOTHERDUCK_TOKEN (already used by adapter for connection).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Credential setup wizard - interactive flow to configure MOTHERDUCK_TOKEN",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-cloud-features",
+        "notes": "MotherDuck supports loading from URLs and cloud storage natively.\nImplement upload_data() method that uses MotherDuck's COPY or\nCREATE TABLE AS SELECT from staged files. Requires MOTHERDUCK_TOKEN.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Cloud storage upload path - upload data via MotherDuck's native mechanisms",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "motherduck-cloud-features",
+        "notes": "Research MotherDuck cache behavior and available control mechanisms.\nOptions to investigate:\n- SET enable_result_caching = false (if available)\n- PRAGMA statements\n- Unique schema per run to avoid cache hits\n- Query hints or comments that bust cache\nImportant for benchmark reproducibility - cached results skew timings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Result cache control - implement cache bypass for consistent benchmarking",
+        "wid": "w3"
+      }
+    ]
+  }
+}

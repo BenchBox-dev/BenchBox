@@ -1,0 +1,176 @@
+{
+  "context": "Extend the classifier first (w1's path-filter group), then add jobs that\nreuse nightly step bodies by copy (not by refactoring nightly.yml itself -\nthis TODO does not touch nightly.yml). Wire into ci-required-result last,\nonce both jobs exist and their `result` values are known-good in a scratch\nrun.\n",
+  "description": "The develop-PR gate (`.github/workflows/pr.yml`, single required check\n`ci-required-result` at pr.yml:757-819) never builds the wheel, never\ninstalls it in isolation, and never runs `pip-audit`. Both checks exist\ntoday but only run nightly (`nightly.yml` `test-package` job ~:261-308,\n`pip-audit` step ~:111-118) or on `main` (`test.yml`, triggers only on\n`push`/`pull_request` to `main`, test.yml:3-9). The nightly `test-package`\njob's own comment (nightly.yml:300-303) states this exact minimal-import\ncontract's absence \"let v0.3.0 ship a broken clean install\" - i.e. this\ngap has already caused a real regression that reached a release before\nany CI lane caught it. A `pyproject.toml`/`MANIFEST.in`/`uv.lock` change\ncan land on develop today with zero build/install/audit signal until the\nnext nightly run or the `main` release PR.\n\nThis item path-filters both checks into the develop-PR required lane\nusing the existing classifier so unrelated PRs (e.g. a docs-only or\nsingle-test-file change) pay no extra CI cost.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "let a skipped package-smoke/dependency-audit job silently pass ci-required-result on a PR that DID touch packaging files",
+        "instead": "verify the path-filter output, not just the job result, gates the check.",
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "why": "that reintroduces the exact gap this TODO closes"
+      },
+      {
+        "dont": "make package-smoke or dependency-audit run unconditionally on every PR",
+        "instead": "path-filter both.",
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "why": "most PRs never touch packaging metadata and the whole point is targeted, cheap promotion"
+      },
+      {
+        "dont": "refactor nightly.yml's test-package job into a shared reusable workflow as part of this change",
+        "instead": "copy the step bodies into pr.yml and let them diverge if needed.",
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "why": "that's a larger, separable refactor"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-07-03T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Non-packaging PRs see no new required job execution time (path filter must correctly skip both jobs).",
+        "item_id": "pr-gate-package-and-audit-promotion"
+      },
+      {
+        "behavior": "ci-required-result's existing skipped-counts-as-pass semantics for audit-sha (pr.yml:789-793) as the pattern to extend, not replace.",
+        "item_id": "pr-gate-package-and-audit-promotion"
+      },
+      {
+        "behavior": "nightly.yml's test-package OS matrix (ubuntu + windows) and its own pip-audit step remain unchanged and continue running nightly independently of this PR-time addition.",
+        "item_id": "pr-gate-package-and-audit-promotion"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "nightly.yml:111-118 pip-audit step — reuse the ignore-vuln parsing",
+        "decision": "reuse",
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "path": "nightly.yml:111-118"
+      },
+      {
+        "concept": "nightly.yml:261-308 test-package job — reuse the build/install/minimal-import steps verbatim",
+        "decision": "reuse",
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "path": "nightly.yml:261-308"
+      },
+      {
+        "concept": "pr.yml:757-819 ci-required-result conditional-job pattern (audit-sha skipped-counts-as-pass) — extend with the same shape for the two new jobs",
+        "decision": "extend",
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "path": "pr.yml:757-819"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/nightly.yml"
+      },
+      {
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/test.yml"
+      },
+      {
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "kind": "only_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      },
+      {
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "kind": "only_modify",
+        "path_glob": "scripts/path_filter_decision.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git checkout -b scratch/break-manifest && echo 'exclude benchbox/py.typed' >> MANIFEST.in && git commit -am 'scratch: break manifest' && gh pr create --fill --base develop && gh pr checks --watch",
+        "description": "Breaking MANIFEST.in on a scratch branch turns package-smoke red",
+        "expected": "package-smoke job fails; ci-required-result fails",
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "gh pr checks <docs-only-pr-number>",
+        "description": "A docs-only PR skips both new jobs and still passes",
+        "expected": "package-smoke and dependency-audit show skipped; ci-required-result succeeds",
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uvx pip-audit",
+        "description": "pip-audit job fails on an intentionally vulnerable pinned dep in a scratch branch",
+        "expected": "matches nightly's existing pip-audit behavior when a known vuln is present",
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "notes": "Done. Extended the classifier generically instead of a single-purpose\n\"packaging\" special case: `scripts/path_filter_decision.py` now derives\nany non-core key in `.github/path-filters.yml` as an \"extra group\"\n(`extra_group_keys()`), emitting `<group>_paths`/`<group>_needed`\ndecision keys, a `<group>-needed` GH Actions output, and a\n`<group>.txt` helper list automatically. Added a `packaging:` group to\npath-filters.yml (pyproject.toml, MANIFEST.in, setup.py, setup.cfg,\nbenchbox/__init__.py, uv.lock) and a `viz:` group reused by\nparity-check-develop-ring.yaml (see that TODO). Added `package-smoke`\njob to pr.yml, gated on `needs.ci-paths.outputs.packaging-needed`,\ncopying nightly.yml's test-package steps verbatim (ubuntu/3.12 only,\nno matrix, no artifact upload - PR gate doesn't need the dist\nartifact). Original notes:\nAdd a `package-smoke` job to pr.yml gated on a new path-filter output\n(extend `scripts/path_filter_decision.py` / `.github/path-filters.yml`\nwith a `packaging` group covering `pyproject.toml`, `MANIFEST.in`,\n`setup.py`/`setup.cfg`, `benchbox/__init__.py`, `uv.lock`). Reuse the\nnightly `test-package` job's steps verbatim where possible: `uv build`,\nassert exactly one wheel (nightly.yml:291-296), then the isolated\ninstall + minimal-import assertion (nightly.yml:300-304): import\n`benchbox` succeeds AND `importlib.util.find_spec('pandas') is None`,\nplus `benchbox --help`. Single ubuntu-latest/3.12 leg is sufficient for\nthe PR gate; leave the full OS matrix (ubuntu + windows) to nightly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Path-filtered package build + isolated install + minimal-import smoke job in pr.yml",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "notes": "Done. Added `dependency-audit` job, gated on the same\n`packaging-needed` output as package-smoke (single group - the TODO's\n\"or a subset\" alternative wasn't needed since pyproject.toml/uv.lock\nare already inside the packaging group). Reused nightly.yml's\n`PIP_AUDIT_IGNORE_VULNS` ignore-list parsing verbatim. Original notes:\nAdd a `dependency-audit` job gated on the same packaging path filter\n(or a `pyproject.toml`/`uv.lock`-only subset if the classifier\ndistinguishes them) plus the `PIP_AUDIT_IGNORE_VULNS` escape hatch\nalready used in nightly.yml:111-118. Reuse that step body directly\nrather than reimplementing the ignore-list parsing.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Path-filtered pip-audit job in pr.yml",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "pr-gate-package-and-audit-promotion",
+        "notes": "Done. Added `PACKAGE_SMOKE_RESULT`/`DEPENDENCY_AUDIT_RESULT` env vars\nand both jobs to `ci-required-result.needs`, plus the same\nsuccess-or-skipped check pattern as `audit-sha`. (The sibling\nparity-check job from parity-check-develop-ring.yaml was initially\nwired into the same aggregator point but was demoted to non-blocking\nafter review — see that TODO; package-smoke/dependency-audit remain\nblocking as specified here since both step bodies are proven green in\nnightly.) Updated the pinned test defaults in\ntests/unit/workflows/test_pr_workflow_path_classifier.py\n(`_run_ci_required_result`'s env dict needed `PACKAGE_SMOKE_RESULT`\netc. defaulted to \"skipped\", otherwise every existing test in that\nfile would fail on an unset env var evaluating to neither \"success\"\nnor \"skipped\") and added new tests\n(`test_ci_required_result_fails_on_packaging_job_failure`,\n`test_ci_required_result_passes_when_packaging_jobs_skip`,\n`test_parity_check_is_demoted_to_non_blocking`,\nplus extended `test_ci_required_result_required_jobs_in_needs`).\nVerified: a docs-only / non-packaging PR (packaging-needed=false)\nshows both jobs `if:`-skipped and the aggregator still passes\n(confirmed via classify_paths() dry run + the pinned aggregator\ntests, not a live PR - see verification section). Original notes:\nFollow the existing conditional-job pattern in `ci-required-result`\n(pr.yml:789-793, the `AUDIT_SHA_RESULT` check: fail only if the result\nis neither `success` nor `skipped`). Add\n`PACKAGE_SMOKE_RESULT`/`DEPENDENCY_AUDIT_RESULT` env vars from\n`needs.package-smoke.result` / `needs.dependency-audit.result`, add\nboth jobs to the `needs:` list at pr.yml:759, and add the same\nsuccess-or-skipped check before the final pass/fail block\n(pr.yml:810-819). A PR that does not touch packaging files must still\npass with both jobs skipped.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire package-smoke and dependency-audit into ci-required-result with skipped-counts-as-pass semantics",
+        "wid": "w3"
+      }
+    ]
+  }
+}

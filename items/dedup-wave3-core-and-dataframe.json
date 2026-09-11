@@ -1,0 +1,386 @@
+{
+  "context": "1. G4+G10 -- Primitives benchmark shared helpers:\n   Extract `_table_exists(connection, table_name, schema_name)` and\n   `_get_create_tables_sql(table_order, get_single_table_fn, ...)`\n   into a shared module (e.g., benchbox/core/primitives_benchmark_utils.py\n   or as methods on a shared base). Both transaction_primitives/benchmark.py\n   and write_primitives/benchmark.py delegate to these shared implementations.\n\n2. G13 -- Ranking parameterization:\n   Extract `_rank_by_metric(results, metric_fn, metric_name)` private method\n   in ranking.py. Both _rank_by_geometric_mean and _rank_by_total_time become\n   thin wrappers passing their metric function (scipy.stats.gmean vs sum).\n\n3. G14 -- TPC audit trail:\n   Extract `generate_audit_trail(benchmark_name, results, metadata, ...)`\n   into benchbox/core/tpc_audit.py or benchbox/core/tpc_patterns.py (which\n   already exists for shared TPC patterns). Both official_benchmark modules\n   delegate to this shared function.\n\n4. G15 -- Type casting dispatch:\n   Add `_apply_cast(self, target_type: str)` private method to the relevant\n   class in unified_frame.py, following the same pattern as the wave-2\n   `_extract_date_part` helper. Each cast method (cast_float64, cast_int32,\n   cast_int64) becomes: `return self._apply_cast(\"float64\")`.\n\n5. G17 -- TPC-DI loader parameterization:\n   Extract `_load_data(data_type, path, validation_rules, ...)` base method\n   in tpcdi/loader.py. Both load_dimension_data and load_fact_data become\n   thin wrappers passing their data type and rules.\n\n6. G25 -- DataFusion window functions:\n   Add `_datafusion_window_rank(self, rank_method: str, order_by, partition_by)`\n   private method in datafusion_df.py, following the same pattern as the\n   wave-2 `_polars_window_rank` helper. Each window function becomes:\n   `return self._datafusion_window_rank(\"rank\", order_by, partition_by)`.\n\n7. G29 -- CLI text formatting:\n   Extract `format_text_table(headers, rows, ...)` into\n   benchbox/cli/commands/text_utils.py or benchbox/cli/formatting.py.\n   Both calculate_qphh.py and metrics.py import and use the shared formatter.\n\n8. G30 -- Registry listing:\n   Extract `list_benchmark_queries(module_path, query_prefix)` into\n   a shared registry utility (e.g., benchbox/core/dataframe/registry_utils.py).\n   All 4 benchmark registries delegate to this shared function.\n",
+  "description": "Wave-3 duplicate-check triage (2026-03-12, post wave-2) identifies 9\nconsolidation-worthy groups in the core library layer, CLI commands, and\nDataFrame platform adapters. These are parallel implementations that can\nbe centralized into shared helpers or parameterized methods.\n\nTargets (report rank -> dup lines):\n\nG4  (49 dup lines): _table_exists in transaction_primitives/benchmark.py:342\n    and write_primitives/benchmark.py:399. 2 copies with identical logic:\n    query information_schema.tables -> check row count -> return bool.\n    Same function in two primitives benchmark modules.\n\nG10 (48 dup lines): get_create_tables_sql in transaction_primitives/benchmark.py:741\n    and write_primitives/benchmark.py:898. 2 copies with identical pattern:\n    iterate table_order -> call per-table SQL builder -> collect and join.\n    Related to G4 - both are in the same two primitives benchmark files.\n\nG13 (46 dup lines): _rank_by_geometric_mean and _rank_by_total_time in\n    analysis/ranking.py:168 and :215. 2 methods in the same file with\n    identical ranking algorithm structure, differing only by the metric\n    computation (geometric mean vs sum of times).\n\nG14 (46 dup lines): generate_audit_trail in tpcds/official_benchmark.py:252\n    and tpch/official_benchmark.py:215. 2 copies with identical audit trail\n    generation logic for TPC official benchmark compliance reports. Only\n    the benchmark name and metadata fields differ.\n\nG15 (46 dup lines): cast_float64, cast_int32, cast_int64 in\n    unified_frame.py:1164, :1212, :1236. 3 methods with identical\n    multi-platform dispatch (PySpark -> DataFusion -> Polars), differing\n    only by the target type. Same pattern as the temporal extraction\n    methods already consolidated in wave-2.\n\nG17 (45 dup lines): load_dimension_data and load_fact_data in\n    tpcdi/loader.py:48 and :94. 2 methods in the same file with identical\n    data loading pattern (resolve path -> read files -> validate -> load),\n    differing only by data type classification and validation rules.\n\nG25 (44 dup lines): window_dense_rank, window_rank, window_row_number in\n    datafusion_df.py:752, :775, :798. 3 methods with identical DataFusion\n    window function dispatch, differing only by the rank method parameter\n    (rank/dense_rank/row_number). Same pattern as the Polars window\n    functions consolidated in wave-2.\n\nG29 (42 dup lines): _format_text_output in cli/commands/calculate_qphh.py:90\n    and cli/commands/metrics.py:232. 2 copies with identical text table\n    formatting logic for CLI output.\n\nG30 (42 dup lines): list_clickbench_queries, list_nyctaxi_queries,\n    list_ssb_queries, list_tpcds_queries across 4 benchmark dataframe\n    query registries: clickbench/dataframe_queries/registry.py:27,\n    nyctaxi/dataframe_queries/registry.py:27,\n    ssb/dataframe_queries/registry.py:31,\n    tpcds/dataframe_queries/registry.py:33. 4 copies with identical\n    registry listing pattern.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change public method signatures",
+        "instead": "only extract internal dispatch logic",
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "why": "callers across 20+ platform adapters and benchmark modules depend on the current signatures; changing them silently breaks the contract without a test failure"
+      },
+      {
+        "dont": "combine the ranking refactor with ranking algorithm changes",
+        "instead": "only extract the shared scaffolding, keep metric computation untouched",
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "why": "the ranking algorithms are validated against TPC official QphH formulas; mixing structural refactoring with logic changes makes regressions harder to isolate"
+      },
+      {
+        "dont": "create abstract base classes for the registries",
+        "instead": "use a plain shared function",
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "why": "4 registries with a 14-line shared pattern doesn't justify the cognitive overhead of an ABC; contributors adding a new benchmark would need to understand the class hierarchy instead of copying a simple function call"
+      },
+      {
+        "dont": "merge transaction_primitives and write_primitives benchmark modules",
+        "instead": "only share the specific _table_exists and get_create_tables_sql helper functions",
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "why": "they represent distinct TPC benchmark categories with independent evolution paths; a merge couples unrelated feature work"
+      },
+      {
+        "dont": "use getattr-based dynamic dispatch for _apply_cast",
+        "instead": "pass string literals like 'float64', not Python type objects",
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "why": "explicit type strings preserve IDE navigability and static analysis across the 3 cast methods"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "needs_item": "dedup-wave3-ignore-rules"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-03-12T00:00:00Z",
+      "created_at": "2026-03-12T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "Audit trail output format and content identical for TPC-DS and TPC-H",
+        "item_id": "dedup-wave3-core-and-dataframe"
+      },
+      {
+        "behavior": "CLI text output formatting identical in both commands",
+        "item_id": "dedup-wave3-core-and-dataframe"
+      },
+      {
+        "behavior": "Cast methods return identical UnifiedExpr types across all platforms",
+        "item_id": "dedup-wave3-core-and-dataframe"
+      },
+      {
+        "behavior": "DataFusion window functions produce identical rank semantics",
+        "item_id": "dedup-wave3-core-and-dataframe"
+      },
+      {
+        "behavior": "Ranking algorithms produce identical rank orderings and scores",
+        "item_id": "dedup-wave3-core-and-dataframe"
+      },
+      {
+        "behavior": "Registry query listings return identical dictionaries",
+        "item_id": "dedup-wave3-core-and-dataframe"
+      },
+      {
+        "behavior": "TPC-DI loader produces identical loaded data for dimension and fact tables",
+        "item_id": "dedup-wave3-core-and-dataframe"
+      },
+      {
+        "behavior": "_table_exists returns identical bool for all table existence checks",
+        "item_id": "dedup-wave3-core-and-dataframe"
+      },
+      {
+        "behavior": "get_create_tables_sql produces identical DDL strings",
+        "item_id": "dedup-wave3-core-and-dataframe"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/calculate_qphh.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/metrics.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/analysis/ranking.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/clickbench/dataframe_queries/registry.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/nyctaxi/dataframe_queries/registry.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/primitives_benchmark_utils.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/ssb/dataframe_queries/registry.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpc_patterns.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcdi/loader.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/dataframe_queries/registry.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpcds/official_benchmark.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tpch/official_benchmark.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transaction_primitives/benchmark.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/datafusion_df.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/dataframe/unified_frame.py"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'primitive or transaction or write_prim'",
+        "description": "Primitives benchmark tests pass",
+        "expected": "exit code 0, no failures",
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'official or audit'",
+        "description": "TPC official benchmark tests pass",
+        "expected": "exit code 0, no failures",
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'dataframe or unified_frame or datafusion'",
+        "description": "DataFrame platform tests pass",
+        "expected": "exit code 0, no failures",
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/ -v -k 'qphh or metrics'",
+        "description": "CLI command tests pass",
+        "expected": "exit code 0, no failures",
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make duplicate-check-verbose 2>&1 | grep -c '_table_exists\\|_rank_by_geometric_mean\\|generate_audit_trail\\|cast_float64\\|_format_text_output\\|list_clickbench_queries'",
+        "description": "Duplicate check shows reduction for targeted groups",
+        "expected": "0",
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "needs_wid": "w9",
+        "wid": "w10"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "needs_wid": "w1",
+        "wid": "w9"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "needs_wid": "w2",
+        "wid": "w9"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "needs_wid": "w3",
+        "wid": "w9"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "needs_wid": "w4",
+        "wid": "w9"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "needs_wid": "w5",
+        "wid": "w9"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "needs_wid": "w6",
+        "wid": "w9"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "needs_wid": "w7",
+        "wid": "w9"
+      },
+      {
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "notes": "Both functions are in transaction_primitives/benchmark.py and\nwrite_primitives/benchmark.py. Consider placing in core/ alongside\nthe existing primitives_utils.py from wave-2.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract shared _table_exists and _get_create_tables_sql into primitives_benchmark_utils.py",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full test suite to verify no regressions: make test-all",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "notes": "Single-file refactor. Both ranking methods reduce to one-liners\npassing different metric functions.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _rank_by_metric parameterized helper in ranking.py",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "notes": "Both tpcds and tpch official benchmarks use identical audit trail logic.\nBenchmark name and metadata fields passed as parameters.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract generate_audit_trail into shared TPC utility",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "notes": "Follows the same pattern as wave-2's _extract_date_part.\nMulti-platform dispatch (PySpark -> DataFusion -> Polars).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _apply_cast helper in unified_frame.py, refactor 3 cast methods",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "notes": "Single-file refactor. Both loading methods differ by data type and\nvalidation rules.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _load_data base method in tpcdi/loader.py, refactor load_dimension/fact_data",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "notes": "Follows the same pattern as wave-2's _polars_window_rank.\nRank method parameter differs (rank/dense_rank/row_number).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _datafusion_window_rank helper in datafusion_df.py, refactor 3 window methods",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "notes": "The deprecated calculate_qphh command already delegates output emission to\nmetrics.py. Removing the dead local helper eliminates the duplicate\nformatting implementation without changing runtime behavior.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove duplicate QphH text formatter from calculate_qphh and keep metrics as the single formatter",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "notes": "Each registry now exports the bound QueryRegistry.list_queries method\ninstead of maintaining an identical wrapper function.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Collapse 4 registry list wrappers to shared QueryRegistry.list_queries bindings",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "dedup-wave3-core-and-dataframe",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run targeted tests: pytest -k 'primitive or ranking or audit or cast or tpcdi or dataframe or cli or registry'",
+        "wid": "w9"
+      }
+    ]
+  }
+}

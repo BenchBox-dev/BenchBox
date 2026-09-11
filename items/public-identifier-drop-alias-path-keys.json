@@ -1,0 +1,130 @@
+{
+  "context": "Audit path_keys/endpoint_keys vs ADR field set; expand public_drop_keys (or drop by semantic class) for aliases with no named consumer; re-derive corpus if published bytes change; extend recovery gate.",
+  "description": "After #1578, public_drop_keys omits machine_id, working_dir, driver_runtime_python_executable, database_path, data_path, engine_host. anonymization_specs path_keys and host suffix rules still hash aliases such as workingdirectory, workdir, workingroot, pythonexecutable, and generic *host keys (except local endpoints) into empty-salt path_/host_ pseudonyms. Adversarial review C4: residual dictionary-oracle surface for fields the ADR intent would treat as unread identifiers if they appear under alternate spellings.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "needs_item": "published-pseudonym-oracle-and-field-set"
+      }
+    ],
+    "item_meta": {
+      "category": "privacy",
+      "completed_at": "2026-08-05T22:14:05Z",
+      "completed_pr": 1590,
+      "created_at": "2026-08-05T20:49:54Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No recovered plaintext in commits or PR bodies",
+        "item_id": "public-identifier-drop-alias-path-keys"
+      },
+      {
+        "behavior": "Retained fields with consumers (endpoint, database_name, submission_path) still publish when under their canonical keys",
+        "item_id": "public-identifier-drop-alias-path-keys"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization_specs.yaml"
+      },
+      {
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "kind": "only_modify",
+        "path_glob": "docs/development/adr/**"
+      },
+      {
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "kind": "only_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/**"
+      },
+      {
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py -q -k drop",
+        "description": "Unit tests cover alias drop keys",
+        "expected": "exit 0",
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "last_result": "pass",
+        "last_run": "2026-08-05T22:11:02Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_corpus_pseudonym_recovery.py tests/unit/scripts/test_corpus_privacy_invariant.py -q",
+        "description": "Recovery/privacy gates green",
+        "expected": "exit 0",
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "last_result": "pass",
+        "last_run": "2026-08-05T22:11:16Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Aliases of 6 drop keys: workdir/workingdirectory/workingroot (working_dir), datadir/datadirectory (data_path), pythonexecutable (driver_runtime_python_executable). host/hostname/server left (broader than engine_host). Corpus currently has zero of these keys post-#1578.",
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "notes": null,
+        "started_at": "2026-08-05T22:09:45Z",
+        "started_branch": "fix/public-identifier-alias-drop",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Inventory alias keys that still mint path_/host_ under empty salt with no consumer",
+        "wid": "w0"
+      },
+      {
+        "evidence": "public_drop_keys aliases + unit tests; ADR decision amended",
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "notes": null,
+        "started_at": "2026-08-05T22:10:35Z",
+        "started_branch": "fix/public-identifier-alias-drop",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Expand drop list or semantic drop rules and unit tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": "No re-derive: post-#1578 corpus has zero alias-key occurrences; recovery+privacy gates green",
+        "item_id": "public-identifier-drop-alias-path-keys",
+        "notes": null,
+        "started_at": "2026-08-05T22:10:46Z",
+        "started_branch": "fix/public-identifier-alias-drop",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Re-derive corpus and recovery gate if published bytes change",
+        "wid": "w2"
+      }
+    ]
+  }
+}

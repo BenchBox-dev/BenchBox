@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #433 of landing-prompts-all-supported-platforms.\nDeferred: Derive benchmark compatibility per platform\nReason deferred: This TODO must fix platform availability. Benchmark-specific compatibility filtering can be added separately unless registry `unsupported_benchmarks` makes it cheap and safe.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:36:15Z",
+      "worktree": "main"
+    }
+  }
+}

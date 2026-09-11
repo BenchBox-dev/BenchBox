@@ -1,0 +1,79 @@
+{
+  "description": "Non-required nits and improvements surfaced by the code review of\nexplorer-establish-cli-explorer-parity-tests.  One Required finding\n(missing vsSlowestRatio fixture coverage) was fixed immediately post-review.\nThis item tracks the remaining nit/consider findings.",
+  "legacy": {
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-04-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- chartMath.parity",
+        "description": "Parity suite still passes after path fix",
+        "expected": "all tests pass",
+        "item_id": "explorer-parity-tests-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test",
+        "description": "Full fast test suite green",
+        "expected": "all green",
+        "item_id": "explorer-parity-tests-review-followups",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-parity-tests-review-followups",
+        "notes": "chartMath.parity.test.ts:43-45 - FIXTURES_DIR resolves via a\nfour-level `../../../../` relative path from __dirname:\n  path.resolve(__dirname, \"../../../../tests/parity/fixtures\")\n\nThis silently breaks if either directory moves.  Options:\n  (a) Use an environment variable (PARITY_FIXTURES_DIR) set in\n      vitest.config.ts so the path is defined in one place.\n  (b) Use `path.resolve(process.cwd(), \"tests/parity/fixtures\")`\n      since vitest runs from the project root.\n  (c) Expose the fixtures path via a vite define constant.\n\nOption (b) is simplest and matches how the Makefile already\ninvokes vitest from the repo root.  Also improve the loadFixture\nerror message to say \"Run `make parity-fixtures` to regenerate.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Harden FIXTURES_DIR path in chartMath.parity.test.ts",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-parity-tests-review-followups",
+        "notes": "docs/visualization-parity.md describes how to ADD new parity tests\nand how to regenerate fixtures, but does not explain what to do\nwhen `make parity-check` fails in CI:\n  - Which file changed?  (Python or TS)\n  - Should I regenerate or revert?\n  - How do I run a single failing fixture case locally?\n\nAdd a \"Failure Modes\" section with decision tree:\n  1. If the Python function changed intentionally → regenerate\n     fixtures and update the TS helper to match.\n  2. If the TS function changed intentionally → regenerate\n     fixtures and verify Python is still the source of truth.\n  3. If neither changed (CI flake) → re-run; if persistent,\n     check for float platform differences.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add failure-modes section to docs/visualization-parity.md",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-parity-tests-review-followups",
+        "notes": "chartMath.ts - computePercentile(values: number[], p: number)\nreturns undefined when values is empty, but this behavior is not\ndocumented.  Callers (computeBoxStats, elsewhere) depend on this\nsilently.\n\nAdd a one-line JSDoc comment:\n  /** Returns undefined for empty input - callers must handle null. */\n\nLow risk: behavior already tested by percentile_ladder fixture's\nnull-result cases.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add empty-array contract comment to computePercentile",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-parity-tests-review-followups",
+        "notes": "generate_visualization_fixtures.py - builder functions follow\ntwo naming conventions:\n  - Most: build_<chart_name>_fixture() e.g. build_heatmap_color_fixture\n  - Added: build_vs_slowest_ratio_fixture() - consistent\n\nBut the BUILDERS list mixes positional and named patterns with\nno enforced contract.  Consider:\n  - A dataclass or TypedDict: FixtureBuilder(name, fn) so the\n    name used in the file matches the function's chart field.\n  - Or a decorator: @fixture(\"vs_slowest_ratio\") def build(): ...\n\nLow urgency; the current list has 13 builders and is readable.\nOnly worth addressing if builders grow past ~20.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Standardize fixture builder naming in generate_visualization_fixtures.py",
+        "wid": "w4"
+      }
+    ]
+  }
+}

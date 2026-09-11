@@ -1,0 +1,9 @@
+{
+  "description": "Introduce a first-class PostgreSQL (with optional TimescaleDB extensions) adapter so users can benchmark against the ubiquitous row-store baseline alongside existing columnar targets.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

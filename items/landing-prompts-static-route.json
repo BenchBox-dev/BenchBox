@@ -1,0 +1,356 @@
+{
+  "context": "Build a small static route that consumes the generator's\n`catalog.generated.js` include. Keep page JS focused on state, filtering,\nrendering, copy behavior, and URL persistence. Let the generator own facts\nand safety assertions; let the UI own presentation and interaction.\n",
+  "description": "Build the public `/prompts/` landing route after the decision gate and\ngenerated catalog contract are complete.\n\nThe page should be a lightweight static landing experience, not a\nresults-explorer-style app and not a Sphinx reference page. It should let a\nvisitor choose goal, agent, surface, interface, deployment mode, platform,\nbenchmark, and scale, then copy a prompt that helps them try the existing\nBenchBox CLI or MCP surface.\n\nThe page consumes the generator's `landing/prompts/catalog.generated.js`\nvia a `<script>` tag (which sets `window.__BENCHBOX_PROMPT_CATALOG__`); it\ndoes not fetch a separate JSON file or re-derive catalog facts in the\nbrowser.\n\nThe route must remain a marketing conversion surface. It must not introduce\nnew CLI/MCP APIs, collect credentials, or make managed cloud execution look\nfrictionless.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a package manager or frontend build step",
+        "instead": "use plain HTML/CSS/JS unless a later decision changes the architecture.",
+        "item_id": "landing-prompts-static-route",
+        "why": "`landing/` currently deploys as static files"
+      },
+      {
+        "dont": "create a landing hero before the builder",
+        "instead": "make the builder the first useful screen.",
+        "item_id": "landing-prompts-static-route",
+        "why": "the feature's goal is immediate conversion"
+      },
+      {
+        "dont": "hide cloud platforms",
+        "instead": "instead make setup/dry-run constraints prominent.",
+        "item_id": "landing-prompts-static-route",
+        "why": "the MVP requirement says cloud is visible"
+      },
+      {
+        "dont": "make generic-agent output assume Codex/Claude tools",
+        "instead": "generate manual-safe instructions.",
+        "item_id": "landing-prompts-static-route",
+        "why": "generic users may only have a chatbot"
+      },
+      {
+        "dont": "modify `landing/index.html` (root nav) or `docs/_templates/page.html` from this TODO",
+        "instead": "keep this PR scoped to `landing/prompts/`.",
+        "item_id": "landing-prompts-static-route",
+        "why": "nav edits are launch-gates' responsibility"
+      },
+      {
+        "dont": "use internal deployment labels directly in visible copy when they are awkward",
+        "instead": "map `self-hosted` to `Self-hosted` and `managed` to `Managed cloud`.",
+        "item_id": "landing-prompts-static-route",
+        "why": "users need plain language"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-static-route",
+        "id": 333,
+        "reason": "Overkill for MVP; plain static JS is sufficient unless the UI grows substantially.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Full TS/Preact rewrite explicitly deferred until the UI 'grows substantially'; no evidence that threshold has been reached.",
+        "summary": "Add a full TypeScript/Preact implementation"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-static-route",
+        "id": 334,
+        "reason": "The feature should compose known snippets, not generate unbounded prompt text.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicit design rejection: feature composes known snippets, not unbounded browser-side LLM generation.",
+        "summary": "Add browser-side LLM generation"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "landing-prompts-static-route",
+        "id": 335,
+        "reason": "Unsafe and unnecessary; prompts should direct users to configure credentials outside chat/browser.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Explicitly rejected as unsafe/unnecessary: browser-based cloud-credential collection was never meant to be built.",
+        "summary": "Collect cloud credentials or environment values in the browser"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "landing-prompts-static-route",
+        "needs_item": "landing-prompts-catalog-generator"
+      }
+    ],
+    "item_meta": {
+      "category": "Product and Documentation",
+      "completed_at": "2026-05-13T00:00:00Z",
+      "created_at": "2026-05-13T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Cloud prompts do not ask users to paste secrets into chat.",
+        "item_id": "landing-prompts-static-route"
+      },
+      {
+        "behavior": "MCP guidance references existing MCP capabilities; it does not claim new prompt-builder tools exist.",
+        "item_id": "landing-prompts-static-route"
+      },
+      {
+        "behavior": "Nav edits to root `landing/index.html` and `docs/_templates/page.html` are owned by `landing-prompts-launch-gates`; this TODO does not touch them.",
+        "item_id": "landing-prompts-static-route"
+      },
+      {
+        "behavior": "Results explorer remains isolated under `/results/`; do not change its build, routes, or package files.",
+        "item_id": "landing-prompts-static-route"
+      },
+      {
+        "behavior": "Root landing page remains available at `/` and keeps existing sections working.",
+        "item_id": "landing-prompts-static-route"
+      },
+      {
+        "behavior": "The prompt page does not fetch a standalone public catalog JSON file in MVP.",
+        "item_id": "landing-prompts-static-route"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".github/workflows/docs.yml:landing/* to site root — preserve deployment behavior",
+        "decision": "reuse",
+        "item_id": "landing-prompts-static-route",
+        "path": ".github/workflows/docs.yml:landing/*"
+      },
+      {
+        "concept": "docs/guides/mcp-integration.md:Codex and Claude Code MCP setup examples — link or summarize accurately",
+        "decision": "reuse",
+        "item_id": "landing-prompts-static-route",
+        "path": "docs/guides/mcp-integration.md:Codex"
+      },
+      {
+        "concept": "landing/index.html:current static landing layout and code block patterns — reuse visual conventions",
+        "decision": "reuse",
+        "item_id": "landing-prompts-static-route",
+        "path": "landing/index.html:current"
+      },
+      {
+        "concept": "landing/script.js:copy button behavior — reuse concept but isolate prompt-page JS",
+        "decision": "reuse",
+        "item_id": "landing-prompts-static-route",
+        "path": "landing/script.js:copy"
+      },
+      {
+        "concept": "landing/style.css:dark theme variables and responsive grid patterns — extend for page-specific controls",
+        "decision": "extend",
+        "item_id": "landing-prompts-static-route",
+        "path": "landing/style.css:dark"
+      },
+      {
+        "concept": "results-explorer/package.json:Vite/Preact stack — do not reuse for this small static builder",
+        "decision": "reuse",
+        "item_id": "landing-prompts-static-route",
+        "path": "results-explorer/package.json:Vite/Preact"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "landing-prompts-static-route",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/platform_registry.py"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "kind": "do_not_modify",
+        "path_glob": "docs/_templates/page.html"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "kind": "do_not_modify",
+        "path_glob": "landing/index.html"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "kind": "do_not_modify",
+        "path_glob": "landing/script.js"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "kind": "do_not_modify",
+        "path_glob": "landing/style.css"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/index.html"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/prompts.css"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "kind": "only_modify",
+        "path_glob": "landing/prompts/prompts.js"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/landing/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f landing/prompts/index.html && rg -n 'catalog.generated.js' landing/prompts/index.html",
+        "description": "Prompt page loads the generated catalog include",
+        "expected": "exit 0; include reference present",
+        "item_id": "landing-prompts-static-route",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f landing/prompts/prompts.js && test -f landing/prompts/prompts.css",
+        "description": "Prompt page JS and CSS exist",
+        "expected": "exit 0",
+        "item_id": "landing-prompts-static-route",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/landing/test_landing_quickstarts.py -q",
+        "description": "Catalog tests still pass after UI integration",
+        "expected": "all tests pass",
+        "item_id": "landing-prompts-static-route",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! git diff --name-only | rg '^(results-explorer/|landing/index\\.html$|landing/style\\.css$|landing/script\\.js$|docs/_templates/page\\.html$)'",
+        "description": "No results-explorer files or root landing/docs nav files changed for this static page",
+        "expected": "exit 0; negated rg finds no matches",
+        "item_id": "landing-prompts-static-route",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "landing-prompts-static-route",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "landing-prompts-static-route",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-static-route",
+        "notes": "Add `landing/prompts/index.html`, `landing/prompts/prompts.js`, and\n`landing/prompts/prompts.css`. The page must include\n`<script src=\"catalog.generated.js\"></script>` (or equivalent relative\ninclude) before `prompts.js` so the catalog assignment is available.\nReuse the landing theme and nav conventions without pulling in the\nresults explorer build stack. The builder should be usable in the first\nviewport and should not start with a long marketing hero.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create the /prompts/ static page shell using landing visual conventions",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-static-route",
+        "notes": "Controls:\n- Goal: Test one platform / Compare platforms\n- Agent: Codex / Claude Code / Generic (final label from decision record)\n- Surface: CLI / MCP\n- Interface: SQL / DataFrame\n- Deployment: Local / Self-hosted / Managed cloud\n- Platform or Platform A/B\n- Benchmark\n- Scale\n\nRead from `window.__BENCHBOX_PROMPT_CATALOG__`. Use registry keys\ninternally (`local`, `self-hosted`, `managed`) and display friendlier\nlabels in the UI.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Render the selector controls from generated catalog data",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-static-route",
+        "notes": "Normalize invalid combinations when controls change:\n- replace a platform that no longer matches current filters\n- prevent duplicate Platform A/B in compare mode\n- restrict DataFrame selections to compatible platforms/benchmarks\n- preserve state in query parameters for shareable links\n- fall back to safe defaults if URL state is invalid\n\nPin the URL parameter names so future copy/PR changes don't break old\nlinks: `goal`, `agent`, `surface`, `interface`, `deployment`,\n`platform` (or `platformA` and `platformB` when goal=compare),\n`benchmark`, `scale`. All values are registry keys, not display labels.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement state normalization, filtering, and URL deep links",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-static-route",
+        "notes": "CLI mode emits dependency/status checks, dry-run commands, and live-run\ncommands only where safe. MCP mode renders TWO copyable blocks: (a) the\n`claude_desktop_config.json` / Codex MCP setup snippet that references\nthe existing `benchbox-mcp` entry-point, and (b) a natural-language\nprompt the user pastes into the agent that references existing MCP\ntools/prompts by name (e.g. `run_benchmark`). Do not invent new MCP\nsurfaces.\n\nGeneric/manual mode must avoid assuming shell or MCP access unless the\ntext explicitly says the user or agent has those capabilities.\n\nManaged cloud selections must make the dry-run/setup prompt primary and\nplace any live-run command behind an explicit after-setup section.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Render CLI, MCP, and generic/manual prompt outputs with safety notes",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-static-route",
+        "notes": "Copy buttons should work for the main prompt, CLI command block, and MCP\nsetup block. Add clear focus states, labels, `aria-live` copy feedback,\nand a no-JS fallback message. Do not rely on external JS frameworks.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add accessible copy interactions and fallback behavior",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "landing-prompts-static-route",
+        "notes": "Check at least mobile narrow, tablet, and desktop viewports. The form and\ncopied prompt must not overflow or overlap. Long platform names and cloud\nwarnings should wrap cleanly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify desktop/mobile layout and text overflow",
+        "wid": "w6"
+      }
+    ]
+  }
+}

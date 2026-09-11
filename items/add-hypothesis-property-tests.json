@@ -1,0 +1,198 @@
+{
+  "context": "Add hypothesis as dev-only dependency. Start with w1 as proof-of-concept.\nEach work unit keeps a few explicit parametrize anchors alongside the new\n@given tests so that specific known-good cases remain as regression tests.\nUse hypothesis profiles: ci (100 examples), dev (10 examples) for speed.\n",
+  "description": "Analysis of the full test suite (~16,800 test functions) identified ~20 tests\nacross 5 categories where property-based testing would genuinely add value by\nreplacing or augmenting manual parametrize lists with generated inputs.\n\nThese are pure-function tests asserting PROPERTIES (invariants that hold for\nany valid input), not specific behaviors (exact output for exact input). The\nremaining ~98% of the suite tests exact SQL strings, mock call sequences,\ngolden-file snapshots, or integration paths - none of which benefit from\nHypothesis.\n\nEstimated impact: ~400 lines of manual test code replaced or augmented,\nwith significantly better edge-case coverage on those specific paths.\n\nThis is a quality enhancement, not a gap. The suite already has 1,352+\nerror-path tests and 161 parametrized test sets covering similar ground\nmanually.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add Hypothesis to mock-heavy or integration tests",
+        "instead": "(not specified)",
+        "item_id": "add-hypothesis-property-tests",
+        "why": "it adds no value for call-sequence verification or real I/O"
+      },
+      {
+        "dont": "remove all parametrize anchors",
+        "instead": "(not specified)",
+        "item_id": "add-hypothesis-property-tests",
+        "why": "keep 3-4 explicit cases per property as readable regression documentation"
+      },
+      {
+        "dont": "replace exact-output tests with properties",
+        "instead": "(not specified)",
+        "item_id": "add-hypothesis-property-tests",
+        "why": "only replace tests that assert invariants (idempotency, roundtrip, monotonicity, case-insensitivity)"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "created_at": "2026-03-27T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing parametrize test cases still pass (keep 3-4 anchors per property)",
+        "item_id": "add-hypothesis-property-tests"
+      },
+      {
+        "behavior": "CI test time increase < 15 seconds total across all new property tests",
+        "item_id": "add-hypothesis-property-tests"
+      },
+      {
+        "behavior": "No existing test files deleted - only augmented",
+        "item_id": "add-hypothesis-property-tests"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "add-hypothesis-property-tests",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml (dev dependency only)"
+      },
+      {
+        "item_id": "add-hypothesis-property-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/dataframe/test_dataframe_capabilities.py"
+      },
+      {
+        "item_id": "add-hypothesis-property-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_builder.py"
+      },
+      {
+        "item_id": "add-hypothesis-property-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_config_utils.py"
+      },
+      {
+        "item_id": "add-hypothesis-property-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/test_parameter_parity.py"
+      },
+      {
+        "item_id": "add-hypothesis-property-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tpch/test_tpch_generator.py"
+      },
+      {
+        "item_id": "add-hypothesis-property-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/credentials/test_credential_files.py"
+      },
+      {
+        "item_id": "add-hypothesis-property-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_redshift_adapter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_builder.py tests/unit/platforms/test_redshift_adapter.py -q",
+        "description": "All existing tests still pass after adding Hypothesis",
+        "expected": "All tests pass",
+        "item_id": "add-hypothesis-property-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m hypothesis -q",
+        "description": "Hypothesis tests discover no counterexamples",
+        "expected": "All property tests pass",
+        "item_id": "add-hypothesis-property-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest -m hypothesis --hypothesis-seed=0 -q --durations=10",
+        "description": "CI time impact is acceptable",
+        "expected": "Total < 15 seconds",
+        "item_id": "add-hypothesis-property-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "add-hypothesis-property-tests",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "add-hypothesis-property-tests",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "add-hypothesis-property-tests",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "add-hypothesis-property-tests",
+        "needs_wid": "w1",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "add-hypothesis-property-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add Hypothesis dependency and benchmark-ID normalization properties",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "add-hypothesis-property-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add type-mapping property tests for Redshift adapter",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "add-hypothesis-property-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add config and credential roundtrip property tests",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "add-hypothesis-property-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add scale-factor arithmetic and parameter-isolation properties",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "add-hypothesis-property-tests",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add platform-capability consistency properties",
+        "wid": "w5"
+      }
+    ]
+  }
+}

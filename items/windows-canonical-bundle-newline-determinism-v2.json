@@ -1,0 +1,99 @@
+{
+  "context": "Apply the narrow newline parameter at the exporter write boundary and extend tests to cover local plus representative cloud/path-wrapper branches. Validate Path.write_text/cloudpathlib compatibility before calling the keyword.",
+  "description": "Run 30690807993 proves ResultExporter._write_file translates canonical JSON newlines to CRLF on Windows, breaking byte equality across primary and companion bundles. Open text handles with newline empty for local paths and pass newline empty to cloud write_text implementations that support pathlib semantics; retain write_bytes fallback for wrappers without write_text.",
+  "legacy": {
+    "item_meta": {
+      "category": "Result integrity",
+      "completed_at": "2026-08-01T14:18:57Z",
+      "completed_pr": 1398,
+      "created_at": "2026-08-01T14:06:16Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Binary-only cloud wrappers continue using UTF-8 write_bytes.",
+        "item_id": "windows-canonical-bundle-newline-determinism-v2"
+      },
+      {
+        "behavior": "Canonical formatting, one trailing LF, anonymization, and local/cloud content remain identical.",
+        "item_id": "windows-canonical-bundle-newline-determinism-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-canonical-bundle-newline-determinism-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/exporter.py"
+      },
+      {
+        "item_id": "windows-canonical-bundle-newline-determinism-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_exporter_timing_contract.py"
+      },
+      {
+        "item_id": "windows-canonical-bundle-newline-determinism-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_results_exporter.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/unit/test_results_exporter.py tests/unit/core/results/test_exporter_timing_contract.py -q",
+        "description": "Canonical exporter suite",
+        "expected": "fails byte equality on the unfixed Windows tree; exit 0 after repair",
+        "item_id": "windows-canonical-bundle-newline-determinism-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-01T14:18:11Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-canonical-bundle-newline-determinism-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-canonical-bundle-newline-determinism-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Added local and cloud text-path fakes whose required newline keyword makes both tests fail against the unfixed _write_file calls; local regression also asserts exact LF bytes.",
+        "item_id": "windows-canonical-bundle-newline-determinism-v2",
+        "notes": null,
+        "started_at": "2026-08-01T14:10:32Z",
+        "started_branch": "fix/windows-canonical-newlines",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Pin CRLF translation against the current local text path",
+        "wid": "w0"
+      },
+      {
+        "evidence": "ResultExporter._write_file now passes newline empty to cloud write_text and local open; binary write_bytes fallback is unchanged.",
+        "item_id": "windows-canonical-bundle-newline-determinism-v2",
+        "notes": null,
+        "started_at": "2026-08-01T14:12:09Z",
+        "started_branch": "fix/windows-canonical-newlines",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Add newline-stable local and cloud writes at the shared boundary",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Focused exporter and timing-contract tests: 17 passed. cloudpathlib CloudPath.write_text accepts newline; CloudStagingPath and DatabricksPath child joins return pathlib.Path and use the covered local branch.",
+        "item_id": "windows-canonical-bundle-newline-determinism-v2",
+        "notes": null,
+        "started_at": "2026-08-01T14:12:14Z",
+        "started_branch": "fix/windows-canonical-newlines",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-04",
+        "status": "done",
+        "summary": "Exercise primary and companion canonical bundles plus path-wrapper fallbacks",
+        "wid": "w2"
+      }
+    ]
+  }
+}

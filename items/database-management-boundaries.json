@@ -1,0 +1,10 @@
+{
+  "description": "- \"Added `benchbox/core/databases/manager.py` exposing `test_connection` using platform adapter + core platform config.\"\n- \"Updated `benchbox/cli/database.py` to call the core utility.\"\n- \"Added `tests/unit/core/test_database_manager.py` (core), and CLI boundary tests covered through delegation.\"",
+  "legacy": {
+    "item_meta": {
+      "category": "Project Lifecycle Management",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "unknown"
+    }
+  }
+}

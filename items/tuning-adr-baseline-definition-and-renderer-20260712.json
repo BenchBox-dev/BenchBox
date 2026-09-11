@@ -1,0 +1,80 @@
+{
+  "description": "Decision gate from the 2026-07-12 tuning-system deep review (evidence pinned to\ncommit acfb8992; findings C5, R2, R3).\n\n1. BASELINE DEFINITION. \"notuning\" is not a baseline today: ClickHouse applies\n   its aggressive OLAP session pack (grace-hash join, spill thresholds,\n   aggregation-in-order) ONLY when tuning is disabled\n   (benchbox/platforms/clickhouse/tuning.py:74-100); StarRocks injects\n   DISTRIBUTED BY HASH(first_col) BUCKETS 8 into every table in every mode\n   (benchbox/platforms/starrocks/workload.py:214-221). Decide what baseline\n   promises: platform defaults + engine-mandatory choices only? Where does the\n   ClickHouse pack live (tuned path, recorded harness-defaults block, or\n   removed)? This also settles the warn-vs-fail axis in the blocked\n   databricks-liquid-clustering-tuning-review-20260526 TODO.\n2. SINGLE RENDERER. Tuning DDL is rendered by two parallel universes:\n   core/tuning/generators/* (used only by dry-run preview and cloud_spark\n   mixins) and per-adapter mixins (the only path touching real databases; some\n   are log-only or dead code - ClickHouse generate_tuning_clause has zero\n   callers). Decide the survivor: adapters consume generators (recommended - the\n   only design dry-run, execution, and a capability registry can share), or\n   generators fold into mixins.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "tuning-adr-baseline-definition-and-renderer-20260712",
+        "id": 278,
+        "reason": "Owned by tuning-renderer-consolidation-and-baseline-policy-20260712",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Renderer migration/baseline enforcement work is carried by the open tuning-* cluster (e.g. tuning-starrocks-ddl-generator-20260716's single-renderer goal).",
+        "summary": "Renderer migration and baseline enforcement"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture Decision",
+      "completed_at": "2026-07-12T00:00:00Z",
+      "created_at": "2026-07-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "prior_art": [
+      {
+        "concept": "benchbox/core/tuning/ddl_generator.py get_ddl_generator: existing registry that would become the single entry point — extend",
+        "decision": "extend",
+        "item_id": "tuning-adr-baseline-definition-and-renderer-20260712",
+        "path": "benchbox/core/tuning/ddl_generator.py"
+      },
+      {
+        "concept": "docs/development/adapter-refactor-map.md: prior refactor-direction record for the platforms/base split — reuse format",
+        "decision": "reuse",
+        "item_id": "tuning-adr-baseline-definition-and-renderer-20260712",
+        "path": "docs/development/adapter-refactor-map.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "ls docs/development/ | grep -i 'tuning'",
+        "description": "Decision record exists defining baseline semantics and naming the surviving renderer",
+        "expected": "Committed decision record with baseline definition and renderer direction",
+        "item_id": "tuning-adr-baseline-definition-and-renderer-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-adr-baseline-definition-and-renderer-20260712",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-adr-baseline-definition-and-renderer-20260712",
+        "notes": "Done 2026-07-12: docs/development/tuning-adr-003-baseline-and-single-renderer.md\ndrafted with Context (ClickHouse inverted OLAP pack at\nplatforms/clickhouse/tuning.py:74-100, StarRocks unconditional\nDISTRIBUTED BY injection at platforms/starrocks/workload.py:214-221, the\ntwo parallel rendering universes with generators reachable only from\ndry-run preview and the cloud_spark mixin), a two-bullet Decision, and\nRejected Options (record-only status quo; consolidate into adapter\nmixins instead of generators).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Draft ADR: baseline definition options + session-pack relocation options; renderer consolidation options with migration cost sketch per platform",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-adr-baseline-definition-and-renderer-20260712",
+        "notes": "Done 2026-07-12: Joe adopted the recommended defaults for both open\nquestions (baseline = platform defaults + engine-mandatory schema\nchoices only; generators become the single renderer). ADR Status set to\nAccepted. Both open_questions entries in\ndatabricks-liquid-clustering-tuning-review-20260526.yaml annotated with\nresolved_with pointing at this ADR (warn-first / block only explicit\nunsafe combinations).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Joe decides; record decisions; annotate databricks-liquid TODO open_questions with the settled policy axis",
+        "wid": "w2"
+      }
+    ]
+  }
+}

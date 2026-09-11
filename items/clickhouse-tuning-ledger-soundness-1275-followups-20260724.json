@@ -1,0 +1,109 @@
+{
+  "context": "(A) Require both catalog facts (partition_key AND sort_key) -- or a separate partition-key intent -- before the generic corroborator upgrades a combined PARTITION BY/ORDER BY table to applied_verified. (B) Record the tuned ORDER BY DDL at connection.execute(optimized) so applied_ledger_hash orders the CREATE TABLE before the later OPTIMIZE TABLE, instead of queuing it in _applied_layout_operations. Land only in the conservative direction: never over-certify. Confirm on a live ClickHouse run per issue #1293.",
+  "description": "Two validated/reproduced reviewer findings on this batch's #1275 (tuning-verification-footprint-duckdb-clickhouse), still live at develop 14b0271c in benchbox/platforms/clickhouse/workload.py; deferred by the maintainer to GitHub issue #1293 (needs a real ClickHouse run to confirm) and NOT yet in the tracker. (A) PR #1275 discussion_r3638089585 (workload.py ~224): a combined PARTITION BY ... ORDER BY CREATE TABLE is recorded only as sort_key, so the generic corroborator can reach applied_verified without ever matching the configured partition_key. (B) PR #1275 discussion_r3638089592 (workload.py ~219): tuned ORDER BY DDL is queued in _applied_layout_operations and folded only after data validation, so applied_ledger_hash orders a later OPTIMIZE TABLE before the earlier CREATE TABLE. SOUNDNESS-relevant (applied_verified certification + ledger-hash input ordering) -> its own PR will not auto-merge under CODEOWNERS.",
+  "legacy": {
+    "item_meta": {
+      "category": "Tuning Ledger",
+      "completed_at": "2026-07-29T12:07:52Z",
+      "completed_pr": 1331,
+      "created_at": "2026-07-24T16:28:05Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Corroboration only ever records LESS, never over-certifies: an uncorroborated partition_key must not reach applied_verified",
+        "item_id": "clickhouse-tuning-ledger-soundness-1275-followups-20260724"
+      },
+      {
+        "behavior": "applied_ledger_hash inputs for non-ClickHouse platforms and for already-correct paths are unchanged",
+        "item_id": "clickhouse-tuning-ledger-soundness-1275-followups-20260724"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "clickhouse-tuning-ledger-soundness-1275-followups-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/**"
+      },
+      {
+        "item_id": "clickhouse-tuning-ledger-soundness-1275-followups-20260724",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/clickhouse/**"
+      },
+      {
+        "item_id": "clickhouse-tuning-ledger-soundness-1275-followups-20260724",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/clickhouse/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/clickhouse -q",
+        "description": "ClickHouse ledger regression tests cover partition-key corroboration and CREATE-before-OPTIMIZE hash ordering",
+        "expected": "pass",
+        "item_id": "clickhouse-tuning-ledger-soundness-1275-followups-20260724",
+        "last_result": "fail",
+        "last_run": "2026-07-29T11:34:37Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Live ClickHouse run: a combined PARTITION BY/ORDER BY table does not reach applied_verified unless partition_key is corroborated (per issue #1293)",
+        "expected": null,
+        "item_id": "clickhouse-tuning-ledger-soundness-1275-followups-20260724",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "clickhouse-tuning-ledger-soundness-1275-followups-20260724",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "clickhouse-tuning-ledger-soundness-1275-followups-20260724",
+        "needs_wid": "w0",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Repro at develop 06484de94: corroborate() returns corroborated=True for a CREATE TABLE with PARTITION BY (l_shipdate) ORDER BY (...) when catalog partition_key is tuple() (only a sort_key entry is emitted); _record_tuned_sort_key_op still queues into _applied_layout_operations and never touches _applied_tuning_ledger",
+        "item_id": "clickhouse-tuning-ledger-soundness-1275-followups-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T11:28:02Z",
+        "started_branch": "fix/clickhouse-tuning-ledger-soundness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Re-validate both defects still reproduce in benchbox/platforms/clickhouse/workload.py at current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": "corroborate() now emits one receipt entry per key clause; combined PARTITION BY/ORDER BY CREATE TABLE requires both catalog facts. Tests: TestCombinedPartitionAndSortKey (4 cases) in tests/unit/platforms/test_clickhouse_introspection.py — both blocking cases fail without the fix, verified by reverting benchbox/core/tuning/introspection.py",
+        "item_id": "clickhouse-tuning-ledger-soundness-1275-followups-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T11:32:04Z",
+        "started_branch": "fix/clickhouse-tuning-ledger-soundness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Gate applied_verified on partition_key corroboration for combined PARTITION BY/ORDER BY tables (finding A)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "_record_tuned_sort_key_op now calls _applied_tuning_ledger.record(PHASE_DDL) at connection.execute time instead of queuing on _applied_layout_operations (folded only post-validation). Test: test_create_table_recorded_before_optimize asserts CREATE precedes OPTIMIZE in executed_statements",
+        "item_id": "clickhouse-tuning-ledger-soundness-1275-followups-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T11:32:15Z",
+        "started_branch": "fix/clickhouse-tuning-ledger-soundness",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-07",
+        "status": "done",
+        "summary": "Record tuned ORDER BY DDL at execute time so applied_ledger_hash orders CREATE TABLE before OPTIMIZE TABLE (finding B)",
+        "wid": "w2"
+      }
+    ]
+  }
+}

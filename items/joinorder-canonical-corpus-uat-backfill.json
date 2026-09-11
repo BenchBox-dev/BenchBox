@@ -1,0 +1,269 @@
+{
+  "description": "Complete the post-cutover canonical JoinOrder UAT that was intentionally not\ncovered by the prior smoke-only cutover. The public `joinorder` benchmark now\npoints at canonical IMDb 2013 (`joinorder-imdb-2013-v1`) and exposes 113 SQL\nqueries at scale 1 only, but `results-data/bundles/` currently has no\ncanonical `joinorder` result bundles.\n\nThis item defines the canonical SF=1 support matrix, runs full local UAT on\nincluded SQL platforms, validates every clean bundle, stages only complete\ncanonical results into `results-data/bundles/`, regenerates the corpus\ninventory, and confirms the old invalid `joinorder_sf1_*` synthetic bundles\nare absent.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "copy a staged bundle into `results-data/bundles/` before validating its manifest sidecar hash.",
+        "instead": "(not specified)",
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "include DataFrame platform bundles with only 13 translated queries.",
+        "instead": "(not specified)",
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "include DataFusion SQL until `joinorder-datafusion-dialect` is resolved.",
+        "instead": "(not specified)",
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use `git add -A`.",
+        "instead": "(not specified)",
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-05-15T00:00:00Z",
+      "created_at": "2026-05-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not change canonical JoinOrder runtime/query semantics in this corpus backfill.",
+        "item_id": "joinorder-canonical-corpus-uat-backfill"
+      },
+      {
+        "behavior": "Do not publish partial JoinOrder runs: included platforms require 113/113 query coverage.",
+        "item_id": "joinorder-canonical-corpus-uat-backfill"
+      },
+      {
+        "behavior": "Do not restore old `joinorder_sf1_*` synthetic bundle names.",
+        "item_id": "joinorder-canonical-corpus-uat-backfill"
+      },
+      {
+        "behavior": "Keep raw UAT logs under `~/Developer/benchmark_runs`, not in git.",
+        "item_id": "joinorder-canonical-corpus-uat-backfill"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/active/joinorder-canonical-corpus-uat-backfill.yaml"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/joinorder-presto-ddl.yaml"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/joinorder-spark-dialect.yaml"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/joinorder-sqlite-performance.yaml"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/joinorder-canonical-corpus-uat-2026-05-12.md"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/verify_joinorder_corpus_backfill.py"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/schema.py"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "kind": "only_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "kind": "only_modify",
+        "path_glob": "results-data/corpus-inventory.json"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/configs/uat-joinorder-canonical-corpus-20260512.yaml"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/test_dataset_identity_fields.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "for f in _project/TODO/main/active/joinorder-canonical-corpus-uat-backfill.yaml _project/TODO/main/planning/joinorder-spark-dialect.yaml _project/TODO/main/planning/joinorder-sqlite-performance.yaml _project/TODO/main/planning/joinorder-presto-ddl.yaml; do uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate \"$f\" || exit 1; done",
+        "description": "TODO is valid",
+        "expected": "valid",
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python - <<'PY'\nimport json\nfrom pathlib import Path\nfor path in sorted(Path('results-data/bundles').glob('joinorder_sf1_*.json')):\n    if path.name.endswith(('.manifest.json', '.plans.json', '.tuning.json')):\n        continue\n    data = json.loads(path.read_text())\n    assert data['benchmark']['id'] == 'joinorder'\n    assert data['benchmark']['dataset_version'] == 'joinorder-imdb-2013-v1'\n    print(path.name)\nPY",
+        "description": "No old invalid synthetic bundles remain under canonical joinorder name",
+        "expected": "3 canonical joinorder_sf1 bundle names only",
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/verify_joinorder_corpus_backfill.py",
+        "description": "Canonical JoinOrder staged bundles have full 113-query coverage and dataset identity fields",
+        "expected": "all canonical JoinOrder bundles pass",
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/generate_corpus_inventory.py --check",
+        "description": "Corpus inventory is current",
+        "expected": "OK",
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python results-data/validate_corpus.py",
+        "description": "Corpus validator passes",
+        "expected": "joinorder SF=1.0: 3 platforms [OK]; command still exits nonzero on unrelated pre-existing shallow cohorts",
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/validate_submission.py results-data/bundles/",
+        "description": "Submission validator has no errors",
+        "expected": "0 error(s)",
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "notes": "Claimed `/Users/joe/Developer/BenchBox.pool-02` on\n`fix/issue-289-joinorder-uat-corpus` from current `origin/develop`.\nMatrix documented in\n`_project/analysis/joinorder-canonical-corpus-uat-2026-05-12.md`.\nUAT config:\n`tests/uat/configs/uat-joinorder-canonical-corpus-20260512.yaml`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Claim clean worktree and record canonical JoinOrder UAT matrix",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "notes": "Initial sweep command:\n`BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-sweep CONFIG=tests/uat/configs/uat-joinorder-canonical-corpus-20260512.yaml`\n\nTargeted follow-up commands:\n`BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=presto BENCHMARK=joinorder SCALE=1 PHASES=load,power TIMEOUT_S=7200 LOG_DIR=~/Developer/benchmark_runs/logs/uat_joinorder_canonical_corpus_20260512`\n`BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-bring-up PLATFORM=lakesail TIMEOUT_S=600 BENCHMARK_RUNS_DIR=~/Developer/benchmark_runs`\n`BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=lakesail BENCHMARK=joinorder SCALE=1 PHASES=load,power TIMEOUT_S=7200 LOG_DIR=~/Developer/benchmark_runs/logs/uat_joinorder_canonical_corpus_20260512`\n\nLogs:\n`~/Developer/benchmark_runs/logs/uat_joinorder_canonical_corpus_20260512/`\n\nPassed and eligible: DuckDB, ClickHouse Local, LakeSail.\nExcluded after evidence: SQLite timed out before completing warmup, Spark\nfailed q33c, Presto failed DDL before load.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run full end-to-end UAT for included canonical JoinOrder SQL platforms",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "notes": "Checked each passed result has:\n  - `benchmark.id == \"joinorder\"`\n  - `benchmark.scale_factor == 1.0`\n  - `summary.queries.total == 339`\n  - 339 measurement rows\n  - 113 unique measurement query IDs\n  - 113 unique warmup query IDs\n  - zero failed query statuses\n  - `dataset_version == \"joinorder-imdb-2013-v1\"`\n  - manifest/data archive hashes matching\n    `benchbox/core/joinorder/data_manifest.toml`\n\nCommand:\n`uv run -- python _project/scripts/verify_joinorder_corpus_backfill.py --skip-corpus`\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate UAT result bundles for 113-query coverage and dataset identity fields",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "notes": "Source is the UAT local-stage submission directory under\n`~/Developer/benchmark_runs/submissions/uat_joinorder_canonical_corpus_20260512/`.\nCopied only the three bundles that passed w3 and\n`scripts/validate_submission.py`:\n  - `joinorder_sf1_duckdb_sql_20260512_202135_4bd91dc4.json`\n  - `joinorder_sf1_clickhouse_local_sql_20260512_223843_3d5d76b6.json`\n  - `joinorder_sf1_lakesail_sql_20260512_225022_528b8c08.json`\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Copy only complete clean staged bundles and manifest sidecars to results-data/bundles",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "notes": "Ran:\n  - `uv run -- python scripts/generate_corpus_inventory.py --write`\n  - `uv run -- python scripts/generate_corpus_inventory.py --check`\n  - `uv run -- python _project/scripts/verify_joinorder_corpus_backfill.py --skip-staged`\n  - `uv run -- python scripts/validate_submission.py results-data/bundles/`\n  - `uv run -- python results-data/validate_corpus.py`\n\nJoinOrder corpus result: `joinorder SF=1.0` now has three platforms\n(`ClickHouse Local`, `DuckDB`, `LakeSail`) and is OK.\n\nResidual broader corpus gate: `results-data/validate_corpus.py` still\nexits nonzero because unrelated pre-existing cohorts are below the\nthree-platform threshold: `tpcds@sf0.01`, `tpcds@sf0.1`, `tpcds@sf1`,\n`ai_primitives@sf1`, and `flightdata@sf1`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate and verify corpus inventory and validators",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "joinorder-canonical-corpus-uat-backfill",
+        "notes": "Staged explicit paths only and did not use `git add -A`.\nCommit: `7ab8f4431 test(joinorder): backfill canonical corpus bundles`.\nPost-commit `make pr-preflight` passed.\nPR: https://github.com/joeharris76/BenchBox/pull/389\nHygiene closeout: PR #389 merged to `develop` on 2026-05-13, so this\nTODO is complete and can move to DONE.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Open PR to develop after explicit-path commit and make pr-preflight",
+        "wid": "w6"
+      }
+    ]
+  }
+}

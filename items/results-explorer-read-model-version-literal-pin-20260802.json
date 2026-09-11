@@ -1,0 +1,188 @@
+{
+  "context": "Keep one runtime source of truth but add separately reviewed expected-version or digest coverage, test older/equal/newer snapshots, and document fail-closed versus forward-compatible behavior.",
+  "description": "The Python build-contract test compares the contract to its imported EXPLORER_READ_MODEL_VERSION, so a synchronized accidental bump passes. db.ts also warns and proceeds on newer snapshots. Require an explicit compatibility decision and independent drift evidence.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bump version without schema migration tests",
+        "instead": "test old/current/newer snapshots",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "why": "runtime query failures can follow green unit tests"
+      },
+      {
+        "dont": "copy the same constant into another test",
+        "instead": "assert an independently reviewed expected value or digest",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "why": "that preserves the tautology"
+      },
+      {
+        "dont": "fail on every newer version without policy",
+        "instead": "document and test the matrix",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "why": "additive compatible changes may exist"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "needs_item": "results-explorer-empty-snapshot-gate-20260802"
+      }
+    ],
+    "item_meta": {
+      "category": "Contract governance",
+      "completed_at": "2026-08-10T15:33:00Z",
+      "completed_pr": 1678,
+      "created_at": "2026-08-02T16:27:42Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Contract remains machine-readable",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802"
+      },
+      {
+        "behavior": "Forward compatibility is explicit and tested",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802"
+      },
+      {
+        "behavior": "Intentional migrations update all consumers together",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802"
+      },
+      {
+        "behavior": "Older incompatible snapshots fail clearly",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Python contract",
+        "decision": "extend",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "path": "_project/scripts/explorer_pipeline/contract.py"
+      },
+      {
+        "concept": "Browser version guard",
+        "decision": "extend",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "path": "results-explorer/src/db.ts"
+      },
+      {
+        "concept": "Tautological test",
+        "decision": "supersede",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "path": "tests/unit/scripts/test_explorer_build_contract.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/contract.py"
+      },
+      {
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/scripts/explorer-build-contract.mjs"
+      },
+      {
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/db-remediation-pin.test.ts"
+      },
+      {
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/test_explorer_build_contract.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/test_explorer_build_contract.py -q",
+        "description": "Contract drift is detected independently",
+        "expected": "Contract tests pass",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "last_result": "pass",
+        "last_run": "2026-08-10T15:22:54Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npx vitest run src/lib/__tests__/db-remediation-pin.test.ts",
+        "description": "Version compatibility behavior is explicit",
+        "expected": "Version tests pass",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "last_result": "pass",
+        "last_run": "2026-08-10T15:23:00Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Defined the machine-readable read_model_compatibility policy: minimum_supported equals current version 7 and newer_policy is warn-and-continue. Added independently reviewed current-version expectations in Python and Vitest tests.",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "notes": null,
+        "started_at": "2026-08-10T15:22:14Z",
+        "started_branch": "fix/results-explorer-read-model-version-pin-20260810",
+        "started_worktree": "/private/tmp/bb-explorer-read-model-pin-20260810",
+        "status": "done",
+        "summary": "Define older/equal/newer compatibility",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Aligned contract.py, explorer-build-contract.mjs, and db.ts: build consumers validate the compatibility policy; runtime rejects older snapshots, accepts current snapshots, and warns/continues for newer snapshots.",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "notes": null,
+        "started_at": "2026-08-10T15:22:20Z",
+        "started_branch": "fix/results-explorer-read-model-version-pin-20260810",
+        "started_worktree": "/private/tmp/bb-explorer-read-model-pin-20260810",
+        "status": "done",
+        "summary": "Add independent drift detection and browser behavior",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added old/missing, current, and newer snapshot behavior tests in db-remediation-pin.test.ts plus an independent Python contract pin; focused Vitest 5 passed and Python contract tests 5 passed.",
+        "item_id": "results-explorer-read-model-version-literal-pin-20260802",
+        "notes": null,
+        "started_at": "2026-08-10T15:22:26Z",
+        "started_branch": "fix/results-explorer-read-model-version-pin-20260810",
+        "started_worktree": "/private/tmp/bb-explorer-read-model-pin-20260810",
+        "status": "done",
+        "summary": "Exercise old/current/newer snapshots in both languages",
+        "wid": "w2"
+      }
+    ]
+  }
+}

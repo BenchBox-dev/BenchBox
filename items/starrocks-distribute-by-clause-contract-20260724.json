@@ -1,0 +1,131 @@
+{
+  "context": "Decide repo-wide whether distribute_by holds rendered SQL or a summary value, then make every generator consistent with that choice (Redshift/Synapse currently render; StarRocks/Doris/Firebolt currently summarize). If it becomes rendered SQL, give TuningClauses a platform-aware clause order so StarRocks emits DISTRIBUTED BY after PARTITION BY. Update the pinned snapshot tests to match the decision rather than working around them.",
+  "description": "chatgpt-codex-connector review finding on merged PR #1262 (P2, benchbox/core/tuning/generators/starrocks.py:180). Deferred from the PR-review sweep in PR #1292 because the clean fix requires a repo-wide contract decision, not a local patch; tracked in GitHub issue #1293.\n\nWhen a StarRocks tuning config includes distribution, the generator stores the BARE COLUMN NAME in clauses.distribute_by AND appends the rendered 'DISTRIBUTED BY HASH(...)' to additional_clauses. The dry-run path (_build_table_ddl_entry -> TuningClauses.get_inline_clauses()) treats distribute_by itself as an inline SQL clause before appending additional_clauses, so StarRocks dry-run previews contain a stray line like 'l_orderkey' plus the real distribution clause, and no longer match the execution DDL.\nThread: https://github.com/joeharris76/BenchBox/pull/1262#discussion_r3630404241\n\nWhy this is not a drive-by fix (verified 2026-07-24):\n- get_inline_clauses() is owned by the SHARED TuningClauses dataclass (benchbox/core/tuning/ddl_generator.py), NOT by the generator class, so there is no StarRocks-only override seam.\n- 6+ tests pin the bare column as intentional: tests/unit/core/tuning/test_starrocks_ddl_generator.py and test_renderer_snapshot_starrocks.py assert distribute_by == 'l_orderkey'.\n- Doris (generators/doris.py:478) and Firebolt (generators/firebolt.py:149) also store non-clause values in distribute_by, while Redshift and Synapse store fully rendered clauses ('DISTSTYLE KEY\\nDISTKEY (col)', 'HASH([col])').\n- get_inline_clauses() emits distribute_by BEFORE partition_by, but StarRocks requires DISTRIBUTED BY after PARTITION BY, so naively promoting the rendered clause into distribute_by produces invalid DDL ordering.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "promote the rendered clause into distribute_by without fixing clause order",
+        "instead": "add platform-aware ordering first",
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "why": "get_inline_clauses() emits distribute_by before partition_by, which is invalid StarRocks DDL"
+      },
+      {
+        "dont": "special-case StarRocks by deleting the pinned test assertions",
+        "instead": "make the contract decision explicit and update the tests to the new contract with a rationale",
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "why": "those tests encode the current intentional contract; silently flipping them hides the decision"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "created_at": "2026-07-24T16:23:05Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Dry-run preview and execution DDL agree for every platform after the change",
+        "item_id": "starrocks-distribute-by-clause-contract-20260724"
+      },
+      {
+        "behavior": "Redshift and Azure Synapse rendered DISTSTYLE/HASH clauses keep producing byte-identical execution DDL",
+        "item_id": "starrocks-distribute-by-clause-contract-20260724"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/equivalence/**"
+      },
+      {
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/expected_results/**"
+      },
+      {
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/ddl_generator.py"
+      },
+      {
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/tuning/generators/**"
+      },
+      {
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/tuning/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning/ -q",
+        "description": "StarRocks + all generator tests pass",
+        "expected": "all pass",
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/tuning/test_renderer_snapshot_starrocks.py -q",
+        "description": "Dry-run preview matches execution DDL for StarRocks",
+        "expected": "all pass",
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Audit every generator's distribute_by usage (redshift, azure_synapse, firebolt, doris, starrocks) and decide rendered-SQL vs summary; record the decision",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Make all generators consistent with the decision, including clause ordering so StarRocks emits DISTRIBUTED BY after PARTITION BY",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "starrocks-distribute-by-clause-contract-20260724",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Update the pinned StarRocks snapshot/generator tests to the decided contract and assert dry-run preview matches execution DDL",
+        "wid": "w3"
+      }
+    ]
+  }
+}

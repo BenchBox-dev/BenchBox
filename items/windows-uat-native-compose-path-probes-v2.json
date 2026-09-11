@@ -1,0 +1,164 @@
+{
+  "context": "Add one test-only compose-path classifier based on separator-normalized path components, use it in all three test modules, and cover POSIX and Windows paths directly. Prove unrelated compose files remain unclassified. Do not alter Docker command construction or lifecycle accounting.",
+  "description": "Nightly run 30690807993 fails seven tests because test doubles identify clickhouse/postgresql by searching '/clickhouse/' or '/postgresql/' in a native compose-file argv. Windows correctly supplies absolute paths with backslashes, so the fakes fail to inject startup failures and record full paths instead of platform ids. This also explains both startup_failed_count assertions: production already annotates DiskFloorAbort from the startup_failed collection; the fake never adds the startup failure. Repair test-side platform extraction only.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Change lifecycle counters or weaken startup_failed_count assertions",
+        "instead": "Normalize the test helper compose-file path before classification.",
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "why": "The zero is caused by a slash-sensitive test fake, not production accounting."
+      },
+      {
+        "dont": "Force production Docker argv to use forward slashes",
+        "instead": "Normalize only at the test comparison boundary.",
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "why": "Native absolute Windows paths are valid Docker Compose inputs."
+      }
+    ],
+    "item_meta": {
+      "category": "CI portability",
+      "created_at": "2026-08-01T14:02:39Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Managed-Docker production argv remains native and unchanged.",
+        "item_id": "windows-uat-native-compose-path-probes-v2"
+      },
+      {
+        "behavior": "Test fakes continue distinguishing clickhouse-server, postgresql, and pg-duckdb.",
+        "item_id": "windows-uat-native-compose-path-probes-v2"
+      },
+      {
+        "behavior": "The two startup_failed_count assertions remain unchanged and still require a count of one.",
+        "item_id": "windows-uat-native-compose-path-probes-v2"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_startup_fail_clickhouse_docker needs the same classifier",
+        "decision": "extend",
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "path": "tests/uat/test_orchestrator.py"
+      },
+      {
+        "concept": "_docker_platform_from_argv centralizes four failing probes",
+        "decision": "extend",
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "path": "tests/uat/test_phases.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/docker_assets.py"
+      },
+      {
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/orchestrator.py"
+      },
+      {
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "kind": "do_not_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/docker_path_helpers.py"
+      },
+      {
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_docker_assets.py"
+      },
+      {
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_docker_path_helpers.py"
+      },
+      {
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_orchestrator.py"
+      },
+      {
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -n 0 tests/uat/test_docker_assets.py tests/uat/test_orchestrator.py tests/uat/test_phases.py -q",
+        "description": "Focused Docker path and startup accounting regressions pass",
+        "expected": "exit 0",
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -z \"$(git diff --name-only origin/develop...HEAD -- tests/uat/phases/execute.py tests/uat/orchestrator.py tests/uat/docker_assets.py)\"",
+        "description": "Production UAT modules are outside the patch",
+        "expected": "exit 0",
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "notes": "The Windows case must fail against the current slash-literal implementation.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Pin POSIX and Windows compose-path classification with direct tests",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "notes": "Prefer one test-only helper and preserve expected sequences.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Replace slash-literal probes in phases, orchestrator, and docker-assets test doubles",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "windows-uat-native-compose-path-probes-v2",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Run focused UAT tests and prove production UAT modules are unchanged",
+        "wid": "w2"
+      }
+    ]
+  }
+}

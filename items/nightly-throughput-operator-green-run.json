@@ -1,0 +1,58 @@
+{
+  "description": "Operator follow-up promoted from nightly-throughput-gate-restoration w3. Dispatch a workflow_dispatch nightly run and confirm the throughput-uat job passes green now that continue-on-error is removed and strict per-stream success gating is on (#1231). Record the run URL.\n\nPREMISE FALSIFIED 2026-08-24. The run was dispatched (nightly run 32684255652, workflow_dispatch on develop) and throughput-uat FAILED. It is not green.\n\nThe job's own assertion step reports:\n  ::error::No throughput UAT result JSON found for duckdb/tpch\n\nSo the failure is upstream of the per-stream success gating this item was written to confirm -- the run produces no result JSON for the assertion to read at all. That is a different problem from the one #1231 fixed, and this item should not be closed by re-dispatching until it is understood.\n\nNote it was NOT in the failure list of the 2026-08-23 scheduled run (32622645993), whose Windows and ubuntu-3.10 failures I triaged in nightly-red-blocks-release-evidence w2. So throughput-uat is either newly broken between 08-23 and 08-24, or intermittent. Both readings are worth distinguishing before fixing.\n\nBlocks nightly-red-blocks-release-evidence w4.\n\nEVIDENCE CORRECTION 2026-08-25: PR #1871 head was e87fa89a127798cf223b795ac83f68937057bc79 and merge commit was f751867169769c47f991c531f39df6025b9ae976. The w2 text used the head SHA after the words merged as; this note preserves the immutable work-unit audit record while correcting the label.",
+  "legacy": {
+    "item_meta": {
+      "completed_at": "2026-08-25T16:27:41Z",
+      "completed_pr": 1871,
+      "created_at": "2026-07-19T23:54:14Z",
+      "worktree": "uat-hardening"
+    },
+    "work_needs": [
+      {
+        "item_id": "nightly-throughput-operator-green-run",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "nightly-throughput-operator-green-run",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Root cause identified: PR #1815 (8d9d09ff6) refactored resolve_official_result_path to require emitted_path (returning None when omitted), but .github/workflows/nightly.yml was not updated and called resolve_official_result_path without emitted_path.",
+        "item_id": "nightly-throughput-operator-green-run",
+        "notes": null,
+        "started_at": "2026-08-24T12:58:54Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Find why the throughput-uat run emits no result JSON for duckdb/tpch",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Confirmed: New since 2026-08-23. Introduced by PR #1815 merged on 2026-08-23 22:39 UTC (after the 2026-08-23 06:19 UTC scheduled run).",
+        "item_id": "nightly-throughput-operator-green-run",
+        "notes": null,
+        "started_at": "2026-08-24T12:58:56Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Establish whether this is new since 2026-08-23 or intermittent",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1871 merged as e87fa89a127798cf223b795ac83f68937057bc79; workflow_dispatch run https://github.com/BenchBox-dev/BenchBox/actions/runs/32794110651 throughput-uat job 97641713571 success at fbe9c7b77d376d72031f8bde085a5ca97695fc1d; scheduled run https://github.com/BenchBox-dev/BenchBox/actions/runs/32816732087 throughput-uat job 97706433411 success at 2253de6e937cef31a5d4cb7648be32cf52c5ffda",
+        "item_id": "nightly-throughput-operator-green-run",
+        "notes": null,
+        "started_at": "2026-08-25T16:27:34Z",
+        "started_branch": "chore/v0-4-0-non-uat-integration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-v0-4-0-non-uat-integration",
+        "status": "done",
+        "summary": "Fix, then confirm green on a dispatched nightly run and record the URL",
+        "wid": "w2"
+      }
+    ]
+  }
+}

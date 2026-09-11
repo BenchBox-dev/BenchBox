@@ -1,0 +1,134 @@
+{
+  "description": "Source: _project/audits/results-explorer-publication-adversarial-review.md\n(develop_sha fddedf26), finding §2.23 (Advisory).\n\nresults-explorer/index.html sets no CSP meta tag, and duckdb-wasm (1.32.0)\ncan INSTALL httpfs / read_csv('https://...'). The SQL editor text is component\nstate (Query.tsx:115) and is never seeded from URL params, so there is no\nthird-party injection vector — a user would have to paste hostile SQL\nthemselves, and the queried data is public. No XSS sinks exist\n(dangerouslySetInnerHTML/innerHTML/eval grep is empty) and all app-generated\nSQL is parameterized with allowlisted columns (queryFilters.ts:33-161). This\nis a self-inflicted-only exfiltration channel; adding a CSP closes it and\nhardens defense-in-depth.\n\nLower priority than the other items: no reachable exploit today, purely a\nhardening improvement.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "set a CSP so strict it blocks the wasm worker or the snapshot fetch",
+        "instead": "scope connect-src to the snapshot origin and allow the wasm/worker assets.",
+        "item_id": "remediate-explorer-csp-hardening",
+        "why": "that breaks the app"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "remediate-explorer-csp-hardening",
+        "id": 470,
+        "reason": "Separate concern; only needed if SharedArrayBuffer-based duckdb-wasm threading is adopted.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: COOP/COEP headers only needed if SharedArrayBuffer-based duckdb-wasm threading is adopted; not adopted.",
+        "summary": "COOP/COEP headers for cross-origin isolation"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-07-06T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "In-app CSV export (COPY TO the WASM virtual FS) keeps working.",
+        "item_id": "remediate-explorer-csp-hardening"
+      },
+      {
+        "behavior": "Snapshot load over HTTP range reads and the read-only ATTACH continue to work.",
+        "item_id": "remediate-explorer-csp-hardening"
+      },
+      {
+        "behavior": "The SQL editor keeps running legitimate read queries against bench.*.",
+        "item_id": "remediate-explorer-csp-hardening"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/index.html — the single entry document that would carry a <meta> CSP (w1).",
+        "decision": "reuse",
+        "item_id": "remediate-explorer-csp-hardening",
+        "path": "results-explorer/index.html"
+      },
+      {
+        "concept": "results-explorer/src/db.ts:262-278 — the existing wasm bundle/attach config is where extension-autoload settings live (w2).",
+        "decision": "reuse",
+        "item_id": "remediate-explorer-csp-hardening",
+        "path": "results-explorer/src/db.ts:262-278"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "remediate-explorer-csp-hardening",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "remediate-explorer-csp-hardening",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "remediate-explorer-csp-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/index.html"
+      },
+      {
+        "item_id": "remediate-explorer-csp-hardening",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -n 'Content-Security-Policy' results-explorer/index.html && uv run -- npm --prefix results-explorer run build",
+        "description": "CSP present and app still functions",
+        "expected": "CSP meta present; build succeeds",
+        "item_id": "remediate-explorer-csp-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "npm --prefix results-explorer run test:e2e:fixtures",
+        "description": "Explorer e2e smoke still passes",
+        "expected": "smoke suite passes with the CSP in place",
+        "item_id": "remediate-explorer-csp-hardening",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "remediate-explorer-csp-hardening",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "remediate-explorer-csp-hardening",
+        "notes": "duckdb-wasm needs wasm-eval and its worker/CDN-or-bundled assets; craft a\nCSP that permits the bundled wasm/worker origins and blocks arbitrary\nremote fetch (connect-src). Verify the app still loads the snapshot and\nruns queries. GitHub Pages cannot set response headers, so a <meta\nhttp-equiv> CSP (or a documented reverse-proxy header) is the mechanism.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a restrictive CSP to results-explorer/index.html (and/or the deploy layer) compatible with duckdb-wasm",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "remediate-explorer-csp-hardening",
+        "notes": "If the threat model includes a user pasting attacker-supplied SQL,\ndisable extension install/autoload so INSTALL httpfs cannot fetch. Confirm\nno app feature (CSV export via COPY TO the virtual FS) depends on it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Optionally disable httpfs/extension autoload in the duckdb-wasm config",
+        "wid": "w2"
+      }
+    ]
+  }
+}

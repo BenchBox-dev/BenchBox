@@ -1,0 +1,210 @@
+{
+  "context": "Add a small helper (scripts/set_worktree_identity.sh) invoked by worktree-claim after the worktree exists. It must: (1) refuse and exit non-zero when the resolved GLOBAL identity is itself a known agent/service identity, rather than propagating it; (2) require extensions.worktreeConfig=true, enabling it on the common repo if absent; (3) write ONLY via `git config --worktree` inside the claimed worktree; (4) be idempotent, so re-claiming is a no-op; (5) leave the ephemeral-clone path (no pool) untouched, since a plain clone has no linked worktree and --worktree is meaningless there. Document the behavior in one concise AGENTS.md line under the worktree section. Land after shared-clone-git-identity-drift-guard-v3 so the audit warning channel and the AGENTS.md edits do not collide.",
+  "description": "Set a --worktree-scoped human Git identity on every pool worktree at claim time, so a stray write to the shared common config becomes inert instead of reauthoring every worktree at once. This is the prevention half that shared-clone-git-identity-drift-v2/-guard-v3 explicitly declined to attempt ('detection and instruction hardening, not prevention: do not claim that the audit can stop another live session from writing .git/config'). That premise is refuted by config precedence, measured directly. MECHANISM (verified in a scratch repo, not inferred): running `git config user.email X` with no --global from INSIDE a linked worktree writes to the COMMON config, i.e. the primary clone's .git/config. Reproduction: init primary, `git worktree add ../pool-09`, then from pool-09 run `git config user.email noreply@anthropic.com` -- primary/.git/config gains that [user] block although it never ran the command, and every other worktree inherits it. That single write explains all the Claude-authored stashes across four different pool worktrees; they do not require four separate write events. FIX, also measured: with extensions.worktreeConfig=true (already enabled on the maintainer's clone) and `git config --worktree user.email joeharris76@gmail.com` set in the worktree, re-contaminating the common config leaves the worktree resolving `Joe Harris <joeharris76@gmail.com>` from .git/worktrees/<name>/config.worktree. A third measurement shows a sibling worktree WITHOUT the override still resolves the agent identity, so the override must be applied per worktree -- which makes `make worktree-claim` the only correct hook point. Cleanup of stale instruction text cannot substitute for this: the instruction's source is an external agent harness still in service, so the supply does not stop.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Delete or rewrite the Claude-authored stashes, or amend/rebase existing commits, while doing this work",
+        "instead": "Leave them untouched; forensics is tracked separately",
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "why": "They are the forensic record of the writer, and a prior identity-history rewrite in this repo corrupted 2286 commits on main undetected for ~2.5 months"
+      },
+      {
+        "dont": "Set or propagate an agent/service identity anywhere to make a check pass",
+        "instead": "Exit non-zero with the resolved identity and its config origins, and require the human identity be fixed first",
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "why": "[COMMIT-IDENTITY-001] rejects agent identities as author, and a green check bought that way hides the exact condition being guarded"
+      },
+      {
+        "dont": "Treat a detection warning as sufficient and close this without the precedence change",
+        "instead": "Land the --worktree override, whose effectiveness is measured, and keep detection as the backstop",
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "why": "shared-clone-git-identity-drift-v2/-guard-v3 both scoped themselves to detection, and the contamination recurred anyway across four worktrees"
+      },
+      {
+        "dont": "Write user.name/user.email into the shared common .git/config to normalize identity",
+        "instead": "Write only with `git config --worktree` inside the claimed worktree, so precedence overrides whatever the common config holds",
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "why": "That write IS the defect under repair: from any linked worktree it lands in the primary clone's config and reauthors every pool worktree at once"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "needs_item": "shared-clone-git-identity-drift-guard-v3"
+      }
+    ],
+    "item_meta": {
+      "category": "repository-maintenance",
+      "completed_at": "2026-08-04T16:49:08Z",
+      "completed_pr": 1539,
+      "created_at": "2026-08-04T01:31:38Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The ephemeral-clone path (BENCHBOX_EPHEMERAL_CLONE=1, no pool present) is unaffected and still requires no worktree identity",
+        "item_id": "worktree-scoped-identity-claim-guard"
+      },
+      {
+        "behavior": "The primary clone's own config is never written by this change",
+        "item_id": "worktree-scoped-identity-claim-guard"
+      },
+      {
+        "behavior": "make agent-write-preflight keeps refusing an agent author identity; this item adds prevention, it does not relax the existing gate",
+        "item_id": "worktree-scoped-identity-claim-guard"
+      },
+      {
+        "behavior": "make worktree-claim continues to claim and print the binding work order exactly as it does today",
+        "item_id": "worktree-scoped-identity-claim-guard"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "kind": "do_not_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "kind": "do_not_modify",
+        "path_glob": ".git/config"
+      },
+      {
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "kind": "only_modify",
+        "path_glob": "AGENTS.md"
+      },
+      {
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "kind": "only_modify",
+        "path_glob": "scripts/set_worktree_identity.sh"
+      },
+      {
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/test_worktree_identity.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_worktree_identity.py -q",
+        "description": "Unfixed-tree gate: a linked worktree keeps the human identity even after the common config is contaminated. Fails on develop because the helper and its test do not exist.",
+        "expected": "exits 1 on an unfixed tree - scripts/set_worktree_identity.sh and its test do not exist on develop, so the rung cannot pass until worktree-scoped identity is set at claim time",
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_worktree_identity.py -q -k refuses_agent",
+        "description": "The helper refuses to propagate an agent identity rather than writing it into the worktree scope",
+        "expected": "non-zero exit and the agent identity is not written to config.worktree",
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/test_agent_write_preflight.py -q",
+        "description": "Existing claim-time guard is unchanged",
+        "expected": "all preflight tests still pass",
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "GIT_AUTHOR_NAME='Joe Harris' GIT_AUTHOR_EMAIL='joeharris76@gmail.com' make agent-identity-check",
+        "description": "The repository-wide identity gate still passes with a human identity declared",
+        "expected": "agent-instructions PASS",
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "scripts/set_worktree_identity.sh: reads the GLOBAL identity (never the resolved one, which would echo back a contaminated common config and pin the contamination), refuses a known agent global identity, refuses when no global identity exists, ensures extensions.worktreeConfig, writes only --worktree scope, idempotent (prints \"already pinned\" on re-run). Validated against a real primary+linked fixture before landing.",
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "notes": null,
+        "started_at": "2026-08-04T16:23:51Z",
+        "started_branch": "fix/worktree-scoped-identity-claim-guard",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/benchbox-git-identity-fix-2d9e93",
+        "status": "done",
+        "summary": "Add scripts/set_worktree_identity.sh: refuse an agent global identity, ensure extensions.worktreeConfig, write only --worktree scope, idempotent",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Invoked from worktree-claim-attempt immediately after the pre-commit install step, before the WORKTREE_PATH emission, with helper stdout routed to stderr so the parseable WORKTREE_PATH line is unaffected. Failure warns and the claim still succeeds (agent-write-preflight is the hard gate immediately after), so worktree-claim behaves exactly as before. The ephemeral no-pool path is untouched because an ephemeral clone never runs worktree-claim.",
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "notes": null,
+        "started_at": "2026-08-04T16:23:55Z",
+        "started_branch": "fix/worktree-scoped-identity-claim-guard",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/benchbox-git-identity-fix-2d9e93",
+        "status": "done",
+        "summary": "Invoke the helper from worktree-claim once the worktree exists; leave the ephemeral no-pool path untouched",
+        "wid": "w2"
+      },
+      {
+        "evidence": "tests/unit/test_worktree_identity.py, 6 tests: (1) pinned identity survives a contaminated common config - reproduces the defect exactly with a plain git config from INSIDE the linked worktree and asserts the write DID reach the shared config so the test is not vacuous; (2) sibling worktree WITHOUT the override IS contaminated - negative control proving the protection is per worktree; (3) refuses agent global identity and writes nothing; (4) refuses with no global identity; (5) idempotent; (6) no identity value reaches the common config. 6 passed.",
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "notes": null,
+        "started_at": "2026-08-04T16:23:58Z",
+        "started_branch": "fix/worktree-scoped-identity-claim-guard",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/benchbox-git-identity-fix-2d9e93",
+        "status": "done",
+        "summary": "Add tests/unit/test_worktree_identity.py covering precedence over a contaminated common config, agent-identity refusal, and idempotence",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Three concise AGENTS.md lines in the worktree-safety section. Budget held: agents_lines 166 (<=170) and active_bytes 15990 (<=16000), PASS - paid for by collapsing the local-check bash block to inline commands and tightening the subagent-delegation sentence. Rungs: 1) 6 passed (fails on develop, files absent); 2) -k refuses_agent 1 passed; 3) test_agent_write_preflight 13 passed unchanged; 4) agent-identity-check PASS with a human identity. check-scope --base clean, 4 files.",
+        "item_id": "worktree-scoped-identity-claim-guard",
+        "notes": null,
+        "started_at": "2026-08-04T16:24:01Z",
+        "started_branch": "fix/worktree-scoped-identity-claim-guard",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/benchbox-git-identity-fix-2d9e93",
+        "status": "done",
+        "summary": "Document claim-time worktree identity in one concise AGENTS.md line",
+        "wid": "w4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "context": "Broaden the numeric mask to a single well-formed SQL-numeric-literal regex\n(integer/decimal/scientific/hex, with sign) that masks the whole token atomically;\nmake the string mask escaped-quote aware ('' inside a literal). Tag PlanMetadata\nwith the normalization mode (a scheme field) and make update_plan_versions /\nmerge_plan_metadata refuse or flag a cross-mode comparison instead of blindly\ndiffing fingerprints.\n",
+  "description": "The opt-in literal-normalized fingerprint (masks numeric/string literals for\nseed-independent comparison) has correctness gaps. It is currently API-only - the\n`--normalize-plan-literals` CLI flag is NOT shipped (docs correctly call it\n\"planned\", docs/features/query-plan-analysis.md:661) - so impact is limited to API\ncallers, but these must be fixed before the flag ships.\n\n1. Literal masking is wrong for several literal forms (benchbox/core/results/query_plan_models.py):\n   - `_LITERAL_NUM_RE = \\b\\d+(?:\\.\\d+)?\\b` (line 123) misses scientific (1e5),\n     hex (0xFF), leading/trailing-dot (.5, 5.), underscore (1_000), and CORRUPTS\n     1.2E-3 into `<NUM>.2E-<NUM>`.  -> false \"plan changed\" when a seed emits 1e2\n     vs 100, or any hex/scientific threshold.\n   - `_LITERAL_STR_RE = '[^']*'` (line 124) does not understand SQL '' escaping, so\n     `'O''Brien'` masks to `<STR><STR>` (two tokens) instead of one. -> false \"changed\",\n     latent collision risk.\n   Verified clean and must stay so: digit-bearing identifiers (col_5, revenue_2024,\n   t1.col_5) are NOT masked; NULL/TRUE/FALSE/DATE literals behave correctly.\n\n2. Cross-run mode mixing (reproduced). `update_plan_versions`\n   (benchbox/core/manifest/plan_metadata_utils.py:64) and `PlanMetadata.plan_fingerprints`\n   carry NO normalized-vs-literal marker. A run recorded with normalize_literals=False\n   compared to one with True yields different fingerprints for the same plan ->\n   false \"version changed\" on EVERY query; merge_plan_metadata silently mixes schemes.\n   The docstring's \"never silently mixes\" (plan_metadata_utils.py:44-48) holds only\n   within a single create_plan_metadata_from_results call, not across runs.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "mask digit runs adjacent to identifier characters",
+        "instead": "keep the identifier-boundary guard.",
+        "item_id": "harden-normalized-plan-fingerprint",
+        "why": "it corrupts columns like col_5"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "harden-normalized-plan-fingerprint",
+        "id": 319,
+        "reason": "Separate feature work; this TODO only hardens the underlying API so the flag is safe to ship.",
+        "resolution": "promoted",
+        "resolved_item": "shipping-the-normalize-plan-literals-cli-flag-and-surfacing",
+        "resolved_reason": null,
+        "summary": "Shipping the --normalize-plan-literals CLI flag and surfacing the normalized fingerprint in the bundle"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-07-05T00:00:00Z",
+      "created_at": "2026-07-04T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Digit-bearing identifiers and NULL/boolean/DATE handling stay correct.",
+        "item_id": "harden-normalized-plan-fingerprint"
+      },
+      {
+        "behavior": "The default literal-sensitive plan_fingerprint is unchanged (normalization stays opt-in).",
+        "item_id": "harden-normalized-plan-fingerprint"
+      },
+      {
+        "behavior": "The structural fingerprint continues to exclude cost/cardinality/timing.",
+        "item_id": "harden-normalized-plan-fingerprint"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "harden-normalized-plan-fingerprint",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/manifest/models.py"
+      },
+      {
+        "item_id": "harden-normalized-plan-fingerprint",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/manifest/plan_metadata_utils.py"
+      },
+      {
+        "item_id": "harden-normalized-plan-fingerprint",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/query_plan_models.py"
+      },
+      {
+        "item_id": "harden-normalized-plan-fingerprint",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/manifest/"
+      },
+      {
+        "item_id": "harden-normalized-plan-fingerprint",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/query_plans/test_fingerprint_normalization.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/query_plans/test_fingerprint_normalization.py tests/unit/core/manifest/ -n 0 -q",
+        "description": "Normalization + manifest suites green with the new adversarial corpus",
+        "expected": "passed",
+        "item_id": "harden-normalized-plan-fingerprint",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "harden-normalized-plan-fingerprint",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "harden-normalized-plan-fingerprint",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "harden-normalized-plan-fingerprint",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Rewrite _LITERAL_NUM_RE/_LITERAL_STR_RE to atomically mask scientific/hex/dotted/underscore numerics and escaped-quote strings",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "harden-normalized-plan-fingerprint",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a normalization-mode marker to PlanMetadata; make update_plan_versions/merge_plan_metadata reject or flag cross-mode comparison",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "harden-normalized-plan-fingerprint",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extend test_fingerprint_normalization.py with the adversarial literal corpus and a cross-mode-mixing regression",
+        "wid": "w3"
+      }
+    ]
+  }
+}

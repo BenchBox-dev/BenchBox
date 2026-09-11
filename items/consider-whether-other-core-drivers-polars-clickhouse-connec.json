@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #215 of move-duckdb-to-optional-extras.\nDeferred: Consider whether other core drivers (polars, clickhouse-connect, psycopg2-binary) should similarly be made optional\nReason deferred: Out of scope for this item - focus only on duckdb, which is the platform with the most active version-testing use case",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:40Z",
+      "worktree": "main"
+    }
+  }
+}

@@ -1,0 +1,227 @@
+{
+  "description": "Under Option B, no bulk private history is published — only the working\ntree (via the final curated sync in Phase 4) and the _project/** subtree\nhistory (via filter-merge in Phase 4). Audit scope shrinks accordingly:\nthe only paths whose contents land on public are the ones in scope here.\n\nRisks audited:\n1. Secrets in the working tree of any path that will land via the final\n   curated sync (i.e., everything except .claude, .codex, .gemini, secrets)\n2. Secrets in the commit history of _project/** (which WILL be published\n   via filter-merge if D2a stays on its recommended choice)\n3. Internal commentary, stakeholder names, vendor complaints in _project/,\n   _blog/drafts/, code comments\n4. Embarrassing or rough commit messages on _project/** specifically\n5. Divergence between private working tree and public mirror history\n   (any commits made only on the public mirror that should be replicated\n   on private before the final sync)\n\nOutcome: either go-ahead, or a remediation plan (fix files in working\ntree, scrub _project/** history with filter-repo, drop _project/** to\nworking-tree-only sync, etc.) before proceeding to Phase 1.\n\nPlan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 0).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "audit commit messages on the full repo",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-0-audit",
+        "why": "Option B does not publish bulk history; only _project/** messages matter (w5)."
+      },
+      {
+        "dont": "proceed to Phase 1 until w8 is complete",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-0-audit",
+        "why": "the remediation strategy may require additional preparation that is cheaper to do before further changes layer on."
+      },
+      {
+        "dont": "run git filter-repo during this audit",
+        "instead": "(not specified)",
+        "item_id": "single-repo-migration-phase-0-audit",
+        "why": "filter-repo rewrites history; that should be a deliberate, separately-scheduled step in Phase 4 (or skipped entirely if D2a flips to working-tree-only)."
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "single-repo-migration-phase-0-audit",
+        "needs_item": "single-repo-migration-decisions-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "Release Tooling",
+      "completed_at": "2026-04-27T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Bulk private history is being left behind anyway, so commit-message audits on non-_project/** paths are NOT needed (a meaningful narrowing vs Option A).",
+        "item_id": "single-repo-migration-phase-0-audit"
+      },
+      {
+        "behavior": "The decisions doc from the gate item is the canonical record - this audit updates it with findings, not a new doc.",
+        "item_id": "single-repo-migration-phase-0-audit"
+      },
+      {
+        "behavior": "The private repo is unchanged by this audit. Audit is read-only; remediation (if any) is staged for a later step.",
+        "item_id": "single-repo-migration-phase-0-audit"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "single-repo-migration-phase-0-audit",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/single-repo-migration.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "test -f /tmp/gitleaks-worktree.json && jq 'length' /tmp/gitleaks-worktree.json",
+        "description": "Working-tree gitleaks scan triaged",
+        "expected": "0 (or all findings categorized in decisions doc)",
+        "item_id": "single-repo-migration-phase-0-audit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f /tmp/gitleaks-project-history.json && jq 'length' /tmp/gitleaks-project-history.json",
+        "description": "_project/** history gitleaks scan triaged",
+        "expected": "0 (or all findings categorized in decisions doc)",
+        "item_id": "single-repo-migration-phase-0-audit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "comm -23 /tmp/public-msgs.txt /tmp/private-msgs.txt | wc -l",
+        "description": "Divergence check has empty (or explained) output",
+        "expected": "0 (or each line accounted for in decisions doc)",
+        "item_id": "single-repo-migration-phase-0-audit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'D2a' _project/decisions/single-repo-migration.md",
+        "description": "Decision doc updated with D2a final choice and audit summary",
+        "expected": "at least 1",
+        "item_id": "single-repo-migration-phase-0-audit",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "single-repo-migration-phase-0-audit",
+        "needs_wid": "w1",
+        "wid": "w8"
+      },
+      {
+        "item_id": "single-repo-migration-phase-0-audit",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "single-repo-migration-phase-0-audit",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "single-repo-migration-phase-0-audit",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "single-repo-migration-phase-0-audit",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "single-repo-migration-phase-0-audit",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "single-repo-migration-phase-0-audit",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-0-audit",
+        "notes": "brew install gitleaks\ncd /Users/joe/Developer/BenchBox\ngitleaks detect --no-git --source . \\\n  --report-path=/tmp/gitleaks-worktree.json\nReview report. Triage each finding as: real secret in a file (must\nfix before final sync + rotate), false positive (add to\n.gitleaksignore), or low-risk legacy test fixture.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Install gitleaks and run working-tree scan",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-0-audit",
+        "notes": "gitleaks detect --source . \\\n  --log-opts='--all -- _project/' \\\n  --report-path=/tmp/gitleaks-project-history.json\nIf clean: D2a (filter-merge) is safe.\nIf dirty with real secrets: choose between scrubbing via\ngit filter-repo --replace-text/--invert-paths, or downgrading\n_project/** to working-tree-only (override D2a).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run gitleaks on _project/** history (the only history being published)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-0-audit",
+        "notes": "find _project -name '*.yaml' -o -name '*.md' | xargs grep -l -i \\\n  'TODO\\|FIXME\\|HACK\\|XXX'\nRead what comes back. Look for stakeholder names, internal vendor\ncomplaints, references to private business plans. Most TODO content\nis fine to publish; the goal is to catch outliers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit _project/ for sensitive content",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-0-audit",
+        "notes": "Read every file under _blog/drafts/ and decide: ship as-is, edit\nbefore final sync, or move to a wip/ branch that never merges (per D4).\nDrafts are higher-risk than TODOs because they may contain unedited\nopinions. Note: only the working-tree state of _blog/ is published;\nhistory is not preserved (no filter-merge for _blog/).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit _blog/drafts/ for unpublished content",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-0-audit",
+        "notes": "Only _project/** history is being published, so only _project/**'s\ncommit messages need this audit:\n  git log --all --format='%h %s' -- _project/ | grep -iE \\\n    'wip|hack|fix(?:me|up)|temp|stupid|broken|fuck|shit'\nIf hits exist: scrub via filter-repo --message-callback before the\nPhase 4 filter-merge, or override D2a to working-tree-only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Scan _project/** commit messages for embarrassing language",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-0-audit",
+        "notes": "cd /Users/joe/Developer/BenchBox\ngit log --format='%s' public/main | sort -u > /tmp/public-msgs.txt\ngit log --format='%s' --all | sort -u > /tmp/private-msgs.txt\ncomm -23 /tmp/public-msgs.txt /tmp/private-msgs.txt\nOutput: commit subjects on public mirror absent from private.\nShould be empty or trivially explainable. Investigate any leftovers —\nthey may represent fix-ups applied directly to the curated mirror\nthat should be replicated on private (or accepted as left-behind)\nbefore the final sync. Verified prior: at least two such fix-ups\nexist (landing badge fix, linkcheck fix); they ARE represented in\nprivate but with different SHAs from prepare_release.py squashing,\nso this comm check should still come back empty by message.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Divergence check: anything on public mirror not represented in private",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-0-audit",
+        "notes": "git rev-list --objects --all -- _project/ | \\\n  git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' | \\\n  awk '$1==\"blob\" && $3 > 5000000' | sort -k3 -nr | head\nAnything over 5 MB in _project/ history is suspicious. If found,\nplan a filter-repo --strip-blobs-bigger-than run before the\nPhase 4 filter-merge.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Check for unintended large blobs in _project/** history",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "single-repo-migration-phase-0-audit",
+        "notes": "Update _project/decisions/single-repo-migration.md with the final\nD2a choice based on findings. Three options:\n- PROCEED: gitleaks clean, content acceptable, divergence empty\n- SCRUB: use git filter-repo to remove specific paths/blobs/messages\n  from _project/** history before the Phase 4 filter-merge\n- WORKING-TREE-ONLY: drop _project/** to part of the final curated\n  sync (no preserved history); loses TODO/DONE archaeology but\n  eliminates content risk\nDocument the choice and reason.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide: proceed-as-is, scrub-then-proceed, or working-tree-only-for-_project",
+        "wid": "w8"
+      }
+    ]
+  }
+}

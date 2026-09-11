@@ -1,0 +1,271 @@
+{
+  "context": "Start with correctness issues: grouped histogram outlier identity and summary-box width\naccounting. Then address box plot label UX, no-color heatmap presentation, and summary-box\ntext-fit behavior for long content.\n\nReuse existing no-color differentiation helpers in `ASCIIChartOptions` and avoid introducing\nnew global rendering modes. Keep changes localized to chart renderer modules plus targeted\nvisualization tests.\n",
+  "description": "Recent no-color/greyscale ASCII chart behavior is still suboptimal in real outputs,\nespecially for head-to-head comparisons. User-reported regressions show that structural\ndifferentiation and readability goals are not consistently met across chart types.\n\nConfirmed issues from live output and code review:\n\n1. **Box plot series labels are over-truncated and include a low-value marker prefix**\n   (e.g., \"■ DataFusion (..\"), making series names harder to read.\n\n2. **Grouped histogram outlier semantics are incorrect**: outlier detection is tracked by\n   `query_id` only, so when one platform is an outlier for a query, all platform bars for\n   that query are rendered as outliers.\n\n3. **Grouped histogram legend markers do not match plotted glyphs** in no-color mode:\n   legend uses marker set (■/◆/...) while bars use fill patterns (█/▓/...), causing\n   unnecessary cognitive load.\n\n4. **Heatmap no-color output is visually sparse and hard to scan**: values are centered\n   instead of right-aligned and column delineation is weak, producing mostly-empty columns\n   and poor comparability.\n\n5. **Heatmap row-truncation indicator path appears dead** and should be validated/fixed\n   if intended behavior is to support row truncation messaging.\n\n6. **Summary box comparison rows overflow box width in no-color mode** because visible\n   width accounting excludes structural pct arrows (e.g., `+6.2%↑`), pushing the right\n   border out by one column.\n\n7. **Summary box best/worst rows can overflow with long query IDs** because they are\n   not wrapped or truncated before border padding.\n\n8. **Summary box title can overflow the box** because title text is centered without\n   width clamping.\n\n9. **Summary box two-column mode drops comparison percentages** when environment data is\n   present, losing key comparison context.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "encode outlier state as query-only in grouped mode",
+        "instead": "track outliers at platform+query bar identity",
+        "item_id": "fix-ascii-visualization-regressions",
+        "why": "it marks non-outlier peer bars incorrectly"
+      },
+      {
+        "dont": "hide comparison percentages in two-column summary mode",
+        "instead": "include both absolute and percent deltas",
+        "item_id": "fix-ascii-visualization-regressions",
+        "why": "users lose the key regression/improvement signal"
+      },
+      {
+        "dont": "pad summary-box rows using raw percentage text length",
+        "instead": "compute visible width from rendered text",
+        "item_id": "fix-ascii-visualization-regressions",
+        "why": "no-color mode appends structural arrows (↑/↓)"
+      },
+      {
+        "dont": "relax tests to accept mismatched legend-vs-bar semantics",
+        "instead": "assert glyph correspondence explicitly",
+        "item_id": "fix-ascii-visualization-regressions",
+        "why": "that hides a readability regression"
+      },
+      {
+        "dont": "switch MCP/CLI no-color flows back to ANSI color dependence",
+        "instead": "use structural glyph/layout improvements instead",
+        "item_id": "fix-ascii-visualization-regressions",
+        "why": "those paths must remain readable without ANSI"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-02-17T00:00:00Z",
+      "created_at": "2026-02-17T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "CLI/MCP chart type interfaces and output contracts remain backward-compatible",
+        "item_id": "fix-ascii-visualization-regressions"
+      },
+      {
+        "behavior": "Colored rendering behavior for ASCII charts remains unchanged when use_color=True",
+        "item_id": "fix-ascii-visualization-regressions"
+      },
+      {
+        "behavior": "Existing query ordering and chunk-splitting behavior in ASCIIQueryHistogram remains stable",
+        "item_id": "fix-ascii-visualization-regressions"
+      },
+      {
+        "behavior": "Heatmap scale semantics (fast→slow normalization and displayed numeric range) remain correct",
+        "item_id": "fix-ascii-visualization-regressions"
+      },
+      {
+        "behavior": "Summary-box line lengths always match configured chart width in no-color and ASCII/Unicode modes",
+        "item_id": "fix-ascii-visualization-regressions"
+      },
+      {
+        "behavior": "Summary-box two-column mode continues to show comparison deltas (percent change), not just absolute values",
+        "item_id": "fix-ascii-visualization-regressions"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "fix-ascii-visualization-regressions",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/commands/visualize.py"
+      },
+      {
+        "item_id": "fix-ascii-visualization-regressions",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/result_plotter.py"
+      },
+      {
+        "item_id": "fix-ascii-visualization-regressions",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/tools/visualization.py"
+      },
+      {
+        "item_id": "fix-ascii-visualization-regressions",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/box_plot.py"
+      },
+      {
+        "item_id": "fix-ascii-visualization-regressions",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/heatmap.py"
+      },
+      {
+        "item_id": "fix-ascii-visualization-regressions",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/histogram.py"
+      },
+      {
+        "item_id": "fix-ascii-visualization-regressions",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/visualization/ascii/summary_box.py"
+      },
+      {
+        "item_id": "fix-ascii-visualization-regressions",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/ascii/test_ascii_charts.py"
+      },
+      {
+        "item_id": "fix-ascii-visualization-regressions",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/test_nocolor_rendering.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -k 'histogram or box_plot or heatmap' -q",
+        "description": "Targeted ASCII visualization tests pass for histogram/box/heatmap behavior",
+        "expected": "all selected tests pass",
+        "item_id": "fix-ascii-visualization-regressions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/test_nocolor_rendering.py -q",
+        "description": "No-color rendering regression tests pass",
+        "expected": "all tests pass",
+        "item_id": "fix-ascii-visualization-regressions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox/core/visualization/ascii/ tests/unit/visualization/",
+        "description": "Static checks pass on touched visualization files",
+        "expected": "All checks passed",
+        "item_id": "fix-ascii-visualization-regressions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -k 'summary and (dot_leader or border or narrow)' -q",
+        "description": "Summary-box width integrity holds at multiple fixed widths",
+        "expected": "all selected tests pass with no line-width overflows",
+        "item_id": "fix-ascii-visualization-regressions",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "fix-ascii-visualization-regressions",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "fix-ascii-visualization-regressions",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "fix-ascii-visualization-regressions",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "fix-ascii-visualization-regressions",
+        "needs_wid": "w6",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "fix-ascii-visualization-regressions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix grouped histogram outlier granularity to be per-bar (platform+query), not per-query",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-ascii-visualization-regressions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make grouped histogram legend glyphs semantically match rendered bar glyphs in no-color mode",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-ascii-visualization-regressions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Improve box plot series label layout to avoid marker-driven truncation and preserve informative names",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-ascii-visualization-regressions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Improve no-color heatmap density/readability with right-aligned numeric cells and clearer column separators",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-ascii-visualization-regressions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Audit heatmap truncation logic, fix dead row-truncation path if needed, and add regression tests",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-ascii-visualization-regressions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix summary-box comparison-row width accounting so no-color pct arrows do not overflow borders",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-ascii-visualization-regressions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Clamp/wrap summary-box title and best/worst rows to prevent border overflow with long text",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "fix-ascii-visualization-regressions",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Restore percentage-change visibility in two-column summary mode and add width-regression tests",
+        "wid": "w8"
+      }
+    ]
+  }
+}

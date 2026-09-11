@@ -1,0 +1,88 @@
+{
+  "context": "Trace the current CLI-to-UAT result path, preserve existing nonzero result JSON behavior, add a machine-readable load-failure sidecar at the UAT boundary, and prove that an induced loader failure cannot become a zero-row success.",
+  "description": "Make a ClickHouse server load failure terminal and diagnosable: success exports keep the normal result JSON contract; a load failure before query execution must not claim a result JSON or silently report an empty table. The UAT runner must write a durable load_failure.json sidecar beside the cell log with table/source/insert-count/memory/timeout/exception fields and result_json:null (or an explicit partial result path).",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "uat-clickhouse-server-load-failure-artifact",
+        "needs_item": "uat-clickhouse-server-streaming-loader"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-13T12:45:12Z",
+      "completed_pr": 1705,
+      "created_at": "2026-08-12T22:56:57Z",
+      "worktree": "clickhouse-load-failure-artifact"
+    },
+    "scope_rules": [
+      {
+        "item_id": "uat-clickhouse-server-load-failure-artifact",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-load-failure-artifact",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-load-failure-artifact",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/runner/*"
+      },
+      {
+        "item_id": "uat-clickhouse-server-load-failure-artifact",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-load-failure-artifact",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/*"
+      },
+      {
+        "item_id": "uat-clickhouse-server-load-failure-artifact",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-load-failure-artifact",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/*"
+      },
+      {
+        "item_id": "uat-clickhouse-server-load-failure-artifact",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/runner/"
+      },
+      {
+        "item_id": "uat-clickhouse-server-load-failure-artifact",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/runner/*"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -q tests/uat/test_runner.py tests/unit/core/runner tests/unit/cli",
+        "description": "Focused load-failure and UAT runner tests",
+        "expected": "pass",
+        "item_id": "uat-clickhouse-server-load-failure-artifact",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "./_project/scripts/todo check-scope uat-clickhouse-server-load-failure-artifact",
+        "description": "Scope check",
+        "expected": "pass",
+        "item_id": "uat-clickhouse-server-load-failure-artifact",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

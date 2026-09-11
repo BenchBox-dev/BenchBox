@@ -1,0 +1,88 @@
+{
+  "context": "Do not narrow the window - close it. Options, roughly in order of preference. (a) Add a maintenance/read-only mode to the tracker so writes are refused for the duration of a cutover; this is the only option that makes the guarantee structural rather than social, and it is reusable for future migrations. (b) Quiesce every other session out of band, then verify quiescence by taking two exports a few minutes apart and asserting the event count is unchanged - cheap, needs no code, but relies on nobody starting up mid-cutover. (c) Snapshot and restore back to back, then reconcile by diffing the live DB against the snapshot and replaying the delta; the audit chain makes replay awkward and this is the most error-prone. Whichever is chosen, the migration item's precondition should be replaced with an event-count-stability check rather than a claim check, because that is what actually detects concurrent writers.",
+  "description": "migrate-hosted-tracker-db-to-todo-db-0-3-schema gates its destructive step on 'no other actor holds a live claim'. That is the wrong test and it has now been falsified with evidence. restore-legacy --replace rebuilds every table from a snapshot, so any write landing between snapshot and restore is destroyed silently - no error, and the resulting audit chain verifies cleanly because it is rehashed from the snapshot. Measured on 2026-07-31: a snapshot staged at 1718 items / 4419 events was already behind a live DB at 1720 items / 4424 events. The two extra items (agent-write-preflight-blocks-ephemeral-clones, standalone-todo-db-renew-verb) were created by actor root@vm - another Claude session - which held NO claim at any point while creating them. So the claim check read clear while writes were landing. Claims cover claim/start/done/complete on existing items; they do not cover create, defer, promote, block or config writes. The window is not narrow either: snapshot, rehearse and restore take minutes.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-08T00:52:59Z",
+      "completed_pr": 1641,
+      "created_at": "2026-07-31T11:51:27Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "a maintenance mode cannot become a permanently stuck lock if the holder dies",
+        "item_id": "tracker-cutover-needs-a-write-freeze-not-a-claim-check"
+      },
+      {
+        "behavior": "normal multi-session operation is unaffected when no cutover is in progress",
+        "item_id": "tracker-cutover-needs-a-write-freeze-not-a-claim-check"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tracker-cutover-needs-a-write-freeze-not-a-claim-check",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/todo_db.py"
+      },
+      {
+        "item_id": "tracker-cutover-needs-a-write-freeze-not-a-claim-check",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"import subprocess,sys,time,json,os; g=lambda: subprocess.run(['_project/scripts/todo','stats','--json'],capture_output=True,text=True).stdout; a=g(); time.sleep(60); sys.exit(0 if a==g() else 1)\"",
+        "description": "Event count is stable across two reads, i.e. no writer is active",
+        "expected": "exit 0",
+        "item_id": "tracker-cutover-needs-a-write-freeze-not-a-claim-check",
+        "last_result": "pass",
+        "last_run": "2026-08-08T00:52:53Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q",
+        "description": "Tracker suites stay green",
+        "expected": "exit 0",
+        "item_id": "tracker-cutover-needs-a-write-freeze-not-a-claim-check",
+        "last_result": "pass",
+        "last_run": "2026-08-08T00:51:48Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tracker-cutover-needs-a-write-freeze-not-a-claim-check",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "DECISION: maintenance mode (leased write freeze), with verified quiescence demoted to a corroborating probe. Rationale: quiescence alone is unsound - it samples the past and cannot bind the future, and the cutover window is minutes. Evidence this session: three reads 5min apart were identical (events count=4440 last_seq=4440 latest=2026-07-31T16:38:10Z), yet the DB had still moved 1720->1726 items and 4424->4440 events earlier the same day, and joe@joe-mac-mini.local holds a live claim. 'Quiet now' is not 'quiet during the restore'. Reconcile-after was rejected: restore-legacy --replace destroys interleaved writes silently and the rebuilt chain re-hashes clean from the snapshot, so there is no post-hoc signal to reconcile against. Implemented as a leased freeze (todo freeze / --status / --release) gating every mutating command in main(); TTL-expiry satisfies the no-stuck-lock must-preserve, and a no-freeze DB is unaffected. Also added stats['events'] write-activity fingerprint - the quiescence probe was previously unimplementable (see w2 note). 32 new tests in tests/unit/scripts/test_todo_db_freeze.py; full suite 1233 passed.",
+        "item_id": "tracker-cutover-needs-a-write-freeze-not-a-claim-check",
+        "notes": null,
+        "started_at": "2026-07-31T17:05:35Z",
+        "started_branch": "claude/todo-db-migration-cutover-9s6817",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Decide between maintenance mode, verified quiescence, or reconcile-after",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Superseded the migration item's claim-based precondition non-destructively. The must-preserve line 'the hosted DB is never restored with --replace while another actor holds a live claim' is create-time-only, and migrate-hosted-tracker-db-to-todo-db-0-3-schema has 5 dependents (replace-embedded-todo-cli-with-todo-db-0-3, seed-corpus-proof-verification-window-v2, snapshot-include-findings-tables, windows-nightly-failure-count-verification-vacuous-xargs, -v2); dep edges are create-time-only too, so drop+re-create would cascade into re-creating all five. Instead re-blocked the migration item with an explicit SUPERSEDED clause naming the leased freeze + stats['events'] stability as the operative precondition and stating a claim check MUST NOT gate the destructive step. Residual for Joe: the stale must-preserve text still reads wrong in the item record; clearing it structurally needs the drop+recreate cascade, or update-scope-rules (todo-db) landing first.",
+        "item_id": "tracker-cutover-needs-a-write-freeze-not-a-claim-check",
+        "notes": null,
+        "started_at": "2026-07-31T17:06:52Z",
+        "started_branch": "claude/todo-db-migration-cutover-9s6817",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Replace the migration item's claim-based precondition with a write-activity check",
+        "wid": "w2"
+      }
+    ]
+  }
+}

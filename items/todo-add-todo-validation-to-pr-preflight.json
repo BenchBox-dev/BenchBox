@@ -1,0 +1,118 @@
+{
+  "description": "During the 2026-06-08 TODO prioritization pass, 6 priority fields were edited\nand committed without running validate_todo.py first. The PR gate already\nhandles this: pr-content-guard runs validate_todo.py on each changed TODO path\nwhen the diff routes to the content-only CI path. So PR merges are protected.\n\nThe gap is at commit time: an author can commit an invalid YAML locally (before\npushing or opening a PR) and only discover the error in CI. Adding a pre-commit\nhook closes this gap by failing the commit immediately.\n\nSeparately, the current pr-content-guard validates only changed files. A mass\nedit outside a PR (e.g. a direct push to a feature branch) could introduce\ninvalid YAML in unreviewed files. Belt-and-suspenders: add a validate --all\nstep to pr-preflight for the content-only code path as well.\n",
+  "legacy": {
+    "item_meta": {
+      "category": "Developer Tooling",
+      "created_at": "2026-06-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing pre-commit hooks continue to fire in the same order",
+        "item_id": "todo-add-todo-validation-to-pr-preflight"
+      },
+      {
+        "behavior": "pr-content-guard continues to validate per-changed-file first (fail fast on the diff)",
+        "item_id": "todo-add-todo-validation-to-pr-preflight"
+      },
+      {
+        "behavior": "validate_todo.py --all exit code 0 when all current files are valid",
+        "item_id": "todo-add-todo-validation-to-pr-preflight"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": ".pre-commit-config.yaml: existing local hooks pattern to follow",
+        "decision": "reuse",
+        "item_id": "todo-add-todo-validation-to-pr-preflight",
+        "path": ".pre-commit-config.yaml"
+      },
+      {
+        "concept": "Makefile:pr-content-guard — already validates changed TODO files; extend with --all",
+        "decision": "extend",
+        "item_id": "todo-add-todo-validation-to-pr-preflight",
+        "path": "Makefile:pr-content-guard"
+      },
+      {
+        "concept": "_project/scripts/validate_todo.py: accepts single path or --all",
+        "decision": "reuse",
+        "item_id": "todo-add-todo-validation-to-pr-preflight",
+        "path": "_project/scripts/validate_todo.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "git commit -m 'test'",
+        "description": "Commit with invalid priority value rejected by pre-commit hook",
+        "expected": "pre-commit hook failure citing the invalid priority enum",
+        "item_id": "todo-add-todo-validation-to-pr-preflight",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all",
+        "description": "All current TODO files pass --all with no changes",
+        "expected": "0 errors",
+        "item_id": "todo-add-todo-validation-to-pr-preflight",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-add-todo-validation-to-pr-preflight",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "todo-add-todo-validation-to-pr-preflight",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "todo-add-todo-validation-to-pr-preflight",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "todo-add-todo-validation-to-pr-preflight",
+        "notes": "Check .pre-commit-config.yaml for the pattern used by other local hooks\n(e.g. the existing check-yaml hook). Add an entry that runs:\n  uv run --project _project/scripts -- python _project/scripts/validate_todo.py {file}\nscoped to files matching _project/TODO/**/*.yaml and _project/DONE/**/*.yaml.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add validate_todo.py as a pre-commit hook for TODO/DONE YAML paths",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-add-todo-validation-to-pr-preflight",
+        "notes": "pr-content-guard already validates changed files. Add --all to catch\nany files outside the diff that may have been corrupted by a direct edit.\nInsert after the existing todo.txt loop in pr-content-guard:\n  uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add validate_todo.py --all to pr-preflight content path as belt-and-suspenders",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "todo-add-todo-validation-to-pr-preflight",
+        "notes": "(a) Edit a TODO file locally, set priority to \"Invalid\", run git commit →\n    should fail at pre-commit hook.\n(b) Skip the hook with --no-verify, push, open a PR → should fail in\n    pr-content-guard / pr-preflight.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Verify: introduce a deliberate invalid priority value, confirm both gates fire",
+        "wid": "w3"
+      }
+    ]
+  }
+}

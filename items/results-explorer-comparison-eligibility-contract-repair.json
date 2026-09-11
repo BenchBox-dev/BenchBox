@@ -1,0 +1,302 @@
+{
+  "context": "Fix the read-model contract first, then regenerate the snapshot and add\ninvariant tests. Only after the backend contract proves that comparable rows\nexist should frontend entrypoint work proceed.\n",
+  "description": "The post-remediation evaluation found a P0 regression: the Results Explorer\nexposes compare entrypoints, but every public result row is non-comparable.\nA fresh snapshot reported 525 total results, 0 comparable rows, and 371\ndisplayable rows. The dominant exclusion reason was\n`insufficient_query_coverage`, including normal TPC-H rows that have 22 valid\nlogical query timings but 66 or 88 raw execution samples.\n\nThe suspected root cause is that backend eligibility compares\n`valid_query_count` against `summary.queries.total`, where `total` can be raw\nsamples/repetitions rather than the logical benchmark query count. This TODO\nrepairs the data contract so comparison eligibility is based on valid\ndisplay timings over the logical comparable query scope, not raw sample count.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change result validation semantics to make compare work; add or correct eligibility semantics instead.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "hide the zero-comparable state with UI copy; the product needs actual compare-safe rows.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "lower the threshold until rows become comparable; use the policy denominator and fail if data genuinely lacks evidence.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "special-case TPC-H by name; the fix must apply to any benchmark with repeated raw samples.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-11T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "results-explorer-followup-todo-review"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not add frontend-only eligibility derivations that can drift from the DuckDB snapshot.",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair"
+      },
+      {
+        "behavior": "Do not conflate validation cleanliness, ranking eligibility, and comparison eligibility.",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair"
+      },
+      {
+        "behavior": "Do not make invalid zero/negative/NaN timings compare-safe.",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair"
+      },
+      {
+        "behavior": "Do not relax comparison eligibility by ignoring missing logical queries.",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair"
+      },
+      {
+        "behavior": "Do not remove excluded rows from provenance, receipt, or result-detail surfaces.",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/DONE/main/planning/results-explorer-read-model-eligibility-contract.yaml introduced the current explicit display/rank/compare eligibility fields; extend or repair that contract rather than creating a parallel one.",
+        "decision": "extend",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "path": "_project/DONE/main/planning/results-explorer-read-model-eligibility-contract.yaml"
+      },
+      {
+        "concept": "_project/scripts/results_explorer_snapshot_invariants.py should become the release-blocking check for contradictory eligibility states.",
+        "decision": "reuse",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "path": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "concept": "benchbox/core/explorer_pipeline/duckdb_builder.py and docs/development/browser-duckdb-schema.sql define the browser snapshot contract.",
+        "decision": "reuse",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "path": "benchbox/core/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "concept": "benchbox/core/explorer_pipeline/models.py:timing_eligibility currently owns comparison exclusion decisions.",
+        "decision": "reuse",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "path": "benchbox/core/explorer_pipeline/models.py:timing_eligibility"
+      },
+      {
+        "concept": "benchbox/core/explorer_pipeline/transformer.py:BundleTransformer passes query summary counts into eligibility.",
+        "decision": "reuse",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "path": "benchbox/core/explorer_pipeline/transformer.py:BundleTransformer"
+      },
+      {
+        "concept": "results-explorer/src/lib/duckdbQueries.ts consumes eligibility and reason fields in frontend pages.",
+        "decision": "reuse",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "path": "results-explorer/src/lib/duckdbQueries.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/components/"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/pages/"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/results_explorer_snapshot_invariants.py"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-comparison-eligibility-contract-repair/"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/duckdb_builder.py"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/models.py"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/transformer.py"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "kind": "only_modify",
+        "path_glob": "docs/development/browser-duckdb-schema.sql"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/types.ts"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline -k 'eligibility or read_model or duckdb or transformer' --tb=short",
+        "description": "Backend eligibility and snapshot tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb",
+        "description": "Snapshot invariants pass against the regenerated DuckDB file",
+        "expected": "exit 0 with nonzero comparable rows and no contradictory eligibility states",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"compare-eligible rows|TPC-H|SSB|insufficient_query_coverage\" _project/verification-logs/results-explorer-comparison-eligibility-contract-repair/w5.log",
+        "description": "SQL evidence proves comparable rows exist",
+        "expected": "w5 log includes nonzero compare-eligible row counts and at least two eligible cohorts",
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "notes": "Regenerate or inspect the current browser DuckDB snapshot and capture the\nchecked git SHA, snapshot file path/checksum, SQL used, and:\n  - total result rows;\n  - displayable rows;\n  - compare-eligible rows;\n  - ranking-eligible rows;\n  - counts by `comparison_exclusion_reason`;\n  - at least one TPC-H row showing `valid_query_count=22` with a larger\n    raw `query_count`.\nStore the SQL and output in\n`_project/verification-logs/results-explorer-comparison-eligibility-contract-repair/w0.log`.\nDecision gate: if comparable rows are already nonzero on the checked SHA,\ncontinue anyway and prove the logical/raw query-count contract with tests\nso the regression cannot return.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Reproduce and capture the current zero-comparable-row invariant",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "notes": "Trace query-count fields from bundle summaries through\n`BundleTransformer`, `timing_eligibility`, DuckDB schema generation, and\nfrontend query helpers. Explicitly identify which field means:\n  - raw execution sample count;\n  - logical benchmark query count;\n  - valid display timing count;\n  - missing logical query count;\n  - comparable query denominator.\nAdd implementation notes to this TODO before editing behavior. Do not\nproceed to w2 if there is no stable logical denominator available; create\nit first in the read model.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the logical query-count contract used by compare eligibility",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "notes": "Update `timing_eligibility()` and its call sites so a row with all logical\nquery timings present is compare-eligible even when raw sample count is\nhigher due to repetitions. Keep exclusion for rows with no query timings,\nno valid positive display timings, missing required logical queries, or\ncoverage below the policy threshold. Keep ranking eligibility separate from\ncomparison eligibility: trust or ranking exclusion can block leaderboard\nrank claims without automatically blocking a valid timing comparison.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Change backend comparison eligibility to use logical display-query coverage",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "notes": "Ensure generated rows expose stable, user-facing reason codes for:\n  - no queries;\n  - no valid display timing;\n  - missing timings;\n  - insufficient logical query coverage;\n  - rank-only exclusion;\n  - display-only exclusion.\nExtend snapshot invariant checks so they fail when every public row is\nnon-comparable, when a fully covered logical cohort is excluded for raw\nsample count, or when a compare-eligible row lacks valid display timings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Normalize exclusion reason fields and snapshot invariants",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "notes": "Add tests with fixtures covering:\n  - TPC-H-like row: 22 valid logical queries, 66 raw samples, compare-safe;\n  - SSB-like row: all logical queries covered, compare-safe;\n  - one valid logical query out of many, compare-excluded;\n  - zero/negative/NaN display timings, compare-excluded;\n  - no query records, compare-excluded;\n  - trust/ranking-excluded but timing-comparable row, compare-safe but not\n    rank-safe.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add focused backend tests for logical-vs-raw query counts",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-comparison-eligibility-contract-repair",
+        "notes": "Regenerate the Results Explorer DuckDB snapshot from the current corpus and\nrerun the SQL from w0. Decision gate: do not mark this item complete unless\nthe snapshot has nonzero compare-eligible rows and at least one TPC-H cohort\nplus one non-TPC-H cohort have two or more compare-eligible rows.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate snapshot and prove at least two comparable cohorts exist",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,254 @@
+{
+  "context": "Part A - Add missing params and fix bugs:\n\n1. Add these parameters to generate_cli_command() signature, _VALUE_PARAMS list,\n   and rendering logic:\n   - platform_options: dict[str, str] | None - render as repeated --platform-option KEY=VALUE\n   - plan_config: str | None - render as --plan-config VALUE\n   - presort: str | None - render as --presort VALUE\n   - sorted_ingestion_mode: str | None - render as --sorted-ingestion-mode VALUE (skip \"off\")\n   - sorted_ingestion_method: str | None - render as --sorted-ingestion-method VALUE\n   - databricks_clustering_strategy: str | None - render as --databricks-clustering-strategy VALUE\n   - liquid_clustering_columns: str | None - render as --liquid-clustering-columns VALUE\n   - global_cache: bool - render as --global-cache flag\n\n2. Thread these through display_interactive_preview() signature and body, adding\n   them to both the preview table and the generate_cli_command() call.\n\n3. Thread them through the production call site in run.py:2399.\n\n4. Fix compression rendering: currently `compression_str if compression_str != \"zstd\" else None`\n   drops explicit --compression zstd. Instead, only skip when compression was NOT\n   explicitly set by the user. The caller (display_interactive_preview) should pass\n   compression=None when compress_data is False, and pass the full compression string\n   otherwise (never skip based on value).\n\n5. Fix table_format rendering: when table_format_compression is set and differs from\n   the default (\"snappy\"), render as --table-format FORMAT:COMPRESSION (e.g.,\n   --table-format delta:zstd). This matches the CLI's accepted input format.\n\nPart B - Add completeness test:\n\n6. Create a test that introspects the Click run command's parameter list, identifies\n   all behavior-affecting params (exclude --dry-run, --verbose, --quiet,\n   --non-interactive, --no-monitoring, --no-progress, --ignore-memory-warnings,\n   --output), and asserts that generate_cli_command() accepts a corresponding kwarg\n   for each one. This test breaks whenever a new CLI param is added without updating\n   generate_cli_command().\n\nThe introspection test uses click.testing or direct inspection of the command's\nparams attribute. The set of \"cosmetic-only\" params is maintained as a frozenset\nin the test - any new param not in the frozenset and not in generate_cli_command\nwill cause a test failure with a clear message.\n",
+  "description": "generate_cli_command() in benchbox/cli/dryrun.py reconstructs a CLI command string\nfrom individual parameters. It is used by:\n1. display_interactive_preview() - \"Equivalent CLI command:\" shown before wizard execution\n2. DryRunDisplay - schema/query preview output\n\nThe function is structurally unsound: the parameter list is manually maintained and\nhas fallen out of sync with the Click run command. An adversarial review identified:\n\n- 7 behavior-affecting CLI params not represented at all (--platform-option,\n  --plan-config, --presort, --sorted-ingestion-mode, --sorted-ingestion-method,\n  --databricks-clustering-strategy, --liquid-clustering-columns, --global-cache)\n- 1 lossy rendering bug (--compression zstd silently dropped because of incorrect\n  default-skip logic)\n- 1 incomplete rendering (--table-format doesn't include compression suffix like\n  delta:zstd)\n- No structural guarantee that new CLI params added in the future will be reflected\n  here - the two lists (Click decorators vs generate_cli_command params) are\n  completely disconnected\n\nThe fix has two parts:\nA. Add all missing params and fix rendering bugs\nB. Add a completeness test that introspects the Click command and asserts parity",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "reconstruct the command from BenchmarkConfig.options dict",
+        "instead": "use explicit params",
+        "item_id": "provable-cli-command-generation",
+        "why": "that dict is a grab-bag with non-CLI keys (unified_tuning_configuration, df_tuning_config, etc.)"
+      },
+      {
+        "dont": "skip compression based on its value",
+        "instead": "skip only when the user didn't set it (compress_data=False)",
+        "item_id": "provable-cli-command-generation",
+        "why": "the default depends on config files and env vars"
+      },
+      {
+        "dont": "use **kwargs in generate_cli_command",
+        "instead": "use explicit typed parameters so IDE/linter catches omissions",
+        "item_id": "provable-cli-command-generation",
+        "why": "it hides missing params at call sites"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "provable-cli-command-generation",
+        "id": 82,
+        "reason": "Larger architectural change - the param-threading approach works for now and is testable via the completeness test. The introspection test (w7) provides the structural guarantee that was missing.",
+        "resolution": "promoted",
+        "resolved_item": "refactor-to-derive-cli-command-from-resolved-config-objects",
+        "resolved_reason": null,
+        "summary": "Refactor to derive CLI command from resolved config objects instead of individual params"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "provable-cli-command-generation",
+        "id": 83,
+        "reason": "Would be the ultimate correctness proof but requires building a CLI command parser, which is significant scope",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Building a full CLI-command parser for a round-trip proof is large, undertracked new scope explicitly called out as 'not necessary, just the ultimate proof'.",
+        "summary": "Add round-trip test: parse generated CLI command back through Click and verify config equivalence"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-03-05T00:00:00Z",
+      "created_at": "2026-03-05T00:00:00Z",
+      "worktree": "core-functionality"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing tests in test_cli_dryrun.py and test_interactive_dry_run.py continue passing",
+        "item_id": "provable-cli-command-generation"
+      },
+      {
+        "behavior": "display_interactive_preview() preview table (non-CLI-command portion) continues rendering correctly with current formatting",
+        "item_id": "provable-cli-command-generation"
+      },
+      {
+        "behavior": "generate_cli_command() continues to omit default values (e.g., --scale 0.01, --table-mode native, --tuning notuning) so the output stays readable",
+        "item_id": "provable-cli-command-generation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "provable-cli-command-generation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "provable-cli-command-generation",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/dryrun.py"
+      },
+      {
+        "item_id": "provable-cli-command-generation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_cli_dryrun.py"
+      },
+      {
+        "item_id": "provable-cli-command-generation",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/test_interactive_dry_run.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_cli_dryrun.py tests/unit/cli/test_interactive_dry_run.py -v --override-ini='addopts='",
+        "description": "All existing CLI dry-run tests pass",
+        "expected": "all tests pass, 0 failures",
+        "item_id": "provable-cli-command-generation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_cli_dryrun.py -k completeness -v --override-ini='addopts='",
+        "description": "Completeness test catches missing params",
+        "expected": "1 passed",
+        "item_id": "provable-cli-command-generation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/cli/test_cli_dryrun.py -k 'all_params' -v --override-ini='addopts='",
+        "description": "Generate command with all params renders correctly",
+        "expected": "tests pass, output contains all flags",
+        "item_id": "provable-cli-command-generation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check benchbox/cli/dryrun.py benchbox/cli/commands/run.py",
+        "description": "Lint passes",
+        "expected": "All checks passed",
+        "item_id": "provable-cli-command-generation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "provable-cli-command-generation",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "provable-cli-command-generation",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "provable-cli-command-generation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "provable-cli-command-generation",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "provable-cli-command-generation",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "provable-cli-command-generation",
+        "needs_wid": "w5",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "provable-cli-command-generation",
+        "notes": "platform_options, plan_config, presort, sorted_ingestion_mode, sorted_ingestion_method, databricks_clustering_strategy, liquid_clustering_columns, global_cache",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add 8 missing params to generate_cli_command() signature and rendering logic",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "provable-cli-command-generation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix compression rendering - remove the lossy `!= 'zstd'` skip, pass None when compress_data=False instead",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "provable-cli-command-generation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix table_format rendering - include compression suffix (e.g., delta:zstd) when table_format_compression differs from 'snappy' default",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "provable-cli-command-generation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Thread new params through display_interactive_preview() signature, preview table rows, and internal generate_cli_command() call",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "provable-cli-command-generation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Thread new params through the production call site in run.py:2399 (display_interactive_preview call in interactive wizard)",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "provable-cli-command-generation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for each new param in generate_cli_command (renders when set, omitted when default)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "provable-cli-command-generation",
+        "notes": "Test structure:\n- Get Click command object for `run`\n- Extract all param names (excluding known cosmetic ones)\n- Get generate_cli_command's inspect.signature().parameters\n- Assert CLI_PARAMS - COSMETIC_PARAMS ⊆ GENERATE_PARAMS\n- Cosmetic frozenset: {dry_run, verbose, quiet, non_interactive,\n  no_monitoring, no_progress, ignore_memory_warnings, output}\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add completeness introspection test: introspect Click run command params, assert parity with generate_cli_command kwargs",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "provable-cli-command-generation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add integration test: display_interactive_preview with all params set, verify CLI command output contains every flag",
+        "wid": "w8"
+      }
+    ]
+  }
+}

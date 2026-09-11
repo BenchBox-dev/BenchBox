@@ -1,0 +1,16 @@
+{
+  "description": "Implement DDL generation for the Trino/Presto family (including AWS Athena)\nwith support for connector-specific partitioning and table format options.\n\n## Platform Relationship\n\n- **Trino**: Fork of PrestoSQL (renamed 2020), community-driven\n- **Presto**: Originally from Facebook, now maintained by Presto Foundation\n- **Athena**: AWS-managed Trino/Presto service with S3-backed storage\n\nAll three support similar connector architecture but with varying DDL syntax.\n\n## Connector-Specific Tuning\n\n### Hive Connector\n- PARTITIONED BY: Hive-style partitioning\n- BUCKETED BY: Hash bucketing\n- SORTED BY: Sort within buckets\n\n### Iceberg Connector\n- partitioning: Partition transforms (year, month, day, hour, bucket, truncate)\n- sorted_by: Sorted table writes\n- format: Parquet, ORC, Avro\n\n### Delta Lake Connector\n- partitioned_by: Column-based partitioning\n- location: Storage location\n\n## Current Gap\n\n- Trino adapter has `generate_tuning_clause()` (line ~1178) with partial support\n- Presto adapter has `generate_tuning_clause()` (line ~1156) with partial support\n- Athena adapter has `generate_tuning_clause()` (line ~1165) with partial support\n- None fully wire tuning config to actual CREATE TABLE",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "pt-06-trino-presto-athena-ddl",
+        "needs_item": "pt-01-ddl-generator-protocol"
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-01-03T00:00:00Z",
+      "worktree": "physical-tuning"
+    }
+  }
+}

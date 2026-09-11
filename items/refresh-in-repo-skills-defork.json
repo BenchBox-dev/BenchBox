@@ -1,0 +1,59 @@
+{
+  "context": "Migrate the fork-only normative text into the skill-sync source (or BenchBox CLAUDE.md bindings), then refresh the scoped copies from source and define how they stay current (skill-sync managed target or documented refresh step in the release checklist).",
+  "description": "BenchBox's scoped skill copies rot independently of the skill-sync source: todo-db skill pinned at 0.2.0 (no doctor route, no exit-4 halt rule, no update docs) while sessions in this repo load the scoped copy by precedence; review-protocol copy is a FORK — unnumbered headings plus a normative paragraph (capture only to ~/.benchbox/finding-drafts; todo finding sync is a separate user-authorized landing step) that exists nowhere in the source, so a future sync would silently delete the only end-to-end landing-step documentation; five-axis-review.md:66 cites a §2 that resolves against nothing in the local copy. Distinct from findings-phase4-surfacing w3 (routing edits): this item is the propagation/consistency repair.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "created_at": "2026-07-26T13:03:25Z",
+      "worktree": "todo-db"
+    },
+    "scope_rules": [
+      {
+        "item_id": "refresh-in-repo-skills-defork",
+        "kind": "only_modify",
+        "path_glob": ".claude/skills/**"
+      },
+      {
+        "item_id": "refresh-in-repo-skills-defork",
+        "kind": "only_modify",
+        "path_glob": "CLAUDE.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -q 'version: 0.3' .claude/skills/todo-db/SKILL.md",
+        "description": "Version",
+        "expected": null,
+        "item_id": "refresh-in-repo-skills-defork",
+        "last_result": "pass",
+        "last_run": "2026-08-08T00:53:19Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": ".claude/skills/todo-db/SKILL.md shim preserves fork-only normative content (consolidated to todo 0.8.0 #1638)",
+        "item_id": "refresh-in-repo-skills-defork",
+        "notes": null,
+        "started_at": "2026-08-08T00:53:25Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Preserve fork-only normative content in the canonical source",
+        "wid": "w1"
+      },
+      {
+        "evidence": ".claude/skills/todo-db shim version 0.3 + skill-sync staleness, grep pass",
+        "item_id": "refresh-in-repo-skills-defork",
+        "notes": null,
+        "started_at": "2026-08-08T00:53:30Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Refresh scoped copies + citation fixes + staleness mechanism",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,271 @@
+{
+  "context": "Treat this as copy driven by computed state. Fix the underlying summary\nmodel first, then update rendered copy. Reuse RunIdentity for same-platform\nlabels and reuse the same comparable/missing query counts that feed the\nnormalized speedup chart.\n",
+  "description": "The 2026-05-09 post-completion review on develop dbac33ee1 found that Compare\nsummaries still make ambiguous or misleading claims. Same-platform comparisons\nsay \"Polars is 1.00x faster\" and \"WINNER Polars\" when both selected runs are\nPolars v1.40.0 from different dates; Query Wins mixes comparable and missing\ndenominators; the empty Compare picker has duplicate SSB benchmark options;\nand comparability copy says only benchmark and scale even though phase is also\nrequired.\n\nThis item addresses review findings #8, #9, #10, and #13 recorded in\n_project/audits/results-explorer-post-completion-review-2026-05-09.md. It\ndepends on compare-selection recovery so the Compare route is not edited in\ntwo conflicting passes.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "declare a winner when the displayed speedup is exactly 1.00x.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "mix missing-query counts into comparable-query win denominators.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use platform name alone when multiple selected runs share it.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "needs_item": "results-explorer-post-completion-compare-selection-recovery"
+      }
+    ],
+    "item_meta": {
+      "category": "Frontend UX",
+      "completed_at": "2026-05-10T00:00:00Z",
+      "created_at": "2026-05-09T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Comparable-only default behavior introduced by prior fixes remains intact.",
+        "item_id": "results-explorer-post-completion-compare-summary-semantics"
+      },
+      {
+        "behavior": "Existing valid Compare deep links keep working.",
+        "item_id": "results-explorer-post-completion-compare-summary-semantics"
+      },
+      {
+        "behavior": "Speedup charts still compute from the selected baseline.",
+        "item_id": "results-explorer-post-completion-compare-summary-semantics"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark_runs/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-post-completion-compare-summary-semantics/"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CompareSummary.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/CompareSummary.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/NormalizedSpeedupChart.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/compareSummary.ts"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/displayLabels.ts"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/runIdentity.ts"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/lib/__tests__/compareSummary.test.ts src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/pages/__tests__/Compare.test.tsx",
+        "description": "Compare summary tests pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Frontend typecheck passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Frontend build passes",
+        "expected": "exit 0",
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual/browser: same-platform compare names runs, handles 1.00x as tie/no material winner, and separates comparable vs missing counts'",
+        "description": "Manual same-platform compare copy check passes",
+        "expected": "manual evidence captured in PR notes or verification log",
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "needs_wid": "w0",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "needs_wid": "w0",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "notes": "Open /results/compare with a same-platform two-id URL and /results/compare\nwith no ids. Capture decision summary text, winner card text, Query Wins\ndenominator copy, hidden/missing query counts, comparability guardrail\ntext, and benchmark select options to\n_project/verification-logs/results-explorer-post-completion-compare-summary-semantics/w0.log.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate compare-summary semantic defects on current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "notes": "Prior art: PR #285 already labels the legacy slug\n`\"SSB (legacy slug)\"` in\n`results-explorer/src/lib/displayLabels.ts`, so the *labeling* half of\nthis work is shipped. Finding #10 reproduces if the Compare picker\nbuilds its benchmark options from a source that yields both `ssb` and\n`star_schema` as separate filter values.\n\nScope of this work unit is the filter-option list only: canonicalize\nlegacy aliases before rendering the Compare picker benchmark select so\nexactly one SSB option appears, or — if both must remain visible for\ndata routing — keep the existing \"SSB (legacy slug)\" label and ensure\neach option filters to a distinct, non-overlapping result set. If w0\ncannot reproduce duplicate options against the current develop tip,\nrecord the stale finding in the w0 log and skip implementation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Dedupe Compare benchmark filter options for the legacy SSB slug",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "notes": "Update CompareSummary so same-platform comparisons name the winning run\nby compact run identity, not just platform. If geomean speedup rounds to\n1.00x or falls inside the existing tie threshold, render tie/no-material\nwinner copy instead of \"is 1.00x faster\".\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Use run identity and tie-aware language in same-platform summaries",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "notes": "Rewrite Query Wins and chart count copy so comparable-query counts and\nexcluded/missing-query counts are separate. Example target:\n\"4 fastest of 80 comparable; 69 queries excluded for missing data.\" Do\nnot add incomparable queries into the denominator used for win rates.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Split comparable and missing-query denominators",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "notes": "Update Compare guardrail text from \"same benchmark and scale\" to \"same\nbenchmark, scale, and phase\" wherever that is the actual winner-claim\nrequirement. Include primary metric where relevant if the code also\nenforces it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make comparability guardrail copy match the actual cohort lock",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-post-completion-compare-summary-semantics",
+        "notes": "Add targeted tests for duplicate benchmark options, same-platform\nsame-speed/tie copy, query win denominators, and guardrail text. Include\nat least one same-platform two-run fixture where platform names alone\nwould be ambiguous.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add compare-summary regression tests",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,339 @@
+{
+  "context": "Implement responsive primitives once, then use them on Home, BenchmarkIndex,\nQuery, and Compare. Start with CSS/layout and DOM ordering before adding new\ncomponents. Validate with Playwright at representative widths because visual\nregressions here are hard to catch with unit tests alone.\n",
+  "description": "Make the Results Explorer usable below 768px without simply stacking all\nfilters before all data. The audit found that the mobile first viewport can\nshow hero/stat/submission chrome before the leaderboard, benchmark heatmaps can\nclip horizontally, and Query Workbench filters can dominate the screen before\nusers see any rows. The mobile design should preserve the leaderboard-first\nidentity while adapting dense tables into scrollable, card, or tabular\npatterns with explicit affordances.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "put all filters above all data on mobile",
+        "instead": "show active filters and result count first, full filters in a drawer.",
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "why": "it hides the leaderboard answer"
+      },
+      {
+        "dont": "reduce desktop table density to solve mobile",
+        "instead": "use responsive variants.",
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "why": "desktop is the primary analysis surface"
+      },
+      {
+        "dont": "silently clip heatmaps",
+        "instead": "add sticky labels and visible overflow affordance or a card fallback.",
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "why": "users cannot tell more columns exist"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "needs_item": "explorer-chart-correctness-and-navigation"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "needs_item": "explorer-leaderboard-first-identity-unification"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "needs_item": "explorer-selection-facets-coverage-at-scale"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-02T00:00:00Z",
+      "created_at": "2026-05-01T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Desktop density does not regress: at 1440px, MetaLeaderboard renders at least 8 rows above the fold (asserted by w8 Playwright check).",
+        "item_id": "explorer-mobile-density-responsive-tables"
+      },
+      {
+        "behavior": "FacetDrawer prop API and the underlying facet model from `explorer-selection-facets-coverage-at-scale` w6 are not modified by this work.",
+        "item_id": "explorer-mobile-density-responsive-tables"
+      },
+      {
+        "behavior": "Horizontal scroll, where used, is explicit and keeps row/header context visible (sticky first column + visible scroll-hint element).",
+        "item_id": "explorer-mobile-density-responsive-tables"
+      },
+      {
+        "behavior": "Keyboard navigation and accessible labels remain available for tables, drawers, and charts.",
+        "item_id": "explorer-mobile-density-responsive-tables"
+      },
+      {
+        "behavior": "URL state remains the source of active filters across responsive layouts (no mobile-only state shadow).",
+        "item_id": "explorer-mobile-density-responsive-tables"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/responsive.spec.ts"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/playwright.config.ts"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/FacetRail.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MobileFilterDrawer.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ResponsiveDataTable.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/FacetRail.test.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MobileFilterDrawer.test.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/ResponsiveDataTable.test.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/index.css"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Query.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run typecheck && npm test && npm run build",
+        "description": "Frontend typecheck, unit tests, and build pass.",
+        "expected": "All commands pass after responsive component changes.",
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium",
+        "description": "Responsive Playwright smoke passes.",
+        "expected": "Chromium e2e tests pass at configured desktop and mobile viewports.",
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "notes": "Add `--bb-bp-mobile`, `--bb-bp-tablet`, `--bb-bp-desktop` to\n`index.css` (consistent with the brand tokens added by the upstream\nidentity unification work). Document the rule \"use horizontal table\nscroll above the mobile breakpoint when the table has a stable sticky\nfirst column; below it, fall back to compact platform cards\" once, in\na CSS comment near the breakpoint tokens. No page edits.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define responsive breakpoint tokens and table-vs-card decision rule",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "notes": "At 390px width, the Home page must render in this DOM order: headline,\nactive cohort/filter summary, first leaderboard rows (or the compact\nResponsiveDataTable card variant), and only after that any Recent\nResults or submission CTA strip. Pull leaderboard ordering from the\ndesktop rules established in `explorer-leaderboard-first-identity-\nunification` w7 — do not redefine them.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply mobile DOM order on Home: headline, cohort summary, leaderboard, then chrome",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "notes": "The FacetDrawer COMPONENT is owned by `explorer-selection-facets-\ncoverage-at-scale` w6. This work unit ONLY adds narrow-width styling\n(full-screen sheet behavior, swipe-to-dismiss optional, focus trap when\nopen). It must not change the drawer's prop shape or the facet model.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Style the FacetDrawer for narrow widths",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "notes": "The drawer trigger button shows active filter chips and live result\ncount BEFORE the user opens it. Result count comes from the same\n`facetsToWhereClause` count query the desktop rail uses; do not run a\nseparate count query just for the mobile trigger.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add closed-state summary chip strip and live result count to drawer trigger",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "notes": "QueryHeatmap/benchmark matrices should use sticky row labels, stable cell\ndimensions, and an explicit horizontal overflow affordance. On very narrow\nscreens, provide a list/card fallback grouped by platform with query\noutliers and aggregate metric.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make benchmark matrices and heatmaps responsive without silent clipping",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "notes": "Query page mobile order should be: title/result count, active filters,\ntable rows or SQL panel tabs, then full filters in a drawer. The default\nshould not require scrolling past every facet before seeing data.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Put Query Workbench results before deep filter controls on mobile",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "notes": "Chart group controls should remain tappable and not overflow. Use icon or\nshort labels where necessary, with accessible names. Do not let chart chips\nresize the chart area on selection.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make chart controls wrap into stable segmented controls at small widths",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "explorer-mobile-density-responsive-tables",
+        "notes": "Mechanical assertions, not screenshot-only smokes. For `/results/`,\n`/results/star_schema/?phase=standard`, `/results/query`, and\n`/results/compare?ids=...`, at 390px AND 1440px:\n  - Headline + cohort summary + first leaderboard row are within the\n    first 800px of scroll on desktop and within the first 1200px on\n    mobile (use `boundingBox().y`).\n  - At 1440px, MetaLeaderboard renders >= 8 rows above the fold (desktop\n    density assertion — fails if mobile responsive rules accidentally\n    truncate the desktop layout).\n  - QueryHeatmap container reports `scrollWidth > clientWidth` ⇒ a\n    visible scroll-hint element exists in the DOM.\n  - FacetDrawer trigger shows the live result count attribute before the\n    drawer is opened.\nScreenshots stay as a secondary regression net.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add Playwright responsive assertions (not just screenshots) for DOM order, density, and overflow",
+        "wid": "w8"
+      }
+    ]
+  }
+}

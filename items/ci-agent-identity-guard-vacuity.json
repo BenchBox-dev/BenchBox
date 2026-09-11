@@ -1,0 +1,146 @@
+{
+  "context": "Delete the `Validate Git identity is not an agent/service` step and its id: guard-agent-identity from the code-lint job in .github/workflows/pr.yml, along with whatever identity injection was added for it. Leave `$(MAKE) agent-identity-check` in the ci-lint recipe untouched. Leave guard-agent-commit-range exactly as it is. Confirm the aggregator's guard set shrinks by exactly one and that the parity test still passes. If instead the team wants a CI-side identity assertion, the only meaningful form is over the commit range, which already exists -- do not re-add a config-resolution check to CI in another shape.",
+  "description": "PR #1494 wired two guards into the pr.yml lint job: guard-agent-identity (running `make agent-identity-check`) and guard-agent-commit-range (running `make agent-commit-range-check`). The first cannot do useful work in CI. agent-identity-check resolves the identity from git config, and on a GitHub Actions runner that is the RUNNER's identity, which says nothing about what the branch carries -- that limitation is precisely why the commit-range guard exists. A follow-up change then made the CI step supply a non-agent identity for the resolution check, which makes the guard structurally incapable of failing. A guard that can never fail is worse than an absent one because the lint-guard-summary aggregator reports it as coverage. Remove the CI step; keep `agent-identity-check` inside ci-lint where the resolved identity is the developer's or agent's real one and the check is meaningful; keep guard-agent-commit-range, which inspects the commits themselves and is the real merge-time control. tests/system/test_ci_lint_parity.py permits this: it asserts every CI lint-job guard command also appears in ci-lint (CI guards are a subset of ci-lint), not the converse, so a local-only guard is legal.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Add the removed step to EXCLUDED_STEPS in test_ci_lint_parity.py to make the test pass",
+        "instead": "Delete the step; the parity test needs no change because it only constrains CI guards to be a subset of ci-lint",
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "why": "EXCLUDED_STEPS documents steps that are genuinely CI-only; this step is being deleted, not excluded, and a stale entry would rot into cover for a guard that stopped existing"
+      },
+      {
+        "dont": "Also remove agent-identity-check from the ci-lint recipe",
+        "instead": "Remove only the CI step; leave the ci-lint line in place",
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "why": "Locally the resolved identity is the developer's or the agent's real identity, so the check is meaningful there and is a real pre-push control"
+      },
+      {
+        "dont": "Keep the step and silence it by injecting a known-good identity",
+        "instead": "Remove the CI step and rely on guard-agent-commit-range, which inspects the branch's actual commits",
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "why": "That is the current state and is exactly the defect: the guard reports success unconditionally and reads as coverage in lint-guard-summary"
+      }
+    ],
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-04T13:02:47Z",
+      "completed_pr": 1523,
+      "created_at": "2026-08-04T01:31:47Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "The pre-commit agent-git-identity hook is unchanged and still fires at commit time",
+        "item_id": "ci-agent-identity-guard-vacuity"
+      },
+      {
+        "behavior": "ci-lint continues to run agent-identity-check locally, where the resolved identity is real",
+        "item_id": "ci-agent-identity-guard-vacuity"
+      },
+      {
+        "behavior": "guard-agent-commit-range remains in the pr.yml lint job and still runs make agent-commit-range-check",
+        "item_id": "ci-agent-identity-guard-vacuity"
+      },
+      {
+        "behavior": "tests/system/test_ci_lint_parity.py continues to pass without being weakened or given a new EXCLUDED_STEPS entry",
+        "item_id": "ci-agent-identity-guard-vacuity"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "kind": "do_not_modify",
+        "path_glob": ".pre-commit-config.yaml"
+      },
+      {
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/agent_instruction_audit.py"
+      },
+      {
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/pr.yml"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! rg -n 'guard-agent-identity' .github/workflows/pr.yml",
+        "description": "Unfixed-tree gate: the pr.yml lint job no longer declares a guard-agent-identity step. Fails on the current branch, where the step exists.",
+        "expected": "exits 1 on an unfixed tree - guard-agent-identity is declared in pr.yml today, so rg matches and the negation fails until the step is deleted",
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -q 'guard-agent-commit-range' .github/workflows/pr.yml",
+        "description": "The real merge-time guard is still wired into CI",
+        "expected": "guard-agent-commit-range is still declared",
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make -n ci-lint 2>/dev/null | grep -q 'agent-identity-check'",
+        "description": "agent-identity-check is still run locally by ci-lint",
+        "expected": "the local recipe still invokes the target",
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/system/test_ci_lint_parity.py -q",
+        "description": "Local/CI lint parity still holds without weakening the test",
+        "expected": "parity tests pass unmodified",
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "670fc009f removed the guard-agent-identity step and its GIT_CONFIG_* identity injection from the code-lint job",
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "notes": null,
+        "started_at": "2026-08-04T12:04:43Z",
+        "started_branch": "claude/git-identity-cloud-rca-maiixe",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Delete the guard-agent-identity step and any identity injection added for it from the code-lint job in pr.yml",
+        "wid": "w1"
+      },
+      {
+        "evidence": "guard steps 21->20, agent guards now guard-agent-instructions + guard-agent-commit-range only; tests/system/test_ci_lint_parity.py 7 passed unmodified",
+        "item_id": "ci-agent-identity-guard-vacuity",
+        "notes": null,
+        "started_at": "2026-08-04T12:04:46Z",
+        "started_branch": "claude/git-identity-cloud-rca-maiixe",
+        "started_worktree": "/home/user/BenchBox",
+        "status": "done",
+        "summary": "Confirm the aggregator guard set shrinks by exactly one and parity passes unmodified",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,198 @@
+{
+  "context": "Incremental migration: move tests class-by-class, verify at each step.\nStart with core chart types (simplest imports), then edge cases, then\nadvanced charts, then split the mixed classes last.\n\nImport rewriting is mechanical: `from benchbox.core.visualization.ascii.X import Y`\nbecomes `from textcharts.X import Y`. The only complication is the 4 mixed\nclasses that need splitting.\n",
+  "description": "textcharts was extracted from BenchBox (see extract-ascii-charting-into-standalone-library)\nbut ALL test coverage (~360 methods in test_ascii_charts.py) still lives in BenchBox.\ntextcharts has zero tests of its own, making it fragile for independent development.\n\nA detailed review classified every test class (71 classes, ~360 methods) into three buckets:\n\n1. **Move to textcharts (~290 methods, 46 classes)**: Pure rendering tests that construct\n   textcharts data models directly (BarData, HistogramBar, etc.) and assert on rendered\n   output. No BenchBox domain knowledge. These broke when textcharts changed because\n   the tests don't live at the source.\n\n2. **Keep in BenchBox (~65 methods, 13 classes)**: Integration tests covering ResultPlotter\n   normalization, ascii_runtime dispatch, exporter wiring, template registry, platform\n   disambiguation, power metric extraction, and chart suggestions.\n\n3. **Split (4 classes)**: Mixed classes where most methods test rendering but 1-2 methods\n   test BenchBox exporters (test_exporters_render_*). Extract the exporter methods into\n   a BenchBox integration class; move the rest.\n\nAfter migration, BenchBox's test_ascii_charts.py shrinks from ~4,500 lines to ~800 lines,\nand textcharts gains independent, self-contained test coverage.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "batch-move all tests in one commit",
+        "instead": "commit in logical groups (core types, edge cases, advanced charts, splits).",
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "why": "a single broken import rewrite would fail the entire migration"
+      },
+      {
+        "dont": "delete tests from BenchBox before verifying they pass in textcharts",
+        "instead": "always verify first.",
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "why": "a failed migration would leave both repos without coverage"
+      },
+      {
+        "dont": "move tests that import BenchBox-specific fixtures (make_normalized_result) or modules (ascii_runtime, exporters, templates)",
+        "instead": "review each class carefully.",
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "why": "these test integration logic that belongs in BenchBox"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "needs_item": "extract-ascii-charting-into-standalone-library"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing & Quality",
+      "completed_at": "2026-03-07T00:00:00Z",
+      "created_at": "2026-03-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "BenchBox golden output snapshot tests continue to pass",
+        "item_id": "migrate-ascii-chart-tests-to-textcharts"
+      },
+      {
+        "behavior": "BenchBox integration tests (ResultPlotter, ascii_runtime, exporters, templates, chart suggestions) remain in BenchBox",
+        "item_id": "migrate-ascii-chart-tests-to-textcharts"
+      },
+      {
+        "behavior": "No test coverage gaps - every test moved to textcharts must pass there",
+        "item_id": "migrate-ascii-chart-tests-to-textcharts"
+      },
+      {
+        "behavior": "textcharts tests import from `textcharts.*` directly, not through BenchBox shims",
+        "item_id": "migrate-ascii-chart-tests-to-textcharts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/cli/"
+      },
+      {
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/visualization/"
+      },
+      {
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/"
+      },
+      {
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/visualization/ascii/test_ascii_charts.py"
+      },
+      {
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "kind": "only_modify",
+        "path_glob": "~/Developer/textcharts/tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd ~/Developer/textcharts && uv run -- python -m pytest -q",
+        "description": "textcharts tests pass independently",
+        "expected": "~290 tests pass with 0 failures",
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -q",
+        "description": "BenchBox integration tests still pass",
+        "expected": "~70 tests pass (integration + shim imports)",
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/visualization/ -q",
+        "description": "BenchBox full visualization suite passes",
+        "expected": "All tests pass",
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "grep -c 'def test_' tests/unit/visualization/ascii/test_ascii_charts.py",
+        "description": "No textcharts rendering tests remain in BenchBox",
+        "expected": "~70 (down from ~360)",
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -q",
+        "description": "Golden parity tests still pass",
+        "expected": "All snapshot tests pass",
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "notes": "Create `~/Developer/textcharts/tests/test_charts.py` (or split by chart type).\n\nMigration steps per class:\n1. Copy class to textcharts test file\n2. Rewrite imports: `from benchbox.core.visualization.ascii.X import Y`\n   → `from textcharts.X import Y`\n3. Remove any `from tests.fixtures.result_dict_fixtures import` (not needed for pure tests)\n4. Verify each class passes: `cd ~/Developer/textcharts && uv run -- python -m pytest -k ClassName -q`\n5. Delete the class from BenchBox's test_ascii_charts.py\n\nClasses to move (grouped by concern):\n\n**Core chart types (8)**:\n- TestTerminalCapabilities, TestTerminalColors, TestASCIIChartOptions\n- TestASCIIBarChart, TestASCIIBoxPlot, TestASCIIHeatmap\n- TestASCIIScatterPlot, TestASCIILineChart\n\n**Config/output modes (2)**:\n- TestNoColorOutput, TestASCIIOnlyOutput\n\n**Histogram (1)**:\n- TestASCIIQueryHistogram\n\n**Edge cases (8)**:\n- TestComputeQuartiles, TestNegativeValues, TestAllIdenticalValues\n- TestSingleDataPoint, TestNaNAndInfinity, TestNarrowWidth\n- TestANSISanitization, TestFactoryFunctionValidation\n\n**Comparison/advanced charts (3)**:\n- TestASCIIComparisonBar, TestASCIIDivergingBar, TestASCIISummaryBox\n\n**Layout/formatting (6)**:\n- TestNewChartEdgeCases, TestHeatmapColumnFitting, TestHistogramWidthAware\n- TestLabelTruncation, TestMetadataSubtitle, TestColoredLabels\n\n**Phase features (6)**:\n- TestAxisLabels, TestHeatmapDivergingPalette, TestHistogramOutliers\n- TestSummaryBoxDotLeader, TestEdgeCases\n\n**Additional chart types (4)**:\n- TestASCIIPercentileLadder, TestComputePercentile\n- TestASCIINormalizedSpeedup, TestASCIIStackedBar (minus test_exporters_*)\n\n**More chart types (3)**:\n- TestASCIISparklineTable (minus test_exporters_*)\n- TestASCIICDFChart (minus test_exporters_*)\n- TestASCIIRankTable (minus test_exporters_*)\n\n**Regression/outlier tests (17)**:\n- TestOutlierSeverityMarkers, TestBarChartColorCycling\n- TestBarChartOutlierSeverityMarkers, TestBoxPlotScaleCapping\n- TestBoxPlotOutlierTruncationMarkers, TestBoxPlotSeriesSpacing\n- TestBoxPlotStatsTable, TestComparisonBarOutlierSeverityMarkers\n- TestHistogramOutlierTruncation, TestHeatmapOutlierTruncation\n- TestStackedBarOutlierTruncation, TestScatterPlotOutlierTruncation\n- TestLineChartOutlierTruncation, TestCDFChartOutlierTruncation\n- TestPercentileLadderOutlierTruncation\n- TestBarChartZeroHeavyTruncation, TestHistogramZeroHeavyTruncation\n- TestStackedBarZeroHeavyTruncation, TestScatterPlotDuplicateLabelTruncation\n- TestRobustP95Fallback\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create textcharts test infrastructure and migrate pure chart-type tests (46 classes)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "notes": "These classes have mostly textcharts tests but contain 1-2 BenchBox exporter methods:\n\n| Class | Methods to KEEP in BenchBox | Methods to MOVE |\n|-------|---------------------------|-----------------|\n| TestFromQueryResults | test_exporters_render_percentile_ladder, test_percentile_ladder_importable_from_module | test_basic_factory, test_empty_values, test_multi_platform_factory |\n| TestFromNormalizedResults | test_exporters_render_normalized_speedup | test_basic_factory, test_slowest_baseline, test_fastest_baseline, test_empty_input |\n| TestASCIIStackedBar | test_exporters_render_stacked_phase | All other methods |\n| TestASCIICDFChart | test_exporters_render_cdf_chart | All other methods |\n| TestASCIISparklineTable | test_exporters_render_sparkline_table | All other methods |\n| TestASCIIRankTable | test_exporters_render_rank_table | All other methods |\n\nConsolidate the kept test_exporters_* methods into a single\n`TestExporterChartTypeDispatch` class in BenchBox's test file.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Split 4 mixed-concern classes: extract test_exporters_* methods, move rendering tests",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "notes": "Add a small `TestShimImports` class in BenchBox's test_ascii_charts.py that verifies\nthe re-export shims still work:\n\n```python\nclass TestShimImports:\n    \"\"\"Verify BenchBox compatibility shims re-export textcharts correctly.\"\"\"\n\n    def test_bar_chart_importable(self):\n        from benchbox.core.visualization.ascii.bar_chart import ASCIIBarChart, BarData\n        assert ASCIIBarChart is not None and BarData is not None\n\n    def test_all_chart_types_importable(self):\n        from benchbox.core.visualization.ascii import (\n            ASCIIBarChart, ASCIIBoxPlot, ASCIIHeatmap, ASCIILineChart,\n            ASCIIQueryHistogram, ASCIIScatterPlot, ASCIIComparisonBar,\n            ASCIIDivergingBar, ASCIISummaryBox, ASCIIPercentileLadder,\n            ASCIINormalizedSpeedup, ASCIIStackedBar, ASCIICDFChart,\n            ASCIISparklineTable, ASCIIRankTable,\n        )\n\n    def test_options_importable(self):\n        from benchbox.core.visualization.ascii.base import ASCIIChartOptions, ColorMode\n        assert ASCIIChartOptions is not None\n```\n\nFinal verification:\n1. BenchBox: `uv run -- python -m pytest tests/unit/visualization/ascii/ -q` - all pass\n2. textcharts: `cd ~/Developer/textcharts && uv run -- python -m pytest -q` - all pass\n3. Line count: BenchBox test file should be ~800 lines (down from ~4,500)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add shim import smoke tests to BenchBox and verify final state",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "migrate-ascii-chart-tests-to-textcharts",
+        "notes": "Update ~/Developer/textcharts CI configuration:\n1. Add pytest + pytest-cov to dev dependencies if not present\n2. Configure coverage for textcharts package\n3. Set coverage threshold (target: >=85% given the comprehensive test suite)\n4. Verify CI runs green with all migrated tests\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update textcharts CI to run migrated tests and enforce coverage threshold",
+        "wid": "w4"
+      }
+    ]
+  }
+}

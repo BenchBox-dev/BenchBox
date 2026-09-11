@@ -1,0 +1,161 @@
+{
+  "description": "Blind-spot `2026-05-04-004045` documented an asymmetry between\n`benchbox/core/primitives/catalog/loader.py:_parse_validation_queries`\n(forwards 7 fields: id/sql/expected_rows/expected_rows_min/\nexpected_rows_max/expected_values/check_expression) and the\nwrite_primitives-local equivalent (which forwards\n`expected_value_min`, `expected_value_max`, and validation-level\n`platform_overrides` in addition).\n\nThe shared loader is consumed by `transaction_primitives` today. Any\nfuture agent reaching for `load_operations_catalog` in another\nbenchmark area silently gets the older, narrower validation_query\nshape -- the field is just dropped, no error.\n\nSweep verification (2026-05-05): operation-level `platform_overrides`\nIS present in the shared loader, but validation-query-level\n`expected_value_min`, `expected_value_max`, and `platform_overrides`\nare NOT.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "delete the write_primitives-local loader as a side-effect",
+        "instead": "(not specified)",
+        "item_id": "shared-primitives-loader-validation-parity",
+        "why": "if the chosen path is (a) incremental extension, leave the local loader in place and let it inherit from the shared one explicitly."
+      },
+      {
+        "dont": "introduce a third copy of the validation-query parsing logic. If (b) is chosen, the write_primitives loader becomes a thin call into the shared one, not a parallel implementation.",
+        "instead": "(not specified)",
+        "item_id": "shared-primitives-loader-validation-parity",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Architecture & Refactoring",
+      "completed_at": "2026-05-06T00:00:00Z",
+      "created_at": "2026-05-05T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "ValidationQuery dataclass shape is backwards-compatible (new params are optional with sensible defaults).",
+        "item_id": "shared-primitives-loader-validation-parity"
+      },
+      {
+        "behavior": "transaction_primitives validation behaviour is unchanged for catalogs that don't use the new fields.",
+        "item_id": "shared-primitives-loader-validation-parity"
+      },
+      {
+        "behavior": "write_primitives validation_query parsing continues to accept all three currently-supported extensions (`expected_value_min`, `expected_value_max`, `platform_overrides`).",
+        "item_id": "shared-primitives-loader-validation-parity"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "shared-primitives-loader-validation-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "shared-primitives-loader-validation-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/transaction_primitives/"
+      },
+      {
+        "item_id": "shared-primitives-loader-validation-parity",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "shared-primitives-loader-validation-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/primitives/"
+      },
+      {
+        "item_id": "shared-primitives-loader-validation-parity",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/write_primitives/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "grep -E 'expected_value_min|expected_value_max|platform_overrides' benchbox/core/primitives/catalog/loader.py | wc -l",
+        "description": "Shared loader forwards the three previously-missing fields",
+        "expected": ">= 3",
+        "item_id": "shared-primitives-loader-validation-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/primitives/test_loader_parity.py -v",
+        "description": "Cross-loader parity test exists and passes",
+        "expected": "exit 0",
+        "item_id": "shared-primitives-loader-validation-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/transaction_primitives/ -m fast -q",
+        "description": "transaction_primitives still loads its catalog cleanly",
+        "expected": "exit 0",
+        "item_id": "shared-primitives-loader-validation-parity",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "shared-primitives-loader-validation-parity",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "shared-primitives-loader-validation-parity",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "shared-primitives-loader-validation-parity",
+        "needs_wid": "w2",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "shared-primitives-loader-validation-parity",
+        "notes": "Two paths:\n(a) extend `benchbox/core/primitives/catalog/loader.py`\n    `_parse_validation_queries` to forward the three missing\n    fields, leave the write_primitives-local loader as a thin\n    wrapper.\n(b) delete the write_primitives-local loader and have\n    `load_write_primitives_catalog` delegate to\n    `load_operations_catalog` end-to-end.\nPath (a) is incremental and safer; path (b) eliminates the\nduplication root cause. Pick one based on how much\nwrite_primitives-local logic is unique vs. just-different.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Decide: extend shared loader, or fold write_primitives-local into shared",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "shared-primitives-loader-validation-parity",
+        "notes": "Port `_parse_validation_platform_overrides` and\n`_parse_expected_value_bounds` from the write_primitives loader\ninto the shared loader (or its helpers). Build the new\nValidationQuery via `build_validation_query(...)` so callers\nthat don't pass the new fields keep working.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement chosen path; ensure both validation_query parsers expose identical shapes",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "shared-primitives-loader-validation-parity",
+        "notes": "Smallest viable: a fast-marked unit test that introspects both\nloader functions' kwargs to `build_validation_query(...)` and\nasserts the field set is identical. Larger: a structural diff\nbetween the two loader files for the validation-query block.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add a CI grep/test that fails when one loader gains a validation_query field the other does not",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "shared-primitives-loader-validation-parity",
+        "notes": "Add a docstring to `benchbox/core/primitives/catalog/loader.py`\nnoting \"validation_query field forwarding must stay in lockstep\nwith write_primitives' equivalent; see TODO\nshared-primitives-loader-validation-parity for rationale and the\ncross-loader test.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the loader contract in module docstring",
+        "wid": "w4"
+      }
+    ]
+  }
+}

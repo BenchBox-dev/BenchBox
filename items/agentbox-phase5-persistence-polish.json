@@ -1,0 +1,122 @@
+{
+  "context": "GUARDRAILS: every sub-feature ships only after its gate work-unit records evidence; launchd plist must not embed secrets (it re-reads env-file at run time); no TLS/proxy layer before a real consumer exists. Anti-pattern: treating deferred items as implicitly approved - each needs its gate evidence first.",
+  "description": "exe.dev-parity polish, each sub-feature behind its own internal gate. (1) launchd LaunchAgent template com.agent-container.<project>.plist re-running agent-run.sh --persistent at login - Apple container has no restart policies, so this is the only reboot-survival path. (2) Named-volume repo mode (--volume-mode named + container cp import) is HARD-GATED on first verifying the reported Apple-container limitation that named volumes cannot be mounted by multiple running containers concurrently, AND on reworking lib/gradle.sh - warmup bind-mounts $PROJECT_DIR (upstream run.sh:408) which does not exist in volume mode; if the concurrency limit is real and painful, record the finding and keep bind mounts. (3) Remote access (Tailscale serve / Cloudflare tunnel to the SSH ports) stays deferred until a second machine actually needs in. (4) Per-agent image split happens only on concrete fat-image size or dependency-conflict evidence - record the evidence in the item before building.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-08-07T07:24:32Z",
+        "from_item": "agentbox-phase5-persistence-polish",
+        "id": 703,
+        "reason": "w2 gate returned BLOCKED on container CLI 1.1.0 - concurrent mount impossible, so the mode cannot be built as designed",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "Blocked by empirical platform limitation, not by remaining effort: Apple container 1.1.0's local volume driver backs each named volume with a single raw ext4 block device, so a second concurrent mount hard-fails at VM bootstrap (VZErrorDomain Code=2). Recorded as 'Volume gate verdict: BLOCKED' at docs/spikes.md:918. Bind-mount mode remains the default and is unaffected. Re-open only if a future container release adds a shareable volume driver.",
+        "summary": "Named-volume mode implementation (w3)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "agentbox-phase5-persistence-polish",
+        "needs_item": "agentbox-phase4-desktop-integration-docs"
+      }
+    ],
+    "item_meta": {
+      "category": "infrastructure",
+      "completed_at": "2026-08-07T07:24:52Z",
+      "created_at": "2026-08-07T00:02:44Z",
+      "worktree": "agent-container"
+    },
+    "preserves": [
+      {
+        "behavior": "Bind-mount mode remains the default regardless of named-volume outcome",
+        "item_id": "agentbox-phase5-persistence-polish"
+      },
+      {
+        "behavior": "Reboot recovery never auto-starts containers for projects the user removed",
+        "item_id": "agentbox-phase5-persistence-polish"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "agentbox-phase5-persistence-polish",
+        "kind": "do_not_modify",
+        "path_glob": "LICENSE"
+      }
+    ],
+    "verifications": [
+      {
+        "command": null,
+        "description": "Persistent container plus auth plus sessions survive host reboot via launchd (manual, transcript in docs/spikes.md)",
+        "expected": null,
+        "item_id": "agentbox-phase5-persistence-polish",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd ~/Developer/agent-container && grep -qE \"^Volume gate verdict:\" docs/spikes.md",
+        "description": "Named-volume gate verdict recorded",
+        "expected": null,
+        "item_id": "agentbox-phase5-persistence-polish",
+        "last_result": "pass",
+        "last_run": "2026-08-07T07:24:49Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "agentbox-phase5-persistence-polish",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "launchd LaunchAgent + agent-recover.sh with 4-condition reconcile; both branches proven live; A/B verified (removing a guard wrongly resurrected a deleted project); rung1 reboot UNVERIFIED pending owner; commit dcc4ca1",
+        "item_id": "agentbox-phase5-persistence-polish",
+        "notes": null,
+        "started_at": "2026-08-07T07:24:25Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "launchd template plus install/uninstall subcommands; verified across a real reboot",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Volume gate verdict: BLOCKED - second concurrent mount hard-fails at bootstrap (VZErrorDomain Code=2 storage device attachment invalid); local driver uses single raw ext4 block device",
+        "item_id": "agentbox-phase5-persistence-polish",
+        "notes": null,
+        "started_at": "2026-08-07T07:24:28Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "GATE - verify named-volume concurrent-mount limitation on current container version; record verdict",
+        "wid": "w2"
+      },
+      {
+        "evidence": "not implemented - w2 gate BLOCKED; deferral #703 dismissed with platform-limitation rationale",
+        "item_id": "agentbox-phase5-persistence-polish",
+        "notes": null,
+        "started_at": "2026-08-07T07:24:47Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Named-volume mode implementation including gradle rework - only if w2 verdict permits",
+        "wid": "w3"
+      },
+      {
+        "evidence": "per-agent split disposition: KEEP FAT IMAGE. agent node_modules 705M/25% vs shared JDK+Rust 835M/30% carried by every split image; 0 dependency conflicts",
+        "item_id": "agentbox-phase5-persistence-polish",
+        "notes": null,
+        "started_at": "2026-08-07T07:24:30Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "GATE - collect evidence for or against per-agent image split; record disposition",
+        "wid": "w4"
+      }
+    ]
+  }
+}

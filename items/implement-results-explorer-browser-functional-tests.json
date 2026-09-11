@@ -1,0 +1,499 @@
+{
+  "context": "Start with a research gate, not with package installation or test writing.\nUse the current explorer implementation as the source of truth:\n`results-explorer/src/App.tsx`, `results-explorer/src/db.ts`,\n`results-explorer/src/lib/duckdbQueries.ts`, the current page-level Vitest\ncoverage, and the archived/manual browser-validation notes.\n\nPrefer a Playwright-style browser harness because this item needs\nmulti-browser support, downloads, clipboard checks, traces, and stable\nroute-level acceptance. Run against the built explorer rather than mocked\nfetches or jsdom-only abstractions. Generate fixture data from canonical\nbundles plus controlled mutations in an isolated test area instead of relying\non whatever happens to be present in `results-explorer/public/data/`.\n\nImplement in thin slices:\n1. lock architecture in the research gate\n2. establish harness and fixture generation\n3. land browse-surface happy paths\n4. land compare/detail happy paths\n5. land query-workbench happy paths\n6. add injected failure-path coverage\n7. wire CI and residual manual release checks\n",
+  "description": "The results explorer now has substantial unit, component, and parity coverage\nunder `results-explorer/src/__tests__/` and `results-explorer/src/**/__tests__/`,\nbut there is still no durable browser-level acceptance suite for the behaviors\nthat matter most in production:\n\n- real DuckDB-WASM startup and worker loading\n- client-side routing under the `/results/` base path\n- deep links to ResultDetail / Compare / Query pages\n- clipboard and download flows\n- compare hard-block and soft-warning behaviors\n- query workbench read-only SQL behavior in a real browser\n- network and sidecar failure handling\n\nThe repo also contains evidence that this gap is real, not hypothetical:\n`_project/_archive/handoffs/handoff-results-publishing-phase2.md` explicitly\nnotes that cross-browser acceptance remained largely manual, and\n`verify-trust-badge-rendering-in-explorer` proved that one-off Playwright-driven\nbrowser checks are useful but too narrow and too manual to act as a long-term\nquality gate.\n\nThis item implements a deterministic browser-functional-test layer for\n`results-explorer/`, centered on a Playwright-style harness that runs against\na built explorer app plus generated fixture data. The implementation must not\nstart by guessing at unresolved details. A research gate comes first and must\nlock the execution model, fixture strategy, and browser matrix before any test\nor product code is edited.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "begin implementation before the research gate closes the open questions",
+        "instead": "lock those decisions first.",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "why": "the built-app target, fixture location, and browser matrix materially change the shape of the solution"
+      },
+      {
+        "dont": "make all three browsers blocking before flake characteristics are known",
+        "instead": "require Chromium first and graduate Firefox/WebKit based on research-gate evidence.",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "why": "a noisy gate will stall adoption"
+      },
+      {
+        "dont": "mutate `results-data/bundles/` or the committed curated corpus to create edge cases",
+        "instead": "synthesize variants in an isolated fixture workspace.",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "why": "that pollutes real published data with test-only scenarios"
+      },
+      {
+        "dont": "point the browser suite at ad-hoc mocked JSON or a jsdom-only harness",
+        "instead": "run against generated `results.duckdb` and actual built assets.",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "why": "the missing coverage is specifically real browser DuckDB-WASM, routing, clipboard, and download behavior"
+      },
+      {
+        "dont": "rely on whichever artifacts happen to exist in `results-explorer/public/data/`",
+        "instead": "generate a fixture corpus per run.",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "why": "the working tree is not deterministic and may not include the variants needed for coverage"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_item": "launch-results-explorer-acceptance-and-seed"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-04-19T00:00:00Z",
+      "created_at": "2026-04-18T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing Vitest unit/component/parity tests remain the fast inner-loop signal; the browser suite supplements them and does not replace them.",
+        "item_id": "implement-results-explorer-browser-functional-tests"
+      },
+      {
+        "behavior": "Existing result download URLs and compare URL semantics remain shareable and user-facing.",
+        "item_id": "implement-results-explorer-browser-functional-tests"
+      },
+      {
+        "behavior": "The curated public corpus under `results-data/bundles/` is not modified for browser-test-only edge cases.",
+        "item_id": "implement-results-explorer-browser-functional-tests"
+      },
+      {
+        "behavior": "The explorer continues to run correctly under the `/results/` base path and existing deep links remain valid.",
+        "item_id": "implement-results-explorer-browser-functional-tests"
+      },
+      {
+        "behavior": "The query workbench remains read-only against the DuckDB snapshot; browser-test plumbing must not introduce a writable test-only bypass.",
+        "item_id": "implement-results-explorer-browser-functional-tests"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "do_not_modify",
+        "path_glob": "docs/reference/hosted-results-contract.md"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/bundles/"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/docs.yml"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "docs/development/browser-test-architecture.md"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "docs/development/results-explorer-browser-testing.md"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package-lock.json"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/package.json"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/playwright.config.ts"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/App.tsx"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ErrorMessage.tsx"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/manifest.ts"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/test-fixtures/"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/test-results/.gitignore"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml",
+        "description": "The TODO item itself validates cleanly",
+        "expected": "Validation passes with no schema or DAG errors",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph remains valid after the new item is added",
+        "expected": "No cycles, dangling refs, or duplicate IDs",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'browser-test-architecture\\.md' _project/TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml",
+        "description": "The TODO explicitly names the research-gate decision record location",
+        "expected": "The TODO points w1 at `docs/development/browser-test-architecture.md` as the architecture-note deliverable",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test",
+        "description": "Existing explorer fast tests remain green after harness integration",
+        "expected": "All Vitest suites pass",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck",
+        "description": "Explorer typecheck remains green",
+        "expected": "TypeScript exits successfully with no errors",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "The built explorer still compiles under the `/results/` base path",
+        "expected": "Vite build succeeds",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:chromium",
+        "description": "Primary browser-functional suite passes in Chromium",
+        "expected": "All required browser-functional tests pass in Chromium",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:firefox",
+        "description": "Cross-browser smoke coverage passes in Firefox",
+        "expected": "Smoke coverage passes in Firefox",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 8,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:webkit",
+        "description": "Cross-browser smoke coverage passes in WebKit",
+        "expected": "Smoke coverage passes in WebKit",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 9,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline -q",
+        "description": "Any Python-side fixture-generation or explorer-pipeline glue stays green",
+        "expected": "All targeted Python explorer-pipeline tests pass",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 10,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": null,
+        "description": "Residual manual release check is executed after meaningful explorer changes (manual - no command by design)",
+        "expected": "One short Chrome/Firefox/Safari pass is documented for Home, BenchmarkIndex, ResultDetail, Compare, and Query pages",
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "last_result": null,
+        "last_run": null,
+        "seq": 11,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w2",
+        "wid": "w4"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w2",
+        "wid": "w6"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w2",
+        "wid": "w7"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w3",
+        "wid": "w7"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w5",
+        "wid": "w7"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w6",
+        "wid": "w7"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "needs_wid": "w8",
+        "wid": "w9"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "notes": "Read the current explorer routes, DuckDB-WASM loading path, existing\njsdom/unit coverage, manual browser-verification TODOs, and deploy/base-path\nassumptions before changing any code.\n\nThe research gate must answer all open questions below with explicit\ndecisions and evidence from the current repo:\n- built app vs dev server test target\n- temp fixture corpus vs mutating `results-explorer/public/data/`\n- blocking vs smoke browser matrix\n- minimum seam required for deterministic failure injection\n\nDeliverable: an implementation note at\n`docs/development/browser-test-architecture.md` that records the chosen\ndefaults and rejected alternatives for each open question, plus a link\nto it from this TODO's notes before w2 starts. No implementation starts\nuntil these decisions are locked.\n\nArchitecture note (accepted 2026-04-18):\n`docs/development/browser-test-architecture.md`. Locked decisions:\n(1) test target is the built `dist/` served via Playwright `webServer`,\n(2) fixture corpus is generated per-run into gitignored\n`results-explorer/test-fixtures/.generated/` with the curated public\ncorpus untouched, (3) Chromium full suite is the required blocking\ngate while Firefox and WebKit run `@smoke` only and graduate on flake\ndata, (4) no production-code seam is added for failure injection -\nall error paths are exercised through Playwright `page.route()`,\n`setOffline`, permissions grants, and download events.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Run a research gate and lock the browser-test architecture before editing",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "notes": "Add the test runner, package scripts, `playwright.config.ts`, and failure\nartifact handling. The suite must exercise the built explorer with the\nreal `/results/` base path rather than a mocked or simplified route setup.\n\nRequired harness properties:\n- deterministic local command for one-shot setup + run\n- traces/screenshots/report on failure\n- artifact directories gitignored\n- Chromium as the primary gate from the first slice\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add the browser-test harness, scripts, and built-app serving model",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "notes": "Browser tests must not depend on whichever derived artifacts happen to be\npresent in the working tree. Generate fixture data per run from canonical\nsource bundles plus controlled metadata variants so tests can cover:\n- valid compare cohorts\n- mixed trust labels\n- mixed tuning modes\n- multiple phases / execution modes\n- results with and without tuning sidecars\n- compare-invalid cohorts for hard-block tests\n\nThe generated fixture corpus must be isolated from `results-data/bundles/`\nand from the committed curated corpus.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement deterministic fixture-corpus generation for browser tests",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "notes": "Add browser tests for:\n- Home\n- BenchmarkIndex\n- PlatformIndex\n\nCover real interactions rather than only page load:\n- filter toggles and URL sync\n- route deep-link loads\n- result and cohort navigation\n\nKeep this slice limited to the landing and browse surfaces so it can land\nas a single vertical increment without being blocked on compare, query,\ndownload, or failure-path work.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover Home plus benchmark/platform index happy paths under the real `/results/` base path",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "notes": "Add browser tests for:\n- ResultDetail\n- Compare\n\nCover real interactions rather than only page load:\n- compare selection flows\n- route deep-link loads\n- result and cohort navigation\n- compare share-URL and clipboard flows\n\nKeep compare/history/clipboard behavior in its own slice because it is\none of the main reasons to add real browser coverage and it can be landed\nindependently from query-workbench and injected-failure work.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover ResultDetail and Compare happy paths, deep links, and shareable URL-state workflows",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "notes": "Add browser tests for the Query page that prove the browser-only parts of\nthe workbench against a real built app:\n- query-table sorting and column toggles\n- starter-query loading\n- read-only SQL enforcement in the workbench\n- CSV and JSON download flows\n\nKeep this separate from the route-browse and compare slices because Query\nalready has several distinct behaviors in Vitest and is large enough to\njustify its own work unit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover Query workbench browser workflows, read-only SQL, and table/download interactions",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "notes": "Add explicit tests for the behaviors jsdom does not prove today:\n- DuckDB snapshot missing/corrupt or unreachable\n- compare benchmark mismatch and scale mismatch hard blocks\n- tuning-config sidecar fetch failure\n- online/offline or retry-state behavior where supported by the app\n- RG-2 HTTP range-reads: assert that a cold single-row lookup against\n  `results.duckdb` served by the test harness issues `Range: bytes=...`\n  requests, receives `206 Partial Content` with `Accept-Ranges: bytes`,\n  and that the sum of `Content-Length` transferred is ≤10% of the\n  on-disk DB size. This closes the\n  `explorer-canonical-browser-duckdb-read-model` RG-2 gate that the\n  completed TODO deferred to browser-level coverage.\n\nFailure assertions must validate user-visible error states, not only\nthrown exceptions or console output.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Cover failure and recovery paths with user-visible assertions",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "notes": "Wire the new suite into CI with a stable gating policy:\n- Chromium full suite required\n- Firefox and WebKit smoke coverage initially narrower unless the\n  research gate proves full parity is low-risk\n- failure artifacts uploaded in CI\n\nAlso document the residual manual release check for meaningful explorer\nchanges: one short pass across Chrome, Firefox, and Safari for layout and\nbrowser-specific rendering issues that automation may not catch early.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Integrate the suite into CI and define the release-check browser matrix",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-results-explorer-browser-functional-tests",
+        "notes": "Do not mark this item complete on a single green run. Verify repeatability,\ncapture any flaky selectors or browser-specific issues, and create focused\nfollow-up TODOs for defects that should not block the initial harness.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Close with full validation, flake triage, and follow-up capture",
+        "wid": "w9"
+      }
+    ]
+  }
+}

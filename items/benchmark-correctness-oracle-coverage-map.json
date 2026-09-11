@@ -1,0 +1,225 @@
+{
+  "context": "Inventory first (w0): a single, ideally generated, coverage matrix is the\nartifact that makes the gap legible and dispatchable. Then route dual-surface\ngaps to the cross-surface gate (w1) and solve single-surface gaps with the\ncheapest credible per-benchmark oracle (w2), reusing existing harnesses\n(cross-surface, cross-dialect, expected-results registry) rather than new\nmachinery. Close with a policy + advisory check (w3) so coverage cannot\nsilently erode.\n",
+  "description": "The TPC-Havoc equivalence work established that a benchmark can have a real\ncorrectness oracle without a hand-maintained answer key (variant-vs-canonical\nand SQL-vs-DataFrame, compared live on a bounded DuckDB cell). Applying that\nlens across the suite exposes how little of it is actually guarded:\n\n- Stored expected results exist for ONLY tpch and tpcds\n  (benchbox/core/expected_results/tpch_results.py, tpcds_results.py).\n- Live equivalence gates exist for ONLY tpchavoc (SQL variant + DataFrame),\n  plus cross-engine sampling for tpchavoc (PRs #803/#806).\n- Every other benchmark - ssb, clickbench, amplab, coffeeshop, datavault,\n  flightdata, joinorder, joinorder_synthetic, nyctaxi, tsbs_devops, tpcds_obt,\n  tpch_skew, and the primitive suites (read/write/transaction/metadata/ai),\n  tpcdi - executes \"green\" with NO automated check that any result is correct.\n\nTwo complementary mechanisms cover most of this gap. The cross-surface\nSQL<->DataFrame gate (owned by benchmark-cross-surface-equivalence-gate)\nhandles dual-surface benchmarks. THIS item owns (a) the coverage map itself -\na single authoritative matrix of which oracle, if any, guards each shipped\nbenchmark - and (b) the benchmarks that cross-surface cannot reach: single-\nsurface benchmarks (one of SQL or DataFrame only) and benchmarks whose two\nsurfaces are not result-comparable. Those need a different oracle: a\ndifferential check against a second engine on the same SQL, a small curated\nexpected-results subset, or a documented structural invariant - chosen per\nbenchmark from evidence.\n\nThe end state is a policy: every shipped benchmark declares its correctness\noracle, and a benchmark with \"none\" is visible (and ideally flagged), so the\nsuite cannot quietly grow more unverified surfaces.\n",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "duplicate the cross-surface gate here",
+        "instead": "dispatch to it for dual-surface benchmarks.",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "why": "it has its own item"
+      },
+      {
+        "dont": "land the coverage check as a hard blocker first",
+        "instead": "advisory until proven.",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "why": "a noisy gate erodes trust"
+      },
+      {
+        "dont": "mandate full expected-results answer keys everywhere",
+        "instead": "prefer live oracles.",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "why": "the maintenance cost is why coverage is thin today"
+      },
+      {
+        "dont": "verify a benchmark against the surface under test",
+        "instead": "use an independent reference (other surface, other engine, or curated key).",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "why": "that is circular"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchmark-correctness-oracle-coverage-map",
+        "id": 11,
+        "reason": "Expensive and brittle to maintain; live oracles (cross-surface / differential) cover most of the value at a fraction of the upkeep. Only curate expected-results where no live oracle is feasible.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] duplicate: Reason explicitly rejects full backfill favoring live oracles; a scoped-out sub-note of the still-open parent oracle-coverage-map item. (tracked by benchmark-correctness-oracle-coverage-map)",
+        "summary": "Backfill full expected-results answer keys for every benchmark"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "completed_at": "2026-08-12T12:44:08Z",
+      "completed_pr": 1693,
+      "created_at": "2026-06-16T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing oracles (tpch/tpcds expected results, tpchavoc gates) are unchanged and remain authoritative for their benchmarks.",
+        "item_id": "benchmark-correctness-oracle-coverage-map"
+      },
+      {
+        "behavior": "No new hard CI gate lands noisy/flaky; advisory-first, promote to blocking only once stable.",
+        "item_id": "benchmark-correctness-oracle-coverage-map"
+      },
+      {
+        "behavior": "benchbox run default behavior is unchanged for every benchmark; coverage work is additive.",
+        "item_id": "benchmark-correctness-oracle-coverage-map"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/TODO/main/planning/benchmark-cross-surface-equivalence-gate.yaml - the dual-surface mechanism this map dispatches to; do not duplicate it.",
+        "decision": "reuse",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "path": "_project/TODO/main/planning/benchmark-cross-surface-equivalence-gate.yaml"
+      },
+      {
+        "concept": "_project/TODO/main/planning/testing-approach-correctness-gates.yaml - the existing real-result gate / test-quality work; this map is complementary (coverage inventory + ungated-benchmark campaign), not a re-do of it.",
+        "decision": "reuse",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "path": "_project/TODO/main/planning/testing-approach-correctness-gates.yaml"
+      },
+      {
+        "concept": "_project/TODO/main/planning/tpchavoc-cross-dialect-equivalence-sampling.yaml and tpchavoc-third-engine-equivalence-sampling.yaml - the cross-engine/differential exemplars for the single-surface fallback.",
+        "decision": "reuse",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "path": "_project/TODO/main/planning/tpchavoc-cross-dialect-equivalence-sampling.yaml"
+      },
+      {
+        "concept": "benchbox/core/benchmark_registry.py - the authoritative list of shipped benchmarks to enumerate the map against.",
+        "decision": "reuse",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "path": "benchbox/core/benchmark_registry.py"
+      },
+      {
+        "concept": "benchbox/core/expected_results/registry.py - register_benchmark_provider / list of registered providers; the place a coverage check would read 'has expected results'.",
+        "decision": "reuse",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "path": "benchbox/core/expected_results/registry.py"
+      },
+      {
+        "concept": "benchbox/core/tpchavoc/equivalence.py and dataframe_equivalence.py - the live-oracle exemplars (variant + cross-surface).",
+        "decision": "reuse",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "path": "benchbox/core/tpchavoc/equivalence.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "kind": "only_modify",
+        "path_glob": "_project/"
+      },
+      {
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/"
+      },
+      {
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      },
+      {
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "run the coverage map generator; diff against the registry",
+        "description": "Coverage matrix enumerates every registered benchmark with its current oracle",
+        "expected": "every shipped benchmark appears with an oracle classification (including NONE)",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "pick one w2 benchmark, plant a wrong result, run its new oracle",
+        "description": "A single-surface benchmark gains an independent oracle that catches a planted defect",
+        "expected": "the oracle flags the defect",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "needs_wid": "w0",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "notes": "Implemented `_project/scripts/generate_oracle_coverage_map.py` (per the\ngating open_question default: GENERATED from live sources, not a curated\ndoc). It reads the benchmark registry (surfaces via `num_queries` /\n`supports_dataframe`), the expected-results provider registry, the\ncross-surface `GATES` registry, and TPC-Havoc gate-module presence, and\nemits checked-in artifacts `_project/analysis/oracle-coverage-map.{md,json}`.\n\nCurrent state (23 benchmarks): 4 GUARDED — tpch/tpcds (expected-results),\ntpchavoc (variant-equivalence + cross-surface-variant), ssb (cross-surface)\n— and 19 UNGUARDED. Of the 19: 17 are dual-surface (cross-surface gate\ncandidates, w1) and 2 are single-surface SQL-only (ai_primitives,\nvector_search) needing a fallback oracle (w2).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Build the authoritative correctness-oracle coverage matrix for every shipped benchmark",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Map dispatch is current against the completed cross-surface gate owner: every unguarded dual-surface benchmark is listed as a gate candidate, with 7 enforced cross-surface gates registered and the remaining 11 candidates visible by name. This item records coverage routing only; it does not duplicate or claim completion of the gate owner campaign.",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "notes": "For benchmarks the matrix shows as dual-surface with oracle=NONE, the fix is\nbenchmark-cross-surface-equivalence-gate. Cross-reference rather than\nre-implement; this item only tracks that they get covered there.\n\nDispatch list from the w0 map (17 dual-surface UNGUARDED): amplab,\nclickbench, coffeeshop, datavault, flightdata, h2odb, joinorder,\njoinorder_synthetic, metadata_primitives, nyctaxi, read_primitives, tpcdi,\ntpcds_obt, tpch_skew, transaction_primitives, tsbs_devops, write_primitives.\nCAVEAT (see map): write/DML/nondeterministic ones (write_primitives,\ntransaction_primitives, metadata_primitives, tpcdi) may not be\nresult-comparable across surfaces and likely belong in w2 (invariant\noracle) rather than the cross-surface gate.\n\nSTATUS SYNC (2026-06-21) from benchmark-cross-surface-equivalence-gate: ssb,\namplab, coffeeshop are GATED, and clickbench + joinorder_synthetic are now\nPROMOTED to enforced GATES (campaign w4) - their prerequisites landed (w9\nloader dtype/empty-string semantics, w8 tie-aware top-N comparator), both run\nas blocking pr.yml steps with medium-marker fast-lane tests, and the oracle\ncoverage map (regenerated here) shows both as cross-surface \"guarded\".\n\nSTATUS SYNC (2026-06-24): h2odb is now an enforced cross-surface GATE\n(single trips table, ids Q1..Q10 1:1; blocking pr.yml step\n`make h2odb-cross-surface-equivalence-report` + medium-marker fast-lane test;\ngated on a bounded SF=0.01 ~100k-row cell because its generator base is the\n10M-row small tier). Wiring it caught and fixed a REAL DataFrame bug: the\nPolars Q9 percentile defaulted to \"nearest\" interpolation (disagreeing with\nboth pandas and SQL PERCENTILE_CONT) - fixed to linear. Q9's only residue is a\nclassified DECIMAL(8,2)-scale percentile difference (DuckDB returns the\npercentile at the column's 2-decimal scale; the DataFrame computes it over\nfloat64). So 6 dual-surface benchmarks are guarded. Remaining dual-surface\ndispatch targets (one focused gate PR each, several need id normalization or a\nbounded data-source check first): datavault, flightdata, joinorder (SF=1-only -\nuse joinorder_synthetic), nyctaxi, read_primitives, tpcds_obt, tpch_skew,\ntsbs_devops. This item only tracks coverage; the gates themselves are owned there.\n",
+        "started_at": "2026-08-12T12:43:19Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Dispatch dual-surface, no-oracle benchmarks to the cross-surface gate",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Vector Search now has an additive structural oracle in benchbox/core/vector_search/metrics.py, applied by VectorSearchBenchmark.run_benchmark: per-query limits, unique IDs, finite numeric metrics, and direction-aware ordering. Focused tests include a planted reversed-similarity result and run-benchmark routing; 84 vector benchmark tests pass.",
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "notes": "For benchmarks with only one comparable surface (or non-comparable\nsurfaces), pick the cheapest credible oracle per benchmark: differential\nvs a second engine on the same SQL (reuse the cross-dialect harness), a\nsmall curated expected-results subset via the existing registry, or a\ndocumented structural invariant where results are nondeterministic.\nPrioritize the canonical/most-used benchmarks. Verify each against an\nindependent reference, never against the surface under test alone.\n",
+        "started_at": "2026-08-12T12:42:58Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Choose and apply a fallback oracle for single-surface, no-oracle benchmarks",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchmark-correctness-oracle-coverage-map",
+        "notes": "Delivered ahead of w1/w2 (the visibility guard is independent of building\nthe oracles). `make oracle-coverage-map-check` (and the generator's\n`--check`) fail when the checked-in map is stale. CI surfacing on develop\nPRs is via TWO paths: the fast unit test\n`tests/unit/test_oracle_coverage_map.py::test_checked_in_artifacts_are_current`\nruns in the pr.yml `code-test` job (`-m fast`), and an explicit\n`make oracle-coverage-map-check` step sits in the pr.yml `code-lint` job\nnext to `compat-docs-check`. It is also in the `ci-lint` aggregate\n(post-merge / local `make pr-preflight` parity). Mechanism: adding a\nbenchmark changes the generated map -> the drift check fails -> the author\nmust regenerate and commit, which surfaces the new benchmark's UNGUARDED\nclassification in review rather than letting it slip in silently. The map's\nUNGUARDED list is the always-current \"no oracle\" inventory. Advisory in the\nsense that UNGUARDED is allowed-and-visible; only staleness is blocked.\n\nw1/w2 (actually building oracles for the 19 UNGUARDED benchmarks) remain the\nopen campaign; the w0 map makes them dispatchable.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Make 'no oracle' visible and prevent silent regressions in coverage",
+        "wid": "w3"
+      }
+    ]
+  }
+}

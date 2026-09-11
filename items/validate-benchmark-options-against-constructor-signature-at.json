@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #352 of benchmark-option-cli-support.\nDeferred: Validate benchmark options against constructor signature at registration time\nReason deferred: Could catch mismatches between registered spec names and actual constructor param names. Low risk since specs are co-located with benchmark code and tested. Adds import-time overhead.\n",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:35:43Z",
+      "worktree": "main"
+    }
+  }
+}

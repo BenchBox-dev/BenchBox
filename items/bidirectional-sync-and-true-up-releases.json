@@ -1,0 +1,11 @@
+{
+  "description": "Add bidirectional sync support between private and public repositories, with a\n\"true up\" mode for incremental releases that only push missing or updated files.\n\nCurrent release automation creates an ephemeral public tree fresh each release,\nwith no tracking of what's in the public repo and no sync capability. This makes\nit difficult to:\n- Push bug fixes without full release (true-up)\n- Import external contributions from public repo\n- Track what files differ between repos\n\nRequirements clarified:\n1. Public repo is on GitHub - Already exists as remote repository\n2. Git-based diff - Use git to determine what changed\n3. Bidirectional sync - Support both private→public and public→private changes\n\nPlan file: /Users/joe/.claude/plans/synthetic-dazzling-pudding.md",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-01-18T00:00:00Z",
+      "created_at": "2026-01-17T00:00:00Z",
+      "worktree": "release-sync"
+    }
+  }
+}

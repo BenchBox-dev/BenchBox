@@ -1,0 +1,151 @@
+{
+  "description": "From the 2026-07-12 tuning review, finding C6 ungated part (evidence pinned to\ncommit acfb8992).\n\nThe explorer pipeline reads only config.tuning_mode\n(_project/scripts/explorer_pipeline/transformer.py:178-184). All 528\nseed-corpus bundles store the value at execution.tuning_mode (325) or nowhere\n(203) -> every corpus run ingests as tuning_mode=None. facetMatching.ts:99 then\ndefaults null to \"untuned\", a token no producer emits, so \"explicitly\nbaseline\", \"tuned but old schema\", and \"never recorded\" all facet-match each\nother. ComparabilityReceipt.tsx:177 shows \"Not recorded\". The explorer's own\ntuning_hash (transformer.py:187-201) hashes {mode, repr string} - cosmetic repr\ndifferences change it.\n\nFix the ingest layer (decision-safe): fall back to execution.tuning_mode,\ningest a distinct \"unknown/not-recorded\" state instead of null-coalescing to a\nfake mode, and stop hashing repr text (hash the canonical config when present,\nelse emit no hash). Facet-matching RULE changes (whether unknown matches\nbaseline) are gated on ADR-2 and owned by the facet implementation TODO.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "change which runs facet-match which (gated on ADR-2)",
+        "instead": "(not specified)",
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "default missing mode to any real mode value",
+        "instead": "(not specified)",
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "why": "(unstated)"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-07-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing explorer duckdb dataset column names (additive states, no renames)",
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712"
+      },
+      {
+        "behavior": "Ingest must not fail on any existing corpus bundle generation",
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/**/__tests__/**"
+      },
+      {
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ComparabilityReceipt.tsx"
+      },
+      {
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TuningBadge.tsx"
+      },
+      {
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/facetMatching.ts"
+      },
+      {
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "rm -rf /tmp/explorer-ingest-check && uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output /tmp/explorer-ingest-check && uv run -- python -c \"import duckdb; print(duckdb.connect('/tmp/explorer-ingest-check/results.duckdb').execute('SELECT tuning_mode, COUNT(*) FROM results GROUP BY tuning_mode ORDER BY 2 DESC').fetchall())\"",
+        "description": "Corpus re-ingest count check",
+        "expected": "Real re-ingest via the explorer_publish.py build entrypoint (pipeline.py is import-only, has no CLI); dataset shows 325 tuned and 203 not-recorded rows (exact counts from w0 re-validation) once this TODO's tuning_mode/not-recorded classification work lands -- pre-implementation, tuning_mode reads NULL for all 528 rows (verified 2026-07-12)",
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run 2>&1 | tail -5",
+        "description": "Explorer unit tests green",
+        "expected": "All passing incl. new not-recorded state tests",
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "needs_wid": "w1",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "notes": "Re-validated 2026-07-16 against the 528 seed-corpus bundles in\nresults-data/bundles/ (sweep log: /tmp/ingest-sweep.log).\nconfig.tuning_mode: 0; execution.tuning_mode: 325 (all \"tuned\");\nabsent everywhere: 203. config.tuning_config/config.tuning: absent in\nall 528. The repr-string tuning detail lives at\nplatform.raw_config.tuning_config (python_repr in 468 bundles) and is\nnever machine-readable in this corpus.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-validate pinned evidence at current HEAD: rerun the corpus sweep script (scratchpad tuning_sweep.py logic) and confirm field locations; commit compact counts in PR body",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "notes": "_tuning_mode: config.tuning_mode first, execution.tuning_mode fallback,\nmissing stays None (no invented mode). _tuning_hash: dict detail hashed\ncanonically (json sort_keys); string/repr detail dropped (not canonical);\nmode-only hash still emitted. 8 new unit tests in\ntests/unit/scripts/explorer_pipeline/test_transformer.py.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "transformer.py: read config.tuning_mode with execution.tuning_mode fallback; represent not-recorded explicitly; tuning_hash only from machine-readable config (never repr strings)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "notes": "facetMatching.ts: NOT_RECORDED_TUNING_MODE (\"not-recorded\") shared\nsentinel; null rows match only an explicit not-recorded selection\n(legacy \"untuned\" token kept so existing chips/URLs match the same\nrows -- matching semantics unchanged, rule changes gated on ADR-2).\nTuningBadge: null/undefined/sentinel render neutral \"Not Recorded\"\nbadge instead of \"Custom Tuning\". ComparabilityReceipt already showed\n\"Not recorded\" -- unchanged. New src/lib/__tests__/facetMatching.test.ts\nplus TuningBadge test updates.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "facetMatching/receipt: surface not-recorded as its own display state (keep current matching rule until ADR-2; remove the invented 'untuned' default token in favor of the explicit state)",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "tuning-explorer-ingest-mode-extraction-20260712",
+        "notes": "explorer_publish.py build over results-data/ processed 528 results /\n58 cohorts. results.duckdb: tuning_mode tuned=325, NULL(not-recorded)=203\n-- matches w0 exactly. tuning_hash: 325 rows share one mode-only hash,\n203 NULL.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-ingest the seed corpus and verify counts: 325 tuned / 203 not-recorded now visible in the explorer dataset",
+        "wid": "w3"
+      }
+    ]
+  }
+}

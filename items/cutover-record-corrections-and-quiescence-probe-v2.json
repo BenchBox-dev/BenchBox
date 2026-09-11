@@ -1,0 +1,81 @@
+{
+  "context": "The must-preserve cascade needs Joe's ruling before anything is dropped. The quiescence probe is already superseded by D8 and by this item's own ladder; what remains is landing the correction once ruled.",
+  "description": "Supersedes cutover-record-corrections-and-quiescence-probe (dropped only to attach a falsifiable ladder; ladders are create-time-only). Two create-time-only defects in the tracked record of the 0.3 cutover, both confirmed by execution on 2026-08-01. (1) migrate-hosted-tracker-db-to-todo-db-0-3-schema still carries the must-preserve 'the hosted DB is never restored with --replace while another actor holds a live claim'. SUPERSEDED - a claim check is not a gate, because create/defer/promote/block/drop and config writes take no claim at all (root@vm emitted 21 unclaimed create/drop events in under 4 minutes on 2026-08-01). The block reason says so; the must-preserve row still says the wrong thing. That item has 5 dependents whose dep edges are create-time-only, so drop+recreate cascades into re-creating all five - do NOT drop it without an explicit ruling from Joe. Note scope-update now exists and fixes scope globs in place, but it does NOT cover preserves, so it does not help here. (2) Rung 1 of tracker-cutover-needs-a-write-freeze-not-a-claim-check shells out to 'todo stats --json', which does not exist; both reads capture empty stdout and '' == '' passes the rung UNCONDITIONALLY. Executed verbatim against production it exited 0 ('no writer is active') while the event count moved 4534 to 4538 during the very 60s window it was measuring. ADR decision D8 supersedes that rung rather than editing it; D7 records that todo-db 0.3's update verb cannot repair v4 records (SCHEMA_VERSION=5, refuses, fails safe). Decisions and runbook: _project/decisions/todo-db-cutover-write-freeze-2026-08-01.md",
+  "legacy": {
+    "item_meta": {
+      "category": "tracker",
+      "completed_at": "2026-08-08T00:51:09Z",
+      "completed_pr": 1641,
+      "created_at": "2026-08-02T01:22:39Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "a quiescence probe must fail, not pass, when it cannot read the event fingerprint",
+        "item_id": "cutover-record-corrections-and-quiescence-probe-v2"
+      },
+      {
+        "behavior": "the migration item's 5 dependent edges survive any correction to its must-preserve",
+        "item_id": "cutover-record-corrections-and-quiescence-probe-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "cutover-record-corrections-and-quiescence-probe-v2",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/**"
+      },
+      {
+        "item_id": "cutover-record-corrections-and-quiescence-probe-v2",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "! _project/scripts/todo show migrate-hosted-tracker-db-to-todo-db-0-3-schema | grep -q 'holds a live claim'",
+        "description": "the migration item no longer asserts the superseded claim-check precondition",
+        "expected": "exit 1 on an unfixed tree (the stale text is still present today); exit 0 once corrected",
+        "item_id": "cutover-record-corrections-and-quiescence-probe-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-08T00:50:33Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/ -q",
+        "description": "Tracker suites stay green",
+        "expected": "exit 0",
+        "item_id": "cutover-record-corrections-and-quiescence-probe-v2",
+        "last_result": "pass",
+        "last_run": "2026-08-08T00:51:06Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "ADR adr-todo-freeze-supersedes-claim-check.md: ruling accept in-place preserve update (5 dependents, create-time-only)",
+        "item_id": "cutover-record-corrections-and-quiescence-probe-v2",
+        "notes": null,
+        "started_at": "2026-08-08T00:50:40Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Get an explicit ruling on the must-preserve cascade (accept the 5-dependent recreate, or leave it superseded by the block reason)",
+        "wid": "w1"
+      },
+      {
+        "evidence": "hosted preserves+blocked_reason patched to freeze, verify --run 1 pass, DECISION 2026-07-30 superseded",
+        "item_id": "cutover-record-corrections-and-quiescence-probe-v2",
+        "notes": null,
+        "started_at": "2026-08-08T00:50:46Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Apply the ruling and confirm the stale claim-check text no longer appears on the migration item",
+        "wid": "w2"
+      }
+    ]
+  }
+}

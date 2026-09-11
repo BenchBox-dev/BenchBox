@@ -1,0 +1,64 @@
+{
+  "context": "Distinguish 'the collect subprocess failed' from 'the policy was violated'. When returncode is non-zero, emit a distinct diagnostic naming the interpreter and the missing dependency (and exit non-zero as a tooling error), rather than appending to the policy-violation list. Optionally resolve pytest via the project venv explicitly instead of sys.executable, so the script behaves the same however it is launched.",
+  "description": "_run_pytest_collect() shells out to [sys.executable, '-m', 'pytest', ...]. Invoked the documented agent way -- 'uv run --project _project/scripts -- python _project/scripts/timing_policy_check.py --strict' -- sys.executable is the _project/scripts venv, which has neither pytest nor benchbox installed. Every collect subprocess exits 1 with no parseable count, and the script converts that into policy violations: 'Fast lane policy violations: 4' with four 'could not parse collect count' lines. Nothing is actually wrong with the fast lane. Run from the project env instead ('uv run -- python _project/scripts/timing_policy_check.py --strict') the same tree reports 'Fast lane policy violations: 0'. Found during the 2026-07-24 benchmark-runs batch (PRs #1299-#1302); verified pre-existing by stashing all batch changes and reproducing on a clean tree. Real-world cost: an agent following the pre-approved command list sees 4 FAST_LANE_VIOLATIONs, cannot tell them from a genuine cap breach, and may 'fix' a cap that was never exceeded. CI is unaffected because its lint job invokes the script with the project environment.",
+  "legacy": {
+    "deferrals": [
+      {
+        "created_at": "2026-07-25T16:21:13Z",
+        "from_item": "timing-policy-check-misreports-pytest-failure-as-violation",
+        "id": 650,
+        "reason": "(1) todo verify grades solely on exit code (todo_db.py:1809 'passed = proc.returncode == 0'), ignoring the prose expectation. Rung 1 runs the script under --strict in the broken env; the CORRECT behaviour there is a non-zero exit, because a policy check that never ran must not report success -- otherwise CI goes green on a broken environment. So the rung can only ever report fail. Verified the rung's intent manually instead: 0 FAST_LANE_VIOLATION lines, no 'Fast lane policy violations' summary, exactly 1 FAST_LANE_ENVIRONMENT_ERROR naming the interpreter, exit 1. Verifications are create-time-only so the rung cannot be amended. (2) tests/unit/scripts/test_timing_policy_modes.py is outside only_modify, but its test_emit_fast_count_unparseable_output_fails_closed asserted the exact string 'could not parse' -- the wording this fix deliberately replaces -- so it had to be updated or CI would go red.",
+        "resolution": "promoted",
+        "resolved_item": "todo-verify-grades-only-on-exit-code",
+        "resolved_reason": null,
+        "summary": "Verification rung 1 is unsatisfiable as authored, and the fix needs a test file outside only_modify"
+      }
+    ],
+    "item_meta": {
+      "category": "tooling",
+      "completed_at": "2026-07-25T16:25:01Z",
+      "completed_pr": 1306,
+      "created_at": "2026-07-25T14:15:38Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "A real fast-lane cap breach still fails with a clear FAST_LANE_VIOLATION",
+        "item_id": "timing-policy-check-misreports-pytest-failure-as-violation"
+      },
+      {
+        "behavior": "CI's lint invocation keeps its current pass/fail semantics for a genuine max_fast_tests breach",
+        "item_id": "timing-policy-check-misreports-pytest-failure-as-violation"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "timing-policy-check-misreports-pytest-failure-as-violation",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/timing_policy_check.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/timing_policy_check.py --strict",
+        "description": "Running under the _project/scripts env no longer reports policy violations",
+        "expected": "reports a tooling/environment error, not 'Fast lane policy violations: 4'",
+        "item_id": "timing-policy-check-misreports-pytest-failure-as-violation",
+        "last_result": "fail",
+        "last_run": "2026-07-25T16:20:00Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python _project/scripts/timing_policy_check.py --strict",
+        "description": "Running under the project env is unchanged",
+        "expected": "Fast lane policy violations: 0, exit 0",
+        "item_id": "timing-policy-check-misreports-pytest-failure-as-violation",
+        "last_result": "pass",
+        "last_run": "2026-07-25T16:20:35Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,419 @@
+{
+  "context": "Build a metric-type formatter contract first, then replace ad hoc component\nformatting. Keep raw values separate from display strings so precision\ncleanup cannot corrupt sorting, ranking, or compare math.\n",
+  "description": "The latest review found large power scores rendered with noisy decimals and\nseveral places where unit/mode copy can become misleading. This is a broader\nformatting contract gap: latency, power score, rank, speedup, cost, coverage,\nand tail metrics are formatted independently across tables, charts, compare\nsummaries, and receipts.\n\nThis TODO creates one metric-formatting contract so values are precise enough\nto compare, compact enough to scan, and labelled consistently with the active\nmode.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "fix a single large-number example with a one-off `.toFixed(0)`.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-metric-formatting-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "infer units from column labels when the read model already carries metric metadata.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-metric-formatting-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "round values before ranking or comparison.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-metric-formatting-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use an em dash for every non-value state when `No run`, `Unranked`, or `Unavailable` carry different meanings.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-metric-formatting-contract",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "needs_item": "results-explorer-comparison-eligibility-contract-repair"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-12T00:00:00Z",
+      "created_at": "2026-05-11T00:00:00Z",
+      "worktree": "results-explorer-followup-todo-review"
+    },
+    "preserves": [
+      {
+        "behavior": "Exports must remain explicit about whether they use raw values or visible columns.",
+        "item_id": "results-explorer-metric-formatting-contract"
+      },
+      {
+        "behavior": "Formatting changes must not alter raw values stored in DuckDB.",
+        "item_id": "results-explorer-metric-formatting-contract"
+      },
+      {
+        "behavior": "Metric direction labels must match the values currently rendered.",
+        "item_id": "results-explorer-metric-formatting-contract"
+      },
+      {
+        "behavior": "Numeric sort and comparison logic must use raw numbers, not formatted strings.",
+        "item_id": "results-explorer-metric-formatting-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "results-explorer/src/components/MetaLeaderboard.tsx, QueryHeatmap.tsx, DistributionBox.tsx, and SparklineTable.tsx format high-risk table/chart values.",
+        "decision": "reuse",
+        "item_id": "results-explorer-metric-formatting-contract",
+        "path": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "concept": "results-explorer/src/lib/compareSummary.ts formats speedup and decision summary metrics.",
+        "decision": "reuse",
+        "item_id": "results-explorer-metric-formatting-contract",
+        "path": "results-explorer/src/lib/compareSummary.ts"
+      },
+      {
+        "concept": "results-explorer/src/lib/costDisplay.ts formats cost values and scope text.",
+        "decision": "reuse",
+        "item_id": "results-explorer-metric-formatting-contract",
+        "path": "results-explorer/src/lib/costDisplay.ts"
+      },
+      {
+        "concept": "results-explorer/src/lib/queryLabels.ts formats Query Workbench visible cells and labels.",
+        "decision": "reuse",
+        "item_id": "results-explorer-metric-formatting-contract",
+        "path": "results-explorer/src/lib/queryLabels.ts"
+      },
+      {
+        "concept": "results-explorer/src/pages/Query.tsx controls visible column labels and CSV/JSON export messaging.",
+        "decision": "reuse",
+        "item_id": "results-explorer-metric-formatting-contract",
+        "path": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "concept": "results-explorer/src/utils.ts currently provides fmtScore, fmtScoreExact, fmtTime, and fmtGeomean.",
+        "decision": "reuse",
+        "item_id": "results-explorer-metric-formatting-contract",
+        "path": "results-explorer/src/utils.ts"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/public/data/"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/verification-logs/results-explorer-metric-formatting-contract/"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/__tests__/utils.test.ts"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CDFChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/ChartPanel.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CompareSummary.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/CostScatter.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/DistributionBox.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/PercentileLadder.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/PowerBar.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryDiffTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHeatmap.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryHistogram.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/QueryTimingChart.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/RankTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/SparklineTable.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/StackedPhase.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TimeSeries.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/costDisplay.test.ts"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/metricFormatters.test.ts"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/__tests__/queryLabels.test.ts"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/compareSummary.ts"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/costDisplay.ts"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/metricFormatters.ts"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/queryLabels.ts"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/BenchmarkIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Compare.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/PlatformIndex.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Query.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/ResultDetail.tsx"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/utils.ts"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- --run src/__tests__/utils.test.ts src/lib/__tests__/metricFormatters.test.ts src/lib/__tests__/queryLabels.test.ts src/lib/__tests__/costDisplay.test.ts",
+        "description": "Metric formatter tests pass",
+        "expected": "all metric formatter tests pass",
+        "item_id": "results-explorer-metric-formatting-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm test -- --run src/components/__tests__/MetaLeaderboard.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/Compare.test.tsx",
+        "description": "Route/component tests covering formatted values pass",
+        "expected": "all targeted tests pass",
+        "item_id": "results-explorer-metric-formatting-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n \"power score|latency|speedup|coverage|gratuitous decimals|PASS|FAIL\" _project/verification-logs/results-explorer-metric-formatting-contract/",
+        "description": "Browser evidence confirms metric formatting",
+        "expected": "logs include pass/fail evidence for metric formatting on high-risk routes",
+        "item_id": "results-explorer-metric-formatting-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-metric-formatting-contract",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-metric-formatting-contract",
+        "notes": "Capture the current formatting for:\n  - leaderboard table cells and headers;\n  - benchmark matrix metric columns;\n  - platform detail table metrics;\n  - Query Workbench table columns and exports;\n  - Compare decision summary, cards, charts, and receipt;\n  - chart axes, legends, and footnotes.\nRecord examples for large power scores, small millisecond values, seconds,\nspeedups, ranks, coverage fractions, cost, and missing values in\n`_project/verification-logs/results-explorer-metric-formatting-contract/w0.log`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Inventory metric values, labels, and units across routes",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-metric-formatting-contract",
+        "notes": "Define rules for:\n  - latency/display timing: ms under 1000, seconds above threshold, no\n    unsupported precision;\n  - power score: compact integers or significant figures for large values,\n    no gratuitous decimals;\n  - speedup/ratio: fixed or significant precision such as `1.59x`;\n  - ranks: integer ordinal or integer rank only;\n  - coverage: `covered/total` with explicit denominator;\n  - cost: currency precision based on magnitude;\n  - missing values: `No run`, `Unavailable`, `Unranked`, or em dash only\n    when each state matches the evidence contract.\nDecision gate: every visible numeric format must have a semantic metric\ntype, not just a component-local formatter.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define metric format rules by semantic metric type",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-metric-formatting-contract",
+        "notes": "Add or extend shared helpers that accept metric type, value, unit,\ncomparison direction, and display context. The helper should return value\ntext, unit text when separate, accessible text, and sortable raw value when\nneeded. Avoid changing raw data values or export semantics unless the\nexport explicitly promises visible-formatted values.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement shared metric formatter helpers",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-metric-formatting-contract",
+        "notes": "Replace ad hoc numeric formatting in Leaderboards, Benchmark detail,\nPlatform detail, Query Workbench, Compare, chart footnotes, and receipt\nsummaries. Headers must match the rendered values: do not show `higher is\nbetter` above latency cells, and do not render decimals on large power\nscores unless the contract requires them.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply metric formatting across tables, charts, and compare surfaces",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-metric-formatting-contract",
+        "notes": "Add tests asserting:\n  - large power scores do not show unnecessary decimals;\n  - latency cells and axes display the correct unit and precision;\n  - speedup ratios keep meaningful precision;\n  - coverage denominators match scope rules;\n  - missing/unranked states use the correct copy;\n  - formatted text does not alter raw numeric sort order;\n  - export copy remains documented and consistent.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add tests for precision, labels, missing states, and exports",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-metric-formatting-contract",
+        "notes": "In a browser, verify `/results/`, one TPC-H benchmark page, one AMPLab\nbenchmark page, one platform page, Query Workbench, and Compare. Decision\ngate: do not complete if any large numeric score still shows gratuitous\ndecimals, if a header contradicts cell units/direction, or if sorting uses\nformatted strings instead of raw values.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Browser-check metric formatting on high-risk routes",
+        "wid": "w5"
+      }
+    ]
+  }
+}

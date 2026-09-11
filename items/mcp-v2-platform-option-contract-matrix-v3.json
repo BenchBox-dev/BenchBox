@@ -1,0 +1,237 @@
+{
+  "context": "Start with a w0 revalidation against current origin/develop and the merged PR heads; record exact source lines and the current adapter behavior before editing. Define one canonical matrix for SQL and DataFrame options, including aliases such as -df, and classify options as execution-only, transport/security-sensitive, or resource-consuming. Add table-driven tests that exercise validation, normal synchronous execution, durable-job persistence/retry, and effective adapter application. Prefer an adapter-facing inspection or applied-setting receipt over a mock that only observes kwargs. Make any new option require an explicit consumer contract, bounded values, redaction review, and a negative test for rejection or unsafe combinations. Document rejected alternatives such as copying the CLI registry wholesale or relying on forwarding-only mocks.",
+  "description": "Create the shared contract guard for the MCP platform_options surface before fixing individual adapters. The adversarial review of PR #1465 found that the manually maintained allowlist accepts values that are ignored, dropped, or misrouted by the real adapters (DuckDB threads, Databricks clustering fields, Velox docker, and Modin pandas), while the ClickHouse and Dask entries create security/resource-envelope risk. Revalidate those findings against the current origin/develop tree and build a table-driven contract matrix mapping every accepted key to its consumer, effective runtime field, security class, bounded resource envelope, and required test. The matrix must fail closed when an allowlisted key has no effective consumer or when a consumer contract drifts. This is a prerequisite for all adapter-specific remediation and must not widen the MCP surface merely to make tests pass.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "Copy the full CLI platform-option registry into MCP",
+        "instead": "Add an option only when its consumer, security classification, bound, and negative test are recorded in the matrix.",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "why": "The CLI contains credentials, endpoints, paths, installation controls, and unbounded resource knobs that violate the remote MCP boundary."
+      },
+      {
+        "dont": "Treat forwarding to a mocked adapter as proof that an option works",
+        "instead": "Assert the effective adapter field or applied runtime setting and cover the durable worker path separately.",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "why": "The review already found a green forwarding test for DuckDB threads even though the real adapter ignores that key."
+      },
+      {
+        "dont": "Use a passing current-tree command as the only verification",
+        "instead": "Include at least one rung whose expected text states that it exits non-zero on the unfixed tree and add regression evidence for the fixed behavior.",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "why": "A green pre-fix test can verify nothing about the defect being fixed."
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-02T20:58:49Z",
+      "completed_pr": 1490,
+      "created_at": "2026-08-02T16:35:34Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "Durable jobs persist only normalized, non-secret options and replay the same validated object after retries or worker restarts.",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3"
+      },
+      {
+        "behavior": "Existing stdio and sessionless Streamable HTTP tool schemas and error codes remain compatible except where a documented unsafe option is intentionally rejected.",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3"
+      },
+      {
+        "behavior": "No test starts a real cloud service, contacts a user-configured endpoint, or stores credentials in source, fixtures, logs, or evidence.",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3"
+      },
+      {
+        "behavior": "The MCP allowlist remains narrower than the CLI option registry and never accepts credentials, hosts, DSNs, filesystem paths, package installation controls, or driver version controls.",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "bounded MCP platform option allowlist",
+        "decision": "extend",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "path": "benchbox/mcp/schemas.py"
+      },
+      {
+        "concept": "MCP option safety and compatibility contract",
+        "decision": "extend",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "path": "docs/reference/mcp.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/security.py"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/mcp/server.py"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "do_not_modify",
+        "path_glob": "docs/operations/mcp-production-readiness.md"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "do_not_modify",
+        "path_glob": "docs/operations/mcp-remote-security.md"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/jobs.py"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/schemas.py"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/development/mcp-platform-option-contract.md"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp.md"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/test_durable_jobs.py"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/integration/mcp/test_run_surface_contract.py"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_benchmark_tools.py"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/test_schemas.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_benchmark_tools.py -q",
+        "description": "The unfixed PR implementation reproduces at least one known option-to-consumer mismatch before the guard is changed",
+        "expected": "exits 1 on the unfixed tree when the new effective-consumer regression assertion is present, then exits 0 after the contract fix",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-02T20:57:46Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp/test_schemas.py tests/unit/mcp/test_benchmark_tools.py tests/integration/mcp/test_durable_jobs.py tests/unit/mcp/test_run_surface_contract.py -q",
+        "description": "The focused schema, benchmark forwarding, durable-job, and run-surface tests pass",
+        "expected": "exits 1 on the unfixed tree if any accepted option lacks a consumer or unsafe combination guard; exits 0 only after all focused contracts pass",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-02T20:57:54Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/mcp/schemas.py benchbox/mcp/tools/benchmark.py benchbox/mcp/jobs.py tests/unit/mcp tests/integration/mcp",
+        "description": "The contract documentation and implementation pass lint and formatting checks",
+        "expected": "exits 1 on the unfixed tree if the matrix or tests introduce lint defects; exits 0 after the scoped checks are clean",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "last_result": "pass",
+        "last_run": "2026-08-02T20:57:57Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "needs_wid": "w2",
+        "wid": "w3"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Revalidated origin/develop at 5abfd3b82. Current allowlist accepts the reviewed option families; benchmark forwarding normalizes DuckDB threads and Databricks clustering, while effective-consumer coverage and destination/resource guards remain incomplete for dependent TODOs. Focused test_benchmark_tools.py passed on the implementation worktree.",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "notes": null,
+        "started_at": "2026-08-02T20:47:14Z",
+        "started_branch": "fix/mcp-v2-option-contract-matrix",
+        "started_worktree": "/private/tmp/mcp-v2-pool/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Revalidate the PR findings, current adapter consumers, and hosted/runtime scope before changing the contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added explicit MCPPlatformOptionContract metadata and fail-closed validator coupling in schemas.py, plus the canonical matrix documentation and public reference pointer. Added table-driven matrix parity/fail-closed tests and a run-surface normalization test. Focused MCP tests: 91 passed; scoped Ruff and format checks passed.",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "notes": null,
+        "started_at": "2026-08-02T20:48:59Z",
+        "started_branch": "fix/mcp-v2-option-contract-matrix",
+        "started_worktree": "/private/tmp/mcp-v2-pool/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Publish the canonical option-to-consumer matrix with security class, bounds, aliases, and rejected alternatives",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Added table-driven effective-preparation coverage for every matrix option, including DuckDB threads and Databricks tuning translation, plus durable repository round-trip coverage for normalized options. Focused MCP schema, benchmark, durable, and run-surface tests: 97 passed; scoped Ruff and format checks passed.",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "notes": null,
+        "started_at": "2026-08-02T20:52:26Z",
+        "started_branch": "fix/mcp-v2-option-contract-matrix",
+        "started_worktree": "/private/tmp/mcp-v2-pool/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Add table-driven validation and effective-consumer contract tests for all accepted options and durable persistence",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Scope check passed for 7 changed files. Hosted verify --run 1/2/3 passed: 38, 103, and 3 scoped checks respectively; diff check passed. The matrix and consumer contract are ready for dependent platform remediation TODOs.",
+        "item_id": "mcp-v2-platform-option-contract-matrix-v3",
+        "notes": null,
+        "started_at": "2026-08-02T20:52:35Z",
+        "started_branch": "fix/mcp-v2-option-contract-matrix",
+        "started_worktree": "/private/tmp/mcp-v2-pool/BenchBox.pool-01",
+        "status": "done",
+        "summary": "Run focused MCP tests, lint/type checks, and a final allowlist drift audit before handing adapter fixes to dependents",
+        "wid": "w3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,123 @@
+{
+  "context": "Add an .applied.json companion reader in explorer_pipeline mirroring the existing .tuning.json read path in transformer.py; thread the per-statement receipt onto DetailResult (models.py / duckdb_builder.py / contract bump only if a new column is needed); add an expandable drill-down under the Tuning verification row in RunReceipt.tsx. Read verbatim, never recompute.",
+  "description": "PR #1287 surfaced the tuning verified-STATE (platform.tuning.validation_status -> DetailResult.tuning_validation_status -> TuningVerificationBadge in the run receipt). The per-statement introspection RECEIPT itself rides in the .applied.json companion file, which the explorer pipeline (_project/scripts/explorer_pipeline/) does NOT read today (confirmed 2026-07-24). Add a companion reader that ingests the per-statement applied-tuning receipt plus a UI drill-down from the 'Tuning verification' row in results-explorer/src/components/RunReceipt.tsx. Producer side already exists (tuning-introspection-receipts-20260716, done); this is the explorer/consumer side. Prior art to mirror: the .tuning.json companion read path in explorer_pipeline/transformer.py.",
+  "legacy": {
+    "item_meta": {
+      "category": "Explorer",
+      "completed_at": "2026-07-29T17:18:32Z",
+      "completed_pr": 1343,
+      "created_at": "2026-07-24T12:55:38Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Bundles without an .applied.json companion degrade gracefully (no drill-down, no error)",
+        "item_id": "explorer-applied-receipt-drilldown-20260724"
+      },
+      {
+        "behavior": "The receipt is read verbatim, never recomputed in the explorer",
+        "item_id": "explorer-applied-receipt-drilldown-20260724"
+      },
+      {
+        "behavior": "The verified-state row and TuningVerificationBadge from #1287 render unchanged",
+        "item_id": "explorer-applied-receipt-drilldown-20260724"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-applied-receipt-drilldown-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/tuning/**"
+      },
+      {
+        "item_id": "explorer-applied-receipt-drilldown-20260724",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/facetMatching.ts"
+      },
+      {
+        "item_id": "explorer-applied-receipt-drilldown-20260724",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/**"
+      },
+      {
+        "item_id": "explorer-applied-receipt-drilldown-20260724",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/**"
+      },
+      {
+        "item_id": "explorer-applied-receipt-drilldown-20260724",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/explorer_pipeline/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npx vitest run src/components/__tests__/RunReceipt.test.tsx",
+        "description": "RunReceipt drill-down renders for a bundle carrying a receipt",
+        "expected": "pass",
+        "item_id": "explorer-applied-receipt-drilldown-20260724",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q",
+        "description": "Pipeline ingest handles receipt-present and legacy-absent bundles",
+        "expected": "pass",
+        "item_id": "explorer-applied-receipt-drilldown-20260724",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-applied-receipt-drilldown-20260724",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-applied-receipt-drilldown-20260724",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Premise confirmed at develop: transformer.py:1054 reads .tuning.json but nothing reads .applied.json; RunReceipt.tsx:113 has the Tuning verification row + TuningVerificationBadge. Also found a live bug: pipeline.py:429 excluded only .plans.json/.tuning.json from bundle discovery, so a published .applied.json (COMPANION_SUFFIXES, copied by bundle_publisher since #1292) was transformed as if it were a result bundle",
+        "item_id": "explorer-applied-receipt-drilldown-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T17:17:16Z",
+        "started_branch": "feat/explorer-applied-receipt-drilldown",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Re-validate premise that explorer_pipeline still does not read .applied.json and the Tuning verification row exists in RunReceipt.tsx",
+        "wid": "w0"
+      },
+      {
+        "evidence": "transformer._applied_receipt() reads {stem}.applied.json and stores the receipt sub-object verbatim (canonical json.dumps) on DetailResult/ManifestEntry.applied_receipt; degrades to None for absent/unreadable/malformed/non-object/no-receipt-key. New results.applied_receipt column + result_detail_metrics projection; contract bumped 5->6 across contract.py, db.ts, explorer-build-contract.mjs AND tests/unit/scripts/test_explorer_build_contract.py (a 4th pin the 3-file lockstep note missed)",
+        "item_id": "explorer-applied-receipt-drilldown-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T17:17:18Z",
+        "started_branch": "feat/explorer-applied-receipt-drilldown",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Companion reader ingests the per-statement receipt onto DetailResult",
+        "wid": "w1"
+      },
+      {
+        "evidence": "AppliedReceiptDrilldown in RunReceipt.tsx renders per-entry verdict/kind/table/statement/expected-vs-observed/diff/reason inside a collapsed <details> under the Tuning verification row; parse never throws and yields no drill-down for every degraded shape. Verified: 304 pytest explorer_pipeline, 29 RunReceipt vitest, 832 vitest total, 26009 fast lane, typecheck clean, Chromium e2e validated build contract 6",
+        "item_id": "explorer-applied-receipt-drilldown-20260724",
+        "notes": null,
+        "started_at": "2026-07-29T17:17:21Z",
+        "started_branch": "feat/explorer-applied-receipt-drilldown",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-02",
+        "status": "done",
+        "summary": "Drill-down UI under the Tuning verification row in RunReceipt.tsx",
+        "wid": "w2"
+      }
+    ]
+  }
+}

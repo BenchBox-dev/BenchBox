@@ -1,0 +1,209 @@
+{
+  "context": "Start with documentation (w1) since it resolves the silent requirement today\nwith zero code risk. Then implement normalization from the inside out: signature\nfunction first (w2), then propagate up through the DAG (w3), then add the CLI\nflag (w4). Tests throughout. Keep normalize_literals=False as the default so\nexisting behavior is preserved.\n",
+  "description": "benchbox/core/results/query_plan_models.py:269-271 includes filter expressions\nverbatim in the structural signature used to compute plan_fingerprint:\n  if self.filter_expressions:\n      filters_str = \",\".join(sorted(self.filter_expressions))\n      signature_parts.append(f\"filters:{filters_str}\")\n\nFilter expressions include parameter literal values captured from the EXPLAIN\noutput. For example, a TPC-H query with seed 42 may produce a filter like\n`customer_acctbal < 1234.56` while seed 43 produces `customer_acctbal < 2345.67`.\nBoth are structurally identical plans (same operator tree, same join order, same\ntable access methods) but produce different fingerprints because the literal\nvalues differ.\n\nThis silently breaks cross-run regression detection: comparing plan fingerprints\nacross two runs with different benchmark seeds produces false positives (plan\nappears \"changed\" when only the seed changed). The user must use identical seeds\nacross runs for fingerprint comparison to be meaningful — but this constraint is\nnowhere documented, and the comparison tooling (plan_metadata_utils.py:70-71)\ndoes not warn when comparing runs with potentially different seeds.\n\nTwo levels of fix:\n1. Short-term (documentation): document that fingerprints are seed-sensitive and\n   cross-run comparison requires identical seeds. Add a caveat to\n   docs/features/query-plan-analysis.md and the fingerprint stability contract.\n2. Long-term (normalization): add a normalize_literals option to\n   LogicalOperator.get_structural_signature() that strips or masks numeric and\n   string literals from filter_expressions, join_conditions, and\n   projection_expressions before computing the hash. Use a regex to replace\n   numeric literals with <NUM> and single-quoted strings with <STR>. This\n   produces a structural-only fingerprint that is stable across seeds.\n\nThe normalization must be opt-in (default off) to preserve backward compatibility\nfor users who rely on literal-sensitive fingerprints (e.g., detecting when a\nfilter threshold changes as part of a query modification).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "apply regex to the full query SQL string",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "why": "normalize only the parsed filter_expressions from the LogicalOperator model."
+      },
+      {
+        "dont": "make normalization the default",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "why": "it breaks backward compatibility for users who intentionally track literal-sensitive plan changes."
+      },
+      {
+        "dont": "normalize table_name, operator_type, or column identifiers",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "why": "these are structural, not literal values."
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-06-11T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Default plan_fingerprint (normalize_literals=False) must be identical to the existing SHA256.",
+        "item_id": "query-plan-capture-fingerprint-literal-normalization"
+      },
+      {
+        "behavior": "Existing plan_fingerprint consumers (plan_metadata_utils.py, comparison.py) must not be broken.",
+        "item_id": "query-plan-capture-fingerprint-literal-normalization"
+      },
+      {
+        "behavior": "Literal normalization must not alter operator types, table names, join types, or sort column names.",
+        "item_id": "query-plan-capture-fingerprint-literal-normalization"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/manifest/plan_metadata_utils.py:60-73 — cross-run fingerprint comparison",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "path": "benchbox/core/manifest/plan_metadata_utils.py:60-73"
+      },
+      {
+        "concept": "benchbox/core/results/query_plan_models.py:229-307 — get_structural_signature() with filter_expressions",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "path": "benchbox/core/results/query_plan_models.py:229-307"
+      },
+      {
+        "concept": "benchbox/core/results/query_plan_models.py:351-364 — compute_plan_fingerprint()",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "path": "benchbox/core/results/query_plan_models.py:351-364"
+      },
+      {
+        "concept": "docs/features/query-plan-analysis.md — fingerprint stability contract section",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "path": "docs/features/query-plan-analysis.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/main/planning/query-plan-capture-fingerprint-literal-normalization.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/cli/commands/run.py"
+      },
+      {
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/manifest/plan_metadata_utils.py"
+      },
+      {
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/query_plan_models.py"
+      },
+      {
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "kind": "only_modify",
+        "path_glob": "docs/features/query-plan-analysis.md"
+      },
+      {
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/cli/run.md"
+      },
+      {
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/query_plans/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/query_plans/ -k 'normalize' -v",
+        "description": "Normalized fingerprint stable across benchmark seeds",
+        "expected": "Different-seed filter expressions produce identical normalized fingerprints",
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/query_plans/ -k 'fingerprint' -v",
+        "description": "Default fingerprint unchanged by new parameter",
+        "expected": "All existing fingerprint tests pass unchanged",
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "notes": "In the Fingerprint Stability Contract section of docs/features/query-plan-analysis.md,\nadd a caveat:\n  \"Plan fingerprints include filter expression literals (e.g., `customer_acctbal < 1234.56`).\n  Cross-run comparison requires identical benchmark seeds if any queries use\n  data-driven filter values. Two runs with different seeds will produce\n  different fingerprints for structurally identical plans.\n  Literal-normalized fingerprints (normalize_literals=True) are planned\n  for a future release.\"\nAlso update the CLI reference (docs/reference/cli/run.md) and any usage\nexamples that show fingerprint comparison.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Document fingerprint seed sensitivity in query-plan-analysis.md",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "notes": "In benchbox/core/results/query_plan_models.py:\n  def get_structural_signature(self, normalize_literals: bool = False) -> str:\nWhen normalize_literals=True, apply before appending filter_expressions,\njoin_conditions, and projection_expressions:\n  import re\n  def _mask_literals(expr: str) -> str:\n      expr = re.sub(r\"\\\\b\\\\d+(\\\\.\\\\d+)?\\\\b\", \"<NUM>\", expr)\n      expr = re.sub(r\"'[^']*'\", \"<STR>\", expr)\n      return expr\nDo NOT normalize table_name, join_type, operator_type, group_by_keys,\nsort_keys (column names, not literals). Normalization should only target\nconcrete values, not structural identifiers.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add normalize_literals parameter to get_structural_signature() and compute_plan_fingerprint()",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "notes": "Update QueryPlanDAG.compute_plan_fingerprint(normalize_literals=False) and\nthe module-level compute_plan_fingerprint() function. Add a\nnormalized_fingerprint attribute to QueryPlanDAG that is computed lazily\nwhen accessed (similar to plan_fingerprint). This keeps both fingerprints\navailable without recomputing the full DAG.\nUpdate benchbox/core/manifest/plan_metadata_utils.py to optionally store\nboth fingerprints, or add a comparison mode flag.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Propagate normalize_literals through compute_plan_fingerprint() and QueryPlanDAG",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "notes": "When --normalize-plan-literals is set, pass normalize_literals=True through\nto compute_plan_fingerprint(). Store the normalized fingerprint under a\nseparate key (e.g., plan_fingerprint_normalized) in the result dict to\navoid breaking existing consumers of plan_fingerprint.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add --normalize-plan-literals CLI flag to benchbox run",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-fingerprint-literal-normalization",
+        "notes": "Test cases:\n  - Two filter expressions with different numeric literals → same normalized\n    fingerprint, different unnormalized fingerprint\n  - Two filter expressions with identical structure but string literals →\n    same normalized fingerprint\n  - normalize_literals=False (default) → original behavior unchanged\n  - projection_expressions with column names only → normalization does not\n    alter them (column names are identifiers, not literals)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add unit tests for literal normalization",
+        "wid": "w5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,273 @@
+{
+  "context": "Start with a v1-to-v2 compatibility inventory covering imports, decorators, annotations, model fields, server metadata, and test introspection. Change the dependency to mcp>=2,<3 and update the lock atomically with the code. Use MCPServer and public SDK listing/call surfaces, supply the BenchBox version explicitly, convert model fields such as readOnlyHint to v2 snake_case equivalents, and keep stdio as the only/default transport in this item. Record any intentional schema delta and require explicit approval rather than silently changing client-visible contracts.",
+  "description": "Move the existing stdio implementation from Python MCP SDK 1.28.x FastMCP APIs to SDK 2 MCPServer APIs as an intentional major-version migration. Production modules and tests currently import mcp.server.fastmcp.FastMCP, use v1 model-field spellings, omit an explicit BenchBox server version, and in places inspect private SDK manager state. The migration must preserve the current 12-tool, 6-resource, and 7-prompt contract while replacing those v1 assumptions.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "carry a dual v1/v2 abstraction layer indefinitely",
+        "instead": "perform one explicit atomic v2 cutover after the temporary v1 cap",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "why": "it hides incompatible SDK semantics and doubles the test matrix"
+      },
+      {
+        "dont": "reimplement protocol negotiation, discovery, or request-header validation in BenchBox",
+        "instead": "use public SDK-v2 server and transport APIs",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "why": "those are SDK responsibilities and custom copies will drift"
+      },
+      {
+        "dont": "treat private SDK registry-manager attributes as a stable contract",
+        "instead": "assert behavior through public list and call APIs",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "why": "private internals caused avoidable coupling in the v1 tests"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "needs_item": "mcp-sdk-v1-major-version-cap-v2"
+      }
+    ],
+    "item_meta": {
+      "category": "compatibility",
+      "completed_at": "2026-08-01T21:21:39Z",
+      "completed_pr": 1439,
+      "created_at": "2026-08-01T15:47:52Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "The registered inventory remains 12 tools, 6 resources, and 7 prompts unless a separately reviewed contract change is documented",
+        "item_id": "mcp-sdk-v2-server-migration-v2"
+      },
+      {
+        "behavior": "Tool inputs, outputs, side effects, result identifiers, and path-containment behavior remain semantically equivalent",
+        "item_id": "mcp-sdk-v2-server-migration-v2"
+      },
+      {
+        "behavior": "stdio remains the default and existing local MCP launch commands continue to work",
+        "item_id": "mcp-sdk-v2-server-migration-v2"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "current stdio server lifecycle",
+        "decision": "extend",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "path": "benchbox/mcp/__init__.py"
+      },
+      {
+        "concept": "central server construction and registry wiring",
+        "decision": "extend",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "path": "benchbox/mcp/server.py"
+      },
+      {
+        "concept": "official Python SDK v1-to-v2 migration contract",
+        "decision": "reuse",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "path": "https://py.sdk.modelcontextprotocol.io/migration/"
+      },
+      {
+        "concept": "server contract and registration coverage",
+        "decision": "extend",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "path": "tests/unit/mcp/test_mcp_server.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/benchmarks/**"
+      },
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/**"
+      },
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/**"
+      },
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/mcp*.md"
+      },
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/mcp/**"
+      },
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -c \"from importlib.metadata import version; assert version('mcp').split('.')[0] == '2'; import benchbox.mcp\"",
+        "description": "The resolved MCP SDK is major version 2 and BenchBox MCP imports",
+        "expected": "Fails on the unfixed tree before this item is implemented; SDK-v2 version assertion and BenchBox import succeed",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n 'mcp\\.server\\.fastmcp|\\bFastMCP\\b' benchbox/mcp",
+        "description": "No production code imports the removed FastMCP module",
+        "expected": "no v1 FastMCP references remain in production MCP code",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv lock --check",
+        "description": "The project lock remains consistent",
+        "expected": "uv reports the lockfile is current",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/mcp -q",
+        "description": "Focused MCP behavior is green on SDK 2",
+        "expected": "all MCP unit tests pass",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- ruff check benchbox/mcp tests/unit/mcp && uv run -- ty check",
+        "description": "Static checks pass for the migrated surface",
+        "expected": "Ruff and ty exit successfully",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Captured /tmp/benchbox-mcp-v1-contract.json via public list_tools/list_resources/list_resource_templates/list_prompts APIs; inventory is 12 tools, 4 static resources + 2 templates, and 7 prompts. rg inventory identified all FastMCP imports, camelCase ToolAnnotations fields, and private manager test access.",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:08:16Z",
+        "started_branch": "feat/mcp-sdk-v2-server-migration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Inventory every v1 SDK import, type, model field, decorator, private test hook, and client-visible schema",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Updated both project declarations to mcp>=2,<3; uv lock resolves mcp 2.0.0 with mcp-types/httpx2/OpenTelemetry dependencies; uv lock --check passes.",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:09:42Z",
+        "started_branch": "feat/mcp-sdk-v2-server-migration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Move project metadata and uv.lock from the temporary v1 cap to mcp>=2,<3",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Production registries now import mcp.server.mcpserver.MCPServer; create_benchbox_server constructs MCPServer with explicit name benchbox and BenchBox package version 0.3.1; import and construction succeed on mcp 2.0.0.",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:11:22Z",
+        "started_branch": "feat/mcp-sdk-v2-server-migration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Replace FastMCP imports and annotations with MCPServer and provide explicit BenchBox server metadata",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Converted ToolAnnotations constructor fields to SDK-v2 snake_case names across all 12 tool registrations. Public model_dump(by_alias=True) comparison confirms wire annotations and tool schemas are unchanged.",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:11:28Z",
+        "started_branch": "feat/mcp-sdk-v2-server-migration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Port annotations and protocol model fields to SDK-v2 names without changing handler semantics",
+        "wid": "w4"
+      },
+      {
+        "evidence": "Removed all FastMCP imports and all _tool_manager/_resource_manager/_prompt_manager access from tests/unit/mcp. Added public MCPServer list/call/read/get test adapters; 507 focused tests pass through public APIs.",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:11:31Z",
+        "started_branch": "feat/mcp-sdk-v2-server-migration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Replace private SDK-manager assertions with public listing and invocation coverage",
+        "wid": "w5"
+      },
+      {
+        "evidence": "Compared /tmp/benchbox-mcp-v1-contract.json with /tmp/benchbox-mcp-v2-contract.json using public model dumps: identical names and schemas for 12 tools, 4 static resources, 2 templates, and 7 prompts. docs/reference/mcp.md records the preserved contract; exact inventory is pinned in test_mcp_server.py.",
+        "item_id": "mcp-sdk-v2-server-migration-v2",
+        "notes": null,
+        "started_at": "2026-08-01T20:20:15Z",
+        "started_branch": "feat/mcp-sdk-v2-server-migration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Compare pre/post tool, resource, prompt, and JSON-schema inventories and document any approved delta",
+        "wid": "w6"
+      }
+    ]
+  }
+}

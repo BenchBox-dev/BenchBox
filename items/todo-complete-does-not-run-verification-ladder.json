@@ -1,0 +1,134 @@
+{
+  "context": "Wire the existing 'todo verify --run' path into the completion gate: refuse completion when any rung exits non-zero, with an explicit override flag that records the override and its reason in the events table rather than silently allowing it. Treat pytest exit 5 (no tests collected) as failure, since a vacuous -k selector is the most common way a rung stops testing anything -- the clickhouse-profile-late-binding item already documents that exact trap in its own rung text.",
+  "description": "BenchBox's active wrapper delegates lifecycle commands to the released todo-db package, whose complete command checks work units, deferrals, and blocks but does not execute the item's verification ladder. That lets completion accept failing or vacuous commands, including pytest exit 5 from an empty selector. Implement the gate in the canonical todo-db package so every consumer gets the same behavior: run the current ladder in order before completion, fail closed on any non-zero or indeterminate result, preserve the hosted-command trust boundary, and provide an explicit reason-bearing override recorded in the completion audit event. Existing done items stay terminal and are not retroactively reopened.",
+  "legacy": {
+    "item_meta": {
+      "category": "defect",
+      "completed_at": "2026-08-13T14:22:36Z",
+      "completed_pr": 6,
+      "created_at": "2026-08-11T12:56:41Z",
+      "worktree": "todo-db"
+    },
+    "preserves": [
+      {
+        "behavior": "Existing completed items are not retroactively reopened by the new gate; it applies to completions from the change forward.",
+        "item_id": "todo-complete-does-not-run-verification-ladder"
+      },
+      {
+        "behavior": "The override path stays available for rungs that genuinely cannot run in a given environment, but records who overrode and why.",
+        "item_id": "todo-complete-does-not-run-verification-ladder"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "todo-complete-does-not-run-verification-ladder",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "todo-complete-does-not-run-verification-ladder",
+        "kind": "only_modify",
+        "path_glob": "src/todo_db/**"
+      },
+      {
+        "item_id": "todo-complete-does-not-run-verification-ladder",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "todo-complete-does-not-run-verification-ladder",
+        "kind": "only_modify",
+        "path_glob": "uv.lock"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run pytest tests/test_tracker.py -q -k complete",
+        "description": "Tracker completion gate tests",
+        "expected": "exit 0",
+        "item_id": "todo-complete-does-not-run-verification-ladder",
+        "last_result": "pass",
+        "last_run": "2026-08-13T13:14:08Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run pytest tests/test_cli_tracker.py -q -k complete",
+        "description": "CLI completion gate tests",
+        "expected": "exit 0",
+        "item_id": "todo-complete-does-not-run-verification-ladder",
+        "last_result": "pass",
+        "last_run": "2026-08-13T13:14:13Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run ruff check .",
+        "description": "Canonical package lint",
+        "expected": "exit 0",
+        "item_id": "todo-complete-does-not-run-verification-ladder",
+        "last_result": "pass",
+        "last_run": "2026-08-13T13:14:19Z",
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run pytest -q",
+        "description": "Canonical full suite",
+        "expected": "exit 0",
+        "item_id": "todo-complete-does-not-run-verification-ladder",
+        "last_result": "pass",
+        "last_run": "2026-08-13T13:14:28Z",
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "todo-complete-does-not-run-verification-ladder",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "todo-complete-does-not-run-verification-ladder",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "TodoTracker.complete now runs the current ladder, revalidates its definition and passing results in the completion transaction, preserves the hosted trust gate, and writes reason-bearing override detail into the complete audit event; focused tracker tests passed.",
+        "item_id": "todo-complete-does-not-run-verification-ladder",
+        "notes": null,
+        "started_at": "2026-08-13T13:06:42Z",
+        "started_branch": "fix/complete-verification-gate",
+        "started_worktree": "/Users/joe/Developer/todo-db.wt-complete-verification-gate",
+        "status": "done",
+        "summary": "Implement fail-closed verification execution and audited reason-bearing override in TodoTracker.complete",
+        "wid": "w0"
+      },
+      {
+        "evidence": "complete --override-verification REASON is exposed in the CLI; positive, exit-5, human-expected-text, hosted refusal/allow, empty override, and audited override regressions pass (8 focused tests).",
+        "item_id": "todo-complete-does-not-run-verification-ladder",
+        "notes": null,
+        "started_at": "2026-08-13T13:10:45Z",
+        "started_branch": "fix/complete-verification-gate",
+        "started_worktree": "/Users/joe/Developer/todo-db.wt-complete-verification-gate",
+        "status": "done",
+        "summary": "Expose the override contract in the complete CLI and add positive, failing, vacuous, hosted-trust, and audit tests",
+        "wid": "w1"
+      },
+      {
+        "evidence": "CHANGELOG documents the gate, exit-status contract, hosted trust boundary, and override audit behavior; uv run ruff check . passed and uv run pytest -q passed 115 tests.",
+        "item_id": "todo-complete-does-not-run-verification-ladder",
+        "notes": null,
+        "started_at": "2026-08-13T13:10:57Z",
+        "started_branch": "fix/complete-verification-gate",
+        "started_worktree": "/Users/joe/Developer/todo-db.wt-complete-verification-gate",
+        "status": "done",
+        "summary": "Document the completion gate and run focused plus full package verification",
+        "wid": "w2"
+      }
+    ]
+  }
+}

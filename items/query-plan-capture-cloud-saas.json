@@ -1,0 +1,363 @@
+{
+  "context": "Start with fixture collection (w1) since all parsers depend on knowing the\nactual output format. Parse work can proceed in parallel per platform once\nfixtures are available. BigQuery requires the most architectural thought (w3)\nsince its plan source is fundamentally different from EXPLAIN-based platforms.\nImplement parsers and wiring in priority order: Snowflake (most popular),\nAzure Synapse, Firebolt, Fabric Warehouse, Lakesail, BigQuery (architectural\nredesign last or in parallel). Unit tests can all be written from fixtures\nwithout cloud credentials.\n",
+  "description": "Six cloud SaaS platforms need query plan capture work ranging from adding a new\nparser to redesigning how the plan is fetched. Each has distinct EXPLAIN behavior\nand all require cloud credentials for integration testing. The platforms are\ngrouped here because they share the pattern: need a new parser, need\nexecute_query() wiring, and each requires a cloud account.\n\nCurrent state per platform:\n  1. SnowflakeAdapter (benchbox/platforms/snowflake.py)\n     - get_query_plan(): ❌ no override — Snowflake does not have a simple\n       EXPLAIN statement; instead it returns a query profile via\n       `EXPLAIN <query>` as JSON with LogicalPlanNode objects.\n     - No parser exists.\n     - Has execute_query() at line 1138.\n\n  2. BigQueryAdapter (benchbox/platforms/bigquery.py)\n     - get_query_plan(): ⚠️ exists at line 1714 but returns a dict with\n       `bytes_processed` and `job_id`, NOT a plan tree.\n       BigQuery's query plan is only available post-execution via the\n       Job Statistics API (`job.query_plan` on a completed QueryJob).\n     - No parser exists.\n     - Has execute_query() at line 1467.\n\n  3. AzureSynapseAdapter (benchbox/platforms/azure_synapse.py)\n     - get_query_plan(): ✅ line 1131 — EXPLAIN via cursor\n     - No parser exists.\n     - Has execute_query() at line 967.\n\n  4. FireboltAdapter (benchbox/platforms/firebolt.py)\n     - get_query_plan(): ✅ line 1296 — EXPLAIN via cursor\n     - No parser exists.\n\n  5. FabricWarehouseAdapter (benchbox/platforms/fabric_warehouse.py)\n     - get_query_plan(): ✅ line 1078\n     - No parser exists.\n     - Has execute_query() at line 638.\n\n  6. LakesailAdapter (benchbox/platforms/lakesail.py)\n     - get_query_plan(): ✅ line 552\n     - No parser exists.\n\nBigQuery requires the most redesign: plans are not available from EXPLAIN but\nfrom the post-execution Job statistics API. The `get_query_plan()` method must\nbe redesigned to accept a completed job reference rather than issuing a separate\nEXPLAIN query.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add plan capture to BigQuery's get_query_plan() method without addressing its current incorrect return type (returns cost dict, not plan text).",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-cloud-saas",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "issue a second EXPLAIN query for BigQuery",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-cloud-saas",
+        "why": "the query plan is already available from the completed job object at no extra cost."
+      },
+      {
+        "dont": "use SET SHOWPLAN_TEXT for Azure Synapse if SET SHOWPLAN_XML produces a richer parseable structure",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-cloud-saas",
+        "why": "prefer XML."
+      },
+      {
+        "dont": "use synchronous EXPLAIN for BigQuery",
+        "instead": "(not specified)",
+        "item_id": "query-plan-capture-cloud-saas",
+        "why": "there is no EXPLAIN statement; use the Job Statistics API."
+      }
+    ],
+    "item_meta": {
+      "category": "Platform Expansion",
+      "created_at": "2026-06-02T00:00:00Z",
+      "worktree": "platform-expansion"
+    },
+    "preserves": [
+      {
+        "behavior": "All six adapters' execute_query() result dict shape must not change for non-plan fields.",
+        "item_id": "query-plan-capture-cloud-saas"
+      },
+      {
+        "behavior": "BigQuery execute_query() must not issue any additional API calls when capture_plans=False.",
+        "item_id": "query-plan-capture-cloud-saas"
+      },
+      {
+        "behavior": "Do not issue extra EXPLAIN queries that incur billing in BigQuery — use the job statistics from the already-executed query.",
+        "item_id": "query-plan-capture-cloud-saas"
+      },
+      {
+        "behavior": "Plan capture failure must be silent when strict_plan_capture=False — cloud queries are expensive and billing-sensitive.",
+        "item_id": "query-plan-capture-cloud-saas"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "benchbox/core/query_plans/parsers/base.py — abstract interface",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-saas",
+        "path": "benchbox/core/query_plans/parsers/base.py"
+      },
+      {
+        "concept": "benchbox/core/query_plans/parsers/datafusion.py — JSON tree parser pattern (for Snowflake)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-saas",
+        "path": "benchbox/core/query_plans/parsers/datafusion.py"
+      },
+      {
+        "concept": "benchbox/core/query_plans/parsers/postgresql.py — text-tree parser pattern (for Azure Synapse, Firebolt, Fabric)",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-saas",
+        "path": "benchbox/core/query_plans/parsers/postgresql.py"
+      },
+      {
+        "concept": "benchbox/platforms/bigquery.py:1467 — BigQuery execute_query() with completed QueryJob in scope",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-saas",
+        "path": "benchbox/platforms/bigquery.py:1467"
+      },
+      {
+        "concept": "benchbox/platforms/duckdb.py:969 — execute_query() capture integration pattern",
+        "decision": "reuse",
+        "item_id": "query-plan-capture-cloud-saas",
+        "path": "benchbox/platforms/duckdb.py:969"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/platform-expansion/planning/query-plan-capture-cloud-saas.yaml"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/azure_synapse.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/bigquery.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/fabric_warehouse.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/firebolt.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/lakesail.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/registry.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/query_plans/parsers/snowflake.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/azure_synapse.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/bigquery.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/fabric_warehouse.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/firebolt.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/lakesail.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/snowflake.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "tests/fixtures/query_plans/"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/platforms/test_cloud_saas_plan_capture.py"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/query_plans/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/query_plans/test_snowflake_parser.py tests/unit/query_plans/test_bigquery_parser.py tests/unit/query_plans/test_azure_synapse_parser.py -v",
+        "description": "All new parser unit tests pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "query-plan-capture-cloud-saas",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/test_cloud_saas_plan_capture.py -v",
+        "description": "Cloud SaaS adapter wiring tests pass",
+        "expected": "All tests pass, 0 failures",
+        "item_id": "query-plan-capture-cloud-saas",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/ -q",
+        "description": "Full unit suite passes",
+        "expected": "0 failures, 0 errors",
+        "item_id": "query-plan-capture-cloud-saas",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "needs_wid": "w1",
+        "wid": "w6"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "needs_wid": "w4",
+        "wid": "w6"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "needs_wid": "w1",
+        "wid": "w7"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "needs_wid": "w2",
+        "wid": "w8"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "needs_wid": "w3",
+        "wid": "w8"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "needs_wid": "w4",
+        "wid": "w8"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "needs_wid": "w5",
+        "wid": "w8"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "needs_wid": "w6",
+        "wid": "w8"
+      },
+      {
+        "item_id": "query-plan-capture-cloud-saas",
+        "needs_wid": "w7",
+        "wid": "w8"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-saas",
+        "notes": "For each available platform, run `EXPLAIN <simple_query>` and record:\n  - Full EXPLAIN output text (or JSON)\n  - Platform version / engine version\n  - Any differences in syntax (e.g., `EXPLAIN USING TEXT` for Snowflake)\nStore as tests/fixtures/query_plans/{platform}_explain_sample.{txt|json}.\nBigQuery: instead of EXPLAIN, run a small query, then call\n`job.query_plan` on the completed QueryJob and record the JSON structure.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Collect EXPLAIN output samples for Snowflake, Azure Synapse, Firebolt, Fabric, and Lakesail",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-saas",
+        "notes": "Snowflake EXPLAIN returns JSON (when using `EXPLAIN USING JSON`):\n  {\"GlobalStats\": {...}, \"Operations\": [{\"id\": N, \"operation\": \"...\", ...}]}\nParser maps Snowflake operation names to LogicalOperatorType:\n  TableScan / JoinFilter → SCAN\n  Filter → FILTER\n  Aggregate → AGGREGATE\n  Join / InnerJoin / LeftOuterJoin → JOIN\n  Sort → SORT\n  Result / WithReference → PROJECT\nWire in SnowflakeAdapter:\n  - Override get_query_plan() to use `EXPLAIN USING JSON <query>`\n  - Override get_query_plan_parser() returning SnowflakeQueryPlanParser\n  - Add capture_query_plan() call to execute_query()\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement SnowflakeQueryPlanParser and wire into SnowflakeAdapter",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-saas",
+        "notes": "BigQuery plans come from the Job Statistics API, not an EXPLAIN statement.\nThis is an architectural mismatch with the base class:\n  - Base class result_capture.py capture_query_plan() calls\n    self.get_query_plan(connection, query) BEFORE the query executes.\n  - BigQuery plans are only available AFTER execution via job.query_plan\n    on the completed google.cloud.bigquery.QueryJob object.\n\nRequired approach: override capture_query_plan() directly in BigQueryAdapter\nto extract the plan from the already-completed QueryJob. Do NOT attempt\nto use the get_query_plan() → parse() path for BigQuery; the QueryJob is\nin scope inside execute_query() at line 1467 after job.result() returns.\n\nImplementation:\n  1. Inside BigQueryAdapter.execute_query(), after job.result() completes,\n     call self._capture_bq_plan(job, query_id) instead of capture_query_plan().\n  2. Implement _capture_bq_plan(job, query_id) to:\n       a. Read job.query_plan — a list of QueryPlanEntry objects with\n          `name`, `substeps`, `records_read`, `records_written`, `status`.\n       b. Pass the JSON-serialized plan to BigQueryQueryPlanParser.parse().\n       c. Return (QueryPlanDAG, elapsed_ms).\n  3. Set plan_fingerprint from the returned DAG in the result dict.\n\nImplement BigQueryQueryPlanParser:\n  - parse(raw_plan: str) -> QueryPlanDAG where raw_plan is JSON of\n    the job.query_plan structure.\n  - Each QueryPlanEntry.name maps to LogicalOperatorType:\n      INPUT → SCAN, FILTER → FILTER, AGGREGATE → AGGREGATE,\n      HASH_JOIN / BROADCAST_HASH_JOIN → JOIN, SORT → SORT,\n      OUTPUT → PROJECT (final projection/output step).\n  - entry.substeps provide operator detail strings.\n\nDo NOT modify get_query_plan() in BigQueryAdapter for plan capture —\nits current return (cost dict) may be used by other consumers; leave\nit as-is and add the new _capture_bq_plan() method alongside it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement BigQueryQueryPlanParser and override capture_query_plan() in BigQueryAdapter",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-saas",
+        "notes": "Azure Synapse Dedicated Pool uses T-SQL-based EXPLAIN (XML format via\n`SET SHOWPLAN_XML ON`; or text via `SET SHOWPLAN_TEXT ON`). Serverless\nuses a different planner. Confirm which format get_query_plan() at\nline 1131 currently retrieves. Implement a parser for that format.\nWire get_query_plan_parser() and the capture call in execute_query().\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement AzureSynapseQueryPlanParser and wire into AzureSynapseAdapter",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-saas",
+        "notes": "Firebolt's EXPLAIN returns a JSON structure with a tree of nodes.\nImplement FireboltQueryPlanParser mapping Firebolt operator names\n(TableScan, Projection, Aggregation, Join, etc.) to LogicalOperatorType.\nWire get_query_plan_parser() and the capture call in FireboltAdapter.execute_query().\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement FireboltQueryPlanParser and wire into FireboltAdapter",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-saas",
+        "notes": "Fabric Warehouse (Synapse Serverless + Delta Lake) EXPLAIN format may\ndiffer from Synapse Dedicated. After collecting the Fabric fixture in w1\nand implementing AzureSynapseQueryPlanParser in w4:\n\nDecision gate (required before writing any Fabric parser code):\n  Compare the Fabric EXPLAIN fixture from w1 to the Azure Synapse fixture.\n  - If the T-SQL plan format is structurally identical:\n      Reuse AzureSynapseQueryPlanParser — do NOT implement a separate\n      FabricWarehouseQueryPlanParser. Wire FabricWarehouseAdapter to return\n      AzureSynapseQueryPlanParser from get_query_plan_parser().\n  - If the format differs (Synapse Serverless uses a different planner):\n      Implement a separate FabricWarehouseQueryPlanParser. Register under\n      dialect=\"fabric_warehouse\" in the parser registry.\n\nWire get_query_plan_parser() and the capture call in execute_query()\nregardless of which parser is chosen.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Wire FabricWarehouseAdapter plan capture; reuse AzureSynapseQueryPlanParser if format matches",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-saas",
+        "notes": "Lakesail is a MySQL-wire-compatible engine. Collect EXPLAIN format in w1.\nImplement LakesailQueryPlanParser. Wire get_query_plan_parser() and\nthe capture call in LakesailAdapter.execute_query().\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement LakesailQueryPlanParser and wire into LakesailAdapter",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "query-plan-capture-cloud-saas",
+        "notes": "Create tests/unit/query_plans/ tests for each new parser:\n  test_snowflake_parser.py, test_bigquery_parser.py,\n  test_azure_synapse_parser.py, test_firebolt_parser.py,\n  test_lakesail_parser.py\n  (FabricWarehouse parser test only if a new parser was required in w6;\n   skip if AzureSynapseQueryPlanParser is reused for Fabric)\nFor BigQuery, test _capture_bq_plan() directly with a mock QueryJob object\nrather than testing get_query_plan_parser() — BigQuery bypasses that path.\nCreate tests/unit/platforms/test_cloud_saas_plan_capture.py with\nparametrized cases for all six adapters:\n  - get_query_plan_parser() returns non-None\n  - execute_query() with capture_plans=True captures plan\n  - graceful degradation on capture failure\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add unit tests for all new parsers and adapter wiring",
+        "wid": "w8"
+      }
+    ]
+  }
+}

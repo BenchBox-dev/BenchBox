@@ -1,0 +1,11 @@
+{
+  "description": "PySpark dataframe mode fails on 13 TPC-H queries due to missing methods in the\nUnifiedExpr class. The queries use Polars-style expression APIs that are not\ntranslated for PySpark.\n\nError messages observed:\n- 'UnifiedExpr' object has no attribute 'is_in'\n- 'UnifiedExpr' object has no attribute 'str'\n- 'UnifiedExpr' object has no attribute 'dt'\n- 'UnifiedExpr' object has no attribute 'filter'\n- 'UnifiedExpr' object has no attribute 'n_unique'\n- object of type 'DataFrame' has no len() (Q11 - ctx.scalar issue)\n\nAffected queries: Q2, Q7, Q8, Q9, Q11, Q12, Q13, Q14, Q15, Q16, Q19, Q20, Q21, Q22",
+  "legacy": {
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2025-12-26T00:00:00Z",
+      "created_at": "2025-12-26T00:00:00Z",
+      "worktree": "dataframe-expansion"
+    }
+  }
+}

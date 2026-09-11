@@ -1,0 +1,290 @@
+{
+  "context": "Pure operations.yaml work for w1-w5 — no Python or schema.py\nchanges. The runtime infrastructure (BINARY type translator,\nvalidation contract loader, expected_value_min/max enforcement) all\nshipped in PR #112 / #114; this TODO uses them.\n\nFor ClickHouse, each op gets a self-contained override that creates\nits own AggregateFunction-typed table, populates with -State, queries\nwith -Merge, and drops. Same per-op self-contained pattern as the\nDuckDB base SQL. The BINARY column type translator is not touched —\nClickHouse's parameterised column types don't fit that abstraction\nand shouldn't be forced into it.\n\nFor storage-size validation, append a second validation_query to\neach ★ headline op. The existing scalar-bounds query stays; the new\none uses octet_length and the same expected_value_min/max contract.\nLoader-side validation already enforces both queries.\n\nDocs and changelog land last, after the live ClickHouse runs confirm\nthe empirical bounds (w5 → w6 → w7 chain).\n",
+  "description": "## Unblocked by `write-primitives-architecture-fixes` (2026-05-04)\n\nThe validation_query.platform_overrides extension point landed; the\n`_run_operation_validation` runtime now resolves per-platform validation\nSQL. ClickHouse-native `-State`/`-Merge` overrides can declare their own\nClickHouse-only validation bodies (or `null` skip) without crashing on\ndefault DuckDB SQL. Spike-confirmed empirical observations from PR #133\n(chDB validated uniqState/uniqMerge, quantileTDigestState/Merge(0.5),\ntopKState(8)/Merge(8); storage sizes theta ~60KB, KLL ~3.5KB, topK\n~317B) remain valid inputs to w5 bounds when implementation resumes.\n\nNote: the DuckDB community datasketches extension drift captured in\n`_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`\nis a separate dependency-management problem, not a write_primitives\narchitecture gap. Treat it as a parallel blocker if you hit\nfunction-not-found during w3 bound retuning; otherwise out of scope.\n\n## Original description\n\nTwo coordinated expansions to the `sketch` category that landed in\nPR #112:\n\n- **A. ClickHouse-native sketch variants** using `-State` / `-Merge`\n  aggregate combinators. Currently every sketch op skips on ClickHouse\n  via `null` `platform_overrides`. ClickHouse's sketch model is\n  algorithmically comparable to DataSketches but uses its own binary\n  serialisation (not portable to Theta/KLL/Top-K bytes), so the\n  columns must use parameterised `AggregateFunction(...)` types\n  rather than the BINARY surface used elsewhere. This was explicitly\n  deferred in the merged write_primitives TODO with the rationale\n  \"valuable but a scope expansion that should land as a follow-up\n  once the DataSketches-portable core works.\" That core has now\n  shipped; this TODO is the resolution.\n\n- **B. Storage-size validation** on the three ★ headline ops. Today\n  every sketch op measures only latency. Adding `LENGTH(sketch_column)`\n  aggregate validations gives users the byte-cost side of the\n  \"millisecond merge\" claim: how much storage are partitioned\n  sketches consuming, and how much smaller does the merged sketch\n  get? Uses the existing `expected_value_min/max` runtime contract\n  added in PR #114 — no schema changes needed.\n\nBundled because both expansions complete the cross-engine sketch\nstory: A adds ClickHouse to the matrix; B makes every existing\nsketch op more analytically useful by surfacing the cost dimension\nalongside latency.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "collapse the existing scalar-bounds validation_query when adding the storage-size one",
+        "instead": "append, don't replace.",
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "why": "they validate different correctness invariants (estimate quality vs storage hygiene) and a single query can't cover both"
+      },
+      {
+        "dont": "extend the BINARY → dialect type translator with a ClickHouse special-case",
+        "instead": "emit the CREATE TABLE inline in each ClickHouse override.",
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "why": "parameterised AggregateFunction types depend on the aggregate name AND the input column type, so a single column-type translation can't express them"
+      },
+      {
+        "dont": "reuse DuckDB's storage-size bounds for ClickHouse",
+        "instead": "observe ClickHouse sizes empirically in w5 and document both side-by-side.",
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "why": "uniq's HyperLogLog++ encoding produces meaningfully different sizes vs DataSketches Theta"
+      },
+      {
+        "dont": "skip the empirical-tolerance step for ClickHouse",
+        "instead": "observe the values at SF=0.01 over multiple runs and document the chosen tolerances inline.",
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "why": "hash-family differences make value bounds non-trivially different from DuckDB"
+      },
+      {
+        "dont": "try to make ClickHouse `AggregateFunction(...)` columns binary-portable to DataSketches",
+        "instead": "document the model difference in the docs and treat them as algorithmically-comparable, not byte-compatible.",
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "why": "the serialisation formats are genuinely incompatible (different hash families, different layouts)"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "id": 529,
+        "reason": "Adds weighted-quantile coverage but is a niche capability not paralleled in DataSketches KLL. Defer until weighted-quantile becomes a stated cross-engine requirement.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: ClickHouse quantileTDigestWeighted support explicitly deferred until weighted-quantile becomes a stated cross-engine requirement; no such requirement exists.",
+        "summary": "ClickHouse `quantileTDigestWeighted` for weighted quantile sketches"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "needs_item": "write-primitives-architecture-fixes"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-04T00:00:00Z",
+      "created_at": "2026-05-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All 117 existing write_primitives operations execute identically — no behavior changes to the existing Databricks/Snowflake/BigQuery overrides or the DuckDB base SQL.",
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics"
+      },
+      {
+        "behavior": "Catalog loader continues to accept the augmented ★ ops with two validation_queries each (existing scalar-bounds + new storage-size bounds).",
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics"
+      },
+      {
+        "behavior": "Per-op cleanup_sql still runs after each op — the ClickHouse-native variants must clean up their AggregateFunction-typed tables.",
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics"
+      },
+      {
+        "behavior": "The 8 existing sketch ops continue to pass on DuckDB SF=0.01 with their current scalar-bounds validation contracts.",
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/benchmark.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/loader.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/dataframe_operations.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/generator.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/operations.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/schema.py"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/write_primitives/catalog/operations.yaml"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/write-primitives-sketch-functions.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/write_primitives -q",
+        "description": "All write_primitives unit tests pass",
+        "expected": "all tests pass, including catalog_loader tests for the augmented validation_queries",
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform duckdb --benchmark write_primitives --scale 0.01 --queries sketch_ddl_create_persistent_table,sketch_insert_theta_per_partition,sketch_insert_kll_per_partition,sketch_insert_topk_per_shard,sketch_query_theta_union_merge,sketch_query_kll_quantiles_merge,sketch_query_topk_combine,sketch_drop_persistent_table",
+        "description": "DuckDB end-to-end re-run of all 8 sketch ops (regression check; storage-size validation now active)",
+        "expected": "8/8 pass; both scalar-bounds and storage-size validations green on the 3 ★ ops",
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform clickhouse-local --benchmark write_primitives --scale 0.01 --queries sketch_ddl_create_persistent_table,sketch_insert_theta_per_partition,sketch_insert_kll_per_partition,sketch_insert_topk_per_shard,sketch_query_theta_union_merge,sketch_query_kll_quantiles_merge,sketch_query_topk_combine,sketch_drop_persistent_table",
+        "description": "ClickHouse local end-to-end run of all 8 sketch ops (now using -State/-Merge variants)",
+        "expected": "8/8 pass on ClickHouse local; previously 0/8 (all skipped via null overrides)",
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --help-topic benchmarks 2>&1 | grep -i sketch",
+        "description": "Help-topic still references the sketch docs (no regression)",
+        "expected": "output references docs/benchmarks/write-primitives-sketch-functions.md",
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "needs_wid": "w3",
+        "wid": "w6"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "needs_wid": "w4",
+        "wid": "w7"
+      },
+      {
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "notes": "The current override is `clickhouse: null`. Replace with a real\nDDL block that creates a table with `AggregateFunction(uniq,\nUInt64)` columns for the theta-style sketches. Pattern:\n\n  CREATE TABLE sketch_ops_daily_users (\n    activity_date Date,\n    region String,\n    user_sketch AggregateFunction(uniq, UInt64),\n    rev_sketch AggregateFunction(uniq, UInt64)\n  ) ENGINE = MergeTree() ORDER BY (activity_date, region);\n\nVerify against chDB locally: the validation query\n`SELECT COUNT(*) FROM information_schema.tables WHERE\ntable_name = 'sketch_ops_daily_users'` should return 1.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ClickHouse override for sketch_ddl_create_persistent_table",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "notes": "For each insert op, add a `clickhouse:` override that uses the\n`-State` combinator:\n\n  sketch_insert_theta_per_partition:\n    INSERT INTO sketch_ops_daily_users\n    SELECT l_shipdate, l_returnflag,\n           uniqState(l_orderkey),\n           uniqState(toUInt64(l_extendedprice))\n    FROM lineitem GROUP BY l_shipdate, l_returnflag;\n\n  sketch_insert_kll_per_partition:\n    (creates its own sketch_ops_kll_partitions with\n    AggregateFunction(quantileTDigest(0.5), Float64), uses\n    quantileTDigestState(toFloat64(l_extendedprice)))\n\n  sketch_insert_topk_per_shard:\n    (creates sketch_ops_topk with\n    AggregateFunction(topK(8), String), uses topKState(8))\n\nAlso handle the cast issue: ClickHouse rejects Decimal for these\naggregates — wrap in toFloat64() / toUInt64() per type.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ClickHouse overrides for the 3 sketch_insert_* ops",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "notes": "For each headline op, add a `clickhouse:` override that uses the\n`-Merge` combinator:\n\n  sketch_query_theta_union_merge:\n    SELECT uniqMerge(user_sketch) AS distinct_orders\n    FROM sketch_ops_daily_users;\n\n  sketch_query_kll_quantiles_merge:\n    SELECT quantileTDigestMerge(0.5)(price_sketch) AS median_price\n    FROM sketch_ops_kll_partitions;\n\n  sketch_query_topk_combine:\n    SELECT length(topKMerge(8)(topk_sketch)) AS frequent_count\n    FROM sketch_ops_topk;\n\nValidation bounds (expected_value_min/max) must be re-tuned\nempirically against ClickHouse — uniq's HyperLogLog estimator\nproduces different bias than DataSketches Theta. Document the\nobserved values inline alongside the existing DuckDB bounds.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ClickHouse overrides for the 3 ★ sketch_query_* merge ops",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "notes": "Trivial: just `DROP TABLE IF EXISTS sketch_ops_daily_users` and\nthen `CREATE TABLE ... DROP TABLE` for the measurement op.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add ClickHouse override for sketch_drop_persistent_table",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "notes": "For each of `sketch_query_theta_union_merge`,\n`sketch_query_kll_quantiles_merge`, `sketch_query_topk_combine`,\nadd a second validation_query that computes `octet_length()` (or\nClickHouse equivalent: `length()`) on the merged sketch and\nasserts the byte count falls in observed bounds.\n\nEmpirical observations to inform initial bounds (run on DuckDB\nSF=0.01 first; ClickHouse may differ once w3 lands):\n  - theta merged sketch: observed ~16KB → bounds [4000, 32000]\n  - KLL merged sketch:   observed ~3KB  → bounds [1000, 8000]\n  - topk merged sketch:  observed ~600B → bounds [200, 2000]\n\nThe validation is an additional `validation_query`, not a\nreplacement — the existing scalar-bounds query stays.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add storage-size validation_queries to the 3 ★ headline ops",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "notes": "In `docs/benchmarks/write-primitives-sketch-functions.md`:\n  - Add a row for ClickHouse to the function-name reference\n    tables (theta / KLL / top-K) using uniq* / quantileTDigest* /\n    topK* names.\n  - Update the \"Per-engine column type\" table: ClickHouse now\n    uses `AggregateFunction(...)` parameterised types (different\n    model from BINARY-portable). Note explicitly that this is\n    comparable algorithmically but NOT binary-compatible with\n    DataSketches.\n  - Add a \"Storage-size methodology\" section documenting the\n    octet_length validation approach and the observed bounds\n    per family.\n  - Reflect the ClickHouse addition in the headline-tests\n    cross-reference table.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update cross-platform sketch docs with ClickHouse column types and storage-size methodology",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "write-primitives-sketch-clickhouse-and-storage-metrics",
+        "notes": "Two terse user-facing bullets:\n\"write_primitives sketch: add ClickHouse-native variants\n(uniqState/uniqMerge, quantileTDigestState/Merge, topKState/Merge)\nusing the AggregateFunction column model.\"\n\"write_primitives sketch: add storage-size validation\n(octet_length) on the three ★ headline ops alongside existing\nscalar-bounds validation.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add changelog entry under unreleased",
+        "wid": "w7"
+      }
+    ]
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "description": "Follow-up correctness defect from migrate-test-docker-stacks-to-mocker (deferral #337). Reproduced with Mocker 0.7.2: an alpine:3.20 Compose service whose healthcheck always exits 1 made 'mocker compose up -d --wait --wait-timeout 5' return success in 0 seconds, and inspect exposed no Health state. This is a false-success readiness contract, not merely missing test coverage. Group the unhealthy-fixture, capability detection/emulation, bounded timeout, and cleanup work here. Evidence: /tmp/mocker-negative-wait-probe.log (2026-08-16).",
+  "legacy": {
+    "item_meta": {
+      "blocked_reason": "Measured locally on mocker 0.7.2: an alpine:3.20 service with healthcheck 'exit 1' made 'mocker compose up -d --wait --wait-timeout 5' return 0 in 0s; inspect exposed no Health state. A passing regression requires either an upstream Mocker healthcheck implementation/version or an explicitly scoped BenchBox healthcheck-emulation design. Real Docker is unavailable on this host. Evidence: /tmp/mocker-negative-wait-probe.log.",
+      "created_at": "2026-07-19T12:35:36Z",
+      "worktree": "main"
+    },
+    "scope_rules": [
+      {
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "kind": "only_modify",
+        "path_glob": "docker/**"
+      },
+      {
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "kind": "only_modify",
+        "path_glob": "make/**"
+      },
+      {
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "kind": "only_modify",
+        "path_glob": "tests/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "_project/scripts/mocker_wait_negative_test.sh mocker",
+        "description": "Mocker unhealthy wait contract",
+        "expected": "returns nonzero within its bound and cleans only its project",
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "_project/scripts/mocker_wait_negative_test.sh docker",
+        "description": "Docker parity when Docker is available",
+        "expected": "same bounded unhealthy result; explicit skip when daemon unavailable",
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "needs_wid": "w1",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Add a project-scoped fixture whose healthcheck deterministically never passes and records elapsed time plus exit status",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Prevent Mocker --wait from reporting readiness when health cannot be observed, via a supported upstream version or an explicit BenchBox capability check/emulation",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Assert bounded nonzero failure for the unhealthy fixture and retain a positive healthy-service control",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "negative-wait-test-a-healthcheck-that-never-passes",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Guarantee project-scoped teardown on success, timeout, and interruption; never globally prune",
+        "wid": "w4"
+      }
+    ]
+  }
+}

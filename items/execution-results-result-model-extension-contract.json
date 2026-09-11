@@ -1,0 +1,327 @@
+{
+  "context": "Treat `BenchmarkResults` cleanup as a compatibility design problem, not a\nmechanical field move. First document the extension policy, then inventory\ncurrent fields and consumers, then add contract tests, and only then make a\nminimal internal-only or backward-compatible change.\n",
+  "description": "Independent verification partially confirmed that `BenchmarkResults` is doing\ntoo much, but also found that the original critic overstated the facts. The\ndataclass currently has 78 fields, not roughly 205. It has several platform\nmetadata dictionaries, `_benchmark_id_override`, and a platform-specific\n`native_comparison` field. The claimed `migration` top-level model field is\nnot a `BenchmarkResults` field; schema-v2 exports migration as a phase when\n`ExecutionPhases.migration` is present, while a separate pg_mooncake script\nemits a top-level `migration` block.\n\nThe suggested fix, moving platform-specific results into\n`platform_extensions: dict[str, Any]`, is therefore directionally useful but\nrisky. Result JSON is a product boundary consumed by runtime loaders, CLI\ncompare/export/show, MCP tools, public submissions, hosted result bundles,\nand the explorer pipeline. This TODO creates the migration contract and a\nnarrow extension policy before any field move.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add a catch-all dict that bypasses schema-v2 validation policy.",
+        "instead": "(not specified)",
+        "item_id": "execution-results-result-model-extension-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "delete `_benchmark_id_override` until result filename, loader, and builder behavior have an explicit replacement.",
+        "instead": "(not specified)",
+        "item_id": "execution-results-result-model-extension-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "move `native_comparison` or migration fields into `platform_extensions` in one step without loader, explorer, MCP, and public-submission tests.",
+        "instead": "(not specified)",
+        "item_id": "execution-results-result-model-extension-contract",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "treat the dataclass field count as the user-facing problem",
+        "instead": "(not specified)",
+        "item_id": "execution-results-result-model-extension-contract",
+        "why": "exported result compatibility is the primary risk."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "execution-results-result-model-extension-contract",
+        "id": 399,
+        "reason": "This is the risky change the TODO is designed to evaluate; do it only after policy, inventory, and consumer tests prove compatibility.",
+        "resolution": "open",
+        "resolved_item": null,
+        "resolved_reason": null,
+        "summary": "Move all existing platform-specific result fields into `platform_extensions`"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "execution-results-result-model-extension-contract",
+        "id": 400,
+        "reason": "Result schema policy currently supports schema-v2 consumers; a major break requires a separate migration plan.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: A major result-schema version bump needs a separate migration plan that doesn't exist; current schema-v2 policy still holds.",
+        "summary": "Bump result schema major version for a broad model cleanup"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "needs_item": "architecture-contract-map-and-support-taxonomy"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "needs_item": "result-schema-policy-and-explorer-input-gate"
+      }
+    ],
+    "item_meta": {
+      "category": "Results",
+      "created_at": "2026-05-21T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Do not conflate internal dataclass cleanup with exported JSON schema cleanup.",
+        "item_id": "execution-results-result-model-extension-contract"
+      },
+      {
+        "behavior": "Existing schema-v2 result bundles remain loadable by `load_result_file()`.",
+        "item_id": "execution-results-result-model-extension-contract"
+      },
+      {
+        "behavior": "Explorer pipeline input gate behavior from result-schema-policy work is not weakened.",
+        "item_id": "execution-results-result-model-extension-contract"
+      },
+      {
+        "behavior": "No existing top-level exported key is removed without same-PR compatibility and docs updates.",
+        "item_id": "execution-results-result-model-extension-contract"
+      },
+      {
+        "behavior": "Public submission validation remains compatible with accepted schema-v2 bundles.",
+        "item_id": "execution-results-result-model-extension-contract"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "_project/scripts/explorer_pipeline/transformer.py: hosted/explorer consumer - include in downstream compatibility checks.",
+        "decision": "reuse",
+        "item_id": "execution-results-result-model-extension-contract",
+        "path": "_project/scripts/explorer_pipeline/transformer.py"
+      },
+      {
+        "concept": "benchbox/core/results/loader.py: reconstruction contract for historical result files - test before moving fields.",
+        "decision": "reuse",
+        "item_id": "execution-results-result-model-extension-contract",
+        "path": "benchbox/core/results/loader.py"
+      },
+      {
+        "concept": "benchbox/core/results/schema.py: current schema-v2 payload builder - exported keys are the compatibility boundary.",
+        "decision": "reuse",
+        "item_id": "execution-results-result-model-extension-contract",
+        "path": "benchbox/core/results/schema.py"
+      },
+      {
+        "concept": "benchbox/core/results/schema_policy.py: consumer-specific schema acceptance - preserve these risk postures.",
+        "decision": "reuse",
+        "item_id": "execution-results-result-model-extension-contract",
+        "path": "benchbox/core/results/schema_policy.py"
+      },
+      {
+        "concept": "docs/reference/public-contracts.md: result JSON bundle contract tier - extend before moving exported fields.",
+        "decision": "extend",
+        "item_id": "execution-results-result-model-extension-contract",
+        "path": "docs/reference/public-contracts.md"
+      },
+      {
+        "concept": "scripts/benchmark_mooncake_migration.py: standalone top-level migration payload - decide whether to align or leave separate.",
+        "decision": "reuse",
+        "item_id": "execution-results-result-model-extension-contract",
+        "path": "scripts/benchmark_mooncake_migration.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/runner/"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/DONE/"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/explorer_pipeline/"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/benchmark.py"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "only_modify",
+        "path_glob": "benchbox/mcp/tools/results.py"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/public-contracts.md"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "only_modify",
+        "path_glob": "docs/reference/result-formats.md"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "only_modify",
+        "path_glob": "scripts/benchmark_mooncake_migration.py"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/cli/commands/test_submit.py"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/explorer_pipeline/"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results -q",
+        "description": "Focused result schema/model tests pass.",
+        "expected": "Result model, loader, schema, and normalizer tests pass.",
+        "item_id": "execution-results-result-model-extension-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/explorer_pipeline tests/unit/cli/commands/test_submit.py --tb=short",
+        "description": "Explorer and submission consumers remain compatible.",
+        "expected": "Explorer pipeline and submission command tests pass.",
+        "item_id": "execution-results-result-model-extension-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python scripts/validate_submission.py results-data/bundles/",
+        "description": "Published bundle validator still accepts existing corpus.",
+        "expected": "Existing public result bundles validate.",
+        "item_id": "execution-results-result-model-extension-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph",
+        "description": "TODO graph remains valid after implementation.",
+        "expected": "TODO validation and graph checks pass.",
+        "item_id": "execution-results-result-model-extension-contract",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "execution-results-result-model-extension-contract",
+        "needs_wid": "w3",
+        "wid": "w4"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "execution-results-result-model-extension-contract",
+        "notes": "Re-run the current-tree evidence before proposing schema or model changes.\nCapture checked SHA, commands, and compact results in the implementation\nPR body or TODO notes; do not commit raw stdout.\n\nRequired checks:\n  - `uv run -- python - <<'PY'` snippet using `dataclasses.fields(BenchmarkResults)` to print field count and platform/native/migration-related fields.\n  - `rg -n \"native_comparison|\\\\[\\\\\\\"migration\\\\\\\"\\\\]|platform_info|platform_metadata|platform_raw|BenchmarkResults\\\\(|build_result_payload|reconstruct_benchmark_results|load_result_file|ResultExporter|PUBLIC_SUBMISSION_SCHEMA_POLICY\" benchbox _project scripts tests docs/reference --glob '!build/**' --glob '!docs/_build/**' --glob '!.venv/**'`.\n  - Inspect `benchbox/core/results/schema.py`, `benchbox/core/results/loader.py`, `benchbox/core/results/exporter.py`, `benchbox/mcp/tools/benchmark.py`, `benchbox/mcp/tools/results.py`, and `_project/scripts/explorer_pipeline/`.\n\nDecision gate: do not move or remove any serialized result key in the\nimplementation PR unless the migration policy explicitly classifies the\nchange as backward-compatible or includes a same-PR migration/loader gate.\n\nCompleted 2026-05-22 at checked SHA\n`185006fde1a04b460e4c30d52d4035afeb1861eb`: dataclass field count is 78;\nplatform/native/migration-related fields are `platform`,\n`platform_deployment`, `platform_cloud`, `platform_compute`,\n`platform_storage`, `platform_raw_config`, `platform_raw_metadata`,\n`platform_info`, `platform_metadata`, and `native_comparison`;\n`BenchmarkResults` has no `migration` field. Consumer rg returned 2504\nbroad hits. Inspection confirmed `comparisons.native_duckdb`,\n`phases.migration`, platform metadata blocks, loader reconstruction, MCP\nresult loading, and explorer projection are the relevant compatibility\nboundaries.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Revalidate BenchmarkResults field count, platform-specific fields, and schema consumers",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-result-model-extension-contract",
+        "notes": "Add a policy section to docs/reference/public-contracts.md or a focused\nresult-schema doc that answers:\n  - where platform-specific structured data should live in the internal\n    model;\n  - where it should serialize in schema-v2 payloads;\n  - when top-level schema keys are allowed;\n  - when a new `platform_extensions` block is acceptable;\n  - how loader, normalizer, public submission, and explorer consumers\n    must handle unknown extension keys;\n  - what evidence is required before moving an existing field.\n\nThe policy must distinguish internal dataclass fields from exported JSON\nkeys. Do not let a model cleanup imply a schema break.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Write a result-model extension policy covering platform-specific data and schema-v2 compatibility",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-result-model-extension-contract",
+        "notes": "Build a concise inventory covering at least:\n  - `native_comparison` and its `comparisons.native_duckdb` export;\n  - `ExecutionPhases.migration` and `phases.migration` export;\n  - the standalone pg_mooncake migration script's top-level `migration`\n    payload;\n  - `platform_info`, `platform_metadata`, `platform_raw_config`,\n    `platform_raw_metadata`;\n  - `platform_deployment`, `platform_cloud`, `platform_compute`,\n    `platform_storage`;\n  - `execution_context` and `_benchmark_id_override`.\n\nFor each row record current owner, exported key, loader reconstruction\nbehavior, downstream consumers, and recommended action:\n  - keep;\n  - alias;\n  - move internally only;\n  - migrate exported schema with compatibility;\n  - reject as not worth it.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create an extension inventory and migration matrix for current platform-specific fields",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-result-model-extension-contract",
+        "notes": "Before changing model shape, add focused tests or fixtures that prove\ncurrent behavior for `comparisons.native_duckdb`, `phases.migration`, and\nplatform metadata blocks through:\n  - `build_result_payload()`;\n  - `reconstruct_benchmark_results()`;\n  - public submission validation where applicable;\n  - explorer pipeline transformation where applicable.\n\nIf the matrix chooses no field migration yet, this work still protects\nfuture refactors by making the current contract explicit.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add consumer tests or fixtures that lock current extension behavior before migration",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "execution-results-result-model-extension-contract",
+        "notes": "Choose one narrow change from the w2 matrix that does not break exported\nresult JSON. Examples:\n  - add an internal `platform_extensions` field while continuing to\n    serialize existing keys unchanged;\n  - route one new platform-specific result through an extension block\n    without moving existing keys;\n  - add loader passthrough for unknown extension blocks while preserving\n    known fields.\n\nIf every field move is risky, record that as the outcome and stop after\npolicy, inventory, and tests. A \"no migration yet\" result is acceptable\nif it is evidence-backed.\n\nOutcome: no existing field was moved. The only code cleanup is accepting\nthe existing producer-emitted top-level `comparisons` key in schema-v2\nvalidation. Current extension locations are locked by tests and policy.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement only the lowest-risk internal extension cleanup approved by the matrix",
+        "wid": "w4"
+      }
+    ]
+  }
+}

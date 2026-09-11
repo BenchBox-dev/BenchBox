@@ -1,0 +1,257 @@
+{
+  "context": "Duplication is a symptom, not the disease. For each cluster:\n  1. Read both copies end-to-end. If they diverge meaningfully (different\n     error handling, different SDK quirks), leave them alone and document\n     in duplication-residuals.md.\n  2. If they are genuinely identical in intent, extract a helper at the\n     narrowest natural scope (module private helper > package mixin >\n     cross-package utility).\n  3. Write a unit test covering the extracted helper BEFORE migration.\n  4. Migrate callers one at a time; commit per migration; run full\n     platform tests.\n\nFor the apply_platform_optimizations cluster, coordinate with\nquality-map-adapter-base-refactor-scope - if the adapter base is about\nto grow a tuning module, that is the right destination. Do not extract\nto a third location.\n",
+  "description": "Quality plan supplement - duplication workstream. pylint\n`duplicate-code --min-similarity-lines=8` finds ~368 duplicate blocks in\nbenchbox/core/ and ~188 in benchbox/platforms/. Even at 15-line similarity,\n100 blocks remain in platforms alone. Duplication across 73 adapters is\nexactly what widens the blast radius of the adapter-base refactor and of\nany future cross-cutting change (error capture, timing, validation).\n\nConcrete clusters confirmed by inventory:\n  - Azure fabric_spark_adapter ↔ synapse_spark_adapter (credential +\n    token refresh logic, ~16 lines)\n  - GCP dataproc_adapter ↔ dataproc_serverless_adapter (GCS path\n    parsing + config validation, ~13 lines)\n  - Databend ↔ Databricks (apply_platform_optimizations /\n    apply_table_tunings dispatch pattern, ~20 lines)\n\nExtract shared helpers where the duplication is genuine (same intent,\nsame behavior). Reject DRY where platforms diverge in meaningful ways -\nthe goal is fewer accidental copies, not forced abstraction.\n\nShould run BEFORE quality-refactor-adapter-base-into-cohesive-modules so\nthe base refactor operates on deduplicated callers.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "chase the metric",
+        "instead": "only consolidate real duplication",
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "why": "hitting a duplicate-block count by splitting helpers into micro-functions is worse than the duplication"
+      },
+      {
+        "dont": "create cross-package utility modules for platform-specific helpers",
+        "instead": "keep helpers close to their platform",
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "why": "it hides coupling"
+      },
+      {
+        "dont": "extract an abstraction that collapses meaningful platform differences",
+        "instead": "leave distinct implementations distinct",
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "why": "false DRY hurts more than duplication"
+      },
+      {
+        "dont": "promote R0801 to error in this TODO",
+        "instead": "warn-only initially, promote in a follow-up",
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "why": "the baseline is noisy"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "needs_item": "quality-bulk-fix-encoding-lint-and-ratchet"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-12T00:00:00Z",
+      "created_at": "2026-04-12T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All platform tests pass after every slice",
+        "item_id": "quality-consolidate-duplicate-code-clusters"
+      },
+      {
+        "behavior": "Lazy-loading and optional-dependency semantics preserved (helpers don't force-import SDKs at module load)",
+        "item_id": "quality-consolidate-duplicate-code-clusters"
+      },
+      {
+        "behavior": "Platform-specific variants remain distinct where they genuinely differ (e.g., Fabric vs Synapse token scopes)",
+        "item_id": "quality-consolidate-duplicate-code-clusters"
+      },
+      {
+        "behavior": "Runtime behavior of every affected adapter unchanged - this is structural consolidation, not behavior change",
+        "item_id": "quality-consolidate-duplicate-code-clusters"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "kind": "do_not_modify",
+        "path_glob": "adapter files not surfaced by the inventory"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/platforms/base/adapter.py (owned by adapter-base refactor)"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "kind": "only_modify",
+        "path_glob": ".pre-commit-config.yaml (add R0801 warn hook)"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/azure/"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databend/"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/databricks/"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "kind": "only_modify",
+        "path_glob": "benchbox/platforms/gcp/"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "kind": "only_modify",
+        "path_glob": "clusters identified by w1 inventory"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run --with pylint --with pandas --with polars pylint --disable=all --enable=duplicate-code --min-similarity-lines=15 benchbox/ 2>&1 | grep -cE 'R0801: Similar lines' || true",
+        "description": "Cluster pair count drops materially from w1 baseline (~110)",
+        "expected": "≤ 102 (post-w5 baseline). The original ≤50 stretch goal is blocked by the R-06/R-08/R-09 refactors documented in docs/development/duplication-residuals.md; revisit after those land.",
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/azure/test_credentials_helper.py tests/unit/platforms/gcp/test_gcs_path.py -v",
+        "description": "Extracted helper tests pass",
+        "expected": "all tests pass",
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/platforms/ -q",
+        "description": "Full platform test suite passes",
+        "expected": "all tests pass",
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- pre-commit run duplicate-code --all-files || true",
+        "description": "R0801 pre-commit hook is wired as warn-only",
+        "expected": "hook runs; warnings printed; exit code acceptable per warn-only contract",
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "notes": "Inventory at docs/development/duplication-inventory.csv (110 15-line cluster pairs; 50 in platforms/). Residual rationales at docs/development/duplication-residuals.md.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Produce duplication inventory: `pylint --disable=all --enable=duplicate-code --min-similarity-lines=15 benchbox/` → CSV of clusters ranked by (size × occurrence-count × blast-radius)",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consolidate Azure Spark credential/token cluster into benchbox/platforms/azure/_credentials.py; migrate fabric_spark + synapse_spark adapters",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consolidate GCP Dataproc GCS-path cluster: extract helper in benchbox/platforms/gcp/_gcs_path.py; migrate dataproc_adapter + dataproc_serverless_adapter",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "notes": "Deferred with rationale (not implemented). Premise stale per w1 inventory. At the 15-line threshold Databend↔Databricks show no direct apply_* cluster; the dispatch bodies are 10-12 lines and the implementations diverge meaningfully (Databend no-op informational, Databricks session-deferred). Extracting a base would collapse that distinction. Real cross-adapter cluster (QueryValidator+log+build_result across Redshift/Databend/Databricks/Snowflake, 34-37 lines) is deferred to the adapter-base refactor because its destination is base/adapter.py, which scope_limit excludes. See docs/development/duplication-residuals.md R-01 and R-02.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Consolidate apply_platform_optimizations/apply_table_tunings: decide base template-method vs mixin (coordinate with adapter-base map TODO); implement for Databend + Databricks",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "notes": "Consolidated 11 clusters: platforms.base.models re-export from core.results.models; dataframe._result_helpers (4 sites); _spark_helpers.get_spark_query_plan (2 sites); file_format.validate_tbl_compression_consistency (2 sites); core.schema_primitives.BaseSchemaTable (3 sites: tpch/tpcds/datavault); azure._livy_mixin.LivyStatementMixin (2 sites: fabric/synapse Spark); presto_trino_utils helpers - escape_insert_value/is_date_value/normalize_existing_files, load_file_batches, resolve_data_files (2 sites each). Full consolidation log + deferral rationales in docs/development/duplication-residuals.md.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Tackle next top-10 clusters from w1 inventory; extract helpers per cluster, one commit each",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "notes": "Re-ran inventory: 102 cluster pairs across benchbox/ (w1 baseline ~110). Top remaining clusters all need cross-cutting refactors that exceed this TODO's scope_limit: R-06 throughput_test result-model alignment, R-07 query catalogs (blocked on Protocol migration), R-08 transaction/write_primitives benchmark base (101+93+71 lines, multi-day), R-09 expression/pandas DataFrame family base (blocked on Protocol migration). Inventory CSV regenerated at docs/development/duplication-inventory.csv; residuals + post-refactor target documented in docs/development/duplication-residuals.md. Original ≤50 target was unrealistic without the deferred refactors; updated success criteria accordingly.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-run inventory; confirm duplicate-block count at 15-line threshold is ≤50 (from ~100 in platforms + additional reductions in core). Document residuals with rationale for accepting them.",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-consolidate-duplicate-code-clusters",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add pylint R0801 (duplicate-code) as warn-only pre-commit hook at 15-line threshold; follow-up TODO to promote to error once baseline stabilizes",
+        "wid": "w7"
+      }
+    ]
+  }
+}

@@ -1,0 +1,171 @@
+{
+  "description": "PR #1051 (`fix/docs-linkcheck-resilience`) hardened the Sphinx\n`linkcheck` job against transient timeouts (60s timeout, retries,\nreport-timeouts-as-broken). A clean run of `make docs-linkcheck` on\nthat branch reports **0 broken / 0 timeouts** but **~49 permanent\nredirects** — external URLs that resolve fine (so CI stays green) but\npoint at stale locations that the upstream site 301/302-redirects to a\ncanonical URL.\n\nRedirects are informational and do NOT fail the build, so this is\npure hygiene: repoint the source links at their canonical targets so\nreaders (and future linkcheck runs) hit the real page directly. It is\nexplicitly NOT about the internal repo-relative links — those are the\nseparate `check_doc_relative_links.py` baseline burn-down tracked in\n`burn-down-baselined-broken-doc-links.yaml`. This TODO is external\nhttp/https only, driven off the Sphinx linkcheck redirect report.\n\nNOT every redirect should be chased — some are canonical/stable by\ndesign and repointing them is wrong or churny. Triage first (w1), then\nfix only the clear wins.\n\nRedirect clusters observed 2026-07-08 (regenerate to confirm before\nstarting — counts/targets drift as upstreams reorganize):\n  REPOINT (clear canonical wins):\n    - docs.snowflake.com/...html -> same path without `.html`  (~6)\n    - cloud.google.com/bigquery|storage -> docs.cloud.google.com/... (~10)\n    - clickhouse.com/docs/en/... -> clickhouse.com/docs/... (drop /en) (~4)\n    - arrow.apache.org/datafusion* -> datafusion.apache.org/* (2)\n    - docs.databricks.com/...html -> docs.databricks.com/aws/en/... (~3)\n    - docs.microsoft.com/... -> learn.microsoft.com/... (1)\n    - docs.influxdata.com/influxdb/latest -> .../v2 (1)\n    - docs.timescale.com -> www.tigerdata.com/docs (1)\n    - velodb.io -> www.velodb.io ; singlestore.com/cloud -> /product-overview\n    - clickhouse.cloud -> console.clickhouse.cloud\n    - github.com/mwc360/LakeBench -> github.com/microsoft/LakeBench (1)\n  LEAVE ALONE (do not repoint — record the decision in the PR):\n    - doi.org/10.7910/... -> dataverse.harvard.edu  (DOI is the stable\n      citation identifier; the redirect is the point of a DOI).\n    - github.com/.../issues/new -> github.com/login?return_to=...  (auth\n      gate for anonymous checkers; the source link is correct).\n    - *.readthedocs.io/ -> /en/stable/  (version canonicalization; low\n      value and prone to re-churn on the next docs release).\n    - http://www.cs.umb.edu/... and other `:443`/scheme-normalization\n      redirects that only add an explicit port/scheme.\n\nAlternative considered and rejected as the primary fix: silence stable\nredirects via `linkcheck_allowed_redirects` in `docs/conf.py`. That\nhides the signal rather than fixing the stale link, and readers still\nland on a redirect. Prefer fixing the source; reserve config for the\nLEAVE-ALONE set only if a future stricter policy is adopted.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "blindly follow a redirect that lands on a generic index page",
+        "instead": "find the real successor page or leave it with a note.",
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "why": "you would replace a specific (if stale) link with a less-useful one"
+      },
+      {
+        "dont": "repoint a DOI to its current dataverse landing page",
+        "instead": "leave DOIs alone.",
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "why": "the DOI is the durable citation identifier and the redirect is intentional"
+      },
+      {
+        "dont": "silence redirects with linkcheck_allowed_redirects as the primary fix",
+        "instead": "repoint the source URL.",
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "why": "it hides stale links instead of fixing them and readers still hit the redirect"
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-07-08T00:00:00Z",
+      "created_at": "2026-07-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "DOI, auth-gated, readthedocs-version, and scheme/port-only redirects are left as-is — repointing them is incorrect.",
+        "item_id": "canonicalize-redirected-external-doc-links"
+      },
+      {
+        "behavior": "Internal repo-relative link handling is untouched — that is the separate check_doc_relative_links.py baseline burn-down.",
+        "item_id": "canonicalize-redirected-external-doc-links"
+      },
+      {
+        "behavior": "Sphinx linkcheck stays green (0 broken, 0 timeouts) after edits.",
+        "item_id": "canonicalize-redirected-external-doc-links"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "burn-down-baselined-broken-doc-links.yaml — sibling docs-link TODO; REUSE its triage-table-in-PR pattern, but it covers INTERNAL repo-relative links via check_doc_relative_links.py; this TODO is genuinely new for EXTERNAL redirect canonicalization.",
+        "decision": "reuse",
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "path": "burn-down-baselined-broken-doc-links.yaml"
+      },
+      {
+        "concept": "docs/conf.py:linkcheck_* (added in PR #1051) — the linkcheck config that surfaces the redirect report; REUSE `make docs-linkcheck` output as the input, do not modify the config here.",
+        "decision": "reuse",
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "path": "docs/conf.py:linkcheck_*"
+      },
+      {
+        "concept": "docs/linkcheck_ignore.txt — existing external-link escape hatch for flaky/gated hosts; reference for where LEAVE-ALONE hosts would go IF a stricter policy is later adopted (not in scope now).",
+        "decision": "reuse",
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "path": "docs/linkcheck_ignore.txt"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/"
+      },
+      {
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "kind": "do_not_modify",
+        "path_glob": "docs/conf.py"
+      },
+      {
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "kind": "do_not_modify",
+        "path_glob": "docs/linkcheck_ignore.txt"
+      },
+      {
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/doc_relative_link_baseline.txt"
+      },
+      {
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "kind": "only_modify",
+        "path_glob": "docs/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "make docs-linkcheck",
+        "description": "REPOINTed links now resolve directly (no redirect); build clean",
+        "expected": "exit 0; 0 broken, 0 timeouts; redirect count reduced to the LEAVE-ALONE residual",
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "! rg -n 'docs\\.snowflake\\.com/[^ )]+\\.html' docs/",
+        "description": "Spot-check a representative canonicalization is gone from source",
+        "expected": "no matches (Snowflake .html links repointed)",
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --name-only develop -- scripts/doc_relative_link_baseline.txt",
+        "description": "No repo-relative links were collaterally touched (that is the other TODO)",
+        "expected": "empty (baseline untouched by this work)",
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "notes": "Bind the cited evidence before editing. On the implementation\nbranch run `make docs-linkcheck`, then extract the redirect report:\n  grep -E '\\[redirected' docs/_build/linkcheck/output.txt\n(or parse `output.json` for `\"status\": \"redirected\"`). Record in\nthe PR description: the develop SHA, the total redirect count, and\nany drift from the ~49 captured 2026-07-08 (the clusters in this\nTODO's description are that snapshot). If targets shifted, re-derive\nthe w2 groupings before proceeding.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Regenerate the redirect list against current develop",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "notes": "For each (source_file:line, from_url -> to_url) assign a disposition\nper the description's rules: REPOINT stale-path canonical rewrites;\nLEAVE-ALONE DOIs, auth redirects, readthedocs version canonicalization,\nand pure scheme/port (`:443`) normalizations. Record the table in the\nPR description as the audit trail for w2. When unsure, verify the\ntarget actually serves the intended content (open it) before\nrepointing — a redirect can land on a generic index (e.g. one AWS\n`whats-new` link collapses to `aws.amazon.com/about-aws/`), in which\ncase find the real successor page or LEAVE-ALONE with a note.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Triage every redirect into REPOINT vs LEAVE-ALONE",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "canonicalize-redirected-external-doc-links",
+        "notes": "Edit the source `.md`/`.rst` files to the canonical target URLs from\nthe w1 table. Fix external http/https links only; leave repo-relative\nlinks to the other checker. Re-run `make docs-linkcheck` and confirm\nthe REPOINTed URLs now report `ok` (working) rather than `redirected`,\nthe redirect count drops to the LEAVE-ALONE residual, and broken/\ntimeout stay at 0. Standard close-out: `make lint format typecheck`,\n`code review` (fix findings), `make pr-open`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the REPOINT edits and re-run linkcheck",
+        "wid": "w2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,377 @@
+{
+  "context": "Start by deciding the canonical global header from real rendered surfaces,\nthen make every surface consume or test-enforce that contract. Treat Results\nExplorer's secondary nav as a product-specific child nav, not as part of the\nglobal shell. Keep CSS token names compatible with the follow-up light/dark\ntheme work so phase 2 can swap values without rewriting header markup again.\n",
+  "description": "The public BenchBox site currently ships multiple independent header\nimplementations. The landing page uses `landing/index.html` and\n`landing/style.css`; docs/blog inject a Furo-adjacent header from\n`docs/_templates/page.html` and `docs/_static/custom.css`; Results Explorer\nrenders a separate Preact header in `results-explorer/src/components/Layout.tsx`.\nThose headers differ in link set, CTA presence, max width, fixed/sticky/static\npositioning, spacing, mobile behavior, active state, and theme assumptions.\n\nThis is a product-shell defect: the user should experience one BenchBox\nglobal header everywhere, including `/`, `/docs/`, `/blog/`, and `/results/`.\nResults Explorer may keep a secondary Results-specific navigation row below\nthe global header, but the global header itself must be identical in content,\nlayout, spacing, colors, active-link behavior, and responsive behavior.\n\nThis phase intentionally solves only the shared header contract. It should\nnot attempt the full light/dark retheme; it must, however, avoid introducing\nnew header styling that will block the follow-up theme phase.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "copy-paste three visually similar headers and call them unified",
+        "instead": "(not specified)",
+        "item_id": "benchbox-site-header-unification",
+        "why": "the current defect is independent implementations drifting."
+      },
+      {
+        "dont": "make the Results global header almost identical except for spacing or CTA behavior",
+        "instead": "(not specified)",
+        "item_id": "benchbox-site-header-unification",
+        "why": "the user requirement is identical."
+      },
+      {
+        "dont": "remove Furo's theme controls or search while harmonizing docs/blog",
+        "instead": "(not specified)",
+        "item_id": "benchbox-site-header-unification",
+        "why": "docs usability is outside the header defect."
+      },
+      {
+        "dont": "start the full dark/light retheme in this phase",
+        "instead": "(not specified)",
+        "item_id": "benchbox-site-header-unification",
+        "why": "phase 1 needs a stable shell contract first."
+      },
+      {
+        "dont": "use the Results secondary nav to justify changing the global header",
+        "instead": "(not specified)",
+        "item_id": "benchbox-site-header-unification",
+        "why": "the secondary nav is a separate product navigation layer."
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchbox-site-header-unification",
+        "id": 347,
+        "reason": "Owned by dependent TODO `benchbox-light-dark-theme-system`; this phase must avoid blocking it but should not implement it opportunistically.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] obsolete: Dependent TODO benchbox-light-dark-theme-system is Completed (2026-05-14); full light/dark theme switching already shipped.",
+        "summary": "Full light/dark theme switching"
+      },
+      {
+        "created_at": "2026-07-18T19:50:09Z",
+        "from_item": "benchbox-site-header-unification",
+        "id": 348,
+        "reason": "The request is header parity, not new navigation architecture. Keep the Results secondary nav unless a concrete usability defect requires a separate TODO.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: Deferred only if a concrete usability defect surfaces requiring a new Explorer IA TODO; none identified.",
+        "summary": "Redesign the Results Explorer information architecture"
+      }
+    ],
+    "item_meta": {
+      "category": "User Experience",
+      "completed_at": "2026-05-14T00:00:00Z",
+      "created_at": "2026-05-13T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Docs/blog Furo search, sidebar, edit/view buttons, keyboard navigation, and built-in theme controls remain functional.",
+        "item_id": "benchbox-site-header-unification"
+      },
+      {
+        "behavior": "Existing public URLs continue to work: `/`, `/docs/`, `/blog/`, `/results/`, GitHub, and installation/run-benchmark destination.",
+        "item_id": "benchbox-site-header-unification"
+      },
+      {
+        "behavior": "Header changes do not alter Results Explorer data queries, result routes, compare flow, or DuckDB loading.",
+        "item_id": "benchbox-site-header-unification"
+      },
+      {
+        "behavior": "Landing smooth-scroll/copy interactions and mobile navigation remain functional.",
+        "item_id": "benchbox-site-header-unification"
+      },
+      {
+        "behavior": "One global BenchBox header contract applies to landing, docs/blog, and Results Explorer.",
+        "item_id": "benchbox-site-header-unification"
+      },
+      {
+        "behavior": "Results Explorer keeps a clearly separate secondary Results navigation row unless a separate IA decision changes it.",
+        "item_id": "benchbox-site-header-unification"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "docs/_static/custom.css:10 — current docs nav CSS, including forced dark overrides",
+        "decision": "reuse",
+        "item_id": "benchbox-site-header-unification",
+        "path": "docs/_static/custom.css:10"
+      },
+      {
+        "concept": "docs/_templates/page.html:14 — current Sphinx/Furo injected site navigation",
+        "decision": "reuse",
+        "item_id": "benchbox-site-header-unification",
+        "path": "docs/_templates/page.html:14"
+      },
+      {
+        "concept": "landing/index.html:20 — current public landing header markup; candidate canonical global link set",
+        "decision": "reuse",
+        "item_id": "benchbox-site-header-unification",
+        "path": "landing/index.html:20"
+      },
+      {
+        "concept": "landing/script.js:3 — current landing smooth-scroll and mobile menu behavior",
+        "decision": "reuse",
+        "item_id": "benchbox-site-header-unification",
+        "path": "landing/script.js:3"
+      },
+      {
+        "concept": "landing/shared/ — preferred new home for shared static shell CSS/JS if this TODO creates reusable assets",
+        "decision": "reuse",
+        "item_id": "benchbox-site-header-unification",
+        "path": "landing/shared/"
+      },
+      {
+        "concept": "landing/style.css:55 — current landing nav spacing, fixed positioning, backdrop, and responsive rules",
+        "decision": "reuse",
+        "item_id": "benchbox-site-header-unification",
+        "path": "landing/style.css:55"
+      },
+      {
+        "concept": "results-explorer/e2e/routes/home.spec.ts:28 — existing mixed-theme assertion that phase 2 must supersede",
+        "decision": "supersede",
+        "item_id": "benchbox-site-header-unification",
+        "path": "results-explorer/e2e/routes/home.spec.ts:28"
+      },
+      {
+        "concept": "results-explorer/src/components/Layout.tsx:18 — current Results Explorer global header and secondary nav",
+        "decision": "reuse",
+        "item_id": "benchbox-site-header-unification",
+        "path": "results-explorer/src/components/Layout.tsx:18"
+      },
+      {
+        "concept": "results-explorer/src/components/__tests__/Layout.test.tsx:30 — current Results header/link/active-state unit coverage",
+        "decision": "reuse",
+        "item_id": "benchbox-site-header-unification",
+        "path": "results-explorer/src/components/__tests__/Layout.test.tsx:30"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/db.ts"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/src/lib/duckdbQueries.ts"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "only_modify",
+        "path_glob": "_project/analysis/"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "only_modify",
+        "path_glob": "docs/_static/"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "only_modify",
+        "path_glob": "docs/_templates/"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "only_modify",
+        "path_glob": "docs/conf.py"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "only_modify",
+        "path_glob": "landing/"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "only_modify",
+        "path_glob": "landing/shared/"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/Layout.tsx"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/Layout.test.tsx"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "kind": "only_modify",
+        "path_glob": "tests/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- src/components/__tests__/Layout.test.tsx",
+        "description": "Results Explorer layout tests pass after header refactor",
+        "expected": "Layout tests pass and assert global-header parity plus Results subnav separation",
+        "item_id": "benchbox-site-header-unification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'benchbox-site-header|site-header|nav-logo|Run benchmark|Results' landing docs/_templates docs/_static results-explorer/src/components/Layout.tsx",
+        "description": "Landing header source uses the shared header contract",
+        "expected": "review output shows one shared/global header contract, not divergent local implementations",
+        "item_id": "benchbox-site-header-unification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- sphinx-build -b html docs docs/_build/html",
+        "description": "Docs build still succeeds",
+        "expected": "Sphinx build succeeds without template or static asset errors",
+        "item_id": "benchbox-site-header-unification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run build",
+        "description": "Results Explorer builds",
+        "expected": "Vite build succeeds",
+        "item_id": "benchbox-site-header-unification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "Run the header parity browser check added by this TODO for landing, docs/blog, and Results at desktop and mobile widths",
+        "description": "Cross-surface visual parity check passes",
+        "expected": "global header labels, spacing, active state, CTA, logo, and mobile behavior match across surfaces",
+        "item_id": "benchbox-site-header-unification",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "benchbox-site-header-unification",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "needs_wid": "w2",
+        "wid": "w5"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "benchbox-site-header-unification",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "benchbox-site-header-unification",
+        "notes": "Inspect the current landing, docs/blog, and Results Explorer header\nimplementations and capture a compact comparison matrix covering:\n- link order and labels;\n- external URL casing and target behavior;\n- CTA presence and destination;\n- max width, height, padding, gap, typography, border, backdrop, and z-index;\n- fixed vs sticky vs static positioning;\n- active-link semantics for Home, Docs, Blog, Results, and GitHub;\n- mobile breakpoint behavior and keyboard/focus behavior.\n\nDecision gate: choose the canonical header contract before editing code.\nThe default should be the public landing header shape unless a specific\naccessibility or routing issue requires a documented adjustment. Record\nthe chosen contract in a short analysis note or in the implementation PR\ndescription; do not let each surface make local design choices.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Capture current header variants and define the exact global-header contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-site-header-unification",
+        "notes": "Extract the canonical header markup and CSS into reusable site-shell\nassets that landing and docs/blog can consume without duplicating class\ndefinitions. Prefer a small shared CSS file and template/include strategy\nthat works with the existing static landing deployment and Sphinx/Furo\ndocs build.\n\nPreferred durable home: keep static shared shell assets under\n`landing/shared/` and copy/reference them from docs as part of the normal\ndocs static build, or document why that path is not viable before choosing\na different location. The implementation must leave a clear source of\ntruth so the next header change has one obvious file to edit.\n\nThe shared contract must include:\n- the exact global link set and order;\n- active-state attributes/classes that can be applied by page context;\n- mobile menu behavior if the canonical header needs it;\n- no hard dependency on the Results Explorer Vite build;\n- no duplicated magic numbers between landing and docs custom CSS.\n\nDecision gate: if true shared includes are impractical because of the\ndeployment pipeline, document the constraint and keep one generated source\nof truth or a test-enforced mirror. Do not manually fork the header again.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Create a shared static header asset contract for non-React pages",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-site-header-unification",
+        "notes": "Replace the landing page's local header markup/styles with the shared\nglobal-header contract while preserving landing-only section links only\nif the contract explicitly allows an in-page secondary section nav. If\nsection links remain, they must be visually distinct from the global\nheader and must not appear as global site navigation on other surfaces.\n\nPreserve existing copy buttons, smooth-scroll behavior, mobile menu\nbehavior, and first-viewport hero layout. Any JS moved from\n`landing/script.js` must remain static-file friendly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the shared header to the landing page",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-site-header-unification",
+        "notes": "Replace the docs/blog custom nav in `docs/_templates/page.html` and\n`docs/_static/custom.css` with the shared global-header contract. Keep\nFuro's sidebars, search, edit/view buttons, keyboard navigation, and\nbuilt-in theme controls working.\n\nRemove or revise the existing docs CSS that forces the BenchBox nav to\nstay dark under `[data-theme=\\\"light\\\"]`, because phase 2 will make the\nheader theme-aware. For this phase, preserve the current visual result\nunless the chosen canonical contract says otherwise.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the shared header to docs and blog without breaking Furo controls",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-site-header-unification",
+        "notes": "Refactor `results-explorer/src/components/Layout.tsx` so the global\nheader matches the canonical shared header. Keep the Results Explorer\nsecondary nav (`Leaderboards`, `Benchmarks`, `Platforms`, `Compare`,\n`Query`) below the global header as a separate product nav with its own\naria-label and active-state tests.\n\nThe Results global header must not invent different spacing, link order,\nCTA text, max width, border treatment, or mobile behavior. It may use a\nPreact component wrapper only to integrate routing and active state.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Apply the shared global header to Results Explorer and preserve the Results subnav",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "benchbox-site-header-unification",
+        "notes": "Add verification that compares the global header across:\n- landing `/`;\n- docs `/docs/`;\n- blog `/blog/` if locally buildable;\n- Results `/results/`.\n\nAt minimum, assert identical visible global nav labels/order, CTA label\nand URL, logo URL, active-link semantics, and mobile behavior. Add\ndesktop and mobile visual screenshots or DOM snapshots sufficient to\ncatch future drift. Results-specific secondary nav must be asserted as\nseparate from the global header, not as a reason for global-header drift.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add cross-surface header parity tests and screenshots",
+        "wid": "w5"
+      }
+    ]
+  }
+}

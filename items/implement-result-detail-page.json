@@ -1,0 +1,170 @@
+{
+  "context": "Render from per-result detail JSON files. Pre-render at build time for SEO\nand fast loading. Enhance with JS for sorting, charts, and companion files.\nKeep the page layout clean and scannable - metadata at top, query table\nprominent, companion data expandable.\n",
+  "description": "Build the result detail page at `/results/r/{result_id}`. This is the\ncanonical public page for a single benchmark result - the page users share,\nlink to, and bookmark. It shows full metadata, per-query timing breakdown,\nvalidation status, environment info, and a download link to the raw bundle.\n\nThis is the Geekbench \"result page\" equivalent for BenchBox. Every result in\nthe corpus gets a stable, pre-rendered detail page.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "compute aggregate statistics on the detail page that aren't in the source data",
+        "instead": "aggregation belongs in compare/browse views",
+        "item_id": "implement-result-detail-page",
+        "why": "the detail page shows one result truthfully"
+      },
+      {
+        "dont": "require JavaScript to see basic result data",
+        "instead": "JS enhances, it doesn't gate",
+        "item_id": "implement-result-detail-page",
+        "why": "pre-rendered HTML is better for SEO and sharing"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "implement-result-detail-page",
+        "needs_item": "scaffold-results-explorer-frontend"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-04-03T00:00:00Z",
+      "created_at": "2026-03-29T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Every detail page must link to the raw canonical schema-v2 bundle for download",
+        "item_id": "implement-result-detail-page"
+      },
+      {
+        "behavior": "Pre-rendered HTML must show full metadata and query table without JavaScript",
+        "item_id": "implement-result-detail-page"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "implement-result-detail-page",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "implement-result-detail-page",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm run build && ls dist/r/*/index.html | wc -l",
+        "description": "Vite build succeeds and detail pages are pre-rendered",
+        "expected": "≥30 (matching seed corpus size)",
+        "item_id": "implement-result-detail-page",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && grep -c '<td>' dist/r/$(ls dist/r/ | head -1)/index.html",
+        "description": "Pre-rendered detail pages contain query table without JavaScript",
+        "expected": "≥22 (one row per query minimum)",
+        "item_id": "implement-result-detail-page",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run typecheck && npm run build",
+        "description": "Detail page component tests pass",
+        "expected": "Typecheck and build both pass",
+        "item_id": "implement-result-detail-page",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "implement-result-detail-page",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "implement-result-detail-page",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "implement-result-detail-page",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "implement-result-detail-page",
+        "needs_wid": "w1",
+        "wid": "w5"
+      },
+      {
+        "item_id": "implement-result-detail-page",
+        "needs_wid": "w2",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "implement-result-detail-page",
+        "notes": "The detail page for `/results/r/{result_id}` shows:\n\nHeader section:\n- Benchmark name + platform name (large, prominent)\n- Scale factor, date, total duration\n- Trust badge: \"Maintainer Run\" (Phase 1 only has this label)\n- \"Download Raw Bundle\" button linking to the canonical schema-v2 JSON\n\nMetadata panel:\n- Environment: OS, arch, CPU count, memory\n- Configuration: compression, tuning mode, validation mode, phases run\n- Query summary: N passed, N failed, total queries\n\nData source: per-result detail JSON from `details/{result_id}.json`\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the result detail page layout and metadata display",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-result-detail-page",
+        "notes": "Show per-query results in a sortable table:\n| Query | Time (ms) | Rows | Status |\n|-------|-----------|------|--------|\n| Q1    | 45.2      | 4    | passed |\n| Q2    | 12.1      | 460  | passed |\n...\n\nAdd a simple bar chart showing query times (horizontal bars, sorted by\nquery ID or by duration). This can be a lightweight SVG/Canvas chart -\nno need for a charting library. The chart gives visual context that the\ntable alone doesn't provide.\n\nHighlight failed queries in red. Show validation details if available.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Implement the query timing table and visualization",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-result-detail-page",
+        "notes": "If the result has companion files (.plans.json, .tuning.json):\n- Show a \"Query Plans\" expandable section with plan text per query\n- Show a \"Tuning Configuration\" section with applied tuning clauses\n- Link to companion file downloads\n\nIf companions are not available, hide the sections cleanly.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add companion file display (query plans, tuning config)",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-result-detail-page",
+        "notes": "- \"Compare with another result\" button that navigates to compare view\n  with this result pre-selected\n- Breadcrumb: Results > TPC-H > DuckDB > This Result\n- \"Other results for this benchmark\" and \"Other results on this platform\"\n  quick links (from manifest data)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add compare action and navigation context",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "implement-result-detail-page",
+        "notes": "During Vite build, read manifest.json and generate static HTML for every\nresult: `/results/r/{result_id}/index.html`. Each page includes the full\nmetadata and query table in the HTML (no JS required for basic content).\nJavaScript enhances with sorting, charts, and companion file display.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Pre-render detail pages at build time",
+        "wid": "w5"
+      }
+    ]
+  }
+}

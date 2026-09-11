@@ -1,0 +1,328 @@
+{
+  "description": "Commit 35212ca4e23ba11ee01dfcacbdc7deec383073c8 removed ~140 archived spec files\nthat were superseded by docs/benchmarks/ and docs/platforms/. A post-deletion gap\nanalysis comparing the deleted specs against the current docs found 11 doc pages\nwith missing, incorrect, or incomplete content.\n\nFindings are grouped by severity:\n- P1: Factually wrong content in docs (must be verified against code before editing)\n- P2: Significant functional gaps (entire features or API surfaces undocumented)\n- P3: Notable omissions (useful but not blocking)\n\nCRITICAL RULE: Every work unit has a research gate. Run the stated verification\ncommands FIRST to establish ground truth from the implementation. Never edit docs\nsolely based on what the spec said - specs were the source of divergence in several\ncases (e.g. coffeeshop: spec said 50M orders, code says 8.5M, docs are correct).",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "batch all edits into a single commit",
+        "instead": "(not specified)",
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "why": "if one finding turns out to be wrong, a granular commit history makes it easy to revert just that edit."
+      },
+      {
+        "dont": "copy text from the archived spec into the doc verbatim",
+        "instead": "(not specified)",
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "why": "specs were sometimes incorrect (see coffeeshop SF order count discrepancy). Always verify against the implementation first."
+      },
+      {
+        "dont": "document 'planned' platform support as if it is current",
+        "instead": "(not specified)",
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "why": "the transaction-primitives spec listed MySQL/Snowflake/Databricks, but those adapters may not be registered in benchmark_registry.py. Only document what is wired up."
+      },
+      {
+        "dont": "skip the research gate for P1 items",
+        "instead": "(not specified)",
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "why": "the gap analysis agent found cases where the spec was wrong and the docs were correct. Running the grep commands takes 30 seconds; writing incorrect docs takes hours to fix."
+      }
+    ],
+    "item_meta": {
+      "category": "Documentation",
+      "completed_at": "2026-04-16T00:00:00Z",
+      "created_at": "2026-07-18T19:50:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All heading hierarchy and tag frontmatter in each .md file",
+        "item_id": "reconcile-docs-from-spec-gap-analysis"
+      },
+      {
+        "behavior": "Existing accurate content in each doc page - edits should ADD missing information, not replace correct existing descriptions",
+        "item_id": "reconcile-docs-from-spec-gap-analysis"
+      },
+      {
+        "behavior": "The correct SF=1 order count in coffeeshop.md (8.5M) - DO NOT change this to 50M even though the spec said 50M; the code (generator.py:57) is authoritative",
+        "item_id": "reconcile-docs-from-spec-gap-analysis"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "do_not_modify",
+        "path_glob": "tests/"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/amplab.md"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/clickbench.md"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/coffeeshop.md"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/datavault.md"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/metadata-primitives.md"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/nyctaxi.md"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/tpc-di.md"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/tpc-ds-obt.md"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/tpc-ds.md"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/tpc-h.md"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/transaction-primitives.md"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/tsbs-devops.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/ -k 'transaction_primitives or nyctaxi or coffeeshop or amplab or datavault or tpcds or tpcdi' -m fast -q --tb=no 2>&1 | tail -5",
+        "description": "Fast benchmark tests still pass after docs edits",
+        "expected": "passed",
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd docs && make linkcheck 2>&1 | grep -c 'broken' || echo '0'",
+        "description": "No broken links introduced in docs",
+        "expected": "0",
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "needs_wid": "w4",
+        "wid": "w11"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "needs_wid": "w7",
+        "wid": "w12"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "needs_wid": "w8",
+        "wid": "w13"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "needs_wid": "w9",
+        "wid": "w13"
+      },
+      {
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "needs_wid": "w5",
+        "wid": "w14"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "RESEARCH GATE (run before editing):\n  # Verify operation count\n  python3 -c \"\n  import yaml\n  ops = yaml.safe_load(open('benchbox/core/transaction_primitives/catalog/operations.yaml'))\n  print('op count:', len(ops.get('operations', ops)))\n  \"\n  # Verify get_operations_by_category exists\n  grep -n \"def get_operations_by_category\" benchbox/core/transactional/benchmark_base.py\n  # Verify cleanup_auxiliary_files exists\n  grep -n \"def cleanup_auxiliary_files\" benchbox/core/transaction_primitives/benchmark.py\n\nEDITS NEEDED in docs/benchmarks/transaction-primitives.md:\n  1. API reference section: change \"Get all available operations (8 total)\" to \"Get all\n     available operations (23 total)\". The operations.yaml has 23 entries - confirmed.\n  2. Add `get_operations_by_category(category)` method signature to API Reference:\n     defined in benchbox/core/transactional/benchmark_base.py:182. Returns dict of\n     operations matching the given category string.\n  3. Add `cleanup_auxiliary_files()` method signature to API Reference:\n     defined in benchbox/core/transaction_primitives/benchmark.py. Call after teardown\n     to remove any generated temp files.\n  4. Platform support section: the spec listed MySQL, Snowflake, Databricks, and\n     Redshift. Before adding these to the docs, check\n     `benchbox/core/benchmark_registry.py` and `benchbox/core/results/benchmark_specs.py`\n     to confirm which platforms are registered for transaction_primitives. Only document\n     platforms that have registered adapters; flag others as \"planned\".\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix transaction-primitives.md: correct get_all_operations() count (8 → 23) and add missing API methods",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "RESEARCH GATE (run before editing):\n  # Verify hash algorithm list\n  grep -rn \"sha1\\|sha256\\|md5\\|hash_algo\\|SUPPORTED_HASH\" \\\n    benchbox/core/datavault/ 2>/dev/null | head -20\n  # Confirm ValidationReport dataclass\n  grep -rn \"class ValidationReport\\|ValidationReport\\|validate_loads\" \\\n    benchbox/core/datavault/ 2>/dev/null | head -20\n  # Get ValidationReport fields\n  grep -A15 \"class ValidationReport\" benchbox/core/datavault/ -r 2>/dev/null\n  # Check ETL source file naming pattern\n  grep -rn \"shard\\|_04d\\|csv.gz\\|naming\" benchbox/core/datavault/generator.py 2>/dev/null | head -10\n\nEDITS NEEDED in docs/benchmarks/datavault.md:\n  1. If sha1 is in SUPPORTED_HASH or equivalent list: add it to the Hash Algorithms\n     section between md5 and sha256 (alphabetical or by security level).\n  2. If ValidationReport class exists: add it to the API Reference section with all\n     confirmed fields (hub_count, link_count, sat_count, etc. - verify each field\n     name by reading the actual dataclass definition).\n  3. ETL source file naming: if sharding pattern is in the code, add a note in the\n     Data Generation section: \"Source files are sharded as {entity}_{N:04d}.csv.gz.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix datavault.md: add SHA1 hash algorithm and ValidationReport API object",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "Depends on w4 research findings. After w4 verifies the disk schema from code,\nupdate the schema table in docs/benchmarks/tsbs-devops.md to include all columns\nfound in benchbox/core/tsbs_devops/schema.py.\n\nAlso add a note under the disk and net table schemas: \"These metrics are cumulative\ncounters - compute delta between consecutive samples for rate values.\" Only add this\nif it is confirmed accurate by checking the actual data generation and any query\nexamples in benchbox/core/tsbs_devops/.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix tsbs-devops.md (P3): expand disk table schema and add counter semantics note",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "Depends on w7 research findings. If SCD Type 2 validation queries were confirmed to\nexist in the tpcdi codebase, add a \"Validation Approach\" section to\ndocs/benchmarks/tpc-di.md describing:\n- That the benchmark validates SCD Type 2 correctness by checking effective/expiry\n  date chains for no gaps and no overlaps\n- The specific tables where SCD Type 2 semantics are tested (DimCustomer, DimAccount,\n  DimSecurity, etc. - use actual table names from the code)\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix tpc-di.md (P3): add SCD Type 2 validation methodology section",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "Batch fix for P3 items whose research was already performed in w8 and w9.\n\n1. docs/benchmarks/tpc-h.md - DuckDB thread safety caveat:\n   Confirmed or denied in w8. If confirmed, add to DuckDB platform notes.\n\n2. docs/benchmarks/tpc-ds.md - --allow-unofficial-scale for SF<1:\n   Confirmed or denied in w9. If confirmed, add to Scale Factor section.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix P3 omissions from w8/w9 research: tpc-h thread safety and tpc-ds --allow-unofficial-scale",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "Batch fix for remaining P3 items. Run research gate for each before editing.\n\n1. docs/benchmarks/coffeeshop.md - dim_locations.regional_weight column:\n   RESEARCH GATE:\n     grep -n \"regional_weight\" benchbox/core/coffeeshop/schema.py benchbox/core/coffeeshop/generator.py\n   If the column exists in the schema, add it to the dim_locations schema table\n   with a one-line description: \"Relative weight used by the sales distribution\n   generator to bias orders toward high-traffic locations.\"\n   NOTE: the docs are CORRECT on SF=1 order count (8.5M); the spec was wrong.\n   Do NOT change the order count - generator.py:57 confirms SF1_ORDER_COUNT = 8_500_000.\n\n2. docs/benchmarks/clickbench.md - CSV empty-string preservation:\n   RESEARCH GATE:\n     grep -rn \"empty\\|''\\|empty_string\\|csv.*null\\|null.*csv\" \\\n       benchbox/core/clickbench/ 2>/dev/null | head -10\n   If empty-string preservation logic exists in the CSV loader, add a callout in\n   the \"Loading Data\" section: \"The CSV loader preserves empty strings as empty\n   (not NULL). ClickBench result validation uses string equality (= '') which\n   requires this behavior.\"\n\n3. docs/benchmarks/metadata-primitives.md - tier model definition:\n   Confirmed or denied in w5. If tier concept exists in code, add a legend row\n   below the platform table defining Tier 1 / 2 / 3 meanings.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix P3 omissions: coffeeshop regional_weight, clickbench CSV semantics, metadata-primitives tier legend",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "RESEARCH GATE (run before editing):\n  # Check generator for canonical row counts\n  grep -n \"SF1\\|scale_factor\\|row_count\\|rankings\\|uservisit\\|document\" \\\n    benchbox/core/amplab/generator.py benchbox/core/amplab/benchmark.py 2>/dev/null | head -30\n  # Check schema for row count annotations\n  grep -n \"row_count\\|rankings\\|uservisit\\|document\" \\\n    benchbox/core/amplab/schema.py 2>/dev/null | head -20\n  # Check pagerank range\n  grep -n \"pagerank\\|page_rank\\|1000\\|10000\" \\\n    benchbox/core/amplab/generator.py 2>/dev/null | head -20\n\nRESOLUTION RULE:\n  - If code says SF=1 → Rankings=100K: update docs (currently 250K)\n  - If code says SF=1 → Rankings=250K: spec was wrong, docs are correct - no change\n  - Same logic for UserVisits, Documents, and PageRank range (1-1,000 vs 1-10,000)\n  - Document the formula (not just the SF=1 value) so all scale factors are derivable\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix amplab.md: verify and correct row count table and PageRank value range",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "RESEARCH GATE (run before editing):\n  # Count actual query files\n  find benchbox/core/tpcds_obt/ -name \"*.sql\" -o -name \"*.yaml\" 2>/dev/null | wc -l\n  # Check the query registry / catalog\n  grep -rn \"query_id\\|excluded\\|skip\\|unsupported\" \\\n    benchbox/core/tpcds_obt/ 2>/dev/null | head -30\n  # Check benchmark_specs.py for obt query list\n  grep -A5 \"tpcds_obt\\|tpc_ds_obt\" benchbox/core/results/benchmark_specs.py 2>/dev/null | head -20\n\nEDITS NEEDED in docs/benchmarks/tpc-ds-obt.md:\n  - If query count < 99: replace \"Same 99 queries\" with the actual count and explain\n    which categories are excluded (inventory-fact, external-dimension-lookup, etc.)\n    with a one-line reason for each exclusion category.\n  - If query count = 99: spec was wrong, no change needed.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix tpc-ds-obt.md: correct '99 queries' claim and document excluded query categories",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "RESEARCH GATE (run before editing):\n  # Get disk table column list from schema\n  grep -n \"disk\\|reads_merged\\|writes_merged\\|sectors\\|io_time\\|weighted\" \\\n    benchbox/core/tsbs_devops/schema.py 2>/dev/null | head -30\n  # Check duration scaling formula\n  grep -n \"duration\\|days\\|scale_factor\\|max(\" \\\n    benchbox/core/tsbs_devops/generator.py benchbox/core/tsbs_devops/benchmark.py 2>/dev/null | head -20\n\nRESOLUTION RULE:\n  - disk table: document ALL columns present in schema.py. Spec listed 14; docs have 7.\n    Add any missing columns with their types and a one-line description.\n  - Duration: if generator uses `max(1, SF)` days: correct docs (currently claims \"fixed\n    2 days\"). If generator uses a fixed duration: spec was wrong, keep docs as-is.\n  - Either way, add a note that disk/net metrics are cumulative counters requiring delta\n    computation between samples (verify this is accurate by checking query patterns in\n    benchbox/core/tsbs_devops/queries.py).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix tsbs-devops.md: verify disk table schema and duration scaling behavior",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "RESEARCH GATE (run before editing):\n  # Find ACL support detection or tier assignments in code\n  grep -rn \"acl\\|ACL\\|tier\\|snowflake\\|bigquery\\|databricks\" \\\n    benchbox/core/metadata_primitives/ 2>/dev/null | grep -i \"support\\|tier\\|full\\|partial\\|none\" | head -20\n  # Check which platforms have registered ACL operations\n  grep -rn \"acl_operations\\|acl_queries\\|acl_support\" \\\n    benchbox/core/metadata_primitives/ 2>/dev/null | head -20\n\nRESOLUTION RULE:\n  - The spec placed Snowflake/BigQuery in Tier 3 (no SQL-level ACL introspection);\n    the docs mark them \"Full\". Code is ground truth. Correct whichever is wrong.\n  - Add the three-tier definition to the docs platform table:\n    Tier 1 = full SQL-level ACL introspection, Tier 2 = partial, Tier 3 = none.\n    Only add this if the tier concept is reflected in the actual implementation.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix metadata-primitives.md: reconcile ACL platform tiers and document tier definitions",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "RESEARCH GATE (run before editing):\n  # Confirm spatial.py API surface\n  grep -n \"^def \\|^class \" benchbox/core/nyctaxi/spatial.py\n  # Count spatial queries\n  grep -c '\"category\": \"spatial\"' benchbox/core/nyctaxi/spatial.py 2>/dev/null || \\\n    grep -c \"spatial\" benchbox/core/nyctaxi/spatial.py\n  # Check benchmark-option integration\n  grep -n \"spatial\" benchbox/core/nyctaxi/benchmark.py | head -20\n  # Check CLI registration\n  grep -rn \"spatial\" benchbox/cli/ 2>/dev/null | head -10\n\nEDITS NEEDED in docs/benchmarks/nyctaxi.md:\n  The entire spatial layer is absent. Add a new \"Spatial Queries\" section covering:\n  1. Overview: spatial queries require a platform extension (DuckDB Spatial,\n     PostGIS, ClickHouse geo, BigQuery GIS, etc.)\n  2. A platform support table sourced from `check_spatial_support()` return values\n     (benchbox/core/nyctaxi/spatial.py:780)\n  3. Query categories as defined in spatial.py (spatial-distance-top-routes,\n     spatial-borough-centroids, spatial-radius-search, etc.)\n  4. API reference entries for:\n     - `get_spatial_queries(platform: str) -> dict` (spatial.py:681)\n     - `get_spatial_create_table_sql(dialect: str) -> str` (spatial.py:715)\n     - `check_spatial_support(platform: str) -> dict` (spatial.py:780)\n  5. `TAXI_ZONE_CENTROIDS` reference data description (spatial.py:21)\n  6. CLI option: check benchbox/cli/ and benchmark.py for how spatial is toggled\n     (--benchmark-option spatial=true/false or equivalent). Only document what\n     is actually wired - if the option doesn't exist yet, note it as planned.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix nyctaxi.md: document the spatial query layer (benchbox/core/nyctaxi/spatial.py)",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "RESEARCH GATE (run before editing):\n  # Get definitive query list and naming from code\n  find benchbox/core/tpcdi/ -name \"*.sql\" -o -name \"*.yaml\" 2>/dev/null | head -20\n  grep -rn \"query_id\\|VQ\\|AQ\\|EQ\\|V[0-9]\\|A[0-9]\\|DQ\" \\\n    benchbox/core/tpcdi/ 2>/dev/null | head -30\n  # Check FinWire parser\n  find benchbox/core/tpcdi/ -name \"*.py\" | xargs grep -ln \"finwire\\|FinWire\\|fixed.width\" 2>/dev/null\n  # Check pandas dependency\n  grep -rn \"import pandas\\|from pandas\" benchbox/core/tpcdi/ 2>/dev/null | head -5\n\nEDITS NEEDED in docs/benchmarks/tpc-di.md:\n  1. Query catalog: the spec (VQ/AQ/EQ, 30 queries) and docs (V/A/DQ, 16 queries)\n     diverge significantly. Use the actual SQL files and/or YAML catalog in the\n     codebase as the ONLY source of truth. Rewrite the query catalog section to\n     match what is actually implemented.\n  2. FinWire format: if benchbox/core/tpcdi/ contains a FinWire parser, add a\n     \"FinWire Format\" section explaining: what FinWire is (TPC-DI's proprietary\n     fixed-width flat file format), what files it parses, and that it requires\n     the pandas dependency for fixed-width reading.\n  3. SCD Type 2 validation: if validation queries exist in tpcdi/, describe the\n     validation methodology (effective/expiry date chain checks).\n  4. If pandas is imported, add it to the prerequisites section.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix tpc-di.md: reconcile query catalog naming and add FinWire format documentation",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "RESEARCH GATE (run before editing):\n  # Check if composite metric calculation is implemented\n  grep -rn \"QphH\\|qph\\|composite\\|Power@Size\\|Throughput@Size\\|geometric\" \\\n    benchbox/core/tpch/ 2>/dev/null | head -20\n  # Check maintenance test (RF1/RF2) implementation\n  grep -rn \"RF1\\|RF2\\|refresh\\|maintenance\\|insert.*order\\|delete.*order\" \\\n    benchbox/core/tpch/ 2>/dev/null | head -20\n  # Check DataFrame query coverage\n  find benchbox/core/tpch/ -name \"*.py\" | xargs grep -ln \"dataframe\\|DataFrame\" 2>/dev/null\n  # Check DuckDB thread safety caveat\n  grep -rn \"thread\\|concurrent\\|in.memory\" benchbox/core/tpch/ 2>/dev/null | head -10\n\nEDITS NEEDED in docs/benchmarks/tpc-h.md:\n  1. Only add QphH@Size / composite metrics section if the code actually computes\n     these values (check BenchmarkResults fields in benchbox/core/results/). If not\n     implemented, note them as \"TPC-H official metrics - not computed by BenchBox.\"\n  2. Only add RF1/RF2 section if maintenance phase operations are implemented in the\n     codebase. Check benchbox/core/tpch/maintenance.py or equivalent.\n  3. DataFrame coverage: if all 22 queries have DataFrame equivalents, add a one-liner\n     noting this to the DataFrame platform row in the platform support table.\n  4. Thread safety caveat: if the DuckDB in-memory limitation is real and code-confirmed,\n     add a callout box to the DuckDB platform section.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix tpc-h.md: add official composite metrics (QphH@Size) and RF1/RF2 maintenance test",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "reconcile-docs-from-spec-gap-analysis",
+        "notes": "RESEARCH GATE (run before editing):\n  # Check QphDS implementation\n  grep -rn \"QphDS\\|composite\\|geometric\\|Power@Size\\|Throughput@Size\" \\\n    benchbox/core/tpcds/ 2>/dev/null | head -20\n  # Check throughput permutation modes\n  grep -rn \"permut\\|stream\\|order\\|sequential\\|random\" \\\n    benchbox/core/tpcds/ 2>/dev/null | grep -iv \"import\\|comment\" | head -20\n  # Check maintenance operations\n  find benchbox/core/tpcds/ -name \"maintenance*\" -o -name \"*refresh*\" 2>/dev/null\n  grep -rn \"maintenance\\|INSERT\\|UPDATE\\|DELETE\" \\\n    benchbox/core/tpcds/ 2>/dev/null | grep -v \".pyc\\|#\" | head -20\n  # Check --allow-unofficial-scale handling\n  grep -rn \"allow.unofficial\\|unofficial_scale\" benchbox/ 2>/dev/null | head -5\n\nEDITS NEEDED in docs/benchmarks/tpc-ds.md:\n  1. Composite metric: same rule as TPC-H - only document if computed by BenchBox.\n  2. Throughput permutation: if code implements multiple stream ordering modes, add\n     a brief explanation with the mode names.\n  3. Maintenance operations: if INSERT/UPDATE/DELETE maintenance ops are implemented,\n     add a \"Maintenance Phase\" section describing what runs between power and throughput.\n  4. --allow-unofficial-scale: confirm the flag name via\n     `grep -rn \"allow.unofficial\" benchbox/cli/` then add a note to the scale factor\n     section: \"SF < 1 requires --allow-unofficial-scale flag (uses patched dsdgen).\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fix tpc-ds.md: add QphDS metric, throughput permutation modes, and maintenance ops",
+        "wid": "w9"
+      }
+    ]
+  }
+}

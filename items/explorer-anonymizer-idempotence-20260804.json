@@ -1,0 +1,133 @@
+{
+  "context": "The recognition logic already exists in the repo but only inside the migration tool: _PUBLIC_HASH_RE and _preserve_public_hashes in _project/scripts/results_explorer_corpus_migrate.py. Lift that into the anonymizer so both surfaces share one rule, then decide whether to re-derive the corpus from pre-#1467 originals so source values sit one pass from raw. Re-deriving changes result_id for every bundle, which is currently free: nothing is published, docs.yml's deploy job has never run on release and release carries zero result bundles.",
+  "description": "AnonymizationManager.anonymize_result_payload is not a fixed point. _hash_public_identifier computes sha256(salt|prefix|value)[:12] without recognising that value is already a pseudonym of that shape, so anonymizing its own output yields a different token. Verified on develop after #1467: source machine_3d46427037d2 publishes as machine_f8dd3066dcd1, and the publish pass changes bytes for 203/203 corpus bundles. #1467 wrote already-anonymized 12-hex pseudonyms into results-data/bundles (202 of 203 primary bundles carry a 12-hex machine_id), so the corpus now sits two passes from the raw values while a fresh community submission arrives at one. The same physical machine therefore publishes under two different pseudonyms depending on whether its result predates the migration. Nothing fails; the Explorer's same-machine correlation is just silently wrong. The same argument applies to host_ and path_ tokens.",
+  "legacy": {
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-04T12:27:48Z",
+      "completed_pr": 1512,
+      "created_at": "2026-08-04T11:32:06Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "No private value is ever passed through unredacted by the new recognition rule",
+        "item_id": "explorer-anonymizer-idempotence-20260804"
+      },
+      {
+        "behavior": "Pseudonym identity is never treated as a provenance or trust signal, since a submitter can choose their own token once shapes pass through",
+        "item_id": "explorer-anonymizer-idempotence-20260804"
+      },
+      {
+        "behavior": "find_public_path_leaks semantics are unchanged - it stays the single detector for submission and Explorer boundaries",
+        "item_id": "explorer-anonymizer-idempotence-20260804"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "explorer-anonymizer-idempotence-20260804",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/results_explorer_corpus_migrate.py"
+      },
+      {
+        "item_id": "explorer-anonymizer-idempotence-20260804",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/results/anonymization.py"
+      },
+      {
+        "item_id": "explorer-anonymizer-idempotence-20260804",
+        "kind": "only_modify",
+        "path_glob": "results-data/**"
+      },
+      {
+        "item_id": "explorer-anonymizer-idempotence-20260804",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/results/**"
+      },
+      {
+        "item_id": "explorer-anonymizer-idempotence-20260804",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/scripts/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py -q -k idempot",
+        "description": "Public anonymization is a fixed point over the real corpus",
+        "expected": "Exits 1 on the unfixed tree, where re-anonymizing the anonymizer's own output changes all 203 corpus bundles, and exits 0 once the transform is a fixed point. Write the test in w1 so this rung becomes runnable.",
+        "item_id": "explorer-anonymizer-idempotence-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:18:49Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/core/results/test_anonymization.py -q",
+        "description": "Canonical detector contract still passes",
+        "expected": "Detector semantics unchanged",
+        "item_id": "explorer-anonymizer-idempotence-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:18:57Z",
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q",
+        "description": "Explorer pipeline still passes",
+        "expected": "No regression in publication behaviour",
+        "item_id": "explorer-anonymizer-idempotence-20260804",
+        "last_result": "pass",
+        "last_run": "2026-08-04T12:19:04Z",
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "explorer-anonymizer-idempotence-20260804",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "explorer-anonymizer-idempotence-20260804",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "PR #1512, commit 767468edf7. _hash_public_identifier now returns the value unchanged when _is_public_pseudonym(value, prefix) matches, i.e. the value already carries THIS prefix's pseudonym shape at the exact emitted 12-hex digest width. Scoped deliberately tighter than the migration tool's ^(?:machine|host|path|...)_[0-9a-f]{8,64}$: a capture-side machine_<16 hex> is still hashed (internal id never published verbatim) and a host_ token cannot survive inside a path_ field. Derives the prefix in hand rather than enumerating one (27 prefixes in use vs the 10 that pattern listed). Measured: publish pass changed bytes for 203/203 bundles before, 0/203 after. Also dropped _preserve_public_hashes from results_explorer_corpus_migrate.py - now a no-op on all 203 bundles, migration reports 207/207 unchanged without it, leaving the anonymizer as single authority.",
+        "item_id": "explorer-anonymizer-idempotence-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T12:19:21Z",
+        "started_branch": "claude/nifty-kowalevski-52c3eb",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Pass through values already matching the public pseudonym shape so anonymization reaches a fixed point",
+        "wid": "w0"
+      },
+      {
+        "evidence": "PR #1512, commit 767468edf7. Two layers. (1) tests/unit/scripts/test_corpus_privacy_invariant.py::test_anonymizing_the_corpus_twice_matches_anonymizing_it_once - whole-corpus gate asserting anonymize(anonymize(x)) == anonymize(x) over every corpus JSON, routing .tuning.json through anonymize_tuning_payload as the publisher does, with a non-vacuous-scan guard. (2) TestPublicPseudonymFixedPoint in tests/unit/core/results/test_anonymization.py - fixed point for result and tuning payloads, emitter/recognizer agreement across all 27 prefixes (pins the [:12] slice against the accepted width so they cannot drift apart), plus guards that a 16-hex capture-side machine id is still hashed and that pass-through does not cross prefixes. Negative control: reverting the pass-through fails 5 of these gates including the corpus-wide one, so they are not vacuous. Ladder rungs 1/2/3 pass: 2, 113, 319 tests.",
+        "item_id": "explorer-anonymizer-idempotence-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T12:19:35Z",
+        "started_branch": "claude/nifty-kowalevski-52c3eb",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Pin the fixed point with a test over the real corpus",
+        "wid": "w1"
+      },
+      {
+        "evidence": "PR #1512. DECIDED: do not re-derive; corpus left untouched. The premise that stored bundles are two passes from raw does not hold. Checked all 206 pre-#1467 originals at 37370ce5e4^: H(raw_16hex) == the current stored 12-hex value for 206/206. The corpus was always exactly one pass from raw - only publication was doubling it - so fixing the boundary is sufficient. Confirmed end to end: after the fix, a fresh submission of the raw pre-#1467 bundle and the curated bundle publish the SAME machine_id for 206/206 (agree=206 disagree=0), which was the actual grouping bug. Independent corroboration: results-data/bundles/path-privacy-migration.manifest.json already recorded new_result_id values that match today's publication for 207/207, i.e. the manifest recorded the intended single-pass IDs and the fix brought publication into line with them. Published bytes do change so every result_id changes; free today - origin/release carries zero bundles (verified) and the docs deploy job has never run on release.",
+        "item_id": "explorer-anonymizer-idempotence-20260804",
+        "notes": null,
+        "started_at": "2026-08-04T12:19:49Z",
+        "started_branch": "claude/nifty-kowalevski-52c3eb",
+        "started_worktree": "/Users/joe/Developer/BenchBox/.claude/worktrees/nifty-kowalevski-52c3eb",
+        "status": "done",
+        "summary": "Decide and execute whether to re-derive the corpus from pre-#1467 originals",
+        "wid": "w2"
+      }
+    ]
+  }
+}

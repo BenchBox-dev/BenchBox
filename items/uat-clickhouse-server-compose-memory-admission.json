@@ -1,0 +1,169 @@
+{
+  "context": "Thread the resolved per-platform memory request through Docker asset parsing and the execute admission gate, preserve the existing 0-disables semantics only for explicit supervised overrides, add runtime-limit/reserve telemetry, and test missing-variable, malformed-limit, under-budget, exact-budget, and post-start mismatch cases.",
+  "description": "After calibration selects M, make the ClickHouse server compose stack request that exact memory limit via an explicit environment-resolved mem_limit, and make the UAT entry path fail closed before provisioning unless measured host available memory covers the requested VM/container bytes plus the configured host reserve. After startup, verify the runtime limit and remaining reserve separately; never double-count the request or silently fall back to 1 GiB.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "needs_item": "uat-clickhouse-server-streaming-memory-calibration"
+      }
+    ],
+    "item_meta": {
+      "category": "correctness",
+      "completed_at": "2026-08-13T17:36:01Z",
+      "completed_pr": 1713,
+      "created_at": "2026-08-12T22:57:56Z",
+      "worktree": "clickhouse-compose-memory-admission"
+    },
+    "scope_rules": [
+      {
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "kind": "only_modify",
+        "path_glob": "docker/clickhouse/docker-compose.yml"
+      },
+      {
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "kind": "only_modify",
+        "path_glob": "docs/operations/uat-framework.md"
+      },
+      {
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/config.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/conftest.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/docker_assets.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/phases/execute.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_config.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_docker_assets.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_phases.py"
+      },
+      {
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "kind": "only_modify",
+        "path_glob": "tests/uat/test_sweep_durability.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest -q tests/uat/test_docker_assets.py tests/uat/test_phases.py tests/uat/test_config.py",
+        "description": "Focused memory admission tests",
+        "expected": "pass",
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "last_result": "pass",
+        "last_run": "2026-08-13T17:33:16Z",
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "test -f /Users/joe/Developer/BenchBox.wt-clickhouse-compose-memory-admission/docker/clickhouse/docker-compose.yml && grep -Fq \"mem_limit: \\${CLICKHOUSE_MEMORY_LIMIT}\" /Users/joe/Developer/BenchBox.wt-clickhouse-compose-memory-admission/docker/clickhouse/docker-compose.yml && ! grep -Eiq \"1g|1000-row|1000 rows\" /Users/joe/Developer/BenchBox.wt-clickhouse-compose-memory-admission/docker/clickhouse/docker-compose.yml && printf PASS",
+        "description": "Compose source admission guard",
+        "expected": "PASS",
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "last_result": "pass",
+        "last_run": "2026-08-13T17:33:18Z",
+        "seq": 9,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "env -i PATH=/usr/bin:/bin:/opt/homebrew/bin HOME=/Users/joe CLICKHOUSE_MEMORY_LIMIT=4g /bin/sh -c 'out=$(/opt/homebrew/bin/mocker compose -f /Users/joe/Developer/BenchBox.wt-clickhouse-compose-memory-admission/docker/clickhouse/docker-compose.yml config) && printf \"%s\\\\n\" \"$out\" | grep -Eq \"memory: 4g\" && ! printf \"%s\\\\n\" \"$out\" | grep -Eiq \"1g|1000-row|1000 rows\" && printf PASS'",
+        "description": "Mocker compose admission with isolated environment",
+        "expected": "PASS",
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "last_result": "pass",
+        "last_run": "2026-08-13T17:33:20Z",
+        "seq": 10,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "env -u VIRTUAL_ENV make -C /Users/joe/Developer/BenchBox.wt-clickhouse-compose-memory-admission-clean pr-preflight && env -i PATH=/usr/bin:/bin:/opt/homebrew/bin HOME=/Users/joe CLICKHOUSE_MEMORY_LIMIT=4g /bin/sh -c 'out=$(/opt/homebrew/bin/mocker compose -f /Users/joe/Developer/BenchBox.wt-clickhouse-compose-memory-admission-clean/docker/clickhouse/docker-compose.yml config) && printf \"%s\\\\n\" \"$out\" | grep -Eq \"memory: 4g\" && ! printf \"%s\\\\n\" \"$out\" | grep -Eiq \"1g|1000-row|1000 rows\" && printf PASS'",
+        "description": "Clean compose branch preflight and Mocker config",
+        "expected": "PASS",
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "last_result": "pass",
+        "last_run": "2026-08-13T17:35:56Z",
+        "seq": 12,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "env -i PATH=/usr/bin:/bin:/opt/homebrew/bin HOME=/Users/joe CLICKHOUSE_MEMORY_LIMIT=8g /bin/sh -c 'out=$(/opt/homebrew/bin/mocker compose -f /Users/joe/Developer/BenchBox.wt-clickhouse-compose-memory-admission-clean/docker/clickhouse/docker-compose.yml config) && printf \"%s\\\\n\" \"$out\" | grep -Eq \"memory: 8g\" && ! printf \"%s\\\\n\" \"$out\" | grep -Eiq \"1g|1000-row|1000 rows\" && printf PASS'",
+        "description": "Default SF1 memory admission guard",
+        "expected": "PASS",
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "last_result": "pass",
+        "last_run": "2026-08-13T17:35:58Z",
+        "seq": 13,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "tracked calibration dependency and the native streaming/no-1000-row loader contract in PR #1706 and its focused tests",
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "notes": null,
+        "started_at": "2026-08-13T16:13:36Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Revalidate calibration dependency and the no-fallback streaming loader contract",
+        "wid": "w0"
+      },
+      {
+        "evidence": "implemented docker/clickhouse mem_limit from CLICKHOUSE_MEMORY_LIMIT with strict missing/empty/malformed/zero rejection; focused config and asset tests pass",
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "notes": null,
+        "started_at": "2026-08-13T16:13:49Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Enforce explicit ClickHouse compose memory resolution and strict parsing",
+        "wid": "w1"
+      },
+      {
+        "evidence": "implemented host request-plus-reserve admission, exact runtime limit validation, and memory-aware teardown; focused phase and durability tests pass",
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "notes": null,
+        "started_at": "2026-08-13T16:14:01Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Add request-aware host admission and exact post-start runtime checks",
+        "wid": "w2"
+      },
+      {
+        "evidence": "focused suite passed (348 tests), full preflight passed (27878 passed, 19 skipped), and direct Mocker config guard rendered memory: 4g with no 1g/1000-row fallback",
+        "item_id": "uat-clickhouse-server-compose-memory-admission",
+        "notes": null,
+        "started_at": "2026-08-13T16:14:14Z",
+        "started_branch": "develop",
+        "started_worktree": "/Users/joe/Developer/BenchBox",
+        "status": "done",
+        "summary": "Verify focused tests, preflight, compose rendering, and scoped branch evidence",
+        "wid": "w3"
+      }
+    ]
+  }
+}

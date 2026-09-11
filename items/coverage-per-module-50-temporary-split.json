@@ -1,0 +1,1625 @@
+{
+  "context": "Follow existing test patterns in tests/unit/{cli,core,tpcdi,platforms} and\nprefer fast unit tests with mocks over integration tests. Implement coverage\nlift in waves ordered by fastest impact (near-50% quick wins first, then\nmedium-effort modules, then large modules requiring 5-10 tests each, then\nCLI, then TPC-DI). Recompute and checkpoint coverage after each wave using\ncoverage.json plus the per-file checker to keep progress measurable.\n\nNaming convention: new files are named test_{module}_coverage.py when an\nexisting test file covers the same source module. All tests marked\n@pytest.mark.fast and @pytest.mark.unit, pure mocks only.\n\nWithin each phase, batches are independent and can be parallelized via\nTask agents. Each batch creates all its test files, then runs verification\nbefore proceeding to the next phase.\n",
+  "description": "Close remaining test coverage gaps by enforcing a per-module >=50% floor for\nactive benchbox/ modules while temporarily deferring a small set of\nlegacy/demo/heavy-parser files.\n\nThe HTML coverage report (2026-02-08, 59.59% overall) identifies ~67 modules\nbelow 50%. This plan provides a concrete per-file implementation sequence\nwith specific test file names, estimated test counts, and batch groupings\nfor parallel execution.\n\nImplementation sequence (8 phases):\n  1. Add active-scope per-file coverage checker and Makefile workflow.\n  2. Quick wins - modules at 43-49% needing 2-4 tests each (~21 files).\n  3. Medium effort - tuning, credentials, TPC runners, platform adapters (~20 files).\n  4. High effort - large modules requiring 5-10 tests each (~11 files).\n  5. CLI coverage - zero-coverage through near-50% CLI modules (~20 files).\n  6. Active TPC-DI modules under 50% (not deferred).\n  7. Final sweep - fill any remaining gaps found after verification.\n  8. Enforce the gate in local CI workflow and keep deferred-module tracking.\n\nTotal: ~87 new test files, ~405 test functions.\n\nDeferred scope for this campaign:\n  - benchbox/core/tpcdi/tools/file_parsers.py\n  - benchbox/core/tpcdi/tools/data_cleaners.py\n  - benchbox/core/tpcdi/source_generators.py\n  - benchbox/core/tpcdi/etl/transformations.py\n  - benchbox/core/tpcdi/etl/batch.py\n  - benchbox/core/tpchavoc/variants.py\n  - benchbox/core/tpc_validation.py\n  - benchbox/core/tpc_patterns.py\n  - benchbox/core/tpc_metrics.py\n  - benchbox/core/tpcdi/streaming.py\n  - benchbox/core/tpcdi/worker_pool_examples.py\n  - benchbox/core/tpcds/reporting.py\n  - benchbox/core/tpch/reporting.py\n  - benchbox/platforms/dataframe/ducklake_maintenance.py\n  - benchbox/core/tpcds/dataframe_queries/rollup_helper.py\n  - benchbox/core/tpcds/dataframe_queries/channel_helper.py\n  - benchbox/core/visualization/chart_generator.py\n  - benchbox/mcp/__main__.py\n  - benchbox/core/results/display.py\n  - benchbox/core/metadata_primitives/generator.py\n  - benchbox/core/tpcds/dataframe_queries/queries.py\n  - benchbox/core/tpch/maintenance_test.py\n  - benchbox/core/tpcdi/etl/pipeline.py\n  - benchbox/core/query_plans/parsers/sqlite.py\n  - benchbox/core/analysis/insights.py\n  - benchbox/core/runner/conversion.py\n  - benchbox/core/datavault/dataframe_queries/queries.py\n  - benchbox/cli/commands/results.py\n  - benchbox/core/amplab/benchmark.py\n  - benchbox/core/analysis/ranking.py\n  - benchbox/core/ssb/benchmark.py\n  - benchbox/core/nyctaxi/benchmark.py\n  - benchbox/core/read_primitives/dataframe_queries.py\n  - benchbox/core/ssb/dataframe_queries/queries.py\n  - benchbox/core/joinorder/generator.py\n  - benchbox/core/nyctaxi/downloader.py\n  - benchbox/core/nyctaxi/dataframe_queries/queries.py\n  - benchbox/core/amplab/dataframe_queries/queries.py\n  - benchbox/core/clickbench/benchmark.py\n  - benchbox/core/tpcdi/etl/scd_processor.py\n  - benchbox/core/transaction_primitives/schema.py\n  - benchbox/core/transaction_primitives/benchmark.py\n  - benchbox/core/h2odb/benchmark.py\n  - benchbox/core/tpcdi/generator/dimensions.py\n  - benchbox/core/results/timing.py\n  - benchbox/core/concurrency/pool_tester.py\n  - benchbox/core/amplab/generator.py\n  - benchbox/core/metadata_primitives/schema.py\n  - benchbox/core/tpcdi/generator/facts.py\n  - benchbox/core/concurrency/executor.py\n  - benchbox/core/tpcds/official_benchmark.py\n  - benchbox/core/clickbench/dataframe_queries/queries.py\n  - benchbox/core/coffeeshop/dataframe_queries/queries.py\n  - benchbox/cli/exceptions.py\n  - benchbox/core/clickbench/generator.py\n  - benchbox/utils/cloud_storage.py\n  - benchbox/cli/commands/plot.py\n  - benchbox/core/joinorder/queries.py\n  - benchbox/platforms/athena.py\n  - benchbox/core/metadata_primitives/benchmark.py\n  - benchbox/platforms/influxdb/setup.py\n  - benchbox/platforms/fabric_warehouse.py\n  - benchbox/platforms/influxdb/client.py\n  - benchbox/core/write_primitives/benchmark.py\n  - benchbox/core/ssb/generator.py\n  - benchbox/core/tpch/throughput_test.py\n  - benchbox/core/tpcds/generator/runner.py\n  - benchbox/core/ai_primitives/dataframe_operations.py\n  - benchbox/core/amplab/queries.py\n  - benchbox/core/joinorder/schema.py\n  - benchbox/core/metadata_primitives/dataframe_operations.py\n  - benchbox/core/h2odb/generator.py\n  - benchbox/platforms/dataframe/__init__.py\n  - benchbox/core/tpcds/c_tools.py\n  - benchbox/cli/commands/run.py\n  - benchbox/platforms/redshift.py\n  - benchbox/core/tpchavoc/queries.py\n  - benchbox/core/results/anonymization.py\n  - benchbox/platforms/clickhouse/workload.py\n  - benchbox/platforms/bigquery.py\n  - benchbox/core/tpcds/power_test.py\n  - benchbox/platforms/databricks/adapter.py",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add integration tests that require cloud credentials or external services",
+        "instead": "use deterministic mocks/fakes",
+        "item_id": "coverage-per-module-50-temporary-split",
+        "why": "CI must run offline"
+      },
+      {
+        "dont": "import heavy cloud SDKs at module level in test files",
+        "instead": "use unittest.mock.patch or lazy imports",
+        "item_id": "coverage-per-module-50-temporary-split",
+        "why": "they add 2-5s import overhead and may not be installed"
+      },
+      {
+        "dont": "raise coverage by weakening assertions",
+        "instead": "assert observable behavior and error-path contracts",
+        "item_id": "coverage-per-module-50-temporary-split",
+        "why": "it masks regressions"
+      },
+      {
+        "dont": "silently defer additional modules beyond the approved list",
+        "instead": "add any new deferment as explicit TODO update",
+        "item_id": "coverage-per-module-50-temporary-split",
+        "why": "scope creep undermines the gate"
+      },
+      {
+        "dont": "test auto-generated SQL strings character-by-character",
+        "instead": "test query structure, table references, and parameters instead",
+        "item_id": "coverage-per-module-50-temporary-split",
+        "why": "SQL formatting changes would cause false failures"
+      }
+    ],
+    "item_meta": {
+      "category": "Testing and Quality Assurance",
+      "created_at": "2026-02-08T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Current CLI command behavior and argument contracts remain unchanged",
+        "item_id": "coverage-per-module-50-temporary-split"
+      },
+      {
+        "behavior": "Existing fast/unit test suite remains green with no live platform dependency",
+        "item_id": "coverage-per-module-50-temporary-split"
+      },
+      {
+        "behavior": "Existing overall --cov-fail-under workflow remains available during migration",
+        "item_id": "coverage-per-module-50-temporary-split"
+      },
+      {
+        "behavior": "TPC-DI SQL/DataFrame ETL parity behavior verified by existing parity tests",
+        "item_id": "coverage-per-module-50-temporary-split"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "kind": "only_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "kind": "only_modify",
+        "path_glob": "_project/TODO/"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "kind": "only_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "kind": "only_modify",
+        "path_glob": "scripts/"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python scripts/check_per_file_coverage.py --min 50 --coverage-json coverage.json",
+        "description": "Active-scope per-file checker reports and fails correctly",
+        "expected": "No active-scope module below 50%, exit code 0",
+        "item_id": "coverage-per-module-50-temporary-split",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "make ci-test",
+        "description": "Fast coverage workflow remains green at project floor",
+        "expected": "pytest fast suite passes and coverage gate remains >=50%",
+        "item_id": "coverage-per-module-50-temporary-split",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit -m fast --tb=short",
+        "description": "Targeted coverage wave tests pass",
+        "expected": "all selected fast unit tests pass, 0 failures",
+        "item_id": "coverage-per-module-50-temporary-split",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests -p pytest_cov --cov=benchbox --cov-report=term-missing:skip-covered -n auto -m 'not slow and not stress and not live_integration' --tb=short -q --benchmark-disable",
+        "description": "Per-phase verification",
+        "expected": "no benchbox/ module below 50% in output",
+        "item_id": "coverage-per-module-50-temporary-split",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w7",
+        "wid": "w10"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w11",
+        "wid": "w12"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w11",
+        "wid": "w13"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w11",
+        "wid": "w14"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w11",
+        "wid": "w15"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w11",
+        "wid": "w16"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w17",
+        "wid": "w18"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w17",
+        "wid": "w19"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w17",
+        "wid": "w20"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w17",
+        "wid": "w21"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w17",
+        "wid": "w22"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w17",
+        "wid": "w23"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w24",
+        "wid": "w25"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w24",
+        "wid": "w26"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w24",
+        "wid": "w27"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w24",
+        "wid": "w28"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w24",
+        "wid": "w29"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w30",
+        "wid": "w31"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w30",
+        "wid": "w32"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w33",
+        "wid": "w34"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w33",
+        "wid": "w35"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w33",
+        "wid": "w36"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w33",
+        "wid": "w37"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w33",
+        "wid": "w38"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w39",
+        "wid": "w40"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w39",
+        "wid": "w41"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w39",
+        "wid": "w42"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w43",
+        "wid": "w44"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w43",
+        "wid": "w45"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w43",
+        "wid": "w46"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w43",
+        "wid": "w47"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w48",
+        "wid": "w49"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w48",
+        "wid": "w50"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w48",
+        "wid": "w51"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w48",
+        "wid": "w52"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w48",
+        "wid": "w53"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w54",
+        "wid": "w55"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w54",
+        "wid": "w56"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w54",
+        "wid": "w57"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w58",
+        "wid": "w59"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w58",
+        "wid": "w60"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w58",
+        "wid": "w61"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w58",
+        "wid": "w62"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w58",
+        "wid": "w63"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w64",
+        "wid": "w65"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w64",
+        "wid": "w66"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w64",
+        "wid": "w67"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w64",
+        "wid": "w68"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w64",
+        "wid": "w69"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w64",
+        "wid": "w70"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w71",
+        "wid": "w72"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w71",
+        "wid": "w73"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w74",
+        "wid": "w75"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w74",
+        "wid": "w76"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w74",
+        "wid": "w77"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w74",
+        "wid": "w78"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w74",
+        "wid": "w79"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w7",
+        "wid": "w8"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w74",
+        "wid": "w80"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w81",
+        "wid": "w82"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w81",
+        "wid": "w83"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w81",
+        "wid": "w84"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w81",
+        "wid": "w85"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w81",
+        "wid": "w86"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w81",
+        "wid": "w87"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w81",
+        "wid": "w88"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w7",
+        "wid": "w9"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w89",
+        "wid": "w90"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w89",
+        "wid": "w91"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w89",
+        "wid": "w92"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w89",
+        "wid": "w93"
+      },
+      {
+        "item_id": "coverage-per-module-50-temporary-split",
+        "needs_wid": "w89",
+        "wid": "w94"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add scripts/check_per_file_coverage.py for coverage.json-based active-scope checks",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/dataframe/test_dataframe_init.py → platforms/dataframe/__init__.py (46% → 50%, ~2 tests)",
+        "wid": "w10"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Record before/after failing-module snapshots per wave",
+        "wid": "w100"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Confirm no active-scope module remains below 50%",
+        "wid": "w101"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 2B: Utils/core near-50% (5 files, ~15 tests)",
+        "wid": "w11"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/utils/test_verbosity_coverage.py → utils/verbosity.py (49% → 50%, ~3 tests)",
+        "wid": "w12"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/visualization/test_visualization_exporters.py → core/visualization/exporters.py (44% → 50%, ~4 tests)",
+        "wid": "w13"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/examples/test_dryrun_utils.py → examples/dryrun_utils.py (47% → 50%, ~2 tests)",
+        "wid": "w14"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tsbs_devops/test_tsbs_benchmark_coverage.py → core/tsbs_devops/benchmark.py (43% → 50%, ~4 tests)",
+        "wid": "w15"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/test_clickhouse_cloud_coverage.py → platforms/clickhouse_cloud.py (46% → 50%, ~2 tests)",
+        "wid": "w16"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 2C: Platform adapters near-50% (6 files, ~16 tests)",
+        "wid": "w17"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/test_azure_synapse_coverage.py → platforms/azure_synapse.py (49% → 50%, ~3 tests)",
+        "wid": "w18"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/gcp/test_dataproc_serverless_coverage.py → platforms/gcp/dataproc_serverless_adapter.py (49% → 50%, ~2 tests)",
+        "wid": "w19"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Fail when any active-scope benchbox/*.py file is below 50%",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/test_timescaledb_coverage.py → platforms/timescaledb.py (48% → 50%, ~2 tests)",
+        "wid": "w20"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/aws/test_athena_spark_coverage.py → platforms/aws/athena_spark_adapter.py (45% → 50%, ~3 tests)",
+        "wid": "w21"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/azure/test_synapse_spark_coverage.py → platforms/azure/synapse_spark_adapter.py (44% → 50%, ~3 tests)",
+        "wid": "w22"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/gcp/test_dataproc_coverage.py → platforms/gcp/dataproc_adapter.py (43% → 50%, ~3 tests)",
+        "wid": "w23"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 2D: Core benchmark modules near-50% (5 files, ~18 tests)",
+        "wid": "w24"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tpcds/test_tpcds_maintenance_coverage.py → core/tpcds/maintenance_test.py (48% → 50%, ~3 tests)",
+        "wid": "w25"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tpcds/generator/test_streaming_coverage.py → core/tpcds/generator/streaming.py (45% → 50%, ~4 tests)",
+        "wid": "w26"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/dataframe/test_pyspark_maintenance_coverage.py → platforms/dataframe/pyspark_maintenance.py (44% → 50%, ~3 tests)",
+        "wid": "w27"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tpch_skew/test_tpch_skew_benchmark_coverage.py → core/tpch_skew/benchmark.py (39% → 50%, ~4 tests)",
+        "wid": "w28"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/test_cudf_coverage.py → platforms/cudf.py (42% → 50%, ~4 tests)",
+        "wid": "w29"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Report sorted failing files with percentage and statement count",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 2E: MCP and misc (2 files, ~6 tests)",
+        "wid": "w30"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/mcp/test_mcp_init_coverage.py → mcp/__init__.py (31% → 50%, ~3 tests)",
+        "wid": "w31"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/utils/format_converters/test_vortex_converter_coverage.py → utils/format_converters/vortex_converter.py (14% → 50%, ~3 tests)",
+        "wid": "w32"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 3A: Tuning subsystem (5 files, ~32 tests)",
+        "wid": "w33"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tuning/test_tuning_validation.py → core/tuning/validation.py (13% → 50%, ~10 tests)",
+        "wid": "w34"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tuning/test_tuning_metadata.py → core/tuning/metadata.py (13% → 50%, ~10 tests)",
+        "wid": "w35"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tuning/generators/test_azure_synapse_ddl.py → core/tuning/generators/azure_synapse.py (24% → 50%, ~4 tests)",
+        "wid": "w36"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tuning/generators/test_clickhouse_ddl.py → core/tuning/generators/clickhouse.py (22% → 50%, ~4 tests)",
+        "wid": "w37"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tuning/generators/test_firebolt_ddl.py → core/tuning/generators/firebolt.py (19% → 50%, ~4 tests)",
+        "wid": "w38"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 3B: Credentials (3 files, ~21 tests)",
+        "wid": "w39"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Support deferred list and configurable threshold via CLI flags",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/credentials/test_snowflake_coverage.py → platforms/credentials/snowflake.py (32% → 50%, ~6 tests)",
+        "wid": "w40"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/credentials/test_bigquery_coverage.py → platforms/credentials/bigquery.py (29% → 50%, ~6 tests)",
+        "wid": "w41"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/credentials/test_databricks_credentials_coverage.py → platforms/databricks/credentials.py (28% → 50%, ~6 tests)",
+        "wid": "w42"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 3C: TPC benchmark runners (4 files, ~22 tests)",
+        "wid": "w43"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tpcds/benchmark/test_tpcds_runner_coverage.py → core/tpcds/benchmark/runner.py (34% → 50%, ~7 tests)",
+        "wid": "w44"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tpcds/test_throughput_test_coverage.py → core/tpcds/throughput_test.py (32% → 50%, ~5 tests)",
+        "wid": "w45"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tpch/test_official_benchmark_coverage.py → core/tpch/official_benchmark.py (32% → 50%, ~4 tests)",
+        "wid": "w46"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/transaction_primitives/test_dataframe_ops_coverage.py → core/transaction_primitives/dataframe_operations.py (38% → 50%, ~6 tests)",
+        "wid": "w47"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 3D: Platform adapters (5 files, ~24 tests)",
+        "wid": "w48"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/test_motherduck_coverage.py → platforms/motherduck.py (32% → 50%, ~5 tests)",
+        "wid": "w49"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add make coverage-per-file target and document usage",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/test_influxdb_adapter_coverage.py → platforms/influxdb/adapter.py (31% → 50%, ~5 tests)",
+        "wid": "w50"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/test_clickhouse_metadata_coverage.py → platforms/clickhouse/metadata.py (31% → 50%, ~4 tests)",
+        "wid": "w51"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/aws/test_emr_serverless_coverage.py → platforms/aws/emr_serverless_adapter.py (38% → 50%, ~5 tests)",
+        "wid": "w52"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/dataframe/test_iceberg_maintenance_coverage.py → platforms/dataframe/iceberg_maintenance.py (38% → 50%, ~5 tests)",
+        "wid": "w53"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 3E: DataFrame adapters and remaining credentials (3 files, ~20 tests)",
+        "wid": "w54"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/dataframe/test_expression_family_coverage.py → platforms/dataframe/expression_family.py (35% → 50%, ~6 tests)",
+        "wid": "w55"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/dataframe/test_modin_df_coverage.py → platforms/dataframe/modin_df.py (27% → 50%, ~5 tests)",
+        "wid": "w56"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/credentials/test_redshift_coverage.py → platforms/credentials/redshift.py (24% → 50%, ~9 tests)",
+        "wid": "w57"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 4A: Largest core modules (5 files, ~40 tests)",
+        "wid": "w58"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/dataframe/test_unified_frame_coverage.py → platforms/dataframe/unified_frame.py (35% → 50%, ~10 tests)",
+        "wid": "w59"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Update pyproject coverage omit/deferred notes for temporary split",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tpch/test_dataframe_queries_coverage.py → core/tpch/dataframe_queries.py (12% → 50%, ~10 tests)",
+        "wid": "w60"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/transaction_primitives/test_generator_coverage.py → core/transaction_primitives/generator.py (11% → 50%, ~8 tests)",
+        "wid": "w61"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tpch/test_parameter_extractor_coverage.py → core/tpch/parameter_extractor.py (22% → 50%, ~6 tests)",
+        "wid": "w62"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py → core/tpchavoc/validation.py (14% → 50%, ~6 tests)",
+        "wid": "w63"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 4B: More large modules (6 files, ~35 tests)",
+        "wid": "w64"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tpch_skew/test_skew_generator_coverage.py → core/tpch_skew/generator.py (17% → 50%, ~7 tests)",
+        "wid": "w65"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tpcds/test_parameter_extractor_coverage.py → core/tpcds/parameter_extractor.py (15% → 50%, ~4 tests)",
+        "wid": "w66"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tsbs_devops/test_tsbs_df_queries_coverage.py → core/tsbs_devops/dataframe_queries/queries.py (19% → 50%, ~7 tests)",
+        "wid": "w67"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/dataframe/test_cudf_df_coverage.py → platforms/dataframe/cudf_df.py (24% → 50%, ~5 tests)",
+        "wid": "w68"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/dataframe/test_dask_df_coverage.py → platforms/dataframe/dask_df.py (20% → 50%, ~6 tests)",
+        "wid": "w69"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 2A: Trivial small modules (3 files, ~8 tests)",
+        "wid": "w7"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py → platforms/databricks/dataframe_adapter.py (18% → 50%, ~6 tests)",
+        "wid": "w70"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 5A: Zero-coverage CLI modules (2 files, ~12 tests)",
+        "wid": "w71"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/test_tuning_wizard.py → cli/tuning.py (0% → 50%, ~6 tests)",
+        "wid": "w72"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/test_onboarding_coverage.py → cli/onboarding.py (0% → 50%, ~6 tests)",
+        "wid": "w73"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 5B: Low-coverage CLI commands (6 files, ~32 tests)",
+        "wid": "w74"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/commands/test_compare_plans_coverage.py → cli/commands/compare_plans.py (8% → 50%, ~5 tests)",
+        "wid": "w75"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/commands/test_compare_dataframes_coverage.py → cli/commands/compare_dataframes.py (9% → 50%, ~5 tests)",
+        "wid": "w76"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/commands/test_df_tuning_coverage.py → cli/commands/df_tuning.py (11% → 50%, ~5 tests)",
+        "wid": "w77"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/commands/test_export_coverage.py → cli/commands/export.py (13% → 50%, ~5 tests)",
+        "wid": "w78"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/test_preferences_coverage.py → cli/preferences.py (15% → 50%, ~7 tests)",
+        "wid": "w79"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/visualization/test_visualization_exceptions.py → core/visualization/exceptions.py (33% → 50%, ~3 tests)",
+        "wid": "w8"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/commands/test_plan_history_coverage.py → cli/commands/plan_history.py (19% → 50%, ~5 tests)",
+        "wid": "w80"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 5C: Medium-coverage CLI (7 files, ~33 tests)",
+        "wid": "w81"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/commands/test_datagen_coverage.py → cli/commands/datagen.py (22% → 50%, ~5 tests)",
+        "wid": "w82"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/commands/test_show_plan_coverage.py → cli/commands/show_plan.py (24% → 50%, ~4 tests)",
+        "wid": "w83"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/commands/test_compare_coverage.py → cli/commands/compare.py (28% → 50%, ~5 tests)",
+        "wid": "w84"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/commands/test_shell_coverage.py → cli/commands/shell.py (30% → 50%, ~5 tests)",
+        "wid": "w85"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/commands/test_run_official_coverage.py → cli/commands/run_official.py (33% → 50%, ~5 tests)",
+        "wid": "w86"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/test_system_coverage.py → cli/system.py (36% → 50%, ~4 tests)",
+        "wid": "w87"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/test_composite_params_coverage.py → cli/composite_params.py (39% → 50%, ~5 tests)",
+        "wid": "w88"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Batch 5D: Near-50% CLI modules (5 files, ~21 tests)",
+        "wid": "w89"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/core/tpcds/schema/test_tpcds_schema_registry.py → core/tpcds/schema/registry.py (27% → 50%, ~3 tests)",
+        "wid": "w9"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/test_config_coverage.py → cli/config.py (41% → 50%, ~5 tests)",
+        "wid": "w90"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/test_output_coverage.py → cli/output.py (43% → 50%, ~5 tests)",
+        "wid": "w91"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/commands/test_tuning_group_coverage.py → cli/commands/tuning_group.py (40% → 50%, ~4 tests)",
+        "wid": "w92"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/commands/test_tuning_cmd_coverage.py → cli/commands/tuning.py (46% → 50%, ~2 tests)",
+        "wid": "w93"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "tests/unit/cli/presentation/test_system_presentation_coverage.py → cli/presentation/system.py (6% → 50%, ~5 tests)",
+        "wid": "w94"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Raise non-deferred TPC-DI modules under 50%: benchmark/generator/queries/loader/schema/validation/metrics/config/etl.py/etl/validation.py",
+        "wid": "w95"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Keep ETL tests unit-heavy with mocked pipeline and deterministic fixtures",
+        "wid": "w96"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Re-run full coverage report and identify any modules still below 50%",
+        "wid": "w97"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add targeted tests for remaining gaps discovered after phases 2-6",
+        "wid": "w98"
+      },
+      {
+        "evidence": null,
+        "item_id": "coverage-per-module-50-temporary-split",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Enable failing mode for coverage-per-file in local CI/test workflow",
+        "wid": "w99"
+      }
+    ]
+  }
+}

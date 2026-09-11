@@ -1,0 +1,120 @@
+{
+  "context": "Extract aggregate policy to a small script under _project/scripts or scripts/; drive matrix unit tests; keep workflow as thin wrapper. Do not change ruleset contexts.",
+  "description": "browser-gate-named-blocking-blocks-nothing closed the name/wiring honesty gap with YAML contract tests and ruleset pin. Residual (adversarial C1): the browser-required-result job’s inline shell implements fail-closed policy (explorer-changes fail, chromium fail/cancel, needed=true+skipped, needed=false+skipped, success) but is not extracted or unit-tested. A future edit that always exits 0 would keep YAML pins green while unwiring real blocking.\n\nBatch residual 2026-08-05 browser PR review Consider C1.",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805",
+        "needs_item": "browser-gate-named-blocking-blocks-nothing"
+      }
+    ],
+    "item_meta": {
+      "category": "ci-integrity",
+      "completed_at": "2026-08-12T13:06:25Z",
+      "completed_pr": 1696,
+      "created_at": "2026-08-05T23:41:09Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Firefox/WebKit must not enter the required gate needs",
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805"
+      },
+      {
+        "behavior": "Required context name Results Explorer browser gate must remain stable",
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805",
+        "kind": "do_not_modify",
+        "path_glob": "results-explorer/**"
+      },
+      {
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805",
+        "kind": "only_modify",
+        "path_glob": ".github/workflows/results-explorer-browser.yml"
+      },
+      {
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805",
+        "kind": "only_modify",
+        "path_glob": "_project/scripts/**"
+      },
+      {
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805",
+        "kind": "only_modify",
+        "path_glob": "scripts/**"
+      },
+      {
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/**"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit -q -k browser_gate_aggregate || uv run -- python -m pytest tests/unit/workflows -q -k browser",
+        "description": "A unit test covers browser gate aggregate policy",
+        "expected": null,
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805",
+        "needs_wid": "w0",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Extracted fail-closed policy to _project/scripts/browser_gate_aggregate.py with explicit evaluate_gate(changes_result, chromium_result, needed) matrix: only success/success or success/skipped+needed=false passes; unknown skipped state fails.",
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805",
+        "notes": null,
+        "started_at": "2026-08-12T12:59:44Z",
+        "started_branch": "fix/results-explorer-browser-gate-aggregate-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-browser-gate-aggregate-20260812",
+        "status": "done",
+        "summary": "Extract aggregate policy script with explicit case matrix",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Added 12-case unit matrix and unknown-needed skip negative control in tests/unit/scripts/test_browser_gate_aggregate.py; focused script test passed 12/12.",
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805",
+        "notes": null,
+        "started_at": "2026-08-12T13:02:17Z",
+        "started_branch": "fix/results-explorer-browser-gate-aggregate-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-browser-gate-aggregate-20260812",
+        "status": "done",
+        "summary": "Unit tests for fail-closed matrix",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Replaced inline browser-required-result shell case with python _project/scripts/browser_gate_aggregate.py; preserved always() job, required context name, and Firefox/WebKit exclusion from needs. Workflow browser contract tests passed 15.",
+        "item_id": "browser-gate-aggregate-script-contract-tests-20260805",
+        "notes": null,
+        "started_at": "2026-08-12T13:02:41Z",
+        "started_branch": "fix/results-explorer-browser-gate-aggregate-20260812",
+        "started_worktree": "/Users/joe/Developer/BenchBox.results-explorer-browser-gate-aggregate-20260812",
+        "status": "done",
+        "summary": "Wire workflow to call script; keep always() gate job",
+        "wid": "w2"
+      }
+    ]
+  }
+}

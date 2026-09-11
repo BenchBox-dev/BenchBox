@@ -1,0 +1,199 @@
+{
+  "context": "Each cluster gets its own commit (or small commit series). Start with\nw1 and w5 - lowest-risk, highest-density wins.\n\nw1 (_safe_metadata_collect): a trivial wrapper - the risk is only that\nsome call sites catch a *specific* exception today. Audit each try\nblock before migrating; preserve specificity where it exists.\n\nw5 (pricing dict dispatch): mirror bigquery._determine_bigquery_pricing.\nKey design choice: fall through to a DEFAULT_PRICING_PLAN entry rather\nthan returning None, to match current behavior.\n\nw2 (credential_setup_flow): design the field-schema dataclass first;\nmigrate athena first since it has the cleanest shape (already refactored\nfor C901 in commit 3288e108f). Validator stays per-platform.\n\nw3 (catalog loader): spec object per benchmark family; single loader\nparses YAML/JSON and produces SchemaCollection. Preserve per-benchmark\nquirks as spec-level flags, not branches in the loader.\n\nw4 (ServiceLimitCollector): Protocol + dispatch registry. Start with\nEC2 (most complex) to surface interface requirements, then port the\nsimpler services.\n",
+  "description": "Follow-up to quality-consolidate-duplicate-code-clusters. The C901\ncomplexity-reduction grind (quality-reduce-complexity-hotspots-to-mccabe-20)\nhas surfaced 5 additional duplicate-code clusters that are prime targets\nfor shared helpers. Consolidating them removes ~200-300 LOC, reduces\nmaintenance surface when adding new cloud adapters / benchmark families,\nand eliminates a common C901 contributor (the try/except-per-metadata-call\nshape and long if/elif commitment-plan ladders).\n\nDependency note: w1 and w5 are independent and lowest-risk - start there.\nw2 touches interactive code paths and should be done after w1 (same\nadapters). w3 and w4 are independent of the rest.\n\nClusters identified:\n\n1. Platform `get_platform_info` scaffolding\n   Files: benchbox/platforms/bigquery.py, snowflake.py, databricks/*.py,\n          redshift.py, athena.py (and clickhouse/metadata.py)\n   Pattern: Each cloud adapter repeats a try: value = fetch_metadata();\n            except Exception: value = None block per metadata call.\n   Proposed fix: Extract _safe_metadata_collect(name, fn) -> Any | None\n            in benchbox/platforms/_platform_info_utils.py.\n   Impact: ~80+ lines removed across 5+ files; side effect: reduces\n            C901 complexity on get_platform_info methods.\n\n2. setup_*_credentials interactive flows\n   Files: benchbox/platforms/credentials/athena.py, bigquery.py,\n          Azure/GCP equivalents\n   Pattern: Each repeats env-var → existing-credentials-file → keyring →\n            interactive-prompt chain + auto-detect + validate + save-next-\n            steps section.\n   Proposed fix: credential_setup_flow(platform, fields, auto_detector,\n            validator) in benchbox/platforms/credentials/_flow.py; per-\n            platform modules keep only field schema + validator.\n   Impact: dedupe the auto-detect/prompt/finalize scaffolding today's\n            athena C901 refactor surfaced (commit 3288e108f).\n\n3. Catalog-loader shape (TPC-H vs TPC-DS)\n   Files: benchbox/core/tpch/* and benchbox/core/tpcds/* -\n          _load_*_schema / _load_*_catalog pairs\n   Pattern: Same file-open → parse → validate → index shape, only\n            benchmark-specific field names differ.\n   Proposed fix: Parameterize over schema definitions; single\n            load_catalog(schema_path, spec) with per-benchmark spec object.\n   Impact: Lower maintenance cost when adding a new benchmark family\n            (e.g., TPC-DI follow-ons).\n\n4. aws_cost_limits.py per-service collectors\n   Files: benchbox/platforms/_aws/aws_cost_limits.py (or equivalent)\n   Pattern: EC2, S3, Redshift, Athena each duplicate the budget/limit\n            fetch shape (client → describe → normalize → aggregate).\n   Proposed fix: ServiceLimitCollector protocol + shared dispatch loop;\n            per-service code becomes a short callable returning\n            normalized records.\n   Impact: Adding a new AWS service ~20 lines instead of ~80.\n\n5. Pricing / commitment if/elif ladders → dict dispatch\n   Files: benchbox/platforms/bigquery.py (already refactored this session\n          via commitment_plan_map, commit 07cea9852), databricks/*.py,\n          redshift.py\n   Pattern: Long if plan == \"x\": ...; elif plan == \"y\": ... chains\n            mapping commitment/edition strings to pricing model fields.\n   Proposed fix: Module-level PRICING_PLAN_MAP: dict[str, tuple[\n            pricing_model, edition]] + single .get() lookup - mirrors\n            bigquery _determine_bigquery_pricing pattern.\n   Impact: Removes ~30-50 lines per adapter; also removes a common\n            C901 contributor.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "bundle w1 + w2 + w3 into one commit",
+        "instead": "one commit per work unit minimum",
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "why": "review needs to be bounded"
+      },
+      {
+        "dont": "change behavior during extraction",
+        "instead": "if a call site differs, preserve the difference via a helper parameter",
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "why": "this is structural dedup"
+      },
+      {
+        "dont": "collapse _safe_metadata_collect blocks that catch specific exceptions",
+        "instead": "preserve per-call exception filters",
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "why": "the specificity is intentional"
+      },
+      {
+        "dont": "introduce a shared helper without at least 3 call sites",
+        "instead": "keep duplicated code if only 2 adapters use it",
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "why": "two-site dedupe is premature abstraction"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "needs_item": "quality-consolidate-duplicate-code-clusters"
+      }
+    ],
+    "item_meta": {
+      "category": "Code Quality and Technical Debt",
+      "completed_at": "2026-04-14T00:00:00Z",
+      "created_at": "2026-04-13T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Catalog-load output shape (column names, types, row ordering) is byte-identical per benchmark",
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2"
+      },
+      {
+        "behavior": "Existing behavior when metadata fetches fail (None → surfaced as None, not raised)",
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2"
+      },
+      {
+        "behavior": "Interactive credential prompt sequence and error messages remain identical to the user",
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2"
+      },
+      {
+        "behavior": "Pricing dict-lookup must fall back to current default when plan string is unknown",
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2"
+      },
+      {
+        "behavior": "Public method signatures of get_platform_info, setup_*_credentials, catalog-loader entry points",
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "kind": "do_not_modify",
+        "path_glob": "adapter logic outside get_platform_info / setup_*_credentials"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "kind": "do_not_modify",
+        "path_glob": "benchmark runners, query generators, result schema"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "kind": "do_not_modify",
+        "path_glob": "unrelated C901 hotspots (covered by quality-reduce-complexity-hotspots)"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "kind": "only_modify",
+        "path_glob": "files listed in the 5 clusters above"
+      },
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "kind": "only_modify",
+        "path_glob": "new _platform_info_utils.py and _flow.py helper modules"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run ruff check --select=C901 benchbox/",
+        "description": "No new C901 violations",
+        "expected": "count does not increase vs baseline",
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest -m fast -q",
+        "description": "Full fast suite passes",
+        "expected": "all tests pass",
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest tests/ -k 'bigquery or snowflake or databricks or redshift or athena or clickhouse or credentials or catalog or cost_limits' -m fast -q",
+        "description": "Targeted platform tests pass",
+        "expected": "all tests pass",
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run jscpd --silent --threshold 50 --reporters console benchbox/ 2>&1 | tail -5",
+        "description": "jscpd report shows reduced duplication",
+        "expected": "duplicate-line count lower than pre-change baseline",
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "notes": "Audited per-adapter try/except blocks. Exception handlers vary significantly: different exception types (ImportError/AttributeError vs broad Exception), multi-key mutations, cursor cleanup, conditional None guards. A bare _safe_metadata_collect(fn) would be lossy. Anti-pattern rule: not worthwhile with less than 3 identical call sites. Skipping.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract _safe_metadata_collect helper in platforms/_platform_info_utils.py; migrate bigquery, snowflake, databricks, redshift, athena, clickhouse get_platform_info methods. Own commit per adapter.",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "notes": "w1 was not warranted; w2 depends on w1. Also re-audited credential flows: athena and bigquery were heavily refactored for C901 already (commits 3288e108f, c7fdf9de6). The remaining differences (field schemas, validators, auto-detect logic) are platform-specific enough that a shared scaffold would paper over meaningful distinctions. Skipping.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Extract credential_setup_flow scaffolding in platforms/credentials/_flow.py; migrate athena + bigquery + one Azure/GCP to prove the pattern. Keep per-platform field schemas and validators local.",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "notes": "Audited benchbox/core/tpch/schema.py and benchbox/core/tpcds/schema/tables.py - structurally different, no shared _load_*_schema/_load_*_catalog pattern exists. The write_primitives and ai_primitives catalog loaders do share a _load_catalog_payload() shape, but core/primitives/catalog/loader.py already provides a parameterized shared loader for that family. Skipping.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Parameterize catalog loaders; collapse TPC-H / TPC-DS _load_*_schema pairs into a single load_catalog(path, spec) function with per-benchmark spec objects.",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "notes": "No aws_cost_limits.py file exists in the codebase. The AWS platform adapters (athena_spark, emr_serverless, glue) each set billing_model as a static string - no collect/describe/aggregate loop to unify. Skipping.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define ServiceLimitCollector protocol in aws_cost_limits; migrate EC2/S3/Redshift/Athena collectors to conform. Per-service code becomes normalized-record callables.",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "quality-consolidate-duplicate-code-clusters-round-2",
+        "notes": "Audited databricks/adapter.py and redshift.py - no pricing/commitment if-elif ladders exist. Only bigquery had this pattern; it was resolved in commit 07cea9852. w5 is complete by virtue of there being nothing to do.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Convert pricing/commitment if-elif ladders in databricks + redshift to dict-dispatch tables (bigquery already done - use _determine_bigquery_pricing as reference). Own commit per adapter.",
+        "wid": "w5"
+      }
+    ]
+  }
+}

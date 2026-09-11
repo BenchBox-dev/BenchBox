@@ -1,0 +1,317 @@
+{
+  "context": "Write one DataFrame impl pair (expression_impl + pandas_impl) per query,\nfollowing the same shape as the existing aggregation_distinct /\naggregation_distinct_groupby impls. Branch on ctx-provided platform\ncapability where possible; only fall back to platform isinstance\nchecks if no clean abstraction emerges.\n\nInvestigate extending DataFrameContext with `approx_distinct(col)`\nand `approx_quantile(col, q)` helpers that each platform implements\nnatively. This keeps query bodies clean and platform-agnostic, and\ngives future approximate-aggregate queries a stable hook. If the\nabstraction doesn't fit cleanly, fall back to direct calls in the\nexpression_impl with a comment explaining the per-platform mapping.\n\nFor Pandas / Modin / cuDF, the exact-fallback is the right call —\nthere's no sketch surface to wrap. Document the asymmetry inline\nand in the cross-platform doc; do NOT silently report exact numbers\nas \"approximate\".\n\nThe SQL catalog stays put. This TODO does not introduce new query\nIDs; it just adds DataFrame impls for IDs that already exist.\n",
+  "description": "PR #112 added 5 approximate-aggregate SQL queries to `read_primitives`\n(`approx_count_distinct_simple`, `approx_count_distinct_groupby`,\n`approx_quantile_groupby`, `approx_quantiles_array`,\n`approx_top_k_lineitem`). Of those:\n\n- `approx_quantile_groupby` shipped with a DataFrame impl that uses\n  **exact** `.quantile(0.5)` — semantically wrong for an \"approximate\"\n  query on platforms where a sketch path exists (PySpark, DataFusion,\n  Dask).\n- The other 4 went straight into `SKIP_FOR_DATAFRAME` because no\n  DataFrame impl was written.\n\nCross-platform research (see context section below) shows that two of\nthe four skipped queries have **multi-platform sketch support** that we\ncan light up today — `approx_count_distinct_*` covers Polars, PySpark,\nand DataFusion natively, while Dask has a native HLL path only for the\nsingle-value distinct query. The remaining two (`approx_quantiles_array`,\n`approx_top_k_lineitem`) are essentially PySpark-only at the DataFrame\nlayer and stay deferred with explicit rationale.\n\nThis TODO is purely a DataFrame-side expansion. It does NOT change the\nSQL catalog, the runtime validator, or the write_primitives sketch ops.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "add DataFrame impls for `approx_quantiles_array` or `approx_top_k_lineitem`",
+        "instead": "keep them in SKIP_FOR_DATAFRAME with the rationale comment from w4.",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "why": "PySpark is the only platform with a native array-percentile or top-K accumulator, and emulating via a loop defeats the latency measurement"
+      },
+      {
+        "dont": "introduce platform-specific isinstance branching inside the expression_impl bodies",
+        "instead": "extend DataFrameContext with `approx_distinct` / `approx_quantile` helpers that each platform context implements with the right native fn.",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "why": "the abstraction is supposed to be platform-agnostic"
+      },
+      {
+        "dont": "modify the SQL catalog (`benchbox/core/read_primitives/catalog/queries.yaml`)",
+        "instead": "touching it conflates concerns and risks regressing the SQL parity tests.",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "why": "this TODO is DataFrame-only and the SQL catalog already has these queries"
+      },
+      {
+        "dont": "silently substitute exact `nunique()` / `quantile()` for the approximate variant where a platform has a native sketch API",
+        "instead": "use the native sketch fn explicitly, and document exact fallbacks where no matching API exists.",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "why": "the perf delta vs the exact path is the whole point of the benchmark"
+      },
+      {
+        "dont": "update SKIP_FOR_DATAFRAME assertion to expect the wrong size",
+        "instead": "the new shape is 5 entries (3 correlated + 2 PySpark-only), not 7.",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "why": "we're DROPPING 2 entries (the distinct-count pair) without adding any new ones"
+      }
+    ],
+    "deferrals": [
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "id": 543,
+        "reason": "PySpark-only native support; loop-emulation on other engines defeats the latency measurement. Re-evaluate when Polars / DataFusion ship native equivalents.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] conditional-unmet: DataFrame impls for approx_quantiles_array/approx_top_k_lineitem explicitly deferred until Polars/DataFusion ship native sketch equivalents.",
+        "summary": "DataFrame impls for approx_quantiles_array and approx_top_k_lineitem"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "id": 544,
+        "reason": "PySpark `hll_sketch_agg` / `hll_union_agg` and `approx_top_k_*` could power a DataFrame-side equivalent of the SQL sketch ops, but it would be a single-engine showcase (no cross-engine matrix). Worth a separate TODO if pursued.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Explicitly a single-engine (PySpark) showcase with no cross-engine matrix; never pursued as a separate TODO and not tracked anywhere.",
+        "summary": "PySpark sketch persistence DataFrame surface in write_primitives"
+      },
+      {
+        "created_at": "2026-07-18T19:50:10Z",
+        "from_item": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "id": 545,
+        "reason": "libcudf has TDIGEST/MERGE_TDIGEST primitives that Spark-RAPIDS uses for accelerated `percentile_approx`, but they're not exposed in `cudf.pandas`. RAPIDS ecosystem work; outside BenchBox scope unless RAPIDS exposes a public path.",
+        "resolution": "dismissed",
+        "resolved_item": null,
+        "resolved_reason": "[G4 sweep] non-actionable: Reason states this is RAPIDS/libcudf ecosystem work outside BenchBox's control, not actionable here.",
+        "summary": "Surface libcudf TDIGEST aggregation in cuDF Python API"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-02T00:00:00Z",
+      "created_at": "2026-05-02T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "All existing read_primitives DataFrame queries continue to load via REGISTRY and execute identically on Polars / PySpark / DataFusion / Pandas / Modin / cuDF / Dask.",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage"
+      },
+      {
+        "behavior": "Parametrize lists in test_read_primitives_dataframe.py picked up the 2 new approx_count_distinct_* queries.",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage"
+      },
+      {
+        "behavior": "SKIP_FOR_DATAFRAME shape assertion tests updated to match the new size (5 entries: 3 correlated subqueries + 2 PySpark-only) and exact contents.",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage"
+      },
+      {
+        "behavior": "approx_quantile_groupby DataFrame query still produces the same column shape (l_shipmode, median_quantity); only the underlying impl semantics change on platforms with sketch support.",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/benchmark.py"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/catalog/queries.yaml"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/generator.py"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/schema.py"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/read_primitives/variant_contracts.py"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/core/write_primitives/"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "kind": "only_modify",
+        "path_glob": "CHANGELOG.md"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/dataframe/context.py"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "kind": "only_modify",
+        "path_glob": "benchbox/core/read_primitives/dataframe_queries.py"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "kind": "only_modify",
+        "path_glob": "docs/benchmarks/read-primitives-approximate-functions.md"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/benchmarks/test_read_primitives_dataframe_queries.py"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "kind": "only_modify",
+        "path_glob": "tests/unit/core/read_primitives/test_read_primitives_dataframe.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python -m pytest tests/unit/read_primitives tests/unit/core/read_primitives -q -m fast",
+        "description": "All read_primitives unit tests pass with new DataFrame impls",
+        "expected": "all tests pass, no failures",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -m pytest tests/unit/benchmarks/test_read_primitives_dataframe_queries.py -q",
+        "description": "DataFrame parity / skip-list tests pass with new shape assertions",
+        "expected": "all tests pass; SKIP_FOR_DATAFRAME size = 5",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform polars --benchmark read_primitives --scale 0.01 --queries approx_count_distinct_simple,approx_count_distinct_groupby,approx_quantile_groupby",
+        "description": "Polars smoke run executes the 3 new approximate DataFrame queries (sketch where supported)",
+        "expected": "all 3 queries complete with non-null results; approx_count_distinct_* uses approx_n_unique",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform pyspark --benchmark read_primitives --scale 0.01 --queries approx_count_distinct_simple,approx_count_distinct_groupby,approx_quantile_groupby",
+        "description": "PySpark smoke run executes the 3 new approximate DataFrame queries (sketch on all 3)",
+        "expected": "all 3 queries complete; approx_count_distinct_* uses approx_count_distinct; approx_quantile_groupby uses percentile_approx",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 4,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform datafusion --benchmark read_primitives --scale 0.01 --queries approx_count_distinct_simple,approx_count_distinct_groupby,approx_quantile_groupby",
+        "description": "DataFusion smoke run executes the 3 new approximate DataFrame queries",
+        "expected": "all 3 queries complete; approx_distinct + approx_percentile_cont used",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --platform pandas --benchmark read_primitives --scale 0.01 --queries approx_count_distinct_simple,approx_count_distinct_groupby,approx_quantile_groupby",
+        "description": "Pandas smoke run with explicit exact-fallback (sanity)",
+        "expected": "all 3 queries complete via exact fallback; matches the docs note",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- benchbox run --help-topic benchmarks 2>&1 | grep -iE 'approx|approximate-functions'",
+        "description": "Help-topic still surfaces the docs reference (no regression from PR #112)",
+        "expected": "output references docs/benchmarks/read-primitives-approximate-functions.md",
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "needs_wid": "w1",
+        "wid": "w3"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "needs_wid": "w1",
+        "wid": "w4"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "needs_wid": "w3",
+        "wid": "w5"
+      },
+      {
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "needs_wid": "w4",
+        "wid": "w5"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "notes": "In `benchbox/core/read_primitives/dataframe_queries.py`:\n  - Implement and register `approx_count_distinct_simple_*_impl` and\n    `approx_count_distinct_groupby_*_impl`.\n  - expression_impl: use the platform's native sketch when available.\n    Polars: `pl.col(\"x\").approx_n_unique()`.\n    PySpark: `F.approx_count_distinct(F.col(\"x\"))`.\n    DataFusion: `from datafusion import functions as f; f.approx_distinct(col(\"x\"))`.\n  - pandas_impl: degrade to exact `.nunique()` for Pandas/Modin/cuDF\n    and for Dask groupby; use `.nunique_approx()` only for Dask's\n    single-value distinct query, where dask-expr exposes a native\n    HLL aggregate.\n  - Each impl docstring must say explicitly: \"approximate on\n    {platforms}; exact fallback on {platforms} — see\n    docs/benchmarks/read-primitives-approximate-functions.md\".\n  - Drop both query IDs from `SKIP_FOR_DATAFRAME`.\n  - Update parametrize lists in\n    `tests/unit/core/read_primitives/test_read_primitives_dataframe.py`\n    (CORE_EXPRESSION_QUERIES at minimum).\n  - Update `test_skip_for_dataframe_contains_correlated_subqueries`\n    and `test_skip_for_dataframe_has_expected_queries` and\n    `test_benchmark_get_dataframe_skip_queries_returns_list` to\n    assert the new shape (5 entries: 3 correlated + 2 PySpark-only;\n    NOT 7).\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add expression_impl + pandas_impl for approx_count_distinct_simple and approx_count_distinct_groupby",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "notes": "`approx_quantile_groupby_expression_impl` (line ~3257) currently\ncalls `.quantile(0.5)` on the column expression — exact on every\nplatform that supports it. Replace with the sketch path where\navailable:\n  - PySpark: `F.percentile_approx(F.col(\"l_quantity\"), 0.5)`\n  - DataFusion: `f.approx_percentile_cont(col(\"l_quantity\"), lit(0.5))`\n  - Polars: keep exact `.quantile(0.5)` (no sketch alternative;\n    docstring must note \"exact fallback\").\n  - Dask: exact fallback. Current dask-expr exposes Series-level\n    T-Digest quantile only with optional `crick`, and no groupby\n    quantile method matching this query shape.\n  - Pandas / Modin / cuDF: keep exact `.median()` /\n    `.quantile(0.5)` (no sketch).\nDon't introduce isinstance checks. The cleanest abstraction is\nprobably to extend DataFrameContext with `approx_quantile(col, q)`\nand `approx_distinct(col)` helpers — each platform's context picks\nthe native fn. Investigate during w2 whether that fits the existing\nDataFrameContext shape; if not, fall back to per-platform impl\nregistration.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Replace approx_quantile_groupby exact .quantile() with sketch-backed paths where supported",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "notes": "Extend `docs/benchmarks/read-primitives-approximate-functions.md`\nwith a new \"DataFrame platform coverage\" section:\n  - The same support matrix from the context_sections block above,\n    with sketch vs exact-fallback called out per cell.\n  - Per-query notes: which DataFrame engines run sketch-backed,\n    which run exact-fallback, and the resulting interpretation\n    guidance for users comparing benchmark numbers.\n  - Cross-link to the SQL section so users can correlate SQL and\n    DataFrame results for the same query ID.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document the cross-platform DataFrame support matrix in the existing read-primitives doc",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "notes": "In `benchbox/core/read_primitives/dataframe_queries.py`, expand the\n`SKIP_FOR_DATAFRAME` inline comments for these two entries to say\nexplicitly:\n  - approx_quantiles_array: \"PySpark is the only DataFrame engine\n    with a native array-returning approximate-quantile aggregate\n    (`percentile_approx(col, array(...))`); emulating via a loop\n    on other engines defeats the latency measurement.\"\n  - approx_top_k_lineitem: \"PySpark 4.1+ is the only DataFrame\n    engine with a native `approx_top_k` accumulator; Polars\n    `top_k` returns largest-by-sort-key (different semantics).\"\nAlso reflect this in the docs file from w3 so users discover the\n\"PySpark-only\" status without having to read the source.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Document why approx_quantiles_array and approx_top_k_lineitem remain in SKIP_FOR_DATAFRAME",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "read-primitives-approximate-aggregates-dataframe-coverage",
+        "notes": "Terse user-facing bullet:\n\"read_primitives DataFrame: add `approx_count_distinct_*` impls\n(sketch on Polars/PySpark/DataFusion and Dask single-value\ndistinct; exact fallback on Pandas/Modin/cuDF and Dask groupby).\n`approx_quantile_groupby` now uses sketch-backed quantile on\nPySpark/DataFusion (was exact). Cross-platform DataFrame coverage\nmatrix in docs.\"\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add changelog entry under unreleased",
+        "wid": "w5"
+      }
+    ]
+  }
+}

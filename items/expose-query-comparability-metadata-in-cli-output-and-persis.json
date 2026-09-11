@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #153 of ensure-read-primitives-variant-comparability.\nDeferred: Expose query comparability metadata in CLI output and persisted result artifacts\nReason deferred: The first implementation should fix benchmark correctness at the catalog/test layer; CLI/result-report integration can follow once the contract shape stabilizes.",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:11Z",
+      "worktree": "main"
+    }
+  }
+}

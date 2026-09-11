@@ -1,0 +1,9 @@
+{
+  "description": "Promoted from deferral #222 of open-table-format-gap-analysis.\nDeferred: Add Databricks Hudi support to BenchBox Databricks SQL adapter\nReason deferred: Databricks platform supports Hudi but the BenchBox SQL adapter has no Hudi code",
+  "legacy": {
+    "item_meta": {
+      "created_at": "2026-07-19T12:34:50Z",
+      "worktree": "main"
+    }
+  }
+}

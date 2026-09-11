@@ -1,0 +1,114 @@
+{
+  "context": "Human review of the ADR and oracle-independence tests; commit under docs/decisions/ with Accepted/Rejected status; if amended, update tests to match.",
+  "description": "docs/decisions/0001-oracle-grounding.md is Proposed and untracked. It records that behavioral oracles are hand-authored YAML (not generator-circular), that deriving oracles from verification_contract/lifecycle_disposition would be circular, and that dead checks.py helpers were replaced by codex IDENT/COMP audit paths. Joe must accept, amend, or reject before real-corpus scoring design treats it as binding.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "self-accept the ADR from an agent",
+        "instead": "require Joe status change",
+        "item_id": "memory-adr-0001-oracle-grounding-decision",
+        "why": "it reverses a human-authorized plan"
+      }
+    ],
+    "item_meta": {
+      "blocked_reason": "Batch blocker: work order explicitly requires Joe to review and record accept/amend/reject; agent must not self-accept the ADR.",
+      "category": "Architecture",
+      "created_at": "2026-08-05T22:10:17Z",
+      "worktree": "memory-evaluation"
+    },
+    "preserves": [
+      {
+        "behavior": "Executable independence tests remain green under Accepted",
+        "item_id": "memory-adr-0001-oracle-grounding-decision"
+      },
+      {
+        "behavior": "No oracle may be derived from generator-authored verification_contract or lifecycle_disposition without a new ADR",
+        "item_id": "memory-adr-0001-oracle-grounding-decision"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "Proposed ADR",
+        "decision": "extend",
+        "item_id": "memory-adr-0001-oracle-grounding-decision",
+        "path": "/Users/joe/Developer/memory-governance/docs/decisions/0001-oracle-grounding.md"
+      },
+      {
+        "concept": "Independence + circularity pins",
+        "decision": "reuse",
+        "item_id": "memory-adr-0001-oracle-grounding-decision",
+        "path": "/Users/joe/Developer/memory-governance/tests/scorers/test_oracle_independence.py"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "memory-adr-0001-oracle-grounding-decision",
+        "kind": "do_not_modify",
+        "path_glob": "evaluation_runs/behavioral/src/memory_tooling/score.py"
+      },
+      {
+        "item_id": "memory-adr-0001-oracle-grounding-decision",
+        "kind": "only_modify",
+        "path_glob": "docs/decisions/**"
+      },
+      {
+        "item_id": "memory-adr-0001-oracle-grounding-decision",
+        "kind": "only_modify",
+        "path_glob": "docs/evaluation.md"
+      },
+      {
+        "item_id": "memory-adr-0001-oracle-grounding-decision",
+        "kind": "only_modify",
+        "path_glob": "reports/**"
+      },
+      {
+        "item_id": "memory-adr-0001-oracle-grounding-decision",
+        "kind": "only_modify",
+        "path_glob": "tests/scorers/test_oracle_independence.py"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd /Users/joe/Developer/memory-governance && uv run --project evaluation_runs/behavioral -- python -m pytest tests/scorers/test_oracle_independence.py -q",
+        "description": "Oracle independence suite passes",
+        "expected": "All independence tests green",
+        "item_id": "memory-adr-0001-oracle-grounding-decision",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "memory-adr-0001-oracle-grounding-decision",
+        "needs_wid": "w0",
+        "wid": "w1"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "memory-adr-0001-oracle-grounding-decision",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Joe reviews ADR 0001 and oracle-independence tests; records accept/amend/reject",
+        "wid": "w0"
+      },
+      {
+        "evidence": null,
+        "item_id": "memory-adr-0001-oracle-grounding-decision",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Commit ADR with final status; sync any doc references",
+        "wid": "w1"
+      }
+    ]
+  }
+}

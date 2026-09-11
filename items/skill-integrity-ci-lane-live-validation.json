@@ -1,0 +1,319 @@
+{
+  "context": "Reuse the existing event-fanout metrics and write one bounded decision report. Compare against the 2026-08-14 full-code baseline and include always-on workflows in the floor. A result above five minutes triggers diagnosis, not automatic rollback. Recommend rollback only for false-negative routing, missing required integrity, invalid full-certification evidence, or persistent inability to execute the lane.",
+  "description": "After the required skill-integrity lane lands, validate it on the first three legitimate skill-only consumer PRs. Use the existing `dev_loop_pr_metrics.py` `event_fanout_v1` model and the path-decision/check artifacts. Confirm product jobs do not start, the skill job and required umbrella succeed, strict-current-base refreshes remain correctly bound, and no false skip or full-certification mislabel occurs. Report required-gate/merge-unblock wall time, all-workflow wall time, successful runner-minutes, cancelled runner-minutes, queue delay, and post-merge ci-lint cost separately. Derive a durable budget only from three distinct samples; do not label savings measured before then and do not weaken gates in this observational item.\n\nThe observation window begins with the first legitimate skill-only PR after the implementation merges. The report must contain a structured table with exactly identified `sample-1`, `sample-2`, and `sample-3` rows, each carrying a PR number plus distinct 40-character head and base SHAs. If fewer than three legitimate PRs exist after 14 calendar days, publish an interim report marked `INSUFFICIENT SAMPLE`, record the observed rows and next review date, and block this TODO with the missing sample count. Do not derive a durable budget or complete the item. Continue collection until three samples exist, unless a later explicit user decision changes the evidence requirement. If no samples exist, block it as awaiting a legitimate canary rather than creating a synthetic trigger.\n\nUse `behind-pr-occurrence-02-throughput-measurement` / PR #1756 as the immutable pre-lane baseline; do not reopen or rewrite it. Its 2026-08-14 through 2026-08-17 sample reports overall develop-merge interarrival p50 31.3 minutes and 50% of gaps below 31 minutes, before a skill lane existed. The tracker CLI currently cannot add an item dependency through `todo update`; this citation is the binding baseline and does not delay C after A.\n\nThe post-A report must stratify rather than average: full-product, skill-only, and mixed required-gate durations; overall interarrival and interarrival by merged lane; open-stale versus in-flight staleness; skill-only merges landing during an in-flight full-product gate; full-product PRs becoming BEHIND after a skill-only merge versus after another full-product merge; and, for every sampled skill merge, the lanes of other open PRs during its gate, time until their refresh, and cancelled runner-minutes attributable to that refresh. It must state whether skill merge-unblock improved while aggregate refresh churn rose.\n\nRecord refresh-shadow reason codes by lane. `prior_certification_not_full` for a skill-only parent is expected ineligibility by design, not a classifier miss; do not reinterpret 02's pre-lane 0/10 `shadow_eligible` result as post-lane failure. This item stays observational: it may provide evidence to a later activation alongside 02, but must not recommend, unblock, implement, or rewrite 07a reduced-refresh modes or 07b `merge_group` support.\n\n2026-09-07 reconciliation: #2077 evidence corrections are merged; only one legitimate sample is proven. Done units w0-w4 record an interim checkpoint, not three-sample acceptance. Pending w5-w6 now own the missing samples and final assessment. Replace manual job sums with the corrected existing collector from ci-baseline-representative-remeasure-sample. This specialized lane cannot establish completion of pr-process-low-drama-acceptance or authorize changes to required product/queue lanes.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "create a second metrics implementation or manually sum selected jobs",
+        "instead": "use `_project/scripts/dev_loop_pr_metrics.py` event_fanout_v1",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "why": "parallel metric definitions drift and mishandle reruns or cancellations"
+      },
+      {
+        "dont": "exclude cancelled synchronize attempts from the report",
+        "instead": "show cancelled consumption in its own bucket",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "why": "concurrency cancellation can make completed-run savings look better than total churn"
+      },
+      {
+        "dont": "measure only the pr.yml skill job or omit independent workflows",
+        "instead": "report required-gate, all-workflow, queue, successful, cancelled, and post-merge dimensions",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "why": "a narrow workflow-only number understates user-visible and system-wide cost"
+      },
+      {
+        "dont": "treat five minutes or ten runner-minutes as a pre-proven hard contract",
+        "instead": "derive the budget from the first three samples and use five minutes as an investigation threshold",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "why": "always-on workflow floors and clean-runner setup cost were not measured before rollout"
+      },
+      {
+        "dont": "weaken, bypass, or reroute a gate while performing validation",
+        "instead": "record the defect and create a separately reviewed implementation follow-up",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "why": "measurement does not authorize remediation or safety-policy changes"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "needs_item": "ci-baseline-representative-remeasure-sample"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "needs_item": "skill-integrity-specialized-ci-lane"
+      }
+    ],
+    "item_meta": {
+      "category": "Dev Loop",
+      "created_at": "2026-08-17T00:26:19Z",
+      "worktree": "ci-failure-reduction"
+    },
+    "preserves": [
+      {
+        "behavior": "Cancelled and incomplete runs are reported separately from successful completed runner-minutes",
+        "item_id": "skill-integrity-ci-lane-live-validation"
+      },
+      {
+        "behavior": "Existing event_fanout_v1 metric definitions and consumers remain unchanged",
+        "item_id": "skill-integrity-ci-lane-live-validation"
+      },
+      {
+        "behavior": "Interim checkpoint work does not satisfy the final three-sample completion gate.",
+        "item_id": "skill-integrity-ci-lane-live-validation"
+      },
+      {
+        "behavior": "No synthetic content change is created solely to trigger a canary",
+        "item_id": "skill-integrity-ci-lane-live-validation"
+      },
+      {
+        "behavior": "Required contexts, strict-current-base behavior, test coverage, and auto-merge policy are not modified",
+        "item_id": "skill-integrity-ci-lane-live-validation"
+      },
+      {
+        "behavior": "Savings are labeled measured only after three legitimate samples are recorded",
+        "item_id": "skill-integrity-ci-lane-live-validation"
+      }
+    ],
+    "prior_art": [
+      {
+        "concept": "full-code required-gate, all-workflow, and runner-minute baseline",
+        "decision": "extend",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "path": "_project/decisions/strict-base-refresh-ci-profile-2026-08-14.md"
+      },
+      {
+        "concept": "existing versioned event_fanout_v1 run/job correlation and cancellation accounting",
+        "decision": "reuse",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "path": "_project/scripts/dev_loop_pr_metrics.py"
+      },
+      {
+        "concept": "existing duration-budget and censoring conventions",
+        "decision": "reuse",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "path": "docs/operations/fast-lane-budget.md"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "kind": "do_not_modify",
+        "path_glob": ".github/path-filters.yml"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "kind": "do_not_modify",
+        "path_glob": ".github/workflows/**"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "kind": "do_not_modify",
+        "path_glob": "GitHub repository settings and rulesets"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "kind": "do_not_modify",
+        "path_glob": "Makefile"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "kind": "do_not_modify",
+        "path_glob": "_project/scripts/dev_loop_pr_metrics.py"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "kind": "do_not_modify",
+        "path_glob": "scripts/path_filter_decision.py"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "kind": "do_not_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "kind": "only_modify",
+        "path_glob": "_project/decisions/skill-integrity-ci-lane-validation-*.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/dev_loop_pr_metrics.py --help",
+        "description": "Existing event-fanout metrics command remains the only measurement implementation",
+        "expected": "exit 0 and event-fanout option is documented",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'sample|head SHA|base SHA|required-gate|merge-unblock|all-workflow|successful runner|cancelled runner|queue delay|post-merge|certification|false skip|budget|fallback' _project/decisions/skill-integrity-ci-lane-validation-*.md",
+        "description": "Validation report contains all required scopes and three identified samples",
+        "expected": "all required dimensions and three sample identities are present",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff --name-only origin/develop...HEAD | grep -vE '^_project/decisions/skill-integrity-ci-lane-validation-[^/]+[.]md$' | test ! -s /dev/stdin",
+        "description": "Observational item changed only its decision report",
+        "expected": "exit 0; no workflow, classifier, metric implementation, test, or product path changed",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'full-product|required-gate|skill-only|mixed|interarrival by lane|open-stale|in-flight|BEHIND|skill-only merge|full-product merge|open PR lanes|time to refresh|cancelled runner|aggregate refresh churn' _project/decisions/skill-integrity-ci-lane-validation-*.md",
+        "description": "Report stratifies gate duration, interarrival, BEHIND causes, leapfrogs, refresh delay, and cancelled work",
+        "expected": "every system-throughput dimension is present separately rather than averaged",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 5,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "rg -n 'prior_certification_not_full|expected ineligibility|0/10|pre-lane|07a|07b|observational' _project/decisions/skill-integrity-ci-lane-validation-*.md",
+        "description": "Expected non-full skill certification is separated from refresh classifier misses",
+        "expected": "skill-only prior_not_full is expected, the 02 baseline remains historical, and the report does not activate either blocked path",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 6,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "uv run -- python -c 'import pathlib,re; p=pathlib.Path(\"_project/decisions/skill-integrity-ci-lane-validation-2026-08-18.md\"); rows=[[c.strip() for c in l.split(\"|\")[1:-1]] for l in p.read_text().splitlines() if l.startswith(\"| sample-\")]; good=[r for r in rows if len(r)>=4 and re.fullmatch(r\"sample-[123]\",r[0]) and re.fullmatch(r\"#[0-9]+\",r[1]) and re.fullmatch(r\"[0-9a-f]{40}\",r[2]) and re.fullmatch(r\"[0-9a-f]{40}\",r[3])]; assert len(good)==3 and len({r[0] for r in good})==3 and len({r[1] for r in good})==3 and len({r[2] for r in good})==3, \"INSUFFICIENT SAMPLE\"'",
+        "description": "Three distinct full-SHA sample rows exist without coupling the check to incidental table width",
+        "expected": "exit 0 only for three distinct legitimate identified samples; human reviews the linked routing/run evidence",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "last_result": null,
+        "last_run": null,
+        "seq": 7,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "needs_wid": "w0",
+        "wid": "w1"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "needs_wid": "w5",
+        "wid": "w6"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "_project/decisions/skill-integrity-ci-lane-validation-2026-08-18.md; make agent-write-preflight; git diff --check; todo check-scope; rg required evidence fields",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "notes": "Exclude synthetic trigger commits. Record PR/head/base identities, exact changed paths, path-decision artifact, required checks, synchronize attempts, cancellations, merge time, and post-merge run.",
+        "started_at": "2026-08-18T00:52:21Z",
+        "started_branch": "docs/skill-integrity-ci-lane-live-validation",
+        "started_worktree": "/Users/joe/Developer/BenchBox.wt-skill-integrity-ci-lane-live-validation",
+        "status": "done",
+        "summary": "Define lane-stratified cohort, interference, staleness, refresh, and cancellation evidence",
+        "wid": "w0"
+      },
+      {
+        "evidence": "Validated PR #1996 (head 2a0a21a5, base 16f95adf): skill-integrity, certification, and ci-required-result succeeded; all 17 product jobs skipped; prior_certification_not_full recorded.",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "notes": "Confirm medium-test, correctness, plan capture, product fast tests, foreign-platform framing, and database integrations did not start. Confirm skill-integrity and ci-required-result succeeded and certification kind was not full.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Validate the first live skill-only canary routing and certification",
+        "wid": "w1"
+      },
+      {
+        "evidence": "Observed 1 sample (PR #1996) at Day 19; 14-day window elapsed; interim checkpoint published; blocked on 2 missing samples; next review 2026-09-20.",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "notes": "Use event_fanout_v1. Do not count cancelled/incomplete work as completed runner-minutes; report its bucket independently so superseded runs do not flatter savings.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Collect three distinct samples or record the 14-day insufficient-sample blocker",
+        "wid": "w2"
+      },
+      {
+        "evidence": "Interim report section System throughput stratification compares full-product baseline (02 / PR #1756) against PR #1996 and mixed cohort across required-gate, all-workflow, runner-minutes, staleness, BEHIND, time to refresh, and churn.",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "notes": "Include base guard, ruleset drift, browser umbrella, refresh shadow, auto-merge/revocation, orphan detection, and post-merge ci-lint. Separate merge-unblock from last-workflow completion.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Compare per-lane gates and interarrival against 02 without hiding full-PR starvation",
+        "wid": "w3"
+      },
+      {
+        "evidence": "Interim report published at _project/decisions/skill-integrity-ci-lane-validation-2026-08-18.md; recorded INSUFFICIENT SAMPLE, Day 19 cohort scan, PR #1996 metrics, and next review date 2026-09-20 without recommending 07a/07b.",
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "notes": "Record median and maximum values, lane failures, false skips, structural-policy fallbacks, and whether local-preflight follow-up is justified. This item cannot change workflow routing or required contexts.",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Publish observational throughput evidence without recommending or unblocking 07a or 07b",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Collect the two missing legitimate samples with complete run-attempt evidence",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "skill-integrity-ci-lane-live-validation",
+        "notes": null,
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "pending",
+        "summary": "Complete three-sample routing and interference acceptance",
+        "wid": "w6"
+      }
+    ]
+  }
+}

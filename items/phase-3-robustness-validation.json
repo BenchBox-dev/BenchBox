@@ -1,0 +1,10 @@
+{
+  "description": "Add comprehensive validation and error handling to ensure query plan data\nintegrity and robustness against malformed inputs. Implement validation at\nmultiple layers: post-parse, pre-serialization, and post-deserialization.\n\n**Problems Addressed**:\n- No validation of parsed plan tree structure (could have cycles, orphans)\n- Fingerprints become stale after tree mutations (not validated)\n- Parser errors lack context (no line numbers, sample data)\n- Malformed plans cause silent failures or cryptic errors",
+  "legacy": {
+    "item_meta": {
+      "category": "Quality & Reliability",
+      "created_at": "2026-07-18T19:50:10Z",
+      "worktree": "query-plan-remediation"
+    }
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "context": "Run the canonical dependency audit generator after the MCP SDK 2 manifest and lock changes, review the generated diff to confirm it contains only the two intended MCP constraint updates, and verify the check mode passes. This artifact must travel in the same PR as its source manifest because either half alone is mechanically invalid.",
+  "description": "The MCP SDK 2 migration changes both declared mcp constraints from mcp>=1.28.1,<2 to mcp>=2,<3. The repository's dependency-audit-raw.md is a generated manifest inventory and its drift gate fails until that artifact is regenerated atomically with the dependency change.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hand-edit the generated dependency audit",
+        "instead": "run _project/scripts/dependency_audit/parse_deps.py",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2",
+        "why": "manual edits can diverge from the canonical renderer"
+      },
+      {
+        "dont": "land the artifact separately from its source manifest",
+        "instead": "include it atomically in the MCP SDK 2 migration PR",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2",
+        "why": "one side of either PR would fail the drift guard"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2",
+        "needs_item": "mcp-sdk-v2-server-migration-v2"
+      }
+    ],
+    "item_meta": {
+      "category": "compatibility",
+      "completed_at": "2026-08-01T21:22:04Z",
+      "completed_pr": 1439,
+      "created_at": "2026-08-01T20:19:41Z",
+      "worktree": "mcp-stateless"
+    },
+    "preserves": [
+      {
+        "behavior": "No dependency declaration or lock resolution is changed by this follow-up",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2"
+      },
+      {
+        "behavior": "The artifact changes only the two MCP declarations migrated by its prerequisite",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2"
+      },
+      {
+        "behavior": "The generated audit remains a faithful rendering of pyproject.toml",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/**"
+      },
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2",
+        "kind": "do_not_modify",
+        "path_glob": "pyproject.toml"
+      },
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2",
+        "kind": "do_not_modify",
+        "path_glob": "tests/**"
+      },
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2",
+        "kind": "do_not_modify",
+        "path_glob": "uv.lock"
+      },
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2",
+        "kind": "only_modify",
+        "path_glob": "docs/development/dependency-audit-raw.md"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "uv run -- python _project/scripts/dependency_audit/parse_deps.py --check",
+        "description": "The committed dependency audit matches pyproject.toml",
+        "expected": "Fails on the unfixed tree with exit 1; after regeneration the drift check exits successfully",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "git diff -- docs/development/dependency-audit-raw.md | rg -q 'mcp>=2,<3'",
+        "description": "The generated diff is limited to the intended MCP constraints",
+        "expected": "Fails before the artifact is regenerated; afterward the audit diff records the MCP 2 range and no unrelated dependency changes",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2",
+        "needs_wid": "w1",
+        "wid": "w2"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": "Generated atomically in PR #1439 with uv run -- python _project/scripts/dependency_audit/parse_deps.py",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2",
+        "notes": null,
+        "started_at": "2026-08-01T21:21:53Z",
+        "started_branch": "feat/mcp-sdk-v2-server-migration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Regenerate dependency-audit-raw.md with the canonical parser",
+        "wid": "w1"
+      },
+      {
+        "evidence": "uv run -- python _project/scripts/dependency_audit/parse_deps.py --check passed; PR #1439 diff limited to MCP dependency rows",
+        "item_id": "mcp-sdk-v2-dependency-audit-artifact-v2",
+        "notes": null,
+        "started_at": "2026-08-01T21:21:58Z",
+        "started_branch": "feat/mcp-sdk-v2-server-migration",
+        "started_worktree": "/Users/joe/Developer/BenchBox.pool-06",
+        "status": "done",
+        "summary": "Review the generated diff and prove check mode is clean",
+        "wid": "w2"
+      }
+    ]
+  }
+}

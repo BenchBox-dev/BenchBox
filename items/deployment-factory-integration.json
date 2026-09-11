@@ -1,0 +1,16 @@
+{
+  "description": "Integrate deployment mode awareness into the adapter factory, enabling routing\nto appropriate adapters based on deployment mode (local, self-hosted, managed).\n\nThis extends the existing _normalize_platform_name() pattern that handles the\n-df suffix for DataFrame mode, adding support for :deployment suffix parsing\n(e.g., clickhouse:cloud, firebolt:core).",
+  "legacy": {
+    "item_deps": [
+      {
+        "item_id": "deployment-factory-integration",
+        "needs_item": "deployment-registry-extensions"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "created_at": "2026-01-14T00:00:00Z",
+      "worktree": "platform-expansion"
+    }
+  }
+}

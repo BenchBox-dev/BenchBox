@@ -1,0 +1,261 @@
+{
+  "description": "The Home page is the strongest expression of the intended BenchBox brand, but\nthe cross-benchmark leaderboard still has data-presentation and accessibility\nissues. The audit observed an active-looking blue ring on a `No run` cell at\nfirst render, mixed units in the same mode (`1 ms` for SSB next to TPC-H power\nscore values such as `11,636.653`), visually competing heatmap colors, blue\nlinks, green trust badges, green validation badges, and weak explanations of\nmissing runs, coverage, ranking, and speedup semantics.\n\nThis item should make the leaderboard feel like a rigorous benchmark product:\nevery cohort must clearly state metric, unit, and direction; missing data must\nbe distinct from slow data; trust and validation must be visible without\noverpowering quantitative comparison; and keyboard focus must be intentional.",
+  "legacy": {
+    "anti_patterns": [
+      {
+        "dont": "hide metric direction in title attributes only.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "make missing runs look like slow runs or zero values.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "remove keyboard grid navigation while fixing focus styling.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "why": "(unstated)"
+      },
+      {
+        "dont": "use the same green pill style for trust, validation, computed, and ranking states.",
+        "instead": "(not specified)",
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "why": "(unstated)"
+      }
+    ],
+    "item_deps": [
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "needs_item": "results-explorer-retheme-theme-system-foundation"
+      }
+    ],
+    "item_meta": {
+      "category": "Core Functionality",
+      "completed_at": "2026-05-07T00:00:00Z",
+      "created_at": "2026-05-07T00:00:00Z",
+      "worktree": "main"
+    },
+    "preserves": [
+      {
+        "behavior": "Clickable cohort headers and result receipt links.",
+        "item_id": "results-explorer-retheme-leaderboard-semantics"
+      },
+      {
+        "behavior": "Coverage policy: missing cohorts are not scored; coverage is shown separately.",
+        "item_id": "results-explorer-retheme-leaderboard-semantics"
+      },
+      {
+        "behavior": "Existing leaderboard URL mode contract (`?mode=ranks`, `?mode=speedup`) unless explicitly migrated.",
+        "item_id": "results-explorer-retheme-leaderboard-semantics"
+      },
+      {
+        "behavior": "High-contrast/reduced-color path for heatmap cells.",
+        "item_id": "results-explorer-retheme-leaderboard-semantics"
+      }
+    ],
+    "scope_rules": [
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "kind": "do_not_modify",
+        "path_glob": "benchbox/"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "kind": "do_not_modify",
+        "path_glob": "results-data/"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/e2e/routes/home.spec.ts"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/MetaLeaderboard.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TrustBadge.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/TuningBadge.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/lib/chartMath.ts"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/Home.tsx"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "kind": "only_modify",
+        "path_glob": "results-explorer/src/pages/__tests__/Home.test.tsx"
+      }
+    ],
+    "verifications": [
+      {
+        "command": "cd results-explorer && npm test -- src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/MetaLeaderboard.a11y.test.tsx",
+        "description": "MetaLeaderboard unit and accessibility tests pass",
+        "expected": "all MetaLeaderboard tests pass",
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 1,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --grep home",
+        "description": "Home page browser smoke covers all three modes",
+        "expected": "home smoke passes for times, ranks, and speedup",
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 2,
+        "workspace_fingerprint": null
+      },
+      {
+        "command": "echo 'Manual: capture /results/ at 390, 768, 1280, 1600 in times/ranks/speedup and verify focus, units, heatmap, missing runs, badges, and coverage labels'",
+        "description": "Manual visual QA across requested viewports",
+        "expected": "manual evidence captured in _project/audits/",
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "last_result": null,
+        "last_run": null,
+        "seq": 3,
+        "workspace_fingerprint": null
+      }
+    ],
+    "work_needs": [
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "needs_wid": "w1",
+        "wid": "w2"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "needs_wid": "w2",
+        "wid": "w3"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "needs_wid": "w3",
+        "wid": "w4"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "needs_wid": "w4",
+        "wid": "w5"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "needs_wid": "w5",
+        "wid": "w6"
+      },
+      {
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "needs_wid": "w6",
+        "wid": "w7"
+      }
+    ],
+    "work_units": [
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "notes": "In `MetaLeaderboard.tsx`, distinguish roving-grid internal focus position\nfrom visible keyboard focus. The first cell should not show a blue ring\nuntil the user actually keyboard-focuses the grid or selects a cell.\nPrefer `focus-visible` styling over always applying `ring-2` from\n`focusPos`.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Remove the misleading initial focus/selection ring from leaderboard cells",
+        "wid": "w1"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "notes": "Update cohort headers so visible text or compact sublabels communicate:\n  - benchmark label;\n  - scale factor;\n  - phase;\n  - metric family (`Geomean latency`, `Power score`, etc.);\n  - unit (`ms`, score, ratio);\n  - direction (`lower is faster` or `higher is better`).\n\nDo not rely on title tooltips. Tooltips are additive only.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Add metric, unit, and direction labels to each cohort header",
+        "wid": "w2"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "notes": "Replace the two adjacent segmented groups with shared primitives from the\ntheme-system TODO. Labels should explain the mode:\n  - `Times` -> native metric values;\n  - `Ranks` -> rank within each cohort;\n  - `Speedup` -> relative to cohort best.\n\nConsider grouping sort and mode under a compact toolbar with labels so\n`Avg rank over covered cohorts` does not dominate mobile.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Redesign mode and sort controls so they read as analytical controls, not generic tabs",
+        "wid": "w3"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "notes": "Define a cell layout where the value remains the primary read, heatmap\nshade is secondary, and trust/validation metadata is either compact,\nde-emphasized, or exposed in a consistent metadata row. The trust badge\nand validation badge should not both look like the same green success\nchip.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Separate quantitative heat from trust and validation metadata",
+        "wid": "w4"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "notes": "Add a compact legend that names:\n  - best/slowest or stronger/weaker shade semantics;\n  - missing run treatment;\n  - validation/trust glyph or badge meaning;\n  - whether speedup values below `1.00x` are worse.\n\nReuse the existing reduced-color/high-contrast logic and verify it still\nworks after the visual changes.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Define accessible color and legend behavior for heatmap and speedup modes",
+        "wid": "w5"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "notes": "The `Avg rank over covered cohorts` column should make clear that missing\ncohorts are not scored. The `1/4 cohorts` coverage chip should remain\nvisible but not compete with the platform name. Add copy or a legend\nexplaining `No run` vs not eligible vs filtered out.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Clarify ranking and coverage labels",
+        "wid": "w6"
+      },
+      {
+        "evidence": null,
+        "item_id": "results-explorer-retheme-leaderboard-semantics",
+        "notes": "Check 390px, 768px, 1280px, and 1600px. At mobile widths, either add a\nclear horizontal-scroll affordance or introduce compact platform cards\nthat preserve cohort comparison. Keyboard traversal must remain possible\nwithout invisible focus or focus/selection ambiguity.\n",
+        "started_at": null,
+        "started_branch": null,
+        "started_worktree": null,
+        "status": "done",
+        "summary": "Verify desktop and mobile leaderboard behavior",
+        "wid": "w7"
+      }
+    ]
+  }
+}
